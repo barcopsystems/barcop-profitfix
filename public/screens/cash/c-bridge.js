@@ -116,10 +116,8 @@ S.CashBridge = {
     return '<div class="card">' + rows + pdfTable + '</div>';
   },
 
-  // Abbreviated money for chart labels ($27,706 -> $28k).
-  _abbr(v) { const a = Math.abs(v), s = v < 0 ? '-' : ''; return a >= 1000 ? s + '$' + Math.round(a / 1000) + 'k' : s + '$' + Math.round(a); },
-
-  // ── Waterfall: the bridge as a picture, between the hero and the detail ───────
+  // ── Waterfall: the bridge as a picture, between the hero and the detail. Kept
+  //    compact and label-free (the exact numbers are in the table right below). ─
   waterfallChart(br) {
     if (!(br.profit > 0)) return '';   // a loss month has no sensible step-down
     const invChange = br.inv.change, co = br.co;
@@ -131,40 +129,38 @@ S.CashBridge = {
     if (co.tax > 0)     steps.push({ label: 'Tax', delta: -co.tax });
     if (!steps.length) return '';   // profit == kept, nothing to bridge
 
-    const bars = [{ label: 'Profit', y0: 0, y1: br.profit, kind: 'anchor', amt: br.profit }];
+    const bars = [{ label: 'Profit', y0: 0, y1: br.profit, kind: 'anchor' }];
     let cum = br.profit;
-    steps.forEach(s => { const start = cum; cum += s.delta; bars.push({ label: s.label, y0: start, y1: cum, kind: s.delta < 0 ? 'down' : 'up', amt: s.delta }); });
-    bars.push({ label: 'Kept', y0: 0, y1: br.cashKept, kind: 'anchor', amt: br.cashKept });
+    steps.forEach(s => { const start = cum; cum += s.delta; bars.push({ label: s.label, y0: start, y1: cum, kind: s.delta < 0 ? 'down' : 'up' }); });
+    bars.push({ label: 'Kept', y0: 0, y1: br.cashKept, kind: 'anchor' });
 
     const vals = bars.reduce((a, b) => a.concat([b.y0, b.y1]), [0]);
     const top = Math.max.apply(null, vals), bot = Math.min.apply(null, vals);
     const range = (top - bot) || 1;
-    const W = 720, H = 210, padT = 22, padB = 46, plotH = H - padT - padB;
-    const n = bars.length, gap = 16, bw = (W - gap * (n + 1)) / n;
+    const W = 720, H = 112, padT = 12, padB = 28, plotH = H - padT - padB;
+    const n = bars.length, slot = W / n, bw = Math.min(52, slot * 0.56);
     const yFor = v => padT + (top - v) / range * plotH;
-    const num = x => (Math.round(x * 10) / 10);
+    const num = x => Math.round(x * 10) / 10;
 
     let svg = '<line x1="0" y1="' + num(yFor(0)) + '" x2="' + W + '" y2="' + num(yFor(0)) + '" style="stroke:var(--b2)" stroke-width="1"/>';
     bars.forEach((b, i) => {
-      const x = gap + i * (bw + gap);
+      const cx = slot * (i + 0.5), x = cx - bw / 2;
       const yA = yFor(b.y0), yB = yFor(b.y1);
       const yTop = Math.min(yA, yB), h = Math.max(Math.abs(yB - yA), 2);
       const isNegAnchor = (b.kind === 'anchor' && b.y1 < 0);
       const tok = (b.kind === 'down' || isNegAnchor) ? 'var(--red)' : 'var(--green)';
       svg += '<rect x="' + num(x) + '" y="' + num(yTop) + '" width="' + num(bw) + '" height="' + num(h) + '" rx="1.5" style="fill:' + tok + '"/>';
       if (i < bars.length - 1) {
-        const ly = num(yFor(b.y1));
-        svg += '<line x1="' + num(x + bw) + '" y1="' + ly + '" x2="' + num(x + bw + gap) + '" y2="' + ly + '" style="stroke:var(--b2)" stroke-width="1" stroke-dasharray="2 2"/>';
+        const ly = num(yFor(b.y1)), nx = slot * (i + 1.5) - bw / 2;
+        svg += '<line x1="' + num(cx + bw / 2) + '" y1="' + ly + '" x2="' + num(nx) + '" y2="' + ly + '" style="stroke:var(--b2)" stroke-width="1" stroke-dasharray="2 2"/>';
       }
-      let amtStr = this._abbr(b.amt);
-      if (b.kind === 'up' && b.amt > 0) amtStr = '+' + amtStr;
-      svg += '<text x="' + num(x + bw / 2) + '" y="' + num(yTop - 6) + '" text-anchor="middle" font-size="11" font-weight="600" style="fill:' + tok + '">' + esc(amtStr) + '</text>';
-      svg += '<text x="' + num(x + bw / 2) + '" y="' + num(H - padB + 18) + '" text-anchor="middle" font-size="11" fill="currentColor">' + esc(b.label) + '</text>';
+      svg += '<text x="' + num(cx) + '" y="' + num(H - padB + 16) + '" text-anchor="middle" font-size="11" fill="currentColor">' + esc(b.label) + '</text>';
     });
     return '<div class="card" style="color:var(--t3);margin-top:16px;"><svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;font-family:\'Barlow Condensed\',sans-serif;">' + svg + '</svg></div>';
   },
 
-  // ── Trend: profit earned vs cash actually kept, last six months ───────────────
+  // ── Trend: profit earned vs cash actually kept, last six months. Thin twin
+  //    bars per month, no per-bar labels (shape is the read). ───────────────────
   trendCard() {
     const months = [];
     const now = new Date();
@@ -183,20 +179,18 @@ S.CashBridge = {
     const vals = months.reduce((a, m) => a.concat([m.profit, m.kept]), [0]);
     const top = Math.max.apply(null, vals), bot = Math.min.apply(null, vals);
     const range = (top - bot) || 1;
-    const W = 720, H = 220, padT = 22, padB = 40, plotH = H - padT - padB;
-    const n = months.length, gap = 26, gw = (W - gap * (n + 1)) / n, bw = (gw - 8) / 2;
+    const W = 720, H = 120, padT = 12, padB = 30, plotH = H - padT - padB;
+    const n = months.length, slot = W / n, bw = 20, pairGap = 7;
     const yFor = v => padT + (top - v) / range * plotH;
-    const num = x => (Math.round(x * 10) / 10);
+    const num = x => Math.round(x * 10) / 10;
     let svg = '<line x1="0" y1="' + num(yFor(0)) + '" x2="' + W + '" y2="' + num(yFor(0)) + '" style="stroke:var(--b2)" stroke-width="1"/>';
     months.forEach((m, i) => {
-      const gx = gap + i * (gw + gap);
-      [{ v: m.profit, tok: 'var(--steel)', off: 0 }, { v: m.kept, tok: m.kept < 0 ? 'var(--red)' : 'var(--green)', off: bw + 8 }].forEach(bar => {
-        const x = gx + bar.off, yv = yFor(bar.v), y0 = yFor(0);
-        const yTop = Math.min(yv, y0), h = Math.max(Math.abs(yv - y0), 2);
-        svg += '<rect x="' + num(x) + '" y="' + num(yTop) + '" width="' + num(bw) + '" height="' + num(h) + '" rx="1.5" style="fill:' + bar.tok + '"/>';
-        svg += '<text x="' + num(x + bw / 2) + '" y="' + num(yTop - 5) + '" text-anchor="middle" font-size="10" font-weight="600" style="fill:' + bar.tok + '">' + esc(this._abbr(bar.v)) + '</text>';
+      const cx = slot * (i + 0.5), left = cx - (bw * 2 + pairGap) / 2;
+      [{ v: m.profit, tok: 'var(--steel)', x: left }, { v: m.kept, tok: m.kept < 0 ? 'var(--red)' : 'var(--green)', x: left + bw + pairGap }].forEach(bar => {
+        const yv = yFor(bar.v), y0 = yFor(0), yTop = Math.min(yv, y0), h = Math.max(Math.abs(yv - y0), 2);
+        svg += '<rect x="' + num(bar.x) + '" y="' + num(yTop) + '" width="' + bw + '" height="' + num(h) + '" rx="1.5" style="fill:' + bar.tok + '"/>';
       });
-      svg += '<text x="' + num(gx + gw / 2) + '" y="' + num(H - padB + 18) + '" text-anchor="middle" font-size="11" fill="currentColor">' + esc(m.label) + '</text>';
+      svg += '<text x="' + num(cx) + '" y="' + num(H - padB + 16) + '" text-anchor="middle" font-size="11" fill="currentColor">' + esc(m.label) + '</text>';
     });
     const legend = '<div style="display:flex;gap:16px;align-items:center;margin-bottom:10px;font-size:11px;color:var(--t3);">'
       + '<span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--steel);display:inline-block;"></span>Profit earned</span>'
