@@ -2186,7 +2186,8 @@ const App = {
         drill('Audits', 'audit', null, null, IC.audit),
         drill('Events', 'events', () => App.jumpToSection('events'), 'Book The Events', IC.events),
         drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Close The Books', IC.books),
-        drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Bar Cop Settings', IC.settings, 'App Settings')
+        // App Settings is off in the live demo (same as the desktop gear, which is hidden).
+        ...(App.demoMode ? [] : [drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Bar Cop Settings', IC.settings, 'App Settings')])
       ]},
       { label: 'Control', items: [
         drill('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Close The Week', IC.inventory),
@@ -2197,9 +2198,6 @@ const App = {
         drill('Profit', 'profit', () => App.jumpToSection('profit'), 'Close The Week', IC.profit),
         drill('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Close The Week', IC.revenue),
         drill('Cash', 'cash', () => App.jumpToSection('cash'), 'Close The Week', IC.cash)
-      ]},
-      { label: 'Support', items: [
-        { label: 'Help', icon: IC.help, go: () => S2.HubHelp && S2.HubHelp.open() }
       ]}
     ]};
 
@@ -2248,9 +2246,28 @@ const App = {
     const render = () => {
       const node = stack[stack.length - 1];
       const canBack = stack.length > 1;
-      headEl.innerHTML = (canBack ? '<button class="mnav-back" type="button" aria-label="Back">‹</button>' : '<span class="mnav-back-sp"></span>')
-        + '<span class="mnav-title">' + esc(node.title) + '</span>'
-        + '<button class="mnav-x" type="button" aria-label="Close">×</button>';
+      if (canBack) {
+        headEl.innerHTML = '<button class="mnav-back" type="button" aria-label="Back">‹</button>'
+          + '<span class="mnav-title">' + esc(node.title) + '</span>'
+          + '<button class="mnav-x" type="button" aria-label="Close">×</button>';
+      } else {
+        // Root landing: the bar name (or the multi-unit switcher) sits left where the
+        // title would be, no "Bar Cop Menu" label.
+        const accts = App._acctList || [];
+        const active = accts.find(a => a.id === App._acctActiveId) || accts[0];
+        const locHtml = (active && accts.length > 1)
+          ? '<select class="at-qsel mnav-loc-sel">'
+              + accts.map(a => '<option value="' + esc(a.id) + '"' + (a.id === active.id ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('')
+              + '</select>'
+          : '<span class="mnav-barname">' + esc((active && active.name) || 'My Bar') + '</span>';
+        headEl.innerHTML = '<span class="mnav-head-loc">' + locHtml + '</span>'
+          + '<button class="mnav-x" type="button" aria-label="Close">×</button>';
+        const sel = headEl.querySelector('.mnav-loc-sel');
+        if (sel) sel.addEventListener('change', (ev) => {
+          const id = ev.target.value;
+          if (id && active && id !== active.id) fire(() => { if (window.DB && DB.setActiveAccount) DB.setActiveAccount(id); });
+        });
+      }
       headEl.querySelector('.mnav-x').addEventListener('click', close);
       const backBtn = headEl.querySelector('.mnav-back');
       if (backBtn) backBtn.addEventListener('click', () => { stack.pop(); render(); });
@@ -2261,32 +2278,9 @@ const App = {
       let started = false;
       const divider = () => { if (started) { const d = document.createElement('div'); d.className = 'mnav-divider'; bodyEl.appendChild(d); } started = true; };
       if (node.groups) {
-        // Multi-unit only: a location dropdown above the Hub link, styled like the
-        // audit intake "Select Answer" selects. Switching a unit reloads into that
-        // account.
-        const accts = App._acctList || [];
-        const active = accts.find(a => a.id === App._acctActiveId) || accts[0];
-        if (active) {
-          const loc = document.createElement('div');
-          loc.className = 'mnav-loc';
-          if (accts.length > 1) {
-            // Multi-unit: the switcher (no "Viewing" label).
-            loc.innerHTML = '<select class="at-qsel mnav-loc-sel">'
-              + accts.map(a => '<option value="' + esc(a.id) + '"' + (a.id === active.id ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('')
-              + '</select>';
-            loc.querySelector('.mnav-loc-sel').addEventListener('change', (ev) => {
-              const id = ev.target.value;
-              if (id && id !== active.id) fire(() => { if (window.DB && DB.setActiveAccount) DB.setActiveAccount(id); });
-            });
-          } else {
-            // Single location: just the bar name, same spot.
-            loc.innerHTML = '<span class="mnav-barname">' + esc(active.name || 'My Bar') + '</span>';
-          }
-          bodyEl.appendChild(loc);
-          started = true;
-        }
         // Level 1 (root): each category is a divider-separated block. Section rows
-        // drill in (with a chevron); Hub/Blueprint/Support navigate.
+        // drill in (with a chevron); Hub/Blueprint/Support navigate. The bar name /
+        // unit switcher lives in the header now (see above), not here.
         node.groups.forEach(grp => {
           const items = grp.items || [];
           if (!items.length) return;

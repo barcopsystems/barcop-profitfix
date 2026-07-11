@@ -248,6 +248,10 @@ input,select,textarea{color-scheme:dark;}
 .mnav-back,.mnav-x{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--c3);border:1px solid transparent;color:var(--t2);font-size:20px;line-height:1;cursor:pointer;border-radius:var(--r2);padding:0;}
 .mnav-back:hover,.mnav-x:hover{background:var(--c4);color:var(--w);}
 .mnav-back-sp{width:34px;flex-shrink:0;}
+/* Root landing: the bar name / unit switcher fills the header left-aligned, in
+   place of the (removed) "Bar Cop Menu" title, with the close X on the right. */
+.mnav-head-loc{flex:1;min-width:0;display:flex;align-items:center;overflow:hidden;}
+.mnav-head-loc .mnav-barname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mnav-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-top:12px;padding-bottom:28px;background:var(--surface);}
 /* Flat mobile drawer (matches the desktop flat sidebar): a flat icon list with a
    divider between groups, no accordions. Default muted, white on tap, active page
