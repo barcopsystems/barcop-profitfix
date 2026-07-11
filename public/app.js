@@ -1790,16 +1790,16 @@ const App = {
   // shell DOM is static in index.html so the relocated account-switcher nodes
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
-  _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Workflow'],['audit','Audits'],['events','Events'],['books','Books']],
+  _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Map'],['week-review','Review'],['audit','Audits'],['events','Events'],['books','Books']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'books', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'books', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -1814,10 +1814,16 @@ const App = {
       { h: 'The six section cards', p: ['One card per system: Inventory, Labor, Shift, Profit, Revenue, and Cash. Each shows that section\'s headline numbers over its weekly-close steps with a progress bar, so you see where each section stands and step into the exact work right from the Hub. The whole card is a link into that section.'] },
       { h: 'Multiple bars', p: ['Your bar name shows in the top bar. If you run more than one bar, that name becomes a switcher: pick another bar and Bar Cop reloads into it.'] }
     ] },
-    'flowmap': { title: 'How the Workflow Map Works', sections: [
-      { h: 'What this is', p: ['The Workflow map is how your whole week fits together, top to bottom. Bar Cop runs on one sitting at the end of the week: close your three Control sections, roll them up and work the money in Recovery, then chase only what the close flags. This lays the flow out so you can see where every piece sits and why.'] },
+    'flowmap': { title: 'How the Map Works', sections: [
+      { h: 'What this is', p: ['The Map is how your whole week fits together, top to bottom. Bar Cop runs on one sitting at the end of the week: close your three Control sections, roll them up and work the money in Recovery, then chase only what the close flags. This lays the flow out so you can see where every piece sits and why.'] },
       { h: 'The four stages', p: ['1. Close your Control sections: Inventory, Labor, Shift. 2. Work the money in Recovery: Profit, Revenue, Cash, each starting with Confirm the Week. 3. As needed: the jobs you open only when the close flags them, never on a schedule. 4. Where it lands: the Hub, Books, and your Bar Cop Audit score. Events feeds the week on its own clock.'] },
       { h: 'Reading a node', p: ['Tap any section or step and the panel tells you what it is, why it sits where it does, and what it hands off, in plain terms. The stage number turns green to mark where you last looked. Open takes you straight to the page that does that work. The plumbing, which number feeds which, lives in each section\'s Help under Connections; this is the flow of the work, not the data.'] }
+    ] },
+    'week-review': { title: 'How Week in Review Works', sections: [
+      { h: 'What this is', p: ['The accountability side of your weekly close. For any week it reads what your team actually did in each section, whether the close got finished, what it turned up, and what is carrying into next week, so you see in one place where the crew is on it and where things slid.'] },
+      { h: 'Pick a week', p: ['The arrows step back through your weeks; NOW marks the current one. Everything reads from your real logs and the steps you marked done, nothing projected.'] },
+      { h: 'Read a section', p: ['Done This Week is the raw activity that got logged, counts, deliveries, hours, tips, sales days, plus the Recovery work: audits run, sales reviews, discrepancies filed, investigations opened, and experiments running. The Weekly Close shows which sign-off steps got finished and which are still open. What It Turned Up is the result, and Carrying Into Next Week is the open items to clear.'] },
+      { h: 'Why some numbers read a dash', p: ['The Recovery sections (Profit, Revenue, Cash) only produce cost and margin numbers once you Confirm the Week. Until you do, the cost cells read a dash and the Weekly Close shows a red X on "Confirmed the week." That dash and that X are the signal to go confirm it, not a made-up number. This is on purpose.'] }
     ] },
     'bar-cop-audit': { title: 'How the Bar Cop Audit Works', sections: [
       { h: 'What this is', p: [
@@ -1951,6 +1957,7 @@ const App = {
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
+    if (g === 'week-review') return (window.S && S.WeekReview) ? S.WeekReview.open() : null;
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
     if (g === 'books') return (window.S && S.HubBooksHome)   ? S.HubBooksHome.open()   : null;
     if (g === 'events') return this.jumpToSection('events');
@@ -2165,7 +2172,8 @@ const App = {
     const root = { title: 'Bar Cop Menu', groups: [
       { label: 'Go to', items: [
         { label: 'Hub', icon: IC.hub, go: () => App.showHub() },
-        { label: 'Workflow', icon: IC.blueprint, go: () => S2.FlowMap && S2.FlowMap.open() },
+        { label: 'Map', icon: IC.blueprint, go: () => S2.FlowMap && S2.FlowMap.open() },
+        { label: 'Review', icon: IC.audit, go: () => S2.WeekReview && S2.WeekReview.open() },
         drill('Audits', 'audit', null, null, IC.audit),
         drill('Events', 'events', () => App.jumpToSection('events'), 'Book The Events', IC.events),
         drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Close The Books', IC.books),
