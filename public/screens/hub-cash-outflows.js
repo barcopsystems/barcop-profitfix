@@ -60,7 +60,6 @@ S.HubCashOutflows = {
   draw() {
     const b = this.periodBounds();
     this.container.innerHTML = '<div class="screen">'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.7;max-width:760px;margin-bottom:4px;">Log the money that leaves the bank but never hits your P&L as a cost: owner draws, loan principal, capital buys, and tax you remit. Bar Cop reads these into the Cash Bridge and Survival Forecast. Rent, utilities, and other operating bills go in Operating Expenses.</div>'
       + this.addCard()
       + this.recurringSection()
       + this.loggedSection(b)
@@ -112,7 +111,12 @@ S.HubCashOutflows = {
             + '</tr>';
         }).join('')
       : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No recurring outflows. Check Recurring monthly when you log a draw or loan that repeats.</td></tr>';
-    return '<div class="sh" style="margin:24px 0 10px;">Recurring Outflows</div>'
+    const chip = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-period" data-p="' + k + '" style="' + this.onSel(this._period === k) + '">' + label + '</button>';
+    const controlRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + this.PERIODS.map(chip).join('') + '</div>'
+      + '<button class="btn btn-ghost btn-sm no-print" id="cb-export">Export PDF</button>'
+      + '</div>';
+    return controlRow
       + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="width:100%;">'
       + '<thead><tr><th>Type</th><th>Note</th><th>Status</th><th>Amount</th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>';
@@ -131,12 +135,7 @@ S.HubCashOutflows = {
           + '<td class="no-print" style="text-align:right;white-space:nowrap;"><button class="btn btn-ghost btn-sm cb-repeat" data-id="' + esc(o.id) + '">Repeat</button> <button class="btn btn-ghost btn-sm cb-edit" data-id="' + esc(o.id) + '">Edit</button> <button class="btn btn-danger btn-sm cb-del" data-id="' + esc(o.id) + '">Delete</button></td>'
           + '</tr>').join('')
       : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No one-time outflows logged for ' + esc(b.label) + '.</td></tr>';
-    const chip = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-period" data-p="' + k + '" style="' + this.onSel(this._period === k) + '">' + label + '</button>';
-    const headRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">Logged Outflows</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' + this.PERIODS.map(chip).join('') + '<button class="btn btn-ghost btn-sm no-print" id="cb-export">Export PDF</button></div>'
-      + '</div>';
-    return headRow
+    return '<div class="sh" style="margin:24px 0 10px;">Logged Outflows</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="width:100%;">'
       + '<thead><tr><th>Date</th><th>Type</th><th>Note</th><th>Amount</th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>';

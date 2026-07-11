@@ -70,15 +70,15 @@ S.Hub = {
     return ''
       + '<div class="nav-section"></div>'
       + row('breakeven', 'Break-Even', 'breakeven')
+      + '<div class="nav-section">Operations</div>'
+      + row('cash-outflows', 'Cash Outflows', 'cashout')
+      + row('operating-expenses', 'Operating Expenses', 'expense')
+      + row('expense-history', 'Expense History', 'history')
+      + row('permits', 'Licensing', 'shield')
       + '<div class="nav-section">Accounting</div>'
       + row('weekly-pnl', 'Weekly P&L Brief', 'report')
       + row('books', 'Month-End Books', 'books')
       + row('year-end', 'Annual Review', 'calendar')
-      + '<div class="nav-section">Operations</div>'
-      + row('permits', 'Permits and Licenses', 'shield')
-      + row('operating-expenses', 'Operating Expenses', 'expense')
-      + row('cash-outflows', 'Cash Outflows', 'cashout')
-      + row('expense-history', 'Expense History', 'history')
       + '<div class="nav-section">Support</div>'
       + row('books-help', 'Help and FAQ', 'help')
       + row('report-bug', 'Report a Bug', 'bug');

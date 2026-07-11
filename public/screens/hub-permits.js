@@ -50,7 +50,7 @@ S.HubPermits = {
 
   // ── Entry ───────────────────────────────────────────────────────────────
   open() {
-    App.openHubFullPage('Permits and Licenses', (mount) => {
+    App.openHubFullPage('Licensing', (mount) => {
       this.container = mount;
       this.renderMain();
     }, 'permits');
@@ -281,7 +281,7 @@ S.HubPermits = {
 
     region.querySelector('#hp-export')?.addEventListener('click', () => {
       const el = document.getElementById('hp-list');
-      if (el) App.exportPDF({ title: 'Permits and Licenses', root: el });
+      if (el) App.exportPDF({ title: 'Licensing', root: el });
     });
     region.querySelectorAll('.fc-chip').forEach(chip => {
       chip.addEventListener('click', () => { this._filter = chip.dataset.v; this._renderListRegion(); });
@@ -307,7 +307,7 @@ S.HubPermits = {
   async _saveAdd() {
     const g = (id) => document.getElementById(id);
     const name         = (g('hpa-name')?.value || '').trim();
-    const type         = g('hpa-type')?.value || 'Other';
+    const type         = g('hpa-type')?.value || '';
     const recurrence   = g('hpa-recurrence')?.value || 'Annual';
     const renewal_date = g('hpa-renewal')?.value || '';
     const last_renewed = g('hpa-last')?.value || '';
@@ -316,6 +316,7 @@ S.HubPermits = {
     const notes        = (g('hpa-notes')?.value || '').trim();
     const showErr = (m) => { const e = g('hpa-err'); if (e) { e.textContent = m; e.style.display = 'block'; } };
     if (!name) { showErr('Give the permit a name.'); return; }
+    if (!type) { showErr('Pick a type.'); return; }
     if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
     this.records().push({
       id: App.uid ? App.uid() : ('prm-' + Date.now()),
@@ -373,7 +374,7 @@ S.HubPermits = {
     if (isEdit) document.getElementById('hp-modal-del')?.addEventListener('click', async () => { App.closeModal(id); await this._delete(rec.id); });
     document.getElementById('hp-save')?.addEventListener('click', async () => {
       const name         = (document.getElementById('hp-f-name')?.value || '').trim();
-      const type         = document.getElementById('hp-f-type')?.value || 'Other';
+      const type         = document.getElementById('hp-f-type')?.value || '';
       const renewal_date = document.getElementById('hp-f-renewal')?.value || '';
       const recurrence   = document.getElementById('hp-f-recurrence')?.value || 'Annual';
       const costRaw      = document.getElementById('hp-f-cost')?.value;
@@ -381,6 +382,7 @@ S.HubPermits = {
       const last_renewed = document.getElementById('hp-f-last')?.value || '';
       const notes        = (document.getElementById('hp-f-notes')?.value || '').trim();
       if (!name) { showErr('Give the permit a name.'); return; }
+      if (!type) { showErr('Pick a type.'); return; }
       if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
       const arr = this.records();
       if (isEdit) {
@@ -450,7 +452,7 @@ S.HubPermits = {
           category:   'Licenses and Permits',
           vendor:     rec.type || '',
           amount:     cost,
-          notes:      'From Permits Log: ' + (rec.name || 'permit') + ' renewal',
+          notes:      'From Licensing: ' + (rec.name || 'permit') + ' renewal',
           created_at: new Date().toISOString()
         });
         await App.saveKey('operating_expenses');

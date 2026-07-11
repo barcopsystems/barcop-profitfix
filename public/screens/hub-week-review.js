@@ -56,8 +56,8 @@ S.WeekReview = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:4px;">' + label + '</div></div>';
   },
   _actRow(items) {
-    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 22px;"></div>';
-    return '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + items.join(vdiv) + '</div>';
+    const vdiv = '<div class="wr-vdiv" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 22px;"></div>';
+    return '<div class="wr-statrow" style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + items.join(vdiv) + '</div>';
   },
   _res(label, val, col) {
     return '<div style="min-width:0;">'
@@ -65,8 +65,8 @@ S.WeekReview = {
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
   },
   _resRow(items) {
-    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 24px;"></div>';
-    return '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + items.join(vdiv) + '</div>';
+    const vdiv = '<div class="wr-vdiv" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 24px;"></div>';
+    return '<div class="wr-statrow" style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + items.join(vdiv) + '</div>';
   },
   _openItem(text, sev) {
     const col = sev === 'red' ? 'var(--red)' : 'var(--amber)';
@@ -134,7 +134,7 @@ S.WeekReview = {
     const stat = (label, val) => '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:600;line-height:0.9;color:var(--w);">' + val + '</div></div>';
-    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 34px;"></div>';
+    const vdiv = '<div class="wr-vdiv" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 34px;"></div>';
     const stats = [
       stat('Net Sales', m.netSales != null ? App.fmtCurrency(m.netSales, 0) : '-'),
       stat('Prime Cost', pct(m.prime)),
@@ -145,7 +145,7 @@ S.WeekReview = {
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Week In Review</div>'
       +   '<button class="btn btn-ghost btn-sm no-print" id="wr-brief" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>'
       + '</div>'
-      + '<div style="padding:20px 22px;display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + stats + '</div></div>';
+      + '<div class="wr-statrow" style="padding:20px 22px;display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + stats + '</div></div>';
   },
 
   // ── Inventory ───────────────────────────────────────────────────────────────
@@ -518,7 +518,6 @@ S.WeekReview = {
 
     const dat = App.data || {};
     const auditsWk  = (dat.cash_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
-    const outflowWk = (dat.cash_outflows || []).filter(o => this._inWeek(o.date || o.created_at)).length;
     const expActive = (dat.cash_initiatives || []).filter(e => e.status === 'Active').length;
 
     const STEPS = [
@@ -531,7 +530,7 @@ S.WeekReview = {
     const runwayLabel = r => r == null ? '13+ wks' : r === 0 ? 'This wk' : r + ' wk' + (r === 1 ? '' : 's');
 
     const activity = this._actRow([
-      this._act(auditsWk, 'Audits Run'), this._act(outflowWk, 'Outflows Logged'), this._act(expActive, 'Experiments')
+      this._act(auditsWk, 'Audits Run'), this._act(expActive, 'Experiments')
     ]);
     const results = this._resRow([
       this._res('Trapped Cash', trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-', (trapped.hasData && trapped.total > 0) ? 'var(--amber)' : 'var(--t1)'),
@@ -548,7 +547,7 @@ S.WeekReview = {
     if (!done.audit) open.push({ t: 'Cash audit not run this week', sev: 'amber' });
 
     (this._pdf || (this._pdf = [])).push({ name: 'Cash', status: this._statusPlain(doneCount, STEPS.length),
-      activity: 'Audits Run ' + auditsWk + ', Outflows Logged ' + outflowWk + ', Experiments ' + expActive,
+      activity: 'Audits Run ' + auditsWk + ', Experiments ' + expActive,
       close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
       results: 'Current position: Trapped Cash ' + (trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-') + ', Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-') + ', Safe to Spend ' + (pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-') + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtCurrency(sf.lowPoint.balance, 0) : '-'),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
@@ -630,6 +629,7 @@ S.WeekReview = {
 
     const opex = (App.data && App.data.operating_expenses) || [];
     const billsWk = opex.filter(r => r && this._inWeek(r.date)).length;
+    const outflowWk = ((App.data && App.data.cash_outflows) || []).filter(o => this._inWeek(o.date || o.created_at)).length;
     const billsMonth = opex.filter(r => r && String(r.date || '').slice(0, 7) === st.curKey).length;
     const rawRun = key => { try { return localStorage.getItem(key); } catch (e) { return null; } };
     const pnlRun = rawRun('books_report_run_weeklypnl');
@@ -644,7 +644,7 @@ S.WeekReview = {
     ];
 
     const activity = this._actRow([
-      this._act(billsWk, 'Bills Logged'), this._act(reportsWk, 'Reports Run')
+      this._act(billsWk, 'Bills Logged'), this._act(outflowWk, 'Outflows Logged'), this._act(reportsWk, 'Reports Run')
     ]);
     const results = this._resRow([
       this._res('Op Income YTD', BH._money(st.ytdInc), st.ytdInc < 0 ? 'var(--red)' : 'var(--t1)'),
@@ -659,7 +659,7 @@ S.WeekReview = {
     if (st.dueCount > 0) open.push({ t: '<b>' + st.dueCount + '</b> permit/license item' + (st.dueCount === 1 ? '' : 's') + ' need attention', sev: st.expiredCt > 0 ? 'red' : 'amber' });
 
     (this._pdf || (this._pdf = [])).push({ name: 'Books', status: this._statusPlain(doneCount, STEPS.length),
-      activity: 'Bills Logged ' + billsWk + ', Reports Run ' + reportsWk,
+      activity: 'Bills Logged ' + billsWk + ', Outflows Logged ' + outflowWk + ', Reports Run ' + reportsWk,
       close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
       results: 'Op Income YTD ' + BH._money(st.ytdInc) + ', Margin ' + BH._pct(st.ytdMargin) + ', Month Revenue ' + BH._money(st.cmRev) + ', Month Income ' + BH._money(st.mInc),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing to close' });
