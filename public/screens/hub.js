@@ -430,11 +430,11 @@ S.Hub = {
                   : App.fmtCurrency(Math.abs(beSum.delta), 0) + ' short last week');
     const tiles =
         '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      + '<div class="hub-wys-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--b2);">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Where You Stand</div>'
       +   '<div id="hub-briefing-slot" style="flex-shrink:0;"></div>'
       + '</div>'
-      + '<div style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;padding:18px 22px;">'
+      + '<div class="hub-wys-body" style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;">'
       + heroTile('dashboard', "S.Hub._enter('dashboard','profit')", 'Open Profit Close The Week', 'Total Opportunity',
              anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--w)' : 'var(--t4)',
