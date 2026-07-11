@@ -507,7 +507,7 @@ S.EventsBookings = {
       if (rcs.length && rcs.length <= 6) {
         rcPicker = '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + rcs.map(r =>
           '<button type="button" class="eb-rc-pill" data-rc="' + esc(r.id) + '" style="padding:8px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;'
-          + (b.rate_card_id === r.id ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);' : 'background:var(--gold-tint);border:1px solid var(--b1);color:var(--t2);')
+          + (b.rate_card_id === r.id ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);' : 'background:var(--gold-tint);border:1px solid var(--b2);color:var(--t2);')
           + '">' + esc(r.package_name || '') + (r.per_head ? ' &middot; ' + App.fmtCurrency(r.per_head) + '/head' : '') + '</button>').join('') + '</div>';
       } else if (rcs.length) {
         rcPicker = '<select id="eb-q-rc" class="form-input" style="max-width:300px;"><option value="">Pick a package (optional)</option>' + rcs.map(r => '<option value="' + esc(r.id) + '"' + (b.rate_card_id === r.id ? ' selected' : '') + '>' + esc(r.package_name || '') + '</option>').join('') + '</select>';
