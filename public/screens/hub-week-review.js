@@ -107,7 +107,7 @@ S.WeekReview = {
       + '<button class="btn btn-ghost btn-sm no-print" onclick="' + oc + '">Open ' + esc(name) + '</button></div>';
     // flex column + a growing body wrapper pins the Open link to the card bottom,
     // so both cards in a grid row read the same height no matter what is in them.
-    return '<div class="card" style="padding:0;overflow:hidden;margin:0;display:flex;flex-direction:column;">'
+    return '<div class="card" style="padding:0 !important;overflow:hidden;margin:0;display:flex;flex-direction:column;">'
       + header + '<div style="flex:1 1 auto;">' + body + '</div>' + footer + '</div>';
   },
 
@@ -140,7 +140,7 @@ S.WeekReview = {
       stat('Prime Cost', pct(m.prime)),
       stat('Labor', pct(m.laborPct))
     ].join(vdiv);
-    return '<div class="card" style="margin-bottom:16px;overflow:hidden;padding:0;">'
+    return '<div class="card" style="margin-bottom:16px;overflow:hidden;padding:0 !important;">'
       + '<div class="wr-tophead" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Week In Review</div>'
       +   '<button class="btn btn-ghost btn-sm no-print" id="wr-brief" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>'
