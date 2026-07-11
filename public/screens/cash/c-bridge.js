@@ -15,7 +15,7 @@ S.CashBridge = {
 
   showHowTo() {
     App.showHelpModal('How the Cash Bridge Works', [
-      { p: ['The question that haunts a profitable operator: I made money on paper, so why is the account always tight? This is the answer. Profit is not cash. The bridge takes your profit for a period and shows every place the money went instead of into the bank.'] },
+      { p: ['The question that haunts a profitable operator: I made money on paper, so why is the account always tight? This is the answer. Profit is not cash. Pick a period with the chips and the bridge takes your profit for that stretch and shows every place the money went instead of into the bank.'] },
       { h: 'Where Profit Goes', p: ['Four things eat profit without showing up as a cost. Money goes into more inventory when you buy more than you use. Owner draws come straight out of cash. Loan principal is a payment, not an expense. Capital buys are paid in cash but written off slowly. Add the tax you remit and you have the whole gap.'] },
       { h: 'Where The Outflows Come From', p: ['You log the draws, loan payments, capital buys, and tax remittances in Books under Cash Outflows. This page reads them back. Recurring ones carry forward every month until you stop them. Operating bills like rent and utilities are not outflows here, those live in Operating Expenses.'] },
       { h: 'Cash You Kept', p: ['Profit, minus what went into inventory, draws, loans, capital, and tax, is the cash that actually stayed. When that number is far below your profit, this screen tells you exactly which line to work on.'] }
@@ -46,16 +46,15 @@ S.CashBridge = {
     const b = this.periodBounds();
     const br = CashEngine.bridge(b.s, b.e);
     const chip = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-period" data-p="' + k + '" style="' + this.onSel(this._period === k) + '">' + label + '</button>';
-    const periodRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:28px 0 16px;">'
+    const controlRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + this.PERIODS.map(chip).join('') + '</div>'
       + '<button class="btn btn-ghost btn-sm no-print" id="cb-export">Export PDF</button>'
       + '</div>';
 
     this.container.innerHTML = '<div class="screen">'
-      + periodRow
       + (br.hasData
-          ? this.headline(br, b) + '<div class="sh" style="margin:24px 0 10px;">Where Your Profit Went</div>' + this.waterfall(br)
-          : '<div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">The bridge reads your profit off your weekly numbers. Once you have weeks confirmed in This Week for ' + esc(b.label) + ', it fills in here.</div></div>')
+          ? this.headline(br, b) + controlRow + this.waterfall(br)
+          : controlRow + '<div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">The bridge reads your profit off your weekly numbers. Once you have weeks confirmed in This Week for ' + esc(b.label) + ', it fills in here.</div></div>')
       + '<div class="no-print" style="font-size:11px;color:var(--t3);margin-top:16px;">Log draws, loan payments, capital buys, and tax in Books under Cash Outflows. This page reads them back as the bridge.</div>'
       + '</div>';
     this.wire();
