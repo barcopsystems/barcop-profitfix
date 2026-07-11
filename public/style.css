@@ -895,16 +895,17 @@ body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
 .wr-block{padding:15px 20px;}
 .wr-foot{padding:14px 20px;}
 .wr-idiv{height:1px;background:var(--b2);margin:0 20px;}
-/* On mobile the WR page tightens to the app's phone padding, the stat rows drop
-   their vertical dividers (like the Hub Where You Stand card) and gap the tiles
-   instead, the card blocks tighten their side padding, and the block dividers go
-   full bleed to match the full-bleed section header. */
+/* On mobile the WR page tightens to the app's phone padding and the stat rows
+   drop their vertical dividers (like the Hub Where You Stand card). The section
+   header keeps its full-bleed divider (border-bottom on a full-width header, only
+   the text is inset); the text content AND the section dividers sit flush at 15px,
+   so the header divider is the only full-bleed line. */
 @media (max-width:768px){
   .wr-screen{padding:16px 14px 40px;}
   .wr-vdiv{display:none;}
   .wr-statrow{column-gap:22px;}
-  .wr-tophead,.wr-topstats,.wr-head,.wr-block,.wr-foot{padding-left:14px;padding-right:14px;}
-  .wr-idiv{margin:0;}
+  .wr-tophead,.wr-topstats,.wr-head,.wr-block,.wr-foot{padding-left:15px;padding-right:15px;}
+  .wr-idiv{margin-left:15px;margin-right:15px;}
 }
 body.chrome-on .hub-app .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
 body.chrome-on .hub-app .nav-section:first-child{padding-top:6px;}
