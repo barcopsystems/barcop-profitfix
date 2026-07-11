@@ -105,7 +105,10 @@ S.WeekReview = {
     const body = blocks.map(b => '<div style="padding:15px 20px;">' + this._eyebrow(b.label) + b.html + '</div>').join(idiv);
     const footer = idiv + '<div style="padding:14px 20px;">'
       + '<button class="btn btn-ghost btn-sm no-print" onclick="' + oc + '">Open ' + esc(name) + '</button></div>';
-    return '<div class="card" style="padding:0;overflow:hidden;margin:0;">' + header + body + footer + '</div>';
+    // flex column + a growing body wrapper pins the Open link to the card bottom,
+    // so both cards in a grid row read the same height no matter what is in them.
+    return '<div class="card" style="padding:0;overflow:hidden;margin:0;display:flex;flex-direction:column;">'
+      + header + '<div style="flex:1 1 auto;">' + body + '</div>' + footer + '</div>';
   },
 
   // ── The week's money headline (from the confirmed week, matched by Sunday) ───
@@ -189,6 +192,11 @@ S.WeekReview = {
     if (st.parOff > 0) open.push({ t: '<b>' + st.parOff + '</b> par' + (st.parOff === 1 ? '' : 's') + ' off versus real usage', sev: 'amber' });
     if (st.menuOver > 0) open.push({ t: '<b>' + st.menuOver + '</b> menu item' + (st.menuOver === 1 ? '' : 's') + ' over cost target', sev: 'amber' });
 
+    (this._pdf || (this._pdf = [])).push({ name: 'Inventory', status: this._statusPlain(doneCount, STEPS.length),
+      activity: 'Counts ' + wkCounts + ', Deliveries ' + wkDeliv + ', Orders ' + wkOrders + ', Spot Checks ' + wkSpot + ', Adjustments ' + wkAdj + ', Transfers ' + wkTransfer,
+      close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
+      results: 'Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Shrinkage 30d ' + App.fmtCurrency(st.shrink, 0) + ', Dead Stock ' + st.deadAll + ', Over Target ' + st.menuOver,
+      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Inventory', 'ic-dashboard', 'inventory', this._statusText(doneCount, STEPS.length), [
       { label: 'Done This Week', html: activity },
       { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
@@ -264,6 +272,11 @@ S.WeekReview = {
     if (expired > 0) open.push({ t: '<b>' + expired + '</b> certification' + (expired === 1 ? '' : 's') + ' expired', sev: 'red' });
     if (expiring > 0) open.push({ t: '<b>' + expiring + '</b> certification' + (expiring === 1 ? '' : 's') + ' expiring within 30 days', sev: 'amber' });
 
+    (this._pdf || (this._pdf = [])).push({ name: 'Labor', status: this._statusPlain(doneCount, STEPS.length),
+      activity: 'Hours ' + (wkHours ? wkHours.toFixed(1) : 0) + ', Tip Entries ' + tipN + ', Call-Outs ' + calloutN + ', Time-Off ' + toPending,
+      close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
+      results: 'Labor Cost ' + App.fmtCurrency(wkCost, 0) + ', Labor % ' + (laborPct != null ? laborPct.toFixed(1) + '%' : '-') + ', Hours ' + wkHours.toFixed(1) + ', RPLH ' + (rplh != null ? App.fmtCurrency(rplh) : '-') + ', OT Risk ' + otRisk,
+      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Labor', 'lc-dashboard', 'labor', this._statusText(doneCount, STEPS.length), [
       { label: 'Done This Week', html: activity },
       { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
@@ -327,6 +340,11 @@ S.WeekReview = {
     if (!done.cash && reconN === 0) open.push({ t: 'Cash not reconciled this week', sev: 'amber' });
     if (walkedN > 0) open.push({ t: '<b>' + walkedN + '</b> walked tab' + (walkedN === 1 ? '' : 's') + ' this week', sev: 'amber' });
 
+    (this._pdf || (this._pdf = [])).push({ name: 'Shift', status: this._statusPlain(doneCount, STEPS.length),
+      activity: 'Days ' + days + ', Reconciles ' + reconN + ', Voids/Comps ' + vcN + ', Waste ' + wasteN + ', Walked Tabs ' + walkedN,
+      close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
+      results: 'Net Sales ' + App.fmtCurrency(rev, 0) + ', Covers ' + covers + ', Check Avg ' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + ', Over/Short ' + (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar, 0) + ', Voids+Comps ' + App.fmtCurrency(voidTot + compTot, 0),
+      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Shift', 'sc-dashboard', 'shift', this._statusText(doneCount, STEPS.length), [
       { label: 'Done This Week', html: activity },
       { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
@@ -395,6 +413,12 @@ S.WeekReview = {
     if (!done.leaks && topLeak && topLeak.dollars > 0) open.push({ t: 'Biggest leak not worked: <b>' + App.fmtCurrency(topLeak.dollars, 0) + '</b>/yr on ' + esc(topLeak.name), sev: 'red' });
     if (!done.audit || (auditState && auditState.due)) open.push({ t: (auditState && auditState.latest) ? ('Profit audit is ' + (auditState.daysSince != null ? auditState.daysSince + ' days old' : 'stale') + ', run a fresh one') : 'No Profit audit run yet', sev: 'amber' });
 
+    const pcv = i => (costRows && costRows[i] && costRows[i].val != null) ? (costRows[i].val.toFixed(1) + '%') : '-';
+    (this._pdf || (this._pdf = [])).push({ name: 'Profit', status: this._statusPlain(doneCount, STEPS.length),
+      activity: 'Audits Run ' + auditsWk + ', Sales Reviews ' + reviewsWk + ', Discrepancies ' + discWk + ', Investigations ' + investWk + ', Experiments ' + expActive,
+      close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
+      results: 'Bar Pour ' + pcv(0) + ', Food ' + pcv(1) + ', Prime ' + pcv(2) + ', Recoverable/yr ' + (recoverable > 0 ? App.fmtCurrency(recoverable, 0) : '-'),
+      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Profit', 'dashboard', 'profit', this._statusText(doneCount, STEPS.length), [
       { label: 'Done This Week', html: activity },
       { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
@@ -459,6 +483,11 @@ S.WeekReview = {
     if (!done.leaks && topLeak && topLeak.dollars > 0) open.push({ t: 'Biggest leak not worked: <b>' + App.fmtCurrency(topLeak.dollars, 0) + '</b>/yr on ' + esc(topLeak.name), sev: 'red' });
     if (!done.audit || (auditState && auditState.due)) open.push({ t: (auditState && auditState.latest) ? ('Revenue audit is ' + (auditState.daysSince != null ? auditState.daysSince + ' days old' : 'stale') + ', run a fresh one') : 'No Revenue audit run yet', sev: 'amber' });
 
+    (this._pdf || (this._pdf = [])).push({ name: 'Revenue', status: this._statusPlain(doneCount, STEPS.length),
+      activity: 'Audits Run ' + auditsWk + ', Price Changes ' + priceWk + ', Experiments ' + expActive,
+      close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
+      results: 'Check Avg ' + metrics[0].value + ', Labor % ' + metrics[1].value + ', Rev/Labor Hr ' + metrics[2].value + ', Recoverable/yr ' + (recoverable > 0 ? App.fmtCurrency(recoverable, 0) : '-'),
+      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Revenue', 'r-dashboard', 'revenue', this._statusText(doneCount, STEPS.length), [
       { label: 'Done This Week', html: activity },
       { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
@@ -511,6 +540,11 @@ S.WeekReview = {
     if (pos.hasOpening && pos.safe != null && pos.safe < 0) open.push({ t: 'Safe-to-spend is negative, into money already spoken for', sev: 'red' });
     if (!done.audit) open.push({ t: 'Cash audit not run this week', sev: 'amber' });
 
+    (this._pdf || (this._pdf = [])).push({ name: 'Cash', status: this._statusPlain(doneCount, STEPS.length),
+      activity: 'Audits Run ' + auditsWk + ', Experiments ' + expActive,
+      close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
+      results: 'Current position: Trapped Cash ' + (trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-') + ', Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-') + ', Safe to Spend ' + (pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-') + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtCurrency(sf.lowPoint.balance, 0) : '-'),
+      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Cash', 'c-dashboard', 'cash', this._statusText(doneCount, STEPS.length), [
       { label: 'Done This Week', html: activity },
       { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
@@ -561,6 +595,11 @@ S.WeekReview = {
     if (st.noRunSheet.length) open.push({ t: '<b>' + st.noRunSheet.length + '</b> upcoming event' + (st.noRunSheet.length === 1 ? '' : 's') + ' need a run sheet', sev: 'amber' });
     if (st.completedOpen.length) open.push({ t: '<b>' + st.completedOpen.length + '</b> completed event' + (st.completedOpen.length === 1 ? '' : 's') + ' to close out', sev: 'amber' });
 
+    (this._pdf || (this._pdf = [])).push({ name: 'Events', status: this._statusPlain(doneCount, STEPS.length),
+      activity: 'New Bookings ' + newBookWk + ', Events Held ' + heldWk + ', Deposits In ' + depCollWk,
+      close: STEPS.map(s => s.label + (done[s.key] ? ' (handled)' : ' (open)')).join(', '),
+      results: 'Booked ' + ED._money(st.bookedRev) + ', Pipeline ' + ED._money(st.pipeline) + ', Deposits Due ' + ED._money(st.depositsDue) + ', Win Rate ' + st.conv,
+      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Events', 'ev-dashboard', 'events', this._statusText(doneCount, STEPS.length), [
       { label: 'Done This Week', html: activity },
       { label: 'Pipeline Handled &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
@@ -612,6 +651,11 @@ S.WeekReview = {
     if (!done.generate) open.push({ t: esc(st.monthName) + ' books not closed yet', sev: 'amber' });
     if (st.dueCount > 0) open.push({ t: '<b>' + st.dueCount + '</b> permit/license item' + (st.dueCount === 1 ? '' : 's') + ' need attention', sev: st.expiredCt > 0 ? 'red' : 'amber' });
 
+    (this._pdf || (this._pdf = [])).push({ name: 'Books', status: this._statusPlain(doneCount, STEPS.length),
+      activity: 'Bills Logged ' + billsWk + ', Reports Run ' + reportsWk,
+      close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
+      results: 'Op Income YTD ' + BH._money(st.ytdInc) + ', Margin ' + BH._pct(st.ytdMargin) + ', Month Revenue ' + BH._money(st.cmRev) + ', Month Income ' + BH._money(st.mInc),
+      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing to close' });
     return this._sectionCard('Books', 'books-home', 'books', this._statusText(doneCount, STEPS.length), [
       { label: 'Done This Week', html: activity },
       { label: 'The Monthly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
@@ -646,11 +690,15 @@ S.WeekReview = {
     const pill = '<span style="display:inline-flex;align-items:center;border:1px solid var(--b-edge);background:var(--sel-active-bg);border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;color:var(--t1);white-space:nowrap;">'
       + esc(range) + (isCur ? '<span style="color:var(--gold);font-weight:800;font-size:11px;margin-left:6px;">NOW</span>' : '') + '</span>';
     const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm wr-now" style="margin-left:4px;">This Week</button>';
-    const selectorRow = '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>';
+    const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="wr-export">Export PDF</button>';
+    const selectorRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;">'
+      + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
+      + exportBtn + '</div>';
 
+    this._pdf = [];   // section payloads, collected as each section builds, for the PDF
     const sections = [this._inventorySection(), this._laborSection(), this._shiftSection(), this._profitSection(), this._revenueSection(), this._cashSection(), this._eventsSection(), this._booksSection()].filter(Boolean).join('');
 
-    mount.innerHTML = '<div class="screen">'
+    mount.innerHTML = '<div class="screen wr-screen">'
       + this._topCard()
       + selectorRow
       + '<div class="wr-grid">' + sections + '</div>'
@@ -659,6 +707,38 @@ S.WeekReview = {
     mount.querySelectorAll('.wr-arrow').forEach(a =>
       a.addEventListener('click', () => this._step(parseInt(a.dataset.step, 10))));
     mount.querySelector('.wr-now')?.addEventListener('click', () => { this._wkStart = this._monday(); this.render(mount); });
+    document.getElementById('wr-export')?.addEventListener('click', () => this._exportPDF());
+  },
+
+  // Plain-text status + tag strip for the PDF.
+  _statusPlain(doneCount, total) {
+    const r = total - doneCount;
+    if (r === 0) return 'Complete';
+    return this._isThisWeek() ? (r + ' to do') : (r + ' missed');
+  },
+  _stripTags(s) { return String(s == null ? '' : s).replace(/<[^>]*>/g, ''); },
+
+  // Data-driven PDF built from the per-section payloads collected during render.
+  async _exportPDF() {
+    try { await App._ensurePDFLib(); }
+    catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
+    const m = this._weekMoney();
+    const pctv = v => (v != null && !isNaN(v)) ? (Number(v).toFixed(1) + '%') : '-';
+    const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+    const range = fmt(this._wkS()) + ' - ' + fmt(this._wkE());
+    const b = App._pdfBuilder('Week in Review', {});
+    b.header({ right: 'Week in Review', meta: range });
+    b.kv('Net Sales', m.netSales != null ? App.fmtCurrency(m.netSales, 0) : '-');
+    b.kv('Prime Cost', pctv(m.prime));
+    b.kv('Labor', pctv(m.laborPct));
+    (this._pdf || []).forEach(s => {
+      b.sectionTitle(s.name + '   (' + s.status + ')');
+      if (s.activity) b.paragraph('Done this week: ' + s.activity, { gray: 70 });
+      b.paragraph('Weekly close: ' + s.close, { gray: 70 });
+      b.paragraph('What it turned up: ' + s.results, { gray: 70 });
+      b.paragraph('Carrying over: ' + s.open, { gray: 70 });
+    });
+    await b.save('Week in Review');
   },
 
   showHowTo() {
