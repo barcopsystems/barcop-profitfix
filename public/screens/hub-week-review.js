@@ -47,8 +47,9 @@ S.WeekReview = {
   _check() {
     return '<span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:12px;font-weight:800;">&#10003;</span>';
   },
+  // Solid red circle with a dark X, mirroring the green check.
   _cross() {
-    return '<span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:rgba(192,56,40,0.14);border:1px solid var(--red);color:var(--red);font-size:11px;font-weight:800;">&#10005;</span>';
+    return '<span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:var(--red);color:var(--bg);font-size:11px;font-weight:800;">&#10005;</span>';
   },
   // One activity figure (count + label); muted when nothing happened, so "what
   // did not get done" reads as plainly as what did.
@@ -62,7 +63,6 @@ S.WeekReview = {
     const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 22px;"></div>';
     return '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + items.join(vdiv) + '</div>';
   },
-  // One result figure (label over value, colored by meaning).
   _res(label, val, col) {
     return '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">' + label + '</div>'
@@ -72,29 +72,63 @@ S.WeekReview = {
     const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 24px;"></div>';
     return '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + items.join(vdiv) + '</div>';
   },
+  // One open item, in its own data-row wrapper.
   _openItem(text, sev) {
     const col = sev === 'red' ? 'var(--red)' : 'var(--amber)';
-    return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">'
+    return '<div style="display:flex;align-items:center;gap:11px;padding:10px 13px;background:var(--gold-tint);border-radius:5px;">'
       + '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' + col + ';"></span>'
       + '<span style="font-size:12.5px;color:var(--t2);line-height:1.5;">' + text + '</span></div>';
-  },
-  // A section shell: header (name + status pill + open link) over stacked blocks.
-  _sectionCard(name, screen, mod, statusPill, blocks) {
-    const header = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 20px;border-bottom:1px solid var(--b2);">'
-      + '<div style="display:flex;align-items:center;gap:12px;min-width:0;">'
-      +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--t1);">' + esc(name) + '</span>'
-      +   statusPill
-      + '</div>'
-      + '<button class="btn btn-ghost btn-sm no-print" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">Open ' + esc(name) + ' &rsaquo;</button>'
-      + '</div>';
-    const body = blocks.map((b, i) =>
-      '<div style="padding:15px 20px;' + (i < blocks.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">' + this._eyebrow(b.label) + b.html + '</div>').join('');
-    return '<div class="card" style="padding:0;overflow:hidden;">' + header + body + '</div>';
   },
   _statusPill(text, tone) {
     const map = { good: 'var(--green)', warn: 'var(--amber)', bad: 'var(--red)' };
     const col = map[tone] || 'var(--t3)';
     return '<span style="font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:' + col + ';border:1px solid ' + col + ';border-radius:20px;padding:2px 10px;white-space:nowrap;">' + text + '</span>';
+  },
+  // A section shell: header (name + status, full-bleed divider), stacked blocks
+  // split by INSET dividers, then the Open link on its own row at the bottom.
+  _sectionCard(name, screen, mod, statusPill, blocks) {
+    const idiv = '<div style="height:1px;background:var(--b2);margin:0 20px;"></div>';
+    const header = '<div style="display:flex;align-items:center;gap:12px;padding:15px 20px;border-bottom:1px solid var(--b2);min-width:0;">'
+      + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--t1);">' + esc(name) + '</span>'
+      + statusPill + '</div>';
+    const body = blocks.map(b => '<div style="padding:15px 20px;">' + this._eyebrow(b.label) + b.html + '</div>').join(idiv);
+    const footer = idiv + '<div style="padding:14px 20px;">'
+      + '<button class="btn btn-ghost btn-sm no-print" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">Open ' + esc(name) + '</button></div>';
+    return '<div class="card" style="padding:0;overflow:hidden;">' + header + body + footer + '</div>';
+  },
+
+  // ── The week's money headline (from the confirmed week, matched by Sunday) ───
+  _weekMoney() {
+    const pe = this._wkE();
+    const w  = ((App.data && App.data.weeks) || []).find(x => x && x.period_end === pe);
+    const rw = ((App.data && App.data.revenue_weeks) || []).find(x => x && x.period_end === pe);
+    let netSales = null, prime = null, laborPct = null;
+    if (w) {
+      const bar = w.bar || {}, food = w.food || {}, cat = w.catering || {}, oth = w.other || {};
+      netSales = (bar.revenue || 0) + (food.revenue || 0) + (cat.revenue || 0) + (oth.revenue || 0);
+      prime = w.prime_cost_pct;
+    } else if (rw) {
+      netSales = (rw.bar_revenue || 0) + (rw.floor_revenue || 0);
+    }
+    if (rw && rw.labor_pct_blended != null) laborPct = rw.labor_pct_blended;
+    else if (w) { const b = w.bar || {}, f = w.food || {}; const s = (b.revenue || 0) + (f.revenue || 0); if (s > 0) laborPct = ((b.labor || 0) + (f.labor || 0)) / s * 100; }
+    return { netSales, prime, laborPct };
+  },
+  _topCard() {
+    const m = this._weekMoney();
+    const pct = v => (v != null && !isNaN(v)) ? (Number(v).toFixed(1) + '%') : '-';
+    const stat = (label, val) => '<div style="min-width:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">' + label + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:600;line-height:0.9;color:var(--w);">' + val + '</div></div>';
+    const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 34px;"></div>';
+    const stats = [
+      stat('Net Sales', m.netSales != null ? App.fmtCurrency(m.netSales, 0) : '-'),
+      stat('Prime Cost', pct(m.prime)),
+      stat('Labor', pct(m.laborPct))
+    ].join(vdiv);
+    return '<div class="card" style="margin-bottom:16px;overflow:hidden;padding:0;">'
+      + '<div style="padding:12px 22px;border-bottom:1px solid var(--b2);"><div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Week In Review</div></div>'
+      + '<div style="padding:20px 22px;display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + stats + '</div></div>';
   },
 
   // ── Inventory section (the pattern) ─────────────────────────────────────────
@@ -104,16 +138,13 @@ S.WeekReview = {
     const inv = (App.inventoryData) || {};
     const products = (inv.ic_products || []).filter(p => p.active !== false);
     const counts = inv.ic_counts || [];
-    if (!products.length || !counts.length) return null;   // handled by empty state upstream
+    if (!products.length || !counts.length) return null;
 
-    // Reuse the real cockpit compute + step stamps, forced to the chosen week,
-    // then restore so nothing about the live Inventory page changes.
     const sv = ID._weekStart;
     ID._weekStart = this._wkS();
     let st, done;
     try { st = ID.computeState(); done = ID.stepDone(st); } finally { ID._weekStart = sv; }
 
-    // Activity: real records filed in the week window.
     const wkCounts   = counts.filter(c => this._inWeek(c.date)).length;
     const wkSpot     = (inv.ic_spot_checks || []).filter(s => this._inWeek(s.date)).length;
     const wkDeliv    = st.deliveriesThisWeek || 0;
@@ -121,7 +152,6 @@ S.WeekReview = {
     const wkAdj      = (inv.ic_adjustments || []).filter(a => this._inWeek(a.date_time || a.created_at)).length;
     const wkTransfer = (inv.ic_transfers || []).filter(t => this._inWeek(t.date_time || t.created_at)).length;
 
-    // Weekly close: which of the four steps got signed off.
     const STEPS = [
       { key: 'count',      label: 'Took the count' },
       { key: 'deliveries', label: 'Received deliveries' },
@@ -129,9 +159,12 @@ S.WeekReview = {
       { key: 'review',     label: 'Reviewed the flags' }
     ];
     const doneCount = STEPS.filter(s => done[s.key]).length;
-    const pill = doneCount === STEPS.length
+    const remaining = STEPS.length - doneCount;
+    const pill = remaining === 0
       ? this._statusPill('Complete', 'good')
-      : this._statusPill((STEPS.length - doneCount) + ' skipped', doneCount >= 2 ? 'warn' : 'bad');
+      : this._isThisWeek()
+        ? this._statusPill(remaining + ' to do', 'warn')
+        : this._statusPill(remaining + ' missed', remaining >= 3 ? 'bad' : 'warn');
 
     const activity = this._actRow([
       this._act(wkCounts, 'Counts'),
@@ -156,7 +189,6 @@ S.WeekReview = {
       this._res('Over Target', String(st.menuOver), st.menuOver > 0 ? 'var(--red)' : 'var(--t1)')
     ]);
 
-    // Carrying over: real open items (skipped steps + unresolved findings).
     const open = [];
     const anyFlag = st.shrink > 0 || st.spotFlags > 0 || st.deadAll > 0 || st.menuOver > 0;
     if (!done.review && anyFlag) open.push({ t: 'Variance flags never reviewed this week', sev: 'red' });
@@ -165,7 +197,7 @@ S.WeekReview = {
     if (st.parOff > 0) open.push({ t: '<b>' + st.parOff + '</b> par' + (st.parOff === 1 ? '' : 's') + ' off versus real usage', sev: 'amber' });
     if (st.menuOver > 0) open.push({ t: '<b>' + st.menuOver + '</b> menu item' + (st.menuOver === 1 ? '' : 's') + ' over cost target', sev: 'amber' });
     const openHtml = open.length
-      ? open.slice(0, 4).map(o => this._openItem(o.t, o.sev)).join('')
+      ? '<div style="display:flex;flex-direction:column;gap:8px;">' + open.slice(0, 4).map(o => this._openItem(o.t, o.sev)).join('') + '</div>'
       : '<div style="font-size:12.5px;color:var(--green);padding:2px 0;">&#10003; Nothing open. Clean week.</div>';
 
     return this._sectionCard('Inventory', 'ic-dashboard', 'inventory', pill, [
@@ -202,17 +234,19 @@ S.WeekReview = {
     const pill = '<span style="display:inline-flex;align-items:center;border:1px solid var(--b-edge);background:var(--sel-active-bg);border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;color:var(--t1);white-space:nowrap;">'
       + esc(range) + (isCur ? '<span style="color:var(--gold);font-weight:800;font-size:11px;margin-left:6px;">NOW</span>' : '') + '</span>';
     const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm wr-now" style="margin-left:6px;">This Week</button>';
-    const selector = '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>';
-    const intro = '<div style="font-size:12px;color:var(--t3);margin-bottom:18px;">What your team did in each section this week, what got skipped, and what is carrying over.</div>';
+    const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="wr-export">Export PDF</button>';
+    const selectorRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
+      + exportBtn + '</div>';
 
     const inv = this._inventorySection() || '';
     const note = '<div style="margin-top:16px;font-size:11.5px;color:var(--t4);line-height:1.6;">This is the Inventory pattern. Labor, Shift, Profit, Revenue, Cash, Events, and Books roll up the same way, added once this shape is signed off.</div>';
 
-    const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="wr-export">Export PDF</button>';
-    const head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;"><div class="sh" style="margin:0;">The Week</div>' + exportBtn + '</div>';
-
-    mount.innerHTML = '<div class="screen">' + selector + intro
-      + '<div id="wr-export-root">' + head + inv + note + '</div></div>';
+    mount.innerHTML = '<div class="screen">'
+      + this._topCard()
+      + selectorRow
+      + '<div id="wr-export-root">' + inv + note + '</div>'
+      + '</div>';
 
     mount.querySelectorAll('.wr-arrow').forEach(a =>
       a.addEventListener('click', () => this._step(parseInt(a.dataset.step, 10))));
@@ -232,7 +266,7 @@ S.WeekReview = {
     App.showHelpModal('How Week Review Works', [
       { p: ['Week Review is the accountability side of your weekly close. For any week it reads what your team actually did in each section, whether the weekly close got finished, what it turned up, and what is carrying into next week, so you can see in one place where the crew is on it and where things slid.'] },
       { h: 'Pick a week', p: ['Use the arrows to step back through your weeks. NOW marks the current one. Everything reads from your real logs and the steps you marked done, nothing projected.'] },
-      { h: 'Read a section', p: ['Done This Week is the raw activity, counts, spot checks, deliveries, orders, and logs filed. The Weekly Close shows which sign-off steps got finished and which got skipped. What It Turned Up is the result, and Carrying Into Next Week is the open items to clear.'] },
+      { h: 'Read a section', p: ['Done This Week is the raw activity, counts, spot checks, deliveries, orders, and logs filed. The Weekly Close shows which sign-off steps got finished and which are still open. What It Turned Up is the result, and Carrying Into Next Week is the open items to clear.'] },
       { h: 'Export', p: ['Export PDF saves the week as a one-page accountability report you can keep or hand off.'] }
     ]);
   }
