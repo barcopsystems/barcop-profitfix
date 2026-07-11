@@ -69,6 +69,7 @@ S.Hub = {
     return ''
       + '<div class="nav-section"></div>'
       + row('breakeven', 'Break-Even', 'breakeven')
+      + row('week-review', 'Week Review', 'grid')
       + '<div class="nav-section">Accounting</div>'
       + row('weekly-pnl', 'Weekly P&L Brief', 'report')
       + row('books', 'Month-End Books', 'books')
@@ -613,7 +614,7 @@ S.Hub = {
       const body = strip
         + (sum ? '<div style="margin-top:13px;">' + progBar(sum.doneCount, sum.total) + '</div>'
                  + '<div style="margin-top:4px;display:flex;flex-direction:column;">' + stepRows(sum.steps, o.objName, o.screen, o.mod) + '</div>' : '')
-        + (footer ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--row-div);margin-top:' + (sum ? '12px' : '13px') + ';padding-top:9px;">' + footer + '</div>' : '');
+        + (footer ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--b-edge);margin-top:' + (sum ? '12px' : '13px') + ';padding-top:9px;">' + footer + '</div>' : '');
       return '<div style="display:flex;flex-direction:column;min-width:0;">'
         + '<div class="sh" style="margin:0 0 10px;">' + esc(o.title) + '</div>'
         + '<div class="hd-row" onclick="' + cardGo + '" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;flex:1;min-width:0;">'
@@ -772,8 +773,8 @@ S.Hub = {
       // Triage: split into Critical (bad) and Watch (warn) under their own
       // headers so the operator instantly sees what matters today.
       const rowOf = (a, isFirst, dotCol) => '<div class="hd-row hd-arow" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
-        + 'style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--row-div);'
-        + (isFirst ? 'border-top:1px solid var(--row-div);' : '') + '">'
+        + 'style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--b-edge);'
+        + (isFirst ? 'border-top:1px solid var(--b-edge);' : '') + '">'
         + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotCol + ';flex-shrink:0;"></span>'
         + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</div>'
         + '</div>';
@@ -958,8 +959,8 @@ S.Hub = {
           };
           const mc = modBadgeColors[it.sys] || modBadgeColors.Profit;
           return '<div class="hd-row hd-arow" onclick="S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')" '
-            + 'style="display:flex;align-items:center;gap:14px;padding:10px 12px;border-bottom:1px solid var(--row-div);'
-            + (i === 0 ? 'border-top:1px solid var(--row-div);' : '') + '">'
+            + 'style="display:flex;align-items:center;gap:14px;padding:10px 12px;border-bottom:1px solid var(--b-edge);'
+            + (i === 0 ? 'border-top:1px solid var(--b-edge);' : '') + '">'
             + '<div style="flex-shrink:0;min-width:65px;white-space:nowrap;">'
             +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--t1);line-height:1;">' + dollar + '</span>'
             +   (it.impact > 0 ? '<span style="font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/mo</span>' : '')
@@ -1317,6 +1318,7 @@ S.Hub = {
       else if (action === 'bar-cop-audit')      S.HubBarCopAudit?.open?.();
       else if (action === 'books-home')         S.HubBooksHome?.open?.();
       else if (action === 'breakeven')          S.HubBreakEven?.open?.();
+      else if (action === 'week-review')        S.WeekReview?.open?.();
       else if (action === 'books')              S.HubBooks.open();
       else if (action === 'weekly-pnl')         S.Reports?._openQboModal?.();
       else if (action === 'year-end')           S.HubYearEnd.open();
