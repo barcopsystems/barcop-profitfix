@@ -60,11 +60,30 @@ S.HubCashOutflows = {
   draw() {
     const b = this.periodBounds();
     this.container.innerHTML = '<div class="screen">'
+      + this.statsCard()
       + this.addCard()
       + this.recurringSection()
       + this.loggedSection(b)
       + '</div>';
     this.wire();
+  },
+
+  // Top stat box (This Month / Year to Date / Recurring per month), matching the
+  // Operating Expenses page. Reads CashEngine.outflowsBetween, which folds in the
+  // projected recurring occurrences, so the month and year totals are real cash out.
+  statsCard() {
+    const today = App.todayLocal();
+    const monthStart = today.slice(0, 7) + '-01';
+    const yearStart = today.slice(0, 4) + '-01-01';
+    const sumBetween = (s, e) => (CashEngine.outflowsBetween(s, e) || []).reduce((a, o) => a + (o.amount || 0), 0);
+    const monthTotal = sumBetween(monthStart, today);
+    const ytdTotal = sumBetween(yearStart, today);
+    const recurMonthly = this.activeRecurring().reduce((a, o) => a + (parseFloat(o.amount) || 0), 0);
+    const fmt$ = v => App.fmtCurrency(v || 0);
+    const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
+    return '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + stat('This Month', fmt$(monthTotal)) + stat('Year to Date', fmt$(ytdTotal)) + stat('Recurring / mo', fmt$(recurMonthly))
+      + '</div></div>';
   },
 
   // ── Log a Cash Outflow (collapsible) ─────────────────────────────────────────

@@ -97,13 +97,13 @@ S.WeekReview = {
   // Section shell: header (name + status, full-bleed divider), inset-divided
   // blocks, then the Open link on its own bottom row.
   _sectionCard(name, screen, mod, statusText, blocks, openJs) {
-    const idiv = '<div style="height:1px;background:var(--b2);margin:0 20px;"></div>';
+    const idiv = '<div class="wr-idiv"></div>';
     const oc = openJs || ("S.Hub._enter('" + screen + "','" + mod + "')");
-    const header = '<div style="display:flex;align-items:center;gap:12px;padding:15px 20px;border-bottom:1px solid var(--b2);min-width:0;">'
+    const header = '<div class="wr-head" style="display:flex;align-items:center;gap:12px;min-width:0;">'
       + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--t1);">' + esc(name) + '</span>'
       + statusText + '</div>';
-    const body = blocks.map(b => '<div style="padding:15px 20px;">' + this._eyebrow(b.label) + b.html + '</div>').join(idiv);
-    const footer = idiv + '<div style="padding:14px 20px;">'
+    const body = blocks.map(b => '<div class="wr-block">' + this._eyebrow(b.label) + b.html + '</div>').join(idiv);
+    const footer = idiv + '<div class="wr-foot">'
       + '<button class="btn btn-ghost btn-sm no-print" onclick="' + oc + '">Open ' + esc(name) + '</button></div>';
     // flex column + a growing body wrapper pins the Open link to the card bottom,
     // so both cards in a grid row read the same height no matter what is in them.
@@ -141,11 +141,11 @@ S.WeekReview = {
       stat('Labor', pct(m.laborPct))
     ].join(vdiv);
     return '<div class="card" style="margin-bottom:16px;overflow:hidden;padding:0;">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      + '<div class="wr-tophead" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Week In Review</div>'
       +   '<button class="btn btn-ghost btn-sm no-print" id="wr-brief" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>'
       + '</div>'
-      + '<div class="wr-statrow" style="padding:20px 22px;display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + stats + '</div></div>';
+      + '<div class="wr-statrow wr-topstats" style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + stats + '</div></div>';
   },
 
   // ── Inventory ───────────────────────────────────────────────────────────────
