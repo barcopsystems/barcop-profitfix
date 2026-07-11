@@ -96,14 +96,15 @@ S.WeekReview = {
   },
   // Section shell: header (name + status, full-bleed divider), inset-divided
   // blocks, then the Open link on its own bottom row.
-  _sectionCard(name, screen, mod, statusText, blocks) {
+  _sectionCard(name, screen, mod, statusText, blocks, openJs) {
     const idiv = '<div style="height:1px;background:var(--b2);margin:0 20px;"></div>';
+    const oc = openJs || ("S.Hub._enter('" + screen + "','" + mod + "')");
     const header = '<div style="display:flex;align-items:center;gap:12px;padding:15px 20px;border-bottom:1px solid var(--b2);min-width:0;">'
       + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--t1);">' + esc(name) + '</span>'
       + statusText + '</div>';
     const body = blocks.map(b => '<div style="padding:15px 20px;">' + this._eyebrow(b.label) + b.html + '</div>').join(idiv);
     const footer = idiv + '<div style="padding:14px 20px;">'
-      + '<button class="btn btn-ghost btn-sm no-print" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">Open ' + esc(name) + '</button></div>';
+      + '<button class="btn btn-ghost btn-sm no-print" onclick="' + oc + '">Open ' + esc(name) + '</button></div>';
     return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">' + header + body + footer + '</div>';
   },
 
@@ -466,6 +467,159 @@ S.WeekReview = {
     ]);
   },
 
+  // ── Cash (Recovery; numbers are a live position, not per-week) ──────────────
+  _cashSection() {
+    const CD = S.CashDashboard;
+    if (!CD || !window.CashEngine) return '';
+    const trapped = CashEngine.trapped ? CashEngine.trapped() : { hasData: false };
+    const sf = CashEngine.survivalForecast ? CashEngine.survivalForecast(13) : { hasData: false };
+    const pos = CashEngine.position ? CashEngine.position() : { hasOpening: false };
+    if (!trapped.hasData && !sf.hasData) return null;
+
+    const sv = CD._weekStart;
+    CD._weekStart = this._wkS();
+    let done;
+    try { done = CD.stepDone(); } finally { CD._weekStart = sv; }
+
+    const dat = App.data || {};
+    const auditsWk  = (dat.cash_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
+    const expActive = (dat.cash_initiatives || []).filter(e => e.status === 'Active').length;
+
+    const STEPS = [
+      { key: 'trapped', label: 'Freed up trapped cash' },
+      { key: 'week',    label: 'Checked the week ahead' },
+      { key: 'terms',   label: 'Paid on terms' },
+      { key: 'audit',   label: 'Ran the Cash audit' }
+    ];
+    const doneCount = STEPS.filter(s => done[s.key]).length;
+    const runwayLabel = r => r == null ? '13+ wks' : r === 0 ? 'This wk' : r + ' wk' + (r === 1 ? '' : 's');
+
+    const activity = this._actRow([
+      this._act(auditsWk, 'Audits Run'), this._act(expActive, 'Experiments')
+    ]);
+    const results = this._resRow([
+      this._res('Trapped Cash', trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-', (trapped.hasData && trapped.total > 0) ? 'var(--amber)' : 'var(--t1)'),
+      this._res('Runway', (sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-', (sf.hasOpening && sf.runway != null) ? 'var(--red)' : 'var(--t1)'),
+      this._res('Safe to Spend', pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-', (pos.hasOpening && pos.safe < 0) ? 'var(--red)' : 'var(--t1)'),
+      this._res('Tightest Week', (sf.hasData && sf.lowPoint) ? App.fmtCurrency(sf.lowPoint.balance, 0) : '-', (sf.lowPoint && sf.lowPoint.balance < 0) ? 'var(--red)' : 'var(--t1)')
+    ]);
+
+    const open = [];
+    if (!done.trapped && trapped.hasData && trapped.total > 0) open.push({ t: '<b>' + App.fmtCurrency(trapped.total, 0) + '</b> still trapped on the shelf, not freed', sev: 'amber' });
+    if (sf.hasOpening && sf.runway != null && sf.runway <= 4) open.push({ t: 'Cash runs thin, about ' + runwayLabel(sf.runway) + ' of runway', sev: 'red' });
+    else if (sf.hasData && sf.tightWeeks > 0) open.push({ t: '<b>' + sf.tightWeeks + '</b> tight week' + (sf.tightWeeks === 1 ? '' : 's') + ' in the next 13', sev: 'amber' });
+    if (pos.hasOpening && pos.safe != null && pos.safe < 0) open.push({ t: 'Safe-to-spend is negative, into money already spoken for', sev: 'red' });
+    if (!done.audit) open.push({ t: 'Cash audit not run this week', sev: 'amber' });
+
+    return this._sectionCard('Cash', 'c-dashboard', 'cash', this._statusText(doneCount, STEPS.length), [
+      { label: 'Done This Week', html: activity },
+      { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
+      { label: 'What It Turned Up &middot; Current Position', html: results },
+      { label: 'Carrying Into Next Week', html: this._openList(open) }
+    ]);
+  },
+
+  // ── Events (pipeline, not a weekly close) ───────────────────────────────────
+  _eventsSection() {
+    const ED = S.EventsDashboard;
+    if (!ED) return '';
+    if (!((App.data && App.data.bookings) || []).length) return null;
+
+    let st, done, doneCount;
+    try {
+      st = ED._computeState();
+      done = {};
+      ED.ORDER.forEach(k => { done[k] = ED.stepInfo(k, st).done; });
+      doneCount = ED.ORDER.filter(k => done[k]).length;
+    } catch (e) { return null; }
+
+    const bookings = (App.data && App.data.bookings) || [];
+    const newBookWk = bookings.filter(b => this._inWeek(b.date_received)).length;
+    const heldWk    = bookings.filter(b => this._inWeek(b.event_date) && (b.stage === 'Booked' || b.stage === 'Completed')).length;
+    const depCollWk = bookings.filter(b => this._inWeek(b.deposit_paid_date)).length;
+
+    const STEPS = [
+      { key: 'leads',    label: 'Worked the open leads' },
+      { key: 'deposits', label: 'Collected deposits due' },
+      { key: 'prep',     label: 'Prepped upcoming events' },
+      { key: 'close',    label: 'Closed out completed events' }
+    ];
+
+    const activity = this._actRow([
+      this._act(newBookWk, 'New Bookings'), this._act(heldWk, 'Events Held'), this._act(depCollWk, 'Deposits In')
+    ]);
+    const results = this._resRow([
+      this._res('Booked', ED._money(st.bookedRev)),
+      this._res('Pipeline', ED._money(st.pipeline)),
+      this._res('Deposits Due', ED._money(st.depositsDue), st.depositsDue > 0 ? 'var(--amber)' : 'var(--t1)'),
+      this._res('Win Rate', st.conv)
+    ]);
+
+    const open = [];
+    if (st.open.length) open.push({ t: '<b>' + st.open.length + '</b> open lead' + (st.open.length === 1 ? '' : 's') + ' to follow up', sev: st.stale.length ? 'red' : 'amber' });
+    if (st.depositsDue > 0) open.push({ t: '<b>' + ED._money(st.depositsDue) + '</b> in deposits still due', sev: 'amber' });
+    if (st.noRunSheet.length) open.push({ t: '<b>' + st.noRunSheet.length + '</b> upcoming event' + (st.noRunSheet.length === 1 ? '' : 's') + ' need a run sheet', sev: 'amber' });
+    if (st.completedOpen.length) open.push({ t: '<b>' + st.completedOpen.length + '</b> completed event' + (st.completedOpen.length === 1 ? '' : 's') + ' to close out', sev: 'amber' });
+
+    return this._sectionCard('Events', 'ev-dashboard', 'events', this._statusText(doneCount, STEPS.length), [
+      { label: 'Done This Week', html: activity },
+      { label: 'Pipeline Handled &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
+      { label: 'What It Turned Up &middot; Current Pipeline', html: results },
+      { label: 'Carrying Into Next Week', html: this._openList(open) }
+    ]);
+  },
+
+  // ── Books (monthly close) ───────────────────────────────────────────────────
+  _booksSection() {
+    const BH = S.HubBooksHome;
+    if (!BH) return '';
+    if (!((App.data && App.data.weeks) || []).length) return null;
+
+    let st, done, doneCount;
+    try {
+      st = BH._computeState();
+      done = BH.stepDone();
+      doneCount = BH.ORDER.filter(k => done[k]).length;
+    } catch (e) { return null; }
+
+    const opex = (App.data && App.data.operating_expenses) || [];
+    const billsWk = opex.filter(r => r && this._inWeek(r.date)).length;
+    const billsMonth = opex.filter(r => r && String(r.date || '').slice(0, 7) === st.curKey).length;
+    const rawRun = key => { try { return localStorage.getItem(key); } catch (e) { return null; } };
+    const pnlRun = rawRun('books_report_run_weeklypnl');
+    const meRun  = rawRun('books_report_run_monthend');
+    const reportsWk = (pnlRun && this._inWeek(String(pnlRun).slice(0, 10)) ? 1 : 0) + (meRun && this._inWeek(String(meRun).slice(0, 10)) ? 1 : 0);
+
+    const STEPS = [
+      { key: 'expenses', label: 'Logged the month\'s expenses' },
+      { key: 'pnl',      label: 'Generated the P&L brief' },
+      { key: 'review',   label: 'Reviewed the income statement' },
+      { key: 'generate', label: 'Generated Month-End Books' }
+    ];
+
+    const activity = this._actRow([
+      this._act(billsWk, 'Bills Logged'), this._act(reportsWk, 'Reports Run')
+    ]);
+    const results = this._resRow([
+      this._res('Op Income YTD', BH._money(st.ytdInc), st.ytdInc < 0 ? 'var(--red)' : 'var(--t1)'),
+      this._res('Margin', BH._pct(st.ytdMargin)),
+      this._res('Month Revenue', BH._money(st.cmRev)),
+      this._res('Month Income', BH._money(st.mInc), st.mInc < 0 ? 'var(--red)' : 'var(--t1)')
+    ]);
+
+    const open = [];
+    if (!done.expenses && billsMonth === 0) open.push({ t: 'No bills logged this month yet', sev: 'amber' });
+    if (!done.generate) open.push({ t: esc(st.monthName) + ' books not closed yet', sev: 'amber' });
+    if (st.dueCount > 0) open.push({ t: '<b>' + st.dueCount + '</b> permit/license item' + (st.dueCount === 1 ? '' : 's') + ' need attention', sev: st.expiredCt > 0 ? 'red' : 'amber' });
+
+    return this._sectionCard('Books', 'books-home', 'books', this._statusText(doneCount, STEPS.length), [
+      { label: 'Done This Week', html: activity },
+      { label: 'The Monthly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
+      { label: 'What It Turned Up &middot; Month + YTD', html: results },
+      { label: 'To Close', html: this._openList(open) }
+    ], 'S.HubBooksHome&&S.HubBooksHome.open&&S.HubBooksHome.open()');
+  },
+
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     if (this._wkStart == null) this._wkStart = this._monday();
@@ -497,13 +651,12 @@ S.WeekReview = {
       + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
       + exportBtn + '</div>';
 
-    const sections = [this._inventorySection(), this._laborSection(), this._shiftSection(), this._profitSection(), this._revenueSection()].filter(Boolean).join('');
-    const note = '<div style="margin-top:4px;font-size:11.5px;color:var(--t4);line-height:1.6;">Cash, Events, and Books roll up the same way, added next.</div>';
+    const sections = [this._inventorySection(), this._laborSection(), this._shiftSection(), this._profitSection(), this._revenueSection(), this._cashSection(), this._eventsSection(), this._booksSection()].filter(Boolean).join('');
 
     mount.innerHTML = '<div class="screen">'
       + this._topCard()
       + selectorRow
-      + '<div id="wr-export-root">' + sections + note + '</div>'
+      + '<div id="wr-export-root">' + sections + '</div>'
       + '</div>';
 
     mount.querySelectorAll('.wr-arrow').forEach(a =>
