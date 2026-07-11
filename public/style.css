@@ -889,7 +889,7 @@ body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
 .wr-screen{max-width:none;padding:var(--sp) 24px 24px;}
 .wr-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 @media (max-width:960px){.wr-grid{grid-template-columns:1fr;}}
-.wr-tophead{padding:11px 22px;border-bottom:1px solid var(--b2);}
+.wr-tophead{padding:15px 20px;border-bottom:1px solid var(--b2);}
 .wr-topstats{padding:20px 22px;}
 .wr-head{padding:15px 20px;border-bottom:1px solid var(--b2);}
 .wr-block{padding:15px 20px;}
@@ -904,7 +904,7 @@ body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
   .wr-screen{padding:16px 14px 40px;}
   .wr-vdiv{display:none;}
   .wr-statrow{column-gap:22px;}
-  .wr-tophead,.wr-topstats,.wr-head,.wr-block,.wr-foot{padding-left:15px;padding-right:15px;}
+  .wr-topstats,.wr-head,.wr-block,.wr-foot{padding-left:15px;padding-right:15px;}
   .wr-idiv{margin-left:15px;margin-right:15px;}
 }
 /* Hub "Where You Stand" card is hand-built (not a .card), so it needs its own
@@ -913,7 +913,7 @@ body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
 .hub-wys-head{padding:15px 20px;}
 .hub-wys-body{padding:18px 20px;}
 @media (max-width:768px){
-  .hub-wys-head{padding:15px 14px;}
+  .hub-wys-head,.wr-tophead{padding:15px 14px;}
   .hub-wys-body{padding:18px 14px;}
 }
 body.chrome-on .hub-app .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
