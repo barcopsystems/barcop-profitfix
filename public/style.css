@@ -889,6 +889,14 @@ body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
 .wr-screen{max-width:none;padding:var(--sp) 24px 24px;}
 .wr-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 @media (max-width:960px){.wr-grid{grid-template-columns:1fr;}}
+/* On mobile the WR stat rows drop their vertical dividers (like the Hub Where You
+   Stand card) and gap the tiles instead, and the page tightens to the app's
+   standard phone padding so the cards do not read inset. */
+@media (max-width:768px){
+  .wr-screen{padding:16px 14px 40px;}
+  .wr-vdiv{display:none;}
+  .wr-statrow{column-gap:22px;}
+}
 body.chrome-on .hub-app .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
 body.chrome-on .hub-app .nav-section:first-child{padding-top:6px;}
 body.chrome-on .hub-app .nav-item{padding:10px 20px;gap:13px;}

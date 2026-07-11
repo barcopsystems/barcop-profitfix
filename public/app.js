@@ -1875,7 +1875,7 @@ const App = {
       { h: 'Tracking against it', p: ['The strip up top shows last week against the line: cleared it and the amount is your profit, short and that is your gap, plus the day of the week you cross break-even at last week\'s pace. The eight-week table at the bottom shows the streak.'] },
       { h: 'What If', p: ['The what-if is a sandbox. Move your weekly sales, cut the nut, or trim the variable rate and watch break-even and your profit move, so you can see what a price change or a rent cut actually buys you before you commit. Hit Reset to snap back to your real numbers.'] }
     ] },
-    'permits': { title: 'How Permits and Licenses Work', sections: [
+    'permits': { title: 'How Licensing Works', sections: [
       { h: 'What this page is', p: ['Tracks your permits and licenses by renewal date so none of them lapse. Add each one with its type, next renewal date, recurrence, and last cost, and Bar Cop watches the calendar for you.'] },
       { h: 'How the statuses work', p: ['A renewal more than 30 days out is On Track. Within 30 days is due soon and within 14 is more urgent, both flagged amber; once the date passes it is Expired, in red. Anything due soon or expired shows under Needs Attention here and under Coming Due on the Books overview. Use the chips to filter the list by status.'] },
       { h: 'Marking one renewed', p: ['When you renew a permit, click Mark Renewed and enter the cost paid and the next renewal date (Bar Cop suggests it from the recurrence). That advances the renewal date and logs the cost to Operating Expenses under Licenses and Permits, so your bookkeeper does not enter it twice.'] },
@@ -2094,6 +2094,7 @@ const App = {
         'bar-cop-audit':      () => S2.HubBarCopAudit && S2.HubBarCopAudit.open(),
         'audit-help':         () => S2.HubAuditHelp && S2.HubAuditHelp.open(),
         'weekly-pnl':         () => S2.Reports && S2.Reports._openQboModal(),
+        'breakeven':          () => S2.HubBreakEven && S2.HubBreakEven.open(),
         'books':              () => S2.HubBooks && S2.HubBooks.open(),
         'year-end':           () => S2.HubYearEnd && S2.HubYearEnd.open(),
         'permits':            () => S2.HubPermits && S2.HubPermits.open(),
@@ -2117,6 +2118,7 @@ const App = {
       if (k === 'events')    return Events.navHTML();
       if (k === 'profit')    return ProfitNav.html();
       if (k === 'revenue')   return Revenue.navHTML();
+      if (k === 'cash')      return Cash.navHTML();
       if (k === 'audit')     return S2.Hub._auditSidebarHTML();
       if (k === 'books')     return S2.Hub._booksSidebarHTML();
       if (k === 'settings')  return S2.Hub._settingsSidebarHTML();
