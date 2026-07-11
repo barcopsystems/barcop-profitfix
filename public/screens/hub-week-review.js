@@ -334,7 +334,7 @@ S.WeekReview = {
     ]);
   },
 
-  // ── Profit (Recovery: decisions, not logs — three blocks) ───────────────────
+  // ── Profit (Recovery) ───────────────────────────────────────────────────────
   _profitSection() {
     const PD = S.Dashboard;
     if (!PD) return '';
@@ -342,7 +342,7 @@ S.WeekReview = {
 
     const sv = PD._weekEnd;
     PD._weekEnd = this._wkE();
-    let done, w, costRows, overCount, topLeak, auditState, recoverable, auditsThisWk;
+    let done, w, costRows, overCount, topLeak, auditState, recoverable;
     try {
       done = PD.stepDone();
       w = PD.savedWeek(this._wkE());
@@ -353,8 +353,15 @@ S.WeekReview = {
       const latestAudit = App.latestEvent ? App.latestEvent(PD.audits()) : null;
       const monthly = latestAudit ? (latestAudit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0) : 0;
       recoverable = monthly * 12;
-      auditsThisWk = PD.audits().filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
     } finally { PD._weekEnd = sv; }
+
+    // Real recovery activity logged this week (records dated in the window).
+    const dat = App.data || {};
+    const auditsWk  = (dat.audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
+    const reviewsWk = (dat.sales_reviews || []).filter(r => this._inWeek(r.date || r.created_at)).length;
+    const discWk    = (dat.vendor_discrepancies || []).filter(d => this._inWeek(d.date || d.filed_at || d.created_at)).length;
+    const investWk  = (dat.variance_investigations || []).filter(i => this._inWeek(i.opened_date || i.date)).length;
+    const expActive = (dat.profit_initiatives || []).filter(e => e.status === 'Active').length;
 
     const STEPS = [
       { key: 'week',  label: 'Confirmed the week' },
@@ -364,6 +371,10 @@ S.WeekReview = {
     ];
     const doneCount = STEPS.filter(s => done[s.key]).length;
 
+    const activity = this._actRow([
+      this._act(auditsWk, 'Audits Run'), this._act(reviewsWk, 'Sales Reviews'), this._act(discWk, 'Discrepancies'),
+      this._act(investWk, 'Investigations'), this._act(expActive, 'Experiments')
+    ]);
     const costCell = (i, label) => {
       const r = costRows ? costRows[i] : null;
       const has = r && r.val != null;
@@ -371,12 +382,11 @@ S.WeekReview = {
     };
     const results = this._resRow([
       costCell(0, 'Bar Pour'), costCell(1, 'Food Cost'), costCell(2, 'Prime Cost'),
-      this._res('Recoverable/yr', recoverable > 0 ? App.fmtCurrency(recoverable, 0) : '-'),
-      this._res('Audits Run', String(auditsThisWk))
+      this._res('Recoverable/yr', recoverable > 0 ? App.fmtCurrency(recoverable, 0) : '-')
     ]);
 
     const open = [];
-    if (!done.week) open.push({ t: 'Week not confirmed', sev: 'red' });
+    if (!done.week) open.push({ t: 'Week not confirmed, so this week\'s cost numbers are blank', sev: 'red' });
     if (w && overCount > 0) {
       const names = costRows.filter(r => r.over).map(r => r.label.toLowerCase());
       open.push({ t: '<b>' + overCount + '</b> of 3 costs over target (' + names.join(', ') + ')', sev: overCount >= 2 ? 'red' : 'amber' });
@@ -385,6 +395,7 @@ S.WeekReview = {
     if (!done.audit || (auditState && auditState.due)) open.push({ t: (auditState && auditState.latest) ? ('Profit audit is ' + (auditState.daysSince != null ? auditState.daysSince + ' days old' : 'stale') + ', run a fresh one') : 'No Profit audit run yet', sev: 'amber' });
 
     return this._sectionCard('Profit', 'dashboard', 'profit', this._statusText(doneCount, STEPS.length), [
+      { label: 'Done This Week', html: activity },
       { label: 'The Weekly Close &middot; ' + doneCount + ' of ' + STEPS.length, html: this._closeList(STEPS, done) },
       { label: 'What It Turned Up', html: results },
       { label: 'Carrying Into Next Week', html: this._openList(open) }
@@ -442,7 +453,8 @@ S.WeekReview = {
     App.showHelpModal('How Week Review Works', [
       { p: ['Week Review is the accountability side of your weekly close. For any week it reads what your team actually did in each section, whether the weekly close got finished, what it turned up, and what is carrying into next week, so you can see in one place where the crew is on it and where things slid.'] },
       { h: 'Pick a week', p: ['Use the arrows to step back through your weeks. NOW marks the current one. Everything reads from your real logs and the steps you marked done, nothing projected.'] },
-      { h: 'Read a section', p: ['Done This Week is the raw activity that got logged. The Weekly Close shows which sign-off steps got finished and which are still open. What It Turned Up is the result, and Carrying Into Next Week is the open items to clear.'] },
+      { h: 'Read a section', p: ['Done This Week is the raw activity that got logged: counts, deliveries, hours, tips, sales days, and for the Recovery sections the audits run, sales reviews, vendor discrepancies filed, investigations opened, and experiments running. The Weekly Close shows which sign-off steps got finished and which are still open. What It Turned Up is the result, and Carrying Into Next Week is the open items to clear.'] },
+      { h: 'Why some numbers read a dash', p: ['The Recovery sections (Profit, Revenue, Cash) only produce cost and margin numbers once you Confirm the Week, which rolls up that week\'s revenue, COGS, and labor into the numbers. Until you do, the cost cells read a dash and the Weekly Close shows a red X on "Confirmed the week." That dash and that X are the signal: they are telling you the week is not confirmed yet, so go into the section, confirm it, and the numbers fill in. This is on purpose. A dash is an honest blank, never a made-up number.'] },
       { h: 'Export', p: ['Export PDF saves the week as a one-page accountability report you can keep or hand off.'] }
     ]);
   }
