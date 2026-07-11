@@ -176,8 +176,7 @@ S.CashBridge = {
         }).join('')
       : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No recurring outflows. Check Recurring monthly when you log a draw or loan that repeats.</td></tr>';
     return '<div class="sh" style="margin:24px 0 10px;">Recurring Outflows</div>'
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-      + '<colgroup><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"></colgroup>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="width:100%;">'
       + '<thead><tr><th>Type</th><th>Note</th><th>Status</th><th>Amount</th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>';
   },
@@ -196,8 +195,7 @@ S.CashBridge = {
           + '</tr>').join('')
       : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No one-time outflows logged for ' + esc(b.label) + '.</td></tr>';
     return '<div class="sh" style="margin:24px 0 10px;">Logged Outflows</div>'
-      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-      + '<colgroup><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"></colgroup>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="width:100%;">'
       + '<thead><tr><th>Date</th><th>Type</th><th>Note</th><th>Amount</th><th class="no-print"></th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>';
   },
