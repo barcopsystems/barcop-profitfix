@@ -454,6 +454,8 @@ S.WeekReview = {
     const dat = App.data || {};
     const auditsWk = (dat.revenue_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
     const priceWk  = (dat.revenue_price_log || []).filter(p => this._inWeek(p.date || p.created_at || p.changed_at)).length;
+    const dogWk    = (dat.menu_dog_tests || []).filter(t => this._inWeek(t.start_date || t.created_at)).length;
+    const checkWk  = (dat.revenue_server_checks || []).filter(c => this._inWeek(c.date || c.created_at)).length;
     const expActive = (dat.initiatives || []).filter(e => e.status === 'Active').length;
 
     const STEPS = [
@@ -465,7 +467,8 @@ S.WeekReview = {
     const doneCount = STEPS.filter(s => done[s.key]).length;
 
     const activity = this._actRow([
-      this._act(auditsWk, 'Audits Run'), this._act(priceWk, 'Price Changes'), this._act(expActive, 'Experiments')
+      this._act(auditsWk, 'Audits Run'), this._act(priceWk, 'Price Changes'), this._act(dogWk, 'Dog Tests'),
+      this._act(checkWk, 'Server Checks'), this._act(expActive, 'Experiments')
     ]);
     const mCell = (i, label) => {
       const m = metrics[i];
@@ -487,7 +490,7 @@ S.WeekReview = {
     if (!done.audit || (auditState && auditState.due)) open.push({ t: (auditState && auditState.latest) ? ('Revenue audit is ' + (auditState.daysSince != null ? auditState.daysSince + ' days old' : 'stale') + ', run a fresh one') : 'No Revenue audit run yet', sev: 'amber' });
 
     (this._pdf || (this._pdf = [])).push({ name: 'Revenue', status: this._statusPlain(doneCount, STEPS.length),
-      activity: 'Audits Run ' + auditsWk + ', Price Changes ' + priceWk + ', Experiments ' + expActive,
+      activity: 'Audits Run ' + auditsWk + ', Price Changes ' + priceWk + ', Dog Tests ' + dogWk + ', Server Checks ' + checkWk + ', Experiments ' + expActive,
       close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
       results: 'Check Avg ' + metrics[0].value + ', Labor % ' + metrics[1].value + ', Rev/Labor Hr ' + metrics[2].value + ', Recoverable/yr ' + (recoverable > 0 ? App.fmtCurrency(recoverable, 0) : '-'),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
@@ -515,6 +518,7 @@ S.WeekReview = {
 
     const dat = App.data || {};
     const auditsWk  = (dat.cash_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
+    const outflowWk = (dat.cash_outflows || []).filter(o => this._inWeek(o.date || o.created_at)).length;
     const expActive = (dat.cash_initiatives || []).filter(e => e.status === 'Active').length;
 
     const STEPS = [
@@ -527,7 +531,7 @@ S.WeekReview = {
     const runwayLabel = r => r == null ? '13+ wks' : r === 0 ? 'This wk' : r + ' wk' + (r === 1 ? '' : 's');
 
     const activity = this._actRow([
-      this._act(auditsWk, 'Audits Run'), this._act(expActive, 'Experiments')
+      this._act(auditsWk, 'Audits Run'), this._act(outflowWk, 'Outflows Logged'), this._act(expActive, 'Experiments')
     ]);
     const results = this._resRow([
       this._res('Trapped Cash', trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-', (trapped.hasData && trapped.total > 0) ? 'var(--amber)' : 'var(--t1)'),
@@ -544,7 +548,7 @@ S.WeekReview = {
     if (!done.audit) open.push({ t: 'Cash audit not run this week', sev: 'amber' });
 
     (this._pdf || (this._pdf = [])).push({ name: 'Cash', status: this._statusPlain(doneCount, STEPS.length),
-      activity: 'Audits Run ' + auditsWk + ', Experiments ' + expActive,
+      activity: 'Audits Run ' + auditsWk + ', Outflows Logged ' + outflowWk + ', Experiments ' + expActive,
       close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
       results: 'Current position: Trapped Cash ' + (trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-') + ', Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-') + ', Safe to Spend ' + (pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-') + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtCurrency(sf.lowPoint.balance, 0) : '-'),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
@@ -717,7 +721,7 @@ S.WeekReview = {
   // ── Bar Cop Briefing — a written cross-section read of the week. Code-generated
   //    (no API), off the same per-section payloads the page and PDF are built from.
   showBriefing() {
-    if (window.DashUI && DashUI.insightsModal) DashUI.insightsModal('Bar Cop Briefing', this._briefing());
+    DashUI.insightsModal('Bar Cop Briefing', this._briefing());
   },
   _briefing() {
     const m = this._weekMoney();
