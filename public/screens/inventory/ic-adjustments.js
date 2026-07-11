@@ -81,6 +81,7 @@ S.InventoryAdjustments = {
   // 'cases', per-bottle otherwise). Drives the per-line Value + the snapshot.
   perUnitCostFor(p, unit) {
     if (!p) return 0;
+    if (unit === 'oz') { const c = App.costPerOz(p); return c != null ? c : 0; }
     if (p.category === 'Bottle Beer' && p.case_size) return (unit === 'cases') ? (App.unitCost(p) || 0) : (App.bottleCost(p) || 0);
     return App.unitCost(p) || 0;
   },
@@ -492,13 +493,8 @@ S.InventoryAdjustments = {
       set(idp + 'c-unitcost', product ? (product.unit_cost != null ? App.fmtCurrency(product.unit_cost) : '-') : '-', 'dim');
       return;
     }
-    let perUnitCost, unitLabel;
-    if (product.category === 'Bottle Beer' && product.case_size) {
-      if (unit === 'cases') { perUnitCost = App.unitCost(product) || 0; unitLabel = '/case'; }
-      else { perUnitCost = App.bottleCost(product) || 0; unitLabel = '/bottle'; }
-    } else {
-      perUnitCost = App.unitCost(product) || 0; unitLabel = '/unit';
-    }
+    const perUnitCost = this.perUnitCostFor(product, unit);
+    const unitLabel = unit === 'oz' ? '/oz' : (unit === 'cases' ? '/case' : unit === 'bottles' ? '/bottle' : '/unit');
     const value = qty * perUnitCost;
     set(idp + 'c-value', value > 0 ? App.fmtCurrency(value) : '-');
     set(idp + 'c-unitcost', perUnitCost > 0 ? App.fmtCurrency(perUnitCost) + unitLabel : '-', 'dim');
@@ -602,8 +598,9 @@ S.InventoryAdjustments = {
   unitOptions(productCategory, selected) {
     let opts = ['bottles', 'units'];
     if (productCategory === 'Bottle Beer') opts = ['cases', 'bottles'];
-    else if (productCategory === 'Draft Beer') opts = ['kegs'];
+    else if (productCategory === 'Draft Beer') opts = ['kegs', 'oz'];
     else if (productCategory === 'Food' || productCategory === 'Misc') opts = ['units', 'each', 'lbs', 'oz'];
+    else if (productCategory === 'Liquor' || productCategory === 'Wine') opts = ['bottles', 'oz'];
     return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
   },
 
