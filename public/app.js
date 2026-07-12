@@ -453,7 +453,7 @@ const App = {
     const bar = document.createElement('div');
     bar.id = 'demo-banner';
     bar.innerHTML = '<span style="font-size:12px;font-weight:700;letter-spacing:0.03em;flex:1;">Bar Cop Live Demo</span>'
-      + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Set Up Bar Cop</button>';
+      + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Set Up My Bar</button>';
     document.body.appendChild(bar);
     document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/?signup=1'; });
   },
@@ -473,7 +473,7 @@ const App = {
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:8px;padding:30px;max-width:430px;text-align:center;">'
       + '<div style="font-size:15px;font-weight:800;color:var(--w);margin-bottom:10px;">' + esc(title) + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:22px;">' + esc(body) + '</div>'
-      + '<button class="btn btn-primary" id="demo-go" style="width:100%;">Set Up Bar Cop</button>'
+      + '<button class="btn btn-primary" id="demo-go" style="width:100%;">Set Up My Bar</button>'
       + '<button class="btn btn-ghost btn-sm" id="demo-stay" style="margin-top:10px;">Keep Exploring</button>'
       + '</div>';
     document.body.appendChild(m);
