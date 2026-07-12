@@ -2491,8 +2491,16 @@ const App = {
     const sb = document.getElementById('signup-btn'); if (sb) { sb.textContent = 'Create Account'; sb.disabled = false; }
     const le = document.getElementById('login-error'); if (le) le.style.display = 'none';
     const se = document.getElementById('signup-error'); if (se) se.style.display = 'none';
-    // Show success banner if landing from Stripe checkout
     const params = new URLSearchParams(window.location.search);
+    // Pick which auth panel shows. Default is Log In; the marketing site's
+    // "Set Up Bar Cop" button deep-links in with ?signup=1 to open Create Account.
+    const wantSignup = params.get('signup') === '1';
+    ['auth-login','auth-signup','auth-reset','auth-set-password','auth-paywall'].forEach(x => {
+      const el = document.getElementById(x);
+      if (el) el.style.display = x === (wantSignup ? 'auth-signup' : 'auth-login') ? '' : 'none';
+    });
+    if (wantSignup) window.history.replaceState({}, '', window.location.pathname);
+    // Show success banner if landing from Stripe checkout
     const banner = document.getElementById('checkout-success-msg');
     if (banner) banner.style.display = params.get('checkout') === 'success' ? 'block' : 'none';
     // Clean up the URL
