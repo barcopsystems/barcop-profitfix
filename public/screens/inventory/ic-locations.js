@@ -232,6 +232,7 @@ S.InventoryLocations = {
       const rows = active.map(l => {
         const n = this.productCount(l.name);
         return '<tr data-id="' + esc(l.id) + '">'
+          + DragReorder.handleCellHTML()
           + '<td><button class="il-open" data-id="' + l.id + '" style="padding:0;border:none;background:none;color:var(--t1);font-weight:700;font-size:13px;cursor:pointer;">' + esc(l.name) + '</button></td>'
           + '<td>' + this.holdsLabel(l.name) + '</td>'
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
@@ -241,10 +242,12 @@ S.InventoryLocations = {
           + '</div></td></tr>';
       }).join('');
 
-      const listHeading = '';
+      const listHeading = active.length > 1
+        ? '<div class="no-print" style="margin:0 0 10px;font-size:10px;color:var(--t3);">Drag the handle to set the order Take Inventory counts your locations in.</div>'
+        : '';
       const listCard = active.length
-        ? '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-            + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
+        ? '<div class="card" style="overflow-x:auto;"><table class="row-list il-arrange"><thead><tr>'
+            + '<th style="width:24px;"></th><th>Location</th><th>Holds</th><th>Products</th><th></th>'
             + '</tr></thead><tbody id="il-loc-body">' + rows + '</tbody></table></div>'
         : '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
             + '<th>Location</th><th>Holds</th><th>Products</th><th></th>'
@@ -413,6 +416,21 @@ S.InventoryLocations = {
       this._justSavedCount = null;
       if (this._newNameError && e.target.value.trim()) { this._newNameError = false; e.target.style.borderColor = ''; }
     });
+    // Drag the location rows to set the order Take Inventory counts them in.
+    const lb = document.getElementById('il-loc-body');
+    if (lb) DragReorder.wire({ container: lb, rowSelector: 'tr[data-id]', handleSelector: '.dr-handle', dragClass: 'il-drag', onCommit: ids => this._persistLocationOrder(ids) });
+  },
+
+  // Save the dragged location order. The commit gives the active rows in their
+  // new order; rebuild ic_locations as [actives in new order] + [archived kept
+  // as-is]. Count order (Take Inventory / blank sheet) reads this array order.
+  async _persistLocationOrder(idsInOrder) {
+    const locs = this.locations();
+    const byId = new Map(locs.map(l => [l.id, l]));
+    const actives = idsInOrder.map(id => byId.get(id)).filter(Boolean);
+    const archived = locs.filter(l => l.archived);
+    App.inventoryData.ic_locations = [...actives, ...archived];
+    await App.saveInventory();
   },
 
   async saveNewLocation() {
