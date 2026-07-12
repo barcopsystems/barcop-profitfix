@@ -311,6 +311,7 @@ S.InventoryLocations = {
   saveLocRow() {
     return '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
       + '<button class="btn btn-primary" id="il-new-save">Save Location</button>'
+      + '<button class="btn btn-ghost" id="il-new-startover">Start Over</button>'
       + '<span id="il-new-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
   },
@@ -387,6 +388,7 @@ S.InventoryLocations = {
         if (cb) { cb.checked = !cb.checked; this._toggleNew(cb.value, cb.checked); }
         return;
       }
+      if (ev.target.closest('#il-new-startover')) { this.startOverNew(); return; }
       const save = ev.target.closest('#il-new-save');
       const open = ev.target.closest('.il-open');
       const edit = ev.target.closest('.il-edit');
@@ -431,6 +433,19 @@ S.InventoryLocations = {
     const archived = locs.filter(l => l.archived);
     App.inventoryData.ic_locations = [...actives, ...archived];
     await App.saveInventory();
+  },
+
+  // Start Over: close the Add Products picker and wipe the half-built location
+  // (typed name, register flag, checked products). The only way out of the
+  // picker without saving.
+  startOverNew() {
+    this.pickerOpen = false;
+    this._newName = '';
+    this._newServiceBar = false;
+    this.newChecked = new Set();
+    this._newNameError = false;
+    this._justSavedCount = null;
+    this.renderList();
   },
 
   async saveNewLocation() {
