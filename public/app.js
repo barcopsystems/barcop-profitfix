@@ -445,7 +445,7 @@ const App = {
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:10px;padding:32px 30px;max-width:460px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,0.5);">'
       + '<div style="margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
       + '<div style="font-size:18px;font-weight:800;color:var(--w);margin-bottom:12px;">Welcome to the Bar Cop Live Demo</div>'
-      + '<div style="font-size:13.5px;color:var(--t2);line-height:1.7;margin-bottom:24px;">This is a real bar loaded with real numbers, so you can see exactly how Bar Cop runs the place. Open any section, run an audit, change a price, count some stock, break whatever you want. Nothing here saves and nothing breaks. When you are ready to run your own place, hit <b style="color:var(--gold);">Set Up My Bar</b> down in the corner. Now go dig around.</div>'
+      + '<div style="font-size:13.5px;color:var(--t2);line-height:1.7;margin-bottom:24px;">This is a real bar loaded with real numbers, so you can see exactly how Bar Cop runs the place. Open any section, run an audit, change a price, count some stock, change whatever you want. Nothing here saves and nothing breaks. When you are ready to run your own place, hit <b style="color:var(--gold);">Set Up My Bar</b> down in the corner. Now go dig around.</div>'
       + '<button class="btn btn-primary" id="demo-welcome-go" style="width:100%;padding:14px 20px;font-size:12px;">Dig In</button>'
       + '</div>';
     document.body.appendChild(m);
