@@ -432,6 +432,26 @@ const App = {
     this._mountDemoBanner();
     this.showHub();
     this._wireChrome();   // demo skips boot(), so wire the top-nav (i-help, logo, mobile menu) here
+    this._showDemoWelcome();
+  },
+
+  // One-time welcome overlay on demo landing. Dimmed background like onboarding,
+  // orients the visitor (nothing saves, nothing breaks), points at Set Up My Bar,
+  // and closes on Dig In (or clicking the backdrop).
+  _showDemoWelcome() {
+    const m = document.createElement('div');
+    m.id = 'demo-welcome';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9600;display:flex;align-items:center;justify-content:center;padding:24px;';
+    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:10px;padding:32px 30px;max-width:460px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,0.5);">'
+      + '<div style="margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
+      + '<div style="font-size:18px;font-weight:800;color:var(--w);margin-bottom:12px;">Welcome to the Bar Cop Live Demo</div>'
+      + '<div style="font-size:13.5px;color:var(--t2);line-height:1.7;margin-bottom:24px;">This is a real bar loaded with real numbers, so you can see exactly how Bar Cop runs a night. Open any section, run an audit, change a price, count some stock, break whatever you want. Nothing here saves and nothing breaks. When you are ready to run your own place, hit <b style="color:var(--gold);">Set Up My Bar</b> down in the corner. Now go dig around.</div>'
+      + '<button class="btn btn-primary" id="demo-welcome-go" style="width:100%;">Dig In</button>'
+      + '</div>';
+    document.body.appendChild(m);
+    const close = () => m.remove();
+    m.querySelector('#demo-welcome-go').addEventListener('click', close);
+    m.addEventListener('click', e => { if (e.target === m) close(); });
   },
 
   _mountDemoBanner() {
@@ -452,7 +472,8 @@ const App = {
     document.head.appendChild(style);
     const bar = document.createElement('div');
     bar.id = 'demo-banner';
-    bar.innerHTML = '<span style="font-size:12px;font-weight:700;letter-spacing:0.03em;flex:1;">Bar Cop Live Demo</span>'
+    bar.innerHTML = '<span style="font-size:12px;font-weight:700;letter-spacing:0.03em;">Bar Cop Live Demo</span>'
+      + '<span style="flex:1;min-width:0;font-size:11px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">&copy; Bar Cop</span>'
       + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Set Up My Bar</button>';
     document.body.appendChild(bar);
     document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/?signup=1'; });
@@ -2500,6 +2521,7 @@ const App = {
       if (el) el.style.display = x === (wantSignup ? 'auth-signup' : 'auth-login') ? '' : 'none';
     });
     if (wantSignup) window.history.replaceState({}, '', window.location.pathname);
+    const cy = document.getElementById('auth-copy-year'); if (cy) cy.textContent = String(new Date().getFullYear());
     // Show success banner if landing from Stripe checkout
     const banner = document.getElementById('checkout-success-msg');
     if (banner) banner.style.display = params.get('checkout') === 'success' ? 'block' : 'none';
