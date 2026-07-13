@@ -159,8 +159,11 @@ async function generateRevenueAudit(apiKey, files, appData, practices, controlDa
 // Missing/mis-set price envs now FAIL LOUDLY at checkout (see the guard below).
 // Set STRIPE_PRICE_MONTHLY / STRIPE_PRICE_ANNUAL in every env: the test IDs in
 // sandbox, the LIVE IDs in production.
-const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY || ''; // $249/mo
-const STRIPE_PRICE_ANNUAL  = process.env.STRIPE_PRICE_ANNUAL  || ''; // $2,490/yr
+// .trim() so a stray leading/trailing space pasted into the env var can't produce
+// a "No such price: ' price_...'" error (a space in the pasted value is invisible
+// in most dashboards but Stripe searches for the literal, space-and-all).
+const STRIPE_PRICE_MONTHLY = (process.env.STRIPE_PRICE_MONTHLY || '').trim(); // $249/mo
+const STRIPE_PRICE_ANNUAL  = (process.env.STRIPE_PRICE_ANNUAL  || '').trim(); // $2,490/yr
 const ALL_MODULES     = ['profit', 'revenue'];
 
 app.post('/api/create-checkout-session', async (req, res) => {
@@ -202,7 +205,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
       return res.status(409).json({ error: 'This bar already has an active subscription.' });
     }
 
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
     const priceId = plan === 'annual' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
     // Fail loudly if the price env for this plan is not configured, rather than
     // sending an empty/undefined price to Stripe or (previously) a hardcoded test
@@ -227,7 +230,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
     // browser. (Billing still keys to account_id in the webhook regardless.)
     if (userData.user.email) sessionArgs.customer_email = userData.user.email;
     const session = await stripe.checkout.sessions.create(sessionArgs);
-    res.json({ clientSecret: session.client_secret, publishableKey: process.env.STRIPE_PUBLISHABLE_KEY });
+    res.json({ clientSecret: session.client_secret, publishableKey: (process.env.STRIPE_PUBLISHABLE_KEY || '').trim() });
   } catch (e) {
     console.error('Checkout session error:', e);
     res.status(500).json({ error: e.message });
@@ -263,7 +266,7 @@ app.post('/api/billing-portal', async (req, res) => {
       return res.status(403).json({ error: 'Only the account owner can manage billing.' });
     }
 
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
     const { data, error } = await supabaseAdmin
       .from('subscriptions')
       .select('stripe_customer_id')
@@ -297,9 +300,9 @@ const supabaseAdmin = createClient(
 );
 
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
   const sig    = req.headers['stripe-signature'];
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = (process.env.STRIPE_WEBHOOK_SECRET || '').trim();
 
   let event;
   try {
