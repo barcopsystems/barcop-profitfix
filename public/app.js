@@ -5260,6 +5260,28 @@ const App = {
     // Settings and Getting Started are Hub-owned views, never module screens —
     // open them in the Hub container regardless of where the call came from.
     if (id === 'settings') { S.HubSettings.open(); return; }
+    // Retire the old standalone "This Week" / "Revenue This Week" write screens.
+    // Confirm the Week is the single weekly-close writer: it writes BOTH the profit
+    // `week` and the revenue_week with the correct hourly-labor split and catering
+    // handling that the old saveWeek forms did not, so leaving those forms reachable
+    // let a divergent second record be written. Every entry point that still targets
+    // them (Getting Started, a Fix result link, a stale nav) now opens the Confirm
+    // the Week popup for the current week over the section's Close The Week dashboard.
+    if (id === 'this-week' || id === 'r-this-week') {
+      const isProfit = (id === 'this-week');
+      const dashId = isProfit ? 'dashboard' : 'r-dashboard';
+      const dash   = isProfit ? S.Dashboard : S.RevenueDashboard;
+      this.openScreen(dashId);
+      const pe = (dash && dash.weekEnd) ? dash.weekEnd()
+        : ((S.ThisWeek && S.ThisWeek.currentWeekEnd) ? S.ThisWeek.currentWeekEnd() : this.todayLocal());
+      if (typeof ConfirmWeek !== 'undefined' && ConfirmWeek.open) {
+        ConfirmWeek.open(pe, { onDone: () => {
+          const c = document.getElementById('content-area'), a = document.getElementById('topbar-actions');
+          if (dash && dash.render && c) dash.render(c, a);
+        } });
+      }
+      return;
+    }
     // Landing on a screen is the base of its in-screen view history (floating back).
     this._currentScreenId = id;
     this._viewStack = [];
