@@ -372,7 +372,9 @@ S.LaborReports = {
     const salWk = App.salariedCost(ws, we);
     // Salaried pay accrues every week regardless of hourly activity, so it is always
     // in the week total (and itemized in the By Staff table below).
-    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + salWk.total;
+    // Include the weekly OT premium (0.5x over 40/wk) so the Week lens Actual Labor
+    // Cost / Labor % foots to gross and matches the Range lens, which already adds it.
+    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + salWk.total + this.otPremiums(weekActuals).total;
 
     const sched = this.scheduleCovering(ws);
     const schedHours = sched ? (sched.total_hours || 0) : null;

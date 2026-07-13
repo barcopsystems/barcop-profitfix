@@ -79,7 +79,8 @@ S.LaborDashboard = {
       const wkActuals = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
       const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
       const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
-      const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost;
+      const otPrem = App.otPremiumForRows ? App.otPremiumForRows(wkActuals).total : 0;   // 0.5x over 40/wk, not stored in a.cost
+      const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost + otPrem;
       let otRisk = 0; try { const p = this.weekProjection(); otRisk = (p.over || 0) + (p.approaching || 0); } catch (e) {}
       const stats = [
         { label: 'Labor Cost', value: App.fmtCurrency(wkCost) },
@@ -320,7 +321,8 @@ S.LaborDashboard = {
       const wkActuals = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
       const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
       const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
-      const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost;
+      const otPrem = App.otPremiumForRows ? App.otPremiumForRows(wkActuals).total : 0;   // 0.5x over 40/wk, not stored in a.cost
+      const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost + otPrem;
       // Labor % and RPLH read actual revenue for the week (sc_shifts), not a forecast,
       // so they read "-" until the week's sales are imported rather than dressing a
       // projection as actual.
