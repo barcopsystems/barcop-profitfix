@@ -166,12 +166,14 @@ S.LaborPayrollExport = {
       if (r.salaried) {
         return {
           name: r.name, position: pos ? pos.name : '', payType: 'Salary',
-          regHours: null, otHours: null, totalHours: r.hours,
+          regHours: r.regular_hours, otHours: 0, totalHours: r.hours,   // show coverage hours so the column foots with the TOTAL row (matches the on-screen detail)
           rate: null, regPay: r.regular_cost, otPay: 0, tipShare: null, gross: r.gross,
           status: 'Salaried (exempt)', salaried: true
         };
       }
-      const effHourly = r.hours > 0 ? (r.gross + tipShare) / r.hours : 0;
+      // Straight-time wage + tips for the tip-credit test (not gross, which carries
+      // the 1.5x OT premium and would mask a below-minimum shortfall).
+      const effHourly = r.hours > 0 ? ((r.wage || 0) * r.hours + tipShare) / r.hours : 0;
       let status = '';
       if (tipped) {
         if (!stateMinValid) status = 'No state minimum wage set';

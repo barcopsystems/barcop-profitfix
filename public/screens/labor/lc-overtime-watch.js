@@ -31,13 +31,15 @@ S.LaborOvertimeWatch = {
   scheduleCovering(dateStr) {
     const target = new Date(dateStr + 'T00:00:00').getTime();
     if (isNaN(target)) return null;
-    for (const s of this.schedules()) {
-      if (!s.week_start) continue;
+    const matches = this.schedules().filter(s => {
+      if (!s.week_start) return false;
       const start = new Date(s.week_start + 'T00:00:00').getTime();
-      if (isNaN(start)) continue;
-      if (target >= start && target <= start + 6 * 86400000) return s;
-    }
-    return null;
+      return !isNaN(start) && target >= start && target <= start + 6 * 86400000;
+    });
+    if (!matches.length) return null;
+    // Newest wins when a week has more than one schedule record — matches Log Hours,
+    // Pay Periods and Call-Out Log (all use App.cmpNewest), not first-in-array.
+    return App.cmpNewest ? matches.slice().sort(App.cmpNewest)[0] : matches[0];
   },
 
   // One week range pill (mirrors Build Schedule / the dashboards): the active-selector

@@ -266,7 +266,11 @@ S.LaborPayPeriods = {
       const pos = this.positionById(r.position_id);
       const isTipped = !!(pos && pos.tipped);
       const tipShare = isTipped ? this.tipShareForStaffInWeek(r.staff_id, agg.weekStart, agg.weekEnd) : 0;
-      const effectiveHourly = r.hours > 0 ? (r.gross + tipShare) / r.hours : 0;
+      // Tip-credit test compares the STRAIGHT-TIME cash wage + tips against the
+      // minimum — not gross (which carries the 1.5x OT premium and would inflate the
+      // rate, masking a below-minimum shortfall for anyone who worked overtime).
+      const straightPay = (r.wage || 0) * r.hours;
+      const effectiveHourly = r.hours > 0 ? (straightPay + tipShare) / r.hours : 0;
       const below = isTipped && stateMinValid && r.hours > 0 && effectiveHourly < stateMin;
       if (below) belowMinCount++;
       const tipCell = isTipped
