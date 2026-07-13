@@ -290,6 +290,12 @@ const App = {
     // the navigation so we don't grow the history stack on every back-step.
     window.addEventListener('popstate', (e) => {
       if (!e.state) return;
+      // If the app shell is not the active view (the auth / set-password screen is up,
+      // or no account data is loaded), a back/forward step must NOT pull the user into
+      // a module screen — App.data is null there and every data-driven screen throws,
+      // rendering a broken shell over the sign-in page. Ignore it and stay put.
+      const appHidden = document.getElementById('app')?.classList.contains('hidden');
+      if (appHidden || !this.data) return;
       this._navigationLock = true;
       try {
         if (e.state.mode === 'hub') {
@@ -914,9 +920,15 @@ const App = {
       + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">' + heading + '</div>'
       + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">' + bodyHtml + '</div>'
       + (showPicker
-          ? '<div id="gate-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">'
+          ? '<div id="gate-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">'
             +   planOpt('monthly', '<b>Monthly</b> &middot; $249/mo', '')
             +   planOpt('annual',  '<b>Annual</b> &middot; $2,490/yr', 'save $498')
+            + '</div>'
+            // In-app billing clause: the terms the operator agrees to by paying. Kept
+            // in step with the website Refund Policy (recurring, per bar, auto-renews,
+            // cancel stops future charges, current term is non-refundable).
+            + '<div style="font-size:10px;color:var(--t3);line-height:1.5;margin-bottom:16px;">'
+            +   'Continuing starts a recurring subscription for this bar at the price shown, charged to your card and renewing automatically each billing period until you cancel. You can cancel anytime under Manage Billing; cancellation stops future charges, and the current period is not refunded. See our <a href="' + App.TOS_TERMS_URL + '" target="_blank" rel="noopener" style="color:var(--gold);">Terms of Use</a>.'
             + '</div>'
           : '')
       + '<button class="btn btn-primary" id="gate-pay" style="width:100%;padding:14px 20px;font-size:12px;">' + primaryLabel + '</button>'
@@ -5254,6 +5266,11 @@ const App = {
   },
 
   navigate(id) {
+    // Not signed in / no account data loaded — never render a data-driven screen
+    // (every screen reads App.data). Defense in depth against a stray navigate (e.g.
+    // browser back on the sign-in page, or a queued callback after sign-out) painting
+    // a broken app shell over the auth screen.
+    if (!this.data) return;
     // Role-based block: a member can't navigate to a screen they don't have
     // access to. Show the no-access notice and stay put (no bounce).
     if (!this.canAccess(id)) { this.showNoAccess(); return; }
