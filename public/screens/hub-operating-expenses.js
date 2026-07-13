@@ -401,13 +401,15 @@ S.HubOperatingExpenses = {
     } else {
       bodyInner = segToggle
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-        +   '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
+        +   '<div class="f" style="width:150px;"><label>Date Submitted</label><input type="date" value="' + App.todayLocal() + '" disabled title="When you logged this. Always today."/></div>'
+        +   '<div class="f" style="width:150px;"><label>Due Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
         +   '<div class="f" style="width:230px;"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oexa-cat', key: 'expense_category', builtin: this.CATEGORIES, blank: true, blankLabel: 'Select category...' }) + '</div>'
         +   '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
         +   '<div class="f" style="width:140px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div></div>'
         + '</div>'
         + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oexa-recurring"/> Recurring bill (same cost each time)</label></div>'
         + '<div id="oexa-term-wrap" style="margin-top:12px;display:none;">'
+        +   '<div style="font-size:11px;color:var(--gold);margin-bottom:12px;max-width:540px;line-height:1.5;">Set the <b>Due Date</b> above to when this bill is next actually due. The schedule repeats from that date, not from today.</div>'
         +   '<div class="f" style="max-width:540px;"><label>How often</label><select id="oexa-frequency" style="width:200px;"><option value="monthly">Monthly</option><option value="quarterly">Quarterly (every 3 months)</option><option value="annual">Annually (once a year)</option></select></div>'
         +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" id="oexa-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs until you stop it. Set this only for a bill that ends after a fixed number of months.</div></div></div>'
         + '</div>'
@@ -659,13 +661,19 @@ S.HubOperatingExpenses = {
     // ANY entry in the series (no hunting for the original 12-month-old row).
     const parent = rec.recurring_parent ? (arr.find(r => r.id === rec.recurring_parent) || rec) : rec;
     const seriesOn = !!parent.recurring;
-    const recurHtml = '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oex-f-recurring"' + (seriesOn ? ' checked' : '') + '/> Recurring monthly bill (same cost each month)</label></div>'
-      + '<div class="form-row" id="oex-f-term-wrap" style="margin-top:12px;' + (seriesOn ? '' : 'display:none;') + 'align-items:flex-end;gap:12px;flex-wrap:wrap;"><div class="f" style="width:170px;"><label>Ends after (months)</label><input type="number" id="oex-f-term" min="1" step="1" value="' + esc(parent.term_months || '') + '" placeholder="Ongoing"/></div></div>';
+    const freqOpt = (v, lbl) => '<option value="' + v + '"' + (parent.frequency === v || (!parent.frequency && v === 'monthly') ? ' selected' : '') + '>' + lbl + '</option>';
+    const recurHtml = '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oex-f-recurring"' + (seriesOn ? ' checked' : '') + '/> Recurring bill (same cost each time)</label></div>'
+      + '<div id="oex-f-term-wrap" style="margin-top:12px;' + (seriesOn ? '' : 'display:none;') + '">'
+      +   '<div style="font-size:11px;color:var(--gold);margin-bottom:12px;max-width:540px;line-height:1.5;">Set the <b>Due Date</b> above to when this bill is next due. The schedule repeats from that date.</div>'
+      +   '<div class="f" style="max-width:540px;"><label>How often</label><select id="oex-f-frequency" style="width:200px;">' + freqOpt('monthly', 'Monthly') + freqOpt('quarterly', 'Quarterly (every 3 months)') + freqOpt('annual', 'Annually (once a year)') + '</select></div>'
+      +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><input type="number" id="oex-f-term" min="1" step="1" value="' + esc(parent.term_months || '') + '" placeholder="Ongoing" style="width:170px;"/></div>'
+      + '</div>';
 
     const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">' + (isEdit ? 'Edit Expense' : 'Add Expense') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      +   '<div class="f"><label>Date</label><input type="date" id="oex-f-date" value="' + esc(rec.date) + '"/></div>'
+      +   '<div class="f"><label>Date Submitted</label><input type="date" value="' + esc((rec.created_at || '').slice(0, 10) || rec.date || App.todayLocal()) + '" disabled/></div>'
+      +   '<div class="f"><label>Due Date</label><input type="date" id="oex-f-date" value="' + esc(rec.date) + '"/></div>'
       +   '<div class="f"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oex-f-cat', key: 'expense_category', builtin: this.CATEGORIES, selected: rec.category, blank: true, blankLabel: 'Select category...' }) + '</div>'
       +   '<div class="f"><label>Vendor</label><input type="text" id="oex-f-vendor" value="' + esc(rec.vendor) + '" placeholder="Who did you pay"/></div>'
       +   '<div class="f"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div></div>'
@@ -697,23 +705,24 @@ S.HubOperatingExpenses = {
       if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
       const updates = { date, category, vendor, amount, notes };
       const recChecked = !!document.getElementById('oex-f-recurring')?.checked;
+      const freqV = document.getElementById('oex-f-frequency')?.value || 'monthly';
       const termV = parseInt(document.getElementById('oex-f-term')?.value, 10);
       if (recChecked && document.getElementById('oex-f-term')?.value && (isNaN(termV) || termV < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
       if (isEdit) {
         const idx = arr.findIndex(r => r.id === rec.id);
         if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], updates);
-        // Recurring on/off + term are series-level, so they always land on the
-        // series parent no matter which entry you edited.
+        // Recurring on/off + frequency + term are series-level, so they always land
+        // on the series parent no matter which entry you edited.
         const parentId = rec.recurring_parent || rec.id;
         const pIdx = arr.findIndex(r => r.id === parentId);
         if (pIdx >= 0) {
           arr[pIdx] = recChecked
-            ? Object.assign({}, arr[pIdx], { recurring: true, term_months: (termV && termV > 0) ? termV : null, recur_day: arr[pIdx].recur_day || (parseInt(String(arr[pIdx].date).slice(8, 10), 10) || 1) })
-            : Object.assign({}, arr[pIdx], { recurring: false, term_months: null });
+            ? Object.assign({}, arr[pIdx], { recurring: true, frequency: freqV, term_months: (termV && termV > 0) ? termV : null, recur_day: arr[pIdx].recur_day || (parseInt(String(arr[pIdx].date).slice(8, 10), 10) || 1) })
+            : Object.assign({}, arr[pIdx], { recurring: false, frequency: undefined, term_months: null });
         }
       } else {
         const newRec = Object.assign({ id: App.uid ? App.uid() : ('oex-' + Date.now()), created_at: new Date().toISOString() }, updates);
-        if (recChecked) { newRec.recurring = true; newRec.term_months = (termV && termV > 0) ? termV : null; newRec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; }
+        if (recChecked) { newRec.recurring = true; newRec.frequency = freqV; newRec.term_months = (termV && termV > 0) ? termV : null; newRec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; }
         arr.push(newRec);
       }
       await App.saveKey('operating_expenses');
