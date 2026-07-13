@@ -43,15 +43,26 @@ S.HubBreakEven = {
     const netRev = YTD ? (YTD.totalRev || 0) : 0;   // net sales (comps already excluded); includes catering + other
     const cogs   = YTD ? (YTD.totalCogs || 0) : 0;
     const labor  = YTD ? (YTD.totalLabor || 0) : 0;
-    // Books labor now includes salaried; peel it back so the VARIABLE rate reflects
-    // only hourly labor (what flexes with sales). salariedYTD reconstructs exactly
-    // what the aggregator folded in, week by week.
+    // Books labor includes salaried; the VARIABLE rate must reflect only the hourly
+    // (schedulable) labor that flexes with sales. Prefer the hourly split Confirm the
+    // Week already stored on each week (revenue_week.hourly_labor_cost, with salaried
+    // peeled out at confirm time): summing it needs no roster reconstruction and stays
+    // correct across a mid-year salaried hire, raise, or departure. The old code
+    // re-derived salaried from TODAY's roster and applied it to every historical week,
+    // so a roster change skewed the rate. Fall back to peeling salaried with the
+    // current roster only for a week that predates the stored split.
     const _yr = curKey.slice(0, 4), _mn = parseInt(curKey.slice(5, 7), 10);
     const _inYTD = d => d && String(d).slice(0, 4) === _yr && parseInt(String(d).slice(5, 7), 10) <= _mn;
-    const salariedYTD = ((App.data && App.data.weeks) || [])
+    const hourlyLabor = ((App.data && App.data.revenue_weeks) || [])
       .filter(w => _inYTD(w.period_end))
-      .reduce((s, w) => s + (App.salariedCost ? (App.salariedCost(App.weekStartFor(w.period_end), w.period_end).total || 0) : 0), 0);
-    const hourlyLabor = Math.max(0, labor - salariedYTD);
+      .reduce((s, w) => {
+        const hl = parseFloat(w.hourly_labor_cost);
+        if (!isNaN(hl)) return s + hl;
+        const tl = parseFloat(w.total_labor_cost) || 0;
+        const pe = String(w.period_end || '').slice(0, 10);
+        const sal = App.salariedCost ? (App.salariedCost(App.weekStartFor(pe), pe).total || 0) : 0;
+        return s + Math.max(0, tl - sal);
+      }, 0);
     const varRate = netRev > 0 ? (cogs + hourlyLabor) / netRev : null;
 
     const opex = (App.data && App.data.operating_expenses) || [];
