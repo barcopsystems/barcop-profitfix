@@ -278,12 +278,16 @@ const ConfirmWeek = {
 
     // ── Revenue `revenue_week` record ──
     const rw = (App.data.revenue_weeks || []).find(w => (w.period_end || '').slice(0, 10) === pe) || null;
-    const laborCost = bLab + fLab;
+    // Total labor INCLUDES catering labor, consistent with prime_cost_pct and the
+    // locked "total labor drives every labor% number" rule. It was dropping cLab
+    // while the denominator (totRev) kept catering revenue, understating labor%.
+    const laborCost = bLab + fLab + cLab;
     const hours = this._hours || 0;
-    // Hourly (schedulable) labor = total labor minus the fixed salaried pay, so the
-    // labor-scheduling recovery leak dollarizes only what scheduling can move.
+    // Hourly (schedulable) labor = bar+food hourly only, minus fixed salaried pay,
+    // so the labor-scheduling recovery leak dollarizes only what the weekly schedule
+    // can move (catering event crew is event-driven, not weekly-schedulable).
     const salaried = App.salariedCost ? (App.salariedCost(App.weekStartFor(pe), pe).total || 0) : 0;
-    const hourlyLabor = Math.max(0, laborCost - salaried);
+    const hourlyLabor = Math.max(0, (bLab + fLab) - salaried);
     const rweek = {
       id: rw ? rw.id : App.uid(),
       week_num: rw ? rw.week_num : ((App.data.revenue_weeks || []).length + 1),
