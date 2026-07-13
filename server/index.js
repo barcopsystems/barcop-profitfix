@@ -316,9 +316,8 @@ async function sendWelcomeEmail(email, barName) {
     const helpUrl = 'https://www.barcop.com/blogs/help';
     const html =
         '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Arial,sans-serif;max-width:560px;margin:0 auto;color:#14222A;">'
-      +   '<div style="padding:22px 28px;border-bottom:3px solid ' + gold + ';">'
-      +     '<span style="font-size:22px;font-weight:800;letter-spacing:0.5px;color:#14222A;">bar</span>'
-      +     '<span style="font-size:22px;font-weight:800;letter-spacing:0.5px;color:' + gold + ';">cop</span>'
+      +   '<div style="background:#070E16;padding:20px 28px;text-align:center;">'
+      +     '<img src="https://app.barcop.com/assets/logo.png" alt="Bar Cop" width="190" height="33" style="display:inline-block;border:0;width:190px;height:33px;color:#ffffff;font-size:20px;font-weight:800;letter-spacing:0.5px;line-height:33px;" />'
       +   '</div>'
       +   '<div style="padding:26px 28px;font-size:15px;line-height:1.6;color:#2A3942;">'
       +     '<div style="font-size:22px;font-weight:800;color:#14222A;margin-bottom:14px;">You\'re in.</div>'
