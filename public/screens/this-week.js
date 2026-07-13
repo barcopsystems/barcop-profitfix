@@ -107,13 +107,25 @@ S.ThisWeek = {
     // not bar/food, so skip them here to avoid double-counting that labor.
     const evKeys = this.offsiteEventStaffKeys(periodEnd);
     let bar = 0, food = 0, any = false;
+    const wkRows = [];
     actuals.forEach(a => {
       if (!a.date || a.date < start || a.date > periodEnd) return;
       if (evKeys.has(a.staff_id + '|' + String(a.date).slice(0, 10))) return;
       any = true;
+      wkRows.push(a);
       if (posDept[a.position_id] === 'Bar') bar += a.cost || 0;
       else food += a.cost || 0;
     });
+    // Overtime premium (0.5x on weekly hours over 40) is NOT stored in a.cost
+    // (straight time only), so add it here or the booked weekly P&L and prime cost
+    // understate labor exactly on the weeks someone runs into overtime. Split it
+    // across Bar/Food by their share of this week's hourly cost, same as salary.
+    const otPrem = App.otPremiumForRows ? App.otPremiumForRows(wkRows).total : 0;
+    if (otPrem > 0) {
+      const h = bar + food;
+      if (h > 0) { bar += otPrem * (bar / h); food += otPrem * (food / h); }
+      else { food += otPrem; }
+    }
     // Salaried (exempt) pay is fixed weekly labor on top of hourly wages, same as
     // Revenue's feed. Bar Cop can stand behind it (annual / 52), so it belongs in the
     // week's labor. Split across Bar and Food by their share of this week's hourly

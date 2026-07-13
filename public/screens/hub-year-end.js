@@ -682,7 +682,7 @@ S.HubYearEnd = {
       totalRev ? (totalWages / totalRev) : null,
       totalHours ? (totalRev / totalHours) : null]);
 
-    this._pushFooter(rows, merges, 'Hours and wages from Labor Control logged actuals. Overtime computed per staff per week (hours over 40 = OT, paid at 1.5x base wage). Revenue from Shift Control shifts. RPLH = Revenue per Labor Hour. These wages are recomputed from logged hours and may not exactly match Total Labor on the Annual Summary and P&L by Month sheets, which use your weekly booked labor.', COL_COUNT);
+    this._pushFooter(rows, merges, 'Hours and wages from Labor Control logged actuals. Overtime computed per staff per week (hours over 40 = OT, paid at 1.5x base wage). Revenue from Shift Control shifts (bar and food only, excluding catering and ancillary), so Labor % and RPLH here can differ from the Annual Summary and P&L by Month sheets, which measure against net sales. RPLH = Revenue per Labor Hour. These wages are recomputed from logged hours and may not exactly match Total Labor on those sheets, which use your weekly booked labor.', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
@@ -1096,8 +1096,10 @@ S.HubYearEnd = {
     const tips = (App.laborData?.lc_tips || []).filter(t => inYear(t.date));
     const totalTips = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
 
-    // Strongest/weakest month
-    const netMonthlyRev = Y.months.map(M => M.totalRev - (M.compsLoss || 0));
+    // Strongest/weakest month. Revenue is already net sales (comps excluded), so
+    // do NOT re-subtract comps here — doing so could rank a high-comp month below a
+    // lower-revenue one and print the wrong "strongest month" + a understated figure.
+    const netMonthlyRev = Y.months.map(M => M.totalRev);
     let strongIdx = -1, weakIdx = -1, strongVal = -Infinity, weakVal = Infinity;
     netMonthlyRev.forEach((v, i) => {
       if (v > strongVal) { strongVal = v; strongIdx = i; }

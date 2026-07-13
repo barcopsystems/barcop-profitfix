@@ -603,7 +603,7 @@ S.HubBooks = {
     rows.push(blank());
     rows.push(this._lineRow('Revenue from Shift Control. COGS from Inventory Control weekly counts. Labor from Labor Control actuals.', COL_COUNT));
     merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
-    rows.push(this._lineRow('Guest comps reduce revenue; staff meals and shift drinks are booked as an operating expense, both from the Shift Control void and comp log. Maintenance from the maintenance log. Operating expenses from your Operating Expenses log.', COL_COUNT));
+    rows.push(this._lineRow('Revenue is net sales as entered; comps and discounts are tracked in Shift Control, not re-subtracted here. Maintenance from the maintenance log. Operating expenses from your Operating Expenses log.', COL_COUNT));
     merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
 
     // Footer + disclaimer
@@ -792,7 +792,10 @@ S.HubBooks = {
     Object.keys(byCat).sort().forEach(c => {
       rows.push(['  ' + c, byCat[c].qty, byCat[c].value, '', '']);
     });
-    rows.push(['Total Ending Inventory', items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0), endingValue, '', '']);
+    // No grand-total Units: each category counts in its own unit (cases, bottles,
+    // kegs, lbs), so summing them is a meaningless number. Only the dollar value
+    // totals across categories.
+    rows.push(['Total Ending Inventory', '', endingValue, '', '']);
     rows.push(blank());
 
     // Bottle-level detail
@@ -1329,7 +1332,7 @@ S.HubBooks = {
 
     rows.push(this._lineRow(this._baseTitle('Labor Cost Analysis', monthKey), COL_COUNT));
     mergeFull(0);
-    rows.push(this._lineRow('This sheet totals wages from logged hours by calendar month and accrues salary by days-in-month. The Income Statement labor is built from confirmed weekly records (a week is booked whole to the month it ends in), so the two Total Labor figures can differ by a partial straddling week and the salary accrual method. Both are correct on their own basis.', COL_COUNT));
+    rows.push(this._lineRow('This sheet totals wages from logged hours by calendar month and accrues salary by days-in-month, measured against POS shift revenue (bar and food). The Income Statement labor is built from confirmed weekly records (a week is booked whole to the month it ends in) and its labor percent is measured against net sales, which also includes catering and ancillary revenue. So the two Total Labor figures can differ by a partial straddling week and the salary accrual method, and the two Labor Percent figures can differ by that revenue base. Both are correct on their own basis.', COL_COUNT));
     mergeFull(rows.length - 1);
     rows.push(blank());
 

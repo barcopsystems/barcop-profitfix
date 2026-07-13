@@ -438,7 +438,7 @@ S.Hub = {
       + heroTile('dashboard', "S.Hub._enter('dashboard','profit')", 'Open Profit Close The Week', 'Total Opportunity',
              anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              anyAudit && totalOpp > 0 ? 'var(--w)' : 'var(--t4)',
-             anyAudit ? 'On the table to recover' : 'Run an audit to surface this')
+             anyAudit ? 'On the table to recover a month' : 'Run an audit to surface this')
       + statDiv
       + heroTile('r-dashboard', "S.Hub._enter('r-dashboard','revenue')", 'Open Revenue Close The Week', 'Recovered',
              recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',

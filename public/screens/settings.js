@@ -342,7 +342,10 @@ S.HubSettings = {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      // Defer revocation so a large multi-MB backup finishes downloading before the
+      // blob URL is torn down (matches the app's PDF saver). Revoking on the same
+      // tick can yield a 0-byte or truncated file on a slow read.
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
       this._backupMsg('Backup downloaded. Keep it somewhere safe.', 'var(--gold)');
     } catch (e) {
       this._backupMsg('Could not create the backup file: ' + (e.message || 'unknown error'), 'var(--red)');
