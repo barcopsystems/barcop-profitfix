@@ -443,11 +443,26 @@ window.CashEngine = {
       const base = new Date((p.date || startYmd) + 'T00:00:00');
       if (isNaN(base.getTime())) return;
       const day = parseInt(p.recur_day, 10) || base.getDate();
-      const term = parseInt(p.term_months, 10) || 12;
+      const term = parseInt(p.term_months, 10) || 0;        // 0 = ongoing until stopped
+      const stop = p.stopped_ym || null;                     // YYYY-MM; no occurrence in or after this month
       const step = p.frequency === 'quarterly' ? 3 : p.frequency === 'annual' ? 12 : 1;   // recurrence interval in months
-      for (let m = 0; m < term; m += step) {
-        const occ = new Date(base.getFullYear(), base.getMonth() + m, day);
+      // Anchor the horizon to the forecast window END, not the bill's own start.
+      // The old loop (`m < term` with a 12-month default for ongoing bills) only
+      // ever generated the 12 months FOLLOWING the bill's first date, so an
+      // ongoing bill logged over a year ago projected $0 into a future window and
+      // the survival forecast silently dropped it (overstating the bank balance).
+      // Mirrors outflowsBetween, incl. the short-month day clamp.
+      const endD = new Date(endYmd + 'T00:00:00');
+      const monthsToEnd = (endD.getFullYear() - base.getFullYear()) * 12 + (endD.getMonth() - base.getMonth());
+      const lastM = term > 0 ? Math.min(term - 1, monthsToEnd) : monthsToEnd;
+      for (let m = 0; m <= lastM; m += step) {
+        // Clamp the day to the target month's last day so a series dated the
+        // 29th to 31st does not roll a short month forward (Jan 31 -> Mar 3) and
+        // silently skip the short month.
+        const dim = new Date(base.getFullYear(), base.getMonth() + m + 1, 0).getDate();
+        const occ = new Date(base.getFullYear(), base.getMonth() + m, Math.min(day, dim));
         const ymd = App.ymdLocal(occ);
+        if (stop && ymd.slice(0, 7) >= stop) break;
         if (ymd < startYmd || ymd > endYmd) continue;
         const key = p.id + '@' + ymd.slice(0, 7);
         if (covered.has(key)) continue;
@@ -628,7 +643,7 @@ window.CashEngine = {
   //    cash out) and the bridge (where the profit went). Same forward-recurring
   //    projection as bills. ──────────────────────────────────────────────────
   cashOutflows() { return (App.data && Array.isArray(App.data.cash_outflows)) ? App.data.cash_outflows : []; },
-  _outflowLabel(t) { return t === 'draw' ? 'Owner draw' : t === 'loan' ? 'Loan payment' : t === 'tax' ? 'Tax remittance' : 'Capital'; },
+  _outflowLabel(t) { return t === 'draw' ? 'Owner draw' : t === 'loan' ? 'Loan payment' : t === 'tax' ? 'Tax remittance' : t === 'capital' ? 'Capital / equipment' : 'Other'; },
   outflowsBetween(startYmd, endYmd) {
     const recs = this.cashOutflows();
     const out = []; const covered = new Set();
@@ -643,10 +658,11 @@ window.CashEngine = {
       const day = parseInt(p.recur_day, 10) || base.getDate();
       const term = parseInt(p.term_months, 10) || 0;        // 0 = ongoing until stopped
       const stop = p.stopped_ym || null;                     // YYYY-MM; no occurrence in or after this month
+      const step = p.frequency === 'quarterly' ? 3 : p.frequency === 'annual' ? 12 : 1;   // recurrence interval in months
       const endD = new Date(endYmd + 'T00:00:00');
       const monthsToEnd = (endD.getFullYear() - base.getFullYear()) * 12 + (endD.getMonth() - base.getMonth());
       const lastM = term > 0 ? Math.min(term - 1, monthsToEnd) : monthsToEnd;
-      for (let m = 0; m <= lastM; m++) {
+      for (let m = 0; m <= lastM; m += step) {
         // Clamp the day to the target month's last day so a series dated the
         // 29th to 31st does not roll a short month forward (Jan 31 -> Mar 3)
         // and silently skip the short month.
