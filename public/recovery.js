@@ -193,12 +193,27 @@ window.Recovery = {
      { logged, recovered, withFigure, measuring }: total logged fixes, the
      summed annualized recovered dollars, how many produced a dollar figure,
      and how many are still in the measuring window. */
+  // Recovery is measured per gap-AREA — compute() reads the gap's weekly metric
+  // vs a baseline, so it returns the SAME dollars for every fix_log entry sharing a
+  // gap_id. Collapse to one entry per gap (the earliest) before summing, or logging
+  // a second fix in the same area double-counts the realized/annual dollars.
+  _oneFixPerGap(entries) {
+    const byGap = {};
+    (entries || []).forEach(e => {
+      if (!e || e.gap_id == null) return;
+      const cur = byGap[e.gap_id];
+      if (!cur || String(e.date || '') < String(cur.date || '')) byGap[e.gap_id] = e;
+    });
+    return Object.keys(byGap).map(k => byGap[k]);
+  },
+
   moduleSummary(moduleKey) {
     const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     const mine = log.filter(e => e.module === moduleKey);
+    // Money + measured-fix counts dedupe by gap; `logged` stays the literal count.
+    const scored = this._oneFixPerGap(mine.filter(e => this.COMPOSITE_GAPS.indexOf(e.gap_id) === -1));
     let recovered = 0, annual = 0, withFigure = 0, measuring = 0;
-    mine.forEach(e => {
-      if (this.COMPOSITE_GAPS.indexOf(e.gap_id) !== -1) return;   // skip composite (double-count)
+    scored.forEach(e => {
       const r = this.compute(e);
       if (r.status === 'ok' && r.dollars != null && r.dollars > 0) { recovered += r.dollars; annual += (r.dollarsAnnual || 0); withFigure++; }
       else if (r.status === 'building') measuring++;
@@ -212,9 +227,11 @@ window.Recovery = {
      pace, for an "on pace for" line only. */
   total() {
     const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    // One entry per gap-area (see moduleSummary) so a second fix in the same gap
+    // never double-counts the headline "Recovered to Date" / Hub total.
+    const scored = this._oneFixPerGap(log.filter(e => this.COMPOSITE_GAPS.indexOf(e.gap_id) === -1));
     let dollars = 0, annual = 0, cost = 0, revenue = 0, fixes = 0;
-    log.forEach(e => {
-      if (this.COMPOSITE_GAPS.indexOf(e.gap_id) !== -1) return;
+    scored.forEach(e => {
       const r = this.compute(e);
       if (r.status === 'ok' && r.dollars > 0) {
         dollars += r.dollars; annual += (r.dollarsAnnual || 0); fixes++;

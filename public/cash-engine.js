@@ -444,7 +444,8 @@ window.CashEngine = {
       if (isNaN(base.getTime())) return;
       const day = parseInt(p.recur_day, 10) || base.getDate();
       const term = parseInt(p.term_months, 10) || 12;
-      for (let m = 0; m < term; m++) {
+      const step = p.frequency === 'quarterly' ? 3 : p.frequency === 'annual' ? 12 : 1;   // recurrence interval in months
+      for (let m = 0; m < term; m += step) {
         const occ = new Date(base.getFullYear(), base.getMonth() + m, day);
         const ymd = App.ymdLocal(occ);
         if (ymd < startYmd || ymd > endYmd) continue;
@@ -469,7 +470,14 @@ window.CashEngine = {
     const rows = [];
     for (let i = 0; i < numWeeks; i++) {
       const ws = this._addDays(start, i * 7), we = this._addDays(ws, 6);
-      const sales = this.revenueForWeek(ws) * (1 + salesAdj / 100);
+      let sales = this.revenueForWeek(ws) * (1 + salesAdj / 100);
+      if (i === 0) {
+        // Opening cash is a "right now" balance that already reflects sales banked
+        // earlier this week, so week 0 only projects the days still to come — else
+        // the elapsed days are double-counted and the near-term runway overshoots.
+        const dow = (new Date().getDay() + 6) % 7;   // 0=Mon .. 6=Sun
+        sales = sales * ((7 - dow) / 7);
+      }
       // A SAVED forecast override already bundles this week's booked-event revenue
       // (Build Schedule adds it into the number you type), so adding the event
       // balance again would double-count. The baseline sales path is event-free, so
@@ -548,11 +556,17 @@ window.CashEngine = {
   setGiftCardLiability(v) { this._cfgSet('cash_gift_card_liability', v); },
 
   // Weekly fixed overhead: the recurring bills (rent, utilities, insurance, loan),
-  // normalized to a week. The nut you owe even on a dead week.
+  // normalized to a week by their frequency (monthly / quarterly / annual), so a
+  // quarterly or annual bill is not weighted as if it hit every month.
   weeklyFixedCosts() {
-    let monthly = 0;
-    this.bills().forEach(b => { if (b.recurring) monthly += (parseFloat(b.amount) || 0); });
-    return monthly / (52 / 12);
+    let annual = 0;
+    this.bills().forEach(b => {
+      if (!b.recurring) return;   // recurring parents only (children carry recurring_parent, not recurring)
+      const amt = parseFloat(b.amount) || 0;
+      const perYear = b.frequency === 'quarterly' ? 4 : b.frequency === 'annual' ? 1 : 12;
+      annual += amt * perYear;
+    });
+    return annual / 52;
   },
 
   _taxPeriodBounds() {
@@ -586,16 +600,11 @@ window.CashEngine = {
   setAside() {
     const b = this._taxPeriodBounds();
     const sales = this._salesBetween(b.start, b.end);
-    // Net out any sales tax already remitted this period (a tax outflow logged
-    // in Cash Bridge), so Set Aside never holds back money you have already
-    // paid. Matches the remittance suppression in the forecast.
-    let remitted = 0;
-    this.cashOutflows().forEach(o => {
-      if (o.type !== 'tax') return;
-      const d = String(o.date || '').slice(0, 10);
-      if (d >= b.start && d <= b.end) remitted += parseFloat(o.amount) || 0;
-    });
-    const salesTax = Math.max(0, sales * (this.salesTaxRate() / 100) - remitted);
+    // Sales tax is remitted in ARREARS: a payment logged this period (typically
+    // ~the 20th) settles the PRIOR period's liability, not this one's. Netting it
+    // against the current period's accrual understated the hold and made Safe to
+    // Spend read too high. This in-progress period's tax is still owed in full.
+    const salesTax = Math.max(0, sales * (this.salesTaxRate() / 100));
     const wages = this._wagesBetween(b.start, b.end);
     const payrollTax = wages * (this.payrollBurden() / 100);
     const giftCards = this.giftCardLiability();

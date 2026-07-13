@@ -3343,7 +3343,11 @@ const App = {
       const purchases = purch[pid] || 0;
       const isCaseBeer = this.isCaseBeer(p);
       const unitCost = (p.unit_cost != null) ? this.unitCost(p) : this.unitCostFromCountItem(ei);
-      const servingsPerUnit = isCaseBeer ? p.case_size : (p.pours_per_container || null);
+      // Fall back to the pour math when pours_per_container was never stored, so a
+      // seeded/imported pourable still yields theoretical draws (kept consistent
+      // with ic-report-variance _compServingsToStock).
+      const servingsPerUnit = isCaseBeer ? p.case_size
+        : (p.pours_per_container || ((p.container_size_oz && p.pour_size_oz) ? p.container_size_oz / p.pour_size_oz : null));
       const ozPerUnit = isCaseBeer
         ? (p.container_size_oz != null ? p.case_size * p.container_size_oz : null)
         : (p.container_size_oz != null ? p.container_size_oz : null);
