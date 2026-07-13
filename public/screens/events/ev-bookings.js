@@ -122,12 +122,18 @@ S.EventsBookings = {
     const ph = parseFloat(b.per_head) || 0;
     const party = parseInt(b.party_size) || 0;
     const fbMin = parseFloat(b.fb_minimum) || 0;
+    const roomFee = parseFloat(b.room_fee) || 0;
     const svcPct = (b.service_charge_pct != null && b.service_charge_pct !== '') ? (parseFloat(b.service_charge_pct) || 0) : this.DEFAULT_SVC_PCT;
     const taxPct = (b.tax_pct != null && b.tax_pct !== '') ? (parseFloat(b.tax_pct) || 0) : this.defaultTaxPct();
     const subtotal = Math.max(ph * party, fbMin);
     const service = subtotal * svcPct / 100;
     const tax = subtotal * taxPct / 100;
-    return { ph, party, fbMin, svcPct, taxPct, subtotal, service, tax, total: subtotal + service + tax };
+    // Room fee is a flat facility charge added on top of the F&B quote. Gratuity
+    // is on F&B only and room-rental tax varies by jurisdiction, so the fee is not
+    // auto-serviced or auto-taxed — it flows straight to the total (and the balance
+    // due). Before this it was collected on the rate card but silently dropped from
+    // every quote, PDF, agreement, and balance.
+    return { ph, party, fbMin, roomFee, svcPct, taxPct, subtotal, service, tax, total: subtotal + service + tax + roomFee };
   },
   quoteTotal(b) { return this.quoteParts(b).total; },
   quoteBreakdownHtml(p) {
@@ -138,6 +144,7 @@ S.EventsBookings = {
       + line('F&amp;B Subtotal', p.subtotal)
       + line('Service Charge (' + (p.svcPct || 0) + '%)', p.service)
       + line('Tax (' + (p.taxPct || 0) + '%)', p.tax)
+      + (p.roomFee ? line('Room Fee', p.roomFee) : '')
       + line('Quoted Total', p.total, true)
       + '</div>';
   },
@@ -525,6 +532,7 @@ S.EventsBookings = {
           + '<div class="f" style="width:130px;flex-shrink:0;"><label>Per Head</label><div class="fw"><span class="pre">$</span><input class="form-input pre eb-q-in" type="number" id="eb-q-ph" value="' + (b.per_head != null && b.per_head !== 0 ? b.per_head : '') + '" step="0.01"/></div></div>'
           + '<div class="f" style="width:100px;flex-shrink:0;"><label>Guests</label><input class="form-input eb-q-in" type="number" id="eb-q-party" value="' + (b.party_size != null && b.party_size !== 0 ? b.party_size : '') + '"/></div>'
           + '<div class="f" style="width:140px;flex-shrink:0;"><label>F&amp;B Minimum</label><div class="fw"><span class="pre">$</span><input class="form-input pre eb-q-in" type="number" id="eb-q-fb" value="' + (b.fb_minimum != null && b.fb_minimum !== 0 ? b.fb_minimum : '') + '"/></div></div>'
+          + '<div class="f" style="width:120px;flex-shrink:0;"><label>Room Fee</label><div class="fw"><span class="pre">$</span><input class="form-input pre eb-q-in" type="number" id="eb-q-room" value="' + (b.room_fee != null && b.room_fee !== 0 ? b.room_fee : '') + '"/></div></div>'
           + '<div class="f" style="width:120px;flex-shrink:0;"><label>Service Charge</label><div class="fw"><input class="form-input suf eb-q-in" type="number" id="eb-q-svc" value="' + (b.service_charge_pct != null && b.service_charge_pct !== '' ? b.service_charge_pct : this.DEFAULT_SVC_PCT) + '" step="0.5"/><span class="suf">%</span></div></div>'
           + '<div class="f" style="width:110px;flex-shrink:0;"><label>Tax</label><div class="fw"><input class="form-input suf eb-q-in" type="number" id="eb-q-tax" value="' + (b.tax_pct != null && b.tax_pct !== '' ? b.tax_pct : this.defaultTaxPct()) + '" step="0.01"/><span class="suf">%</span></div></div>'
         + '</div>'
@@ -608,6 +616,7 @@ S.EventsBookings = {
     if (g('eb-q-ph'))    f.per_head = parseFloat(g('eb-q-ph').value) || 0;
     if (g('eb-q-party')) f.party_size = parseInt(g('eb-q-party').value) || null;
     if (g('eb-q-fb'))    f.fb_minimum = parseFloat(g('eb-q-fb').value) || 0;
+    if (g('eb-q-room'))  f.room_fee = parseFloat(g('eb-q-room').value) || 0;
     if (g('eb-q-svc'))   f.service_charge_pct = (g('eb-q-svc').value !== '') ? (parseFloat(g('eb-q-svc').value) || 0) : this.DEFAULT_SVC_PCT;
     if (g('eb-q-tax'))   f.tax_pct = (g('eb-q-tax').value !== '') ? (parseFloat(g('eb-q-tax').value) || 0) : this.defaultTaxPct();
     const cur = this.bookings().find(x => x.id === this._detailId) || {};
@@ -631,6 +640,7 @@ S.EventsBookings = {
     if (rc) {
       if (rc.per_head != null) fields.per_head = rc.per_head;
       if (rc.fb_minimum != null) fields.fb_minimum = rc.fb_minimum;
+      if (rc.room_fee != null) fields.room_fee = rc.room_fee;
     }
     fields.quoted_total = Math.round(this.quoteParts(Object.assign({}, b, fields)).total);
     this.patch(id, fields);
@@ -730,6 +740,7 @@ S.EventsBookings = {
     L.push('Food and beverage subtotal: ' + App.fmtCurrency(p.subtotal));
     if (p.svcPct) L.push('Service charge (' + p.svcPct + '%): ' + App.fmtCurrency(p.service));
     if (p.taxPct) L.push('Tax (' + p.taxPct + '%): ' + App.fmtCurrency(p.tax));
+    if (p.roomFee) L.push('Room fee: ' + App.fmtCurrency(p.roomFee));
     L.push('Quoted total: ' + App.fmtCurrency(p.total));
     if (b.deposit_amount) L.push('Deposit to confirm: ' + App.fmtCurrency(b.deposit_amount));
     L.push('');
@@ -857,6 +868,7 @@ S.EventsBookings = {
     lines.push(['F&B Subtotal', money(qp.subtotal)]);
     if (qp.svcPct) lines.push(['Service Charge (' + qp.svcPct + '%)', money(qp.service)]);
     if (qp.taxPct) lines.push(['Tax (' + qp.taxPct + '%)', money(qp.tax)]);
+    if (qp.roomFee) lines.push(['Room Fee', money(qp.roomFee)]);
     lines.push(['Quoted Total', money(qp.total)]);
     if (b.deposit_amount) lines.push(['Deposit to Confirm', money(b.deposit_amount)]);
     const rowsHtml = lines.map(([k, v]) => '<tr><td style="color:var(--t3);">' + esc(k) + '</td><td style="text-align:right;font-weight:600;">' + esc(v) + '</td></tr>').join('');

@@ -202,7 +202,18 @@ S.EventsRegulars = {
   },
 
   async importRows(rows) {
-    const parseDate = s => { if (!s) return ''; const d = new Date(s); return isNaN(d.getTime()) ? '' : App.ymdLocal(d); };
+    const parseDate = s => {
+      if (!s) return '';
+      const str = String(s).trim();
+      // A plain YYYY-MM-DD is kept verbatim: new Date('1985-06-01') parses as UTC
+      // midnight, and ymdLocal would then roll it back a day in any US timezone,
+      // bucketing a March 1 birthday into February so it never surfaces in the
+      // month's outreach list. Other formats (M/D/YYYY, "June 1 1985") parse local.
+      const iso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (iso) return iso[1] + '-' + String(+iso[2]).padStart(2, '0') + '-' + String(+iso[3]).padStart(2, '0');
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? '' : App.ymdLocal(d);
+    };
     (rows || []).forEach(r => {
       const name = (r.name || '').trim(); if (!name) return;
       this.regulars().push({
