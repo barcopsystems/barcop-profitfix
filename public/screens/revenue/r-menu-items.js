@@ -1098,45 +1098,71 @@ S.RevenueMenuItems = {
 
   async importItems(rows) {
     const num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
-    const toAdd = [];
+    const existing = this.items();
+    const keyOf = (t, n) => String(t || '') + '|' + String(n || '').trim().toLowerCase();
+    const byKey = {};
+    existing.forEach(it => { byKey[keyOf(it.type, it.name)] = it; });
+    let added = 0, updated = 0;
     rows.forEach(r => {
       const name = (r.name || '').trim();
       if (!name) return;
-      toAdd.push({
-        id:                 App.uid(),
-        type:               this.activeType,   // the tile the Upload was opened from sets the item type
-        name,
-        category:           (r.category || '').trim(),
-        price:              num(r.price),
-        cost:               +(num(r.cost)).toFixed(2),
-        weekly_covers:      num(r.covers),
-        prev_weekly_covers: null,
-        weekly_covers_updated_at: null,
-        notes:              '',
-        recipe:             null,
-        linked_product_id:  '',
-        pour_size_oz:       null,
-        target_cost_pct:    null,
-        created_at:         new Date().toISOString(),
-        updated_at:         new Date().toISOString()
-      });
+      const price = num(r.price), cost = +(num(r.cost)).toFixed(2), covers = num(r.covers);
+      const cat = (r.category || '').trim();
+      const cur = byKey[keyOf(this.activeType, name)];
+      if (cur) {
+        // Re-dropping an export REFRESHES the matching item instead of duplicating
+        // it. Only overwrite a field the file actually carries, so a partial export
+        // (e.g. no cost column) never wipes a good cost/price already on file.
+        if (price > 0)  cur.price = price;
+        if (cost > 0)   cur.cost = cost;
+        if (covers > 0) cur.weekly_covers = covers;
+        if (cat)        cur.category = cat;
+        cur.updated_at = new Date().toISOString();
+        updated++;
+      } else {
+        const it = {
+          id:                 App.uid(),
+          type:               this.activeType,   // the tile the Upload was opened from sets the item type
+          name,
+          category:           cat,
+          price,
+          cost,
+          weekly_covers:      covers,
+          prev_weekly_covers: null,
+          weekly_covers_updated_at: null,
+          notes:              '',
+          recipe:             null,
+          linked_product_id:  '',
+          pour_size_oz:       null,
+          target_cost_pct:    null,
+          created_at:         new Date().toISOString(),
+          updated_at:         new Date().toISOString()
+        };
+        existing.push(it);
+        byKey[keyOf(this.activeType, name)] = it;
+        added++;
+      }
     });
 
     const result = document.getElementById('mi-imp-result');
-    if (!toAdd.length) {
+    if (!added && !updated) {
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No items imported. No item names were found in the file.</div>';
       return;
     }
 
-    this.items().push(...toAdd);
     await App.saveKey('menu_items');
     App.markSetupDone('gs_r_menu');
     // Re-render so the new items show in the list below (stays in import mode),
     // then drop the summary into the freshly-mounted result slot.
     this.renderLanding();
     const res2 = document.getElementById('mi-imp-result');
-    if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
-      + 'Imported ' + toAdd.length + ' item' + (toAdd.length === 1 ? '' : 's') + '. Edit any item to set its price, cost, or recipe.'
-      + '</div>';
+    if (res2) {
+      const parts = [];
+      if (added)   parts.push('imported ' + added + ' new item' + (added === 1 ? '' : 's'));
+      if (updated) parts.push('refreshed ' + updated + ' existing');
+      res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
+        + parts.join(' and ').replace(/^./, c => c.toUpperCase()) + '. Edit any item to set its price, cost, or recipe.'
+        + '</div>';
+    }
   }
 };
