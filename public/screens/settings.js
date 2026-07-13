@@ -308,15 +308,29 @@ S.HubSettings = {
   },
 
   exportBackup() {
+    // Cash Recovery config lives device-local (CashEngine/localStorage), NOT in
+    // the four data objects below, so capture it explicitly or a restore to a
+    // fresh device would silently drop the opening balance, tax, credit line,
+    // gift-card liability and reserve settings.
+    const CE = window.CashEngine;
     const backup = {
       _backup: 'barcop',
-      version: 1,
+      version: 2,
       exported_at: new Date().toISOString(),
       bar_name: (App.data.settings && App.data.settings.bar_name) || '',
       data:          App.data || {},
       inventoryData: App.inventoryData || {},
       laborData:     App.laborData || {},
-      shiftData:     App.shiftData || {}
+      shiftData:     App.shiftData || {},
+      cashConfig: CE ? {
+        opening_cash:        CE.openingCash(),
+        sales_tax_rate:      CE.salesTaxRate(),
+        tax_frequency:       CE.taxFrequency(),
+        payroll_burden:      CE.payrollBurden(),
+        reserve_weeks:       CE.reserveWeeks(),
+        available_credit:    CE.availableCredit(),
+        gift_card_liability: CE.giftCardLiability()
+      } : null
     };
     try {
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -366,6 +380,18 @@ S.HubSettings = {
       App.inventoryData = backup.inventoryData || {};
       App.laborData     = backup.laborData || {};
       App.shiftData     = backup.shiftData || {};
+      // Restore device-local Cash Recovery config. Absent in v1 backups (made
+      // before this was captured) — skip cleanly so old files still restore.
+      if (backup.cashConfig && window.CashEngine) {
+        const cc = backup.cashConfig, CE = window.CashEngine;
+        CE.setOpeningCash(cc.opening_cash);
+        CE.setSalesTaxRate(cc.sales_tax_rate);
+        CE.setTaxFrequency(cc.tax_frequency);
+        CE.setPayrollBurden(cc.payroll_burden);
+        CE.setReserveWeeks(cc.reserve_weeks);
+        CE.setAvailableCredit(cc.available_credit);
+        CE.setGiftCardLiability(cc.gift_card_liability);
+      }
       await App.save();
       await App.saveInventory();
       await App.seedEventStores('ic');
