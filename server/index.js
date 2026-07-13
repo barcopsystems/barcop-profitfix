@@ -299,6 +299,58 @@ const supabaseAdmin = createClient(
   { realtime: { transport: ws } }
 );
 
+// Best-effort "Welcome to Bar Cop" email, sent from the checkout webhook once a NEW
+// subscriber is active (on top of Stripe's own receipt). Never throws — a failed or
+// unconfigured send must not break account provisioning.
+async function sendWelcomeEmail(email, barName) {
+  try {
+    const apiKey = (process.env.RESEND_API_KEY || '').trim();
+    if (!apiKey || !email) return;
+    const from    = (process.env.WELCOME_SENDER || process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev').trim();
+    const replyTo = (process.env.SUPPORT_NOTIFY_EMAIL || 'support@barcop.com').trim();
+    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
+    const nm  = String(barName == null ? '' : barName).trim();
+    const bar = (nm && nm !== 'My Bar') ? esc(nm) : '';
+    const gold = '#DBAB46';
+    const appUrl  = 'https://app.barcop.com';
+    const helpUrl = 'https://www.barcop.com/blogs/help';
+    const html =
+        '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Arial,sans-serif;max-width:560px;margin:0 auto;color:#14222A;">'
+      +   '<div style="padding:22px 28px;border-bottom:3px solid ' + gold + ';">'
+      +     '<span style="font-size:22px;font-weight:800;letter-spacing:0.5px;color:#14222A;">bar</span>'
+      +     '<span style="font-size:22px;font-weight:800;letter-spacing:0.5px;color:' + gold + ';">cop</span>'
+      +   '</div>'
+      +   '<div style="padding:26px 28px;font-size:15px;line-height:1.6;color:#2A3942;">'
+      +     '<div style="font-size:22px;font-weight:800;color:#14222A;margin-bottom:14px;">You\'re in.</div>'
+      +     '<p style="margin:0 0 14px;">Welcome to Bar Cop' + (bar ? '. You just set up <b>' + bar + '</b>' : '') + '. From here, Bar Cop does one job: it turns the numbers you already have into the money you\'re leaving on the table.</p>'
+      +     '<p style="margin:0 0 14px;">The loop is simple. Close your three Control sections each week (Inventory, Labor, Shift), work the money in Recovery (Profit, Revenue, Cash), then chase only what the week flags. Run your first audit and Bar Cop shows your biggest leaks in real dollars.</p>'
+      +     '<p style="margin:0 0 18px;"><b>Where to start:</b> open Bar Cop and work the Get Started steps on your Hub. Add your products, take a count, close a week. Your numbers start paying off from week one.</p>'
+      +     '<div style="margin:0 0 22px;"><a href="' + appUrl + '" style="display:inline-block;background:' + gold + ';color:#14222A;font-weight:800;font-size:14px;text-decoration:none;padding:13px 26px;border-radius:6px;">Open Bar Cop</a></div>'
+      +     '<p style="margin:0 0 8px;font-weight:700;color:#14222A;">A few things worth knowing:</p>'
+      +     '<ul style="margin:0 0 18px;padding-left:20px;">'
+      +       '<li style="margin-bottom:6px;">Stuck on anything? The <a href="' + helpUrl + '" style="color:' + gold + ';font-weight:700;">Help Center</a> walks every screen.</li>'
+      +       '<li style="margin-bottom:6px;">Questions? Just reply to this email, or reach <a href="mailto:support@barcop.com" style="color:' + gold + ';font-weight:700;">support@barcop.com</a>.</li>'
+      +       '<li style="margin-bottom:6px;">Your subscription lives under <b>Settings &rarr; Your Account</b>. Cancel anytime; access runs through the period you\'ve paid for.</li>'
+      +     '</ul>'
+      +     '<p style="margin:0 0 16px;">Bar Cop was built by an operator who spent years watching good money walk out the door. Now it\'s yours. Let\'s go find it.</p>'
+      +     '<p style="margin:0;color:#14222A;font-weight:700;">&mdash; Kyle, Bar Cop</p>'
+      +   '</div>'
+      +   '<div style="padding:16px 28px;border-top:1px solid #E5E9EC;font-size:11px;color:#8A98A0;">'
+      +     'Bar Cop &middot; <a href="mailto:support@barcop.com" style="color:#8A98A0;">support@barcop.com</a><br>'
+      +     '&copy; 2004&ndash;' + new Date().getFullYear() + ' Bar Cop'
+      +   '</div>'
+      + '</div>';
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: email, subject: 'Welcome to Bar Cop', html, reply_to: replyTo })
+    });
+    if (!resp.ok) console.error('welcome email send failed:', resp.status, await resp.text());
+  } catch (e) {
+    console.error('welcome email error (non-fatal):', e.message);
+  }
+}
+
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
   const sig    = req.headers['stripe-signature'];
@@ -374,6 +426,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       }
 
       if (accountId) {
+        // Only a brand-new subscription (no row yet) is a "new subscriber" — so the
+        // welcome email fires once, never on a Stripe re-delivery or a reactivation.
+        const { data: priorSub } = await supabaseAdmin
+          .from('subscriptions').select('account_id').eq('account_id', accountId).maybeSingle();
+        const isNewSubscriber = !priorSub;
         await supabaseAdmin.from('subscriptions').upsert({
           account_id:          accountId,
           user_id:             userId,
@@ -384,6 +441,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           current_period_end:  null,
           updated_at:          new Date().toISOString(),
         }, { onConflict: 'account_id' });
+        if (isNewSubscriber && email) {
+          const { data: acctRow } = await supabaseAdmin
+            .from('accounts').select('name').eq('id', accountId).maybeSingle();
+          await sendWelcomeEmail(email, acctRow && acctRow.name);   // best-effort; never throws
+        }
       } else {
         console.error('checkout.session.completed: no account_id resolved for customer', customerId);
       }
