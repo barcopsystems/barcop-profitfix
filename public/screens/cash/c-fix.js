@@ -77,7 +77,12 @@ S.CashFix = {
   agoText(ds) { return ds === 0 ? 'today' : ds === 1 ? 'yesterday' : ds + ' days ago'; },
 
   // State checks: "good" means no outstanding work right now.
-  tightWeeks() { return CashEngine.forecast(13).filter(r => r.net < 0).length; },
+  // Use the SAME 13-week survival forecast every other cash screen uses (c-audit /
+  // c-dashboard / c-forecast). The old CashEngine.forecast() is a stale twin that
+  // omits projected recurring bills, events, cash outflows, tax remittances, and the
+  // week-0 proration, so it reported "clear ahead" while the rest of Cash showed
+  // tight weeks. This is the Cash Fix "Stay Ahead" health read, so it must match.
+  tightWeeks() { const sf = CashEngine.survivalForecast(13); return (sf && typeof sf.tightWeeks === 'number') ? sf.tightWeeks : 0; },
   termsSet()   { return CashEngine.termVendors().length; },
 
   // Does the system behind a gap actually hold data yet? Gates the review steps so
