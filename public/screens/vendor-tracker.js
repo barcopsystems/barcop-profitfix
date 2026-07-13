@@ -219,7 +219,7 @@ S.VendorTracker = {
     const out = [];
     this.deliveries().forEach(d => {
       (d.line_items || []).forEach(li => {
-        if (li.price_changed && li.prev_price != null && li.price_per_unit != null) {
+        if (li.price_changed && !li.price_disputed && li.prev_price != null && li.price_per_unit != null) {
           out.push({ date: d.date, vendor: d.vendor, product_id: li.product_id, name: li.name, old: li.prev_price, new: li.price_per_unit });
         }
       });

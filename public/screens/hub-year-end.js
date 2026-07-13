@@ -945,14 +945,17 @@ S.HubYearEnd = {
       rows.push(['Annual Totals by System', '', '', '', '', '']);
       buckets.forEach(b => {
         const yearList = b.list.filter(a => inYear(a.date));
-        const totalMonthly = yearList.reduce((sum, a) => {
-          return sum + (a.action_items || []).reduce((s, i) => s + (parseFloat(i.monthly_impact) || 0), 0);
-        }, 0);
+        // Opportunity is a run-rate, not a cumulative: use the LATEST audit's monthly
+        // gaps, NOT the sum across every weekly audit. Summing counted the same
+        // recurring leak once per run and overstated the annual figure ~13x. Matches
+        // the month-end books deliverable (one audit per system).
+        const latest = yearList.slice().sort((a, c) => String(a.date || '').localeCompare(String(c.date || ''))).pop();
+        const totalMonthly = latest ? (latest.action_items || []).reduce((s, i) => s + (parseFloat(i.monthly_impact) || 0), 0) : 0;
         rows.push(['', b.label, yearList.length + ' audits', totalMonthly, totalMonthly * 12, '']);
       });
     }
 
-    this._pushFooter(rows, merges, 'Source: Profit Audit, Revenue Audit, Cash Audit records. Monthly Opportunity is the sum of action_items.monthly_impact at the time the audit was saved.', COL_COUNT);
+    this._pushFooter(rows, merges, 'Source: Profit Audit, Revenue Audit, Cash Audit records. Monthly Opportunity is your latest audit per system (a run-rate), not summed across every audit run.', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
@@ -1107,21 +1110,26 @@ S.HubYearEnd = {
       if (v > 0 && v < weakVal) { weakVal = v; weakIdx = i; }
     });
 
-    // Audits — top 5 opportunities of the year across all systems
+    // Audits — top opportunities of the year. Opportunity is a run-rate, not a
+    // cumulative: take the LATEST audit per system (its action items), NOT every
+    // weekly audit. Summing every run counted the same recurring leak once per audit
+    // (~13x overstatement) and filled the top-5 with duplicates of one item.
+    const _latestInYear = list => (list || []).filter(a => inYear(a.date))
+      .slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))).pop() || null;
     const allItems = [];
     [
       { label: 'Profit',  list: App.data?.audits || [] },
       { label: 'Revenue', list: App.data?.revenue_audits || [] },
       { label: 'Cash', list: App.data?.cash_audits || [] }
     ].forEach(bk => {
-      bk.list.filter(a => inYear(a.date)).forEach(a => {
-        (a.action_items || []).forEach(it => {
-          allItems.push({
-            system: bk.label,
-            title: it.title || it.name || it.action || '(unnamed)',
-            monthly: parseFloat(it.monthly_impact) || 0,
-            date: a.date || ''
-          });
+      const a = _latestInYear(bk.list);
+      if (!a) return;
+      (a.action_items || []).forEach(it => {
+        allItems.push({
+          system: bk.label,
+          title: it.title || it.name || it.action || '(unnamed)',
+          monthly: parseFloat(it.monthly_impact) || 0,
+          date: a.date || ''
         });
       });
     });
@@ -1187,7 +1195,7 @@ S.HubYearEnd = {
     if (topFive.length === 0) {
       b.paragraph('No open audit action items on file for ' + year + '. Run a Profit, Revenue, or Cash audit to surface opportunities.', { gray: 100 });
     } else {
-      b.paragraph('Total annualized opportunity across every audit run this year: ' + fmt$(totalAnnualOpp) + '.');
+      b.paragraph('Total annualized opportunity from your latest audit in each system: ' + fmt$(totalAnnualOpp) + '.');
       b.table(['System', 'Opportunity', 'Monthly $', 'Annual $'],
         topFive.map(it => [it.system, it.title, fmt$(it.monthly), fmt$(it.monthly * 12)]),
         { columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } } });
