@@ -375,7 +375,12 @@ S.EventsBookings = {
     rec.id = App.uid();
     rec.created_at = new Date().toISOString();
     rec.updated_at = rec.created_at;
-    await App.putRecord('core', 'booking', rec);
+    const ok = await App.putRecord('core', 'booking', rec);
+    if (!ok) {
+      const e = document.getElementById('eb-add-err');
+      if (e) { e.textContent = 'Could not save this booking. Check your access and try again.'; e.style.display = 'inline'; }
+      return;   // don't navigate into a booking that was rejected (e.g. read-only access)
+    }
     this._addDraft = null;
     this.openDetail(rec.id);   // jump straight into the new booking's workspace
   },
@@ -828,7 +833,8 @@ S.EventsBookings = {
     const existing = id ? this.bookings().find(x => x.id === id) : null;
     const rec = Object.assign({}, existing || {}, fields, { id: id || App.uid(), updated_at: new Date().toISOString() });
     if (!id) rec.created_at = new Date().toISOString();
-    await App.putRecord('core', 'booking', rec);
+    const ok = await App.putRecord('core', 'booking', rec);
+    if (!ok) { if (err) { err.textContent = 'Could not save this booking. Check your access and try again.'; err.style.display = 'inline'; } return; }
     App.closeModal('eb-form');
     if (this._detailId) this.renderDetail(rec.id);
     else if (!id) this.openDetail(rec.id);
