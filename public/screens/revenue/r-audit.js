@@ -399,14 +399,24 @@ S.RevenueAudit = {
       if (lp != null || rp != null) cd.sources.push('Labor Control (confirmed weekly labor)');
     }
 
-    // Labor Control — raw actual hours and cost
-    const actuals = lab.lc_actuals || [];
+    // Labor Control — raw actual hours and cost, WINDOWED to the audit's trailing
+    // 4-week period. Summing all-time labor against a 4-week revenue base printed a
+    // "Total Labor Period" that grew with account age (and could exceed revenue).
+    let winStart, winEnd;
+    if (weeks.length) {
+      winStart = App.weekStartFor(weeks[0].period_end);
+      winEnd   = weeks[weeks.length - 1].period_end;
+    } else {
+      const allD = (lab.lc_actuals || []).map(a => a.date).filter(Boolean).sort();
+      winEnd = allD.length ? allD[allD.length - 1] : App.todayLocal();
+      const s = new Date(winEnd + 'T00:00:00'); s.setDate(s.getDate() - 27); winStart = App.ymdLocal(s);
+    }
+    const actuals = (lab.lc_actuals || []).filter(a => a && a.date && a.date >= winStart && a.date <= winEnd);
     if (actuals.length) {
       cd.labor_hours = r1(actuals.reduce((s,a) => s + (a.hours || 0), 0));
       let laborCost = actuals.reduce((s,a) => s + ((a.hours || 0) * (a.wage || 0)), 0);
-      // Add fixed salaried (exempt) cost over the span the actuals cover.
-      const dts = actuals.map(a => a.date).filter(Boolean).sort();
-      if (dts.length) laborCost += App.salariedCost(dts[0], dts[dts.length - 1]).total;
+      // Fixed salaried (exempt) cost over the SAME window, not the whole history.
+      laborCost += App.salariedCost(winStart, winEnd).total;
       cd.labor_cost = Math.round(laborCost);
       cd.sources.push('Labor Control actuals');
     }
