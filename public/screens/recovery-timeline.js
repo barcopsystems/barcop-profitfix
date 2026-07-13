@@ -17,7 +17,7 @@
 
 const RT_GREEN = '#518A79';   // = --green; the recovery/win line on every timeline
 const RT_RED  = '#C03828';
-const RT_GRID = '#121C22';
+const RT_GRID = '#14222A';
 const RT_STEEL = '#496477';
 const RT_DIM  = 'rgba(255,255,255,0.38)';   // = --t3, muted axis labels
 
@@ -141,20 +141,27 @@ S.RecoveryTimeline = {
     if (!window.Recovery) return { points: [], firstMeasure: null };
     const R = window.Recovery;
     const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
-    const mine = log.filter(e => e.module === moduleKey && e.date
-      && R.COMPOSITE_GAPS.indexOf(e.gap_id) === -1 && R.METRICS[e.gap_id]);
+    // Match the Recovery Scoreboard exactly so this chart never contradicts it:
+    // one entry per gap (a second fix in the same area computes the SAME dollars,
+    // so summing both double-counts), skip noDollar gaps (pricing/rplh dollarize
+    // the very signal check-average already counts), and dollarize with
+    // recoverValue (hourly labor %, not blended) just like Recovery.compute.
+    const mine = R._oneFixPerGap(log.filter(e => e.module === moduleKey && e.date
+      && R.COMPOSITE_GAPS.indexOf(e.gap_id) === -1
+      && R.METRICS[e.gap_id] && !R.METRICS[e.gap_id].noDollar));
     const byWeek = {};
     const B = R.BASELINE_WEEKS;
     mine.forEach(e => {
       const m = R.METRICS[e.gap_id];
+      const vf = m.recoverValue || m.value;
       const op = R._series(m.series)
-        .filter(w => w.period_end && w.period_end >= e.date && m.value(w) != null)
+        .filter(w => w.period_end && w.period_end >= e.date && vf(w) != null)
         .slice().sort((a, b) => a.period_end.localeCompare(b.period_end));
       if (op.length <= B) return;                       // this gap still building
-      const bAvg = R._avg(op.slice(0, B).map(m.value));
+      const bAvg = R._avg(op.slice(0, B).map(vf));
       if (bAvg == null) return;
       op.slice(B).forEach(w => {
-        const v = m.value(w), base = m.base(w);
+        const v = vf(w), base = m.base(w);
         if (v == null || base == null) return;
         const imp = m.lowerBetter ? (bAvg - v) : (v - bAvg);
         const d = (m.baseKind === 'pts') ? (imp / 100) * base : imp * base;

@@ -380,7 +380,12 @@ S.HubBarCopAudit = {
     // Matured fixes that produced positive dollar movement via Recovery.
     let recoveredCount = 0;
     if (window.Recovery && typeof Recovery.compute === 'function') {
-      fixLog.forEach(f => {
+      // Dedupe to one entry per gap-area (a gap with an auto-start + a manual mark
+      // is one recovered fix, not two), matching the Recovery Scoreboard.
+      const scored = (typeof Recovery._oneFixPerGap === 'function')
+        ? Recovery._oneFixPerGap(fixLog.filter(f => (Recovery.COMPOSITE_GAPS || []).indexOf(f.gap_id) === -1))
+        : fixLog;
+      scored.forEach(f => {
         try {
           const r = Recovery.compute(f);
           if (r.status === 'ok' && r.dollars > 0) recoveredCount++;
@@ -721,10 +726,15 @@ S.HubBarCopAudit = {
       } catch (e) {}
     }
     if (window.Recovery && typeof Recovery.compute === 'function') {
-      fixLog.forEach(f => {
+      // 'building' is the real mid-measurement status compute() returns; there is
+      // no 'pending', so this counter was always 0. Dedupe per gap-area too.
+      const scored = (typeof Recovery._oneFixPerGap === 'function')
+        ? Recovery._oneFixPerGap(fixLog.filter(f => (Recovery.COMPOSITE_GAPS || []).indexOf(f.gap_id) === -1))
+        : fixLog;
+      scored.forEach(f => {
         try {
           const r = Recovery.compute(f);
-          if (r.status === 'pending') result.stillMeasuring++;
+          if (r.status === 'building') result.stillMeasuring++;
         } catch (e) {}
       });
     }

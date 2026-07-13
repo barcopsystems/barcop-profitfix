@@ -72,19 +72,23 @@ S.HubBooksHome = {
     const monthName = (HB && HB._monthLabel) ? HB._monthLabel(curKey) : curKey;
     const YTD    = (HB && HB._aggregateYTD)  ? HB._aggregateYTD(curKey) : null;
 
-    const cmRev   = curM ? (curM.totalRev - (curM.compsLoss || 0)) : 0;
+    // Revenue is already net sales (comps excluded by the POS), so do NOT
+    // re-subtract comps or re-expense policy comps — that double-removed them and
+    // made this landing disagree with the Income Statement it links to. Comps
+    // stay tracked in Shift Control.
+    const cmRev   = curM ? curM.totalRev : 0;
     const cmCogs  = curM ? curM.totalCogs : 0;
     const cmLabor = curM ? curM.totalLabor : 0;
     const cmPrimePct = cmRev ? (cmCogs + cmLabor) / cmRev : null;
     const opexM = (HB && HB._opExSums) ? HB._opExSums(curKey, false) : {};
     const totalOpExM = Object.values(opexM).reduce((s, v) => s + (v || 0), 0)
-      + ((curM && curM.maintenance) || 0) + ((curM && curM.platformFees) || 0) + ((curM && curM.compsPolicy) || 0);
+      + ((curM && curM.maintenance) || 0) + ((curM && curM.platformFees) || 0);
     const mInc = cmRev - cmCogs - cmLabor - totalOpExM;
 
-    const ytdNet = YTD ? (YTD.totalRev - (YTD.compsLoss || 0)) : 0;
+    const ytdNet = YTD ? YTD.totalRev : 0;
     const opexY = (HB && HB._opExSums) ? HB._opExSums(curKey, true) : {};
     const totalOpExY = Object.values(opexY).reduce((s, v) => s + (v || 0), 0)
-      + ((YTD && YTD.maintenance) || 0) + ((YTD && YTD.platformFees) || 0) + ((YTD && YTD.compsPolicy) || 0);
+      + ((YTD && YTD.maintenance) || 0) + ((YTD && YTD.platformFees) || 0);
     const ytdInc = ytdNet - (YTD ? YTD.totalCogs : 0) - (YTD ? YTD.totalLabor : 0) - totalOpExY;
     const ytdMargin = ytdNet ? ytdInc / ytdNet : null;
 

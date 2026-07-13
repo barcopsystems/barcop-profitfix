@@ -132,11 +132,16 @@ S.HubCashOutflows = {
       ? recs.map(o => {
           const end = CashEngine.recurringEndYm(o);
           const status = end ? 'Ends ' + this.fmtYm(end) : 'Ongoing';
+          // The amount is the per-occurrence figure, so label it by the actual
+          // frequency. A $3,000 quarterly loan payment is "$3,000 /qtr", not
+          // "$3,000 /mo" (that read as 3x its real monthly cost and contradicted
+          // the monthly-normalized "Recurring / mo" stat above).
+          const freqSuf = o.frequency === 'quarterly' ? ' /qtr' : o.frequency === 'annual' ? ' /yr' : ' /mo';
           return '<tr>'
             + '<td data-label="Type" style="color:var(--t1);">' + esc(CashEngine._outflowLabel(o.type)) + this._recurTag(o) + '</td>'
             + '<td data-label="Note" style="color:var(--t2);">' + esc(o.notes || '') + '</td>'
             + '<td data-label="Status" style="color:var(--t3);">' + status + '</td>'
-            + '<td data-label="Amount" style="font-weight:700;color:var(--t1);white-space:nowrap;">' + App.fmtCurrency(o.amount) + '<span style="color:var(--t3);font-weight:400;font-size:11px;"> /mo</span></td>'
+            + '<td data-label="Amount" style="font-weight:700;color:var(--t1);white-space:nowrap;">' + App.fmtCurrency(o.amount) + '<span style="color:var(--t3);font-weight:400;font-size:11px;">' + freqSuf + '</span></td>'
             + '<td class="no-print" style="text-align:right;white-space:nowrap;"><button class="btn btn-ghost btn-sm cb-stop" data-id="' + esc(o.id) + '">Stop</button> <button class="btn btn-ghost btn-sm cb-edit" data-id="' + esc(o.id) + '">Edit</button> <button class="btn btn-danger btn-sm cb-del" data-id="' + esc(o.id) + '">Delete</button></td>'
             + '</tr>';
         }).join('')
