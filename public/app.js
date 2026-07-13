@@ -730,7 +730,9 @@ const App = {
     if (this.demoMode) return;
     const s = this.subscription && this.subscription.status;
     if (s === 'active' || s === 'unknown') { this._removePlanGate(); return; }
-    this.showPlanGate();
+    // Pass the status through so the gate can tell a brand-new signup apart from
+    // a returning customer whose subscription lapsed (past due / cancelled).
+    this.showPlanGate({ status: s });
   },
 
   _removePlanGate() { const g = document.getElementById('plan-gate'); if (g) g.remove(); },
@@ -867,12 +869,39 @@ const App = {
   showPlanGate(ctx) {
     if (document.getElementById('plan-gate')) return;
     const isNewBar = !!(ctx && ctx.newBar);
+    const status = (ctx && ctx.status) || '';
+    // A returning customer whose subscription lapsed must NOT be greeted like a
+    // brand-new signup. Two shapes: past_due/unpaid still HAVE a plan (just fix
+    // the card via the billing portal), while canceled/expired need to start a
+    // plan again. Neither may see "Start Over" — that abandons the account, and a
+    // returning customer's account holds their real data.
+    const isPastDue = status === 'past_due' || status === 'unpaid';
+    const isEnded   = status === 'canceled' || status === 'cancelled' || status === 'incomplete_expired';
+    const isLapsed  = isPastDue || isEnded;
     const barName = isNewBar
       ? (ctx.draft.bar_name || '').trim()
       : ((this.data && this.data.settings && this.data.settings.bar_name) || '').trim();
-    const acctLine = isNewBar
-      ? (barName ? 'Your new bar <b style="color:var(--t1);">' + esc(barName) + '</b> is set up.' : 'Your new bar is set up.')
-      : (barName ? 'Your account for <b style="color:var(--t1);">' + esc(barName) + '</b> is now set up.' : 'Your account is now set up.');
+    const nameB = barName ? '<b style="color:var(--t1);">' + esc(barName) + '</b>' : '';
+    let heading, bodyHtml;
+    if (isPastDue) {
+      heading = 'Payment Past Due';
+      bodyHtml = (barName ? 'We could not process the last payment for ' + nameB + '. ' : 'We could not process your last payment. ')
+        + 'Update your card to keep running Bar Cop. Your data is safe and waiting.';
+    } else if (isEnded) {
+      heading = 'Subscription Ended';
+      bodyHtml = (barName ? 'Your subscription for ' + nameB + ' has ended. ' : 'Your subscription has ended. ')
+        + 'Start it back up whenever you are ready. Your data is safe and waiting.';
+    } else {
+      heading = "You're Almost Ready";
+      const acctLine = isNewBar
+        ? (barName ? 'Your new bar ' + nameB + ' is set up.' : 'Your new bar is set up.')
+        : (barName ? 'Your account for ' + nameB + ' is now set up.' : 'Your account is now set up.');
+      bodyHtml = acctLine + '<br>Start your subscription plan for instant access.';
+    }
+    // past_due keeps its existing plan — send them to the billing portal to fix
+    // the card, not back through a fresh plan picker.
+    const showPicker = !isPastDue;
+    const primaryLabel = isPastDue ? 'Update Payment Method' : 'Continue to Payment';
     const planOpt = (plan, label, note) =>
       '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
       + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
@@ -881,22 +910,26 @@ const App = {
     m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.74);z-index:9700;display:flex;align-items:center;justify-content:center;padding:20px;';
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:30px;max-width:420px;width:100%;">'
       + '<div style="text-align:center;margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
-      + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">You\'re Almost Ready</div>'
-      + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">' + acctLine + '<br>Start your subscription plan for instant access.</div>'
-      + '<div id="gate-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">'
-      +   planOpt('monthly', '<b>Monthly</b> &middot; $249/mo', '')
-      +   planOpt('annual',  '<b>Annual</b> &middot; $2,490/yr', 'save $498')
-      + '</div>'
-      + '<button class="btn btn-primary" id="gate-pay" style="width:100%;padding:14px 20px;font-size:12px;">Continue to Payment</button>'
+      + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">' + heading + '</div>'
+      + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">' + bodyHtml + '</div>'
+      + (showPicker
+          ? '<div id="gate-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">'
+            +   planOpt('monthly', '<b>Monthly</b> &middot; $249/mo', '')
+            +   planOpt('annual',  '<b>Annual</b> &middot; $2,490/yr', 'save $498')
+            + '</div>'
+          : '')
+      + '<button class="btn btn-primary" id="gate-pay" style="width:100%;padding:14px 20px;font-size:12px;">' + primaryLabel + '</button>'
       + '<div id="gate-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>'
       + (isNewBar
           ? '<div style="text-align:center;margin-top:18px;"><button class="auth-link" id="gate-cancel" style="font-size:11px;">Cancel</button></div>'
-          : '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button>'
-            + '<span style="color:var(--b-edge);margin:0 10px;">|</span>'
-            + '<button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>')
+          : isLapsed
+            ? '<div style="text-align:center;margin-top:18px;"><button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>'
+            : '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button>'
+              + '<span style="color:var(--b-edge);margin:0 10px;">|</span>'
+              + '<button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>')
       + '</div>';
     document.body.appendChild(m);
-    const opts = Array.from(m.querySelectorAll('#gate-plan-picker .plan-opt'));
+    const opts = showPicker ? Array.from(m.querySelectorAll('#gate-plan-picker .plan-opt')) : [];
     const selectOpt = (el) => opts.forEach(o => {
       const on = o === el;
       o.classList.toggle('plan-selected', on);
@@ -907,19 +940,35 @@ const App = {
     if (opts[0]) selectOpt(opts[0]);
     const gateErr = (t) => { const e = document.getElementById('gate-err'); if (e) { e.textContent = t; e.style.display = 'block'; } };
     document.getElementById('gate-pay').addEventListener('click', async () => {
+      const btn = document.getElementById('gate-pay');
+      // Past due: the subscription still exists, so open the Stripe billing portal
+      // to update the card rather than starting a second subscription.
+      if (isPastDue) {
+        btn.disabled = true; btn.textContent = 'Opening billing...';
+        try {
+          const headers = await DB._authHeaders();
+          const accountId = await DB._ensureAccountId();
+          const r = await fetch('/api/billing-portal', { method: 'POST', headers, body: JSON.stringify({ accountId }) });
+          const data = await r.json();
+          if (data && data.url) { window.location.href = data.url; return; }
+          gateErr('Could not open billing right now. Try again, or contact support.');
+        } catch (e) { gateErr('Connection error. Try again.'); }
+        btn.disabled = false; btn.textContent = primaryLabel;
+        return;
+      }
       const sel = m.querySelector('#gate-plan-picker .plan-opt.plan-selected');
       const plan = (sel && sel.dataset.plan) || 'monthly';
-      const btn = document.getElementById('gate-pay');
       btn.disabled = true; btn.textContent = 'Going to checkout...';
       if (isNewBar) await this.startNewBarCheckout(plan, ctx.draft, gateErr);
       else await this.startCheckout(plan, gateErr);
       // The embedded checkout modal (if it opened) now covers this button, so
       // resetting it is invisible; on cancel the gate is revealed ready to retry.
-      btn.disabled = false; btn.textContent = 'Continue to Payment';
+      btn.disabled = false; btn.textContent = primaryLabel;
     });
     // New bar: Cancel drops back to User Accounts (no account exists yet).
-    // Signup: Start Over discards the account and returns to signup.
-    document.getElementById('gate-cancel').addEventListener('click', () =>
+    // Signup: Start Over discards the account and returns to signup. A lapsed
+    // account shows neither (only Sign Out) so real data is never abandoned.
+    document.getElementById('gate-cancel')?.addEventListener('click', () =>
       isNewBar ? this._returnToUserAccounts() : this.abandonAndRestart());
     // Non-destructive exit (signup only): sign out (account + email kept) and land
     // on the login page. Signing back in re-shows this gate, so they can finish
