@@ -80,9 +80,12 @@ const CSVMapper = {
     if (lines.length < 2) return null;
     const parseLine = line => {
       const out = []; let inQ = false, cur = '';
-      for (const ch of line) {
-        if (ch === '"') inQ = !inQ;
-        else if (ch === ',' && !inQ) { out.push(cur.trim()); cur = ''; }
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQ && line[i + 1] === '"') { cur += '"'; i++; }   // escaped "" inside a quoted field -> one literal quote (O""Brien -> O"Brien)
+          else inQ = !inQ;
+        } else if (ch === ',' && !inQ) { out.push(cur.trim()); cur = ''; }
         else cur += ch;
       }
       out.push(cur.trim());
@@ -95,9 +98,14 @@ const CSVMapper = {
 
   _parseXLSX(buffer, container, opts) {
     const run = () => {
-      const wb = XLSX.read(buffer, { type: 'array' });
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      // raw:false so SheetJS returns each cell as its DISPLAYED text (dates as
+      // "7/13/2026", not the numeric serial 45845). Without it a real Excel
+      // date-typed column came through as serial numbers, normDate rejected every
+      // one, and the whole file imported zero rows with no explanation. Formatted
+      // text is exactly what the CSV path already feeds normDate/_num.
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
       if (data.length < 2) { this._msg(container, 'File appears empty.', 'var(--red)'); return; }
       const headers = data[0].map(h => String(h).trim());
       const rows = data.slice(1).filter(r => r.some(c => c !== '')).map(r => r.map(c => String(c).trim()));

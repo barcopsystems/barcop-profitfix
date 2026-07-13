@@ -102,6 +102,23 @@ const PosIngest = {
     return neg ? -n : n;
   },
 
+  // Parse a POS HOURS cell. Timeclock exports commonly give "8:30" (8 hours 30
+  // minutes); plain parseFloat("8:30") returned 8 and silently dropped the 30
+  // minutes off gross pay, and _num would strip the colon to 830. Handle H:MM
+  // explicitly; otherwise fall back to the money-safe cleaner ($/comma tolerant).
+  _hours(v) {
+    if (v == null) return NaN;
+    const s = String(v).trim();
+    if (!s) return NaN;
+    if (s.indexOf(':') !== -1) {
+      const p = s.split(':');
+      const h = parseInt(p[0], 10), mn = parseInt(p[1], 10);
+      if (isNaN(h) || isNaN(mn)) return NaN;
+      return h + mn / 60;
+    }
+    return this._num(s);
+  },
+
   _ymd(y, mo, d) { const p = n => String(n).padStart(2, '0'); return y + '-' + p(mo) + '-' + p(d); },
 
   // Content-dedup that consumes each existing record AT MOST ONCE, so a file with
@@ -165,7 +182,7 @@ const PosIngest = {
     const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
-      const hours = parseFloat(r.hours);
+      const hours = this._hours(r.hours);
       if (!staff || isNaN(hours) || hours <= 0) { skipped.push(r.name || '(blank)'); return; }
       const recDate = this.normDate(r.date);
       // Skip an exact re-import (same staff + date + hours) so re-dropping a
@@ -191,8 +208,8 @@ const PosIngest = {
     const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
-      const cash = parseFloat(r.cash_tips) || 0;
-      const card = parseFloat(r.card_tips) || 0;
+      const cash = this._num(r.cash_tips);
+      const card = this._num(r.card_tips);
       if (!staff || (cash + card) <= 0) { skipped.push(r.name || '(blank)'); return; }
       const recDate = this.normDate(r.date);
       // Skip an exact re-import (same staff + date + the same cash and card tips)
