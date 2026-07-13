@@ -417,6 +417,23 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
   }
 });
 
+// ── Rate limiter for the two UNAUTHENTICATED notify endpoints ────────────────
+// Both endpoints trigger an outbound Resend email to a fixed team inbox. They take
+// no JWT (the bug/support forms are reachable pre-auth), so cap how often one IP can
+// fire an email to stop a script flooding the inbox or burning the Resend quota.
+// Best-effort, in-memory, per-instance — a real user sends once and never trips it.
+const _notifyHits = new Map();
+function notifyRateLimited(req, key, maxPerMin) {
+  const ip = String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'unknown').split(',')[0].trim();
+  const bucket = key + ':' + ip;
+  const now = Date.now();
+  const arr = (_notifyHits.get(bucket) || []).filter(t => now - t < 60000);
+  if (arr.length >= maxPerMin) { _notifyHits.set(bucket, arr); return true; }
+  arr.push(now); _notifyHits.set(bucket, arr);
+  if (_notifyHits.size > 5000) { for (const [k, v] of _notifyHits) { if (!v.length || now - v[v.length - 1] > 60000) _notifyHits.delete(k); } }
+  return false;
+}
+
 // ── Bug report notification ──────────────────────────────────────────────────
 // Fires after the client successfully writes a bug report row to Supabase.
 // The DB record is the source of truth; this endpoint just sends a courtesy
@@ -424,6 +441,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 // or the env vars are missing, we still return ok=true — the report itself
 // is safely persisted, the email is best-effort.
 app.post('/api/report-bug-notify', async (req, res) => {
+  // The report row is already persisted client-side; the email is a courtesy, so a
+  // throttled request still returns ok (nothing is lost, the email is just skipped).
+  if (notifyRateLimited(req, 'bug', 5)) return res.json({ ok: true, emailed: false, reason: 'rate_limited' });
   const apiKey = process.env.RESEND_API_KEY;
   const to     = process.env.BUG_REPORT_NOTIFY_EMAIL;
   const from   = process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev';
@@ -483,6 +503,9 @@ app.post('/api/report-bug-notify', async (req, res) => {
 // is kept — the support inbox is the record. The user's email is set as
 // reply_to so the team can hit Reply and write back directly.
 app.post('/api/support-message-notify', async (req, res) => {
+  // No DB row is kept for support messages, so a throttled request is a genuine
+  // failure to deliver — report it (429) rather than falsely claiming success.
+  if (notifyRateLimited(req, 'support', 5)) return res.status(429).json({ ok: false, emailed: false, reason: 'rate_limited' });
   const apiKey = process.env.RESEND_API_KEY;
   const to     = process.env.SUPPORT_NOTIFY_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL;
   const from   = process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev';

@@ -369,7 +369,12 @@ function computeRevenueAudit(appData, controlData) {
     .filter(w => w && ((num(w.bar_revenue) || 0) + (num(w.floor_revenue) || 0) > 0 || num(w.total_revenue) > 0))
     .sort((a, b) => String(a.period_end || a.week_end || '').localeCompare(String(b.period_end || b.week_end || '')))
     .slice(-PERIOD_WEEKS);   // sort oldest->newest FIRST (revenue_weeks arrives newest-first) so slice(-4) is the most recent 4, not the oldest
-  const menuItems = (appData.menu_items || []).filter(i => num(i.price) != null && num(i.cost) != null && num(i.weekly_covers) != null);
+  // Match the client's Menu Engineering filter exactly: a priced, costed, selling,
+  // non-archived item. `num(i.cost) != null` let cost=0 items through (num(0)===0),
+  // so a menu imported without a cost column scored as all-Stars — a "healthy menu"
+  // built from unknown costs — and Dog-Test-cut (archived) items kept depressing the
+  // score after the operator had already removed them.
+  const menuItems = (appData.menu_items || []).filter(i => num(i.price) > 0 && num(i.cost) > 0 && num(i.weekly_covers) > 0 && !i.archived);
   // Window server checks to the audit's trailing period (the same weeks the
   // revenue base uses), not all-time. Averaging every check ever logged let a
   // server who left months ago set the bottom check average, widening the spread
