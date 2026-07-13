@@ -54,7 +54,10 @@ S.HubCashOutflows = {
 
   onSel(active) { return active ? 'background:var(--sel-active-bg);border-color:var(--b-edge);color:var(--t1);' : ''; },
   fmtYm(ym) { const d = new Date(ym + '-01T00:00:00'); return isNaN(d.getTime()) ? ym : d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); },
-  _recurTag() { return ' <span style="color:var(--t4);font-size:10px;white-space:nowrap;">recurring</span>'; },
+  _recurTag(o) {
+    const f = o && o.frequency && o.frequency !== 'monthly' ? ' · ' + o.frequency : '';
+    return ' <span style="color:var(--t4);font-size:10px;white-space:nowrap;">recurring' + f + '</span>';
+  },
   typeOptions(sel) { return this.TYPES.map(([k, label]) => '<option value="' + k + '"' + ((sel || 'draw') === k ? ' selected' : '') + '>' + label + '</option>').join(''); },
 
   draw() {
@@ -78,7 +81,10 @@ S.HubCashOutflows = {
     const sumBetween = (s, e) => (CashEngine.outflowsBetween(s, e) || []).reduce((a, o) => a + (o.amount || 0), 0);
     const monthTotal = sumBetween(monthStart, today);
     const ytdTotal = sumBetween(yearStart, today);
-    const recurMonthly = this.activeRecurring().reduce((a, o) => a + (parseFloat(o.amount) || 0), 0);
+    const recurMonthly = this.activeRecurring().reduce((a, o) => {
+      const amt = parseFloat(o.amount) || 0;
+      return a + (o.frequency === 'quarterly' ? amt / 3 : o.frequency === 'annual' ? amt / 12 : amt);
+    }, 0);
     const fmt$ = v => App.fmtCurrency(v || 0);
     const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
     return '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
@@ -94,8 +100,11 @@ S.HubCashOutflows = {
       +   '<div class="f" style="width:200px;"><label>Type</label><select class="form-input" id="cb-type">' + this.typeOptions('draw') + '</select></div>'
       +   '<div class="f" style="width:160px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="cb-amt" step="0.01" min="0" placeholder="0.00"/></div></div>'
       + '</div>'
-      + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="cb-recur"/> Recurring monthly (same amount each month)</label></div>'
-      + '<div id="cb-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="max-width:540px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" class="suf" id="cb-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs every month until you stop it. Only set this for one with a fixed payoff, like a loan.</div></div></div></div>'
+      + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="cb-recur"/> Recurring (same amount each time)</label></div>'
+      + '<div id="cb-term-wrap" style="margin-top:12px;display:none;">'
+      +   '<div class="f" style="max-width:540px;"><label>How often</label><select id="cb-frequency" style="width:200px;"><option value="monthly">Monthly</option><option value="quarterly">Quarterly (every 3 months)</option><option value="annual">Annually (once a year)</option></select></div>'
+      +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" class="suf" id="cb-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs until you stop it. Set this only for one with a fixed payoff, like a loan.</div></div></div>'
+      + '</div>'
       + '<div class="form-row" style="margin-top:14px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Note</label><textarea class="notes-ta" rows="2" id="cb-note" placeholder="e.g. SBA loan, March draw"></textarea></div></div>'
       + '<div id="cb-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
       + '</div>';
@@ -122,14 +131,14 @@ S.HubCashOutflows = {
           const end = CashEngine.recurringEndYm(o);
           const status = end ? 'Ends ' + this.fmtYm(end) : 'Ongoing';
           return '<tr>'
-            + '<td data-label="Type" style="color:var(--t1);">' + esc(CashEngine._outflowLabel(o.type)) + this._recurTag() + '</td>'
+            + '<td data-label="Type" style="color:var(--t1);">' + esc(CashEngine._outflowLabel(o.type)) + this._recurTag(o) + '</td>'
             + '<td data-label="Note" style="color:var(--t2);">' + esc(o.notes || '') + '</td>'
             + '<td data-label="Status" style="color:var(--t3);">' + status + '</td>'
             + '<td data-label="Amount" style="font-weight:700;color:var(--t1);white-space:nowrap;">' + App.fmtCurrency(o.amount) + '<span style="color:var(--t3);font-weight:400;font-size:11px;"> /mo</span></td>'
             + '<td class="no-print" style="text-align:right;white-space:nowrap;"><button class="btn btn-ghost btn-sm cb-stop" data-id="' + esc(o.id) + '">Stop</button> <button class="btn btn-ghost btn-sm cb-edit" data-id="' + esc(o.id) + '">Edit</button> <button class="btn btn-danger btn-sm cb-del" data-id="' + esc(o.id) + '">Delete</button></td>'
             + '</tr>';
         }).join('')
-      : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No recurring outflows. Check Recurring monthly when you log a draw or loan that repeats.</td></tr>';
+      : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No recurring outflows. Check Recurring when you log a draw or loan that repeats.</td></tr>';
     const chip = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-period" data-p="' + k + '" style="' + this.onSel(this._period === k) + '">' + label + '</button>';
     const controlRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + this.PERIODS.map(chip).join('') + '</div>'
@@ -174,7 +183,7 @@ S.HubCashOutflows = {
     if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
     if (recur && g('cb-term')?.value && (isNaN(term) || term < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
     const rec = { id: App.uid(), date, type, amount, notes: note, created_at: new Date().toISOString() };
-    if (recur) { rec.recurring = true; rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; if (term && term > 0) rec.term_months = term; }
+    if (recur) { rec.recurring = true; rec.frequency = g('cb-frequency')?.value || 'monthly'; rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; if (term && term > 0) rec.term_months = term; }
     await App.putRecord('core', 'cash_outflow', rec);
     if (!recur) this._setPeriodFor(date);
     this.draw();
@@ -183,6 +192,7 @@ S.HubCashOutflows = {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
     set('cb-date', App.todayLocal()); set('cb-amt', ''); set('cb-note', ''); set('cb-term', '');
     const t = document.getElementById('cb-type'); if (t) t.selectedIndex = 0;
+    const fq = document.getElementById('cb-frequency'); if (fq) fq.selectedIndex = 0;
     const r = document.getElementById('cb-recur'); if (r) r.checked = false;
     const w = document.getElementById('cb-term-wrap'); if (w) w.style.display = 'none';
     const e = document.getElementById('cb-err'); if (e) e.style.display = 'none';
@@ -194,8 +204,12 @@ S.HubCashOutflows = {
     const rec = record || prefill || { id: '', date: App.todayLocal(), type: 'draw', amount: '', notes: '', recurring: false };
     const id = 'cb-modal';
     const seriesOn = !!rec.recurring;
-    const recurHtml = '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="cb-f-recur"' + (seriesOn ? ' checked' : '') + '/> Recurring monthly (same amount each month)</label></div>'
-      + '<div id="cb-f-term-wrap" style="margin-top:12px;' + (seriesOn ? '' : 'display:none;') + '"><div class="f" style="max-width:540px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" class="suf" id="cb-f-term" min="1" step="1" value="' + esc(rec.term_months || '') + '" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs every month until you stop it. Only set this for one with a fixed payoff, like a loan.</div></div></div></div>';
+    const freqOpt = (v, lbl) => '<option value="' + v + '"' + (rec.frequency === v || (!rec.frequency && v === 'monthly') ? ' selected' : '') + '>' + lbl + '</option>';
+    const recurHtml = '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="cb-f-recur"' + (seriesOn ? ' checked' : '') + '/> Recurring (same amount each time)</label></div>'
+      + '<div id="cb-f-term-wrap" style="margin-top:12px;' + (seriesOn ? '' : 'display:none;') + '">'
+      +   '<div class="f" style="max-width:540px;"><label>How often</label><select id="cb-f-frequency" style="width:200px;">' + freqOpt('monthly', 'Monthly') + freqOpt('quarterly', 'Quarterly (every 3 months)') + freqOpt('annual', 'Annually (once a year)') + '</select></div>'
+      +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" class="suf" id="cb-f-term" min="1" step="1" value="' + esc(rec.term_months || '') + '" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs until you stop it. Set this only for one with a fixed payoff, like a loan.</div></div></div>'
+      + '</div>';
     const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">' + (isEdit ? 'Edit Outflow' : 'Repeat Outflow') + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
@@ -228,8 +242,8 @@ S.HubCashOutflows = {
       if (recChecked && document.getElementById('cb-f-term')?.value && (isNaN(termV) || termV < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank.'); return; }
       const base = isEdit ? (this.records().find(o => o.id === rec.id) || {}) : {};
       const out = Object.assign({}, base, { id: isEdit ? rec.id : App.uid(), date, type, amount, notes: note, created_at: base.created_at || new Date().toISOString() });
-      if (recChecked) { out.recurring = true; out.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; if (termV && termV > 0) out.term_months = termV; else delete out.term_months; delete out.stopped_ym; }
-      else { delete out.recurring; delete out.recur_day; delete out.term_months; delete out.stopped_ym; }
+      if (recChecked) { out.recurring = true; out.frequency = document.getElementById('cb-f-frequency')?.value || 'monthly'; out.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; if (termV && termV > 0) out.term_months = termV; else delete out.term_months; delete out.stopped_ym; }
+      else { delete out.recurring; delete out.frequency; delete out.recur_day; delete out.term_months; delete out.stopped_ym; }
       await App.putRecord('core', 'cash_outflow', out);
       if (!recChecked) this._setPeriodFor(date);
       App.closeModal(id);
