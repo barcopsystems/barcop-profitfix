@@ -873,16 +873,19 @@ const DB = {
         this._queueEvent(table, kind, 'put', rec); return { ok: false, offline: true };
       }
       const accountId = await this._ensureAccountId();
-      if (!accountId) { this._queueEvent(table, kind, 'put', rec); return { ok: false, error: 'no account membership found' }; }
+      // queued:true — the op is safely in the local replay queue and WILL sync,
+      // so the caller must keep it in the in-memory list (not revert it). Absent
+      // on the viewer path below, which is a genuine rejection with no queue.
+      if (!accountId) { this._queueEvent(table, kind, 'put', rec); return { ok: false, queued: true, error: 'no account membership found' }; }
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
       try {
         const { error } = await this._sb.from(table).upsert({
           account_id: accountId, kind: kind, id: String(rec.id),
           date: this._eventDate(rec), payload: rec, updated_at: new Date().toISOString()
         }, { onConflict: 'account_id,kind,id' });
-        if (error) { this._queueEvent(table, kind, 'put', rec); return { ok: false, error }; }
+        if (error) { this._queueEvent(table, kind, 'put', rec); return { ok: false, queued: true, error }; }
         return { ok: true };
-      } catch (e) { this._queueEvent(table, kind, 'put', rec); return { ok: false, error: e }; }
+      } catch (e) { this._queueEvent(table, kind, 'put', rec); return { ok: false, queued: true, error: e }; }
     }
     return { ok: true }; // local-only mode: App keeps the in-memory array
   },
@@ -894,14 +897,16 @@ const DB = {
         this._queueEvent(table, kind, 'del', { id }); return { ok: false, offline: true };
       }
       const accountId = await this._ensureAccountId();
-      if (!accountId) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, error: 'no account membership found' }; }
+      // queued:true — see putEvent: the delete is safely queued for replay, so
+      // the caller keeps the row removed instead of restoring it.
+      if (!accountId) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, queued: true, error: 'no account membership found' }; }
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
       try {
         const { error } = await this._sb.from(table).delete()
           .eq('account_id', accountId).eq('kind', kind).eq('id', String(id));
-        if (error) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, error }; }
+        if (error) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, queued: true, error }; }
         return { ok: true };
-      } catch (e) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, error: e }; }
+      } catch (e) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, queued: true, error: e }; }
     }
     return { ok: true };
   },

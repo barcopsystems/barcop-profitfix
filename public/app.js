@@ -4986,7 +4986,10 @@ const App = {
     const prev = idx >= 0 ? arr[idx] : null;
     if (idx >= 0) arr[idx] = rec; else arr.push(rec);
     const r = await DB.putEvent(store.table, kind, rec);
-    if (r.ok || r.offline) return true;
+    // Saved, offline, or safely queued for replay (a dropped connection with
+    // navigator.onLine still true) — keep the row in the list; it will sync.
+    // Only a genuine rejection (viewer read-only) falls through to the revert.
+    if (r.ok || r.offline || r.queued) return true;
     const back = arr.findIndex(x => x && x.id === rec.id);
     if (prev) { if (back >= 0) arr[back] = prev; }
     else if (back >= 0) arr.splice(back, 1);
@@ -5018,7 +5021,9 @@ const App = {
     const removed = idx >= 0 ? arr[idx] : null;
     if (idx >= 0) arr.splice(idx, 1);
     const r = await DB.removeEvent(store.table, kind, id);
-    if (r.ok || r.offline) return true;
+    // Removed, offline, or safely queued for replay — keep it removed; the
+    // delete will sync. Only a viewer rejection falls through to restore the row.
+    if (r.ok || r.offline || r.queued) return true;
     if (removed) arr.splice(idx, 0, removed);
     return false;
   },
