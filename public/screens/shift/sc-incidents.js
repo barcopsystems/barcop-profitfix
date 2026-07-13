@@ -222,7 +222,7 @@ S.ShiftIncidents = {
         this.renderList();
         return;
       }
-      if (ev.target.closest('#in-export')) { App.exportPDF({ title: 'Incident Log', root: this.container }); return; }
+      if (ev.target.closest('#in-export')) { App.exportPDF({ title: 'Incident Log', root: this.container, footer: 'A record-keeping aid, not legal advice. Verify details before relying on this document.' }); return; }
       if (ev.target.closest('#in-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#in-save')) { this.saveNew(); return; }
       if (ev.target.closest('#in-startover')) { this.startOver(); return; }
