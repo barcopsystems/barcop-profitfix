@@ -5872,6 +5872,35 @@ const App = {
     });
     return out;
   },
+  // Weekly overtime premium for a set of actual labor rows: 0.5x the straight-time
+  // rate on hours over OT_THRESHOLD (40) per staff, per Mon-Sun week. lc_actuals
+  // store straight-time cost only (cost = hours x wage), so this premium must be
+  // ADDED at every weekly labor rollup or the booked P&L / prime cost / labor %
+  // understate labor whenever anyone crosses 40 hours (Build Schedule and the Range
+  // lens already add it; the actuals-side weekly feeds did not). Salaried staff are
+  // exempt. Returns { total, byStaff }.
+  otPremiumForRows(rows) {
+    const OT = this.OT_THRESHOLD || 40;
+    const wk = {};
+    (rows || []).forEach(a => {
+      if (!a || this.isSalaried(a.staff_id)) return;
+      const ws = this.weekStartFor ? this.weekStartFor(a.date) : (a.date || '');
+      const key = (a.staff_id || a.name || '?') + '|' + ws;
+      if (!wk[key]) wk[key] = { staff: a.staff_id || a.name || '?', hours: 0, cost: 0 };
+      wk[key].hours += (a.hours || 0);
+      wk[key].cost  += (a.cost  || 0);
+    });
+    let total = 0; const byStaff = {};
+    Object.keys(wk).forEach(k => {
+      const b = wk[k];
+      const otH = Math.max(0, b.hours - OT);
+      if (otH <= 0 || b.hours <= 0) return;
+      const prem = otH * (b.cost / b.hours) * 0.5;
+      total += prem;
+      byStaff[b.staff] = (byStaff[b.staff] || 0) + prem;
+    });
+    return { total: total, byStaff: byStaff };
+  },
   // Weekly salary cost for ONE staff member (annual_salary / 52), or 0 when the
   // staff member is not salaried or has no salary on file. Used by per-staff
   // and per-day rollups (Daily View, Weekly Summary, Pay Periods).
