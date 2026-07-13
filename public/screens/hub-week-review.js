@@ -372,9 +372,13 @@ S.WeekReview = {
       overCount = costRows ? costRows.filter(r => r.over).length : 0;
       topLeak = PD._topLeak ? PD._topLeak() : null;
       auditState = PD._auditState();
-      const latestAudit = App.latestEvent ? App.latestEvent(PD.audits()) : null;
-      const monthly = latestAudit ? (latestAudit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0) : 0;
-      recoverable = monthly * 12;
+      // Recoverable/yr is a CURRENT-state number (from the latest audit); it does not
+      // belong to a past week's results, so only surface it on the current week.
+      if (this._isThisWeek()) {
+        const latestAudit = App.latestEvent ? App.latestEvent(PD.audits()) : null;
+        const monthly = latestAudit ? (latestAudit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0) : 0;
+        recoverable = monthly * 12;
+      } else recoverable = null;
     } finally { PD._weekEnd = sv; }
 
     // Real recovery activity logged this week (records dated in the window).
@@ -446,9 +450,12 @@ S.WeekReview = {
       offCount = metrics.filter(m => m.good === false).length;
       topLeak = RD._topLeak ? RD._topLeak() : null;
       auditState = RD._auditState();
-      const latestAudit = App.latestEvent ? App.latestEvent(RD.audits()) : null;
-      const monthly = latestAudit ? (latestAudit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0) : 0;
-      recoverable = monthly * 12;
+      // Current-state recoverable — only on the current week (see the profit block).
+      if (this._isThisWeek()) {
+        const latestAudit = App.latestEvent ? App.latestEvent(RD.audits()) : null;
+        const monthly = latestAudit ? (latestAudit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0) : 0;
+        recoverable = monthly * 12;
+      } else recoverable = null;
     } finally { RD._weekEnd = sv; }
 
     const dat = App.data || {};

@@ -348,8 +348,9 @@ S.HubYearEnd = {
     row('  Food Revenue',     Y.foodRev,     P.foodRev);
     row('  Catering Revenue', Y.cateringRev, P.cateringRev);
     row('  Other / Ancillary Revenue', Y.otherRev, P.otherRev);
-    row('  Less: Comps',  Y.compsLoss != null ? -Math.abs(Y.compsLoss) : null, P.compsLoss != null ? -Math.abs(P.compsLoss) : null);
-    row('Total Revenue (net of comps)', Y.totalRev - (Y.compsLoss || 0), P.totalRev - (P.compsLoss || 0));
+    // Revenue is net sales (comps already excluded by the POS); do not re-subtract
+    // comps or re-expense policy comps. Comps stay tracked in Shift Control.
+    row('Total Revenue (net sales)', Y.totalRev, P.totalRev);
     rows.push(blank());
 
     rows.push(['Cost of Goods Sold', '', '', '']);
@@ -360,7 +361,7 @@ S.HubYearEnd = {
     row('Total COGS', Y.totalCogs, P.totalCogs);
     rows.push(blank());
 
-    row('Gross Profit', Y.totalRev - Y.totalCogs - (Y.compsLoss || 0), P.totalRev - P.totalCogs - (P.compsLoss || 0));
+    row('Gross Profit', Y.totalRev - Y.totalCogs, P.totalRev - P.totalCogs);
     rows.push(blank());
 
     rows.push(['Labor', '', '', '']);
@@ -377,9 +378,9 @@ S.HubYearEnd = {
     // maintenance + weekly platform fees. Books and Year-End share the same
     // category enum so the numbers tie back across both deliverables.
     const totalOpExY = Object.values(Y.opex || {}).reduce((s, v) => s + (v || 0), 0)
-                      + (Y.maintenance || 0) + (Y.platformFees || 0) + (Y.compsPolicy || 0);
+                      + (Y.maintenance || 0) + (Y.platformFees || 0);
     const totalOpExP = Object.values(P.opex || {}).reduce((s, v) => s + (v || 0), 0)
-                      + (P.maintenance || 0) + (P.platformFees || 0) + (P.compsPolicy || 0);
+                      + (P.maintenance || 0) + (P.platformFees || 0);
     rows.push(['Operating Expenses', '', '', '']);
     row('  Occupancy (rent, property tax)',           (Y.opex?.['Occupancy (Rent, Property Tax)'] || 0), (P.opex?.['Occupancy (Rent, Property Tax)'] || 0));
     row('  Utilities',                                (Y.opex?.['Utilities']                      || 0), (P.opex?.['Utilities']                      || 0));
@@ -387,7 +388,6 @@ S.HubYearEnd = {
     row('  Marketing and advertising',                (Y.opex?.['Marketing and Advertising']      || 0), (P.opex?.['Marketing and Advertising']      || 0));
     row('  Repairs and maintenance',                  Y.maintenance,                                    P.maintenance);
     row('  3rd-party platform fees',                  Y.platformFees,                                   P.platformFees);
-    row('  Staff meals and shift drinks',             Y.compsPolicy,                                    P.compsPolicy);
     row('  Professional fees',                        (Y.opex?.['Professional Fees']              || 0), (P.opex?.['Professional Fees']              || 0));
     row('  Bank and credit card fees',                (Y.opex?.['Bank and Credit Card Fees']      || 0), (P.opex?.['Bank and Credit Card Fees']      || 0));
     row('  Licenses and permits',                     (Y.opex?.['Licenses and Permits']           || 0), (P.opex?.['Licenses and Permits']           || 0));
@@ -397,8 +397,8 @@ S.HubYearEnd = {
     rows.push(blank());
 
     row('Operating Income (before taxes)',
-        (Y.totalRev - (Y.compsLoss || 0)) - Y.totalCogs - Y.totalLabor - totalOpExY,
-        (P.totalRev - (P.compsLoss || 0)) - P.totalCogs - P.totalLabor - totalOpExP);
+        Y.totalRev - Y.totalCogs - Y.totalLabor - totalOpExY,
+        P.totalRev - P.totalCogs - P.totalLabor - totalOpExP);
     rows.push(blank());
 
     // Percentages
@@ -876,12 +876,19 @@ S.HubYearEnd = {
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
+    const intFmt = '#,##0';
+    // The monthly table's cols 4/5 are Over/Short COUNTS (integers), but the
+    // worst-offenders table's cols 3/4/5 are dollars. Format per table so a count
+    // never renders as "$3.00".
+    const worstHdr = rows.findIndex(r => r && r[0] === 'Date' && r[1] === 'Shift');
+    const fmtCell = (i, c, z) => { const cell = ws[XLSX.utils.encode_cell({ r: i, c })]; if (cell && typeof cell.v === 'number') cell.z = z; };
     rows.forEach((r, i) => {
-      [1, 3, 4, 5].forEach(c => {
-        const addr = XLSX.utils.encode_cell({ r: i, c });
-        const cell = ws[addr];
-        if (cell && typeof cell.v === 'number') cell.z = moneyFmt;
-      });
+      if (worstHdr >= 0 && i > worstHdr) {
+        [3, 4, 5].forEach(c => fmtCell(i, c, moneyFmt));   // Expected / Counted / Variance
+      } else {
+        [1, 3].forEach(c => fmtCell(i, c, moneyFmt));       // Drops / Variance dollars
+        [2, 4, 5].forEach(c => fmtCell(i, c, intFmt));      // Drop count / Over count / Short count
+      }
     });
     return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
   },

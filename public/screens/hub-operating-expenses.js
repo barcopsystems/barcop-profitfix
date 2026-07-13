@@ -152,11 +152,13 @@ S.HubOperatingExpenses = {
       const startIdx = start.getFullYear() * 12 + start.getMonth();
       const term = parseInt(p.term_months, 10);
       const recurDay = p.recur_day || start.getDate();
+      // Recurrence interval in months: monthly (1), quarterly (3), annual (12).
+      const step = p.frequency === 'quarterly' ? 3 : p.frequency === 'annual' ? 12 : 1;
       // Ongoing (no term) fills through the current month; a fixed term stops at its end.
       const lastIdx = term > 0 ? Math.min(curIdx, startIdx + term - 1) : curIdx;
       const have = new Set([start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0')]);
       arr.forEach(r => { if (r.recurring_parent === p.id && r.date) have.add(String(r.date).slice(0, 7)); });
-      for (let idx = startIdx + 1; idx <= lastIdx; idx++) {
+      for (let idx = startIdx + step; idx <= lastIdx; idx += step) {
         const yy = Math.floor(idx / 12), mm = idx % 12;
         const mk = yy + '-' + String(mm + 1).padStart(2, '0');
         if (have.has(mk)) continue;
@@ -274,8 +276,10 @@ S.HubOperatingExpenses = {
     return (endIdx - (now.getFullYear() * 12 + now.getMonth())) <= 2;
   },
 
-  _recurTag() {
-    return ' <span style="color:var(--t4);font-size:10px;white-space:nowrap;">recurring</span>';
+  _recurTag(rec) {
+    const p = rec && rec.recurring_parent ? this.records().find(x => x.id === rec.recurring_parent) : rec;
+    const f = p && p.frequency && p.frequency !== 'monthly' ? ' · ' + p.frequency : '';
+    return ' <span style="color:var(--t4);font-size:10px;white-space:nowrap;">recurring' + f + '</span>';
   },
 
   // One real-record row: Date, Category (+Recurring tag), Vendor, Amount, actions.
@@ -298,7 +302,7 @@ S.HubOperatingExpenses = {
     }
     return '<tr>'
       + '<td data-label="Date" style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
-      + '<td style="color:var(--t2);">' + esc(r.category || '') + (isRec ? this._recurTag() : '') + '</td>'
+      + '<td style="color:var(--t2);">' + esc(r.category || '') + (isRec ? this._recurTag(r) : '') + '</td>'
       + '<td style="color:var(--t2);">' + esc(r.vendor || '') + '</td>'
       + '<td style="font-weight:700;color:var(--t1);">' + fmt$(r.amount) + '</td>'
       + '<td class="no-print" style="text-align:right;white-space:nowrap;">' + actions + '</td>'
@@ -315,8 +319,10 @@ S.HubOperatingExpenses = {
       if (isNaN(s.getTime())) return;
       const startIdx = s.getFullYear() * 12 + s.getMonth();
       const term = parseInt(p.term_months, 10);
+      const step = p.frequency === 'quarterly' ? 3 : p.frequency === 'annual' ? 12 : 1;
       const endIdx = term > 0 ? startIdx + term - 1 : Infinity;   // no term = ongoing
       if (idx < startIdx || idx > endIdx) return;
+      if ((idx - startIdx) % step !== 0) return;                   // only the months this bill actually recurs in
       if (arr.some(r => (r.id === p.id || r.recurring_parent === p.id) && String(r.date || '').slice(0, 7) === monthKey)) return;
       out.push(p);
     });
@@ -339,7 +345,7 @@ S.HubOperatingExpenses = {
     const emptyRow = (txt) => '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">' + txt + '</td></tr>';
     const expectedRow = (p) => '<tr style="opacity:0.6;">'
       + '<td data-label="Date" style="color:var(--t3);white-space:nowrap;">Expected</td>'
-      + '<td style="color:var(--t2);">' + esc(p.category || '') + this._recurTag() + '</td>'
+      + '<td style="color:var(--t2);">' + esc(p.category || '') + this._recurTag(p) + '</td>'
       + '<td style="color:var(--t2);">' + esc(p.vendor || '') + '</td>'
       + '<td style="color:var(--t2);">' + fmt$(p.amount) + '</td>'
       + '<td class="no-print" style="text-align:right;white-space:nowrap;"><button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(p.id) + '">Stop</button></td></tr>';
@@ -400,8 +406,11 @@ S.HubOperatingExpenses = {
         +   '<div class="f" style="flex:1 1 200px;min-width:160px;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
         +   '<div class="f" style="width:140px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div></div>'
         + '</div>'
-        + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oexa-recurring"/> Recurring monthly bill (same cost each month)</label></div>'
-        + '<div id="oexa-term-wrap" style="margin-top:12px;display:none;"><div class="f" style="max-width:540px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" id="oexa-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs every month until you stop it. Only set this for a bill that ends after a fixed number of payments.</div></div></div></div>'
+        + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oexa-recurring"/> Recurring bill (same cost each time)</label></div>'
+        + '<div id="oexa-term-wrap" style="margin-top:12px;display:none;">'
+        +   '<div class="f" style="max-width:540px;"><label>How often</label><select id="oexa-frequency" style="width:200px;"><option value="monthly">Monthly</option><option value="quarterly">Quarterly (every 3 months)</option><option value="annual">Annually (once a year)</option></select></div>'
+        +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" id="oexa-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs until you stop it. Set this only for a bill that ends after a fixed number of months.</div></div></div>'
+        + '</div>'
         + App.noteField({ id: 'oexa-notes', placeholder: 'Optional context for the bookkeeper' })
         + '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>';
       addButtons = '<div data-collapse-group="oex-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
@@ -609,7 +618,12 @@ S.HubOperatingExpenses = {
       date, category, vendor, amount, notes,
       created_at: new Date().toISOString()
     };
-    if (recurring) { rec.recurring = true; rec.term_months = (term && term > 0) ? term : null; rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; }
+    if (recurring) {
+      rec.recurring = true;
+      rec.frequency = document.getElementById('oexa-frequency')?.value || 'monthly';
+      rec.term_months = (term && term > 0) ? term : null;
+      rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1;
+    }
     this.records().push(rec);
     await App.saveKey('operating_expenses');
     this.renderMain();
@@ -620,6 +634,7 @@ S.HubOperatingExpenses = {
     const c = document.getElementById('oexa-cat');  if (c) c.selectedIndex = 0;
     ['oexa-vendor', 'oexa-amount', 'oexa-notes', 'oexa-term'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const rc = document.getElementById('oexa-recurring'); if (rc) rc.checked = false;
+    const fq = document.getElementById('oexa-frequency'); if (fq) fq.selectedIndex = 0;
     const tw = document.getElementById('oexa-term-wrap'); if (tw) tw.style.display = 'none';
     const e = document.getElementById('oexa-err');  if (e) e.style.display = 'none';
   },

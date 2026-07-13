@@ -100,9 +100,13 @@ S.HubBooks = {
     const f = v => (v == null || isNaN(v)) ? '-' : (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const pct = v => (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%';
     const opexSum = o => Object.values(o).reduce((s, v) => s + (v || 0), 0);
-    const totalOpExM = opexSum(opexM) + (M.maintenance || 0) + (M.platformFees || 0) + (M.compsPolicy || 0);
-    const totalOpExY = opexSum(opexY) + (YTD.maintenance || 0) + (YTD.platformFees || 0) + (YTD.compsPolicy || 0);
-    const netRevM = M.totalRev - (M.compsLoss || 0), netRevY = YTD.totalRev - (YTD.compsLoss || 0);
+    // Revenue entered from the POS is NET sales (comps/discounts already excluded),
+    // so the P&L must NOT re-subtract comps from revenue or re-expense policy comps
+    // — either one double-removed them. Comps stay tracked in Shift Control for
+    // discipline (comp %, theft signal). See the net-sales note on the statement.
+    const totalOpExM = opexSum(opexM) + (M.maintenance || 0) + (M.platformFees || 0);
+    const totalOpExY = opexSum(opexY) + (YTD.maintenance || 0) + (YTD.platformFees || 0);
+    const netRevM = M.totalRev, netRevY = YTD.totalRev;
     const grossM = netRevM - M.totalCogs, grossY = netRevY - YTD.totalCogs;
     const opIncM = grossM - M.totalLabor - totalOpExM, opIncY = grossY - YTD.totalLabor - totalOpExY;
 
@@ -124,8 +128,7 @@ S.HubBooks = {
       + line('Food Revenue', M.foodRev, YTD.foodRev, { sub: 1 })
       + line('Catering Revenue', M.cateringRev, YTD.cateringRev, { sub: 1 })
       + line('Other / Ancillary Revenue', M.otherRev, YTD.otherRev, { sub: 1 })
-      + line('Less: Comps', -(M.compsLoss || 0), -(YTD.compsLoss || 0), { sub: 1, neg: 1 })
-      + line('Total Revenue (net of comps)', netRevM, netRevY, { bold: 1, border: 1 })
+      + line('Total Revenue (net sales)', netRevM, netRevY, { bold: 1, border: 1 })
       + sec('Cost of Goods Sold')
       + line('Bar COGS', M.barCogs, YTD.barCogs, { sub: 1 })
       + line('Food COGS', M.foodCogs, YTD.foodCogs, { sub: 1 })
@@ -146,7 +149,6 @@ S.HubBooks = {
       + line('Marketing and advertising', opexM['Marketing and Advertising'] || 0, opexY['Marketing and Advertising'] || 0, { sub: 1 })
       + line('Repairs and maintenance', M.maintenance, YTD.maintenance, { sub: 1 })
       + line('3rd-party platform fees', M.platformFees, YTD.platformFees, { sub: 1 })
-      + line('Staff meals and shift drinks', M.compsPolicy, YTD.compsPolicy, { sub: 1 })
       + line('Professional fees', opexM['Professional Fees'] || 0, opexY['Professional Fees'] || 0, { sub: 1 })
       + line('Bank and credit card fees', opexM['Bank and Credit Card Fees'] || 0, opexY['Bank and Credit Card Fees'] || 0, { sub: 1 })
       + line('Licenses and permits', opexM['Licenses and Permits'] || 0, opexY['Licenses and Permits'] || 0, { sub: 1 })
@@ -175,7 +177,11 @@ S.HubBooks = {
   // Taxable sales = revenue net of comps (comped product was never charged, so
   // it is not a taxable sale), which also keeps this in step with the
   // net-of-comps revenue on the Income Statement directly above it.
-  _taxableSales(monthKey) { const a = this._aggregateMonth(monthKey); return a.totalRev - (a.compsLoss || 0); },
+  // Taxable base = bar + food + catering (net sales). Excludes Other/Ancillary
+  // revenue (gift-card sales, cover charges, service charges are commonly NON-
+  // taxable) and does not re-subtract comps (revenue is already net). An estimate
+  // to confirm against the POS / a tax pro.
+  _taxableSales(monthKey) { const a = this._aggregateMonth(monthKey); return (a.barRev || 0) + (a.foodRev || 0) + (a.cateringRev || 0); },
   _quarterToDate(monthKey) {
     const year = monthKey.slice(0, 4), mNum = parseInt(monthKey.slice(5, 7), 10);
     const qStart = Math.floor((mNum - 1) / 3) * 3 + 1;
@@ -285,7 +291,7 @@ S.HubBooks = {
 
     b.sectionTitle('The Month in Dollars');
     b.table(null, [
-      ['Total Revenue (net of comps)', fmt$(M.totalRev - (M.compsLoss || 0))],
+      ['Total Revenue (net sales)', fmt$(M.totalRev)],
       ['  Bar Revenue', fmt$(M.barRev)],
       ['  Food Revenue', fmt$(M.foodRev)],
       ['Cost of Goods Sold', fmt$(M.totalCogs)],
@@ -303,7 +309,7 @@ S.HubBooks = {
 
     b.sectionTitle('Year to Date');
     b.table(null, [
-      ['Revenue (net of comps)', fmt$(YTD.totalRev - (YTD.compsLoss || 0))],
+      ['Revenue (net sales)', fmt$(YTD.totalRev)],
       ['COGS', fmt$(YTD.totalCogs)],
       ['Labor', fmt$(YTD.totalLabor)],
       ['Prime Cost', fmt$(YTD.totalCogs + YTD.totalLabor)]
@@ -528,8 +534,8 @@ S.HubBooks = {
     rows.push(r('  Food Revenue',     M.foodRev,     YTD.foodRev));
     rows.push(r('  Catering Revenue', M.cateringRev, YTD.cateringRev));
     rows.push(r('  Other / Ancillary Revenue', M.otherRev, YTD.otherRev));
-    rows.push(r('  Less: Comps',  M.compsLoss != null ? -Math.abs(M.compsLoss) : null, YTD.compsLoss != null ? -Math.abs(YTD.compsLoss) : null));
-    rows.push(r('Total Revenue (net of comps)', M.totalRev - (M.compsLoss || 0), YTD.totalRev - (YTD.compsLoss || 0)));
+    rows.push(r('Total Revenue (net sales)', M.totalRev, YTD.totalRev));
+    rows.push(['  Revenue is net sales as entered; comps and discounts are tracked in Shift Control.', '', '']);
     rows.push(blank());
 
     // COGS
@@ -541,7 +547,7 @@ S.HubBooks = {
     rows.push(r('Total COGS', M.totalCogs, YTD.totalCogs));
     rows.push(blank());
 
-    rows.push(r('Gross Profit', M.totalRev - M.totalCogs - (M.compsLoss || 0), YTD.totalRev - YTD.totalCogs - (YTD.compsLoss || 0)));
+    rows.push(r('Gross Profit', M.totalRev - M.totalCogs, YTD.totalRev - YTD.totalCogs));
     rows.push(blank());
 
     // Labor
@@ -562,11 +568,11 @@ S.HubBooks = {
     const opexM = this._opExSums(monthKey, false);
     const opexY = this._opExSums(monthKey, true);
     const totalOpExM = Object.values(opexM).reduce((s, v) => s + (v || 0), 0)
-                      + (M.maintenance || 0) + (M.platformFees || 0) + (M.compsPolicy || 0);
+                      + (M.maintenance || 0) + (M.platformFees || 0);
     const totalOpExY = Object.values(opexY).reduce((s, v) => s + (v || 0), 0)
-                      + (YTD.maintenance || 0) + (YTD.platformFees || 0) + (YTD.compsPolicy || 0);
-    const operatingIncomeM = (M.totalRev - (M.compsLoss || 0)) - M.totalCogs - M.totalLabor - totalOpExM;
-    const operatingIncomeY = (YTD.totalRev - (YTD.compsLoss || 0)) - YTD.totalCogs - YTD.totalLabor - totalOpExY;
+                      + (YTD.maintenance || 0) + (YTD.platformFees || 0);
+    const operatingIncomeM = M.totalRev - M.totalCogs - M.totalLabor - totalOpExM;
+    const operatingIncomeY = YTD.totalRev - YTD.totalCogs - YTD.totalLabor - totalOpExY;
 
     rows.push(['Operating Expenses', '', '']);
     rows.push(r('  Occupancy (rent, property tax)',                 opexM['Occupancy (Rent, Property Tax)']    || 0, opexY['Occupancy (Rent, Property Tax)']    || 0));
@@ -575,7 +581,6 @@ S.HubBooks = {
     rows.push(r('  Marketing and advertising',                      opexM['Marketing and Advertising']         || 0, opexY['Marketing and Advertising']         || 0));
     rows.push(r('  Repairs and maintenance',                        M.maintenance,                                  YTD.maintenance));
     rows.push(r('  3rd-party platform fees (DoorDash, UberEats, etc.)', M.platformFees,                              YTD.platformFees));
-    rows.push(r('  Staff meals and shift drinks',                   M.compsPolicy,                                  YTD.compsPolicy));
     rows.push(r('  Professional fees',                              opexM['Professional Fees']                 || 0, opexY['Professional Fees']                 || 0));
     rows.push(r('  Bank and credit card fees',                      opexM['Bank and Credit Card Fees']         || 0, opexY['Bank and Credit Card Fees']         || 0));
     rows.push(r('  Licenses and permits',                           opexM['Licenses and Permits']              || 0, opexY['Licenses and Permits']              || 0));
@@ -1324,6 +1329,8 @@ S.HubBooks = {
 
     rows.push(this._lineRow(this._baseTitle('Labor Cost Analysis', monthKey), COL_COUNT));
     mergeFull(0);
+    rows.push(this._lineRow('This sheet totals wages from logged hours by calendar month and accrues salary by days-in-month. The Income Statement labor is built from confirmed weekly records (a week is booked whole to the month it ends in), so the two Total Labor figures can differ by a partial straddling week and the salary accrual method. Both are correct on their own basis.', COL_COUNT));
+    mergeFull(rows.length - 1);
     rows.push(blank());
 
     rows.push(['Monthly Summary', '', '', '', '']);
@@ -1548,10 +1555,10 @@ S.HubBooks = {
 
     rows.push(['Schedule C Line', 'Amount', 'Source', '']);
     rows.push(['Line 1: Gross receipts', YTD.totalRev, 'Sum of Profit weekly revenue for ' + year, '']);
-    rows.push(['Line 2: Returns and allowances', YTD.compsLoss, 'Guest comps from Shift Control (staff meals and shift drinks are booked as an expense, not a return)', '']);
-    rows.push(['Line 3: Subtract Line 2 from Line 1', YTD.totalRev - (YTD.compsLoss || 0), 'Calculated', '']);
+    rows.push(['Line 2: Returns and allowances', 0, 'Line 1 is net sales; comps are tracked in Shift Control, not income or a return', '']);
+    rows.push(['Line 3: Subtract Line 2 from Line 1', YTD.totalRev, 'Calculated', '']);
     rows.push(['Line 4: Cost of goods sold', calcCogs != null ? calcCogs : YTD.totalCogs, calcCogs != null ? 'Begin + purchases - end' : 'Sum of Profit weekly COGS (no end-of-year count on file)', '']);
-    rows.push(['Line 5: Gross profit (Line 3 minus Line 4)', (YTD.totalRev - (YTD.compsLoss || 0)) - (calcCogs != null ? calcCogs : YTD.totalCogs), 'Calculated', '']);
+    rows.push(['Line 5: Gross profit (Line 3 minus Line 4)', YTD.totalRev - (calcCogs != null ? calcCogs : YTD.totalCogs), 'Calculated', '']);
     rows.push(blank());
     rows.push(['Line 26: Wages (less employment credits)', YTD.totalLabor, 'Sum of Labor Control wages for ' + year, '']);
     rows.push(['Line 21: Repairs and maintenance', YTD.maintenance, 'Sum of Shift Control maintenance log for ' + year, '']);

@@ -40,7 +40,7 @@ S.HubBreakEven = {
     const curKey = (HB && HB._currentMonthKey) ? HB._currentMonthKey()
       : (new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'));
     const YTD = (HB && HB._aggregateYTD) ? HB._aggregateYTD(curKey) : null;
-    const netRev = YTD ? ((YTD.totalRev || 0) - (YTD.compsLoss || 0)) : 0;
+    const netRev = YTD ? (YTD.totalRev || 0) : 0;   // net sales (comps already excluded); includes catering + other
     const cogs   = YTD ? (YTD.totalCogs || 0) : 0;
     const labor  = YTD ? (YTD.totalLabor || 0) : 0;
     // Books labor now includes salaried; peel it back so the VARIABLE rate reflects
@@ -56,8 +56,15 @@ S.HubBreakEven = {
 
     const opex = (App.data && App.data.operating_expenses) || [];
     const recurring = opex.filter(r => r && r.recurring && !r.recurring_parent);
-    const monthlyOpex = recurring.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
-    const weeklyOpex = monthlyOpex * 12 / 52;
+    // Normalize each recurring bill by its frequency (monthly/quarterly/annual) so
+    // the weekly nut isn't over-weighted by a quarterly or annual bill.
+    const annualOpex = recurring.reduce((s, r) => {
+      const amt = parseFloat(r.amount) || 0;
+      const perYear = r.frequency === 'quarterly' ? 4 : r.frequency === 'annual' ? 1 : 12;
+      return s + amt * perYear;
+    }, 0);
+    const monthlyOpex = annualOpex / 12;
+    const weeklyOpex = annualOpex / 52;
     // The nut also carries salaried (exempt) pay: fixed every week like rent. One
     // full week through the canonical salariedCost so it ties to Labor and Cash.
     const beEnd = App.nextSunday ? App.nextSunday() : App.todayLocal();
@@ -68,9 +75,14 @@ S.HubBreakEven = {
 
     const breakEven = (varRate != null && varRate < 1 && weeklyNut > 0) ? weeklyNut / (1 - varRate) : null;
 
-    const weeks = ((App.data && App.data.revenue_weeks) || []).slice()
+    // Break-even is a whole-operation number (varRate is measured on TOTAL revenue),
+    // so compare against TOTAL revenue too — from the profit week records, which carry
+    // catering + other (revenue_weeks store only bar + floor). Mixing bases made
+    // "Cleared By / Short By / Break-Even Day" wrong for any bar that caters.
+    const weeks = ((App.data && App.data.weeks) || []).slice()
       .sort((a, b) => String(a.period_end || '').localeCompare(String(b.period_end || '')));
-    const salesOf = w => (w.bar_revenue || 0) + (w.floor_revenue || 0);
+    const salesOf = w => ((w.bar && w.bar.revenue) || 0) + ((w.food && w.food.revenue) || 0)
+      + ((w.catering && w.catering.revenue) || 0) + ((w.other && w.other.revenue) || 0);
     const lastWk = weeks[weeks.length - 1] || null;
     const lastSales = lastWk ? salesOf(lastWk) : null;
 
