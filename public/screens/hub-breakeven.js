@@ -53,17 +53,35 @@ S.HubBreakEven = {
     // current roster only for a week that predates the stored split.
     const _yr = curKey.slice(0, 4), _mn = parseInt(curKey.slice(5, 7), 10);
     const _inYTD = d => d && String(d).slice(0, 4) === _yr && parseInt(String(d).slice(5, 7), 10) <= _mn;
-    const hourlyLabor = ((App.data && App.data.revenue_weeks) || [])
-      .filter(w => _inYTD(w.period_end))
-      .reduce((s, w) => {
-        const hl = parseFloat(w.hourly_labor_cost);
-        if (!isNaN(hl)) return s + hl;
+    // Catering labor per week lives on the profit `week` record (revenue_week's
+    // hourly_labor_cost is bar+food only). Catering crew is a VARIABLE cost that
+    // scales with catering revenue — which is already in netRev along with catering
+    // COGS — so it belongs in the variable rate's numerator too.
+    const _catLaborByPe = {};
+    ((App.data && App.data.weeks) || []).forEach(w => {
+      if (w && w.period_end) _catLaborByPe[String(w.period_end).slice(0, 10)] = (w.catering && parseFloat(w.catering.labor)) || 0;
+    });
+    let hourlyLabor = 0, catLabor = 0;
+    ((App.data && App.data.revenue_weeks) || []).filter(w => _inYTD(w.period_end)).forEach(w => {
+      const pe = String(w.period_end || '').slice(0, 10);
+      const hl = parseFloat(w.hourly_labor_cost);
+      if (!isNaN(hl)) {
+        // Stored split (bar+food hourly, salaried already peeled): no roster
+        // reconstruction, stays correct across a mid-year salaried change. Add the
+        // week's catering crew for the rate.
+        hourlyLabor += hl;
+        catLabor += _catLaborByPe[pe] || 0;
+      } else {
+        // Pre-split week: total labor (already includes catering) minus salaried.
         const tl = parseFloat(w.total_labor_cost) || 0;
-        const pe = String(w.period_end || '').slice(0, 10);
         const sal = App.salariedCost ? (App.salariedCost(App.weekStartFor(pe), pe).total || 0) : 0;
-        return s + Math.max(0, tl - sal);
-      }, 0);
-    const varRate = netRev > 0 ? (cogs + hourlyLabor) / netRev : null;
+        hourlyLabor += Math.max(0, tl - sal);
+      }
+    });
+    // "Hourly Labor" stat stays bar+food only (accurate label); the rate uses variable
+    // labor = bar+food hourly + catering crew.
+    const varLabor = hourlyLabor + catLabor;
+    const varRate = netRev > 0 ? (cogs + varLabor) / netRev : null;
 
     const opex = (App.data && App.data.operating_expenses) || [];
     const recurring = opex.filter(r => r && r.recurring && !r.recurring_parent);

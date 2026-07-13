@@ -1563,8 +1563,22 @@ S.HubBooks = {
     rows.push(['Line 4: Cost of goods sold', calcCogs != null ? calcCogs : YTD.totalCogs, calcCogs != null ? 'Begin + purchases - end' : 'Sum of Profit weekly COGS (no end-of-year count on file)', '']);
     rows.push(['Line 5: Gross profit (Line 3 minus Line 4)', YTD.totalRev - (calcCogs != null ? calcCogs : YTD.totalCogs), 'Calculated', '']);
     rows.push(blank());
-    rows.push(['Line 26: Wages (less employment credits)', YTD.totalLabor, 'Sum of Labor Control wages for ' + year, '']);
+    // Operating-expense deductions by Schedule C line, from the Operating Expenses
+    // log by category (the header promised these; they were previously omitted, so an
+    // accountant transcribing this sheet lost every deduction except wages and
+    // repairs). Listed in IRS line-number order.
+    const opexY = (this._opExSums ? this._opExSums(year + '-12', true) : {}) || {};
+    const ov = k => opexY[k] || 0;
+    rows.push(['Line 8: Advertising', ov('Marketing and Advertising'), 'Operating Expenses: Marketing and Advertising', '']);
+    rows.push(['Line 10: Commissions and fees', ov('Bank and Credit Card Fees') + (YTD.platformFees || 0), 'Operating Expenses: bank / credit card fees + 3rd-party platform fees', '']);
+    rows.push(['Line 15: Insurance (other than health)', ov('Insurance'), 'Operating Expenses: Insurance', '']);
+    rows.push(['Line 17: Legal and professional services', ov('Professional Fees'), 'Operating Expenses: Professional Fees', '']);
+    rows.push(['Line 20b: Rent or lease (other business property)', ov('Occupancy (Rent, Property Tax)'), 'Operating Expenses: Occupancy (rent, property tax)', '']);
     rows.push(['Line 21: Repairs and maintenance', YTD.maintenance, 'Sum of Shift Control maintenance log for ' + year, '']);
+    rows.push(['Line 23: Taxes and licenses', ov('Licenses and Permits'), 'Operating Expenses: Licenses and Permits', '']);
+    rows.push(['Line 25: Utilities', ov('Utilities'), 'Operating Expenses: Utilities', '']);
+    rows.push(['Line 26: Wages (less employment credits)', YTD.totalLabor, 'Sum of Labor Control wages for ' + year, '']);
+    rows.push(['Line 27a: Other expenses', ov('Software and Subscriptions') + ov('Other'), 'Operating Expenses: software / subscriptions + other', '']);
     rows.push(blank());
 
     rows.push(['Part III: Cost of Goods Sold Detail', '', '', '']);
