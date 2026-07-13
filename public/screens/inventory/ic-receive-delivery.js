@@ -695,9 +695,12 @@ S.InventoryReceiveDelivery = {
     // price drift is auditable.
     appliedUpdates.forEach(({ product, newPrice, prevPrice }) => {
       product.unit_cost = newPrice;
-      const pours = product.container_size_oz && product.pour_size_oz
+      const derivedPours = product.container_size_oz && product.pour_size_oz
         ? product.container_size_oz / product.pour_size_oz : null;
-      product.pours_per_container = pours;
+      // Only overwrite pours_per_container when it is actually derivable; otherwise
+      // keep the stored value (a price change must not null out a manual setting).
+      if (derivedPours) product.pours_per_container = derivedPours;
+      const pours = product.pours_per_container || derivedPours;
       const perBottle = App.bottleCost(product);
       product.cost_per_pour = pours && perBottle != null ? perBottle / pours : null;
       product.pour_cost_pct = product.cost_per_pour != null && product.menu_price

@@ -166,12 +166,19 @@ S.InventoryVarianceReport = {
       if (!entry) return;
       const p = this.productById(w.product_id) || {};
       const units = parseFloat(w.units) || 0;
-      if (p.category === 'Draft Beer' && p.container_size_oz) {
-        entry.waste_units += units / p.container_size_oz;
-      } else if (p.category === 'Bottle Beer' && p.case_size) {
-        entry.waste_units += units / p.case_size;
+      // Convert the waste line to the product's STOCK unit, honoring its logged
+      // `unit`. Spirits/wine default to OUNCES, so the old raw `+= units` treated a
+      // 10 oz dump as 10 bottles — corrupting the variance for the whole product.
+      const unit = String(w.unit || '').toLowerCase();
+      if (p.category === 'Bottle Beer' && p.case_size) {
+        entry.waste_units += units / p.case_size;                                  // bottles -> cases
+      } else if (p.category === 'Draft Beer' && p.container_size_oz) {
+        entry.waste_units += (unit === 'oz' || !unit) ? units / p.container_size_oz : units;  // ounces -> kegs
+      } else if (unit === 'oz') {
+        const ozPer = (App.ozPerContainer && App.ozPerContainer(p)) || p.container_size_oz || 0;
+        entry.waste_units += ozPer > 0 ? units / ozPer : units;                    // ounces -> bottles (liquor/wine)
       } else {
-        entry.waste_units += units;
+        entry.waste_units += units;                                                // already in the stock unit ('btls'/each)
       }
     });
     return out;
@@ -183,7 +190,10 @@ S.InventoryVarianceReport = {
   // which lines up with usage treating that product's servingsPerUnit as null.
   _compServingsToStock(p, servings) {
     if (!servings) return 0;
-    const spu = App.isCaseBeer(p) ? p.case_size : (p.pours_per_container || null);
+    let spu = App.isCaseBeer(p) ? p.case_size : (p.pours_per_container || null);
+    // Fall back to the pour math when pours_per_container was never stored (seeded/
+    // imported product), or a comped pour cancels a whole container of usage.
+    if (!spu && p.container_size_oz && p.pour_size_oz) spu = p.container_size_oz / p.pour_size_oz;
     return (spu && spu > 0) ? servings / spu : servings;
   },
 
