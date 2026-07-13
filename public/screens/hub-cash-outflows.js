@@ -16,7 +16,7 @@ S.HubCashOutflows = {
   _period: 'last-month',
 
   PERIODS: [['this-month', 'This Month'], ['last-month', 'Last Month'], ['this-quarter', 'This Quarter'], ['last-quarter', 'Last Quarter']],
-  TYPES: [['draw', 'Owner draw'], ['loan', 'Loan payment'], ['capital', 'Capital / equipment'], ['tax', 'Tax remittance']],
+  TYPES: [['draw', 'Owner draw'], ['loan', 'Loan payment'], ['capital', 'Capital / equipment'], ['tax', 'Tax remittance'], ['other', 'Other']],
 
   open() {
     App.openHubFullPage('Cash Outflows', (mount) => {
