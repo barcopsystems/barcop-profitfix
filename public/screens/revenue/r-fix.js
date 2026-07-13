@@ -195,9 +195,15 @@ S.RevenueFix = {
   },
   recoveredFor(id) {
     if (!window.Recovery) return 0;
-    let r = 0;
-    this.fixLog().filter(e => e.gap_id === id).forEach(e => { const c = Recovery.compute(e); if (c && c.status === 'ok' && c.dollars > 0) r += c.dollars; });
-    return r;
+    // compute() returns the SAME dollars for every fix_log entry sharing a gap_id
+    // (recovery is measured per gap-area), so summing across entries double-counts
+    // when a gap has both an auto-start and a manual mark. Collapse to one, exactly
+    // like the Recovery Scoreboard's _oneFixPerGap.
+    const entries = this.fixLog().filter(e => e.gap_id === id);
+    if (!entries.length) return 0;
+    const one = Recovery._oneFixPerGap(entries)[0];
+    const c = one && Recovery.compute(one);
+    return (c && c.status === 'ok' && c.dollars > 0) ? c.dollars : 0;
   },
 
   // Status ring (SVG literal hex per the SVG-fill rule). In progress: a thin
