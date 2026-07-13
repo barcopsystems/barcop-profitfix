@@ -93,16 +93,17 @@ S.FlowMap = {
   ],
 
   OUTPUTS: [
-    { id: 'hub',   title: 'The Hub',       action: 'hub',   d: 'Your cross-system home. Total recovered, your Bar Cop Audit score, and the top exposures across every section, in one read.' },
-    { id: 'books', title: 'Books',         action: 'books', d: 'Month-end financials, the Weekly P&L, and the payroll worksheet. Built from your confirmed weeks, your hours and tips, operating expenses, and permits.' },
-    { id: 'bca',   title: 'Bar Cop Audit', action: 'audit', d: 'The score that answers whether the place is run with discipline, separate from the dollar-hunting audits. Reads all three Control sections and grades six areas.' }
+    { id: 'hub',    title: 'The Hub',        action: 'hub',    d: 'Your cross-system home. Total recovered, your Bar Cop Audit score, and the top exposures across every section, in one read.' },
+    { id: 'review', title: 'Week in Review', action: 'review', d: 'The accountability side of the weekly close, section by section. Four reads per section on how the week actually ran, and it fills in once you confirm the week.' },
+    { id: 'books',  title: 'Books',          action: 'books',  d: 'Month-end financials, the Weekly P&L, and the payroll worksheet. Built from your confirmed weeks, your hours and tips, operating expenses, and permits.' },
+    { id: 'bca',    title: 'Bar Cop Audit',  action: 'audit',  d: 'The score that answers whether the place is run with discipline, separate from the dollar-hunting audits. Reads all three Control sections and grades six areas.' }
   ],
 
   STAGES: [
     { num: 1, key: 'capture',  title: 'Close your Control sections', sub: 'Put the week\'s raw numbers in. Three closes, worked top to bottom.', cols: 3, list: 'CAPTURE', feeder: true },
     { num: 2, key: 'recovery', title: 'Work the money in Recovery',  sub: 'Each opens with Confirm the Week, pulling your Control closes into one read, then it diagnoses, fixes, and scores.', cols: 3, list: 'RECOVERY' },
     { num: 3, key: 'asneeded', title: 'As needed',                   sub: 'Off the weekly clock. You open these only when the close flags them.', cols: 4, list: 'ASNEEDED' },
-    { num: 4, key: 'lands',    title: 'Where it lands',              sub: 'What the week feeds once you have closed it.', cols: 3, list: 'OUTPUTS' }
+    { num: 4, key: 'lands',    title: 'Where it lands',              sub: 'What the week feeds once you have closed it.', cols: 4, list: 'OUTPUTS' }
   ],
 
   open() {
@@ -247,9 +248,10 @@ S.FlowMap = {
   },
 
   goTo(go, action) {
-    if (action === 'hub')   return App.showHub();
-    if (action === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
-    if (action === 'books') return (window.S && S.HubBooks) ? S.HubBooks.open() : null;
+    if (action === 'hub')    return App.showHub();
+    if (action === 'audit')  return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
+    if (action === 'books')  return (window.S && S.HubBooks) ? S.HubBooks.open() : null;
+    if (action === 'review') return (window.S && S.WeekReview) ? S.WeekReview.open() : null;
     if (go) return App.openScreen(go);
   }
 };
