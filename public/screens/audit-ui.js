@@ -188,7 +188,7 @@ const AuditUI = {
   dataQualityChip(a, total) {
     const q = this.dataQuality(a, total);
     if (!q) return '';
-    return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;background:transparent;border:1px solid var(--b-edge);color:' + q.color + ';">' + q.label + '</span>';
+    return '<span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;background:transparent;border:1px solid var(--b-edge);color:' + q.color + ';">' + esc(q.label) + '</span>';
   },
 
   // ── Landing: Audit History data-card ───────────────────────────────────────
