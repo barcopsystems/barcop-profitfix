@@ -656,6 +656,12 @@ S.InventoryReceiveDelivery = {
       // Disputed price changes auto-file a vendor discrepancy claim below
       // (skip lines the operator already filed by hand during entry).
       disputedUpdates = productUpdates.filter((u, i) => choice.dispute.has(i) && !u.alreadyFlagged);
+      // Flag every disputed line (rejected as the new cost, unit_cost unchanged) so
+      // the Vendor Price Changes tab does NOT also report it as a realized increase.
+      // It is filed as an overcharge discrepancy instead; counting both would surface
+      // one rejected line as two separate leak numbers.
+      const disputedProductIds = new Set(productUpdates.filter((_, i) => choice.dispute.has(i)).map(u => u.product && u.product.id).filter(Boolean));
+      lineItems.forEach(li => { if (disputedProductIds.has(li.product_id)) li.price_disputed = true; });
     }
 
     const matchedOrderId = document.getElementById('rd-order')?.value || '';
