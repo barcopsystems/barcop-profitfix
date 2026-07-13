@@ -290,7 +290,7 @@ const ConfirmWeek = {
     const hourlyLabor = Math.max(0, (bLab + fLab) - salaried);
     const rweek = {
       id: rw ? rw.id : App.uid(),
-      week_num: rw ? rw.week_num : ((App.data.revenue_weeks || []).length + 1),
+      week_num: rw ? rw.week_num : ((App.data.revenue_weeks || []).reduce((m, w) => Math.max(m, w.week_num || 0), 0) + 1),
       period_end: pe,
       bar_revenue: bRev,
       floor_revenue: fRev,
