@@ -356,6 +356,9 @@ window.CashEngine = {
   // (in steady state you buy what you use). Overhead bills are counted separately.
   recurringPurchases() { const o = this.overOrder(3); return o.weeklyCogs || 0; },
 
+  // DEPRECATED — do not use for any cash read. This omits projected recurring bills,
+  // events, cash outflows, and tax remittances (it uses billsDue = dated records
+  // only). Use survivalForecast() everywhere; it is the single comprehensive forecast.
   forecast(numWeeks, startMonday) {
     numWeeks = numWeeks || 4;
     const start = startMonday || this._mondayOf(new Date());
@@ -504,9 +507,15 @@ window.CashEngine = {
       const inflow = sales + evAdd;
       const lab = this.laborForWeek(ws);
       const billRecs = this.projectedBills(ws, we);
-      const bills = billRecs.reduce((s, b) => s + b.amount, 0);
       const ofRecs = this.outflowsBetween(ws, we).concat(this.projectedTaxRemittances(ws, we));
-      const outflows = ofRecs.reduce((s, o) => s + o.amount, 0);
+      // Week 0: opening cash is "right now" and already reflects money that left
+      // earlier this week, so count only outflows still to come (dated today or
+      // later) — the mirror of the sales proration above. Counting a bill or outflow
+      // dated earlier this same week (already paid, already out of opening) would
+      // double it and push the near-term low point artificially negative.
+      const _future0 = r => (i !== 0) || (String(r.date || '') >= App.todayLocal());
+      const bills = billRecs.filter(_future0).reduce((s, b) => s + b.amount, 0);
+      const outflows = ofRecs.filter(_future0).reduce((s, o) => s + o.amount, 0);
       let extraOut = 0;
       extra.forEach(x => { if (x.recurring || x.week === i || (x.week == null && i === 0)) extraOut += (parseFloat(x.amount) || 0); });
       const out = lab.cost + purch + bills + outflows + extraOut;
@@ -574,9 +583,17 @@ window.CashEngine = {
   // normalized to a week by their frequency (monthly / quarterly / annual), so a
   // quarterly or annual bill is not weighted as if it hit every month.
   weeklyFixedCosts() {
+    const cur = App.todayLocal().slice(0, 7);   // current YYYY-MM
     let annual = 0;
     this.bills().forEach(b => {
       if (!b.recurring) return;   // recurring parents only (children carry recurring_parent, not recurring)
+      // Skip a series that has ENDED (fixed term fully paid) or been STOPPED. The
+      // forecast (projectedBills) already honors term/stop, so without this the
+      // reserve target counted a paid-off loan or canceled bill forever — inflating
+      // the reserve and shrinking Safe to Spend against a phantom bill.
+      if (b.stopped_ym && b.stopped_ym <= cur) return;
+      const endYm = this.recurringEndYm(b);
+      if (endYm && endYm < cur) return;
       const amt = parseFloat(b.amount) || 0;
       const perYear = b.frequency === 'quarterly' ? 4 : b.frequency === 'annual' ? 1 : 12;
       annual += amt * perYear;

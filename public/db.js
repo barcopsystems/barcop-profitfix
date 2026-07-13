@@ -179,7 +179,11 @@ const DB = {
       // An owner of two bars has two subscription rows, keyed by account_id.
       const accountId = await this._ensureAccountId();
       if (!accountId) {
-        return { status: 'inactive', plan: null, active_modules: [], period_end: null };
+        // A TRANSIENT account-resolution failure must not masquerade as "never paid"
+        // and throw the plan gate (with its destructive Start Over) over a paying
+        // customer's Hub. 'unknown' keeps them usable — RLS still gates data — and it
+        // recovers on the next read. A genuine no-account still reports 'inactive'.
+        return { status: this._acctResolveErr ? 'unknown' : 'inactive', plan: null, active_modules: [], period_end: null };
       }
       const { data, error } = await this._sb
         .from('subscriptions')
@@ -239,6 +243,7 @@ const DB = {
   async _ensureAccountId() {
     if (this._accountId) return this._accountId;
     if (!this._sb || !this._user) return null;
+    this._acctResolveErr = false;   // set true below on a TRANSIENT failure so callers can tell it apart from a genuine no-account
     try {
       // Multi-account: if the user previously selected an active account,
       // resolve that one first. Falls back to first membership otherwise.
@@ -257,7 +262,15 @@ const DB = {
           this._permissions = m.permissions || {};
           return this._accountId;
         }
-        // Stale stored ID (user lost access to that account). Clear it.
+        if (e1) {
+          // Transient error reading the stored account (network/RLS hiccup): do NOT
+          // clear the user's selected bar, and do NOT fall through to first-membership
+          // (which would silently switch them to a DIFFERENT bar). Stay unresolved and
+          // let the caller retry on the next read/reload.
+          this._acctResolveErr = true;
+          return null;
+        }
+        // Genuinely no membership row for the stored account (user lost access). Clear it.
         this._setStoredActiveAccountId(null);
       }
       const { data, error } = await this._sb
@@ -267,13 +280,15 @@ const DB = {
         .order('account_id', { ascending: true })   // deterministic: a multi-account user with no stored active bar resolves to the SAME bar every time, not an arbitrary one
         .limit(1)
         .single();
-      if (error || !data) return null;
+      if (error) { this._acctResolveErr = true; return null; }   // transient read failure, not a definitive no-account
+      if (!data) return null;
       this._accountId = data.account_id;
       this._role = data.role || 'admin';
       this._ownerUserId = (data.accounts && data.accounts.owner_user_id) || null;
       this._permissions = data.permissions || {};
       return this._accountId;
     } catch (e) {
+      this._acctResolveErr = true;
       return null;
     }
   },
