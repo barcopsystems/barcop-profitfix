@@ -152,11 +152,15 @@ async function generateRevenueAudit(apiKey, files, appData, practices, controlDa
 }
 
 // ── Stripe checkout session ───────────────────────────────────────────────────
-// Per-bar billing, two prices on the one "Bar Cop" product. IDs come from env
-// so the test→live swap is an env change, not a code edit. The fallbacks are the
-// SANDBOX price IDs (safe test money); set the env vars to the LIVE IDs at launch.
-const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY || 'price_1TpwYXGow04S066UQ8BSpauR'; // $249/mo
-const STRIPE_PRICE_ANNUAL  = process.env.STRIPE_PRICE_ANNUAL  || 'price_1TpwZ1Gow04S066UBcwhEPNK'; // $2,490/yr
+// Per-bar billing, two prices on the one "Bar Cop" product. Price IDs come ONLY
+// from the environment — there is deliberately NO hardcoded fallback. A hardcoded
+// test-mode price ID is a go-live landmine: with a LIVE secret key but the price
+// env unset, checkout would silently charge against the wrong (test) product.
+// Missing/mis-set price envs now FAIL LOUDLY at checkout (see the guard below).
+// Set STRIPE_PRICE_MONTHLY / STRIPE_PRICE_ANNUAL in every env: the test IDs in
+// sandbox, the LIVE IDs in production.
+const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY || ''; // $249/mo
+const STRIPE_PRICE_ANNUAL  = process.env.STRIPE_PRICE_ANNUAL  || ''; // $2,490/yr
 const ALL_MODULES     = ['profit', 'revenue'];
 
 app.post('/api/create-checkout-session', async (req, res) => {
@@ -200,6 +204,13 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const priceId = plan === 'annual' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
+    // Fail loudly if the price env for this plan is not configured, rather than
+    // sending an empty/undefined price to Stripe or (previously) a hardcoded test
+    // ID. Prevents a charge from ever landing on the wrong product after go-live.
+    if (!priceId) {
+      console.error('create-checkout-session: STRIPE_PRICE_' + (plan === 'annual' ? 'ANNUAL' : 'MONTHLY') + ' is not set — refusing checkout.');
+      return res.status(500).json({ error: 'Billing is not fully configured yet. Please try again shortly or contact support.' });
+    }
     const sessionArgs = {
       ui_mode: 'embedded',
       mode: 'subscription',
