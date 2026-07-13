@@ -504,12 +504,28 @@ function computeRevenueAudit(appData, controlData) {
   const s4 = (spreadScore != null || compScore != null) ? clampScore(avg([spreadScore, compScore])) : null;
 
   // ── S5 — Events & Private Dining ──
+  // Window completed events to the audit's trailing period (the same weeks the
+  // revenue base uses), not all-time. Summing every event ever and dividing by a
+  // hardcoded 3 months made years of catering read as one period's worth — the
+  // dollar the narrative calls "in the window" and the S5 score were both false.
   let s5 = null, eventsPerMonth = null, avgEventRev = null, eventRevPeriod = null;
-  if (events.length > 0) {
-    eventRevPeriod = round0(events.reduce((s, e) => s + (num(e.actual_revenue) || 0), 0));
-    eventsPerMonth = round1(events.length / 3);
-    avgEventRev = round0(eventRevPeriod / events.length);
-    s5 = clampScore(eventsPerMonth >= 4 ? 80 : eventsPerMonth >= 2 ? 60 : eventsPerMonth >= 1 ? 45 : 30);
+  {
+    const shiftYmd = (ymd, days) => { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+    const evDate = e => String(e.event_date || '').slice(0, 10);
+    const winEnd = weeks.length
+      ? String(weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end || '').slice(0, 10)
+      : (events.map(evDate).filter(Boolean).sort().slice(-1)[0] || '');
+    const winStart = winEnd ? shiftYmd(winEnd, -(PERIOD_WEEKS * 7 - 1)) : '';
+    const windowEvents = (winStart && winEnd)
+      ? events.filter(e => { const d = evDate(e); return d && d >= winStart && d <= winEnd; })
+      : events;
+    if (windowEvents.length > 0) {
+      const monthsInPeriod = PERIOD_WEEKS / WEEKS_PER_MONTH;   // the real length of the audit window, not an assumed 3
+      eventRevPeriod = round0(windowEvents.reduce((s, e) => s + (num(e.actual_revenue) || 0), 0));
+      eventsPerMonth = round1(windowEvents.length / monthsInPeriod);
+      avgEventRev = round0(eventRevPeriod / windowEvents.length);
+      s5 = clampScore(eventsPerMonth >= 4 ? 80 : eventsPerMonth >= 2 ? 60 : eventsPerMonth >= 1 ? 45 : 30);
+    }
   }
 
   const overall = clampScore(avg([s1, s2, s3, s4, s5]));

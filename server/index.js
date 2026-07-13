@@ -92,7 +92,8 @@ async function generateProfitAudit(apiKey, files, appData, practices, controlDat
   const numbers = computeProfitAudit(appData, controlData, extracted);
   // Stamp identifiers code owns (not the model).
   numbers.AUDIT_ID = 'PFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
-  numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
+  // (The audit's business date is stamped client-side with App.todayLocal(); the
+  // server has no knowledge of the operator's timezone, so it derives no date.)
   const prose = profitNarrative(numbers);   // code-generated findings, no API
   // Computed numbers win over anything the model echoed back.
   return Object.assign({}, prose, numbers);
@@ -145,7 +146,7 @@ async function generateRevenueAudit(apiKey, files, appData, practices, controlDa
   // are intentionally ignored (nothing sends them) and never override the numbers.
   const numbers = computeRevenueAudit(appData, controlData, extracted);
   numbers.AUDIT_ID = 'RFA-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);
-  numbers.AUDIT_DATE = new Date().toISOString().slice(0, 10);
+  // (Business date is stamped client-side with App.todayLocal(); see profit audit.)
   const prose = revenueNarrative(numbers);   // code-generated findings, no API
   return Object.assign({}, prose, numbers);
 }
@@ -307,7 +308,10 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       let accountId = session.metadata?.account_id || null;
 
       if (!userId && email) {
-        const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
+        // Paginate generously — an unpaginated listUsers() returns only the first
+        // ~50 users, so past that a returning customer on a metadata-less (payment
+        // link) checkout wouldn't be found and we'd wrongly try to re-create them.
+        const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
         const found = existing?.users?.find(u => u.email === email);
         if (found) {
           userId = found.id;
@@ -318,7 +322,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             user_metadata: { created_via: 'stripe_checkout' },
           });
           if (createErr) {
-            console.error('Failed to create Supabase user:', createErr.message);
+            // Likely a concurrent webhook re-delivery already created them — re-look up.
+            const { data: retry } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+            const now = retry?.users?.find(u => u.email === email);
+            if (now) userId = now.id;
+            else console.error('Failed to create Supabase user:', createErr.message);
           } else {
             userId = created.user.id;
             console.log('Account created for new subscriber:', email);
@@ -337,6 +345,18 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           .limit(1)
           .maybeSingle();
         accountId = acct?.id || null;
+        // Metadata-less checkout by a user who owns no account yet (payment link):
+        // provision an account + owner membership so a paying customer is never
+        // left charged with nothing attached. Normal signup passes metadata and
+        // skips this entirely.
+        if (!accountId) {
+          const { data: newAcct } = await supabaseAdmin
+            .from('accounts').insert({ name: 'My Bar', owner_user_id: userId }).select('id').single();
+          if (newAcct) {
+            await supabaseAdmin.from('memberships').insert({ account_id: newAcct.id, user_id: userId, role: 'admin' });
+            accountId = newAcct.id;
+          }
+        }
       }
 
       if (accountId) {
@@ -359,15 +379,22 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       const sub        = event.data.object;
       const customerId = sub.customer;
       const status     = sub.status;
-      const periodEnd  = new Date(sub.current_period_end * 1000).toISOString();
+      // current_period_end moved onto the subscription's items in newer Stripe API
+      // versions. Guard so a missing value can't throw — an unguarded new Date(NaN)
+      // .toISOString() would 500 and make Stripe retry the event forever.
+      const cpe = sub.current_period_end != null ? sub.current_period_end
+                : (sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].current_period_end);
+      const periodEnd = cpe ? new Date(cpe * 1000).toISOString() : null;
 
-      await supabaseAdmin.from('subscriptions')
-        .update({
-          subscription_status: status,
-          current_period_end:  periodEnd,
-          updated_at:          new Date().toISOString(),
-        })
-        .eq('stripe_customer_id', customerId);
+      const update = { subscription_status: status, updated_at: new Date().toISOString() };
+      if (periodEnd) update.current_period_end = periodEnd;
+      // On (re)activation restore module access — a prior 'deleted' event clears
+      // active_modules to [], so an active payer whose subscription reactivated via
+      // an update (not a fresh checkout) would otherwise be locked out of every
+      // module despite an 'active' status.
+      if (status === 'active') { update.active_modules = ALL_MODULES; update.subscription_plan = 'full_access'; }
+
+      await supabaseAdmin.from('subscriptions').update(update).eq('stripe_customer_id', customerId);
     }
 
     if (event.type === 'customer.subscription.deleted') {
