@@ -384,7 +384,12 @@ S.RevenueFix = {
 
   measureLine(g) {
     if (!g) return '';
-    const logged = this.loggedDate(g.id);
+    // Measure from the EARLIEST entry for this gap (one-per-gap), matching the
+    // Recovery Scoreboard and the "$X recovered" line. loggedDate returns the LATEST,
+    // which would show a shorter window than every other surface if a gap ever had
+    // two fix_log entries (auto-start + a manual mark).
+    const _entries = this.fixLog().filter(x => x.gap_id === g.id);
+    const logged = (window.Recovery && Recovery._oneFixPerGap) ? (Recovery._oneFixPerGap(_entries)[0] || null) : (_entries.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0] || null);
     const nm = '<span style="color:var(--t1);font-weight:600;">' + esc(g.name) + '</span>';
     const gold = v => '<span style="color:var(--gold);font-weight:700;">' + App.fmtCurrency(v, 0) + '</span>';
     const red  = v => '<span style="color:var(--red);font-weight:700;">' + App.fmtCurrency(v, 0) + '</span>';
