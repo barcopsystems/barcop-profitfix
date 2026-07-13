@@ -481,6 +481,9 @@ const DB = {
   async writeData(appData) {
     if (this._demo) return { ok: true };
     if (this._sb && this._user) {
+      // Viewer is read-only — reject before the offline queue so a viewer's edit
+      // never lands in the pending list to fail RLS forever on replay.
+      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
       // Fix D: short-circuit the network call when the browser knows it is offline.
       // No round-trip, no console error, faster save. The local copy is canonical.
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -679,6 +682,8 @@ const DB = {
   async _writeControl(table, lsKey, data) {
     if (this._demo) return { ok: true };
     if (this._sb && this._user) {
+      // Viewer is read-only — reject before the offline queue (see writeData).
+      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
       // Fix D: short-circuit the network call when the browser knows it is offline.
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         this._localWriteControl(lsKey, data);
@@ -819,6 +824,23 @@ const DB = {
     try { const r = localStorage.getItem(this._evCacheKey(table, kind)); return r ? JSON.parse(r) : []; }
     catch (e) { return []; }
   },
+  // Is a local key actually account-scoped? (else _acctKey falls back to the base
+  // key and any queued op would be orphaned once the account resolves).
+  _acctScopeAvailable() { return !!(this._accountId || this._getStoredActiveAccountId()); },
+  // Keep the local window cache in step with an offline/queued op so an offline
+  // reload shows the operator's own just-made work (puts) and hides deletes —
+  // otherwise loadEvents would overwrite the in-memory array with a stale cache
+  // that predates the offline change, making it vanish (and inviting a duplicate
+  // re-entry). Only called on queued paths; online writes are re-fetched.
+  _patchEventCache(table, kind, putRecs, delIds) {
+    try {
+      const delSet = new Set((delIds || []).map(String));
+      const putMap = new Map((putRecs || []).filter(r => r && r.id != null).map(r => [String(r.id), r]));
+      const kept = this._readEventCache(table, kind)
+        .filter(r => r && !delSet.has(String(r.id)) && !putMap.has(String(r.id)));
+      this._cacheEvents(table, kind, [...putMap.values(), ...kept]);
+    } catch (e) { /* cache is best-effort */ }
+  },
 
   // Load one kind, newest first. Default = rolling 24-month window (the hot set
   // every screen reads). opts.before = an older page ("Show older"). opts.limit
@@ -837,9 +859,16 @@ const DB = {
               .order('date', { ascending: false, nullsFirst: false })
               .order('id', { ascending: false });
             // Default = the rolling window; include null-date rows so a record
-            // missing a business date is never hidden.
-            if (opts.before) q = q.lt('date', opts.before);
-            else q = q.or('date.gte.' + this._windowStartDate() + ',date.is.null');
+            // missing a business date is never hidden. Older-page: a compound
+            // (date,id) keyset cursor so rows sharing the boundary date are never
+            // skipped (a plain date-only `lt` drops same-date rows past the page edge).
+            if (opts.before) {
+              q = (opts.beforeId != null)
+                ? q.or('date.lt.' + opts.before + ',and(date.eq.' + opts.before + ',id.lt.' + opts.beforeId + ')')
+                : q.lt('date', opts.before);
+            } else {
+              q = q.or('date.gte.' + this._windowStartDate() + ',date.is.null');
+            }
             return q.range(from, to);
           };
           if (opts.limit) {
@@ -869,23 +898,30 @@ const DB = {
   async putEvent(table, kind, rec) {
     if (this._demo || !rec || rec.id == null) return { ok: this._demo === true };
     if (this._sb && this._user) {
+      // Viewer is read-only — reject BEFORE queuing (a queued write would only
+      // fail RLS forever on replay and sit in the pending queue permanently).
+      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      const queue = () => { this._queueEvent(table, kind, 'put', rec); this._patchEventCache(table, kind, [rec], []); };
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        this._queueEvent(table, kind, 'put', rec); return { ok: false, offline: true };
+        queue(); return { ok: false, offline: true, queued: true };
       }
       const accountId = await this._ensureAccountId();
       // queued:true — the op is safely in the local replay queue and WILL sync,
-      // so the caller must keep it in the in-memory list (not revert it). Absent
-      // on the viewer path below, which is a genuine rejection with no queue.
-      if (!accountId) { this._queueEvent(table, kind, 'put', rec); return { ok: false, queued: true, error: 'no account membership found' }; }
+      // so the caller keeps it in the in-memory list (not revert it). Only claim
+      // it when the queue is actually account-scoped, else the replay is orphaned.
+      if (!accountId) {
+        if (this._acctScopeAvailable()) { queue(); return { ok: false, queued: true, error: 'no account membership found' }; }
+        return { ok: false, error: 'no account membership found' };
+      }
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
       try {
         const { error } = await this._sb.from(table).upsert({
           account_id: accountId, kind: kind, id: String(rec.id),
           date: this._eventDate(rec), payload: rec, updated_at: new Date().toISOString()
         }, { onConflict: 'account_id,kind,id' });
-        if (error) { this._queueEvent(table, kind, 'put', rec); return { ok: false, queued: true, error }; }
+        if (error) { queue(); return { ok: false, queued: true, error }; }
         return { ok: true };
-      } catch (e) { this._queueEvent(table, kind, 'put', rec); return { ok: false, queued: true, error: e }; }
+      } catch (e) { queue(); return { ok: false, queued: true, error: e }; }
     }
     return { ok: true }; // local-only mode: App keeps the in-memory array
   },
@@ -893,42 +929,59 @@ const DB = {
   async removeEvent(table, kind, id) {
     if (this._demo || id == null) return { ok: this._demo === true };
     if (this._sb && this._user) {
+      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      const queue = () => { this._queueEvent(table, kind, 'del', { id }); this._patchEventCache(table, kind, [], [id]); };
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        this._queueEvent(table, kind, 'del', { id }); return { ok: false, offline: true };
+        queue(); return { ok: false, offline: true, queued: true };
       }
       const accountId = await this._ensureAccountId();
       // queued:true — see putEvent: the delete is safely queued for replay, so
-      // the caller keeps the row removed instead of restoring it.
-      if (!accountId) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, queued: true, error: 'no account membership found' }; }
+      // the caller keeps the row removed. Only claim it when account-scoped.
+      if (!accountId) {
+        if (this._acctScopeAvailable()) { queue(); return { ok: false, queued: true, error: 'no account membership found' }; }
+        return { ok: false, error: 'no account membership found' };
+      }
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
       try {
         const { error } = await this._sb.from(table).delete()
           .eq('account_id', accountId).eq('kind', kind).eq('id', String(id));
-        if (error) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, queued: true, error }; }
+        if (error) { queue(); return { ok: false, queued: true, error }; }
         return { ok: true };
-      } catch (e) { this._queueEvent(table, kind, 'del', { id }); return { ok: false, queued: true, error: e }; }
+      } catch (e) { queue(); return { ok: false, queued: true, error: e }; }
     }
     return { ok: true };
   },
 
-  // Seed many rows for a kind in one upsert (sample data / migration).
+  // Seed / bulk-write many rows for a kind in one request. Same offline + error
+  // safety as putEvent: on offline or a failed write, EVERY row is queued for
+  // replay and cached locally, so a batch operation (e.g. locking a whole week of
+  // logged hours when a pay period closes) is never silently lost.
   async putEventsBulk(table, kind, recs) {
     if (this._demo || !this._sb || !this._user) return { ok: true };
+    const list = (recs || []).filter(r => r && r.id != null);
+    if (!list.length) return { ok: true };
+    if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+    const queueAll = () => { list.forEach(rec => this._queueEvent(table, kind, 'put', rec)); this._patchEventCache(table, kind, list, []); };
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      queueAll(); return { ok: false, offline: true, queued: true };
+    }
     const accountId = await this._ensureAccountId();
-    if (!accountId) return { ok: false, error: 'no account membership found' };
-    const rows = (recs || []).filter(r => r && r.id != null).map(rec => ({
+    if (!accountId) {
+      if (this._acctScopeAvailable()) { queueAll(); return { ok: false, queued: true, error: 'no account membership found' }; }
+      return { ok: false, error: 'no account membership found' };
+    }
+    const rows = list.map(rec => ({
       account_id: accountId, kind: kind, id: String(rec.id),
       date: this._eventDate(rec), payload: rec, updated_at: new Date().toISOString()
     }));
-    if (!rows.length) return { ok: true };
     try {
       // Chunk to keep each request small.
       for (let i = 0; i < rows.length; i += 500) {
         const { error } = await this._sb.from(table).upsert(rows.slice(i, i + 500), { onConflict: 'account_id,kind,id' });
-        if (error) return { ok: false, error };
+        if (error) { queueAll(); return { ok: false, queued: true, error }; }
       }
       return { ok: true };
-    } catch (e) { return { ok: false, error: e }; }
+    } catch (e) { queueAll(); return { ok: false, queued: true, error: e }; }
   },
 
   // Delete every row for this account in an events table (sample reload / clear

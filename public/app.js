@@ -871,13 +871,13 @@ const App = {
     const isNewBar = !!(ctx && ctx.newBar);
     const status = (ctx && ctx.status) || '';
     // A returning customer whose subscription lapsed must NOT be greeted like a
-    // brand-new signup. Two shapes: past_due/unpaid still HAVE a plan (just fix
-    // the card via the billing portal), while canceled/expired need to start a
-    // plan again. Neither may see "Start Over" — that abandons the account, and a
-    // returning customer's account holds their real data.
-    const isPastDue = status === 'past_due' || status === 'unpaid';
-    const isEnded   = status === 'canceled' || status === 'cancelled' || status === 'incomplete_expired';
-    const isLapsed  = isPastDue || isEnded;
+    // brand-new signup. past_due/unpaid still HAVE a plan (fix the card via the
+    // billing portal). CRITICAL: "Start Over" deletes the account, so it is shown
+    // ONLY for a POSITIVELY-identified never-paid new signup — never by exclusion.
+    // Any other status (canceled, paused, trialing, or anything Stripe adds later)
+    // is a real account with data and falls to the safe, non-destructive branch.
+    const isPastDue   = status === 'past_due' || status === 'unpaid';
+    const isNewSignup = !status || status === 'inactive' || status === 'incomplete';
     const barName = isNewBar
       ? (ctx.draft.bar_name || '').trim()
       : ((this.data && this.data.settings && this.data.settings.bar_name) || '').trim();
@@ -887,16 +887,17 @@ const App = {
       heading = 'Payment Past Due';
       bodyHtml = (barName ? 'We could not process the last payment for ' + nameB + '. ' : 'We could not process your last payment. ')
         + 'Update your card to keep running Bar Cop. Your data is safe and waiting.';
-    } else if (isEnded) {
-      heading = 'Subscription Ended';
-      bodyHtml = (barName ? 'Your subscription for ' + nameB + ' has ended. ' : 'Your subscription has ended. ')
-        + 'Start it back up whenever you are ready. Your data is safe and waiting.';
-    } else {
+    } else if (isNewSignup) {
       heading = "You're Almost Ready";
       const acctLine = isNewBar
         ? (barName ? 'Your new bar ' + nameB + ' is set up.' : 'Your new bar is set up.')
         : (barName ? 'Your account for ' + nameB + ' is now set up.' : 'Your account is now set up.');
       bodyHtml = acctLine + '<br>Start your subscription plan for instant access.';
+    } else {
+      // canceled / paused / trialing / any other non-active status on a real account
+      heading = 'Subscription Inactive';
+      bodyHtml = (barName ? 'Your subscription for ' + nameB + ' is not active. ' : 'Your subscription is not active. ')
+        + 'Start it back up whenever you are ready. Your data is safe and waiting.';
     }
     // past_due keeps its existing plan — send them to the billing portal to fix
     // the card, not back through a fresh plan picker.
@@ -922,11 +923,11 @@ const App = {
       + '<div id="gate-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>'
       + (isNewBar
           ? '<div style="text-align:center;margin-top:18px;"><button class="auth-link" id="gate-cancel" style="font-size:11px;">Cancel</button></div>'
-          : isLapsed
-            ? '<div style="text-align:center;margin-top:18px;"><button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>'
-            : '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button>'
+          : isNewSignup
+            ? '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button>'
               + '<span style="color:var(--b-edge);margin:0 10px;">|</span>'
-              + '<button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>')
+              + '<button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>'
+            : '<div style="text-align:center;margin-top:18px;"><button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>')
       + '</div>';
     document.body.appendChild(m);
     const opts = showPicker ? Array.from(m.querySelectorAll('#gate-plan-picker .plan-opt')) : [];
@@ -4718,6 +4719,12 @@ const App = {
     if (this.isLiquidIngredient(p)) {
       return { measure: 'oz', unitLabel: 'oz', costPerUnit: this.costPerOz(p) || 0 };
     }
+    // Bottle beer is tracked/priced by the CASE, so unit_cost is a case price.
+    // Cost a recipe use (a beer cocktail) per BOTTLE via bottleCost (case_size
+    // conversion) — the stock-unit fallback below would charge the full case.
+    if (p.category === 'Bottle Beer') {
+      return { measure: 'unit', unitLabel: 'bottle', costPerUnit: this.bottleCost(p) || 0 };
+    }
     const pk = parseFloat(p.pack_size);
     const isEach = String(p.unit_type || '').toLowerCase() === 'each';
     if (pk > 0 || isEach) {
@@ -4962,13 +4969,16 @@ const App = {
   },
 
   // Append an older page of one kind ("Show older"). Returns the fetched rows.
-  async loadOlder(mod, kind, beforeDate, limit) {
+  async loadOlder(mod, kind, cursor, limit) {
     const store = this.EVENT_STORES[mod];
     if (!store) return [];
     const dataObj = store.data();
     const key = store && store.kinds[kind];
     if (!dataObj || !key) return [];
-    const older = await DB.loadEvents(store.table, kind, { before: beforeDate, limit: limit || 200 });
+    // cursor may be a {date,id} keyset or a bare date string (back-compat).
+    const beforeDate = (cursor && typeof cursor === 'object') ? cursor.date : cursor;
+    const beforeId   = (cursor && typeof cursor === 'object') ? cursor.id : null;
+    const older = await DB.loadEvents(store.table, kind, { before: beforeDate, beforeId: beforeId, limit: limit || 200 });
     if (!Array.isArray(dataObj[key])) dataObj[key] = [];
     const seen = new Set(dataObj[key].map(r => r && r.id));
     older.forEach(r => { if (r && !seen.has(r.id)) dataObj[key].push(r); });
@@ -5056,7 +5066,9 @@ const App = {
     const list = (recs || []).filter(r => r && r.id != null);
     if (!list.length) return true;
     const res = await DB.putEventsBulk(store.table, kind, list);
-    return !(res && res.ok === false);
+    // Saved, offline, or safely queued for replay all count as success — the
+    // caller's in-memory rows stay put and the queue will sync them.
+    return !!(res && (res.ok || res.offline || res.queued));
   },
 
   async removeRecord(mod, kind, id) {
@@ -5112,6 +5124,25 @@ const App = {
     let min = null;
     arr.forEach(r => { const d = DB._eventDate(r); if (d && (min == null || d < min)) min = d; });
     return min;
+  },
+
+  // Oldest loaded record as a {date,id} keyset cursor: the minimum date, and
+  // among records at that date the minimum row id. Used to page older records
+  // without skipping rows that share the boundary date.
+  oldestLoaded(mod, kind) {
+    const store = this.EVENT_STORES[mod];
+    if (!store) return null;
+    const dataObj = store.data();
+    const key = store.kinds[kind];
+    const arr = (dataObj && Array.isArray(dataObj[key])) ? dataObj[key] : [];
+    let date = null, id = null;
+    arr.forEach(r => {
+      const d = DB._eventDate(r); if (!d) return;
+      const rid = r && r.id != null ? String(r.id) : null;
+      if (date == null || d < date) { date = d; id = rid; }
+      else if (d === date && rid != null && (id == null || rid < id)) { id = rid; }
+    });
+    return date ? { date: date, id: id } : null;
   },
 
   // Could older-than-window records plausibly exist on the server? True only
@@ -5170,10 +5201,10 @@ const App = {
     const key = this._listKey(mod, kind);
     const st = this._listState[key] || {};
     if (mode === 'server') {
-      const before = this.oldestLoadedDate(mod, kind);
+      const cursor = this.oldestLoaded(mod, kind);
       btn.disabled = true; btn.textContent = 'Loading...';
       const PAGE = 200;
-      const older = before ? await this.loadOlder(mod, kind, before, PAGE) : [];
+      const older = cursor ? await this.loadOlder(mod, kind, cursor, PAGE) : [];
       st.paged = true;
       if (!older || older.length < PAGE) st.exhausted = true;
     }
