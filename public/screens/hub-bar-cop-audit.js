@@ -753,7 +753,10 @@ S.HubBarCopAudit = {
     const serial = String(Math.floor(Math.random() * 9000) + 1000);
     return {
       id:          App.uid ? App.uid() : ('bca-' + Date.now()),
-      date:        now.toISOString(),
+      // Business date is the LOCAL calendar day (matches every other audit + the
+      // event-store index); a full UTC ISO here read a day ahead in the evening.
+      date:        App.todayLocal(),
+      generated_at: now.toISOString(),
       audit_id:    'BCA-' + now.getFullYear() + '-' + serial,
       audit_period: 'Last 30 days',
       grade:       'Complete Operational Analysis',
@@ -1148,7 +1151,7 @@ S.HubBarCopAudit = {
 
     let ds = App._pdfDateStamp();
     if (audit.date) {
-      const dt = new Date(audit.date);
+      const dt = new Date(String(audit.date).length <= 10 ? audit.date + 'T00:00:00' : audit.date);
       if (!isNaN(dt.getTime())) {
         const p = n => String(n).padStart(2, '0');
         ds = '' + dt.getFullYear() + p(dt.getMonth() + 1) + p(dt.getDate());

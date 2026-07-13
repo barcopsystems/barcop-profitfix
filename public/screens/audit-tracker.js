@@ -483,19 +483,25 @@ S.AuditTracker = {
     // Period window — the audit covers the same trailing 4 weeks the cost
     // percentages use. Scope every summed Control figure to that window so a
     // bar with months of logged records does not overstate a one-period rate.
-    let windowStart = null;
+    let windowStart = null, windowEnd = null;
     if (weeks.length) {
       const ends = weeks.map(w => w.period_end).sort();
       const d = new Date(ends[0] + 'T00:00:00');
       d.setDate(d.getDate() - 6);          // include the full first week of the window
       windowStart = isNaN(d) ? null : d;
+      // Upper bound = the latest confirmed week's end. Without it, comps/waste/
+      // variance logged in the CURRENT in-progress week are summed against the 4
+      // closed weeks' revenue, inflating the recoverable-dollar headline.
+      const e = new Date(ends[ends.length - 1] + 'T00:00:00');
+      windowEnd = isNaN(e) ? null : e;
     }
     const inWindow = (rec) => {
       if (!windowStart) return true;       // no weekly data — do not filter
       const ds = rec && (rec.date || rec.created_at);
       if (!ds) return true;                // undated — include rather than silently drop
       const rd = new Date(('' + ds).slice(0, 10) + 'T00:00:00');
-      return isNaN(rd) ? true : rd >= windowStart;
+      if (isNaN(rd)) return true;
+      return rd >= windowStart && (!windowEnd || rd <= windowEnd);
     };
 
     // Inventory Control — counts
