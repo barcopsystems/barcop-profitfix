@@ -54,7 +54,7 @@ S.CashBridge = {
     this.container.innerHTML = '<div class="screen">'
       + (br.hasData
           ? this.headline(br, b) + controlRow + this.waterfall(br)
-          : controlRow + '<div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">The bridge reads your profit off your weekly numbers. Once you have weeks confirmed in This Week for ' + esc(b.label) + ', it fills in here.</div></div>')
+          : '<div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">The bridge reads your profit off your weekly numbers. Once you confirm your weeks for ' + esc(b.label) + ' in Confirm the Week, it fills in here.</div></div>')
       + '<div class="no-print" style="font-size:11px;color:var(--t3);margin-top:16px;">Log draws, loan payments, capital buys, and tax in Books under Cash Outflows. This page reads them back as the bridge.</div>'
       + '</div>';
     this.wire();
