@@ -370,7 +370,21 @@ function computeRevenueAudit(appData, controlData) {
     .sort((a, b) => String(a.period_end || a.week_end || '').localeCompare(String(b.period_end || b.week_end || '')))
     .slice(-PERIOD_WEEKS);   // sort oldest->newest FIRST (revenue_weeks arrives newest-first) so slice(-4) is the most recent 4, not the oldest
   const menuItems = (appData.menu_items || []).filter(i => num(i.price) != null && num(i.cost) != null && num(i.weekly_covers) != null);
-  const serverChecks = (appData.revenue_server_checks || []).filter(c => (num(c.covers) > 0) && num(c.sales) != null);
+  // Window server checks to the audit's trailing period (the same weeks the
+  // revenue base uses), not all-time. Averaging every check ever logged let a
+  // server who left months ago set the bottom check average, widening the spread
+  // and inflating the S4 recoverable dollar under a header that reads "4 weeks
+  // ending ...". Mirrors the S5 events window below.
+  const _shiftYmd = (ymd, days) => { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+  const _scWinEnd = weeks.length ? String(weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end || '').slice(0, 10) : '';
+  const _scWinStart = _scWinEnd ? _shiftYmd(_scWinEnd, -(PERIOD_WEEKS * 7 - 1)) : '';
+  const serverChecks = (appData.revenue_server_checks || [])
+    .filter(c => (num(c.covers) > 0) && num(c.sales) != null)
+    .filter(c => {
+      if (!_scWinStart || !_scWinEnd) return true;   // no closed weeks yet: use every check we have
+      const d = String(c.date || '').slice(0, 10);
+      return d && d >= _scWinStart && d <= _scWinEnd;
+    });
   const priceLog = appData.revenue_price_log || [];
   const dogTests = appData.menu_dog_tests || [];
   const events = (appData.bookings || []).filter(e => e && e.stage === 'Completed');
