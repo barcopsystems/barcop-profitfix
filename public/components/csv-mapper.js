@@ -121,10 +121,17 @@ const CSVMapper = {
   _autoMap(headers, fields) {
     const map = {};
     const used = {};
+    const esc = c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     fields.forEach(f => {
       const cands = [f.key, f.label, ...(f.match || [])].map(s => String(s).toLowerCase());
       let hit = headers.find(h => !used[h] && cands.includes(String(h).toLowerCase().trim()));
-      if (!hit) hit = headers.find(h => !used[h] && cands.some(c => String(h).toLowerCase().trim().includes(c)));
+      // Fallback = a WORD-BOUNDARY match, not a raw substring, so "count" no longer
+      // matches inside "account" and a candidate only hits a whole token.
+      if (!hit) hit = headers.find(h => {
+        if (used[h]) return false;
+        const hl = String(h).toLowerCase().trim();
+        return cands.some(c => c.length >= 3 && new RegExp('(^|[^a-z])' + esc(c) + '([^a-z]|$)').test(hl));
+      });
       if (hit) { map[f.key] = hit; used[hit] = true; }
     });
     return map;
@@ -162,6 +169,12 @@ const CSVMapper = {
       + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;">Found <strong style="color:var(--w);">'
       + rows.length + ' rows</strong>. Match each field to a column from your file. '
       + 'Detected columns are pre-selected and this mapping is remembered for next time.</div>'
+      // Ragged rows = a data row with a different column count than the header,
+      // almost always an unquoted comma in a number cell (like 1,234) that split
+      // the row and shifted every column after it. Warn before the operator confirms.
+      + (rows.filter(r => r.length !== headers.length).length
+          ? '<div style="font-size:12px;color:var(--gold);background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:10px 12px;margin-bottom:14px;">Heads up: some rows have a different number of columns than the header. That usually means a number cell holds an unquoted comma (like 1,234), which splits the row and shifts the columns after it. Check the preview below lines up, or re-save the file with number columns quoted.</div>'
+          : '')
       + '<div class="form-row" style="flex-wrap:wrap;gap:12px 20px;">';
     opts.fields.forEach(f => {
       html += '<div class="f" style="width:210px;flex-shrink:0;"><label>' + esc(f.label)

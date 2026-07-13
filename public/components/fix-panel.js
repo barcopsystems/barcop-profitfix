@@ -716,7 +716,7 @@ window.FixPanel = {
       { h: 'Where You\'re Leaking', p: ['Each gap shows its weekly status and, where Bar Cop has a live weekly number for it, the dollars a year you are losing at this week\'s pace. Gaps without a live dollar, like theft and loss or vendors, show as a review row, never an invented number. Open Leaks, In Progress, and Recovered to Date up top are your running picture.'] },
       { h: 'Working a Gap', p: ['Every step in a fix process is a link into the part of Bar Cop that does the work. DO IT opens the screen where the work happens, SEE IT opens where Bar Cop already shows the number, and DOCUMENT downloads a policy, standard, or template. Check the boxes as you go; your progress saves and shows up in Recent Activity.'] },
       { h: 'Watch Out For', p: ['Each gap lists the mistakes that quietly cost operators the most. Read them first. They are the things Bar Cop itself cannot stop.'] },
-      { h: 'Mark Implemented', p: ['When the fix is in place, lock in the date. Bar Cop averages the eight weeks before and after to measure what the fix actually recovered, and the Recovery Scoreboard on your dashboard tracks it. A figure shows once two weeks of after-data land.'] },
+      { h: 'Mark Implemented', p: ['When the fix is in place, lock in the date. From there Bar Cop tracks the gap’s weekly number against your baseline weeks and shows how far it has moved on the Recovery Scoreboard. A dollar figure shows once a couple of weeks of data land after the date.'] },
       { h: 'The Honest Rule', p: ['A dollar figure only shows when the math comes from real data Bar Cop already holds. A fix that cannot be dollarized honestly still gets logged; its recovery shows as the score moving, not invented dollars.'] }
     ];
   }

@@ -44,7 +44,7 @@ const PosIngest = {
       { key: 'date',   label: 'Date',       required: true,  match: ['date', 'business date', 'day', 'service date'] },
       { key: 'bar',    label: 'Bar Sales',  required: false, match: ['bar sales', 'bar revenue', 'bar', 'beverage', 'liquor sales', 'beverage sales'] },
       { key: 'food',   label: 'Food Sales', required: false, match: ['food sales', 'food revenue', 'food', 'kitchen', 'floor', 'floor sales', 'kitchen sales'] },
-      { key: 'covers', label: 'Covers',     required: false, match: ['covers', 'guests', 'guest count', 'customers', 'count'] }
+      { key: 'covers', label: 'Covers',     required: false, match: ['covers', 'guests', 'guest count', 'customers'] }
     ],
     // A POS cash / drawer report: per-day, optionally per-register. The POS blind
     // close already computed over/short, so the cash-variance pattern recovery
@@ -65,7 +65,7 @@ const PosIngest = {
     server: [
       { key: 'name',   label: 'Server',      required: true,  match: ['server', 'server name', 'employee', 'employee name', 'name', 'staff', 'bartender'] },
       { key: 'date',   label: 'Date',        required: true,  match: ['date', 'business date', 'shift date', 'service date'] },
-      { key: 'covers', label: 'Covers',      required: true,  match: ['covers', 'guests', 'guest count', 'checks', 'customers', 'count'] },
+      { key: 'covers', label: 'Covers',      required: true,  match: ['covers', 'guests', 'guest count', 'checks', 'customers'] },
       { key: 'sales',  label: 'Total Sales', required: true,  match: ['sales', 'net sales', 'total sales', 'gross sales', 'revenue', 'amount'] },
       { key: 'shift',  label: 'Shift',       required: false, match: ['shift', 'shift type', 'daypart'] }
     ],
@@ -74,7 +74,7 @@ const PosIngest = {
     // place (no new records), so it has a custom commit (_commitPmix).
     pmix: [
       { key: 'name',  label: 'Item Name',  required: true, match: ['item', 'item name', 'menu item', 'menu item name', 'name', 'product', 'description'] },
-      { key: 'units', label: 'Units Sold', required: true, match: ['units', 'units sold', 'sold', 'qty', 'qty sold', 'quantity', 'covers', 'count', 'sales count'] }
+      { key: 'units', label: 'Units Sold', required: true, match: ['units', 'units sold', 'sold', 'qty', 'qty sold', 'quantity', 'covers', 'sales count'] }
     ]
   },
 
@@ -88,10 +88,55 @@ const PosIngest = {
     pmix:  { label: 'Menu Sales Mix', module: 'core', kind: 'menu_item' }
   },
 
+  // Parse a POS number cleanly: strips $ and thousands commas AND handles a
+  // NEGATIVE in any common export form — leading "-15", accounting "(15)", or
+  // trailing "15-". The old cleaner kept "-" but stripped "()", so a "($50)"
+  // drawer shortage read as +50 (a shortage stored as a surplus).
+  _num(v) {
+    if (v == null) return 0;
+    const s = String(v).trim();
+    if (!s) return 0;
+    const neg = /^\(.*\)$/.test(s) || /^-/.test(s) || /-\s*$/.test(s);
+    const n = parseFloat(s.replace(/[^0-9.]/g, ''));
+    if (isNaN(n)) return 0;
+    return neg ? -n : n;
+  },
+
+  _ymd(y, mo, d) { const p = n => String(n).padStart(2, '0'); return y + '-' + p(mo) + '-' + p(d); },
+
+  // Content-dedup that consumes each existing record AT MOST ONCE, so a file with
+  // two legitimately-identical rows (a split shift, two same-value sittings) isn't
+  // collapsed to one, while a full re-import of the same file still dedups cleanly.
+  _isDup(existing, used, pred) {
+    for (const x of existing) {
+      if (used.has(x.id) || !pred(x)) continue;
+      used.add(x.id); return true;
+    }
+    return false;
+  },
+
+  // Normalize a POS date cell to canonical local YYYY-MM-DD (App.ymdLocal's
+  // format), handling ISO, US MM/DD/YYYY, M/D/YY, and dash variants. The old code
+  // only handled ISO (it appended 'T00:00:00' to everything), so MM/DD/YYYY became
+  // Invalid Date and was stored raw — silently breaking dedup and week grouping.
+  // Returns '' (not the raw string) when unparseable, so a bad row is skipped
+  // rather than stored with a date that no comparison will ever match.
   normDate(raw) {
     if (!raw) return '';
-    const d = new Date(String(raw).length <= 10 ? raw + 'T00:00:00' : raw);
-    return isNaN(d.getTime()) ? String(raw) : App.ymdLocal(d);
+    const s = String(raw).trim();
+    if (!s) return '';
+    const datePart = s.split(/[ T]/)[0];   // drop any trailing time component
+    let m = datePart.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);   // ISO-ish YYYY-MM-DD
+    if (m) return this._ymd(+m[1], +m[2], +m[3]);
+    m = datePart.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/);     // US MM/DD/YYYY (or DD/MM when the first field can't be a month)
+    if (m) {
+      let a = +m[1], b = +m[2], y = +m[3]; if (y < 100) y += 2000;
+      const mo = (a > 12 && b <= 12) ? b : a;
+      const d  = (a > 12 && b <= 12) ? a : b;
+      return this._ymd(y, mo, d);
+    }
+    const dt = new Date(s.length <= 10 ? s + 'T00:00:00' : s);   // "Jul 13 2026", ISO with time, etc.
+    return isNaN(dt.getTime()) ? '' : App.ymdLocal(dt);
   },
 
   _staffByName() {
@@ -117,7 +162,7 @@ const PosIngest = {
   buildHours(rows) {
     const staffByName = this._staffByName();
     const existing = (App.laborData && App.laborData.lc_actuals) || [];
-    const toAdd = []; const skipped = []; let dupCount = 0;
+    const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const hours = parseFloat(r.hours);
@@ -125,7 +170,7 @@ const PosIngest = {
       const recDate = this.normDate(r.date);
       // Skip an exact re-import (same staff + date + hours) so re-dropping a
       // timeclock file never double-counts hours into gross pay.
-      if (existing.some(x => x.staff_id === staff.id && x.date === recDate && Math.abs((x.hours || 0) - hours) < 0.001)) {
+      if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate && Math.abs((x.hours || 0) - hours) < 0.001)) {
         dupCount++; return;
       }
       const sal = App.isSalaried(staff);
@@ -143,7 +188,7 @@ const PosIngest = {
   buildTips(rows) {
     const staffByName = this._staffByName();
     const existing = (App.laborData && App.laborData.lc_tips) || [];
-    const toAdd = []; const skipped = []; let dupCount = 0;
+    const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const cash = parseFloat(r.cash_tips) || 0;
@@ -152,7 +197,7 @@ const PosIngest = {
       const recDate = this.normDate(r.date);
       // Skip an exact re-import (same staff + date + the same cash and card tips)
       // so re-dropping a tips export never double-counts tip income.
-      if (existing.some(x => x.staff_id === staff.id && x.date === recDate
+      if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate
             && Math.abs((x.cash_tips || 0) - cash) < 0.001
             && Math.abs((x.card_tips || 0) - card) < 0.001)) {
         dupCount++; return;
@@ -172,10 +217,13 @@ const PosIngest = {
     const byName = this._staffByName();
     const existing = (App.shiftData && App.shiftData.sc_void_comps) || [];
     const today = App.todayLocal();
-    const toAdd = []; const skipped = []; let dupCount = 0;
+    const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
-      const amount = parseFloat(String(r.amount == null ? '' : r.amount).replace(/[^0-9.\-]/g, ''));
-      if (isNaN(amount) || amount < 0) { skipped.push('(no amount)'); return; }
+      // A void/comp is a LOSS magnitude. POS exports show it as a negative ("-15")
+      // or accounting parens ("(15)") to signal it reduces sales; both are a $15
+      // loss. Take the absolute value so those rows import instead of being dropped.
+      const amount = Math.abs(this._num(r.amount));
+      if (!(amount > 0)) { skipped.push('(no amount)'); return; }
       const t = (r.type || '').trim().toLowerCase();
       const type = (t.indexOf('comp') >= 0 || t === 'c') ? 'Comp' : 'Void';
       const serverName = (r.server || '').trim();
@@ -185,7 +233,7 @@ const PosIngest = {
       const recDate = this.normDate(r.date) || today;
       // Skip an exact re-import (same date + amount + server + item) so re-dropping
       // a voids/comps export never double-counts loss.
-      if (existing.some(x => x.date === recDate && Math.abs((x.amount || 0) - amount) < 0.001
+      if (this._isDup(existing, used, x => x.date === recDate && Math.abs((x.amount || 0) - amount) < 0.001
             && (x.server || '') === server && (x.item || '') === item)) {
         dupCount++; return;
       }
@@ -203,17 +251,21 @@ const PosIngest = {
   },
 
   buildSales(rows) {
-    const existingDates = new Set((((App.shiftData && App.shiftData.sc_shifts) || [])).map(s => s.date));
-    const num = v => parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')) || 0;
+    const existingShifts = ((App.shiftData && App.shiftData.sc_shifts) || []);
+    // A hand-entered close (imported !== true) is richer + authoritative; never
+    // let a bulk sales import overwrite it. Only a prior IMPORTED day is replaced.
+    const manualDates   = new Set(existingShifts.filter(s => s && s.imported !== true).map(s => s.date));
+    const importedDates = new Set(existingShifts.filter(s => s && s.imported === true).map(s => s.date));
     const toAdd = []; const skipped = []; let dupCount = 0; const seen = new Set();
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
       if (!date) { skipped.push('(no date)'); return; }
-      const bar = num(r.bar), food = num(r.food);
+      if (manualDates.has(date)) { skipped.push(date + ' (manual close kept)'); return; }
+      const bar = this._num(r.bar), food = this._num(r.food);
       if (bar + food <= 0) { skipped.push(date); return; }
       if (seen.has(date)) return;          // one row per day; ignore a repeat date in the file
       seen.add(date);
-      if (existingDates.has(date)) dupCount++;   // this day already has a record — it gets replaced
+      if (importedDates.has(date)) dupCount++;   // this day already has an imported record — it gets replaced
       const covers = parseInt(String(r.covers == null ? '' : r.covers).replace(/[^0-9]/g, ''), 10) || 0;
       toAdd.push({
         id: App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
@@ -241,15 +293,15 @@ const PosIngest = {
     });
     const staffByName = this._staffByName();
     const existing = (App.shiftData && App.shiftData.sc_variances) || [];
-    const num = v => parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
-    const toAdd = []; const skipped = []; let dupCount = 0;
+    const has = v => v != null && String(v).trim() !== '';
+    const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
       if (!date) { skipped.push('(no date)'); return; }
-      const exp = num(r.expected), cnt = num(r.counted), os = num(r.over_short);
+      const exp = this._num(r.expected), cnt = this._num(r.counted), os = this._num(r.over_short);
       let expected_cash = null, counted_cash = null, variance;
-      if (!isNaN(exp) && !isNaN(cnt)) { expected_cash = exp; counted_cash = cnt; variance = Math.round((cnt - exp) * 100) / 100; }
-      else if (!isNaN(os)) { variance = Math.round(os * 100) / 100; }
+      if (has(r.expected) && has(r.counted)) { expected_cash = exp; counted_cash = cnt; variance = Math.round((cnt - exp) * 100) / 100; }
+      else if (has(r.over_short)) { variance = Math.round(os * 100) / 100; }   // a "($50)" shortage now correctly reads -50, not +50
       else { skipped.push(date); return; }            // no over/short derivable
       const dName = (r.drawer || '').trim();
       const dRec = dName ? drawerByName[dName.toLowerCase()] : null;
@@ -257,7 +309,7 @@ const PosIngest = {
       const cName = (r.cashier || '').trim();
       const staff = cName ? staffByName[cName.toLowerCase()] : null;
       const cashier = staff ? staff.name : cName;
-      if (existing.some(x => x.date === date && (x.drawer || '') === drawer
+      if (this._isDup(existing, used, x => x.date === date && (x.drawer || '') === drawer
             && Math.abs((x.variance || 0) - variance) < 0.001)) { dupCount++; return; }
       // Tolerance is the matched register's own (App.drawerTolerance); $10 when
       // the register is unrecognized or unmapped.
@@ -283,15 +335,14 @@ const PosIngest = {
   buildServer(rows) {
     const staffByName = this._staffByName();
     const existing = (App.data && App.data.revenue_server_checks) || [];
-    const num = v => parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
-    const toAdd = []; const skipped = []; let dupCount = 0;
+    const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const covers = parseInt(String(r.covers == null ? '' : r.covers).replace(/[^0-9]/g, ''), 10) || 0;
-      const sales = num(r.sales);
-      if (!staff || !covers || isNaN(sales) || sales <= 0) { skipped.push(r.name || '(blank)'); return; }
+      const sales = this._num(r.sales);
+      if (!staff || !covers || !(sales > 0)) { skipped.push(r.name || '(blank)'); return; }
       const recDate = this.normDate(r.date);
-      if (existing.some(x => x.staff_id === staff.id && x.date === recDate
+      if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate
             && (x.covers || 0) === covers && Math.abs((x.sales || 0) - sales) < 0.001)) { dupCount++; return; }
       toAdd.push({
         id: App.uid(), date: recDate, shift: (r.shift || '').trim(), shift_id: '',
@@ -328,7 +379,9 @@ const PosIngest = {
     const t = this.TYPES[type];
     if (!t) return false;
     let ok = true;
-    for (const rec of (toAdd || [])) { ok = (await App.putRecord(t.module, t.kind, rec)) && ok; }
+    try {
+      for (const rec of (toAdd || [])) { ok = (await App.putRecord(t.module, t.kind, rec)) && ok; }
+    } catch (e) { return false; }
     return ok;
   },
 
@@ -354,10 +407,17 @@ const PosIngest = {
   // older record for the day.
   async _commitSales(toAdd) {
     const dates = new Set((toAdd || []).map(r => r.date));
-    const existing = (((App.shiftData && App.shiftData.sc_shifts) || [])).filter(s => dates.has(s.date));
+    // Replace only prior IMPORTED days for these dates — never a hand-entered
+    // manual close (buildSales already skips those dates). Insert the new records
+    // FIRST, then remove the superseded imports, so a failure mid-way never leaves
+    // a date with no record at all.
+    const stale = (((App.shiftData && App.shiftData.sc_shifts) || []))
+      .filter(s => s && dates.has(s.date) && s.imported === true);
     let ok = true;
-    for (const e of existing) { ok = (await App.removeRecord('sc', 'shift', e.id)) && ok; }
-    for (const rec of (toAdd || [])) { ok = (await App.putRecord('sc', 'shift', rec)) && ok; }
+    try {
+      for (const rec of (toAdd || [])) { ok = (await App.putRecord('sc', 'shift', rec)) && ok; }
+      for (const e of stale) { ok = (await App.removeRecord('sc', 'shift', e.id)) && ok; }
+    } catch (e) { return false; }
     return ok;
   }
 };
