@@ -141,8 +141,8 @@ S.InventoryVarianceReport = {
 
   adjustmentsMap(startDate, endDate) {
     const out = {};
-    const bump = (pid, units) => {
-      if (!pid || !units) return;
+    const bump = (pid) => {
+      if (!pid) return null;
       if (!out[pid]) out[pid] = { comp_units: 0, waste_units: 0 };
       return out[pid];
     };
@@ -150,7 +150,8 @@ S.InventoryVarianceReport = {
       if (!v.product_id || v.units == null) return;
       if (v.type !== 'Comp') return;
       if (v.date <= startDate || v.date > endDate) return;
-      const entry = bump(v.product_id, v.units);
+      const entry = bump(v.product_id);
+      if (!entry) return;
       const p = this.productById(v.product_id) || {};
       const units = parseFloat(v.units) || 0;
       // Void/Comp logs `units` as SERVINGS (pours/drinks); usage (rawUsed) is in the
@@ -161,7 +162,8 @@ S.InventoryVarianceReport = {
     this.waste().forEach(w => {
       if (!w.product_id || w.units == null) return;
       if (w.date <= startDate || w.date > endDate) return;
-      const entry = bump(w.product_id, w.units);
+      const entry = bump(w.product_id);
+      if (!entry) return;
       const p = this.productById(w.product_id) || {};
       const units = parseFloat(w.units) || 0;
       if (p.category === 'Draft Beer' && p.container_size_oz) {
