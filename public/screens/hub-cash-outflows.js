@@ -107,7 +107,7 @@ S.HubCashOutflows = {
       +   '<div class="f" style="max-width:540px;"><label>How often</label><select id="cb-frequency" style="width:200px;"><option value="monthly">Monthly</option><option value="quarterly">Quarterly (every 3 months)</option><option value="annual">Annually (once a year)</option></select></div>'
       +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" class="suf" id="cb-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs until you stop it. Set this only for one with a fixed payoff, like a loan.</div></div></div>'
       + '</div>'
-      + '<div class="form-row" style="margin-top:14px;margin-bottom:0;"><div class="f" style="width:100%;"><label>Note</label><textarea class="notes-ta" rows="2" id="cb-note" placeholder="e.g. SBA loan, March draw"></textarea></div></div>'
+      + App.noteField({ id: 'cb-note', placeholder: 'e.g. SBA loan, March draw' })
       + '<div id="cb-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
       + '</div>';
     const buttons = '<div data-collapse-group="cb-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
@@ -222,7 +222,7 @@ S.HubCashOutflows = {
       +   '<div class="f"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="cb-f-amt" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + recurHtml
-      + '<div class="form-row" style="margin-top:14px;"><div class="f" style="width:100%;"><label>Note</label><textarea class="notes-ta" rows="2" id="cb-f-note" placeholder="e.g. SBA loan, March draw">' + esc(rec.notes || '') + '</textarea></div></div>'
+      + App.noteField({ id: 'cb-f-note', value: rec.notes, placeholder: 'e.g. SBA loan, March draw' })
       + '<div class="card-actions">'
       +   '<button class="btn btn-primary" id="cb-f-save">' + (isEdit ? 'Save Changes' : 'Add Outflow') + '</button>'
       +   '<button class="btn btn-ghost" id="cb-f-cancel">Cancel</button>'
