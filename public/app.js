@@ -5687,7 +5687,10 @@ const App = {
     if (!el) return;
     const weeks = this.data?.weeks || [];
     if (weeks.length > 0) {
-      const w = weeks[weeks.length - 1];
+      // Event stores load date/id-DESC, so weeks[last] is the OLDEST-created week, not
+      // the current one. Pick the newest via App.latestEvent so the sidebar label
+      // matches what the dashboards show (never pick "latest" by array position).
+      const w = App.latestEvent(weeks) || weeks[weeks.length - 1];
       el.textContent = 'Week ' + w.week_num + '   ' + (w.period_end || '');
     } else {
       el.textContent = 'No data yet';
