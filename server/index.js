@@ -4,7 +4,6 @@ const path     = require('path');
 const https    = require('https');
 const http     = require('http');
 const fs       = require('fs');
-const { execSync } = require('child_process');
 const multiparty = require('multiparty');
 let XLSX;
 try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }
@@ -466,6 +465,14 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         const { data: priorSub } = await supabaseAdmin
           .from('subscriptions').select('account_id').eq('account_id', accountId).maybeSingle();
         const isNewSubscriber = !priorSub;
+        // Only grant ACTIVE access when the checkout's payment actually cleared. Card
+        // checkout completes 'paid' (and free/trial is 'no_payment_required'); a delayed
+        // method like bank debit can complete UNPAID and fail later. We still record the
+        // subscription row (so the account is tracked and keyed by subscription id), but
+        // hold it inactive until customer.subscription.updated confirms it went active.
+        const paid = !session.payment_status
+          || session.payment_status === 'paid'
+          || session.payment_status === 'no_payment_required';
         await supabaseAdmin.from('subscriptions').upsert({
           account_id:             accountId,
           user_id:                userId,
@@ -475,13 +482,13 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           // under one Stripe Customer (same email via Link), a customer-keyed update
           // would clobber the other bar; keying on the subscription id can't.
           stripe_subscription_id: session.subscription || null,
-          subscription_status:    'active',
+          subscription_status:    paid ? 'active' : 'incomplete',
           subscription_plan:      'full_access',
-          active_modules:         ALL_MODULES,
+          active_modules:         paid ? ALL_MODULES : [],
           current_period_end:     null,
           updated_at:             new Date().toISOString(),
         }, { onConflict: 'account_id' });
-        if (isNewSubscriber && email) {
+        if (paid && isNewSubscriber && email) {
           const { data: acctRow } = await supabaseAdmin
             .from('accounts').select('name').eq('id', accountId).maybeSingle();
           // Fire-and-forget on this long-running server: a slow or hung Resend call must
@@ -759,6 +766,25 @@ app.post('/api/invite-user', async (req, res) => {
     // Clamp the granted areas/levels to what this inviter may hand out.
     const grantPerms = clampPermsToGranter(cleanPerms, requester.permissions, requester.isOwner);
     const cleanEmail = String(email).toLowerCase().trim();
+
+    // SECURITY: write the invite to a SERVER-ONLY table (service-role; no anon/user RLS
+    // policy, so the browser can't read or forge it). The signup trigger provisions the
+    // membership from THIS record, matched by the new user's verified email, and IGNORES
+    // the signup metadata below. This is what stops a self-signup with a forged
+    // invited_to_account_id from joining an account it was never invited to.
+    const { error: inviteRecErr } = await supabaseAdmin
+      .from('account_invites')
+      .upsert({
+        email: cleanEmail,
+        account_id: accountId,
+        role: inviteRole,
+        permissions: grantPerms,
+        invited_by: inviterUserId
+      }, { onConflict: 'email,account_id' });
+    if (inviteRecErr) {
+      console.error('invite record write failed:', inviteRecErr.message);
+      return res.status(500).json({ error: 'Could not record the invite. Please try again.' });
+    }
 
     const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       cleanEmail,
