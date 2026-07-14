@@ -180,22 +180,25 @@ const ConfirmWeek = {
     const cat = this._catering || {};
     const cRev = parseFloat(cat.revenue) || 0, cCogs = parseFloat(cat.cogs) || 0, cLab = parseFloat(cat.labor) || 0;
     const totRev = bRev + fRev + cRev;
+    const oRev = this._val('cw-anc-rev');
+    // Total sales = F&B (bar+food+catering) + ancillary. Prime % and Labor % are measured
+    // against TOTAL SALES — the standard restaurant KPI, and what Books/the income statement
+    // use — so they foot to the P&L and read the same on every screen. Catering labor is in
+    // the numerator too. Check average stays per-cover F&B (ancillary isn't a per-guest check).
+    const totSales = totRev + oRev;
     const primeCost = bCogs + fCogs + bLab + fLab + cCogs + cLab;
     const t = (App.data.settings && App.data.settings.targets) || {};
     const primeTgt = t.prime_cost_pct ?? 60;
-    const primePct = totRev > 0 ? primeCost / totRev * 100 : null;
+    const primePct = totSales > 0 ? primeCost / totSales * 100 : null;
     const checkAvg = covers > 0 ? totRev / covers : null;
-    // Include catering labor so the Labor % the operator approves in this modal
-    // matches what gets SAVED (labor_pct_blended = (bLab+fLab+cLab)/totRev) and shown
-    // on every other screen — the prime % preview above already includes catering.
     const laborCost = bLab + fLab + cLab;
-    const laborPct = totRev > 0 ? laborCost / totRev * 100 : null;
+    const laborPct = totSales > 0 ? laborCost / totSales * 100 : null;
     const rplh = this._hours > 0 ? totRev / this._hours : null;
     const caTgt = ((App.data.revenue_settings && App.data.revenue_settings.targets) || {}).check_avg ?? 35;
     const laborTgt = App.laborTargetPct ? App.laborTargetPct() : 30;
 
     const set = (id, txt, cls) => { const el = document.getElementById(id); if (el) { el.textContent = txt; el.className = 'calc-val lg ' + (cls || ''); } };
-    set('cw-m-rev', App.fmtCurrency(totRev, 0));
+    set('cw-m-rev', App.fmtCurrency(totSales, 0));
     set('cw-m-prime', primePct != null ? primePct.toFixed(1) + '%' : '-', primePct != null ? (primePct > primeTgt ? 'warn' : 'good') : '');
     set('cw-m-ca', checkAvg != null ? App.fmtCurrency(checkAvg) : '-', checkAvg != null ? (checkAvg >= caTgt ? 'good' : 'warn') : '');
     set('cw-m-lp', laborPct != null ? laborPct.toFixed(1) + '%' : '-', laborPct != null ? (laborPct <= laborTgt ? 'good' : 'warn') : '');
@@ -259,6 +262,10 @@ const ConfirmWeek = {
     const t = (App.data.settings && App.data.settings.targets) || {};
     const bTgt = t.bar_pour_cost_pct ?? 22, fTgt = t.food_cost_pct ?? 32;
     const totRev = bRev + fRev + cRev;
+    // Total sales incl ancillary. Prime % and blended Labor % are measured against total
+    // sales (standard KPI + matches the Books income statement); check average and RPLH
+    // stay on F&B totRev.
+    const totSales = totRev + oRev;
     const primeCost = bCogs + fCogs + bLab + fLab + cCogs + cLab;
     const bPct = bRev > 0 ? bCogs / bRev * 100 : 0;
     const fPct = fRev > 0 ? fCogs / fRev * 100 : 0;
@@ -275,7 +282,7 @@ const ConfirmWeek = {
       catering: { revenue: cRev, cogs: cCogs, labor: cLab, cost_pct: cRev > 0 ? cCogs / cRev * 100 : 0, labor_pct: cRev > 0 ? cLab / cRev * 100 : 0 },
       other: { revenue: oRev, cogs: oCogs },
       platform_fees: fees,
-      prime_cost_pct: totRev > 0 ? primeCost / totRev * 100 : 0,
+      prime_cost_pct: totSales > 0 ? primeCost / totSales * 100 : 0,
       notes: notes
     };
 
@@ -302,7 +309,7 @@ const ConfirmWeek = {
       total_labor_cost: laborCost,
       hourly_labor_cost: parseFloat(hourlyLabor.toFixed(2)),
       total_hours: hours,
-      labor_pct_blended: totRev > 0 ? parseFloat((laborCost / totRev * 100).toFixed(2)) : 0,
+      labor_pct_blended: totSales > 0 ? parseFloat((laborCost / totSales * 100).toFixed(2)) : 0,
       hourly_labor_pct: totRev > 0 ? parseFloat((hourlyLabor / totRev * 100).toFixed(2)) : 0,
       rplh_blended: hours > 0 ? parseFloat((totRev / hours).toFixed(2)) : 0,
       notes: notes,
