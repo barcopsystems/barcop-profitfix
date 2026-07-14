@@ -65,6 +65,11 @@ const DB = {
     this._ownerUserId = null;
     this._permissions = null;
     this._accountsCache = null;
+    // Clear the stored active-account id so a DIFFERENT person signing in on a shared
+    // browser can't have the previous user's account resolved (and their cached blob
+    // read) before membership is re-checked. _ensureAccountId re-resolves from the
+    // signed-in user's memberships; a single-bar user still lands on their only bar.
+    this._setStoredActiveAccountId(null);
     return { data, error };
   },
 
@@ -160,6 +165,9 @@ const DB = {
     this._ownerUserId = null;
     this._permissions = null;
     this._accountsCache = null;
+    // Drop the stored active-account id on sign-out so the next person to sign in on a
+    // shared browser starts with no account pre-resolved (prevents a cross-user cache read).
+    this._setStoredActiveAccountId(null);
   },
 
   async resetPassword(email) {
