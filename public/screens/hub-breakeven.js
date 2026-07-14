@@ -84,7 +84,17 @@ S.HubBreakEven = {
     const varRate = netRev > 0 ? (cogs + varLabor) / netRev : null;
 
     const opex = (App.data && App.data.operating_expenses) || [];
-    const recurring = opex.filter(r => r && r.recurring && !r.recurring_parent);
+    // Match CashEngine.weeklyFixedCosts: drop a recurring bill that has been STOPPED or
+    // whose fixed TERM is fully paid, so the break-even nut agrees with Cash Position's
+    // reserve target instead of carrying a paid-off loan or canceled bill forever.
+    const curYm = App.todayLocal().slice(0, 7);
+    const recurring = opex.filter(r => {
+      if (!r || !r.recurring || r.recurring_parent) return false;
+      if (r.stopped_ym && r.stopped_ym <= curYm) return false;
+      const endYm = (window.CashEngine && CashEngine.recurringEndYm) ? CashEngine.recurringEndYm(r) : null;
+      if (endYm && endYm < curYm) return false;
+      return true;
+    });
     // Normalize each recurring bill by its frequency (monthly/quarterly/annual) so
     // the weekly nut isn't over-weighted by a quarterly or annual bill.
     const annualOpex = recurring.reduce((s, r) => {
