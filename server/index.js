@@ -151,6 +151,13 @@ async function generateRevenueAudit(apiKey, files, appData, practices, controlDa
   return Object.assign({}, prose, numbers);
 }
 
+// ── Health check (unauthenticated) ───────────────────────────────────────────
+// A trivial liveness probe for uptime monitoring (e.g. UptimeRobot). Returns 200
+// as long as the Node server is up and routing /api. No DB call on purpose, so a
+// transient Supabase blip can't false-alarm the monitor — this checks "is the
+// backend running," not "is every dependency healthy."
+app.get('/api/health', (req, res) => res.json({ ok: true }));
+
 // ── Stripe checkout session ───────────────────────────────────────────────────
 // Per-bar billing, two prices on the one "Bar Cop" product. Price IDs come ONLY
 // from the environment — there is deliberately NO hardcoded fallback. A hardcoded
