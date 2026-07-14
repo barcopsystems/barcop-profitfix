@@ -224,9 +224,14 @@ S.Reports = {
       const fCog = parseFloat(w.food?.cogs)    || 0;
       const bLab = parseFloat(w.bar?.labor)    || 0;
       const fLab = parseFloat(w.food?.labor)   || 0;
-      const tRev = bRev + fRev;
-      const tCog = bCog + fCog;
-      const tLab = bLab + fLab;
+      // Totals roll in catering + ancillary so they tie to the Books income statement and
+      // the Prime Cost % (measured against total sales) foots. The Bar/Food columns are the
+      // F&B floor breakout; catering + ancillary fold into the Total columns.
+      const cRev = parseFloat(w.catering?.revenue) || 0, cCog = parseFloat(w.catering?.cogs) || 0, cLab = parseFloat(w.catering?.labor) || 0;
+      const oRev = parseFloat(w.other?.revenue)    || 0, oCog = parseFloat(w.other?.cogs)    || 0;
+      const tRev = bRev + fRev + cRev + oRev;
+      const tCog = bCog + fCog + cCog + oCog;
+      const tLab = bLab + fLab + cLab;
       const prime = tCog + tLab;
       rows.push([
         w.period_end || '',
@@ -243,7 +248,7 @@ S.Reports = {
 
     // Footer: blank, source note (merged), then the shared disclaimer block.
     rows.push(blankRow());
-    rows.push(lineRow('Source: Profit > This Week weekly rollups. Revenue from Shift Control. COGS from Inventory Control. Labor from Labor Control.'));
+    rows.push(lineRow('Source: Confirm the Week rollups. Total columns include catering + ancillary revenue (Bar/Food columns are the F&B floor breakout). Prime Cost % is measured against total sales, consistent with the Books income statement.'));
     mergeFull(rows.length - 1);
     App.deliverableFooter().disclaimerLines.forEach(line => {
       rows.push(lineRow(line));

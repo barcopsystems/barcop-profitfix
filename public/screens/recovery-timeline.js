@@ -160,13 +160,22 @@ S.RecoveryTimeline = {
       if (op.length <= B) return;                       // this gap still building
       const bAvg = R._avg(op.slice(0, B).map(vf));
       if (bAvg == null) return;
+      // Build this gap's per-week deltas AND its total. Only fold the gap into the chart
+      // when its TOTAL is positive — matching the Scoreboard, which counts only gaps with
+      // compute().dollars > 0. Otherwise a net-slipping gap would drag the chart's "now"
+      // below the headline Recovered number shown on the same screen.
+      const gapWeeks = {};
+      let gapTotal = 0;
       op.slice(B).forEach(w => {
         const v = vf(w), base = m.base(w);
         if (v == null || base == null) return;
         const imp = m.lowerBetter ? (bAvg - v) : (v - bAvg);
         const d = (m.baseKind === 'pts') ? (imp / 100) * base : imp * base;
-        byWeek[w.period_end] = (byWeek[w.period_end] || 0) + d;
+        gapWeeks[w.period_end] = (gapWeeks[w.period_end] || 0) + d;
+        gapTotal += d;
       });
+      if (gapTotal <= 0) return;
+      Object.keys(gapWeeks).forEach(pe => { byWeek[pe] = (byWeek[pe] || 0) + gapWeeks[pe]; });
     });
     const dates = Object.keys(byWeek).sort();
     let cum = 0;
