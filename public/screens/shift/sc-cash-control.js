@@ -421,7 +421,12 @@ S.ShiftCashControl = {
 
     App.openModal(html, { id: 'cc-modal', maxWidth: 540, onClose: () => { this._dropOnDone = null; App.closeModal('cc-modal'); } });
     const counter = CashCounter.mount(document.getElementById('ccd-counter'), {
-      onChange: total => { const a = document.getElementById('ccd-amount'); if (a && total > 0) a.value = total.toFixed(2); }
+      // Only fill Amount from the counter when it is still BLANK, so counting a
+      // fresh drop auto-fills it, but a value the manager typed (or a saved amount
+      // when editing) is never silently overwritten. The counter fires onChange on
+      // mount and on every stepper tap; without this guard, opening an edit or
+      // tapping a stepper to spot-check a stack would rewrite the real amount.
+      onChange: total => { const a = document.getElementById('ccd-amount'); if (a && total > 0 && !(parseFloat(a.value) > 0)) a.value = total.toFixed(2); }
     });
     document.getElementById('ccd-save')?.addEventListener('click', () => this.saveDrop(counter, editing ? rec.id : null));
     document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('cash drop', async () => {
@@ -436,6 +441,16 @@ S.ShiftCashControl = {
     if (!date) { fail('Date is required.'); return; }
     const amount = parseFloat(document.getElementById('ccd-amount')?.value);
     if (isNaN(amount) || amount <= 0) { fail('Enter the amount dropped.'); return; }
+
+    // If the manager itemized the drop with the counter, the counted bills MUST
+    // match the amount. Never save a drop whose recorded bills disagree with the
+    // recorded dollars (that is how the safe silently ends up over/short). If the
+    // counter is empty (they typed a round amount without itemizing), trust it.
+    const counted = counter ? counter.total() : 0;
+    if (counted > 0 && Math.abs(counted - amount) >= 0.01) {
+      fail('The bills you counted (' + App.fmtCurrency(counted) + ') do not match the amount dropped (' + App.fmtCurrency(amount) + '). Fix one so they match, or clear the counter.');
+      return;
+    }
 
     const existing = editId ? this.drops().find(x => x.id === editId) : null;
     const drawerId = document.getElementById('ccd-drawer')?.value || '';
