@@ -1108,7 +1108,20 @@ S.InventoryVarianceReport = {
       const soldOz = pr.ouncesSold || 0;
       const actualUnits = u.used;
       let theoUnits;
-      if (cat === 'Food' || cat === 'Misc') theoUnits = soldOz;
+      if (cat === 'Food' || cat === 'Misc') {
+        // soldOz holds the recipe draw in the ingredient's ENTRY measure — ounces for a
+        // liquid mixer (container_size_oz set), servings/pieces for a pack solid — while
+        // actualUnits (u.used) is in stock CONTAINERS. Convert the theoretical to
+        // containers first, or the variance subtracts ounces/pieces from containers and
+        // reads as nonsense (e.g. 50 pieces vs 2 bags -> -2400%). A plain native-unit
+        // product (no pack, no container oz) divides by 1, unchanged.
+        if (App.isLiquidIngredient(p)) {
+          const ozPer = App.ozPerContainer(p) || 0;
+          theoUnits = ozPer > 0 ? soldOz / ozPer : null;
+        } else {
+          theoUnits = soldOz / (App.servingsPerUnit(p) || 1);
+        }
+      }
       else if (cat === 'Bottle Beer')       theoUnits = (csOz ? soldOz / csOz : 0) / (cseSz || 1);
       else                                   theoUnits = csOz ? soldOz / csOz : null;
       const dollarVar = (u.unitCost != null && actualUnits != null && theoUnits != null)
@@ -1121,6 +1134,7 @@ S.InventoryVarianceReport = {
         caseSize: parseFloat(p.case_size) || 0,
         unitType: p.unit_type || '',
         byBottle: this.isByBottle(p),
+        theoUnits,
         unitCost: u.unitCost, usageCost: u.usageCost, dollarVar
       });
     });
@@ -1210,9 +1224,9 @@ S.InventoryVarianceReport = {
   },
   usageTableMisc(rows, label) {
     const body = rows.map(r => {
-      const recipeQt = r.ouncesSold || 0;
+      const recipeQt = r.theoUnits;   // theoretical draw, converted to stock containers
       const countedQt = r.containersUsed;
-      const qtVar = countedQt != null ? countedQt - recipeQt : null;
+      const qtVar = (countedQt != null && recipeQt != null) ? countedQt - recipeQt : null;
       const varPct = (qtVar != null && countedQt) ? qtVar / countedQt * 100 : null;
       return '<tr>'
         + '<td><div class="val">' + esc(r.name) + '</div></td>'
@@ -1227,9 +1241,9 @@ S.InventoryVarianceReport = {
   foodName(name) { return String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim(); },
   usageTableFood(rows, label) {
     const body = rows.map(r => {
-      const recipeUse = r.ouncesSold || 0;
+      const recipeUse = r.theoUnits;   // theoretical draw, converted to stock containers
       const countedUse = r.containersUsed;
-      const useVar = countedUse != null ? countedUse - recipeUse : null;
+      const useVar = (countedUse != null && recipeUse != null) ? countedUse - recipeUse : null;
       const varPct = (useVar != null && countedUse) ? useVar / countedUse * 100 : null;
       const unit = r.unitType || this.foodUnit(r.name);
       return '<tr>'
