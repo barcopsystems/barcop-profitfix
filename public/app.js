@@ -290,12 +290,15 @@ const App = {
     // the navigation so we don't grow the history stack on every back-step.
     window.addEventListener('popstate', (e) => {
       if (!e.state) return;
-      // If the app shell is not the active view (the auth / set-password screen is up,
-      // or no account data is loaded), a back/forward step must NOT pull the user into
-      // a module screen — App.data is null there and every data-driven screen throws,
-      // rendering a broken shell over the sign-in page. Ignore it and stay put.
-      const appHidden = document.getElementById('app')?.classList.contains('hidden');
-      if (appHidden || !this.data) return;
+      // Block a back/forward step only while the auth / set-password screen is actually
+      // up (App.data is also null there) — otherwise every data-driven screen throws and
+      // paints a broken shell over the sign-in page. Do NOT gate on "#app is hidden": the
+      // Hub hides #app too, so that test can't tell the auth screen from the Hub and would
+      // kill browser Back/Forward on the home view. auth-screen is display:flex on the auth
+      // panel and display:none everywhere inside the app, so it distinguishes them cleanly.
+      const authEl = document.getElementById('auth-screen');
+      const authShowing = !!(authEl && authEl.style.display !== 'none');
+      if (authShowing || !this.data) return;
       this._navigationLock = true;
       try {
         if (e.state.mode === 'hub') {
@@ -883,7 +886,11 @@ const App = {
     // Any other status (canceled, paused, trialing, or anything Stripe adds later)
     // is a real account with data and falls to the safe, non-destructive branch.
     const isPastDue   = status === 'past_due' || status === 'unpaid';
-    const isNewSignup = !status || status === 'inactive' || status === 'incomplete';
+    // POSITIVELY identify a never-paid signup — a genuinely new account reads 'inactive'
+    // (no subscription row). Do NOT include `!status`: an empty/unexpected status must
+    // fall to the safe "Subscription Inactive" branch (Sign Out only), never light up the
+    // account-DELETING "Start Over" by exclusion. ('unknown' is short-circuited earlier.)
+    const isNewSignup = status === 'inactive' || status === 'incomplete';
     const barName = isNewBar
       ? (ctx.draft.bar_name || '').trim()
       : ((this.data && this.data.settings && this.data.settings.bar_name) || '').trim();
