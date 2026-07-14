@@ -346,15 +346,44 @@ async function sendWelcomeEmail(email, barName) {
       +     '&copy; 2004&ndash;' + new Date().getFullYear() + ' Bar Cop'
       +   '</div>'
       + '</div>';
-    const resp = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: email, subject: 'Welcome to Bar Cop', html, reply_to: replyTo })
-    });
+    // Bound the call so a hung Resend can never keep this promise (or, historically,
+    // the webhook) pending. It is fired without await now, but the timeout also stops
+    // a stuck socket from leaking.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    let resp;
+    try {
+      resp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to: email, subject: 'Welcome to Bar Cop', html, reply_to: replyTo }),
+        signal: ctrl.signal
+      });
+    } finally { clearTimeout(timer); }
     if (!resp.ok) console.error('welcome email send failed:', resp.status, await resp.text());
   } catch (e) {
     console.error('welcome email error (non-fatal):', e.message);
   }
+}
+
+// Apply a subscription-event update to exactly the row for THIS Stripe subscription.
+// Keying on the subscription id (not the customer) is the fix for the two-bars case:
+// if an operator ever runs two bars under one Stripe Customer, a customer-keyed update
+// would clobber the other bar's access. Rows created before we stored the subscription
+// id have it null; we match those by customer once and stamp the id so every later
+// event keys precisely. Returns nothing; best-effort like the rest of the webhook.
+async function applySubUpdate(sub, update) {
+  const subId = sub.id;
+  const customerId = sub.customer;
+  const { data: hit } = await supabaseAdmin
+    .from('subscriptions').update(update)
+    .eq('stripe_subscription_id', subId).select('account_id');
+  if (hit && hit.length) return;
+  // Legacy/backfill: no row carries this subscription id yet. Match the customer's
+  // row(s) that have no subscription id stored, and stamp it going forward.
+  await supabaseAdmin
+    .from('subscriptions').update({ ...update, stripe_subscription_id: subId })
+    .eq('stripe_customer_id', customerId).is('stripe_subscription_id', null);
 }
 
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -438,29 +467,42 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           .from('subscriptions').select('account_id').eq('account_id', accountId).maybeSingle();
         const isNewSubscriber = !priorSub;
         await supabaseAdmin.from('subscriptions').upsert({
-          account_id:          accountId,
-          user_id:             userId,
-          stripe_customer_id:  customerId,
-          subscription_status: 'active',
-          subscription_plan:   'full_access',
-          active_modules:      ALL_MODULES,
-          current_period_end:  null,
-          updated_at:          new Date().toISOString(),
+          account_id:             accountId,
+          user_id:                userId,
+          stripe_customer_id:     customerId,
+          // Store the subscription id so later subscription.updated/deleted events key
+          // on THIS subscription, not the customer. If an operator ever runs two bars
+          // under one Stripe Customer (same email via Link), a customer-keyed update
+          // would clobber the other bar; keying on the subscription id can't.
+          stripe_subscription_id: session.subscription || null,
+          subscription_status:    'active',
+          subscription_plan:      'full_access',
+          active_modules:         ALL_MODULES,
+          current_period_end:     null,
+          updated_at:             new Date().toISOString(),
         }, { onConflict: 'account_id' });
         if (isNewSubscriber && email) {
           const { data: acctRow } = await supabaseAdmin
             .from('accounts').select('name').eq('id', accountId).maybeSingle();
-          await sendWelcomeEmail(email, acctRow && acctRow.name);   // best-effort; never throws
+          // Fire-and-forget on this long-running server: a slow or hung Resend call must
+          // never delay the webhook ack (a delayed ack makes Stripe retry the whole
+          // event). The priorSub check above already gates it to the first activation,
+          // so this fires exactly once and never on a re-delivery.
+          sendWelcomeEmail(email, acctRow && acctRow.name).catch(() => {});
         }
       } else {
+        // We charged the customer but could not resolve an account to attach the
+        // subscription to (e.g. a transient DB failure on a metadata-less payment
+        // link). Return non-2xx so Stripe re-delivers and we can try again, rather
+        // than acking success and stranding a paid customer with no account.
         console.error('checkout.session.completed: no account_id resolved for customer', customerId);
+        return res.status(500).json({ error: 'account provisioning failed; Stripe will retry' });
       }
     }
 
     if (event.type === 'customer.subscription.updated') {
-      const sub        = event.data.object;
-      const customerId = sub.customer;
-      const status     = sub.status;
+      const sub    = event.data.object;
+      const status = sub.status;
       // current_period_end moved onto the subscription's items in newer Stripe API
       // versions. Guard so a missing value can't throw — an unguarded new Date(NaN)
       // .toISOString() would 500 and make Stripe retry the event forever.
@@ -476,20 +518,16 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       // module despite an 'active' status.
       if (status === 'active') { update.active_modules = ALL_MODULES; update.subscription_plan = 'full_access'; }
 
-      await supabaseAdmin.from('subscriptions').update(update).eq('stripe_customer_id', customerId);
+      await applySubUpdate(sub, update);
     }
 
     if (event.type === 'customer.subscription.deleted') {
-      const sub        = event.data.object;
-      const customerId = sub.customer;
-
-      await supabaseAdmin.from('subscriptions')
-        .update({
-          subscription_status: 'canceled',
-          active_modules:      [],
-          updated_at:          new Date().toISOString(),
-        })
-        .eq('stripe_customer_id', customerId);
+      const sub = event.data.object;
+      await applySubUpdate(sub, {
+        subscription_status: 'canceled',
+        active_modules:      [],
+        updated_at:          new Date().toISOString(),
+      });
     }
 
     res.json({ received: true });
@@ -505,13 +543,21 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 // fire an email to stop a script flooding the inbox or burning the Resend quota.
 // Best-effort, in-memory, per-instance — a real user sends once and never trips it.
 const _notifyHits = new Map();
-function notifyRateLimited(req, key, maxPerMin) {
+let _notifyGlobal = [];   // timestamps of ALL allowed notify sends this minute, any IP
+function notifyRateLimited(req, key, maxPerMin, globalMax) {
+  const now = Date.now();
+  // Global backstop FIRST: the per-IP cap keys on X-Forwarded-For, which a client can
+  // spoof to mint a fresh bucket per request. So cap the two unauth endpoints together
+  // at globalMax emails/min regardless of IP — spoofing can no longer flood the inbox
+  // or burn the Resend quota. Generous enough that real traffic never trips it.
+  _notifyGlobal = _notifyGlobal.filter(t => now - t < 60000);
+  if (_notifyGlobal.length >= globalMax) return true;
   const ip = String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'unknown').split(',')[0].trim();
   const bucket = key + ':' + ip;
-  const now = Date.now();
   const arr = (_notifyHits.get(bucket) || []).filter(t => now - t < 60000);
   if (arr.length >= maxPerMin) { _notifyHits.set(bucket, arr); return true; }
   arr.push(now); _notifyHits.set(bucket, arr);
+  _notifyGlobal.push(now);
   if (_notifyHits.size > 5000) { for (const [k, v] of _notifyHits) { if (!v.length || now - v[v.length - 1] > 60000) _notifyHits.delete(k); } }
   return false;
 }
@@ -525,7 +571,7 @@ function notifyRateLimited(req, key, maxPerMin) {
 app.post('/api/report-bug-notify', async (req, res) => {
   // The report row is already persisted client-side; the email is a courtesy, so a
   // throttled request still returns ok (nothing is lost, the email is just skipped).
-  if (notifyRateLimited(req, 'bug', 5)) return res.json({ ok: true, emailed: false, reason: 'rate_limited' });
+  if (notifyRateLimited(req, 'bug', 5, 30)) return res.json({ ok: true, emailed: false, reason: 'rate_limited' });
   const apiKey = process.env.RESEND_API_KEY;
   const to     = process.env.BUG_REPORT_NOTIFY_EMAIL;
   const from   = process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev';
@@ -587,7 +633,7 @@ app.post('/api/report-bug-notify', async (req, res) => {
 app.post('/api/support-message-notify', async (req, res) => {
   // No DB row is kept for support messages, so a throttled request is a genuine
   // failure to deliver — report it (429) rather than falsely claiming success.
-  if (notifyRateLimited(req, 'support', 5)) return res.status(429).json({ ok: false, emailed: false, reason: 'rate_limited' });
+  if (notifyRateLimited(req, 'support', 5, 30)) return res.status(429).json({ ok: false, emailed: false, reason: 'rate_limited' });
   const apiKey = process.env.RESEND_API_KEY;
   const to     = process.env.SUPPORT_NOTIFY_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL;
   const from   = process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev';
