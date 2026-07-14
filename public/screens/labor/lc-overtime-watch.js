@@ -102,16 +102,24 @@ S.LaborOvertimeWatch = {
       if (!map[id]) map[id] = { id, name: name || '-', actual: 0, scheduled: 0 };
       return map[id];
     };
+    const DAYS = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     weekActuals.forEach(a => {
       if (App.isSalaried(a.staff_id)) return; // salaried = exempt, no overtime
       const e = ensure(a.staff_id || a.name, a.name);
       e.actual += (a.hours || 0);
+      (e.workedDays = e.workedDays || {})[a.date] = true; // this day is already logged
     });
     if (sched) {
       (sched.shifts || []).forEach(sh => {
         if (App.isSalaried(sh.staff_id)) return; // salaried = exempt, no overtime
         const e = ensure(sh.staff_id || sh.name, sh.name);
         e.scheduled += (sh.hours || 0);
+        // Map the shift's weekday name to its date this week so we can tell which
+        // scheduled hours are still upcoming vs already worked (ws is a Monday, DAYS
+        // is Monday-first, so index = offset from the week start).
+        const di = DAYS.indexOf(sh.day);
+        const dt = di >= 0 ? this.addDays(ws, di) : null;
+        if (dt) (e.schedByDate = e.schedByDate || {})[dt] = (e.schedByDate[dt] || 0) + (sh.hours || 0);
       });
     }
 
@@ -119,7 +127,13 @@ S.LaborOvertimeWatch = {
       // Wage in effect at the start of the week — covers wage changes mid-week
       const wage = App.wageForStaffOn ? App.wageForStaffOn(e.id, ws)
         : ((this.staffById(e.id) || {}).wage || (weekActuals.find(a => (a.staff_id || a.name) === e.id) || {}).wage || 0);
-      const projected = Math.max(e.actual, e.scheduled);
+      // Project the full week honestly: hours already WORKED (actuals include any
+      // pickups beyond the posted schedule) plus hours still SCHEDULED on days not yet
+      // worked. The old max(actual, scheduled) missed anyone already logging extra who
+      // still has scheduled shifts to come, under-warning their overtime.
+      const remainingSched = Object.keys(e.schedByDate || {}).reduce((t, d) =>
+        t + ((e.workedDays && e.workedDays[d]) ? 0 : e.schedByDate[d]), 0);
+      const projected = e.actual + remainingSched;
       const otHours = Math.max(0, projected - App.OT_THRESHOLD);
       const otCost = otHours * wage * 0.5; // the OT premium (extra half-time)
       let status = 'OK';

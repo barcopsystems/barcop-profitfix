@@ -374,7 +374,8 @@ S.LaborReports = {
     // in the week total (and itemized in the By Staff table below).
     // Include the weekly OT premium (0.5x over 40/wk) so the Week lens Actual Labor
     // Cost / Labor % foots to gross and matches the Range lens, which already adds it.
-    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + salWk.total + this.otPremiums(weekActuals).total;
+    const otWk = this.otPremiums(weekActuals);
+    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + salWk.total + otWk.total;
 
     const sched = this.scheduleCovering(ws);
     const schedHours = sched ? (sched.total_hours || 0) : null;
@@ -409,6 +410,9 @@ S.LaborReports = {
       if (!byStaff[st.id]) byStaff[st.id] = { name: st.name || '-', days: {}, hours: 0, cost: 0 };
       byStaff[st.id].cost += annual / 52;
     });
+    // Fold each hourly worker's weekly OT premium into their row so the By Staff
+    // Cost column foots to the summary Actual Labor Cost, which includes it.
+    Object.keys(otWk.byStaff).forEach(k => { if (byStaff[k]) byStaff[k].cost += otWk.byStaff[k]; });
     let staffBody;
     const staffKeys = Object.keys(byStaff);
     if (staffKeys.length === 0) {

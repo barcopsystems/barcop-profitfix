@@ -273,8 +273,20 @@ S.LaborLogHours = {
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
     const filtered = this.applyFilters(all);
     const totHours = filtered.reduce((s, a) => s + (parseFloat(a.hours) || 0), 0);
-    const totCost  = filtered.reduce((s, a) => s + (App.isSalaried(a.staff_id)
-      ? (App.staffWeeklySalary(a.staff_id) / 7) : (parseFloat(a.cost) || 0)), 0);
+    // Salaried pay is weekly-fixed, not per-entry: count each salaried person's weekly
+    // salary once per week they logged in this range (charging weeklySalary/7 per entry
+    // under- or over-counts unless they happen to log exactly 7 days). Hourly = entry cost.
+    const salSeen = {};
+    let totCost = 0;
+    filtered.forEach(a => {
+      if (App.isSalaried(a.staff_id)) {
+        const ws = App.weekStartFor ? App.weekStartFor(a.date) : (a.date || '');
+        const key = (a.staff_id || a.name || '?') + '|' + ws;
+        if (!salSeen[key]) { salSeen[key] = 1; totCost += App.staffWeeklySalary(a.staff_id) || 0; }
+      } else {
+        totCost += parseFloat(a.cost) || 0;
+      }
+    });
 
     let below;
     if (all.length === 0) {

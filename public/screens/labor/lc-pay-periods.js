@@ -264,22 +264,31 @@ S.LaborPayPeriods = {
     let belowMinCount = 0;
     const rows = agg.rows.sort((a, b) => b.gross - a.gross).map(r => {
       const pos = this.positionById(r.position_id);
-      const isTipped = !!(pos && pos.tipped);
+      // Salaried (exempt) staff are never subject to the tipped-minimum cash-wage
+      // test — exclude them exactly as Payroll Export does, so an exempt manager on
+      // a tipped position never gets a false "below minimum, makeup pay owed" flag.
+      const isTipped = !!(pos && pos.tipped) && !App.isSalaried(r.staff_id);
       const tipShare = isTipped ? this.tipShareForStaffInWeek(r.staff_id, agg.weekStart, agg.weekEnd) : 0;
       // Tip-credit test compares the STRAIGHT-TIME cash wage + tips against the
       // minimum — not gross (which carries the 1.5x OT premium and would inflate the
       // rate, masking a below-minimum shortfall for anyone who worked overtime).
       const straightPay = (r.wage || 0) * r.hours;
       const effectiveHourly = r.hours > 0 ? (straightPay + tipShare) / r.hours : 0;
-      const below = isTipped && stateMinValid && r.hours > 0 && effectiveHourly < stateMin;
+      // Only judge below-minimum once tips for the week are actually recorded. With
+      // no tips logged we cannot know the real effective rate, so we prompt for the
+      // tips instead of firing a confident "owed" accusation off missing data.
+      const tipsRecorded = tipShare > 0;
+      const below = isTipped && stateMinValid && tipsRecorded && r.hours > 0 && effectiveHourly < stateMin;
       if (below) belowMinCount++;
-      const tipCell = isTipped
-        ? (stateMinValid
-            ? (below
-                ? '<span style="color:var(--red);font-weight:700;" title="Effective $' + effectiveHourly.toFixed(2) + '/hr, state min $' + stateMin.toFixed(2) + '">Below Min &middot; $' + (stateMin - effectiveHourly).toFixed(2) + '/hr owed</span>'
-                : '<span style="color:var(--green);font-weight:700;">OK &middot; $' + effectiveHourly.toFixed(2) + '/hr</span>')
-            : '<span style="color:var(--t3);font-weight:700;">Set State Min Wage</span>')
-        : '<span style="color:var(--t4);font-size:11px;">Non-Tipped</span>';
+      const tipCell = !isTipped
+        ? '<span style="color:var(--t4);font-size:11px;">Non-Tipped</span>'
+        : !stateMinValid
+          ? '<span style="color:var(--t3);font-weight:700;">Set State Min Wage</span>'
+          : !tipsRecorded
+            ? '<span style="color:var(--t3);font-size:11px;">Tips not recorded</span>'
+            : below
+              ? '<span style="color:var(--red);font-weight:700;" title="Effective $' + effectiveHourly.toFixed(2) + '/hr, state min $' + stateMin.toFixed(2) + '">Below Min &middot; $' + (stateMin - effectiveHourly).toFixed(2) + '/hr owed</span>'
+              : '<span style="color:var(--green);font-weight:700;">OK &middot; $' + effectiveHourly.toFixed(2) + '/hr</span>';
       return '<tr>'
         + '<td><div class="val">' + esc(r.name) + '</div>'
         + (pos ? '<div style="font-size:10px;color:var(--t3);">' + esc(pos.name) + '</div>' : '') + '</td>'
