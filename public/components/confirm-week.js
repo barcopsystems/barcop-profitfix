@@ -185,7 +185,10 @@ const ConfirmWeek = {
     const primeTgt = t.prime_cost_pct ?? 60;
     const primePct = totRev > 0 ? primeCost / totRev * 100 : null;
     const checkAvg = covers > 0 ? totRev / covers : null;
-    const laborCost = bLab + fLab;
+    // Include catering labor so the Labor % the operator approves in this modal
+    // matches what gets SAVED (labor_pct_blended = (bLab+fLab+cLab)/totRev) and shown
+    // on every other screen — the prime % preview above already includes catering.
+    const laborCost = bLab + fLab + cLab;
     const laborPct = totRev > 0 ? laborCost / totRev * 100 : null;
     const rplh = this._hours > 0 ? totRev / this._hours : null;
     const caTgt = ((App.data.revenue_settings && App.data.revenue_settings.targets) || {}).check_avg ?? 35;
