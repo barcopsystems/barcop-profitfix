@@ -543,7 +543,7 @@ S.LaborReports = {
     const statsCard = this.statsCard(
       this.statItem('Total Hours', totHours.toFixed(1))
       + this.statItem('Labor Cost', App.fmtCurrency(totCost))
-      + this.statItem('Labor %', laborPctVal != null ? App.fmtPct(laborPctVal) : '-')
+      + this.statItem('Labor % (floor sales)', laborPctVal != null ? App.fmtPct(laborPctVal) : '-')
       + this.statItem('Rev / Labor Hr', rplhVal != null ? App.fmtCurrency(rplhVal) : '-')
       + this.statItem('Avg Wage', App.fmtCurrency(totHours > 0 ? totCost / totHours : 0))
       + this.statItem('Tips Logged', App.fmtCurrency(totTips)));

@@ -392,7 +392,7 @@ S.LaborDashboard = {
 
     // 1 — where labor stands
     let p1 = 'Labor ran ' + m(st.wkCost) + ' on ' + st.wkHours.toFixed(1) + ' hours this week. ';
-    if (st.laborPct != null) p1 += 'That is ' + st.laborPct.toFixed(1) + '% of revenue against a ' + target + '% target, ' + (st.laborPct > target ? 'over the line.' : 'inside the line.') + (st.rplh != null ? ' Revenue per labor hour is ' + m(st.rplh) + '.' : '');
+    if (st.laborPct != null) p1 += 'That is ' + st.laborPct.toFixed(1) + '% of floor sales against a ' + target + '% target, ' + (st.laborPct > target ? 'over the line.' : 'inside the line.') + (st.rplh != null ? ' Revenue per labor hour is ' + m(st.rplh) + '.' : '');
     else p1 += 'Import this week\'s sales and the labor percent fills in.';
     paras.push(p1);
 
