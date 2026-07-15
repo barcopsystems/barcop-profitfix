@@ -4493,7 +4493,7 @@ const App = {
         size = size || 12;
         this.y += 10; this._need(size + 8);
         doc.setFont('helvetica', 'bold'); doc.setFontSize(size); doc.setTextColor(20, 20, 20);
-        doc.text(App._pdfSafe(text), margin, this.y); this.y += 8;
+        doc.text(App._pdfSafe(text), margin, this.y); this.y += size + 4;
         return this;
       },
       kv(label, value) {
