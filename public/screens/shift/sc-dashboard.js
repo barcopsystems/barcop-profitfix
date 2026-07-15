@@ -12,6 +12,7 @@ S.ShiftDashboard = {
   _weekEnd: null,    // Sunday of the selected week
   _openStep: null,   // which step is expanded ('' = all collapsed; null = auto-open first undone)
   _flash: null,      // one-shot confirmation line under the banner
+  _salesMode: null,  // step-1 sales entry: null/'import' = drop file, 'manual' = per-day grid
 
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
@@ -129,7 +130,7 @@ S.ShiftDashboard = {
       + this.outlierStrip()
       + '</div>';
 
-    if (this._openStep === 'import') {
+    if (this._openStep === 'import' && this._salesMode !== 'manual') {
       this.mountImport();
       if (this._optOpen && this._optOpen.server) this.mountServer();
       if (this._optOpen && this._optOpen.pmix) this.mountPmix();
@@ -259,7 +260,14 @@ S.ShiftDashboard = {
   workspace(k, isDone) {
     this._isDone = isDone;
     if (k === 'import') {
-      return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS and drop it below. Re-importing replaces the days already in. Mark this done once the week is in.</div>'
+      const seg = this._salesSeg();
+      if (this._salesMode === 'manual') {
+        return seg + this._manualSalesGrid()
+          + '<div id="sc-ck-import-res"></div>'
+          + '<div id="sc-ck-import-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;"><button class="btn btn-primary btn-sm" data-savesales="1">Save the Week</button>' + this.markBtn('import', 'Mark Done') + '</div>';
+      }
+      return seg
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS and drop it below. Re-importing replaces the days already in. Mark this done once the week is in.</div>'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Daily sales <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; required</span></span>' + App.freqTag('Weekly') + '</div>'
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>'
         + this.optDrop('sc-ck-server', 'Per-server sales', 'One row per server with covers and sales. Feeds your Server Check scorecard.', 'server')
@@ -443,6 +451,57 @@ S.ShiftDashboard = {
     this.render(this.container, this.actions);
   },
 
+  // ── Manual sales entry (step-1 "Enter Manually" toggle) ──────────────────────
+  // Writes the same per-day sc_shifts records the drop file does (reuses
+  // importSales for build/commit/advance), so Confirm the Week fills identically.
+  _salesSeg() {
+    const on = m => (this._salesMode === m || (m === 'import' && this._salesMode !== 'manual'));
+    const btn = (m, label) => '<button type="button" class="btn btn-sm" data-salesmode="' + m + '" style="'
+      + (on(m) ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    return '<div class="seg-toggle" style="margin-bottom:14px;">' + btn('import', 'Import File') + btn('manual', 'Enter Manually') + '</div>';
+  },
+  _weekDays() {
+    const out = [], s = new Date(this.weekStart() + 'T00:00:00');
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(s.getFullYear(), s.getMonth(), s.getDate() + i);
+      out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    }
+    return out;
+  },
+  _manualSalesGrid() {
+    const days = this._weekDays(), existing = {};
+    this.shifts().filter(s => this.inWeek(s.date)).forEach(s => { existing[String(s.date).slice(0, 10)] = s; });
+    const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
+    const v = (s, f) => (s && s[f] != null && s[f] !== '') ? s[f] : '';
+    const dollar = (id, val) => '<td style="background:#0D181E;"><div class="fw" style="margin:0;"><span class="pre">$</span><input class="form-input pre" type="number" step="0.01" min="0" id="' + id + '" value="' + val + '" style="width:100%;min-width:0;"/></div></td>';
+    const plain = (id, val) => '<td style="background:#0D181E;"><input class="form-input" type="number" step="1" min="0" id="' + id + '" value="' + val + '" style="width:100%;min-width:0;"/></td>';
+    const lbl = t => '<td style="font-weight:600;color:var(--t1);background:#0D181E;white-space:nowrap;">' + t + '</td>';
+    const rows = days.map(d => { const s = existing[d];
+      return '<tr class="cw-line">' + lbl(fmt(d)) + dollar('scm-bar-' + d, v(s, 'bar_revenue')) + dollar('scm-food-' + d, v(s, 'floor_revenue')) + plain('scm-cov-' + d, v(s, 'covers')) + '</tr>';
+    }).join('');
+    return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">No POS export this week? Key it in by hand. Enter each day\'s bar and food sales, plus covers if you track them, then save. It lands exactly like the file drop and feeds Confirm the Week the same way.</div>'
+      + '<div style="overflow-x:auto;"><table class="ing-tbl pill" style="table-layout:fixed;width:100%;">'
+      + '<colgroup><col style="width:120px;"/><col/><col/><col style="width:90px;"/></colgroup>'
+      + '<thead><tr><th>Day</th><th>Bar Sales</th><th>Food Sales</th><th>Covers</th></tr></thead><tbody>'
+      + rows + '</tbody></table></div>';
+  },
+  async saveManualSales() {
+    const has = x => x != null && String(x).trim() !== '';
+    const rows = [];
+    this._weekDays().forEach(d => {
+      const bar = (document.getElementById('scm-bar-' + d) || {}).value;
+      const food = (document.getElementById('scm-food-' + d) || {}).value;
+      const cov = (document.getElementById('scm-cov-' + d) || {}).value;
+      if (has(bar) || has(food) || has(cov)) rows.push({ date: d, bar: bar, food: food, covers: cov });
+    });
+    const res = document.getElementById('sc-ck-import-res');
+    if (!rows.length) {
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Enter at least one day\'s sales before saving.</div>';
+      return;
+    }
+    await this.importSales(rows);
+  },
+
   // ── Inline per-server sales import (step 1 optional) ─────────────────────────
   // Feeds Server Check + Sales Integrity off the same weekly sitting. Matches each
   // server to the roster by name; unmatched rows are skipped and surfaced.
@@ -600,6 +659,9 @@ S.ShiftDashboard = {
   wire() {
     this.container.onclick = ev => {
       if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
+      const sm = ev.target.closest('[data-salesmode]');
+      if (sm) { this._salesMode = sm.dataset.salesmode; this._openStep = 'import'; this.render(this.container, this.actions); return; }
+      if (ev.target.closest('[data-savesales]')) { this.saveManualSales(); return; }
       const opt = ev.target.closest('[data-opt]');
       if (opt) { const key = opt.dataset.opt; this._optOpen = this._optOpen || {}; this._optOpen[key] = !this._optOpen[key]; this.render(this.container, this.actions); return; }
       const head = ev.target.closest('.sc-step-head');
