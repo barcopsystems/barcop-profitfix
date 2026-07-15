@@ -189,12 +189,12 @@ S.EventsRegulars = {
       dropSub: 'Only Name is required; phone, email, birthday, anniversary, and drink preferences come in if your file has them.',
       actionsEl: '#rg-imp-actions',
       fields: [
-        { key: 'name',        label: 'Name',        required: true,  match: ['name', 'guest', 'customer', 'regular', 'full name'] },
-        { key: 'phone',       label: 'Phone',       required: false, match: ['phone', 'mobile', 'cell', 'phone number'] },
-        { key: 'email',       label: 'Email',       required: false, match: ['email', 'e-mail', 'email address'] },
-        { key: 'birthday',    label: 'Birthday',    required: false, match: ['birthday', 'birth date', 'dob', 'bday'] },
-        { key: 'anniversary', label: 'Anniversary', required: false, match: ['anniversary'] },
-        { key: 'drink_prefs', label: 'Drink Preferences', required: false, match: ['drink', 'prefs', 'preferences', 'favorite', 'usual'] }
+        { key: 'name',        label: 'Name',        required: true,  match: ['name', 'guest', 'customer', 'regular', 'full name', 'first name', 'last name', 'contact name', 'patron', 'member', 'member name'] },
+        { key: 'phone',       label: 'Phone',       required: false, match: ['phone', 'mobile', 'cell', 'phone number', 'telephone', 'contact phone', 'mobile number', 'primary phone', 'cell phone'] },
+        { key: 'email',       label: 'Email',       required: false, match: ['email', 'e-mail', 'email address', 'e mail', 'contact email', 'primary email'] },
+        { key: 'birthday',    label: 'Birthday',    required: false, match: ['birthday', 'birth date', 'dob', 'bday', 'birthdate', 'date of birth'] },
+        { key: 'anniversary', label: 'Anniversary', required: false, match: ['anniversary', 'anniversary date', 'wedding anniversary'] },
+        { key: 'drink_prefs', label: 'Drink Preferences', required: false, match: ['drink', 'prefs', 'preferences', 'favorite', 'usual', 'drink preference', 'drink preferences', 'drinks', 'favorite drink', 'usual order', 'go-to drink', 'preferred drink'] }
       ],
       confirmLabel: 'Import Regulars',
       onComplete: rows => this.importRows(rows)
