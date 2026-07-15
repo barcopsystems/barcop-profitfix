@@ -371,14 +371,14 @@ S.LaborStaffRoster = {
       dropSub: 'Only Name is required; position, pay, status, phone, and email come in if your file has them.',
       actionsEl: '#sr-imp-actions',
       fields: [
-        { key: 'name',          label: 'Name',          required: true,  match: ['name', 'employee', 'employee name', 'staff', 'full name'] },
-        { key: 'position',      label: 'Position',      required: false, match: ['position', 'role', 'title', 'job', 'job title'] },
-        { key: 'pay_type',      label: 'Pay Type',      required: false, match: ['pay type', 'type', 'pay'] },
-        { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate'] },
-        { key: 'annual_salary', label: 'Annual Salary', required: false, match: ['salary', 'annual salary', 'annual'] },
-        { key: 'status',        label: 'Status',        required: false, match: ['status', 'active'] },
-        { key: 'phone',         label: 'Phone',         required: false, match: ['phone', 'mobile', 'cell', 'phone number'] },
-        { key: 'email',         label: 'Email',         required: false, match: ['email', 'e-mail', 'email address'] }
+        { key: 'name',          label: 'Name',          required: true,  match: ['name', 'employee', 'employee name', 'staff', 'full name', 'first name', 'last name', 'team member', 'staff name', 'worker'] },
+        { key: 'position',      label: 'Position',      required: false, match: ['position', 'role', 'title', 'job', 'job title', 'job role', 'position title', 'job position'] },
+        { key: 'pay_type',      label: 'Pay Type',      required: false, match: ['pay type', 'type', 'pay', 'employment type', 'wage type', 'pay category'] },
+        { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate', 'hourly wage', 'wage rate', 'hourly pay'] },
+        { key: 'annual_salary', label: 'Annual Salary', required: false, match: ['salary', 'annual salary', 'annual', 'yearly salary', 'annual pay', 'yearly pay'] },
+        { key: 'status',        label: 'Status',        required: false, match: ['status', 'active', 'employment status', 'active status', 'staff status'] },
+        { key: 'phone',         label: 'Phone',         required: false, match: ['phone', 'mobile', 'cell', 'phone number', 'telephone', 'cell phone', 'contact phone', 'mobile number'] },
+        { key: 'email',         label: 'Email',         required: false, match: ['email', 'e-mail', 'email address', 'e mail', 'contact email', 'work email'] }
       ],
       confirmLabel: 'Import Staff',
       onComplete: rows => this.importStaffRows(rows)
