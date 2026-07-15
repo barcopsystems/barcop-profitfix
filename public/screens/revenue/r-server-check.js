@@ -16,6 +16,7 @@ S.RevenueServerCheck = {
   _entryId: null,
   _saving: false,
   _form: null,
+  _impFlash: null,   // one-shot result line for the on-page per-server import
   _window: '30',
   WINDOW_CHIPS: [
     { v: '7', label: 'Last 7 Days' },
@@ -138,7 +139,7 @@ S.RevenueServerCheck = {
     App.showHelpModal('How Server Check Works', [
       { p: ['Log each server\'s covers and sales for a shift; Bar Cop turns it into a check average and tracks every server against your target. Comps pull in from Shift Control\'s Void and Comp log and tips from Tip Tracking, so you never enter the same number twice.'] },
       { h: 'The Window', p: ['The chips set the window for the scorecard and the Server Shift list: the last 7, 30 or 90 days, or all time. The team average, top performer, who is trending down, and the spread top to bottom all reflect the window you pick.'] },
-      { h: 'Logging a Check', p: ['Pick the date, shift and server, enter covers and total sales, and the check average shows live against target before you save. An open shift for that date and service period links automatically. If your POS exports a per-server sales report, you can skip the hand entry: drop it at your Shift weekly close and every server\'s covers and sales land here at once. Worksheet prints a blank sheet to capture checks on paper during service and enter after close. Every logged check lists in the Server Shift log below: Edit loads one back into the form to correct it, and Delete removes a row.'] },
+      { h: 'Logging a Check', p: ['Pick the date, shift and server, enter covers and total sales, and the check average shows live against target before you save. An open shift for that date and service period links automatically. If your POS exports a per-server sales report, you can skip the hand entry: drop it right here on this page or at your Shift weekly close and every server\'s covers and sales land at once. Worksheet prints a blank sheet to capture checks on paper during service and enter after close. Every logged check lists in the Server Shift log below: Edit loads one back into the form to correct it, and Delete removes a row.'] },
       { h: 'The Scorecard', p: ['Per server: check average against target and against the team, covers, sales, comps and tips as a percent of sales, and a trend arrow comparing the last 7 days to the prior 7. TOP and DOWN call out the leader and anyone slipping. Add a coaching note on any row to log it on that server in Labor Control.'] }
     ]);
   },
@@ -232,7 +233,7 @@ S.RevenueServerCheck = {
         + '<button class="btn btn-ghost btn-sm" id="rsc-worksheet">Worksheet</button>'
       + '</div></div>';
     if (!sc.rows.length) {
-      return headingRow + '<div class="card"><div style="text-align:center;padding:22px;color:var(--t4);">No server data in this range. Log a shift check above, or import a per-server sales report at your Shift weekly close, to build the scorecard.</div></div>';
+      return headingRow + '<div class="card"><div style="text-align:center;padding:22px;color:var(--t4);">No server data in this range. Log a shift check above, or drop a per-server sales report here or at your Shift weekly close, to build the scorecard.</div></div>';
     }
     const rows = sc.rows.map((r, i) => {
       const vsT = r.checkAvg - targetCA;
@@ -315,6 +316,7 @@ S.RevenueServerCheck = {
     this.container.innerHTML = '<div class="screen">'
       + this.statStrip(scorecard, targetCA)
       + this.renderForm(targetCA)
+      + this.serverImportHtml()
       + this.scorecardSection(scorecard, targetCA)
       + this.logSection(log, targetCA)
       + '</div>';
@@ -328,12 +330,52 @@ S.RevenueServerCheck = {
     this._form = { date: v('rsc-date'), shift: v('rsc-shift'), server: v('rsc-server'), cov: v('rsc-cov'), sales: v('rsc-sales') };
   },
 
+  // ── On-page per-server import (same weekly file the Shift close accepts) ──────
+  // Mirrors Menu Engineering's on-page re-import: a between-closes door to drop the
+  // per-server file right here. PosIngest matches each row to the roster by name.
+  serverImportHtml() {
+    const fl = this._impFlash; this._impFlash = null;
+    let flash = '';
+    if (fl) {
+      flash = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.added ? 'var(--gold)' : 'var(--red)') + ';">'
+        + (fl.added ? fl.added + ' server check' + (fl.added === 1 ? '' : 's') + ' imported.' : 'No rows imported. Check that the file has server, covers, and sales columns.')
+        + '</div>'
+        + (fl.unmatched && fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched to your roster: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in the Staff Roster or rename to match.</div>' : '');
+    }
+    return '<div class="card form-card no-print">'
+      + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Import Per-Server Sales</span>' + App.freqTag('As needed') + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:2px 0 12px;">Got a per-server sales export? Drop it here to build the whole team\'s scorecard at once instead of logging each check by hand. One row per server, with covers and total sales. You can also drop this at your Shift weekly close.</div>'
+      + '<div id="rsc-imp-csv"></div>' + flash
+      + '</div>'
+      + '<div id="rsc-imp-actions" style="margin:16px 0 24px;"></div>';
+  },
+  mountServerImport() {
+    const el = document.getElementById('rsc-imp-csv');
+    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your POS per-server sales report here',
+      dropSub: 'One row per server with covers and total sales. Bar Cop matches each row to your roster by name.',
+      actionsEl: '#rsc-imp-actions',
+      fields: PosIngest.FIELDS.server,
+      confirmLabel: 'Import',
+      onComplete: rows => this.applyServerImport(rows)
+    });
+  },
+  async applyServerImport(rows) {
+    const { toAdd, skipped } = PosIngest.build('server', rows);
+    let added = 0;
+    if (toAdd.length) { await PosIngest.commit('server', toAdd); added = toAdd.length; }
+    this._impFlash = { added, unmatched: (skipped || []).filter(s => s && s !== '(blank)') };
+    this.draw();
+  },
+
   // ── Wiring (re-run each draw; per-element listeners, no container stacking) ───
   wire() {
     const c = this.container;
     const collapseHead = c.querySelector('.card-collapse-head');
     if (collapseHead) collapseHead.addEventListener('click', () => App.toggleCollapse(collapseHead));
     App.applyCollapsed(c);
+    this.mountServerImport();
     c.querySelectorAll('.rsc-range-chip').forEach(b => b.addEventListener('click', () => { this.captureForm(); this._window = b.dataset.v; this.draw(); }));
     c.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     document.getElementById('rsc-worksheet')?.addEventListener('click', () => this.printBlank());
