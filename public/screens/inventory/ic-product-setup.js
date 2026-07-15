@@ -1553,50 +1553,50 @@ S.InventoryProducts = {
   // fields that will be ignored.
   importFieldsForCategory(cat) {
     const COMMON = [
-      {key:'name',          label:'Product Name',  required:true,  aliases:['name','item','product','description','item name','product name']},
-      {key:'brand',         label:'Brand',         required:false, aliases:['brand','make','label']},
-      {key:'sub_category',  label:'Sub-Category',  required:false, aliases:['sub-category','subcategory','sub category','subtype','type']},
-      {key:'vendor',        label:'Primary Vendor',required:false, aliases:['vendor','supplier','distributor','source']},
-      {key:'unit_cost',     label:'Unit Cost ($)', required:false, aliases:['cost','unit cost','cogs','item cost','wholesale','price paid']},
+      {key:'name',          label:'Product Name',  required:true,  aliases:['name','item','product','description','item name','product name','item description','product description','item desc']},
+      {key:'brand',         label:'Brand',         required:false, aliases:['brand','make','label','manufacturer','producer','brand name','maker']},
+      {key:'sub_category',  label:'Sub-Category',  required:false, aliases:['sub-category','subcategory','sub category','subtype','type','category','style','varietal','class']},
+      {key:'vendor',        label:'Primary Vendor',required:false, aliases:['vendor','supplier','distributor','source','primary vendor','supplier name','vendor name','distributor name','purveyor']},
+      {key:'unit_cost',     label:'Unit Cost ($)', required:false, aliases:['cost','unit cost','cogs','item cost','wholesale','price paid','case cost','cost per unit','wholesale cost','purchase price','buy price','cost each']},
     ];
     if (cat === 'Liquor' || cat === 'Wine') {
       return COMMON.concat([
-        {key:'container_size_oz',label:'Bottle Size (oz)', required:false, aliases:['size','bottle size','container','volume','oz','ounces']},
-        {key:'pour_size_oz',     label:'Pour Size (oz)',   required:false, aliases:['pour','pour size','standard pour','std pour']},
-        {key:'menu_price',       label:'Menu Price ($)',   required:false, aliases:['price','menu price','sell price','retail','selling price']},
-        {key:'par_level',        label:'Par (bottles)',    required:false, aliases:['par','par level','target stock']},
-        {key:'reorder_point',    label:'Reorder Point (bottles)', required:false, aliases:['reorder','reorder point','min','minimum']},
+        {key:'container_size_oz',label:'Bottle Size (oz)', required:false, aliases:['size','bottle size','container','volume','oz','ounces','container size','bottle volume','size (oz)']},
+        {key:'pour_size_oz',     label:'Pour Size (oz)',   required:false, aliases:['pour','pour size','standard pour','std pour','pour (oz)','serving size','shot size']},
+        {key:'menu_price',       label:'Menu Price ($)',   required:false, aliases:['price','menu price','sell price','retail','selling price','pour price','glass price','list price']},
+        {key:'par_level',        label:'Par (bottles)',    required:false, aliases:['par','par level','target stock','par stock','target par']},
+        {key:'reorder_point',    label:'Reorder Point (bottles)', required:false, aliases:['reorder','reorder point','min','minimum','reorder level','min stock','minimum stock']},
       ]);
     }
     if (cat === 'Bottle Beer') {
       return COMMON.map(f => f.key === 'unit_cost' ? {...f, label:'Cost per Case ($)'} : f).concat([
-        {key:'case_size',        label:'Case Size (bottles per case)', required:false, aliases:['case','case size','case pack','pack','bottles per case','pack size','units per case']},
-        {key:'menu_price',       label:'Menu Price ($ per bottle)', required:false, aliases:['price','menu price','sell price','retail']},
-        {key:'par_level',        label:'Par (cases)',      required:false, aliases:['par','par level','target stock']},
-        {key:'reorder_point',    label:'Reorder Point (cases)', required:false, aliases:['reorder','reorder point','min','minimum']},
+        {key:'case_size',        label:'Case Size (bottles per case)', required:false, aliases:['case','case size','case pack','pack','bottles per case','pack size','units per case','case qty','case quantity','case count','pack count']},
+        {key:'menu_price',       label:'Menu Price ($ per bottle)', required:false, aliases:['price','menu price','sell price','retail','bottle price','selling price','list price']},
+        {key:'par_level',        label:'Par (cases)',      required:false, aliases:['par','par level','target stock','par stock','target par']},
+        {key:'reorder_point',    label:'Reorder Point (cases)', required:false, aliases:['reorder','reorder point','min','minimum','reorder level','min stock','minimum stock']},
       ]);
     }
     if (cat === 'Draft Beer') {
       return COMMON.map(f => f.key === 'unit_cost' ? {...f, label:'Cost per Keg ($)'} : f).concat([
-        {key:'container_size_oz',label:'Keg Size (oz)',   required:false, aliases:['size','keg','keg size','volume','oz','ounces']},
-        {key:'pour_size_oz',     label:'Pour Size (oz)',  required:false, aliases:['pour','pour size','standard pour','std pour']},
-        {key:'menu_price',       label:'Menu Price ($)',  required:false, aliases:['price','menu price','sell price','retail']},
-        {key:'par_level',        label:'Par (kegs)',      required:false, aliases:['par','par level','target stock']},
-        {key:'reorder_point',    label:'Reorder Point (kegs)', required:false, aliases:['reorder','reorder point','min','minimum']},
+        {key:'container_size_oz',label:'Keg Size (oz)',   required:false, aliases:['size','keg','keg size','volume','oz','ounces','keg volume','container size','size (oz)']},
+        {key:'pour_size_oz',     label:'Pour Size (oz)',  required:false, aliases:['pour','pour size','standard pour','std pour','pour (oz)','serving size','glass size']},
+        {key:'menu_price',       label:'Menu Price ($)',  required:false, aliases:['price','menu price','sell price','retail','pour price','glass price','selling price']},
+        {key:'par_level',        label:'Par (kegs)',      required:false, aliases:['par','par level','target stock','par stock','target par']},
+        {key:'reorder_point',    label:'Reorder Point (kegs)', required:false, aliases:['reorder','reorder point','min','minimum','reorder level','min stock','minimum stock']},
       ]);
     }
     const tail = [
-      {key:'unit_type',         label:'Unit Type (lb / case / each / gallon / ...)', required:false, aliases:['unit','unit type','uom','unit of measure','measure']},
-      {key:'container_size_oz', label:'Container Size (oz, for a liquid)', required:false, aliases:['size','container','container size','volume','oz','ounces','bottle size']},
-      {key:'pack_size',         label:'Pieces / Servings per Unit', required:false, aliases:['pack','pack size','servings','servings per unit','pieces','pieces per unit','units per','per unit','yield','count per unit']},
-      {key:'serving_name',      label:'Serving / Piece Name', required:false, aliases:['serving name','serving','piece','piece name','portion name','each name']},
-      {key:'par_level',         label:'Par Level',     required:false, aliases:['par','par level','target stock']},
-      {key:'reorder_point',     label:'Reorder Point', required:false, aliases:['reorder','reorder point','min','minimum']},
+      {key:'unit_type',         label:'Unit Type (lb / case / each / gallon / ...)', required:false, aliases:['unit','unit type','uom','unit of measure','measure','buy unit','order unit','purchase unit']},
+      {key:'container_size_oz', label:'Container Size (oz, for a liquid)', required:false, aliases:['size','container','container size','volume','oz','ounces','bottle size','size (oz)','net weight','fluid ounces']},
+      {key:'pack_size',         label:'Pieces / Servings per Unit', required:false, aliases:['pack','pack size','servings','servings per unit','pieces','pieces per unit','units per','per unit','yield','count per unit','pieces per case','servings per case','pieces per pack']},
+      {key:'serving_name',      label:'Serving / Piece Name', required:false, aliases:['serving name','serving','piece','piece name','portion name','each name','unit name','portion','piece unit']},
+      {key:'par_level',         label:'Par Level',     required:false, aliases:['par','par level','target stock','par stock','target par']},
+      {key:'reorder_point',     label:'Reorder Point', required:false, aliases:['reorder','reorder point','min','minimum','reorder level','min stock','minimum stock']},
     ];
     if (cat === 'Misc') {
       // Misc swaps free-text Sub-Category for the structured Misc Type tag.
       return COMMON.filter(f => f.key !== 'sub_category').concat([
-        {key:'misc_type', label:'Misc Type (NA Beverage / Drink Mixer / Garnish / supply)', required:false, aliases:['misc type','type','group','category','sub-category','subcategory','sub category']},
+        {key:'misc_type', label:'Misc Type (NA Beverage / Drink Mixer / Garnish / supply)', required:false, aliases:['misc type','type','group','category','sub-category','subcategory','sub category','item type','classification','kind']},
       ], tail);
     }
     // Food

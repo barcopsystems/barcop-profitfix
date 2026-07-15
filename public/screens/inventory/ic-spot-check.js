@@ -155,7 +155,7 @@ S.InventorySpotCheck = {
         + '</div>';
     }
     if (this._isPourable(p)) {
-      return BottleSlider.html(slotId, { value: vals.value || 0, fulls: vals.fulls || 0, category: p.category, shape: (p.category === 'Draft Beer' ? 'keg' : 'bottle') });
+      return BottleSlider.html(slotId, { value: vals.value || 0, fulls: vals.fulls || 0, category: p.category, shape: App.sliderShape(p) });
     }
     return '<div class="f" style="width:170px;"><label>Count</label><div class="fw"><input class="suf sp-num" data-slot="' + slotId + '" type="number" min="0" step="0.1" value="' + (vals.value || 0) + '" style="height:42px;text-align:center;"/><span class="suf">' + esc(App.unitAbbr(App.productUnit(p)) || 'units') + '</span></div></div>';
   },
@@ -584,8 +584,8 @@ S.InventorySpotCheck = {
       dropTitle: 'Drop the ' + loc + ' POS sales report for this shift',
       dropSub: 'Needs columns for product name and pours or bottles sold. That register only, not the whole venue.<br>The sold number fills in on each product you have added.',
       fields: [
-        { key: 'product', label: 'Product', required: true, match: ['product', 'item', 'name', 'description'] },
-        { key: 'sold',    label: 'Sold',    required: true, match: ['sold', 'pours', 'qty', 'quantity', 'units', 'count'] }
+        { key: 'product', label: 'Product', required: true, match: ['product', 'item', 'name', 'description', 'item name', 'menu item', 'product name'] },
+        { key: 'sold',    label: 'Sold',    required: true, match: ['sold', 'pours', 'qty', 'quantity', 'units', 'count', 'qty sold', 'quantity sold', 'units sold', 'sold qty', 'number sold'] }
       ],
       confirmLabel: 'Fill POS Sold',
       onComplete: rows => this.applyPosImport(rows)

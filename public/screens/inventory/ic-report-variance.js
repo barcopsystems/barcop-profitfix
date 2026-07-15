@@ -453,9 +453,9 @@ S.InventoryVarianceReport = {
         dropTitle: 'Drop your ' + this.fmtLong(period.startC.date) + ' to ' + this.fmtLong(period.endC.date) + ' POS sales file here',
         dropSub: 'Needs columns for product name, quantity sold, and sales amount.',
         fields: [
-          { key: 'name',  label: 'Product Name',   required: true,  match: ['product', 'item', 'name', 'description', 'menu item'] },
-          { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['qty', 'quantity', 'sold', 'units', 'count'] },
-          { key: 'sales', label: 'Sales Amount',   required: false, match: ['sales', 'amount', 'revenue', 'net sales', 'total'] }
+          { key: 'name',  label: 'Product Name',   required: true,  match: ['product', 'item', 'name', 'description', 'menu item', 'product name', 'item name'] },
+          { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['qty', 'quantity', 'sold', 'units', 'count', 'units sold', 'qty sold', 'quantity sold', 'number sold', 'pours'] },
+          { key: 'sales', label: 'Sales Amount',   required: false, match: ['sales', 'amount', 'revenue', 'net sales', 'total', 'gross sales', 'sales amount', 'sales total', 'net amount', 'total sales'] }
         ],
         onComplete: rows => {
           this.posRows = rows.map(r => ({
