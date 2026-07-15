@@ -457,11 +457,11 @@ S.HubOperatingExpenses = {
       dropSub: 'Needs columns for date and amount; category, vendor, and notes come in if your file has them. Categories that do not match yours import as Other.',
       actionsEl: '#oexa-imp-actions',
       fields: [
-        { key: 'date',     label: 'Date',     required: true,  match: ['date', 'paid', 'posted', 'transaction date'] },
-        { key: 'category', label: 'Category', required: false, match: ['category', 'type', 'account'] },
-        { key: 'vendor',   label: 'Vendor',   required: false, match: ['vendor', 'payee', 'merchant', 'description', 'name'] },
-        { key: 'amount',   label: 'Amount',   required: true,  match: ['amount', 'total', 'cost', 'debit'] },
-        { key: 'notes',    label: 'Notes',    required: false, match: ['notes', 'memo', 'note'] }
+        { key: 'date',     label: 'Date',     required: true,  match: ['date', 'paid', 'posted', 'transaction date', 'business date', 'day', 'due date', 'bill date', 'invoice date', 'date paid', 'trans date', 'entry date'] },
+        { key: 'category', label: 'Category', required: false, match: ['category', 'type', 'account', 'expense type', 'expense category', 'gl account', 'account name', 'class', 'gl code'] },
+        { key: 'vendor',   label: 'Vendor',   required: false, match: ['vendor', 'payee', 'merchant', 'description', 'name', 'paid to', 'supplier', 'company', 'vendor name', 'payee name', 'biller'] },
+        { key: 'amount',   label: 'Amount',   required: true,  match: ['amount', 'total', 'cost', 'debit', 'amt', 'value', 'expense', 'payment', 'charge', 'dollars', 'total amount', 'amount paid'] },
+        { key: 'notes',    label: 'Notes',    required: false, match: ['notes', 'memo', 'note', 'comment', 'details', 'remark'] }
       ],
       confirmLabel: 'Import Expenses',
       onComplete: rows => this._importRows(rows)
