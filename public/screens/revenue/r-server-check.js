@@ -16,7 +16,8 @@ S.RevenueServerCheck = {
   _entryId: null,
   _saving: false,
   _form: null,
-  _impFlash: null,   // one-shot result line for the on-page per-server import
+  _impFlash: null,   // one-shot result line for the per-server import
+  _entryMode: 'manual',   // New Shift Check card: 'manual' form or 'import' drop
   _window: '30',
   WINDOW_CHIPS: [
     { v: '7', label: 'Last 7 Days' },
@@ -193,10 +194,22 @@ S.RevenueServerCheck = {
   },
 
   // ── New Shift Check form (always-on, top of page; editing happens in a modal) ─
+  // Standard Enter Manually / Import File toggle: manual logs one check, import
+  // drops a per-server file (same one the Shift close accepts) for the whole team.
   renderForm(targetCA) {
+    const seg = this._checkSeg();
+    if (this._entryMode === 'import') {
+      return '<div class="card form-card">'
+        + App.collapsibleCardTitle('rsc-newcheck', 'New Shift Check')
+        + '<div class="collapse-body">' + seg
+          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop a per-server sales export to build the whole team\'s scorecard at once, one row per server with covers and total sales. You can also drop it at your Shift weekly close.</div>'
+          + '<div id="rsc-imp-csv"></div>' + this._impFlashHtml() + '</div>'
+        + '</div>'
+        + '<div id="rsc-imp-actions" style="margin:16px 0 24px;"></div>';
+    }
     return '<div class="card form-card">'
       + App.collapsibleCardTitle('rsc-newcheck', 'New Shift Check')
-      + '<div class="collapse-body">' + this.formBody(this._form, targetCA, 'rsc') + '</div>'
+      + '<div class="collapse-body">' + seg + this.formBody(this._form, targetCA, 'rsc') + '</div>'
       + '</div>'
       + '<div data-collapse-group="rsc-newcheck" style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="rsc-submit">Log Check</button>'
@@ -316,7 +329,6 @@ S.RevenueServerCheck = {
     this.container.innerHTML = '<div class="screen">'
       + this.statStrip(scorecard, targetCA)
       + this.renderForm(targetCA)
-      + this.serverImportHtml()
       + this.scorecardSection(scorecard, targetCA)
       + this.logSection(log, targetCA)
       + '</div>';
@@ -330,24 +342,21 @@ S.RevenueServerCheck = {
     this._form = { date: v('rsc-date'), shift: v('rsc-shift'), server: v('rsc-server'), cov: v('rsc-cov'), sales: v('rsc-sales') };
   },
 
-  // ── On-page per-server import (same weekly file the Shift close accepts) ──────
-  // Mirrors Menu Engineering's on-page re-import: a between-closes door to drop the
-  // per-server file right here. PosIngest matches each row to the roster by name.
-  serverImportHtml() {
+  // ── Per-server import: the toggle helper + result line ───────────────────────
+  // PosIngest matches each row to the roster by name (same path the Shift close uses).
+  _checkSeg() {
+    const on = m => (this._entryMode === m || (m === 'manual' && this._entryMode !== 'import'));
+    const btn = (m, label) => '<button type="button" class="btn btn-sm rsc-mode" data-mode="' + m + '" style="'
+      + (on(m) ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    return '<div class="seg-toggle" style="margin-bottom:14px;">' + btn('manual', 'Enter Manually') + btn('import', 'Import File') + '</div>';
+  },
+  _impFlashHtml() {
     const fl = this._impFlash; this._impFlash = null;
-    let flash = '';
-    if (fl) {
-      flash = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.added ? 'var(--gold)' : 'var(--red)') + ';">'
-        + (fl.added ? fl.added + ' server check' + (fl.added === 1 ? '' : 's') + ' imported.' : 'No rows imported. Check that the file has server, covers, and sales columns.')
-        + '</div>'
-        + (fl.unmatched && fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched to your roster: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in the Staff Roster or rename to match.</div>' : '');
-    }
-    return '<div class="card form-card no-print">'
-      + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Import Per-Server Sales</span>' + App.freqTag('As needed') + '</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:2px 0 12px;">Got a per-server sales export? Drop it here to build the whole team\'s scorecard at once instead of logging each check by hand. One row per server, with covers and total sales. You can also drop this at your Shift weekly close.</div>'
-      + '<div id="rsc-imp-csv"></div>' + flash
+    if (!fl) return '';
+    return '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.added ? 'var(--gold)' : 'var(--red)') + ';">'
+      + (fl.added ? fl.added + ' server check' + (fl.added === 1 ? '' : 's') + ' imported.' : 'No rows imported. Check that the file has server, covers, and sales columns.')
       + '</div>'
-      + '<div id="rsc-imp-actions" style="margin:16px 0 24px;"></div>';
+      + (fl.unmatched && fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched to your roster: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in the Staff Roster or rename to match.</div>' : '');
   },
   mountServerImport() {
     const el = document.getElementById('rsc-imp-csv');
@@ -375,7 +384,8 @@ S.RevenueServerCheck = {
     const collapseHead = c.querySelector('.card-collapse-head');
     if (collapseHead) collapseHead.addEventListener('click', () => App.toggleCollapse(collapseHead));
     App.applyCollapsed(c);
-    this.mountServerImport();
+    c.querySelectorAll('.rsc-mode').forEach(b => b.addEventListener('click', () => { if (this._entryMode !== 'import') this.captureForm(); this._entryMode = b.dataset.mode; this.draw(); }));
+    if (this._entryMode === 'import') this.mountServerImport();
     c.querySelectorAll('.rsc-range-chip').forEach(b => b.addEventListener('click', () => { this.captureForm(); this._window = b.dataset.v; this.draw(); }));
     c.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     document.getElementById('rsc-worksheet')?.addEventListener('click', () => this.printBlank());
