@@ -17,64 +17,64 @@
 const PosIngest = {
   FIELDS: {
     hours: [
-      { key: 'name',  label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff'] },
-      { key: 'date',  label: 'Date',       required: true,  match: ['date', 'work date', 'shift date'] },
-      { key: 'hours', label: 'Hours',      required: true,  match: ['hours', 'total hours', 'hrs', 'worked'] },
-      { key: 'shift', label: 'Shift',      required: false, match: ['shift', 'shift type'] }
+      { key: 'name',  label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff', 'staff name', 'server', 'server name', 'team member', 'worker', 'crew', 'associate', 'full name', 'first name', 'last name'] },
+      { key: 'date',  label: 'Date',       required: true,  match: ['date', 'work date', 'shift date', 'business date', 'day', 'clock date', 'worked date', 'date worked', 'pay date', 'shift day'] },
+      { key: 'hours', label: 'Hours',      required: true,  match: ['hours', 'total hours', 'hrs', 'worked', 'hours worked', 'total hrs', 'reg hours', 'regular hours', 'hrs worked', 'labor hours', 'paid hours', 'net hours', 'duration', 'time'] },
+      { key: 'shift', label: 'Shift',      required: false, match: ['shift', 'shift type', 'daypart', 'shift name', 'department', 'am/pm', 'meal period'] }
     ],
     tips: [
-      { key: 'name',      label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff', 'server', 'server name'] },
-      { key: 'date',      label: 'Date',       required: true,  match: ['date', 'business date', 'work date', 'shift date'] },
-      { key: 'card_tips', label: 'Card Tips',  required: false, match: ['card tips', 'credit tips', 'cc tips', 'card', 'credit card tips', 'charged tips', 'non-cash tips'] },
-      { key: 'cash_tips', label: 'Cash Tips',  required: false, match: ['cash tips', 'cash', 'declared cash tips', 'declared tips'] },
-      { key: 'shift',     label: 'Shift',      required: false, match: ['shift', 'shift type', 'daypart'] }
+      { key: 'name',      label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff', 'staff name', 'server', 'server name', 'bartender', 'team member', 'waiter', 'full name', 'first name', 'last name'] },
+      { key: 'date',      label: 'Date',       required: true,  match: ['date', 'business date', 'work date', 'shift date', 'day', 'service date', 'pay date'] },
+      { key: 'card_tips', label: 'Card Tips',  required: false, match: ['card tips', 'credit tips', 'cc tips', 'card', 'credit card tips', 'charged tips', 'non-cash tips', 'non cash tips', 'noncash tips', 'charge tips', 'tips charged', 'electronic tips', 'card gratuity', 'auto gratuity', 'autograt'] },
+      { key: 'cash_tips', label: 'Cash Tips',  required: false, match: ['cash tips', 'cash', 'declared cash tips', 'declared tips', 'declared', 'cash gratuity', 'cash tip', 'tips cash'] },
+      { key: 'shift',     label: 'Shift',      required: false, match: ['shift', 'shift type', 'daypart', 'shift name', 'meal period'] }
     ],
     voids: [
-      { key: 'amount', label: 'Amount',       required: true,  match: ['amount', 'total', 'value', 'comp amount', 'void amount', '$'] },
-      { key: 'type',   label: 'Void or Comp', required: false, match: ['type', 'void/comp', 'transaction', 'kind'] },
-      { key: 'item',   label: 'Item',         required: false, match: ['item', 'item name', 'product', 'menu item', 'description'] },
-      { key: 'server', label: 'Server',       required: false, match: ['server', 'employee', 'name', 'staff', 'bartender', 'cashier'] },
-      { key: 'reason', label: 'Reason',       required: false, match: ['reason', 'comp reason', 'void reason', 'note'] },
-      { key: 'date',   label: 'Date',         required: false, match: ['date', 'business date', 'shift date'] }
+      { key: 'amount', label: 'Amount',       required: true,  match: ['amount', 'total', 'value', 'comp amount', 'void amount', '$', 'amt', 'dollars', 'discount', 'discount amount', 'total amount', 'comp total', 'void total'] },
+      { key: 'type',   label: 'Void or Comp', required: false, match: ['type', 'void/comp', 'void or comp', 'transaction', 'kind', 'adjustment type', 'category', 'action', 'reason type'] },
+      { key: 'item',   label: 'Item',         required: false, match: ['item', 'item name', 'product', 'product name', 'menu item', 'description', 'sku', 'plu'] },
+      { key: 'server', label: 'Server',       required: false, match: ['server', 'server name', 'employee', 'employee name', 'name', 'staff', 'bartender', 'cashier', 'authorized by', 'approved by', 'voided by', 'comped by', 'manager'] },
+      { key: 'reason', label: 'Reason',       required: false, match: ['reason', 'comp reason', 'void reason', 'note', 'notes', 'memo', 'comment', 'explanation'] },
+      { key: 'date',   label: 'Date',         required: false, match: ['date', 'business date', 'shift date', 'day', 'transaction date', 'service date'] }
     ],
     // A POS "sales by day" report: one row per day. Bar/food (revenue centers)
     // optional but at least one is needed; covers optional. Writes one per-day
     // record into sc_shifts (revenue/covers, no live-shift cruft).
     sales: [
-      { key: 'date',   label: 'Date',       required: true,  match: ['date', 'business date', 'day', 'service date'] },
-      { key: 'bar',    label: 'Bar Sales',  required: false, match: ['bar sales', 'bar revenue', 'bar', 'beverage', 'liquor sales', 'beverage sales', 'drink sales', 'drinks', 'drink', 'liquor', 'alcohol'] },
-      { key: 'food',   label: 'Food Sales', required: false, match: ['food sales', 'food revenue', 'food', 'kitchen', 'floor', 'floor sales', 'kitchen sales'] },
-      { key: 'covers', label: 'Covers',     required: false, match: ['covers', 'guests', 'guest count', 'customers'] }
+      { key: 'date',   label: 'Date',       required: true,  match: ['date', 'business date', 'day', 'service date', 'business day', 'sales date', 'trans date', 'date of sale'] },
+      { key: 'bar',    label: 'Bar Sales',  required: false, match: ['bar sales', 'bar revenue', 'bar', 'beverage', 'liquor sales', 'beverage sales', 'drink sales', 'drinks', 'drink', 'liquor', 'alcohol', 'wet sales', 'beverage revenue', 'drink revenue', 'bar total', 'beverage total', 'alcohol sales'] },
+      { key: 'food',   label: 'Food Sales', required: false, match: ['food sales', 'food revenue', 'food', 'kitchen', 'floor', 'floor sales', 'kitchen sales', 'food total', 'dining', 'dining sales', 'meal sales', 'dry sales', 'kitchen revenue', 'entree sales'] },
+      { key: 'covers', label: 'Covers',     required: false, match: ['covers', 'guests', 'guest count', 'customers', 'checks', 'check count', 'transactions', 'tickets', 'headcount', 'heads', 'patrons', 'guest ct', 'orders', 'sales count', 'covers count'] }
     ],
     // A POS cash / drawer report: per-day, optionally per-register. The POS blind
     // close already computed over/short, so the cash-variance pattern recovery
     // reads comes from this import, not a hand reconcile. Takes Over/Short
     // directly, OR Expected + Counted. Writes sc_variances.
     cash: [
-      { key: 'date',       label: 'Date',          required: true,  match: ['date', 'business date', 'day', 'service date', 'shift date'] },
-      { key: 'drawer',     label: 'Register',      required: false, match: ['drawer', 'register', 'till', 'station', 'terminal'] },
-      { key: 'cashier',    label: 'Cashier',       required: false, match: ['cashier', 'server', 'employee', 'name', 'staff', 'bartender'] },
-      { key: 'expected',   label: 'Expected Cash', required: false, match: ['expected', 'expected cash', 'declared', 'system cash', 'pos cash', 'cash due'] },
-      { key: 'counted',    label: 'Counted Cash',  required: false, match: ['counted', 'counted cash', 'actual', 'actual cash', 'deposit', 'deposited', 'drawer count'] },
-      { key: 'over_short', label: 'Over / Short',  required: false, match: ['over/short', 'over short', 'variance', 'difference', 'discrepancy', '+/-'] }
+      { key: 'date',       label: 'Date',          required: true,  match: ['date', 'business date', 'day', 'service date', 'shift date', 'business day'] },
+      { key: 'drawer',     label: 'Register',      required: false, match: ['drawer', 'register', 'till', 'station', 'terminal', 'pos', 'device', 'workstation', 'reg', 'register name', 'till id', 'drawer id', 'terminal id'] },
+      { key: 'cashier',    label: 'Cashier',       required: false, match: ['cashier', 'server', 'employee', 'name', 'staff', 'bartender', 'clerk', 'operator', 'user', 'server name', 'employee name'] },
+      { key: 'expected',   label: 'Expected Cash', required: false, match: ['expected', 'expected cash', 'declared', 'system cash', 'pos cash', 'cash due', 'expected drawer', 'system total', 'net cash', 'cash sales', 'expected total', 'sys cash', 'expected amount'] },
+      { key: 'counted',    label: 'Counted Cash',  required: false, match: ['counted', 'counted cash', 'actual', 'actual cash', 'deposit', 'deposited', 'drawer count', 'actual drawer', 'counted total', 'cash counted', 'ending cash', 'bank', 'deposit amount', 'cash in drawer', 'actual amount'] },
+      { key: 'over_short', label: 'Over / Short',  required: false, match: ['over/short', 'over short', 'variance', 'difference', 'discrepancy', '+/-', 'short/over', 'over', 'short', 'cash variance', 'diff', 'variance amount'] }
     ],
     // A POS per-server sales report: one row per server (per day). Covers + sales
     // give the check average (Server Check). Matches the server to the roster by
     // name; writes revenue_server_check records. Comps/tips already auto-join from
     // the Void/Comp log and Tip Tracking, so they are not needed here.
     server: [
-      { key: 'name',   label: 'Server',      required: true,  match: ['server', 'server name', 'employee', 'employee name', 'name', 'staff', 'bartender'] },
-      { key: 'date',   label: 'Date',        required: true,  match: ['date', 'business date', 'shift date', 'service date'] },
-      { key: 'covers', label: 'Covers',      required: true,  match: ['covers', 'guests', 'guest count', 'checks', 'customers'] },
-      { key: 'sales',  label: 'Total Sales', required: true,  match: ['sales', 'net sales', 'total sales', 'gross sales', 'revenue', 'amount'] },
-      { key: 'shift',  label: 'Shift',       required: false, match: ['shift', 'shift type', 'daypart'] }
+      { key: 'name',   label: 'Server',      required: true,  match: ['server', 'server name', 'employee', 'employee name', 'name', 'staff', 'bartender', 'staff name', 'waiter', 'sales rep', 'attendant'] },
+      { key: 'date',   label: 'Date',        required: true,  match: ['date', 'business date', 'shift date', 'service date', 'day', 'business day'] },
+      { key: 'covers', label: 'Covers',      required: true,  match: ['covers', 'guests', 'guest count', 'checks', 'customers', 'check count', 'tickets', 'tables', 'transactions', 'guest ct', 'orders', 'headcount'] },
+      { key: 'sales',  label: 'Total Sales', required: true,  match: ['sales', 'net sales', 'total sales', 'gross sales', 'revenue', 'amount', 'net', 'total', 'gross', 'sales total', 'server sales', 'rung sales', 'dollars', 'net total'] },
+      { key: 'shift',  label: 'Shift',       required: false, match: ['shift', 'shift type', 'daypart', 'meal period', 'shift name'] }
     ],
     // A POS product-mix (PMIX) report: one row per menu item with units sold for
     // the week. Matches the item to the menu by name and UPDATES weekly_covers in
     // place (no new records), so it has a custom commit (_commitPmix).
     pmix: [
-      { key: 'name',  label: 'Item Name',  required: true, match: ['item', 'item name', 'menu item', 'menu item name', 'name', 'product', 'description'] },
-      { key: 'units', label: 'Units Sold', required: true, match: ['units', 'units sold', 'sold', 'qty', 'qty sold', 'quantity', 'covers', 'sales count'] }
+      { key: 'name',  label: 'Item Name',  required: true, match: ['item', 'item name', 'menu item', 'menu item name', 'name', 'product', 'description', 'product name', 'menu', 'plu', 'plu name', 'item description', 'sku', 'item no'] },
+      { key: 'units', label: 'Units Sold', required: true, match: ['units', 'units sold', 'sold', 'qty', 'qty sold', 'quantity', 'covers', 'sales count', 'count', 'number sold', 'quantity sold', 'sold qty', 'each', 'orders', 'rung', 'total sold', 'units count'] }
     ]
   },
 
