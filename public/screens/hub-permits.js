@@ -246,16 +246,18 @@ S.HubPermits = {
       : recs.map(r => {
           const s = this._status(r);
           return '<tr>'
-            + '<td style="color:var(--t1);">' + esc(r.name || '') + '</td>'
-            + '<td style="color:var(--t2);">' + esc(r.type || '') + '</td>'
-            + '<td style="white-space:nowrap;">' + this._fmtDate(r.renewal_date) + '</td>'
-            + '<td style="color:var(--t2);">' + esc(r.recurrence || '') + '</td>'
-            + '<td>' + (r.cost ? fmt$(r.cost) : '—') + '</td>'
-            + '<td style="font-weight:700;color:' + s.color + ';white-space:nowrap;">' + esc(s.label) + '</td>'
-            + '<td class="no-print">'
-            +   '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '">Mark Renewed</button>'
-            +   '<button class="btn btn-ghost btn-sm hp-edit" data-id="' + esc(r.id) + '">Edit</button>'
-            +   '<button class="btn btn-danger btn-sm hp-del" data-id="' + esc(r.id) + '">Delete</button>'
+            + '<td data-label="Name" style="color:var(--t1);">' + esc(r.name || '') + '</td>'
+            + '<td data-label="Type" style="color:var(--t2);">' + esc(r.type || '') + '</td>'
+            + '<td data-label="Renewal Date" style="white-space:nowrap;">' + this._fmtDate(r.renewal_date) + '</td>'
+            + '<td data-label="Recurrence" style="color:var(--t2);">' + esc(r.recurrence || '') + '</td>'
+            + '<td data-label="Last Cost">' + (r.cost ? fmt$(r.cost) : '—') + '</td>'
+            + '<td data-label="Status" style="font-weight:700;color:' + s.color + ';white-space:nowrap;">' + esc(s.label) + '</td>'
+            + '<td class="no-print" data-label="">'
+            +   '<div class="row-actions" style="flex-wrap:wrap;">'
+            +     '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '">Mark Renewed</button>'
+            +     '<button class="btn btn-ghost btn-sm hp-edit" data-id="' + esc(r.id) + '">Edit</button>'
+            +     '<button class="btn btn-danger btn-sm hp-del" data-id="' + esc(r.id) + '">Delete</button>'
+            +   '</div>'
             + '</td>'
           + '</tr>';
         }).join('');
