@@ -1085,11 +1085,11 @@ S.RevenueMenuItems = {
       onState: state => { const row = document.getElementById('mi-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : ''; },
       actionsEl: '#mi-imp-actions',
       fields: [
-        { key: 'name',     label: 'Menu Name',    required: true,  match: ['name', 'item', 'item name', 'menu name', 'product', 'description', 'menu item'] },
-        { key: 'category', label: 'Category',     required: false, match: ['category', 'type', 'group', 'section'] },
-        { key: 'price',    label: 'Menu Price',   required: false, match: ['price', 'menu price', 'sell price', 'sell', 'retail'] },
-        { key: 'cost',     label: 'Cost',         required: false, match: ['cost', 'item cost', 'cogs', 'food cost', 'plate cost'] },
-        { key: 'covers',   label: 'Weekly Units Sold',required: false, match: ['covers', 'cover', 'weekly covers', 'units', 'units sold', 'volume', 'qty', 'quantity', 'count', 'sold'] }
+        { key: 'name',     label: 'Menu Name',    required: true,  match: ['name', 'item', 'item name', 'menu name', 'product', 'description', 'menu item', 'product name', 'dish', 'dish name', 'title'] },
+        { key: 'category', label: 'Category',     required: false, match: ['category', 'type', 'group', 'section', 'menu category', 'menu section', 'course', 'class', 'department'] },
+        { key: 'price',    label: 'Menu Price',   required: false, match: ['price', 'menu price', 'sell price', 'sell', 'retail', 'selling price', 'list price', 'price each'] },
+        { key: 'cost',     label: 'Cost',         required: false, match: ['cost', 'item cost', 'cogs', 'food cost', 'plate cost', 'recipe cost', 'cost each', 'ingredient cost', 'unit cost'] },
+        { key: 'covers',   label: 'Weekly Units Sold',required: false, match: ['covers', 'cover', 'weekly covers', 'units', 'units sold', 'volume', 'qty', 'quantity', 'count', 'sold', 'weekly units', 'qty sold', 'quantity sold', 'units per week', 'sales count'] }
       ],
       confirmLabel: 'Import',
       onComplete: rows => this.importItems(rows)
