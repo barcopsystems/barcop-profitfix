@@ -42,7 +42,7 @@ const PosIngest = {
     // record into sc_shifts (revenue/covers, no live-shift cruft).
     sales: [
       { key: 'date',   label: 'Date',       required: true,  match: ['date', 'business date', 'day', 'service date'] },
-      { key: 'bar',    label: 'Bar Sales',  required: false, match: ['bar sales', 'bar revenue', 'bar', 'beverage', 'liquor sales', 'beverage sales'] },
+      { key: 'bar',    label: 'Bar Sales',  required: false, match: ['bar sales', 'bar revenue', 'bar', 'beverage', 'liquor sales', 'beverage sales', 'drink sales', 'drinks', 'drink', 'liquor', 'alcohol'] },
       { key: 'food',   label: 'Food Sales', required: false, match: ['food sales', 'food revenue', 'food', 'kitchen', 'floor', 'floor sales', 'kitchen sales'] },
       { key: 'covers', label: 'Covers',     required: false, match: ['covers', 'guests', 'guest count', 'customers'] }
     ],
