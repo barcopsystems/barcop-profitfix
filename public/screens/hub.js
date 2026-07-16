@@ -1453,12 +1453,15 @@ S.Hub = {
     const ws = mondayOf(new Date());
     const weEnd = (() => { const d = new Date(ws + 'T00:00:00'); d.setDate(d.getDate() + 6); return iso(d); })();
     const wkActuals = (ld.lc_actuals || []).filter(a => a.date >= ws && a.date <= weEnd);
-    const sched = (ld.lc_schedules || []).find(s => {
+    // Newest wins if a week ever carries two schedules (see cash-engine.laborForWeek).
+    // This drives an alert the operator acts on, so it takes the same picker as
+    // Overtime Watch / Log Hours / the Call-Out Log, not first-in-array.
+    const sched = (ld.lc_schedules || []).filter(s => {
       if (!s.week_start) return false;
       const st = new Date(s.week_start + 'T00:00:00').getTime();
       const tg = new Date(ws + 'T00:00:00').getTime();
       return !isNaN(st) && tg >= st && tg <= st + 6 * 86400000;
-    });
+    }).sort(App.cmpNewest)[0];
     const otMap = {};
     wkActuals.forEach(a => { const id = a.staff_id || a.name;
       (otMap[id] = otMap[id] || { actual: 0, scheduled: 0, wage: a.wage, name: a.name }).actual += (a.hours || 0); });
