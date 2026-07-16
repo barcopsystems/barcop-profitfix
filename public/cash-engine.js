@@ -738,8 +738,14 @@ window.CashEngine = {
     const last = new Date(base.getFullYear(), base.getMonth() + term - 1, 1);
     return App.ymdLocal(last).slice(0, 7);
   },
+  // One key per type Books offers (hub-cash-outflows TYPES), `other` included. It used
+  // to be absent here and only sprang into existence via `r[o.type] = ...` when a row
+  // happened to carry it, while `r.total` counted it all along. The Cash Bridge renders
+  // a row per named key, so `other` was subtracted from Cash You Kept and never shown:
+  // the waterfall did not add up, on a screen that says "the bridge below shows where".
+  // Any new type here needs a row in c-bridge.waterfall.
   outflowsInPeriod(s, e) {
-    const r = { draw: 0, loan: 0, capital: 0, tax: 0, total: 0, list: [] };
+    const r = { draw: 0, loan: 0, capital: 0, tax: 0, other: 0, total: 0, list: [] };
     this.outflowsBetween(s, e).forEach(o => { r[o.type] = (r[o.type] || 0) + o.amount; r.total += o.amount; r.list.push(o); });
     return r;
   },
