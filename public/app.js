@@ -6033,16 +6033,20 @@ const App = {
       const d = String(a.date).slice(0, 10);
       if ((!start || d >= start) && (!end || d <= end)) wk[key].inHours += h;
     });
-    let total = 0; const byStaff = {};
+    let total = 0, otHours = 0; const byStaff = {};
     Object.keys(wk).forEach(k => {
       const b = wk[k];
       const otH = Math.max(0, b.hours - OT);
       if (otH <= 0 || b.hours <= 0 || b.inHours <= 0) return;
-      const prem = otH * (b.cost / b.hours) * 0.5 * (b.inHours / b.hours);
+      const share = b.inHours / b.hours;
+      const prem = otH * (b.cost / b.hours) * 0.5 * share;
       total += prem;
+      otHours += otH * share;
       byStaff[b.staff] = (byStaff[b.staff] || 0) + prem;
     });
-    return { total: total, byStaff: byStaff };
+    // `hours` = the OT hours behind `total`, allocated the same way, for sheets that
+    // report an OT Hours column alongside the dollars.
+    return { total: total, hours: otHours, byStaff: byStaff };
   },
   // Weekly salary cost for ONE staff member (annual_salary / 52), or 0 when the
   // staff member is not salaried or has no salary on file. Used by per-staff
