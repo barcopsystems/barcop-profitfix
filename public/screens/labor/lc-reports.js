@@ -531,6 +531,15 @@ S.LaborReports = {
     const ot = this.otPremiums(rows);
     const totHours = rows.reduce((t, a) => t + (a.hours || 0), 0);
     const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0) + salRange.total + ot.total;
+    // Avg Wage is a WAGE: straight-time hourly pay over hourly hours, on the same basis
+    // as the By Staff column below (straight / hours). Dividing totCost by totHours put
+    // fixed salary and the OT premium in the numerator against hours salaried managers
+    // barely log, so the stat printed a blended cost-per-hour ABOVE every wage on the
+    // roster, contradicting every row of the table underneath it.
+    const _hourlyRows  = rows.filter(a => !App.isSalaried(a.staff_id));
+    const _hourlyHours = _hourlyRows.reduce((t, a) => t + (a.hours || 0), 0);
+    const _hourlyPay   = _hourlyRows.reduce((t, a) => t + (a.cost || 0), 0);
+    const avgWage = _hourlyHours > 0 ? _hourlyPay / _hourlyHours : 0;
     const totTips = tips.reduce((t, x) => t + (x.total_tips || 0), 0);
     const periodRev = ((App.shiftData && App.shiftData.sc_shifts) || []).reduce((s, sh) => {
       const d = sh.date || '';
@@ -545,7 +554,7 @@ S.LaborReports = {
       + this.statItem('Labor Cost', App.fmtCurrency(totCost))
       + this.statItem('Labor % (floor sales)', laborPctVal != null ? App.fmtPct(laborPctVal) : '-')
       + this.statItem('Rev / Labor Hr', rplhVal != null ? App.fmtCurrency(rplhVal) : '-')
-      + this.statItem('Avg Wage', App.fmtCurrency(totHours > 0 ? totCost / totHours : 0))
+      + this.statItem('Avg Wage', App.fmtCurrency(avgWage))
       + this.statItem('Tips Logged', App.fmtCurrency(totTips)));
 
     return statsCard + this.rangeFilterRow()

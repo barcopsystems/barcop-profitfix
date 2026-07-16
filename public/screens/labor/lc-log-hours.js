@@ -320,7 +320,12 @@ S.LaborLogHours = {
             + '<td>' + esc(a.shift_type || '-') + '</td>'
             + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
             + '<td>' + (App.isSalaried(a.staff_id) ? '<span style="color:var(--t3);">Salary</span>' : (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-')) + '</td>'
-            + '<td class="val">' + (App.isSalaried(a.staff_id) ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7) : App.fmtCurrency(a.cost || 0)) + '</td>'
+            // "Salary", not weeklySalary/7. Salaried pay is weekly-fixed, so a per-entry
+            // seventh is a number that exists nowhere: five logged days rendered $1,071
+            // of rows against a Labor Cost stat of $1,500 (which counts the salary once
+            // per week, correctly), with no visible reason for the gap. Same render the
+            // By Staff table in Reports uses.
+            + '<td class="val">' + (App.isSalaried(a.staff_id) ? '<span style="color:var(--t3);">Salary</span>' : App.fmtCurrency(a.cost || 0)) + '</td>'
             + '<td><div class="row-actions">' + actions + '</div></td></tr>';
         }).join('');
         listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
@@ -742,7 +747,8 @@ S.LaborLogHours = {
     if (list.length === 0) return;
     const rows = list.map(a => {
       const wageCell = App.isSalaried(a.staff_id) ? 'Salary' : (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-');
-      const costCell = App.isSalaried(a.staff_id) ? App.fmtCurrency(App.staffWeeklySalary(a.staff_id) / 7) : App.fmtCurrency(a.cost || 0);
+      // "Salary" here too: the export carried the same per-entry seventh as the screen.
+      const costCell = App.isSalaried(a.staff_id) ? 'Salary' : App.fmtCurrency(a.cost || 0);
       return '<tr><td>' + this.fmtDate(a.date) + (a.locked ? ' (locked)' : '') + '</td>'
         + '<td>' + esc(a.name || '-') + '</td>'
         + '<td>' + esc(a.shift_type || '-') + '</td>'

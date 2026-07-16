@@ -85,7 +85,7 @@ S.LaborOvertimeWatch = {
   showHowTo() {
     App.showHelpModal('How Overtime Watch Works', [
       { p: ['Overtime Watch looks ahead at a week and flags who is heading into overtime before it happens, so you can adjust the schedule while there is still time. Step week to week with the chips or arrows.'] },
-      { h: 'How The Projection Works', p: ['For each hourly staff member, Projected is the greater of hours already logged and hours still scheduled this week. Anything over ' + App.OT_THRESHOLD + ' hours is overtime, and Extra OT Cost is the half-time premium on those hours. Salaried staff are exempt and never appear.'] },
+      { h: 'How The Projection Works', p: ['For each hourly staff member, Projected is the hours they have already worked plus the hours still scheduled on days they have not worked yet. Pick up an extra shift and it counts, even with shifts still to come. Anything over ' + App.OT_THRESHOLD + ' hours is overtime, and Extra OT Cost is the half-time premium on those hours. Salaried staff are exempt and never appear.'] },
       { h: 'The Suggested Action', p: ['When someone is projected over, the Suggested Action column shows the exact hours to cut from their remaining shifts to clear the threshold. If they have already worked past the line, it reads Already over instead, since logged hours cannot be cut and the fix is to lighten their next week. View Schedule for This Week opens the same week in Build Schedule so you make the change in the right place.'] },
       { h: 'Export', p: ['Export PDF saves the week\'s projection for a manager or your own records.'] }
     ]);

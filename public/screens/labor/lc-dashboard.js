@@ -267,19 +267,40 @@ S.LaborDashboard = {
       + this.markBtn('review', 'Mark Reviewed') + '</div>';
   },
 
-  // Per-staff overtime projection for the selected week (greater of logged and
-  // scheduled hours, the same basis Overtime Watch uses).
+  // Per-staff overtime projection for the selected week: hours already WORKED plus
+  // hours still SCHEDULED on days not yet worked. Same basis as Overtime Watch, which
+  // this used to claim to match while actually running max(actual, scheduled) — the
+  // basis Overtime Watch abandoned because it misses anyone already logging extra who
+  // still has shifts to come. That gap let Close The Week and the Hub Labor card report
+  // "0 staff projected over 40" and "$0 premium", and the Briefing say the schedule was
+  // clean, on a week Overtime Watch was flagging the same person as Over.
   weekProjection() {
     const wkStart = this.weekStart(), wkEnd = this.weekEnd();
     const curWeek = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
     const sched = this.schedules().find(s => s.week_start === wkStart) || null;
     const proj = {};
     const ensure = (id, name) => { if (!proj[id]) proj[id] = { id, name: name || '-', actual: 0, scheduled: 0 }; return proj[id]; };
-    curWeek.forEach(a => { if (App.isSalaried(a.staff_id)) return; ensure(a.staff_id || a.name, a.name).actual += (a.hours || 0); });
-    if (sched) (sched.shifts || []).forEach(sh => { if (App.isSalaried(sh.staff_id)) return; ensure(sh.staff_id || sh.name, sh.name).scheduled += (sh.hours || 0); });
+    const DAYS = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    curWeek.forEach(a => {
+      if (App.isSalaried(a.staff_id)) return;
+      const e = ensure(a.staff_id || a.name, a.name);
+      e.actual += (a.hours || 0);
+      (e.workedDays = e.workedDays || {})[a.date] = true;   // this day is already logged
+    });
+    if (sched) (sched.shifts || []).forEach(sh => {
+      if (App.isSalaried(sh.staff_id)) return;
+      const e = ensure(sh.staff_id || sh.name, sh.name);
+      e.scheduled += (sh.hours || 0);
+      // wkStart is a Monday and DAYS is Monday-first, so the index is the day offset.
+      const di = DAYS.indexOf(sh.day);
+      const dt = di >= 0 ? this.addDays(wkStart, di) : null;
+      if (dt) (e.schedByDate = e.schedByDate || {})[dt] = (e.schedByDate[dt] || 0) + (sh.hours || 0);
+    });
     let over = 0, approaching = 0, otPremium = 0;
     Object.values(proj).forEach(e => {
-      const projected = Math.max(e.actual, e.scheduled);
+      const remainingSched = Object.keys(e.schedByDate || {}).reduce((t, d) =>
+        t + ((e.workedDays && e.workedDays[d]) ? 0 : e.schedByDate[d]), 0);
+      const projected = e.actual + remainingSched;
       const wage = App.wageForStaffOn ? (App.wageForStaffOn(e.id, wkStart) || 0) : 0;
       const otHours = Math.max(0, projected - App.OT_THRESHOLD);
       otPremium += otHours * wage * 0.5;
