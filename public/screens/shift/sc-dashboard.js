@@ -432,21 +432,29 @@ S.ShiftDashboard = {
       onComplete: rows => this.importSales(rows)
     });
   },
-  async importSales(rows) {
+  // opts.manual = came from the Enter Manually grid, which has no file, so it must never
+  // be told to go check the file's columns. opts.cleared = days zeroed out by that grid.
+  async importSales(rows, opts) {
+    opts = opts || {};
     const { toAdd, dupCount } = PosIngest.build('sales', rows);
     const res = document.getElementById('sc-ck-import-res');
     if (!toAdd.length) {
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No days imported. Check that the file has a Date column and sales values.</div>';
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + (opts.manual ? 'No days saved. Enter sales for at least one day.'
+                       : 'No days imported. Check that the file has a Date column and sales values.')
+        + '</div>';
       return;
     }
     const ok = await PosIngest.commit('sales', toAdd);
     if (!ok) {
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>';
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the ' + (opts.manual ? 'save' : 'import') + ' again.</div>';
       return;
     }
     if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
     this.setDone('import', true);   // a cockpit import is a deliberate "the week is in" action
-    this._flash = toAdd.length + ' day' + (toAdd.length === 1 ? '' : 's') + ' imported' + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '') + '.';
+    this._flash = toAdd.length + ' day' + (toAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
+      + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
+      + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + '.';
     this._openStep = 'cash';
     this.render(this.container, this.actions);
   },
@@ -487,19 +495,39 @@ S.ShiftDashboard = {
   },
   async saveManualSales() {
     const has = x => x != null && String(x).trim() !== '';
-    const rows = [];
+    const n = x => { const v = parseFloat(String(x == null ? '' : x).replace(/[^0-9.\-]/g, '')); return isNaN(v) ? 0 : v; };
+    const rows = [], zeroDays = [];
     this._weekDays().forEach(d => {
       const bar = (document.getElementById('scm-bar-' + d) || {}).value;
       const food = (document.getElementById('scm-food-' + d) || {}).value;
       const cov = (document.getElementById('scm-cov-' + d) || {}).value;
-      if (has(bar) || has(food) || has(cov)) rows.push({ date: d, bar: bar, food: food, covers: cov });
+      if (!(has(bar) || has(food) || has(cov))) return;   // day left untouched: leave it alone
+      // A day the operator explicitly zeroed is a CORRECTION, not an empty row. buildSales
+      // drops a zero row and _commitSales only clears records for the dates it is
+      // replacing, so a wrong $500 Monday on a day the bar was closed could never be taken
+      // back down: the save reported success and the grid re-rendered the same $500, while
+      // it kept feeding Where You Stand, the Hub and Revenue. Clear those days instead.
+      if (n(bar) + n(food) <= 0) { zeroDays.push(d); return; }
+      rows.push({ date: d, bar: bar, food: food, covers: cov });
     });
     const res = document.getElementById('sc-ck-import-res');
-    if (!rows.length) {
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Enter at least one day\'s sales before saving.</div>';
-      return;
+    const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
+    if (!rows.length && !zeroDays.length) { fail('Enter at least one day\'s sales before saving.'); return; }
+
+    let cleared = 0, broke = false;
+    for (const d of zeroDays) {
+      const stale = ((App.shiftData && App.shiftData.sc_shifts) || []).filter(s => s && s.date === d);
+      for (const s of stale) { if (await App.removeRecord('sc', 'shift', s.id)) cleared++; else broke = true; }
     }
-    await this.importSales(rows);
+    if (broke) { fail('Could not clear a day. Try the save again.'); return; }
+    if (rows.length) { await this.importSales(rows, { manual: true, cleared: cleared }); return; }
+
+    // Zeroed days only: nothing left to write, so report the clear from here.
+    this._flash = cleared
+      ? cleared + ' day' + (cleared === 1 ? '' : 's') + ' cleared to zero.'
+      : 'Those days were already empty.';
+    this._openStep = 'cash';
+    this.render(this.container, this.actions);
   },
 
   // ── Inline per-server sales import (step 1 optional) ─────────────────────────
