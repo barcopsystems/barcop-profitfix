@@ -283,7 +283,14 @@ function computeProfitAudit(appData, controlData) {
   const overall = _overallAvg != null ? clampScore(_overallAvg) : null;
 
   const latestEnd = weeks.length ? (weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end) : null;
-  const auditPeriod = latestEnd ? (`${PERIOD_WEEKS} weeks ending ${latestEnd}`) : 'Most recent 4 weeks';
+  // The REAL number of weeks scored, never a hardcoded 4. `weeks` is sliced to the last
+  // PERIOD_WEEKS, so a bar with 2 confirmed weeks is scored on 2, and every period figure
+  // below is derived over those 2 (periodWeeks / _periodWeeks = weeks.length), while this
+  // heading claimed 4: S2_LABOR_PERIOD was a 2-week sum under a "4 weeks ending" title.
+  // latestEnd is only non-null when weeks.length > 0, so this never prints "0 weeks".
+  const auditPeriod = latestEnd
+    ? (`${weeks.length} week${weeks.length === 1 ? '' : 's'} ending ${latestEnd}`)
+    : 'Most recent 4 weeks';
   const dataTier = (controlData && (cd.sources || []).length)
     ? 'Bar Cop operating data'
     : (weeks.length ? 'Weekly data entered' : 'Baseline');
@@ -573,7 +580,14 @@ function computeRevenueAudit(appData, controlData) {
   const _overallAvg = avg([s1, s2, s3, s4, s5]);
   const overall = _overallAvg != null ? clampScore(_overallAvg) : null;
   const latestEnd = weeks.length ? (weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end) : null;
-  const auditPeriod = latestEnd ? (`${PERIOD_WEEKS} weeks ending ${latestEnd}`) : 'Most recent 4 weeks';
+  // The REAL number of weeks scored, never a hardcoded 4. `weeks` is sliced to the last
+  // PERIOD_WEEKS, so a bar with 2 confirmed weeks is scored on 2, and every period figure
+  // below is derived over those 2 (periodWeeks / _periodWeeks = weeks.length), while this
+  // heading claimed 4: S2_LABOR_PERIOD was a 2-week sum under a "4 weeks ending" title.
+  // latestEnd is only non-null when weeks.length > 0, so this never prints "0 weeks".
+  const auditPeriod = latestEnd
+    ? (`${weeks.length} week${weeks.length === 1 ? '' : 's'} ending ${latestEnd}`)
+    : 'Most recent 4 weeks';
   const dataTier = (controlData && (cd.sources || []).length) ? 'Bar Cop operating data'
     : (weeks.length ? 'Weekly data entered' : 'Baseline');
 
