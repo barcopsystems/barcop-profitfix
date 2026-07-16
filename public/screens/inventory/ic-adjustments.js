@@ -83,6 +83,15 @@ S.InventoryAdjustments = {
     if (!p) return 0;
     if (unit === 'oz') { const c = App.costPerOz(p); return c != null ? c : 0; }
     if (p.category === 'Bottle Beer' && p.case_size) return (unit === 'cases') ? (App.unitCost(p) || 0) : (App.bottleCost(p) || 0);
+    // 'each' is ONE PIECE out of a pack-bought container (a wing from a 45-count bag),
+    // never the container itself. Costing it at unit_cost booked a 12-wing drop as
+    // $270 instead of $6 and carried that 45x into the Adjustment Log's Total Loss,
+    // the Shrinkage tile and the Briefing. piecePrice returns the unit cost by itself
+    // when there is no pack size (the unit already IS the piece, like each or lb).
+    if (unit === 'each') {
+      const pc = App.piecePrice ? App.piecePrice(p) : null;
+      return pc != null ? pc : (App.unitCost(p) || 0);
+    }
     return App.unitCost(p) || 0;
   },
   costFor(p, qty, unit) { return (qty > 0 ? qty : 0) * this.perUnitCostFor(p, unit); },

@@ -32,8 +32,16 @@ S.InventoryParSuggestions = {
     return ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false);
   },
   countsAsc() {
-    return [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
-      .sort(App.cmpOldest);
+    const sorted = [...((App.inventoryData && App.inventoryData.ic_counts) || [])].sort(App.cmpOldest);
+    // One count of record per day: a same-day re-count collapses to the latest, so a
+    // usage period never comes out zero-length. Same guard the Usage and Variance
+    // reports already run. Without it a typo re-count on the same Sunday added a pair
+    // with ~zero usage that still counted as a WHOLE WEEK, dragging avg_weekly down and
+    // suggesting a par under real demand ("Reduce, $X freed" on a product whose demand
+    // never moved), which then fed the Order Sheet nudge and the Par accuracy trend.
+    const byDate = new Map();
+    sorted.forEach(c => { const d = String(c.date || '').slice(0, 10) || ('_' + c.id); byDate.set(d, c); });
+    return [...byDate.values()];
   },
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
   categories() {

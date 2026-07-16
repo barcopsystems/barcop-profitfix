@@ -57,7 +57,7 @@ S.InventoryOrderSheet = {
       { h: 'More Actions On A Placed Order', p: ['On an Already Ordered row, the ... button opens a menu with three moves. Export PDF gives you a purchase order to print or attach to a vendor email. Edit Order pulls that placed order back onto the page as an editable card so you can fix a quantity or add a line, then Update Order writes it back to the same order. Cancel Order removes it and returns those items to your Order Sheet so you can reorder.'] },
       { h: 'Suggested Orders', p: ['Each vendor card lists their products that fell under par in your last count, with on-hand, par, and a suggested order quantity. Adjust any quantity, add a product the count missed with Add Item, then Create Order. Bottle beer is ordered by the case. If a vendor card or the Order Status shows that some pars look off versus your real usage, the Dynamic Pars link takes you to tune them, because the suggested quantities are only as sharp as the pars behind them.'] },
       { h: 'Sending The Order', p: ['Once you create an order it moves to Already Ordered up top. Email to Vendor opens your email client with the order written out and addressed to the vendor on file, and marks it Submitted. The order also sits in Order History.'] },
-      { h: 'Order Minimums', p: ['If a vendor has an Order Minimum set on their vendor page, each vendor card shows your running order against it and turns amber when you are short, for example "$70 under the $250 minimum" (or a count like "2 cases under the 5 cases minimum" for a case minimum). Tap Top Off To Minimum and Bar Cop adds that vendor’s next below-par items, biggest gap first, until the order clears the minimum, so you hit it in one delivery instead of paying twice. A delivery fee or free-delivery-over amount shows here too. Order Status up top counts how many vendors are currently under minimum. You are only ever warned, so you can still create a short order if you need to.'] },
+      { h: 'Order Minimums', p: ['If a vendor has an Order Minimum set on their vendor page, each vendor card shows your running order against it, right beside Add Item, and turns amber when you are short, for example "$70 under the $250 minimum" (or a count like "2 cases under the 5 cases minimum" for a case minimum). Add more of that vendor’s below-par items to clear it in one delivery instead of paying twice. A delivery fee or free-delivery-over amount shows here too. Order Status up top counts how many vendors are currently under minimum. You are only ever warned, so you can still create a short order if you need to.'] },
       { h: 'Create A Custom Order', p: ['Need an off-cycle order, like a party order or a one-time buy without waiting on a count? Hit Create Custom Order on the right side of the Order Status card. The build card opens up: pick the vendor, add the products and quantities, and create it the same way. Hit Cancel Custom Order on that same link to close it back up.'] },
       { h: 'Closing The Loop', p: ['When the delivery shows up, go to Receive Delivery and match it to the open order. The line items pre-fill, you confirm against the invoice, and Bar Cop marks the order Received.'] }
     ]);
@@ -365,12 +365,14 @@ S.InventoryOrderSheet = {
     const unitCost = product.unit_cost != null ? product.unit_cost : 0;
     const unit = App.unitAbbr(App.productUnit(product));
 
-    let onHand = null;
-    const counts = this.countsAsc();
-    if (counts.length) {
-      const it = (counts[counts.length - 1].items || []).find(i => i.product_id === pid);
-      if (it) onHand = it.total != null ? it.total : null;
-    }
+    // Perpetual on-hand summed across EVERY location, the same number belowParByVendor
+    // and the suggested lines already read. The old lookup took the first matching line
+    // off the latest count, which is a single LOCATION's shelf, so a product stocked at
+    // the front bar and dry storage showed only the front bar and this one screen
+    // carried two different on-hand figures for it. Worse, the low one seeded the order
+    // qty, so + Add Item reordered a full par against a shelf already at par.
+    const _oh = App.currentOnHand()[pid];
+    const onHand = (_oh != null && !isNaN(_oh)) ? _oh : null;
     const par = (product.par_level != null && product.par_level !== '') ? product.par_level : null;
 
     row.dataset.productId = product.id || '';
@@ -779,12 +781,10 @@ S.InventoryOrderSheet = {
   _restoreLineHTML(vendor, d, existingIds) {
     const product = d.product_id ? this.productById(d.product_id) : null;
     if (!product) return this.blankLineRowHTML(vendor, existingIds);
-    let onHand = null;
-    const counts = this.countsAsc();
-    if (counts.length) {
-      const it = (counts[counts.length - 1].items || []).find(i => i.product_id === d.product_id);
-      if (it) onHand = it.total != null ? it.total : null;
-    }
+    // Same perpetual, all-locations on-hand as onLineProductChange: restoring a draft
+    // used to silently flip every line's On Hand from the summed figure to one shelf's.
+    const _oh = App.currentOnHand()[d.product_id];
+    const onHand = (_oh != null && !isNaN(_oh)) ? _oh : null;
     const par = (product.par_level != null && product.par_level !== '') ? product.par_level : null;
     return this.lineRowHTML(product, d.qty !== '' ? d.qty : 0, onHand, par);
   },

@@ -255,8 +255,23 @@ S.InventoryVarianceReport = {
       }
       if (mapped) { p = this.productById(mapped); if (!p) mi = this.menuItemById(mapped); }
       if (p) {
-        const ozPer = parseFloat(p.pour_size_oz) || (App.isCaseBeer(p) ? (parseFloat(p.container_size_oz) || 0) : 0);
-        const oz = (parseFloat(pr.qty) || 0) * ozPer;
+        const q = parseFloat(pr.qty) || 0;
+        let oz;
+        if (p.category === 'Food' || p.category === 'Misc') {
+          // The POS sold this PRODUCT under its own name (a bottled soda, a bag of
+          // chips), so qty is units of it. Express that draw in the ingredient's ENTRY
+          // measure, the same one explodeMenuItem feeds the rows below: ounces for a
+          // liquid (container size set), pieces for a solid. Food/Misc never carry a
+          // pour_size_oz (product setup does not offer the field on them) and they are
+          // not case beer, so the old oz math collapsed to ZERO for every one of them:
+          // theoretical usage read 0, and the Usage Variance tab billed the product's
+          // whole stock draw as a 100% Over Recipe leak on a product that sold exactly
+          // what it used.
+          oz = App.isLiquidIngredient(p) ? q * (App.ozPerContainer(p) || 0) : q;
+        } else {
+          const ozPer = parseFloat(p.pour_size_oz) || (App.isCaseBeer(p) ? (parseFloat(p.container_size_oz) || 0) : 0);
+          oz = q * ozPer;
+        }
         addProduct(p.id, oz, pr.qty, pr.sales, false);
       } else if (mi) {
         const explosion = App.explodeMenuItem ? App.explodeMenuItem(mi, pr.qty) : {};

@@ -348,7 +348,7 @@ S.InventoryTakeInventory = {
 
     const cards = grp.products.map(p => {
       const _ckey = p.id + '@@' + grp.location;
-      const isCounted = this.draft.counts[_ckey] != null;
+      const isCounted = this._hasCount(this.draft.counts[_ckey]);
       const c = this.draft.counts[_ckey] || { value: 0, fulls: 0, notes: '' };
       // Bottle beer with case_size set uses a case + loose-bottle input
       // pair. Bottles either are full or empty (no partial level applies),
@@ -596,6 +596,16 @@ S.InventoryTakeInventory = {
     if (bar) bar.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
   },
 
+  // A draft entry is COUNTED only when it carries a real count, never on the presence
+  // of the entry alone. Typing a note on a product nobody counted creates the entry
+  // from the note by itself: that used to read as counted, drop the product out of the
+  // "N products were not counted" review banner, and submit a hard ZERO. The shelf then
+  // read empty, the Usage Report billed the whole prior stock as used, Variance called
+  // it a full-shelf leak, and the Order Sheet reordered a full par, all off one note.
+  _hasCount(e) {
+    return !!e && (e.value != null || e.fulls != null || e.cases != null || e.loose != null);
+  },
+
   // ── Review ────────────────────────────────────────────────────────────────
   // Bottle beer is counted and stored in CASES. The operator enters full cases +
   // loose bottles; on-hand = cases + (loose / case_size), kept as a decimal
@@ -605,7 +615,7 @@ S.InventoryTakeInventory = {
     const out = [];
     this.groups().forEach(g => g.products.forEach(p => {
       const _key = p.id + '@@' + g.location;
-      const counted = this.draft.counts[_key] != null;
+      const counted = this._hasCount(this.draft.counts[_key]);
       const c = this.draft.counts[_key] || { value: 0, fulls: 0, notes: '' };
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
       // Only the loose (full+loose) style totals as fulls + loose/pack; a
@@ -636,7 +646,7 @@ S.InventoryTakeInventory = {
 
     // Silent-zero guardrail: any product with no entry submits as 0. Flag them
     // so a skipped shelf is never recorded as empty by accident.
-    const uncountedSet = new Set(rows.filter(r => this.draft.counts[r.p.id + '@@' + r.location] == null)
+    const uncountedSet = new Set(rows.filter(r => !this._hasCount(this.draft.counts[r.p.id + '@@' + r.location]))
       .map(r => r.p.id + '@@' + r.location));
     const uncounted = uncountedSet.size;
     const warnBanner = uncounted > 0
