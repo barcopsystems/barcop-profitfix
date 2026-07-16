@@ -182,8 +182,16 @@ S.HubBarCopAudit = {
       { label: 'Opening checklist completion',  ratio: openRatio,  na: !active || openRatio == null,  extra: openRatio == null ? opens.length + ' logged (no shifts in window)'  : runNote(opens.length) },
       { label: 'Closing checklist completion',  ratio: closeRatio, na: !active || closeRatio == null, extra: closeRatio == null ? closes.length + ' logged (no shifts in window)' : runNote(closes.length) },
       { label: 'Inventory counts completed',    ratio: Math.min(1, wkCounts.length / 4),  na: !active, extra: wkCounts.length + ' of 4 expected weekly' },
-      { label: 'Spot checks completed',         ratio: Math.min(1, wkSpots.length  / 4),  na: !active, extra: wkSpots.length  + ' of 4 expected weekly' },
-      { label: 'Shifts logged',                 ratio: Math.min(1, wkShifts.length / 30), na: !active, extra: wkShifts.length + ' shifts in window' }
+      { label: 'Spot checks completed',         ratio: Math.min(1, wkSpots.length  / 4),  na: !active, extra: wkSpots.length  + ' of 4 expected weekly' }
+      // ('Shifts logged' was REMOVED. It scored sc_shifts RECORDS against a flat 30, but
+      //  there is one record per daypart, not per day, and no setting says which days a
+      //  bar is open. So a two-daypart bar open Thu-Sun logged 34 records and scored 100,
+      //  a one-daypart bar open all week logged 30 and scored 100, and the same Thu-Sun
+      //  bar on one daypart logged 17 and scored 57. It rewarded having more dayparts and
+      //  punished being closed on Mondays. There is no honest denominator to give it:
+      //  sc_shifts is the only record of which days you ran, so scoring it against your
+      //  own run days is circular. The checklist, count and spot-check components above
+      //  already measure procedure completion against real operating days.)
     ];
 
     // Recovery-audit cadence. N/A until that audit has been run at least once.
@@ -689,27 +697,13 @@ S.HubBarCopAudit = {
     // Prevention screen owns per-product shrinkage; surfacing it here would mean
     // re-deriving theoretical usage, so it lives there, not in this rule set.)
 
-    // Rule 4: same day-of-week plus labor overage
-    const wkActuals = actuals.filter(a => since90(a.date));
-    const byDow = [0,0,0,0,0,0,0];
-    const totalsDow = [0,0,0,0,0,0,0];
-    wkActuals.forEach(a => {
-      const d = new Date(String(a.date).length <= 10 ? a.date + 'T00:00:00' : a.date);
-      if (isNaN(d.getTime())) return;
-      const dow = d.getDay();
-      totalsDow[dow]++;
-      if ((parseFloat(a.hours) || 0) > 40) byDow[dow]++;
-    });
-    const dowNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    byDow.forEach((count, idx) => {
-      if (count >= 4 && totalsDow[idx] >= 8) {
-        out.push({
-          label: 'Recurring labor overage on ' + dowNames[idx],
-          detail: count + ' over-40-hour entries on ' + dowNames[idx] + 's in last 90 days. Schedule the day differently.',
-          screen: 'lc-build-schedule'
-        });
-      }
-    });
+    // (Rule 4, "Recurring labor overage on <day>", was REMOVED. It tested lc_actuals for
+    // hours > 40 on a single row, but that is one staff member on one DAY, so it could
+    // never be true and the rule never fired once. There is no honest rebuild: overtime
+    // is a weekly threshold (Labor Hygiene scores it, and Overtime Watch owns it), and a
+    // per-DAY labor overage needs a per-day labor budget this app does not track. The
+    // only version buildable from what is stored is "the day of week with the worst labor
+    // percent", which is the slowest day for every bar every week: noise, not a finding.)
 
     // Rule 5: same vendor plus repeated discrepancies
     const wkDiscrep = discrep.filter(d => since90(d.date));
