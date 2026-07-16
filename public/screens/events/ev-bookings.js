@@ -466,7 +466,11 @@ S.EventsBookings = {
       const margin = rev - cost;
       const mp = rev > 0 ? margin / rev * 100 : null;
       t.push(this.statTile('Revenue', App.fmtCurrency(rev), 'actual entered'));
-      t.push(this.statTile('Margin', App.fmtCurrency(margin), 'after all costs', margin >= 0 ? 'good' : 'bad'));
+      // Margin is a RESULT (the event's bottom line), so it takes App.fmtBal: minus
+      // outside the '$', no plus on a positive. It is negative-capable by design and
+      // this very line knows it (`margin >= 0 ? 'good' : 'bad'`), so a job that lost
+      // money printed "$-500" on the tile flagged bad.
+      t.push(this.statTile('Margin', App.fmtBal(margin), 'after all costs', margin >= 0 ? 'good' : 'bad'));
       t.push(this.statTile('Margin %', mp != null ? mp.toFixed(0) + '%' : '-', '30% is a solid event', mp != null && mp >= 30 ? 'good' : mp != null ? 'warn' : ''));
       t.push(this.statTile('Labor', App.fmtCurrency(labor), this.eventStaffShifts(b).length ? 'checked event staff' : 'check staff in schedule'));
     }
@@ -819,7 +823,7 @@ S.EventsBookings = {
         + item('Cost / Head', App.fmtCurrency(perHeadCost))
         + item('Suggested / Head', App.fmtCurrency(perHeadPrice), true)
         + item('Event Revenue', App.fmtCurrency(totalRev))
-        + item('Gross Margin', App.fmtCurrency(totalRev - totalCost))
+        + item('Gross Margin', App.fmtBal(totalRev - totalCost))
         + '</div>';
       return { perHeadPrice, totalRev };
     };

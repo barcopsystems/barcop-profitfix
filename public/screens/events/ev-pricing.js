@@ -201,7 +201,7 @@ S.EventsPricing = {
       + item('Cost / Head', App.fmtCurrency(perHeadCost))
       + item('Suggested / Head', App.fmtCurrency(perHeadPrice), true)
       + item('Event Revenue', App.fmtCurrency(totalRev))
-      + item('Gross Margin', App.fmtCurrency(margin))
+      + item('Gross Margin', App.fmtBal(margin))
       + '</div>';
   },
 
