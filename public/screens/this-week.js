@@ -30,23 +30,51 @@ S.ThisWeek = {
   get BAR_CATS()     { return App.BAR_CATS; },
   get KITCHEN_CATS() { return App.KITCHEN_CATS; },
 
+  // Days of slop allowed on what should be a 7-day count span. Wide enough for an
+  // operator who counts Saturday one week and Monday the next, tight enough that a
+  // half-week or a month can never be booked as a week.
+  COGS_WEEK_TOL: 2,
+
   // ── Inventory Control COGS feed ───────────────────────────────────────────
   icCOGS(cats, periodEnd) {
     const counts = [...((App.inventoryData && App.inventoryData.ic_counts) || [])]
       .sort(App.cmpOldest);
     if (counts.length < 2) return null;
+    const cdate = c => String((c && (c.date || c.created_at)) || '').slice(0, 10);
     // Scope to the count pair ending on or before the selected week, so loading a
     // past week pulls THAT week's usage, not the most recent counts. With no
     // periodEnd (or no count pair on/before it) fall back to the latest pair.
     let endIdx = counts.length - 1;
     if (periodEnd) {
-      const cdate = c => String(c.date || c.created_at || '').slice(0, 10);
       let idx = -1;
       for (let i = counts.length - 1; i >= 0; i--) { if (cdate(counts[i]) <= periodEnd) { idx = i; break; } }
       if (idx < 1) return null;   // no count pair on or before this week → no honest COGS
       endIdx = idx;
     }
     const startC = counts[endIdx - 1], endC = counts[endIdx];
+    // The pair has to approximately COVER this week or its usage is not this week's
+    // usage. Nothing above constrained it to 7 days: an operator who counts MONTHLY has
+    // counts on Apr 30 and May 31, so confirming the week ending Jun 8 picked that pair
+    // and booked ALL OF MAY'S usage onto that one week. Prime read about 4x and carried
+    // into Books and the annual sheets as an actual, while the readiness check went
+    // green (it only tests != null). Same stance as the "no count pair" return above:
+    // with no honest weekly COGS, say nothing rather than invent a number. The cell is
+    // still there to type into.
+    if (periodEnd) {
+      const gap = (a, b) => Math.round((new Date(a + 'T00:00:00').getTime() - new Date(b + 'T00:00:00').getTime()) / 86400000);
+      const eD = cdate(endC), sD = cdate(startC);
+      if (!eD || !sD) return null;
+      const TOL = this.COGS_WEEK_TOL;
+      // 1. The pair spans about a week. Not a month, and not a half week either.
+      if (Math.abs(gap(eD, sD) - 7) > TOL) return null;
+      // 2. It is recent enough to BE this week. Test the span, never the alignment to
+      //    periodEnd: the current week's end is in the FUTURE (Dashboard.weekEnd is
+      //    App.nextSunday), so the closing count cannot land on it while the week is
+      //    still running. Allow up to a week back, which covers both an operator who
+      //    counted today and one who counts every Sunday and has last week's close as
+      //    their newest count. Beyond that the pair belongs to an earlier week.
+      if (gap(periodEnd, eD) > 7 + TOL) return null;
+    }
     const prods = (App.inventoryData && App.inventoryData.ic_products) || [];
     const sMap = {}; (startC.items || []).forEach(it => sMap[it.product_id] = it);
     const eMap = {}; (endC.items || []).forEach(it => eMap[it.product_id] = it);
