@@ -218,7 +218,9 @@ S.LaborOvertimeWatch = {
   openWeekInSchedule() {
     const ws = this.weekStart;
     if (S.LaborBuildSchedule) {
-      const posted = this.schedules().find(s => s.week_start === ws);
+      // Newest wins, same as scheduleCovering above. This hands an editId to Build
+      // Schedule, so first-in-array would open the older record for editing.
+      const posted = this.schedules().filter(s => s.week_start === ws).sort(App.cmpNewest)[0];
       if (posted) { S.LaborBuildSchedule.editId = posted.id; S.LaborBuildSchedule._enterEdit = true; }
       else { S.LaborBuildSchedule._gotoWeek = ws; }
     }

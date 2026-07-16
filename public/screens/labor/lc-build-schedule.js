@@ -171,7 +171,11 @@ S.LaborBuildSchedule = {
   // build). editId always tracks the displayed week so a save targets the right
   // record (or hits the duplicate-week guard for a brand-new week).
   loadWeek(wk) {
-    const posted = this.schedules().find(s => s.week_start === wk);
+    // Newest wins if a week ever carries two schedules (see the duplicate-week guard in
+    // save() below, which is why the single-device flow cannot make one). This sets
+    // editId, so first-in-array would open the older record for editing while every
+    // other screen reads the newer one.
+    const posted = this.schedules().filter(s => s.week_start === wk).sort(App.cmpNewest)[0];
     if (posted) {
       this.editId = posted.id;
       this.draft = {
