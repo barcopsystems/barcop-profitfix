@@ -39,6 +39,11 @@ S.CashForecast = {
       + this.CFCOLS + '<thead><tr>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div>';
   },
   signed(v) { return (v < 0 ? '-' : '+') + App.fmtCurrency(Math.abs(v)); },
+  // A BALANCE, not a net: no plus sign on a positive, and the minus belongs OUTSIDE the
+  // dollar sign. App.fmtCurrency is '$' + v.toLocaleString(), so a raw negative renders
+  // "$-3,000". Every branch below that prints a balance under zero only runs WHEN it is
+  // under zero, so those read malformed every single time, lender export included.
+  fmtBal(v) { return (v < 0 ? '-' : '') + App.fmtCurrency(Math.abs(v)); },
   fmtWk(ws) { const d = new Date(ws + 'T00:00:00'); return isNaN(d.getTime()) ? ws : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
 
   render(container, actions) {
@@ -96,7 +101,7 @@ S.CashForecast = {
       } else {
         const runway = fc.runway != null ? (fc.runway === 0 ? 'This week' : fc.runway + ' wk' + (fc.runway === 1 ? '' : 's')) : this.WEEKS + '+ wks';
         items = this.statItem('Runway', runway, fc.runway != null ? 'warn' : '')
-          + this.statItem('Low Point', App.fmtCurrency(fc.lowPoint.balance), (fc.lowPoint.balance < 0 || fc.lowPoint.balance < opening * 0.25) ? 'warn' : '')
+          + this.statItem('Low Point', this.fmtBal(fc.lowPoint.balance), (fc.lowPoint.balance < 0 || fc.lowPoint.balance < opening * 0.25) ? 'warn' : '')
           + this.statItem('Low-Point Week', this.fmtWk(fc.lowPoint.ws))
           + this.statItem('End of Quarter', App.fmtCurrency(fc.end), fc.end < opening ? 'warn' : '');
       }
@@ -184,7 +189,7 @@ S.CashForecast = {
   lowLine(fc, opening) {
     if (opening == null || !fc.lowPoint) return '';
     const low = fc.lowPoint, credit = fc.credit || 0;
-    const wk = this.fmtWk(low.ws), bal = App.fmtCurrency(low.balance);
+    const wk = this.fmtWk(low.ws), bal = this.fmtBal(low.balance);
     const wrap = (inner) => '<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px;">' + inner + '</div>'
       + '<div class="pdf-para" style="display:none;">' + inner + '</div>';
     if (low.balance >= 0) {
@@ -240,17 +245,31 @@ S.CashForecast = {
     if (this._scAmt) {
       const baseLow = base.lowPoint ? base.lowPoint.balance : 0;
       const newLow = fc.lowPoint ? fc.lowPoint.balance : 0;
-      const credit = fc.credit || 0;
-      const ok = newLow >= 0, onCredit = !ok && newLow >= -credit;
-      const head = ok ? 'You can carry it.' : onCredit ? 'You can carry it, on credit.' : 'It breaks you.';
-      const headCol = ok ? 'var(--green)' : onCredit ? 'var(--amber)' : 'var(--red)';
-      const tail = ok ? '. The cushion holds.'
-        : onCredit ? ', under zero. Your ' + App.fmtCurrency(credit) + ' credit line covers it, but you would be borrowing to do it.'
-        : ', under zero. Even with your credit line you would be ' + App.fmtCurrency(Math.abs(newLow) - credit) + ' short. Free trapped cash or hold it until the runway is longer.';
-      verdict = '<div style="margin-top:14px;padding:11px 13px;border-radius:var(--r);background:var(--gold-tint);border:1px solid var(--b-edge);font-size:12px;color:var(--t1);line-height:1.6;">'
-        + '<strong style="color:' + headCol + ';">' + head + '</strong> '
-        + 'Your low point ' + (this.cashOnHand() != null ? 'goes from ' + App.fmtCurrency(baseLow) + ' to ' + App.fmtCurrency(newLow) : 'drops by ' + App.fmtCurrency(baseLow - newLow))
-        + tail + '</div>';
+      const box = inner => '<div style="margin-top:14px;padding:11px 13px;border-radius:var(--r);background:var(--gold-tint);border:1px solid var(--b-edge);font-size:12px;color:var(--t1);line-height:1.6;">' + inner + '</div>';
+      if (!fc.hasOpening) {
+        // With no bank balance on file, survivalForecast opens the quarter at an assumed
+        // $0 (`openingCash() || 0`), so every balance in this forecast is an offset from
+        // a number the operator never gave us. Ruling "It breaks you, under zero" off
+        // that is a verdict on nothing: it fires for ANY amount, on exactly the bars the
+        // audit tells "flying blind on cash". The two other balance reads on this screen
+        // (positionCard, lowLine) already gate on the opening; this one did not.
+        // The SWING is still honest: the opening is a constant offset, so it cancels out
+        // of the delta between the two forecasts. Show that, and ask for the balance
+        // before ruling on it.
+        verdict = box('<strong>Your low point moves ' + App.fmtCurrency(Math.abs(baseLow - newLow)) + '.</strong> '
+          + 'Whether you can carry that comes down to what is in the bank, and Bar Cop does not have that yet. '
+          + 'Put your balance in up top and this gives you a straight answer.');
+      } else {
+        const credit = fc.credit || 0;
+        const ok = newLow >= 0, onCredit = !ok && newLow >= -credit;
+        const head = ok ? 'You can carry it.' : onCredit ? 'You can carry it, on credit.' : 'It breaks you.';
+        const headCol = ok ? 'var(--green)' : onCredit ? 'var(--amber)' : 'var(--red)';
+        const tail = ok ? '. The cushion holds.'
+          : onCredit ? ', under zero. Your ' + App.fmtCurrency(credit) + ' credit line covers it, but you would be borrowing to do it.'
+          : ', under zero. Even with your credit line you would be ' + App.fmtCurrency(Math.abs(newLow) - credit) + ' short. Free trapped cash or hold it until the runway is longer.';
+        verdict = box('<strong style="color:' + headCol + ';">' + head + '</strong> '
+          + 'Your low point goes from ' + this.fmtBal(baseLow) + ' to ' + this.fmtBal(newLow) + tail);
+      }
     }
 
     return '<div class="no-print"><div class="sh" style="margin:24px 0 10px;">Stress Test</div>'

@@ -163,7 +163,13 @@ S.CashAudit = {
       DIO: cyc.hasData ? cyc.dio : null, DPO: cyc.hasData ? cyc.dpo : null, CYCLE_DAYS: cyc.hasData ? cyc.cycle : null,
       LOCKED_CASH: cyc.hasData ? cyc.lockedCash : null, DAILY_COGS: cyc.hasData ? cyc.dailyCogs : null,
       // S3
-      TIGHT_WEEKS: sf.hasData ? sf.tightWeeks : null, RUNWAY: sf.runway, HAS_OPENING: sf.hasOpening,
+      // RUNWAY is meaningless without a bank balance: survivalForecast opens at an
+      // assumed $0, so the weeks-until-out is counted down from a number the operator
+      // never gave us. Its neighbours OPENING_CASH and SAFE_TO_SPEND already gate on
+      // hasOpening; this one did not, so the Experiments "Runway (weeks)" metric
+      // (initiative-tracker) fired for exactly the bars whose audit reads "flying blind
+      // on cash" two lines away.
+      TIGHT_WEEKS: sf.hasData ? sf.tightWeeks : null, RUNWAY: sf.hasOpening ? sf.runway : null, HAS_OPENING: sf.hasOpening,
       OPENING_CASH: sf.hasOpening ? sf.opening : null, END_BALANCE: sf.hasData ? sf.end : null,
       LOW_POINT_BAL: (sf.hasData && sf.lowPoint) ? sf.lowPoint.balance : null,
       LOW_POINT_WEEK: (sf.hasData && sf.lowPoint) ? this.fmtWk(sf.lowPoint.ws) : '',
