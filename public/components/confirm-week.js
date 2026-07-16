@@ -310,7 +310,17 @@ const ConfirmWeek = {
       hourly_labor_cost: parseFloat(hourlyLabor.toFixed(2)),
       total_hours: hours,
       labor_pct_blended: totSales > 0 ? parseFloat((laborCost / totSales * 100).toFixed(2)) : 0,
-      hourly_labor_pct: totRev > 0 ? parseFloat((hourlyLabor / totRev * 100).toFixed(2)) : 0,
+      // Hourly labor % divides by BAR + FOOD revenue, matching its own numerator.
+      // hourlyLabor is bar+food hourly pay with catering crew deliberately left out
+      // (event-driven, not weekly-schedulable), so dividing it by totRev, which carries
+      // catering REVENUE, measured a bar+food cost against bar+food+catering sales and
+      // read low on every week with an event. It also disagreed with the two things that
+      // consume it: Recovery dollarizes a point of this against bar_revenue +
+      // floor_revenue (recovery.js), and the Anchor seed already computes it over
+      // bar+food. So the leak dollars ran light by catering's share of the week.
+      // (labor_pct_blended stays on totSales: that is the P&L number, total labor against
+      // total sales, and it ties to Books. Different metric, different basis, on purpose.)
+      hourly_labor_pct: (bRev + fRev) > 0 ? parseFloat((hourlyLabor / (bRev + fRev) * 100).toFixed(2)) : 0,
       rplh_blended: hours > 0 ? parseFloat((totRev / hours).toFixed(2)) : 0,
       notes: notes,
       saved_at: new Date().toISOString()
