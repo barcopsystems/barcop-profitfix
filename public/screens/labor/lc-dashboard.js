@@ -277,7 +277,17 @@ S.LaborDashboard = {
   weekProjection() {
     const wkStart = this.weekStart(), wkEnd = this.weekEnd();
     const curWeek = this.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
-    const sched = this.schedules().find(s => s.week_start === wkStart) || null;
+    // Newest wins when a week somehow carries more than one schedule, matching Overtime
+    // Watch, Log Hours, Pay Periods and the Call-Out Log (all .sort(App.cmpNewest)[0]).
+    // NOTE, so nobody re-derives this: rebuilding a week does NOT strand a superseded
+    // record. Build Schedule's duplicate-week guard replaces in place (same id) and
+    // loadWeek edits the existing one, so the single-device flow keeps exactly one
+    // schedule per week_start. The narrow case this covers is two managers posting the
+    // same week from different devices before a sync. Defensive and consistent, not a
+    // live leak. cmpNewest resolves it through its created_at tiebreak (App._recDate
+    // reads none of a schedule's fields), and a schedule gets created_at at creation
+    // which an edit preserves.
+    const sched = this.schedules().filter(s => s.week_start === wkStart).sort(App.cmpNewest)[0] || null;
     const proj = {};
     const ensure = (id, name) => { if (!proj[id]) proj[id] = { id, name: name || '-', actual: 0, scheduled: 0 }; return proj[id]; };
     const DAYS = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
