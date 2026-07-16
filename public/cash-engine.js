@@ -400,8 +400,7 @@ window.CashEngine = {
   openingCash() { const v = parseFloat(localStorage.getItem(this._key(this._OPENING_KEY))); return isNaN(v) ? null : v; },
   setOpeningCash(v) { try { const k = this._key(this._OPENING_KEY); if (v == null || v === '') localStorage.removeItem(k); else localStorage.setItem(k, String(v)); } catch (e) {} },
 
-  // Event balance payments collected around the event date (the deposit is
-  // already in hand). Booked + completed only.
+  // Event balance payments collected around the event date. Booked only.
   // The all-in event total (F&B subtotal + service charge + tax), from the Events
   // section so it matches what the booking shows; falls back to the stored field.
   _eventTotal(b) { try { return S.EventsBookings.quoteTotal(b); } catch (e) { return parseFloat(b.quoted_total) || 0; } },
@@ -416,7 +415,14 @@ window.CashEngine = {
       const d = String(b.event_date || '').slice(0, 10);
       if (!d || d < startYmd || d > endYmd) return;
       const evTotal = this._eventTotal(b);
-      const dep = parseFloat(b.deposit_amount) || 0;
+      // Only a COLLECTED deposit comes off the balance still to come. Netting an
+      // uncollected one out made that money vanish from the forecast entirely: it was
+      // not inflow here, and committedEventCash counts deposits only when
+      // deposit_paid_date is set, so it was in neither. Meanwhile Bookings and the
+      // Events dashboard were both showing it as "Deposits Due", money the bar is owed
+      // and will bank. It also made the forecast's "Deposit Held" column print a
+      // deposit that is not held.
+      const dep = b.deposit_paid_date ? (parseFloat(b.deposit_amount) || 0) : 0;
       const bal = Math.max(0, evTotal - dep);
       if (bal > 0) { total += bal; list.push({ name: b.event_name || 'Event', amount: bal, date: d, total: evTotal, deposit: dep }); }
     });
@@ -517,7 +523,12 @@ window.CashEngine = {
       // events ARE added there. Only add event cash when NOT on a saved override.
       const savedFc = App.forecastForWeek ? App.forecastForWeek(ws) : null;
       const onOverride = !!(savedFc && savedFc.total);
-      const ev = this.eventInflow(ws, we);
+      // Week 0 counts only events dated today or later, the same rule as the sales
+      // proration above and _future0 below. Opening cash is a "right now" balance that
+      // already holds an event balance collected earlier this week, so counting that
+      // event again added it twice and read the near-term balance and runway high, in
+      // the optimistic direction, on the week that matters most.
+      const ev = this.eventInflow(i === 0 ? App.todayLocal() : ws, we);
       const evAdd = onOverride ? 0 : ev.total;
       const inflow = sales + evAdd;
       const lab = this.laborForWeek(ws);
