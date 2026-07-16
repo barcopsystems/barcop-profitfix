@@ -208,13 +208,19 @@ S.Reports = {
     ]);
 
     // Data rows
+    // A weeks record stores these as percentage POINTS (22.4 means 22.4%). ConfirmWeek is
+    // the only live writer and computes cogs / revenue * 100; the seed (sample-profile)
+    // does the same. Excel's % cell format wants a FRACTION, so divide. Always.
+    //
+    // This used to hedge: `n > 1 ? n / 100 : n`, on the premise that stored values "may be
+    // either 0.32 or 32 depending on source". That premise is stale, and the hedge broke
+    // the real sub-1% case it could not tell apart from a fraction: $500 of bar revenue
+    // against $4 of COGS is a genuine 0.8 POINTS, which is not > 1, so it passed straight
+    // through and Excel printed 80.0%. A 100x error, in the sheet handed to the accountant.
     const pctOrNull = v => {
       const n = parseFloat(v);
       if (v == null || v === '' || isNaN(n)) return null;
-      // Stored values may be either 0.32 or 32 depending on source — both seen
-      // in weeks records. Treat any value > 1 as a percentage point figure and
-      // divide so Excel's % format renders correctly.
-      return n > 1 ? n / 100 : n;
+      return n / 100;
     };
 
     weeks.forEach(w => {
