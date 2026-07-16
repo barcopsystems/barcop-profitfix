@@ -64,12 +64,25 @@ S.CashBridge = {
   headline(br, b) {
     const kept = br.cashKept, diff = br.profit - kept;
     const keptCol = kept < 0 ? 'var(--red)' : 'var(--w)';
+    // Without two inventory counts the bridge cannot see cash moving onto or off the
+    // shelf: inventoryChange returns { change: 0, hasData: false }, so cashKept is profit
+    // minus the LOGGED outflows only. The waterfall row already gates on hasData, but the
+    // hero, the ¢-per-dollar line and the tail did not, so an incomplete figure read as
+    // the finished answer. Worse, the no-leak tail flatly claimed "Nothing leaked out to
+    // inventory" on exactly the bars where inventory is the one thing Bar Cop cannot see.
+    const noInv = !br.inv.hasData;
+    const invNote = noInv
+      ? ' Two inventory counts are not in yet, so this leaves out cash that moved onto or off the shelf. Take a count and the bridge closes.'
+      : '';
     let convTxt = '';
     if (br.profit > 0) {
       const pct = Math.round(kept / br.profit * 100);
-      if (kept < 0) convTxt = 'You kept none of your profit ' + b.label + '. Cash went backward.';
-      else if (pct > 100) convTxt = 'You kept every dollar of profit ' + b.label + ' and freed cash on top.';
-      else convTxt = 'You kept ' + pct + '¢ of every profit dollar ' + b.label + '.';
+      const lead = noInv ? 'Before inventory, you' : 'You';
+      // "Cash went backward" is a claim about ALL the cash, so it only holds once
+      // inventory is in: freeing stock off the shelf could have covered the gap.
+      if (kept < 0) convTxt = lead + ' kept none of your profit ' + b.label + '.' + (noInv ? '' : ' Cash went backward.');
+      else if (pct > 100) convTxt = lead + ' kept every dollar of profit ' + b.label + ' and freed cash on top.';
+      else convTxt = lead + ' kept ' + pct + '¢ of every profit dollar ' + b.label + '.';
     }
     const convLine = convTxt ? '<div style="font-size:12px;color:var(--t2);margin-top:8px;">' + convTxt + '</div>' : '';
     return '<div class="card form-card"><div class="card-title">Cash You Kept</div>'
@@ -81,10 +94,15 @@ S.CashBridge = {
       + '<div style="font-size:12px;color:var(--t3);margin-top:12px;">'
       +   (diff > 0.5
             ? '<strong style="color:var(--amber);">' + App.fmtCurrency(diff) + '</strong> went somewhere other than the bank. The bridge below shows where.'
-            : 'You kept all of your profit this period. Nothing leaked out to inventory, draws, or capital.')
+            : noInv
+              ? 'Nothing you logged took cash out of this period.'
+              : 'You kept all of your profit this period. Nothing leaked out to inventory, draws, or capital.')
+      +   invNote
       + '</div>'
       // PDF-only summary (the hero number is a styled span the exporter skips).
-      + '<div class="pdf-para" style="display:none;">' + App.fmtCurrency(kept, 0) + ' cash kept of ' + App.fmtCurrency(br.profit, 0) + ' profit ' + b.label + '.' + (diff > 0.5 ? ' ' + App.fmtCurrency(diff) + ' went somewhere other than the bank.' : ' You kept all of your profit this period.') + '</div>'
+      + '<div class="pdf-para" style="display:none;">' + App.fmtCurrency(kept, 0) + (noInv ? ' cash kept before inventory, of ' : ' cash kept of ') + App.fmtCurrency(br.profit, 0) + ' profit ' + b.label + '.'
+        + (diff > 0.5 ? ' ' + App.fmtCurrency(diff) + ' went somewhere other than the bank.' : noInv ? ' Nothing you logged took cash out of this period.' : ' You kept all of your profit this period.')
+        + invNote + '</div>'
       + '</div>';
   },
 
@@ -105,6 +123,10 @@ S.CashBridge = {
     if (co.loan > 0) rows += row('Loan payments', -co.loan, 'Principal is a payment, not an expense');
     if (co.capital > 0) rows += row('Capital and equipment', -co.capital, 'Paid in cash, written off slowly');
     if (co.tax > 0) rows += row('Tax remitted', -co.tax, 'Money you collected and paid through');
+    // `other` is a real type in Books (hub-cash-outflows TYPES) and outflowsInPeriod has
+    // always folded it into co.total, so Cash You Kept was already net of it. It just had
+    // no row, so the visible lines did not sum to the result underneath them.
+    if (co.other > 0) rows += row('Other cash out', -co.other, 'Logged in Books under Cash Outflows');
     rows += '<div style="height:1px;background:var(--row-div);margin:4px 0;"></div>';
     rows += row('Cash you actually kept', br.cashKept, '', true);
     // PDF-only table (the on-screen waterfall is styled divs the exporter skips).
