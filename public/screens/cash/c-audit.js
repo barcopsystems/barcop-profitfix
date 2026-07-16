@@ -18,20 +18,10 @@ S.CashAudit = {
 
   fmtWk(ws) { const d = new Date(ws + 'T00:00:00'); return isNaN(d.getTime()) ? ws : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
 
-  // A BALANCE, negative-safe: the minus goes OUTSIDE the dollar sign and there is no
-  // plus on a positive (that is `signed`, for a NET). App.fmtCurrency is '$' + v, so a
-  // raw negative renders "$-2,340.00". Several of the lines below fire ONLY when the
-  // value is under zero (Safe to Spend, the low point, cash kept), so they printed
-  // malformed EVERY time they appeared, including in the exported lender PDF. Same
-  // helper and same rule as c-forecast.fmtBal. Amounts that cannot go negative
-  // (trapped cash, dead stock, locked cash) stay on plain `cur`.
-  // The sign reads off the ROUNDED value: fmtCurrency normalizes -0 so it never prints
-  // "$-0.00", and testing the raw v would hand back "-$0.00" instead, reintroducing the
-  // same malformed-currency bug one layer up.
-  fmtBal(v, d) {
-    const dd = d !== undefined ? d : 2;
-    return (Number(Number(v).toFixed(dd)) < 0 ? '-' : '') + App.fmtCurrency(Math.abs(v), d);
-  },
+  // Balances below (Safe to Spend, the low point, cash kept) go through App.fmtBal:
+  // several of those lines fire ONLY when the value is under zero, so raw fmtCurrency
+  // printed "$-2,340.00" every time, lender PDF included. Amounts that cannot go
+  // negative (trapped cash, dead stock, locked cash) stay on plain `cur`.
   runwayLabel(r) { return r == null ? '13+ wks' : r === 0 ? 'This week' : r + ' wk' + (r === 1 ? '' : 's'); },
 
   render(container, actions) {
@@ -178,7 +168,7 @@ S.CashAudit = {
     const ai = [];
     if (trapped.hasData && trapped.total > 0) ai.push({ s: s1, action: 'Free ' + cur(trapped.total) + ' of lazy shelf cash: ' + cur(trapped.dead) + ' in dead stock, ' + cur(trapped.overPar) + ' above par.', gap_id: 'free-trapped' });
     if (cyc.hasData && cyc.cycle > 7) ai.push({ s: s2, action: 'Your cash is locked about ' + Math.round(cyc.cycle) + ' days. Order to par to free roughly ' + cur(cyc.dailyCogs) + ' for each day you shorten it.', gap_id: 'order-to-par' });
-    if (sf.hasData && sf.tightWeeks > 0) ai.push({ s: s3, action: sf.tightWeeks + ' tight week' + (sf.tightWeeks === 1 ? '' : 's') + ' in the next thirteen' + (sf.hasOpening && sf.lowPoint ? ', bottoming out ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + this.fmtBal(sf.lowPoint.balance) : '') + '. Move a payment or hold an order to cover it.', gap_id: 'stay-ahead' });
+    if (sf.hasData && sf.tightWeeks > 0) ai.push({ s: s3, action: sf.tightWeeks + ' tight week' + (sf.tightWeeks === 1 ? '' : 's') + ' in the next thirteen' + (sf.hasOpening && sf.lowPoint ? ', bottoming out ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + App.fmtBal(sf.lowPoint.balance) : '') + '. Move a payment or hold an order to cover it.', gap_id: 'stay-ahead' });
     if (totalV > 0 && tv.length < totalV) ai.push({ s: s4, action: 'Set payment terms on the ' + (totalV - tv.length) + ' vendor' + ((totalV - tv.length) === 1 ? '' : 's') + ' without them, so you stop paying early.', gap_id: 'pay-on-terms' });
     ai.sort((a, b) => (a.s == null ? 100 : a.s) - (b.s == null ? 100 : b.s));
     const action_items = ai.map(x => ({ action: x.action, gap_id: x.gap_id }));
@@ -246,7 +236,7 @@ S.CashAudit = {
     if (sf.hasData && sf.hasOpening && sf.runway != null) {
       out.push({
         label: 'Cash crunch ahead', score: 'HIGH',
-        evidence: 'Your account runs dry in about ' + (sf.runway === 0 ? 'a week' : sf.runway + ' week' + (sf.runway === 1 ? '' : 's')) + (sf.lowPoint ? ', bottoming out the week of ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + this.fmtBal(sf.lowPoint.balance) : '') + '.',
+        evidence: 'Your account runs dry in about ' + (sf.runway === 0 ? 'a week' : sf.runway + ' week' + (sf.runway === 1 ? '' : 's')) + (sf.lowPoint ? ', bottoming out the week of ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + App.fmtBal(sf.lowPoint.balance) : '') + '.',
         gap: 'A profitable bar that runs out of cash still closes its doors. This is the most urgent thing to cover.',
         tool: 'Free trapped cash and move a payment, on the Cash Forecast.'
       });
@@ -254,7 +244,7 @@ S.CashAudit = {
     if (pos.hasOpening && pos.safe < 0) {
       out.push({
         label: 'Spending money that is not yours', score: 'HIGH',
-        evidence: 'Safe to Spend is ' + this.fmtBal(pos.safe) + ', under zero. You are holding ' + cur(pos.setAside.total) + ' in tax and tips owed against a ' + this.fmtBal(pos.opening || 0) + ' balance.',
+        evidence: 'Safe to Spend is ' + App.fmtBal(pos.safe) + ', under zero. You are holding ' + cur(pos.setAside.total) + ' in tax and tips owed against a ' + App.fmtBal(pos.opening || 0) + ' balance.',
         gap: 'You are leaning on the sales tax you collected or your reserve. Spending the tax is the classic way a profitable bar cannot pay its tax bill.',
         tool: 'See what is truly free, on Cash Position.'
       });
@@ -266,7 +256,7 @@ S.CashAudit = {
       if (ownerOut > 0 && ownerOut > Math.max(0, br.cashKept)) {
         out.push({
           label: 'Draws and debt outpacing what you keep', score: br.cashKept < 0 ? 'HIGH' : 'MEDIUM',
-          evidence: 'Last month ' + cur(ownerOut) + ' left for owner draws and loan payments while the business kept ' + this.fmtBal(br.cashKept) + '.',
+          evidence: 'Last month ' + cur(ownerOut) + ' left for owner draws and loan payments while the business kept ' + App.fmtBal(br.cashKept) + '.',
           gap: 'When draws and debt service take most of the cash the operation generates, there is little left to build a cushion. Fine for a month, a problem as a pattern.',
           tool: 'See where the profit went, on the Cash Bridge.'
         });
@@ -358,7 +348,7 @@ S.CashAudit = {
       S3_FINDING: 'Without an opening balance this is timing only, not a real runway.',
       S3_TOOL: 'Set your opening cash balance in Cash Position to see the full runway and exactly which week runs thin.'
     };
-    const lowTxt = sf.lowPoint ? ' The tightest week is ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + this.fmtBal(sf.lowPoint.balance) + '.' : '';
+    const lowTxt = sf.lowPoint ? ' The tightest week is ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + App.fmtBal(sf.lowPoint.balance) + '.' : '';
     if (sf.runway != null) return {
       S3_NARRATIVE: 'Your cash runs about ' + this.runwayLabel(sf.runway) + ' before it would go negative.',
       S3_FINDING: (lowTxt ? lowTxt.trim() : 'The next thirteen weeks are the window.') + safeTxt,
@@ -416,8 +406,8 @@ S.CashAudit = {
         ['Tight Weeks Ahead', d.TIGHT_WEEKS != null ? String(d.TIGHT_WEEKS) : '', d.TIGHT_WEEKS > 0 ? 'warn' : 'good'],
         ['Runway', d.HAS_OPENING ? this.runwayLabel(d.RUNWAY) : '', d.HAS_OPENING && d.RUNWAY != null ? 'warn' : ''],
         ['Low-Point Week', d.HAS_OPENING ? d.LOW_POINT_WEEK : ''],
-        ['Low Point', d.HAS_OPENING ? this.fmtBal(d.LOW_POINT_BAL) : '', (d.HAS_OPENING && d.LOW_POINT_BAL < 0) ? 'warn' : ''],
-        ['Safe to Spend', d.SAFE_TO_SPEND != null ? this.fmtBal(d.SAFE_TO_SPEND) : '', (d.SAFE_TO_SPEND != null && d.SAFE_TO_SPEND < 0) ? 'warn' : '']
+        ['Low Point', d.HAS_OPENING ? App.fmtBal(d.LOW_POINT_BAL) : '', (d.HAS_OPENING && d.LOW_POINT_BAL < 0) ? 'warn' : ''],
+        ['Safe to Spend', d.SAFE_TO_SPEND != null ? App.fmtBal(d.SAFE_TO_SPEND) : '', (d.SAFE_TO_SPEND != null && d.SAFE_TO_SPEND < 0) ? 'warn' : '']
       ], null, d),
       AuditUI.sectionBlock(4, N[3], sx[N[3]], [
         ['Vendors On Terms', d.TOTAL_VENDORS ? d.VENDORS_ON_TERMS + ' of ' + d.TOTAL_VENDORS : '', (d.TOTAL_VENDORS && d.VENDORS_ON_TERMS < d.TOTAL_VENDORS) ? 'warn' : 'good'],

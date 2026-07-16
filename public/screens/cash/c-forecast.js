@@ -38,12 +38,9 @@ S.CashForecast = {
     return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
       + this.CFCOLS + '<thead><tr>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div>';
   },
+  // A NET (a change), where the plus carries meaning. Its sibling for a BALANCE is
+  // App.fmtBal: no plus, minus outside the '$'. Pick by what the number IS.
   signed(v) { return (v < 0 ? '-' : '+') + App.fmtCurrency(Math.abs(v)); },
-  // A BALANCE, not a net: no plus sign on a positive, and the minus belongs OUTSIDE the
-  // dollar sign. App.fmtCurrency is '$' + v.toLocaleString(), so a raw negative renders
-  // "$-3,000". Every branch below that prints a balance under zero only runs WHEN it is
-  // under zero, so those read malformed every single time, lender export included.
-  fmtBal(v) { return (v < 0 ? '-' : '') + App.fmtCurrency(Math.abs(v)); },
   fmtWk(ws) { const d = new Date(ws + 'T00:00:00'); return isNaN(d.getTime()) ? ws : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
 
   render(container, actions) {
@@ -101,7 +98,7 @@ S.CashForecast = {
       } else {
         const runway = fc.runway != null ? (fc.runway === 0 ? 'This week' : fc.runway + ' wk' + (fc.runway === 1 ? '' : 's')) : this.WEEKS + '+ wks';
         items = this.statItem('Runway', runway, fc.runway != null ? 'warn' : '')
-          + this.statItem('Low Point', this.fmtBal(fc.lowPoint.balance), (fc.lowPoint.balance < 0 || fc.lowPoint.balance < opening * 0.25) ? 'warn' : '')
+          + this.statItem('Low Point', App.fmtBal(fc.lowPoint.balance), (fc.lowPoint.balance < 0 || fc.lowPoint.balance < opening * 0.25) ? 'warn' : '')
           + this.statItem('Low-Point Week', this.fmtWk(fc.lowPoint.ws))
           + this.statItem('End of Quarter', App.fmtCurrency(fc.end), fc.end < opening ? 'warn' : '');
       }
@@ -189,7 +186,7 @@ S.CashForecast = {
   lowLine(fc, opening) {
     if (opening == null || !fc.lowPoint) return '';
     const low = fc.lowPoint, credit = fc.credit || 0;
-    const wk = this.fmtWk(low.ws), bal = this.fmtBal(low.balance);
+    const wk = this.fmtWk(low.ws), bal = App.fmtBal(low.balance);
     const wrap = (inner) => '<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px;">' + inner + '</div>'
       + '<div class="pdf-para" style="display:none;">' + inner + '</div>';
     if (low.balance >= 0) {
@@ -268,7 +265,7 @@ S.CashForecast = {
           : onCredit ? ', under zero. Your ' + App.fmtCurrency(credit) + ' credit line covers it, but you would be borrowing to do it.'
           : ', under zero. Even with your credit line you would be ' + App.fmtCurrency(Math.abs(newLow) - credit) + ' short. Free trapped cash or hold it until the runway is longer.';
         verdict = box('<strong style="color:' + headCol + ';">' + head + '</strong> '
-          + 'Your low point goes from ' + this.fmtBal(baseLow) + ' to ' + this.fmtBal(newLow) + tail);
+          + 'Your low point goes from ' + App.fmtBal(baseLow) + ' to ' + App.fmtBal(newLow) + tail);
       }
     }
 
