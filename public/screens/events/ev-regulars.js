@@ -189,7 +189,10 @@ S.EventsRegulars = {
       dropSub: 'Only Name is required; phone, email, birthday, anniversary, and drink preferences come in if your file has them.',
       actionsEl: '#rg-imp-actions',
       fields: [
-        { key: 'name',        label: 'Name',        required: true,  match: ['name', 'guest', 'customer', 'regular', 'full name', 'first name', 'last name', 'contact name', 'patron', 'member', 'member name'] },
+        // Whole phrases only. A bare 'customer' / 'guest' / 'patron' matched the
+        // Customer EMAIL column (every column in these files starts with the same
+        // word), so the book filled with regulars named jen@gmail.com.
+        { key: 'name',        label: 'Name',        required: true,  match: ['name', 'full name', 'first name', 'last name', 'contact name', 'member name', 'customer name', 'guest name', 'patron name', 'regular name'] },
         { key: 'phone',       label: 'Phone',       required: false, match: ['phone', 'mobile', 'cell', 'phone number', 'telephone', 'contact phone', 'mobile number', 'primary phone', 'cell phone'] },
         { key: 'email',       label: 'Email',       required: false, match: ['email', 'e-mail', 'email address', 'e mail', 'contact email', 'primary email'] },
         { key: 'birthday',    label: 'Birthday',    required: false, match: ['birthday', 'birth date', 'dob', 'bday', 'birthdate', 'date of birth'] },
