@@ -127,7 +127,11 @@ S.CashForecast = {
     const pts = fc.rows.map((r, i) => x(i).toFixed(1) + ',' + y(r.balance).toFixed(1)).join(' ');
     const zeroY = y(0).toFixed(1);
     const low = fc.lowPoint, lowNeg = low.balance < 0;
-    const GREEN = '#518A79', RED = '#C1544B', GOLD = '#DBAB46', T4 = '#5A6B77';
+    // SVG can't read the CSS vars, so these mirror the locked palette by hand: --green,
+    // --red, --gold. RED was #C1544B, an off-palette red that matched nothing else in
+    // Bar Cop (App.scoreHex and every other chart use --red). T4 is a solid stand-in
+    // for --t4, which is an rgba token.
+    const GREEN = '#518A79', RED = '#C03828', GOLD = '#DBAB46', T4 = '#5A6B77';
     // Transparent oversized hit circles carry each week's figures for the hover
     // tooltip (wired in wireChart), so the tiny visible dots are easy to land on.
     const hit = fc.rows.map((r, i) =>
