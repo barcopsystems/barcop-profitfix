@@ -171,8 +171,14 @@ function computeProfitAudit(appData, controlData) {
   const spotFlagged = num(cd.spot_check_flagged);
   const wasteTotal = num(cd.waste_total);
   const invCounts = num(cd.inventory_counts) || 0;
-  const shrinkDollar = round0((invVarDollar != null ? Math.abs(invVarDollar) : 0) + (wasteTotal != null ? wasteTotal : 0));
-  const invVarPct = (invVarDollar != null && totalCogsPeriod > 0) ? round1((Math.abs(invVarDollar) / totalCogsPeriod) * 100) : null;
+  // KEEP THE SIGN. ic-report-variance defines salesVar as theoSales - registerSales:
+  // positive = product depleted but never rung (real shrink), negative = you rang MORE
+  // than you depleted, which is a count or a recipe that is off, not theft. Math.abs
+  // here turned a net-favorable variance into shrink, and the narrative then called a
+  // bar that rang $600 MORE than it poured "over-pour, waste, and theft you can see".
+  // A favorable variance adds no shrink: nothing went missing.
+  const shrinkDollar = round0(Math.max(0, invVarDollar || 0) + (wasteTotal != null ? wasteTotal : 0));
+  const invVarPct = (invVarDollar != null && totalCogsPeriod > 0) ? round1((invVarDollar / totalCogsPeriod) * 100) : null;
   const freqRatio = invCounts > 0 ? Math.min(1, invCounts / expectedCounts) : null;
   const countFreq = invCounts <= 0 ? 'Not counted this period'
     : invCounts >= expectedCounts ? 'Weekly'
@@ -182,7 +188,11 @@ function computeProfitAudit(appData, controlData) {
   let s3 = null;
   if (haveShrink) {
     const parts = [];
-    if (invVarPct != null) parts.push(invVarPct <= 1 ? 90 : invVarPct <= 2 ? 70 : invVarPct <= 3 ? 50 : invVarPct <= 5 ? 35 : 20);
+    // Score the MAGNITUDE: a variance is a control failure in either direction, and a
+    // signed -4% would otherwise sail past the <= 1 test and score better than a real
+    // 0.5%. The displayed number keeps its sign; only the grade uses the distance.
+    if (invVarPct != null) { const mag = Math.abs(invVarPct);
+      parts.push(mag <= 1 ? 90 : mag <= 2 ? 70 : mag <= 3 ? 50 : mag <= 5 ? 35 : 20); }
     if (freqRatio != null) parts.push(clampScore(freqRatio * 90 + 10)); // weekly -> 100, monthly-in-4wk -> ~32
     if (spotChecks > 0) {
       const spotScore = (spotVarDollar != null && totalCogsPeriod > 0)
@@ -311,7 +321,7 @@ function computeProfitAudit(appData, controlData) {
 
     // S3 — Shrink & Waste (scored; NO recoverable dollar — it lives in S1/S2)
     S3_SCORE: s3,
-    S3_INV_VARIANCE_DOLLAR: invVarDollar != null ? round0(Math.abs(invVarDollar)) : null,
+    S3_INV_VARIANCE_DOLLAR: invVarDollar != null ? round0(invVarDollar) : null,
     S3_INV_VARIANCE_PCT: invVarPct,
     S3_SPOT_CHECKS: spotChecks || null,
     S3_SPOT_VARIANCE_DOLLAR: spotVarDollar != null ? round0(Math.abs(spotVarDollar)) : null,
