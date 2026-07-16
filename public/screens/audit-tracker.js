@@ -402,7 +402,10 @@ S.AuditTracker = {
         id:            App.uid(),
         date:          App.todayLocal(),
         bar_name:      d.BAR_NAME || App.data.settings.bar_name,
-        overall_score: noData ? null : (d.OVERALL_SCORE || 0),
+        // `|| 0` would turn the server's honest "no score" into a fabricated 0, and this
+        // noData gate is a different test than the server's section gates, so they can
+        // disagree. Null in, null through.
+        overall_score: (noData || d.OVERALL_SCORE == null) ? null : d.OVERALL_SCORE,
         grade:         d.DATA_TIER_LABEL || '',
         audit_period:  d.AUDIT_PERIOD || '',
         audit_id:      d.AUDIT_ID || '',

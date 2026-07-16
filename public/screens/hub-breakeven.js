@@ -225,8 +225,17 @@ S.HubBreakEven = {
       + '</div></div>';
 
     // ── 4. The Nut (2nd to last) ───────────────────────────────────────────
+    // Normalize every bill to a MONTHLY figure by its frequency, exactly as annualOpex
+    // does. Summing raw amounts printed a quarterly bill at 4x and an annual one at 12x
+    // its real monthly cost under a "Per Month" heading (a $12k annual insurance policy
+    // read as a $12k monthly bill), and the rows then visibly did not add up to their own
+    // Total, which was frequency-correct all along.
     const byCat = {};
-    c.recurring.forEach(r => { const k = r.category || 'Other'; byCat[k] = (byCat[k] || 0) + (parseFloat(r.amount) || 0); });
+    c.recurring.forEach(r => {
+      const k = r.category || 'Other';
+      const perYear = r.frequency === 'quarterly' ? 4 : r.frequency === 'annual' ? 1 : 12;
+      byCat[k] = (byCat[k] || 0) + ((parseFloat(r.amount) || 0) * perYear / 12);
+    });
     const salRow = c.weeklySalaried > 0
       ? '<tr><td><div class="val">Salaried Labor</div></td><td>' + f2(c.salariedMonthly) + '</td><td class="val">' + f2(c.weeklySalaried) + '</td><td></td></tr>'
       : '';
