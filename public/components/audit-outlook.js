@@ -117,7 +117,12 @@ window.AuditOutlook = {
 
   _cashOutlook(audit) {
     const d = audit.raw || {};
-    const m = (v) => v == null ? 'n/a' : '$' + Math.round(v).toLocaleString('en-US');
+    // Negative-safe BALANCE format: the minus goes outside the '$', no plus on a
+    // positive. Two of the three things m() renders can go under zero (the low point,
+    // and Safe to Spend, whose own line branches on < 0 so it printed "$-2,340" every
+    // time it fired). The rest (trapped cash, dead stock, over par) are never
+    // negative, so they read exactly as before.
+    const m = (v) => v == null ? 'n/a' : (v < 0 ? '-' : '') + '$' + Math.round(Math.abs(v)).toLocaleString('en-US');
     const paras = [];
 
     // 1 — the survival read
