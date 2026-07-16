@@ -158,7 +158,12 @@ S.RevenueAudit = {
     catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
 
     const d = audit.raw || audit;
-    const overall = audit.overall_score || 0;
+    // Null is "not enough data", never 0: `|| 0` printed "Score 0 (Critical)" in the
+    // exported PDF for an audit the screen correctly showed as N/A. Same leak the Profit
+    // Audit export had.
+    const overall = audit.overall_score;
+    const overallTxt = overall == null ? 'N/A' : String(overall);
+    const overallBand = overall == null ? 'Not enough data yet' : App.scoreLabel(overall);
 
     // Formatters mirror viewAudit() exactly.
     const pct = v => v != null ? v + '%' : '';
@@ -167,13 +172,13 @@ S.RevenueAudit = {
     const yN  = v => v === true ? 'Yes' : v === false ? 'No' : '';
 
     const period = [audit.audit_period, audit.audit_id].filter(Boolean).map(x => String(x)).join('  ·  ');
-    const metaBits = [(audit.date || '').slice(0, 10) || App._pdfDateStamp(), 'Score ' + overall + ' (' + App.scoreLabel(overall) + ')'];
+    const metaBits = [(audit.date || '').slice(0, 10) || App._pdfDateStamp(), 'Score ' + overallTxt + ' (' + overallBand + ')'];
     if (period) metaBits.push(period);
 
     const b = App._pdfBuilder('Revenue Audit');
     b.header({ right: 'Revenue Audit', meta: metaBits.join('   ·   ') });
     b.kv('Bar', audit.bar_name || App.data.settings.bar_name || 'Your Bar');
-    b.kv('Revenue Score', overall + ' of 100  (' + App.scoreLabel(overall) + ')');
+    b.kv('Revenue Score', overall == null ? 'N/A  (Not enough data yet)' : (overall + ' of 100  (' + overallBand + ')'));
     const dq = AuditUI.dataQualityLabel(audit, 5);
     if (dq) b.kv('Data Quality', dq);
     b.kv('Target', String(d.TARGET_SCORE || 70));
