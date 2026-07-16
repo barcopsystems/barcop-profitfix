@@ -35,14 +35,19 @@ S.RecipeCostAnalysis = {
   // One row builder for all three sections, so every column sits in the same
   // place. cost always comes from the canonical App.menuItemCost (recipe, linked
   // product, or manual fallback). opts: { tgt, sub, tag }.
+  // One source for cost / % / target / over: App.menuItemPct, which is what
+  // App.menuItemsOverTarget reads, which is what the IC dashboard's "over target" count
+  // shows. This used to roll its own: it defaulted the target to `target_cost_pct ||
+  // null`, so a LINKED or manual-cost row printed no status at all even though the
+  // dashboard was already counting it as over, and it dropped the canonical 0.05
+  // tolerance, so an item a hair over target read Over here and On target there.
+  // opts: { sub, tag } only. There is deliberately no target override.
   rcaRow(i, opts) {
     opts = opts || {};
-    const cost = App.menuItemCost(i) || 0;
-    const pct  = (i.price > 0 && cost > 0) ? (cost / i.price * 100) : null;
+    const m = App.menuItemPct(i);
+    const cost = m.cost, pct = m.pct, tgt = m.target, over = m.over;
     const margin = (i.price && cost) ? (i.price - cost) : null;
-    const tgt = opts.tgt != null ? opts.tgt : (i.target_cost_pct || null);
     const hasStatus = (tgt != null && pct != null);
-    const over = hasStatus && pct > tgt;
     const tagS = opts.tag ? ' <span style="font-size:9px;color:var(--t3);">' + opts.tag + '</span>' : '';
     const subS = opts.sub ? '<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">' + opts.sub + '</div>' : '';
     const statusS = hasStatus
@@ -94,17 +99,20 @@ S.RecipeCostAnalysis = {
     const linked      = items.filter(i => !hasRecipeFn(i) && !!i.linked_product_id);
     const noRecipe    = items.filter(i => !hasRecipeFn(i) && !i.linked_product_id);
 
-    // Rank items WITH recipes by recipe cost % vs target (over-target first).
+    // Rank items WITH recipes by recipe cost % vs target (over-target first), off the
+    // same App.menuItemPct the rows and the dashboard read.
     const ranked = withRecipe.map(i => {
-      const cost = App.menuItemCost(i) || 0;
-      const tgt  = i.target_cost_pct || (i.recipe.mode === 'food' ? App.MENU_TARGET_COST_PCT.plate : App.MENU_TARGET_COST_PCT.cocktail);
-      const pct  = i.price > 0 ? (cost / i.price * 100) : null;
-      const over = pct != null && pct > tgt;
-      const gap  = (pct != null && over) ? (pct - tgt) : 0;
-      return { item: i, cost, tgt, pct, over, gap };
+      const m = App.menuItemPct(i);
+      return { item: i, cost: m.cost, tgt: m.target, pct: m.pct, over: m.over,
+               gap: (m.pct != null && m.over) ? (m.pct - m.target) : 0 };
     }).sort((a, b) => (b.over === a.over ? (b.gap - a.gap) : (b.over - a.over)));
 
-    const overCount = ranked.filter(r => r.over).length;
+    // EVERY item over target, not just the ones with recipes: App.menuItemsOverTarget is
+    // the canonical count and the IC dashboard shows it, so scoping this to withRecipe
+    // read 1 where the dashboard read 3 for the same menu. A linked or manual-cost item
+    // can be over target too, and now shows its status in its own section below, so this
+    // number and the red rows on the page agree.
+    const overCount = App.menuItemsOverTarget().length;
 
     // ── Stat strip — counts that map to the three groups below ──────────
     const stat = (label, val, cls) =>
@@ -119,7 +127,9 @@ S.RecipeCostAnalysis = {
 
     // ── Items With Recipes (over-target first) ──────────────────────────
     const rankedRows = ranked.map(r =>
-      this.rcaRow(r.item, { tgt: r.tgt, sub: r.item.recipe.mode === 'food' ? 'Food Plate' : 'Single Drink' })
+      // No tgt passed: rcaRow reads it off App.menuItemPct, the one source, so a row
+      // cannot be scored against a different target than the count above it.
+      this.rcaRow(r.item, { sub: r.item.recipe.mode === 'food' ? 'Food Plate' : 'Single Drink' })
     ).join('') || '<tr><td colspan="9" style="color:var(--t3);text-align:center;padding:14px;">No menu items have recipes attached yet.</td></tr>';
 
     // The .sh prints; Export PDF is no-print so it stays out of the PDF.
