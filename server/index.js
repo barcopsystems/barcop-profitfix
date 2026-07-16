@@ -305,6 +305,22 @@ const supabaseAdmin = createClient(
   { realtime: { transport: ws } }
 );
 
+// ── Demo visit counter ────────────────────────────────────────────────────────
+// The public live demo only. No account, no user, no IP: vid is a random id the
+// browser keeps in localStorage, so DISTINCT visitor_id = individual visitors and
+// the row count = demo views. Never throws — a counter must not break the demo.
+app.post('/api/demo-visit', async (req, res) => {
+  try {
+    const vid = String((req.body && req.body.vid) || '').trim().slice(0, 64);
+    if (!vid) return res.json({ ok: false });
+    const ref = String((req.body && req.body.ref) || '').trim().slice(0, 300) || null;
+    await supabaseAdmin.from('demo_visits').insert({ visitor_id: vid, referrer: ref });
+    res.json({ ok: true });
+  } catch (e) {
+    res.json({ ok: false });
+  }
+});
+
 // Best-effort "Welcome to Bar Cop" email, sent from the checkout webhook once a NEW
 // subscriber is active (on top of Stripe's own receipt). Never throws — a failed or
 // unconfigured send must not break account provisioning.
