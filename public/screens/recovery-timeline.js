@@ -153,7 +153,13 @@ S.RecoveryTimeline = {
     const B = R.BASELINE_WEEKS;
     mine.forEach(e => {
       const m = R.METRICS[e.gap_id];
+      // The base has to follow the value, exactly as Recovery.compute pairs them:
+      // recoverValue (hourly labor %) is measured against bar+food, so it dollarizes
+      // against recoverBase. Pairing it with `base` (total sales, what the blended %
+      // is measured against) would overstate this chart past the Scoreboard headline
+      // sitting on the same screen.
       const vf = m.recoverValue || m.value;
+      const bf = m.recoverBase || m.base;
       const op = R._series(m.series)
         .filter(w => w.period_end && w.period_end >= e.date && vf(w) != null)
         .slice().sort((a, b) => a.period_end.localeCompare(b.period_end));
@@ -167,7 +173,7 @@ S.RecoveryTimeline = {
       const gapWeeks = {};
       let gapTotal = 0;
       op.slice(B).forEach(w => {
-        const v = vf(w), base = m.base(w);
+        const v = vf(w), base = bf(w);
         if (v == null || base == null) return;
         const imp = m.lowerBetter ? (bAvg - v) : (v - bAvg);
         const d = (m.baseKind === 'pts') ? (imp / 100) * base : imp * base;
