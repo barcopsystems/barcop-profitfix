@@ -547,7 +547,9 @@ S.RevenueMenuEngineering = {
     let flash = '';
     if (fl) {
       flash = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.updated ? 'var(--gold)' : 'var(--red)') + ';">'
-        + (fl.updated ? 'Updated units sold on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's') + '.' : 'No items matched. Check that the item names in your export match your menu.')
+        + (fl.failed ? 'Save failed. Try the import again.'
+           : fl.updated ? 'Updated units sold on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's') + '.'
+           : 'No items matched. Check that the item names in your export match your menu.')
         + '</div>'
         + (fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in Menu Builder or rename to match.</div>' : '');
     }
@@ -574,9 +576,14 @@ S.RevenueMenuEngineering = {
   async applyCoversImport(rows) {
     // One ingest path: PosIngest matches by name + upserts weekly_covers.
     const { toAdd, skipped } = PosIngest.build('pmix', rows);
-    let updated = 0;
-    if (toAdd.length) { await PosIngest.commit('pmix', toAdd); updated = toAdd.length; }
-    this._coversFlash = { updated, unmatched: skipped.filter(s => s && s !== '(blank)') };
+    let updated = 0, failed = false;
+    if (toAdd.length) {
+      // Honor the commit result: discarding it reported "Updated units sold on N items"
+      // after a save that was rejected and rolled back.
+      const ok = await PosIngest.commit('pmix', toAdd);
+      if (ok) updated = toAdd.length; else failed = true;
+    }
+    this._coversFlash = { updated, failed, unmatched: skipped.filter(s => s && s !== '(blank)') };
     this.draw();
   },
 

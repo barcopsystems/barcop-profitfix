@@ -320,7 +320,9 @@ S.RevenueAudit = {
         id:            App.uid(),
         date:          App.todayLocal(),
         bar_name:      d.BAR_NAME || App.data.settings?.bar_name || '',
-        overall_score: noData ? null : (d.OVERALL_SCORE || 0),
+        // Null in, null through: `|| 0` would turn the server's honest "no score" into
+        // a fabricated 0. Same reason as the profit audit.
+        overall_score: (noData || d.OVERALL_SCORE == null) ? null : d.OVERALL_SCORE,
         grade:         d.DATA_TIER_LABEL || '',
         audit_period:  d.AUDIT_PERIOD || '',
         audit_id:      d.AUDIT_ID || '',

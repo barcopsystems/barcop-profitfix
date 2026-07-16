@@ -365,10 +365,20 @@ S.RevenueServerCheck = {
   _impFlashHtml() {
     const fl = this._impFlash; this._impFlash = null;
     if (!fl) return '';
-    return '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.added ? 'var(--gold)' : 'var(--red)') + ';">'
-      + (fl.added ? fl.added + ' server check' + (fl.added === 1 ? '' : 's') + ' imported.' : 'No rows imported. Check that the file has server, covers, and sales columns.')
-      + '</div>'
-      + (fl.unmatched && fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched to your roster: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in the Staff Roster or rename to match.</div>' : '');
+    // Say what actually happened. This used to print the file-is-wrong message for every
+    // zero-row outcome, so re-dropping a good report whose rows were already logged read
+    // as "check that the file has server, covers, and sales columns".
+    let head;
+    if (fl.failed)      head = 'Save failed. Try the import again.';
+    else if (fl.added)  head = fl.added + ' server check' + (fl.added === 1 ? '' : 's') + ' imported'
+                               + (fl.dupCount ? ', ' + fl.dupCount + ' already logged' : '') + '.';
+    else if (fl.dupCount) head = 'No new checks. All ' + fl.dupCount + ' row' + (fl.dupCount === 1 ? ' was' : 's were') + ' already logged.';
+    else                head = 'No rows imported. Check that the file has server, covers, and sales columns.';
+    const note = t => '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">' + t + '</div>';
+    const list = a => a.slice(0, 8).map(esc).join(', ') + (a.length > 8 ? ', and ' + (a.length - 8) + ' more' : '');
+    return '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + ((fl.added && !fl.failed) ? 'var(--gold)' : (fl.dupCount && !fl.failed) ? 'var(--t2)' : 'var(--red)') + ';">' + head + '</div>'
+      + (fl.unmatched && fl.unmatched.length ? note('Not matched to your roster: ' + list(fl.unmatched) + '. Add them in the Staff Roster or rename to match.') : '')
+      + (fl.incomplete && fl.incomplete.length ? note('Skipped, no covers or sales rung: ' + list(fl.incomplete) + '. These are on your roster, nothing to fix.') : '');
   },
   mountServerImport() {
     const el = document.getElementById('rsc-imp-csv');
@@ -383,10 +393,20 @@ S.RevenueServerCheck = {
     });
   },
   async applyServerImport(rows) {
-    const { toAdd, skipped } = PosIngest.build('server', rows);
-    let added = 0;
-    if (toAdd.length) { await PosIngest.commit('server', toAdd); added = toAdd.length; }
-    this._impFlash = { added, unmatched: (skipped || []).filter(s => s && s !== '(blank)') };
+    const { toAdd, skipped, incomplete, dupCount } = PosIngest.build('server', rows);
+    let added = 0, failed = false;
+    if (toAdd.length) {
+      // Honor the commit result. Discarding it reported "N server checks imported" in
+      // gold after a save the server rejected and reverted (viewer role), while the
+      // scorecard right below re-rendered with no new rows.
+      const ok = await PosIngest.commit('server', toAdd);
+      if (ok) added = toAdd.length; else failed = true;
+    }
+    this._impFlash = {
+      added, failed, dupCount: dupCount || 0,
+      unmatched: (skipped || []).filter(s => s && s !== '(blank)'),
+      incomplete: (incomplete || []).filter(s => s && s !== '(blank)')
+    };
     this.draw();
   },
 
