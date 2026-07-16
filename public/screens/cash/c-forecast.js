@@ -204,7 +204,11 @@ S.CashForecast = {
       const tg = r.net < 0;
       const isLow = i === fc.lowIdx && opening != null;
       const wk = this.fmtWk(r.ws) + (i === 0 ? ' <span style="color:var(--gold);font-weight:700;font-size:9px;letter-spacing:.5px;">NOW</span>' : '') + (isLow ? ' <span style="color:var(--gold);font-weight:700;font-size:9px;letter-spacing:.5px;">LOW</span>' : '');
-      const rowBg = (opening != null && r.balance < 0) ? 'background:rgba(193,84,75,0.07);' : (tg ? 'background:rgba(193,84,75,0.04);' : '');
+      // rgb(192,56,40) = #C03828 = --red. This was rgba(193,84,75,...), which is the
+      // retired off-palette #C1544B: the RED constant above got moved to the real token
+      // and this tint was missed, so the rows tinted in one red under a curve drawn in
+      // another.
+      const rowBg = (opening != null && r.balance < 0) ? 'background:rgba(192,56,40,0.07);' : (tg ? 'background:rgba(192,56,40,0.04);' : '');
       return '<tr style="' + rowBg + '"><td data-label="Week" style="color:var(--t1);">' + wk + '</td>'
         + '<td data-label="In" class="val">' + App.fmtCurrency(r.inflow) + '</td>'
         + '<td data-label="Out" class="val">' + App.fmtCurrency(r.out) + '</td>'
