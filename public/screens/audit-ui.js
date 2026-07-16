@@ -179,6 +179,13 @@ const AuditUI = {
     const scored = Object.keys((a && a.sections) || {}).length;
     const t = total || scored;
     if (!t) return null;
+    // Nothing scored is not "limited", it is NONE. "Limited data" implies some data
+    // got through; an audit with zero scored sections has none and its overall_score
+    // is null, so the badge sat one line under "Profit Score: N/A (Not enough data
+    // yet)" in the exported PDF and contradicted it. This is also the branch that
+    // makes the projection above honest: projectedQuality promises "Not enough data"
+    // at zero ready, and without this the post-run badge could never produce it.
+    if (!scored) return { label: 'Not enough data', color: 'var(--t3)' };
     if (scored >= t)   return { label: 'Full data',    color: 'var(--green)' };
     if (scored*2 >= t) return { label: 'Partial data', color: 'var(--amber)' };
     return { label: 'Limited data', color: 'var(--t3)' };
