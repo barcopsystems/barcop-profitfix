@@ -634,7 +634,8 @@ S.HubYearEnd = {
     rows.push(['Month', 'Hours', 'OT Hours', 'Wages', 'Revenue', 'Labor %', 'RPLH']);
 
     const inYear = (d) => d && String(d).slice(0, 4) === year;
-    const yearActuals = (App.laborData?.lc_actuals || []).filter(a => inYear(a.date));
+    const allActuals = (App.laborData?.lc_actuals || []);
+    const yearActuals = allActuals.filter(a => inYear(a.date));
     const yearShifts = (App.shiftData?.sc_shifts || []).filter(s => inYear(s.date));
 
     let totalHours = 0, totalOt = 0, totalWages = 0, totalRev = 0;
@@ -644,31 +645,37 @@ S.HubYearEnd = {
       const monthActuals = yearActuals.filter(a => String(a.date).slice(0, 7) === mk);
       const monthShifts  = yearShifts.filter(s => String(s.date).slice(0, 7) === mk);
 
-      // Per-staff/per-week OT calc: sum hours per staff per week, anything over 40 = OT
-      let mHours = 0, mOt = 0, mWages = 0;
-      const byStaffWeek = {};
+      const mLastDay = new Date(parseInt(year, 10), m, 0).getDate();
+      const mStart = mk + '-01', mEnd = mk + '-' + String(mLastDay).padStart(2, '0');
+
+      // Straight time from each row's OWN cost. This used to capture one wage off the
+      // first row of a staff-week and cost the whole week at it, which is wrong for a
+      // cross-trained cook picking up a shift at a second-position rate, or anyone who
+      // got a raise mid-week. lc_actuals carry straight time only; the premium is added
+      // below (reg x w + ot x w x 1.5 is just hours x w + the 0.5x premium).
+      let mHours = 0, mWages = 0;
       monthActuals.forEach(a => {
         const hrs = parseFloat(a.hours) || 0;
         mHours += hrs;
         // Salaried (exempt): hours count as coverage, but pay is the fixed
         // salary added below, never hours * wage and never overtime.
         if (App.isSalaried(a.staff_id)) return;
-        const wage = parseFloat(a.wage) || (typeof App.wageForStaffOn === 'function' ? (App.wageForStaffOn(a.staff_id, a.date) || 0) : 0);
-        const key = (a.staff_id || a.name || '') + '|' + this._weekKeyFor(a.date);
-        if (!byStaffWeek[key]) byStaffWeek[key] = { hours: 0, wage: wage };
-        byStaffWeek[key].hours += hrs;
-        // wages computed from per-week OT below
+        mWages += parseFloat(a.cost) || (hrs * (parseFloat(a.wage) || 0));
       });
-      Object.values(byStaffWeek).forEach(b => {
-        const reg = Math.min(40, b.hours);
-        const ot  = Math.max(0, b.hours - 40);
-        mOt += ot;
-        mWages += reg * b.wage + ot * b.wage * 1.5;
-      });
+      // Overtime is a WEEKLY threshold, so it is measured over whole Mon-Sun weeks from
+      // the FULL history and only then allocated to this month. Bucketing the
+      // month-filtered rows split every straddling week into two part-weeks and tested
+      // each against 40 on its own, so neither reached it: max(0,a-40) + max(0,b-40) is
+      // always <= max(0,a+b-40), which means it could only ever UNDER-report. Up to 11
+      // straddling weeks a year, on a tax-facing sheet whose own footer promises the
+      // overtime is computed per staff per week. Reading the unfiltered actuals also
+      // keeps the week straddling Dec 31 whole across both years' sheets.
+      const otM = App.otPremiumInWindow(allActuals, mStart, mEnd);
+      const mOt = otM.hours;
+      mWages += otM.total;
       // Salaried (exempt) staff: fixed monthly salary (annual/52 by the weeks
       // the month spans), no overtime.
-      const mLastDay = new Date(parseInt(year, 10), m, 0).getDate();
-      mWages += App.salariedCost(mk + '-01', mk + '-' + String(mLastDay).padStart(2, '0')).total;
+      mWages += App.salariedCost(mStart, mEnd).total;
       const mRev = monthShifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
       const laborPct = mRev ? (mWages / mRev) : null;
       const rplh = mHours ? (mRev / mHours) : null;
@@ -682,7 +689,7 @@ S.HubYearEnd = {
       totalRev ? (totalWages / totalRev) : null,
       totalHours ? (totalRev / totalHours) : null]);
 
-    this._pushFooter(rows, merges, 'Hours and wages from Labor Control logged actuals. Overtime computed per staff per week (hours over 40 = OT, paid at 1.5x base wage). Revenue from Shift Control shifts (bar and food only, excluding catering and ancillary), so Labor % and RPLH here can differ from the Annual Summary and P&L by Month sheets, which measure against net sales. RPLH = Revenue per Labor Hour. These wages are recomputed from logged hours and may not exactly match Total Labor on those sheets, which use your weekly booked labor.', COL_COUNT);
+    this._pushFooter(rows, merges, 'Hours and wages from Labor Control logged actuals. Overtime computed per staff per whole Mon-Sun week (hours over 40 = OT, paid at 1.5x the rate those hours were logged at), then allocated to the month by the share of that week worked in it, so a week spanning two months is never split and tested against 40 twice. Revenue from Shift Control shifts (bar and food only, excluding catering and ancillary), so Labor % and RPLH here can differ from the Annual Summary and P&L by Month sheets, which measure against net sales. RPLH = Revenue per Labor Hour. These wages are recomputed from logged hours and may not exactly match Total Labor on those sheets, which use your weekly booked labor.', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
@@ -699,17 +706,10 @@ S.HubYearEnd = {
     return this._finishSheet(ws, rows.length, merges, COL_WIDTHS);
   },
 
-  _weekKeyFor(dateStr) {
-    if (!dateStr) return '';
-    const d = new Date(String(dateStr).length <= 10 ? dateStr + 'T00:00:00' : dateStr);
-    if (isNaN(d.getTime())) return '';
-    // Monday-start week
-    const day = d.getDay();
-    const diff = (day + 6) % 7; // shift Sunday=0 to 6
-    const ws = new Date(d);
-    ws.setDate(d.getDate() - diff);
-    return App.ymdLocal(ws);
-  },
+  // (_weekKeyFor removed 2026-07-16: its only caller bucketed month-filtered rows,
+  //  which is exactly the bug. Overtime now goes through App.otPremiumInWindow, which
+  //  buckets whole Mon-Sun weeks off the unfiltered actuals. Use that, not a local
+  //  week key over a pre-filtered set.)
 
   // ── Sheet 5 — Tip Allocation (Form 8027 Worksheet, annual) ───────────────
   _buildTipAllocation(year) {
