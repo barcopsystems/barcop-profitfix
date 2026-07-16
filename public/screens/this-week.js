@@ -110,9 +110,12 @@ S.ThisWeek = {
     const wkRows = [];
     actuals.forEach(a => {
       if (!a.date || a.date < start || a.date > periodEnd) return;
+      // EVERY row this week feeds the overtime test, event days included: overtime is
+      // a weekly, whole-person threshold, so an offsite Saturday still counts toward
+      // that person's 40. Only the Bar/Food money split skips event rows (below).
+      wkRows.push(a);
       if (evKeys.has(a.staff_id + '|' + String(a.date).slice(0, 10))) return;
       any = true;
-      wkRows.push(a);
       if (posDept[a.position_id] === 'Bar') bar += a.cost || 0;
       else food += a.cost || 0;
     });
@@ -120,11 +123,23 @@ S.ThisWeek = {
     // (straight time only), so add it here or the booked weekly P&L and prime cost
     // understate labor exactly on the weeks someone runs into overtime. Split it
     // across Bar/Food by their share of this week's hourly cost, same as salary.
+    // It is measured on wkRows = the FULL week. Measuring it on the bar/food rows
+    // alone tested a partial week: a bartender with 35 floor hours plus a 10-hour
+    // offsite event read 35, drew no premium, and the event day came back through
+    // cateringFromBookings at straight time, so the premium vanished from the week
+    // entirely. r-this-week.laborFeed has always run OT over all rows; the two feeds
+    // disagreed on the same week.
+    // The premium lands on Bar/Food because it is a payroll consequence of the whole
+    // week's schedule, not a cost of one booking: a weekly threshold cannot be
+    // attributed to a single event, which is why EB.bookingLabor stays straight time
+    // and the per-event margin on the Events screen must not move. Prime cost sums
+    // every line, so the week's total is right either way.
     const otPrem = App.otPremiumForRows ? App.otPremiumForRows(wkRows).total : 0;
     if (otPrem > 0) {
       const h = bar + food;
       if (h > 0) { bar += otPrem * (bar / h); food += otPrem * (food / h); }
       else { food += otPrem; }
+      any = true;   // a real premium means real labor this week, same as salary below
     }
     // Salaried (exempt) pay is fixed weekly labor on top of hourly wages, same as
     // Revenue's feed. Bar Cop can stand behind it (annual / 52), so it belongs in the
