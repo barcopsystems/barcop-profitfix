@@ -342,7 +342,7 @@ S.InventoryTakeInventory = {
 
     const grp = groups[this.locStep];
     const total = groups.reduce((s, g) => s + g.products.length, 0);
-    const done = Object.keys(this.draft.counts).length;
+    const done = this._countedTotal();
     const pct = total ? Math.round(done / total * 100) : 0;
     const isLast = this.locStep === groups.length - 1;
 
@@ -589,7 +589,7 @@ S.InventoryTakeInventory = {
 
   updateProgress() {
     const total = this.groups().reduce((s, g) => s + g.products.length, 0);
-    const done = Object.keys(this.draft.counts).length;
+    const done = this._countedTotal();
     const txt = document.getElementById('ti-prog-txt');
     const bar = document.getElementById('ti-prog-bar');
     if (txt) txt.textContent = done + ' of ' + total;
@@ -604,6 +604,20 @@ S.InventoryTakeInventory = {
   // it a full-shelf leak, and the Order Sheet reordered a full par, all off one note.
   _hasCount(e) {
     return !!e && (e.value != null || e.fulls != null || e.cases != null || e.loose != null);
+  },
+  // How many products actually carry a count. Walks the same product-by-location
+  // population the `total` denominator is built from, so the two can never disagree
+  // (and an orphan draft key for a deleted product cannot push it over the total).
+  // The three call sites used Object.keys(this.draft.counts).length, which counts
+  // ENTRIES: typing a note creates an entry from the note alone, so a note-only product
+  // read as counted. That inflated the progress bar and put "Counted 12" directly above
+  // "1 of 12 products were not counted" on the review screen, which reads off _hasCount.
+  _countedTotal() {
+    let n = 0;
+    this.groups().forEach(g => g.products.forEach(p => {
+      if (this._hasCount(this.draft.counts[p.id + '@@' + g.location])) n++;
+    }));
+    return n;
   },
 
   // ── Review ────────────────────────────────────────────────────────────────
@@ -642,7 +656,9 @@ S.InventoryTakeInventory = {
   renderReview() {
     const rows = this.rows();
     const totalValue = rows.reduce((s, r) => s + (r.value || 0), 0);
-    const counted = Object.keys(this.draft.counts).length;
+    // Same basis as the uncounted banner right below, which reads off _hasCount. These
+    // two sat on one screen disagreeing: "Counted 12" above "1 of 12 were not counted".
+    const counted = this._countedTotal();
 
     // Silent-zero guardrail: any product with no entry submits as 0. Flag them
     // so a skipped shelf is never recorded as empty by accident.
