@@ -339,6 +339,12 @@ const ConfirmWeek = {
       period_end: pe,
       bar_revenue: f.bRev,
       floor_revenue: f.fRev,
+      // Carried so Recovery can dollarize labor_pct_blended against the denominator it
+      // was actually measured with (total sales). Without these the record could only
+      // reach bar+food, and a point of a total-sales % dollarized against bar+food ran
+      // light by exactly catering's and ancillary's share. See recovery.js _rTotSales.
+      catering_revenue: f.cRev,
+      other_revenue: f.oRev,
       covers: f.covers,
       check_avg: r2(f.checkAvg),
       total_labor_cost: f.laborCost,
