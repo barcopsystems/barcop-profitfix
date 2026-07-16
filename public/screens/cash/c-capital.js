@@ -48,12 +48,20 @@ S.CashCapital = {
       return;
     }
 
+    // "Average" is load-bearing, not padding. capitalByCategory prefers avgCategoryValue(4)
+    // over the current perpetual value, because turns and GMROI are only honest against
+    // AVERAGE inventory (that math is right and stays). But the old present-tense label,
+    // "Capital On the Shelf", sold that average as what is on the shelf right now. Trapped
+    // Cash on c-trapped IS a right-now number (it reads onHand()), so on a bar whose stock
+    // is building, the two screens contradicted each other: $4,200 of trapped cash reported
+    // inside $3,750 of capital, a subset bigger than its whole. Keep the label on the same
+    // basis as the number, and keep the card derivable: turns = annual COGS / this figure.
     const stats = this.statsCard(
-      this.statItem('Capital On the Shelf', App.fmtCurrency(cap.totalCap))
+      this.statItem('Average Capital On the Shelf', App.fmtCurrency(cap.totalCap))
       + this.statItem('Blended Turns', cap.turns != null ? cap.turns.toFixed(1) + 'x' : '-')
       + this.statItem('Weeks On Hand', cap.turns != null && cap.turns > 0 ? (52 / cap.turns).toFixed(1) + 'w' : '-'));
 
-    const headers = '<th>Category</th><th>Capital</th><th>Turns/yr</th><th>Weeks</th><th>Verdict</th>';
+    const headers = '<th>Category</th><th>Avg Capital</th><th>Turns/yr</th><th>Weeks</th><th>Verdict</th>';
     const rows = cap.rows.map(r => {
       const [vl, vc] = this.verdict(r.gmroi);
       return '<tr><td style="color:var(--t1);">' + esc(r.cat) + '</td>'
