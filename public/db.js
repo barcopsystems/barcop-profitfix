@@ -946,7 +946,11 @@ const DB = {
         return { ok: true };
       } catch (e) { queue(); return { ok: false, queued: true, error: e }; }
     }
-    return { ok: true }; // local-only mode: App keeps the in-memory array
+    // No client and not demo: nothing was written and nothing would survive a reload,
+    // so never claim success here. App.start() refuses to boot into this state at all
+    // (see _bootUnavailable), which is why this is now only a backstop: reporting the
+    // failure makes App.putRecord revert the row instead of showing a phantom save.
+    return { ok: false, error: 'No connection to Bar Cop.' };
   },
 
   async removeEvent(table, kind, id) {
@@ -972,7 +976,8 @@ const DB = {
         return { ok: true };
       } catch (e) { queue(); return { ok: false, queued: true, error: e }; }
     }
-    return { ok: true };
+    // Same as putEvent: no client and not demo means the delete never happened.
+    return { ok: false, error: 'No connection to Bar Cop.' };
   },
 
   // Seed / bulk-write many rows for a kind in one request. Same offline + error

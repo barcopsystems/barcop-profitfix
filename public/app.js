@@ -322,9 +322,15 @@ const App = {
       await this.startDemo();
       return;
     }
+    // No SUPABASE_URL means DB.init found no Supabase client, i.e. the library never
+    // loaded. There is no local-only mode worth booting into: putEvent returns ok
+    // without writing, _configBlob strips every event array back out of the blob it
+    // does write, and loadEvents reads a cache nothing ever filled. A GM could work a
+    // whole shift (drawer, voids, counts, hours, close the week), see every save
+    // succeed, reload, and find all of it gone, with no error and nothing to recover.
+    // Stop and say so instead of serving a convincing fake.
     if (!window.SUPABASE_URL) {
-      await this.loadAllData();
-      this.boot();
+      this._bootUnavailable();
       return;
     }
     // Check if this is a password recovery OR invite link before checking session.
@@ -428,6 +434,23 @@ const App = {
      Settings and the two email forms (Report a Bug / Contact Support), which are
      gated via demoBlock() so a visitor can't rename the bar or reach our inbox. */
   demoMode: false,
+
+  // Hard stop when Bar Cop cannot reach its backend at boot (see the SUPABASE_URL gate
+  // in start()). Reuses the auth card so it reads as Bar Cop, not a browser error.
+  _bootUnavailable() {
+    const scr = document.getElementById('auth-screen');
+    document.getElementById('app')?.classList.add('hidden');
+    if (!scr) { document.body.textContent = 'Bar Cop could not load. Check your connection and reload.'; return; }
+    scr.style.display = 'flex';
+    scr.innerHTML = '<div class="auth-view" style="display:block;"><div class="auth-card">'
+      + '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
+      + '<div class="auth-heading">Bar Cop could not load</div>'
+      + '<div class="auth-sub">Your connection, or something on your network blocking scripts, stopped part of Bar Cop from loading. Nothing you entered right now would reach your account, so Bar Cop stopped here rather than let you work a shift into a hole.</div>'
+      + '<div class="auth-inputs"><button class="btn btn-primary" id="boot-retry" style="width:100%;">Try Again</button></div>'
+      + '<div class="auth-sub" style="margin-top:14px;">Your data is safe on your account. If this keeps happening, try another network or email support@barcop.com.</div>'
+      + '</div></div>';
+    document.getElementById('boot-retry')?.addEventListener('click', () => location.reload());
+  },
 
   async startDemo() {
     this.demoMode = true;
@@ -615,7 +638,7 @@ const App = {
     const bar = document.createElement('div');
     bar.id = 'viewer-banner';
     bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9400;background:rgba(20,20,20,0.92);color:var(--gold);border-bottom:1px solid var(--gold);text-align:center;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 10px;';
-    bar.textContent = 'Viewer access — read-only';
+    bar.textContent = 'Viewer access, read-only';
     document.body.appendChild(bar);
   },
 
@@ -5925,7 +5948,14 @@ const App = {
     if (!startDate || !endDate) return out;
     const sd = new Date(startDate + 'T00:00:00'), ed = new Date(endDate + 'T00:00:00');
     if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return out;
-    const days = Math.floor((ed.getTime() - sd.getTime()) / 86400000) + 1;
+    // ROUND, not floor. These are local midnights, so a span containing the March
+    // spring-forward Sunday is one hour short of a whole number of days and floor()
+    // silently dropped a day: March came out 30 days, and every salaried figure on the
+    // annual workbook, the cash forecast and the audit window read low. Mon-Sun weekly
+    // rollups were never hit (the 2am change lands after the Sunday-00:00 anchor), so
+    // this only ever bit the month and rolling-window callers. Fall-back adds an hour,
+    // which round() absorbs the same way.
+    const days = Math.round((ed.getTime() - sd.getTime()) / 86400000) + 1;
     if (days <= 0) return out;
     const weeks = days / 7;
     const posDept = {};

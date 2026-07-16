@@ -324,29 +324,44 @@ window.CashEngine = {
     if (sched && Array.isArray(sched.shifts) && sched.shifts.length) {
       const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       let cost = 0;
+      const rows = [];
       sched.shifts.forEach(sh => {
         if (!sh.staff_id || !sh.start || !sh.end) return;
         const di = DAYS.indexOf(sh.day);
         const date = di >= 0 ? this._addDays(ws, di) : ws;
         const wage = App.wageForStaffOn ? App.wageForStaffOn(sh.staff_id, date) : 0;
-        cost += this._hoursOf(sh.start, sh.end) * wage;
+        const hours = this._hoursOf(sh.start, sh.end);
+        const shCost = hours * wage;
+        rows.push({ staff_id: sh.staff_id, date, hours, cost: shCost });
+        cost += shCost;
       });
+      // Overtime premium, same as Build Schedule's own card: the shift math above is
+      // straight time, so without this the forecast disagrees with the schedule the
+      // operator is looking at, exactly on the weeks someone is posted into overtime.
+      cost += App.otPremiumForRows ? App.otPremiumForRows(rows).total : 0;
       cost += App.salariedCost ? App.salariedCost(ws, this._addDays(ws, 6)).total : 0;
       return { cost, source: 'scheduled' };
     }
-    return { cost: this._trailingWeeklyLabor(ws), source: 'estimated' };
+    return { cost: this._trailingWeeklyLabor(), source: 'estimated' };
   },
-  _trailingWeeklyLabor(beforeYmd) {
+  // A trailing four-week average of what you ACTUALLY paid, always anchored to TODAY.
+  // It used to anchor to the forecast week being priced, so from week 4 out the whole
+  // 28-day window sat in the future, matched no actuals, and returned $0 hourly labor.
+  // The 13-week forecast shed ~80% of payroll on a smooth ramp (nothing looked broken)
+  // while sales kept replaying real weeks, so the balance curve, the low point, the
+  // runway and the lender PDF all read far too optimistic.
+  _trailingWeeklyLabor() {
     const actuals = (App.laborData && App.laborData.lc_actuals) || [];
-    const end = new Date(beforeYmd + 'T00:00:00').getTime();
+    const end = new Date(App.todayLocal() + 'T00:00:00').getTime();
     const start = end - 28 * 86400000;
-    let cost = 0, any = false;
-    actuals.forEach(a => {
-      const t = new Date((a.date || '') + 'T00:00:00').getTime();
-      if (isNaN(t) || t >= end || t < start) return;
-      cost += (a.cost || 0); any = true;
+    const rows = actuals.filter(a => {
+      const t = new Date((a && a.date || '') + 'T00:00:00').getTime();
+      return !isNaN(t) && t < end && t >= start;
     });
-    const hourlyWeekly = any ? cost / 4 : 0;
+    let cost = rows.reduce((s, a) => s + (a.cost || 0), 0);
+    // lc_actuals carry straight time only; add the weekly premium over the same window.
+    cost += App.otPremiumForRows ? App.otPremiumForRows(rows).total : 0;
+    const hourlyWeekly = rows.length ? cost / 4 : 0;
     const wkEnd = App.ymdLocal(new Date(end - 86400000));
     const wkStart = App.ymdLocal(new Date(end - 7 * 86400000));
     const salaried = App.salariedCost ? App.salariedCost(wkStart, wkEnd).total : 0;
