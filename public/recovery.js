@@ -39,6 +39,29 @@ window.Recovery = {
   _rtargets() { return ((App.data.revenue_settings || {}).targets) || {}; },
   _checkAvg() { return Recovery._rtargets().check_avg ?? 35; },
 
+  /* THE BASE RULE: a metric's `base` must be the DENOMINATOR its `value` was
+     measured against, because a point of a % is worth exactly denominator/100.
+     Pair a % with the wrong base and every dollar it produces is off by the ratio
+     of the two. See [[labor-cost-model]] DENOMINATORS before touching either side. */
+
+  // Total sales for a profit `week`: bar + food + catering + ancillary. The same
+  // denominator confirm-week.js divides prime_cost_pct by, and the Books tie.
+  _totSales(w) {
+    const n = v => parseFloat(v) || 0;
+    return n(w.bar && w.bar.revenue) + n(w.food && w.food.revenue)
+         + n(w.catering && w.catering.revenue) + n(w.other && w.other.revenue);
+  },
+  // Total sales for a `revenue_week`. catering_revenue/other_revenue were added
+  // 2026-07-16 so this base could reach the denominator labor_pct_blended actually
+  // uses. A row saved before that carries neither, so fall back to bar+floor, which
+  // is what the base was for every row until now: an old row cannot get worse.
+  _rTotSales(w) {
+    const n = v => parseFloat(v) || 0;
+    const fb = n(w.bar_revenue) + n(w.floor_revenue);
+    return (w.catering_revenue == null && w.other_revenue == null)
+      ? fb : fb + n(w.catering_revenue) + n(w.other_revenue);
+  },
+
   METRICS: {
     'pour-cost': {
       series: 'weeks', label: 'Bar Pour Cost', lowerBetter: true,
@@ -57,7 +80,10 @@ window.Recovery = {
     'prime-cost': {
       series: 'weeks', label: 'Prime Cost', lowerBetter: true,
       value: w => w.prime_cost_pct,
-      base:  w => (w.bar ? w.bar.revenue || 0 : 0) + (w.food ? w.food.revenue || 0 : 0), baseKind: 'pts',
+      // prime_cost_pct is measured against TOTAL sales, so a point of it is worth
+      // total sales / 100. Basing it on bar+food alone understated the leak by
+      // catering's and ancillary's share of the week.
+      base:  w => Recovery._totSales(w), baseKind: 'pts',
       target: () => Recovery._ptargets().prime_cost_pct ?? 60,
       fmt: v => v.toFixed(1) + '%'
     },
@@ -88,7 +114,14 @@ window.Recovery = {
       // sales grow (that dilution would double-count with check-average growth).
       value: w => w.labor_pct_blended,
       recoverValue: w => (w.hourly_labor_pct != null ? w.hourly_labor_pct : w.labor_pct_blended),
-      base:  w => (w.bar_revenue || 0) + (w.floor_revenue || 0), baseKind: 'pts',
+      // TWO values, two denominators, so TWO bases. labor_pct_blended is measured
+      // against total sales; hourly_labor_pct against bar+food only. The 2026-07-16
+      // fix lined up recoverValue with this bar+food base for compute(), and left
+      // gapImpact dollarizing the TOTAL-sales-basis labor_pct_blended against it, so
+      // the leak on the board ran light by catering's share of the week. base pairs
+      // with value (gapImpact), recoverBase pairs with recoverValue (compute).
+      base:  w => Recovery._rTotSales(w), baseKind: 'pts',
+      recoverBase: w => (w.bar_revenue || 0) + (w.floor_revenue || 0),
       target: () => App.laborTargetPct(),
       fmt: v => v.toFixed(1) + '%'
     },
@@ -122,7 +155,10 @@ window.Recovery = {
 
     // Recovery dollars use the metric's recoverValue when defined (labor dollarizes
     // HOURLY labor %, not total), falling back to value for every other metric.
+    // The base has to follow the value: recoverValue carries its own denominator, so
+    // it carries its own base. Every other metric has neither and falls back to both.
     const vf = m.recoverValue || m.value;
+    const bf = m.recoverBase || m.base;
 
     // The weeks the operator has run SINCE the system started, earliest first.
     // The baseline is their own first weeks, not a pre-start history a new user
@@ -155,7 +191,7 @@ window.Recovery = {
     // (net slipping below your starting point).
     let dollars = 0, counted = 0;
     allMeasure.forEach(w => {
-      const v = vf(w), base = m.base(w);
+      const v = vf(w), base = bf(w);
       if (v == null || base == null) return;
       const imp = m.lowerBetter ? (bAvg - v) : (v - bAvg);
       dollars += (m.baseKind === 'pts') ? (imp / 100) * base : imp * base;
@@ -165,7 +201,7 @@ window.Recovery = {
 
     // Forward run-rate from the CURRENT sustained rate, a labeled "on pace for".
     const improvement = m.lowerBetter ? (bAvg - cAvg) : (cAvg - bAvg);
-    const recentBase = this._avg(recentMeasure.map(m.base));
+    const recentBase = this._avg(recentMeasure.map(bf));
     const perWeek = (!m.noDollar && recentBase != null) ? ((m.baseKind === 'pts') ? (improvement / 100) * recentBase : improvement * recentBase) : null;
     const dollarsAnnual = (perWeek != null) ? perWeek * 52 : null;
 
