@@ -19,7 +19,11 @@ const PosIngest = {
     hours: [
       { key: 'name',  label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff', 'staff name', 'server', 'server name', 'team member', 'worker', 'crew', 'associate', 'full name', 'first name', 'last name'] },
       { key: 'date',  label: 'Date',       required: true,  match: ['date', 'work date', 'shift date', 'business date', 'day', 'clock date', 'worked date', 'date worked', 'pay date', 'shift day'] },
-      { key: 'hours', label: 'Hours',      required: true,  match: ['hours', 'total hours', 'hrs', 'worked', 'hours worked', 'total hrs', 'reg hours', 'regular hours', 'hrs worked', 'labor hours', 'paid hours', 'net hours', 'duration', 'time'] },
+      // NOT a bare 'time': every timeclock export leads with "Time In" / "Time Out",
+      // which would import a clock time as hours worked ("17:00" -> 17.0 hours) and
+      // flag the whole roster for overtime. Only whole-phrase time columns match; a
+      // file with no single total column stays unmapped so the operator picks it.
+      { key: 'hours', label: 'Hours',      required: true,  match: ['hours', 'total hours', 'hrs', 'worked', 'hours worked', 'total hrs', 'reg hours', 'regular hours', 'hrs worked', 'labor hours', 'paid hours', 'net hours', 'duration', 'total time'] },
       { key: 'shift', label: 'Shift',      required: false, match: ['shift', 'shift type', 'daypart', 'shift name', 'department', 'am/pm', 'meal period'] }
     ],
     tips: [
@@ -52,10 +56,16 @@ const PosIngest = {
     // directly, OR Expected + Counted. Writes sc_variances.
     cash: [
       { key: 'date',       label: 'Date',          required: true,  match: ['date', 'business date', 'day', 'service date', 'shift date', 'business day'] },
-      { key: 'drawer',     label: 'Register',      required: false, match: ['drawer', 'register', 'till', 'station', 'terminal', 'pos', 'device', 'workstation', 'reg', 'register name', 'till id', 'drawer id', 'terminal id'] },
+      // NOT a bare 'pos': it eats the "POS Cash" column, which is this file's Expected
+      // Cash, and files a dollar amount as the register name.
+      { key: 'drawer',     label: 'Register',      required: false, match: ['drawer', 'register', 'till', 'station', 'terminal', 'device', 'workstation', 'reg', 'register name', 'till id', 'drawer id', 'terminal id'] },
       { key: 'cashier',    label: 'Cashier',       required: false, match: ['cashier', 'server', 'employee', 'name', 'staff', 'bartender', 'clerk', 'operator', 'user', 'server name', 'employee name'] },
-      { key: 'expected',   label: 'Expected Cash', required: false, match: ['expected', 'expected cash', 'declared', 'system cash', 'pos cash', 'cash due', 'expected drawer', 'system total', 'net cash', 'cash sales', 'expected total', 'sys cash', 'expected amount'] },
-      { key: 'counted',    label: 'Counted Cash',  required: false, match: ['counted', 'counted cash', 'actual', 'actual cash', 'deposit', 'deposited', 'drawer count', 'actual drawer', 'counted total', 'cash counted', 'ending cash', 'bank', 'deposit amount', 'cash in drawer', 'actual amount'] },
+      // Expected = cash sales + starting bank - paid-outs. NOT 'cash sales' / 'net cash':
+      // those are a different quantity, and mapping them makes buildVoids prefer a bogus
+      // counted-minus-sales subtraction over the POS's own authoritative Over/Short.
+      { key: 'expected',   label: 'Expected Cash', required: false, match: ['expected', 'expected cash', 'declared', 'system cash', 'pos cash', 'cash due', 'expected drawer', 'system total', 'expected total', 'sys cash', 'expected amount'] },
+      // NOT 'bank': on a drawer report "Bank" is the opening float, not the count.
+      { key: 'counted',    label: 'Counted Cash',  required: false, match: ['counted', 'counted cash', 'actual', 'actual cash', 'deposit', 'deposited', 'drawer count', 'actual drawer', 'counted total', 'cash counted', 'ending cash', 'deposit amount', 'cash in drawer', 'actual amount'] },
       { key: 'over_short', label: 'Over / Short',  required: false, match: ['over/short', 'over short', 'variance', 'difference', 'discrepancy', '+/-', 'short/over', 'over', 'short', 'cash variance', 'diff', 'variance amount'] }
     ],
     // A POS per-server sales report: one row per server (per day). Covers + sales
@@ -74,7 +84,9 @@ const PosIngest = {
     // place (no new records), so it has a custom commit (_commitPmix).
     pmix: [
       { key: 'name',  label: 'Item Name',  required: true, match: ['item', 'item name', 'menu item', 'menu item name', 'name', 'product', 'description', 'product name', 'menu', 'plu', 'plu name', 'item description', 'sku', 'item no'] },
-      { key: 'units', label: 'Units Sold', required: true, match: ['units', 'units sold', 'sold', 'qty', 'qty sold', 'quantity', 'covers', 'sales count', 'count', 'number sold', 'quantity sold', 'sold qty', 'each', 'orders', 'rung', 'total sold', 'units count'] }
+      // NOT a bare 'each': it grabs an "Each Price" column, and $12.50 strips to 1250
+      // units sold, which moves the item's whole Menu Engineering quadrant.
+      { key: 'units', label: 'Units Sold', required: true, match: ['units', 'units sold', 'sold', 'qty', 'qty sold', 'quantity', 'covers', 'sales count', 'count', 'number sold', 'quantity sold', 'sold qty', 'orders', 'rung', 'total sold', 'units count'] }
     ]
   },
 

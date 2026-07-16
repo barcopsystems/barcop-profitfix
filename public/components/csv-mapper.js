@@ -14,7 +14,13 @@
    }); */
 
 const CSVMapper = {
-  _LS: 'csv_mappings',
+  // Bumped to _v2 to throw away every mapping remembered under the old matcher.
+  // Confirming an import saves whatever sits in the dropdowns, auto-detected picks
+  // included, and _afterParse honors a saved map ahead of _autoMap. So a file that
+  // auto-mapped wrong once stayed wrong on every later drop, and fixing _autoMap
+  // alone would never have reached those operators. Cost of the reset is one
+  // re-pick on files where the columns were chosen by hand.
+  _LS: 'csv_mappings_v2',
 
   mount(container, opts) {
     container.innerHTML =
@@ -126,21 +132,35 @@ const CSVMapper = {
     try { const all = this._savedMaps(); all[sig] = map; localStorage.setItem(this._LS, JSON.stringify(all)); } catch (e) {}
   },
 
+  // Two passes ACROSS ALL FIELDS, exact first. Running exact-then-fuzzy per field
+  // let an earlier field's fuzzy guess eat a header a later field named exactly:
+  // Void/Comp's `type` matched 'transaction' inside "Transaction Date" before `date`
+  // (a later field, exact candidate 'transaction date') ever got to claim it, so
+  // every comp imported as a Void stamped today. An exact header match now always
+  // beats another field's fuzzy guess, whatever order the fields are declared in.
   _autoMap(headers, fields) {
     const map = {};
     const used = {};
     const esc = c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const candsFor = f => [f.key, f.label, ...(f.match || [])].map(s => String(s).toLowerCase());
+    const norm = h => String(h).toLowerCase().trim();
+    const claim = (f, hit) => { if (hit) { map[f.key] = hit; used[hit] = true; } };
+
     fields.forEach(f => {
-      const cands = [f.key, f.label, ...(f.match || [])].map(s => String(s).toLowerCase());
-      let hit = headers.find(h => !used[h] && cands.includes(String(h).toLowerCase().trim()));
-      // Fallback = a WORD-BOUNDARY match, not a raw substring, so "count" no longer
-      // matches inside "account" and a candidate only hits a whole token.
-      if (!hit) hit = headers.find(h => {
+      const cands = candsFor(f);
+      claim(f, headers.find(h => !used[h] && cands.includes(norm(h))));
+    });
+    // Whatever is still unmapped falls back to a WORD-BOUNDARY match, not a raw
+    // substring, so "count" no longer matches inside "account" and a candidate only
+    // hits a whole token.
+    fields.forEach(f => {
+      if (map[f.key]) return;
+      const cands = candsFor(f);
+      claim(f, headers.find(h => {
         if (used[h]) return false;
-        const hl = String(h).toLowerCase().trim();
+        const hl = norm(h);
         return cands.some(c => c.length >= 3 && new RegExp('(^|[^a-z])' + esc(c) + '([^a-z]|$)').test(hl));
-      });
-      if (hit) { map[f.key] = hit; used[hit] = true; }
+      }));
     });
     return map;
   },
