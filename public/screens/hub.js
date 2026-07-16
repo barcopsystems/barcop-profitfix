@@ -217,7 +217,11 @@ S.Hub = {
       return Math.floor((Date.now() - d.getTime()) / 86400000);
     };
     const auditOpp  = (a) => a ? (a.action_items || []).reduce((sum,x) => sum + (x.monthly_impact || 0), 0) : 0;
-    const sysTrend  = (au) => { const l = last(au), p = prior(au); return (l && p) ? (l.overall_score||0) - (p.overall_score||0) : null; };
+    // Both scores must be REAL. `|| 0` turned an N/A audit into a 0, so a first audit with
+    // nothing to score against a prior 63 invented a "-63 pts" trend out of no data. The
+    // two lines below already guard `!= null`; this one was missed.
+    const sysTrend  = (au) => { const l = last(au), p = prior(au);
+      return (l && p && l.overall_score != null && p.overall_score != null) ? (l.overall_score - p.overall_score) : null; };
     const shortDate = (str) => str ? new Date(String(str).length<=10 ? str+'T00:00:00' : str).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : null;
 
     // ── Cross-system rollup ──
@@ -896,7 +900,13 @@ S.Hub = {
 
       let markerSvg = '';
       if (withMarkers && window.Recovery && window.FixPanel) {
-        const refWeeks = pWeeks.slice(-series.length);
+        // The chart's OWN weeks, which is what `series` (and therefore every x position)
+        // is built from. This read the outer `pWeeks` instead, and that array arrives
+        // date-DESC from loadEvents, so slicing its tail returned the OLDEST weeks in
+        // reverse order and every marker would have landed on the wrong week. Dead today
+        // (all three miniChart calls pass withMarkers false), but armed for whoever
+        // switches markers on.
+        const refWeeks = weeks;
         if (refWeeks.length >= 2) {
           const marks = ['profit','revenue']
             .reduce((acc,m) => acc.concat(Recovery.chartMarkers(refWeeks, m)), []);

@@ -206,13 +206,20 @@ S.AuditTracker = {
     if (audit.audit_period) metaBits.push(audit.audit_period);
     if (audit.audit_id)     metaBits.push(audit.audit_id);
 
+    // A null score is "not enough data", NOT a zero. `|| 0` turned it into a fabricated
+    // 0, and App.scoreLabel(0) reads "Critical" — so a brand-new bar that saw
+    // "N/A / Not enough data yet" on screen exported a PDF headed "Profit Score 0
+    // (Critical)" next to an industry average of 63, and handed that to their bank. The
+    // screen has always handled null (audit-ui.js); the export was the last leak.
+    const _score = audit.overall_score;
+    const _scoreTxt = _score == null ? 'N/A' : String(_score);
     const b = App._pdfBuilder('Profit Audit');
     b.header({
       right: 'Profit Audit',
-      meta: metaBits.join('  ·  ') + '  ·  Profit Score ' + (audit.overall_score || 0)
+      meta: metaBits.join('  ·  ') + '  ·  Profit Score ' + _scoreTxt
     });
     b.kv('Operation', venue);
-    b.kv('Profit Score', (audit.overall_score || 0) + '  (' + App.scoreLabel(audit.overall_score || 0) + ')');
+    b.kv('Profit Score', _score == null ? 'N/A  (Not enough data yet)' : (_score + '  (' + App.scoreLabel(_score) + ')'));
     const dq = AuditUI.dataQualityLabel(audit, App.AUDIT_PROFIT_SECTION_NAMES.length);
     if (dq) b.kv('Data Quality', dq);
     b.kv('Target', String(d.TARGET_SCORE || 70));

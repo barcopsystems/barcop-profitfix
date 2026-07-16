@@ -51,12 +51,15 @@ const DashUI = {
     const screen = opts.screen;
     if (!latest) return '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:12px;">' + esc(opts.emptyText || '') + '</div>'
       + '<button class="btn btn-ghost btn-sm db-qa" data-go="' + screen + '">' + esc(opts.runText || 'Run Audit') + '</button>';
-    const score = latest.overall_score || 0;
-    const col = App.scoreColor(score);
+    // An N/A audit has no score. `|| 0` painted a 46px "0" in critical red with the label
+    // "Critical" for a bar that simply has not logged anything yet.
+    const score = latest.overall_score;
+    const naScore = score == null;
+    const col = naScore ? 'var(--t3)' : App.scoreColor(score);
     const timing = 'Run a fresh one anytime.';
     return '<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:700;color:' + col + ';line-height:1;">' + score + '</div>'
-      + '<div><div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + col + ';">' + esc(App.scoreLabel(score)) + '</div>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:700;color:' + col + ';line-height:1;">' + (naScore ? 'N/A' : score) + '</div>'
+      + '<div><div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + col + ';">' + esc(naScore ? 'Not enough data yet' : App.scoreLabel(score)) + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date || '').slice(0, 10) + '</div></div></div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + timing + '</div>'
       + '<button class="btn btn-ghost btn-sm db-qa" data-go="' + screen + '">View Audit</button>';
