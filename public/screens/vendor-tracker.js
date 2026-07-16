@@ -130,13 +130,23 @@ S.VendorTracker = {
     const priceChanges  = dels.reduce((s, d) => s + (d.price_change_count || 0), 0);
     const priceApplied  = dels.reduce((s, d) => s + (d.price_change_applied_count || 0), 0);
 
+    // Annualized DOLLARS, not a sum of per-unit price deltas. A $/bottle change plus a
+    // $/case change plus a $/keg change is a number with no unit, and it was printed as
+    // currency next to Total Spend and divided by it for driftPct, so the High status
+    // could never fire. Price Changes one tab over already does it right
+    // (delta x annualUsage), so the SAME data read $4,200/yr there and $47 here.
+    // annualUsage is resolved lazily, once per product, and only for products this
+    // vendor actually moved a price on.
     let netDrift = 0;
     this.products().forEach(p => {
+      let au;
       (p.cost_history || []).forEach(h => {
         if (h.vendor !== vendorName) return;
         if (start && h.date < start) return;
         if (h.source !== 'delivery') return;
-        netDrift += (parseFloat(h.new_cost) || 0) - (parseFloat(h.old_cost) || 0);
+        if (au === undefined) au = this.annualUsage(p.id);
+        if (au == null) return;   // no count pair: the drift is unknown, not zero
+        netDrift += ((parseFloat(h.new_cost) || 0) - (parseFloat(h.old_cost) || 0)) * au;
       });
     });
 
@@ -149,13 +159,31 @@ S.VendorTracker = {
       .map(d => (new Date(d.resolved_at).getTime() - new Date(d.credit_requested_at).getTime()) / 86400000);
     const avgDaysToCredit = resolvedTimes.length ? Math.round(resolvedTimes.reduce((s, t) => s + t, 0) / resolvedTimes.length) : null;
 
-    return { vendorName, totalSpend, deliveryCount, shortCounts, priceChanges, priceApplied, netDrift, overchargeOpen, recovered, openCount, totalDiscrepancies, avgDaysToCredit };
+    // netDrift is an ANNUAL figure and totalSpend covers the selected range, so anything
+    // comparing the two has to put them on the same footing first (driftPct did not).
+    const spanDays = this._rangeDays(dels);
+    const annualSpend = (spanDays && totalSpend > 0) ? totalSpend / spanDays * 365 : null;
+
+    return { vendorName, totalSpend, annualSpend, deliveryCount, shortCounts, priceChanges, priceApplied, netDrift, overchargeOpen, recovered, openCount, totalDiscrepancies, avgDaysToCredit };
+  },
+
+  // Days the selected range covers, for annualizing a range figure. A fixed range says
+  // so; 'all' has no set length, so measure the span the deliveries actually cover.
+  _rangeDays(dels) {
+    if (this.range !== 'all') return parseInt(this.range, 10) || 90;
+    const ds = (dels || []).map(d => d.date).filter(Boolean).sort();
+    if (ds.length < 2) return null;
+    const span = Math.round((new Date(ds[ds.length - 1] + 'T00:00:00').getTime() - new Date(ds[0] + 'T00:00:00').getTime()) / 86400000);
+    return span > 0 ? span : null;
   },
 
   // Status as colored TEXT (no badge): High red / Watch amber / Clean green / No activity grey.
   statusFor(m) {
     if (!m.deliveryCount && !m.totalDiscrepancies) return { label: 'No Activity', color: 'var(--t4)' };
-    const driftPct = m.totalSpend > 0 ? (m.netDrift / m.totalSpend) * 100 : 0;
+    // Annual drift against ANNUAL spend. Dividing an annual figure by a 90-day range's
+    // spend would read four times high; dividing the old per-unit sum by it was
+    // meaningless, which is why High never fired on drift.
+    const driftPct = m.annualSpend > 0 ? (m.netDrift / m.annualSpend) * 100 : 0;
     if (m.overchargeOpen > 100 || driftPct > 5 || m.shortCounts > 2) return { label: 'High',  color: 'var(--red)' };
     if (m.overchargeOpen > 0   || m.netDrift > 0  || m.shortCounts > 0) return { label: 'Watch', color: 'var(--amber)' };
     return { label: 'Clean', color: 'var(--green)' };
@@ -172,16 +200,21 @@ S.VendorTracker = {
 
     const stats = this.statsCard(
       this.statItem('Total Spend', App.fmtCurrency(totalSpend))
-      + this.statItem('Net Price Drift', (totalDrift >= 0 ? '+' : '') + App.fmtCurrency(totalDrift), totalDrift > 0 ? 'warn' : '')
+      + this.statItem('Net Price Drift', (totalDrift >= 0 ? '+' : '') + App.fmtCurrency(totalDrift) + '/yr', totalDrift > 0 ? 'warn' : '')
       + this.statItem('Open Overcharge', App.fmtCurrency(totalOpenOver), totalOpenOver > 0 ? 'warn' : '')
       + this.statItem('Recovered', App.fmtCurrency(totalRecovered), 'good')
     );
 
     const filterRow = this.rangeFilterRow('vt-sc-export');
 
-    // Vendors ranked by total impact so the pain-causers surface first.
-    const sorted = metrics.slice().sort((a, b) =>
-      (b.overchargeOpen + Math.max(0, b.netDrift) + b.totalSpend * 0.01) - (a.overchargeOpen + Math.max(0, a.netDrift) + a.totalSpend * 0.01));
+    // Ranked by what a vendor is actually COSTING you: money you are owed back, plus the
+    // annualized drift they have pushed through. Both are dollars.
+    // Spend is not pain. The old formula added `totalSpend * 0.01`, so a clean $180k
+    // vendor scored 1,800 and outranked a produce vendor sitting on $600 of open
+    // overcharge (630): the biggest vendor topped the list for being big. Size already
+    // has its own column, so it stays a tiebreaker only.
+    const impact = m => m.overchargeOpen + Math.max(0, m.netDrift);
+    const sorted = metrics.slice().sort((a, b) => (impact(b) - impact(a)) || (b.totalSpend - a.totalSpend));
 
     const rows = sorted.map(m => {
       const s = this.statusFor(m);
@@ -199,7 +232,7 @@ S.VendorTracker = {
         + '</tr>';
     }).join('') || '<tr><td colspan="10" style="color:var(--t3);text-align:center;padding:14px;">No vendor activity in this range. Pick a wider range above.</td></tr>';
 
-    const thead = '<thead><tr><th>Vendor</th><th>Deliveries</th><th>Spend</th><th>Net Drift</th>'
+    const thead = '<thead><tr><th>Vendor</th><th>Deliveries</th><th>Spend</th><th>Annual Drift</th>'
       + '<th>Price Updates</th><th>Short Counts</th><th>Open Overcharge</th><th>Recovered</th><th>Avg Days to Credit</th><th>Status</th></tr></thead>';
 
     return stats + filterRow + this.dataCard(thead, rows);
@@ -238,8 +271,13 @@ S.VendorTracker = {
     let purch = 0;
     this.deliveries().filter(d => d.date > s.date && d.date <= e.date)
       .forEach(d => (d.line_items || []).forEach(li => { if (li.product_id === pid) purch += App.unitsFromDeliveryLine(li); }));
-    const used = (si.total || 0) + purch - (ei.total || 0);
-    const days = (new Date(e.date + 'T00:00:00').getTime() - new Date(s.date + 'T00:00:00').getTime()) / 86400000;
+    // Floor at zero: the policy App.computeUsagePair's contract says every caller layers
+    // on top of rawUsed. This one hand-rolls the math and skipped it. A negative "used"
+    // means the count came out higher than purchases explain (a correction, a transfer
+    // in, a miscount). That is not negative consumption, and multiplying a price INCREASE
+    // by it rendered "-$312.86/yr" in GREEN beside a red +9.1%.
+    const used = Math.max(0, (si.total || 0) + purch - (ei.total || 0));
+    const days = Math.round((new Date(e.date + 'T00:00:00').getTime() - new Date(s.date + 'T00:00:00').getTime()) / 86400000);
     if (days <= 0) return null;
     return used / days * 365;
   },
