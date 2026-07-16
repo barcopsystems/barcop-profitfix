@@ -785,7 +785,10 @@ async function resolveRequester(accountId, jwt) {
   const { data: acct } = await supabaseAdmin
     .from('accounts').select('owner_user_id').eq('id', accountId).single();
   const isOwner = !!(acct?.owner_user_id && acct.owner_user_id === userId);
-  return { userId, role: membership.role, permissions: membership.permissions || {}, isOwner };
+  // ownerUserId is returned so a caller can tell whether an EXISTING row was the
+  // owner's doing, not just whether the requester is the owner (see /api/invite-user).
+  return { userId, role: membership.role, permissions: membership.permissions || {}, isOwner,
+           ownerUserId: acct?.owner_user_id || null };
 }
 
 // ── Invite user to an account (Phase 2 multi-user) ────────────────────────────
@@ -827,6 +830,33 @@ app.post('/api/invite-user', async (req, res) => {
     // Clamp the granted areas/levels to what this inviter may hand out.
     const grantPerms = clampPermsToGranter(cleanPerms, requester.permissions, requester.isOwner);
     const cleanEmail = String(email).toLowerCase().trim();
+
+    // SECURITY: a pending invite the OWNER created is the owner's decision, and only
+    // the owner may change it. The upsert below keys on (email, account_id), so a
+    // non-owner admin re-inviting the same address wrote straight over the owner's
+    // row: role forced down to staff (line above), permissions clamped to their own,
+    // invited_by rewritten, no error to anyone. The signup trigger provisions the
+    // membership from THIS row, so the invitee then arrived with less access than the
+    // owner granted and the owner never saw it happen. Downgrade only (a non-owner
+    // cannot raise a role or grant past their own perms), but a lower tier must not
+    // silently overrule the owner on the table that decides access.
+    if (!requester.isOwner) {
+      const { data: existingInv, error: existingErr } = await supabaseAdmin
+        .from('account_invites')
+        .select('invited_by')
+        .eq('email', cleanEmail)
+        .eq('account_id', accountId)
+        .maybeSingle();
+      if (existingErr) {
+        console.error('invite lookup failed:', existingErr.message);
+        return res.status(500).json({ error: 'Could not check the invite. Please try again.' });
+      }
+      if (existingInv && requester.ownerUserId && existingInv.invited_by === requester.ownerUserId) {
+        return res.status(403).json({
+          error: 'That address already has a pending invite from the owner. Ask the owner to change it.'
+        });
+      }
+    }
 
     // SECURITY: write the invite to a SERVER-ONLY table (service-role; no anon/user RLS
     // policy, so the browser can't read or forge it). The signup trigger provisions the
