@@ -738,9 +738,14 @@ if (require.main === module) {
     { name: 'Wings', category: 'Starter', price: 13, cost: 7, weekly_covers: 30 },
     { name: 'Salad', category: 'Starter', price: 12, cost: 4, weekly_covers: 25 }
   ];
+  // Dates are REQUIRED: serverChecks is windowed to the 4 weeks ending on the last
+  // period_end (here 2026-04-04, so the window opens 2026-03-08), which is what stops a
+  // server who left months ago from setting the bottom check average and inflating the
+  // S4 dollar. This fixture predated that window and carried no dates, so every row was
+  // filtered out and both S4 assertions had been failing silently ever since.
   const rServers = [
-    { server_name: 'A', covers: 100, sales: 3800 }, { server_name: 'B', covers: 100, sales: 3100 },
-    { server_name: 'C', covers: 100, sales: 2400 }, { server_name: 'D', covers: 100, sales: 2900 }
+    { server_name: 'A', date: '2026-03-30', covers: 100, sales: 3800 }, { server_name: 'B', date: '2026-03-31', covers: 100, sales: 3100 },
+    { server_name: 'C', date: '2026-04-01', covers: 100, sales: 2400 }, { server_name: 'D', date: '2026-04-02', covers: 100, sales: 2900 }
   ];
   const rev = computeRevenueAudit({
     settings: { bar_name: 'The Anchor Bar & Kitchen' },
