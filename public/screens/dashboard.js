@@ -162,8 +162,15 @@ S.Dashboard = {
   // the latest logged week, each against its target. Color = meaning only.
   costStrip() {
     const latest = App.latestEvent ? App.latestEvent(this.weeks()) : null;
+    // This lives in the Where You Stand hero, which is a RIGHT-NOW card (the audit score
+    // and the recovered total beside it are latest/all-time too), so reading the latest
+    // LOGGED week is right for it: it deliberately does not follow the week selector on
+    // the steps below. But it has to SAY which week. Unattributed, stepping the selector
+    // back put two different Bar Pour Cost figures on one page with nothing to tell them
+    // apart. The steps use this.savedWeek(this.weekEnd()); this one is the latest.
+    const wkLbl = (latest && latest.period_end) ? ' &middot; week ending ' + this.fmtWk(latest.period_end) : '';
     const wrap = inner => '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Where Your Costs Stand</div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Where Your Costs Stand' + wkLbl + '</div>'
       + inner + '</div>';
     // No week yet: show the same stat design with dashes, never explainer text.
     const rows = latest ? this._costRows(latest) : [{ val: null }, { val: null }, { val: null }];
@@ -417,13 +424,20 @@ S.Dashboard = {
     const costs = [
       { name: 'Bar pour cost', arr: weeks.map(w => w.bar && w.bar.cost_pct),  tgt: bT, act: 'jigger the wells, cost your recipes, and watch pour variance in Spot Check' },
       { name: 'Food cost',     arr: weeks.map(w => w.food && w.food.cost_pct), tgt: fT, act: 'tighten portions and log waste in Inventory' },
-      { name: 'Prime cost',    arr: weeks.map(w => w.prime_cost_pct),          tgt: pT, act: 'work the biggest of pour, food, and labor first in Profit Fix' }
+      { name: 'Prime cost',    arr: weeks.map(w => w.prime_cost_pct),          tgt: pT, act: 'work the biggest of pour, food, and labor first in Profit Fix', composite: true }
     ].map(c => { const v = c.arr.filter(x => x != null); return Object.assign(c, { cur: v.length ? v[v.length - 1] : null, n: v.length, dir: direction(v) }); })
      .filter(c => c.cur != null);
     costs.forEach(c => c.over = c.cur - c.tgt);
     const curB = (costs.find(c => c.name === 'Bar pour cost') || {}).cur;
     const barOver = (curB != null && curB > bT) ? Math.round((curB - bT) / 100 * aR) : 0;
-    const worst = costs.slice().sort((a, b) => b.over - a.over)[0];
+    // Prime is the COMPOSITE of pour, food and labor, so it must never compete with its
+    // own parts for "the first one to chase": chasing prime IS chasing those, which its
+    // own action line admits ("work the biggest of pour, food, and labor first"), so the
+    // Briefing could tell you to chase prime and prime could tell you to go chase the
+    // parts it just outranked. _topLeak() below drops COMPOSITE_GAPS for exactly this,
+    // and the Profit Audit carries prime as unscored CONTEXT, not a section. It stays in
+    // the trend sentence, where reporting the combined number is the whole point.
+    const worst = costs.filter(c => !c.composite).slice().sort((a, b) => b.over - a.over)[0];
 
     const paras = [];
     if (worst && worst.over > 0.05) {
@@ -433,8 +447,12 @@ S.Dashboard = {
     } else if (costs.length) {
       paras.push('Your costs are at or under target: ' + costs.map(c => c.name.toLowerCase().replace(' cost', '') + ' ' + r1(c.cur) + '%').join(', ') + '. Nothing here is bleeding, which is the whole job.');
     }
-    if (costs.some(c => c.n >= 3)) {
-      paras.push('Over the last ' + Math.max.apply(null, costs.map(c => c.n)) + ' weeks, ' + costs.map(c => c.name.toLowerCase() + ' is ' + c.dir).join(', ') + '.');
+    // Only the costs that HAVE a trend go in the trend sentence. Every cost used to be
+    // listed, so a cost with under 3 weeks spliced its own guard clause into the middle
+    // of the sentence: "food cost is still too few weeks to call a trend".
+    const trended = costs.filter(c => c.n >= 3);
+    if (trended.length) {
+      paras.push('Over the last ' + Math.max.apply(null, trended.map(c => c.n)) + ' weeks, ' + trended.map(c => c.name.toLowerCase() + ' is ' + c.dir).join(', ') + '.');
     }
     if (worst && worst.over > 0.05) paras.push('This week, put the wrench on ' + worst.name.toLowerCase() + ': ' + worst.act + ' until it comes back to target.');
     else paras.push('Nothing urgent to chase. Hold the discipline and keep logging every week so the trend stays honest.');
