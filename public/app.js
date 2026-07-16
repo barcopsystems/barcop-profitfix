@@ -442,6 +442,26 @@ const App = {
     this.showHub();
     this._wireChrome();   // demo skips boot(), so wire the top-nav (i-help, logo, mobile menu) here
     this._showDemoWelcome();
+    this._pingDemoVisit();
+  },
+
+  // Fire-and-forget demo counter. A random id in localStorage marks the browser,
+  // so DISTINCT ids = individual visitors and rows = demo views. Demo only: no
+  // account, no personal data, no IP. Never blocks or breaks the demo.
+  _pingDemoVisit() {
+    try {
+      let vid = localStorage.getItem('bc_demo_vid');
+      if (!vid) {
+        vid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+            : String(Date.now()) + Math.random().toString(16).slice(2);
+        localStorage.setItem('bc_demo_vid', vid);
+      }
+      fetch('/api/demo-visit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vid: vid, ref: document.referrer || '' })
+      }).catch(() => {});
+    } catch (e) { /* a counter must never break the demo */ }
   },
 
   // One-time welcome overlay on demo landing. Dimmed background like onboarding,
