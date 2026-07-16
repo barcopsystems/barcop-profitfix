@@ -149,10 +149,21 @@ S.EventsBookings = {
       + '</div>';
   },
 
+  // The agreement's balance TERM: quoted minus the deposit, what the contract says is
+  // owed. This is what belongs on the signed agreement, where it sits beside "Deposit to
+  // Confirm": both are deal terms, so neither moves after the client pays. Use
+  // balanceOutstanding for anything reporting what is still owed TODAY.
   balanceDue(b) {
     const quoted = this.quoteTotal(b);
     const dep = parseFloat(b.deposit_amount) || 0;
     return Math.max(0, quoted - dep);
+  },
+  // What is actually still owed right now: zero once the balance is collected.
+  // cash-engine.eventInflow already drops any booking carrying a balance_paid_date,
+  // precisely because that cash is in hand, but the Balance Due tile kept printing the
+  // full figure with "paid in full" written underneath it.
+  balanceOutstanding(b) {
+    return b.balance_paid_date ? 0 : this.balanceDue(b);
   },
 
   // Other active bookings holding the same space on the same day: a double-book risk.
@@ -442,7 +453,8 @@ S.EventsBookings = {
       const dU = this.daysUntil(b.event_date);
       const cd = dU == null ? '-' : dU < 0 ? 'past' : dU === 0 ? 'today' : String(dU);
       const cdSub = dU == null ? 'no date set' : dU < 0 ? 'event date passed' : dU === 0 ? 'event is today' : 'days out';
-      const bal = this.balanceDue(b);
+      // Outstanding, not the contract term: this tile reports what is still owed.
+      const bal = this.balanceOutstanding(b);
       t.push(this.statTile('Countdown', cd, cdSub, dU != null && dU >= 0 && dU <= 7 ? 'warn' : ''));
       t.push(this.statTile('Quoted Total', App.fmtCurrency(this.quoteTotal(b)), 'all in, service and tax'));
       t.push(this.statTile('Deposit', b.deposit_paid_date ? 'Paid' : (b.deposit_amount ? App.fmtCurrency(b.deposit_amount) : '-'), b.deposit_paid_date ? 'in hand' : (b.deposit_amount ? 'still due' : 'none set'), b.deposit_paid_date ? 'good' : (b.deposit_amount ? 'warn' : '')));
