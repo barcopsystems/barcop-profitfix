@@ -1286,7 +1286,7 @@ S.HubBooks = {
     const staffPosId = (sid) => (staff.find(s => s.id === sid) || {}).position_id || '';
 
     let totalHours = 0, totalWages = 0;
-    const byPos = {}, byStaff = {};
+    const byPos = {}, byStaff = {}, posBySid = {};
     actuals.forEach(a => {
       const hours = parseFloat(a.hours) || 0;
       const cost  = parseFloat(a.cost)  || (hours * (parseFloat(a.wage) || 0));
@@ -1298,10 +1298,24 @@ S.HubBooks = {
       byPos[pname].hours += hours;
       byPos[pname].wages += cost;
       const sid = a.staff_id || a.name || '(unknown)';
+      posBySid[sid] = pname;
       if (!byStaff[sid]) byStaff[sid] = { name: a.name || '(unknown)', position: pname, hours: 0, wages: 0 };
       byStaff[sid].hours += hours;
       byStaff[sid].wages += cost;
     });
+
+    // lc_actuals hold straight time only (cost = hours x wage), so the 0.5x weekly
+    // overtime premium has to be added here or Total Wages Paid hands the accountant a
+    // payroll figure light by the whole premium on any week someone crossed 40 hours.
+    // Attributed back to the same staff and position that carried the hours.
+    const otPrem = App.otPremiumForRows ? App.otPremiumForRows(actuals) : { total: 0, byStaff: {} };
+    Object.keys(otPrem.byStaff || {}).forEach(sid => {
+      const prem = otPrem.byStaff[sid] || 0;
+      const pname = posBySid[sid];
+      if (pname && byPos[pname]) byPos[pname].wages += prem;
+      if (byStaff[sid]) byStaff[sid].wages += prem;
+    });
+    totalWages += otPrem.total;
 
     // Salaried (exempt) management is paid a fixed weekly salary with no
     // lc_actuals rows, so without this Total Wages Paid and Labor % of Revenue

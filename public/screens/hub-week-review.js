@@ -229,7 +229,8 @@ S.WeekReview = {
       const wkActuals = LD.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
       wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
       const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
-      wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost;
+      const otPrem = App.otPremiumForRows ? App.otPremiumForRows(wkActuals).total : 0;   // 0.5x over 40/wk, not stored in a.cost
+      wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost + otPrem;
       const weekRevenue = ((App.shiftData && App.shiftData.sc_shifts) || [])
         .filter(s => LD.inWeek(s.date)).reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
       laborPct = weekRevenue > 0 ? (wkCost / weekRevenue * 100) : null;

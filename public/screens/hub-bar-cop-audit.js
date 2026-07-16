@@ -169,9 +169,18 @@ S.HubBarCopAudit = {
     // Completion procedures are only judged when the operation is active in the
     // window. With nothing logged at all, these are N/A (not a 0% failing grade).
     const active = wkShifts.length > 0 || opens.length > 0 || closes.length > 0 || wkCounts.length > 0 || wkSpots.length > 0;
+    // One opening and one closing per DAY THE OPERATION RAN, not per calendar day. The
+    // flat /30 assumed a 7-day bar, so a bar open Thu-Sun logging every checklist
+    // perfectly (~17 in 30 days) scored 57 and carried a "run only 17 of an expected 30"
+    // exposure it could never clear without opening on days it is closed. Same
+    // denominator _scoreCashIntegrity already uses for drawer counts.
+    const runDays    = new Set(wkShifts.map(s => s.date)).size;
+    const openRatio  = runDays > 0 ? Math.min(1, opens.length  / runDays) : null;
+    const closeRatio = runDays > 0 ? Math.min(1, closes.length / runDays) : null;
+    const runNote    = n => n + ' of ' + runDays + ' day' + (runDays === 1 ? '' : 's') + ' the bar ran';
     const components = [
-      { label: 'Opening checklist completion',  ratio: Math.min(1, opens.length   / 30), na: !active, extra: opens.length  + ' opening checklists logged' },
-      { label: 'Closing checklist completion',  ratio: Math.min(1, closes.length  / 30), na: !active, extra: closes.length + ' closing checklists logged' },
+      { label: 'Opening checklist completion',  ratio: openRatio,  na: !active || openRatio == null,  extra: openRatio == null ? opens.length + ' logged (no shifts in window)'  : runNote(opens.length) },
+      { label: 'Closing checklist completion',  ratio: closeRatio, na: !active || closeRatio == null, extra: closeRatio == null ? closes.length + ' logged (no shifts in window)' : runNote(closes.length) },
       { label: 'Inventory counts completed',    ratio: Math.min(1, wkCounts.length / 4),  na: !active, extra: wkCounts.length + ' of 4 expected weekly' },
       { label: 'Spot checks completed',         ratio: Math.min(1, wkSpots.length  / 4),  na: !active, extra: wkSpots.length  + ' of 4 expected weekly' },
       { label: 'Shifts logged',                 ratio: Math.min(1, wkShifts.length / 30), na: !active, extra: wkShifts.length + ' shifts in window' }
@@ -329,8 +338,20 @@ S.HubBarCopAudit = {
     const calloutRate = wkCallouts.length / Math.max(20, wkActuals.length || 1) * 20;
     const calloutScore = laborActive ? Math.max(0, 1 - calloutRate) : null;
 
-    // OT incidents: actuals over 40 hours in the window.
-    const otCount = wkActuals.filter(a => (parseFloat(a.hours) || 0) > 40).length;
+    // OT incidents: staff-WEEKS over the threshold. lc_actuals is one row per staff per
+    // DAY, so the old per-row `hours > 40` test could never be true (a day has 24 hours)
+    // and this component scored a fabricated 100 for every bar, including one running
+    // three people at 55 hours every week. Overtime is a weekly threshold, bucketed the
+    // same way App.otPremiumForRows does it. Salaried staff are exempt.
+    const OT_HRS = App.OT_THRESHOLD || 40;
+    const otWeeks = {};
+    wkActuals.forEach(a => {
+      if (!a || (App.isSalaried && App.isSalaried(a.staff_id))) return;
+      const ws = App.weekStartFor ? App.weekStartFor(a.date) : (a.date || '');
+      const key = (a.staff_id || a.name || '?') + '|' + ws;
+      otWeeks[key] = (otWeeks[key] || 0) + (parseFloat(a.hours) || 0);
+    });
+    const otCount = Object.keys(otWeeks).filter(k => otWeeks[k] > OT_HRS).length;
     const otScore = laborActive ? Math.max(0, 1 - (otCount / 5)) : null;
 
     // Certifications. N/A when none are on file.
@@ -348,7 +369,7 @@ S.HubBarCopAudit = {
     const components = [
       { label: 'Schedule adherence',                  ratio: schedScore,    na: schedScore == null,         extra: schedExtra },
       { label: 'Callout frequency',                   ratio: calloutScore,  na: !laborActive,               extra: wkCallouts.length + ' callouts in window' },
-      { label: 'Overtime incidents under control',    ratio: otScore,       na: !laborActive,               extra: otCount + ' shifts over 40 hours' },
+      { label: 'Overtime incidents under control',    ratio: otScore,       na: !laborActive,               extra: otCount + ' time' + (otCount === 1 ? '' : 's') + ' someone went over 40 hours in a week' },
       { label: 'Certifications current',              ratio: certScore,     na: certs.length === 0,         extra: certs.length === 0 ? 'No certifications on file' : (expired.length + ' expired, ' + expiring.length + ' expiring in 30 days') },
       { label: 'Coaching log activity',               ratio: coachingScore, na: !laborActive,               extra: wkNotes.length + ' coaching notes in last 90 days' },
       { label: 'Wage policy configured',              ratio: policyScore,   na: !laborActive,               extra: policyConfigured ? 'State minimum wage set in Wage Policies' : 'Wage Policies not configured' }
@@ -416,8 +437,14 @@ S.HubBarCopAudit = {
   // 6. Operational Consistency. Week-over-week variance in stable metrics
   //    over last 8 weeks. Low variance = disciplined operation.
   _scoreOperationalConsistency() {
-    const weeks = (App.data?.weeks || []).slice(-this.CONSISTENCY_WEEKS);
-    const revWeeks = (App.data?.revenue_weeks || []).slice(-this.CONSISTENCY_WEEKS);
+    // Sort oldest->newest FIRST: App.data.weeks arrives NEWEST-first (loadEvents orders
+    // date DESC), so an unsorted slice(-8) scored the OLDEST 8 weeks on file and never
+    // moved as new weeks were confirmed. Same guard the server-side audit already runs
+    // (see the note in audit-compute.js). filter() copies, so sort() cannot mutate
+    // App.data here.
+    const byEnd = (a, b) => String(a.period_end || '').localeCompare(String(b.period_end || ''));
+    const weeks = (App.data?.weeks || []).filter(w => w && w.period_end).sort(byEnd).slice(-this.CONSISTENCY_WEEKS);
+    const revWeeks = (App.data?.revenue_weeks || []).filter(w => w && w.period_end).sort(byEnd).slice(-this.CONSISTENCY_WEEKS);
 
     // Coefficient of variation: stddev / mean. Lower = more consistent.
     // 0% CV = perfect, 15%+ CV = 0.
@@ -432,8 +459,11 @@ S.HubBarCopAudit = {
       return Math.max(0, 1 - (cv / 0.15));
     };
     const coversCV = cvScore(revWeeks.map(w => (parseFloat(w.covers) || 0)));
+    // Catering has to be on BOTH sides or neither. Counting catering labor against
+    // bar+food revenue alone swung this metric purely on catering timing, so a bar
+    // whose labor discipline never moved scored 0 for inconsistency.
     const laborPctCV = cvScore(weeks.map(w => {
-      const rev = (parseFloat(w.bar?.revenue) || 0) + (parseFloat(w.food?.revenue) || 0);
+      const rev = (parseFloat(w.bar?.revenue) || 0) + (parseFloat(w.food?.revenue) || 0) + (parseFloat(w.catering?.revenue) || 0);
       const lab = (parseFloat(w.bar?.labor) || 0) + (parseFloat(w.food?.labor) || 0) + (parseFloat(w.catering?.labor) || 0);
       return rev > 0 ? (lab / rev) * 100 : null;
     }));
@@ -458,6 +488,7 @@ S.HubBarCopAudit = {
     const checklists = (App.shiftData?.sc_checklists) || [];
     const permits   = (App.data?.permits_compliance) || [];
     const maint     = (App.shiftData?.sc_maintenance) || [];
+    const shifts    = (App.shiftData?.sc_shifts)      || [];
 
     // Deferred maintenance — high-priority open items are real exposure (a
     // failing walk-in or ice machine is lost product plus an emergency bill),
@@ -537,20 +568,28 @@ S.HubBarCopAudit = {
     }
 
     // Skipped procedures: opening or closing checklist completion rate below 70%.
+    // Measured against the days the bar actually RAN, not 30 flat calendar days. The
+    // old 20-of-30 test assumed a 7-day operation, so a Thu-Sun bar running every
+    // checklist it should carried both of these warnings permanently with no way to
+    // clear them short of opening on days it is closed.
     const wkOpens   = checklists.filter(c => (c.type || '').toLowerCase().indexOf('open') === 0 && this._withinWindow(c.date, 30));
     const wkCloses  = checklists.filter(c => (c.type || '').toLowerCase().indexOf('clos') === 0 && this._withinWindow(c.date, 30));
-    if (wkOpens.length < 20) {
+    const runDays30 = new Set(shifts.filter(s => this._withinWindow(s.date, 30)).map(s => s.date)).size;
+    const ranNote   = 'of the ' + runDays30 + ' day' + (runDays30 === 1 ? '' : 's') + ' you were open';
+    const openRate  = runDays30 > 0 ? wkOpens.length  / runDays30 : null;
+    const closeRate = runDays30 > 0 ? wkCloses.length / runDays30 : null;
+    if (openRate != null && openRate < 0.7) {
       out.push({
-        label:    'Opening checklist run only ' + wkOpens.length + ' times in last 30 days',
-        detail:   'Below 20 of an expected 30 runs. Day starts without the opening sweep can mean missed restock or setup issues.',
+        label:    'Opening checklist run ' + wkOpens.length + ' times ' + ranNote,
+        detail:   'That is ' + Math.round(openRate * 100) + '% of your open days. Day starts without the opening sweep can mean missed restock or setup issues.',
         severity: 'warn',
         screen:   'sc-checklists'
       });
     }
-    if (wkCloses.length < 20) {
+    if (closeRate != null && closeRate < 0.7) {
       out.push({
-        label:    'Closing checklist run only ' + wkCloses.length + ' times in last 30 days',
-        detail:   'Below 20 of an expected 30 runs. Missed closes invite cash-handling and clean-up gaps.',
+        label:    'Closing checklist run ' + wkCloses.length + ' times ' + ranNote,
+        detail:   'That is ' + Math.round(closeRate * 100) + '% of your open days. Missed closes invite cash-handling and clean-up gaps.',
         severity: 'warn',
         screen:   'sc-checklists'
       });
