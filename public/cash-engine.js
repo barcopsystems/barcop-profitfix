@@ -36,16 +36,17 @@ window.CashEngine = {
   // turns and GMROI read far too high. The textbook basis for capital efficiency
   // is AVERAGE inventory, so the capital reads use this. Trapped cash still reads
   // the CURRENT count (onHand), which is what is on the shelf right now.
+  // ⚠ TWO BASES, AND THEY DO NOT MIX. Never divide a trapped/onHand figure by an
+  // average, or the result measures the inventory TREND, not the thing you asked
+  // about: c-audit's S1 did exactly that and scored one bar 0 while it built stock
+  // and 65 while it drew the same stock down, at an unchanged 50% lazy. A SHARE of
+  // the shelf takes onHand on both sides; turns and GMROI take the average on both
+  // sides. (The old `avgInventoryValue` helper lived here and was deleted once S1
+  // stopped mixing them: its only two callers were the bug. `avgCategoryValue`
+  // below is the live average read, used by capitalByCategory.)
   recentCounts(n) {
     const asc = this.countsAsc();
     return asc.slice(Math.max(0, asc.length - (n || 4)));
-  },
-  avgInventoryValue(n) {
-    const cs = this.recentCounts(n);
-    if (!cs.length) return this.onHand().value;
-    let t = 0;
-    cs.forEach(c => { t += (c.items || []).reduce((s, it) => s + (it.counted === false ? 0 : (it.value || 0)), 0); });
-    return t / cs.length;
   },
   avgCategoryValue(n) {
     const cs = this.recentCounts(n);
