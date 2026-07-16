@@ -306,14 +306,42 @@ const supabaseAdmin = createClient(
 );
 
 // ── Demo visit counter ────────────────────────────────────────────────────────
+// Rate cap for the demo counter. Deliberately NOT notifyRateLimited: that one shares a
+// global bucket sized for outbound EMAIL, so demo traffic could starve a bug report or
+// support request. Best-effort, in-memory, per-instance. A real visitor fires this once
+// per demo load, so neither cap is reachable by honest traffic. X-Forwarded-For is
+// spoofable, hence the global backstop underneath the per-IP bucket.
+const _demoHits = new Map();
+let _demoGlobal = [];
+function demoVisitLimited(req) {
+  const now = Date.now();
+  _demoGlobal = _demoGlobal.filter(t => now - t < 60000);
+  if (_demoGlobal.length >= 300) return true;
+  const ip = String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'unknown').split(',')[0].trim();
+  const arr = (_demoHits.get(ip) || []).filter(t => now - t < 60000);
+  if (arr.length >= 10) { _demoHits.set(ip, arr); return true; }
+  arr.push(now); _demoHits.set(ip, arr);
+  _demoGlobal.push(now);
+  if (_demoHits.size > 5000) { for (const [k, v] of _demoHits) { if (!v.length || now - v[v.length - 1] > 60000) _demoHits.delete(k); } }
+  return false;
+}
+
 // The public live demo only. No account, no user, no IP: vid is a random id the
 // browser keeps in localStorage, so DISTINCT visitor_id = individual visitors and
 // the row count = demo views. Never throws — a counter must not break the demo.
 app.post('/api/demo-visit', async (req, res) => {
   try {
+    // Unauthenticated service-role insert, so cap it. Uncapped, anyone could curl a
+    // fresh random vid in a loop and turn the one number this table exists to produce
+    // into whatever they felt like, plus grow the table without bound.
+    if (demoVisitLimited(req)) return res.json({ ok: false });
     const vid = String((req.body && req.body.vid) || '').trim().slice(0, 64);
     if (!vid) return res.json({ ok: false });
-    const ref = String((req.body && req.body.ref) || '').trim().slice(0, 300) || null;
+    // Referrer keeps the ORIGIN AND PATH only. document.referrer arrives raw from the
+    // browser, and a query string can carry personal data (?email=, ?token=) that this
+    // table promises never to hold. Which page sent them is all the counter needs.
+    const rawRef = String((req.body && req.body.ref) || '').trim();
+    const ref = rawRef ? (rawRef.split('?')[0].split('#')[0].slice(0, 300) || null) : null;
     await supabaseAdmin.from('demo_visits').insert({ visitor_id: vid, referrer: ref });
     res.json({ ok: true });
   } catch (e) {
@@ -396,9 +424,26 @@ async function applySubUpdate(sub, update) {
   if (hit && hit.length) return;
   // Legacy/backfill: no row carries this subscription id yet. Match the customer's
   // row(s) that have no subscription id stored, and stamp it going forward.
+  // Look FIRST and stamp exactly one row. Running this as a filtered update is an
+  // unbounded multi-row write: two un-stamped rows under one Stripe Customer and a
+  // single cancel event would set canceled + active_modules [] on BOTH bars, locking a
+  // still-paying one out of everything. That is precisely the clobber the
+  // subscription-id keying above exists to prevent, and it is reachable because
+  // stripe_subscription_id arrived by ALTER TABLE, so every pre-existing row is null
+  // until its first event. If it is ambiguous, do nothing and say so: a missed webhook
+  // is recoverable, a wrongly canceled paying customer is not.
+  const { data: cands } = await supabaseAdmin
+    .from('subscriptions').select('account_id')
+    .eq('stripe_customer_id', customerId).is('stripe_subscription_id', null);
+  if (!cands || !cands.length) return;
+  if (cands.length > 1) {
+    console.error('applySubUpdate: ' + cands.length + ' un-stamped subscription rows for customer ' + customerId
+      + '; refusing to guess which one ' + subId + ' belongs to. Stamp stripe_subscription_id by hand.');
+    return;
+  }
   await supabaseAdmin
     .from('subscriptions').update({ ...update, stripe_subscription_id: subId })
-    .eq('stripe_customer_id', customerId).is('stripe_subscription_id', null);
+    .eq('account_id', cands[0].account_id).is('stripe_subscription_id', null);
 }
 
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -1257,7 +1302,10 @@ app.post('/api/transfer-ownership', async (req, res) => {
 app.post('/api/add-account', async (req, res) => {
   try {
     const { name } = req.body || {};
-    const barName = (name && String(name).trim()) || 'My Bar';
+    // Capped at 120 like set-account-name: uncapped, this write was bounded only by the
+    // 50mb JSON limit, so a 10MB bar name could land in the row that renders in the bar
+    // switcher and gets echoed into the welcome email.
+    const barName = (name && String(name).trim().slice(0, 120)) || 'My Bar';
 
     const authHeader = req.headers.authorization || '';
     const jwt = authHeader.replace(/^Bearer\s+/, '');

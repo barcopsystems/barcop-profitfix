@@ -264,7 +264,13 @@ function computeProfitAudit(appData, controlData) {
 
   // ── Overall — the five independent levers, N/A excluded. Prime is NOT averaged
   //    in (it is pour + food + labor, so it would double-weight S1/S2). ──
-  const overall = clampScore(avg([s1, s2, s3, s4, s5]));
+  // Null when EVERY section is N/A, never a number. avg() returns null there, and
+  // clampScore(null) rounds to 0 then floors to 1, so a brand-new bar with nothing to
+  // score used to be handed a confident 1/100 sitting next to INDUSTRY_AVG 63 on its
+  // very first audit. That is the fabricated placeholder this file's honesty contract
+  // exists to forbid.
+  const _overallAvg = avg([s1, s2, s3, s4, s5]);
+  const overall = _overallAvg != null ? clampScore(_overallAvg) : null;
 
   const latestEnd = weeks.length ? (weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end) : null;
   const auditPeriod = latestEnd ? (`${PERIOD_WEEKS} weeks ending ${latestEnd}`) : 'Most recent 4 weeks';
@@ -411,6 +417,12 @@ function computeRevenueAudit(appData, controlData) {
   const estWk = settings.week_sales_estimate || {};
   const estWeekTotal = (num(estWk.bar) || 0) + (num(estWk.food) || 0);
   const monthlyRev = wkTotalRev != null ? wkTotalRev * WEEKS_PER_MONTH : (estWeekTotal > 0 ? estWeekTotal * WEEKS_PER_MONTH : null);
+  // Revenue over the AUDIT WINDOW (the "N weeks ending X" this report is labeled with),
+  // as opposed to monthlyRev's 4.345 weeks. S2_LABOR_PERIOD needs this: its other branch
+  // is a true 4-week sum off Control data, so deriving the fallback from a month put two
+  // different period lengths under one "Total Labor Period" heading, 8.6% apart.
+  const _periodWeeks = weeks.length || PERIOD_WEEKS;
+  const periodRev = wkTotalRev != null ? wkTotalRev * _periodWeeks : (estWeekTotal > 0 ? estWeekTotal * _periodWeeks : null);
   const wkCovers = avg(weeks.map(w => w.covers));
   const monthlyCovers = wkCovers != null ? wkCovers * WEEKS_PER_MONTH : null;
 
@@ -547,7 +559,9 @@ function computeRevenueAudit(appData, controlData) {
     }
   }
 
-  const overall = clampScore(avg([s1, s2, s3, s4, s5]));
+  // Null when every section is N/A, same reason as the profit audit above.
+  const _overallAvg = avg([s1, s2, s3, s4, s5]);
+  const overall = _overallAvg != null ? clampScore(_overallAvg) : null;
   const latestEnd = weeks.length ? (weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end) : null;
   const auditPeriod = latestEnd ? (`${PERIOD_WEEKS} weeks ending ${latestEnd}`) : 'Most recent 4 weeks';
   const dataTier = (controlData && (cd.sources || []).length) ? 'Bar Cop operating data'
@@ -580,7 +594,7 @@ function computeRevenueAudit(appData, controlData) {
     S2_LABOR_TARGET_PCT: round1(laborTarget),
     S2_RPLH: rplh,
     S2_RPLH_TARGET: round0(rplhTarget),
-    S2_LABOR_PERIOD: num(cd.labor_cost) != null ? cd.labor_cost : (laborPct != null && monthlyRev != null ? round0((laborPct / 100) * monthlyRev) : null),
+    S2_LABOR_PERIOD: num(cd.labor_cost) != null ? cd.labor_cost : (laborPct != null && periodRev != null ? round0((laborPct / 100) * periodRev) : null),
     S2_MONTHLY_GAP: s2Gap,
     S2_ANNUAL_GAP: round0(s2Gap * 12),
 
