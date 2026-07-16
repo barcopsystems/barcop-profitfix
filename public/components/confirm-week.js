@@ -317,7 +317,7 @@ const ConfirmWeek = {
     const pw = (App.data.weeks || []).find(w => w.period_end === pe) || null;
     const week = {
       id: pw ? pw.id : App.uid(),
-      week_num: pw ? pw.week_num : (App.nextWeekNum ? App.nextWeekNum() : ((App.data.weeks || []).length + 1)),
+      week_num: pw ? pw.week_num : App.weekNumFor(App.data.weeks || [], pe),
       period_end: pe,
       saved_at: new Date().toISOString(),
       bar:  { revenue: f.bRev, cogs: f.bCogs, labor: f.bLab, cost_pct: f.barPct, labor_pct: f.barLabPct,
@@ -341,7 +341,7 @@ const ConfirmWeek = {
     const r2 = v => (v == null ? null : parseFloat(v.toFixed(2)));
     const rweek = {
       id: rw ? rw.id : App.uid(),
-      week_num: rw ? rw.week_num : ((App.data.revenue_weeks || []).reduce((m, w) => Math.max(m, w.week_num || 0), 0) + 1),
+      week_num: rw ? rw.week_num : App.weekNumFor(App.data.revenue_weeks || [], pe),
       period_end: pe,
       bar_revenue: f.bRev,
       floor_revenue: f.fRev,
@@ -378,6 +378,14 @@ const ConfirmWeek = {
     const okP = await App.putRecord('core', 'week', week);
     const okR = await App.putRecord('core', 'revenue_week', rweek);
     if (okP && okR) {
+      // Confirming a back-filled week slots it in ahead of weeks already logged, so
+      // every later week's number shifts up one. Re-rank both stores off period_end
+      // and persist only the records that actually moved (none on the normal path,
+      // where the week being confirmed is already the latest).
+      const movedP = App.renumberWeekStore(App.data.weeks || []);
+      const movedR = App.renumberWeekStore(App.data.revenue_weeks || []);
+      if (movedP.length) await App.putRecordsBulk('core', 'week', movedP);
+      if (movedR.length) await App.putRecordsBulk('core', 'revenue_week', movedR);
       if (App.markSetupDone) { App.markSetupDone('gs_p_week'); App.markSetupDone('gs_r_week'); }
       if (App.updatePeriod) App.updatePeriod();
       App.closeModal(this.MODAL_ID);
