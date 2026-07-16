@@ -516,8 +516,12 @@ window.FixPanel = {
           const prelim = r.mature ? '' : ' Preliminary, ' + r.weeksAfter + ' week' + (r.weeksAfter === 1 ? '' : 's') + ' in.';
           if (r.dollars != null && r.dollars > 0) {
             good = true;
+            // > 0, not truthy: dollarsAnnual run-rates the CURRENT window, so a fix that
+            // worked early and has since slipped is negative here while dollars stays
+            // positive, and App.fmtCurrency prefixes the $ ("on pace for $-4,160 a year").
+            // The before-to-after move below already shows the drift. Line 308 has this right.
             result = 'Recovered about ' + App.fmtCurrency(r.dollars) + ' so far'
-              + (r.dollarsAnnual ? ', on pace for ' + App.fmtCurrency(r.dollarsAnnual) + ' a year' : '')
+              + (r.dollarsAnnual > 0 ? ', on pace for ' + App.fmtCurrency(r.dollarsAnnual) + ' a year' : '')
               + '. ' + move + '.' + prelim;
           } else if (r.dollars != null && r.dollars < 0) {
             result = 'Slipping. About ' + App.fmtCurrency(Math.abs(r.dollars)) + ' below your starting point. ' + move + '.' + prelim;
