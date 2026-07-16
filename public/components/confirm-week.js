@@ -171,38 +171,88 @@ const ConfirmWeek = {
     this._recalc();
   },
 
+  // For cells where zero is a real answer (most weeks book no ancillary revenue
+  // and no platform fees).
   _val(id) { return parseFloat(document.getElementById(id)?.value) || 0; },
 
-  _recalc() {
-    const bRev = this._val('cw-bar-rev'), bCogs = this._val('cw-bar-cogs'), bLab = this._val('cw-bar-lab');
-    const fRev = this._val('cw-food-rev'), fCogs = this._val('cw-food-cogs'), fLab = this._val('cw-food-lab');
-    const covers = this._val('cw-covers');
+  // For cells where blank means "not measured yet", which is not the same number
+  // as zero. This form deliberately invites a partial close ("Missing pieces read
+  // as blank. You can still confirm and fill them later"), so a cell the operator
+  // has not filled has to survive as null. Saved as 0 it becomes a measurement: a
+  // blank COGS on a $20k bar week reads as a 0% pour cost, which prints "On target"
+  // on the leak board and pays out recovered dollars against the biggest leak in
+  // the bar, because every guard downstream tests for null, not zero.
+  _valOrNull(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const raw = String(el.value == null ? '' : el.value).trim();
+    if (raw === '') return null;
+    const v = parseFloat(raw);
+    return isNaN(v) ? null : v;
+  },
+
+  /* The week's numbers, derived in one place so the money strip and the saved
+     record can never drift apart. Null in, null out: a percentage whose input was
+     never entered is unknown, and it stays unknown all the way into the store. */
+  _figures() {
+    const nz = v => (v == null ? 0 : v);
+    const bRev = this._valOrNull('cw-bar-rev'),  bCogs = this._valOrNull('cw-bar-cogs'),  bLab = this._valOrNull('cw-bar-lab');
+    const fRev = this._valOrNull('cw-food-rev'), fCogs = this._valOrNull('cw-food-cogs'), fLab = this._valOrNull('cw-food-lab');
+    const covers = this._valOrNull('cw-covers');
+    const oRev = this._val('cw-anc-rev'), fees = this._val('cw-fees');
     const cat = this._catering || {};
     const cRev = parseFloat(cat.revenue) || 0, cCogs = parseFloat(cat.cogs) || 0, cLab = parseFloat(cat.labor) || 0;
-    const totRev = bRev + fRev + cRev;
-    const oRev = this._val('cw-anc-rev');
+    const hours = this._hours || 0;
+
+    const totRev = nz(bRev) + nz(fRev) + cRev;
     // Total sales = F&B (bar+food+catering) + ancillary. Prime % and Labor % are measured
     // against TOTAL SALES — the standard restaurant KPI, and what Books/the income statement
     // use — so they foot to the P&L and read the same on every screen. Catering labor is in
     // the numerator too. Check average stays per-cover F&B (ancillary isn't a per-guest check).
     const totSales = totRev + oRev;
-    const primeCost = bCogs + fCogs + bLab + fLab + cCogs + cLab;
+    const fbRev = nz(bRev) + nz(fRev);
+
+    // A department only owes a cost and a labor figure once it has rung sales, so a
+    // bar with no kitchen leaves every food cell blank forever and still foots.
+    const cogsIn  = (!(bRev > 0) || bCogs != null) && (!(fRev > 0) || fCogs != null);
+    const laborIn = (!(bRev > 0) || bLab  != null) && (!(fRev > 0) || fLab  != null);
+
+    const primeCost = nz(bCogs) + nz(fCogs) + nz(bLab) + nz(fLab) + cCogs + cLab;
+    const laborCost = nz(bLab) + nz(fLab) + cLab;
+    // Hourly (schedulable) labor = bar+food hourly only, minus fixed salaried pay,
+    // so the labor-scheduling recovery leak dollarizes only what the weekly schedule
+    // can move (catering event crew is event-driven, not weekly-schedulable).
+    const salaried = App.salariedCost ? (App.salariedCost(App.weekStartFor(this._weekEnd), this._weekEnd).total || 0) : 0;
+    const hourlyLabor = Math.max(0, (nz(bLab) + nz(fLab)) - salaried);
+
+    return {
+      bRev, bCogs, bLab, fRev, fCogs, fLab, cRev, cCogs, cLab, oRev, fees, covers, hours,
+      totRev, totSales, primeCost, laborCost, hourlyLabor,
+      barPct:     (bRev > 0 && bCogs != null) ? bCogs / bRev * 100 : null,
+      foodPct:    (fRev > 0 && fCogs != null) ? fCogs / fRev * 100 : null,
+      barLabPct:  (bRev > 0 && bLab  != null) ? bLab  / bRev * 100 : null,
+      foodLabPct: (fRev > 0 && fLab  != null) ? fLab  / fRev * 100 : null,
+      primePct:  (cogsIn && laborIn && totSales > 0) ? primeCost / totSales * 100 : null,
+      laborPct:  (laborIn && totSales > 0) ? laborCost / totSales * 100 : null,
+      hourlyPct: (laborIn && fbRev > 0)    ? hourlyLabor / fbRev * 100 : null,
+      checkAvg:  (covers > 0) ? totRev / covers : null,
+      rplh:      (hours  > 0) ? totRev / hours  : null
+    };
+  },
+
+  _recalc() {
+    const f = this._figures();
     const t = (App.data.settings && App.data.settings.targets) || {};
     const primeTgt = t.prime_cost_pct ?? 60;
-    const primePct = totSales > 0 ? primeCost / totSales * 100 : null;
-    const checkAvg = covers > 0 ? totRev / covers : null;
-    const laborCost = bLab + fLab + cLab;
-    const laborPct = totSales > 0 ? laborCost / totSales * 100 : null;
-    const rplh = this._hours > 0 ? totRev / this._hours : null;
     const caTgt = ((App.data.revenue_settings && App.data.revenue_settings.targets) || {}).check_avg ?? 35;
     const laborTgt = App.laborTargetPct ? App.laborTargetPct() : 30;
 
     const set = (id, txt, cls) => { const el = document.getElementById(id); if (el) { el.textContent = txt; el.className = 'calc-val lg ' + (cls || ''); } };
-    set('cw-m-rev', App.fmtCurrency(totSales, 0));
-    set('cw-m-prime', primePct != null ? primePct.toFixed(1) + '%' : '-', primePct != null ? (primePct > primeTgt ? 'warn' : 'good') : '');
-    set('cw-m-ca', checkAvg != null ? App.fmtCurrency(checkAvg) : '-', checkAvg != null ? (checkAvg >= caTgt ? 'good' : 'warn') : '');
-    set('cw-m-lp', laborPct != null ? laborPct.toFixed(1) + '%' : '-', laborPct != null ? (laborPct <= laborTgt ? 'good' : 'warn') : '');
-    set('cw-m-rplh', rplh != null ? App.fmtCurrency(rplh) : '-');
+    set('cw-m-rev', App.fmtCurrency(f.totSales, 0));
+    set('cw-m-prime', f.primePct != null ? f.primePct.toFixed(1) + '%' : '-', f.primePct != null ? (f.primePct > primeTgt ? 'warn' : 'good') : '');
+    set('cw-m-ca', f.checkAvg != null ? App.fmtCurrency(f.checkAvg) : '-', f.checkAvg != null ? (f.checkAvg >= caTgt ? 'good' : 'warn') : '');
+    set('cw-m-lp', f.laborPct != null ? f.laborPct.toFixed(1) + '%' : '-', f.laborPct != null ? (f.laborPct <= laborTgt ? 'good' : 'warn') : '');
+    set('cw-m-rplh', f.rplh != null ? App.fmtCurrency(f.rplh) : '-');
   },
 
   // Force the Control-sourced cells back to the live auto-fill, overwriting any
@@ -249,26 +299,13 @@ const ConfirmWeek = {
     const fail = msg => { if (err) { err.textContent = msg; err.style.display = 'inline'; } };
     if (err) err.style.display = 'none';
 
-    const bRev = this._val('cw-bar-rev'), bCogs = this._val('cw-bar-cogs'), bLab = this._val('cw-bar-lab');
-    const fRev = this._val('cw-food-rev'), fCogs = this._val('cw-food-cogs'), fLab = this._val('cw-food-lab');
-    const covers = this._val('cw-covers');
-    const oRev = this._val('cw-anc-rev'), oCogs = 0, fees = this._val('cw-fees');
+    const f = this._figures();
     const notes = (document.getElementById('cw-notes')?.value || '').trim();
-    const cat = this._catering || {};
-    const cRev = parseFloat(cat.revenue) || 0, cCogs = parseFloat(cat.cogs) || 0, cLab = parseFloat(cat.labor) || 0;
 
-    if (bRev + fRev + cRev === 0) { fail('Enter at least one revenue figure before confirming.'); return; }
+    if (f.totRev === 0) { fail('Enter at least one revenue figure before confirming.'); return; }
 
     const t = (App.data.settings && App.data.settings.targets) || {};
     const bTgt = t.bar_pour_cost_pct ?? 22, fTgt = t.food_cost_pct ?? 32;
-    const totRev = bRev + fRev + cRev;
-    // Total sales incl ancillary. Prime % and blended Labor % are measured against total
-    // sales (standard KPI + matches the Books income statement); check average and RPLH
-    // stay on F&B totRev.
-    const totSales = totRev + oRev;
-    const primeCost = bCogs + fCogs + bLab + fLab + cCogs + cLab;
-    const bPct = bRev > 0 ? bCogs / bRev * 100 : 0;
-    const fPct = fRev > 0 ? fCogs / fRev * 100 : 0;
 
     // ── Profit `week` record ──
     const pw = (App.data.weeks || []).find(w => w.period_end === pe) || null;
@@ -277,12 +314,16 @@ const ConfirmWeek = {
       week_num: pw ? pw.week_num : (App.nextWeekNum ? App.nextWeekNum() : ((App.data.weeks || []).length + 1)),
       period_end: pe,
       saved_at: new Date().toISOString(),
-      bar:  { revenue: bRev, cogs: bCogs, labor: bLab, cost_pct: bPct, labor_pct: bRev > 0 ? bLab / bRev * 100 : 0, vs_target_pct: bPct - bTgt, vs_target_dollar: ((bPct - bTgt) / 100) * bRev },
-      food: { revenue: fRev, cogs: fCogs, labor: fLab, cost_pct: fPct, labor_pct: fRev > 0 ? fLab / fRev * 100 : 0, vs_target_pct: fPct - fTgt, vs_target_dollar: ((fPct - fTgt) / 100) * fRev },
-      catering: { revenue: cRev, cogs: cCogs, labor: cLab, cost_pct: cRev > 0 ? cCogs / cRev * 100 : 0, labor_pct: cRev > 0 ? cLab / cRev * 100 : 0 },
-      other: { revenue: oRev, cogs: oCogs },
-      platform_fees: fees,
-      prime_cost_pct: totSales > 0 ? primeCost / totSales * 100 : 0,
+      bar:  { revenue: f.bRev, cogs: f.bCogs, labor: f.bLab, cost_pct: f.barPct, labor_pct: f.barLabPct,
+              vs_target_pct: f.barPct != null ? f.barPct - bTgt : null,
+              vs_target_dollar: f.barPct != null ? ((f.barPct - bTgt) / 100) * f.bRev : null },
+      food: { revenue: f.fRev, cogs: f.fCogs, labor: f.fLab, cost_pct: f.foodPct, labor_pct: f.foodLabPct,
+              vs_target_pct: f.foodPct != null ? f.foodPct - fTgt : null,
+              vs_target_dollar: f.foodPct != null ? ((f.foodPct - fTgt) / 100) * f.fRev : null },
+      catering: { revenue: f.cRev, cogs: f.cCogs, labor: f.cLab, cost_pct: f.cRev > 0 ? f.cCogs / f.cRev * 100 : 0, labor_pct: f.cRev > 0 ? f.cLab / f.cRev * 100 : 0 },
+      other: { revenue: f.oRev, cogs: 0 },
+      platform_fees: f.fees,
+      prime_cost_pct: f.primePct,
       notes: notes
     };
 
@@ -291,25 +332,19 @@ const ConfirmWeek = {
     // Total labor INCLUDES catering labor, consistent with prime_cost_pct and the
     // locked "total labor drives every labor% number" rule. It was dropping cLab
     // while the denominator (totRev) kept catering revenue, understating labor%.
-    const laborCost = bLab + fLab + cLab;
-    const hours = this._hours || 0;
-    // Hourly (schedulable) labor = bar+food hourly only, minus fixed salaried pay,
-    // so the labor-scheduling recovery leak dollarizes only what the weekly schedule
-    // can move (catering event crew is event-driven, not weekly-schedulable).
-    const salaried = App.salariedCost ? (App.salariedCost(App.weekStartFor(pe), pe).total || 0) : 0;
-    const hourlyLabor = Math.max(0, (bLab + fLab) - salaried);
+    const r2 = v => (v == null ? null : parseFloat(v.toFixed(2)));
     const rweek = {
       id: rw ? rw.id : App.uid(),
       week_num: rw ? rw.week_num : ((App.data.revenue_weeks || []).reduce((m, w) => Math.max(m, w.week_num || 0), 0) + 1),
       period_end: pe,
-      bar_revenue: bRev,
-      floor_revenue: fRev,
-      covers: covers,
-      check_avg: covers > 0 ? parseFloat((totRev / covers).toFixed(2)) : 0,
-      total_labor_cost: laborCost,
-      hourly_labor_cost: parseFloat(hourlyLabor.toFixed(2)),
-      total_hours: hours,
-      labor_pct_blended: totSales > 0 ? parseFloat((laborCost / totSales * 100).toFixed(2)) : 0,
+      bar_revenue: f.bRev,
+      floor_revenue: f.fRev,
+      covers: f.covers,
+      check_avg: r2(f.checkAvg),
+      total_labor_cost: f.laborCost,
+      hourly_labor_cost: parseFloat(f.hourlyLabor.toFixed(2)),
+      total_hours: f.hours,
+      labor_pct_blended: r2(f.laborPct),
       // Hourly labor % divides by BAR + FOOD revenue, matching its own numerator.
       // hourlyLabor is bar+food hourly pay with catering crew deliberately left out
       // (event-driven, not weekly-schedulable), so dividing it by totRev, which carries
@@ -320,8 +355,8 @@ const ConfirmWeek = {
       // bar+food. So the leak dollars ran light by catering's share of the week.
       // (labor_pct_blended stays on totSales: that is the P&L number, total labor against
       // total sales, and it ties to Books. Different metric, different basis, on purpose.)
-      hourly_labor_pct: (bRev + fRev) > 0 ? parseFloat((hourlyLabor / (bRev + fRev) * 100).toFixed(2)) : 0,
-      rplh_blended: hours > 0 ? parseFloat((totRev / hours).toFixed(2)) : 0,
+      hourly_labor_pct: r2(f.hourlyPct),
+      rplh_blended: r2(f.rplh),
       notes: notes,
       saved_at: new Date().toISOString()
     };

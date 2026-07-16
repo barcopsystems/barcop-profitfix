@@ -40,11 +40,16 @@ const InitiativeTracker = {
         { key: 'check_avg', label: 'Check Average',             fmt: 'currency' },
         { key: 'labor_pct', label: 'Labor %', fmt: 'pct', lowerBetter: true }
       ],
+      // A partially confirmed week stores null for anything not measured yet, and
+      // _measure filters nulls out of the before/after averages. Coercing them to 0
+      // here would smuggle a fabricated zero past that filter and drag an
+      // experiment's lift toward a result the operator never recorded.
       metricFor: (w, key) => {
+        const n = v => { const x = parseFloat(v); return isNaN(x) ? null : x; };
         if (key === 'revenue')   return (parseFloat(w.bar_revenue) || 0) + (parseFloat(w.floor_revenue) || 0);
-        if (key === 'covers')    return parseFloat(w.covers) || 0;
-        if (key === 'check_avg') return parseFloat(w.check_avg) || 0;
-        if (key === 'labor_pct') return parseFloat(w.labor_pct_blended) || 0;
+        if (key === 'covers')    return n(w.covers);
+        if (key === 'check_avg') return n(w.check_avg);
+        if (key === 'labor_pct') return n(w.labor_pct_blended);
         return null;
       },
       namePh: 'New Cocktail Menu',

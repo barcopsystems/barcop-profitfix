@@ -45,11 +45,24 @@ function profitNarrative(d) {
   // S3 — Shrink & Waste
   if (d.S3_SCORE != null) {
     const vpct = d.S3_INV_VARIANCE_PCT, vdol = d.S3_INV_VARIANCE_DOLLAR;
-    const bad = (vpct != null && vpct > 2) || (d.S3_COUNT_FREQ && /monthly|not counted/i.test(d.S3_COUNT_FREQ));
-    o.S3_NARRATIVE = (vdol != null)
-      ? `The variance report shows ${money(vdol)} of product used but never rung this period${vpct != null ? `, ${pct1(vpct)} of your cost of goods` : ''}. That is over-pour, waste, and theft you can see.`
-      : `You are counting inventory but the variance is not scored yet. Run the variance report to put a dollar on the shrink.`;
-    o.S3_FINDING = `Counts are running ${String(d.S3_COUNT_FREQ || '').toLowerCase()}${d.S3_WASTE_TOTAL != null ? `, and ${money(d.S3_WASTE_TOTAL)} of waste is logged` : ''}. You can only catch shrink you count for, and that dollar already sits inside your pour and food cost above.`;
+    // The variance dollar is SIGNED: positive is product that walked, negative means
+    // the register rang more than you actually used, which is a count or a recipe
+    // that is off, not theft. Never narrate a negative as shrink.
+    const counting = (d.S3_COUNTS_IN_PERIOD || 0) > 0;
+    const bad = (vpct != null && Math.abs(vpct) > 2) || (d.S3_COUNT_FREQ && /monthly|not counted/i.test(d.S3_COUNT_FREQ));
+    const ofCogs = v => (v != null ? `, ${pct1(Math.abs(v))} of your cost of goods` : '');
+    o.S3_NARRATIVE = (vdol != null && vdol > 0)
+      ? `The variance report shows ${money(vdol)} of product used but never rung this period${ofCogs(vpct)}. That is over-pour, waste, and theft you can see.`
+      : (vdol != null && vdol < 0)
+        ? `The variance report came back ${money(Math.abs(vdol))} the other way this period${ofCogs(vpct)}. You rang more than you used, so this is a count or a recipe that is off, not shrink. Recount the loose lines and check your recipes before you trust this number.`
+        : (vdol != null)
+          ? `The variance report came back flat this period. Nothing measured walked out.`
+          : counting
+            ? `You are counting inventory but the variance is not scored yet. Run the variance report to put a dollar on the shrink.`
+            : `There is no variance dollar this period. Take a count and run the variance report to put a number on the shrink.`;
+    o.S3_FINDING = (counting ? `Counts are running ${String(d.S3_COUNT_FREQ || '').toLowerCase()}` : `No counts went in this period`)
+      + (d.S3_WASTE_TOTAL != null ? `, and ${money(d.S3_WASTE_TOTAL)} of waste is logged` : '')
+      + `. You can only catch shrink you count for, and that dollar already sits inside your pour and food cost above.`;
     o.S3_TOOL = bad
       ? `Count weekly, run the variance report every count, and work the biggest negative lines in Loss Prevention.`
       : `Hold the weekly count and the variance report. That is what keeps the shrink honest.`;
