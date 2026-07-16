@@ -352,19 +352,25 @@ window.CashEngine = {
   // runway and the lender PDF all read far too optimistic.
   _trailingWeeklyLabor() {
     const actuals = (App.laborData && App.laborData.lc_actuals) || [];
-    const end = new Date(App.todayLocal() + 'T00:00:00').getTime();
-    const start = end - 28 * 86400000;
+    // Calendar arithmetic, not milliseconds: subtracting 28 x 86400000 from a local
+    // midnight lands an hour off across a DST change and rolls the day, the same trap
+    // that made App.salariedCost count 30 days in March.
+    const dayBefore = (ymd, n) => { const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() - n); return App.ymdLocal(d); };
+    const today = App.todayLocal();
+    const start = dayBefore(today, 28), end = dayBefore(today, 1);   // 28 days, ending yesterday
     const rows = actuals.filter(a => {
-      const t = new Date((a && a.date || '') + 'T00:00:00').getTime();
-      return !isNaN(t) && t < end && t >= start;
+      const d = (a && a.date) ? String(a.date).slice(0, 10) : '';
+      return d && d >= start && d <= end;
     });
     let cost = rows.reduce((s, a) => s + (a.cost || 0), 0);
-    // lc_actuals carry straight time only; add the weekly premium over the same window.
-    cost += App.otPremiumForRows ? App.otPremiumForRows(rows).total : 0;
+    // lc_actuals carry straight time only, so add the weekly premium. It has to be
+    // measured over WHOLE weeks and then allocated to this window: a rolling 28 days
+    // is not week-aligned, so handing the filtered rows to otPremiumForRows tested the
+    // cut weeks at each edge against 40, they never reached it, and the estimate this
+    // feeds (runway, the stress test, the lender PDF) always ran light.
+    cost += App.otPremiumInWindow ? App.otPremiumInWindow(actuals, start, end).total : 0;
     const hourlyWeekly = rows.length ? cost / 4 : 0;
-    const wkEnd = App.ymdLocal(new Date(end - 86400000));
-    const wkStart = App.ymdLocal(new Date(end - 7 * 86400000));
-    const salaried = App.salariedCost ? App.salariedCost(wkStart, wkEnd).total : 0;
+    const salaried = App.salariedCost ? App.salariedCost(dayBefore(today, 7), end).total : 0;
     return hourlyWeekly + salaried;
   },
   // Recurring weekly inventory spend, estimated as your weekly cost of goods

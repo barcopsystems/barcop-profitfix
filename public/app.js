@@ -5978,14 +5978,20 @@ const App = {
   // understate labor whenever anyone crosses 40 hours (Build Schedule and the Range
   // lens already add it; the actuals-side weekly feeds did not). Salaried staff are
   // exempt. Returns { total, byStaff }.
+  // The ONE key an OT premium is bucketed and reported under. Any caller that
+  // attributes premium back onto its own per-staff rollup must key it the same way,
+  // or the premium lands on a staff row that does not exist while the total still
+  // counts it, and Total Wages Paid stops equalling the sum of its own breakdowns.
+  otStaffKey(a) { return (a && (a.staff_id || a.name)) || '?'; },
+
   otPremiumForRows(rows) {
     const OT = this.OT_THRESHOLD || 40;
     const wk = {};
     (rows || []).forEach(a => {
       if (!a || this.isSalaried(a.staff_id)) return;
       const ws = this.weekStartFor ? this.weekStartFor(a.date) : (a.date || '');
-      const key = (a.staff_id || a.name || '?') + '|' + ws;
-      if (!wk[key]) wk[key] = { staff: a.staff_id || a.name || '?', hours: 0, cost: 0 };
+      const key = this.otStaffKey(a) + '|' + ws;
+      if (!wk[key]) wk[key] = { staff: this.otStaffKey(a), hours: 0, cost: 0 };
       wk[key].hours += (a.hours || 0);
       wk[key].cost  += (a.cost  || 0);
     });
@@ -5995,6 +6001,44 @@ const App = {
       const otH = Math.max(0, b.hours - OT);
       if (otH <= 0 || b.hours <= 0) return;
       const prem = otH * (b.cost / b.hours) * 0.5;
+      total += prem;
+      byStaff[b.staff] = (byStaff[b.staff] || 0) + prem;
+    });
+    return { total: total, byStaff: byStaff };
+  },
+
+  /* The OT premium attributable to an arbitrary date window [start, end] (inclusive
+     ymd). Overtime is a WEEKLY threshold, so the premium has to be computed over whole
+     Mon-Sun weeks and only THEN allocated to the window.
+
+     Handing a cut window straight to otPremiumForRows ALWAYS under-counts: a calendar
+     month or a rolling 28 days slices the weeks at its edges, and the slice of a
+     45-hour week that lands inside the window is under 40 on its own, so it draws no
+     premium at all. Pass ALL rows here, never a pre-filtered set: the filtering is the
+     bug. Each week's premium is then allocated by that week's share of hours inside the
+     window, the same blended model otPremiumForRows already uses for the rate. A window
+     that covers whole weeks allocates 1.0 and returns exactly what otPremiumForRows
+     would. */
+  otPremiumInWindow(rows, start, end) {
+    const OT = this.OT_THRESHOLD || 40;
+    const wk = {};
+    (rows || []).forEach(a => {
+      if (!a || !a.date || this.isSalaried(a.staff_id)) return;
+      const ws = this.weekStartFor ? this.weekStartFor(a.date) : (a.date || '');
+      const key = this.otStaffKey(a) + '|' + ws;
+      if (!wk[key]) wk[key] = { staff: this.otStaffKey(a), hours: 0, cost: 0, inHours: 0 };
+      const h = a.hours || 0;
+      wk[key].hours += h;
+      wk[key].cost  += (a.cost || 0);
+      const d = String(a.date).slice(0, 10);
+      if ((!start || d >= start) && (!end || d <= end)) wk[key].inHours += h;
+    });
+    let total = 0; const byStaff = {};
+    Object.keys(wk).forEach(k => {
+      const b = wk[k];
+      const otH = Math.max(0, b.hours - OT);
+      if (otH <= 0 || b.hours <= 0 || b.inHours <= 0) return;
+      const prem = otH * (b.cost / b.hours) * 0.5 * (b.inHours / b.hours);
       total += prem;
       byStaff[b.staff] = (byStaff[b.staff] || 0) + prem;
     });
