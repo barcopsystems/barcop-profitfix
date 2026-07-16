@@ -623,6 +623,11 @@ S.InventoryReceiveDelivery = {
       lineItems.push({
         product_id:        pid,
         name:              p.name,
+        // A line the operator flagged BY HAND during entry already filed its claim
+        // (openLineDiscrepancy). Carry the claim id onto the saved line so Delivery
+        // History reads it as Filed; without it that line shows Flag again and
+        // filing from there raises a SECOND claim for the same overcharge.
+        discrepancy_id:    line.dataset.discrepancyId || null,
         container_size_oz: p.container_size_oz != null ? p.container_size_oz : null,
         qty,
         price_per_unit:    unitPrice,
@@ -770,7 +775,8 @@ S.InventoryReceiveDelivery = {
     if (ok) {
       App.markSetupDone('gs_ic_delivery');
       this._draft = null; this._draftLines = null;
-      const filed = await this._autoFileDisputes(disputedUpdates, { vendor, date: record.date, invoice: record.invoice_number });
+      const filed = await this._autoFileDisputes(disputedUpdates, { vendor, date: record.date, invoice: record.invoice_number, deliveryId: record.id });
+      await this._linkFiledDisputes(record);
       this.renderDone(record, filed, creepHits);
     } else {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Delivery'; }
@@ -781,6 +787,11 @@ S.InventoryReceiveDelivery = {
   // File a vendor discrepancy claim for each DISPUTED price change (the ones the
   // operator chose not to accept as the new cost) so "dispute" actually files
   // the claim in one step. Lands in Profit Recovery > Vendor Discrepancies.
+  // delivery_id ties the claim back to the delivery it came off, exactly like the
+  // hand-flag path (ic-delivery-history discPrefill). Two readers need it: the
+  // Vendor Tracker Work button, and ic-delivery-history discForLine, which without
+  // it cannot see the claim and shows the disputed line as Flag, so re-opening the
+  // delivery files a SECOND claim for the same overcharge.
   async _autoFileDisputes(disputed, ctx) {
     let filed = 0;
     for (const u of (disputed || [])) {
@@ -790,6 +801,7 @@ S.InventoryReceiveDelivery = {
         date:           ctx.date,
         vendor:         ctx.vendor,
         reference:      ctx.invoice || '',
+        delivery_id:    ctx.deliveryId || null,
         type:           'Price Overcharge',
         sku:            u.product.name,
         units:          u.qty || 0,
@@ -805,6 +817,22 @@ S.InventoryReceiveDelivery = {
       if (okR) filed++;
     }
     return filed;
+  },
+
+  // A line flagged BY HAND during entry filed its claim before this delivery
+  // existed, so the claim could not carry a delivery_id yet. Backfill it now that
+  // the record has an id, so the Vendor Tracker Work button can reach the claim
+  // like it does for every auto-filed one. Only fills a blank: a claim already
+  // tied to a delivery is never re-pointed at another one.
+  async _linkFiledDisputes(record) {
+    const all = (App.data && App.data.vendor_discrepancies) || [];
+    for (const li of (record.line_items || [])) {
+      if (!li.discrepancy_id) continue;
+      const rec = all.find(x => x && x.id === li.discrepancy_id);
+      if (!rec || rec.delivery_id) continue;
+      rec.delivery_id = record.id;
+      await App.putRecord('core', 'vendor_discrepancy', rec);
+    }
   },
 
   renderDone(record, disputesFiled, creepHits) {
