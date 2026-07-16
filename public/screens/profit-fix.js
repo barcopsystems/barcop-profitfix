@@ -217,8 +217,17 @@ S.ProfitFix = {
   healthColor(state) {
     return state === 'running' ? 'var(--green)' : state === 'slipping' ? 'var(--amber)' : state === 'atrisk' ? 'var(--red)' : 'var(--t3)';
   },
+  isComposite(id) {
+    return !!(window.Recovery && (Recovery.COMPOSITE_GAPS || []).indexOf(id) !== -1);
+  },
   recoveredFor(id) {
     if (!window.Recovery) return 0;
+    // A composite gap (prime cost = pour + food + labor) recovers the SAME dollars its
+    // parts do, so a figure here prints them twice on one card: Pour $19,600 + Food
+    // $7,000 + Prime $26,600, under a header on the same card reading $26,600 total.
+    // recovery.js states the rule and moduleSummary, total(), the leak board and the
+    // dashboard all honor it. This was the one door that did not.
+    if (this.isComposite(id)) return 0;
     // compute() returns the SAME dollars for every fix_log entry sharing a gap_id
     // (recovery is measured per gap-area), so summing across entries double-counts
     // when a gap has both an auto-start and a manual mark. Collapse to one, exactly
@@ -429,11 +438,22 @@ S.ProfitFix = {
     } else {
       const r = window.Recovery ? Recovery.compute(logged) : { status: 'untracked' };
       const since = ' running since ' + esc(logged.date) + '. ';
-      if (r.status === 'building') {
+      if (this.isComposite(g.id)) {
+        // Prime is the only composite. Its dollars are the parts restated, and
+        // recoveredFor already returns 0 for it, so say why instead of showing a blank.
+        body = since + 'Prime cost is your pour, food, and labor combined, so the dollars it recovers are already counted in those systems. Bar Cop does not count them twice.';
+      } else if (r.status === 'building') {
         const wk = r.weeksIn || 0, need = (r.baselineWeeks || 3) + 1;
         body = since + 'Building your baseline, ' + wk + ' of about ' + need + ' weeks logged. The recovery number turns on around your first month.';
       } else if (r.status === 'ok' && r.dollars != null && r.dollars > 0) {
-        body = since + 'Recovered about ' + gold(r.dollars) + ' so far' + (r.dollarsAnnual ? ', on pace for ' + gold(r.dollarsAnnual) + ' a year' : '') + '.';
+        // Only pace it forward when the recent weeks are still ahead. dollarsAnnual is a
+        // run-rate off the CURRENT window, so a fix that worked early and has since
+        // slipped comes back NEGATIVE while dollars stays positive. A bare truthy test
+        // printed that as gold good news reading "on pace for $-4,160 a year".
+        body = since + 'Recovered about ' + gold(r.dollars) + ' so far'
+          + (r.dollarsAnnual > 0 ? ', on pace for ' + gold(r.dollarsAnnual) + ' a year.'
+            : r.dollarsAnnual < 0 ? '. The recent weeks are running below where you started, so get the watched steps back on track.'
+            : '.');
       } else if (r.status === 'ok' && r.dollars != null && r.dollars < 0) {
         body = since + 'Slipping, about ' + red(Math.abs(r.dollars)) + ' below where you started. Get the watched steps back on track.';
       } else if (r.status === 'ok') {
