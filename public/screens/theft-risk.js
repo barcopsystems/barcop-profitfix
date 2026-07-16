@@ -32,12 +32,24 @@ S.TheftRisk = {
   _signalData(fromStr) {
     const inRange = d => { const ds = d ? String(d).slice(0, 10) : ''; return ds && ds >= fromStr; };
     const shorts = this.variances().filter(v => v.status === 'Short' && inRange(v.date));
+    // Count CHECKS carrying at least one flag, not flagged product LINES. The row is
+    // labelled "Flagged spot checks", so one check that flagged five products counted as
+    // 5 and inflated Flags Today 3-5x. The Brief contradicted itself on one page:
+    // "Flagged spot checks: 11" printed directly above "Spot checks run: 3". The dollar
+    // AMOUNT still sums every flagged line, which is the right basis for a dollar.
     const spots = [];
-    this.spotChecks().forEach(c => { if (inRange(c.date)) (c.items || []).forEach(it => { if (it.flagged) spots.push(it); }); });
+    let spotsFlagged = 0;
+    this.spotChecks().forEach(c => {
+      if (!inRange(c.date)) return;
+      const flagged = (c.items || []).filter(it => it.flagged);
+      if (!flagged.length) return;
+      flagged.forEach(it => spots.push(it));
+      spotsFlagged++;
+    });
     const theft = this.adjustments().filter(a => a.reason === 'Theft' && inRange((a.date_time || '').slice(0, 10)));
     return {
       shorts:    { count: shorts.length,    amount: Math.abs(shorts.reduce((s, v) => s + Math.min(0, v.variance || 0), 0)) },
-      spots:     { count: spots.length,     amount: spots.reduce((s, it) => s + Math.max(0, it.variance_dollar || 0), 0) },
+      spots:     { count: spotsFlagged,     amount: spots.reduce((s, it) => s + Math.max(0, it.variance_dollar || 0), 0) },
       theft:     { count: theft.length,     amount: theft.reduce((s, a) => s + Math.abs(a.value || 0), 0) }
     };
   },
@@ -51,7 +63,12 @@ S.TheftRisk = {
     const inRange = d => { const ds = d ? String(d).slice(0, 10) : ''; return ds && ds >= fromStr; };
     const out = [];
     this.variances().forEach(v => { if (v.status === 'Short' && inRange(v.date)) out.push({ date: String(v.date).slice(0, 10), severe: false }); });
-    this.spotChecks().forEach(c => { if (inRange(c.date)) (c.items || []).forEach(it => { if (it.flagged) out.push({ date: String(c.date).slice(0, 10), severe: false }); }); });
+    // One entry per flagged CHECK, not per flagged line, same rule as _signalData. This
+    // feeds the Hub's "Loss-prevention flags: N to review" (hub.js), so one spot check
+    // that flagged five products announced five separate things to review.
+    this.spotChecks().forEach(c => {
+      if (inRange(c.date) && (c.items || []).some(it => it.flagged)) out.push({ date: String(c.date).slice(0, 10), severe: false });
+    });
     this.adjustments().forEach(a => { const d = (a.date_time || '').slice(0, 10); if (a.reason === 'Theft' && inRange(d)) out.push({ date: d, severe: true }); });
     return out;
   },
@@ -133,8 +150,19 @@ S.TheftRisk = {
   // the right place with that modal open. [[two-doors-same-data]]
   investigationsSection() {
     const invs = App.data.variance_investigations || [];
-    const open = invs.filter(i => i.status !== 'resolved');
-    const resolved = invs.filter(i => i.status === 'resolved');
+    // Sort explicitly, newest first. App.cmpNewest is a NO-OP on these: it reads
+    // App._recDate, which looks for date / period_end / date_reported / date_86 /
+    // generated_at / saved_at, and an investigation carries none of those. It has
+    // opened_date and resolved_date. Sort each list on the field it is actually about.
+    // Neither list was ordered at all: `open` was sliced raw, and `resolved` was
+    // .reverse()'d off a date-DESC store into OLDEST-first while being called `newest`,
+    // so the page showed the oldest N and "Show older" paged the wrong way.
+    const byNewest = (...fields) => (a, b) => {
+      const k = r => { for (let i = 0; i < fields.length; i++) if (r && r[fields[i]]) return String(r[fields[i]]); return ''; };
+      return k(b).localeCompare(k(a));
+    };
+    const open = invs.filter(i => i.status !== 'resolved').sort(byNewest('opened_date'));
+    const resolved = invs.filter(i => i.status === 'resolved').sort(byNewest('resolved_date', 'opened_date'));
 
     let h = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 10px;">'
       + '<div class="sh" style="margin:0;">Investigations</div>'
@@ -166,8 +194,7 @@ S.TheftRisk = {
     }
 
     if (resolved.length) {
-      const newest = resolved.slice().reverse();
-      const rows = newest.slice(0, App.listLimit('core', 'variance_investigation')).map(inv =>
+      const rows = resolved.slice(0, App.listLimit('core', 'variance_investigation')).map(inv =>
         '<tr>'
         + '<td><div class="val">' + esc(inv.sku) + '</div></td>'
         + '<td>' + esc(inv.resolved_date || '-') + '</td>'
@@ -178,7 +205,7 @@ S.TheftRisk = {
         + this.COLGROUP
         + '<thead><tr>'
         + '<th>Resolved</th><th>Resolved On</th><th colspan="2">Finding</th><th class="no-print"></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('core', 'variance_investigation', newest, false);
+        + App.showOlderBar('core', 'variance_investigation', resolved, false);
     }
     return h;
   },
