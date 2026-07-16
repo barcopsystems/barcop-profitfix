@@ -403,7 +403,13 @@ S.RevenueFix = {
         const wk = r.weeksIn || 0, need = (r.baselineWeeks || 3) + 1;
         body = since + 'Building your baseline, ' + wk + ' of about ' + need + ' weeks logged. The recovery number turns on around your first month.';
       } else if (r.status === 'ok' && r.dollars != null && r.dollars > 0) {
-        body = since + 'Recovered about ' + gold(r.dollars) + ' so far' + (r.dollarsAnnual ? ', on pace for ' + gold(r.dollarsAnnual) + ' a year' : '') + '.';
+        // dollarsAnnual is a run-rate off the CURRENT window, so a fix that worked early
+        // and has since slipped comes back NEGATIVE while dollars stays positive. A bare
+        // truthy test printed that as gold good news: "on pace for $-4,160 a year".
+        body = since + 'Recovered about ' + gold(r.dollars) + ' so far'
+          + (r.dollarsAnnual > 0 ? ', on pace for ' + gold(r.dollarsAnnual) + ' a year.'
+            : r.dollarsAnnual < 0 ? '. The recent weeks are running below where you started, so get the watched steps back on track.'
+            : '.');
       } else if (r.status === 'ok' && r.dollars != null && r.dollars < 0) {
         body = since + 'Slipping, about ' + red(Math.abs(r.dollars)) + ' below where you started. Get the watched steps back on track.';
       } else if (r.status === 'ok') {
