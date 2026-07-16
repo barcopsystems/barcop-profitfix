@@ -5767,6 +5767,27 @@ const App = {
   //     batch contributes (qty / servings_per_batch) × each batch ingredient.
   //
   // Total result is then multiplied by sold_qty in the caller.
+  /* One recipe/batch quantity -> the draw the variance report's theoretical side expects.
+
+     A stored recipe quantity is ALWAYS in the measure recipeBasis(p) reports, because
+     that is what the Menu Builder labels the input with, what the prep-batch builder
+     labels and costs with, and what menuItemCost multiplies by recipeBasis' costPerUnit:
+     OUNCES for any liquid (Liquor, Wine, Draft Beer, and a Food/Misc product carrying a
+     container size), SERVINGS for a portioned solid, BOTTLES for bottle beer, the stock
+     unit otherwise.
+
+     usageVarRows then converts that draw to stock units per category: it divides by
+     container_size_oz for every bar product (so bar wants OUNCES), and for Food/Misc it
+     divides by ozPerContainer for a liquid, servingsPerUnit for a portioned solid, and 1
+     otherwise (so Food/Misc wants the recipeBasis measure as-is). Bottle beer is the only
+     one whose recipeBasis measure and the divisor's expectation differ, so it is the only
+     conversion here. */
+  recipeDraw(p, qty) {
+    if (!p || !(qty > 0)) return 0;
+    if (p.category === 'Bottle Beer') return qty * (parseFloat(p.container_size_oz) || 0);
+    return qty;
+  },
+
   explodeMenuItem(item, soldQty) {
     const result = {};
     if (!item) return result;
@@ -5789,7 +5810,6 @@ const App = {
 
     // Recipe with ingredients
     if (item.recipe && Array.isArray(item.recipe.ingredients)) {
-      const isSingleDrink = item.recipe.mode === 'single';
       const plateYield = (item.recipe.mode === 'food' && item.recipe.plate_yield > 0) ? item.recipe.plate_yield : 1;
       const perUnit = soldQty / plateYield; // for food, plate_yield converts recipe into per-plate
 
@@ -5810,12 +5830,13 @@ const App = {
             if (!bp) return;
             const biQty = parseFloat(bi.quantity) || 0;
             if (biQty <= 0) return;
-            // Batch ingredients are typically in product units (bottles/units).
-            // Convert to oz when the underlying product has container_size_oz.
-            const sizeOz = parseFloat(bp.container_size_oz) || 0;
-            const unitsPerBatchServing = biQty / spb;
-            const ozPerBatchServing = sizeOz > 0 ? unitsPerBatchServing * sizeOz : unitsPerBatchServing;
-            result[bp.id] = (result[bp.id] || 0) + (ozPerBatchServing * qty * perUnit);
+            // A batch ingredient quantity is in recipeBasis measure, exactly like a menu
+            // recipe's: ic-prep-batches labels the column and costs the line off
+            // App.recipeBasis. This used to multiply it by container_size_oz on the
+            // premise that "batch ingredients are typically in product units (bottles)",
+            // which predates recipeBasis and is false: a batch calling for 8 oz of syrup
+            // drew 256 oz, 32x the real usage, straight into theoretical variance.
+            result[bp.id] = (result[bp.id] || 0) + (this.recipeDraw(bp, biQty / spb) * qty * perUnit);
           });
           return;
         }
@@ -5823,24 +5844,15 @@ const App = {
         // source === 'product'
         const p = prodById(id);
         if (!p) return;
-        const isBar = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'].includes(p.category);
-        let oz = 0;
-        if (isBar && isSingleDrink) {
-          // qty is in "pours" — multiply by pour_size_oz
-          oz = qty * (parseFloat(p.pour_size_oz) || 0);
-        } else if (isBar) {
-          // Food / non-single use of bar product — qty is in bottles
-          oz = qty * (parseFloat(p.container_size_oz) || 0);
-        } else {
-          // Kitchen + Misc mixers — quantity is already in the product's native
-          // purchase unit (lb / each / dozen / qt of mixer), the same convention
-          // menuItemCost uses with unit_cost, so the count (also native units)
-          // and the recipe draw compare apples to apples. Previously a Misc
-          // mixer in a cocktail was multiplied by a token pour_size_oz, charging
-          // ~0 oz and producing a false ~99% variance.
-          oz = qty;
-        }
-        result[p.id] = (result[p.id] || 0) + (oz * perUnit);
+        // The quantity is ALREADY in recipeBasis measure: it is the same number
+        // menuItemCost multiplies by recipeBasis' costPerUnit, and the Menu Builder
+        // labels the field with recipeBasis' unitLabel. This used to re-multiply it by
+        // pour_size_oz ("qty is in pours") or container_size_oz ("qty is in bottles"),
+        // conventions that predate recipeBasis and no longer hold: a 2 oz pour drew 3 oz,
+        // and a bar product in a food recipe drew 25x. recipeBasis is documented as the
+        // single source menuItemCost and the Menu Builder both read so they never
+        // disagree; this is the third reader and it has to read it too.
+        result[p.id] = (result[p.id] || 0) + (this.recipeDraw(p, qty) * perUnit);
       });
     }
 
