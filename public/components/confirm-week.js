@@ -138,6 +138,7 @@ const ConfirmWeek = {
       + '<div class="sh" style="margin:0 0 10px;">Optional</div>'
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;margin-bottom:6px;">'
       + '<div class="f" style="width:180px;"><label>Ancillary Revenue</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-anc-rev"/></div></div>'
+      + '<div class="f" style="width:180px;"><label>Ancillary Cost</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-anc-cogs"/></div></div>'
       + '<div class="f" style="width:200px;"><label>Platform / Operating Fees</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-fees"/></div></div>'
       + '</div>'
       + App.noteField({ id: 'cw-notes', value: m.notes, mt: 10 });
@@ -158,7 +159,7 @@ const ConfirmWeek = {
     set('cw-bar-rev', m.bar.revenue);   set('cw-bar-cogs', m.bar.cogs);   set('cw-bar-lab', m.bar.labor);
     set('cw-food-rev', m.food.revenue); set('cw-food-cogs', m.food.cogs); set('cw-food-lab', m.food.labor);
     set('cw-covers', m.covers);
-    set('cw-anc-rev', m.other.revenue); set('cw-fees', m.platform_fees);
+    set('cw-anc-rev', m.other.revenue); set('cw-anc-cogs', m.other.cogs); set('cw-fees', m.platform_fees);
     this._hours = m.hours;
     this._catering = m.catering;
 
@@ -199,7 +200,7 @@ const ConfirmWeek = {
     const bRev = this._valOrNull('cw-bar-rev'),  bCogs = this._valOrNull('cw-bar-cogs'),  bLab = this._valOrNull('cw-bar-lab');
     const fRev = this._valOrNull('cw-food-rev'), fCogs = this._valOrNull('cw-food-cogs'), fLab = this._valOrNull('cw-food-lab');
     const covers = this._valOrNull('cw-covers');
-    const oRev = this._val('cw-anc-rev'), fees = this._val('cw-fees');
+    const oRev = this._val('cw-anc-rev'), oCogs = this._val('cw-anc-cogs'), fees = this._val('cw-fees');
     const cat = this._catering || {};
     const cRev = parseFloat(cat.revenue) || 0, cCogs = parseFloat(cat.cogs) || 0, cLab = parseFloat(cat.labor) || 0;
     const hours = this._hours || 0;
@@ -217,7 +218,12 @@ const ConfirmWeek = {
     const cogsIn  = (!(bRev > 0) || bCogs != null) && (!(fRev > 0) || fCogs != null);
     const laborIn = (!(bRev > 0) || bLab  != null) && (!(fRev > 0) || fLab  != null);
 
-    const primeCost = nz(bCogs) + nz(fCogs) + nz(bLab) + nz(fLab) + cCogs + cLab;
+    // Ancillary COST is in prime because ancillary REVENUE is in the denominator
+    // (totSales). Left out, logging merch or vending sales mechanically improved prime %
+    // for free. There was no input for it at all until 2026-07-16: the retired This Week
+    // screen had one, Confirm the Week did not carry it over, so Books' Other COGS line
+    // was unfillable and a no-op re-save wiped whatever the seed had written.
+    const primeCost = nz(bCogs) + nz(fCogs) + nz(bLab) + nz(fLab) + cCogs + cLab + oCogs;
     const laborCost = nz(bLab) + nz(fLab) + cLab;
     // Hourly (schedulable) labor = bar+food hourly only, minus fixed salaried pay,
     // so the labor-scheduling recovery leak dollarizes only what the weekly schedule
@@ -226,7 +232,7 @@ const ConfirmWeek = {
     const hourlyLabor = Math.max(0, (nz(bLab) + nz(fLab)) - salaried);
 
     return {
-      bRev, bCogs, bLab, fRev, fCogs, fLab, cRev, cCogs, cLab, oRev, fees, covers, hours,
+      bRev, bCogs, bLab, fRev, fCogs, fLab, cRev, cCogs, cLab, oRev, oCogs, fees, covers, hours,
       totRev, totSales, primeCost, laborCost, hourlyLabor,
       barPct:     (bRev > 0 && bCogs != null) ? bCogs / bRev * 100 : null,
       foodPct:    (fRev > 0 && fCogs != null) ? fCogs / fRev * 100 : null,
@@ -321,7 +327,7 @@ const ConfirmWeek = {
               vs_target_pct: f.foodPct != null ? f.foodPct - fTgt : null,
               vs_target_dollar: f.foodPct != null ? ((f.foodPct - fTgt) / 100) * f.fRev : null },
       catering: { revenue: f.cRev, cogs: f.cCogs, labor: f.cLab, cost_pct: f.cRev > 0 ? f.cCogs / f.cRev * 100 : 0, labor_pct: f.cRev > 0 ? f.cLab / f.cRev * 100 : 0 },
-      other: { revenue: f.oRev, cogs: 0 },
+      other: { revenue: f.oRev, cogs: f.oCogs },
       platform_fees: f.fees,
       prime_cost_pct: f.primePct,
       notes: notes
