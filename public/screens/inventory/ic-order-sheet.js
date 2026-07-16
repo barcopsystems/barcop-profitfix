@@ -594,17 +594,23 @@ S.InventoryOrderSheet = {
   // items (current on-hand / par shown alongside). Saving writes back to the
   // SAME order. This is "pull it back to the Order Sheet to tweak it".
   editVendorCardHTML(order) {
-    const data = this.belowParByVendor();
-    const onHandMap = {};
-    if (data && data.latest) (data.latest.items || []).forEach(it => {
-      onHandMap[it.product_id] = (onHandMap[it.product_id] || 0) + (it.total || 0);
-    });
+    // On hand from the perpetual read, the same source the fresh order sheet, the
+    // line-product picker (onLineProductChange) and the delivery flow all use. This built
+    // its own map off `belowParByVendor().latest.items`, which is ONE count: a product
+    // counted at another location dropped out entirely, and with no `counted === false`
+    // filter an UNCOUNTED line read as real stock. Worst of it, changing a row's product
+    // fires onLineProductChange, which reads App.currentOnHand(), so the same cell in the
+    // same card showed two different On Hand numbers depending on whether you touched it.
+    // (App.currentOnHand takes the newest COUNTED value per product per location across
+    // every count, then sums the locations.)
+    const onHand = App.currentOnHand();
     const products = [];
     const rows = (order.line_items || []).map(li => {
       let p = this.productById(li.product_id);
       if (!p) p = { id: li.product_id || '', name: li.name || 'Unknown product', unit_cost: li.unit_cost || 0, category: '' };
       products.push(p);
-      const oh = (li.product_id != null && (li.product_id in onHandMap)) ? onHandMap[li.product_id] : null;
+      const _oh = li.product_id != null ? onHand[li.product_id] : null;
+      const oh = (_oh != null && !isNaN(_oh)) ? _oh : null;
       const par = (p.par_level != null && p.par_level !== '') ? p.par_level : null;
       return this.lineRowHTML(p, li.qty != null ? li.qty : 0, oh, par);
     }).join('');
