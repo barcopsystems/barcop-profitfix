@@ -6638,10 +6638,42 @@ const App = {
       + '</svg></div>';
   },
 
+  // SUPERSEDED by weekNumFor/renumberWeekStore below. Left only because the retired
+  // this-week.js still references it; nothing live calls it. Do not reach for it: a
+  // running max+1 is the bug those two helpers exist to fix.
   nextWeekNum() {
     const weeks = this.data?.weeks || [];
     if (weeks.length === 0) return 1;
     return Math.max(...weeks.map(w => w.week_num || 0)) + 1;
+  },
+
+  // ── week_num: a CHRONOLOGICAL label, the Nth week you have logged, ranked by
+  //    period_end. NEVER a running max+1. Back-filling a missed week is a normal
+  //    supported flow (Week History puts a Confirm button on every unconfirmed
+  //    week), and max+1 handed that EARLIEST week the HIGHEST number. Both readers
+  //    show the number beside its date in date order, so it read as nonsense:
+  //    reports.js sorts the accountant export by period_end, so its Week Number
+  //    column ran 3, 1, 2 down the sheet, and the sidebar labelled the newest week
+  //    with a lower number than an older one. Nothing sorts or does math on
+  //    week_num (checked app-wide), so re-ranking is safe. ───────────────────────
+  weekNumFor(arr, pe) {
+    const k = String(pe || '').slice(0, 10);
+    if (!k) return 1;
+    return (arr || []).filter(w => w && w.period_end
+      && String(w.period_end).slice(0, 10) < k).length + 1;
+  },
+
+  // Re-rank a week store IN PLACE after an insert so the sequence stays dense and in
+  // date order (a back-fill shifts every later week up one). Returns only the records
+  // whose number actually moved, so the caller writes just those. A no-op on the
+  // normal path (the new week is the latest) and on the seed (its week 1 is already
+  // its oldest, `endAgo = (weeks.length - wk) * 7`), so the demo does not churn.
+  renumberWeekStore(arr) {
+    const moved = [];
+    (arr || []).filter(w => w && w.period_end).slice()
+      .sort((a, b) => String(a.period_end).slice(0, 10).localeCompare(String(b.period_end).slice(0, 10)))
+      .forEach((w, i) => { if (w.week_num !== i + 1) { w.week_num = i + 1; moved.push(w); } });
+    return moved;
   },
 
   nextSunday() {
