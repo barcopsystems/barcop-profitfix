@@ -502,6 +502,10 @@ S.ShiftDashboard = {
       const food = (document.getElementById('scm-food-' + d) || {}).value;
       const cov = (document.getElementById('scm-cov-' + d) || {}).value;
       if (!(has(bar) || has(food) || has(cov))) return;   // day left untouched: leave it alone
+      // Covers WITHOUT sales is an incomplete row, not an instruction. Only an explicit
+      // zero in a SALES cell means "this day had none, clear it". Without this test a day
+      // with covers typed and sales blank fell through to zeroDays and deleted the day.
+      if (!(has(bar) || has(food))) return;
       // A day the operator explicitly zeroed is a CORRECTION, not an empty row. buildSales
       // drops a zero row and _commitSales only clears records for the dates it is
       // replacing, so a wrong $500 Monday on a day the bar was closed could never be taken
@@ -516,7 +520,11 @@ S.ShiftDashboard = {
 
     let cleared = 0, broke = false;
     for (const d of zeroDays) {
-      const stale = ((App.shiftData && App.shiftData.sc_shifts) || []).filter(s => s && s.date === d);
+      // Scoped to imported records, the same guard buildSales and _commitSales hold: a
+      // hand-entered close (imported !== true) is the richer, authoritative record and
+      // must never be destroyed by this path. Clearing every record for the date dropped
+      // that scope.
+      const stale = ((App.shiftData && App.shiftData.sc_shifts) || []).filter(s => s && s.date === d && s.imported === true);
       for (const s of stale) { if (await App.removeRecord('sc', 'shift', s.id)) cleared++; else broke = true; }
     }
     if (broke) { fail('Could not clear a day. Try the save again.'); return; }
@@ -546,7 +554,10 @@ S.ShiftDashboard = {
     });
   },
   async importServer(rows) {
-    const { toAdd, skipped, dupCount } = PosIngest.build('server', rows);
+    // `incomplete` (on the roster, rang no covers/sales) is split out of `skipped` (name
+    // not matched) by buildServer. Destructure BOTH or those rows vanish with no mention:
+    // they used to be counted in the skipped total. Server Check's door reports both.
+    const { toAdd, skipped, incomplete, dupCount } = PosIngest.build('server', rows);
     const res = document.getElementById('sc-ck-server-res');
     if (!toAdd.length) {
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
@@ -555,9 +566,11 @@ S.ShiftDashboard = {
     }
     const ok = await PosIngest.commit('server', toAdd);
     if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
+    const inc = (incomplete || []).length;
     this._flash = toAdd.length + ' server check' + (toAdd.length === 1 ? '' : 's') + ' imported'
       + (dupCount ? ' (' + dupCount + ' already logged)' : '')
-      + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped, names not matched)' : '') + '.';
+      + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped, names not matched)' : '')
+      + (inc ? ' (' + inc + ' row' + (inc === 1 ? '' : 's') + ' skipped, no covers or sales rung)' : '') + '.';
     if (this._optOpen) this._optOpen.server = false;   // collapse back to the link
     this._openStep = 'import';
     this.render(this.container, this.actions);
