@@ -466,7 +466,10 @@ S.HubBarCopAudit = {
       const cv = Math.sqrt(variance) / Math.abs(mean);
       return Math.max(0, 1 - (cv / 0.15));
     };
-    const coversCV = cvScore(revWeeks.map(w => (parseFloat(w.covers) || 0)));
+    // No `|| 0`: a week confirmed before the covers were in stores null, and cvScore
+    // drops it. Read as a zero-cover week it would read as wild swing and score the
+    // bar 0 for inconsistency it never had.
+    const coversCV = cvScore(revWeeks.map(w => parseFloat(w.covers)));
     // Catering has to be on BOTH sides or neither. Counting catering labor against
     // bar+food revenue alone swung this metric purely on catering timing, so a bar
     // whose labor discipline never moved scored 0 for inconsistency.

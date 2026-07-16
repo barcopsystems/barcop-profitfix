@@ -55,6 +55,13 @@ S.SalesIntegrity = {
     { key: 'pricing',  label: 'Under-Ringing and Pricing' }
   ],
   MIN_CHECKS: 8,   // a server below this is "not enough data", not scored
+  // When the export carries no Checks column there is nothing to count, so fall back
+  // to volume: a server under this share of the median server's sales worked a
+  // partial shift or is support (barback, host), not a server to benchmark against
+  // the floor. Relative, so it holds on a $400 night and a $40,000 one.
+  MIN_SALES_SHARE: 0.25,
+  MIN_TEAM: 3,     // no floor to stand out from below this many scored servers
+  MIN_EVENTS: 2,   // captured shorts/walkouts below this are the cost of doing business
 
   // Six-step investigation a Sales Integrity flag opens in Loss Prevention. Server
   // and cash focused (the product-pour steps stay on the Loss Prevention side).
@@ -101,7 +108,7 @@ S.SalesIntegrity = {
       const name = (r.server || '').trim();
       if (!name) return;
       const key = name.toLowerCase();
-      if (!agg[key]) agg[key] = { name, sales: 0, checks: 0, cash: 0, card: 0, voids: 0, void_count: 0, comps: 0, no_sales: 0, refunds: 0, hours: 0 };
+      if (!agg[key]) agg[key] = { name, sales: 0, checks: 0, cash: 0, card: 0, voids: 0, void_count: 0, comps: 0, no_sales: 0, refunds: 0, hours: 0, days: new Set() };
       const a = agg[key];
       const add = (field, raw, col) => { const n = this.num(raw); if (n != null) { a[field] += n; present[col] = true; } };
       add('sales', r.net_sales, 'net_sales');
@@ -115,7 +122,7 @@ S.SalesIntegrity = {
       add('refunds', r.refunds, 'refunds');
       add('hours', r.hours, 'hours');
       const d = r.date ? String(r.date).slice(0, 10) : '';
-      if (d) dates.add(d);
+      if (d) { dates.add(d); a.days.add(d); }
     });
 
     // Optional cross-reference to captured Shift data, restricted to the report's
@@ -140,27 +147,48 @@ S.SalesIntegrity = {
       });
     }
 
-    // Per-server metrics.
+    // Per-server metrics. Every signal is a RATE, never a raw count: the file is
+    // invited to cover several days, so the bartender who closes every night racks
+    // up 3-5x everyone's no-sales and shorts purely by working more. Counts are
+    // divided by the shifts that server actually appears on (one report period when
+    // the export carries no date column, which puts everyone on the same footing).
+    const hasCapture = dateList.length > 0;
     const byName = this.staffByName();
     const servers = Object.keys(agg).map(key => {
       const a = agg[key];
+      const shifts = a.days.size || 1;
+      const shortCount = capShorts[key] ? capShorts[key].count : 0;
+      const walkCount  = capWalk[key] ? capWalk[key].count : 0;
       const cashTotal = (present.cash_sales && present.card_sales) ? (a.cash + a.card) : null;
       const m = {
-        no_sales:    present.no_sales ? a.no_sales : null,
+        no_sales:    present.no_sales ? a.no_sales / shifts : null,
         void_pct:    (present.voids && a.sales > 0) ? a.voids / a.sales : null,
         avg_check:   (present.checks && a.checks > 0) ? a.sales / a.checks : null,
         comp_pct:    (present.comps && a.sales > 0) ? a.comps / a.sales : null,
         cash_ratio:  (cashTotal && cashTotal > 0) ? a.cash / cashTotal : ((present.cash_sales && a.sales > 0) ? a.cash / a.sales : null),
         refund_pct:  (present.refunds && a.sales > 0) ? a.refunds / a.sales : null,
         sales_per_hr:(present.hours && a.hours > 0) ? a.sales / a.hours : null,
-        drawer_short:capShorts[key] ? capShorts[key].count : null,
-        walkouts:    capWalk[key] ? capWalk[key].count : null
+        // A server with no captured short had ZERO shorts on these dates, which is a
+        // measurement. Left null they dropped out of the team average, so the average
+        // was taken across only the servers who HAD one and could never be under 1.
+        drawer_short: hasCapture ? shortCount / shifts : null,
+        walkouts:     hasCapture ? walkCount / shifts : null
       };
-      const qualifies = present.checks ? (a.checks >= this.MIN_CHECKS) : (a.sales > 0);
       const staff = byName[key];
-      return { name: a.name, staff_id: staff ? staff.id : '', raw: a,
+      return { name: a.name, staff_id: staff ? staff.id : '', raw: a, shifts, shortCount, walkCount,
         shortAmt: capShorts[key] ? capShorts[key].amount : 0, walkAmt: capWalk[key] ? capWalk[key].amount : 0,
-        m, qualifies };
+        m, qualifies: false };
+    });
+
+    // Who is big enough to benchmark. With a Checks column that is MIN_CHECKS; with
+    // no way to count checks it is volume against the median server, so a barback
+    // with $60 of rung sales is not scored or flagged.
+    const salesVals = servers.map(s => s.raw.sales).filter(v => v > 0).sort((x, y) => x - y);
+    const medSales = salesVals.length ? salesVals[Math.floor(salesVals.length / 2)] : 0;
+    servers.forEach(s => {
+      s.qualifies = present.checks
+        ? (s.raw.checks >= this.MIN_CHECKS)
+        : (medSales > 0 && s.raw.sales >= medSales * this.MIN_SALES_SHARE);
     });
 
     // Team baselines from qualifying servers only.
@@ -179,16 +207,31 @@ S.SalesIntegrity = {
         const v = s.m[sig.key];
         const avg = teamAvg[sig.key];
         if (v == null) return;
-        // Capture-based signals (drawer shorts / walkouts) flag on presence vs a
-        // light team floor; they are real events, not a rate to benchmark hard.
+        // Capture-based signals (drawer shorts / walkouts) are real logged events
+        // rather than a rate to benchmark hard, but a small crew still has no floor
+        // to stand out from: on a two-bartender bar one $7 short IS half the team.
+        // The old gate read `teamCount < 3 ||` and so short-circuited to ALWAYS trip
+        // on the exact crews it should have refused to score, which is how one short
+        // plus one walked tab printed "High Risk, Cash Skimming" against a name.
+        // Every other signal below refuses without a floor; these do the same now.
         let tripped = false;
         if (sig.capture) {
-          tripped = (v >= 1) && (teamCount < 3 || v > (avg || 0) * 1.5 || v >= 2);
-        } else if (avg == null || teamCount < 3) {
+          // Two tests, both required: enough events to be a pattern rather than the
+          // one short every bartender has eventually, and a per-shift rate above the
+          // floor's. Rate for the comparison, raw count for the materiality, so the
+          // closer who works five nights is not flagged for volume alone.
+          const events = (sig.key === 'drawer_short') ? s.shortCount : s.walkCount;
+          tripped = teamCount >= this.MIN_TEAM && avg != null
+                    && events >= this.MIN_EVENTS && v > avg * 1.5;
+        } else if (avg == null || teamCount < this.MIN_TEAM) {
           tripped = false;   // need a floor to compare against
         } else if (sig.dir === 'high') {
-          const floor = this._floor(sig.key, avg);
-          tripped = v > avg * 2 && v >= floor;
+          // Compare on the rate, but check materiality on the raw count for no_sales:
+          // its floor has always meant "at least this many opens in the window", and
+          // testing a per-shift rate against it would demand 3 opens EVERY shift and
+          // miss the bartender popping the drawer twice a night all week.
+          const material = (sig.key === 'no_sales') ? s.raw.no_sales : v;
+          tripped = v > avg * 2 && material >= this._floor(sig.key, avg);
         } else if (sig.dir === 'low') {
           tripped = avg > 0 && v < avg * 0.6;
         } else if (sig.dir === 'both') {
@@ -206,7 +249,12 @@ S.SalesIntegrity = {
       const strongN = s.flags.filter(f => f.strong).length;
       s.composite = comp;
       s.exposure = s.flags.reduce((t, f) => t + (f.exposure || 0), 0);
-      s.severity = (comp >= 5 || strongN >= 2) ? 'high' : (comp >= 2 ? 'watch' : 'clean');
+      // This file's own rule, up top: one outlier is noise, two-plus stacking is a
+      // pattern, so a server flags on a composite and never on a single signal. One
+      // weight-2 signal cleared the old `comp >= 2` on its own, which put the patio
+      // server's naturally low check average on the board as a name to investigate.
+      s.severity = s.flags.length < 2 ? 'clean'
+        : ((comp >= 5 || strongN >= 2) ? 'high' : 'watch');
     });
 
     const flagged = scored.filter(s => s.severity !== 'clean')
@@ -237,7 +285,12 @@ S.SalesIntegrity = {
 
   _floor(key, avg) {
     // A minimum the value must clear so a 2x of a tiny team average never flags.
-    if (key === 'no_sales')   return Math.max(3, avg);
+    // no_sales is a count of opens in the window (the caller passes the raw count);
+    // the rest are ratios measured against themselves. This was Math.max(3, avg)
+    // back when no_sales was a raw sum and avg was a raw count too. Now that avg is
+    // a per-shift rate, maxing a count against a rate would compare two different
+    // units, and the `v > avg * 2` test already covers "above the team's own rate".
+    if (key === 'no_sales')   return 3;
     if (key === 'void_pct')   return 0.02;
     if (key === 'comp_pct')   return 0.02;
     if (key === 'refund_pct') return 0.01;
@@ -252,21 +305,29 @@ S.SalesIntegrity = {
     if (sig.dollar === 'walkout') return s.walkAmt || 0;
     return 0;
   },
+  // "Floor" reads as a limit, and half the staff sit above an average by definition,
+  // so calling the team MEAN a floor accused everyone on the high side of normal of
+  // breaching something. It is an average and it says so, on screen and in the PDF.
   _flagDetail(sig, v, avg, s) {
-    const teamTxt = (avg != null) ? ' (floor ' + this._fmtVal(sig, avg) + ')' : '';
-    if (sig.key === 'no_sales')     return s.raw.no_sales + ' no-sale opens' + teamTxt;
-    if (sig.key === 'void_pct')     return this.pct(v) + ' of sales voided' + (avg != null ? ' vs ' + this.pct(avg) + ' floor' : '');
-    if (sig.key === 'avg_check')    return App.fmtCurrency(v) + ' average check' + (avg != null ? ' vs ' + App.fmtCurrency(avg) + ' floor' : '');
-    if (sig.key === 'comp_pct')     return this.pct(v) + ' of sales comped' + (avg != null ? ' vs ' + this.pct(avg) + ' floor' : '');
-    if (sig.key === 'cash_ratio')   return this.pct(v) + ' cash' + (avg != null ? ' vs ' + this.pct(avg) + ' floor' : '') + (avg != null && v > avg ? ', runs high' : ', runs low');
-    if (sig.key === 'refund_pct')   return this.pct(v) + ' of sales refunded' + (avg != null ? ' vs ' + this.pct(avg) + ' floor' : '');
-    if (sig.key === 'sales_per_hr') return App.fmtCurrency(v) + ' per hour' + (avg != null ? ' vs ' + App.fmtCurrency(avg) + ' floor' : '');
-    if (sig.key === 'drawer_short') return s.m.drawer_short + ' drawer short' + (s.m.drawer_short === 1 ? '' : 's') + ' (' + App.fmtCurrency(s.shortAmt) + ')';
-    if (sig.key === 'walkouts')     return s.m.walkouts + ' walkout' + (s.m.walkouts === 1 ? '' : 's') + ' (' + App.fmtCurrency(s.walkAmt) + ')';
+    const teamTxt = (avg != null) ? ' vs ' + this._fmtVal(sig, avg) + ' team average' : '';
+    // Only spell the rate out when the report spans more than one shift. On a
+    // single-shift report the count already IS the per-shift rate.
+    const span = s.shifts > 1 ? ' over ' + s.shifts + ' shifts (' + this._fmtVal(sig, v) + ')' : '';
+    if (sig.key === 'no_sales')     return s.raw.no_sales + ' no-sale opens' + span + teamTxt;
+    if (sig.key === 'void_pct')     return this.pct(v) + ' of sales voided' + teamTxt;
+    if (sig.key === 'avg_check')    return App.fmtCurrency(v) + ' average check' + teamTxt;
+    if (sig.key === 'comp_pct')     return this.pct(v) + ' of sales comped' + teamTxt;
+    if (sig.key === 'cash_ratio')   return this.pct(v) + ' cash' + teamTxt + (avg != null && v > avg ? ', runs high' : ', runs low');
+    if (sig.key === 'refund_pct')   return this.pct(v) + ' of sales refunded' + teamTxt;
+    if (sig.key === 'sales_per_hr') return App.fmtCurrency(v) + ' per hour' + teamTxt;
+    if (sig.key === 'drawer_short') return s.shortCount + ' drawer short' + (s.shortCount === 1 ? '' : 's') + ' (' + App.fmtCurrency(s.shortAmt) + ')' + span + teamTxt;
+    if (sig.key === 'walkouts')     return s.walkCount + ' walkout' + (s.walkCount === 1 ? '' : 's') + ' (' + App.fmtCurrency(s.walkAmt) + ')' + span + teamTxt;
     return this._fmtVal(sig, v);
   },
   _fmtVal(sig, v) {
-    if (sig.key === 'no_sales' || sig.key === 'drawer_short' || sig.key === 'walkouts') return Math.round(v) + '';
+    // The count signals carry a per-shift rate now, so rounding to a whole number
+    // would print "0" for a real 0.4-a-shift pattern.
+    if (sig.key === 'no_sales' || sig.key === 'drawer_short' || sig.key === 'walkouts') return (Math.round(v * 10) / 10) + ' per shift';
     if (sig.key === 'avg_check' || sig.key === 'sales_per_hr') return App.fmtCurrency(v);
     return this.pct(v);
   },

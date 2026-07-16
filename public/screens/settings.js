@@ -2500,8 +2500,11 @@ S.HubSettings = {
     // engine so the demo lands on a real review with a history below it. The
     // planted bad actor is Brianna K. (the same server the comp pattern
     // concentrates on); her numbers escalate over the last two weekends, caught
-    // building: two clean weekends, then a cash-mix Watch, then a High (heavy
-    // no-sales, a high void rate, refunds). On the current weekend a second
+    // building: two clean weekends, then a Watch (cash mix running high AND the
+    // first refunds showing), then a High (heavy no-sales, a high void rate, more
+    // refunds). Two signals on the Watch weekend on purpose: a server flags on a
+    // composite, never on one outlier, so a one-signal weekend reads clean by
+    // design. On the current weekend a second
     // server, Marcus T., also flags (Watch, under-ringing) on heavy comps and a
     // run of low-dollar checks well off the floor, so the current review shows
     // two flagged. The rest track the floor. True by construction (same
@@ -2520,7 +2523,7 @@ S.HubSettings = {
       const siShifts = [
         { ago:2,  bad:{ net_sales:1500, cash_sales:705, card_sales:795,  voids:90, void_count:7, no_sales:9, refunds:40 },
                   bad2:{ net_sales:1480, cash_sales:330, card_sales:1170, voids:18, void_count:1, comps:185, no_sales:1, refunds:0 } }, // High + Watch
-        { ago:9,  bad:{ net_sales:1620, cash_sales:680, card_sales:940,  voids:24, void_count:2, no_sales:2, refunds:0  } }, // Watch (cash mix)
+        { ago:9,  bad:{ net_sales:1620, cash_sales:680, card_sales:940,  voids:24, void_count:2, no_sales:2, refunds:26 } }, // Watch (cash mix + first refunds)
         { ago:16, bad:{ net_sales:1700, cash_sales:360, card_sales:1340, voids:22, void_count:2, no_sales:1, refunds:0  } }, // clean
         { ago:23, bad:{ net_sales:1580, cash_sales:330, card_sales:1250, voids:20, void_count:2, no_sales:1, refunds:0  } }  // clean
       ];

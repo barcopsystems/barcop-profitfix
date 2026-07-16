@@ -83,7 +83,7 @@ S.AuditTracker = {
     const d = audit.raw || audit;
 
     const pct = (v,t) => v ? v+'%' + (t?' (Target: '+t+'%)':'') : '';
-    const cur = v => v ? App.fmtCurrency(v) : '';
+    const cur = v => v ? (v < 0 ? '-' + App.fmtCurrency(Math.abs(v)) : App.fmtCurrency(v)) : '';   // App.fmtCurrency prefixes the $, so a raw negative renders "$-600.00"
     const num = v => v != null && v !== 0 ? String(v) : '';
     const yN  = v => v===true?'Yes':v===false?'No':'';
 
@@ -109,7 +109,9 @@ S.AuditTracker = {
       ], null, d),
       AuditUI.sectionBlock(3, NAMES[2], d.S3_SCORE, [
         ['Inventory Variance $',    cur(d.S3_INV_VARIANCE_DOLLAR), d.S3_INV_VARIANCE_DOLLAR > 0 ? 'warn' : ''],
-        ['Inventory Variance %',    d.S3_INV_VARIANCE_PCT != null ? d.S3_INV_VARIANCE_PCT + '% of COGS' : '', d.S3_INV_VARIANCE_PCT > 2 ? 'warn' : ''],
+        // Warn on the magnitude: the dollar is signed now, and a variance running 4%
+        // the WRONG way is a broken count, not a clean sheet.
+        ['Inventory Variance %',    d.S3_INV_VARIANCE_PCT != null ? d.S3_INV_VARIANCE_PCT + '% of COGS' : '', Math.abs(d.S3_INV_VARIANCE_PCT) > 2 ? 'warn' : ''],
         ['Count Frequency',         d.S3_COUNT_FREQ, /not counted/i.test(d.S3_COUNT_FREQ||'') ? '' : (/monthly/i.test(d.S3_COUNT_FREQ||'') ? 'warn' : (d.S3_COUNT_FREQ ? 'good' : ''))],
         ['Counts This Period',      num(d.S3_COUNTS_IN_PERIOD)],
         ['Spot Checks',             num(d.S3_SPOT_CHECKS)],
@@ -160,7 +162,7 @@ S.AuditTracker = {
   // weight S1 and S2. It reads as context here: where the whole margin stands.
   primeContext(d) {
     if (d.PRIME_COST_PCT == null) return '';
-    const cur = v => v ? App.fmtCurrency(v) : '';
+    const cur = v => v ? (v < 0 ? '-' + App.fmtCurrency(Math.abs(v)) : App.fmtCurrency(v)) : '';   // App.fmtCurrency prefixes the $, so a raw negative renders "$-600.00"
     const pct = v => v != null ? v + '%' : '';
     const over = d.PRIME_COST_PCT > (d.PRIME_TARGET_PCT || 60);
     const rows = [
@@ -197,7 +199,7 @@ S.AuditTracker = {
 
     // Same formatting helpers viewAudit uses, so PDF values match the screen.
     const pct = (v,t) => v ? v+'%' + (t?' (Target: '+t+'%)':'') : '';
-    const cur = v => v ? App.fmtCurrency(v) : '';
+    const cur = v => v ? (v < 0 ? '-' + App.fmtCurrency(Math.abs(v)) : App.fmtCurrency(v)) : '';   // App.fmtCurrency prefixes the $, so a raw negative renders "$-600.00"
     const num = v => v != null && v !== 0 ? String(v) : '';
     const gap = (v) => v > 0 ? cur(v) : v < 0 ? (cur(Math.abs(v)) + ' under target') : '';
 
