@@ -19,11 +19,17 @@ const PosIngest = {
     hours: [
       { key: 'name',  label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff', 'staff name', 'server', 'server name', 'team member', 'worker', 'crew', 'associate', 'full name', 'first name', 'last name'] },
       { key: 'date',  label: 'Date',       required: true,  match: ['date', 'work date', 'shift date', 'business date', 'day', 'clock date', 'worked date', 'date worked', 'pay date', 'shift day'] },
-      // NOT a bare 'time': every timeclock export leads with "Time In" / "Time Out",
-      // which would import a clock time as hours worked ("17:00" -> 17.0 hours) and
-      // flag the whole roster for overtime. Only whole-phrase time columns match; a
-      // file with no single total column stays unmapped so the operator picks it.
-      { key: 'hours', label: 'Hours',      required: true,  match: ['hours', 'total hours', 'hrs', 'worked', 'hours worked', 'total hrs', 'reg hours', 'regular hours', 'hrs worked', 'labor hours', 'paid hours', 'net hours', 'duration', 'total time'] },
+      // This field is TOTAL hours worked. Two classes of string are banned from it:
+      //  - a bare 'time': every timeclock export leads with "Time In" / "Time Out", so it
+      //    imported a clock time as hours worked ("17:00" -> 17.0 hours) and flagged the
+      //    whole roster for overtime.
+      //  - 'reg hours' / 'regular hours': a payroll export (ADP, Paychex, Toast) lists
+      //    Regular Hours, Overtime Hours, THEN Total Hours, and the matcher takes the
+      //    first header it matches in file order. A 45-hour week imported as 40, and
+      //    App.otPremiumForRows then saw 40 and computed a ZERO premium, silently
+      //    undoing the overtime work everywhere else. Regular hours are not total hours.
+      // A file with no single total column stays unmapped so the operator picks it.
+      { key: 'hours', label: 'Hours',      required: true,  match: ['hours', 'total hours', 'hrs', 'worked', 'hours worked', 'total hrs', 'hrs worked', 'labor hours', 'paid hours', 'net hours', 'duration', 'total time'] },
       { key: 'shift', label: 'Shift',      required: false, match: ['shift', 'shift type', 'daypart', 'shift name', 'department', 'am/pm', 'meal period'] }
     ],
     tips: [
