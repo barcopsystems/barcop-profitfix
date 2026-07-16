@@ -733,11 +733,20 @@ S.LaborStaffRoster = {
     const today = App.todayLocal();
     const catOpts = this.NOTE_CATEGORIES.map(c =>
       '<option' + (n && n.category === c ? ' selected' : (!n && c === 'Coaching' ? ' selected' : '')) + '>' + esc(c) + '</option>').join('');
+    // Who the note lands on, shown read-only so a note opened from another screen
+    // (Server Check) can never be logged against the wrong person by mistake.
+    const st = ((App.laborData && App.laborData.lc_staff) || []).find(s => s.id === staffId);
+    const who = st ? (st.name || '') : '';
+    const whoField = who
+      ? '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Staff Member</label>'
+        + '<input type="text" value="' + esc(who) + '" disabled title="This note logs to this person\'s coaching log."/></div>'
+      : '';
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">' + (this.noteEditId ? 'Edit Note' : 'Add Coaching Note') + '</div>'
       + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
         + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Date</label>'
           + '<input type="date" id="note-date" value="' + esc(n?.date || today) + '"/></div>'
+        + whoField
         + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Category</label>'
           + '<select id="note-cat">' + catOpts + '</select></div>'
         + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Manager</label>'
