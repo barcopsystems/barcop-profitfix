@@ -35,9 +35,15 @@ S.WeekHistory = {
     return set;
   },
   wk(pe) { return App.dateRangeLabel(App.weekStartFor(pe), pe); },
+  // Total sales, the same bar + food + catering + ancillary that Confirm the Week's
+  // money strip and the Books income statement show. Ancillary was missing, so one
+  // week read $10,500 in the popup, $10,000 in this table, and $10,500 in Books. The
+  // Prime Cost column beside it is measured against total sales too, so leaving
+  // ancillary out made the row disagree with itself as well.
   totalRev(x) {
     const p = x.p || {};
-    return ((p.bar && p.bar.revenue) || 0) + ((p.food && p.food.revenue) || 0) + ((p.catering && p.catering.revenue) || 0);
+    return ((p.bar && p.bar.revenue) || 0) + ((p.food && p.food.revenue) || 0)
+         + ((p.catering && p.catering.revenue) || 0) + ((p.other && p.other.revenue) || 0);
   },
 
   draw() {

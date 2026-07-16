@@ -33,10 +33,19 @@ S.ProfitForecast = {
       .slice(0, this.RUN_WEEKS);
     const nW = recent.length;
     let sumRev = 0, sumCogs = 0, sumLabor = 0, sumPF = 0;
+    // Every line Books' income statement carries: bar + food + catering + ancillary,
+    // matching hub-books' totalRev / totalCogs / totalLabor exactly. This summed bar+food
+    // ONLY while comparing the result against prime_cost_pct, which is a TOTAL-SALES
+    // basis target, and while the header above promised it "mirrors Books' profit basis
+    // so the two never disagree". On a catering bar it read 52.0% here against 50.5% on
+    // Confirm the Week, the dashboard and Books, and Projected Sales run-rated the bar
+    // and kitchen alone. (Ancillary has revenue and COGS but no labor line, same as
+    // Books.) See [[labor-cost-model]] DENOMINATORS: a % is only comparable to a target
+    // measured on the same denominator.
     recent.forEach(w => {
-      sumRev   += (w.bar?.revenue || 0) + (w.food?.revenue || 0);
-      sumCogs  += (w.bar?.cogs   || 0) + (w.food?.cogs   || 0);
-      sumLabor += (w.bar?.labor  || 0) + (w.food?.labor  || 0);
+      sumRev   += (w.bar?.revenue || 0) + (w.food?.revenue || 0) + (w.catering?.revenue || 0) + (w.other?.revenue || 0);
+      sumCogs  += (w.bar?.cogs   || 0) + (w.food?.cogs   || 0) + (w.catering?.cogs   || 0) + (w.other?.cogs || 0);
+      sumLabor += (w.bar?.labor  || 0) + (w.food?.labor  || 0) + (w.catering?.labor  || 0);
       sumPF    += parseFloat(w.platform_fees) || 0;
     });
     const avgWeeklyRev    = nW ? sumRev / nW : 0;
