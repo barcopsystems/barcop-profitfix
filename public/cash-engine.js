@@ -523,12 +523,14 @@ window.CashEngine = {
       // events ARE added there. Only add event cash when NOT on a saved override.
       const savedFc = App.forecastForWeek ? App.forecastForWeek(ws) : null;
       const onOverride = !!(savedFc && savedFc.total);
-      // Week 0 counts only events dated today or later, the same rule as the sales
-      // proration above and _future0 below. Opening cash is a "right now" balance that
-      // already holds an event balance collected earlier this week, so counting that
-      // event again added it twice and read the near-term balance and runway high, in
-      // the optimistic direction, on the week that matters most.
-      const ev = this.eventInflow(i === 0 ? App.todayLocal() : ws, we);
+      // NOT date-filtered for week 0, unlike sales and _future0 below. That asymmetry is
+      // correct: eventInflow already drops any booking with a balance_paid_date, so a
+      // balance collected earlier this week is excluded at the source and cannot be
+      // double-counted against opening cash. The only rows a today-or-later gate removes
+      // are UNCOLLECTED balances dated Mon..yesterday, which are still owed to you and
+      // are in no other week either (every later week starts on a future Monday), so
+      // gating here silently deleted them from the whole 13-week forecast.
+      const ev = this.eventInflow(ws, we);
       const evAdd = onOverride ? 0 : ev.total;
       const inflow = sales + evAdd;
       const lab = this.laborForWeek(ws);
