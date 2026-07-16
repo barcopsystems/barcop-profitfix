@@ -267,7 +267,14 @@ S.InventoryVarianceReport = {
           // theoretical usage read 0, and the Usage Variance tab billed the product's
           // whole stock draw as a 100% Over Recipe leak on a product that sold exactly
           // what it used.
-          oz = App.isLiquidIngredient(p) ? q * (App.ozPerContainer(p) || 0) : q;
+          // A SOLID converts units-sold -> servings (q x servingsPerUnit), because that is
+          // the measure the divisor undoes (soldOz / servingsPerUnit) and the measure
+          // explodeMenuItem reports for the same product. Left as a bare `q` it put UNITS
+          // (bags) in the same accumulator the menu path fills with SERVINGS (wings), and
+          // the divisor then read one whole bag sold as 1/45th of a bag.
+          oz = App.isLiquidIngredient(p)
+            ? q * (App.ozPerContainer(p) || 0)
+            : q * (App.servingsPerUnit(p) || 1);
         } else {
           const ozPer = parseFloat(p.pour_size_oz) || (App.isCaseBeer(p) ? (parseFloat(p.container_size_oz) || 0) : 0);
           oz = q * ozPer;
