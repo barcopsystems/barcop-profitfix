@@ -1026,6 +1026,11 @@ S.EventsBookings = {
     lines.push(['F&B Subtotal', money(p.subtotal)]);
     if (p.svcPct) lines.push(['Service Charge (' + p.svcPct + '%)', money(p.service)]);
     if (p.taxPct) lines.push(['Tax (' + p.taxPct + '%)', money(p.tax)]);
+    // The room fee is in quoteParts' total, so leaving its line off made the client's
+    // SIGNED agreement itemize to less than the total it asks them to pay. The on-screen
+    // quote and the quote PDF both print it; this document was the one that did not, and
+    // an unexplained gap on a signature page is exactly what gets disputed.
+    if (p.roomFee) lines.push(['Room Fee', money(p.roomFee)]);
     lines.push(['Quoted Total', money(p.total)]);
     if (b.deposit_amount) lines.push(['Deposit to Confirm', money(b.deposit_amount)]);
     lines.push(['Balance Due', money(this.balanceDue(b))]);
