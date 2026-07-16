@@ -266,16 +266,29 @@ S.LaborBuildSchedule = {
   computeTotals() {
     const byDay = {};
     this.DAYS.forEach(d => byDay[d] = { hours: 0, count: 0 });
-    const byStaff = {};   // staff_id -> scheduled hours (hourly only; salaried get no OT)
+    const byStaff = {};       // staff_id -> scheduled hours (hourly only; salaried get no OT)
+    const byStaffCost = {};   // parallel base cost per hourly staff, for the OT premium
     let hours = 0, cost = 0, conflicts = 0, offConflicts = 0;
     this.draft.shifts.forEach((sh, i) => {
       if (!sh.staff_id || !sh.start || !sh.end) return;
       const c = this.shiftCalc(sh);
       hours += c.hours; cost += c.cost;
       if (byDay[sh.day]) { byDay[sh.day].hours += c.hours; byDay[sh.day].count += 1; }
-      if (!c.salaried) byStaff[sh.staff_id] = (byStaff[sh.staff_id] || 0) + c.hours;
+      if (!c.salaried) {
+        byStaff[sh.staff_id] = (byStaff[sh.staff_id] || 0) + c.hours;
+        byStaffCost[sh.staff_id] = (byStaffCost[sh.staff_id] || 0) + c.cost;
+      }
       if (this.isConflict(sh, i)) conflicts++;
       if (this.offReasonFor(sh.staff_id, sh.day)) offConflicts++;
+    });
+    // Add the overtime premium (0.5x on weekly hours over the threshold, at the
+    // staff member's blended rate) so Scheduled Cost / Labor % / Budget Left match
+    // what OT actually bills at Pay Periods and Payroll — the schedule used to omit
+    // it, understating cost exactly when someone is scheduled into overtime.
+    const OT = App.OT_THRESHOLD || 40;
+    Object.keys(byStaff).forEach(sid => {
+      const h = byStaff[sid];
+      if (h > OT && byStaffCost[sid] > 0) cost += (h - OT) * (byStaffCost[sid] / h) * 0.5;
     });
     cost += this.salariedWeekCost(this.draft.week_start);
     return { hours, cost, byDay, byStaff, conflicts, offConflicts };
@@ -967,9 +980,11 @@ S.LaborBuildSchedule = {
     if (validShifts.length === 0) { fail('Add at least one complete shift.'); return; }
 
     let totalHours = 0, totalCost = 0;
+    const otRows = [];
     const shifts = validShifts.map(sh => {
       const c = this.shiftCalc(sh);
       totalHours += c.hours; totalCost += c.cost;
+      otRows.push({ staff_id: sh.staff_id, date: d.week_start, hours: c.hours, cost: c.cost });
       return {
         staff_id: sh.staff_id, name: c.staff ? c.staff.name : '',
         position_id: c.staff ? c.staff.position_id : '',
@@ -978,6 +993,11 @@ S.LaborBuildSchedule = {
         event: sh.event || ''
       };
     });
+    // The same overtime premium computeTotals puts on the card. Without it the saved
+    // total_cost / labor_pct came out UNDER what the operator just read on screen, and
+    // the over-budget guard below compared a premium-free number against the budget,
+    // so it never fired on exactly the weeks overtime pushed the schedule over.
+    totalCost += App.otPremiumForRows ? App.otPremiumForRows(otRows).total : 0;
     totalCost += this.salariedWeekCost(d.week_start);
     const forecast = this.forecastTotal(d.week_start);
 
