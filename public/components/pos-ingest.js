@@ -364,12 +364,18 @@ const PosIngest = {
   buildServer(rows) {
     const staffByName = this._staffByName();
     const existing = (App.data && App.data.revenue_server_checks) || [];
-    const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
+    const toAdd = []; const skipped = []; const incomplete = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const covers = parseInt(String(r.covers == null ? '' : r.covers).replace(/[^0-9]/g, ''), 10) || 0;
       const sales = this._num(r.sales);
-      if (!staff || !covers || !(sales > 0)) { skipped.push(r.name || '(blank)'); return; }
+      // Two different problems, two different lists. An unmatched NAME is a roster fix.
+      // A server who IS on the roster but rang no covers or no sales is just a row with
+      // nothing to log. Lumping them sent the operator to "add them in the Staff Roster"
+      // for someone already on it, so they added a duplicate that fixed nothing and
+      // corrupted the roster.
+      if (!staff) { skipped.push(r.name || '(blank)'); return; }
+      if (!covers || !(sales > 0)) { incomplete.push(r.name || '(blank)'); return; }
       const recDate = this.normDate(r.date);
       if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate
             && (x.covers || 0) === covers && Math.abs((x.sales || 0) - sales) < 0.001)) { dupCount++; return; }
@@ -379,7 +385,7 @@ const PosIngest = {
         imported: true, saved_at: new Date().toISOString()
       });
     });
-    return { toAdd, skipped, dupCount };
+    return { toAdd, skipped, incomplete, dupCount };
   },
 
   // A POS product-mix report: one row per item with units sold. Matches the item
