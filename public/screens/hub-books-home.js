@@ -18,7 +18,14 @@ S.HubBooksHome = {
     App.openHubFullPage('Books', (mount) => { this.container = mount; this.render(mount); }, 'books-home');
   },
 
-  _money(v)  { return (v == null || isNaN(v)) ? '-' : App.fmtCurrency(Number(v)); },
+  // Operating income is a LEVEL and it goes under zero on a down month or a down
+  // year, which this file already knows (`ytdInc < 0` paints the hero red, `mInc < 0`
+  // adds "still in the red"). App.fmtCurrency is '$' + v, so a raw negative printed
+  // "$-45,000.00" in 46px on the landing, while the income statement one click away
+  // rendered the SAME figure as "-$45,000.00" (hub-books _incomeStatementCard), on a
+  // pair of screens whose own comment promises they always agree. App.fmtBal is the
+  // canonical balance formatter; the null/NaN dash is this file's own contract.
+  _money(v)  { return (v == null || isNaN(v)) ? '-' : App.fmtBal(Number(v)); },
   _pct(v)    { return (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%'; },
   _dateLbl(iso) { try { const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { return null; } },
   _lastRun(key) { try { const v = localStorage.getItem(key); return v ? this._dateLbl(v) : null; } catch (e) { return null; } },
@@ -136,7 +143,10 @@ S.HubBooksHome = {
     DashUI.insightsModal('Bar Cop Briefing', this._insBriefing(this._computeState()));
   },
   _insBriefing(st) {
-    const m = v => (v == null || isNaN(v)) ? '-' : App.fmtCurrency(Number(v), 0);
+    // Same rule as _money above: these are LEVELS, and the paragraph below adds
+    // "still in the red for the month" off `mInc < 0`, so the value it prints beside
+    // that clause is negative by construction.
+    const m = v => (v == null || isNaN(v)) ? '-' : App.fmtBal(Number(v), 0);
     const pct = v => (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%';
     const paras = [];
 

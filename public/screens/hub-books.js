@@ -97,7 +97,12 @@ S.HubBooks = {
   _incomeStatementCard(monthKey) {
     const M = this._aggregateMonth(monthKey), YTD = this._aggregateYTD(monthKey);
     const opexM = this._opExSums(monthKey, false), opexY = this._opExSums(monthKey, true);
-    const f = v => (v == null || isNaN(v)) ? '-' : (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Was a 4th hand-rolled balance formatter. It was already negative-safe and right,
+    // but it is the same rule as App.fmtBal, and hub-books-home renders these very
+    // figures through the same helper now, which is what makes the landing and this
+    // statement agree on a down month. The null/NaN dash stays: that is this card's
+    // contract, not fmtBal's.
+    const f = v => (v == null || isNaN(v)) ? '-' : App.fmtBal(v);
     const pct = v => (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%';
     const opexSum = o => Object.values(o).reduce((s, v) => s + (v || 0), 0);
     // Revenue entered from the POS is NET sales (comps/discounts already excluded),
