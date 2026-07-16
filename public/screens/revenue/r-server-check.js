@@ -337,9 +337,21 @@ S.RevenueServerCheck = {
     this.calc();
   },
 
+  // Only reads fields that are actually on screen. In Import mode the rsc-* inputs are
+  // not rendered at all, so reading them as '' wiped the in-progress entry: a date chip
+  // clicked while importing blanked the date, and the check then saved dated '' and was
+  // invisible in every window, forever. Keep whatever we already hold for a field the
+  // current mode does not render.
   captureForm() {
-    const v = id => document.getElementById(id)?.value ?? '';
-    this._form = { date: v('rsc-date'), shift: v('rsc-shift'), server: v('rsc-server'), cov: v('rsc-cov'), sales: v('rsc-sales') };
+    const f = this._form || {};
+    const v = (id, cur) => { const el = document.getElementById(id); return el ? el.value : (cur ?? ''); };
+    this._form = {
+      date:   v('rsc-date',   f.date),
+      shift:  v('rsc-shift',  f.shift),
+      server: v('rsc-server', f.server),
+      cov:    v('rsc-cov',    f.cov),
+      sales:  v('rsc-sales',  f.sales)
+    };
   },
 
   // ── Per-server import: the toggle helper + result line ───────────────────────
@@ -453,6 +465,9 @@ S.RevenueServerCheck = {
     if (err) err.style.display = 'none';
     const cov = parseFloat(f.cov) || 0;
     const sales = parseFloat(f.sales) || 0;
+    // A check saved without a date sorts below every window cutoff, so it never shows
+    // in the log or the scorecard again. Guard it like every other save in Shift does.
+    if (!f.date) { fail('Pick the date before saving.'); return; }
     if (!cov || !sales) { fail('Enter covers and total sales before saving.'); return; }
     const byId = this.staffById(f.server);
     if (!byId) { fail('Pick a server.'); return; }

@@ -1103,6 +1103,7 @@ S.RevenueMenuItems = {
     const byKey = {};
     existing.forEach(it => { byKey[keyOf(it.type, it.name)] = it; });
     let added = 0, updated = 0;
+    const repriced = [];
     rows.forEach(r => {
       const name = (r.name || '').trim();
       if (!name) return;
@@ -1113,7 +1114,17 @@ S.RevenueMenuItems = {
         // Re-dropping an export REFRESHES the matching item instead of duplicating
         // it. Only overwrite a field the file actually carries, so a partial export
         // (e.g. no cost column) never wipes a good cost/price already on file.
-        if (price > 0)  cur.price = price;
+        if (price > 0) {
+          if (price !== cur.price) {
+            repriced.push({ item: cur, from: cur.price });
+            // A price the file moves is a real reprice, same as a direct edit: the new
+            // live price supersedes any planned one. Left on the item, a stale plan
+            // makes Menu Engineering show a negative delta and its Mark Live button
+            // CUT the price, on a screen whose whole contract is raise-only.
+            cur.planned_price = null; cur.planned_vol_pct = null; cur.planned_at = null;
+          }
+          cur.price = price;
+        }
         if (cost > 0)   cur.cost = cost;
         if (covers > 0) cur.weekly_covers = covers;
         if (cat)        cur.category = cat;
@@ -1151,6 +1162,12 @@ S.RevenueMenuItems = {
     }
 
     await App.saveKey('menu_items');
+    // Every reprice the file carried goes through the one canonical pricing logger,
+    // same as a direct edit, so the Pricing Review Log and Recovery see it. Without
+    // this the audit told the operator to reprice the day after they repriced.
+    for (const rp of repriced) {
+      await App.logPriceChange(rp.item, rp.from, rp.item.price, { reason: 'Menu list import', source: 'menu-items-import' });
+    }
     App.markSetupDone('gs_r_menu');
     // Re-render so the new items show in the list below (stays in import mode),
     // then drop the summary into the freshly-mounted result slot.

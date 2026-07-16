@@ -371,6 +371,15 @@ S.RevenueMenuEngineering = {
     const item = (App.data.menu_items || []).find(i => i.id === itemId);
     if (!item || !(item.planned_price > 0)) return;
     const old = item.price, np = item.planned_price, vol = item.planned_vol_pct;
+    // This page only ever plans a RAISE, so a plan that now sits at or under the live
+    // price is stale: the price moved after the plan was made. Drop it rather than
+    // push it live, or Mark Live quietly CUTS the price the operator just set.
+    if (old != null && np <= old) {
+      item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
+      await App.saveKey('menu_items');
+      this.draw();
+      return;
+    }
     item.price = np; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
     await App.saveKey('menu_items');
     if (old != null && old !== np) await this._logPriceChange(item, old, np, vol);

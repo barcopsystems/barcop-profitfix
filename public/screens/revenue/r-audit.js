@@ -415,6 +415,10 @@ S.RevenueAudit = {
     if (actuals.length) {
       cd.labor_hours = r1(actuals.reduce((s,a) => s + (a.hours || 0), 0));
       let laborCost = actuals.reduce((s,a) => s + ((a.hours || 0) * (a.wage || 0)), 0);
+      // lc_actuals hold straight time only. Add the weekly overtime premium here too,
+      // or Total Labor Period contradicts labor_pct_blended (which is OT-inclusive,
+      // coming off the saved revenue_weeks) inside the same audit.
+      laborCost += App.otPremiumForRows ? App.otPremiumForRows(actuals).total : 0;
       // Fixed salaried (exempt) cost over the SAME window, not the whole history.
       laborCost += App.salariedCost(winStart, winEnd).total;
       cd.labor_cost = Math.round(laborCost);
