@@ -1297,7 +1297,11 @@ S.HubBooks = {
       if (!byPos[pname]) byPos[pname] = { hours: 0, wages: 0 };
       byPos[pname].hours += hours;
       byPos[pname].wages += cost;
-      const sid = a.staff_id || a.name || '(unknown)';
+      // Key exactly the way otPremiumForRows/otPremiumInWindow bucket, or a row with no
+      // staff_id AND no name keys here as '(unknown)' and there as '?', the premium
+      // attaches to no staff row and no position, and Total Wages Paid ends up larger
+      // than the sum of its own breakdowns on a sheet handed to an accountant.
+      const sid = App.otStaffKey(a);
       posBySid[sid] = pname;
       if (!byStaff[sid]) byStaff[sid] = { name: a.name || '(unknown)', position: pname, hours: 0, wages: 0 };
       byStaff[sid].hours += hours;
@@ -1308,7 +1312,15 @@ S.HubBooks = {
     // overtime premium has to be added here or Total Wages Paid hands the accountant a
     // payroll figure light by the whole premium on any week someone crossed 40 hours.
     // Attributed back to the same staff and position that carried the hours.
-    const otPrem = App.otPremiumForRows ? App.otPremiumForRows(actuals) : { total: 0, byStaff: {} };
+    // Measured over WHOLE weeks from the UNFILTERED actuals, then allocated to this
+    // month. `actuals` is already cut to the calendar month, and overtime is a weekly
+    // threshold: a week straddling the month boundary was split into two part-weeks,
+    // each tested against 40 on its own, so neither drew a premium and the month came
+    // back light. Up to two straddling weeks every month, on the accountant's sheet.
+    const allActuals = (App.laborData?.lc_actuals || []);
+    const monthStart = this._monthStartDate(monthKey);
+    const monthEnd   = this._monthEndDate(monthKey);
+    const otPrem = App.otPremiumInWindow ? App.otPremiumInWindow(allActuals, monthStart, monthEnd) : { total: 0, byStaff: {} };
     Object.keys(otPrem.byStaff || {}).forEach(sid => {
       const prem = otPrem.byStaff[sid] || 0;
       const pname = posBySid[sid];
@@ -1321,9 +1333,8 @@ S.HubBooks = {
     // lc_actuals rows, so without this Total Wages Paid and Labor % of Revenue
     // understate the real spend and disagree with Payroll and the Revenue
     // dashboards for the same month. Accrued day-for-day across the month.
-    const _ms = new Date(monthKey + '-01T00:00:00');
-    const monthEnd = App.ymdLocal(new Date(_ms.getFullYear(), _ms.getMonth() + 1, 0));
-    const salWeeks = (Math.floor((new Date(monthEnd + 'T00:00:00').getTime() - _ms.getTime()) / 86400000) + 1) / 7;
+    const _ms = new Date(monthStart + 'T00:00:00');   // monthStart/monthEnd hoisted above
+    const salWeeks = (Math.round((new Date(monthEnd + 'T00:00:00').getTime() - _ms.getTime()) / 86400000) + 1) / 7;
     staff.forEach(st => {
       const wk = App.staffWeeklySalary(st);
       if (!wk) return;
