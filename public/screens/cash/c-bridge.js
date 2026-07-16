@@ -60,6 +60,20 @@ S.CashBridge = {
     this.wire();
   },
 
+  // A BALANCE, negative-safe: minus outside the '$', no plus on a positive (that is
+  // the waterfall's job below, where a FLOW gets +/- and only the result line goes
+  // bare). App.fmtCurrency is '$' + v, so a raw negative renders "$-2,340". Both
+  // values in the hero can go under zero and the code already knows it: cashKept has
+  // a `kept < 0` red branch, and the ¢-line is gated `if (br.profit > 0)`, so a
+  // losing month is expected.
+  // The sign is taken from the ROUNDED value on purpose: fmtCurrency normalizes -0 so
+  // it never prints "$-0.00", and testing the raw v would hand back "-$0.00" instead,
+  // reintroducing the exact malformed-currency bug one layer up.
+  fmtBal(v, d) {
+    const dd = d !== undefined ? d : 2;
+    return (Number(Number(v).toFixed(dd)) < 0 ? '-' : '') + App.fmtCurrency(Math.abs(v), d);
+  },
+
   // ── Cash You Kept hero ───────────────────────────────────────────────────────
   headline(br, b) {
     const kept = br.cashKept, diff = br.profit - kept;
@@ -87,8 +101,8 @@ S.CashBridge = {
     const convLine = convTxt ? '<div style="font-size:12px;color:var(--t2);margin-top:8px;">' + convTxt + '</div>' : '';
     return '<div class="card form-card"><div class="card-title">Cash You Kept</div>'
       + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
-      +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:' + keptCol + ';">' + App.fmtCurrency(kept, 0) + '</span>'
-      +   '<span style="font-size:13px;color:var(--t2);">of ' + App.fmtCurrency(br.profit, 0) + ' profit ' + b.label + '</span>'
+      +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:' + keptCol + ';">' + this.fmtBal(kept, 0) + '</span>'
+      +   '<span style="font-size:13px;color:var(--t2);">of ' + this.fmtBal(br.profit, 0) + ' profit ' + b.label + '</span>'
       + '</div>'
       + convLine
       + '<div style="font-size:12px;color:var(--t3);margin-top:12px;">'
@@ -100,7 +114,7 @@ S.CashBridge = {
       +   invNote
       + '</div>'
       // PDF-only summary (the hero number is a styled span the exporter skips).
-      + '<div class="pdf-para" style="display:none;">' + App.fmtCurrency(kept, 0) + (noInv ? ' cash kept before inventory, of ' : ' cash kept of ') + App.fmtCurrency(br.profit, 0) + ' profit ' + b.label + '.'
+      + '<div class="pdf-para" style="display:none;">' + this.fmtBal(kept, 0) + (noInv ? ' cash kept before inventory, of ' : ' cash kept of ') + this.fmtBal(br.profit, 0) + ' profit ' + b.label + '.'
         + (diff > 0.5 ? ' ' + App.fmtCurrency(diff) + ' went somewhere other than the bank.' : noInv ? ' Nothing you logged took cash out of this period.' : ' You kept all of your profit this period.')
         + invNote + '</div>'
       + '</div>';

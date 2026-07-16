@@ -25,7 +25,13 @@ S.CashAudit = {
   // malformed EVERY time they appeared, including in the exported lender PDF. Same
   // helper and same rule as c-forecast.fmtBal. Amounts that cannot go negative
   // (trapped cash, dead stock, locked cash) stay on plain `cur`.
-  fmtBal(v) { return (v < 0 ? '-' : '') + App.fmtCurrency(Math.abs(v)); },
+  // The sign reads off the ROUNDED value: fmtCurrency normalizes -0 so it never prints
+  // "$-0.00", and testing the raw v would hand back "-$0.00" instead, reintroducing the
+  // same malformed-currency bug one layer up.
+  fmtBal(v, d) {
+    const dd = d !== undefined ? d : 2;
+    return (Number(Number(v).toFixed(dd)) < 0 ? '-' : '') + App.fmtCurrency(Math.abs(v), d);
+  },
   runwayLabel(r) { return r == null ? '13+ wks' : r === 0 ? 'This week' : r + ' wk' + (r === 1 ? '' : 's'); },
 
   render(container, actions) {
