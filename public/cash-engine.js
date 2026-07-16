@@ -320,7 +320,14 @@ window.CashEngine = {
   // Labor cost for an upcoming week: the built schedule if one exists, otherwise
   // a trailing four-week average of what you actually paid.
   laborForWeek(ws) {
-    const sched = ((App.laborData && App.laborData.lc_schedules) || []).find(s => s && s.week_start === ws);
+    // Newest wins if a week ever carries two schedules. Build Schedule's duplicate-week
+    // guard replaces in place, so the single-device flow cannot make one; two managers
+    // posting the same week from different devices before a sync can. This feeds the
+    // quarter and the lender export, so it takes the same picker as Overtime Watch /
+    // Log Hours / the Call-Out Log. cmpNewest resolves schedules on its created_at
+    // tiebreak (App._recDate reads none of their fields).
+    const sched = ((App.laborData && App.laborData.lc_schedules) || [])
+      .filter(s => s && s.week_start === ws).sort(App.cmpNewest)[0];
     if (sched && Array.isArray(sched.shifts) && sched.shifts.length) {
       const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       let cost = 0;
