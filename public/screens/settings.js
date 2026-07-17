@@ -480,6 +480,15 @@ S.HubSettings = {
     const uid = () => App.uid();
     const today = new Date();
     const dateStr = (daysAgo) => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); return App.ymdLocal(d); };
+    // A day that has not happened yet cannot have a Closed shift, an imported POS line
+    // or logged hours: no live operator can import a file for tomorrow. dateStr counts
+    // DAYS AGO, so anything negative is the future. The current-week blocks below run
+    // off `sunOff - 7` (this week's Sunday, which is ahead of today every day except
+    // Saturday), so they wrote future rows on 6 of the 7 days the demo can be loaded
+    // on, and on a SUNDAY every single day of the "current" week was in the future: a
+    // prospect saw next Saturday already Closed with $2,600 booked. [[seed-honesty-audit]]
+    // Rule 1. History is unaffected (its baseAgo is always >= sunOff, so >= 0).
+    const hasHappened = (daysAgo) => daysAgo >= 0;
 
     // ── Settings ──
     App.data.settings.bar_name           = 'The Anchor Bar & Kitchen';
@@ -912,8 +921,17 @@ S.HubSettings = {
         AUDIT_PERIOD: periodLabel(90), AUDIT_ID: 'RVA-2026-0012',
         INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 38, S1_CHECK_AVG: 35.40, S1_CHECK_AVG_TARGET: 40.00, S1_BAR_CHECK_AVG: 28.40,
-        S1_FOOD_CHECK_AVG: 41.60, S1_COVER_COUNT: 2090, S1_MONTHLY_REVENUE: 73400,
-        S1_MONTHLY_GAP: 3400, S1_ANNUAL_GAP: 40800,
+        // 73,986 = 35.40 x 2,090. r-audit prints Monthly Revenue, Cover Count and Check
+        // Average on the same card, and 73,400 / 2,090 came to $35.12, not the $35.40
+        // beside it. Live these foot by construction (the engine derives both from the
+        // same weeks), so the seed has to as well.
+        S1_FOOD_CHECK_AVG: 41.60, S1_COVER_COUNT: 2090, S1_MONTHLY_REVENUE: 73986,
+        // Every S1 gap here foots the LIVE rule (audit-compute.js: gap = (target -
+        // check average) x monthly covers, annual = x12), and the audit narrative
+        // prints the arithmetic right next to it: "On 2,090 monthly covers, closing
+        // that gap is $X a month." They used to be hand-picked and ~3x light, which a
+        // prospect could catch in their head. (4.60 x 2,090)
+        S1_MONTHLY_GAP: 9614, S1_ANNUAL_GAP: 115368,
         S2_SCORE: 40, S2_LABOR_PCT: 32.5, S2_LABOR_TARGET_PCT: 30, S2_RPLH: 60, S2_RPLH_TARGET: 75,
         S2_LABOR_PERIOD: 23900, S2_MONTHLY_GAP: 1838, S2_ANNUAL_GAP: 22056,
         S3_SCORE: 36, S3_STARS_COUNT: 3, S3_PLOWHORSES_COUNT: 9, S3_DOGS_COUNT: 7, S3_PUZZLES_COUNT: 5,
@@ -930,7 +948,7 @@ S.HubSettings = {
         INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 47, S1_CHECK_AVG: 36.20, S1_CHECK_AVG_TARGET: 40.00, S1_BAR_CHECK_AVG: 29.60,
         S1_FOOD_CHECK_AVG: 42.40, S1_COVER_COUNT: 2110, S1_MONTHLY_REVENUE: 76400,
-        S1_MONTHLY_GAP: 2600, S1_ANNUAL_GAP: 31200,
+        S1_MONTHLY_GAP: 8018, S1_ANNUAL_GAP: 96216,   // (40.00 - 36.20) x 2,110
         S2_SCORE: 50, S2_LABOR_PCT: 31.5, S2_LABOR_TARGET_PCT: 30, S2_RPLH: 68, S2_RPLH_TARGET: 75,
         S2_LABOR_PERIOD: 24100, S2_MONTHLY_GAP: 1146, S2_ANNUAL_GAP: 13752,
         S3_SCORE: 45, S3_STARS_COUNT: 5, S3_PLOWHORSES_COUNT: 8, S3_DOGS_COUNT: 4, S3_PUZZLES_COUNT: 6,
@@ -947,7 +965,7 @@ S.HubSettings = {
         INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 56, S1_CHECK_AVG: 36.90, S1_CHECK_AVG_TARGET: 40.00, S1_BAR_CHECK_AVG: 30.60,
         S1_FOOD_CHECK_AVG: 43.00, S1_COVER_COUNT: 2140, S1_MONTHLY_REVENUE: 78900,
-        S1_MONTHLY_GAP: 1700, S1_ANNUAL_GAP: 20400,
+        S1_MONTHLY_GAP: 6634, S1_ANNUAL_GAP: 79608,   // (40.00 - 36.90) x 2,140
         S2_SCORE: 60, S2_LABOR_PCT: 30.0, S2_LABOR_TARGET_PCT: 30, S2_RPLH: 74, S2_RPLH_TARGET: 75,
         S2_LABOR_PERIOD: 24000, S2_MONTHLY_GAP: 0, S2_ANNUAL_GAP: 0,
         S3_SCORE: 53, S3_STARS_COUNT: 6, S3_PLOWHORSES_COUNT: 8, S3_DOGS_COUNT: 3, S3_PUZZLES_COUNT: 6,
@@ -964,7 +982,7 @@ S.HubSettings = {
         INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 64, S1_CHECK_AVG: 38.10, S1_CHECK_AVG_TARGET: 40.00, S1_BAR_CHECK_AVG: 31.80,
         S1_FOOD_CHECK_AVG: 44.20, S1_COVER_COUNT: 2170, S1_MONTHLY_REVENUE: 82700,
-        S1_MONTHLY_GAP: 800, S1_ANNUAL_GAP: 9600,
+        S1_MONTHLY_GAP: 4123, S1_ANNUAL_GAP: 49476,   // (40.00 - 38.10) x 2,170
         S2_SCORE: 68, S2_LABOR_PCT: 28.6, S2_LABOR_TARGET_PCT: 30, S2_RPLH: 80, S2_RPLH_TARGET: 75,
         S2_LABOR_PERIOD: 23800, S2_MONTHLY_GAP: 0, S2_ANNUAL_GAP: 0,
         S3_SCORE: 62, S3_STARS_COUNT: 7, S3_PLOWHORSES_COUNT: 7, S3_DOGS_COUNT: 2, S3_PUZZLES_COUNT: 6,
@@ -982,7 +1000,16 @@ S.HubSettings = {
     //  events, dog tests and the price-change log.
     // ════════════════════════════════════════════════════════════════════
     App.data.revenue_settings = App.data.revenue_settings || {};
-    App.data.revenue_settings.targets = { check_avg:35, rplh_lunch:50, rplh_dinner:75, rplh_bar:65, event_close_rate:40 };
+    // check_avg is 40, not 35, and that is load-bearing: it is the ONE target the
+    // Revenue Dashboard, Recovery and the live audit engine all read
+    // (audit-compute.js `checkTarget = rt.check_avg ?? 35`). Seeded at 35 it
+    // contradicted the demo on two adjacent screens: the Dashboard rendered "$38.30,
+    // target $35.00" in GREEN as a beat, while the audit dated TODAY said "$38.10
+    // against a $40.00 target. Every guest is leaving room on the table" and booked a
+    // gap. Worse, a live "Generate New Audit" on the demo would have scored S1 85 with
+    // NO gap (below = 35 - 38.10 is negative), erasing the whole check-average story
+    // the seeded audit tells. Every other target here already matches Settings.
+    App.data.revenue_settings.targets = { check_avg:40, rplh_lunch:50, rplh_dinner:75, rplh_bar:65, event_close_rate:40 };
 
     // Four servers carry the floor. Each week's covers split by these weights,
     // with the top server running a higher check average than the bottom.
@@ -2172,12 +2199,15 @@ S.HubSettings = {
         scDays.push({ date:date, manager:mgrs[di % 3] });
       });
     });
-    // Current week, mid-close: the operator has run their end-of-week sales
-    // import (one file, the whole week), so Shift's Close The Week shows the full
-    // week's revenue with step 1 done. Live: a fresh week is zero until imported.
+    // Current week, mid-close: the operator has imported the days that have HAPPENED,
+    // so Shift's Close The Week shows the week so far with step 1 done. Live: a fresh
+    // week is zero until imported, and fills in a day at a time. It used to write all
+    // 7 days of the week regardless, so it booked Closed shifts with revenue on days
+    // that had not happened yet (see hasHappened).
     const curWk = ANCHS.weeks.reduce((m, a) => (ANCHS.endAgo(a) < ANCHS.endAgo(m) ? a : m), ANCHS.weeks[0]);
     const curBaseAgo = sunOff - 7;   // days-ago of THIS week's Sunday (negative mid-week)
     if (curWk) for (let di = 0; di < 7; di++) {
+      if (!hasHappened(curBaseAgo + 6 - di)) continue;   // that day has not happened yet
       const w = dayW[di] || 0.12;
       const dBar = Math.round(curWk.bar_rev * w), dFloor = Math.round(curWk.food_rev * w);
       scShifts.push({
@@ -2554,7 +2584,15 @@ S.HubSettings = {
       { name:'Busser',    department:'Front of House', default_wage:11,                  tipped:true,  tip_out_pct:0 },
       { name:'Host',      department:'Front of House', default_wage:12.5,                tipped:false },
       { name:'Manager',   department:'Management',     pay_type:'Salary', default_salary:68000, tipped:false },
-      { name:'Assistant Manager', department:'Management', default_wage:24, tipped:false },
+      // The AM runs the bar, so her department is Bar and her pay lands on the bar's
+      // P&L. This is load-bearing, not cosmetic: this-week.laborCost buckets EVERY row
+      // by its position's department with `posDept === 'Bar' ? bar : food`, so anything
+      // not Bar falls on FOOD. Parked in Management, her $780/wk landed on a $2,136
+      // food budget alongside the GM's $510 share, leaving $846 for 4 cooks and 7 FOH
+      // (a line cook logged 1.7 h/day). Her hours are allocated out of bar_labor below
+      // to match. She is still not IN lcBar (that list is by position name), so nothing
+      // else moves.
+      { name:'Assistant Manager', department:'Bar', default_wage:24, tipped:false },
     ].map(p => ({ id:uid(), created_at:new Date().toISOString(), ...p }));
     App.laborData.lc_positions = lcPositions;
     const lcPos = n => lcPositions.find(p => p.name === n).id;
@@ -2935,6 +2973,7 @@ S.HubSettings = {
         for (let d = 0; d < 5; d++) {
           const h = +(weekHours / 5).toFixed(1);
           if (h <= 0) continue;
+          if (!hasHappened(baseAgo + 5 - d)) continue;   // nobody logs hours for tomorrow
           lcActuals.push({
             id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name,
             position_id:st.position_id, shift_type:dayparts[(i + d) % dayparts.length],
@@ -2958,8 +2997,8 @@ S.HubSettings = {
     // The GM logs coverage hours at 0 hourly cost (salary added by salariedCost); the
     // hourly AM logs real hours/cost, carved out of the food labor budget below.
     const seedLeaders = (baseAgo) => {
-      gmStaff.forEach(st => { for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name, position_id:st.position_id, shift_type:'Full Day', hours:9, wage:0, cost:0, notes:'' }); });
-      if (amStaff) for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:amStaff.id, name:amStaff.name, position_id:amStaff.position_id, shift_type:'Full Day', hours:amHrs, wage:amStaff.wage, cost:+(amHrs * amStaff.wage).toFixed(2), notes:'' });
+      gmStaff.forEach(st => { for (let d = 0; d < 5; d++) { if (!hasHappened(baseAgo + 5 - d)) continue; lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name, position_id:st.position_id, shift_type:'Full Day', hours:9, wage:0, cost:0, notes:'' }); } });
+      if (amStaff) for (let d = 0; d < 5; d++) { if (!hasHappened(baseAgo + 5 - d)) continue; lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:amStaff.id, name:amStaff.name, position_id:amStaff.position_id, shift_type:'Full Day', hours:amHrs, wage:amStaff.wage, cost:+(amHrs * amStaff.wage).toFixed(2), notes:'' }); }
     };
     // Hours actually seeded into lc_actuals, per week. This is the ONLY honest source
     // for revenue_weeks.total_hours: a live re-confirm reads laborFeed(), which sums
@@ -2971,9 +3010,21 @@ S.HubSettings = {
       const totLab   = a.bar_labor + a.food_labor;
       const barSal   = totLab > 0 ? weeklySalaried * (a.bar_labor / totLab) : 0;
       const foodSal  = weeklySalaried - barSal;
-      const foodCrew = Math.max(0, a.food_labor - foodSal - amWeekly);   // AM carved out of food
+      // The AM's position is in the Bar department, so laborCost books her pay to BAR.
+      // Carve her out of the BAR budget to match, and leave the food budget whole for
+      // the crew. The bar/food hourly ratio is unchanged either way (the same $780 just
+      // sits on the other side), so the GM's salary still splits 61/39 and both
+      // departments still foot their seeded labor exactly.
+      const foodCrew = Math.max(0, a.food_labor - foodSal);
       const rowsBefore = lcActuals.length;
-      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       Math.max(0, a.bar_labor - barSal), baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
+      // Bar weights are deliberately top-heavy: Maria is the seeded shift lead and runs
+      // a real full-time week (44.1 h) while the other three are part-time (22-26 h).
+      // That is what a bar this size actually staffs, AND it is the demo's only genuine
+      // overtime: she crosses 40 by 4.1 h, so the Hub's "Overtime projected" alert and
+      // Overtime Watch have something true to show. An even spread across four
+      // bartenders leaves nobody over 40 and those screens go dark. The weights sum to
+      // 1.00, so the bar budget still foots either way.
+      lcAllocate(lcBar,     [0.40, 0.24, 0.20, 0.16],       Math.max(0, a.bar_labor - barSal - amWeekly), baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
       lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       foodCrew * 0.5, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
       lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], foodCrew * 0.5, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
       seedLeaders(baseAgo);
@@ -3008,8 +3059,8 @@ S.HubSettings = {
       const cTot      = curL.bar_labor + curL.food_labor;
       const cBarSal   = cTot > 0 ? weeklySalaried * (curL.bar_labor / cTot) : 0;
       const cFoodSal  = weeklySalaried - cBarSal;
-      const cFoodCrew = Math.max(0, curL.food_labor - cFoodSal - amWeekly);
-      lcAllocate(lcBar,     [0.30, 0.27, 0.24, 0.19],       Math.max(0, curL.bar_labor - cBarSal), curLBase, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
+      const cFoodCrew = Math.max(0, curL.food_labor - cFoodSal);   // AM sits on the bar, as above
+      lcAllocate(lcBar,     [0.40, 0.24, 0.20, 0.16],       Math.max(0, curL.bar_labor - cBarSal - amWeekly), curLBase, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
       lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       cFoodCrew * 0.5, curLBase, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
       lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], cFoodCrew * 0.5, curLBase, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
       seedLeaders(curLBase);
