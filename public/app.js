@@ -5740,6 +5740,27 @@ const App = {
     }
   },
 
+  // ── A BALANCE, negative-safe. THE canonical one: do not hand-roll another. ──────
+  // fmtCurrency is '$' + v, so a raw negative renders "$-2,340.00", which is right for
+  // nothing. Plenty of screens print a balance on a line that fires ONLY when the value
+  // is under zero (Safe to Spend "under zero", the cash low point, a losing month's
+  // Cash You Kept), so those printed malformed EVERY time they appeared, lender PDFs
+  // included.
+  //   fmtBal  = a BALANCE or a LEVEL: "-$2,340.00" / "$2,340.00". Never a plus sign.
+  //   signed  = a NET or a CHANGE, where "+$500" carries meaning. Stays per-file.
+  // Pick by what the number IS. c-bridge's waterfall states the rule best: a FLOW takes
+  // +/-, the RESULT line takes neither.
+  // This does NOT change fmtCurrency's contract, so the many callers that already do
+  // their own Math.abs + sign cannot double up.
+  // ⚠ The sign reads off the ROUNDED value on purpose: fmtCurrency normalizes -0 so it
+  // never prints "$-0.00", and testing the raw v would hand back "-$0.00" instead,
+  // reintroducing the same malformed-currency bug one layer up. `decimals` is forwarded
+  // untouched so fmtBal(v, 0) still gives whole dollars.
+  fmtBal(v, decimals) {
+    const d = decimals !== undefined ? decimals : 2;
+    return (Number(Number(v).toFixed(d)) < 0 ? '-' : '') + App.fmtCurrency(Math.abs(v), decimals);
+  },
+
   fmtCurrency(n, decimals) {
     if (isNaN(n) || n == null) return ' ';
     // Currency always shows to the exact cent (accurate + honest). A caller can
