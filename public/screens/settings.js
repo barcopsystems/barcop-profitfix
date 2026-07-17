@@ -732,11 +732,29 @@ S.HubSettings = {
           raw[k] = isFloat ? +v.toFixed(1) : Math.round(v);
         }
       });
-      // Carry the string readouts (recipe coverage, count cadence, drawer recon,
-      // price verify, last price increase) from the nearer milestone so the
-      // generated findings on a weekly fill read complete, not "undefined".
+      // Carry the string readouts (count frequency, drawer recon, price verify, last
+      // price increase, top category) from the nearer milestone so the generated
+      // findings on a weekly fill read complete, not "undefined". Those are standalone
+      // labels with no numeric twin, so carrying them is honest.
       const near = t >= 0.5 ? hi : lo;
       Object.keys(near).forEach(k => { if (raw[k] == null && typeof near[k] === 'string' && !/_NARRATIVE$|_FINDING$|_TOOL$|^AUDIT_/.test(k)) raw[k] = near[k]; });
+      // ── EXCEPT the two coverage readouts, which are not labels: they are a RENDERING
+      // of a number that this function just interpolated. Carried from the nearer
+      // milestone they contradicted their own twin on every weekly fill: the day-51
+      // profit audit read "8 of 18 bar items costed (44%)" beside an interpolated
+      // S1_RECIPE_COVERAGE_PCT of 58, so the warn badge disagreed with the sentence next
+      // to it. Rebuild both from the interpolated pct instead. The total and the noun are
+      // parsed off the milestone rather than hardcoded, so bar items (of 18) and plates
+      // (of 24) both keep their own wording.
+      [['S1_RECIPE_COVERAGE', 'S1_RECIPE_COVERAGE_PCT'], ['S2_RECIPE_COVERAGE', 'S2_RECIPE_COVERAGE_PCT']]
+        .forEach(([sKey, pKey]) => {
+          const pct = raw[pKey];
+          const m = String(near[sKey] || '').match(/^\d+ of (\d+) (.+) costed \(\d+%\)$/);
+          if (typeof pct !== 'number' || !m) return;
+          const total = +m[1];
+          raw[sKey] = Math.round(pct / 100 * total) + ' of ' + total + ' ' + m[2]
+                    + ' costed (' + Math.round(pct) + '%)';
+        });
       raw.BAR_NAME = lo.BAR_NAME || 'The Anchor Bar & Kitchen';
       raw.DATA_TIER_LABEL = near.DATA_TIER_LABEL || 'Bar Cop operating data';
       return raw;
@@ -3004,7 +3022,7 @@ S.HubSettings = {
     // for revenue_weeks.total_hours: a live re-confirm reads laborFeed(), which sums
     // every lc_actuals hour in the week (salaried managers included, by its own
     // comment). See the reconcile pass right below the loop.
-    const seededHrs = {};
+    const seededHrs = {}, seededOT = {};
     ANCHL.weeks.forEach(a => {
       const baseAgo  = sunOff + ANCHS.endAgo(a);
       const totLab   = a.bar_labor + a.food_labor;
@@ -3028,7 +3046,12 @@ S.HubSettings = {
       lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       foodCrew * 0.5, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
       lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], foodCrew * 0.5, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
       seedLeaders(baseAgo);
-      seededHrs[a.wk] = +lcActuals.slice(rowsBefore).reduce((s, r) => s + (r.hours || 0), 0).toFixed(1);
+      const wkRows = lcActuals.slice(rowsBefore);
+      seededHrs[a.wk] = +wkRows.reduce((s, r) => s + (r.hours || 0), 0).toFixed(1);
+      // The OT premium is NEVER stored in lc_actuals (they are straight time only), so
+      // every weekly rollup has to add it. Read it off the rows through the canonical
+      // helper, never re-implement the reg/OT wage math ([[labor-cost-model]]).
+      seededOT[a.wk] = App.otPremiumForRows ? +(App.otPremiumForRows(wkRows).total || 0).toFixed(2) : 0;
     });
 
     // ── Reconcile revenue_weeks to the rows that actually shipped ──────────────
@@ -3049,6 +3072,47 @@ S.HubSettings = {
       if (!(h > 0)) return;
       rw.total_hours  = h;
       rw.rplh_blended = +(((rw.bar_revenue || 0) + (rw.floor_revenue || 0)) / h).toFixed(2);
+    });
+
+    // ── labor_pct_blended + prime_cost_pct: TOTAL-SALES basis, OT premium included ──
+    // Both came straight off the ANCHOR, which measures them against `total_rev` =
+    // bar + food only and leaves ancillary COGS out of prime entirely. The live app
+    // measures BOTH against totSales (bar+food+catering+ancillary) and folds oCogs into
+    // prime ([[labor-cost-model]] DENOMINATORS; confirm-week `_figures`), and its labor
+    // carries the OT premium that lc_actuals never store. So a re-confirm moved the
+    // seeded numbers on every week that has either. Derive them from the shipped rows
+    // and the shipped week record instead, so the seed and a live re-confirm agree by
+    // construction. Ancillary lands on weeks 4/8/12 (`othRev`); catering is 0 on every
+    // seeded week (it comes only from Completed bookings), but it is read here rather
+    // than assumed so this keeps holding if that changes.
+    (App.data.weeks || []).forEach(pw => {
+      const ot   = seededOT[pw.week_num] || 0;
+      const bRev = (pw.bar && pw.bar.revenue) || 0,   fRev = (pw.food && pw.food.revenue) || 0;
+      const cRev = (pw.catering && pw.catering.revenue) || 0, oRev = (pw.other && pw.other.revenue) || 0;
+      const totSales = bRev + fRev + cRev + oRev;
+      if (!(totSales > 0)) return;
+      const labor = ((pw.bar && pw.bar.labor) || 0) + ((pw.food && pw.food.labor) || 0)
+                  + ((pw.catering && pw.catering.labor) || 0) + ot;
+      const prime = ((pw.bar && pw.bar.cogs) || 0) + ((pw.food && pw.food.cogs) || 0)
+                  + ((pw.catering && pw.catering.cogs) || 0) + ((pw.other && pw.other.cogs) || 0) + labor;
+      pw.prime_cost_pct = +(prime / totSales * 100).toFixed(2);
+      const rw = (App.data.revenue_weeks || []).find(r => r.week_num === pw.week_num);
+      if (!rw) return;
+      // Recovery dollarizes a point of labor_pct_blended against its `base`, and that
+      // base must be the denominator the value was measured against. Without these two
+      // fields `_rTotSales` can only reach bar+floor, so the leak dollars would run
+      // light by exactly catering's and ancillary's share (see recovery.js, and the
+      // BASE RULE). Seeding the value on a totSales basis REQUIRES seeding them.
+      rw.catering_revenue  = cRev;
+      rw.other_revenue     = oRev;
+      rw.total_labor_cost  = +labor.toFixed(2);
+      rw.hourly_labor_cost = +Math.max(0, labor - WEEKLY_GM_SALARY).toFixed(2);
+      rw.labor_pct_blended = +(labor / totSales * 100).toFixed(2);
+      // hourly_labor_pct stays on BAR + FOOD only: its numerator excludes the catering
+      // crew, and it must equal Recovery's labor-scheduling base. Different metric,
+      // different basis, on purpose.
+      const fbRev = bRev + fRev;
+      if (fbRev > 0) rw.hourly_labor_pct = +(Math.max(0, labor - WEEKLY_GM_SALARY) / fbRev * 100).toFixed(2);
     });
     // Current week, mid-close: the operator has imported this week's hours, so
     // Labor's Close The Week shows the full week with step 1 done. Live: zero
@@ -3674,12 +3738,21 @@ S.HubSettings = {
     try {
       if (window.S && S.CashAudit && window.CashEngine && S.CashAudit._computeAudit) {
         const engCash = S.CashAudit._computeAudit();
-        if (engCash && App.data.cash_audits[0]) {
-          engCash.audit_id     = App.data.cash_audits[0].audit_id;
-          engCash.audit_period = App.data.cash_audits[0].audit_period;
-          engCash.date         = App.data.cash_audits[0].date;
-          engCash.generated_at = App.data.cash_audits[0].generated_at;
-          App.data.cash_audits[0] = engCash;
+        // Pick the day-0 audit by DATE, never by array position. `cash_audits[0]` was
+        // day 0 only because weeklySeries happens to build newest-first; reorder that
+        // and this would have silently overwritten a 90-day-old audit with today's
+        // engine output, and the demo's newest audit would have kept a stale
+        // hand-authored raw. `latestEvent` is safe for this kind: a cash_audit carries
+        // `date`, which App._recDate reads (it FAILS OPEN on kinds it cannot date, so
+        // check the field before reaching for it — [[event-store-gotchas]] section 0).
+        const latest = App.latestEvent ? App.latestEvent(App.data.cash_audits) : App.data.cash_audits[0];
+        const idx = latest ? App.data.cash_audits.indexOf(latest) : -1;
+        if (engCash && latest && idx >= 0) {
+          engCash.audit_id     = latest.audit_id;
+          engCash.audit_period = latest.audit_period;
+          engCash.date         = latest.date;
+          engCash.generated_at = latest.generated_at;
+          App.data.cash_audits[idx] = engCash;
         }
       }
     } catch (e) { /* keep the hand-authored day-0 if the engine cannot read yet */ }
