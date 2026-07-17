@@ -323,6 +323,11 @@ S.RecoveryPlaybook = {
         if (blk.note) b.paragraph(blk.note, { gray: 115, italic: true, size: 9 });
         break;
       case 'diag':
+        // The score bands below need THIS diagnostic's question count: Cash asks
+        // eleven, Profit and Revenue ask ten. Same coupling the screen already uses
+        // (diagHtml sets _diagItems, _diagScoreHtml reads it); diagscore always
+        // follows its diag block in the same section.
+        this._pdfDiagTotal = (blk.items || []).length;
         blk.items.forEach(q => {
           b.heading(q.n + '. ' + q.q, 10);
           b.paragraph('Yes: ' + q.yes, { gray: 70, size: 9 });
@@ -335,7 +340,12 @@ S.RecoveryPlaybook = {
         break;
       case 'diagscore':
         b.heading('Score your answers', 11);
-        b.paragraph('8 to 10 Yes: you are ahead of most bars. Use the system to formalize what works and close the rest. Even one No is costing you every month.', { gray: 55 });
+        // "8 to 10" was hardcoded and shared by all three diagnostics, so the Cash
+        // one (eleven questions, and its own lead says "Eleven questions") told an
+        // operator who answered all eleven Yes that no band covered them. The screen
+        // was never wrong: its `yes >= 8` already covers 8 through 11 and its band
+        // text carries no range. This is the export only.
+        b.paragraph('8 to ' + (this._pdfDiagTotal || 10) + ' Yes: you are ahead of most bars. Use the system to formalize what works and close the rest. Even one No is costing you every month.', { gray: 55 });
         b.paragraph('5 to 7 Yes: you have profitable holes. Add up the monthly figures next to your No answers. That is what this system is built to recover.', { gray: 55 });
         b.paragraph('0 to 4 Yes: this system pays for itself in the first 30 days. Instinct and experience both have limits. A system does not.', { gray: 55 });
         break;
@@ -752,11 +762,15 @@ S.RecoveryPlaybook = {
                 ['Pour cost', '23%', '31.4%', '8.4 points above where he thought he was'],
                 ['Food cost', '32%', '38.2%', 'No recipe cards, protein yields never run'],
                 ['Vendor overcharges', 'Unknown', '$4,800 in 6 months', 'Found in the first delivery audit across 3 distributors'],
-                ['Prime cost', '58%', '67.1%', '9 points above target for a full-service room']
+                // 67.1 - 58 = 9.1, which is above HIS ESTIMATE (the column beside it),
+                // not above target. Above a 60 percent target it is 7.1. The old
+                // "9 points above target" was right for neither. The pour row above
+                // states the same gap the same way.
+                ['Prime cost', '58%', '67.1%', '9.1 points above his estimate, 7.1 above a 60 percent target']
               ],
               note: 'Day 1 is always uncomfortable. The number is almost always worse than the estimate. That is not a failure. That is the first accurate look this bar has had at itself in six years.' },
             { t: 'p', text: 'Week two: a signed pour policy goes up and measured pours start. Weekly counting begins in Take Inventory. The first delivery audit catches 840 in price variances and the credits get requested. Recipe costs go in on the top ten menu items. The first variance report flags well vodka and house tequila running 11 to 13 percent over.' },
-            { t: 'p', text: 'Week six: pour cost is at 27.8 percent, down 3.6 points. The well variance resolves to a mix of free-pouring and one Friday bartender pocketing 60 to 80 a shift in no-ring cash. Documented. Addressed. Recipe costs are in on 22 items. Four price below their cost floor: two get a price move, two get a recipe change.' },
+            { t: 'p', text: 'Week six: pour cost is at 27.8 percent, down 3.6 points. The well variance resolves to a mix of free-pouring and one Friday bartender pocketing 60 to 80 a shift in no-ring cash. Documented. Addressed. Recipe costs are in on 22 items. Four are priced below their cost floor: two get a price move, two get a recipe change.' },
             { t: 'p', text: 'Day 90: the first full quarter. Pour cost 24.3, down 7.1 points. Food cost 32.8, down 5.4. Vendor credits recovered: 6,200 in the quarter. Prime cost 59.4, under 60 for the first time in the bar history. Same room, same staff, no new customers. A different set of systems running every week.' },
             { t: 'box', tone: 'steel', title: 'This gap exists whether you track it or not', text: 'The money is leaving right now, every shift. The only question is whether something is telling you where it goes and handing you the tool to stop it. That is the whole job Bar Cop does.' }
           ]
