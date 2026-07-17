@@ -525,7 +525,13 @@ const App = {
     const bar = document.createElement('div');
     bar.id = 'demo-banner';
     bar.innerHTML = '<span style="font-size:12px;font-weight:700;letter-spacing:0.03em;">Bar Cop Live Demo</span>'
-      + '<span style="flex:1;min-width:0;font-size:11px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">&copy; Bar Cop</span>'
+      // The demo seeds the CURRENT week whole (all 7 days of sales, hours and shifts)
+      // so the close reads like a finished week. Part of that week is still ahead of
+      // today, so say so plainly rather than let a visitor find a Saturday already
+      // closed and wonder what else is invented. See the note by `dateStr` in the seed.
+      + '<span style="flex:1;min-width:0;font-size:11px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+      +   'For demo purposes this week\'s data runs through the full week, ahead of today. Everything else is real math on real records.'
+      + '</span>'
       + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Set Up My Bar</button>';
     document.body.appendChild(bar);
     document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/?signup=1'; });
