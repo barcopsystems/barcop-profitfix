@@ -220,8 +220,17 @@ S.LaborBuildSchedule = {
       // trip through Schedule History to make a quick change to this week.
       this.editId = null;
       const saved = this.savedDraft();
-      if (saved && (saved.shifts || []).length) this.draft = saved;
-      else this.loadWeek(this.mondayOf(App.todayLocal()));
+      // Only resume a draft we can actually SHOW. A cell finds its shift by
+      // sh.staff_id === staff.id, so a draft whose staff no longer exist (every
+      // sample re-seed mints new ids; a live roster can have people deleted) renders
+      // as a completely empty grid while still pinning the screen to that draft's old
+      // week. That reads as "Build Schedule keeps opening on the previous week with
+      // nothing in it". If nothing in the draft can render, drop it and land on the
+      // current week's posted schedule instead.
+      const resumable = saved && (saved.shifts || []).some(sh =>
+        this.activeStaff().some(st => st.id === sh.staff_id));
+      if (resumable) this.draft = saved;
+      else { this.clearDraft(); this.loadWeek(this.mondayOf(App.todayLocal())); }
     }
     if (this.activeStaff().length === 0) {
       App.setupCard(this.container, {
