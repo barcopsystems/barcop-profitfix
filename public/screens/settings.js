@@ -427,6 +427,14 @@ S.HubSettings = {
     // Drop the cockpit's per-week "done" stamps (localStorage) so a fresh sample
     // does not inherit phantom step checks from a prior session.
     try { Object.keys(localStorage).filter(k => k.indexOf('cockpit_done_') !== -1).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    // Same reason, and it bites harder: Build Schedule keeps an unsaved draft on the
+    // device (lc_sched_draft) holding a week_start and shifts keyed by staff_id. Every
+    // seed mints NEW staff ids, so a draft from a prior session survives with shifts
+    // that match nobody: the screen resumes it, pins itself to that OLD week, and every
+    // cell renders empty (the grid matches a cell by sh.staff_id === staff.id), with
+    // Scheduled showing only the salaried GM. Clear it so a fresh sample lands on the
+    // current week's posted schedule.
+    try { localStorage.removeItem('lc_sched_draft'); } catch (e) {}
 
     // Cash Recovery device-local config (opening balance, tax rate, reserve). These
     // live on the device, not in App.data, so the sample sets them here to light up
@@ -3948,7 +3956,7 @@ S.HubSettings = {
         CashEngine.setGiftCardLiability(null);
       }
     } catch (e) {}
-    try { ['events_step_ack_leads', 'events_step_ack_deposits', 'events_step_ack_prep', 'events_step_ack_close', 'event_agreement_terms'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    try { ['events_step_ack_leads', 'events_step_ack_deposits', 'events_step_ack_prep', 'events_step_ack_close', 'event_agreement_terms', 'lc_sched_draft'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
     App.updatePeriod();
 
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = '✓ All data cleared. Reloading...'; }
