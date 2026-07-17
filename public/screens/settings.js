@@ -509,24 +509,6 @@ S.HubSettings = {
       { id:'sp_anchor_late',   name:'Late Night', start:'22:00', end:'02:00' }
     ];
 
-    // ── Bar Products ──
-    const bp = [
-      { id:uid(), name:"Tito's Handmade Vodka",    category:'Spirits',      vendor:'Republic National', bottle_size_oz:25.4, std_pour_oz:1.5, cost_per_unit:14.99, menu_price:9.00  },
-      { id:uid(), name:"Espolòn Tequila Blanco",   category:'Spirits',      vendor:'Republic National', bottle_size_oz:25.4, std_pour_oz:1.5, cost_per_unit:17.49, menu_price:10.00 },
-      { id:uid(), name:"Hendrick's Gin",            category:'Spirits',      vendor:'RNDC',              bottle_size_oz:25.4, std_pour_oz:1.5, cost_per_unit:24.99, menu_price:12.00 },
-      { id:uid(), name:"Jack Daniel's Old No. 7",   category:'Spirits',      vendor:'Republic National', bottle_size_oz:25.4, std_pour_oz:1.5, cost_per_unit:16.99, menu_price:9.00  },
-      { id:uid(), name:"Bacardi Superior Rum",      category:'Spirits',      vendor:'RNDC',              bottle_size_oz:25.4, std_pour_oz:1.5, cost_per_unit:11.99, menu_price:8.00  },
-      { id:uid(), name:"Bud Light",                 category:'Beer - Bottle',vendor:'Glazer\'s',         bottle_size_oz:12,   std_pour_oz:12,  cost_per_unit:1.10,  menu_price:4.00  },
-      { id:uid(), name:"Modelo Especial",           category:'Beer - Bottle',vendor:'Glazer\'s',         bottle_size_oz:12,   std_pour_oz:12,  cost_per_unit:1.35,  menu_price:5.00  },
-      { id:uid(), name:"Austin Beerworks IPA",      category:'Beer - Draft', vendor:'Austin Beerworks',  bottle_size_oz:661,  std_pour_oz:16,  cost_per_unit:85.00, menu_price:6.00  },
-      { id:uid(), name:"Kim Crawford Sauvignon Blanc",category:'Wine',       vendor:'RNDC',              bottle_size_oz:25.4, std_pour_oz:5,   cost_per_unit:12.99, menu_price:9.00  },
-      { id:uid(), name:"Well Whiskey",              category:'Spirits',      vendor:'Republic National', bottle_size_oz:33.8, std_pour_oz:1.5, cost_per_unit:9.99,  menu_price:7.00  },
-    ].map(p => {
-      const pours = p.bottle_size_oz / p.std_pour_oz;
-      const cpp   = p.cost_per_unit / pours;
-      const pct   = cpp / p.menu_price * 100;
-      return { ...p, pours_per_bottle: pours, cost_per_pour: cpp, pour_cost_pct: pct, created_at: new Date().toISOString() };
-    });
 
     // Recipes are built further down, once ic_products exists — see
     // "── Recipes" after the Inventory Control block.
@@ -542,17 +524,6 @@ S.HubSettings = {
     const sunOff = new Date(App.todayLocal() + 'T00:00:00').getDay();
     const weeks = window.ANCHOR.weeks.map(a => {
       const endDate = dateStr(sunOff + window.ANCHOR.endAgo(a));
-      const bar_count = bp.map(p => {
-        const used = +(rnd()*3+0.5).toFixed(2);
-        return { product_id:p.id, beg_inv:+(rnd()*2+0.5).toFixed(1), purchases:+(rnd()*4+1).toFixed(0), end_inv:+(rnd()*1.5).toFixed(1), units_used:used, total_cost:+(used*p.cost_per_unit).toFixed(2) };
-      });
-      const bar_variance = bp.map(p => {
-        const cnt = bar_count.find(c=>c.product_id===p.id);
-        const actualPours = (cnt?.units_used||0) * p.pours_per_bottle;
-        const theo = Math.round(actualPours * (0.95 + rnd()*0.08));
-        const varU = +(actualPours - theo).toFixed(1);
-        return { product_id:p.id, actual_units:+actualPours.toFixed(1), theoretical_units:theo, variance_units:varU, variance_oz:+(varU*p.std_pour_oz).toFixed(1), variance_dollar:+(varU*p.cost_per_pour).toFixed(2), status:Math.abs(varU)<=2?'OK':(varU>0?'Over: Investigate':'Under: Investigate') };
-      });
       // Merch and vending as Other on every fourth week, plus weekly 3rd-party platform
       // fees (~4.5% of food revenue), so the Books income statement is non-zero + real.
       // Catering is deliberately NOT seeded on historical weeks: in the live app
@@ -570,7 +541,7 @@ S.HubSettings = {
         catering: { revenue:0, cogs:0, labor:0, cost_pct:0, labor_pct:0 },
         other:{ revenue:othRev, cogs:+(othRev*0.45).toFixed(2) },
         platform_fees:+(a.food_rev*0.045).toFixed(2),
-        prime_cost_pct:a.prime_cost_pct, bar_count, bar_variance, food_count:[], notes:'' };
+        prime_cost_pct:a.prime_cost_pct, notes:'' };
     });
     App.data.weeks = weeks;
 
