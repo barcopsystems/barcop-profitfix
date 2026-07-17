@@ -4463,6 +4463,14 @@ const App = {
 
   async _savePDF(doc, filename) {
     filename = App.fileSafe(filename);
+    // Guarantee the extension HERE, once, rather than trusting 17 call sites to
+    // remember it. Three did not (the Cash Audit, the Week in Review and the Recovery
+    // Playbook), and the download fallback below writes `a.download = filename`
+    // verbatim, so any browser without showSaveFilePicker handed the operator a file
+    // with no extension that Windows will not open on a double-click. Appended only
+    // when missing, so the 14 callers that already pass "....pdf" cannot end up with
+    // ".pdf.pdf". fileSafe keeps dots, so this survives it.
+    if (!/\.pdf$/i.test(filename)) filename += '.pdf';
     const blob = doc.output('blob');
     if (window.showSaveFilePicker) {
       try {
