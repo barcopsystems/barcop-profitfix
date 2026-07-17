@@ -8,13 +8,18 @@
 
 S.HubUserAccounts = {
 
-  // Permission groups: organized by module, each with two checkboxes per
-  // member (Access + Allow Edit/Delete).
-  // No pre-selected defaults. Admin explicitly checks every box for every
-  // staff invite. Protects ownership from accidental over-permissioning.
   // Permissions are granted by OPERATING AREA (matching how the whole app is
-  // organized), each set to a level: View / Add / Edit & Delete. Owner grants
-  // "Inventory: Edit" instead of toggling 40 individual screens.
+  // organized), each set to No Access or Full Access: the member's permissions
+  // object holds { area: 'edit' } for every area they can use, and a missing area
+  // means No Access. Owner grants "Inventory" once instead of toggling 40 screens.
+  // THERE IS NO READ-ONLY TIER. It was dropped as unenforceable across every screen
+  // for a trusted team (db.js, the permission-system note). This comment used to
+  // describe two checkboxes per member (Access + Allow Edit/Delete) AND a three-level
+  // View / Add / Edit & Delete scale, neither of which was ever built, and it
+  // contradicted itself in the same breath. This file is where the next person will
+  // come to learn the access model, so it says only what ships.
+  // No pre-selected defaults: every area starts at No Access on a new invite, so
+  // nobody is over-permissioned by accident.
   AREAS: [
     { key: 'inventory', label: 'Inventory Control' },
     { key: 'labor',     label: 'Labor Control' },
