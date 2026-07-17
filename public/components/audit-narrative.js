@@ -90,9 +90,19 @@ function profitNarrative(d) {
     o.S5_NARRATIVE = d.S5_DELIVERIES_LOGGED
       ? `You logged ${d.S5_DELIVERIES_LOGGED} deliveries and caught ${d.S5_VENDOR_PRICE_CHANGES || 0} price change${d.S5_VENDOR_PRICE_CHANGES === 1 ? '' : 's'} this period. Checking the invoice in is where vendor overcharges get caught.`
       : `Vendor activity is on file but deliveries are not being logged against the order. That is the door you are leaving open.`;
+    // The finding has to branch on the same fact the narrative just stated. It used to
+    // gate on `cred` alone, so a bar that logs every delivery read "You logged 40
+    // deliveries and caught 3 price changes" and then, one line later, "spend is exposed
+    // to overcharges you are not verifying". They ARE verifying: that is what the 40
+    // logged deliveries were. S5_EXPOSURE_MONTHLY is an unconditional 3% of spend
+    // (audit-compute VENDOR_EXPOSURE_PCT), so quoting it at someone who checks every
+    // invoice in is an invented leak ([[output-honesty]]). Three real states, three
+    // findings.
     o.S5_FINDING = cred
       ? `You already flagged ${money(d.S5_UNCOLLECTED_CREDITS)} in overcharges across ${d.S5_OPEN_CREDIT_COUNT || 0} open discrepanc${d.S5_OPEN_CREDIT_COUNT === 1 ? 'y' : 'ies'} and have not collected it. The catching is done, the chasing is not.`
-      : `About ${money(d.S5_EXPOSURE_MONTHLY)} a month of spend is exposed to overcharges you are not verifying. It is an estimate, not a measured leak.`;
+      : d.S5_DELIVERIES_LOGGED
+        ? `Nothing is sitting uncollected. Your exposure now is any invoice that goes in without a price check, not the ones you caught.`
+        : `About ${money(d.S5_EXPOSURE_MONTHLY)} a month of spend is exposed to overcharges you are not verifying. It is an estimate, not a measured leak.`;
     o.S5_TOOL = cred
       ? `Chase the filed credits in Vendor Tracker, and match every new invoice to its price sheet before you pay it.`
       : `Match every invoice to its PO and price sheet in Receive Delivery, and flag the drift the day it lands.`;
