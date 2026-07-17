@@ -488,15 +488,21 @@ S.HubSettings = {
     const uid = () => App.uid();
     const today = new Date();
     const dateStr = (daysAgo) => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); return App.ymdLocal(d); };
-    // A day that has not happened yet cannot have a Closed shift, an imported POS line
-    // or logged hours: no live operator can import a file for tomorrow. dateStr counts
-    // DAYS AGO, so anything negative is the future. The current-week blocks below run
-    // off `sunOff - 7` (this week's Sunday, which is ahead of today every day except
-    // Saturday), so they wrote future rows on 6 of the 7 days the demo can be loaded
-    // on, and on a SUNDAY every single day of the "current" week was in the future: a
-    // prospect saw next Saturday already Closed with $2,600 booked. [[seed-honesty-audit]]
-    // Rule 1. History is unaffected (its baseAgo is always >= sunOff, so >= 0).
-    const hasHappened = (daysAgo) => daysAgo >= 0;
+    // ── THE CURRENT WEEK RUNS AHEAD OF TODAY, ON PURPOSE. Disclosed, not hidden. ──
+    // The demo seeds the current week WHOLE (all 7 days of sales, hours and shifts),
+    // even though only part of it has happened. That is deliberate and it is stated in
+    // the demo banner ("this week's data runs through the full week").
+    // WHY, because this was tried the other way and it was worse: the app's current
+    // week is Mon..NEXT Sunday (App.nextSunday()), so it is NEVER complete on any day.
+    // Seeding only the ELAPSED days looks honest and then falls apart, because the rest
+    // of the week's numbers do not shrink with it. COGS comes from an inventory COUNT
+    // PAIR spanning a full 7 days, so a part-week's revenue against a whole week's COGS
+    // put PRIME COST at 91.7% and LABOR at 37.4% on the Confirm the Week popup. The
+    // cockpit's done stamps are manual by design and cannot derive from data
+    // ([[cockpit-steps-manual]]), so they read "week imported" over a Monday with almost
+    // nothing in it. A demo that is date-accurate and internally incoherent is worse
+    // than one that runs a few days ahead and says so.
+    // KEEP THE WEEK WHOLE. If you gate these days again, you own prime cost too.
 
     // ── Settings ──
     App.data.settings.bar_name           = 'The Anchor Bar & Kitchen';
@@ -2196,15 +2202,15 @@ S.HubSettings = {
         scDays.push({ date:date, manager:mgrs[di % 3] });
       });
     });
-    // Current week, mid-close: the operator has imported the days that have HAPPENED,
-    // so Shift's Close The Week shows the week so far with step 1 done. Live: a fresh
-    // week is zero until imported, and fills in a day at a time. It used to write all
-    // 7 days of the week regardless, so it booked Closed shifts with revenue on days
-    // that had not happened yet (see hasHappened).
+    // Current week, mid-close: the operator has run their end-of-week sales import
+    // (one file, the WHOLE week), so Shift's Close The Week shows the full week's
+    // revenue with step 1 done. Live: a fresh week is zero until imported.
+    // The week is seeded whole even though part of it is still ahead of today. That is
+    // deliberate and disclosed in the demo banner: see the note by `dateStr` above for
+    // why a part-week seed is worse (it breaks prime cost and the cockpit stamps).
     const curWk = ANCHS.weeks.reduce((m, a) => (ANCHS.endAgo(a) < ANCHS.endAgo(m) ? a : m), ANCHS.weeks[0]);
     const curBaseAgo = sunOff - 7;   // days-ago of THIS week's Sunday (negative mid-week)
     if (curWk) for (let di = 0; di < 7; di++) {
-      if (!hasHappened(curBaseAgo + 6 - di)) continue;   // that day has not happened yet
       const w = dayW[di] || 0.12;
       const dBar = Math.round(curWk.bar_rev * w), dFloor = Math.round(curWk.food_rev * w);
       scShifts.push({
@@ -2970,7 +2976,6 @@ S.HubSettings = {
         for (let d = 0; d < 5; d++) {
           const h = +(weekHours / 5).toFixed(1);
           if (h <= 0) continue;
-          if (!hasHappened(baseAgo + 5 - d)) continue;   // nobody logs hours for tomorrow
           lcActuals.push({
             id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name,
             position_id:st.position_id, shift_type:dayparts[(i + d) % dayparts.length],
@@ -2994,8 +2999,8 @@ S.HubSettings = {
     // The GM logs coverage hours at 0 hourly cost (salary added by salariedCost); the
     // hourly AM logs real hours/cost, carved out of the food labor budget below.
     const seedLeaders = (baseAgo) => {
-      gmStaff.forEach(st => { for (let d = 0; d < 5; d++) { if (!hasHappened(baseAgo + 5 - d)) continue; lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name, position_id:st.position_id, shift_type:'Full Day', hours:9, wage:0, cost:0, notes:'' }); } });
-      if (amStaff) for (let d = 0; d < 5; d++) { if (!hasHappened(baseAgo + 5 - d)) continue; lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:amStaff.id, name:amStaff.name, position_id:amStaff.position_id, shift_type:'Full Day', hours:amHrs, wage:amStaff.wage, cost:+(amHrs * amStaff.wage).toFixed(2), notes:'' }); }
+      gmStaff.forEach(st => { for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name, position_id:st.position_id, shift_type:'Full Day', hours:9, wage:0, cost:0, notes:'' }); });
+      if (amStaff) for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:amStaff.id, name:amStaff.name, position_id:amStaff.position_id, shift_type:'Full Day', hours:amHrs, wage:amStaff.wage, cost:+(amHrs * amStaff.wage).toFixed(2), notes:'' });
     };
     // Hours actually seeded into lc_actuals, per week. This is the ONLY honest source
     // for revenue_weeks.total_hours: a live re-confirm reads laborFeed(), which sums
