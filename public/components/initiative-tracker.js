@@ -145,7 +145,7 @@ const InitiativeTracker = {
     const sign = lift > 0 ? '+' : '';   // negatives carry their own minus sign
     const f = metric ? metric.fmt : null;
     let body;
-    if (f === 'currency')    body = App.fmtCurrency(lift);
+    if (f === 'currency')    body = App.fmtBal(lift);   // fmtBal, not fmtCurrency: a losing (negative) lift must read -$123, never the malformed $-123
     else if (f === 'rating') body = lift.toFixed(1) + '★';
     else if (f === 'int')    body = Math.round(lift).toLocaleString('en-US');
     else if (f === 'days')   body = Math.round(lift) + ' days';
