@@ -411,8 +411,8 @@ window.CashEngine = {
   //    your opening cash, the low-point week, and your runway. The stress lever
   //    (slow-season sales adjust + scenario costs) powers "Can I Afford It". ─────
   _OPENING_KEY: 'cash_opening_balance',
-  openingCash() { const v = parseFloat(localStorage.getItem(this._key(this._OPENING_KEY))); return isNaN(v) ? null : v; },
-  setOpeningCash(v) { try { const k = this._key(this._OPENING_KEY); if (v == null || v === '') localStorage.removeItem(k); else localStorage.setItem(k, String(v)); } catch (e) {} },
+  openingCash() { let v = App.acctGet(this._OPENING_KEY); if (v == null) v = this._migCfg(this._OPENING_KEY); const n = parseFloat(v); return isNaN(n) ? null : n; },
+  setOpeningCash(v) { App.acctSet(this._OPENING_KEY, (v == null || v === '') ? null : String(v)); },
 
   // Event balance payments collected around the event date. Booked only.
   // The all-in event total (F&B subtotal + service charge + tax), from the Events
@@ -602,12 +602,16 @@ window.CashEngine = {
       || 'none';
   },
   _key(base) { return base + '::' + this._acctScope(); },
-  _cfgNum(key, def) { const v = parseFloat(localStorage.getItem(this._key(key))); return isNaN(v) ? def : v; },
-  _cfgSet(key, v) { try { const k = this._key(key); if (v == null || v === '') localStorage.removeItem(k); else localStorage.setItem(k, String(v)); } catch (e) {} },
+  // One-time move of a pre-sync device-local cash setting onto the account, so an existing
+  // operator's opening balance, tax, reserve, credit etc. are not lost the first time this
+  // ships. Reads the old localStorage key, migrates it onto the account, returns the value.
+  _migCfg(key) { try { const old = localStorage.getItem(this._key(key)); if (old != null && old !== '') { App.acctSet(key, old); return old; } } catch (e) {} return null; },
+  _cfgNum(key, def) { let v = App.acctGet(key); if (v == null) v = this._migCfg(key); const n = parseFloat(v); return isNaN(n) ? def : n; },
+  _cfgSet(key, v) { App.acctSet(key, (v == null || v === '') ? null : String(v)); },
   salesTaxRate()   { return this._cfgNum('cash_sales_tax_rate', 0); },
   setSalesTaxRate(v) { this._cfgSet('cash_sales_tax_rate', v); },
-  taxFrequency()   { return localStorage.getItem(this._key('cash_tax_freq')) || 'monthly'; },
-  setTaxFrequency(v) { try { localStorage.setItem(this._key('cash_tax_freq'), v === 'quarterly' ? 'quarterly' : 'monthly'); } catch (e) {} },
+  taxFrequency()   { let v = App.acctGet('cash_tax_freq'); if (v == null) v = this._migCfg('cash_tax_freq'); return v || 'monthly'; },
+  setTaxFrequency(v) { App.acctSet('cash_tax_freq', v === 'quarterly' ? 'quarterly' : 'monthly'); },
   payrollBurden()  { return this._cfgNum('cash_payroll_burden', 0); },
   setPayrollBurden(v) { this._cfgSet('cash_payroll_burden', v); },
   reserveWeeks()   { return this._cfgNum('cash_reserve_weeks', 8); },

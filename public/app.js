@@ -278,6 +278,22 @@ const App = {
     return '::' + id;
   },
 
+  // ── Account-synced small state ────────────────────────────────────────────────
+  // Survives on the ACCOUNT across every device the operator logs into (localStorage is
+  // per-browser). Lives in the config blob (App.data.account_state) and persists through
+  // saveKey. Holds what an operator SETS that must read the same on any machine: cockpit
+  // step-done marks, cash forecast config, event agreement terms, saved import mappings.
+  // (UI prefs, the offline queue, and the active-bar pointer stay in localStorage on
+  // purpose — those are genuinely per-device.)
+  _acctState() { if (!this.data) this.data = {}; if (!this.data.account_state) this.data.account_state = {}; return this.data.account_state; },
+  acctGet(key, def) { const v = this._acctState()[key]; return (v === undefined || v === null) ? def : v; },
+  acctSet(key, val) {
+    const s = this._acctState();
+    if (val === undefined || val === null || val === '') { if (!(key in s)) return; delete s[key]; }
+    else s[key] = val;
+    this.saveKey('account_state');
+  },
+
   async init() {
     await DB.init();
     window.onerror = (msg, src, line, col, err) => {
