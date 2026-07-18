@@ -301,7 +301,7 @@ const PosIngest = {
       if (seen.has(date)) return;          // one row per day; ignore a repeat date in the file
       seen.add(date);
       if (importedDates.has(date)) dupCount++;   // this day already has an imported record — it gets replaced
-      const covers = parseInt(String(r.covers == null ? '' : r.covers).replace(/[^0-9]/g, ''), 10) || 0;
+      const covers = Math.round(parseFloat(String(r.covers == null ? '' : r.covers).replace(/[^0-9.]/g, ''))) || 0;   // keep the decimal point: "12.00" is 12, not 1200; strip only commas/currency
       toAdd.push({
         id: App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
         total_revenue: bar + food, shift_type: 'Full Day', status: 'Closed',
@@ -373,7 +373,7 @@ const PosIngest = {
     const toAdd = []; const skipped = []; const incomplete = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
-      const covers = parseInt(String(r.covers == null ? '' : r.covers).replace(/[^0-9]/g, ''), 10) || 0;
+      const covers = Math.round(parseFloat(String(r.covers == null ? '' : r.covers).replace(/[^0-9.]/g, ''))) || 0;   // keep the decimal point: "12.00" is 12, not 1200; strip only commas/currency
       const sales = this._num(r.sales);
       // Two different problems, two different lists. An unmatched NAME is a roster fix.
       // A server who IS on the roster but rang no covers or no sales is just a row with
@@ -404,7 +404,7 @@ const PosIngest = {
     const toAdd = []; const skipped = []; let dupCount = 0;
     (rows || []).forEach(r => {
       const nm = (r.name || '').trim().toLowerCase();
-      const units = parseInt(String(r.units == null ? '' : r.units).replace(/[^0-9]/g, ''), 10);
+      const units = Math.round(parseFloat(String(r.units == null ? '' : r.units).replace(/[^0-9.]/g, '')));   // keep the decimal point: "12.00" is 12, not 1200; strip only commas/currency
       if (!nm || isNaN(units)) { skipped.push(r.name || '(blank)'); return; }
       const it = byName[nm];
       if (!it) { skipped.push(r.name); return; }
