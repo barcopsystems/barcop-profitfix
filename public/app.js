@@ -787,7 +787,9 @@ const App = {
   enforcePaywall() {
     if (this.demoMode) return;
     const s = this.subscription && this.subscription.status;
-    if (s === 'active' || s === 'unknown') { this._removePlanGate(); return; }
+    // 'trialing' is a live, usable bar (db.listMyAccounts treats it as active too) — do
+    // not throw the "Subscription Inactive" gate over a customer mid-trial.
+    if (s === 'active' || s === 'unknown' || s === 'trialing') { this._removePlanGate(); return; }
     // Pass the status through so the gate can tell a brand-new signup apart from
     // a returning customer whose subscription lapsed (past due / cancelled).
     this.showPlanGate({ status: s });
@@ -3393,11 +3395,17 @@ const App = {
   computeUsagePair(start, end, deliveries) {
     const out = {};
     const sMap = {}, eMap = {};
+    // Skip products a partial count left uncounted (counted===false, stored total:0):
+    // reading that 0 as the endpoint would bill the whole shelf as used and flag a
+    // phantom 100% leak, while _perpetualInventory (the on-hand reader) skips them and
+    // keeps the last count. Usage needs a real value at BOTH ends, so filter both maps.
     ((start && start.items) || []).forEach(it => {
+      if (it.counted === false) return;
       if (sMap[it.product_id]) sMap[it.product_id].total = (sMap[it.product_id].total || 0) + (it.total || 0);
       else sMap[it.product_id] = { ...it };
     });
     ((end && end.items) || []).forEach(it => {
+      if (it.counted === false) return;
       if (eMap[it.product_id]) eMap[it.product_id].total = (eMap[it.product_id].total || 0) + (it.total || 0);
       else eMap[it.product_id] = { ...it };
     });
