@@ -1005,7 +1005,7 @@ S.EventsBookings = {
   agreementTerms() {
     let v = App.acctGet('event_agreement_terms');
     // Migrate a pre-sync device-local value onto the account so custom terms are not lost.
-    if (v == null) { try { const old = localStorage.getItem('event_agreement_terms'); if (old != null && old !== '') { App.acctSet('event_agreement_terms', old); v = old; } } catch (e) {} }
+    if (v == null) { try { const old = localStorage.getItem('event_agreement_terms'); if (old != null && old !== '') { App.acctSet('event_agreement_terms', old); localStorage.removeItem('event_agreement_terms'); v = old; } } catch (e) {} }   // removeItem so blanking custom terms reverts to the default, not the stale browser value
     return (v != null && v !== '') ? v : this.DEFAULT_AGREEMENT_TERMS;
   },
 
