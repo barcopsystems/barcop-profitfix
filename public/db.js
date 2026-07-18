@@ -291,6 +291,11 @@ const DB = {
       if (error) { this._acctResolveErr = true; return null; }   // transient read failure, not a definitive no-account
       if (!data) return null;
       this._accountId = data.account_id;
+      // Persist the resolved default so localStorage keys scope consistently across
+      // reloads. Without this, a password-login user's stored id stays null, and on an
+      // OFFLINE reload _acctKey falls back to the UNSCOPED base key and misses the
+      // scoped pending-sync queue (offline edits load stale). _acctKey assumes this holds.
+      this._setStoredActiveAccountId(data.account_id);
       this._role = data.role || 'admin';
       this._ownerUserId = (data.accounts && data.accounts.owner_user_id) || null;
       this._permissions = data.permissions || {};
@@ -1016,7 +1021,12 @@ const DB = {
   // all). Also drops the local window caches for that table.
   async clearEvents(table) {
     try {
-      Object.keys(localStorage).filter(k => k.indexOf('pfev_' + table + '_') === 0)
+      // Scope the cache clear to THIS account: the prefix also matches other bars'
+      // account-suffixed keys (pfev_<table>_...__<otherAcct>), so an unscoped sweep
+      // wiped a multi-bar owner's OTHER bar's cached window.
+      const _acct = this._accountId || this._getStoredActiveAccountId();
+      Object.keys(localStorage).filter(k =>
+        k.indexOf('pfev_' + table + '_') === 0 && (!_acct || k.endsWith('__' + _acct)))
         .forEach(k => localStorage.removeItem(k));
     } catch (e) {}
     if (this._demo || !this._sb || !this._user) return { ok: true };
