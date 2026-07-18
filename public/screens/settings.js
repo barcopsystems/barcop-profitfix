@@ -463,7 +463,7 @@ S.HubSettings = {
       const _curMon = _mon(new Date());
       for (let w = 1; w <= 8; w++) {
         const m = new Date(_curMon + 'T00:00:00'); m.setDate(m.getDate() - 7 * w);
-        App.acctSet('cash_cockpit_done_' + App.ymdLocal(m), { trapped: true, order: true, week: true, terms: true });
+        App.acctSet('cash_cockpit_done_' + App.ymdLocal(m), { trapped: true, week: true, terms: true, audit: true });   // keys must match CashDashboard.ORDER ['trapped','week','terms','audit']; 'order' was bogus and 'audit' was missing
       }
       // Control sections, current week mid-close: the first two close steps are
       // done, the last two still to do. Keyed to each page's own done-key (the

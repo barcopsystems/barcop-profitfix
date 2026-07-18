@@ -601,7 +601,7 @@ S.HubBooks = {
     rows.push(['Key Cost Ratios', '', '']);
     rows.push(r('  Pour Cost %',  M.barRev  ? (M.barCogs  / M.barRev)  : null, YTD.barRev  ? (YTD.barCogs  / YTD.barRev)  : null));
     rows.push(r('  Food Cost %',  M.foodRev ? (M.foodCogs / M.foodRev) : null, YTD.foodRev ? (YTD.foodCogs / YTD.foodRev) : null));
-    rows.push(r('  Labor % of Revenue', M.totalRev ? (M.totalLabor / M.totalRev) : null, YTD.totalRev ? (YTD.totalLabor / YTD.totalRev) : null));
+    rows.push(r('  Labor %', M.totalRev ? (M.totalLabor / M.totalRev) : null, YTD.totalRev ? (YTD.totalLabor / YTD.totalRev) : null));   // label must end in "%" so the pct-format pass (isPctRow) catches it, else it prints $0.29 instead of 29.0%
     rows.push(r('  Prime Cost %', M.totalRev ? ((M.totalCogs + M.totalLabor) / M.totalRev) : null, YTD.totalRev ? ((YTD.totalCogs + YTD.totalLabor) / YTD.totalRev) : null));
 
     // Source notes (each line as its own merged row)
