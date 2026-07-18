@@ -4903,9 +4903,20 @@ const App = {
   // Per-item cost target: the item's own override, else the default for its kind
   // (food plate vs cocktail).
   menuTargetPct(item) {
-    if (item && item.target_cost_pct != null && item.target_cost_pct !== '') return parseFloat(item.target_cost_pct);
-    const food = !!(item && item.recipe && item.recipe.mode === 'food');
-    return food ? this.MENU_TARGET_COST_PCT.plate : this.MENU_TARGET_COST_PCT.cocktail;
+    if (item && item.target_cost_pct) return parseFloat(item.target_cost_pct);
+    // Only made-to-recipe items carry a cost-% target: a plate dish or a cocktail. No-prep
+    // resale beverages (beer/wine/NA, inventory-linked) are markup-priced and have NONE
+    // unless the operator sets a per-item override — return null so they drop out of the
+    // "over target" check (menuItemPct guards target != null) rather than being flagged
+    // against the cocktail number. THE single target rule: Menu Engineering's targetPctFor
+    // and the Menu Items list both defer to this via classifyItem, so no two screens drift.
+    const type = (window.S && S.RevenueMenuItems && S.RevenueMenuItems.classifyItem)
+      ? S.RevenueMenuItems.classifyItem(item)
+      : ((item && item.type) || (item && item.recipe && item.recipe.mode === 'food' ? 'plate'
+        : (item && item.recipe && item.recipe.mode === 'single' ? 'cocktail' : null)));
+    if (type === 'plate')    return this.MENU_TARGET_COST_PCT.plate;
+    if (type === 'cocktail') return this.MENU_TARGET_COST_PCT.cocktail;
+    return null;
   },
   // Live cost percentage of a menu item against its menu price, plus its target.
   menuItemPct(item) {
