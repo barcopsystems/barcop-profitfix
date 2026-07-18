@@ -441,7 +441,7 @@ S.RevenueAudit = {
     if (checks.length) {
       const serverSales = checks.reduce((s, c) => s + (parseFloat(c.sales) || 0), 0);
       const comps = ((App.shiftData && App.shiftData.sc_void_comps) || [])
-        .filter(r => r.type === 'Comp' && (r.date || '') >= cutoffStr);
+        .filter(r => r.type === 'Comp' && App.compReasonIsLoss(r.reason || r.category) && (r.date || '') >= cutoffStr);   // give-aways only; excludes Staff Meal/Shift Drink so S4 doesn't fire a false "tighten comp discipline" flag
       const compTotal = comps.reduce((s, v) => s + (parseFloat(v.amount) || 0), 0);
       if (serverSales > 0) {
         cd.server_comp_total = Math.round(compTotal);

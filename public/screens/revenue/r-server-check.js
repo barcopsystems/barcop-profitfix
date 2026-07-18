@@ -63,7 +63,7 @@ S.RevenueServerCheck = {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (windowDays || 30));
     const cutoffStr = App.ymdLocal(cutoff);
     const checks = (App.data.revenue_server_checks || []).filter(c => (c.date || '') >= cutoffStr);
-    const voids  = ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => r.type === 'Comp' && (r.date || '') >= cutoffStr);
+    const voids  = ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => r.type === 'Comp' && App.compReasonIsLoss(r.reason || r.category) && (r.date || '') >= cutoffStr);   // give-away comps only, not Staff Meal/Shift Drink (policy expense) — matches the Void/Comp Log's % and Theft Risk
     const pools  = ((App.laborData && App.laborData.lc_tip_pools)  || []).filter(p => (p.date || '') >= cutoffStr);
     const tips   = ((App.laborData && App.laborData.lc_tips)       || []).filter(t => (t.date || '') >= cutoffStr);
 

@@ -520,6 +520,9 @@ S.RevenueMenuEngineering = {
     const logs = [];
     planned.forEach(item => {
       const old = item.price, np = item.planned_price, vol = item.planned_vol_pct;
+      // Raise-only: never CUT a live price in bulk. If the planned price is at/below live,
+      // drop the plan without applying it (same guard the single Mark Live / saveLive use).
+      if (old != null && np <= old) { item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null; return; }
       item.price = np; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
       if (old != null && old !== np) logs.push([item, old, np, vol]);
     });
