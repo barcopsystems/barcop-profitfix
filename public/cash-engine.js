@@ -605,7 +605,7 @@ window.CashEngine = {
   // One-time move of a pre-sync device-local cash setting onto the account, so an existing
   // operator's opening balance, tax, reserve, credit etc. are not lost the first time this
   // ships. Reads the old localStorage key, migrates it onto the account, returns the value.
-  _migCfg(key) { try { const old = localStorage.getItem(this._key(key)); if (old != null && old !== '') { App.acctSet(key, old); return old; } } catch (e) {} return null; },
+  _migCfg(key) { try { const oldK = this._key(key); const old = localStorage.getItem(oldK); if (old != null && old !== '') { App.acctSet(key, old); localStorage.removeItem(oldK); return old; } } catch (e) {} return null; },   // removeItem after migrating: else clearing/wiping a value lets the stale browser key resurrect it on the next read
   _cfgNum(key, def) { let v = App.acctGet(key); if (v == null) v = this._migCfg(key); const n = parseFloat(v); return isNaN(n) ? def : n; },
   _cfgSet(key, v) { App.acctSet(key, (v == null || v === '') ? null : String(v)); },
   salesTaxRate()   { return this._cfgNum('cash_sales_tax_rate', 0); },
