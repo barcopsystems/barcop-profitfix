@@ -91,8 +91,10 @@ S.InventoryParSuggestions = {
       const startC = recent[i - 1];
       const endC   = recent[i];
       // Sum a product's lines across all locations it was counted in.
-      const sItems = (startC.items || []).filter(it => it.product_id === productId);
-      const eItems = (endC.items   || []).filter(it => it.product_id === productId);
+      // counted===false = a partial count skipped this product; its stored total:0 is not
+      // a real endpoint, so exclude it (else "used" = the whole shelf and pars inflate).
+      const sItems = (startC.items || []).filter(it => it.product_id === productId && it.counted !== false);
+      const eItems = (endC.items   || []).filter(it => it.product_id === productId && it.counted !== false);
       if (!sItems.length || !eItems.length) continue;
       const start = sItems.reduce((s, it) => s + (parseFloat(it.total) || 0), 0);
       const end   = eItems.reduce((s, it) => s + (parseFloat(it.total) || 0), 0);
