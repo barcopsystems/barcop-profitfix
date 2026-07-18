@@ -341,6 +341,14 @@ S.CashForecast = {
       if (!ok) return;
       this._cfAckGiven = true;
     }
-    App.exportPDF({ title: '13-Week Cash Flow Forecast', root: this.container, brand: (App.data && App.data.settings && App.data.settings.bar_name) || '', footer: 'Projected figures based on historical sales and known commitments. Actual results will vary.' });
+    // A lender PDF must show the BASE forecast, never an active what-if (the slow-season
+    // slider or a "Can I afford it" outflow). Those are exploratory and no-print on screen,
+    // so exporting the live container as-is would hand the bank stressed numbers dressed as
+    // the real projection. Reset to base, export, then restore the operator's view.
+    const sv = { adj: this._salesAdj, amt: this._scAmt, rec: this._scRecurring };
+    const stressed = this._salesAdj || this._scAmt;
+    if (stressed) { this._salesAdj = 0; this._scAmt = 0; this._scRecurring = false; this.draw(); }
+    await App.exportPDF({ title: '13-Week Cash Flow Forecast', root: this.container, brand: (App.data && App.data.settings && App.data.settings.bar_name) || '', footer: 'Projected figures based on historical sales and known commitments. Actual results will vary.' });
+    if (stressed) { this._salesAdj = sv.adj; this._scAmt = sv.amt; this._scRecurring = sv.rec; this.draw(); }
   }
 };
