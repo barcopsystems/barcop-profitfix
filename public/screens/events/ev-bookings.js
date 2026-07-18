@@ -1002,7 +1002,12 @@ S.EventsBookings = {
     + 'Cancellation: Cancellations made well ahead of the date may refund any payment beyond the deposit. Closer to the date, payments are non-refundable.\n\n'
     + 'Service charge and tax: A service charge and applicable sales tax are added to the food and beverage total, as shown above.\n\n'
     + 'Damage and overages: You are responsible for any damage to the space and for charges beyond what is quoted, billed after the event.',
-  agreementTerms() { try { const v = localStorage.getItem('event_agreement_terms'); return (v != null && v !== '') ? v : this.DEFAULT_AGREEMENT_TERMS; } catch (e) { return this.DEFAULT_AGREEMENT_TERMS; } },
+  agreementTerms() {
+    let v = App.acctGet('event_agreement_terms');
+    // Migrate a pre-sync device-local value onto the account so custom terms are not lost.
+    if (v == null) { try { const old = localStorage.getItem('event_agreement_terms'); if (old != null && old !== '') { App.acctSet('event_agreement_terms', old); v = old; } } catch (e) {} }
+    return (v != null && v !== '') ? v : this.DEFAULT_AGREEMENT_TERMS;
+  },
 
   agreementModal(id) {
     const b = this.bookings().find(x => x.id === id);
@@ -1023,7 +1028,7 @@ S.EventsBookings = {
     App.openModal(html, { id: 'eb-agreement-modal', maxWidth: 680, noClose: true });
     document.getElementById('ag-print')?.addEventListener('click', () => {
       const terms = document.getElementById('ag-terms')?.value || '';
-      try { localStorage.setItem('event_agreement_terms', terms); } catch (e) {}
+      App.acctSet('event_agreement_terms', terms);
       App.closeModal('eb-agreement-modal');
       this.printAgreement(b, terms);
     });
