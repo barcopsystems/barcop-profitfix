@@ -212,7 +212,10 @@ S.ThisWeek = {
     let rev = 0, cogs = 0, labor = 0;
     this.offsiteBookings(periodEnd).forEach(b => {
       rev   += parseFloat(b.actual_revenue) || 0;
-      cogs  += (parseFloat(b.event_food_cost) || 0) + (parseFloat(b.event_bar_cost) || 0);
+      // Include event_other_cost so this catering COGS matches the Event P&L cost basis
+      // (ev-bookings margin = food + bar + other + labor). Omitting it overstated Books
+      // catering margin and dropped that cost from prime entirely.
+      cogs  += (parseFloat(b.event_food_cost) || 0) + (parseFloat(b.event_bar_cost) || 0) + (parseFloat(b.event_other_cost) || 0);
       labor += EB ? (EB.bookingLabor(b) || 0) : 0;
     });
     return (rev > 0 || cogs > 0 || labor > 0)
