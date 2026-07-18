@@ -125,12 +125,12 @@ const ConfirmWeek = {
       + '<tr class="cw-line">' + lbl('Food') + cell('cw-food-rev') + cell('cw-food-cogs') + cell('cw-food-lab') + '</tr>'
       + '</tbody></table></div>';
 
-    // Total Covers + Events Revenue (read-only, from bookings) on one row, the
+    // Total Covers + Catering Revenue (read-only, from bookings) on one row, the
     // events value vertically centered against the covers input.
     const evRev = parseFloat(m.catering && m.catering.revenue) || 0;
     const coversField = '<div class="form-row" style="gap:24px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">'
       + '<div class="f" style="width:150px;"><label>Total Covers</label><input class="cw-in" type="number" step="1" id="cw-covers"/></div>'
-      + '<div class="f" style="width:auto;"><label>Events Revenue</label>'
+      + '<div class="f" style="width:auto;"><label>Catering Revenue</label>'
       +   '<div style="min-height:36px;display:flex;align-items:center;font-size:13px;color:var(--t2);">' + (evRev > 0 ? money(evRev) + ' from bookings' : 'None this week') + '</div></div>'
       + '</div>';
 
