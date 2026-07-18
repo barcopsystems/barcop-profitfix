@@ -287,6 +287,11 @@ S.LaborLogHours = {
         totCost += parseFloat(a.cost) || 0;
       }
     });
+    // Add the weekly OT premium (0.5x over 40/wk). The straight-time entry cost above
+    // never carries it; compute it over WHOLE weeks off UNFILTERED actuals and allocate
+    // to this date window, the same model Reports and the dashboard use.
+    const _otRange = this.effectiveRange();
+    totCost += (App.otPremiumInWindow ? App.otPremiumInWindow(this.actuals(), _otRange.from, _otRange.to).total : 0);
 
     let below;
     if (all.length === 0) {

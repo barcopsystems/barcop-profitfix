@@ -528,7 +528,7 @@ S.LaborReports = {
       : 0;
     const salRange = (rFrom && rTo) ? App.salariedCost(rFrom, rTo) : { total: 0 };
 
-    const ot = this.otPremiums(rows);
+    const ot = this.otPremiums(this.actuals(), rFrom, rTo);
     const totHours = rows.reduce((t, a) => t + (a.hours || 0), 0);
     const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0) + salRange.total + ot.total;
     // Avg Wage is a WAGE: straight-time hourly pay over hourly hours, on the same basis
@@ -583,25 +583,34 @@ S.LaborReports = {
   // Weekly OT premium per non-salaried staff (0.5x on hours over 40/week),
   // bucketed across the range and attributed to staff + dept so Labor Cost
   // reconciles with gross. Returns { total, byStaff, byDept }.
-  otPremiums(rows) {
+  // Weekly OT premium (0.5x on hours over 40/week) for the range [winFrom, winTo].
+  // OT is a WEEKLY threshold, so it must be computed over WHOLE Mon-Sun weeks off
+  // UNFILTERED rows and only THEN allocated to the window by each week's share of
+  // hours inside it (the same model App.otPremiumInWindow uses). Passing range-
+  // FILTERED rows under-counts: a week straddling the range edge falls under 40 on
+  // its sliced hours and draws no premium. Returns { total, byStaff, byDept }.
+  otPremiums(allRows, winFrom, winTo) {
     const wk = {};
-    rows.forEach(a => {
+    (allRows || []).forEach(a => {
       if (App.isSalaried(a.staff_id)) return;
       const sk = a.staff_id || a.name || '?';
       const ws = App.weekStartFor ? App.weekStartFor(a.date) : (a.date || '');
       const key = sk + '|' + ws;
       if (!wk[key]) {
         const pos = this.positionById(a.position_id);
-        wk[key] = { sk, dept: pos ? (pos.department || 'Other') : 'Unassigned', hours: 0, cost: 0 };
+        wk[key] = { sk, dept: pos ? (pos.department || 'Other') : 'Unassigned', hours: 0, cost: 0, inHours: 0 };
       }
       wk[key].hours += (a.hours || 0);
       wk[key].cost += (a.cost || 0);
+      const d = String(a.date || '').slice(0, 10);
+      if ((!winFrom || d >= winFrom) && (!winTo || d <= winTo)) wk[key].inHours += (a.hours || 0);
     });
     const out = { total: 0, byStaff: {}, byDept: {} };
     Object.values(wk).forEach(b => {
       const otH = Math.max(0, b.hours - App.OT_THRESHOLD);
-      if (otH <= 0 || b.hours <= 0) return;
-      const prem = otH * (b.cost / b.hours) * 0.5;
+      if (otH <= 0 || b.hours <= 0 || b.inHours <= 0) return;
+      const share = b.inHours / b.hours;
+      const prem = otH * (b.cost / b.hours) * 0.5 * share;
       out.total += prem;
       out.byStaff[b.sk] = (out.byStaff[b.sk] || 0) + prem;
       out.byDept[b.dept] = (out.byDept[b.dept] || 0) + prem;
