@@ -273,25 +273,19 @@ S.LaborLogHours = {
       new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
     const filtered = this.applyFilters(all);
     const totHours = filtered.reduce((s, a) => s + (parseFloat(a.hours) || 0), 0);
-    // Salaried pay is weekly-fixed, not per-entry: count each salaried person's weekly
-    // salary once per week they logged in this range (charging weeklySalary/7 per entry
-    // under- or over-counts unless they happen to log exactly 7 days). Hourly = entry cost.
-    const salSeen = {};
+    // Hourly = entry cost. Salaried pay + the weekly OT premium (0.5x over 40/wk) are then
+    // added the CANONICAL way — App.salariedCost (annual/52 x days/7 over the window) and
+    // App.otPremiumInWindow (whole weeks off UNFILTERED actuals) — so this Labor Cost stat
+    // foots to Reports / Pay Periods / the dashboard instead of counting a full week's salary
+    // per week-touched (which over-counted on partial-week ranges like "This Month").
     let totCost = 0;
-    filtered.forEach(a => {
-      if (App.isSalaried(a.staff_id)) {
-        const ws = App.weekStartFor ? App.weekStartFor(a.date) : (a.date || '');
-        const key = (a.staff_id || a.name || '?') + '|' + ws;
-        if (!salSeen[key]) { salSeen[key] = 1; totCost += App.staffWeeklySalary(a.staff_id) || 0; }
-      } else {
-        totCost += parseFloat(a.cost) || 0;
-      }
-    });
-    // Add the weekly OT premium (0.5x over 40/wk). The straight-time entry cost above
-    // never carries it; compute it over WHOLE weeks off UNFILTERED actuals and allocate
-    // to this date window, the same model Reports and the dashboard use.
-    const _otRange = this.effectiveRange();
-    totCost += (App.otPremiumInWindow ? App.otPremiumInWindow(this.actuals(), _otRange.from, _otRange.to).total : 0);
+    filtered.forEach(a => { if (!App.isSalaried(a.staff_id)) totCost += parseFloat(a.cost) || 0; });
+    const _dates = filtered.map(a => a.date).filter(Boolean).sort();
+    const _r = this.effectiveRange();
+    const _from = _r.from || _dates[0] || '';
+    const _to   = _r.to   || _dates[_dates.length - 1] || '';
+    if (_from && _to && App.salariedCost) totCost += App.salariedCost(_from, _to).total || 0;
+    totCost += (App.otPremiumInWindow ? App.otPremiumInWindow(this.actuals(), _from, _to).total : 0);
 
     let below;
     if (all.length === 0) {
