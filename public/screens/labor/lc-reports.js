@@ -524,8 +524,8 @@ S.LaborReports = {
     const rFrom = winFrom || datesInRange[0] || '';
     const rTo = winTo || datesInRange[datesInRange.length - 1] || '';
     const salWeeks = (rFrom && rTo)
-      ? (Math.floor((new Date(rTo + 'T00:00:00').getTime() - new Date(rFrom + 'T00:00:00').getTime()) / 86400000) + 1) / 7
-      : 0;
+      ? (Math.round((new Date(rTo + 'T00:00:00').getTime() - new Date(rFrom + 'T00:00:00').getTime()) / 86400000) + 1) / 7
+      : 0;   // round, not floor: a DST-spring range is an hour short and floor drops a day (App.salariedCost rounds too, so the tables foot to the Labor Cost stat)
     const salRange = (rFrom && rTo) ? App.salariedCost(rFrom, rTo) : { total: 0 };
 
     const ot = this.otPremiums(this.actuals(), rFrom, rTo);
@@ -643,7 +643,7 @@ S.LaborReports = {
       return '<tr' + (clickable ? ' class="lr-staff-row" data-staff="' + esc(k) + '" style="cursor:pointer;"' : '') + '>'
         + '<td><div class="val">' + esc(s.name) + '</div></td>'
         + '<td>' + s.hours.toFixed(1) + '</td>'
-        + '<td>' + App.fmtCurrency(s.hours > 0 ? s.straight / s.hours : 0) + '</td>'
+        + '<td>' + (App.isSalaried(k) ? '&mdash;' : App.fmtCurrency(s.hours > 0 ? s.straight / s.hours : 0)) + '</td>'
         + '<td class="val">' + App.fmtCurrency(cost(k)) + '</td>'
         + '<td>' + (totCost > 0 ? App.fmtPct(cost(k) / totCost * 100) : '-') + '</td></tr>';
     }).join('') || this.noRow(5);
@@ -656,9 +656,12 @@ S.LaborReports = {
     rows.forEach(a => {
       const pos = this.positionById(a.position_id);
       const dept = pos ? (pos.department || 'Other') : 'Unassigned';
-      if (!g[dept]) g[dept] = { hours: 0, cost: 0 };
+      if (!g[dept]) g[dept] = { hours: 0, cost: 0, hHours: 0, hStraight: 0 };
       g[dept].hours += (a.hours || 0);
       g[dept].cost += (a.cost || 0);
+      // Track hourly-only straight pay/hours so Avg Wage is a real hourly wage, not
+      // loaded cost (salary + OT premium) over hours — matches the headline Avg Wage stat.
+      if (!App.isSalaried(a.staff_id)) { g[dept].hHours += (a.hours || 0); g[dept].hStraight += (a.cost || 0); }
     });
     if (salWeeks > 0) {
       ((App.laborData && App.laborData.lc_staff) || []).forEach(st => {
@@ -666,15 +669,15 @@ S.LaborReports = {
         if (!wk) return;
         const pos = this.positionById(st.position_id);
         const dept = pos ? (pos.department || 'Other') : 'Unassigned';
-        if (!g[dept]) g[dept] = { hours: 0, cost: 0 };
+        if (!g[dept]) g[dept] = { hours: 0, cost: 0, hHours: 0, hStraight: 0 };
         g[dept].cost += wk * salWeeks;
       });
     }
-    Object.keys(otByDept).forEach(d => { if (!g[d]) g[d] = { hours: 0, cost: 0 }; g[d].cost += otByDept[d]; });
+    Object.keys(otByDept).forEach(d => { if (!g[d]) g[d] = { hours: 0, cost: 0, hHours: 0, hStraight: 0 }; g[d].cost += otByDept[d]; });
     const trs = Object.keys(g).sort((a, b) => g[b].cost - g[a].cost).map(k =>
       '<tr><td><div class="val">' + esc(k) + '</div></td>'
       + '<td>' + g[k].hours.toFixed(1) + '</td>'
-      + '<td>' + App.fmtCurrency(g[k].hours > 0 ? g[k].cost / g[k].hours : 0) + '</td>'
+      + '<td>' + (g[k].hHours > 0 ? App.fmtCurrency(g[k].hStraight / g[k].hHours) : '&mdash;') + '</td>'
       + '<td class="val">' + App.fmtCurrency(g[k].cost) + '</td>'
       + '<td>' + (totCost > 0 ? App.fmtPct(g[k].cost / totCost * 100) : '-') + '</td></tr>').join('') || this.noRow(5);
     return this.dataCard('<th style="width:30%;">Department</th><th style="width:15%;">Hours</th><th style="width:18%;">Avg Wage</th><th style="width:19%;">Labor Cost</th><th style="width:18%;">% of Labor</th>', trs);
