@@ -29,18 +29,10 @@ S.RevenueMenuEngineering = {
 
   // The item's margin target: its own override, else the category default. Null
   // for beverages / inventory items with no set target, so no price is suggested.
-  targetPctFor(item) {
-    if (item.target_cost_pct) return item.target_cost_pct;
-    // Target is driven by the item TYPE now that the category is a free-form menu
-    // section (a dish under "Happy Hour" is still a dish). No-prep beverages have
-    // no set target, so no price is suggested for them.
-    const type = (S.RevenueMenuItems && S.RevenueMenuItems.classifyItem)
-      ? S.RevenueMenuItems.classifyItem(item)
-      : (item.type || (item.category === 'Cocktails' ? 'cocktail' : 'plate'));
-    if (type === 'plate') return App.MENU_TARGET_COST_PCT.plate;
-    if (type === 'cocktail') return App.MENU_TARGET_COST_PCT.cocktail;
-    return null;
-  },
+  // THE single cost-% target rule lives in App.menuTargetPct (override → plate/cocktail
+  // by type → null for no-prep resale beverages). This is a thin alias so the reprice tool
+  // and the "over target" count/Recipe Summary can never score against different targets.
+  targetPctFor(item) { return App.menuTargetPct(item); },
 
   // Suggested price = the price that hits the target cost %. Only ever a RAISE
   // (Bar Cop never tells you to cut a price); null when at/under target or no target.
