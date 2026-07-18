@@ -73,7 +73,8 @@ S.InventoryOrderSheet = {
     const groups = {};
     Object.keys(onHand).forEach(pid => {
       const p = this.productById(pid);
-      if (!p || p.par_level == null || p.par_level === '' || !(p.par_level > 0)) return;
+      if (!p || p.active === false) return;   // hidden/discontinued: out of orders, same as counts/par/receive (Hide promises this)
+      if (p.par_level == null || p.par_level === '' || !(p.par_level > 0)) return;
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
       const oh = onHand[pid] || 0;
       if (oh >= p.par_level) return;
