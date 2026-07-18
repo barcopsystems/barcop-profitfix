@@ -227,7 +227,10 @@ S.InventoryVarianceReport = {
     const result = {};
     if (!this.posRows) return result;
     const productByName  = {};
-    this.allProducts().forEach(p => { productByName[p.name.toLowerCase().trim()] = p; });
+    // Exclude hidden products from POS name-matching: else a POS line for a discontinued
+    // product matches it, drops from the usage rows (counts skip hidden), AND from
+    // unmatchedPos, silently inflating Recipe Coverage. Unmatched now surfaces it instead.
+    this.allProducts().forEach(p => { if (p.active !== false) productByName[p.name.toLowerCase().trim()] = p; });
     const menuItemByName = {};
     this.menuItems().forEach(m => { if (m && m.name) menuItemByName[m.name.toLowerCase().trim()] = m; });
 

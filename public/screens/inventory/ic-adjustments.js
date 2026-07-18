@@ -271,7 +271,7 @@ S.InventoryAdjustments = {
     return '<tr class="adj-line">'
       + '<td><select class="form-input ajl-prod" style="width:100%;">' + this.productOptions(row.product_id || '') + '</select></td>'
       + '<td><input class="form-input ajl-qty" type="number" min="0" step="0.5" value="' + (row.quantity != null && row.quantity !== '' ? esc(String(row.quantity)) : '') + '" placeholder="0" style="width:100%;"/></td>'
-      + '<td><select class="form-input ajl-unit" style="width:100%;">' + this.unitOptions(cat, unitDefault) + '</select></td>'
+      + '<td><select class="form-input ajl-unit" style="width:100%;">' + this.unitOptions(cat, unitDefault, !!((this.productById(row.product_id) || {}).container_size_oz)) + '</select></td>'
       + '<td><select class="form-input ajl-reason" style="width:100%;">' + this.reasonOptions(reason) + '</select></td>'
       + '<td><select class="form-input ajl-dir" style="width:100%;"><option value="out"' + (dir === 'out' ? ' selected' : '') + '>Loss</option><option value="in"' + (dir === 'in' ? ' selected' : '') + '>Found</option></select></td>'
       + '<td class="ajl-val val" style="font-size:12px;">-</td>'
@@ -314,7 +314,7 @@ S.InventoryAdjustments = {
     if (ev.target.classList.contains('ajl-prod')) {
       const p = this.productById(ev.target.value);
       const unitSel = line.querySelector('.ajl-unit');
-      if (unitSel) unitSel.innerHTML = this.unitOptions(p ? p.category : '', p && p.category === 'Bottle Beer' ? 'cases' : (p && p.category === 'Draft Beer' ? 'kegs' : 'bottles'));
+      if (unitSel) unitSel.innerHTML = this.unitOptions(p ? p.category : '', p && p.category === 'Bottle Beer' ? 'cases' : (p && p.category === 'Draft Beer' ? 'kegs' : 'bottles'), !!(p && p.container_size_oz));
     }
     this.refreshLineCalc(line);
   },
@@ -449,7 +449,7 @@ S.InventoryAdjustments = {
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Quantity</label>'
           + '<input type="number" id="' + idp + 'qty" min="0" step="0.5" value="' + v(r?.quantity) + '" placeholder="0"/></div>'
         + '<div class="f" style="width:110px;flex-shrink:0;"><label>Unit</label>'
-          + '<select id="' + idp + 'unit">' + this.unitOptions(initialCat, initialUnit) + '</select></div>'
+          + '<select id="' + idp + 'unit">' + this.unitOptions(initialCat, initialUnit, !!((this.productById(initialProdId) || {}).container_size_oz)) + '</select></div>'
       + '</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reason</label>'
@@ -482,7 +482,7 @@ S.InventoryAdjustments = {
     document.getElementById(idp + 'prod')?.addEventListener('change', e => {
       const p = this.productById(e.target.value);
       const unitSel = document.getElementById(idp + 'unit');
-      if (unitSel && p) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'cases' : (p.category === 'Draft Beer' ? 'kegs' : 'bottles'));
+      if (unitSel && p) unitSel.innerHTML = this.unitOptions(p.category, p.category === 'Bottle Beer' ? 'cases' : (p.category === 'Draft Beer' ? 'kegs' : 'bottles'), !!(p && p.container_size_oz));
       this.recalc(idp);
     });
     [idp + 'qty', idp + 'unit', idp + 'dir'].forEach(fid =>
@@ -604,11 +604,13 @@ S.InventoryAdjustments = {
     return h;
   },
 
-  unitOptions(productCategory, selected) {
+  unitOptions(productCategory, selected, hasOz) {
     let opts = ['bottles', 'units'];
     if (productCategory === 'Bottle Beer') opts = ['cases', 'bottles'];
     else if (productCategory === 'Draft Beer') opts = ['kegs', 'oz'];
-    else if (productCategory === 'Food' || productCategory === 'Misc') opts = ['units', 'each', 'lbs', 'oz'];
+    // Food/Misc: offer 'oz' ONLY for a liquid (container_size_oz set, where costPerOz works).
+    // A solid (lb/each, no container_size_oz) has no fluid-oz cost, so 'oz' booked $0 — use lbs.
+    else if (productCategory === 'Food' || productCategory === 'Misc') opts = hasOz ? ['units', 'each', 'lbs', 'oz'] : ['units', 'each', 'lbs'];
     else if (productCategory === 'Liquor' || productCategory === 'Wine') opts = ['bottles', 'oz'];
     return opts.map(o => '<option' + (o === selected ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
   },

@@ -603,11 +603,20 @@ S.InventoryReceiveDelivery = {
     let shortCounts = 0;
     lineEls.forEach(line => {
       const pid   = line.querySelector('.rd-prod').value;
-      const qty   = parseFloat(line.querySelector('.rd-qty').value);
+      const qtyRaw = parseFloat(line.querySelector('.rd-qty').value);
       const price = parseFloat(line.querySelector('.rd-price').value);
-      if (!pid || isNaN(qty) || qty <= 0) return;
+      if (!pid) return;
       const p = this.productById(pid);
       if (!p) return;
+      const _oq = line.dataset.orderedQty;
+      const isOrderedLine = !(_oq === '' || _oq == null);
+      // Keep an ORDERED line even at qty 0: a short / no-show must be RECORDED (its short_count
+      // + the line on the delivery) so the shortage is not silently dropped, the PO does not
+      // look fully received, and the item can be reordered. Skip a blank manual (non-order)
+      // line; a negative qty is invalid.
+      const qty = isNaN(qtyRaw) ? 0 : qtyRaw;
+      if (qty < 0) return;
+      if (!isOrderedLine && qty <= 0) return;
       const prevPrice = p.unit_cost != null ? p.unit_cost : null;
       const unitPrice = isNaN(price) ? prevPrice : price;
       const changed = prevPrice != null && unitPrice != null && Math.abs(unitPrice - prevPrice) > 0.001;
