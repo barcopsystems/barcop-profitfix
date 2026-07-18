@@ -100,7 +100,7 @@ S.CashForecast = {
         items = this.statItem('Runway', runway, fc.runway != null ? 'warn' : '')
           + this.statItem('Low Point', App.fmtBal(fc.lowPoint.balance), (fc.lowPoint.balance < 0 || fc.lowPoint.balance < opening * 0.25) ? 'warn' : '')
           + this.statItem('Low-Point Week', this.fmtWk(fc.lowPoint.ws))
-          + this.statItem('End of Quarter', App.fmtCurrency(fc.end), fc.end < opening ? 'warn' : '');
+          + this.statItem('End of Quarter', App.fmtBal(fc.end), fc.end < opening ? 'warn' : '');
       }
       statsHtml = '<div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--b2);display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div>';
     }
@@ -140,7 +140,7 @@ S.CashForecast = {
       '<circle class="cf-dot" data-wk="' + esc(this.fmtWk(r.ws) + (i === 0 ? ' (now)' : (i === fc.lowIdx ? ' (low point)' : ''))) + '"'
       + ' data-in="' + esc(App.fmtCurrency(r.inflow)) + '" data-out="' + esc(App.fmtCurrency(r.out)) + '"'
       + ' data-net="' + esc(this.signed(r.net)) + '" data-netneg="' + (r.net < 0 ? '1' : '0') + '"'
-      + ' data-bal="' + esc(App.fmtCurrency(r.balance)) + '" data-balneg="' + (r.balance < 0 ? '1' : '0') + '"'
+      + ' data-bal="' + esc(App.fmtBal(r.balance)) + '" data-balneg="' + (r.balance < 0 ? '1' : '0') + '"'
       + ' cx="' + x(i).toFixed(1) + '" cy="' + y(r.balance).toFixed(1) + '" r="14" fill="transparent" style="cursor:pointer;"/>').join('');
     return '<svg class="cf-curve" viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;height:auto;">'
       + '<line x1="' + padL + '" y1="' + zeroY + '" x2="' + (W - padR) + '" y2="' + zeroY + '" stroke="' + RED + '" stroke-width="1" stroke-dasharray="5 5" opacity="0.45"/>'
@@ -215,7 +215,7 @@ S.CashForecast = {
         + '<td data-label="In" class="val">' + App.fmtCurrency(r.inflow) + '</td>'
         + '<td data-label="Out" class="val">' + App.fmtCurrency(r.out) + '</td>'
         + '<td data-label="Net" class="val" style="font-weight:700;color:' + (tg ? 'var(--red)' : 'var(--green)') + ';">' + this.signed(r.net) + '</td>'
-        + (opening != null ? '<td data-label="Balance" class="val" style="font-weight:600;color:' + (r.balance < 0 ? 'var(--red)' : 'var(--t1)') + ';">' + App.fmtCurrency(r.balance) + '</td>' : '')
+        + (opening != null ? '<td data-label="Balance" class="val" style="font-weight:600;color:' + (r.balance < 0 ? 'var(--red)' : 'var(--t1)') + ';">' + App.fmtBal(r.balance) + '</td>' : '')
         + '</tr>';
     }).join('');
     return '<div style="overflow-x:auto;margin-top:0;"><table class="row-list"><thead><tr>' + headers + '</tr></thead><tbody>' + body + '</tbody></table></div>';
