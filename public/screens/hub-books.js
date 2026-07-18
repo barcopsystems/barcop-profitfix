@@ -1137,12 +1137,17 @@ S.HubBooks = {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
     const pctFmt   = '0.0%';
+    const hoursFmt = '#,##0.0';
     rows.forEach((row, i) => {
-      // Line value column (col 1) is money on Form 8027 line rows
+      // Per-employee monthly-totals rows have col1 = HOURS (not money), col3 = share
+      // (0..1), col4 = money. Everything before them is Form 8027 line rows (col1 = money).
+      const isEmpRow = i > allocStartIdx && typeof row[3] === 'number' && row[3] >= 0 && row[3] <= 1 && typeof row[4] === 'number';
+      // Col 1 is money on the 8027 line rows but HOURS on the per-employee rows — never
+      // stamp "$" on an hours cell (the annual builder guards this the same way).
       const c1 = XLSX.utils.encode_cell({ r: i, c: 1 });
-      if (ws[c1] && typeof ws[c1].v === 'number') ws[c1].z = moneyFmt;
+      if (ws[c1] && typeof ws[c1].v === 'number') ws[c1].z = isEmpRow ? hoursFmt : moneyFmt;
       // For per-employee allocation rows (col 3 = share <= 1, col 4 = money)
-      if (i > allocStartIdx && typeof row[3] === 'number' && row[3] >= 0 && row[3] <= 1 && typeof row[4] === 'number') {
+      if (isEmpRow) {
         const c3 = XLSX.utils.encode_cell({ r: i, c: 3 });
         const c4 = XLSX.utils.encode_cell({ r: i, c: 4 });
         if (ws[c3]) ws[c3].z = pctFmt;
