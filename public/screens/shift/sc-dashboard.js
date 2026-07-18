@@ -48,9 +48,9 @@ S.ShiftDashboard = {
   },
 
   // ── Per-week step-done stamps (operator-controlled, local to the device) ────
-  _doneKey() { return 'sc_cockpit_done_' + this.weekEnd() + App.acctScopeSuffix(); },
-  doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
-  setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
+  _doneKey() { return 'sc_cockpit_done_' + this.weekEnd(); },   // account-synced (App.data), follows the user across devices; no per-browser suffix
+  doneMap()  { return App.acctGet(this._doneKey(), {}); },
+  setDone(step, val) { const m = { ...this.doneMap() }; m[step] = val; App.acctSet(this._doneKey(), m); },
 
   // A step is done ONLY when the operator marks it — never auto-checked off data.
   stepDone() {
