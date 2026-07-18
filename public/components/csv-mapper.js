@@ -127,10 +127,8 @@ const CSVMapper = {
   },
 
   _sig(headers) { return headers.map(h => String(h).toLowerCase().trim()).join('|'); },
-  _savedMaps()  { try { return JSON.parse(localStorage.getItem(this._LS) || '{}'); } catch (e) { return {}; } },
-  _saveMap(sig, map) {
-    try { const all = this._savedMaps(); all[sig] = map; localStorage.setItem(this._LS, JSON.stringify(all)); } catch (e) {}
-  },
+  _savedMaps()  { return App.acctGet(this._LS, {}); },   // account-synced (App.data): saved import maps follow the user across devices
+  _saveMap(sig, map) { const all = { ...this._savedMaps() }; all[sig] = map; App.acctSet(this._LS, all); },
 
   // Two passes ACROSS ALL FIELDS, exact first. Running exact-then-fuzzy per field
   // let an earlier field's fuzzy guess eat a header a later field named exactly:
