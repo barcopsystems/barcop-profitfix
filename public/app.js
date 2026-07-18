@@ -939,7 +939,11 @@ const App = {
     // (no subscription row). Do NOT include `!status`: an empty/unexpected status must
     // fall to the safe "Subscription Inactive" branch (Sign Out only), never light up the
     // account-DELETING "Start Over" by exclusion. ('unknown' is short-circuited earlier.)
-    const isNewSignup = status === 'inactive' || status === 'incomplete';
+    // A NEW BAR is inherently a never-paid new signup (created only at payment, carries no
+    // status), so it always takes the new-signup branch — never the "reactivate" copy. The
+    // account-DELETING "Start Over" stays off for it: the button block checks isNewBar first
+    // and shows only Cancel.
+    const isNewSignup = isNewBar || status === 'inactive' || status === 'incomplete';
     const barName = isNewBar
       ? (ctx.draft.bar_name || '').trim()
       : ((this.data && this.data.settings && this.data.settings.bar_name) || '').trim();
