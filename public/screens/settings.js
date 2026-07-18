@@ -455,15 +455,15 @@ S.HubSettings = {
     } catch (e) {}
 
     // A history of closed-out weeks so the demo shows the operator has been doing
-    // the weekly Cash close, not starting cold. The Close The Week step stamps live
-    // in localStorage per week (the clear above wiped them); seed the last eight
-    // weeks fully closed and leave the current week open so there is work to do.
+    // the weekly Cash close, not starting cold. The Close The Week step-done marks live
+    // on the account now (App.acctSet); seed the last eight weeks fully closed and leave
+    // the current week open so there is work to do.
     try {
       const _mon = (d) => { const x = new Date(d); const wd = x.getDay(); x.setDate(x.getDate() + (wd === 0 ? -6 : 1 - wd)); return App.ymdLocal(x); };
       const _curMon = _mon(new Date());
       for (let w = 1; w <= 8; w++) {
         const m = new Date(_curMon + 'T00:00:00'); m.setDate(m.getDate() - 7 * w);
-        localStorage.setItem('cash_cockpit_done_' + App.ymdLocal(m) + App.acctScopeSuffix(), JSON.stringify({ trapped: true, order: true, week: true, terms: true }));
+        App.acctSet('cash_cockpit_done_' + App.ymdLocal(m), { trapped: true, order: true, week: true, terms: true });
       }
       // Control sections, current week mid-close: the first two close steps are
       // done, the last two still to do. Keyed to each page's own done-key (the
@@ -473,15 +473,15 @@ S.HubSettings = {
       // demo would read 0/4 everywhere. Each = most of the week's steps done, the
       // last one or two still open so there is visible work to do.
       if (window.S) {
-        if (S.InventoryDashboard) localStorage.setItem(S.InventoryDashboard._doneKey(), JSON.stringify({ count: true, deliveries: true, orders: true }));
-        if (S.LaborDashboard)     localStorage.setItem(S.LaborDashboard._doneKey(),     JSON.stringify({ hours: true, tips: true, schedule: true }));
-        if (S.ShiftDashboard)     localStorage.setItem(S.ShiftDashboard._doneKey(),     JSON.stringify({ import: true, cash: true }));
+        if (S.InventoryDashboard) App.acctSet(S.InventoryDashboard._doneKey(), { count: true, deliveries: true, orders: true });
+        if (S.LaborDashboard)     App.acctSet(S.LaborDashboard._doneKey(),     { hours: true, tips: true, schedule: true });
+        if (S.ShiftDashboard)     App.acctSet(S.ShiftDashboard._doneKey(),     { import: true, cash: true });
         // Profit + Revenue: no stamp. Their step 1 (Confirm the Week) now derives
         // its done-state from the confirmed-week record, and the current in-progress
         // week has none yet, so the cockpit honestly opens on "Confirm the Week".
         // (costs/numbers can't be reviewed until the week is confirmed, so nothing
         // downstream is pre-marked either.)
-        if (S.CashDashboard)      localStorage.setItem(S.CashDashboard._doneKey(),      JSON.stringify({ trapped: true, week: true }));
+        if (S.CashDashboard)      App.acctSet(S.CashDashboard._doneKey(),      { trapped: true, week: true });
       }
     } catch (e) {}
 

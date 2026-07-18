@@ -37,9 +37,9 @@ S.HubBooksHome = {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   },
-  _doneKey() { return 'books_close_done_' + this._curKey() + App.acctScopeSuffix(); },
-  doneMap()  { try { return JSON.parse(localStorage.getItem(this._doneKey()) || '{}'); } catch (e) { return {}; } },
-  setDone(step, val) { const m = this.doneMap(); m[step] = val; try { localStorage.setItem(this._doneKey(), JSON.stringify(m)); } catch (e) {} },
+  _doneKey() { return 'books_close_done_' + this._curKey(); },   // account-synced (App.data), follows the user across devices; no per-browser suffix
+  doneMap()  { return App.acctGet(this._doneKey(), {}); },
+  setDone(step, val) { const m = { ...this.doneMap() }; m[step] = val; App.acctSet(this._doneKey(), m); },
 
   ORDER: ['expenses', 'pnl', 'review', 'generate'],
   _META: {
