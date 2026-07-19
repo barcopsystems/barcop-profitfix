@@ -341,7 +341,7 @@ S.RevenueMenuEngineering = {
     item.planned_price = Math.round(newPrice * 100) / 100;
     item.planned_vol_pct = parseFloat(volPct) || 0;
     item.planned_at = new Date().toISOString();
-    App.saveKey('menu_items').then(() => { App.closeModal('re-modal'); this.draw(); });
+    App.putRecord('core', 'menu_item', item).then(() => { App.closeModal('re-modal'); this.draw(); });
   },
 
   // Roll it out now: set the live price + log the change at this moment.
@@ -352,7 +352,7 @@ S.RevenueMenuEngineering = {
     const old = item.price;
     item.price = np;
     item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
-    await App.saveKey('menu_items');
+    await App.putRecord('core', 'menu_item', item);
     if (old != null && old !== np) await this._logPriceChange(item, old, np, volPct);
     App.closeModal('re-modal');
     this.draw();
@@ -368,12 +368,12 @@ S.RevenueMenuEngineering = {
     // push it live, or Mark Live quietly CUTS the price the operator just set.
     if (old != null && np <= old) {
       item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
-      await App.saveKey('menu_items');
+      await App.putRecord('core', 'menu_item', item);
       this.draw();
       return;
     }
     item.price = np; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
-    await App.saveKey('menu_items');
+    await App.putRecord('core', 'menu_item', item);
     if (old != null && old !== np) await this._logPriceChange(item, old, np, vol);
     this.draw();
   },
@@ -382,7 +382,7 @@ S.RevenueMenuEngineering = {
     const item = (App.data.menu_items || []).find(i => i.id === itemId);
     if (!item) return;
     item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
-    App.saveKey('menu_items').then(() => this.draw());
+    App.putRecord('core', 'menu_item', item).then(() => this.draw());
   },
 
   // ── Reprice to Target — the batch "engineer the whole menu" pass ─────────────
@@ -490,13 +490,14 @@ S.RevenueMenuEngineering = {
   async applyBatch(live) {
     const ids = [...document.querySelectorAll('.batch-chk')].filter(c => c.checked).map(c => c.dataset.id);
     if (!ids.length) { App.closeModal('batch-modal'); return; }
-    const logs = [];
+    const logs = [], touched = [];
     ids.forEach(id => {
       const item = (App.data.menu_items || []).find(x => x.id === id);
       if (!item) return;
       const cost = App.menuItemCost(item) || 0;
       const sugg = this.suggested(item, cost);
       if (!sugg) return;
+      touched.push(item);
       if (live) {
         const old = item.price;
         item.price = sugg; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
@@ -505,7 +506,7 @@ S.RevenueMenuEngineering = {
         item.planned_price = sugg; item.planned_vol_pct = 0; item.planned_at = new Date().toISOString();
       }
     });
-    await App.saveKey('menu_items');
+    await App.putRecordsBulk('core', 'menu_item', touched);
     for (const [item, old, np, vol] of logs) await this._logPriceChange(item, old, np, vol);
     App.closeModal('batch-modal');
     this.draw();
@@ -526,7 +527,7 @@ S.RevenueMenuEngineering = {
       item.price = np; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
       if (old != null && old !== np) logs.push([item, old, np, vol]);
     });
-    await App.saveKey('menu_items');
+    await App.putRecordsBulk('core', 'menu_item', planned);
     for (const [item, old, np, vol] of logs) await this._logPriceChange(item, old, np, vol);
     this.draw();
   },

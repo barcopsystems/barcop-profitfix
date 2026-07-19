@@ -233,7 +233,7 @@ S.RevenueDogTest = {
     // can be restored or deleted for good. Keep leaves the item live.
     if (status === 'Cut' && item) {
       item.archived = true;
-      App.putRecord('core', 'menu_dog_test', t).then(() => App.saveKey('menu_items')).then(() => this.draw());
+      App.putRecord('core', 'menu_dog_test', t).then(() => App.putRecord('core', 'menu_item', item)).then(() => this.draw());
       return;
     }
     App.putRecord('core', 'menu_dog_test', t).then(() => this.draw());

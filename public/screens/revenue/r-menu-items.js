@@ -407,10 +407,8 @@ S.RevenueMenuItems = {
         confirmText: 'Delete', danger: true
       });
       if (!ok) return;
-      const kill = new Set(ids);
-      App.data.menu_items = this.items().filter(i => !kill.has(i.id));
       this._selected = new Set();
-      await App.saveKey('menu_items');
+      for (const delId of ids) await App.removeRecord('core', 'menu_item', delId);
       this.renderLanding();
     });
 
@@ -426,15 +424,14 @@ S.RevenueMenuItems = {
       b.addEventListener('click', async () => {
         const ok = await App.confirmDelete();
         if (!ok) return;
-        App.data.menu_items = this.items().filter(i => i.id !== b.dataset.id);
-        await App.saveKey('menu_items');
+        await App.removeRecord('core', 'menu_item', b.dataset.id);
         this.renderLanding();
       }));
     // Archived: restore or delete-permanently (guarded, no undo).
     this.container.querySelectorAll('.mi-restore').forEach(b =>
       b.addEventListener('click', async () => {
         const item = this.items().find(i => i.id === b.dataset.id);
-        if (item) { item.archived = false; await App.saveKey('menu_items'); this.renderLanding(); }
+        if (item) { item.archived = false; await App.putRecord('core', 'menu_item', item); this.renderLanding(); }
       }));
     this.container.querySelectorAll('.mi-delperm').forEach(b =>
       b.addEventListener('click', async () => {
@@ -446,8 +443,7 @@ S.RevenueMenuItems = {
           confirmText: 'Delete Permanently', danger: true
         });
         if (!ok) return;
-        App.data.menu_items = this.items().filter(i => i.id !== b.dataset.id);
-        await App.saveKey('menu_items');
+        await App.removeRecord('core', 'menu_item', b.dataset.id);
         this.renderLanding();
       }));
 
@@ -1046,10 +1042,7 @@ S.RevenueMenuItems = {
       updated_at:         new Date().toISOString()
     };
 
-    if (this.editIdx !== null) this.items()[this.editIdx] = entry;
-    else this.items().push(entry);
-
-    await App.saveKey('menu_items');
+    await App.putRecord('core', 'menu_item', entry);
     // A direct price edit on an existing item is a real reprice: log it through
     // the one canonical pricing logger (no prediction — that is a Menu
     // Engineering reprice thing) so the Pricing Review Log and Recovery pick it up.
@@ -1161,7 +1154,7 @@ S.RevenueMenuItems = {
       return;
     }
 
-    await App.saveKey('menu_items');
+    await App.putRecordsBulk('core', 'menu_item', this.items());
     // Every reprice the file carried goes through the one canonical pricing logger,
     // same as a direct edit, so the Pricing Review Log and Recovery see it. Without
     // this the audit told the operator to reprice the day after they repriced.
