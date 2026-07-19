@@ -919,7 +919,9 @@ const DB = {
   // so loadEvents' "date IS NULL" branch always returns them in full, regardless of the
   // 24-month window (their business date, if any, lives in the payload). Empty until an
   // array is migrated; adding a kind here + to EVENT_STORES is what activates it.
-  NONWINDOWED_KINDS: ['permit', 'operating_expense', 'menu_item', 'product'],
+  NONWINDOWED_KINDS: ['permit', 'operating_expense', 'menu_item', 'product',
+    'event_rate_card', 'event_regular', 'event_calendar_entry',
+    'profit_initiative', 'revenue_initiative', 'cash_initiative', 'fix_activity'],
   // Set per-kind when a blob->rows backfill write FAILED this session, so _configBlob
   // keeps that array in the blob as a backup until the rows are confirmed (never orphan).
   _backfillPending: {},

@@ -5057,9 +5057,11 @@ const App = {
       }
     },
     // Core / Recovery (Profit pass): unbounded recovery logs live row-per-record
-    // in core_events. Config (settings, products, menu, targets, getting-started,
-    // fix_progress/fix_activity, vestigial shifts/vendor_log/reconciliations) stays
-    // in the user_data blob. fix_log moves in its own shared pass.
+    // in core_events. Config (settings, targets, getting-started, fix_progress,
+    // vestigial shifts/vendor_log/reconciliations) stays in the user_data blob.
+    // The entered-data lists (products/menu/permits/expenses, the Events rate
+    // cards / regulars / calendar, the experiment initiatives, and the fix
+    // activity feed) are all row-per-record now (data-safety migration).
     core: {
       table: 'core_events',
       data: () => App.data,
@@ -5092,7 +5094,23 @@ const App = {
         // Operating expenses: row-per-record (data-safety migration). NULL event date
         // (NONWINDOWED_KINDS) so every logged bill loads regardless of the 24-month
         // window — the bill's own date lives in the payload, read/summed by period.
-        operating_expense: 'operating_expenses'
+        operating_expense: 'operating_expenses',
+        // Events section entered-data lists — rate-card packages, the regulars book,
+        // and the manually-added planning calendar dates. Row-per-record so a bug can
+        // only ever touch one record, never wipe the list (data-safety migration).
+        // All NONWINDOWED (date:null) so they always load in full.
+        event_rate_card: 'event_rate_cards',
+        event_regular: 'event_regulars',
+        event_calendar_entry: 'event_calendar',
+        // Experiment tracker (shared across Profit / Revenue / Cash). Row-per-record,
+        // NONWINDOWED so the operator's experiments always load. Keys kept *_initiatives
+        // (and bare `initiatives` for Revenue) for back-compat.
+        profit_initiative: 'profit_initiatives',
+        revenue_initiative: 'initiatives',
+        cash_initiative: 'cash_initiatives',
+        // Fix System activity feed (row-per-record, NONWINDOWED). fix_progress (the
+        // per-gap checkbox map) stays in the blob; only the append-only feed moves.
+        fix_activity: 'fix_activity'
       }
     }
   },
