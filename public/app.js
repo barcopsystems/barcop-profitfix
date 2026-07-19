@@ -2782,6 +2782,7 @@ const App = {
   // Load Recovery data plus the three Control data stores (Rule 21)
   async loadAllData() {
     DB._dataReady = false;          // gate every config-blob save until THIS load confirms what the server holds (prevents a boot/deploy/switch-race save from wiping the account)
+    DB._allowReset = false;         // any leftover reset bypass ends at the next load
     this._setupDismissed = false;   // setup banner dismiss is per-login; a fresh login shows it again
     this.data          = await DB.readData();
     this.inventoryData = await DB.readInventoryData();

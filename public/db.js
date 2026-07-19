@@ -465,14 +465,22 @@ const DB = {
   // a server error — can never upsert empty defaults over a populated account (a full
   // config wipe). Set true only on a confirmed-load path below; reset in loadAllData.
   _dataReady: false,
+  // Was the account POPULATED at the last confirmed load? Drives the total-wipe backstop
+  // in writeData (never overwrite a known-populated account with an all-empty blob unless
+  // an intentional reset sets _allowReset). Reset flows (Clear Data / reload sample) set it.
+  _loadedNonEmpty: false,
+  _allowReset: false,
+  _blobHasArrayData(b) { return !!b && Object.keys(b).some(k => Array.isArray(b[k]) && b[k].length > 0); },
   async readData() {
     // Supabase mode
     if (this._sb && this._user) {
       // Unsynced local changes from an offline session are newer than the
       // server copy — load them so no offline work is lost.
       if (this._pendingList().includes('pf_data')) {
+        const merged = this._mergeDefaults(this._localRead());
         this._dataReady = true;   // local holds the operator's own unsynced edits — authoritative, safe to sync
-        return this._mergeDefaults(this._localRead());
+        this._loadedNonEmpty = this._blobHasArrayData(merged);
+        return merged;
       }
       const accountId = await this._ensureAccountId();
       if (!accountId) {
@@ -493,19 +501,38 @@ const DB = {
           return this._mergeDefaults(this._localRead());
         }
         if (!data) {
-          // First login — create row with defaults
+          // "No row" from .single() is USUALLY first login, but it can also be a
+          // false-empty (a transient RLS mismatch, a not-yet-visible row, a duplicate).
+          // Insert defaults, but only treat it as a confirmed-NEW account (open the gate
+          // on empty) if the insert actually created the row. On the account_id unique
+          // constraint the row already EXISTS and is populated — re-read and return the
+          // REAL data, never empty defaults, so a save can't clobber a live account on a
+          // false-empty read.
           const defaults = this._defaultData();
-          await this._sb.from('user_data').insert({
+          const { error: insErr } = await this._sb.from('user_data').insert({
             account_id: accountId,
             user_id: this._user.id,
             data: defaults,
             updated_at: new Date().toISOString()
           });
-          this._dataReady = true;   // account confirmed new/empty on the server — safe to persist from here
+          if (insErr) {
+            const { data: real } = await this._sb.from('user_data').select('data').eq('account_id', accountId).single();
+            if (real && real.data) {
+              const merged = this._mergeDefaults(real.data);
+              this._dataReady = true;
+              this._loadedNonEmpty = this._blobHasArrayData(merged);
+              return merged;
+            }
+            return this._mergeDefaults(this._localRead());   // still unconfirmed — do NOT open the gate
+          }
+          this._dataReady = true;         // insert created the row — genuinely new/empty account
+          this._loadedNonEmpty = false;
           return defaults;
         }
-        this._dataReady = true;     // confirmed server load — the in-memory blob now mirrors the server
-        return this._mergeDefaults(data.data);
+        const merged = this._mergeDefaults(data.data);
+        this._dataReady = true;           // confirmed server load — in-memory now mirrors the server
+        this._loadedNonEmpty = this._blobHasArrayData(merged);
+        return merged;
       } catch (e) {
         console.error('readData exception:', e);
         return this._mergeDefaults(this._localRead());
@@ -528,6 +555,17 @@ const DB = {
       // it (no local write, no queue): the real data loads and the operator's next real
       // edit saves normally. This is the guard for the deploy/reload race.
       if (!this._dataReady) return { ok: false, deferred: true };
+      // Total-wipe backstop (belt-and-suspenders on the gate): never overwrite a
+      // KNOWN-POPULATED account with a blob whose every user array is empty — the
+      // signature of an in-memory corruption or a bug, never a legit save from a real
+      // account. An intentional reset (Clear Data / reload sample) sets _allowReset. A
+      // genuinely-empty account (_loadedNonEmpty false) is unaffected, so a new user
+      // building up data saves fine, and a legit single-array delete leaves the other
+      // arrays populated so it still passes.
+      if (this._loadedNonEmpty && !this._allowReset && !this._blobHasArrayData(appData)) {
+        console.error('writeData: BLOCKED a total-wipe write (every user array empty over a populated account). Server data preserved.');
+        return { ok: false, blocked: true };
+      }
       // Fix D: short-circuit the network call when the browser knows it is offline.
       // No round-trip, no console error, faster save. The local copy is canonical.
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -650,6 +688,11 @@ const DB = {
       const table = tableOf[lsKey];
       if (!table) { this._clearPending(lsKey); continue; }
       const data = lsKey === 'pf_data' ? this._localRead() : this._localReadControl(lsKey);
+      // Never replay a whole-blob push unless the initial load confirmed the account
+      // (same gate as writeData), and never push a missing/empty local blob over a
+      // populated server row — that would reset the account to defaults on reconnect.
+      const emptyLocal = lsKey === 'pf_data' ? !this._blobHasArrayData(data) : (!data || Object.keys(data).length === 0);
+      if (!this._dataReady || emptyLocal) { continue; }
       try {
         const { error } = await this._sb.from(table).upsert({
           account_id: accountId, user_id: this._user.id, data: data, updated_at: new Date().toISOString()
@@ -705,13 +748,20 @@ const DB = {
           return this._localReadControl(lsKey);
         }
         if (!data) {
-          // First access — create the row with an empty object
-          await this._sb.from(table).insert({
+          // "No row" is usually first access, but can be a false-empty (RLS/dup). Insert
+          // an empty blob, but if it hits the unique constraint the row already exists —
+          // re-read and return the REAL control data, never empty, so a later control
+          // write can't clobber it on a false-empty read (mirror of readData).
+          const { error: insErr } = await this._sb.from(table).insert({
             account_id: accountId,
             user_id: this._user.id,
             data: {},
             updated_at: new Date().toISOString()
           });
+          if (insErr) {
+            const { data: real } = await this._sb.from(table).select('data').eq('account_id', accountId).single();
+            return (real && real.data) || this._localReadControl(lsKey);
+          }
           return {};
         }
         return data.data || {};
