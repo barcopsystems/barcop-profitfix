@@ -5046,9 +5046,13 @@ const App = {
         // Product master: row-per-record (data-safety migration 2026-07-19, so a bug
         // can only ever touch one product, never wipe the master list). No business
         // date -> NULL event date (NONWINDOWED_KINDS in db.js) so the whole product
-        // list always loads in full. Locations/vendors/prep-batches/par+variance
-        // settings stay in the ic_data config blob and still save via saveInventory.
-        product: 'ic_products'
+        // list always loads in full. Locations/vendors/par+variance settings stay in
+        // the ic_data config blob and still save via saveInventory (prep batches below).
+        product: 'ic_products',
+        // Prep batches (recipe sub-recipes): row-per-record (control-blob data-safety
+        // migration). No business date -> NULL event date (NONWINDOWED_KINDS) so the whole
+        // set always loads. Reads (menu cost roll-ups) unchanged; App.inventoryData.ic_prep_batches.
+        prep_batch: 'ic_prep_batches'
       }
     },
     sc: {

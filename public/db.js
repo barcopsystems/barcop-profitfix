@@ -1001,7 +1001,8 @@ const DB = {
   // array is migrated; adding a kind here + to EVENT_STORES is what activates it.
   NONWINDOWED_KINDS: ['permit', 'operating_expense', 'menu_item', 'product',
     'event_rate_card', 'event_regular', 'event_calendar_entry',
-    'profit_initiative', 'revenue_initiative', 'cash_initiative', 'fix_activity'],
+    'profit_initiative', 'revenue_initiative', 'cash_initiative', 'fix_activity',
+    'prep_batch'],
   // Set per-kind when a blob->rows backfill write FAILED this session, so _configBlob
   // keeps that array in the blob as a backup until the rows are confirmed (never orphan).
   _backfillPending: {},
