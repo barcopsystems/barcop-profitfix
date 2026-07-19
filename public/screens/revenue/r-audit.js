@@ -38,25 +38,48 @@ S.RevenueAudit = {
       { label: 'Hours logged in Labor',                done: cd.labor_pct_blended != null || cd.rplh_blended != null, go: 'lc-log-hours' },
       { label: 'Menu items priced with units sold',        done: costedMenu.length >= 4, go: 'r-menu-items' },
       { label: 'Server checks logged',                 done: (App.data.revenue_server_checks || []).length >= 3, go: 'r-server-check' },
-      { label: 'Events booked',                        done: (App.data.bookings || []).length > 0, go: 'ev-dashboard' },
+      { label: 'Events completed',                     done: this._windowedCompletedEvents().length > 0, go: 'ev-dashboard' },
       { label: 'Confirm the week',                     done: cd.check_average != null, go: 'r-dashboard' }
     ];
   },
 
   onGenerate() { this.generateAudit(); },
 
+  // Mirror the server's S5 window (audit-compute.js computeRevenueAudit): the audit
+  // only scores events that are COMPLETED and fall inside the trailing 4-week window
+  // (the same weeks the revenue base uses), never all-time. Readiness has to test the
+  // same thing, or the projected badge promises "Full data" while the run returns
+  // "Partial" because a completed event sitting outside the window is not scorable.
+  _windowedCompletedEvents() {
+    const completed = (App.data.bookings || []).filter(e => e && e.stage === 'Completed');
+    if (!completed.length) return [];
+    const PW = 4;
+    const evDate   = e => String(e.event_date || '').slice(0, 10);
+    const shiftYmd = (ymd, days) => { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+    const weeks = (App.data.revenue_weeks || [])
+      .filter(w => w && (((+w.bar_revenue || 0) + (+w.floor_revenue || 0)) > 0 || (+w.total_revenue || 0) > 0))
+      .sort((a, b) => String(a.period_end || a.week_end || '').localeCompare(String(b.period_end || b.week_end || '')))
+      .slice(-PW);
+    const winEnd = weeks.length
+      ? String(weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end || '').slice(0, 10)
+      : (completed.map(evDate).filter(Boolean).sort().slice(-1)[0] || '');   // no closed weeks yet: anchor on the latest event, same as the server
+    const winStart = winEnd ? shiftYmd(winEnd, -(PW * 7 - 1)) : '';
+    return (winStart && winEnd)
+      ? completed.filter(e => { const d = evDate(e); return d && d >= winStart && d <= winEnd; })
+      : completed;
+  },
+
   // One boolean per scored section = whether Bar Cop can score it now. Drives the
   // projected data badge so it matches what a run would produce.
   _sectionsReady() {
     const cd = this.buildControlData() || {};
     const costedMenu = (App.data.menu_items || []).filter(i => i.price != null && i.cost != null && i.weekly_covers != null);
-    const events = (App.data.bookings || []).filter(e => e && e.stage === 'Completed');
     return [
       cd.check_average != null,                                             // S1 Check Average
       cd.labor_pct_blended != null || cd.rplh_blended != null,              // S2 Labor
       costedMenu.length >= 4,                                               // S3 Menu
       (App.data.revenue_server_checks || []).length >= 3 || cd.server_comp_pct != null,  // S4 Server
-      events.length > 0                                                     // S5 Events
+      this._windowedCompletedEvents().length > 0                            // S5 Events (windowed, mirrors the server)
     ];
   },
 
