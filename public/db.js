@@ -459,12 +459,19 @@ const DB = {
   screenCanEdit(screen) { return this.canAccessLevel(screen) === 'edit'; },   // Full Access
 
   // ── Data ──────────────────────────────────────────────────────────────────
+  // Gate: false until the initial load has CONFIRMED what the account holds. No
+  // config-blob write reaches the server while false (see writeData), so a save that
+  // fires before readData finishes — or after it falls back to an empty local copy on
+  // a server error — can never upsert empty defaults over a populated account (a full
+  // config wipe). Set true only on a confirmed-load path below; reset in loadAllData.
+  _dataReady: false,
   async readData() {
     // Supabase mode
     if (this._sb && this._user) {
       // Unsynced local changes from an offline session are newer than the
       // server copy — load them so no offline work is lost.
       if (this._pendingList().includes('pf_data')) {
+        this._dataReady = true;   // local holds the operator's own unsynced edits — authoritative, safe to sync
         return this._mergeDefaults(this._localRead());
       }
       const accountId = await this._ensureAccountId();
@@ -494,8 +501,10 @@ const DB = {
             data: defaults,
             updated_at: new Date().toISOString()
           });
+          this._dataReady = true;   // account confirmed new/empty on the server — safe to persist from here
           return defaults;
         }
+        this._dataReady = true;     // confirmed server load — the in-memory blob now mirrors the server
         return this._mergeDefaults(data.data);
       } catch (e) {
         console.error('readData exception:', e);
@@ -512,6 +521,13 @@ const DB = {
       // Viewer is read-only — reject before the offline queue so a viewer's edit
       // never lands in the pending list to fail RLS forever on replay.
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      // Never overwrite the server blob until the initial load confirmed what the
+      // account holds (_dataReady). A save that fires before readData completes, or
+      // after it fell back to an empty local copy on a server error, would otherwise
+      // upsert empty defaults over a populated account — a full config-blob wipe. Drop
+      // it (no local write, no queue): the real data loads and the operator's next real
+      // edit saves normally. This is the guard for the deploy/reload race.
+      if (!this._dataReady) return { ok: false, deferred: true };
       // Fix D: short-circuit the network call when the browser knows it is offline.
       // No round-trip, no console error, faster save. The local copy is canonical.
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -712,6 +728,10 @@ const DB = {
     if (this._sb && this._user) {
       // Viewer is read-only — reject before the offline queue (see writeData).
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      // Same hydration gate as writeData: never overwrite a control blob (ic/lc/sc_data)
+      // until the initial load confirmed the account, so a pre-load / deploy-race save
+      // can't wipe it either. _dataReady is set once readData confirms the account.
+      if (!this._dataReady) return { ok: false, deferred: true };
       // Fix D: short-circuit the network call when the browser knows it is offline.
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         this._localWriteControl(lsKey, data);

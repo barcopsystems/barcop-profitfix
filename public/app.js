@@ -2730,12 +2730,14 @@ const App = {
   // this.data by the caller; we just write the stripped blob. Every event
   // write-site goes through putRecord/removeRecord instead.
   async save() {
+    if (!DB._dataReady) return false;   // gated pre-load (see DB.writeData) — nothing loaded yet to persist
     const r = await DB.writeData(this._configBlob('core', this.data));
     if (!r.ok) console.error('Save failed:', r.error);
     return r.ok;
   },
 
   async saveKey(key) {
+    if (!DB._dataReady) return false;   // gated pre-load (see DB.writeData) — a premature save must not clobber the server blob
     const r = await DB.writeData(this._configBlob('core', this.data));
     // An offline save is NOT a failure: the copy is kept on-device and queued, and
     // the global offline banner tells the operator it will sync. Report success so
@@ -2779,6 +2781,7 @@ const App = {
 
   // Load Recovery data plus the three Control data stores (Rule 21)
   async loadAllData() {
+    DB._dataReady = false;          // gate every config-blob save until THIS load confirms what the server holds (prevents a boot/deploy/switch-race save from wiping the account)
     this._setupDismissed = false;   // setup banner dismiss is per-login; a fresh login shows it again
     this.data          = await DB.readData();
     this.inventoryData = await DB.readInventoryData();
