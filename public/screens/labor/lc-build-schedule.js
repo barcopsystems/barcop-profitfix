@@ -978,8 +978,7 @@ S.LaborBuildSchedule = {
 
   async confirmDelTemplate(id) {
     if (!(await App.confirmDelete())) return;
-    App.laborData.lc_schedule_templates = this.templates().filter(x => x.id !== id);
-    await App.saveLabor();
+    await App.removeRecord('lc', 'schedule_template', id);   // row-per-record
     this.draw();
   },
 
@@ -1100,9 +1099,12 @@ S.LaborBuildSchedule = {
         const tmpls = App.laborData.lc_schedule_templates;
         const tshifts = validShifts.map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end }));
         const ex = tmpls.find(x => (x.name || '').trim().toLowerCase() === tmplName.toLowerCase());
-        if (ex) { ex.shifts = tshifts; ex.name = tmplName; ex.updated_at = new Date().toISOString(); }
-        else tmpls.push({ id: App.uid(), name: tmplName, shifts: tshifts, created_at: new Date().toISOString() });
-        await App.saveLabor();
+        // Row-per-record: mutate the existing template in place, or build a new one; putRecord
+        // handles the in-memory replace/push and writes just that row.
+        let tmpl;
+        if (ex) { ex.shifts = tshifts; ex.name = tmplName; ex.updated_at = new Date().toISOString(); tmpl = ex; }
+        else tmpl = { id: App.uid(), name: tmplName, shifts: tshifts, created_at: new Date().toISOString() };
+        await App.putRecord('lc', 'schedule_template', tmpl);
       }
       this.editId = null;
       this.clearDraft();
