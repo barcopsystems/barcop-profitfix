@@ -207,8 +207,15 @@ app.post('/api/create-checkout-session', async (req, res) => {
     // create a second Stripe subscription and double-charge the customer.
     const { data: existingSub } = await supabaseAdmin
       .from('subscriptions').select('subscription_status').eq('account_id', accountId).maybeSingle();
-    if (existingSub && existingSub.subscription_status === 'active') {
-      return res.status(409).json({ error: 'This bar already has an active subscription.' });
+    // Block on ANY live Stripe state, not just 'active'. A past_due (failed payment) or
+    // trialing/unpaid subscription is still a live subscription in Stripe; letting one
+    // through here would mint a SECOND recurring subscription for the same bar (the
+    // webhook upsert then orphans the first in the DB while it keeps billing in Stripe).
+    // Terminal/never-started states (canceled, incomplete*) fall through so reactivation
+    // still works. Past_due users belong in the billing portal, not fresh checkout.
+    const LIVE_SUB_STATES = ['active', 'trialing', 'past_due', 'unpaid'];
+    if (existingSub && LIVE_SUB_STATES.includes(existingSub.subscription_status)) {
+      return res.status(409).json({ error: 'This bar already has a subscription. Manage it under Billing.' });
     }
 
     const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
