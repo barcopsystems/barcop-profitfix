@@ -433,7 +433,7 @@ S.LaborStaffRoster = {
       return;
     }
     this.staff().push(...toAdd);
-    const ok = await App.saveLabor();
+    const ok = await App.putRecordsBulk('lc', 'staff', toAdd);   // row-per-record
     if (ok) {
       App.markSetupDone('gs_lc_roster');
       const noPos = toAdd.filter(s => !s.position_id).length;
@@ -543,7 +543,7 @@ S.LaborStaffRoster = {
       if (i > -1 && Array.isArray(list[i].wage_history) && list[i].wage_history[idx]) {
         list[i].wage_history[idx].effective_date = v;
         list[i].wage_history[idx].updated_at = new Date().toISOString();
-        await App.saveLabor();
+        await App.putRecord('lc', 'staff', list[i]);   // wage_history is a field on the staff row
       }
       App.closeModal('wh-modal');
       this.renderUnified(staffId);
@@ -561,7 +561,7 @@ S.LaborStaffRoster = {
     const i = list.findIndex(x => x.id === staffId);
     if (i > -1 && Array.isArray(list[i].wage_history)) {
       list[i].wage_history.splice(idx, 1);
-      await App.saveLabor();
+      await App.putRecord('lc', 'staff', list[i]);   // wage_history is a field on the staff row
     }
     this.renderUnified(staffId);
   },
@@ -839,17 +839,15 @@ S.LaborStaffRoster = {
     };
     if (!staffId) rec.created_at = new Date().toISOString();
 
+    // Row-per-record: build the record to persist (merge onto the existing staff on edit so
+    // fields not on the form — wage_history, created_at — survive) and write just that row.
     const list = this.staff();
-    if (staffId) {
-      const i = list.findIndex(x => x.id === staffId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
-    }
+    let out = rec;
+    if (staffId) { const i = list.findIndex(x => x.id === staffId); if (i > -1) out = { ...list[i], ...rec }; }
 
     const btn = document.getElementById('sr-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveLabor();
+    const ok = await App.putRecord('lc', 'staff', out);
     if (ok) {
       App.markSetupDone('gs_lc_roster');
       if (staffId) this.renderUnified(staffId);
@@ -885,8 +883,7 @@ S.LaborStaffRoster = {
     // blob (migrated in its own step), so it still goes through saveLabor.
     const certIds = this.certs().filter(c => c.staff_id === id).map(c => c.id);
     const noteIds = this.notes().filter(n => n.staff_id === id).map(n => n.id);
-    App.laborData.lc_staff = this.staff().filter(x => x.id !== id);
-    await App.saveLabor();
+    await App.removeRecord('lc', 'staff', id);   // row-per-record (staff, then its certs + notes)
     for (const cid of certIds) await App.removeRecord('lc', 'cert', cid);
     for (const nid of noteIds) await App.removeRecord('lc', 'staff_note', nid);
     this.renderList();
