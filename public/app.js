@@ -5064,7 +5064,11 @@ const App = {
         maintenance: 'sc_maintenance', walked_tab: 'sc_walked_tabs',
         waste: 'sc_waste', checklist: 'sc_checklists',
         safe_count: 'sc_safe_counts', incident: 'sc_incidents',
-        briefing: 'sc_briefings'
+        briefing: 'sc_briefings',
+        // Checklist TEMPLATES (reusable, config — distinct from the `checklist` RUNS above):
+        // row-per-record (control-blob data-safety migration), NONWINDOWED so all load. The
+        // sc_starter_seeded flag stays in the sc_data blob (still saved via saveShift).
+        checklist_template: 'sc_checklist_templates'
       }
     },
     lc: {
