@@ -967,6 +967,53 @@ const DB = {
   },
   async writeShiftData(data)     { return await this._writeControl('sc_data', 'pf_sc_data', data); },
 
+  // ── Account backups (owner-only; enforced by the account_backups RLS policy) ──
+  // A backup is the whole account (all four blobs + cash config) captured as one JSON
+  // snapshot, stored server-side so the owner can roll the account back to a prior day
+  // without needing a file they saved. Auto-created ~daily on owner login (App._maybeAutoBackup).
+  async saveBackup(snapshot, reason) {
+    if (this._demo || !this._sb || !this._user || !snapshot) return { ok: false };
+    const accountId = await this._ensureAccountId();
+    if (!accountId) return { ok: false };
+    const { error } = await this._sb.from('account_backups')
+      .insert({ account_id: accountId, reason: reason || 'manual', snapshot });
+    if (error) { console.error('saveBackup:', error.message || error); return { ok: false, error }; }
+    // Retention: keep the newest 30 per account, drop the rest (best-effort).
+    try {
+      const { data: old } = await this._sb.from('account_backups')
+        .select('id').eq('account_id', accountId)
+        .order('created_at', { ascending: false }).range(30, 999);
+      if (old && old.length) await this._sb.from('account_backups').delete().in('id', old.map(r => r.id));
+    } catch (e) { /* prune is best-effort */ }
+    return { ok: true };
+  },
+  async listBackups() {
+    if (!this._sb || !this._user) return [];
+    const accountId = await this._ensureAccountId();
+    if (!accountId) return [];
+    const { data, error } = await this._sb.from('account_backups')
+      .select('id, created_at, reason').eq('account_id', accountId)
+      .order('created_at', { ascending: false }).limit(60);
+    if (error) { console.error('listBackups:', error.message || error); return []; }
+    return data || [];
+  },
+  async getBackup(id) {
+    if (!this._sb || !this._user || !id) return null;
+    const { data, error } = await this._sb.from('account_backups')
+      .select('snapshot').eq('id', id).single();
+    if (error) { console.error('getBackup:', error.message || error); return null; }
+    return data ? data.snapshot : null;
+  },
+  async lastBackupAt() {
+    if (!this._sb || !this._user) return null;
+    const accountId = await this._ensureAccountId();
+    if (!accountId) return null;
+    const { data } = await this._sb.from('account_backups')
+      .select('created_at').eq('account_id', accountId)
+      .order('created_at', { ascending: false }).limit(1);
+    return (data && data[0]) ? data[0].created_at : null;
+  },
+
   // ── Event-log stores (row per record) ────────────────────────────────────
   // Unbounded logs (counts, deliveries, shifts, tips, audits…) live one row per
   // record in <module>_events instead of inside the JSON blob, so login and save

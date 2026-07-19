@@ -2826,6 +2826,23 @@ const App = {
     // Pre-fetch the accounts list so the Hub sidebar can render the
     // Locations section synchronously (multi-account users only).
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
+    // Automatic daily backup: on owner login, if the last snapshot is >~20h old, capture the
+    // whole account so there's always a recent restore point (see Your Account → Data & Backup).
+    // Fire-and-forget so it never delays boot.
+    this._maybeAutoBackup();
+  },
+
+  // Create a fresh account backup at most once a day, on OWNER login. Best-effort — a failed
+  // or skipped backup never affects the app. Restores are owner-driven from Your Account.
+  async _maybeAutoBackup() {
+    try {
+      if (this.demoMode || !DB.isOwner || !DB.isOwner()) return;
+      if (!(window.S && S.HubSettings && S.HubSettings._buildBackup)) return;
+      const last = await DB.lastBackupAt();
+      const stale = !last || (Date.now() - new Date(last).getTime()) > 20 * 3600 * 1000;
+      if (!stale) return;
+      await DB.saveBackup(S.HubSettings._buildBackup(), 'auto-daily');
+    } catch (e) { /* best-effort; never block the app on a backup */ }
   },
 
   // Convert a delivery line_items[i] entry to total bottles. Used wherever
