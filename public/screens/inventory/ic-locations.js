@@ -426,13 +426,22 @@ S.InventoryLocations = {
   // Save the dragged location order. The commit gives the active rows in their
   // new order; rebuild ic_locations as [actives in new order] + [archived kept
   // as-is]. Count order (Take Inventory / blank sheet) reads this array order.
+  // Next sort_order for a new location (append at the end of the count-sheet order).
+  _nextLocSeq() {
+    return this.locations().reduce((m, l) => Math.max(m, (l.sort_order != null ? l.sort_order : 0)), 0) + 1;
+  },
+
   async _persistLocationOrder(idsInOrder) {
     const locs = this.locations();
     const byId = new Map(locs.map(l => [l.id, l]));
     const actives = idsInOrder.map(id => byId.get(id)).filter(Boolean);
     const archived = locs.filter(l => l.archived);
-    App.inventoryData.ic_locations = [...actives, ...archived];
-    await App.saveInventory();
+    const ordered = [...actives, ...archived];
+    // Row-per-record: the count-sheet order is a per-location sort_order now (rows have no
+    // inherent array order). Stamp each, keep the in-memory order, and write the rows.
+    ordered.forEach((l, i) => { l.sort_order = i; });
+    App.inventoryData.ic_locations = ordered;
+    await App.putRecordsBulk('ic', 'location', ordered);
   },
 
   // Start Over: close the Add Products picker and wipe the half-built location
@@ -457,11 +466,12 @@ S.InventoryLocations = {
     if (this.locations().some(l => l.name.toLowerCase() === name.toLowerCase())) { fail('A location with that name already exists.'); return; }
 
     const id = App.uid();
-    this.locations().push({ id, name, archived: false, service_bar: !!document.getElementById('il-new-servicebar')?.checked });
+    const loc = { id, name, archived: false, service_bar: !!document.getElementById('il-new-servicebar')?.checked, sort_order: this._nextLocSeq() };
+    this.locations().push(loc);
     const touched = this._reconcileProducts(name, this.newChecked);   // assign every checked product
     const btn = document.getElementById('il-new-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveInventory();   // new location -> config blob
+    const ok = await App.putRecord('ic', 'location', loc);   // new location -> row
     if (touched.length) await App.putRecordsBulk('ic', 'product', touched);   // product assignments -> rows
     // Drop straight into the new location's arrange page (build → order in one flow).
     if (ok) { App.markSetupDone('gs_ic_locations'); this.openEdit(id); }
@@ -487,10 +497,11 @@ S.InventoryLocations = {
     this._savingProducts = true;
     const link = this.container.querySelector('.il-addprod-link');
     if (link) { link.textContent = 'Saving...'; link.style.opacity = '0.6'; link.style.pointerEvents = 'none'; }
-    this.locations().push({ id, name, archived: false, service_bar: !!document.getElementById('il-new-servicebar')?.checked });
+    const loc = { id, name, archived: false, service_bar: !!document.getElementById('il-new-servicebar')?.checked, sort_order: this._nextLocSeq() };
+    this.locations().push(loc);
     const touched = this._reconcileProducts(name, this.newChecked);
     const savedCount = this.newChecked.size;
-    await App.saveInventory();   // new location -> config blob
+    await App.putRecord('ic', 'location', loc);   // new location -> row
     if (touched.length) await App.putRecordsBulk('ic', 'product', touched);   // product assignments -> rows
     this._savingProducts = false;
     App.markSetupDone('gs_ic_locations');
@@ -721,7 +732,7 @@ S.InventoryLocations = {
     if (this.editMode === 'products') this._reconcileProducts(name, this.editChecked).forEach(p => touched.set(p.id, p));
     const btn = document.getElementById('il-update-loc');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveInventory();   // renamed location -> config blob
+    const ok = await App.putRecord('ic', 'location', l);   // renamed location -> row
     if (touched.size) await App.putRecordsBulk('ic', 'product', [...touched.values()]);   // rename cascade -> rows
     if (ok) {
       App.markSetupDone('gs_ic_locations');
@@ -838,7 +849,7 @@ S.InventoryLocations = {
     const l = this.locations().find(x => x.id === id);
     if (!l) return;
     l.archived = val;
-    await App.saveInventory();
+    await App.putRecord('ic', 'location', l);   // row-per-record
     this.renderList();
   },
 
@@ -871,17 +882,17 @@ S.InventoryLocations = {
       if (p.location_sequences && p.location_sequences[l.name] != null) { delete p.location_sequences[l.name]; changed = true; }
       if (changed) touched.push(p);
     });
-    App.inventoryData.ic_locations = this.locations().filter(x => x.id !== id);
-    await App.saveInventory();   // location removed from config blob
+    await App.removeRecord('ic', 'location', id);   // location removed -> row deleted
     if (touched.length) await App.putRecordsBulk('ic', 'product', touched);   // location cleared off products -> rows
     this.renderList();
   },
 
   async addDefaults() {
     const have = this.locations().map(l => l.name.toLowerCase());
+    let seq = this._nextLocSeq();
     const add = this.DEFAULTS.filter(n => !have.includes(n.toLowerCase()))
-      .map(n => ({ id: App.uid(), name: n, archived: false }));
-    if (add.length) { this.locations().push(...add); await App.saveInventory(); }
+      .map(n => ({ id: App.uid(), name: n, archived: false, sort_order: seq++ }));
+    if (add.length) { this.locations().push(...add); await App.putRecordsBulk('ic', 'location', add); }
     this.renderList();
   },
 
