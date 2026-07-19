@@ -403,7 +403,7 @@ S.InventoryVendors = {
     }
 
     this.vendors().push(...toAdd);
-    const ok = await App.saveInventory();
+    const ok = await App.putRecordsBulk('ic', 'vendor', toAdd);   // row-per-record
     if (!ok) {
       App.inventoryData.ic_vendors = existing.filter(v => !toAdd.includes(v));
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>';
@@ -576,25 +576,27 @@ S.InventoryVendors = {
 
     let savedId = vendorId;
     const touched = [];   // products whose vendor name changed on a rename (row-per-record)
+    let vendorRec = null;
     if (vendorId) {
       const v = this.vendorById(vendorId);
       if (v) {
         const old = v.name;
         Object.assign(v, fields);
+        vendorRec = v;
         if (old !== name) {
           this.products().forEach(p => { if (p.vendor === old) { p.vendor = name; touched.push(p); } });
         }
       }
     } else {
       savedId = App.uid();
-      this.vendors().push({ id: savedId, ...fields, created_at: new Date().toISOString() });
+      vendorRec = { id: savedId, ...fields, created_at: new Date().toISOString() };   // putRecord pushes it into memory
     }
 
     const btn = document.getElementById('iv-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    // The vendor record lives in the config blob (saveInventory); the rename
-    // cascade to the affected products persists as rows.
-    const ok = await App.saveInventory();
+    // Vendor record is row-per-record now; the rename cascade to the affected products
+    // persists as rows too.
+    const ok = vendorRec ? await App.putRecord('ic', 'vendor', vendorRec) : true;
     if (touched.length) await App.putRecordsBulk('ic', 'product', touched);
     if (ok) {
       if (vendorId) this.openEdit(savedId);
@@ -608,8 +610,7 @@ S.InventoryVendors = {
   // ── Delete ────────────────────────────────────────────────────────────────
   async confirmDel(id) {
     if (!(await App.confirmDelete())) return;
-    App.inventoryData.ic_vendors = this.vendors().filter(x => x.id !== id);
-    await App.saveInventory();
+    await App.removeRecord('ic', 'vendor', id);   // row-per-record
     this.renderList();
   },
 
