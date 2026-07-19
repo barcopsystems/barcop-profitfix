@@ -497,6 +497,65 @@ async function applySubUpdate(sub, update, eventIso) {
     .eq('account_id', cands[0].account_id).is('stripe_subscription_id', null);
 }
 
+// ── Missed-webhook reconciliation ────────────────────────────────────────────
+// Access is webhook-driven, so a dropped Stripe event can leave a canceled sub stuck 'active'
+// (a churned customer keeps free access) or a paid one stuck inactive (a wrong lockout). This
+// re-checks every stamped subscription against Stripe — the source of truth — and corrects any
+// drift. Runs nightly in-process (scheduled near app.listen) and can be triggered manually via
+// the protected endpoint below. Uses "now" as the event time so the true current status wins
+// over any older webhook stamp (applySubUpdate's ordering guard).
+async function reconcileSubscriptions() {
+  const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
+  const { data: rows, error } = await supabaseAdmin
+    .from('subscriptions')
+    .select('account_id, stripe_subscription_id, subscription_status')
+    .not('stripe_subscription_id', 'is', null);
+  if (error) { console.error('reconcile: could not read subscriptions:', error.message); return { checked: 0, fixed: 0 }; }
+  let checked = 0, fixed = 0;
+  for (const row of rows || []) {
+    try {
+      const sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
+      checked++;
+      if (sub.status === row.subscription_status) continue;   // in sync, nothing to do
+      const cpe = sub.current_period_end != null ? sub.current_period_end
+                : (sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].current_period_end);
+      const periodEnd = cpe ? new Date(cpe * 1000).toISOString() : null;
+      const nowIso = new Date().toISOString();
+      const update = { subscription_status: sub.status, updated_at: nowIso };
+      if (periodEnd) update.current_period_end = periodEnd;
+      if (sub.status === 'active') { update.active_modules = ALL_MODULES; update.subscription_plan = 'full_access'; }
+      else if (sub.status === 'canceled') { update.active_modules = []; }
+      await applySubUpdate(sub, update, nowIso);
+      fixed++;
+      console.log('reconcile: ' + row.stripe_subscription_id + ' ' + row.subscription_status + ' -> ' + sub.status);
+    } catch (e) {
+      if (e && (e.code === 'resource_missing' || e.statusCode === 404)) {
+        // The subscription no longer exists in Stripe — it's gone; treat as canceled.
+        await supabaseAdmin.from('subscriptions')
+          .update({ subscription_status: 'canceled', active_modules: [], updated_at: new Date().toISOString() })
+          .eq('stripe_subscription_id', row.stripe_subscription_id);
+        fixed++;
+        console.log('reconcile: ' + row.stripe_subscription_id + ' missing in Stripe -> canceled');
+      } else {
+        console.error('reconcile: error on ' + row.stripe_subscription_id + ':', (e && e.message) || e);
+      }
+    }
+  }
+  console.log('reconcileSubscriptions: checked ' + checked + ', fixed ' + fixed);
+  return { checked, fixed };
+}
+
+// Manual trigger (optional — the nightly interval is the primary path). Protected by a shared
+// secret: set RECONCILE_SECRET in the server env, then POST with header X-Reconcile-Secret.
+app.post('/api/reconcile-subscriptions', async (req, res) => {
+  const secret = (process.env.RECONCILE_SECRET || '').trim();
+  if (!secret || String(req.headers['x-reconcile-secret'] || '') !== secret) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  try { const r = await reconcileSubscriptions(); res.json({ ok: true, ...r }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
   const sig    = req.headers['stripe-signature'];
@@ -1530,3 +1589,13 @@ const server = app.listen(PORT, () => {
 });
 server.timeout = 300000;
 server.headersTimeout = 310000;
+
+// Missed-webhook reconciliation schedule: this server process is long-lived, so run it
+// in-process — first pass 5 minutes after boot (so startup isn't slowed), then every 24h.
+// No external cron needed. (If this ever moves to a scale-to-zero host, drive the
+// /api/reconcile-subscriptions endpoint from a real scheduler instead.)
+if ((process.env.STRIPE_SECRET_KEY || '').trim()) {
+  const RECONCILE_MS = 24 * 60 * 60 * 1000;
+  setTimeout(() => { reconcileSubscriptions().catch(e => console.error('reconcile (startup):', (e && e.message) || e)); }, 5 * 60 * 1000);
+  setInterval(() => { reconcileSubscriptions().catch(e => console.error('reconcile (interval):', (e && e.message) || e)); }, RECONCILE_MS);
+}
