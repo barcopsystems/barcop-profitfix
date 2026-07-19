@@ -335,7 +335,7 @@ S.WeekReview = {
       this._res('Net Sales', App.fmtCurrency(rev, 0)),
       this._res('Covers', String(covers)),
       this._res('Check Avg', checkAvg != null ? App.fmtCurrency(checkAvg) : '-'),
-      this._res('Over / Short', (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar, 0), netVar < 0 ? 'var(--red)' : 'var(--t1)'),
+      this._res('Over / Short', (netVar > 0 ? '+' : '') + App.fmtBal(netVar, 0), netVar < 0 ? 'var(--red)' : 'var(--t1)'),
       this._res('Voids + Comps', App.fmtCurrency(voidTot + compTot, 0))
     ]);
     const open = [];
@@ -347,7 +347,7 @@ S.WeekReview = {
     (this._pdf || (this._pdf = [])).push({ name: 'Shift', status: this._statusPlain(doneCount, STEPS.length),
       activity: 'Days ' + days + ', Reconciles ' + reconN + ', Voids/Comps ' + vcN + ', Waste ' + wasteN + ', Walked Tabs ' + walkedN,
       close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
-      results: 'Net Sales ' + App.fmtCurrency(rev, 0) + ', Covers ' + covers + ', Check Avg ' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + ', Over/Short ' + (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar, 0) + ', Voids+Comps ' + App.fmtCurrency(voidTot + compTot, 0),
+      results: 'Net Sales ' + App.fmtCurrency(rev, 0) + ', Covers ' + covers + ', Check Avg ' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + ', Over/Short ' + (netVar > 0 ? '+' : '') + App.fmtBal(netVar, 0) + ', Voids+Comps ' + App.fmtCurrency(voidTot + compTot, 0),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Shift', 'sc-dashboard', 'shift', this._statusText(doneCount, STEPS.length), [
       { label: 'Done This Week', html: activity },
@@ -543,8 +543,8 @@ S.WeekReview = {
     const results = this._resRow([
       this._res('Trapped Cash', trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-', (trapped.hasData && trapped.total > 0) ? 'var(--amber)' : 'var(--t1)'),
       this._res('Runway', (sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-', (sf.hasOpening && sf.runway != null) ? 'var(--red)' : 'var(--t1)'),
-      this._res('Safe to Spend', pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-', (pos.hasOpening && pos.safe < 0) ? 'var(--red)' : 'var(--t1)'),
-      this._res('Tightest Week', (sf.hasData && sf.lowPoint) ? App.fmtCurrency(sf.lowPoint.balance, 0) : '-', (sf.lowPoint && sf.lowPoint.balance < 0) ? 'var(--red)' : 'var(--t1)')
+      this._res('Safe to Spend', pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-', (pos.hasOpening && pos.safe < 0) ? 'var(--red)' : 'var(--t1)'),
+      this._res('Tightest Week', (sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-', (sf.lowPoint && sf.lowPoint.balance < 0) ? 'var(--red)' : 'var(--t1)')
     ]);
 
     const open = [];
@@ -557,7 +557,7 @@ S.WeekReview = {
     (this._pdf || (this._pdf = [])).push({ name: 'Cash', status: this._statusPlain(doneCount, STEPS.length),
       activity: 'Audits Run ' + auditsWk + ', Experiments ' + expActive,
       close: STEPS.map(s => s.label + (done[s.key] ? ' (done)' : ' (open)')).join(', '),
-      results: 'Current position: Trapped Cash ' + (trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-') + ', Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-') + ', Safe to Spend ' + (pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-') + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtCurrency(sf.lowPoint.balance, 0) : '-'),
+      results: 'Current position: Trapped Cash ' + (trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-') + ', Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-') + ', Safe to Spend ' + (pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-') + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-'),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Cash', 'c-dashboard', 'cash', this._statusText(doneCount, STEPS.length), [
       { label: 'Done This Week', html: activity },

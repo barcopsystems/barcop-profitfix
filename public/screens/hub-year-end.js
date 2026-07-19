@@ -1063,7 +1063,7 @@ S.HubYearEnd = {
     const P = this._aggregateYear(priorYear);
     const hasPrior = P.totalRev > 0 || P.totalCogs > 0 || P.totalLabor > 0;
 
-    const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : (Number(Number(v).toFixed(2)) < 0 ? '-' : '') + '$' + Math.abs(Number(v)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });   // negative-safe: a loss-year Operating Income prints "-$45,000.00", not "$-45,000.00"
     const fmtPct = (v) => (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%';
     const fmtDeltaPct = (cur, prev) => {
       if (!hasPrior || prev === 0 || cur == null || prev == null) return '';

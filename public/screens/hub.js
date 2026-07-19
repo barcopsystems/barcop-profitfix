@@ -649,7 +649,7 @@ S.Hub = {
     const csStats = [
       { label:'Trapped Cash', value: trapped.hasData ? App.fmtCurrency(trappedCash, 0) : '-' },
       { label:'Runway', value: runwayTxt || '-', color: (cashSF.hasData && cashSF.runway != null && cashSF.runway <= 4) ? 'var(--red-soft)' : 'var(--t1)' },
-      { label:'Safe to Spend', value: cashPos.hasOpening ? App.fmtCurrency(cashPos.safe, 0) : '-', color: (cashPos.hasOpening && cashPos.safe < 0) ? 'var(--red-soft)' : 'var(--t1)' }
+      { label:'Safe to Spend', value: cashPos.hasOpening ? App.fmtBal(cashPos.safe, 0) : '-', color: (cashPos.hasOpening && cashPos.safe < 0) ? 'var(--red-soft)' : 'var(--t1)' }
     ];
     const pfSum = safeSteps(S.Dashboard), rvSum = safeSteps(S.RevenueDashboard), csSum = safeSteps(S.CashDashboard);
     const pfCard = richCard({ title:'Profit', screen:'dashboard', mod:'profit', objName:'Dashboard', stats: pfStats, sum: pfSum, footer: auditLine(pA) });
