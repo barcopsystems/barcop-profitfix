@@ -5079,7 +5079,10 @@ const App = {
         // date (NONWINDOWED_KINDS in db.js) so the 24-month window never drops one — the
         // renewal date lives in the payload, read/sorted client-side. (operating_expenses
         // is the next array to move the same way; until then it stays in the blob.)
-        permit: 'permits_compliance'
+        permit: 'permits_compliance',
+        // Menu items: row-per-record (data-safety migration). No business date -> NULL
+        // event date (NONWINDOWED_KINDS) so the whole menu always loads in full.
+        menu_item: 'menu_items'
       }
     }
   },
