@@ -670,13 +670,9 @@ S.LaborStaffRoster = {
     if (!this.certEditId) rec.created_at = new Date().toISOString();
 
     const list = this.certs();
-    if (this.certEditId) {
-      const i = list.findIndex(x => x.id === this.certEditId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
-    }
-    const ok = await App.saveLabor();
+    let out = rec;   // row-per-record: merge onto the existing cert on edit, then write one row
+    if (this.certEditId) { const i = list.findIndex(x => x.id === this.certEditId); if (i > -1) out = { ...list[i], ...rec }; }
+    const ok = await App.putRecord('lc', 'cert', out);
     this.certEditId = null;
     if (ok) { App.closeModal('cert-modal'); this.renderUnified(staffId); }
     else fail('Save failed. Try again.');
@@ -685,8 +681,7 @@ S.LaborStaffRoster = {
   async confirmDelCert(id, staffId) {
     const ok = await App.confirmDelete();
     if (!ok) return;
-    App.laborData.lc_certs = this.certs().filter(x => x.id !== id);
-    await App.saveLabor();
+    await App.removeRecord('lc', 'cert', id);   // row-per-record
     this.renderUnified(staffId);
   },
 
@@ -783,13 +778,9 @@ S.LaborStaffRoster = {
     if (!this.noteEditId) rec.created_at = new Date().toISOString();
 
     const list = this.notes();
-    if (this.noteEditId) {
-      const i = list.findIndex(x => x.id === this.noteEditId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
-    }
-    const ok = await App.saveLabor();
+    let out = rec;   // row-per-record: merge onto the existing note on edit, then write one row
+    if (this.noteEditId) { const i = list.findIndex(x => x.id === this.noteEditId); if (i > -1) out = { ...list[i], ...rec }; }
+    const ok = await App.putRecord('lc', 'staff_note', out);
     this.noteEditId = null;
     if (ok) {
       App.closeModal('note-modal');
@@ -802,8 +793,7 @@ S.LaborStaffRoster = {
   async confirmDelNote(id, staffId) {
     const ok = await App.confirmDelete();
     if (!ok) return;
-    App.laborData.lc_staff_notes = this.notes().filter(x => x.id !== id);
-    await App.saveLabor();
+    await App.removeRecord('lc', 'staff_note', id);   // row-per-record
     this.renderUnified(staffId);
   },
 
@@ -890,11 +880,15 @@ S.LaborStaffRoster = {
     } else if (!(await App.confirmDelete())) {
       return;
     }
+    // Certs + coaching notes are row-per-record now — capture this person's ids BEFORE the
+    // removes mutate the arrays, then delete each row. lc_staff still lives in the lc_data
+    // blob (migrated in its own step), so it still goes through saveLabor.
+    const certIds = this.certs().filter(c => c.staff_id === id).map(c => c.id);
+    const noteIds = this.notes().filter(n => n.staff_id === id).map(n => n.id);
     App.laborData.lc_staff = this.staff().filter(x => x.id !== id);
-    // Clean up the person's certs + coaching notes so they don't orphan.
-    App.laborData.lc_certs = this.certs().filter(c => c.staff_id !== id);
-    App.laborData.lc_staff_notes = this.notes().filter(n => n.staff_id !== id);
     await App.saveLabor();
+    for (const cid of certIds) await App.removeRecord('lc', 'cert', cid);
+    for (const nid of noteIds) await App.removeRecord('lc', 'staff_note', nid);
     this.renderList();
   }
 };
