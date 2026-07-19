@@ -5077,7 +5077,12 @@ const App = {
       kinds: {
         actual: 'lc_actuals', schedule: 'lc_schedules', tip: 'lc_tips',
         tip_pool: 'lc_tip_pools', callout: 'lc_callouts', pay_period: 'lc_pay_periods',
-        time_off: 'lc_time_off'
+        time_off: 'lc_time_off',
+        // Positions (job roles — config): row-per-record (control-blob data-safety
+        // migration), NONWINDOWED so all load. Staff reference a position by position_id
+        // (read-only; a deleted position leaves a dangling ref by design). The
+        // lc_positions_seeded flag stays in the lc_data blob (saved via saveLabor).
+        position: 'lc_positions'
       }
     },
     // Core / Recovery (Profit pass): unbounded recovery logs live row-per-record
