@@ -580,7 +580,11 @@ window.FixPanel = {
 
   recentActivityCard(moduleKey) {
     const all = (App.data && Array.isArray(App.data.fix_activity)) ? App.data.fix_activity : [];
-    const mine = all.filter(a => a.module === moduleKey).slice(-10).reverse();
+    // Newest 10, by ts — the event store loads newest-first, so a positional
+    // slice(-10) would grab the oldest rows. Sort explicitly instead.
+    const mine = all.filter(a => a.module === moduleKey)
+      .slice().sort((x, y) => String(y.ts || '').localeCompare(String(x.ts || '')))  // newest first
+      .slice(0, 10);
     const titleBar = this.sectionHeader('Recent Activity');
 
     if (!mine.length) {
@@ -670,14 +674,13 @@ window.FixPanel = {
             ts: new Date().toISOString()
           };
           await App.putRecord('core', 'fix_activity', rec);
-          // Trim the module's feed to its 100 newest rows (delete the oldest overflow).
-          const all = App.data.fix_activity;
-          let moduleCount = all.filter(a => a.module === moduleKey).length;
-          const overflow = [];
-          for (let i = 0; i < all.length && moduleCount > 100; i++) {
-            if (all[i].module === moduleKey) { overflow.push(all[i].id); moduleCount--; }
-          }
-          for (const rid of overflow) await App.removeRecord('core', 'fix_activity', rid);
+          // Trim the module's feed to its 100 NEWEST rows (delete the oldest overflow).
+          // Sort by ts, not array position: the event store loads newest-first, so an
+          // index-based trim would delete the newest rows instead of the oldest.
+          const mineByAge = App.data.fix_activity.filter(a => a.module === moduleKey)
+            .slice().sort((x, y) => String(x.ts || '').localeCompare(String(y.ts || '')));  // oldest first
+          const overflow = mineByAge.slice(0, Math.max(0, mineByAge.length - 100));
+          for (const a of overflow) await App.removeRecord('core', 'fix_activity', a.id);
         }
       }
       reRender();
