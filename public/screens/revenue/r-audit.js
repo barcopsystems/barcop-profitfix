@@ -37,7 +37,7 @@ S.RevenueAudit = {
     return [
       { label: 'Hours logged in Labor',                done: cd.labor_pct_blended != null || cd.rplh_blended != null, go: 'lc-log-hours' },
       { label: 'Menu items priced with units sold',        done: costedMenu.length >= 4, go: 'r-menu-items' },
-      { label: 'Server checks logged',                 done: (App.data.revenue_server_checks || []).length >= 3, go: 'r-server-check' },
+      { label: 'Server checks logged',                 done: this._windowedServerCount() >= 3, go: 'r-server-check' },
       { label: 'Events completed',                     done: this._windowedCompletedEvents().length > 0, go: 'ev-dashboard' },
       { label: 'Confirm the week',                     done: cd.check_average != null, go: 'r-dashboard' }
     ];
@@ -45,28 +45,49 @@ S.RevenueAudit = {
 
   onGenerate() { this.generateAudit(); },
 
-  // Mirror the server's S5 window (audit-compute.js computeRevenueAudit): the audit
-  // only scores events that are COMPLETED and fall inside the trailing 4-week window
-  // (the same weeks the revenue base uses), never all-time. Readiness has to test the
-  // same thing, or the projected badge promises "Full data" while the run returns
-  // "Partial" because a completed event sitting outside the window is not scorable.
-  _windowedCompletedEvents() {
-    const completed = (App.data.bookings || []).filter(e => e && e.stage === 'Completed');
-    if (!completed.length) return [];
-    const PW = 4;
-    const evDate   = e => String(e.event_date || '').slice(0, 10);
-    const shiftYmd = (ymd, days) => { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+  // Shared trailing-4-week window end, mirroring the server (audit-compute.js
+  // computeRevenueAudit): winEnd = the last confirmed revenue week's period_end, or ''
+  // when no weeks are confirmed yet (each caller applies its own no-weeks fallback).
+  _auditWinEndFromWeeks() {
     const weeks = (App.data.revenue_weeks || [])
       .filter(w => w && (((+w.bar_revenue || 0) + (+w.floor_revenue || 0)) > 0 || (+w.total_revenue || 0) > 0))
       .sort((a, b) => String(a.period_end || a.week_end || '').localeCompare(String(b.period_end || b.week_end || '')))
-      .slice(-PW);
-    const winEnd = weeks.length
-      ? String(weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end || '').slice(0, 10)
-      : (completed.map(evDate).filter(Boolean).sort().slice(-1)[0] || '');   // no closed weeks yet: anchor on the latest event, same as the server
-    const winStart = winEnd ? shiftYmd(winEnd, -(PW * 7 - 1)) : '';
+      .slice(-4);
+    return weeks.length ? String(weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end || '').slice(0, 10) : '';
+  },
+  _shiftYmdUTC(ymd, days) { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); },
+
+  // Mirror the server's S5 window: the audit only scores events that are COMPLETED and
+  // fall inside the trailing 4-week window, never all-time. Readiness must test the same,
+  // or the badge promises "Full data" while the run returns "Partial" (a completed event
+  // outside the window is not scorable).
+  _windowedCompletedEvents() {
+    const completed = (App.data.bookings || []).filter(e => e && e.stage === 'Completed');
+    if (!completed.length) return [];
+    const evDate = e => String(e.event_date || '').slice(0, 10);
+    const winEnd = this._auditWinEndFromWeeks() || (completed.map(evDate).filter(Boolean).sort().slice(-1)[0] || '');   // no weeks yet: anchor on the latest event, same as the server
+    const winStart = winEnd ? this._shiftYmdUTC(winEnd, -(4 * 7 - 1)) : '';
     return (winStart && winEnd)
       ? completed.filter(e => { const d = evDate(e); return d && d >= winStart && d <= winEnd; })
       : completed;
+  },
+
+  // Mirror the server's S4 window: server checks are windowed to the same trailing 4 weeks,
+  // then grouped by SERVER; the spread scores only with >=3 distinct servers. Readiness
+  // counted ALL-TIME rows before, so it projected "ready/Full" while the run scored S4 N/A
+  // (e.g. 3+ checks all older than the window with no recent comp data). Returns distinct
+  // servers with covers in the window, matching what the server groups.
+  _windowedServerCount() {
+    const checks = (App.data.revenue_server_checks || []).filter(c => c && (+(c.covers) || 0) > 0 && c.sales != null && !isNaN(+c.sales));
+    if (!checks.length) return 0;
+    const winEnd = this._auditWinEndFromWeeks();
+    const winStart = winEnd ? this._shiftYmdUTC(winEnd, -(4 * 7 - 1)) : '';
+    const windowed = (winStart && winEnd)
+      ? checks.filter(c => { const d = String(c.date || '').slice(0, 10); return d && d >= winStart && d <= winEnd; })
+      : checks;   // no closed weeks yet: use every check, same as the server
+    const servers = new Set();
+    windowed.forEach(c => { const k = c.staff_id || c.server_name || c.server || c.name; if (k) servers.add(k); });
+    return servers.size;
   },
 
   // One boolean per scored section = whether Bar Cop can score it now. Drives the
@@ -78,7 +99,7 @@ S.RevenueAudit = {
       cd.check_average != null,                                             // S1 Check Average
       cd.labor_pct_blended != null || cd.rplh_blended != null,              // S2 Labor
       costedMenu.length >= 4,                                               // S3 Menu
-      (App.data.revenue_server_checks || []).length >= 3 || cd.server_comp_pct != null,  // S4 Server
+      this._windowedServerCount() >= 3 || cd.server_comp_pct != null,       // S4 Server (windowed + >=3 distinct servers, mirrors the server)
       this._windowedCompletedEvents().length > 0                            // S5 Events (windowed, mirrors the server)
     ];
   },
