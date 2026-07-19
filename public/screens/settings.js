@@ -411,6 +411,13 @@ S.HubSettings = {
   },
 
   async loadSample() {
+    const ok = await App.confirm({
+      title: 'Load sample data?',
+      message: 'This replaces ALL data in this account with the demo bar (The Anchor Bar & Kitchen). Any real data in this account is overwritten, and this cannot be undone.',
+      confirmText: 'Load sample data',
+      cancelText: 'Cancel'
+    });
+    if (!ok) return;
     const msg = document.getElementById('ua-test-msg');
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = 'Loading sample data...'; msg.style.display = 'block'; }
     DB._allowReset = true;   // seeding is an intentional bulk write: let the total-wipe backstop through (its early cockpit stamps save a still-empty blob). Reset at the next loadAllData.

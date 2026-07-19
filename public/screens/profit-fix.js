@@ -98,7 +98,7 @@ S.ProfitFix = {
   // Auto-start: the moment a gap has its first tracked action, log the start
   // date (= that action) so Bar Cop measures from there. No manual button.
   _autoStart() {
-    if (!App.data) return;
+    if (!App.data || !DB._dataReady) return;   // never write from render before the initial load has confirmed the account
     if (!Array.isArray(App.data.fix_log)) App.data.fix_log = [];
     this.gaps().forEach(g => {
       if (this.fixLog().some(e => e.gap_id === g.id)) return;
