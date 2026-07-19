@@ -5082,7 +5082,11 @@ const App = {
         permit: 'permits_compliance',
         // Menu items: row-per-record (data-safety migration). No business date -> NULL
         // event date (NONWINDOWED_KINDS) so the whole menu always loads in full.
-        menu_item: 'menu_items'
+        menu_item: 'menu_items',
+        // Operating expenses: row-per-record (data-safety migration). NULL event date
+        // (NONWINDOWED_KINDS) so every logged bill loads regardless of the 24-month
+        // window — the bill's own date lives in the payload, read/summed by period.
+        operating_expense: 'operating_expenses'
       }
     }
   },
