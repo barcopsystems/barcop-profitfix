@@ -86,11 +86,14 @@ S.ShiftChecklistTemplates = {
     const list = this.templates();
     if (list.length > 0) { App.shiftData.sc_starter_seeded = true; return; }   // already has checklists
     const mk = (name, type, items) => ({ id: App.uid(), name, type, items: (items || []).slice(), created_at: new Date().toISOString() });
-    list.push(mk('Manager Opening', 'Opening', (S.ShiftOpeningChecklist && S.ShiftOpeningChecklist.DEFAULT_ITEMS) || []));
-    list.push(mk('Manager Closing', 'Closing', (S.ShiftClosingChecklist && S.ShiftClosingChecklist.DEFAULT_ITEMS) || []));
-    this.STAFF_STARTERS.forEach(s => list.push(mk(s.name, 'Print', s.items)));
+    const seeded = [];
+    seeded.push(mk('Manager Opening', 'Opening', (S.ShiftOpeningChecklist && S.ShiftOpeningChecklist.DEFAULT_ITEMS) || []));
+    seeded.push(mk('Manager Closing', 'Closing', (S.ShiftClosingChecklist && S.ShiftClosingChecklist.DEFAULT_ITEMS) || []));
+    this.STAFF_STARTERS.forEach(s => seeded.push(mk(s.name, 'Print', s.items)));
+    seeded.forEach(t => list.push(t));
     App.shiftData.sc_starter_seeded = true;
-    App.saveShift();
+    App.saveShift();                                             // the sc_starter_seeded flag stays in the blob
+    App.putRecordsBulk('sc', 'checklist_template', seeded);      // the templates are rows now
   },
 
   render(container, actions) {
@@ -278,17 +281,15 @@ S.ShiftChecklistTemplates = {
 
     const rec = { id: this.editId || App.uid(), name, type: this._type || 'Opening', items };
     if (!this.editId) rec.created_at = new Date().toISOString();
+    // Row-per-record: build the record to persist (merge onto the existing template on edit
+    // so created_at etc. survive), then write just that row.
     const list = this.templates();
-    if (this.editId) {
-      const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
-    }
+    let out = rec;
+    if (this.editId) { const i = list.findIndex(x => x.id === this.editId); if (i > -1) out = { ...list[i], ...rec }; }
 
     const btn = document.getElementById('ct-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'checklist_template', out);
     if (ok) {
       App.markSetupDone('gs_sc_checklists');
       this._resetForm();
@@ -323,8 +324,7 @@ S.ShiftChecklistTemplates = {
 
   async confirmDel(id) {
     if (!(await App.confirmDelete())) return;
-    App.shiftData.sc_checklist_templates = this.templates().filter(x => x.id !== id);
-    await App.saveShift();
+    await App.removeRecord('sc', 'checklist_template', id);   // row-per-record
     this.renderList();
   }
 };
