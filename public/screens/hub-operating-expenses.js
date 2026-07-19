@@ -145,7 +145,7 @@ S.HubOperatingExpenses = {
     const now = new Date();
     const curIdx = now.getFullYear() * 12 + now.getMonth();
     const parents = arr.filter(r => r && r.recurring && !r.recurring_parent && r.date);
-    let added = false;
+    let added = false; const newRecs = [];
     parents.forEach(p => {
       const start = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
       if (isNaN(start.getTime())) return;
@@ -163,18 +163,19 @@ S.HubOperatingExpenses = {
         const mk = yy + '-' + String(mm + 1).padStart(2, '0');
         if (have.has(mk)) continue;
         const dd = Math.min(recurDay, this._daysInMonth(yy, mm));
-        arr.push({
+        const child = {
           id: App.uid ? App.uid() : ('oex-' + idx + '-' + p.id),
           date: mk + '-' + String(dd).padStart(2, '0'),
           category: p.category, vendor: p.vendor, amount: p.amount, notes: p.notes,
           recurring_parent: p.id,
           created_at: new Date().toISOString()
-        });
+        };
+        arr.push(child); newRecs.push(child);
         have.add(mk);
         added = true;
       }
     });
-    if (added) App.saveKey('operating_expenses');
+    if (newRecs.length) App.putRecordsBulk('core', 'operating_expense', newRecs);
     return added;
   },
 
@@ -495,7 +496,7 @@ S.HubOperatingExpenses = {
       if (arr.some(x => x.date === date && Math.abs((parseFloat(x.amount) || 0) - amount) < 0.005 && (x.vendor || '') === vendor && (x.category || '') === category)) return;
       arr.push({ id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date, category, vendor, amount, notes, created_at: new Date().toISOString() });
     });
-    await App.saveKey('operating_expenses');
+    await App.putRecordsBulk('core', 'operating_expense', this.records());
     this._entryMode = 'manual';
     this.renderMain();
   },
@@ -626,8 +627,7 @@ S.HubOperatingExpenses = {
       rec.term_months = (term && term > 0) ? term : null;
       rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1;
     }
-    this.records().push(rec);
-    await App.saveKey('operating_expenses');
+    await App.putRecord('core', 'operating_expense', rec);
     this.renderMain();
   },
 
@@ -708,6 +708,7 @@ S.HubOperatingExpenses = {
       const freqV = document.getElementById('oex-f-frequency')?.value || 'monthly';
       const termV = parseInt(document.getElementById('oex-f-term')?.value, 10);
       if (recChecked && document.getElementById('oex-f-term')?.value && (isNaN(termV) || termV < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
+      const touched = [];
       if (isEdit) {
         const idx = arr.findIndex(r => r.id === rec.id);
         if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], updates);
@@ -720,12 +721,15 @@ S.HubOperatingExpenses = {
             ? Object.assign({}, arr[pIdx], { recurring: true, frequency: freqV, term_months: (termV && termV > 0) ? termV : null, recur_day: arr[pIdx].recur_day || (parseInt(String(arr[pIdx].date).slice(8, 10), 10) || 1) })
             : Object.assign({}, arr[pIdx], { recurring: false, frequency: undefined, term_months: null });
         }
+        if (idx >= 0) touched.push(arr[idx]);
+        if (pIdx >= 0 && pIdx !== idx) touched.push(arr[pIdx]);
       } else {
         const newRec = Object.assign({ id: App.uid ? App.uid() : ('oex-' + Date.now()), created_at: new Date().toISOString() }, updates);
         if (recChecked) { newRec.recurring = true; newRec.frequency = freqV; newRec.term_months = (termV && termV > 0) ? termV : null; newRec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; }
         arr.push(newRec);
+        touched.push(newRec);
       }
-      await App.saveKey('operating_expenses');
+      await App.putRecordsBulk('core', 'operating_expense', touched);
       App.closeModal(id);
       this._rerender();
     });
@@ -751,7 +755,7 @@ S.HubOperatingExpenses = {
     });
     if (!ok) return;
     arr[pIdx] = Object.assign({}, p, { recurring: false, term_months: null });
-    await App.saveKey('operating_expenses');
+    await App.putRecord('core', 'operating_expense', arr[pIdx]);
     this._rerender();
   },
 
@@ -779,9 +783,7 @@ S.HubOperatingExpenses = {
     if (!rec) return;
     const ok = await App.confirmDelete();
     if (!ok) return;
-    const idx = arr.findIndex(r => r.id === id);
-    if (idx >= 0) arr.splice(idx, 1);
-    await App.saveKey('operating_expenses');
+    await App.removeRecord('core', 'operating_expense', id);
     this._rerender();
   }
 };

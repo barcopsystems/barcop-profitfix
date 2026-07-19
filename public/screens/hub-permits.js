@@ -442,8 +442,7 @@ S.HubPermits = {
       }
       // 2. Auto-create the Operating Expenses entry if a cost was paid
       if (cost != null && cost > 0) {
-        if (!Array.isArray(App.data.operating_expenses)) App.data.operating_expenses = [];
-        App.data.operating_expenses.push({
+        await App.putRecord('core', 'operating_expense', {
           id:         App.uid ? App.uid() : ('oex-' + Date.now()),
           date:       renewedOn,
           category:   'Licenses and Permits',
@@ -452,7 +451,6 @@ S.HubPermits = {
           notes:      'From Licensing: ' + (rec.name || 'permit') + ' renewal',
           created_at: new Date().toISOString()
         });
-        await App.saveKey('operating_expenses');
       }
       App.closeModal(id);
       this.renderMain();
