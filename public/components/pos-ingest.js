@@ -432,6 +432,7 @@ const PosIngest = {
     const items = (App.data && App.data.menu_items) || [];
     const byId = {};
     items.forEach(it => { if (it) byId[it.id] = it; });
+    const touched = [];
     (toAdd || []).forEach(u => {
       const it = byId[u.item_id]; if (!it) return;
       if (it.weekly_covers != null && u.covers !== it.weekly_covers) {
@@ -439,8 +440,9 @@ const PosIngest = {
         it.weekly_covers_updated_at = new Date().toISOString();
       }
       it.weekly_covers = u.covers;
+      touched.push(it);
     });
-    return App.saveKey('menu_items');
+    return App.putRecordsBulk('core', 'menu_item', touched);
   },
 
   // Sales upserts by DATE: a re-import of the same week replaces those days'
