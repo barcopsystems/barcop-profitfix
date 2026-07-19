@@ -605,7 +605,7 @@ window.CashEngine = {
   // One-time move of a pre-sync device-local cash setting onto the account, so an existing
   // operator's opening balance, tax, reserve, credit etc. are not lost the first time this
   // ships. Reads the old localStorage key, migrates it onto the account, returns the value.
-  _migCfg(key) { try { const oldK = this._key(key); const old = localStorage.getItem(oldK); if (old != null && old !== '') { App.acctSet(key, old); localStorage.removeItem(oldK); return old; } } catch (e) {} return null; },   // removeItem after migrating: else clearing/wiping a value lets the stale browser key resurrect it on the next read
+  _migCfg(key) { try { const oldK = this._key(key); const old = localStorage.getItem(oldK); if (old != null && old !== '') { Promise.resolve(App.acctSet(key, old)).then(ok => { if (ok) { try { localStorage.removeItem(oldK); } catch (e) {} } }); return old; } } catch (e) {} return null; },   // removeItem ONLY after the migrate save is CONFIRMED — an eager remove after a failed/gated save would lose the value. Leaving the old key until confirmed is safe (acctGet reads the account first), and once confirmed the remove still prevents a cleared value from resurrecting.
   _cfgNum(key, def) { let v = App.acctGet(key); if (v == null) v = this._migCfg(key); const n = parseFloat(v); return isNaN(n) ? def : n; },
   _cfgSet(key, v) { App.acctSet(key, (v == null || v === '') ? null : String(v)); },
   salesTaxRate()   { return this._cfgNum('cash_sales_tax_rate', 0); },

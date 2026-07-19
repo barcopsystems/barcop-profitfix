@@ -289,9 +289,9 @@ const App = {
   acctGet(key, def) { const v = this._acctState()[key]; return (v === undefined || v === null) ? def : v; },
   acctSet(key, val) {
     const s = this._acctState();
-    if (val === undefined || val === null || val === '') { if (!(key in s)) return; delete s[key]; }
+    if (val === undefined || val === null || val === '') { if (!(key in s)) return Promise.resolve(true); delete s[key]; }
     else s[key] = val;
-    this.saveKey('account_state');
+    return this.saveKey('account_state');   // return the save promise so a migrate-on-read can defer its localStorage cleanup until the write is CONFIRMED
   },
 
   async init() {
