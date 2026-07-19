@@ -171,6 +171,10 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 const STRIPE_PRICE_MONTHLY = (process.env.STRIPE_PRICE_MONTHLY || '').trim(); // $249/mo
 const STRIPE_PRICE_ANNUAL  = (process.env.STRIPE_PRICE_ANNUAL  || '').trim(); // $2,490/yr
 const ALL_MODULES     = ['profit', 'revenue'];
+// Stripe states that count as a LIVE subscription for a bar (do not let a second one be
+// created, and do not discard the account). Only terminal states (canceled,
+// incomplete_expired) are absent so reactivation / a genuine fresh start still works.
+const LIVE_SUB_STATES = ['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused'];
 
 app.post('/api/create-checkout-session', async (req, res) => {
   const { accountId, plan } = req.body || {};
@@ -207,18 +211,40 @@ app.post('/api/create-checkout-session', async (req, res) => {
     // create a second Stripe subscription and double-charge the customer.
     const { data: existingSub } = await supabaseAdmin
       .from('subscriptions').select('subscription_status').eq('account_id', accountId).maybeSingle();
-    // Block on ANY live Stripe state, not just 'active'. A past_due (failed payment) or
-    // trialing/unpaid subscription is still a live subscription in Stripe; letting one
-    // through here would mint a SECOND recurring subscription for the same bar (the
-    // webhook upsert then orphans the first in the DB while it keeps billing in Stripe).
-    // Terminal/never-started states (canceled, incomplete*) fall through so reactivation
-    // still works. Past_due users belong in the billing portal, not fresh checkout.
-    const LIVE_SUB_STATES = ['active', 'trialing', 'past_due', 'unpaid'];
+    // Block on ANY live Stripe state, not just 'active'. A past_due/unpaid/incomplete/paused
+    // (or trialing) subscription is still a live subscription in Stripe; letting one through
+    // here would mint a SECOND recurring subscription for the same bar (the webhook upsert
+    // then orphans the first in the DB while it keeps billing in Stripe). Only terminal
+    // states (canceled, incomplete_expired) fall through so reactivation still works.
     if (existingSub && LIVE_SUB_STATES.includes(existingSub.subscription_status)) {
       return res.status(409).json({ error: 'This bar already has a subscription. Manage it under Billing.' });
     }
 
     const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
+
+    // SOURCE-OF-TRUTH dup guard: our subscriptions row is written only by the webhook, which
+    // lags checkout completion by seconds-to-minutes. In that window the DB check above sees
+    // no row, so a customer who gave up on the ~12s client poll and clicked "Continue to
+    // Payment" again would mint a SECOND subscription (first orphaned, keeps billing). Ask
+    // Stripe directly. Scope by the account_id we stamp on the subscription (subscription_data
+    // .metadata below) so a multi-bar owner (same email, one Stripe Customer per bar) is NOT
+    // wrongly blocked from adding a second bar. Best-effort: a Stripe read hiccup must not
+    // block a legitimate first checkout, so failures fall through to the (still-present) webhook path.
+    if (userData.user.email) {
+      try {
+        const custs = await stripe.customers.list({ email: userData.user.email, limit: 20 });
+        for (const cust of (custs && custs.data) || []) {
+          const subs = await stripe.subscriptions.list({ customer: cust.id, status: 'all', limit: 20 });
+          const liveHere = ((subs && subs.data) || []).some(s =>
+            LIVE_SUB_STATES.includes(s.status) && s.metadata && s.metadata.account_id === accountId);
+          if (liveHere) {
+            return res.status(409).json({ error: 'This bar already has a subscription. Manage it under Billing.' });
+          }
+        }
+      } catch (e) {
+        console.error('create-checkout-session: Stripe dup-check failed (non-fatal):', e.message);
+      }
+    }
     const priceId = plan === 'annual' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
     // Fail loudly if the price env for this plan is not configured, rather than
     // sending an empty/undefined price to Stripe or (previously) a hardcoded test
@@ -236,7 +262,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
       // (webhook poll + activation) takes over. The bar id makes the return land
       // on the bar that was just paid for (needed for Add Another Bar).
       return_url: 'https://app.barcop.com/?checkout=success&bar=' + accountId,
-      metadata: { user_id: userId, account_id: accountId }
+      metadata: { user_id: userId, account_id: accountId },
+      // Stamp account_id onto the SUBSCRIPTION itself (session metadata does NOT propagate to
+      // the subscription). The source-of-truth dup guard above reads this to scope "already
+      // has a live sub" to THIS bar, so a multi-bar owner isn't blocked from adding another.
+      subscription_data: { metadata: { user_id: userId, account_id: accountId } }
     };
     // Pre-fill the checkout with the account's own email so Stripe Link can't
     // auto-fill a different email remembered from a prior checkout in the same
@@ -422,13 +452,27 @@ async function sendWelcomeEmail(email, barName) {
 // would clobber the other bar's access. Rows created before we stored the subscription
 // id have it null; we match those by customer once and stamp the id so every later
 // event keys precisely. Returns nothing; best-effort like the rest of the webhook.
-async function applySubUpdate(sub, update) {
+async function applySubUpdate(sub, update, eventIso) {
   const subId = sub.id;
   const customerId = sub.customer;
-  const { data: hit } = await supabaseAdmin
-    .from('subscriptions').update(update)
-    .eq('stripe_subscription_id', subId).select('account_id');
-  if (hit && hit.length) return;
+  // Read the row keyed on THIS subscription id first, so we can (a) apply an ORDERING GUARD
+  // and (b) never fall through to the customer-fallback when the row exists but the event is
+  // stale. Stripe does not guarantee delivery order and retries old events — without the
+  // guard, a re-delivered older 'past_due' could overwrite a newer 'active' and lock a
+  // good-standing customer behind the past-due gate.
+  const { data: existing } = await supabaseAdmin
+    .from('subscriptions').select('account_id, updated_at')
+    .eq('stripe_subscription_id', subId).maybeSingle();
+  if (existing) {
+    const storedMs = existing.updated_at ? new Date(existing.updated_at).getTime() : 0;
+    const eventMs  = eventIso ? new Date(eventIso).getTime() : 0;
+    // Drop only a STRICTLY-older event (same-second transitions still apply, last wins).
+    if (eventMs && storedMs && storedMs > eventMs) return;
+    await supabaseAdmin
+      .from('subscriptions').update({ ...update, updated_at: eventIso || update.updated_at })
+      .eq('stripe_subscription_id', subId);
+    return;
+  }
   // Legacy/backfill: no row carries this subscription id yet. Match the customer's
   // row(s) that have no subscription id stored, and stamp it going forward.
   // Look FIRST and stamp exactly one row. Running this as a filtered update is an
@@ -449,7 +493,7 @@ async function applySubUpdate(sub, update) {
     return;
   }
   await supabaseAdmin
-    .from('subscriptions').update({ ...update, stripe_subscription_id: subId })
+    .from('subscriptions').update({ ...update, stripe_subscription_id: subId, updated_at: eventIso || update.updated_at })
     .eq('account_id', cands[0].account_id).is('stripe_subscription_id', null);
 }
 
@@ -467,6 +511,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
   }
 
   try {
+    // Event creation time (Stripe, seconds). Used as `updated_at` on every write so the
+    // ordering guard in applySubUpdate compares like-for-like and drops stale retries.
+    const eventIso = event.created ? new Date(event.created * 1000).toISOString() : new Date().toISOString();
     if (event.type === 'checkout.session.completed') {
       const session    = event.data.object;
       const customerId = session.customer;
@@ -554,7 +601,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           subscription_plan:      'full_access',
           active_modules:         paid ? ALL_MODULES : [],
           current_period_end:     null,
-          updated_at:             new Date().toISOString(),
+          updated_at:             eventIso,
         }, { onConflict: 'account_id' });
         if (paid && isNewSubscriber && email) {
           const { data: acctRow } = await supabaseAdmin
@@ -585,7 +632,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                 : (sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].current_period_end);
       const periodEnd = cpe ? new Date(cpe * 1000).toISOString() : null;
 
-      const update = { subscription_status: status, updated_at: new Date().toISOString() };
+      const update = { subscription_status: status, updated_at: eventIso };
       if (periodEnd) update.current_period_end = periodEnd;
       // On (re)activation restore module access — a prior 'deleted' event clears
       // active_modules to [], so an active payer whose subscription reactivated via
@@ -593,7 +640,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       // module despite an 'active' status.
       if (status === 'active') { update.active_modules = ALL_MODULES; update.subscription_plan = 'full_access'; }
 
-      await applySubUpdate(sub, update);
+      await applySubUpdate(sub, update, eventIso);
     }
 
     if (event.type === 'customer.subscription.deleted') {
@@ -601,8 +648,8 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       await applySubUpdate(sub, {
         subscription_status: 'canceled',
         active_modules:      [],
-        updated_at:          new Date().toISOString(),
-      });
+        updated_at:          eventIso,
+      }, eventIso);
     }
 
     res.json({ received: true });
@@ -1444,10 +1491,13 @@ app.post('/api/abandon-account', async (req, res) => {
       return res.status(403).json({ error: 'Not allowed' });
     }
 
-    // Safety: never discard an account that is actually paying.
+    // Safety: never discard an account that still has a LIVE subscription in Stripe (not
+    // just 'active' — a past_due/unpaid/incomplete/paused/trialing sub is still billing or
+    // could resume). Aligns with the checkout dup-guard so a still-billing account can't be
+    // hard-deleted (which cascades away its data).
     const { data: sub } = await supabaseAdmin
       .from('subscriptions').select('subscription_status').eq('account_id', accountId).maybeSingle();
-    if (sub && sub.subscription_status === 'active') {
+    if (sub && LIVE_SUB_STATES.includes(sub.subscription_status)) {
       return res.status(400).json({ error: 'This account has an active subscription and cannot be discarded.' });
     }
 
