@@ -320,12 +320,11 @@ S.HubPermits = {
     if (!name) { showErr('Give the permit a name.'); return; }
     if (!type) { showErr('Pick a type.'); return; }
     if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
-    this.records().push({
+    await App.putRecord('core', 'permit', {
       id: App.uid ? App.uid() : ('prm-' + Date.now()),
       name, type, renewal_date, recurrence, cost, last_renewed, notes,
       created_at: new Date().toISOString()
     });
-    await App.saveKey('permits_compliance');
     this.renderMain();
   },
 
@@ -386,18 +385,16 @@ S.HubPermits = {
       if (!name) { showErr('Give the permit a name.'); return; }
       if (!type) { showErr('Pick a type.'); return; }
       if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
-      const arr = this.records();
       if (isEdit) {
-        const idx = arr.findIndex(r => r.id === rec.id);
-        if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], { name, type, renewal_date, recurrence, cost, last_renewed, notes });
+        const cur = this.records().find(r => r.id === rec.id) || rec;
+        await App.putRecord('core', 'permit', Object.assign({}, cur, { name, type, renewal_date, recurrence, cost, last_renewed, notes }));
       } else {
-        arr.push({
+        await App.putRecord('core', 'permit', {
           id:         App.uid ? App.uid() : ('prm-' + Date.now()),
           name, type, renewal_date, recurrence, cost, last_renewed, notes,
           created_at: new Date().toISOString()
         });
       }
-      await App.saveKey('permits_compliance');
       App.closeModal(id);
       this.renderMain();
     });
@@ -435,15 +432,13 @@ S.HubPermits = {
       if (!renewedOn) { showErr('Pick the renewed-on date.'); return; }
       if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
       // 1. Update the permit
-      const arr = this.records();
-      const idx = arr.findIndex(r => r.id === rec.id);
-      if (idx >= 0) {
-        arr[idx] = Object.assign({}, arr[idx], {
+      const cur = this.records().find(r => r.id === rec.id);
+      if (cur) {
+        await App.putRecord('core', 'permit', Object.assign({}, cur, {
           last_renewed: renewedOn,
-          renewal_date: nextRen || arr[idx].renewal_date,
-          cost: cost != null ? cost : arr[idx].cost
-        });
-        await App.saveKey('permits_compliance');
+          renewal_date: nextRen || cur.renewal_date,
+          cost: cost != null ? cost : cur.cost
+        }));
       }
       // 2. Auto-create the Operating Expenses entry if a cost was paid
       if (cost != null && cost > 0) {
@@ -471,9 +466,7 @@ S.HubPermits = {
     if (!rec) return;
     const ok = await App.confirmDelete();
     if (!ok) return;
-    const idx = arr.findIndex(r => r.id === id);
-    if (idx >= 0) arr.splice(idx, 1);
-    await App.saveKey('permits_compliance');
+    await App.removeRecord('core', 'permit', id);
     this.renderMain();
   }
 };
