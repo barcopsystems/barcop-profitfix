@@ -5088,7 +5088,12 @@ const App = {
         position: 'lc_positions',
         // Reusable schedule TEMPLATES (config — distinct from the `schedule` built-week RUNS
         // above): row-per-record, NONWINDOWED. Written from Build Schedule's Template Name box.
-        schedule_template: 'lc_schedule_templates'
+        schedule_template: 'lc_schedule_templates',
+        // Staff certifications + coaching notes (config, keyed to a staff member by staff_id):
+        // row-per-record, NONWINDOWED. Deleting a staff member removes its certs/notes by
+        // staff_id (see lc-staff-roster confirmDel).
+        cert: 'lc_certs',
+        staff_note: 'lc_staff_notes'
       }
     },
     // Core / Recovery (Profit pass): unbounded recovery logs live row-per-record
