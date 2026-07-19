@@ -85,7 +85,17 @@ S.HubUserAccounts = {
       +   '<button class="btn btn-ghost" id="ua-import-btn">Restore from Backup</button>'
       +   '<input type="file" id="ua-import-file" accept="application/json,.json" style="display:none;"/>'
       + '</div>'
-      + '<div id="ua-backup-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>';
+      + '<div id="ua-backup-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>'
+      // Automatic server-side backups — Bar Cop saves the whole account ~daily; the owner
+      // can roll back to any saved point.
+      + '<div style="margin-top:22px;border-top:1px solid var(--b-edge);padding-top:16px;">'
+      +   '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">'
+      +     '<div style="font-size:13px;font-weight:700;color:var(--t1);">Automatic Backups</div>'
+      +     '<button class="btn btn-ghost btn-sm" id="ua-backup-now" style="margin-left:auto;">Back Up Now</button>'
+      +   '</div>'
+      +   '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">Bar Cop saves a full backup of this bar automatically, about once a day. Pick a point below to roll the whole account back to how it was then.</div>'
+      +   '<div id="ua-snap-list" style="font-size:12px;color:var(--t3);">Loading saved backups...</div>'
+      + '</div>';
     const testBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load sample data to test, or clear everything and start fresh.</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
       +   '<button class="btn btn-ghost" id="ua-load-sample">Load Sample Data</button>'
@@ -208,6 +218,18 @@ S.HubUserAccounts = {
     document.getElementById('ua-export-data')?.addEventListener('click', () => this.exportBackup());
     document.getElementById('ua-import-btn')?.addEventListener('click', () => document.getElementById('ua-import-file')?.click());
     document.getElementById('ua-import-file')?.addEventListener('change', (e) => this.importBackup(e));
+    document.getElementById('ua-backup-now')?.addEventListener('click', async () => {
+      const ok = await this.backupNow();
+      if (ok !== false) this._renderSnapshots();
+    });
+    const snapList = document.getElementById('ua-snap-list');
+    if (snapList) {
+      snapList.addEventListener('click', (e) => {
+        const b = e.target.closest('.ua-snap-restore');
+        if (b) this.restoreSnapshot(b.dataset.id, b.dataset.when);
+      });
+      this._renderSnapshots();
+    }
     document.getElementById('ua-add-bar')?.addEventListener('click', () => this._addBar());
     document.getElementById('ua-load-sample')?.addEventListener('click', () => this.loadSample());
     document.getElementById('ua-clear-all')?.addEventListener('click', () => this.clearAll());
@@ -305,6 +327,25 @@ S.HubUserAccounts = {
   importBackup(e) { S.HubSettings?.importBackup?.call(this._asSettingsHost('ua-backup-msg'), e); },
   loadSample() { S.HubSettings?.loadSample?.call(this._asSettingsHost('ua-test-msg')); },
   clearAll() { S.HubSettings?.clearAll?.call(this._asSettingsHost('ua-test-msg')); },
+  backupNow() { return S.HubSettings?.backupNow?.call(this._asSettingsHost('ua-backup-msg')); },
+  restoreSnapshot(id, when) { return S.HubSettings?.restoreSnapshot?.call(this._asSettingsHost('ua-backup-msg'), id, when); },
+  // Render the owner's list of automatic backups (newest first), each with a Restore button.
+  async _renderSnapshots() {
+    const el = document.getElementById('ua-snap-list');
+    if (!el) return;
+    const rows = (window.DB && DB.listBackups) ? await DB.listBackups() : [];
+    if (!rows.length) {
+      el.innerHTML = '<span style="color:var(--t3);">No automatic backups yet. One saves on your first visit and about daily after.</span>';
+      return;
+    }
+    const fmt = ts => { const d = new Date(ts); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+    el.innerHTML = '<table class="pnl-list" style="width:100%;"><tbody>' + rows.map(r => {
+      const when = fmt(r.created_at);
+      const tag = r.reason === 'manual' ? ' <span style="color:var(--t3);">(manual)</span>' : '';
+      return '<tr><td style="font-size:12px;color:var(--t1);">' + esc(when) + tag + '</td>'
+        + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm ua-snap-restore" data-id="' + esc(r.id) + '" data-when="' + esc(when) + '">Restore</button></td></tr>';
+    }).join('') + '</tbody></table>';
+  },
   _asSettingsHost(msgId) {
     // Provide a small shim so S.HubSettings helpers can find the right msg <div>
     // by overriding the _backupMsg/_testMsg targets via document.getElementById.

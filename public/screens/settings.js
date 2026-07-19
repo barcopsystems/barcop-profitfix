@@ -307,13 +307,15 @@ S.HubSettings = {
     if (m) { m.style.color = color || 'var(--gold)'; m.textContent = text; m.style.display = 'block'; }
   },
 
-  exportBackup() {
-    // Cash Recovery config lives device-local (CashEngine/localStorage), NOT in
-    // the four data objects below, so capture it explicitly or a restore to a
-    // fresh device would silently drop the opening balance, tax, credit line,
-    // gift-card liability and reserve settings.
+  // Build the full-account backup object (all four blobs + device-local cash config).
+  // Shared by the file export, the automatic server snapshot, and the "Back up now" button
+  // so all three capture the exact same shape (which _applyBackup restores).
+  _buildBackup() {
+    // Cash Recovery config lives device-local (CashEngine/localStorage), NOT in the four
+    // data objects below, so capture it explicitly or a restore to a fresh device would
+    // silently drop the opening balance, tax, credit line, gift-card liability and reserve.
     const CE = window.CashEngine;
-    const backup = {
+    return {
       _backup: 'barcop',
       version: 2,
       exported_at: new Date().toISOString(),
@@ -332,6 +334,10 @@ S.HubSettings = {
         gift_card_liability: CE.giftCardLiability()
       } : null
     };
+  },
+
+  exportBackup() {
+    const backup = this._buildBackup();
     try {
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
       const url  = URL.createObjectURL(blob);
@@ -379,34 +385,68 @@ S.HubSettings = {
     if (!ok) return;
     this._backupMsg('Restoring backup...', 'var(--t3)');
     try {
-      App.data          = backup.data;
-      // Only replace a control section when the backup actually CARRIES it. A v1 / partial /
-      // truncated backup missing (or empty in) inventoryData/laborData/shiftData must NOT
-      // erase the account's populated locations/vendors/staff/schedules — keep what's loaded.
-      const hasData = o => o && typeof o === 'object' && Object.keys(o).length > 0;
-      if (hasData(backup.inventoryData)) App.inventoryData = backup.inventoryData;
-      if (hasData(backup.laborData))     App.laborData     = backup.laborData;
-      if (hasData(backup.shiftData))     App.shiftData     = backup.shiftData;
-      // Restore device-local Cash Recovery config. Absent in v1 backups (made
-      // before this was captured) — skip cleanly so old files still restore.
-      if (backup.cashConfig && window.CashEngine) {
-        const cc = backup.cashConfig, CE = window.CashEngine;
-        CE.setOpeningCash(cc.opening_cash);
-        CE.setSalesTaxRate(cc.sales_tax_rate);
-        CE.setTaxFrequency(cc.tax_frequency);
-        CE.setPayrollBurden(cc.payroll_burden);
-        CE.setReserveWeeks(cc.reserve_weeks);
-        CE.setAvailableCredit(cc.available_credit);
-        CE.setGiftCardLiability(cc.gift_card_liability);
+      await this._applyBackup(backup);
+      this._backupMsg('Backup restored. Reloading...', 'var(--gold)');
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e) {
+      this._backupMsg('Restore failed: ' + (e.message || 'unknown error'), 'var(--red)');
+    }
+  },
+
+  // Overwrite the account from a backup object (a file OR a stored snapshot — same shape).
+  // Caller validates + confirms first. seedEventStores clears+reseeds each event table, so a
+  // restore fully replaces rows; the hasData guards keep a populated control blob if the
+  // backup lacks that section (a partial/old file must never erase live staff/locations).
+  async _applyBackup(backup) {
+    App.data = backup.data;
+    const hasData = o => o && typeof o === 'object' && Object.keys(o).length > 0;
+    if (hasData(backup.inventoryData)) App.inventoryData = backup.inventoryData;
+    if (hasData(backup.laborData))     App.laborData     = backup.laborData;
+    if (hasData(backup.shiftData))     App.shiftData     = backup.shiftData;
+    if (backup.cashConfig && window.CashEngine) {
+      const cc = backup.cashConfig, CE = window.CashEngine;
+      CE.setOpeningCash(cc.opening_cash);
+      CE.setSalesTaxRate(cc.sales_tax_rate);
+      CE.setTaxFrequency(cc.tax_frequency);
+      CE.setPayrollBurden(cc.payroll_burden);
+      CE.setReserveWeeks(cc.reserve_weeks);
+      CE.setAvailableCredit(cc.available_credit);
+      CE.setGiftCardLiability(cc.gift_card_liability);
+    }
+    await App.save();
+    await App.saveInventory();
+    await App.seedEventStores('ic');
+    await App.saveLabor();
+    await App.seedEventStores('lc');
+    await App.saveShift();
+    await App.seedEventStores('sc');
+    await App.seedEventStores('core');   // recovery event logs -> core_events rows
+  },
+
+  // Save a snapshot right now (the owner "Back up now" button). Returns true on success.
+  async backupNow() {
+    this._backupMsg('Saving a backup...', 'var(--t3)');
+    const r = await DB.saveBackup(this._buildBackup(), 'manual');
+    this._backupMsg((r && r.ok) ? 'Backup saved.' : 'Could not save the backup. Try again.',
+      (r && r.ok) ? 'var(--gold)' : 'var(--red)');
+    return !!(r && r.ok);
+  },
+
+  // Restore a stored server snapshot by id (from the automatic-backup list on Your Account).
+  async restoreSnapshot(id, whenLabel) {
+    const ok = await App.confirm({
+      title: 'Restore your account to ' + (whenLabel || 'this backup') + '?',
+      message: 'This replaces every record currently in your account with that backup: settings, weekly numbers, audits, and all Inventory, Labor, and Shift Control data. It cannot be undone.',
+      confirmText: 'Restore', cancelText: 'Cancel'
+    });
+    if (!ok) return;
+    this._backupMsg('Restoring backup...', 'var(--t3)');
+    try {
+      const backup = await DB.getBackup(id);
+      if (!backup || backup._backup !== 'barcop' || !backup.data) {
+        this._backupMsg('That backup could not be read.', 'var(--red)'); return;
       }
-      await App.save();
-      await App.saveInventory();
-      await App.seedEventStores('ic');
-      await App.saveLabor();
-      await App.seedEventStores('lc');
-      await App.saveShift();
-      await App.seedEventStores('sc');
-      await App.seedEventStores('core');   // recovery event logs -> core_events rows
+      await this._applyBackup(backup);
       this._backupMsg('Backup restored. Reloading...', 'var(--gold)');
       setTimeout(() => window.location.reload(), 1200);
     } catch (e) {
