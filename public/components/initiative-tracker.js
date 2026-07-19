@@ -13,6 +13,7 @@ const InitiativeTracker = {
   CONFIG: {
     profit: {
       dataKey: 'profit_initiatives',
+      kind: 'profit_initiative',            // core_events kind (row-per-record)
       weeks: () => (App.data && App.data.weeks) || [],
       types: ['Pour Spec', 'Vendor Change', 'Portion Control', 'Operational Change', 'Other'],
       metrics: [
@@ -32,6 +33,7 @@ const InitiativeTracker = {
     },
     revenue: {
       dataKey: 'initiatives',
+      kind: 'revenue_initiative',           // core_events kind (row-per-record)
       weeks: () => (App.data && App.data.revenue_weeks) || [],
       types: ['Menu Change', 'Promotion', 'Service Change', 'Operational Change', 'Other'],
       metrics: [
@@ -58,6 +60,7 @@ const InitiativeTracker = {
     },
     cash: {
       dataKey: 'cash_initiatives',
+      kind: 'cash_initiative',              // core_events kind (row-per-record)
       // Cash has no raw weekly operational array; its weekly time series is the
       // interpolated cash_audits (each carries a rich `raw` block). Map date ->
       // period_end so the before/after engine slices it like the others.
@@ -218,7 +221,7 @@ const InitiativeTracker = {
   },
 
   wire(module, container, rerender) {
-    const save = this.cfg(module).dataKey;
+    const kind = this.cfg(module).kind;
     container.querySelector('.init-add')?.addEventListener('click', () => this._showForm(module, rerender));
     // Edit an active experiment (fix the name, the start date that drives the
     // measurement, the metric, or the note) in the same modal, prefilled.
@@ -236,7 +239,7 @@ const InitiativeTracker = {
         if (!i) return;
         i.status = 'Active';
         delete i.completed_at;
-        await App.saveKey(save);
+        await App.putRecord('core', kind, i);   // row-per-record
         rerender();
       });
     });
@@ -246,7 +249,7 @@ const InitiativeTracker = {
         if (!i) return;
         i.status = 'Completed';
         i.completed_at = new Date().toISOString();
-        await App.saveKey(save);
+        await App.putRecord('core', kind, i);   // row-per-record
         rerender();
       });
     });
@@ -254,8 +257,7 @@ const InitiativeTracker = {
       btn.addEventListener('click', async () => {
         const ok = await App.confirmDelete();
         if (!ok) return;
-        App.data[save] = this.list(module).filter(x => x.id !== btn.dataset.id);
-        await App.saveKey(save);
+        await App.removeRecord('core', kind, btn.dataset.id);   // row-per-record
         rerender();
       });
     });
@@ -266,7 +268,7 @@ const InitiativeTracker = {
   _showForm(module, rerender, opts) {
     opts = opts || {};
     const c = this.cfg(module);
-    const save = c.dataKey;
+    const kind = c.kind;
     const editId = opts.editId || null;
     const src = editId ? this.list(module).find(x => x.id === editId) : (opts.seed || null);
     const today = App.todayLocal();
@@ -312,14 +314,17 @@ const InitiativeTracker = {
         metric: document.getElementById('init-metric')?.value || c.metrics[0].key,
         hypothesis: document.getElementById('init-hyp')?.value.trim() || ''
       };
+      // Row-per-record: build the record (edit merges onto the existing one) and
+      // write just that row via putRecord (which also updates the in-memory list).
+      let out;
       if (editId) {
-        const list = this.list(module);
-        const i = list.findIndex(x => x.id === editId);
-        if (i > -1) list[i] = Object.assign({}, list[i], fields, { updated_at: new Date().toISOString() });
+        const cur = this.list(module).find(x => x.id === editId);
+        if (!cur) { App.closeModal('init-modal'); return; }
+        out = Object.assign({}, cur, fields, { updated_at: new Date().toISOString() });
       } else {
-        this.list(module).push(Object.assign({ id: App.uid() }, fields, { status: 'Active', created_at: new Date().toISOString() }));
+        out = Object.assign({ id: App.uid() }, fields, { status: 'Active', created_at: new Date().toISOString() });
       }
-      await App.saveKey(save);
+      await App.putRecord('core', kind, out);
       App.closeModal('init-modal');
       rerender();
     });
