@@ -5068,7 +5068,10 @@ const App = {
         // Checklist TEMPLATES (reusable, config — distinct from the `checklist` RUNS above):
         // row-per-record (control-blob data-safety migration), NONWINDOWED so all load. The
         // sc_starter_seeded flag stays in the sc_data blob (still saved via saveShift).
-        checklist_template: 'sc_checklist_templates'
+        checklist_template: 'sc_checklist_templates',
+        // Cash registers / drawers (config): row-per-record, NONWINDOWED. Carry pos_aliases
+        // for POS cash-import matching. Still App.shiftData.sc_drawers for reads.
+        drawer: 'sc_drawers'
       }
     },
     lc: {
