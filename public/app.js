@@ -5096,7 +5096,11 @@ const App = {
         // row-per-record, NONWINDOWED. Deleting a staff member removes its certs/notes by
         // staff_id (see lc-staff-roster confirmDel).
         cert: 'lc_certs',
-        staff_note: 'lc_staff_notes'
+        staff_note: 'lc_staff_notes',
+        // Staff roster (config, referenced everywhere by staff_id): row-per-record,
+        // NONWINDOWED. wage_history is a sub-array on each staff record (a wage edit rewrites
+        // the whole staff row). Deleting a staff member also removes its certs/notes (above).
+        staff: 'lc_staff'
       }
     },
     // Core / Recovery (Profit pass): unbounded recovery logs live row-per-record
