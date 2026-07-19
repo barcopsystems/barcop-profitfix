@@ -914,6 +914,16 @@ const DB = {
     const s = String(v).slice(0, 10);
     return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
   },
+  // Kinds moved out of the config blob into row-per-record storage that are CONFIG
+  // lists (menu, products, permits, expenses), not time-series. They store `date: null`
+  // so loadEvents' "date IS NULL" branch always returns them in full, regardless of the
+  // 24-month window (their business date, if any, lives in the payload). Empty until an
+  // array is migrated; adding a kind here + to EVENT_STORES is what activates it.
+  NONWINDOWED_KINDS: ['permit', 'operating_expense', 'menu_item', 'product'],
+  // Set per-kind when a blob->rows backfill write FAILED this session, so _configBlob
+  // keeps that array in the blob as a backup until the rows are confirmed (never orphan).
+  _backfillPending: {},
+  _rowDate(kind, rec) { return this.NONWINDOWED_KINDS.indexOf(kind) >= 0 ? null : this._eventDate(rec); },
   _evCacheKey(table, kind) { return this._acctKey('pfev_' + table + '_' + kind); },
   _cacheEvents(table, kind, recs) {
     try { localStorage.setItem(this._evCacheKey(table, kind), JSON.stringify(recs)); } catch (e) {}
@@ -1015,7 +1025,7 @@ const DB = {
       try {
         const { error } = await this._sb.from(table).upsert({
           account_id: accountId, kind: kind, id: String(rec.id),
-          date: this._eventDate(rec), payload: rec, updated_at: new Date().toISOString()
+          date: this._rowDate(kind, rec), payload: rec, updated_at: new Date().toISOString()
         }, { onConflict: 'account_id,kind,id' });
         if (error) { queue(); return { ok: false, queued: true, error }; }
         return { ok: true };
@@ -1075,7 +1085,7 @@ const DB = {
     }
     const rows = list.map(rec => ({
       account_id: accountId, kind: kind, id: String(rec.id),
-      date: this._eventDate(rec), payload: rec, updated_at: new Date().toISOString()
+      date: this._rowDate(kind, rec), payload: rec, updated_at: new Date().toISOString()
     }));
     try {
       // Chunk to keep each request small.
@@ -1147,7 +1157,7 @@ const DB = {
         if (e.op === 'put') {
           ({ error } = await this._sb.from(e.table).upsert({
             account_id: accountId, kind: e.kind, id: e.id,
-            date: this._eventDate(e.payload), payload: e.payload, updated_at: new Date().toISOString()
+            date: this._rowDate(e.kind, e.payload), payload: e.payload, updated_at: new Date().toISOString()
           }, { onConflict: 'account_id,kind,id' }));
         } else {
           ({ error } = await this._sb.from(e.table).delete()

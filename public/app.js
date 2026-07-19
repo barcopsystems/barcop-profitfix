@@ -5088,8 +5088,20 @@ const App = {
     const dataObj = store.data();
     if (!dataObj) return;
     const kinds = Object.keys(store.kinds);
+    // Snapshot each array's BLOB copy before the row-load overwrites it, so a newly
+    // MIGRATED array (its rows not written yet) is backfilled from the blob instead of
+    // being discarded (loadEvents returns [] until its rows exist). See the migration plan.
+    const blobCopy = {}; kinds.forEach(k => { const arr = store.kinds[k]; blobCopy[arr] = Array.isArray(dataObj[arr]) ? dataObj[arr].slice() : []; });
     const results = await Promise.all(kinds.map(k => DB.loadEvents(store.table, k)));
-    kinds.forEach((k, i) => { dataObj[store.kinds[k]] = results[i] || []; });
+    for (let i = 0; i < kinds.length; i++) {
+      const k = kinds[i], arr = store.kinds[k], rows = results[i] || [], prior = blobCopy[arr];
+      if (rows.length) { dataObj[arr] = rows; continue; }               // rows exist: already row-per-record
+      if (prior.length) {                                               // no rows but the blob still has data: one-time backfill
+        const r = await DB.putEventsBulk(store.table, k, prior);
+        dataObj[arr] = prior;                                           // keep the data either way — never lose it
+        if (!(r && (r.ok || r.queued))) DB._backfillPending[k] = true;  // backfill FAILED: keep the array in the blob too (see _configBlob) until rows are confirmed
+      } else { dataObj[arr] = []; }                                     // genuinely empty
+    }
     this.resetListState(mod);
   },
 
@@ -5344,9 +5356,14 @@ const App = {
   // so a config save never rewrites the unbounded event logs into the blob.
   _configBlob(mod, dataObj) {
     const store = this.EVENT_STORES[mod];
-    const eventKeys = store ? new Set(Object.values(store.kinds)) : new Set();
+    // Strip arrays stored row-per-record so they are not double-stored — EXCEPT a
+    // just-migrated kind whose backfill FAILED this session (DB._backfillPending): keep
+    // its array in the blob as a backup until its rows are confirmed, so a failed
+    // backfill can never orphan the data.
+    const stripped = new Set();
+    if (store) Object.keys(store.kinds).forEach(k => { if (!DB._backfillPending[k]) stripped.add(store.kinds[k]); });
     const out = {};
-    Object.keys(dataObj || {}).forEach(k => { if (!eventKeys.has(k)) out[k] = dataObj[k]; });
+    Object.keys(dataObj || {}).forEach(k => { if (!stripped.has(k)) out[k] = dataObj[k]; });
     return out;
   },
   _inventoryConfig() { return this._configBlob('ic', this.inventoryData); },
