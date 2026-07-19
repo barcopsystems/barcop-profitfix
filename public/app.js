@@ -2796,6 +2796,14 @@ const App = {
     // shifts, void/comps, cash drops, variances, safe log, 86 list,
     // maintenance, walked tabs, waste, checklist runs.)
     await this.loadEventStores('ic');
+    // ic_locations is row-per-record now (no inherent array order), but its array position IS
+    // the count-sheet order — so restore it from each location's sort_order (a reorder sets it;
+    // a new location appends). Locations without one (backfilled, never reordered) fall back to
+    // id (creation order). Sort in place so every reader sees the operator's order.
+    const _locs = this.inventoryData && this.inventoryData.ic_locations;
+    if (Array.isArray(_locs)) _locs.sort((a, b) =>
+      ((a.sort_order != null ? a.sort_order : 1e9) - (b.sort_order != null ? b.sort_order : 1e9))
+      || String(a.id).localeCompare(String(b.id)));
     await this.loadEventStores('sc');
     await this.loadEventStores('lc');
     // Core / Recovery event logs (Profit pass): weeks, theft scores, variance
@@ -5055,7 +5063,12 @@ const App = {
         prep_batch: 'ic_prep_batches',
         // Vendors (config): row-per-record, NONWINDOWED. Products reference a vendor by NAME
         // (p.vendor); a rename cascades to product rows (see ic-vendors saveVendor).
-        vendor: 'ic_vendors'
+        vendor: 'ic_vendors',
+        // Locations / shelves (config): row-per-record, NONWINDOWED. Count-sheet order is a
+        // per-location `sort_order` (rows have no inherent array order), applied after load
+        // in loadAllData. Products reference a location by NAME; rename/delete cascade to
+        // product rows (see ic-locations). Still App.inventoryData.ic_locations for reads.
+        location: 'ic_locations'
       }
     },
     sc: {
