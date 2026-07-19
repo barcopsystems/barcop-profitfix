@@ -46,13 +46,15 @@ S.LaborPositions = {
     if (App.laborData.lc_positions_seeded) return;
     const list = this.positions();
     if (list.length > 0) { App.laborData.lc_positions_seeded = true; return; }   // already has positions
-    this.STARTER_POSITIONS.forEach(p => list.push({
+    const seeded = this.STARTER_POSITIONS.map(p => ({
       id: App.uid(), name: p.name, department: p.department,
       default_wage: null, tipped: !!p.tipped, tip_out_pct: 0, notes: '',
       created_at: new Date().toISOString()
     }));
+    seeded.forEach(p => list.push(p));
     App.laborData.lc_positions_seeded = true;
-    App.saveLabor();
+    App.saveLabor();                                       // the lc_positions_seeded flag stays in the blob
+    App.putRecordsBulk('lc', 'position', seeded);          // the positions are rows now
   },
 
   render(container, actions) {
@@ -262,17 +264,15 @@ S.LaborPositions = {
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
 
+    // Row-per-record: build the record to persist (merge onto the existing position on edit
+    // so created_at etc. survive) and write just that row.
     const list = this.positions();
-    if (this.editId) {
-      const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...rec };
-    } else {
-      list.push(rec);
-    }
+    let out = rec;
+    if (this.editId) { const i = list.findIndex(x => x.id === this.editId); if (i > -1) out = { ...list[i], ...rec }; }
 
     const btn = document.getElementById(p + 'save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveLabor();
+    const ok = await App.putRecord('lc', 'position', out);
     this.editId = null;
     if (ok) {
       App.markSetupDone('gs_lc_positions');
@@ -309,8 +309,7 @@ S.LaborPositions = {
     } else if (!(await App.confirmDelete())) {
       return;
     }
-    App.laborData.lc_positions = this.positions().filter(x => x.id !== id);
-    await App.saveLabor();
+    await App.removeRecord('lc', 'position', id);   // row-per-record
     App.markSetupDone('gs_lc_positions');   // a real delete counts as working the list
     this.renderList();
   }
