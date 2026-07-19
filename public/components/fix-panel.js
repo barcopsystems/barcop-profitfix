@@ -640,7 +640,7 @@ window.FixPanel = {
   wireGapDetail(container, moduleKey, gapId) {
     const reRender = () => this.renderGapDetail(container, moduleKey, gapId);
 
-    container.querySelectorAll('.fp-step-check').forEach(cb => cb.addEventListener('click', () => {
+    container.querySelectorAll('.fp-step-check').forEach(cb => cb.addEventListener('click', async () => {
       const gId = cb.dataset.gap;
       const stepIdx = parseInt(cb.dataset.step, 10);
       App.data.fix_progress = App.data.fix_progress || {};
@@ -648,33 +648,38 @@ window.FixPanel = {
       const at = arr.indexOf(stepIdx);
       const wasChecked = at >= 0;
       if (wasChecked) arr.splice(at, 1); else arr.push(stepIdx);
-      App.saveKey('fix_progress');
+      App.saveKey('fix_progress');   // per-gap checkbox map stays in the config blob
 
-      // Activity feed: push on check, remove the most recent matching entry on
-      // uncheck so the feed reflects current truth. Capped at 100 per module.
+      // Activity feed (row-per-record): remove the most recent matching entry on
+      // uncheck; append on check and trim the module to its 100 newest rows.
       App.data.fix_activity = App.data.fix_activity || [];
       if (wasChecked) {
+        let removeId = null;
         for (let i = App.data.fix_activity.length - 1; i >= 0; i--) {
           const a = App.data.fix_activity[i];
-          if (a.gap_id === gId && a.step_index === stepIdx) { App.data.fix_activity.splice(i, 1); break; }
+          if (a.gap_id === gId && a.step_index === stepIdx) { removeId = a.id; break; }
         }
+        if (removeId != null) await App.removeRecord('core', 'fix_activity', removeId);
       } else {
         const gap = this.gapAreas(moduleKey).find(x => x.id === gId);
         const step = gap && gap.process && gap.process.steps && gap.process.steps[stepIdx];
         if (gap && step) {
-          App.data.fix_activity.push({
+          const rec = {
             id: App.uid(), module: moduleKey, gap_id: gId, gap_name: gap.name,
             step_index: stepIdx, step_title: step.title || '', step_kind: step.kind || 'action',
             ts: new Date().toISOString()
-          });
+          };
+          await App.putRecord('core', 'fix_activity', rec);
+          // Trim the module's feed to its 100 newest rows (delete the oldest overflow).
           const all = App.data.fix_activity;
           let moduleCount = all.filter(a => a.module === moduleKey).length;
+          const overflow = [];
           for (let i = 0; i < all.length && moduleCount > 100; i++) {
-            if (all[i].module === moduleKey) { all.splice(i, 1); i--; moduleCount--; }
+            if (all[i].module === moduleKey) { overflow.push(all[i].id); moduleCount--; }
           }
+          for (const rid of overflow) await App.removeRecord('core', 'fix_activity', rid);
         }
       }
-      App.saveKey('fix_activity');
       reRender();
     }));
 
