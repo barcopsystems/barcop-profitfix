@@ -413,6 +413,7 @@ S.HubSettings = {
   async loadSample() {
     const msg = document.getElementById('ua-test-msg');
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = 'Loading sample data...'; msg.style.display = 'block'; }
+    DB._allowReset = true;   // seeding is an intentional bulk write: let the total-wipe backstop through (its early cockpit stamps save a still-empty blob). Reset at the next loadAllData.
 
     // Deterministic pseudo-random for ALL sample data. The demo must load the same
     // every time: same reload => same numbers => same audit scores AND the same
@@ -3932,6 +3933,7 @@ S.HubSettings = {
     App.inventoryData = {};
     App.laborData     = {};
     App.shiftData     = {};
+    DB._allowReset = true;   // intentional wipe: let the total-wipe backstop through for this explicit reset
     await App.save();
     await App.saveInventory();
     await DB.clearEvents('ic_events');   // drop the inventory event rows too
@@ -3940,6 +3942,7 @@ S.HubSettings = {
     await App.saveShift();
     await DB.clearEvents('sc_events');   // drop the shift event rows too
     await DB.clearEvents('core_events'); // drop the recovery event rows too
+    DB._allowReset = false;  // reset the bypass immediately after the intentional wipe
     // The cockpit's per-week "done" stamps live in localStorage (per device), so
     // clear them too or past weeks keep phantom checks after a wipe.
     try { Object.keys(localStorage).filter(k => k.indexOf('cockpit_done_') !== -1).forEach(k => localStorage.removeItem(k)); } catch (e) {}
