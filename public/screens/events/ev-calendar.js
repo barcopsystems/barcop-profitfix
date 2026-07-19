@@ -201,8 +201,7 @@ S.EventsCalendar = {
     document.getElementById('evcf-save')?.addEventListener('click', () => this.save(id));
     document.getElementById('evcf-del')?.addEventListener('click', async () => {
       const ok = await App.confirmDelete(); if (!ok) return;
-      App.data.event_calendar = this.entries().filter(x => x.id !== id);
-      await App.saveKey('event_calendar');
+      await App.removeRecord('core', 'event_calendar_entry', id);   // row-per-record
       App.closeModal('evc-form'); this.draw();
     });
   },
@@ -217,10 +216,12 @@ S.EventsCalendar = {
       checklist: { menu: !!g('evcf-menu')?.checked, promo: !!g('evcf-promo')?.checked, staffing: !!g('evcf-staffing')?.checked, reservations: !!g('evcf-reservations')?.checked },
       notes: g('evcf-notes')?.value.trim() || ''
     };
+    // Row-per-record: build the merged record (edit preserves fields not on the
+    // form) and write just that row.
     const list = this.entries();
-    if (id) { const i = list.findIndex(x => x.id === id); if (i > -1) list[i] = Object.assign({}, list[i], rec); }
-    else list.push(rec);
-    await App.saveKey('event_calendar');
+    let out = rec;
+    if (id) { const i = list.findIndex(x => x.id === id); if (i > -1) out = Object.assign({}, list[i], rec); }
+    await App.putRecord('core', 'event_calendar_entry', out);
     App.closeModal('evc-form'); this.draw();
   },
 

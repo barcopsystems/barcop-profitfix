@@ -83,8 +83,8 @@ S.EventsPricing = {
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     this.container.querySelectorAll('.rp-del').forEach(b => b.addEventListener('click', async () => {
       const ok = await App.confirmDelete(); if (!ok) return;
-      App.data.event_rate_cards = this.rateCards().filter(r => r.id !== b.dataset.id);
-      await App.saveKey('event_rate_cards'); this.draw();
+      await App.removeRecord('core', 'event_rate_card', b.dataset.id);   // row-per-record
+      this.draw();
     }));
     // Hold the in-progress package through leave/return; only Save or Start Over clears it.
     const formRoot = this.container.querySelector('.form-card');
@@ -125,7 +125,7 @@ S.EventsPricing = {
     const g = x => document.getElementById(x);
     const name = g('rp-name')?.value.trim();
     if (!name) return;
-    this.rateCards().push({
+    const rec = {
       id: App.uid(), package_name: name,
       event_type: g('rp-type')?.value || '',
       min_covers: parseFloat(g('rp-minc')?.value) || 0,
@@ -133,9 +133,9 @@ S.EventsPricing = {
       fb_minimum: parseFloat(g('rp-fb')?.value) || 0,
       room_fee:   parseFloat(g('rp-room')?.value) || 0,
       per_head:   parseFloat(g('rp-ph')?.value) || 0
-    });
+    };
     this._draft = null;
-    await App.saveKey('event_rate_cards');
+    await App.putRecord('core', 'event_rate_card', rec);   // row-per-record
     this.draw();
   },
 
@@ -166,7 +166,7 @@ S.EventsPricing = {
     const list = this.rateCards();
     const i = list.findIndex(x => x.id === id);
     if (i < 0) return;
-    list[i] = Object.assign({}, list[i], {
+    const out = Object.assign({}, list[i], {
       package_name: name,
       event_type: g('rpe-type')?.value || '',
       min_covers: parseFloat(g('rpe-minc')?.value) || 0,
@@ -175,7 +175,7 @@ S.EventsPricing = {
       room_fee:   parseFloat(g('rpe-room')?.value) || 0,
       per_head:   parseFloat(g('rpe-ph')?.value) || 0
     });
-    await App.saveKey('event_rate_cards');
+    await App.putRecord('core', 'event_rate_card', out);   // row-per-record
     App.closeModal('rp-edit-modal');
     this.draw();
   },

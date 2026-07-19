@@ -141,8 +141,8 @@ S.EventsRegulars = {
     this.container.querySelectorAll('.rg-del').forEach(b => b.addEventListener('click', async ev => {
       ev.stopPropagation();
       const ok = await App.confirmDelete(); if (!ok) return;
-      App.data.event_regulars = this.regulars().filter(x => x.id !== b.dataset.id);
-      await App.saveKey('event_regulars'); this.renderList();
+      await App.removeRecord('core', 'event_regular', b.dataset.id);   // row-per-record
+      this.renderList();
     }));
     // Hold the in-progress Add-a-Regular entry through leave/return (manual mode only;
     // import mode has no form). Only Save or Start Over clears it.
@@ -161,9 +161,8 @@ S.EventsRegulars = {
     const rec = this.collect('rg');
     if (!rec.name) { const e = document.getElementById('rg-err'); if (e) { e.textContent = 'Name is required.'; e.style.display = 'inline'; } return; }
     rec.id = App.uid(); rec.created_at = new Date().toISOString();
-    this.regulars().push(rec);
     this._draft = null;
-    await App.saveKey('event_regulars');
+    await App.putRecord('core', 'event_regular', rec);   // row-per-record
     this.renderList();
   },
 
@@ -175,8 +174,9 @@ S.EventsRegulars = {
     document.getElementById('rge-save')?.addEventListener('click', async () => {
       const rec = this.collect('rge'); if (!rec.name) return;
       const list = this.regulars(); const i = list.findIndex(x => x.id === id);
-      if (i > -1) list[i] = Object.assign({}, list[i], rec, { updated_at: new Date().toISOString() });
-      await App.saveKey('event_regulars');
+      if (i < 0) return;
+      const out = Object.assign({}, list[i], rec, { updated_at: new Date().toISOString() });
+      await App.putRecord('core', 'event_regular', out);   // row-per-record
       App.closeModal('rg-edit-modal'); this.renderList();
     });
   },
@@ -217,17 +217,21 @@ S.EventsRegulars = {
       const d = new Date(str);
       return isNaN(d.getTime()) ? '' : App.ymdLocal(d);
     };
+    const added = [];
     (rows || []).forEach(r => {
       const name = (r.name || '').trim(); if (!name) return;
-      this.regulars().push({
+      const rec = {
         id: App.uid(), name,
         contact_phone: (r.phone || '').trim(), contact_email: (r.email || '').trim(),
         birthday: parseDate(r.birthday), anniversary: parseDate(r.anniversary),
         drink_prefs: (r.drink_prefs || '').trim(), last_visit: '', vip: false, notes: '',
         created_at: new Date().toISOString()
-      });
+      };
+      this.regulars().push(rec);
+      added.push(rec);
     });
-    await App.saveKey('event_regulars');
+    // Row-per-record: persist just the imported regulars in one bulk upsert.
+    await App.putRecordsBulk('core', 'event_regular', added);
     this.entryMode = 'manual';
     this.renderList();
   },
