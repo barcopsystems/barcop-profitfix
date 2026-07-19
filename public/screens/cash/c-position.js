@@ -88,7 +88,7 @@ S.CashPosition = {
       +   op('&minus;')
       +   eq('Reserve Target', App.fmtCurrency(p.reserve))
       +   op('=')
-      +   eq('Safe to Spend', App.fmtCurrency(p.safe), { big: true, col: safeCol })
+      +   eq('Safe to Spend', App.fmtBal(p.safe), { big: true, col: safeCol })
       + '</div>'
       + (p.safe < 0
           ? '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--b2);font-size:12px;color:var(--t2);line-height:1.6;"><strong style="color:var(--red);">You are spending spoken-for money.</strong> Your balance is already claimed by tax, gift cards, and your reserve. Free trapped cash or hold any spend until this is back above zero.</div>'
@@ -123,7 +123,7 @@ S.CashPosition = {
     const body = target <= 0
       ? '<div style="font-size:12px;color:var(--t3);">Add your recurring bills in Books and set a reserve target above, and Bar Cop sizes your cushion off your fixed overhead.</div>'
       : '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
-        + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:' + (gap > 0 ? 'var(--t1)' : 'var(--green)') + ';">' + App.fmtCurrency(p.cushion) + '</span>'
+        + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:' + (gap > 0 ? 'var(--t1)' : 'var(--green)') + ';">' + App.fmtBal(p.cushion) + '</span>'
         + '<span style="font-size:13px;color:var(--t2);">toward a ' + App.fmtCurrency(target) + ' reserve (' + CashEngine.reserveWeeks() + ' weeks of your ' + App.fmtCurrency(weekly) + '/wk fixed costs)</span></div>'
         + '<div style="height:8px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + (gap > 0 ? 'var(--gold)' : 'var(--green)') + ';"></div></div>'
         + (gap > 0

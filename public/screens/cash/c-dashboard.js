@@ -238,7 +238,7 @@ S.CashDashboard = {
       return wrap('<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
         + mini('Runway', '-') + vdivEmpty
         + mini('Tightest Week', '-') + vdivEmpty
-        + mini('Safe to Spend', (pos && pos.hasOpening) ? App.fmtCurrency(pos.safe, 0) : '-', (pos && pos.hasOpening && pos.safe < 0) ? 'var(--red)' : 'var(--t1)')
+        + mini('Safe to Spend', (pos && pos.hasOpening) ? App.fmtBal(pos.safe, 0) : '-', (pos && pos.hasOpening && pos.safe < 0) ? 'var(--red)' : 'var(--t1)')
         + '</div>'
         + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>');
     }
@@ -263,9 +263,9 @@ S.CashDashboard = {
     return wrap('<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
       + mini('Runway', this.runwayLabel(sf.runway), runwayCol)
       + vdiv
-      + mini('Tightest Week', low ? this.fmtWk(low.ws) + ' &middot; ' + App.fmtCurrency(low.balance, 0) : '-', lowCol)
+      + mini('Tightest Week', low ? this.fmtWk(low.ws) + ' &middot; ' + App.fmtBal(low.balance, 0) : '-', lowCol)
       + vdiv
-      + mini('Safe to Spend', pos.hasOpening ? App.fmtCurrency(pos.safe, 0) : '-', safeCol)
+      + mini('Safe to Spend', pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-', safeCol)
       + '</div>'
       + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button></div>');
   },
