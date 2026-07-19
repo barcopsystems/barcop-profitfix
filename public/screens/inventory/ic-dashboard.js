@@ -50,7 +50,10 @@ S.InventoryDashboard = {
   },
   _onHand(count) {
     const m = {};
-    (count.items || []).forEach(it => { m[it.product_id] = (m[it.product_id] || 0) + (it.total || 0); });
+    // Skip counted:false items: a stored total:0 means "not counted this pass", not "empty".
+    // Counting it as 0 on hand made a partial count read products as below reorder and
+    // falsely dragged the "In-stock vs reorder" / dead-stock trend down. Mirrors _perpetualInventory.
+    (count.items || []).forEach(it => { if (it.counted === false) return; m[it.product_id] = (m[it.product_id] || 0) + (it.total || 0); });
     return m;
   },
 

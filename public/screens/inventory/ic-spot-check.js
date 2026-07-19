@@ -680,7 +680,7 @@ S.InventorySpotCheck = {
     const byTxt = r.variance === 0 ? '' : ' by ' + Math.abs(r.variance).toFixed(1) + ' ' + sw;
     if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + ' &middot; ' + r.sold.toFixed(0) + ' ' + sw + ' rung in.</span><br>'
       + '<span style="color:' + cls + ';font-weight:700;">' + direction + byTxt + ' &middot; '
-      + (r.vd > 0 ? '+' : '') + App.fmtCurrency(r.vd, 2) + '</span>';
+      + (r.vd > 0 ? '+' : '') + App.fmtBal(r.vd, 2) + '</span>';
   },
 
   recalcTotal() {
@@ -695,7 +695,7 @@ S.InventorySpotCheck = {
     set('sp-flagged', flagged);
     const totEl = document.getElementById('sp-total');
     if (totEl) {
-      totEl.textContent = (total > 0 ? '+' : '') + App.fmtCurrency(total, 2);
+      totEl.textContent = (total > 0 ? '+' : '') + App.fmtBal(total, 2);
       totEl.className = 'calc-val lg' + (flagged ? ' warn' : '');
     }
   },
@@ -797,7 +797,7 @@ S.InventorySpotCheck = {
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
         + (it.variance_pours != null ? (it.variance_pours > 0 ? '+' : '') + it.variance_pours.toFixed(1) + ' ' + sw : '-') + '</td>'
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
-        + (vd != null ? (vd > 0 ? '+' : '') + App.fmtCurrency(vd, 2) : '-') + '</td>'
+        + (vd != null ? (vd > 0 ? '+' : '') + App.fmtBal(vd, 2) : '-') + '</td>'
         + '<td><div class="row-actions">' + action + '</div></td></tr>';
     }).join('');
 
@@ -810,7 +810,7 @@ S.InventorySpotCheck = {
       + meta('Shift', esc(c.shift || '-'))
       + meta('Checked By', esc(c.checked_by || '-'))
       + meta('Flagged', (c.flagged_count || 0), (c.flagged_count ? 'warn' : ''))
-      + meta('Total Variance', ((c.total_variance_dollar || 0) > 0 ? '+' : '') + App.fmtCurrency(c.total_variance_dollar || 0, 2), ((c.total_variance_dollar || 0) > 0 ? 'warn' : ''))
+      + meta('Total Variance', ((c.total_variance_dollar || 0) > 0 ? '+' : '') + App.fmtBal(c.total_variance_dollar || 0, 2), ((c.total_variance_dollar || 0) > 0 ? 'warn' : ''))
       + '</div></div>'
       + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Spot Check &middot; ' + this.fmtDate(c.date) + '</div>'

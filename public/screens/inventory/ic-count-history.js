@@ -113,7 +113,7 @@ S.InventoryCountHistory = {
         const c = r.c;
         const varCell = r.variance == null
           ? '<span style="color:var(--t4);">-</span>'
-          : (r.variance > 0 ? '+' : '') + App.fmtCurrency(r.variance);
+          : (r.variance > 0 ? '+' : '') + App.fmtBal(r.variance);
         const status = r.isLatest
           ? '<span style="color:var(--gold);font-weight:700;">Latest</span>'
           : '<span style="color:var(--t3);font-weight:600;">Past</span>';
@@ -178,7 +178,7 @@ S.InventoryCountHistory = {
     }).reverse();
     const rows = ordered.map(r => {
       const c = r.c;
-      const varCell = r.variance == null ? '-' : (r.variance >= 0 ? '+' : '') + App.fmtCurrency(r.variance);
+      const varCell = r.variance == null ? '-' : (r.variance >= 0 ? '+' : '') + App.fmtBal(r.variance);
       return '<tr><td>' + this.fmtDate(c.date) + '</td>'
         + '<td>' + esc(c.type || '-') + '</td>'
         + '<td>' + esc(c.counted_by || '-') + '</td>'
@@ -263,8 +263,11 @@ S.InventoryCountHistory = {
       const prodForCmp = pid => ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === pid);
       const catFor = (pid, it) => (it && it.category) || (prodForCmp(pid) || {}).category || 'Uncategorized';
       const map = {};
-      (count.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name, unit: App.productUnit(prodForCmp(it.product_id)), category: catFor(it.product_id, it) }; map[it.product_id].a = (map[it.product_id].a || 0) + (it.total || 0); });
-      (compare.items || []).forEach(it => { map[it.product_id] = map[it.product_id] || { name: it.name, unit: App.productUnit(prodForCmp(it.product_id)), category: catFor(it.product_id, it) }; map[it.product_id].b = (map[it.product_id].b || 0) + (it.total || 0); });
+      // Skip counted:false items (stored total:0 means "not counted", not "empty") and mark
+      // which side actually counted each product. A product skipped in one count must not be
+      // diffed against a phantom 0 and reported as a full-shelf drawdown. Mirrors _perpetualInventory.
+      (count.items || []).forEach(it => { if (it.counted === false) return; map[it.product_id] = map[it.product_id] || { name: it.name, unit: App.productUnit(prodForCmp(it.product_id)), category: catFor(it.product_id, it) }; map[it.product_id].a = (map[it.product_id].a || 0) + (it.total || 0); map[it.product_id].hasA = true; });
+      (compare.items || []).forEach(it => { if (it.counted === false) return; map[it.product_id] = map[it.product_id] || { name: it.name, unit: App.productUnit(prodForCmp(it.product_id)), category: catFor(it.product_id, it) }; map[it.product_id].b = (map[it.product_id].b || 0) + (it.total || 0); map[it.product_id].hasB = true; });
       const older = new Date(compare.created_at || compare.date) < new Date(count.created_at || count.date);
       const cmpRowHtml = m => {
         const a = m.a || 0, b = m.b || 0, change = a - b;
@@ -280,7 +283,7 @@ S.InventoryCountHistory = {
       const dateB = esc(this.fmtDate(compare.date)), dateA = esc(this.fmtDate(count.date));
       const ORDER = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
       const byCat = {};
-      Object.values(map).forEach(m => { const c = m.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(m); });
+      Object.values(map).filter(m => m.hasA && m.hasB).forEach(m => { const c = m.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(m); });   // only products counted in BOTH counts can be diffed; a partial/mismatched-scope count no longer fabricates a drawdown
       const cats = Object.keys(byCat).sort((x, y) => {
         const ix = ORDER.indexOf(x), iy = ORDER.indexOf(y);
         return ((ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy)) || x.localeCompare(y);

@@ -885,7 +885,7 @@ S.InventoryVarianceReport = {
         this.statItem('Recognized', recognized)
         + this.statItem('Unmatched', unmatched, unmatched ? 'warn' : '')
         + this.statItem('Flagged', flagged, flagged ? 'warn' : '')
-        + this.statItem('Sales Variance', App.fmtCurrency(netVar), netVar > 0 ? 'warn' : ''));
+        + this.statItem('Sales Variance', App.fmtBal(netVar), netVar > 0 ? 'warn' : ''));
     }
 
     // Period = a two-period scroller over the saved runs (no category filter; the
@@ -965,7 +965,7 @@ S.InventoryVarianceReport = {
       return '<tr class="vr-hist-row" data-id="' + esc(r.id) + '" style="cursor:pointer;">'
         + '<td><div class="val">' + this.fmtDate(r.start_date) + ' - ' +this.fmtDate(r.end_date) + '</div></td>'
         + '<td>' + (r.item_count != null ? r.item_count : '-') + '</td>'
-        + '<td class="' + cls + '">' + (sv != null ? App.fmtCurrency(sv) : '-') + '</td>'
+        + '<td class="' + cls + '">' + (sv != null ? App.fmtBal(sv) : '-') + '</td>'
         + '<td style="color:var(--t3);font-size:11px;">' + this.fmtDate((r.run_at || '').slice(0, 10)) + '</td>'
         + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm vr-hist-view" data-id="' + esc(r.id) + '">View</button></div></td></tr>';
     }).join('');
@@ -1011,7 +1011,7 @@ S.InventoryVarianceReport = {
     return '<div style="text-align:right;"><button type="button" class="vr-review btn btn-ghost btn-sm" data-pid="' + esc(pid)
       + '" data-name="' + esc(name || '') + '" data-reason="' + esc(reason) + '" style="' + style + '">' + label + '</button></div>';
   },
-  cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtCurrency(v); },
+  cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtBal(v); },   // fmtBal so a negative sales variance prints "-$X", not "$-X" (== fmtCurrency for non-negatives)
   pct(v) { if (v == null) return '<span style="color:var(--t4);">-</span>'; const x = Number(v.toFixed(1)) === 0 ? 0 : v; return x.toFixed(1) + '%'; },
   // Dollar-variance cell: money used beyond what the recipes/sales account for.
   // Over recipe (positive) is a leak, shown red; under stays neutral.
