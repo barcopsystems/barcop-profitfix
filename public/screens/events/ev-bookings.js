@@ -1003,9 +1003,11 @@ S.EventsBookings = {
     + 'Service charge and tax: A service charge and applicable sales tax are added to the food and beverage total, as shown above.\n\n'
     + 'Damage and overages: You are responsible for any damage to the space and for charges beyond what is quoted, billed after the event.',
   agreementTerms() {
-    let v = App.acctGet('event_agreement_terms');
-    // Migrate a pre-sync device-local value onto the account so custom terms are not lost.
-    if (v == null) { try { const old = localStorage.getItem('event_agreement_terms'); if (old != null && old !== '') { Promise.resolve(App.acctSet('event_agreement_terms', old)).then(ok => { if (ok) { try { localStorage.removeItem('event_agreement_terms'); } catch (e) {} } }); v = old; } } catch (e) {} }   // removeItem only after the migrate save is CONFIRMED, else a failed/gated save + eager remove loses the operator's custom terms
+    // Account-scoped only. The old code migrated a BARE `event_agreement_terms` localStorage
+    // key onto the current account — but that key predates account scoping, so on a multi-bar
+    // device it could carry Bar A's leftover terms into Bar B (a cross-bar leak). Terms live
+    // in account_state now; a legacy bare value (pre-launch, dev device only) is simply ignored.
+    const v = App.acctGet('event_agreement_terms');
     return (v != null && v !== '') ? v : this.DEFAULT_AGREEMENT_TERMS;
   },
 
