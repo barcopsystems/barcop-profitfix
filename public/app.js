@@ -5052,7 +5052,10 @@ const App = {
         // Prep batches (recipe sub-recipes): row-per-record (control-blob data-safety
         // migration). No business date -> NULL event date (NONWINDOWED_KINDS) so the whole
         // set always loads. Reads (menu cost roll-ups) unchanged; App.inventoryData.ic_prep_batches.
-        prep_batch: 'ic_prep_batches'
+        prep_batch: 'ic_prep_batches',
+        // Vendors (config): row-per-record, NONWINDOWED. Products reference a vendor by NAME
+        // (p.vendor); a rename cascades to product rows (see ic-vendors saveVendor).
+        vendor: 'ic_vendors'
       }
     },
     sc: {

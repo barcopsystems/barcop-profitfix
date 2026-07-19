@@ -1003,7 +1003,7 @@ const DB = {
     'event_rate_card', 'event_regular', 'event_calendar_entry',
     'profit_initiative', 'revenue_initiative', 'cash_initiative', 'fix_activity',
     'prep_batch', 'checklist_template', 'position', 'drawer', 'schedule_template',
-    'cert', 'staff_note'],
+    'cert', 'staff_note', 'vendor'],
   // Set per-kind when a blob->rows backfill write FAILED this session, so _configBlob
   // keeps that array in the blob as a backup until the rows are confirmed (never orphan).
   _backfillPending: {},
