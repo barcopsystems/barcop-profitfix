@@ -241,7 +241,7 @@ const ConfirmWeek = {
       primePct:  (cogsIn && laborIn && totSales > 0) ? primeCost / totSales * 100 : null,
       laborPct:  (laborIn && totSales > 0) ? laborCost / totSales * 100 : null,
       hourlyPct: (laborIn && fbRev > 0)    ? hourlyLabor / fbRev * 100 : null,
-      checkAvg:  (covers > 0) ? totRev / covers : null,
+      checkAvg:  (covers > 0) ? fbRev / covers : null,   // F&B revenue over F&B covers: check average is per-guest, so the numerator must match the cover population (catering revenue has no cover here). Matches the retired This Week screen and the metric's base=covers contract.
       rplh:      (hours  > 0) ? totRev / hours  : null
     };
   },
