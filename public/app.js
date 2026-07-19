@@ -2807,6 +2807,14 @@ const App = {
     // App.data so the total-wipe backstop stays accurate in steady state: a real account
     // reads populated (backstop armed), a genuinely-empty one does not (new user saves fine).
     DB._loadedNonEmpty = DB._blobHasArrayData(this.data);
+    // Same recompute for the three CONTROL blobs: once their config arrays (staff, positions,
+    // schedules, locations, vendors, prep batches, drawers, checklist templates) migrate to
+    // rows, the loaded control blob is stripped of them, so _controlNonEmpty (set from the
+    // blob at read time) would understate a populated account and disarm the control total-wipe
+    // backstop. Recompute from the live, rows-filled control objects so it stays armed.
+    DB._controlNonEmpty['ic_data'] = DB._blobHasArrayData(this.inventoryData);
+    DB._controlNonEmpty['lc_data'] = DB._blobHasArrayData(this.laborData);
+    DB._controlNonEmpty['sc_data'] = DB._blobHasArrayData(this.shiftData);
     // Pre-fetch the accounts list so the Hub sidebar can render the
     // Locations section synchronously (multi-account users only).
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
