@@ -470,7 +470,24 @@ const DB = {
   // an intentional reset sets _allowReset). Reset flows (Clear Data / reload sample) set it.
   _loadedNonEmpty: false,
   _allowReset: false,
+  // Per-control-blob readiness + populated-at-load flags (ic_data/lc_data/sc_data).
+  // The core `_dataReady` gate is set by readData ONLY; a control read that fell back
+  // to an empty local copy on a transient error must NOT open that control's write path,
+  // or the next edit would overwrite the populated server row (the same wipe class the
+  // core gate prevents). Set true only on a CONFIRMED control load; reset in loadAllData.
+  _controlReady: {},
+  _controlNonEmpty: {},
   _blobHasArrayData(b) { return !!b && Object.keys(b).some(k => Array.isArray(b[k]) && b[k].length > 0); },
+  // Live in-memory control object for a table, for the total-wipe backstop (mirrors the
+  // core backstop testing live App.data). Entered control data (locations/vendors/staff/
+  // positions/schedules) stays in memory even when a save's outgoing blob is stripped.
+  _liveControl(table) {
+    if (typeof App === 'undefined' || !App) return null;
+    if (table === 'ic_data') return App.inventoryData;
+    if (table === 'lc_data') return App.laborData;
+    if (table === 'sc_data') return App.shiftData;
+    return null;
+  },
   async readData() {
     // Supabase mode
     if (this._sb && this._user) {
@@ -696,7 +713,11 @@ const DB = {
       // Never replay a whole-blob push unless the initial load confirmed the account
       // (same gate as writeData), and never push a missing/empty local blob over a
       // populated server row — that would reset the account to defaults on reconnect.
-      const emptyLocal = lsKey === 'pf_data' ? !this._blobHasArrayData(data) : (!data || Object.keys(data).length === 0);
+      // Emptiness is "no keys at all", NOT "no top-level array": the core config blob is
+      // stripped of every array now (they're row-per-record), so a populated real account's
+      // blob has only config OBJECTS (settings/targets/...) — an array test would flag it
+      // empty and skip EVERY offline core-config replay (onboarding, targets, fix-progress).
+      const emptyLocal = !data || Object.keys(data).length === 0;
       if (!this._dataReady || emptyLocal) { continue; }
       try {
         const { error } = await this._sb.from(table).upsert({
@@ -733,12 +754,17 @@ const DB = {
   // readData()/writeData(); default for a fresh row is an empty object.
   async _readControl(table, lsKey) {
     if (this._sb && this._user) {
-      // Unsynced offline changes are newer than the server copy.
+      // Unsynced offline changes are newer than the server copy — authoritative.
       if (this._pendingList().includes(lsKey)) {
-        return this._localReadControl(lsKey);
+        const local = this._localReadControl(lsKey);
+        this._controlReady[table] = true;
+        this._controlNonEmpty[table] = this._blobHasArrayData(local);
+        return local;
       }
       const accountId = await this._ensureAccountId();
       if (!accountId) {
+        // No account resolved — do NOT open this control's write path (leave
+        // _controlReady false), so a later save can't overwrite the server row.
         return this._localReadControl(lsKey);
       }
       try {
@@ -750,7 +776,7 @@ const DB = {
 
         if (error && error.code !== 'PGRST116') {
           console.error('read ' + table + ' error:', error);
-          return this._localReadControl(lsKey);
+          return this._localReadControl(lsKey);   // transient — leave _controlReady false (fail safe)
         }
         if (!data) {
           // "No row" is usually first access, but can be a false-empty (RLS/dup). Insert
@@ -765,17 +791,35 @@ const DB = {
           });
           if (insErr) {
             const { data: real } = await this._sb.from(table).select('data').eq('account_id', accountId).single();
-            return (real && real.data) || this._localReadControl(lsKey);
+            if (real && real.data && typeof real.data === 'object') {
+              this._controlReady[table] = true;
+              this._controlNonEmpty[table] = this._blobHasArrayData(real.data);
+              return real.data;
+            }
+            return this._localReadControl(lsKey);   // reread failed — leave _controlReady false
           }
+          this._controlReady[table] = true;         // insert created the row — genuinely new/empty account
+          this._controlNonEmpty[table] = false;
           return {};
         }
-        return data.data || {};
+        if (!data.data || typeof data.data !== 'object') {
+          // Confirmed row but null/corrupt payload — treat as UNCONFIRMED (fail safe, like
+          // readData's _mergeDefaults-throws branch), never as a writable empty blob.
+          return this._localReadControl(lsKey);
+        }
+        this._controlReady[table] = true;           // confirmed server load
+        this._controlNonEmpty[table] = this._blobHasArrayData(data.data);
+        return data.data;
       } catch (e) {
         console.error('read ' + table + ' exception:', e);
-        return this._localReadControl(lsKey);
+        return this._localReadControl(lsKey);        // leave _controlReady false (fail safe)
       }
     }
-    return this._localReadControl(lsKey);
+    // Local-only mode (no Supabase/user): the local copy is authoritative, no server to protect.
+    const local = this._localReadControl(lsKey);
+    this._controlReady[table] = true;
+    this._controlNonEmpty[table] = this._blobHasArrayData(local);
+    return local;
   },
 
   async _writeControl(table, lsKey, data) {
@@ -783,10 +827,22 @@ const DB = {
     if (this._sb && this._user) {
       // Viewer is read-only — reject before the offline queue (see writeData).
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
-      // Same hydration gate as writeData: never overwrite a control blob (ic/lc/sc_data)
-      // until the initial load confirmed the account, so a pre-load / deploy-race save
-      // can't wipe it either. _dataReady is set once readData confirms the account.
-      if (!this._dataReady) return { ok: false, deferred: true };
+      // Hydration gate, now PER-CONTROL: never overwrite a control blob (ic/lc/sc_data)
+      // until THIS control's own read confirmed the account. _dataReady (core) is not
+      // enough — a control read that failed transiently on a fresh device leaves the blob
+      // empty in memory while _dataReady is true; without a per-control gate the next edit
+      // would upsert that empty over the populated server row (the wipe class the core gate
+      // prevents). _controlReady[table] is set true only on a confirmed control load.
+      if (!this._dataReady || !this._controlReady[table]) return { ok: false, deferred: true };
+      // Total-wipe backstop (parity with writeData): never overwrite a KNOWN-POPULATED
+      // control blob with an all-empty state unless an intentional reset set _allowReset.
+      // Test the LIVE in-memory control object (its entered arrays persist in memory), not
+      // the outgoing blob, so a legit save is never blocked but an emptied-out one is.
+      const liveCtl = this._liveControl(table) || data;
+      if (this._controlNonEmpty[table] && !this._allowReset && !this._blobHasArrayData(liveCtl)) {
+        console.error('_writeControl: BLOCKED a total-wipe of ' + table + ' (populated account, all-empty state). Server data preserved.');
+        return { ok: false, blocked: true };
+      }
       // Fix D: short-circuit the network call when the browser knows it is offline.
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         this._localWriteControl(lsKey, data);

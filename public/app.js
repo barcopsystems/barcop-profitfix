@@ -2782,6 +2782,8 @@ const App = {
   // Load Recovery data plus the three Control data stores (Rule 21)
   async loadAllData() {
     DB._dataReady = false;          // gate every config-blob save until THIS load confirms what the server holds (prevents a boot/deploy/switch-race save from wiping the account)
+    DB._controlReady = {};          // per-control gate: each control blob's write path stays closed until ITS OWN read confirms the account (a failed control read must not open it)
+    DB._controlNonEmpty = {};       // recomputed per control read; drives the control total-wipe backstop
     DB._allowReset = false;         // any leftover reset bypass ends at the next load
     this._setupDismissed = false;   // setup banner dismiss is per-login; a fresh login shows it again
     this.data          = await DB.readData();
@@ -5140,7 +5142,7 @@ const App = {
       if (prior.length) {                                               // no rows but the blob still has data: one-time backfill
         const r = await DB.putEventsBulk(store.table, k, prior);
         dataObj[arr] = prior;                                           // keep the data either way — never lose it
-        if (!(r && (r.ok || r.queued))) DB._backfillPending[k] = true;  // backfill FAILED: keep the array in the blob too (see _configBlob) until rows are confirmed
+        if (!(r && r.ok)) DB._backfillPending[k] = true;                // rows not CONFIRMED on the server (failed OR merely queued offline): keep the array in the blob too (see _configBlob) until a real server write confirms them, so a never-draining queue can't orphan the only copy
       } else { dataObj[arr] = []; }                                     // genuinely empty
     }
     this.resetListState(mod);
@@ -6847,8 +6849,17 @@ const App = {
   },
   cmpOldest(a, b) { return -App.cmpNewest(a, b); },
 
+  // Record id. Collision-safe under bulk mint (POS imports / seed mint hundreds of ids in
+  // one millisecond): a per-process monotonic counter guarantees uniqueness within this tab
+  // even inside the same ms, and 6 random base36 chars (~2.2B) make a cross-device same-ms
+  // collision negligible. A duplicate id would silently overwrite a record (putRecord) or
+  // fail a whole bulk chunk (Postgres "ON CONFLICT cannot affect row a second time").
+  _uidCounter: 0,
   uid() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    this._uidCounter = (this._uidCounter + 1) & 0xffff;
+    return Date.now().toString(36)
+      + this._uidCounter.toString(36).padStart(4, '0')
+      + Math.random().toString(36).slice(2, 8);
   }
 };
 
