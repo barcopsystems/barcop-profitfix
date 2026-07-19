@@ -5026,7 +5026,13 @@ const App = {
       kinds: {
         count: 'ic_counts', delivery: 'ic_deliveries', order: 'ic_orders',
         transfer: 'ic_transfers', empty: 'ic_empties', adjustment: 'ic_adjustments',
-        spot_check: 'ic_spot_checks', variance_run: 'ic_variance_runs'
+        spot_check: 'ic_spot_checks', variance_run: 'ic_variance_runs',
+        // Product master: row-per-record (data-safety migration 2026-07-19, so a bug
+        // can only ever touch one product, never wipe the master list). No business
+        // date -> NULL event date (NONWINDOWED_KINDS in db.js) so the whole product
+        // list always loads in full. Locations/vendors/prep-batches/par+variance
+        // settings stay in the ic_data config blob and still save via saveInventory.
+        product: 'ic_products'
       }
     },
     sc: {
