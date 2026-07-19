@@ -638,8 +638,8 @@ S.ShiftDashboard = {
       .filter(n => !known.has(key(n)));
 
     if (unmatched.length && drawers.length === 0) {        // blank slate: create silently
-      unmatched.forEach(n => this._addRegister(n));
-      await App.saveShift();
+      const created = unmatched.map(n => this._addRegister(n));
+      await App.putRecordsBulk('sc', 'drawer', created);   // row-per-record
       return this._commitCash(rows);
     }
     if (unmatched.length) { this._showCashMap(unmatched); return; }   // map or add
@@ -648,7 +648,9 @@ S.ShiftDashboard = {
   _addRegister(name) {
     if (!App.shiftData) App.shiftData = {};
     if (!Array.isArray(App.shiftData.sc_drawers)) App.shiftData.sc_drawers = [];
-    App.shiftData.sc_drawers.push({ id: App.uid(), name: name, default_opening_bank: null, notes: '', active: true, pos_aliases: [], created_at: new Date().toISOString() });
+    const rec = { id: App.uid(), name: name, default_opening_bank: null, notes: '', active: true, pos_aliases: [], created_at: new Date().toISOString() };
+    App.shiftData.sc_drawers.push(rec);
+    return rec;   // caller persists it (putRecord/putRecordsBulk) — row-per-record
   },
   _showCashMap(unmatched) {
     const res = document.getElementById('sc-ck-cash-res');
@@ -671,13 +673,17 @@ S.ShiftDashboard = {
   },
   async _applyCashMap() {
     const keyOf = s => String(s || '').trim().toLowerCase();
+    // Dedupe by id: one existing drawer can be the target of several unmatched names, so it
+    // would otherwise appear multiple times in one bulk upsert (Postgres rejects a duplicate
+    // id in a single ON CONFLICT chunk). The Map keeps the last-mutated copy (all aliases added).
+    const touched = new Map();
     [...document.querySelectorAll('.sc-cm-sel')].forEach(sel => {
       const name = sel.dataset.name;
-      if (sel.value === '__add') { this._addRegister(name); return; }
+      if (sel.value === '__add') { const r = this._addRegister(name); touched.set(r.id, r); return; }
       const d = ((App.shiftData && App.shiftData.sc_drawers) || []).find(x => x.id === sel.value);
-      if (d) { if (!Array.isArray(d.pos_aliases)) d.pos_aliases = []; if (!d.pos_aliases.some(a => keyOf(a) === keyOf(name))) d.pos_aliases.push(name); }
+      if (d) { if (!Array.isArray(d.pos_aliases)) d.pos_aliases = []; if (!d.pos_aliases.some(a => keyOf(a) === keyOf(name))) d.pos_aliases.push(name); touched.set(d.id, d); }
     });
-    await App.saveShift();
+    await App.putRecordsBulk('sc', 'drawer', [...touched.values()]);   // row-per-record
     return this._commitCash(this._pendingCashRows);
   },
   async _commitCash(rows) {

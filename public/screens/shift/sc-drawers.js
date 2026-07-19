@@ -137,7 +137,7 @@ S.ShiftDrawers = {
     const d = this.drawers().find(x => x.id === id);
     if (!d) return;
     d.active = !archived;
-    await App.saveShift();
+    await App.putRecord('sc', 'drawer', d);   // row-per-record
     this.renderList();
   },
 
@@ -173,7 +173,7 @@ S.ShiftDrawers = {
     d.notes                = document.getElementById('dre-notes')?.value.trim() || '';
     const btn = document.getElementById('dre-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = await App.putRecord('sc', 'drawer', d);   // row-per-record
     if (ok) { this.editId = null; App.closeModal('dr-edit-modal'); this.renderList(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
   },
@@ -188,6 +188,8 @@ S.ShiftDrawers = {
 
     const numOr = (id, def) => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? def : n; };
 
+    // Row-per-record: mutate/build the one drawer record and write just that row.
+    let rec = null;
     if (this.editId) {
       const d = this.drawers().find(x => x.id === this.editId);
       if (d) {
@@ -195,9 +197,10 @@ S.ShiftDrawers = {
         d.default_opening_bank  = numOr('dr-bank', null);
         d.cash_tolerance        = numOr('dr-tol', 10);
         d.notes                 = document.getElementById('dr-notes')?.value.trim() || '';
+        rec = d;
       }
     } else {
-      this.drawers().push({
+      rec = {
         id:                    App.uid(),
         name,
         default_opening_bank:  numOr('dr-bank', null),
@@ -205,12 +208,12 @@ S.ShiftDrawers = {
         notes:                 document.getElementById('dr-notes')?.value.trim() || '',
         active:                true,
         created_at:            new Date().toISOString()
-      });
+      };
     }
 
     const btn = document.getElementById('dr-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.saveShift();
+    const ok = rec ? await App.putRecord('sc', 'drawer', rec) : true;
     this.editId = null;
     if (ok) {
       this._draft = null;
