@@ -176,7 +176,12 @@ S.LaborPayrollExport = {
       const effHourly = r.hours > 0 ? ((r.wage || 0) * r.hours + tipShare) / r.hours : 0;
       let status = '';
       if (tipped) {
+        // Only judge below-minimum once tips for the week are actually recorded. With no
+        // tips logged, tipShare is 0 and effHourly collapses to the bare cash wage (e.g.
+        // $2.13), firing a false "BELOW: $X/hr owed" on the payroll worksheet a bookkeeper
+        // acts on. Mirror the Pay Periods screen: prompt for tips instead of accusing.
         if (!stateMinValid) status = 'No state minimum wage set';
+        else if (tipShare <= 0) status = 'Tips not recorded';
         else if (effHourly < stateMin) status = 'BELOW: $' + (stateMin - effHourly).toFixed(2) + '/hr owed';
         else status = 'OK';
       }
