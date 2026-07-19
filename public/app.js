@@ -5085,7 +5085,10 @@ const App = {
         // migration), NONWINDOWED so all load. Staff reference a position by position_id
         // (read-only; a deleted position leaves a dangling ref by design). The
         // lc_positions_seeded flag stays in the lc_data blob (saved via saveLabor).
-        position: 'lc_positions'
+        position: 'lc_positions',
+        // Reusable schedule TEMPLATES (config — distinct from the `schedule` built-week RUNS
+        // above): row-per-record, NONWINDOWED. Written from Build Schedule's Template Name box.
+        schedule_template: 'lc_schedule_templates'
       }
     },
     // Core / Recovery (Profit pass): unbounded recovery logs live row-per-record
