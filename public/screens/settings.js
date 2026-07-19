@@ -380,9 +380,13 @@ S.HubSettings = {
     this._backupMsg('Restoring backup...', 'var(--t3)');
     try {
       App.data          = backup.data;
-      App.inventoryData = backup.inventoryData || {};
-      App.laborData     = backup.laborData || {};
-      App.shiftData     = backup.shiftData || {};
+      // Only replace a control section when the backup actually CARRIES it. A v1 / partial /
+      // truncated backup missing (or empty in) inventoryData/laborData/shiftData must NOT
+      // erase the account's populated locations/vendors/staff/schedules — keep what's loaded.
+      const hasData = o => o && typeof o === 'object' && Object.keys(o).length > 0;
+      if (hasData(backup.inventoryData)) App.inventoryData = backup.inventoryData;
+      if (hasData(backup.laborData))     App.laborData     = backup.laborData;
+      if (hasData(backup.shiftData))     App.shiftData     = backup.shiftData;
       // Restore device-local Cash Recovery config. Absent in v1 backups (made
       // before this was captured) — skip cleanly so old files still restore.
       if (backup.cashConfig && window.CashEngine) {
@@ -411,6 +415,11 @@ S.HubSettings = {
   },
 
   async loadSample() {
+    // Destructive + dev-only. The live demo (App.startDemo, demoMode) reseeds silently and
+    // the real-account Testing Tools button is dev-gated in the UI — refuse any OTHER caller
+    // (e.g. a pasted console call on a real account) so this seed/wipe can't run for a
+    // customer. Defense in depth over the UI-render gate.
+    if (!App.demoMode && !(App.isDevAccount && App.isDevAccount())) return { ok: false };
     // The LIVE DEMO (App.startDemo) also calls loadSample with App.demoMode set, and must
     // seed SILENTLY with no dialog (there is no user to click confirm). Only the real-
     // account Testing Tools button confirms. Gating on demoMode keeps the demo working.
@@ -425,7 +434,10 @@ S.HubSettings = {
     }
     const msg = document.getElementById('ua-test-msg');
     if (msg) { msg.style.color = 'var(--gold)'; msg.textContent = 'Loading sample data...'; msg.style.display = 'block'; }
-    DB._allowReset = true;   // seeding is an intentional bulk write: let the total-wipe backstop through (its early cockpit stamps save a still-empty blob). Reset at the next loadAllData.
+    // NOTE: the total-wipe backstop stays ON during seeding (no _allowReset here). The seed
+    // builds arrays in memory and persists the POPULATED blob at the end (App.save below), so
+    // the backstop passes; any intermediate all-empty write is harmlessly blocked. This means
+    // an interrupted re-seed can NEVER leave the account empty — the protection is never off.
 
     // Deterministic pseudo-random for ALL sample data. The demo must load the same
     // every time: same reload => same numbers => same audit scores AND the same
@@ -3920,6 +3932,9 @@ S.HubSettings = {
   },
 
   async clearAll() {
+    // Destructive + dev-only (Testing Tools, dev-gated in the UI). Refuse any other caller
+    // (e.g. a pasted console call on a real account) — defense in depth over the UI gate.
+    if (!(App.isDevAccount && App.isDevAccount())) return;
     const ok = await App.confirm({
       title: 'Clear all data?',
       message: 'This permanently erases ALL data in your account: every weekly record, audit, recipe, and all Inventory, Labor, and Shift Control data. Your settings and targets are kept. This cannot be undone.',
