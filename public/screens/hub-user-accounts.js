@@ -89,11 +89,9 @@ S.HubUserAccounts = {
       // Automatic server-side backups — Bar Cop saves the whole account ~daily; the owner
       // can roll back to any saved point.
       + '<div style="margin-top:22px;border-top:1px solid var(--b-edge);padding-top:16px;">'
-      +   '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">'
-      +     '<div style="font-size:13px;font-weight:700;color:var(--t1);">Automatic Backups</div>'
-      +     '<button class="btn btn-ghost btn-sm" id="ua-backup-now" style="margin-left:auto;">Back Up Now</button>'
-      +   '</div>'
-      +   '<div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6;">Bar Cop saves a full backup of this bar automatically, about once a day. Pick a point below to roll the whole account back to how it was then.</div>'
+      +   '<div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">Automatic Backups</div>'
+      +   '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Bar Cop saves a full backup of this bar automatically, about once a day. Pick a point below to roll the whole account back to how it was then.</div>'
+      +   '<button class="btn btn-ghost" id="ua-backup-now" style="margin-bottom:22px;">Create Restore Point</button>'
       +   '<div id="ua-snap-list" style="font-size:12px;color:var(--t3);">Loading saved backups...</div>'
       + '</div>';
     const testBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load sample data to test, or clear everything and start fresh.</div>'
