@@ -207,7 +207,7 @@ S.PrepBatches = {
     // Keep stored batch costs in sync with current product costs so the list and
     // any menu item that rolls up cost_per_serving never show a stale number when
     // an ingredient's price has changed since the batch was last edited.
-    let _batchCostChanged = false;
+    const _costTouched = [];
     batches.forEach(b => {
       const ingRows = (b.ingredients || []).map(i => ({ cost_per_unit: this.unitCost(this.prodById(i.product_id)), quantity: i.quantity || 0 }));
       const out = this.computeRows(ingRows, b.batch_yield, b.batch_yield_unit, b.serving_size, b.serving_size_unit);
@@ -220,10 +220,11 @@ S.PrepBatches = {
           ing.cost_per_unit = this.unitCost(this.prodById(ing.product_id));
           ing.total_cost = (ing.cost_per_unit || 0) * (ing.quantity || 0);
         });
-        _batchCostChanged = true;
+        _costTouched.push(b);
       }
     });
-    if (_batchCostChanged) App.saveInventory();
+    // Row-per-record: persist only the batches whose cost drifted (one bulk upsert).
+    if (_costTouched.length) App.putRecordsBulk('ic', 'prep_batch', _costTouched);
 
     let listSection;
     if (!batches.length) {
@@ -487,13 +488,8 @@ S.PrepBatches = {
       created_at: this.editId ? (this.byId(this.editId)?.created_at || new Date().toISOString()) : new Date().toISOString()
     };
 
-    if (this.editId) {
-      const i = this.list().findIndex(x => x.id === this.editId);
-      if (i > -1) this.list()[i] = rec;
-    } else {
-      this.list().push(rec);
-    }
-    await App.saveInventory();
+    // Row-per-record: putRecord updates the in-memory list (replace by id / push) and writes one row.
+    await App.putRecord('ic', 'prep_batch', rec);
     this.editId = null;
     if (wasAdd) { this._draft = null; this._draftRows = null; }
     App.closeModal('pb-edit-modal');
@@ -505,8 +501,7 @@ S.PrepBatches = {
     if (!b) return;
     const ok = await App.confirmDelete();
     if (!ok) return;
-    App.inventoryData.ic_prep_batches = this.list().filter(x => x.id !== id);
-    await App.saveInventory();
+    await App.removeRecord('ic', 'prep_batch', id);   // row-per-record
     this.renderList();
   }
 };
