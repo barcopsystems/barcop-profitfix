@@ -1332,19 +1332,24 @@ S.InventoryProducts = {
       serving_sizes:       servingSizes
     };
 
+    // Row-per-record (data-safety migration): build the one record to persist —
+    // on edit, merge onto the existing product so fields not on the form
+    // (created_at, cost_history, imported, location_sequences) are preserved —
+    // then write just that row. putRecord updates the in-memory list too.
     const list = this.products();
+    let rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) list[i] = { ...list[i], ...prod };
+      rec = i > -1 ? { ...list[i], ...prod } : prod;
     } else {
       prod.created_at = new Date().toISOString();
-      list.push(prod);
+      rec = prod;
     }
 
     const btn = document.getElementById('ip-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
-    const ok = await App.saveInventory();
+    const ok = await App.putRecord('ic', 'product', rec);
     this._saving = false;
     this.editId = null;
     this._formCategory = null;
@@ -1364,9 +1369,10 @@ S.InventoryProducts = {
   async confirmDel(ids, msg) {
     if (!ids.length) return;
     if (!(await App.confirmDelete(ids.length > 1 ? ids.length + ' products' : null))) return;
-    App.inventoryData.ic_products = this.products().filter(p => !ids.includes(p.id));
+    // Row-per-record: delete one row per id (removeRecord also drops it from the
+    // in-memory list), so a delete only ever touches those rows, never the set.
+    for (const id of ids) await App.removeRecord('ic', 'product', id);
     if (this._selected) ids.forEach(id => this._selected.delete(id));
-    await App.saveInventory();
     this.renderLanding();
   },
 
@@ -1489,6 +1495,7 @@ S.InventoryProducts = {
     };
     const getUnit = () => document.getElementById('be-unit')?.value || null;
     const idSet = new Set(ids);
+    const touched = [];
     this.products().forEach(p => {
       if (!idSet.has(p.id)) return;
       if (applied.size)    { p.container_size_oz = getSize(); p.container_size_label = getSizeLabel(); }
@@ -1511,10 +1518,12 @@ S.InventoryProducts = {
       if (applied.par)     p.par_level = num('be-par');
       if (applied.reorder) p.reorder_point = num('be-reorder');
       this.recomputeDerived(p);
+      touched.push(p);
     });
     const btn = document.getElementById('be-apply-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Applying...'; }
-    const ok = await App.saveInventory();
+    // Row-per-record: write only the edited products in one bulk upsert.
+    const ok = await App.putRecordsBulk('ic', 'product', touched);
     if (ok) {
       App.closeModal('ip-bulk-modal');
       this._selected = new Set();
@@ -1713,7 +1722,9 @@ S.InventoryProducts = {
     if (!imported.length) { note(dup ? ('No new products imported.' + dupMsg) : 'No rows with a product name were found.'); return; }
 
     this.products().push(...imported);
-    const ok = await App.saveInventory();
+    // Row-per-record: persist just the newly imported products (dups were skipped
+    // above, so existing rows are untouched) in one bulk upsert.
+    const ok = await App.putRecordsBulk('ic', 'product', imported);
     if (ok) {
       App.markSetupDone('gs_ic_products');
       this.activeCat = cat;

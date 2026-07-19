@@ -321,7 +321,8 @@ S.InventoryVendors = {
     });
     if (!ok) return;
     matches.forEach(p => { p.vendor = ''; });
-    await App.saveInventory();
+    // Row-per-record: only the affected products change — write them as rows.
+    await App.putRecordsBulk('ic', 'product', matches);
     this.renderList();
   },
 
@@ -574,13 +575,14 @@ S.InventoryVendors = {
     };
 
     let savedId = vendorId;
+    const touched = [];   // products whose vendor name changed on a rename (row-per-record)
     if (vendorId) {
       const v = this.vendorById(vendorId);
       if (v) {
         const old = v.name;
         Object.assign(v, fields);
         if (old !== name) {
-          this.products().forEach(p => { if (p.vendor === old) p.vendor = name; });
+          this.products().forEach(p => { if (p.vendor === old) { p.vendor = name; touched.push(p); } });
         }
       }
     } else {
@@ -590,7 +592,10 @@ S.InventoryVendors = {
 
     const btn = document.getElementById('iv-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    // The vendor record lives in the config blob (saveInventory); the rename
+    // cascade to the affected products persists as rows.
     const ok = await App.saveInventory();
+    if (touched.length) await App.putRecordsBulk('ic', 'product', touched);
     if (ok) {
       if (vendorId) this.openEdit(savedId);
       else { this.editId = null; this._draft = null; this.renderList(); }

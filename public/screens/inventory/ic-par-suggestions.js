@@ -310,7 +310,7 @@ S.InventoryParSuggestions = {
     p.par_updated_at = new Date().toISOString();
     p.par_source = 'auto-suggestion';
     if (p.par_kept) delete p.par_kept;   // accepting clears any prior Keep
-    await App.saveInventory();
+    await App.putRecord('ic', 'product', p);   // row-per-record: one product row
     this.draw();
   },
 
@@ -320,7 +320,7 @@ S.InventoryParSuggestions = {
     const p = products.find(x => x.id === productId);
     if (!p) return;
     p.par_kept = { usage: (usage != null && !isNaN(usage)) ? usage : null, at: new Date().toISOString() };
-    await App.saveInventory();
+    await App.putRecord('ic', 'product', p);   // row-per-record: one product row
     this.draw();
   }
 };
