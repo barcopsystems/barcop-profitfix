@@ -5072,10 +5072,14 @@ const App = {
         booking: 'bookings',
         // Shared Recovery Scoreboard feed — one module-tagged kind.
         fix_log: 'fix_log',
-        // Hub — executive monthly audit history. operating_expenses +
-        // permits_compliance stay in the blob: financial/compliance data read by
-        // arbitrary period, where the 24-month window would undercount.
-        bar_cop_audit: 'bar_cop_audits'
+        // Hub — executive monthly audit history.
+        bar_cop_audit: 'bar_cop_audits',
+        // Permits/licenses: row-per-record (data-safety migration 2026-07-19, so a bug
+        // can only ever touch one permit, never wipe the set). Stored with a NULL event
+        // date (NONWINDOWED_KINDS in db.js) so the 24-month window never drops one — the
+        // renewal date lives in the payload, read/sorted client-side. (operating_expenses
+        // is the next array to move the same way; until then it stays in the blob.)
+        permit: 'permits_compliance'
       }
     }
   },
