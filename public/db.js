@@ -666,7 +666,7 @@ const DB = {
   _setPendingList(list) {
     try {
       const k = this._acctKey(this._PENDING_KEY);
-      if (list && list.length) localStorage.setItem(k, JSON.stringify(list));
+      if (list && list.length) this._lsSafeSet(k, JSON.stringify(list));   // the replay queue is unsynced work — evict caches to fit
       else localStorage.removeItem(k);
     } catch (e) { /* storage full or unavailable */ }
   },
@@ -740,12 +740,31 @@ const DB = {
     }
   },
 
-  _localWrite(data) {
-    try {
-      localStorage.setItem(this._acctKey('pf_data'), JSON.stringify(data));
-    } catch (e) {
-      console.warn('localStorage write failed:', e);
+  // localStorage setItem that survives a quota error. The bulk of stored data is the
+  // disposable, server-backed pfev_* window caches, so on a full disk evict those and retry
+  // once. Used for the CRITICAL writes (offline blob copies + the pending replay queues) so a
+  // full tablet can't silently drop the operator's UNSYNCED work while the UI reports "saved".
+  // Returns true only if the value actually landed.
+  _lsSafeSet(key, value) {
+    try { localStorage.setItem(key, value); return true; }
+    catch (e) {
+      try {
+        const drop = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.indexOf('pfev_') === 0 && k !== key) drop.push(k);
+        }
+        drop.forEach(k => { try { localStorage.removeItem(k); } catch (e2) {} });
+        localStorage.setItem(key, value); return true;
+      } catch (e3) {
+        console.warn('localStorage full — an unsynced write may be dropped:', key, (e3 && e3.message) || '');
+        return false;
+      }
     }
+  },
+  _localWrite(data) {
+    try { return this._lsSafeSet(this._acctKey('pf_data'), JSON.stringify(data)); }
+    catch (e) { console.warn('localStorage write failed:', e); return false; }
   },
 
   // ── Control module data (separate Supabase tables — see Rule 21) ──────────
@@ -899,9 +918,9 @@ const DB = {
 
   _localWriteControl(lsKey, data) {
     try {
-      localStorage.setItem(this._acctKey(lsKey), JSON.stringify(data));
+      return this._lsSafeSet(this._acctKey(lsKey), JSON.stringify(data));
     } catch (e) {
-      console.warn('localStorage write failed:', e);
+      console.warn('localStorage write failed:', e); return false;
     }
   },
 
@@ -1049,15 +1068,19 @@ const DB = {
             // Fetch EVERY row in the window, paging past Supabase's 1000-row cap
             // (a full year of logged hours / tips / voids blows past it). Without
             // this the oldest records silently stop loading.
-            const PAGE = 1000; const recs = []; let from = 0;
+            const PAGE = 1000; const recs = []; let from = 0; let complete = true;
             for (;;) {
               const { data, error } = await page(from, from + PAGE - 1);
-              if (error || !Array.isArray(data)) { if (from === 0) throw (error || new Error('loadEvents')); break; }
+              if (error || !Array.isArray(data)) { if (from === 0) throw (error || new Error('loadEvents')); complete = false; break; }
               for (const r of data) { if (r && r.payload) recs.push(r.payload); }
               if (data.length < PAGE) break;
               from += PAGE;
             }
-            this._cacheEvents(table, kind, recs);
+            // Only overwrite the offline cache when the FULL window loaded. A mid-pagination
+            // failure (a page past the first errored) yields a TRUNCATED set — caching it
+            // would drop records 1001+ and later serve the partial as the complete window.
+            // Keep the prior good cache; this session still returns what actually loaded.
+            if (complete) this._cacheEvents(table, kind, recs);
             return recs;
           }
         } catch (e) { /* fall through to cache */ }
@@ -1191,7 +1214,7 @@ const DB = {
   _setEventQueue(list) {
     try {
       const k = this._acctKey(this._EVENTQ_KEY);
-      if (list && list.length) localStorage.setItem(k, JSON.stringify(list));
+      if (list && list.length) this._lsSafeSet(k, JSON.stringify(list));   // the event replay queue is unsynced work — evict caches to fit
       else localStorage.removeItem(k);
     } catch (e) {}
   },

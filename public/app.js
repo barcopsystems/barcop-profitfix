@@ -6827,7 +6827,11 @@ const App = {
   // recovery dashboards show "the latest audit / week".
   latestEvent(arr) {
     if (!Array.isArray(arr) || !arr.length) return null;
-    const dk = r => ((r && (r.date || r.period_end || r.generated_at || r.saved_at || r.created_at)) || '') + '';
+    // Same business-date field union as _recDate (keep in sync), with created_at as the last
+    // resort so a record with only created_at still orders instead of collapsing to index 0.
+    const dk = r => (String((r && (r.date || r.period_end || r.event_date || r.date_time || r.opened_date
+      || r.resolved_date || r.date_reported || r.date_86 || r.filed_at || r.closed_at
+      || r.generated_at || r.saved_at)) || '') || (r && r.created_at) || '') + '';
     return arr.slice().sort((x, y) => dk(y).localeCompare(dk(x)))[0];
   },
 
@@ -6840,8 +6844,18 @@ const App = {
   // date flipped when I refreshed" class of bug. cmpNewest = newest first,
   // cmpOldest = oldest first. Reference as App.cmpNewest (not this.) since they
   // are passed straight to .sort() where `this` would be lost.
+  // Business-date resolver for sorting event records: the UNION of every business-date field
+  // used across kinds, most-specific first. Without the full list, cmpNewest silently no-ops
+  // (fail open) on a kind whose date lives in an unlisted field — date_time (adjustments/
+  // transfers), event_date (bookings), opened_date/resolved_date (variance investigations),
+  // filed_at/closed_at. created_at is deliberately NOT here: it stays the cmpNewest tiebreak
+  // (below) / latestEvent last resort, never a primary key (seed + POS imports stamp one
+  // identical created_at, which would collapse the sort to array order — the "date flipped on
+  // refresh" bug). NOTE: keep this field list in sync with latestEvent's `dk` above.
   _recDate(r) {
-    return String((r && (r.date || r.period_end || r.date_reported || r.date_86 || r.generated_at || r.saved_at)) || '');
+    return String((r && (r.date || r.period_end || r.event_date || r.date_time || r.opened_date
+      || r.resolved_date || r.date_reported || r.date_86 || r.filed_at || r.closed_at
+      || r.generated_at || r.saved_at)) || '');
   },
   cmpNewest(a, b) {
     return App._recDate(b).localeCompare(App._recDate(a))
