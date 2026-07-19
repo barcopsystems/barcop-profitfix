@@ -556,13 +556,18 @@ const DB = {
       // edit saves normally. This is the guard for the deploy/reload race.
       if (!this._dataReady) return { ok: false, deferred: true };
       // Total-wipe backstop (belt-and-suspenders on the gate): never overwrite a
-      // KNOWN-POPULATED account with a blob whose every user array is empty — the
-      // signature of an in-memory corruption or a bug, never a legit save from a real
-      // account. An intentional reset (Clear Data / reload sample) sets _allowReset. A
-      // genuinely-empty account (_loadedNonEmpty false) is unaffected, so a new user
-      // building up data saves fine, and a legit single-array delete leaves the other
-      // arrays populated so it still passes.
-      if (this._loadedNonEmpty && !this._allowReset && !this._blobHasArrayData(appData)) {
+      // KNOWN-POPULATED account with an all-empty state — the signature of an in-memory
+      // corruption or a bug, never a legit save from a real account. An intentional reset
+      // (Clear Data / reload sample) sets _allowReset. A genuinely-empty account
+      // (_loadedNonEmpty false) is unaffected, so a new user building up data saves fine,
+      // and a legit single-array delete leaves the other arrays populated so it passes.
+      // Test the LIVE in-memory App.data, NOT the outgoing blob: the entered-data arrays
+      // now persist row-per-record and are STRIPPED from the config blob, so a legit
+      // config save legitimately carries no arrays. The wipe signature is App.data itself
+      // going empty (which still leaves every array empty here). Falls back to the blob if
+      // App isn't reachable.
+      const liveCore = (typeof App !== 'undefined' && App && App.data) ? App.data : appData;
+      if (this._loadedNonEmpty && !this._allowReset && !this._blobHasArrayData(liveCore)) {
         console.error('writeData: BLOCKED a total-wipe write (every user array empty over a populated account). Server data preserved.');
         return { ok: false, blocked: true };
       }

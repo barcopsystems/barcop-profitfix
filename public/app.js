@@ -2799,6 +2799,12 @@ const App = {
     // Core / Recovery event logs (Profit pass): weeks, theft scores, variance
     // investigations, vendor discrepancies, audits -> core_events rows.
     await this.loadEventStores('core');
+    // The entered-data arrays now live row-per-record and are STRIPPED from the config
+    // blob, so DB._loadedNonEmpty (set from the blob at readData) understates a populated
+    // account whose data is entirely in rows. Recompute it from the live, rows-filled
+    // App.data so the total-wipe backstop stays accurate in steady state: a real account
+    // reads populated (backstop armed), a genuinely-empty one does not (new user saves fine).
+    DB._loadedNonEmpty = DB._blobHasArrayData(this.data);
     // Pre-fetch the accounts list so the Hub sidebar can render the
     // Locations section synchronously (multi-account users only).
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
