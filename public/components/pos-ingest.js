@@ -291,24 +291,58 @@ const PosIngest = {
     // let a bulk sales import overwrite it. Only a prior IMPORTED day is replaced.
     const manualDates   = new Set(existingShifts.filter(s => s && s.imported !== true).map(s => s.date));
     const importedDates = new Set(existingShifts.filter(s => s && s.imported === true).map(s => s.date));
-    const toAdd = []; const skipped = []; let dupCount = 0; const seen = new Set();
+    // AGGREGATE BY DATE — never one record per CSV row. A sales export split by daypart, revenue
+    // centre or service period lists the same date several times, which is an ordinary export
+    // shape, and the day's sales are their SUM. The old line was a bare `if (seen.has(date))
+    // return;` — no skipped.push, no dupCount++ — so every service after the FIRST was discarded
+    // in silence while the cockpit reported "7 days imported". A real $18,200 bar / $18,340 food
+    // week imported as $2,940 / $6,860, and sc_shifts is the spine under Where You Stand, the Hub,
+    // Confirm the Week, labour % / RPLH, the cash-forecast baseline and the sales-tax hold — all
+    // of them quietly low, with nothing on any screen saying rows had been dropped.
+    // This is the same bug and the same fix as buildPmix below (that one is units; this one is
+    // money). Aggregating HERE also guarantees one record per date in toAdd, which _commitSales
+    // depends on: a duplicate id inside one ON CONFLICT chunk makes Postgres reject the chunk.
+    const byDate = new Map();
+    const skipped = []; let dupCount = 0; let merged = 0;
+    const skippedDates = new Set();   // a skipped DAY is reported once, not once per row of it
+    const cents = n => Math.round(n * 100) / 100;   // summing floats across services must not drift
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
       if (!date) { skipped.push('(no date)'); return; }
-      if (manualDates.has(date)) { skipped.push(date + ' (manual close kept)'); return; }
+      if (manualDates.has(date)) {
+        if (!skippedDates.has(date)) { skippedDates.add(date); skipped.push(date + ' (manual close kept)'); }
+        return;
+      }
       const bar = this._num(r.bar), food = this._num(r.food);
-      if (bar + food <= 0) { skipped.push(date); return; }
-      if (seen.has(date)) return;          // one row per day; ignore a repeat date in the file
-      seen.add(date);
-      if (importedDates.has(date)) dupCount++;   // this day already has an imported record — it gets replaced
       const covers = Math.round(parseFloat(String(r.covers == null ? '' : r.covers).replace(/[^0-9.]/g, ''))) || 0;   // keep the decimal point: "12.00" is 12, not 1200; strip only commas/currency
-      toAdd.push({
-        id: App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
-        total_revenue: bar + food, shift_type: 'Full Day', status: 'Closed',
-        imported: true, created_at: new Date().toISOString()
-      });
+      const prior = byDate.get(date);
+      if (prior) {
+        prior.bar_revenue = cents(prior.bar_revenue + bar);
+        prior.floor_revenue = cents(prior.floor_revenue + food);
+        prior.covers += covers;
+        prior.total_revenue = cents(prior.bar_revenue + prior.floor_revenue);
+        merged++;
+      } else {
+        byDate.set(date, {
+          id: App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
+          total_revenue: cents(bar + food), shift_type: 'Full Day', status: 'Closed',
+          imported: true, created_at: new Date().toISOString()
+        });
+      }
     });
-    return { toAdd, skipped, dupCount };
+    // "Did this day sell anything" is now a question about the DAY, not about each row. A refund
+    // line ("(50)", which _num correctly reads as -50) has to REDUCE the day rather than be
+    // dropped as a non-positive row, and a day is only empty once all of its services are in.
+    const toAdd = [];
+    byDate.forEach((rec, date) => {
+      if (rec.total_revenue <= 0) { skipped.push(date); return; }
+      if (importedDates.has(date)) dupCount++;   // this day already has an imported record — it gets replaced
+      toAdd.push(rec);
+    });
+    // `merged`, NOT dupCount — the same reasoning spelled out in buildPmix. dupCount means "rows
+    // already logged" in every other builder here and the cockpit renders it as "N replaced
+    // earlier figures"; rows FOLDED INTO a total are the opposite of that.
+    return { toAdd, skipped, dupCount, merged };
   },
 
   // A row is one drawer's (or the day's) over/short. Resolves Register + Cashier
