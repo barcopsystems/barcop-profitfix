@@ -459,7 +459,7 @@ window.CashEngine = {
   //    (slow-season sales adjust + scenario costs) powers "Can I Afford It". ─────
   _OPENING_KEY: 'cash_opening_balance',
   openingCash() { let v = App.acctGet(this._OPENING_KEY); if (v == null) v = this._migCfg(this._OPENING_KEY); const n = parseFloat(v); return isNaN(n) ? null : n; },
-  setOpeningCash(v) { App.acctSet(this._OPENING_KEY, (v == null || v === '') ? null : String(v)); },
+  setOpeningCash(v) { return App.acctSet(this._OPENING_KEY, (v == null || v === '') ? null : String(v)); },
 
   // Event balance payments collected around the event date. Booked only.
   // The all-in event total (F&B subtotal + service charge + tax), from the Events
@@ -654,11 +654,11 @@ window.CashEngine = {
   // ships. Reads the old localStorage key, migrates it onto the account, returns the value.
   _migCfg(key) { try { const oldK = this._key(key); const old = localStorage.getItem(oldK); if (old != null && old !== '') { Promise.resolve(App.acctSet(key, old)).then(ok => { if (ok) { try { localStorage.removeItem(oldK); } catch (e) {} } }); return old; } } catch (e) {} return null; },   // removeItem ONLY after the migrate save is CONFIRMED — an eager remove after a failed/gated save would lose the value. Leaving the old key until confirmed is safe (acctGet reads the account first), and once confirmed the remove still prevents a cleared value from resurrecting.
   _cfgNum(key, def) { let v = App.acctGet(key); if (v == null) v = this._migCfg(key); const n = parseFloat(v); return isNaN(n) ? def : n; },
-  _cfgSet(key, v) { App.acctSet(key, (v == null || v === '') ? null : String(v)); },
+  _cfgSet(key, v) { return App.acctSet(key, (v == null || v === '') ? null : String(v)); },
   salesTaxRate()   { return this._cfgNum('cash_sales_tax_rate', 0); },
   setSalesTaxRate(v) { this._cfgSet('cash_sales_tax_rate', v); },
   taxFrequency()   { let v = App.acctGet('cash_tax_freq'); if (v == null) v = this._migCfg('cash_tax_freq'); return v || 'monthly'; },
-  setTaxFrequency(v) { App.acctSet('cash_tax_freq', v === 'quarterly' ? 'quarterly' : 'monthly'); },
+  setTaxFrequency(v) { return App.acctSet('cash_tax_freq', v === 'quarterly' ? 'quarterly' : 'monthly'); },
   payrollBurden()  { return this._cfgNum('cash_payroll_burden', 0); },
   setPayrollBurden(v) { this._cfgSet('cash_payroll_burden', v); },
   reserveWeeks()   { return this._cfgNum('cash_reserve_weeks', 8); },
