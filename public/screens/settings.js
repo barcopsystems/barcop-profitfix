@@ -467,6 +467,16 @@ S.HubSettings = {
     // event row after a failed blob write. Test the boolean.
     // An offline restore is also refused, deliberately: a restore CLEARS event rows before
     // reseeding, and doing that without a confirmed connection is how an account ends up empty.
+    // Once the FIRST gated write lands, the ENTIRE core blob is on the server, and the cash
+    // config rides inside it: acctSet writes App.data.account_state and _configBlob strips only
+    // event-store array kinds, so opening balance, tax rate, tax frequency, payroll burden,
+    // reserve weeks, credit line and gift-card liability are already the backup's before
+    // inventory/labor/shift/core are touched. From that moment "nothing was erased, your account
+    // is unchanged" is FALSE — the account is a hybrid: the backup's settings and cash setup
+    // against its CURRENT weeks and audits, which is exactly the state an operator would read
+    // Cash Position off and get a wrong opening balance. Round 4 found the reassuring copy
+    // firing on every abort after this point.
+    let committed = false;
     const must = async (label, p) => {
       const ok = await p;
       if (ok !== true) {
@@ -475,8 +485,10 @@ S.HubSettings = {
         // The step goes in the MESSAGE, not just the detail: logClientError dedupes on
         // kind + message per session, so a constant message meant only the FIRST abort was ever
         // reported — and the retries are exactly what reveal where it actually breaks.
-        DB.logClientError('restore_aborted', 'Restore aborted at step: ' + label, 'step=' + label);
-        throw new Error('could not write ' + label + ' — nothing was erased, your account is unchanged');
+        DB.logClientError('restore_aborted', 'Restore aborted at step: ' + label, 'step=' + label + ' committed=' + committed);
+        throw new Error(committed
+          ? 'could not write ' + label + '. Your settings and cash setup were already restored from the backup, but the rest was not. Run the restore again before entering anything new.'
+          : 'could not write ' + label + '. Nothing was erased and your account is unchanged.');
       }
     };
     // Snapshot the LIVE objects before swapping. must() now actually aborts, and its message
@@ -495,6 +507,9 @@ S.HubSettings = {
       // aborted left the account on its OLD data carrying the BACKUP's opening balance, tax rate
       // and credit line. Partial application of exactly the values an operator reads as truth.
       await must('settings', App.save());
+      // The core blob is now the backup's, INCLUDING account_state (the cash config). Every
+      // abort past this line has to say so rather than promise the account is untouched.
+      committed = true;
       if (backup.cashConfig && window.CashEngine) {
         // AWAITED because these write through acctSet -> saveKey -> writeData, and _applyBackup
         // closes the _allowReset window in a finally; fire-and-forget could leave them in flight
@@ -520,7 +535,9 @@ S.HubSettings = {
         const r = await App.seedEventStores(mod);
         if (r && r.ok === false) {
           DB.logClientError('restore_aborted', 'Restore failed while writing ' + label + ' records', 'mod=' + mod);
-          throw new Error('your ' + label + ' records did not finish writing. Your other data is intact, but run the restore again before entering anything new.');
+          // seed() only ever runs after must('settings') succeeded, so the blob is always
+          // already committed here. "Your other data is intact" was never true at this point.
+          throw new Error('your ' + label + ' records did not finish writing. Your settings and cash setup were already restored, so this account is part-way between the backup and where it was. Run the restore again before entering anything new.');
         }
       };
       await must('inventory config', App.saveInventory());
@@ -531,8 +548,17 @@ S.HubSettings = {
       await seed('sc', 'Shift');
       await seed('core', 'Recovery');   // recovery event logs -> core_events rows
     } catch (e) {
-      App.data = _prev.d; App.inventoryData = _prev.i;
-      App.laborData = _prev.l; App.shiftData = _prev.s;
+      // Roll memory back ONLY while nothing has reached the server. That is what makes the
+      // "your account is unchanged" promise honest for a first-write failure. After a commit,
+      // reverting would point App.data at the OLD account while the server holds the backup's
+      // blob, and the next autosave, screen save or _maybeAutoBackup would push that stale copy
+      // straight back over the restored one — the same half-applied push this snapshot exists to
+      // prevent, just in the other direction. Once committed, memory stays on the backup so
+      // memory and server agree and re-running the restore finishes the job.
+      if (!committed) {
+        App.data = _prev.d; App.inventoryData = _prev.i;
+        App.laborData = _prev.l; App.shiftData = _prev.s;
+      }
       throw e;
     }
   },
