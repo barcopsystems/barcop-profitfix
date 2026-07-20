@@ -222,9 +222,20 @@ S.HubUserAccounts = {
     });
     const snapList = document.getElementById('ua-snap-list');
     if (snapList) {
-      snapList.addEventListener('click', (e) => {
+      snapList.addEventListener('click', async (e) => {
         const b = e.target.closest('.ua-snap-restore');
-        if (b) this.restoreSnapshot(b.dataset.id, b.dataset.when);
+        if (b) { this.restoreSnapshot(b.dataset.id, b.dataset.when); return; }
+        const d = e.target.closest('.ua-snap-del');
+        if (!d) return;
+        const ok = await App.confirm({
+          title: 'Delete the restore point from ' + (d.dataset.when || 'this date') + '?',
+          message: 'This removes that saved backup. Your account data is not affected, and your automatic daily backups are untouched.',
+          confirmText: 'Delete', cancelText: 'Cancel'
+        });
+        if (!ok) return;
+        const r = await DB.deleteBackup(d.dataset.id);
+        if (!(r && r.ok)) S.HubSettings._backupMsg('Could not delete that backup. Try again.', 'var(--red)');
+        this._renderSnapshots();
       });
       this._renderSnapshots();
     }
@@ -341,7 +352,14 @@ S.HubUserAccounts = {
       const when = fmt(r.created_at);
       const tag = r.reason === 'manual' ? ' <span style="color:var(--t3);">(manual)</span>' : '';
       return '<tr><td style="font-size:12px;color:var(--t1);">' + esc(when) + tag + '</td>'
-        + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm ua-snap-restore" data-id="' + esc(r.id) + '" data-when="' + esc(when) + '">Restore</button></td></tr>';
+        // Delete is offered on MANUAL restore points only. The automatic dailies are the safety
+        // net — they age out under retention rather than being removable by hand.
+        + '<td style="text-align:right;"><div class="row-actions" style="justify-content:flex-end;">'
+        + '<button class="btn btn-ghost btn-sm ua-snap-restore" data-id="' + esc(r.id) + '" data-when="' + esc(when) + '">Restore</button>'
+        + (r.reason === 'manual'
+            ? '<button class="btn btn-danger btn-sm ua-snap-del" data-id="' + esc(r.id) + '" data-when="' + esc(when) + '">Delete</button>'
+            : '')
+        + '</div></td></tr>';
     }).join('') + '</tbody></table>';
   },
   _asSettingsHost(msgId) {
