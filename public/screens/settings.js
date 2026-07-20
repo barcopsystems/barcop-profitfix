@@ -431,7 +431,14 @@ S.HubSettings = {
     // second then hands back TRUE — leaving the total-wipe backstop disarmed for the rest of the
     // session. That is the "a leaked bypass is worse than the bug it bypasses" condition.
     // Checked before the flag is set below, with no await in between, so there is no window.
-    if (this._restoreInFlight) {
+    // DB._restoreBusy, not a flag on this screen. It has to be visible to db.js (the bar switcher
+    // reloads the page and would kill a restore mid-flight) AND it has to stay set through the
+    // reload that settles a FAILED restore. The old screen-local flag cleared in the finally,
+    // before the caller had even scheduled that reload — so for the whole 2.5s window the
+    // controls were live, the failure copy said "run the restore again", and a retry started in
+    // that window was then killed by the first attempt's timer. Not a race: a restore takes
+    // 20-30s and the timer always won.
+    if (DB._restoreBusy) {
       throw new Error('a restore is already running. Wait for it to finish before starting another.');
     }
     const hasData = o => this._sectionHasRecords(o);
@@ -476,12 +483,22 @@ S.HubSettings = {
     // is sanctioned (same contract clearAll/loadSample use), and always hand it back.
     const prevAllowReset = DB._allowReset;
     DB._allowReset = true;
-    this._restoreInFlight = true;
+    DB._restoreBusy = true;
     try {
       await this._applyBackupInner(backup, hasData);
+      // Success. The caller reloads shortly; nothing left to protect, so release.
+      DB._restoreBusy = false;
+    } catch (e) {
+      // STAY BUSY only while a reload is actually coming to settle the account. That reload is
+      // what makes the 2.5s window safe: the restore controls are never disabled, and the failure
+      // copy invites a retry, so without this a second attempt would start and then be killed
+      // mid-flight by the first attempt's timer — between clearEvents and putEventsBulk, leaving
+      // rows deleted and nothing written. A refusal that changed NOTHING must release, or the app
+      // would be permanently unable to restore or switch bars.
+      if (!e || !e.restoreNeedsReload) DB._restoreBusy = false;
+      throw e;
     } finally {
       DB._allowReset = prevAllowReset;
-      this._restoreInFlight = false;
     }
   },
 
