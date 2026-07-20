@@ -639,7 +639,17 @@ S.ShiftDashboard = {
 
     if (unmatched.length && drawers.length === 0) {        // blank slate: create silently
       const created = unmatched.map(n => this._addRegister(n));
-      await App.putRecordsBulk('sc', 'drawer', created);   // row-per-record
+      // Stop if the registers didn't persist: _commitCash below mints variance rows stamped with
+      // these drawer_ids, and the registers are stripped from the blob — so on reload every
+      // imported reconcile would point at a register that no longer exists.
+      if (!(await App.putRecordsBulk('sc', 'drawer', created))) {   // row-per-record
+        created.forEach(d => { const i = App.shiftData.sc_drawers.indexOf(d); if (i >= 0) App.shiftData.sc_drawers.splice(i, 1); });
+        return App.confirm({
+          title: 'Could not save your registers',
+          message: 'Nothing was imported, so your data is unchanged. Check your connection and run the import again.',
+          confirmText: 'OK', cancelText: '', danger: false
+        });
+      }
       return this._commitCash(rows);
     }
     if (unmatched.length) { this._showCashMap(unmatched); return; }   // map or add

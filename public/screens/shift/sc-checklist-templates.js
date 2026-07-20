@@ -80,7 +80,10 @@ S.ShiftChecklistTemplates = {
       'Empty front-of-house trash', 'Sweep and spot-mop the entry and dining room',
       'Set the thermostat to overnight', 'Final walk: windows, doors, and the back exit locked' ] }
   ],
-  ensureStarters() {
+  // async now (it awaits the row write before flagging the account seeded). Callers may still
+  // fire-and-forget: the in-memory push below happens synchronously, so a render right after
+  // this call still sees the starters.
+  async ensureStarters() {
     if (!App.shiftData) App.shiftData = {};
     if (App.shiftData.sc_starter_seeded) return;
     const list = this.templates();
@@ -91,9 +94,14 @@ S.ShiftChecklistTemplates = {
     seeded.push(mk('Manager Closing', 'Closing', (S.ShiftClosingChecklist && S.ShiftClosingChecklist.DEFAULT_ITEMS) || []));
     this.STAFF_STARTERS.forEach(s => seeded.push(mk(s.name, 'Print', s.items)));
     seeded.forEach(t => list.push(t));
+    // Persist the ROWS first and only set the "already seeded" flag if they landed. Setting the
+    // flag first (and not awaiting the write) meant a failed bulk write left the flag durably
+    // true, the array stripped from the blob, and no rows — so Checklist Templates stayed
+    // permanently empty and could never re-seed.
+    const ok = await App.putRecordsBulk('sc', 'checklist_template', seeded);
+    if (!ok) { seeded.forEach(t => { const i = list.indexOf(t); if (i >= 0) list.splice(i, 1); }); return; }
     App.shiftData.sc_starter_seeded = true;
-    App.saveShift();                                             // the sc_starter_seeded flag stays in the blob
-    App.putRecordsBulk('sc', 'checklist_template', seeded);      // the templates are rows now
+    await App.saveShift();                                       // the sc_starter_seeded flag stays in the blob
   },
 
   render(container, actions) {
@@ -167,7 +175,9 @@ S.ShiftChecklistTemplates = {
   // heading, e.g. Closing under Manager Checklists). Every checklist gets an Export
   // PDF that prints a blank sheet for the clipboard. colHeader names the first column.
   savedSection(type, heading, colHeader) {
-    const list = this.templates().filter(t => t.type === type);
+    // Oldest-first: the starter set is authored in a deliberate order (Bar Open ... Floor Close)
+    // and seeded in one loop, so row order (newest-first) renders it upside-down.
+    const list = this.templates().filter(t => t.type === type).sort(App.byCreation);
     if (list.length === 0) return '';
     const rows = list.map(t => '<tr class="ct-row" data-id="' + t.id + '" style="cursor:pointer;">'
       + '<td><div class="val">' + esc(t.name) + '</div></td>'

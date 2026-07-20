@@ -55,7 +55,10 @@ S.ShiftDrawers = {
 
   renderList() {
     this.editId = null;
-    const all = this.drawers();
+    // Name-sorted, matching App.drawerOptions (the dropdowns). Unsorted, the register table
+    // inherited row order (newest-first) and disagreed with every picker built from the same data.
+    const all = this.drawers().slice()
+      .sort((a, b) => String((a && a.name) || '').localeCompare(String((b && b.name) || '')));
     const active   = all.filter(d => d.active !== false);
     const archived = all.filter(d => d.active === false);
 

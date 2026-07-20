@@ -110,7 +110,10 @@ S.ShiftChecklists = {
   },
 
   startRun(templateId) {
-    const tpls = this.templates();
+    // Oldest-first: templates are row-per-record now and load NEWEST-first, so a bare [0]
+    // auto-started the most recently CREATED template instead of the original/primary one —
+    // the manager checked off and filed the wrong list.
+    const tpls = this.templates().slice().sort(App.byCreation);
     const tid = templateId != null ? templateId : (tpls[0] ? tpls[0].id : '');
     const mgrId = this.activeManagerId();
     this._run = {
