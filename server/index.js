@@ -1994,11 +1994,17 @@ if ((process.env.OPS_ALERT_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL || '').t
 // high-water mark so it never deletes an unreported row, which is right — but it means a
 // permanently failing digest (revoked Resend key) pins the mark and disables retention forever.
 // Past 90 days the row is unrecoverable context anyway; keeping the table alive matters more.
-setInterval(async () => {
+async function floorPruneClientErrors() {
   try {
     const floor = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
     const { error } = await supabaseAdmin.from('client_errors')
       .delete().lt('created_at', floor).neq('kind', 'digest_sent');
     if (error) console.error('client_errors floor prune failed:', error.message);
   } catch (e) { console.error('client_errors floor prune threw:', (e && e.message) || e); }
-}, 24 * 60 * 60 * 1000);
+}
+// Runs 15 min after boot AND every 24h. A bare 24h interval would never fire at all on a
+// container that restarts more often than daily — which is exactly this deployment (every push
+// redeploys), so the safety-net prune would have been dead on arrival. Offset from the digest's
+// 10-min pass so the two don't hit the database together.
+setTimeout(floorPruneClientErrors, 15 * 60 * 1000);
+setInterval(floorPruneClientErrors, 24 * 60 * 60 * 1000);
