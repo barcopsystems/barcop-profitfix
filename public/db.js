@@ -871,17 +871,46 @@ const DB = {
   async _readControl(table, lsKey) {
     if (this._sb && this._user) {
       // Unsynced offline changes are newer than the server copy — authoritative.
+      // ⚠ _localReadControlRaw, NOT _localReadControl: the latter substitutes {} for a MISSING
+      // key, which is indistinguishable from "this bar's control blob is legitimately empty".
+      // A pending flag with no stored blob is not unsynced edits — it is nothing. The flag is a
+      // tiny write that can land while the big blob write is dropped on a full disk (and
+      // _lsSafeSet has just evicted the pfev_* caches to make room for exactly that small write).
+      // Taking it as authoritative set _controlReady TRUE over an empty object, and the operator's
+      // next ordinary save then wrote {} over the populated ic_data/lc_data/sc_data row — losing
+      // par settings, variance thresholds, the POS-to-product map, category sales, the spot-check
+      // percentage, labour settings, training templates and the upsell sequence. The total-wipe
+      // backstop CANNOT catch that: it tests the LIVE control object, whose arrays are row-backed
+      // and still full. readData was hardened against this exact trap (_localReadRaw); this was
+      // the same bug in the mirror function.
       if (this._pendingList().includes(lsKey)) {
-        const local = this._localReadControl(lsKey);
-        this._controlReady[table] = true;
-        this._controlNonEmpty[table] = this._blobHasArrayData(local);
-        return local;
+        const local = this._localReadControlRaw(lsKey);
+        if (local) {
+          this._controlReady[table] = true;
+          this._controlNonEmpty[table] = this._blobHasArrayData(local);
+          return local;
+        }
+        // No blob behind the flag — fall through to the server read below.
       }
       const accountId = await this._ensureAccountId();
       if (!accountId) {
         // No account resolved — do NOT open this control's write path (leave
         // _controlReady false), so a later save can't overwrite the server row.
         return this._localReadControl(lsKey);
+      }
+      // RE-CHECK the queue now the account is resolved — same reason as readData. The check above
+      // runs before _ensureAccountId, and _acctKey falls back to the UNSCOPED base key while no
+      // account id is known, so on the first read after ANY sign-in (signIn nulls the stored id
+      // for shared-browser safety) the scoped queue is invisible. Genuinely queued control edits
+      // — locations, vendors, staff, drawers, checklist templates — were skipped and then
+      // overwritten by the next save.
+      if (this._pendingList().includes(lsKey)) {
+        const _scoped = this._localReadControlRaw(lsKey);
+        if (_scoped) {
+          this._controlReady[table] = true;
+          this._controlNonEmpty[table] = this._blobHasArrayData(_scoped);
+          return _scoped;
+        }
       }
       try {
         const { data, error } = await this._sb
@@ -1015,6 +1044,16 @@ const DB = {
     return { ok: true };
   },
 
+  // NULL when there is no stored blob, so a caller can tell "nothing here" from "an empty blob".
+  // The substituting reader below is right for callers that just want a usable object; it is
+  // WRONG for deciding whether the operator has unsynced work. Mirror of _localReadRaw, which
+  // exists for exactly the same reason on the core blob.
+  _localReadControlRaw(lsKey) {
+    try {
+      const r = localStorage.getItem(this._acctKey(lsKey));
+      return r ? JSON.parse(r) : null;
+    } catch (e) { return null; }
+  },
   _localReadControl(lsKey) {
     try {
       const r = localStorage.getItem(this._acctKey(lsKey));
