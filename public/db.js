@@ -535,6 +535,28 @@ const DB = {
         // locked out of their own data.
         return this._mergeDefaults(this._localRead());
       }
+      // RE-CHECK the queue now that the account is resolved. The check above runs BEFORE
+      // _ensureAccountId, and _acctKey falls back to the UNSCOPED base key while no account id is
+      // known — so it reads the wrong key and finds nothing on the first read after ANY sign-in,
+      // because signIn() deliberately nulls the stored active-account id for shared-browser
+      // safety. That is precisely the moment this matters: the session-expiry banner tells the
+      // operator their work "will save when you sign back in", and signing back in was the one
+      // action that skipped it. readData then loaded the pre-outage SERVER copy, set _dataReady,
+      // and their next keystroke ran _localWrite (overwriting the held work with the server copy)
+      // and _clearPending (dropping the flag). Gone, after doing exactly what they were told.
+      // The comment on _ensureAccountId already warns that _acctKey "assumes this holds" — the
+      // call that makes it hold just ran, so ask again.
+      // Kept as a SECOND check rather than moving the first: the early one is what lets an
+      // offline boot find the queue with no network at all, and that must not regress.
+      if (this._pendingList().includes('pf_data')) {
+        const _scopedPending = this._localReadRaw();
+        if (_scopedPending) {
+          const merged = this._mergeDefaults(_scopedPending);
+          this._dataReady = true;   // the operator's own unsynced edits — authoritative, safe to sync
+          this._loadedNonEmpty = this._blobHasArrayData(merged);
+          return merged;
+        }
+      }
       try {
         const { data, error } = await this._sb
           .from('user_data')
