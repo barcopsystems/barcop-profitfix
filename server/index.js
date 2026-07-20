@@ -579,18 +579,31 @@ async function sendErrorDigest() {
     // surviving backlog rather than silently dropping anything older than a day. A 24h fallback
     // meant a digest returning after any outage longer than a day quietly lost the gap.
     let since = (mark && mark.created_at) || cutoff;
+    let markUntrusted = false;
     if (since > nowIso) {
       console.error('errorDigest: stored high-water mark is in the FUTURE (' + since + ') — ignoring it and reporting the full retained window.');
       since = cutoff;
+      markUntrusted = true;
     }
     // Prune events ONLY up to the older of (retention cutoff, high-water mark). Deleting on age
     // alone let the prune outrun the digest: if reporting ever fell more than 30 days behind,
     // rows aged out having never been emailed — silent permanent loss of exactly the events the
     // backlog was too big to reach. Never delete something that has not been reported.
-    const pruneBefore = since < cutoff ? since : cutoff;
-    const { error: pruneErr } = await supabaseAdmin.from('client_errors')
-      .delete().lt('created_at', pruneBefore).neq('kind', 'digest_sent');
-    if (pruneErr) console.error('errorDigest: retention prune failed (non-fatal):', pruneErr.message);
+    // ...and do not prune AT ALL on a pass where the mark was unusable. The clamp above forces
+    // `since` FORWARD to the retention cutoff, and pruneBefore is derived from that same variable,
+    // so the guard inverts into "delete the whole backlog this pass just declined to report".
+    // Reachable after any stretch where reporting fell behind (revoked Resend key, unset
+    // OPS_ALERT_EMAIL, server down) held the prune back, followed by a poisoned or clock-skewed
+    // mark. A bad mark means we do not know what has been reported, so nothing here is safe to
+    // delete; retention waits one pass, which costs a day of rows and no correctness.
+    if (markUntrusted) {
+      console.warn('errorDigest: retention prune SKIPPED — the stored mark was unusable, so nothing in this table is provably reported. It resumes next pass.');
+    } else {
+      const pruneBefore = since < cutoff ? since : cutoff;
+      const { error: pruneErr } = await supabaseAdmin.from('client_errors')
+        .delete().lt('created_at', pruneBefore).neq('kind', 'digest_sent');
+      if (pruneErr) console.error('errorDigest: retention prune failed (non-fatal):', pruneErr.message);
+    }
     // ASCENDING + stamp at the LAST row: with descending order the marker jumped to the newest
     // event, so a burst larger than the 500 cap silently discarded everything older than the
     // newest 500 — which is where the root cause of a burst usually is. Ascending means an
@@ -658,9 +671,21 @@ async function sendErrorDigest() {
     }
     // Stamp at the LAST (newest) row of this ascending page, so an oversized burst resumes from
     // exactly where this run stopped rather than skipping the remainder.
+    // Never stamp the mark in the FUTURE. RLS deliberately allows a client to postdate a row by
+    // up to 5 minutes (SUPABASE_SETUP.sql: created_at < now() + interval '5 minutes') and these
+    // rows are written by the BROWSER, so the newest row's timestamp is attacker-influenced. The
+    // mark is GLOBAL — one service-role read across every account — so one tenant's postdated row
+    // would set the watermark for everybody, and every genuine error created inside that window
+    // is then skipped by the next run's .gt('created_at', cursor) and deleted by the prune.
+    // Clamping costs at most one re-reported row on the next pass; not clamping costs a blind
+    // window a client can reopen on demand (/api/health is unauthenticated and returns uptime_s,
+    // so the firing time is observable). nowIso is from the top of this pass, which only makes
+    // the clamp more conservative.
+    const lastAt = data[data.length - 1].created_at;
+    const markAt = lastAt > nowIso ? nowIso : lastAt;
     const { error: markErr } = await supabaseAdmin.from('client_errors').insert({
       kind: 'digest_sent', message: 'reported ' + data.length + ' event(s)',
-      created_at: data[data.length - 1].created_at
+      created_at: markAt
     });
     if (markErr) console.error('errorDigest: marker insert failed (next run will re-send these):', markErr.message);
     console.log('errorDigest: sent, ' + data.length + ' events');
