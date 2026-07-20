@@ -15,9 +15,11 @@ const PORT = process.env.PORT || 3000;
 
 // ── SIGNUPS CLOSED ──────────────────────────────────────────────────────────────────────────
 // Flip to true to reopen public signup. Set false 2026-07-20, with ZERO live accounts, while the
-// pre-live hardening is taken to completion. Blocks /api/create-checkout-session, so nobody can
-// reach payment. Existing customers are unaffected: login, the billing portal, the Stripe
-// webhook and everything else stay open.
+// pre-live hardening is taken to completion. Gates the TWO endpoints that mint a new account +
+// subscription: /api/create-checkout-session AND /api/add-account (adding a second bar), so nobody
+// reaches payment and no new bar is created. Existing customers keep everything else — login, the
+// billing portal, the Stripe webhook, invites, health — fully open; only creating a NEW bar is
+// paused, and it returns the moment this flips back to true.
 // ⚠ MIRRORS App.SIGNUPS_OPEN in public/app.js, which blocks the signup form in the browser.
 // CHANGE BOTH. verify-signups-closed.js FAILS if they disagree, so a half-open door is caught.
 const SIGNUPS_OPEN = false;
@@ -1915,6 +1917,13 @@ app.post('/api/transfer-ownership', async (req, res) => {
 // onboards on first entry.
 app.post('/api/add-account', async (req, res) => {
   try {
+    // SIGNUPS CLOSED — adding a bar mints a NEW account + subscription, the same machinery a new
+    // signup uses, so it is paused too while the door is shut. Refuse BEFORE creating anything: the
+    // old flow created the bar here and then checkout 503'd, leaving a half-made bar the owner could
+    // not pay for. Reopening SIGNUPS_OPEN restores add-a-bar. (create-checkout-session is the twin.)
+    if (!SIGNUPS_OPEN) {
+      return res.status(503).json({ error: 'Bar Cop is not taking new bars right now. Please check back shortly.' });
+    }
     const { name } = req.body || {};
     // Capped at 120 like set-account-name: uncapped, this write was bounded only by the
     // 50mb JSON limit, so a 10MB bar name could land in the row that renders in the bar
@@ -2048,26 +2057,38 @@ app.post('/api/abandon-account', async (req, res) => {
     // ⚠ FAILS CLOSED, unlike that guard. There, a Stripe hiccup falls through because blocking a
     // legitimate first checkout is the worse outcome. Here the worse outcome is deleting a paying
     // account, so an unreadable Stripe must REFUSE.
-    if ((process.env.STRIPE_SECRET_KEY || '').trim()) {
-      const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
-      try {
-        const ownerEmail = userData.user.email;
-        if (ownerEmail) {
-          const custs = await stripe.customers.list({ email: ownerEmail, limit: 20 });
-          for (const cust of (custs && custs.data) || []) {
-            const subs = await stripe.subscriptions.list({ customer: cust.id, status: 'all', limit: 20 });
-            // Scope by the account_id stamped on the subscription, so a multi-bar owner
-            // discarding one bar is not blocked by the subscription on another.
-            const mine = ((subs && subs.data) || []).filter(s => s.metadata && s.metadata.account_id === accountId);
-            if (mine.some(s => CHECKOUT_BLOCK_STATES.includes(s.status))) {
-              return res.status(400).json({ error: 'This account has an active subscription and cannot be discarded.' });
-            }
-          }
+    // FAIL CLOSED: if billing cannot be verified, REFUSE. Deleting a paying account is the one
+    // outcome that cannot be undone (it cascades away the subscription row + auth user while Stripe
+    // keeps billing). A MISSING key and a NULL owner email both mean "cannot check Stripe", so both
+    // must refuse HERE rather than fall through to the delete below — those two paths used to skip
+    // the check and delete anyway, defeating the fail-closed intent this block is built on.
+    const stripeKey = (process.env.STRIPE_SECRET_KEY || '').trim();
+    if (!stripeKey) {
+      console.error('abandon-account: STRIPE_SECRET_KEY is not set — cannot verify billing, refusing to delete. account=' + accountId);
+      return res.status(503).json({ error: 'Could not confirm your billing status just now. Nothing was deleted — please try again in a minute.' });
+    }
+    const ownerEmail = userData.user.email;
+    if (!ownerEmail) {
+      // A customer can pay with an email entered at checkout that differs from a null auth email,
+      // so with no email to look up we genuinely cannot confirm they are unbilled. Refuse.
+      console.error('abandon-account: owner has no email — cannot look up billing in Stripe, refusing to delete. account=' + accountId);
+      return res.status(503).json({ error: 'Could not confirm your billing status just now. Nothing was deleted — please contact support.' });
+    }
+    const stripe = require('stripe')(stripeKey);
+    try {
+      const custs = await stripe.customers.list({ email: ownerEmail, limit: 20 });
+      for (const cust of (custs && custs.data) || []) {
+        const subs = await stripe.subscriptions.list({ customer: cust.id, status: 'all', limit: 20 });
+        // Scope by the account_id stamped on the subscription, so a multi-bar owner
+        // discarding one bar is not blocked by the subscription on another.
+        const mine = ((subs && subs.data) || []).filter(s => s.metadata && s.metadata.account_id === accountId);
+        if (mine.some(s => CHECKOUT_BLOCK_STATES.includes(s.status))) {
+          return res.status(400).json({ error: 'This account has an active subscription and cannot be discarded.' });
         }
-      } catch (e) {
-        console.error('abandon-account: could not confirm billing with Stripe, refusing to delete:', e.message);
-        return res.status(503).json({ error: 'Could not confirm your billing status just now. Nothing was deleted — please try again in a minute.' });
       }
+    } catch (e) {
+      console.error('abandon-account: could not confirm billing with Stripe, refusing to delete:', e.message);
+      return res.status(503).json({ error: 'Could not confirm your billing status just now. Nothing was deleted — please try again in a minute.' });
     }
 
     // Delete the account (memberships + subscription cascade via FK ON DELETE CASCADE).
