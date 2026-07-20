@@ -2874,6 +2874,8 @@ const App = {
     DB._controlNonEmpty = {};       // recomputed per control read; drives the control total-wipe backstop
     DB._allowReset = false;         // any leftover reset bypass ends at the next load
     DB._backfillPending = {};       // per-kind "backfill not confirmed" flags are per-LOAD: a flag left set by a queued/failed backfill (or by another account in this tab) makes _configBlob keep re-writing that array into the config blob forever, which is what lets a deleted-to-empty array resurrect on the next login
+    DB._loadedNonEmpty = false;     // "the account I have loaded is known-populated" — the ONE flag here that used to survive a reload. It is re-derived below (and by readData), so carrying the PREVIOUS load's value into this one armed the total-wipe backstop against a half-loaded App.data and produced false wipe_blocked reports. Per-load, like every sibling above.
+    DB._loadInFlight = true;        // diagnostic only: lets the backstop say whether it fired mid-load
     this._setupDismissed = false;   // setup banner dismiss is per-login; a fresh login shows it again
     this.data          = await DB.readData();
     this.inventoryData = await DB.readInventoryData();
@@ -2926,6 +2928,7 @@ const App = {
     DB._controlNonEmpty['ic_data'] = DB._blobHasArrayData(this.inventoryData);
     DB._controlNonEmpty['lc_data'] = DB._blobHasArrayData(this.laborData);
     DB._controlNonEmpty['sc_data'] = DB._blobHasArrayData(this.shiftData);
+    DB._loadInFlight = false;       // data is fully loaded; any backstop hit from here is genuine
     // Persist the migration markers loadEventStores just learned, ONCE, now that every store has
     // loaded and the backstop flags above are accurate. Only writes when something actually
     // changed, so this is a no-op on every login after the first. Without it the marker never

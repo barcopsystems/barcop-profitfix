@@ -613,8 +613,22 @@ const DB = {
         // The backstop firing means something upstream tried to empty a live account. The data
         // is safe, but this should NEVER happen in normal use — it is the single highest-signal
         // event in the app and Kyle needs to see it the day it happens, not months later.
+        // Rich detail on purpose: the first two of these in the wild (2026-07-20) could NOT be
+        // diagnosed, because "keys=31 allowReset=false" does not say whether a load was still in
+        // flight, which arrays existed, or what called the save. A blocked write is harmless but
+        // unexplained, and unexplained is the state that costs a whole session to chase.
+        const arrs = Object.keys(liveCore || {}).filter(k => Array.isArray(liveCore[k]));
+        let stack = '';
+        try { stack = (new Error()).stack || ''; } catch (e) {}
         this.logClientError('wipe_blocked', 'Total-wipe write blocked over a populated account',
-          'keys=' + Object.keys(liveCore || {}).length + ' allowReset=' + this._allowReset);
+          'keys=' + Object.keys(liveCore || {}).length
+          + ' arrays=' + arrs.length + ' (all empty)'
+          + ' allowReset=' + this._allowReset
+          + ' dataReady=' + this._dataReady
+          + ' loadInFlight=' + !!this._loadInFlight
+          + ' online=' + (typeof navigator !== 'undefined' ? navigator.onLine : '?')
+          + '\narrayKeys=' + arrs.slice(0, 40).join(',')
+          + '\n' + stack.split('\n').slice(1, 9).join('\n'));
         return { ok: false, blocked: true };
       }
       // Fix D: short-circuit the network call when the browser knows it is offline.
