@@ -882,6 +882,12 @@ const DB = {
           if (k && k.indexOf('pfev_') === 0 && k !== key) drop.push(k);
         }
         drop.forEach(k => { try { localStorage.removeItem(k); } catch (e2) {} });
+        // Drop any QUEUED cache patches too. They live in memory and would be flushed straight
+        // back onto the keys just evicted — refilling the disk we are trying to free, and
+        // resurrecting caches this sweep deliberately removed. They are disposable by
+        // definition: the next successful load rebuilds them from the server.
+        this._evCachePending = null;
+        if (this._evCacheTimer) { clearTimeout(this._evCacheTimer); this._evCacheTimer = null; }
         localStorage.setItem(key, value); return true;
       } catch (e3) {
         console.warn('localStorage full — an unsynced write may be dropped:', key, (e3 && e3.message) || '');
@@ -1364,10 +1370,51 @@ const DB = {
   _backfillPending: {},
   _rowDate(kind, rec) { return this.NONWINDOWED_KINDS.indexOf(kind) >= 0 ? null : this._eventDate(rec); },
   _evCacheKey(table, kind) { return this._acctKey('pfev_' + table + '_' + kind); },
+  // ── Coalesced cache writes ────────────────────────────────────────────────
+  // Patches accumulate here and are written ONCE, after the burst settles. Necessary because
+  // _patchEventCache rewrites the WHOLE window and the app deletes records in per-record await
+  // loops (multi-select product delete, the CSV commit, fill-from-schedule, tip log, waste,
+  // adjustments, transfers). Writing straight through made an ordinary "delete 400 products"
+  // quadratic: ~250 MB through localStorage, which in a browser is synchronous and disk-backed.
+  // Reads below consult this first, so nothing ever sees a stale cache in the gap.
+  _evCachePending: null,
+  _evCacheTimer: null,
+  _evCacheUnloadWired: false,
+  _flushEventCache() {
+    const p = this._evCachePending;
+    this._evCachePending = null;
+    if (this._evCacheTimer) { clearTimeout(this._evCacheTimer); this._evCacheTimer = null; }
+    if (!p) return;
+    Object.keys(p).forEach(k => {
+      const i = k.indexOf('|');
+      try { localStorage.setItem(this._evCacheKey(k.slice(0, i), k.slice(i + 1)), JSON.stringify(p[k])); }
+      catch (e) { /* cache is best-effort */ }
+    });
+  },
+  _scheduleEventCacheFlush() {
+    if (this._evCacheTimer) clearTimeout(this._evCacheTimer);
+    this._evCacheTimer = setTimeout(() => { this._evCacheTimer = null; this._flushEventCache(); }, 1000);
+    // A debounce can be starved by a long burst, so make sure the last state still reaches disk
+    // when the tab goes away. pagehide covers close AND mobile backgrounding, which is where a
+    // bar tablet spends most of its life.
+    if (!this._evCacheUnloadWired && typeof window !== 'undefined' && window.addEventListener) {
+      this._evCacheUnloadWired = true;
+      window.addEventListener('pagehide', () => this._flushEventCache());
+      window.addEventListener('visibilitychange', () => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') this._flushEventCache();
+      });
+    }
+  },
   _cacheEvents(table, kind, recs) {
+    // A full window load supersedes any queued patch for this kind.
+    if (this._evCachePending) delete this._evCachePending[table + '|' + kind];
     try { localStorage.setItem(this._evCacheKey(table, kind), JSON.stringify(recs)); } catch (e) {}
   },
   _readEventCache(table, kind) {
+    // Pending patches win: they are newer than whatever is on disk. Returned as a COPY so a
+    // caller cannot mutate the queued state (loadEvents tags its result with _fromCache).
+    const pend = this._evCachePending && this._evCachePending[table + '|' + kind];
+    if (pend) return pend.slice();
     try { const r = localStorage.getItem(this._evCacheKey(table, kind)); return r ? JSON.parse(r) : []; }
     catch (e) { return []; }
   },
@@ -1391,7 +1438,11 @@ const DB = {
       const putMap = new Map((putRecs || []).filter(r => r && r.id != null).map(r => [String(r.id), r]));
       const kept = this._readEventCache(table, kind)
         .filter(r => r && !delSet.has(String(r.id)) && !putMap.has(String(r.id)));
-      this._cacheEvents(table, kind, [...putMap.values(), ...kept]);
+      // QUEUE it rather than writing through — see _evCachePending. Writing here per record made
+      // a bulk delete quadratic in localStorage traffic.
+      if (!this._evCachePending) this._evCachePending = {};
+      this._evCachePending[table + '|' + kind] = [...putMap.values(), ...kept];
+      this._scheduleEventCacheFlush();
     } catch (e) { /* cache is best-effort */ }
   },
 
@@ -1581,6 +1632,14 @@ const DB = {
       Object.keys(localStorage).filter(k =>
         k.indexOf('pfev_' + table + '_') === 0 && (!_acct || k.endsWith('__' + _acct)))
         .forEach(k => localStorage.removeItem(k));
+      // And drop this table's QUEUED patches. They live in memory, so without this the pending
+      // flush would write the cleared caches straight back after the sweep — a restore would
+      // clear a module's cache and then resurrect the stale copy a second later.
+      if (this._evCachePending) {
+        Object.keys(this._evCachePending)
+          .filter(k => k.indexOf(table + '|') === 0)
+          .forEach(k => { delete this._evCachePending[k]; });
+      }
     } catch (e) {}
     if (this._demo || !this._sb || !this._user) return { ok: true };
     const accountId = await this._ensureAccountId();
