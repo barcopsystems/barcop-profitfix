@@ -559,10 +559,15 @@ async function sendErrorDigest() {
       .delete().lt('created_at', markCutoff).eq('kind', 'digest_sent');
     if (markPruneErr) console.error('errorDigest: marker prune failed (non-fatal):', markPruneErr.message);
 
-    const { data: mark } = await supabaseAdmin
+    const { data: mark, error: markErr0 } = await supabaseAdmin
       .from('client_errors')
       .select('created_at').eq('kind', 'digest_sent')
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    // A swallowed error here read as "no mark", which falls back to the retention cutoff and
+    // re-reports the entire 30-day window. That was one 500-row page before the drain loop; it
+    // is now up to 10,000 events, arriving with no explanation. A transient read failure must
+    // not look like a fresh install — skip this pass and try again rather than mass-duplicate.
+    if (markErr0) { console.error('errorDigest: could not read the high-water mark, skipping this pass:', markErr0.message); return; }
     // Clamp the mark: client_errors rows are written by the BROWSER, so created_at is
     // attacker-controlled. A single row stamped in the year 2099 would push the mark into the
     // future and silence every future digest — permanently, and looking exactly like a healthy
@@ -608,6 +613,7 @@ async function sendErrorDigest() {
         .gt('created_at', cursor)
         .neq('kind', 'digest_sent')
         .order('created_at', { ascending: true })
+        .order('id', { ascending: true })   // deterministic within a timestamp; ids are bigserial
         .limit(PAGE);
       if (error) {
         console.error('errorDigest read failed:', error.message);
@@ -1977,3 +1983,22 @@ if ((process.env.OPS_ALERT_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL || '').t
   setTimeout(() => { sendErrorDigest().catch(e => console.error("errorDigest (startup):", (e && e.message) || e)); }, 10 * 60 * 1000);
   setInterval(() => { sendErrorDigest().catch(e => console.error("errorDigest (interval):", (e && e.message) || e)); }, 24 * 60 * 60 * 1000);
 }
+
+// RETENTION RUNS UNCONDITIONALLY — it must not be gated behind the alert config. The prune lives
+// inside sendErrorDigest, and sendErrorDigest was only SCHEDULED when an alert address existed,
+// so an instance with OPS_ALERT_EMAIL unset never pruned at all: client_errors is writable by any
+// authenticated user, so it would grow without bound until it became the disk-pressure event that
+// takes the product down. Retention is a survival property of the database; alerting is a feature
+// on top of it, and one must not depend on the other.
+// Also enforces an ABSOLUTE FLOOR the in-digest prune cannot: that one is clamped to the
+// high-water mark so it never deletes an unreported row, which is right — but it means a
+// permanently failing digest (revoked Resend key) pins the mark and disables retention forever.
+// Past 90 days the row is unrecoverable context anyway; keeping the table alive matters more.
+setInterval(async () => {
+  try {
+    const floor = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+    const { error } = await supabaseAdmin.from('client_errors')
+      .delete().lt('created_at', floor).neq('kind', 'digest_sent');
+    if (error) console.error('client_errors floor prune failed:', error.message);
+  } catch (e) { console.error('client_errors floor prune threw:', (e && e.message) || e); }
+}, 24 * 60 * 60 * 1000);
