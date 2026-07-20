@@ -138,7 +138,10 @@ S.InventoryVendors = {
   renderList() {
     this.actions.innerHTML = '';
     this.editId = null;
-    const vendors = this.vendors();
+    // Name-sorted, matching every other vendor surface (ic-product-setup, ic-order-sheet).
+    // Unsorted, this list inherited row order (newest-first) and rendered upside-down.
+    const vendors = this.vendors().slice()
+      .sort((a, b) => String((a && a.name) || '').localeCompare(String((b && b.name) || '')));
 
     let listSection;
     if (vendors.length === 0) {

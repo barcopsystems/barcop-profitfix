@@ -202,7 +202,10 @@ S.PrepBatches = {
     if (this._draftRows) this.rows = this._draftRows.map(r => ({ ...r }));
     else this.initRows(null);
 
-    const batches = this.list();
+    // Name-sorted, matching the ingredient picker in this same file. Unsorted, this list
+    // inherited row order (newest-first) and rendered upside-down.
+    const batches = this.list().slice()
+      .sort((a, b) => String((a && a.name) || '').localeCompare(String((b && b.name) || '')));
 
     // Keep stored batch costs in sync with current product costs so the list and
     // any menu item that rolls up cost_per_serving never show a stale number when

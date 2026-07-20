@@ -778,7 +778,13 @@ S.InventoryReceiveDelivery = {
     // behind it: the delivery (row), then the cost changes (product rows,
     // row-per-record), then the matched order's new status (row).
     const okDel = await App.putRecord('ic', 'delivery', record);
-    const okCfg = appliedUpdates.length ? await App.putRecordsBulk('ic', 'product', appliedUpdates.map(u => u.product)) : true;
+    // Dedupe by id: productUpdates is built per invoice LINE, and one invoice can carry the same
+    // product on two lines (split price tiers, or a line entered twice) — which puts the same id
+    // twice in one chunk and Postgres rejects the whole upsert ("ON CONFLICT ... cannot affect
+    // row a second time"), silently pushing every cost update onto the offline replay queue.
+    const _byId = new Map();
+    appliedUpdates.forEach(u => { if (u && u.product && u.product.id != null) _byId.set(u.product.id, u.product); });
+    const okCfg = _byId.size ? await App.putRecordsBulk('ic', 'product', [..._byId.values()]) : true;
     const okOrd = matchedOrder ? await App.putRecord('ic', 'order', matchedOrder) : true;
     const ok = okDel && okCfg && okOrd;
     if (ok) {
