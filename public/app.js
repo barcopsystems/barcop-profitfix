@@ -1252,6 +1252,13 @@ const App = {
   },
 
   // Discard the just-created unpaid account (frees the email) → fresh signup.
+  // Pull the server's refusal message off a non-OK /api/abandon-account response, so the operator
+  // sees WHY (a live subscription, or billing could not be confirmed) instead of a silent no-op.
+  async _abandonError(resp) {
+    try { const d = await resp.json(); return (d && d.error) || 'This account could not be discarded right now.'; }
+    catch (e) { return 'This account could not be discarded right now.'; }
+  },
+
   async abandonAndRestart() {
     // Keep the plan gate up as a full-screen cover the whole time. The confirm
     // renders ABOVE it (z 9800) and the gate stays put through the async delete
@@ -1263,11 +1270,28 @@ const App = {
       confirmText: 'Discard & Start Over', cancelText: 'Keep It', z: 9800
     });
     if (!ok) return;  // gate is still up; nothing to restore
+    // The server can REFUSE this delete (a live subscription, or it could not confirm billing). If
+    // it does, we must NOT sign out into a fresh signup — the account still exists and may be
+    // billing, and signing out here is the "paid twelve seconds ago, clicked Start Over, now signed
+    // out with a live subscription and no way back to it" trap. Only proceed on a confirmed delete.
+    let refused = null;
     try {
       const headers = await DB._authHeaders();
       const accountId = await DB._ensureAccountId();
-      if (accountId) await fetch('/api/abandon-account', { method: 'POST', headers, body: JSON.stringify({ accountId }) });
-    } catch (e) {}
+      if (accountId) {
+        const resp = await fetch('/api/abandon-account', { method: 'POST', headers, body: JSON.stringify({ accountId }) });
+        if (!resp.ok) refused = await this._abandonError(resp);
+      }
+    } catch (e) { refused = 'Could not reach the server. Nothing was changed — please try again.'; }
+    if (refused) {
+      const reload = await this.confirm({
+        title: 'This account is still active',
+        message: refused + ' You have not been signed out. If you just paid, reload to open your account.',
+        confirmText: 'Reload', cancelText: 'Stay on this page', danger: false, z: 9900
+      });
+      if (reload) window.location.reload();
+      return;   // gate stays up; the operator is NOT signed out and the account is untouched
+    }
     try { await DB.signOut(); } catch (e) {}
     this.showAuth();
     this._removePlanGate();
@@ -7404,11 +7428,27 @@ function wireAuth() {
       confirmText: 'Start Over', cancelText: 'Cancel'
     });
     if (!ok) return;
+    // Same guard as abandonAndRestart: never sign out into a fresh signup if the server refused the
+    // delete. "No payment was made" is the ASSUMPTION this flow is built on, and it is exactly the
+    // assumption that is wrong in the webhook-lag window — so honour the server's answer.
+    let refused = null;
     try {
       const headers = await DB._authHeaders();
       const accountId = await DB._ensureAccountId();
-      if (accountId) await fetch('/api/abandon-account', { method: 'POST', headers, body: JSON.stringify({ accountId }) });
-    } catch (e) { /* best-effort cleanup; still sign out to the fresh signup */ }
+      if (accountId) {
+        const resp = await fetch('/api/abandon-account', { method: 'POST', headers, body: JSON.stringify({ accountId }) });
+        if (!resp.ok) refused = await App._abandonError(resp);
+      }
+    } catch (e) { refused = 'Could not reach the server. Nothing was changed — please try again.'; }
+    if (refused) {
+      const reload = await App.confirm({
+        title: 'This account is still active',
+        message: refused + ' You have not been signed out. If you just paid, reload to open your account.',
+        confirmText: 'Reload', cancelText: 'Stay on this page', danger: false
+      });
+      if (reload) window.location.reload();
+      return;
+    }
     try { await DB.signOut(); } catch (e) {}
     ['signup-email','signup-pw1','signup-pw2'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const tos = document.getElementById('signup-tos'); if (tos) tos.checked = false;
