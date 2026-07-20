@@ -43,7 +43,12 @@ const DB = {
   // evidence of expiry and a false banner is worse than a late one.
   async hasLiveSession() {
     try {
-      if (!this._sb) return true;                 // local / demo mode: never claim expiry
+      // `_sb` exists in DEMO too (init creates it whenever the supabase lib loaded), and it
+      // survives a deliberate sign-out — in both states there is legitimately no session, and
+      // reporting that as "expired" painted a "You have been signed out" banner over the demo
+      // (a sales surface, whose Sign In button reloads the visitor OUT of the demo) and over
+      // the sign-in card. Expiry only means anything if we HAD a session: gate on _user.
+      if (!this._sb || this._demo || !this._user) return true;
       const { data } = await this._sb.auth.getSession();
       return !!(data && data.session);
     } catch (e) { return true; }
@@ -768,7 +773,13 @@ const DB = {
       // blob has only config OBJECTS (settings/targets/...) — an array test would flag it
       // empty and skip EVERY offline core-config replay (onboarding, targets, fix-progress).
       const emptyLocal = !data || Object.keys(data).length === 0;
-      if (!this._dataReady || emptyLocal) { continue; }
+      // An empty/missing local blob means there is provably NOTHING to push, so the pending flag
+      // is stale by definition — clear it. Leaving it set (the original behaviour) stranded the
+      // flag forever: hasPendingSync stayed true, the "changes have not reached the server"
+      // banner returned on every login, and Sync Now reported "All offline changes are synced"
+      // having synced nothing. That trains the operator to ignore the one banner that matters.
+      if (emptyLocal) { this._clearPending(lsKey); continue; }
+      if (!this._dataReady) { continue; }   // genuinely "try again after the load confirms"
       try {
         const { error } = await this._sb.from(table).upsert({
           account_id: accountId, user_id: this._user.id, data: data, updated_at: new Date().toISOString()
@@ -924,6 +935,11 @@ const DB = {
       const liveCtl = this._liveControl(table) || data;
       if (this._controlNonEmpty[table] && !this._allowReset && !this._blobHasArrayData(liveCtl)) {
         console.error('_writeControl: BLOCKED a total-wipe of ' + table + ' (populated account, all-empty state). Server data preserved.');
+        // Report it, same as writeData. This path said "parity with writeData" but dead-ended in
+        // console.error, so a blocked wipe of the Inventory / Labor / Shift config was invisible.
+        this.logClientError('wipe_blocked', 'Total-wipe write blocked over a populated account',
+          'table=' + table + ' keys=' + Object.keys(liveCtl || {}).length
+          + ' allowReset=' + this._allowReset + ' loadInFlight=' + !!this._loadInFlight);
         return { ok: false, blocked: true };
       }
       // Fix D: short-circuit the network call when the browser knows it is offline.
@@ -953,9 +969,15 @@ const DB = {
 
         if (error) {
           console.error('write ' + table + ' error:', error);
+          // Parity with writeData: _writeControl is the ONLY writer for ic_data/lc_data/sc_data,
+          // so without this a shift spent editing locations, vendors, staff or drawers on a dead
+          // session queued every save, showed the "will sync" banner, and never surfaced the one
+          // thing that fixes it. That replay can never drain — it needs the session that died.
+          if (this._isAuthError(error)) this._flagAuthExpired(table);
+          this._reportRlsDenial(table, null, error);
           this._localWriteControl(lsKey, data);
           this._markPending(lsKey);
-          return { ok: false, error };
+          return { ok: false, error, authExpired: this._isAuthError(error) };
         }
         this._localWriteControl(lsKey, data); // keep local copy in sync
         this._clearPending(lsKey);
@@ -1314,12 +1336,21 @@ const DB = {
             // would drop records 1001+ and later serve the partial as the complete window.
             // Keep the prior good cache; this session still returns what actually loaded.
             if (complete) this._cacheEvents(table, kind, recs);
+            // Flag this read as SERVER-CONFIRMED, on the ARRAY itself — loadEventStores runs the
+            // kinds concurrently through Promise.all, so a shared instance flag would race and
+            // report the wrong kind's provenance. loadEventStores uses this to decide whether it
+            // may set the permanent `migrated_kinds` marker: rows from the offline CACHE look
+            // identical to rows from the server, and marking a kind migrated off a stale or
+            // partial cache would strip the blob backup for records the cache never held.
+            try { Object.defineProperty(recs, '_fromCache', { value: !complete, enumerable: false }); } catch (e) {}
             return recs;
           }
         } catch (e) { /* fall through to cache */ }
       }
     }
-    return opts.before ? [] : this._readEventCache(table, kind);
+    const _cached = opts.before ? [] : this._readEventCache(table, kind);
+    try { Object.defineProperty(_cached, '_fromCache', { value: true, enumerable: false }); } catch (e) {}
+    return _cached;
   },
 
   async putEvent(table, kind, rec) {

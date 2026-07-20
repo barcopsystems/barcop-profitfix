@@ -271,7 +271,12 @@ window.CashEngine = {
   // Bar Cop's weighted same-weekday baseline off your shift sales, else a cyclic
   // replay of your recent actual weeks for the far weeks past the lookback window.
   revenueForWeek(ws) {
-    if (App.forecastForWeek) { const f = App.forecastForWeek(ws); if (f && f.total) return f.total; }
+    // `!= null`, NOT truthiness: $0 is a LEGITIMATE saved forecast. saveForecast accepts any
+    // val >= 0 and App.effectiveForecast honours a 0 (Build Schedule shows a $0 labour budget
+    // for it), but a truthiness test here discarded it and fell through to the 8-week average —
+    // so a week the operator explicitly closed for renovation projected a full average week of
+    // phantom revenue into the balance curve, the low-point week, the runway, and the lender PDF.
+    if (App.forecastForWeek) { const f = App.forecastForWeek(ws); if (f && f.total != null) return Number(f.total) || 0; }
     if (App.forecastDefaultsFor) { const d = App.forecastDefaultsFor(ws); if (d && d.total) return d.total; }
     // Beyond the forecast's same-weekday lookback window (the default returns 0
     // once a week is more than ~8 weeks past the last logged sales), replay the

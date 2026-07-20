@@ -2901,11 +2901,12 @@ const App = {
     // one on the next login. Put both on ONE scale instead: stamp any missing sort_order from
     // creation order (id ascending — rows load newest-first, so array position is not creation
     // order) before sorting, so _nextLocSeq appends past the end and the order holds.
+    const _locsStamped = [];
     const _locs = this.inventoryData && this.inventoryData.ic_locations;
     if (Array.isArray(_locs) && _locs.length) {
       const byCreation = _locs.slice().sort((a, b) => String(a && a.id).localeCompare(String(b && b.id)));
       let _seq = byCreation.reduce((m, l) => Math.max(m, (l && l.sort_order != null) ? l.sort_order : -1), -1) + 1;
-      byCreation.forEach(l => { if (l && l.sort_order == null) l.sort_order = _seq++; });
+      byCreation.forEach(l => { if (l && l.sort_order == null) { l.sort_order = _seq++; _locsStamped.push(l); } });
       _locs.sort((a, b) => ((a.sort_order || 0) - (b.sort_order || 0))
         || String(a && a.id).localeCompare(String(b && b.id)));
     }
@@ -2936,6 +2937,13 @@ const App = {
     if (_migCountBefore !== Object.keys(this.data.migrated_kinds || {}).length) {
       await this.saveKey('migrated_kinds');
     }
+    // PERSIST the sort_order stamps assigned above. In-memory-only stamping did not fix the
+    // count-sheet order, it displaced the bug by one login: _nextLocSeq reads the in-memory max,
+    // so a location added this session got a number ABOVE the un-stamped rows, and on the next
+    // load those rows were re-stamped HIGHER than it — putting the newly added location back at
+    // the top of the count sheet. Writing the stamps makes the order stable for good. Rows only
+    // (ic_locations is row-per-record); safe here because the load is complete.
+    if (_locsStamped.length) await this.putRecordsBulk('ic', 'location', _locsStamped);
     // Pre-fetch the accounts list so the Hub sidebar can render the
     // Locations section synchronously (multi-account users only).
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
@@ -5335,7 +5343,11 @@ const App = {
     const results = await Promise.all(kinds.map(k => DB.loadEvents(store.table, k)));
     for (let i = 0; i < kinds.length; i++) {
       const k = kinds[i], arr = store.kinds[k], rows = results[i] || [], prior = blobCopy[arr];
-      if (rows.length) { dataObj[arr] = rows; migrated[k] = true; continue; }   // rows exist: already row-per-record
+      // Only a SERVER-CONFIRMED read may set the permanent marker. Rows served from the offline
+      // cache are indistinguishable from real ones, so marking a kind migrated off a stale or
+      // partial cache would strip the blob backup for records the cache never held — silent,
+      // permanent loss on exactly the flaky-connection login where it matters most.
+      if (rows.length) { dataObj[arr] = rows; if (!rows._fromCache) migrated[k] = true; continue; }   // rows exist: already row-per-record
       // No rows. That is AMBIGUOUS on its own — it means either "this array has never been
       // migrated" or "the operator deleted every record". The marker below is what tells them
       // apart. Without it, emptying a list (all your permits expired, you cleared the calendar)
