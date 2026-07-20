@@ -401,16 +401,34 @@ const PosIngest = {
     const items = (App.data && App.data.menu_items) || [];
     const byName = {};
     items.forEach(it => { if (it && it.name) byName[it.name.trim().toLowerCase()] = it; });
-    const toAdd = []; const skipped = []; let dupCount = 0;
+    // AGGREGATE BY ITEM — never one entry per CSV row. A PMIX split by daypart, revenue centre or
+    // order type lists the same item several times, which is an ordinary export shape, and the
+    // week's units sold is their SUM. One-entry-per-row meant the LAST row won (lunch silently
+    // discarded), _commitPmix walked the same object twice so prev_weekly_covers was overwritten
+    // with an intermediate figure that never existed (corrupting the mix-delta), and the same
+    // object went into the bulk upsert twice — Postgres rejects a duplicate id in one ON CONFLICT
+    // chunk, so the whole batch fell to the offline queue while the screen said "imported".
+    // sc-dashboard.js dedupes with a Map for exactly that last reason.
+    // Aggregating HERE rather than at commit means the PREVIEW shows the combined figure, so the
+    // operator approves the number that will actually be saved.
+    const byItem = new Map();
+    const skipped = []; const dupCount = 0; let merged = 0;
     (rows || []).forEach(r => {
       const nm = (r.name || '').trim().toLowerCase();
       const units = Math.round(parseFloat(String(r.units == null ? '' : r.units).replace(/[^0-9.]/g, '')));   // keep the decimal point: "12.00" is 12, not 1200; strip only commas/currency
       if (!nm || isNaN(units)) { skipped.push(r.name || '(blank)'); return; }
       const it = byName[nm];
       if (!it) { skipped.push(r.name); return; }
-      toAdd.push({ item_id: it.id, covers: units });
+      const prior = byItem.get(it.id);
+      if (prior) { prior.covers += units; merged++; }
+      else byItem.set(it.id, { item_id: it.id, covers: units });
     });
-    return { toAdd, skipped, dupCount };
+    // `merged`, NOT dupCount. In every other builder in this file dupCount means rows SKIPPED
+    // because they were already logged, and every screen renders it as "N already logged" — the
+    // opposite of what happened here, where N rows were FOLDED INTO a total. Reusing the name
+    // would have been a message waiting to lie the moment someone wired it up. dupCount stays 0
+    // so the shared build() contract documented at the top of this file still holds.
+    return { toAdd: [...byItem.values()], skipped, dupCount, merged };
   },
 
   // ── Persist ──────────────────────────────────────────────────────────────
