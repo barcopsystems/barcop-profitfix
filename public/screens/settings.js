@@ -439,6 +439,9 @@ S.HubSettings = {
     const must = async (label, p) => {
       const r = await p;
       if (r && r.ok === false && !r.offline && !r.queued) {
+        // An aborted restore means an owner tried to roll their account back and could not.
+        // They are safe (nothing was erased) but they are also stuck, and they may not say so.
+        DB.logClientError('restore_aborted', 'Restore aborted before clearing rows', 'step=' + label);
         throw new Error('could not write ' + label + ' — nothing was erased, your account is unchanged');
       }
     };
