@@ -735,7 +735,13 @@ const App = {
         // THREE outcomes, not two. A run that skipped everything because the account was still
         // loading is not a connection problem, and saying it is sends the operator off checking
         // their wifi for something that will fix itself in seconds.
-        if (span) span.textContent = r.failed
+        // `r.failed || r.error`, not `r.failed` alone. syncPending's two EARLY returns — not
+        // connected, and no account membership — both carry failed: 0, so branching on failures
+        // alone told a genuinely offline tablet "your account is still loading" and to wait for
+        // something that will never resolve. An offline boot never resolves an account id, so
+        // that is the COMMON path here, not an edge case. Only a run that skipped because the
+        // load had not finished gets the loading message.
+        if (span) span.textContent = (r.failed || r.error)
           ? 'Still cannot reach the server. Your changes are safe on this device. '
             + 'Try again once you have a connection.'
           : 'Your account is still loading. Your changes are safe on this device — '
@@ -5565,7 +5571,21 @@ const App = {
       // delete, not the in-memory corruption the backstop exists to catch. Lowered only on
       // SUCCESS: a rejected delete restores the row below, so the account is still populated and
       // the backstop has to stay armed.
-      DB._loadedNonEmpty = DB._blobHasArrayData(this.data);
+      // Route by STORE. The core flag and the three control flags are separate backstops over
+      // separate objects, and lowering the wrong one is a real hazard: an Inventory delete used
+      // to re-derive the CORE flag off App.data, so a delete could disarm the core backstop for
+      // a corruption it had nothing to do with.
+      if (mod === 'core') {
+        DB._loadedNonEmpty = DB._blobHasArrayData(this.data);
+      } else {
+        // The SAME bug lived in the mirror. `_controlNonEmpty` is the identical flag for
+        // ic_data / lc_data / sc_data, set once at load and never re-derived, so deleting the
+        // last staff member left every Labor config save refused for the session — and Business
+        // Profile's state-minimum-wage save does not check its return, so the value silently
+        // never reached the server while the form reported success. More reachable than the core
+        // case: a control object holds ~12 arrays to a bar's ~25.
+        DB._controlNonEmpty[mod + '_data'] = DB._blobHasArrayData(dataObj);
+      }
       return true;
     }
     if (removed) arr.splice(idx, 0, removed);
