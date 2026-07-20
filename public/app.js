@@ -296,10 +296,37 @@ const App = {
 
   async init() {
     await DB.init();
+    // A crash used to paint a raw stack trace over the operator's screen and report it NOWHERE,
+    // so Kyle only ever learned about a failure if a customer stopped work and filled in the bug
+    // form. Now: the operator gets a calm message they can act on, and the real detail is shipped.
     window.onerror = (msg, src, line, col, err) => {
+      try {
+        DB.logClientError('js_error', msg,
+          (err && err.stack ? err.stack : '') + '\nat ' + (src || '?') + ':' + (line || '?') + ':' + (col || '?'),
+          this._currentScreenId || '');
+      } catch (e) {}
       const el = document.getElementById('content-area');
-      if (el) el.innerHTML = '<div class="screen" style="color:var(--red);font-family:monospace;font-size:12px;white-space:pre-wrap;">ERROR: ' + msg + '\nLine: ' + line + '\n' + (err ? err.stack : '') + '</div>';
+      if (el) el.innerHTML = '<div class="screen"><div class="card" style="max-width:520px;margin:40px auto;text-align:center;">'
+        + '<div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:10px;">This screen ran into a problem</div>'
+        + '<div style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:18px;">'
+        + 'Your saved data is safe. The details were sent to Bar Cop automatically, so no report is needed. '
+        + 'Reload to get going again.</div>'
+        + '<button class="btn btn-primary" onclick="window.location.reload()">Reload Bar Cop</button>'
+        + '</div></div>';
     };
+    // Rejected promises do NOT reach window.onerror. This app is async end to end, so a failed
+    // save deep in an await chain — the exact shape of the data-loss bugs found on 2026-07-19 —
+    // was previously invisible to the operator AND to Kyle. Report it, but do NOT take over the
+    // screen: most rejections are non-fatal and a false alarm trains people to ignore real ones.
+    window.addEventListener('unhandledrejection', (e) => {
+      try {
+        const r = e && e.reason;
+        DB.logClientError('unhandled_rejection',
+          (r && (r.message || r.error_description)) || String(r || 'unknown'),
+          (r && r.stack) ? r.stack : JSON.stringify(r || null),
+          this._currentScreenId || '');
+      } catch (e2) {}
+    });
 
     // Browser back/forward walks the in-app history stack instead of leaving
     // the site. _navigationLock suppresses re-pushing while popstate handles
@@ -5277,7 +5304,14 @@ const App = {
         const r = await DB.putEventsBulk(store.table, k, prior);
         dataObj[arr] = prior;                                           // keep the data either way — never lose it
         if (r && r.ok) migrated[k] = true;
-        else DB._backfillPending[k] = true;                             // rows not CONFIRMED on the server (failed OR merely queued offline): keep the array in the blob too (see _configBlob) until a real server write confirms them, so a never-draining queue can't orphan the only copy
+        else {
+          DB._backfillPending[k] = true;                                // rows not CONFIRMED on the server (failed OR merely queued offline): keep the array in the blob too (see _configBlob) until a real server write confirms them, so a never-draining queue can't orphan the only copy
+          // A stuck backfill means this account's data is living only in the blob backup. It is
+          // safe, but it is not yet where the app expects it, and nothing else would ever say so.
+          // Guarded: this runs during BOOT, and a reporter that throws here would stop the app
+          // from loading — an observability call must never be able to do that.
+          try { DB.logClientError && DB.logClientError('backfill_failed', 'Blob-to-rows backfill not confirmed', 'kind=' + k + ' records=' + prior.length); } catch (e) {}
+        }
       } else {
         dataObj[arr] = [];                                              // genuinely empty (new account, or deleted to empty post-migration)
         if (migratedBefore[k]) migrated[k] = true;                      // stay migrated: an empty migrated array must never fall back to the blob

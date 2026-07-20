@@ -592,6 +592,11 @@ const DB = {
       const liveCore = (typeof App !== 'undefined' && App && App.data) ? App.data : appData;
       if (this._loadedNonEmpty && !this._allowReset && !this._blobHasArrayData(liveCore)) {
         console.error('writeData: BLOCKED a total-wipe write (every user array empty over a populated account). Server data preserved.');
+        // The backstop firing means something upstream tried to empty a live account. The data
+        // is safe, but this should NEVER happen in normal use — it is the single highest-signal
+        // event in the app and Kyle needs to see it the day it happens, not months later.
+        this.logClientError('wipe_blocked', 'Total-wipe write blocked over a populated account',
+          'keys=' + Object.keys(liveCore || {}).length + ' allowReset=' + this._allowReset);
         return { ok: false, blocked: true };
       }
       // Fix D: short-circuit the network call when the browser knows it is offline.
@@ -781,6 +786,9 @@ const DB = {
         // "saved" that vanishes on reload is the worst outcome this whole file exists to prevent.
         this._storageFull = true;
         try { if (this._onStorageFull) this._onStorageFull(key); } catch (e4) {}
+        // Safe to report from here: logClientError writes to Supabase (never localStorage) and
+        // dedupes synchronously before doing any work, so this cannot recurse through _acctKey.
+        this.logClientError('storage_full', 'localStorage quota exceeded after evicting caches', 'key=' + key);
         return false;
       }
     }
@@ -989,6 +997,74 @@ const DB = {
     return d;
   },
   async writeShiftData(data)     { return await this._writeControl('sc_data', 'pf_sc_data', data); },
+
+  // ── Client error reporting (observability) ────────────────────────────────
+  // Every failure path in this file used to dead-end in console.error, which lives on the
+  // OPERATOR's machine and reaches no one. This ships the signal instead. Hard rules, because
+  // a reporter that misbehaves is worse than no reporter at all:
+  //   * NEVER throws (the whole body is wrapped) and never awaits anything the caller needs.
+  //   * NEVER recurses — nothing in here may call a function that reports errors.
+  //   * Deduped per kind+message per session, and hard-capped per window, so one broken render
+  //     loop cannot write thousands of rows or slow the app to a crawl.
+  _errLog: { sent: {}, count: 0, windowStart: 0, MAX: 20, WINDOW_MS: 600000 },
+  logClientError(kind, message, detail, screen) {
+    try {
+      if (this._demo || !this._sb || !this._user || !kind) return;
+      const now = Date.now();
+      const L = this._errLog;
+      if (!L.windowStart || (now - L.windowStart) > L.WINDOW_MS) { L.windowStart = now; L.count = 0; }
+      if (L.count >= L.MAX) return;                                  // flood cap
+      const msg = String(message == null ? '' : message).slice(0, 500);
+      const key = kind + '|' + msg.slice(0, 200);
+      if (L.sent[key]) return;                                       // already reported this session
+      L.sent[key] = true;
+      L.count++;
+      // Fire-and-forget: never block the caller, never surface a failure of the reporter.
+      Promise.resolve()
+        .then(async () => {
+          let accountId = null;
+          try { accountId = await this._ensureAccountId(); } catch (e) {}
+          await this._sb.from('client_errors').insert({
+            account_id: accountId || null,
+            user_id: this._user.id,
+            user_email: (this._user && this._user.email) || null,
+            kind: String(kind).slice(0, 60),
+            message: msg,
+            detail: String(detail == null ? '' : detail).slice(0, 4000),
+            screen: String(screen == null ? '' : screen).slice(0, 120),
+            app_version: this._appVersion(),
+            user_agent: (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent.slice(0, 300) : null
+          });
+        })
+        .catch(() => {});                                            // a failed report is not an error
+    } catch (e) { /* the reporter must never break the app */ }
+  },
+
+  // Which BUILD an error came from. Read off our own <script src="app.js?v=NNN"> rather than a
+  // hand-kept constant, so it can never drift from what is actually deployed — and so "this only
+  // started at v675" is answerable from the data.
+  _appVersion() {
+    try {
+      const s = document.querySelector('script[src*="app.js?v="]');
+      const m = s && String(s.getAttribute('src') || '').match(/v=(\d+)/);
+      return m ? ('app.js v' + m[1]) : null;
+    } catch (e) { return null; }
+  },
+
+  // A PostgREST 42501 is an RLS DENIAL, not a transient network failure. It will fail forever on
+  // replay, so it sits in the queue looking like "pending sync" while the operator's work never
+  // lands. It also means something real is misconfigured — an area-permission map that is too
+  // narrow, a lapsed subscription, a role gap — and the person it is happening to has no way to
+  // tell you. This is the difference between "we hardened permissions" and "we locked out a
+  // paying customer and never found out."
+  _reportRlsDenial(table, kind, error) {
+    try {
+      const code = error && (error.code || error.status);
+      if (String(code) !== '42501') return;
+      this.logClientError('rls_denied', 'Write denied by row-level security',
+        'table=' + table + ' kind=' + (kind || '-') + ' msg=' + ((error && error.message) || ''));
+    } catch (e) {}
+  },
 
   // ── Account backups (owner-only; enforced by the account_backups RLS policy) ──
   // A backup is the whole account (all four blobs + cash config) captured as one JSON
@@ -1205,7 +1281,7 @@ const DB = {
           account_id: accountId, kind: kind, id: String(rec.id),
           date: this._rowDate(kind, rec), payload: rec, updated_at: new Date().toISOString()
         }, { onConflict: 'account_id,kind,id' });
-        if (error) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error }; }
+        if (error) { this._reportRlsDenial(table, kind, error); const q = queue(); return { ok: false, queued: q, storageFull: !q, error }; }
         return { ok: true };
       } catch (e) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: e }; }
     }
@@ -1235,7 +1311,7 @@ const DB = {
       try {
         const { error } = await this._sb.from(table).delete()
           .eq('account_id', accountId).eq('kind', kind).eq('id', String(id));
-        if (error) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error }; }
+        if (error) { this._reportRlsDenial(table, kind, error); const q = queue(); return { ok: false, queued: q, storageFull: !q, error }; }
         return { ok: true };
       } catch (e) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: e }; }
     }
@@ -1275,7 +1351,7 @@ const DB = {
       // Chunk to keep each request small.
       for (let i = 0; i < rows.length; i += 500) {
         const { error } = await this._sb.from(table).upsert(rows.slice(i, i + 500), { onConflict: 'account_id,kind,id' });
-        if (error) { const q = queueAll(); return { ok: false, queued: q, storageFull: !q, error }; }
+        if (error) { this._reportRlsDenial(table, kind, error); const q = queueAll(); return { ok: false, queued: q, storageFull: !q, error }; }
       }
       return { ok: true };
     } catch (e) { const q = queueAll(); return { ok: false, queued: q, storageFull: !q, error: e }; }
