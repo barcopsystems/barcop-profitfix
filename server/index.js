@@ -1047,7 +1047,17 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         const paid = !session.payment_status
           || session.payment_status === 'paid'
           || session.payment_status === 'no_payment_required';
-        await supabaseAdmin.from('subscriptions').upsert({
+        // CHECK THIS WRITE. supabase-js returns {error} rather than throwing, so a discarded
+        // result fell straight through to res.json({received:true}) below — Stripe marks the
+        // event delivered and NEVER retries. There is no recovery path: reconcileSubscriptions
+        // only walks rows that already exist, and later renewal events find no row by
+        // subscription id and no un-stamped row by customer, then return silently. The customer
+        // is billed monthly while has_active_subscription() stays false and the RESTRICTIVE
+        // require_active_sub policy denies every write — paying, and permanently locked out,
+        // with the app holding no record they ever paid. The `else` branch below already returns
+        // 500 so Stripe re-delivers when it cannot resolve an account; the branch that actually
+        // GRANTS access needs the same protection.
+        const { error: subWriteErr } = await supabaseAdmin.from('subscriptions').upsert({
           account_id:             accountId,
           user_id:                userId,
           stripe_customer_id:     customerId,
@@ -1062,6 +1072,13 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           current_period_end:     null,
           updated_at:             eventIso,
         }, { onConflict: 'account_id' });
+        if (subWriteErr) {
+          // Before the welcome email, deliberately: welcoming a customer into an account whose
+          // subscription row does not exist sends them to a screen that denies every write.
+          console.error('checkout.session.completed: subscriptions upsert FAILED for account',
+                        accountId, subWriteErr.message || subWriteErr);
+          return res.status(500).json({ error: 'subscription write failed; Stripe will retry' });
+        }
         if (paid && isNewSubscriber && email) {
           const { data: acctRow } = await supabaseAdmin
             .from('accounts').select('name').eq('id', accountId).maybeSingle();
@@ -1967,6 +1984,42 @@ app.post('/api/abandon-account', async (req, res) => {
     // 'incomplete' is what left a failed-card customer with no way forward and no way back.
     if (sub && CHECKOUT_BLOCK_STATES.includes(sub.subscription_status)) {
       return res.status(400).json({ error: 'This account has an active subscription and cannot be discarded.' });
+    }
+
+    // SOURCE OF TRUTH: ask STRIPE, not just our own table. The comment above says "never discard
+    // an account that still has a LIVE subscription in Stripe" — until now nothing here asked
+    // Stripe. Our subscriptions row is written ONLY by the webhook, which lags checkout by
+    // seconds to minutes, and in that window the read above sees nothing. Meanwhile the client
+    // poll gives up after ~12s and renders the new-signup gate with a "Start Over" link whose
+    // confirm text reads "No payment was made." A customer who paid twelve seconds ago clicks it:
+    // the account is deleted, the cascade takes the subscription row and their auth user, and the
+    // webhook then fails its foreign key. Stripe bills $249/mo forever with no row, no
+    // stripe_customer_id anywhere in the app, no billing-portal route to it, and reconcile (which
+    // walks our table) blind to it. Only a manual Stripe dashboard search would ever find it.
+    // The checkout dup-guard already asks Stripe this way; this is the same question.
+    // ⚠ FAILS CLOSED, unlike that guard. There, a Stripe hiccup falls through because blocking a
+    // legitimate first checkout is the worse outcome. Here the worse outcome is deleting a paying
+    // account, so an unreadable Stripe must REFUSE.
+    if ((process.env.STRIPE_SECRET_KEY || '').trim()) {
+      const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
+      try {
+        const ownerEmail = userData.user.email;
+        if (ownerEmail) {
+          const custs = await stripe.customers.list({ email: ownerEmail, limit: 20 });
+          for (const cust of (custs && custs.data) || []) {
+            const subs = await stripe.subscriptions.list({ customer: cust.id, status: 'all', limit: 20 });
+            // Scope by the account_id stamped on the subscription, so a multi-bar owner
+            // discarding one bar is not blocked by the subscription on another.
+            const mine = ((subs && subs.data) || []).filter(s => s.metadata && s.metadata.account_id === accountId);
+            if (mine.some(s => CHECKOUT_BLOCK_STATES.includes(s.status))) {
+              return res.status(400).json({ error: 'This account has an active subscription and cannot be discarded.' });
+            }
+          }
+        }
+      } catch (e) {
+        console.error('abandon-account: could not confirm billing with Stripe, refusing to delete:', e.message);
+        return res.status(503).json({ error: 'Could not confirm your billing status just now. Nothing was deleted — please try again in a minute.' });
+      }
     }
 
     // Delete the account (memberships + subscription cascade via FK ON DELETE CASCADE).
