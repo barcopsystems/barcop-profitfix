@@ -450,14 +450,18 @@ S.HubSettings = {
     if (hasData(backup.laborData))     App.laborData     = backup.laborData;
     if (hasData(backup.shiftData))     App.shiftData     = backup.shiftData;
     if (backup.cashConfig && window.CashEngine) {
+      // AWAITED for the same reason as clearAll's block: these write through acctSet, and
+      // _applyBackup closes the _allowReset window in a finally. Fire-and-forget could leave
+      // them in flight past that point, where the total-wipe backstop would block them and the
+      // restored account would silently keep the CURRENT cash config instead of the backup's.
       const cc = backup.cashConfig, CE = window.CashEngine;
-      CE.setOpeningCash(cc.opening_cash);
-      CE.setSalesTaxRate(cc.sales_tax_rate);
-      CE.setTaxFrequency(cc.tax_frequency);
-      CE.setPayrollBurden(cc.payroll_burden);
-      CE.setReserveWeeks(cc.reserve_weeks);
-      CE.setAvailableCredit(cc.available_credit);
-      CE.setGiftCardLiability(cc.gift_card_liability);
+      await CE.setOpeningCash(cc.opening_cash);
+      await CE.setSalesTaxRate(cc.sales_tax_rate);
+      await CE.setTaxFrequency(cc.tax_frequency);
+      await CE.setPayrollBurden(cc.payroll_burden);
+      await CE.setReserveWeeks(cc.reserve_weeks);
+      await CE.setAvailableCredit(cc.available_credit);
+      await CE.setGiftCardLiability(cc.gift_card_liability);
     }
     // Each blob save is checked BEFORE the matching seedEventStores clears that module's rows.
     await must('settings', App.save());
@@ -4064,7 +4068,13 @@ S.HubSettings = {
     await App.saveShift();
     await DB.clearEvents('sc_events');   // drop the shift event rows too
     await DB.clearEvents('core_events'); // drop the recovery event rows too
-    DB._allowReset = false;  // reset the bypass immediately after the intentional wipe
+    // ⚠ DO NOT close the reset window here. The Cash Recovery resets below write through
+    // CashEngine.setX -> App.acctSet -> saveKey -> writeData, which is guarded by the total-wipe
+    // backstop. Clearing _allowReset at this point silently BLOCKED all seven of them, so a
+    // "cleared" account kept its opening balance, tax rate, credit line, reserve and gift-card
+    // liability — the exact outcome the comment below says this block exists to prevent. Caught
+    // in the wild 2026-07-20 by the wipe_blocked alert (stack: clearAll -> setTaxFrequency).
+    // The window now closes in the finally after EVERY write of this intentional wipe.
     // The cockpit's per-week "done" stamps live in localStorage (per device), so
     // clear them too or past weeks keep phantom checks after a wipe.
     try { Object.keys(localStorage).filter(k => k.indexOf('cockpit_done_') !== -1).forEach(k => localStorage.removeItem(k)); } catch (e) {}
@@ -4075,17 +4085,21 @@ S.HubSettings = {
     // Cash config now lives on account-scoped keys, so clear it through the
     // setters (raw removeItem would miss the scoped keys). Event ack flags are
     // still flat keys.
+    // AWAITED: these write through acctSet -> saveKey -> writeData. Fire-and-forget left them
+    // in flight past the point the reset window closed, so the finally below could not protect
+    // them. Awaiting also means a failure is real rather than invisible.
     try {
       if (window.CashEngine) {
-        CashEngine.setOpeningCash(null);
-        CashEngine.setSalesTaxRate(null);
-        CashEngine.setTaxFrequency('monthly');
-        CashEngine.setPayrollBurden(null);
-        CashEngine.setReserveWeeks(null);
-        CashEngine.setAvailableCredit(null);
-        CashEngine.setGiftCardLiability(null);
+        await CashEngine.setOpeningCash(null);
+        await CashEngine.setSalesTaxRate(null);
+        await CashEngine.setTaxFrequency('monthly');
+        await CashEngine.setPayrollBurden(null);
+        await CashEngine.setReserveWeeks(null);
+        await CashEngine.setAvailableCredit(null);
+        await CashEngine.setGiftCardLiability(null);
       }
     } catch (e) {}
+    DB._allowReset = false;   // close the reset window only after EVERY write of this wipe
     try { ['events_step_ack_leads', 'events_step_ack_deposits', 'events_step_ack_prep', 'events_step_ack_close', 'event_agreement_terms', 'lc_sched_draft'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
     App.updatePeriod();
 
