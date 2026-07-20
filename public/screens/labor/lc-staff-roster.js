@@ -114,10 +114,17 @@ S.LaborStaffRoster = {
     const positions = this.positions().slice().sort(App.byCreation);
     const deptShort = { 'Management': 'Mgmt', 'Front of House': 'FOH' };
     const posLabel = p => (p.name || '').replace(/\bAssistant\b/gi, 'Asst.') + ', ' + (deptShort[p.department] || p.department || '');
-    const posOpts = positions.map(p =>
-      '<option value="' + p.id + '"' + (s && s.position_id === p.id ? ' selected' : '') + '>'
-      + esc(posLabel(p)) + '</option>').join('');
-    const defaultPos = s ? this.positionById(s.position_id) : positions[0];
+    // A NEW hire starts on an explicit "Select position..." — never on whichever position
+    // happens to sort first. Any default silently assigns a real role AND that position's
+    // default pay to anyone who tabs past the field, and it reads as a deliberate choice
+    // afterwards. save() already refuses an empty pick ("Choose a position."), and the
+    // change handler fills pay type + wage the moment one is chosen. An EXISTING person
+    // keeps their own position selected, so only the add path changes.
+    const posOpts = (s ? '' : '<option value="">Select position...</option>')
+      + positions.map(p =>
+        '<option value="' + p.id + '"' + (s && s.position_id === p.id ? ' selected' : '') + '>'
+        + esc(posLabel(p)) + '</option>').join('');
+    const defaultPos = s ? this.positionById(s.position_id) : null;
     // A new hire inherits the position's default pay type and figure; an existing
     // person keeps their own.
     const isSal = s ? (s.pay_type === 'Salary') : !!(defaultPos && defaultPos.pay_type === 'Salary');
