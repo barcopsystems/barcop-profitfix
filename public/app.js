@@ -722,14 +722,24 @@ const App = {
       const btn = document.getElementById('sync-now');
       btn.disabled = true; btn.textContent = 'Syncing...';
       const r = await DB.syncPending();
-      if (r.ok) {
+      // Gated on the queue being EMPTY, not merely on nothing having thrown. syncPending skips a
+      // store when the account has not finished loading, and that skip counts no failure — so
+      // this branch used to fire, say "All offline changes are synced", and take the banner away
+      // while every queued change was still sitting there.
+      if (r.ok && !r.remaining) {
         bar.innerHTML = '<span style="flex:1;">All offline changes are synced.</span>';
         setTimeout(() => bar.remove(), 2500);
       } else {
         btn.disabled = false; btn.textContent = 'Retry';
         const span = bar.querySelector('span');
-        if (span) span.textContent = 'Still cannot reach the server. Your changes are safe on this device. '
-          + 'Try again once you have a connection.';
+        // THREE outcomes, not two. A run that skipped everything because the account was still
+        // loading is not a connection problem, and saying it is sends the operator off checking
+        // their wifi for something that will fix itself in seconds.
+        if (span) span.textContent = r.failed
+          ? 'Still cannot reach the server. Your changes are safe on this device. '
+            + 'Try again once you have a connection.'
+          : 'Your account is still loading. Your changes are safe on this device — '
+            + 'tap Sync Now again in a moment.';
       }
     };
   },

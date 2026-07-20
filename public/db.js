@@ -814,7 +814,16 @@ const DB = {
         else { this._clearPending(lsKey); synced++; }
       } catch (e) { failed++; }
     }
-    return { ok: failed === 0, synced: synced, failed: failed };
+    // ok means THE QUEUE DRAINED, not "nothing threw". The `!_dataReady` branch above skips a
+    // store WITHOUT counting a failure, so `failed === 0` on its own reported success having
+    // attempted nothing — and the Sync Now banner then told the operator "All offline changes
+    // are synced" and dismissed itself after 2.5s while their work sat untouched in the queue.
+    // That is precisely the trap the emptyLocal comment a few lines up warns about ("trains the
+    // operator to ignore the one banner that matters"), reintroduced on the very next line.
+    // `remaining` lets the caller tell a SKIP apart from a FAILURE and say something true about
+    // each, instead of blaming the connection for a load that had not finished.
+    const remaining = this._pendingList().length;
+    return { ok: failed === 0 && remaining === 0, synced: synced, failed: failed, remaining: remaining };
   },
 
   // ── Local storage fallback ────────────────────────────────────────────────
