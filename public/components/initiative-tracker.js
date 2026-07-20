@@ -199,7 +199,12 @@ const InitiativeTracker = {
     let completedCard = '';
     if (closed.length) {
       const compCols = '<colgroup><col style="width:32%"/><col style="width:12%"/><col style="width:12%"/><col style="width:44%"/></colgroup>';
-      const compBody = closed.slice().reverse().map(i => {
+      // Most-recently-completed first. This was `.reverse()`, which achieved that back when the
+      // array was blob insertion-order; the rows load newest-first now, so reversing put the
+      // operator's OLDEST experiment at the top. Sort on the real field instead.
+      const compBody = closed.slice()
+        .sort((a, b) => String((b && b.completed_at) || '').localeCompare(String((a && a.completed_at) || '')))
+        .map(i => {
         const m = this._measure(module, i);
         const metric = this.metric(module, i.metric);
         return '<tr>'

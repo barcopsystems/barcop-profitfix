@@ -658,11 +658,16 @@ window.FixPanel = {
       // uncheck; append on check and trim the module to its 100 newest rows.
       App.data.fix_activity = App.data.fix_activity || [];
       if (wasChecked) {
-        let removeId = null;
-        for (let i = App.data.fix_activity.length - 1; i >= 0; i--) {
-          const a = App.data.fix_activity[i];
-          if (a.gap_id === gId && a.step_index === stepIdx) { removeId = a.id; break; }
+        // Pick the newest match by ts, NOT by array position: scanning from the end found the
+        // newest only while this array was blob insertion-order. It loads newest-first now, so
+        // the backwards scan was deleting the OLDEST matching row — leaving a stale entry, with
+        // the wrong timestamp, in the feed for a step that is now unchecked.
+        let newest = null;
+        for (const a of App.data.fix_activity) {
+          if (a.gap_id !== gId || a.step_index !== stepIdx) continue;
+          if (!newest || String(a.ts || '').localeCompare(String(newest.ts || '')) >= 0) newest = a;
         }
+        const removeId = newest ? newest.id : null;
         if (removeId != null) await App.removeRecord('core', 'fix_activity', removeId);
       } else {
         const gap = this.gapAreas(moduleKey).find(x => x.id === gId);
