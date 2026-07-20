@@ -493,8 +493,14 @@ const DB = {
     if (this._sb && this._user) {
       // Unsynced local changes from an offline session are newer than the
       // server copy — load them so no offline work is lost.
-      if (this._pendingList().includes('pf_data')) {
-        const merged = this._mergeDefaults(this._localRead());
+      // ...but only if a local copy ACTUALLY EXISTS. A pending flag with no stored blob (the
+      // flag is a tiny write that can land while the blob write itself is dropped on a full
+      // disk) is not "the operator's unsynced edits" — it's nothing. Treating it as
+      // authoritative returned bare defaults AND opened the write gate, so the next ordinary
+      // save overwrote the populated server row with them. Fall through to the server read.
+      const _pendingLocal = this._pendingList().includes('pf_data') ? this._localReadRaw() : null;
+      if (_pendingLocal) {
+        const merged = this._mergeDefaults(_pendingLocal);
         this._dataReady = true;   // local holds the operator's own unsynced edits — authoritative, safe to sync
         this._loadedNonEmpty = this._blobHasArrayData(merged);
         return merged;
@@ -709,7 +715,13 @@ const DB = {
       }
       const table = tableOf[lsKey];
       if (!table) { this._clearPending(lsKey); continue; }
-      const data = lsKey === 'pf_data' ? this._localRead() : this._localReadControl(lsKey);
+      // _localReadRaw, NOT _localRead: _localRead substitutes _defaultData() (~30 keys) when the
+      // key is missing or unparseable, so the emptiness test below could NEVER fire on this
+      // branch — a pending pf_data replay with no local copy (e.g. _localWrite hit the storage
+      // quota and dropped it, while the tiny pending-list write landed) would upsert a full set
+      // of DEFAULTS over the populated server row on reconnect, resetting bar name, targets and
+      // onboarding. This path bypasses writeData, so the total-wipe backstop never sees it.
+      const data = lsKey === 'pf_data' ? this._localReadRaw() : this._localReadControl(lsKey);
       // Never replay a whole-blob push unless the initial load confirmed the account
       // (same gate as writeData), and never push a missing/empty local blob over a
       // populated server row — that would reset the account to defaults on reconnect.
@@ -731,13 +743,19 @@ const DB = {
   },
 
   // ── Local storage fallback ────────────────────────────────────────────────
-  _localRead() {
+  // The stored blob EXACTLY as it is on disk — null when there isn't one. Callers that need a
+  // usable App.data want _localRead (which fills in defaults); callers deciding whether there
+  // is anything worth PUSHING to the server must use this, so "no local copy" can't be
+  // mistaken for "a real, empty account" and replayed over populated server data.
+  _localReadRaw() {
     try {
       const r = localStorage.getItem(this._acctKey('pf_data'));
-      return r ? JSON.parse(r) : this._defaultData();
-    } catch (e) {
-      return this._defaultData();
-    }
+      return r ? JSON.parse(r) : null;
+    } catch (e) { return null; }
+  },
+  _localRead() {
+    const r = this._localReadRaw();
+    return r || this._defaultData();
   },
 
   // localStorage setItem that survives a quota error. The bulk of stored data is the

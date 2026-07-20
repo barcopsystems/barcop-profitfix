@@ -2785,6 +2785,7 @@ const App = {
     DB._controlReady = {};          // per-control gate: each control blob's write path stays closed until ITS OWN read confirms the account (a failed control read must not open it)
     DB._controlNonEmpty = {};       // recomputed per control read; drives the control total-wipe backstop
     DB._allowReset = false;         // any leftover reset bypass ends at the next load
+    DB._backfillPending = {};       // per-kind "backfill not confirmed" flags are per-LOAD: a flag left set by a queued/failed backfill (or by another account in this tab) makes _configBlob keep re-writing that array into the config blob forever, which is what lets a deleted-to-empty array resurrect on the next login
     this._setupDismissed = false;   // setup banner dismiss is per-login; a fresh login shows it again
     this.data          = await DB.readData();
     this.inventoryData = await DB.readInventoryData();
@@ -2800,10 +2801,21 @@ const App = {
     // the count-sheet order — so restore it from each location's sort_order (a reorder sets it;
     // a new location appends). Locations without one (backfilled, never reordered) fall back to
     // id (creation order). Sort in place so every reader sees the operator's order.
+    // A backfilled location carries NO sort_order. Sorting those with a 1e9 sentinel put them
+    // last on a scale the writer never uses: ic-locations._nextLocSeq numbers a new location
+    // from max(sort_order)+1, which on an all-unstamped account is 1 — so the location the
+    // operator just appended to the bottom of the count sheet came back ABOVE every existing
+    // one on the next login. Put both on ONE scale instead: stamp any missing sort_order from
+    // creation order (id ascending — rows load newest-first, so array position is not creation
+    // order) before sorting, so _nextLocSeq appends past the end and the order holds.
     const _locs = this.inventoryData && this.inventoryData.ic_locations;
-    if (Array.isArray(_locs)) _locs.sort((a, b) =>
-      ((a.sort_order != null ? a.sort_order : 1e9) - (b.sort_order != null ? b.sort_order : 1e9))
-      || String(a.id).localeCompare(String(b.id)));
+    if (Array.isArray(_locs) && _locs.length) {
+      const byCreation = _locs.slice().sort((a, b) => String(a && a.id).localeCompare(String(b && b.id)));
+      let _seq = byCreation.reduce((m, l) => Math.max(m, (l && l.sort_order != null) ? l.sort_order : -1), -1) + 1;
+      byCreation.forEach(l => { if (l && l.sort_order == null) l.sort_order = _seq++; });
+      _locs.sort((a, b) => ((a.sort_order || 0) - (b.sort_order || 0))
+        || String(a && a.id).localeCompare(String(b && b.id)));
+    }
     await this.loadEventStores('sc');
     await this.loadEventStores('lc');
     // Core / Recovery event logs (Profit pass): weeks, theft scores, variance
@@ -2838,6 +2850,13 @@ const App = {
     try {
       if (this.demoMode || !DB.isOwner || !DB.isOwner()) return;
       if (!(window.S && S.HubSettings && S.HubSettings._buildBackup)) return;
+      // Never snapshot an unconfirmed or empty account. loadAllData runs to completion even when
+      // readData fell back to defaults (a transient RLS/network error leaves _dataReady false),
+      // and a snapshot taken then captures nothing — but it still lands in the owner's backup
+      // list as the NEWEST restore point, hides the real ones behind the 30-row retention, and
+      // suppresses genuine backups for the next 20h. Same gate the config saves already use.
+      if (!DB._dataReady) return;
+      if (!DB._blobHasArrayData(this.data)) return;
       const last = await DB.lastBackupAt();
       const stale = !last || (Date.now() - new Date(last).getTime()) > 20 * 3600 * 1000;
       if (!stale) return;
@@ -6902,6 +6921,20 @@ const App = {
       || r.resolved_date || r.date_reported || r.date_86 || r.filed_at || r.closed_at
       || r.generated_at || r.saved_at)) || '') || (r && r.created_at) || '') + '';
     return arr.slice().sort((x, y) => dk(y).localeCompare(dk(x)))[0];
+  },
+
+  // OLDEST-FIRST comparator for a CONFIG list (positions, checklist templates, registers,
+  // rate cards, vendors, prep batches...). These arrays used to live in a JSON blob, where
+  // array position WAS insertion order; they are row-per-record now and load newest-first
+  // (`date DESC, id DESC`, and uid is Date.now-prefixed), so every reader that treated
+  // position as "the order the operator built them in" silently inverted. Sort a COPY with
+  // this instead of relying on position. created_at when present, else the id (also
+  // time-prefixed, so it orders the same way).
+  // ⚠ Config lists have no business date — do NOT use cmpNewest/latestEvent here; those key
+  // on date fields these records don't carry, so they fail open and do nothing.
+  byCreation(a, b) {
+    const k = r => String((r && (r.created_at || r.id)) || '');
+    return k(a).localeCompare(k(b));
   },
 
   // Sort comparators keyed on a record's real DATE, with created_at only as a
