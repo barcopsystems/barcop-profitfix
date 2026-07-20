@@ -592,7 +592,7 @@ S.ShiftDashboard = {
     });
   },
   async importPmix(rows) {
-    const { toAdd, skipped } = PosIngest.build('pmix', rows);
+    const { toAdd, skipped, merged } = PosIngest.build('pmix', rows);
     const res = document.getElementById('sc-ck-pmix-res');
     if (!toAdd.length) {
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No items updated. Each row needs an item name Bar Cop can match on your menu and a units-sold number.</div>';
@@ -600,7 +600,10 @@ S.ShiftDashboard = {
     }
     const ok = await PosIngest.commit('pmix', toAdd);
     if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
+    // Say when rows were combined. A daypart-split export legitimately lists an item several
+    // times and we sum them, so the operator should see why the total is bigger than any one row.
     this._flash = toAdd.length + ' menu item' + (toAdd.length === 1 ? '' : 's') + ' updated from sales mix'
+      + (merged ? ' (' + merged + ' extra row' + (merged === 1 ? '' : 's') + ' combined into item totals)' : '')
       + (skipped.length ? ' (' + skipped.length + ' name' + (skipped.length === 1 ? '' : 's') + ' not matched)' : '') + '.';
     if (this._optOpen) this._optOpen.pmix = false;   // collapse back to the link
     this._openStep = 'import';
