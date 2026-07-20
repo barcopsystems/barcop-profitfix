@@ -41,7 +41,10 @@ S.LaborPositions = {
     { name: 'Assistant Manager', department: 'Management',     tipped: false },
     { name: 'General Manager',   department: 'Management',     tipped: false }
   ],
-  ensureStarters() {
+  // async now (it awaits the row write before flagging the account seeded). Callers may still
+  // fire-and-forget: the in-memory push below happens synchronously, so a render right after
+  // this call still sees the starters.
+  async ensureStarters() {
     if (!App.laborData) App.laborData = {};
     if (App.laborData.lc_positions_seeded) return;
     const list = this.positions();
@@ -52,9 +55,14 @@ S.LaborPositions = {
       created_at: new Date().toISOString()
     }));
     seeded.forEach(p => list.push(p));
+    // Persist the ROWS first and only set the "already seeded" flag if they landed. Setting the
+    // flag first (and not awaiting the write) meant a failed bulk write left the flag durably
+    // true, the array stripped from the blob, and no rows — so the starters never appeared and
+    // could never re-seed, permanently blocking the roster behind "Add your positions first".
+    const ok = await App.putRecordsBulk('lc', 'position', seeded);
+    if (!ok) { seeded.forEach(p => { const i = list.indexOf(p); if (i >= 0) list.splice(i, 1); }); return; }
     App.laborData.lc_positions_seeded = true;
-    App.saveLabor();                                       // the lc_positions_seeded flag stays in the blob
-    App.putRecordsBulk('lc', 'position', seeded);          // the positions are rows now
+    await App.saveLabor();                                 // the lc_positions_seeded flag stays in the blob
   },
 
   render(container, actions) {

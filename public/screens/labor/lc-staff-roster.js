@@ -107,7 +107,11 @@ S.LaborStaffRoster = {
   // Status) plus a second row (Phone, Email, Shift Lead). Pay Type swaps the pay
   // field between an hourly Wage and an Annual Salary; salaried = exempt.
   profileFormCells(s) {
-    const positions = this.positions();
+    // Oldest-first: lc_positions is row-per-record now and loads NEWEST-first, which put the
+    // last starter position (General Manager) at index 0 — so the Position dropdown opened on
+    // it and a new hire saved without touching the field silently became a GM on the GM's
+    // default pay, flowing into the schedule grid, tip-outs and every labor report.
+    const positions = this.positions().slice().sort(App.byCreation);
     const deptShort = { 'Management': 'Mgmt', 'Front of House': 'FOH' };
     const posLabel = p => (p.name || '').replace(/\bAssistant\b/gi, 'Asst.') + ', ' + (deptShort[p.department] || p.department || '');
     const posOpts = positions.map(p =>
@@ -883,7 +887,10 @@ S.LaborStaffRoster = {
     // blob (migrated in its own step), so it still goes through saveLabor.
     const certIds = this.certs().filter(c => c.staff_id === id).map(c => c.id);
     const noteIds = this.notes().filter(n => n.staff_id === id).map(n => n.id);
-    await App.removeRecord('lc', 'staff', id);   // row-per-record (staff, then its certs + notes)
+    // Only cascade if the parent actually went. removeRecord reverts the staff row on a hard
+    // rejection, so an unchecked cascade would leave the person on the roster with their
+    // certifications and coaching log erased — the exact HR record the confirm promises to keep.
+    if (!(await App.removeRecord('lc', 'staff', id))) return;   // row-per-record (staff, then its certs + notes)
     for (const cid of certIds) await App.removeRecord('lc', 'cert', cid);
     for (const nid of noteIds) await App.removeRecord('lc', 'staff_note', nid);
     this.renderList();
