@@ -436,7 +436,7 @@ S.ShiftDashboard = {
   // be told to go check the file's columns. opts.cleared = days zeroed out by that grid.
   async importSales(rows, opts) {
     opts = opts || {};
-    const { toAdd, dupCount } = PosIngest.build('sales', rows);
+    const { toAdd, dupCount, merged } = PosIngest.build('sales', rows);
     const res = document.getElementById('sc-ck-import-res');
     if (!toAdd.length) {
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
@@ -452,7 +452,12 @@ S.ShiftDashboard = {
     }
     if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
     this.setDone('import', true);   // a cockpit import is a deliberate "the week is in" action
+    // Say when rows were combined. A daypart-split export legitimately lists a date several times
+    // and buildSales sums them, so the operator has to be able to see why the day's total is
+    // bigger than any single row in the file they dropped. Silently folding rows into a money
+    // figure is how the old drop-the-repeats bug stayed invisible.
     this._flash = toAdd.length + ' day' + (toAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
+      + (merged ? ' (' + merged + ' extra row' + (merged === 1 ? '' : 's') + ' combined into day totals)' : '')
       + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
       + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + '.';
     this._openStep = 'cash';
