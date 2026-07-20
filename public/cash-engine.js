@@ -277,11 +277,13 @@ window.CashEngine = {
     // so a week the operator explicitly closed for renovation projected a full average week of
     // phantom revenue into the balance curve, the low-point week, the runway, and the lender PDF.
     if (App.forecastForWeek) { const f = App.forecastForWeek(ws); if (f && f.total != null) return Number(f.total) || 0; }
-    // The same-weekday projection is built from raw sc_shifts, so it cannot see a week the
-    // operator corrected in Confirm the Week. Carry that correction across, so the forecast
-    // stops projecting off numbers they have already reviewed and changed. Ratio is 1 (no-op)
-    // until at least two confirmed weeks exist, and is bounded either side.
-    if (App.forecastDefaultsFor) { const d = App.forecastDefaultsFor(ws); if (d && d.total) return d.total * this._confirmationRatio(); }
+    // Tier 2 is the raw same-weekday average, uncorrected. It briefly carried the confirmation
+    // ratio; that made weeks 0-7 (tier 2, ratio-uplifted) and weeks 8-12 (tier 3, confirmed-
+    // substituted) sit on different bases, so the 13-week balance curve bent down ~15% partway
+    // along for no data reason — moving the low-point week, the runway and the lender export.
+    // Correction now enters only where it is EXACT: tier 3 and _trailingWeeklySales substitute a
+    // confirmed week's real total, and _salesBetween does the same for the tax basis.
+    if (App.forecastDefaultsFor) { const d = App.forecastDefaultsFor(ws); if (d && d.total) return d.total; }
     // Beyond the forecast's same-weekday lookback window (the default returns 0
     // once a week is more than ~8 weeks past the last logged sales), replay the
     // recent actual weeks forward so a far-out week reads a real recent week's
@@ -300,25 +302,24 @@ window.CashEngine = {
       .find(w => String(w.period_end || '').slice(0, 10) === pe);
     if (!rw) return null;
     const bar = parseFloat(rw.bar_revenue), flo = parseFloat(rw.floor_revenue);
-    if (isNaN(bar) && isNaN(flo)) return null;
-    return (isNaN(bar) ? 0 : bar) + (isNaN(flo) ? 0 : flo);
+    const tot = (isNaN(bar) ? 0 : bar) + (isNaN(flo) ? 0 : flo);
+    // A total of 0 means "no bar/floor figure to substitute", not "this week sold nothing".
+    // The AND guard here used to be `isNaN(bar) && isNaN(flo)`, so a week where the operator
+    // TYPED 0 (a catering-only or closed week — confirm-week's save gate passes on catering
+    // revenue alone) returned 0, and 0 != null won over the raw sum: that week vanished from the
+    // tax basis entirely. Matches how hub.js and hub-group-dashboard.js already treat these rows
+    // (`(bar||0)+(floor||0) > 0`). If the week genuinely sold nothing, the raw sum is ~0 anyway.
+    return tot > 0 ? tot : null;
   },
 
-  // How much the operator's confirmed numbers differ from the raw shift log, across the recent
-  // weeks where both exist. Used to carry that correction into the same-weekday projection,
-  // which is built from sc_shifts and would otherwise keep projecting a number the operator has
-  // already rejected. BOUNDED to 0.5x-2x and requires at least two confirmed weeks, so one odd
-  // week (a closure, a festival) cannot distort the whole quarter. Returns 1 = no correction.
-  _confirmationRatio() {
-    const rows = this._recentWeeklySales(8).filter(r => r.confirmed && r.logged > 0);
-    if (rows.length < 2) return 1;
-    const conf = rows.reduce((s, r) => s + r.total, 0);
-    const log  = rows.reduce((s, r) => s + r.logged, 0);
-    if (!(log > 0)) return 1;
-    const ratio = conf / log;
-    if (!isFinite(ratio) || ratio <= 0) return 1;
-    return Math.min(2, Math.max(0.5, ratio));
-  },
+  // ⚠ A `_confirmationRatio()` helper used to live here — a blended confirmed/logged multiplier
+  // applied to unconfirmed weeks. DELIBERATELY DELETED 2026-07-20, twice attempted and twice
+  // wrong, so do not reintroduce it. It was gated at two confirmed weeks, which made it a step
+  // function: confirming one routine week flipped it 1.00 -> 1.30 and re-scaled every OTHER week
+  // in the tax basis (a ~$7.7k jump on a $38k month, only $3k of it real), and it ran BACKWARDS
+  // when a week aged out of the 8-week sample. Correction now enters ONLY where it is exact —
+  // substituting a confirmed week's real total. An estimate must never move a displayed actual
+  // for a reason the operator cannot point at.
 
   // Recent COMPLETE weeks of actual shift revenue (bar + floor), oldest to newest,
   // excluding the current in-progress week so a partial week never drags it. The
@@ -721,19 +722,23 @@ window.CashEngine = {
       const wk = this._mondayOf(new Date(d + 'T00:00:00'));
       byWeek[wk] = (byWeek[wk] || 0) + (parseFloat(sh.bar_revenue) || 0) + (parseFloat(sh.floor_revenue) || 0);
     });
-    // Whole + confirmed -> the exact reconciled figure. Everything else -> raw, corrected by the
-    // bounded ratio. Leaving partial weeks RAW created a discontinuity: setAside()'s period runs
-    // month-to-DATE, so for roughly the first 11 days of every month no week is yet whole and the
-    // correction applied to 0% of the window — then jumped to ~70% coverage the day the first
-    // week closed. Cash Position's "Sales tax collected" (and Safe to Spend behind it) would move
-    // ~30% overnight with no data having changed. Exact where we have it, corrected where we
-    // don't, is both more accurate than the old blend and continuous across the month.
-    const ratio = this._confirmationRatio();
+    // Whole + confirmed -> the exact reconciled figure. Everything else -> the RAW logged sum.
+    // NO extrapolation. An earlier attempt scaled the unconfirmed weeks by a blended
+    // "confirmation ratio" to avoid a month-start lag; that was worse. The ratio is gated at two
+    // confirmed weeks, so confirming one routine week flipped it 1.00 -> 1.30 and re-scaled every
+    // OTHER week in the window: month-to-date sales jumped ~$7.7k on a $38k month with no new
+    // sales, only $3k of which belonged to the week confirmed. It also ran BACKWARDS when a week
+    // aged out of the 8-week sample. A displayed actual must not move for reasons the operator
+    // cannot point at.
+    // The remaining lag is honest: early in a month no week is whole yet, so the hold reflects
+    // what has been logged. Each week that clears moves it by that week's OWN correction, which
+    // is attributable and explicable. A number that is late is recoverable; a number that moves
+    // for invisible reasons destroys trust in every number beside it.
     let t = 0;
     Object.keys(byWeek).forEach(wk => {
       const whole = wk >= s && this._addDays(wk, 6) <= e;
       const conf = whole ? this._confirmedWeekTotal(wk) : null;
-      t += (conf != null ? conf : byWeek[wk] * ratio);
+      t += (conf != null ? conf : byWeek[wk]);
     });
     return t;
   },
