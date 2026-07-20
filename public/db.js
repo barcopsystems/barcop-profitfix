@@ -996,12 +996,18 @@ const DB = {
     const { error } = await this._sb.from('account_backups')
       .insert({ account_id: accountId, reason: reason || 'manual', snapshot });
     if (error) { console.error('saveBackup:', error.message || error); return { ok: false, error }; }
-    // Retention: keep the newest 30 per account, drop the rest (best-effort).
+    // Retention: prune each REASON in its OWN pool (best-effort). One shared pool was a flat
+    // FIFO across both, so an owner taking manual restore points through a big change day
+    // would evict every automatic daily backup — destroying exactly the time-depth that makes
+    // the backups worth having. The dailies are the safety net and must not be crowded out by
+    // same-day manual snapshots.
     try {
-      const { data: old } = await this._sb.from('account_backups')
-        .select('id').eq('account_id', accountId)
-        .order('created_at', { ascending: false }).range(30, 999);
-      if (old && old.length) await this._sb.from('account_backups').delete().in('id', old.map(r => r.id));
+      for (const [reason, keep] of [['auto-daily', 30], ['manual', 10]]) {
+        const { data: old } = await this._sb.from('account_backups')
+          .select('id').eq('account_id', accountId).eq('reason', reason)
+          .order('created_at', { ascending: false }).range(keep, 999);
+        if (old && old.length) await this._sb.from('account_backups').delete().in('id', old.map(r => r.id));
+      }
     } catch (e) { /* prune is best-effort */ }
     return { ok: true };
   },
@@ -1021,6 +1027,18 @@ const DB = {
       .select('snapshot').eq('id', id).single();
     if (error) { console.error('getBackup:', error.message || error); return null; }
     return data ? data.snapshot : null;
+  },
+  // Delete one stored snapshot. MANUAL restore points only — the automatic dailies are the
+  // safety net and stay under the retention policy's control, so the predicate below hard-scopes
+  // to reason='manual' (and to this account) rather than trusting the caller or the UI.
+  async deleteBackup(id) {
+    if (!this._sb || !this._user || !id) return { ok: false };
+    const accountId = await this._ensureAccountId();
+    if (!accountId) return { ok: false };
+    const { error } = await this._sb.from('account_backups')
+      .delete().eq('id', id).eq('account_id', accountId).eq('reason', 'manual');
+    if (error) { console.error('deleteBackup:', error.message || error); return { ok: false, error }; }
+    return { ok: true };
   },
   async lastBackupAt() {
     if (!this._sb || !this._user) return null;
