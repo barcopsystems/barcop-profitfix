@@ -423,6 +423,29 @@ S.HubSettings = {
         && !hasData(backup.laborData) && !hasData(backup.shiftData)) {
       throw new Error('that backup contains no records, so restoring it would erase this account');
     }
+    // ── PREFLIGHT — refuse BEFORE touching anything ──────────────────────────────────────────
+    // The abort-guard inside _applyBackupInner fires between steps, by which point earlier steps
+    // have already committed: blobs written, event rows cleared and reseeded, and — on the
+    // offline path — writeData has ALREADY done _localWrite + _markPending before returning its
+    // failure, so the browser's `online` event later auto-syncs the half-applied restore to the
+    // server with no reload and no user action. A mid-flight abort therefore cannot honour the
+    // promise "nothing was erased". The only place that promise can be kept is BEFORE the first
+    // mutation, so check the things that make a restore fail here and refuse cleanly.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      throw new Error('you appear to be offline. Restoring replaces every record in your account, so it needs a live connection. Nothing has been changed — try again once you are back online.');
+    }
+    if (!DB._dataReady) {
+      throw new Error('your account has not finished loading, so a restore would not be safe. Nothing has been changed — reload the page and try again.');
+    }
+    // saveInventory/saveLabor/saveShift return false while their control blob is not confirmed
+    // loaded (_writeControl returns {deferred:true}), and _controlReady is only reset by
+    // loadAllData — so one transient control read at boot would otherwise abort the restore
+    // mid-way, every time, until a reload, with no hint that reloading is the fix.
+    const _notReady = ['ic_data', 'lc_data', 'sc_data'].filter(t => !DB._controlReady[t]);
+    if (_notReady.length) {
+      throw new Error('your Inventory, Labor and Shift data has not finished loading, so a restore would not be safe. Nothing has been changed — reload the page and try again.');
+    }
+
     // A restore intentionally replaces everything — tell the total-wipe backstop this write
     // is sanctioned (same contract clearAll/loadSample use), and always hand it back.
     const prevAllowReset = DB._allowReset;
@@ -449,7 +472,10 @@ S.HubSettings = {
       if (ok !== true) {
         // An aborted restore means an owner tried to roll their account back and could not.
         // They are safe (nothing was erased) but they are also stuck, and they may not say so.
-        DB.logClientError('restore_aborted', 'Restore aborted before clearing rows', 'step=' + label);
+        // The step goes in the MESSAGE, not just the detail: logClientError dedupes on
+        // kind + message per session, so a constant message meant only the FIRST abort was ever
+        // reported — and the retries are exactly what reveal where it actually breaks.
+        DB.logClientError('restore_aborted', 'Restore aborted at step: ' + label, 'step=' + label);
         throw new Error('could not write ' + label + ' — nothing was erased, your account is unchanged');
       }
     };
@@ -484,13 +510,26 @@ S.HubSettings = {
         await CE.setGiftCardLiability(cc.gift_card_liability);
       }
       // Each blob save is checked BEFORE the matching seedEventStores clears that module's rows.
+      // seedEventStores is checked too: it clearEvents() FIRST and then reseeds, so a failure
+      // after the clear leaves that module's rows deleted and not replaced. Its result was being
+      // discarded across all 64 record kinds in the four event tables — weeks, audits, the
+      // product master, the staff roster, permits, menu items — and the operator was still told
+      // "Backup restored." We cannot roll the clear back, so the honest thing is to stop and say
+      // which module is incomplete rather than report success over it.
+      const seed = async (mod, label) => {
+        const r = await App.seedEventStores(mod);
+        if (r && r.ok === false) {
+          DB.logClientError('restore_aborted', 'Restore failed while writing ' + label + ' records', 'mod=' + mod);
+          throw new Error('your ' + label + ' records did not finish writing. Your other data is intact, but run the restore again before entering anything new.');
+        }
+      };
       await must('inventory config', App.saveInventory());
-      await App.seedEventStores('ic');
+      await seed('ic', 'Inventory');
       await must('labor config', App.saveLabor());
-      await App.seedEventStores('lc');
+      await seed('lc', 'Labor');
       await must('shift config', App.saveShift());
-      await App.seedEventStores('sc');
-      await App.seedEventStores('core');   // recovery event logs -> core_events rows
+      await seed('sc', 'Shift');
+      await seed('core', 'Recovery');   // recovery event logs -> core_events rows
     } catch (e) {
       App.data = _prev.d; App.inventoryData = _prev.i;
       App.laborData = _prev.l; App.shiftData = _prev.s;
