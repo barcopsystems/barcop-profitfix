@@ -453,33 +453,49 @@ S.HubSettings = {
         throw new Error('could not write ' + label + ' — nothing was erased, your account is unchanged');
       }
     };
-    if (hasData(backup.data)) App.data = backup.data;
-    if (hasData(backup.inventoryData)) App.inventoryData = backup.inventoryData;
-    if (hasData(backup.laborData))     App.laborData     = backup.laborData;
-    if (hasData(backup.shiftData))     App.shiftData     = backup.shiftData;
-    if (backup.cashConfig && window.CashEngine) {
-      // AWAITED for the same reason as clearAll's block: these write through acctSet, and
-      // _applyBackup closes the _allowReset window in a finally. Fire-and-forget could leave
-      // them in flight past that point, where the total-wipe backstop would block them and the
-      // restored account would silently keep the CURRENT cash config instead of the backup's.
-      const cc = backup.cashConfig, CE = window.CashEngine;
-      await CE.setOpeningCash(cc.opening_cash);
-      await CE.setSalesTaxRate(cc.sales_tax_rate);
-      await CE.setTaxFrequency(cc.tax_frequency);
-      await CE.setPayrollBurden(cc.payroll_burden);
-      await CE.setReserveWeeks(cc.reserve_weeks);
-      await CE.setAvailableCredit(cc.available_credit);
-      await CE.setGiftCardLiability(cc.gift_card_liability);
+    // Snapshot the LIVE objects before swapping. must() now actually aborts, and its message
+    // promises "your account is unchanged" — that has to be true in MEMORY as well as on the
+    // server. Without this, an aborted restore left App.data holding the BACKUP while the server
+    // held the real account, and the next autosave, screen save or _maybeAutoBackup would push
+    // that half-applied state up. Restore-on-throw makes the promise honest.
+    const _prev = { d: App.data, i: App.inventoryData, l: App.laborData, s: App.shiftData };
+    try {
+      if (hasData(backup.data)) App.data = backup.data;
+      if (hasData(backup.inventoryData)) App.inventoryData = backup.inventoryData;
+      if (hasData(backup.laborData))     App.laborData     = backup.laborData;
+      if (hasData(backup.shiftData))     App.shiftData     = backup.shiftData;
+      // Settings FIRST, and gated. Nothing may reach the server until one write is CONFIRMED.
+      // The cash-config setters used to run here, before any must() — so a restore that then
+      // aborted left the account on its OLD data carrying the BACKUP's opening balance, tax rate
+      // and credit line. Partial application of exactly the values an operator reads as truth.
+      await must('settings', App.save());
+      if (backup.cashConfig && window.CashEngine) {
+        // AWAITED because these write through acctSet -> saveKey -> writeData, and _applyBackup
+        // closes the _allowReset window in a finally; fire-and-forget could leave them in flight
+        // past that point, where the total-wipe backstop would block them and the restored
+        // account would silently keep the CURRENT cash config instead of the backup's.
+        const cc = backup.cashConfig, CE = window.CashEngine;
+        await CE.setOpeningCash(cc.opening_cash);
+        await CE.setSalesTaxRate(cc.sales_tax_rate);
+        await CE.setTaxFrequency(cc.tax_frequency);
+        await CE.setPayrollBurden(cc.payroll_burden);
+        await CE.setReserveWeeks(cc.reserve_weeks);
+        await CE.setAvailableCredit(cc.available_credit);
+        await CE.setGiftCardLiability(cc.gift_card_liability);
+      }
+      // Each blob save is checked BEFORE the matching seedEventStores clears that module's rows.
+      await must('inventory config', App.saveInventory());
+      await App.seedEventStores('ic');
+      await must('labor config', App.saveLabor());
+      await App.seedEventStores('lc');
+      await must('shift config', App.saveShift());
+      await App.seedEventStores('sc');
+      await App.seedEventStores('core');   // recovery event logs -> core_events rows
+    } catch (e) {
+      App.data = _prev.d; App.inventoryData = _prev.i;
+      App.laborData = _prev.l; App.shiftData = _prev.s;
+      throw e;
     }
-    // Each blob save is checked BEFORE the matching seedEventStores clears that module's rows.
-    await must('settings', App.save());
-    await must('inventory config', App.saveInventory());
-    await App.seedEventStores('ic');
-    await must('labor config', App.saveLabor());
-    await App.seedEventStores('lc');
-    await must('shift config', App.saveShift());
-    await App.seedEventStores('sc');
-    await App.seedEventStores('core');   // recovery event logs -> core_events rows
   },
 
   // Save a snapshot right now (the owner "Back up now" button). Returns true on success.
