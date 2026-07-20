@@ -345,17 +345,34 @@ window.CashEngine = {
   // stay distinguishable. This line used to say the ratio measures the difference, which pointed
   // at a deleted function three lines below its own tombstone.
   _recentWeeklySales(n) {
-    const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
-    if (!shifts.length) return [];
     const curMon = this._mondayOf(new Date());
     const byWeek = {};
-    shifts.forEach(s => {
+    // NO `if (!shifts.length) return []` here. A weekly-only operator confirms weeks and never
+    // logs nightly, so bailing on an empty shift log handed the whole cash forecast a $0 history
+    // off a fully confirmed one.
+    ((App.shiftData && App.shiftData.sc_shifts) || []).forEach(s => {
       const d = String(s.date || '').slice(0, 10); if (!d) return;
       const r = (parseFloat(s.bar_revenue) || 0) + (parseFloat(s.floor_revenue) || 0);
       if (r <= 0) return;
       const wk = this._mondayOf(new Date(d + 'T00:00:00'));
       if (wk >= curMon) return;
       byWeek[wk] = (byWeek[wk] || 0) + r;
+    });
+    // A CONFIRMED week counts even with nothing logged behind it. The map above is built only
+    // from sc_shifts, so a week the operator confirmed but never logged nightly was never a key
+    // and its reconciled total was never read — it contributed $0, not the raw sum and not the
+    // confirmed sum. confirm-week deliberately invites that partial close ("Missing pieces read
+    // as blank. You can still confirm and fill them later"). The tell was a discontinuity: one
+    // dollar of shift data inside the week unlocked its entire confirmed total.
+    // `logged` stays 0 for these — nothing WAS logged — and _confirmedWeekTotal supplies `total`.
+    ((App.data && App.data.revenue_weeks) || []).forEach(w => {
+      const pe = String(w.period_end || '').slice(0, 10); if (!pe) return;
+      const wk = this._addDays(pe, -6);
+      if (wk >= curMon || byWeek[wk] != null) return;   // in-progress week out; never overwrite logged data
+      // Null means "no bar/floor figure to substitute" (a catering-only week). Adding it as a $0
+      // week would drag the trailing average down with revenue that belongs to eventInflow.
+      if (this._confirmedWeekTotal(wk) == null) return;
+      byWeek[wk] = 0;
     });
     return Object.keys(byWeek).sort().slice(-(n || 8)).map(w => {
       const conf = this._confirmedWeekTotal(w);
@@ -743,6 +760,18 @@ window.CashEngine = {
       const d = String(sh.date || '').slice(0, 10); if (!d || d < s || d > e) return;
       const wk = this._mondayOf(new Date(d + 'T00:00:00'));
       byWeek[wk] = (byWeek[wk] || 0) + (parseFloat(sh.bar_revenue) || 0) + (parseFloat(sh.floor_revenue) || 0);
+    });
+    // Same orphan case as _recentWeeklySales: a confirmed week with no shift rows was never a
+    // key, so it contributed $0 to the sales-tax hold and the projected remittances. Only WHOLE
+    // weeks qualify — a partial one cannot take a whole-week total, and with no shift rows there
+    // is no daily granularity to prorate, so it stays out rather than being guessed at.
+    ((App.data && App.data.revenue_weeks) || []).forEach(w => {
+      const pe = String(w.period_end || '').slice(0, 10); if (!pe) return;
+      const wk = this._addDays(pe, -6);
+      if (byWeek[wk] != null) return;                   // never overwrite logged data
+      if (!(wk >= s && pe <= e)) return;                 // the whole Mon..Sun span must be in range
+      if (this._confirmedWeekTotal(wk) == null) return;  // catering-only week: nothing to substitute
+      byWeek[wk] = 0;
     });
     // Whole + confirmed -> the exact reconciled figure. Everything else -> the RAW logged sum.
     // NO extrapolation. An earlier attempt scaled the unconfirmed weeks by a blended
