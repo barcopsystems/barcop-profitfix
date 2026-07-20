@@ -794,7 +794,12 @@ async function sendWelcomeEmail(email, barName) {
 // if an operator ever runs two bars under one Stripe Customer, a customer-keyed update
 // would clobber the other bar's access. Rows created before we stored the subscription
 // id have it null; we match those by customer once and stamp the id so every later
-// event keys precisely. Returns nothing; best-effort like the rest of the webhook.
+// event keys precisely.
+// Returns { ok, changed, retry?, ambiguous?, error? } — the write can FAIL (transient DB error),
+// and a discarded failure left a paying customer stuck in the wrong access state while every
+// caller reported success. ok=false + retry means "the DB write failed, try again" (the webhook
+// re-raises so Stripe re-delivers; reconcile counts it as a failure, not a fix). A stale event or
+// an empty match is ok:true/changed:false — a legitimate no-op, not a failure.
 async function applySubUpdate(sub, update, eventIso) {
   const subId = sub.id;
   const customerId = sub.customer;
@@ -803,18 +808,25 @@ async function applySubUpdate(sub, update, eventIso) {
   // stale. Stripe does not guarantee delivery order and retries old events — without the
   // guard, a re-delivered older 'past_due' could overwrite a newer 'active' and lock a
   // good-standing customer behind the past-due gate.
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error: readErr } = await supabaseAdmin
     .from('subscriptions').select('account_id, updated_at')
     .eq('stripe_subscription_id', subId).maybeSingle();
+  // A discarded READ error is the same silent drop as a discarded write. supabase RESOLVES a soft
+  // read failure (timeout, pool exhaustion, PostgREST 5xx) as { data:null, error } rather than
+  // rejecting — so without this an errored read looks like "no such row", falls through to the
+  // customer-fallback, matches zero already-stamped candidates, and returns changed:false. The
+  // webhook then 200s and Stripe never re-delivers. Treat a read error as retryable.
+  if (readErr) return { ok: false, changed: false, retry: true, error: readErr.message || String(readErr) };
   if (existing) {
     const storedMs = tsToMs(existing.updated_at);
     const eventMs  = tsToMs(eventIso);
     // Drop only a STRICTLY-older event (same-second transitions still apply, last wins).
-    if (eventMs && storedMs && storedMs > eventMs) return;
-    await supabaseAdmin
+    if (eventMs && storedMs && storedMs > eventMs) return { ok: true, changed: false };
+    const { error } = await supabaseAdmin
       .from('subscriptions').update({ ...update, updated_at: eventIso || update.updated_at })
       .eq('stripe_subscription_id', subId);
-    return;
+    if (error) return { ok: false, changed: false, retry: true, error: error.message || String(error) };
+    return { ok: true, changed: true };
   }
   // Legacy/backfill: no row carries this subscription id yet. Match the customer's
   // row(s) that have no subscription id stored, and stamp it going forward.
@@ -826,18 +838,25 @@ async function applySubUpdate(sub, update, eventIso) {
   // stripe_subscription_id arrived by ALTER TABLE, so every pre-existing row is null
   // until its first event. If it is ambiguous, do nothing and say so: a missed webhook
   // is recoverable, a wrongly canceled paying customer is not.
-  const { data: cands } = await supabaseAdmin
+  const { data: cands, error: candErr } = await supabaseAdmin
     .from('subscriptions').select('account_id')
     .eq('stripe_customer_id', customerId).is('stripe_subscription_id', null);
-  if (!cands || !cands.length) return;
+  // Same as the read above: an errored candidate lookup must not read as "no candidates" and drop
+  // the event silently — retry it.
+  if (candErr) return { ok: false, changed: false, retry: true, error: candErr.message || String(candErr) };
+  if (!cands || !cands.length) return { ok: true, changed: false };
   if (cands.length > 1) {
     console.error('applySubUpdate: ' + cands.length + ' un-stamped subscription rows for customer ' + customerId
       + '; refusing to guess which one ' + subId + ' belongs to. Stamp stripe_subscription_id by hand.');
-    return;
+    // A deliberate refusal, not a transient failure: retrying cannot resolve the ambiguity, only a
+    // manual stamp can, so do NOT ask Stripe to re-deliver forever.
+    return { ok: false, changed: false, ambiguous: true, retry: false };
   }
-  await supabaseAdmin
+  const { error } = await supabaseAdmin
     .from('subscriptions').update({ ...update, stripe_subscription_id: subId, updated_at: eventIso || update.updated_at })
     .eq('account_id', cands[0].account_id).is('stripe_subscription_id', null);
+  if (error) return { ok: false, changed: false, retry: true, error: error.message || String(error) };
+  return { ok: true, changed: true };
 }
 
 // ── Missed-webhook reconciliation ────────────────────────────────────────────
@@ -901,7 +920,7 @@ async function reconcileSubscriptions() {
   // Cancelling is the only irreversible-feeling action here, so cap it. A correct pass cancels
   // a handful of churned subs; a wrong-account key cancels everything.
   const cancelCap = Math.max(5, Math.ceil(rows.length * 0.1));
-  let checked = 0, fixed = 0, canceled = 0;
+  let checked = 0, fixed = 0, canceled = 0, writeFailed = 0;
   for (const row of rows || []) {
     try {
       const sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
@@ -915,9 +934,18 @@ async function reconcileSubscriptions() {
       if (periodEnd) update.current_period_end = periodEnd;
       if (sub.status === 'active') { update.active_modules = ALL_MODULES; update.subscription_plan = 'full_access'; }
       else if (sub.status === 'canceled') { update.active_modules = []; }
-      await applySubUpdate(sub, update, nowIso);
-      fixed++;
-      console.log('reconcile: ' + row.stripe_subscription_id + ' ' + row.subscription_status + ' -> ' + sub.status);
+      const r = await applySubUpdate(sub, update, nowIso);
+      // Count a fix ONLY when a row actually changed. A discarded write error used to inflate this
+      // count, so the nightly log reported corrections that never reached the database while the
+      // customer stayed locked out.
+      if (r && r.changed) {
+        fixed++;
+        console.log('reconcile: ' + row.stripe_subscription_id + ' ' + row.subscription_status + ' -> ' + sub.status);
+      } else {
+        if (r && r.retry) writeFailed++;
+        console.error('reconcile: did NOT apply ' + row.stripe_subscription_id + ' -> ' + sub.status
+          + (r && r.error ? ' (' + r.error + ')' : r && r.ambiguous ? ' (ambiguous un-stamped rows)' : ''));
+      }
     } catch (e) {
       if (e && (e.code === 'resource_missing' || e.statusCode === 404)) {
         // The subscription no longer exists in Stripe — it's gone; treat as canceled.
@@ -931,18 +959,33 @@ async function reconcileSubscriptions() {
           ]);
           break;
         }
-        await supabaseAdmin.from('subscriptions')
+        const { error: cancelErr } = await supabaseAdmin.from('subscriptions')
           .update({ subscription_status: 'canceled', active_modules: [], updated_at: new Date().toISOString() })
           .eq('stripe_subscription_id', row.stripe_subscription_id);
-        fixed++;
-        console.log('reconcile: ' + row.stripe_subscription_id + ' missing in Stripe -> canceled');
+        if (cancelErr) {
+          writeFailed++;
+          console.error('reconcile: FAILED to mark ' + row.stripe_subscription_id + ' canceled: ' + cancelErr.message);
+        } else {
+          fixed++;
+          console.log('reconcile: ' + row.stripe_subscription_id + ' missing in Stripe -> canceled');
+        }
       } else {
         console.error('reconcile: error on ' + row.stripe_subscription_id + ':', (e && e.message) || e);
       }
     }
   }
-  console.log('reconcileSubscriptions: checked ' + checked + ', fixed ' + fixed);
-  return { checked, fixed };
+  // A failed write means a customer may be stuck in the wrong access state until a later pass
+  // succeeds. Surface it — this safety net going quietly ineffective is exactly the kind of
+  // failure the observability build exists to catch.
+  if (writeFailed > 0) {
+    await alertOps('Reconcile: ' + writeFailed + ' subscription write(s) FAILED', [
+      writeFailed + ' subscription correction(s) could not be written to the database this pass.',
+      'Those customers may be in the wrong access state until the next successful run.',
+      'Usually a transient database error; if it repeats, check Supabase.'
+    ]);
+  }
+  console.log('reconcileSubscriptions: checked ' + checked + ', fixed ' + fixed + ', writeFailed ' + writeFailed);
+  return { checked, fixed, writeFailed };
 }
 
 // Manual trigger (optional — the nightly interval is the primary path). Protected by a shared
@@ -1116,16 +1159,21 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       // module despite an 'active' status.
       if (status === 'active') { update.active_modules = ALL_MODULES; update.subscription_plan = 'full_access'; }
 
-      await applySubUpdate(sub, update, eventIso);
+      const r = await applySubUpdate(sub, update, eventIso);
+      // A failed DB write must make Stripe RE-DELIVER, not silently 200. Only a real write error
+      // (retry) re-raises; an ambiguous legacy row is logged and left for a manual stamp, since
+      // re-delivery cannot resolve it and would just retry for days.
+      if (r && r.retry) throw new Error('subscription update write failed (' + (r.error || 'unknown') + '); returning 500 so Stripe re-delivers');
     }
 
     if (event.type === 'customer.subscription.deleted') {
       const sub = event.data.object;
-      await applySubUpdate(sub, {
+      const r = await applySubUpdate(sub, {
         subscription_status: 'canceled',
         active_modules:      [],
         updated_at:          eventIso,
       }, eventIso);
+      if (r && r.retry) throw new Error('subscription delete write failed (' + (r.error || 'unknown') + '); returning 500 so Stripe re-delivers');
     }
 
     res.json({ received: true });
