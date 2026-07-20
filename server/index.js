@@ -506,12 +506,43 @@ async function applySubUpdate(sub, update, eventIso) {
 // over any older webhook stamp (applySubUpdate's ordering guard).
 async function reconcileSubscriptions() {
   const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
-  const { data: rows, error } = await supabaseAdmin
-    .from('subscriptions')
-    .select('account_id, stripe_subscription_id, subscription_status')
-    .not('stripe_subscription_id', 'is', null);
-  if (error) { console.error('reconcile: could not read subscriptions:', error.message); return { checked: 0, fixed: 0 }; }
-  let checked = 0, fixed = 0;
+  // Page past PostgREST's 1000-row cap — an unpaged read silently stops reconciling every
+  // customer past the first page while still logging a healthy "checked 1000".
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabaseAdmin
+      .from('subscriptions')
+      .select('account_id, stripe_subscription_id, subscription_status')
+      .not('stripe_subscription_id', 'is', null)
+      .order('account_id', { ascending: true })
+      .range(from, from + 999);
+    if (error) { console.error('reconcile: could not read subscriptions:', error.message); return { checked: 0, fixed: 0 }; }
+    rows.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  // ⚠ SAFETY PROBE — do not remove. A Stripe key that addresses a DIFFERENT Stripe account
+  // (test key against live subs, a mis-rotated key, a staging box booted with the prod
+  // service-role key) makes EVERY retrieve below return resource_missing/404, and that branch
+  // marks the row canceled. Unattended, that cancels the entire customer base in one pass and
+  // the RESTRICTIVE require_active_sub policy then denies every write for all of them.
+  // resource_missing is only trustworthy once we know the key can see SOMETHING here.
+  if (rows.length) {
+    try {
+      const probe = await stripe.subscriptions.list({ limit: 1 });
+      if (!probe || !probe.data || !probe.data.length) {
+        console.error('reconcile: ABORT — Stripe reports no subscriptions at all while the DB holds '
+          + rows.length + '. Refusing to run: this is the signature of a key pointed at the wrong Stripe account.');
+        return { checked: 0, fixed: 0, aborted: 'stripe-empty' };
+      }
+    } catch (e) {
+      console.error('reconcile: ABORT — could not reach Stripe:', (e && e.message) || e);
+      return { checked: 0, fixed: 0, aborted: 'stripe-unreachable' };
+    }
+  }
+  // Cancelling is the only irreversible-feeling action here, so cap it. A correct pass cancels
+  // a handful of churned subs; a wrong-account key cancels everything.
+  const cancelCap = Math.max(5, Math.ceil(rows.length * 0.1));
+  let checked = 0, fixed = 0, canceled = 0;
   for (const row of rows || []) {
     try {
       const sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
@@ -531,6 +562,11 @@ async function reconcileSubscriptions() {
     } catch (e) {
       if (e && (e.code === 'resource_missing' || e.statusCode === 404)) {
         // The subscription no longer exists in Stripe — it's gone; treat as canceled.
+        if (++canceled > cancelCap) {
+          console.error('reconcile: ABORT — more than ' + cancelCap + ' subscriptions reported missing in Stripe. '
+            + 'That is a wrong-key/wrong-account signature, not real churn. No further cancels applied.');
+          break;
+        }
         await supabaseAdmin.from('subscriptions')
           .update({ subscription_status: 'canceled', active_modules: [], updated_at: new Date().toISOString() })
           .eq('stripe_subscription_id', row.stripe_subscription_id);
