@@ -30,7 +30,10 @@ S.EventsPricing = {
   },
 
   draw() {
-    const rc = this.rateCards();
+    // Oldest-first: rate cards are row-per-record now and load NEWEST-first, so the saved-package
+    // table rendered in the reverse of the order the operator built it — and a package added this
+    // session sat at the bottom until reload, then jumped to the top.
+    const rc = this.rateCards().slice().sort(App.byCreation);
     const typeOpts = '<option value="">Select event...</option>' + this.types().map(t => '<option>' + esc(t) + '</option>').join('');
 
     // Rate Card form — all seven cells on one row; actions below the card.
@@ -50,7 +53,7 @@ S.EventsPricing = {
         + '<button class="btn btn-ghost" id="rp-calc">Catering Calculator</button>'
       + '</div>';
 
-    const rows = rc.slice(0, App.listLimit('core', 'event_rate_cards')).map(r =>
+    const rows = rc.slice(0, App.listLimit('core', 'event_rate_card')).map(r =>
       '<tr><td style="font-weight:600;">' + esc(r.package_name || '') + '</td>'
       + '<td>' + esc(r.event_type || '-') + '</td>'
       + '<td>' + (r.min_covers || ' ') + ' - ' + (r.max_covers || ' ') + '</td>'
@@ -68,7 +71,7 @@ S.EventsPricing = {
     const listCard = '<div id="rp-list" class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Package</th><th>Type</th><th>Covers</th><th>F&amp;B Min</th><th>Room Fee</th><th>Per Head</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + App.showOlderBar('core', 'event_rate_cards', rc, false);
+      + App.showOlderBar('core', 'event_rate_card', rc, false);
 
     this.container.innerHTML = '<div class="screen">' + rateForm + headingRow + listCard + '</div>';
     this.wire();
