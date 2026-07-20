@@ -298,8 +298,21 @@ window.CashEngine = {
   // keeps adding it separately on top — a silent double count.
   _confirmedWeekTotal(mondayYmd) {
     const pe = this._addDays(mondayYmd, 6);   // weeks key on Monday; period_end is that Sunday
-    const rw = ((App.data && App.data.revenue_weeks) || [])
-      .find(w => String(w.period_end || '').slice(0, 10) === pe);
+    const matches = ((App.data && App.data.revenue_weeks) || [])
+      .filter(w => String(w.period_end || '').slice(0, 10) === pe);
+    // Newest wins, never array order. Row-per-record removed the blob's last-write-wins collapse,
+    // so two devices confirming the same week before a sync each miss confirm-week's local lookup,
+    // each mint a fresh id, and leave TWO rows on the same period_end. A bare .find returned
+    // whichever the load order surfaced — and this value SUBSTITUTES for the week's sales in the
+    // forecast, the trailing average and the sales-tax hold, so it must not change on reload.
+    // App.forecastForWeek and laborForWeek already defend this exact case; this was the outlier.
+    // Keyed on saved_at because confirm-week always stamps it and _recDate/cmpNewest would sort
+    // on period_end, which is identical across the duplicates by definition.
+    const rw = matches.length < 2 ? matches[0]
+      : matches.slice().sort((a, b) => {
+          const k = r => String((r && (r.saved_at || r.created_at || r.id)) || '');
+          return k(b).localeCompare(k(a));
+        })[0];
     if (!rw) return null;
     const bar = parseFloat(rw.bar_revenue), flo = parseFloat(rw.floor_revenue);
     const tot = (isNaN(bar) ? 0 : bar) + (isNaN(flo) ? 0 : flo);
@@ -326,8 +339,11 @@ window.CashEngine = {
   // basis for both the trailing average and the cyclic replay.
   // A week the operator CONFIRMED reports its confirmed bar+floor instead of the raw shift sum:
   // that is the number they reconciled and stand behind, so projecting off the un-reviewed log
-  // would forecast from a figure they have already corrected. `logged` keeps the raw value so
-  // _confirmationRatio can measure the difference.
+  // would forecast from a figure they have already corrected. `logged` keeps the raw value; it
+  // has NO consumer in the app now that the blended ratio is gone (see the tombstone above), and
+  // is kept only so verify-confirmed-week-forecast.js can assert the raw and confirmed totals
+  // stay distinguishable. This line used to say the ratio measures the difference, which pointed
+  // at a deleted function three lines below its own tombstone.
   _recentWeeklySales(n) {
     const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
     if (!shifts.length) return [];
@@ -584,7 +600,13 @@ window.CashEngine = {
       // balance again would double-count. The baseline sales path is event-free, so
       // events ARE added there. Only add event cash when NOT on a saved override.
       const savedFc = App.forecastForWeek ? App.forecastForWeek(ws) : null;
-      const onOverride = !!(savedFc && savedFc.total);
+      // `!= null`, NOT truthiness — the same test tier 1 of revenueForWeek uses, for the same
+      // reason: saveForecast accepts val >= 0 and a $0 week is a real answer (closed for
+      // renovation), not a missing one. Under a bare truthiness test a saved $0 put the week on
+      // the NON-override path for EVENTS while sales correctly read $0, so a closed week with a
+      // booked event showed that booking's balance as incoming cash — and saving $0 produced a
+      // HIGHER forecast than saving $1.
+      const onOverride = !!(savedFc && savedFc.total != null);
       // NOT date-filtered for week 0, unlike sales and _future0 below. That asymmetry is
       // correct: eventInflow already drops any booking with a balance_paid_date, so a
       // balance collected earlier this week is excluded at the source and cannot be
