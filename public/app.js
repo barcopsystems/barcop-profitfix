@@ -2886,6 +2886,7 @@ const App = {
     DB._allowReset = false;         // any leftover reset bypass ends at the next load
     DB._backfillPending = {};       // per-kind "backfill not confirmed" flags are per-LOAD: a flag left set by a queued/failed backfill (or by another account in this tab) makes _configBlob keep re-writing that array into the config blob forever, which is what lets a deleted-to-empty array resurrect on the next login
     DB._loadedNonEmpty = false;     // "the account I have loaded is known-populated" — the ONE flag here that used to survive a reload. It is re-derived below (and by readData), so carrying the PREVIOUS load's value into this one armed the total-wipe backstop against a half-loaded App.data and produced false wipe_blocked reports. Per-load, like every sibling above.
+    DB._loadDegraded = false;       // "this login did not see the whole account" — raised by loadEventStores on any cache-served or truncated read. MUST be per-load: a stale true would block the daily backup forever, and a stale false would let a partial account be captured as a restore point.
     DB._loadInFlight = true;        // diagnostic only: lets the backstop say whether it fired mid-load
     this._setupDismissed = false;   // setup banner dismiss is per-login; a fresh login shows it again
     this.data          = await DB.readData();
@@ -2986,6 +2987,15 @@ const App = {
       // suppresses genuine backups for the next 20h. Same gate the config saves already use.
       if (!DB._dataReady) return;
       if (!DB._blobHasArrayData(this.data)) return;
+      // ...and never snapshot a PARTIALLY loaded one. The test above is a some() — one non-empty
+      // array anywhere satisfies it — while loadEventStores fires ~28 core kinds concurrently and
+      // any of them can fall back to the offline cache or return a truncated page run. So an
+      // account that loaded 27 kinds short still passed, and got stored as the newest auto-daily.
+      // Restoring it is destructive: seed('core') clears EVERY kind and reseeds only what the
+      // snapshot holds, so the kinds that were missing at capture time are deleted for good under
+      // a "Backup restored" message. Even unrestored it does damage — it takes the newest slot,
+      // suppresses real backups for 20h, and ages a good one out of the 30-row pool.
+      if (DB._loadDegraded) return;
       const last = await DB.lastBackupAt();
       const stale = !last || (Date.now() - new Date(last).getTime()) > 20 * 3600 * 1000;
       if (!stale) return;
@@ -5371,6 +5381,10 @@ const App = {
       // cache are indistinguishable from real ones, so marking a kind migrated off a stale or
       // partial cache would strip the blob backup for records the cache never held — silent,
       // permanent loss on exactly the flaky-connection login where it matters most.
+      // A cache-served or truncated read means this login did NOT see the whole account. Record it
+      // once, globally, so _maybeAutoBackup can refuse to capture a partial picture. Checked
+      // before the length test so an EMPTY cached result counts too — that is the same failure.
+      if (rows._fromCache) DB._loadDegraded = true;
       if (rows.length) { dataObj[arr] = rows; if (!rows._fromCache) migrated[k] = true; continue; }   // rows exist: already row-per-record
       // No rows. That is AMBIGUOUS on its own — it means either "this array has never been
       // migrated" or "the operator deleted every record". The marker below is what tells them

@@ -492,6 +492,10 @@ const DB = {
   // in writeData (never overwrite a known-populated account with an all-empty blob unless
   // an intentional reset sets _allowReset). Reset flows (Clear Data / reload sample) set it.
   _loadedNonEmpty: false,
+  // TRUE when this login did not see the whole account: any kind served from the offline cache,
+  // or a page run that broke part-way. Per-load, reset in loadAllData beside its siblings.
+  // Consumed by _maybeAutoBackup, which must never capture a partial picture as a restore point.
+  _loadDegraded: false,
   _allowReset: false,
   // Per-control-blob readiness + populated-at-load flags (ic_data/lc_data/sc_data).
   // The core `_dataReady` gate is set by readData ONLY; a control read that fell back
