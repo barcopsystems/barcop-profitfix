@@ -702,13 +702,20 @@ window.CashEngine = {
     }
     return { start: App.ymdLocal(new Date(now.getFullYear(), now.getMonth(), 1)), end: App.ymdLocal(now), label: 'this month' };
   },
+  // Logged bar + floor sales in a date window, CARRYING the operator's Confirm-the-Week
+  // corrections (see _confirmationRatio). Both callers are money you owe rather than money you
+  // have — the sales-tax hold behind Safe to Spend, and the projected remittances — so they must
+  // read the revenue the operator reconciled, not the raw shift log they already corrected.
+  // A tax hold computed on a rejected number is wrong in whichever direction the error ran.
+  // The window is an arbitrary date range while confirmations are weekly, so the correction is
+  // applied as the bounded ratio rather than a per-week substitution.
   _salesBetween(s, e) {
     let t = 0;
     ((App.shiftData && App.shiftData.sc_shifts) || []).forEach(sh => {
       const d = String(sh.date || '').slice(0, 10); if (!d || d < s || d > e) return;
       t += (parseFloat(sh.bar_revenue) || 0) + (parseFloat(sh.floor_revenue) || 0);
     });
-    return t;
+    return t * this._confirmationRatio();
   },
   _wagesBetween(s, e) {
     let t = 0;

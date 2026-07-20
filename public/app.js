@@ -5315,7 +5315,11 @@ const App = {
         cash_initiative: 'cash_initiatives',
         // Fix System activity feed (row-per-record, NONWINDOWED). fix_progress (the
         // per-gap checkbox map) stays in the blob; only the append-only feed moves.
-        fix_activity: 'fix_activity'
+        fix_activity: 'fix_activity',
+        // The LAST week-scoped entered-data array still living in the config blob. Migrated for
+        // the same reason as the other 21: a whole-blob rewrite could drop the operator's entire
+        // set of weekly revenue forecasts in one write. Row-per-record makes that impossible.
+        revenue_forecast: 'revenue_forecasts'
       }
     }
   },
