@@ -498,15 +498,29 @@ async function alertOps(subject, lines) {
 // hitting 40 users reads as one line, not 40 alerts.
 async function sendErrorDigest() {
   try {
-    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    // Report ONLY events not already reported. The naive "last 24h" version re-sent the SAME
+    // digest after every deploy, because each restart re-armed the boot timer and the window
+    // still covered events already emailed. An alert that repeats itself is one you train
+    // yourself to ignore, which defeats the entire point of having it.
+    //
+    // The high-water mark is stored as a marker row in client_errors itself (kind
+    // 'digest_sent'), so this survives a restart with no extra table and no SQL for Kyle to
+    // run. The server reads with the service role, which bypasses RLS, so a null account/user
+    // on the marker is fine.
+    const { data: mark } = await supabaseAdmin
+      .from('client_errors')
+      .select('created_at').eq('kind', 'digest_sent')
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const since = (mark && mark.created_at) || new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     const { data, error } = await supabaseAdmin
       .from('client_errors')
       .select('kind, message, user_email, app_version, screen, created_at')
-      .gte('created_at', since)
+      .gt('created_at', since)
+      .neq('kind', 'digest_sent')
       .order('created_at', { ascending: false })
       .limit(500);
     if (error) { console.error('errorDigest read failed:', error.message); return; }
-    if (!data || !data.length) { console.log('errorDigest: nothing in the last 24h'); return; }
+    if (!data || !data.length) { console.log('errorDigest: nothing new since ' + since); return; }
     const byKind = {};
     data.forEach(r => {
       const k = r.kind || 'unknown';
@@ -525,8 +539,14 @@ async function sendErrorDigest() {
       .map(k => (URGENT.includes(k) ? '!! ' : '   ') + k + ' — ' + byKind[k].n + ' event(s), '
         + byKind[k].users.size + ' user(s)\n' + byKind[k].samples.join('\n'));
     const urgentHit = Object.keys(byKind).filter(k => URGENT.includes(k));
-    await alertOps('Daily error digest — ' + data.length + ' event(s)'
-      + (urgentHit.length ? ' — INCLUDES ' + urgentHit.join(', ') : ''), lines);
+    await alertOps('Daily error digest: ' + data.length + ' event(s)'
+      + (urgentHit.length ? ' INCLUDING ' + urgentHit.join(', ') : ''), lines);
+    // Advance the high-water mark only AFTER the send, and stamp it at the newest event we just
+    // reported (not "now") so anything that arrived mid-send is still picked up next time.
+    await supabaseAdmin.from('client_errors').insert({
+      kind: 'digest_sent', message: 'reported ' + data.length + ' event(s)',
+      created_at: data[0].created_at
+    });
     console.log('errorDigest: sent, ' + data.length + ' events');
   } catch (e) { console.error('sendErrorDigest failed (non-fatal):', e.message); }
 }
