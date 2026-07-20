@@ -13,6 +13,15 @@ const { profitNarrative, revenueNarrative } = require('../public/components/audi
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+// ── SIGNUPS CLOSED ──────────────────────────────────────────────────────────────────────────
+// Flip to true to reopen public signup. Set false 2026-07-20, with ZERO live accounts, while the
+// pre-live hardening is taken to completion. Blocks /api/create-checkout-session, so nobody can
+// reach payment. Existing customers are unaffected: login, the billing portal, the Stripe
+// webhook and everything else stay open.
+// ⚠ MIRRORS App.SIGNUPS_OPEN in public/app.js, which blocks the signup form in the browser.
+// CHANGE BOTH. verify-signups-closed.js FAILS if they disagree, so a half-open door is caught.
+const SIGNUPS_OPEN = false;
+
 // Skip JSON parsing for the Stripe webhook route — it needs the raw body for signature verification
 app.use((req, res, next) => {
   if (req.path === '/api/stripe-webhook') return next();
@@ -265,6 +274,13 @@ function tsToMs(v) {
 }
 
 app.post('/api/create-checkout-session', async (req, res) => {
+  // SIGNUPS CLOSED — refuse before anything else runs. This is the money endpoint, so it is the
+  // one that has to hold even if the browser is stale, cached, or bypassed entirely. A visitor
+  // could still mint a bare Supabase auth user (that call goes browser-to-Supabase and never
+  // touches this server), but without a subscription the app grants them nothing.
+  if (!SIGNUPS_OPEN) {
+    return res.status(503).json({ error: 'Bar Cop is not taking new accounts right now. Please check back shortly.' });
+  }
   const { accountId, plan } = req.body || {};
   if (!accountId) return res.status(400).json({ error: 'Missing accountId' });
 
