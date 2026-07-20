@@ -163,7 +163,12 @@ async function generateRevenueAudit(apiKey, files, appData, practices, controlDa
 // Safe to leave unauthenticated: it returns BOOLEANS only, never a key, an env value, a count or
 // any customer data. The DB probe is cached for 30s so hammering this endpoint cannot turn into
 // a database load amplifier.
-let _healthCache = { at: 0, dbOk: null };
+// Caches the in-flight PROMISE, not just the result. Caching only the result left the window
+// between "probe started" and "probe resolved" wide open: N requests arriving in that window all
+// saw a stale timestamp and each fired its own service-role query. Unauthenticated, so a burst
+// against /api/health became N concurrent Supabase queries and could exhaust the connection
+// pool — degrading saves for every paying customer, which is the opposite of a health check's job.
+let _healthCache = { at: 0, dbOk: null, inFlight: null };
 app.get('/api/health', async (req, res) => {
   const out = {
     ok: true,                                   // kept for anything already pinging this
@@ -175,11 +180,21 @@ app.get('/api/health', async (req, res) => {
   };
   try {
     const now = Date.now();
-    if (now - _healthCache.at > 30000) {
-      const { error } = await supabaseAdmin.from('accounts').select('id', { head: true, count: 'exact' }).limit(1);
-      _healthCache = { at: now, dbOk: !error };
-      if (error) console.error('health: database probe failed:', error.message);
+    if (now - _healthCache.at > 30000 && !_healthCache.inFlight) {
+      _healthCache.inFlight = (async () => {
+        const { error } = await supabaseAdmin.from('accounts').select('id', { head: true, count: 'exact' }).limit(1);
+        if (error) console.error('health: database probe failed:', error.message);
+        // Stamp the time on COMPLETION, and always clear inFlight — including on a throw, or a
+        // permanently failing probe would re-query on every single request forever.
+        _healthCache = { at: Date.now(), dbOk: !error, inFlight: null };
+        return !error;
+      })().catch(e => {
+        console.error('health: database probe threw:', e.message);
+        _healthCache = { at: Date.now(), dbOk: false, inFlight: null };
+        return false;
+      });
     }
+    if (_healthCache.inFlight) await _healthCache.inFlight;
     out.database = _healthCache.dbOk === null ? 'unknown' : (_healthCache.dbOk ? 'ok' : 'unreachable');
   } catch (e) {
     out.database = 'unreachable';
@@ -307,7 +322,13 @@ app.post('/api/create-checkout-session', async (req, res) => {
           // Retiring the customer's failed attempt before opening a new one keeps a dead
           // 'incomplete' sub from lingering in Stripe (and from being counted by any future
           // guard). Best-effort — a failure here must never block the retry.
-          for (const s of mine.filter(s => s.status === 'incomplete')) {
+          // Only subs older than 15 minutes. A subscription sits in 'incomplete' for the WHOLE
+          // duration of a 3-D Secure challenge, so cancelling on sight could kill the payment
+          // the customer is authenticating with their bank right now — in the worst case the
+          // PaymentIntent succeeds against a subscription being cancelled in the same second:
+          // money captured, no access. A genuinely stale attempt is minutes old, not seconds.
+          const _staleBefore = Math.floor(Date.now() / 1000) - 900;
+          for (const s of mine.filter(s => s.status === 'incomplete' && (s.created || 0) < _staleBefore)) {
             try { await stripe.subscriptions.cancel(s.id); console.log('checkout: canceled stale incomplete sub ' + s.id); }
             catch (e2) { console.error('checkout: could not cancel incomplete sub ' + s.id + ':', e2.message); }
           }
@@ -467,7 +488,7 @@ async function alertOps(subject, lines) {
   try {
     const apiKey = (process.env.RESEND_API_KEY || '').trim();
     const to = (process.env.OPS_ALERT_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL || '').trim();
-    if (!apiKey || !to) { console.warn('alertOps: not configured, skipping:', subject); return; }
+    if (!apiKey || !to) { console.warn('alertOps: not configured, skipping:', subject); return false; }
     const from = (process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev').trim();
     const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
     const html = '<div style="font-family:-apple-system,Segoe UI,sans-serif;max-width:640px;padding:20px;color:#111;">'
@@ -486,10 +507,13 @@ async function alertOps(subject, lines) {
     if (!resp.ok) {
       console.error('!! alertOps SEND FAILED — this alert did NOT reach anyone:', resp.status, await resp.text());
       console.error('!! the alert was:', subject, '|', (lines || []).join(' | '));
+      return false;
     }
+    return true;
   } catch (e) {
     console.error('!! alertOps SEND FAILED (exception) — this alert did NOT reach anyone:', e.message);
     console.error('!! the alert was:', subject, '|', (lines || []).join(' | '));
+    return false;
   }
 }
 
@@ -511,13 +535,28 @@ async function sendErrorDigest() {
       .from('client_errors')
       .select('created_at').eq('kind', 'digest_sent')
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
-    const since = (mark && mark.created_at) || new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    // Clamp the mark: client_errors rows are written by the BROWSER, so created_at is
+    // attacker-controlled. A single row stamped in the year 2099 would push the mark into the
+    // future and silence every future digest — permanently, and looking exactly like a healthy
+    // quiet system. The RLS policy now bounds created_at too; this is the belt to that braces,
+    // because the server must not be one bad row away from going blind.
+    const nowIso = new Date().toISOString();
+    const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    let since = (mark && mark.created_at) || dayAgo;
+    if (since > nowIso) {
+      console.error('errorDigest: stored high-water mark is in the FUTURE (' + since + ') — ignoring it and falling back to 24h.');
+      since = dayAgo;
+    }
+    // ASCENDING + stamp at the LAST row: with descending order the marker jumped to the newest
+    // event, so a burst larger than the 500 cap silently discarded everything older than the
+    // newest 500 — which is where the root cause of a burst usually is. Ascending means an
+    // oversized burst is reported oldest-first across successive runs and nothing is skipped.
     const { data, error } = await supabaseAdmin
       .from('client_errors')
       .select('kind, message, user_email, app_version, screen, created_at')
       .gt('created_at', since)
       .neq('kind', 'digest_sent')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(500);
     if (error) { console.error('errorDigest read failed:', error.message); return; }
     if (!data || !data.length) { console.log('errorDigest: nothing new since ' + since); return; }
@@ -539,14 +578,24 @@ async function sendErrorDigest() {
       .map(k => (URGENT.includes(k) ? '!! ' : '   ') + k + ' — ' + byKind[k].n + ' event(s), '
         + byKind[k].users.size + ' user(s)\n' + byKind[k].samples.join('\n'));
     const urgentHit = Object.keys(byKind).filter(k => URGENT.includes(k));
-    await alertOps('Daily error digest: ' + data.length + ' event(s)'
+    const sent = await alertOps('Daily error digest: ' + data.length + ' event(s)'
       + (urgentHit.length ? ' INCLUDING ' + urgentHit.join(', ') : ''), lines);
-    // Advance the high-water mark only AFTER the send, and stamp it at the newest event we just
-    // reported (not "now") so anything that arrived mid-send is still picked up next time.
-    await supabaseAdmin.from('client_errors').insert({
+    // Advance the mark ONLY on a confirmed send. Advancing it after a failed send (a Resend
+    // rate limit, an expired key, any 5xx) would permanently exclude that window from every
+    // future digest — including wipe_blocked and restore_aborted, the two this code itself
+    // labels urgent. Better to re-send a duplicate tomorrow than to lose the events.
+    if (!sent) {
+      console.error('errorDigest: send FAILED — high-water mark NOT advanced, these ' + data.length
+        + ' event(s) will be retried on the next run.');
+      return;
+    }
+    // Stamp at the LAST (newest) row of this ascending page, so an oversized burst resumes from
+    // exactly where this run stopped rather than skipping the remainder.
+    const { error: markErr } = await supabaseAdmin.from('client_errors').insert({
       kind: 'digest_sent', message: 'reported ' + data.length + ' event(s)',
-      created_at: data[0].created_at
+      created_at: data[data.length - 1].created_at
     });
+    if (markErr) console.error('errorDigest: marker insert failed (next run will re-send these):', markErr.message);
     console.log('errorDigest: sent, ' + data.length + ' events');
   } catch (e) { console.error('sendErrorDigest failed (non-fatal):', e.message); }
 }
@@ -693,7 +742,13 @@ async function reconcileSubscriptions() {
   // resource_missing is only trustworthy once we know the key can see SOMETHING here.
   if (rows.length) {
     try {
-      const probe = await stripe.subscriptions.list({ limit: 1 });
+      // status:'all' is REQUIRED. Stripe's default excludes canceled subscriptions, while the DB
+      // read above keeps every row with a subscription id regardless of status. So once every
+      // sub is canceled (entirely normal for a young product, guaranteed on a wound-down test
+      // account) the probe returned empty, this guard aborted, and reconciliation disabled
+      // itself permanently — re-aborting every 24h and emailing a false "wrong Stripe account"
+      // alarm daily. Reconcile is what catches a dropped webhook for a RETURNING customer.
+      const probe = await stripe.subscriptions.list({ limit: 1, status: 'all' });
       if (!probe || !probe.data || !probe.data.length) {
         console.error('reconcile: ABORT — Stripe reports no subscriptions at all while the DB holds '
           + rows.length + '. Refusing to run: this is the signature of a key pointed at the wrong Stripe account.');
