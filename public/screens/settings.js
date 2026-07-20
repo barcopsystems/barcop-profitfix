@@ -418,6 +418,17 @@ S.HubSettings = {
   //     restore), and because that return was previously discarded the restore carried on to
   //     clear the rows anyway — blob preserved, every record gone. Abort instead.
   async _applyBackup(backup) {
+    // ONE restore at a time. Neither entry point disables its control — importBackup even resets
+    // the file input to '' so it is instantly re-selectable — and a large restore runs 20-30s
+    // behind a static "Restoring backup..." with the reload deferred 1200ms, so a second click
+    // was reachable. Overlapping runs corrupt the _allowReset save/restore below: the second
+    // captures the first's `true` as its "previous" value, the first hands back `false`, and the
+    // second then hands back TRUE — leaving the total-wipe backstop disarmed for the rest of the
+    // session. That is the "a leaked bypass is worse than the bug it bypasses" condition.
+    // Checked before the flag is set below, with no await in between, so there is no window.
+    if (this._restoreInFlight) {
+      throw new Error('a restore is already running. Wait for it to finish before starting another.');
+    }
     const hasData = o => this._sectionHasRecords(o);
     if (!hasData(backup.data) && !hasData(backup.inventoryData)
         && !hasData(backup.laborData) && !hasData(backup.shiftData)) {
@@ -450,10 +461,12 @@ S.HubSettings = {
     // is sanctioned (same contract clearAll/loadSample use), and always hand it back.
     const prevAllowReset = DB._allowReset;
     DB._allowReset = true;
+    this._restoreInFlight = true;
     try {
       await this._applyBackupInner(backup, hasData);
     } finally {
       DB._allowReset = prevAllowReset;
+      this._restoreInFlight = false;
     }
   },
 
