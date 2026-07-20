@@ -902,9 +902,14 @@ S.LaborBuildSchedule = {
   // projection (baseline + booked events).
   async clearForecast() {
     const ws = this.draft.week_start;
-    // Row-per-record: remove the single row (removeRecord also splices it out of memory).
-    const rec = (App.data.revenue_forecasts || []).find(f => f.week_start === ws);
-    if (rec && rec.id != null) await App.removeRecord('core', 'revenue_forecast', rec.id);
+    // Remove EVERY record for this week, not just the first. The old blob code was
+    // `filter(f => f.week_start !== ws)` — it dropped them all, and a whole-array save made
+    // duplicates impossible anyway. Row-per-record removes that collapse: two devices saving a
+    // forecast for the same untouched week each mint their own uid, so both rows now survive.
+    // Deleting one would leave the other behind and "Use Bar Cop's Number" would close the
+    // modal, redraw, and still show a manual override — reading as a broken button.
+    const recs = (App.data.revenue_forecasts || []).filter(f => f && f.week_start === ws);
+    for (const r of recs) { if (r.id != null) await App.removeRecord('core', 'revenue_forecast', r.id); }
     App.closeModal('bs-fc-modal');
     this.draw();
   },
