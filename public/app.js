@@ -2943,7 +2943,16 @@ const App = {
     // load those rows were re-stamped HIGHER than it — putting the newly added location back at
     // the top of the count sheet. Writing the stamps makes the order stable for good. Rows only
     // (ic_locations is row-per-record); safe here because the load is complete.
-    if (_locsStamped.length) await this.putRecordsBulk('ic', 'location', _locsStamped);
+    // ONLY off a server-confirmed read. loadEventStores already refuses to trust a cache-served
+    // array for the migrated_kinds marker; this write needs the same gate and did not have it.
+    // putEventsBulk upserts `payload: rec` — the WHOLE record — so stamping from the offline
+    // cache would push a stale location object back over the server row, reverting a rename,
+    // an archive or a service_bar toggle made on another device. And a location present on the
+    // server but missing from the cache would be numbered on a different scale, persisting a
+    // scrambled count-sheet order instead of fixing it.
+    if (_locsStamped.length && !(_locs && _locs._fromCache)) {
+      await this.putRecordsBulk('ic', 'location', _locsStamped);
+    }
     // Pre-fetch the accounts list so the Hub sidebar can render the
     // Locations section synchronously (multi-account users only).
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
@@ -6539,7 +6548,15 @@ const App = {
     const ws = this.weekStartFor(dateStr);
     if (!ws) return null;
     const list = (this.data && Array.isArray(this.data.revenue_forecasts)) ? this.data.revenue_forecasts : [];
-    return list.find(f => f.week_start === ws) || null;
+    const matches = list.filter(f => f && f.week_start === ws);
+    if (matches.length < 2) return matches[0] || null;
+    // Row-per-record removed the blob's last-write-wins collapse, so two devices saving a
+    // forecast for the same untouched week can now leave TWO rows. A bare .find would return
+    // whichever the array order happened to surface, and this value drives the cash forecast,
+    // the labor budget and the schedule builder — it must not depend on load order.
+    // Newest wins, matching what the operator last entered.
+    const key = f => String((f.updated_at || f.created_at || f.id) || '');
+    return matches.slice().sort((a, b) => key(b).localeCompare(key(a)))[0];
   },
 
   // Auto-defaults for a coming week's forecast. Looks at the same weekday in

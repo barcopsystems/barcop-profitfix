@@ -656,21 +656,21 @@ window.CashEngine = {
   _cfgNum(key, def) { let v = App.acctGet(key); if (v == null) v = this._migCfg(key); const n = parseFloat(v); return isNaN(n) ? def : n; },
   _cfgSet(key, v) { return App.acctSet(key, (v == null || v === '') ? null : String(v)); },
   salesTaxRate()   { return this._cfgNum('cash_sales_tax_rate', 0); },
-  setSalesTaxRate(v) { this._cfgSet('cash_sales_tax_rate', v); },
+  setSalesTaxRate(v) { return this._cfgSet('cash_sales_tax_rate', v); },
   taxFrequency()   { let v = App.acctGet('cash_tax_freq'); if (v == null) v = this._migCfg('cash_tax_freq'); return v || 'monthly'; },
   setTaxFrequency(v) { return App.acctSet('cash_tax_freq', v === 'quarterly' ? 'quarterly' : 'monthly'); },
   payrollBurden()  { return this._cfgNum('cash_payroll_burden', 0); },
-  setPayrollBurden(v) { this._cfgSet('cash_payroll_burden', v); },
+  setPayrollBurden(v) { return this._cfgSet('cash_payroll_burden', v); },
   reserveWeeks()   { return this._cfgNum('cash_reserve_weeks', 8); },
-  setReserveWeeks(v) { this._cfgSet('cash_reserve_weeks', v); },
+  setReserveWeeks(v) { return this._cfgSet('cash_reserve_weeks', v); },
   // Available credit (a line of credit or card) is the backstop you actually lean
   // on in a thin week, so it extends the survival runway past the bank balance.
   availableCredit() { return Math.max(0, this._cfgNum('cash_available_credit', 0)); },
-  setAvailableCredit(v) { this._cfgSet('cash_available_credit', v); },
+  setAvailableCredit(v) { return this._cfgSet('cash_available_credit', v); },
   // Outstanding gift cards are cash you collected but owe product against, the same
   // trap as spending the sales tax, so they are money that isn't yours to spend.
   giftCardLiability() { return Math.max(0, this._cfgNum('cash_gift_card_liability', 0)); },
-  setGiftCardLiability(v) { this._cfgSet('cash_gift_card_liability', v); },
+  setGiftCardLiability(v) { return this._cfgSet('cash_gift_card_liability', v); },
 
   // Weekly fixed overhead: the recurring bills (rent, utilities, insurance, loan),
   // normalized to a week by their frequency (monthly / quarterly / annual), so a
