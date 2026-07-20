@@ -5529,7 +5529,21 @@ const App = {
     const r = await DB.removeEvent(store.table, kind, id);
     // Removed, offline, or safely queued for replay — keep it removed; the delete will sync.
     // Only a viewer rejection (or a full disk, where nothing was queued) restores the row.
-    if (r.ok || ((r.offline || r.queued) && !r.storageFull)) return true;
+    if (r.ok || ((r.offline || r.queued) && !r.storageFull)) {
+      // Re-derive "this account is known-populated". That flag is computed once per LOAD, and a
+      // delete never goes through writeData, so without this an operator who deletes their LAST
+      // record leaves it stuck TRUE over an App.data whose arrays are now all empty — and the
+      // total-wipe backstop then REFUSES EVERY CONFIG SAVE for the rest of the session (a pour
+      // target, a Getting Started tick, anything through saveKey), firing a wipe_blocked alert
+      // each time. Nothing is lost, but it reads as "Save failed" until they reload, and a bar in
+      // its first week with one array populated reaches it doing nothing unusual.
+      // Safe to lower HERE precisely because the emptying was the operator's own confirmed
+      // delete, not the in-memory corruption the backstop exists to catch. Lowered only on
+      // SUCCESS: a rejected delete restores the row below, so the account is still populated and
+      // the backstop has to stay armed.
+      DB._loadedNonEmpty = DB._blobHasArrayData(this.data);
+      return true;
+    }
     if (removed) arr.splice(idx, 0, removed);
     return false;
   },
