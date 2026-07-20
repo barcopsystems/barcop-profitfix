@@ -182,7 +182,15 @@ app.get('/api/health', async (req, res) => {
     const now = Date.now();
     if (now - _healthCache.at > 30000 && !_healthCache.inFlight) {
       _healthCache.inFlight = (async () => {
-        const { error } = await supabaseAdmin.from('accounts').select('id', { head: true, count: 'exact' }).limit(1);
+        // Bounded. Without a timeout a blackholed connection (TCP dropped, not reset) leaves this
+        // promise pending forever, and because every later request now JOINS the in-flight promise
+        // instead of firing its own, they all park — sockets accumulating without bound on an
+        // UNAUTHENTICATED endpoint that a monitor polls on a timer. Caching the promise fixed the
+        // stampede but created this; a probe that cannot answer is an unhealthy DB either way.
+        const { error } = await Promise.race([
+          supabaseAdmin.from('accounts').select('id', { head: true, count: 'exact' }).limit(1),
+          new Promise(res => setTimeout(() => res({ error: { message: 'probe timed out after 5s' } }), 5000))
+        ]);
         if (error) console.error('health: database probe failed:', error.message);
         // Stamp the time on COMPLETION, and always clear inFlight — including on a throw, or a
         // permanently failing probe would re-query on every single request forever.
@@ -538,9 +546,18 @@ async function sendErrorDigest() {
     // is nothing to report, which is exactly when the send path returns early. 30 days is well
     // past the point a row is useful (the digest reports within a day) and it bounds the marker
     // rows too. Piggy-backed on the daily job, so no scheduler and no pg_cron needed.
+    // ⚠ The prune must NOT eat the high-water markers. They live in this same table, so a blanket
+    // 30-day delete removed them too — and if the digest had not sent for over 30 days (server
+    // down, OPS_ALERT_EMAIL unset, Resend broken) the newest marker vanished, `since` fell back
+    // to 24h, and every unreported event between 24h and 30 days old was silently skipped and
+    // then deleted on the same pass. That is precisely the go-silent failure this mechanism
+    // exists to prevent. Markers are ~1 row per send, so a far longer horizon costs nothing.
     const cutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-    const { error: pruneErr } = await supabaseAdmin.from('client_errors').delete().lt('created_at', cutoff);
-    if (pruneErr) console.error('errorDigest: retention prune failed (non-fatal):', pruneErr.message);
+    const markCutoff = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
+    // (the EVENT prune moved below, after `since` is known — it must never outrun the mark)
+    const { error: markPruneErr } = await supabaseAdmin.from('client_errors')
+      .delete().lt('created_at', markCutoff).eq('kind', 'digest_sent');
+    if (markPruneErr) console.error('errorDigest: marker prune failed (non-fatal):', markPruneErr.message);
 
     const { data: mark } = await supabaseAdmin
       .from('client_errors')
@@ -552,25 +569,58 @@ async function sendErrorDigest() {
     // quiet system. The RLS policy now bounds created_at too; this is the belt to that braces,
     // because the server must not be one bad row away from going blind.
     const nowIso = new Date().toISOString();
-    const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    let since = (mark && mark.created_at) || dayAgo;
+    // With NO usable mark, fall back to the RETENTION cutoff, not 24h. Everything still in the
+    // table is newer than the cutoff (the prune above guarantees it), so this reports the whole
+    // surviving backlog rather than silently dropping anything older than a day. A 24h fallback
+    // meant a digest returning after any outage longer than a day quietly lost the gap.
+    let since = (mark && mark.created_at) || cutoff;
     if (since > nowIso) {
-      console.error('errorDigest: stored high-water mark is in the FUTURE (' + since + ') — ignoring it and falling back to 24h.');
-      since = dayAgo;
+      console.error('errorDigest: stored high-water mark is in the FUTURE (' + since + ') — ignoring it and reporting the full retained window.');
+      since = cutoff;
     }
+    // Prune events ONLY up to the older of (retention cutoff, high-water mark). Deleting on age
+    // alone let the prune outrun the digest: if reporting ever fell more than 30 days behind,
+    // rows aged out having never been emailed — silent permanent loss of exactly the events the
+    // backlog was too big to reach. Never delete something that has not been reported.
+    const pruneBefore = since < cutoff ? since : cutoff;
+    const { error: pruneErr } = await supabaseAdmin.from('client_errors')
+      .delete().lt('created_at', pruneBefore).neq('kind', 'digest_sent');
+    if (pruneErr) console.error('errorDigest: retention prune failed (non-fatal):', pruneErr.message);
     // ASCENDING + stamp at the LAST row: with descending order the marker jumped to the newest
     // event, so a burst larger than the 500 cap silently discarded everything older than the
     // newest 500 — which is where the root cause of a burst usually is. Ascending means an
     // oversized burst is reported oldest-first across successive runs and nothing is skipped.
-    const { data, error } = await supabaseAdmin
-      .from('client_errors')
-      .select('kind, message, user_email, app_version, screen, created_at')
-      .gt('created_at', since)
-      .neq('kind', 'digest_sent')
-      .order('created_at', { ascending: true })
-      .limit(500);
-    if (error) { console.error('errorDigest read failed:', error.message); return; }
-    if (!data || !data.length) { console.log('errorDigest: nothing new since ' + since); return; }
+    // DRAIN, don't take one page. A single 500-row page + a 24h interval capped throughput at
+    // 500 events/day with no way to catch up: a 3,000-event burst would take six days to finish
+    // reporting, and the retention prune deletes on age alone — so a backlog deeper than 30 days
+    // loses unreported rows permanently. Worse, it looks healthy: the same "500 event(s)" subject
+    // arrives daily whether it is draining a month-old backlog or reporting yesterday.
+    // Bounded at 20 pages (10k events) so one runaway client can't make this unbounded work;
+    // whatever is left is picked up next run, and the count in the email is the honest total.
+    const PAGE = 500, MAX_PAGES = 20;
+    const data = [];
+    let cursor = since, truncated = false;
+    for (let page = 0; ; page++) {
+      if (page >= MAX_PAGES) { truncated = true; break; }
+      const { data: chunk, error } = await supabaseAdmin
+        .from('client_errors')
+        .select('kind, message, user_email, app_version, screen, created_at')
+        .gt('created_at', cursor)
+        .neq('kind', 'digest_sent')
+        .order('created_at', { ascending: true })
+        .limit(PAGE);
+      if (error) {
+        console.error('errorDigest read failed:', error.message);
+        if (!data.length) return;         // nothing gathered at all — try again next run
+        break;                            // partial gather: report what we have, mark advances only that far
+      }
+      if (!chunk || !chunk.length) break;
+      data.push(...chunk);
+      cursor = chunk[chunk.length - 1].created_at;
+      if (chunk.length < PAGE) break;
+    }
+    if (!data.length) { console.log('errorDigest: nothing new since ' + since); return; }
+    if (truncated) console.warn('errorDigest: hit the ' + (PAGE * MAX_PAGES) + '-event page cap; the remainder reports on the next run.');
     const byKind = {};
     data.forEach(r => {
       const k = r.kind || 'unknown';
@@ -608,7 +658,7 @@ async function sendErrorDigest() {
     });
     if (markErr) console.error('errorDigest: marker insert failed (next run will re-send these):', markErr.message);
     console.log('errorDigest: sent, ' + data.length + ' events');
-  } catch (e) { console.error('sendErrorDigest failed (non-fatal):', e.message); }
+  } catch (e) { console.error('sendErrorDigest failed (non-fatal):', (e && e.message) || e); }
 }
 
 // Best-effort "Welcome to Bar Cop" email, sent from the checkout webhook once a NEW
@@ -1924,6 +1974,6 @@ if ((process.env.STRIPE_SECRET_KEY || '').trim()) {
 // must keep working even on an instance with no billing key. First pass 10 min after boot
 // (offset from reconcile so the two never email at once), then every 24h.
 if ((process.env.OPS_ALERT_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL || '').trim()) {
-  setTimeout(() => { sendErrorDigest(); }, 10 * 60 * 1000);
-  setInterval(() => { sendErrorDigest(); }, 24 * 60 * 60 * 1000);
+  setTimeout(() => { sendErrorDigest().catch(e => console.error("errorDigest (startup):", (e && e.message) || e)); }, 10 * 60 * 1000);
+  setInterval(() => { sendErrorDigest().catch(e => console.error("errorDigest (interval):", (e && e.message) || e)); }, 24 * 60 * 60 * 1000);
 }
