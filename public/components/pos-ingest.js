@@ -120,6 +120,20 @@ const PosIngest = {
     return neg ? -n : n;
   },
 
+  // Parse a POS COUNT cell (units sold) that may be NEGATIVE — a product return or void reports
+  // "-3" / "(3)" / "3-". The old cleaner stripped [^0-9.], so a "-3" return read as +3 and INFLATED
+  // the week's units instead of reducing them. Same sign handling as _num, but returns NaN (not 0)
+  // for a non-numeric cell, so a junk row is SKIPPED rather than silently counted as zero. Keeps the
+  // decimal point so "12.00" is 12, not 1200.
+  _count(v) {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return NaN;
+    const neg = /^\(.*\)$/.test(s) || /^-/.test(s) || /-\s*$/.test(s);
+    const n = parseFloat(s.replace(/[^0-9.]/g, ''));
+    if (isNaN(n)) return NaN;
+    return Math.round(neg ? -n : n);
+  },
+
   // Parse a POS HOURS cell. Timeclock exports commonly give "8:30" (8 hours 30
   // minutes); plain parseFloat("8:30") returned 8 and silently dropped the 30
   // minutes off gross pay, and _num would strip the colon to 830. Handle H:MM
@@ -449,7 +463,7 @@ const PosIngest = {
     const skipped = []; const dupCount = 0; let merged = 0;
     (rows || []).forEach(r => {
       const nm = (r.name || '').trim().toLowerCase();
-      const units = Math.round(parseFloat(String(r.units == null ? '' : r.units).replace(/[^0-9.]/g, '')));   // keep the decimal point: "12.00" is 12, not 1200; strip only commas/currency
+      const units = this._count(r.units);   // signed: a "-3" return REDUCES the week's units; NaN (junk) is skipped below
       if (!nm || isNaN(units)) { skipped.push(r.name || '(blank)'); return; }
       const it = byName[nm];
       if (!it) { skipped.push(r.name); return; }
@@ -457,12 +471,18 @@ const PosIngest = {
       if (prior) { prior.covers += units; merged++; }
       else byItem.set(it.id, { item_id: it.id, covers: units });
     });
+    // Drop an item whose NET units come out <= 0 (returns met or exceeded sales in this file, or a
+    // returns-only export dropped by mistake). _commitPmix REPLACES weekly_covers, so writing a 0
+    // or a negative would overwrite the item's real prior figure — showing "-3 sold/wk" on Menu
+    // Engineering and dragging the category classification. The same guard buildSales applies to a
+    // non-positive DAY; leave the prior figure untouched rather than replace it with garbage.
+    const toAdd = [...byItem.values()].filter(u => u.covers > 0);
     // `merged`, NOT dupCount. In every other builder in this file dupCount means rows SKIPPED
     // because they were already logged, and every screen renders it as "N already logged" — the
     // opposite of what happened here, where N rows were FOLDED INTO a total. Reusing the name
     // would have been a message waiting to lie the moment someone wired it up. dupCount stays 0
     // so the shared build() contract documented at the top of this file still holds.
-    return { toAdd: [...byItem.values()], skipped, dupCount, merged };
+    return { toAdd, skipped, dupCount, merged };
   },
 
   // ── Persist ──────────────────────────────────────────────────────────────
