@@ -886,10 +886,14 @@ S.LaborBuildSchedule = {
     const list = App.data.revenue_forecasts;
     const ws = this.draft.week_start;
     const tv = Math.round(val * 100) / 100;
+    // Row-per-record: putRecord updates the in-memory array (match on id) AND writes the single
+    // row. An edit merges onto the existing record so created_at/id survive.
     const existing = list.find(f => f.week_start === ws);
-    if (existing) { existing.total = tv; existing.per_day = {}; existing.method = 'total'; existing.updated_at = new Date().toISOString(); }
-    else list.push({ id: App.uid(), week_start: ws, total: tv, per_day: {}, method: 'total', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-    await App.saveKey('revenue_forecasts');
+    const rec = existing
+      ? Object.assign({}, existing, { total: tv, per_day: {}, method: 'total', updated_at: new Date().toISOString() })
+      : { id: App.uid(), week_start: ws, total: tv, per_day: {}, method: 'total', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    const ok = await App.putRecord('core', 'revenue_forecast', rec);
+    if (!ok) { fail('Could not save the forecast. Try again.'); return; }
     App.closeModal('bs-fc-modal');
     this.draw();
   },
@@ -898,10 +902,9 @@ S.LaborBuildSchedule = {
   // projection (baseline + booked events).
   async clearForecast() {
     const ws = this.draft.week_start;
-    if (Array.isArray(App.data.revenue_forecasts)) {
-      App.data.revenue_forecasts = App.data.revenue_forecasts.filter(f => f.week_start !== ws);
-      await App.saveKey('revenue_forecasts');
-    }
+    // Row-per-record: remove the single row (removeRecord also splices it out of memory).
+    const rec = (App.data.revenue_forecasts || []).find(f => f.week_start === ws);
+    if (rec && rec.id != null) await App.removeRecord('core', 'revenue_forecast', rec.id);
     App.closeModal('bs-fc-modal');
     this.draw();
   },
