@@ -277,7 +277,11 @@ window.CashEngine = {
     // so a week the operator explicitly closed for renovation projected a full average week of
     // phantom revenue into the balance curve, the low-point week, the runway, and the lender PDF.
     if (App.forecastForWeek) { const f = App.forecastForWeek(ws); if (f && f.total != null) return Number(f.total) || 0; }
-    if (App.forecastDefaultsFor) { const d = App.forecastDefaultsFor(ws); if (d && d.total) return d.total; }
+    // The same-weekday projection is built from raw sc_shifts, so it cannot see a week the
+    // operator corrected in Confirm the Week. Carry that correction across, so the forecast
+    // stops projecting off numbers they have already reviewed and changed. Ratio is 1 (no-op)
+    // until at least two confirmed weeks exist, and is bounded either side.
+    if (App.forecastDefaultsFor) { const d = App.forecastDefaultsFor(ws); if (d && d.total) return d.total * this._confirmationRatio(); }
     // Beyond the forecast's same-weekday lookback window (the default returns 0
     // once a week is more than ~8 weeks past the last logged sales), replay the
     // recent actual weeks forward so a far-out week reads a real recent week's
@@ -285,9 +289,44 @@ window.CashEngine = {
     return this._cyclicWeeklySales(ws);
   },
 
+  // The CONFIRMED bar + floor revenue for the week starting `mondayYmd`, or null if that week
+  // was never confirmed. Bar + floor ONLY, never the record's grand total: the total also
+  // carries catering and ancillary, while the sc_shifts baseline this corrects is bar + floor.
+  // Mixing the two bases would fold event revenue into the sales baseline while eventInflow
+  // keeps adding it separately on top — a silent double count.
+  _confirmedWeekTotal(mondayYmd) {
+    const pe = this._addDays(mondayYmd, 6);   // weeks key on Monday; period_end is that Sunday
+    const rw = ((App.data && App.data.revenue_weeks) || [])
+      .find(w => String(w.period_end || '').slice(0, 10) === pe);
+    if (!rw) return null;
+    const bar = parseFloat(rw.bar_revenue), flo = parseFloat(rw.floor_revenue);
+    if (isNaN(bar) && isNaN(flo)) return null;
+    return (isNaN(bar) ? 0 : bar) + (isNaN(flo) ? 0 : flo);
+  },
+
+  // How much the operator's confirmed numbers differ from the raw shift log, across the recent
+  // weeks where both exist. Used to carry that correction into the same-weekday projection,
+  // which is built from sc_shifts and would otherwise keep projecting a number the operator has
+  // already rejected. BOUNDED to 0.5x-2x and requires at least two confirmed weeks, so one odd
+  // week (a closure, a festival) cannot distort the whole quarter. Returns 1 = no correction.
+  _confirmationRatio() {
+    const rows = this._recentWeeklySales(8).filter(r => r.confirmed && r.logged > 0);
+    if (rows.length < 2) return 1;
+    const conf = rows.reduce((s, r) => s + r.total, 0);
+    const log  = rows.reduce((s, r) => s + r.logged, 0);
+    if (!(log > 0)) return 1;
+    const ratio = conf / log;
+    if (!isFinite(ratio) || ratio <= 0) return 1;
+    return Math.min(2, Math.max(0.5, ratio));
+  },
+
   // Recent COMPLETE weeks of actual shift revenue (bar + floor), oldest to newest,
   // excluding the current in-progress week so a partial week never drags it. The
   // basis for both the trailing average and the cyclic replay.
+  // A week the operator CONFIRMED reports its confirmed bar+floor instead of the raw shift sum:
+  // that is the number they reconciled and stand behind, so projecting off the un-reviewed log
+  // would forecast from a figure they have already corrected. `logged` keeps the raw value so
+  // _confirmationRatio can measure the difference.
   _recentWeeklySales(n) {
     const shifts = (App.shiftData && App.shiftData.sc_shifts) || [];
     if (!shifts.length) return [];
@@ -301,7 +340,10 @@ window.CashEngine = {
       if (wk >= curMon) return;
       byWeek[wk] = (byWeek[wk] || 0) + r;
     });
-    return Object.keys(byWeek).sort().slice(-(n || 8)).map(w => ({ wk: w, total: byWeek[w] }));
+    return Object.keys(byWeek).sort().slice(-(n || 8)).map(w => {
+      const conf = this._confirmedWeekTotal(w);
+      return { wk: w, total: (conf != null ? conf : byWeek[w]), logged: byWeek[w], confirmed: conf != null };
+    });
   },
   // Average of the recent weeks, the steady fallback when there is only one week
   // to replay (or for a non-projected week).
