@@ -393,13 +393,56 @@ S.HubSettings = {
     }
   },
 
+  // Does a backup section carry actual ENTERED RECORDS (not just scalar flags)? The 21 entered
+  // arrays are row-per-record now, so a control blob can legitimately hold only seed flags like
+  // {lc_positions_seeded:true} — a shallow key count would call that "populated" and let it
+  // replace a live, fully-populated section, after which seedEventStores wipes that module's
+  // rows to match. Test the ARRAYS, which is what a restore actually reseeds.
+  _sectionHasRecords(o) {
+    return !!o && typeof o === 'object'
+      && Object.keys(o).some(k => Array.isArray(o[k]) && o[k].length > 0);
+  },
+
   // Overwrite the account from a backup object (a file OR a stored snapshot — same shape).
   // Caller validates + confirms first. seedEventStores clears+reseeds each event table, so a
-  // restore fully replaces rows; the hasData guards keep a populated control blob if the
-  // backup lacks that section (a partial/old file must never erase live staff/locations).
+  // restore fully replaces rows; the guards below keep a populated section if the backup
+  // lacks it (a partial/old file must never erase live staff/locations).
+  //
+  // ⚠ seedEventStores CLEARS each event table before it reseeds, so this function is
+  // destructive the moment it starts. Two protections, both load-bearing:
+  //  1. Refuse outright to restore a snapshot that carries no records at all. An empty
+  //     snapshot (e.g. captured before the account finished loading) would otherwise clear
+  //     all four event tables and seed nothing back — a total wipe reported as "restored".
+  //  2. _allowReset + a checked return on every blob save. Without _allowReset the writeData
+  //     total-wipe backstop BLOCKS the config save (App.data legitimately looks empty mid-
+  //     restore), and because that return was previously discarded the restore carried on to
+  //     clear the rows anyway — blob preserved, every record gone. Abort instead.
   async _applyBackup(backup) {
-    App.data = backup.data;
-    const hasData = o => o && typeof o === 'object' && Object.keys(o).length > 0;
+    const hasData = o => this._sectionHasRecords(o);
+    if (!hasData(backup.data) && !hasData(backup.inventoryData)
+        && !hasData(backup.laborData) && !hasData(backup.shiftData)) {
+      throw new Error('that backup contains no records, so restoring it would erase this account');
+    }
+    // A restore intentionally replaces everything — tell the total-wipe backstop this write
+    // is sanctioned (same contract clearAll/loadSample use), and always hand it back.
+    const prevAllowReset = DB._allowReset;
+    DB._allowReset = true;
+    try {
+      await this._applyBackupInner(backup, hasData);
+    } finally {
+      DB._allowReset = prevAllowReset;
+    }
+  },
+
+  async _applyBackupInner(backup, hasData) {
+    // A save that reports failure must stop the restore BEFORE seedEventStores clears rows.
+    const must = async (label, p) => {
+      const r = await p;
+      if (r && r.ok === false && !r.offline && !r.queued) {
+        throw new Error('could not write ' + label + ' — nothing was erased, your account is unchanged');
+      }
+    };
+    if (hasData(backup.data)) App.data = backup.data;
     if (hasData(backup.inventoryData)) App.inventoryData = backup.inventoryData;
     if (hasData(backup.laborData))     App.laborData     = backup.laborData;
     if (hasData(backup.shiftData))     App.shiftData     = backup.shiftData;
@@ -413,18 +456,27 @@ S.HubSettings = {
       CE.setAvailableCredit(cc.available_credit);
       CE.setGiftCardLiability(cc.gift_card_liability);
     }
-    await App.save();
-    await App.saveInventory();
+    // Each blob save is checked BEFORE the matching seedEventStores clears that module's rows.
+    await must('settings', App.save());
+    await must('inventory config', App.saveInventory());
     await App.seedEventStores('ic');
-    await App.saveLabor();
+    await must('labor config', App.saveLabor());
     await App.seedEventStores('lc');
-    await App.saveShift();
+    await must('shift config', App.saveShift());
     await App.seedEventStores('sc');
     await App.seedEventStores('core');   // recovery event logs -> core_events rows
   },
 
   // Save a snapshot right now (the owner "Back up now" button). Returns true on success.
   async backupNow() {
+    // Never store a snapshot the account can't be restored FROM. A capture taken before the
+    // load confirmed the account (or of an account with no records) becomes an indistinguishable
+    // one-click "restore" target in the list that would wipe the bar. _applyBackup refuses such
+    // a snapshot too; refusing to create it keeps it out of the list in the first place.
+    if (!DB._dataReady || !this._sectionHasRecords(App.data)) {
+      this._backupMsg('Nothing to back up yet — your account data is still loading. Try again in a moment.', 'var(--red)');
+      return false;
+    }
     this._backupMsg('Saving a backup...', 'var(--t3)');
     const r = await DB.saveBackup(this._buildBackup(), 'manual');
     this._backupMsg((r && r.ok) ? 'Backup saved.' : 'Could not save the backup. Try again.',
