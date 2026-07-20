@@ -504,7 +504,14 @@ S.HubSettings = {
     // against its CURRENT weeks and audits, which is exactly the state an operator would read
     // Cash Position off and get a wrong opening balance. Round 4 found the reassuring copy
     // firing on every abort after this point.
-    let committed = false;
+    // WHICH SECTIONS ARE ACTUALLY APPLIED, in order — not a single boolean. The restore runs
+    // settings → inventory config → seed(ic) → labor config → seed(lc) → shift config → seed(sc)
+    // → seed(core), and each seed() CLEARS that module's rows and reseeds them from the backup.
+    // So by the time must('labor config') fails, Inventory has been completely replaced. One flag
+    // said "your settings and cash setup were already restored, but the rest was not", which is
+    // false for the whole Inventory module and falser at every later step. Same class of
+    // dishonest abort copy the earlier reworks of this function existed to end.
+    const done = [];
     const must = async (label, p) => {
       const ok = await p;
       if (ok !== true) {
@@ -513,9 +520,10 @@ S.HubSettings = {
         // The step goes in the MESSAGE, not just the detail: logClientError dedupes on
         // kind + message per session, so a constant message meant only the FIRST abort was ever
         // reported — and the retries are exactly what reveal where it actually breaks.
-        DB.logClientError('restore_aborted', 'Restore aborted at step: ' + label, 'step=' + label + ' committed=' + committed);
-        throw new Error(committed
-          ? 'could not write ' + label + '. Your settings and cash setup were already restored from the backup, but the rest was not. Reloading — run the restore again before entering anything new.'
+        DB.logClientError('restore_aborted', 'Restore aborted at step: ' + label, 'step=' + label + ' applied=' + (done.join('|') || 'none'));
+        throw new Error(done.length
+          ? 'could not write ' + label + '. Already restored from the backup: ' + done.join(', ')
+            + '. The rest was not. Reloading — run the restore again before entering anything new.'
           : 'could not write ' + label + '. Nothing was changed and nothing is queued to sync.');
       }
     };
@@ -528,6 +536,12 @@ S.HubSettings = {
     // Snapshot the sync queue as well. The preflight has already refused if it was non-empty, so
     // this is an empty list, and restoring it on abort dequeues anything a failed write staged.
     const _prevPending = (DB._pendingList && DB._setPendingList) ? DB._pendingList().slice() : null;
+    // The EVENT queue gets the same treatment. Blanket-clearing it on abort (my first fix for the
+    // orphaned-queue bug) was too blunt: an operator can legitimately have unsynced record ops
+    // queued before a restore, and clearing threw their work away. Snapshotting and restoring
+    // still drops everything THIS restore queued — in the normal case the queue starts empty, so
+    // restoring the snapshot is clearing it — while anything that was already there survives.
+    const _prevEvents = (DB._eventQueue && DB._setEventQueue) ? DB._eventQueue().slice() : null;
     try {
       if (hasData(backup.data)) App.data = backup.data;
       if (hasData(backup.inventoryData)) App.inventoryData = backup.inventoryData;
@@ -540,7 +554,7 @@ S.HubSettings = {
       await must('settings', App.save());
       // The core blob is now the backup's, INCLUDING account_state (the cash config). Every
       // abort past this line has to say so rather than promise the account is untouched.
-      committed = true;
+      done.push('settings and cash setup');
       if (backup.cashConfig && window.CashEngine) {
         // AWAITED because these write through acctSet -> saveKey -> writeData, and _applyBackup
         // closes the _allowReset window in a finally; fire-and-forget could leave them in flight
@@ -566,18 +580,27 @@ S.HubSettings = {
         const r = await App.seedEventStores(mod);
         if (r && r.ok === false) {
           DB.logClientError('restore_aborted', 'Restore failed while writing ' + label + ' records', 'mod=' + mod);
-          // seed() only ever runs after must('settings') succeeded, so the blob is always
-          // already committed here. "Your other data is intact" was never true at this point.
-          throw new Error('your ' + label + ' records did not finish writing. Your settings and cash setup were already restored, so this account is part-way between the backup and where it was. Run the restore again before entering anything new.');
+          // seed() only ever runs after must('settings') succeeded, so something is always
+          // already applied here. Name it rather than saying "your other data is intact", which
+          // was never true at this point.
+          throw new Error('your ' + label + ' records did not finish writing. Already restored from the backup: '
+            + (done.join(', ') || 'settings and cash setup')
+            + '. This account is part-way between the backup and where it was. Reloading — run the restore again before entering anything new.');
         }
       };
+      // Each module is recorded only once its rows are actually reseeded, so `done` never claims
+      // a section that a later abort left half-applied.
       await must('inventory config', App.saveInventory());
       await seed('ic', 'Inventory');
+      done.push('Inventory');
       await must('labor config', App.saveLabor());
       await seed('lc', 'Labor');
+      done.push('Labor');
       await must('shift config', App.saveShift());
       await seed('sc', 'Shift');
+      done.push('Shift');
       await seed('core', 'Recovery');   // recovery event logs -> core_events rows
+      done.push('Recovery');
     } catch (e) {
       // ALWAYS revert all four. Round 4 made this conditional on `committed`, reasoning only about
       // the core blob — but all four objects are swapped at the top of the try, so once a commit
@@ -603,7 +626,7 @@ S.HubSettings = {
       // abandoned backup replayed into the live account at an arbitrary later date. Cleared
       // BEFORE the blob list is restored, because _pendingList now derives an 'events' entry from
       // this queue — restoring an empty list first would leave that entry synthesised right back.
-      try { DB._setEventQueue([]); } catch (_) {}
+      if (_prevEvents) { try { DB._setEventQueue(_prevEvents); } catch (_) {} }
       if (_prevPending) { try { DB._setPendingList(_prevPending); } catch (_) {} }
       // A committed blob cannot be un-written, so memory and the server may still disagree. Only a
       // reload settles that; the callers paint the message first, then reload.
