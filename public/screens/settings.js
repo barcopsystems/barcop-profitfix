@@ -390,6 +390,11 @@ S.HubSettings = {
       setTimeout(() => window.location.reload(), 1200);
     } catch (e) {
       this._backupMsg('Restore failed: ' + (e.message || 'unknown error'), 'var(--red)');
+      // A restore that got as far as writing leaves memory and the server possibly disagreeing —
+      // a committed blob cannot be un-written. Reload so what is on screen is what is on the
+      // server. Longer than the success reload so the failure is actually readable. PREFLIGHT
+      // refusals do not set this flag: nothing ran, so there is nothing to settle.
+      if (e && e.restoreNeedsReload) setTimeout(() => window.location.reload(), 2500);
     }
   },
 
@@ -456,6 +461,16 @@ S.HubSettings = {
     if (_notReady.length) {
       throw new Error('your Inventory, Labor and Shift data has not finished loading, so a restore would not be safe. Nothing has been changed — reload the page and try again.');
     }
+    // Refuse on top of UNSYNCED WORK. Two reasons, both load-bearing. First, the abort path has to
+    // undo what a failed write staged — writeData and _writeControl each do _localWrite +
+    // _markPending BEFORE reporting failure — and that undo is only exact if the queue started
+    // empty; otherwise we cannot tell the operator's own queued work from the backup's blob, and
+    // both live at the same localStorage key. Second, a restore racing the operator's unsynced
+    // edits would push whichever landed last with no way to tell which won.
+    const _pendingNow = (DB._pendingList && DB._pendingList()) || [];
+    if (_pendingNow.length) {
+      throw new Error('you have changes still waiting to sync (' + _pendingNow.length + '). Let them finish, or use Sync Now, before restoring. Nothing has been changed.');
+    }
 
     // A restore intentionally replaces everything — tell the total-wipe backstop this write
     // is sanctioned (same contract clearAll/loadSample use), and always hand it back.
@@ -500,8 +515,8 @@ S.HubSettings = {
         // reported — and the retries are exactly what reveal where it actually breaks.
         DB.logClientError('restore_aborted', 'Restore aborted at step: ' + label, 'step=' + label + ' committed=' + committed);
         throw new Error(committed
-          ? 'could not write ' + label + '. Your settings and cash setup were already restored from the backup, but the rest was not. Run the restore again before entering anything new.'
-          : 'could not write ' + label + '. Nothing was erased and your account is unchanged.');
+          ? 'could not write ' + label + '. Your settings and cash setup were already restored from the backup, but the rest was not. Reloading — run the restore again before entering anything new.'
+          : 'could not write ' + label + '. Nothing was changed and nothing is queued to sync.');
       }
     };
     // Snapshot the LIVE objects before swapping. must() now actually aborts, and its message
@@ -510,6 +525,9 @@ S.HubSettings = {
     // held the real account, and the next autosave, screen save or _maybeAutoBackup would push
     // that half-applied state up. Restore-on-throw makes the promise honest.
     const _prev = { d: App.data, i: App.inventoryData, l: App.laborData, s: App.shiftData };
+    // Snapshot the sync queue as well. The preflight has already refused if it was non-empty, so
+    // this is an empty list, and restoring it on abort dequeues anything a failed write staged.
+    const _prevPending = (DB._pendingList && DB._setPendingList) ? DB._pendingList().slice() : null;
     try {
       if (hasData(backup.data)) App.data = backup.data;
       if (hasData(backup.inventoryData)) App.inventoryData = backup.inventoryData;
@@ -561,17 +579,27 @@ S.HubSettings = {
       await seed('sc', 'Shift');
       await seed('core', 'Recovery');   // recovery event logs -> core_events rows
     } catch (e) {
-      // Roll memory back ONLY while nothing has reached the server. That is what makes the
-      // "your account is unchanged" promise honest for a first-write failure. After a commit,
-      // reverting would point App.data at the OLD account while the server holds the backup's
-      // blob, and the next autosave, screen save or _maybeAutoBackup would push that stale copy
-      // straight back over the restored one — the same half-applied push this snapshot exists to
-      // prevent, just in the other direction. Once committed, memory stays on the backup so
-      // memory and server agree and re-running the restore finishes the job.
-      if (!committed) {
-        App.data = _prev.d; App.inventoryData = _prev.i;
-        App.laborData = _prev.l; App.shiftData = _prev.s;
-      }
+      // ALWAYS revert all four. Round 4 made this conditional on `committed`, reasoning only about
+      // the core blob — but all four objects are swapped at the top of the try, so once a commit
+      // had happened the operator was left with memory holding the BACKUP's product master,
+      // roster, weeks and audits while the server still held their LIVE ic/lc/sc rows. Adding one
+      // product from that screen wrote a real row against the live list and pushed the backup's
+      // config over theirs, and nothing converged afterwards. The memory/server divergence that
+      // change was trying to avoid is handled by the reload below instead.
+      App.data = _prev.d; App.inventoryData = _prev.i;
+      App.laborData = _prev.l; App.shiftData = _prev.s;
+      // Undo whatever a FAILED write STAGED for later replay. writeData and _writeControl each do
+      // _localWrite + _markPending BEFORE returning failure, so without this the backup's blob
+      // sits in localStorage on the pending queue and syncPending pushes it the moment the session
+      // recovers — bypassing writeData, _dataReady, _allowReset and the total-wipe backstop, and
+      // landing well AFTER the operator was told the restore had not happened. That is how "could
+      // not write settings, nothing was changed" ended with the backup's opening cash and credit
+      // line on a live account. The preflight guarantees this queue started empty, so restoring
+      // the snapshot is an exact undo rather than a guess.
+      if (_prevPending) { try { DB._setPendingList(_prevPending); } catch (_) {} }
+      // A committed blob cannot be un-written, so memory and the server may still disagree. Only a
+      // reload settles that; the callers paint the message first, then reload.
+      e.restoreNeedsReload = true;
       throw e;
     }
   },
@@ -612,6 +640,11 @@ S.HubSettings = {
       setTimeout(() => window.location.reload(), 1200);
     } catch (e) {
       this._backupMsg('Restore failed: ' + (e.message || 'unknown error'), 'var(--red)');
+      // A restore that got as far as writing leaves memory and the server possibly disagreeing —
+      // a committed blob cannot be un-written. Reload so what is on screen is what is on the
+      // server. Longer than the success reload so the failure is actually readable. PREFLIGHT
+      // refusals do not set this flag: nothing ran, so there is nothing to settle.
+      if (e && e.restoreNeedsReload) setTimeout(() => window.location.reload(), 2500);
     }
   },
 
