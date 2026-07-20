@@ -442,12 +442,21 @@ async function alertOps(subject, lines) {
       + '<pre style="font-size:12px;background:#f6f6f6;padding:12px;white-space:pre-wrap;">'
       + esc((lines || []).join('\n')) + '</pre>'
       + '<div style="font-size:11px;color:#888;margin-top:14px;">' + esc(new Date().toISOString()) + '</div></div>';
-    await fetch('https://api.resend.com/emails', {
+    const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, to, subject: 'Bar Cop ALERT: ' + subject, html })
     });
-  } catch (e) { console.error('alertOps failed (non-fatal):', e.message); }
+    // An unchecked send meant the ALERTING ITSELF could fail silently — the one thing that must
+    // never be quiet. Nothing can be emailed about a failed email, so make it loud in the log.
+    if (!resp.ok) {
+      console.error('!! alertOps SEND FAILED — this alert did NOT reach anyone:', resp.status, await resp.text());
+      console.error('!! the alert was:', subject, '|', (lines || []).join(' | '));
+    }
+  } catch (e) {
+    console.error('!! alertOps SEND FAILED (exception) — this alert did NOT reach anyone:', e.message);
+    console.error('!! the alert was:', subject, '|', (lines || []).join(' | '));
+  }
 }
 
 // Once-a-day roll-up of client_errors. Read with the SERVICE ROLE so it sees every account
@@ -1755,6 +1764,41 @@ if ((process.env.STRIPE_SECRET_KEY || '').trim()) {
   setTimeout(() => { reconcileSubscriptions().catch(e => console.error('reconcile (startup):', (e && e.message) || e)); }, 5 * 60 * 1000);
   setInterval(() => { reconcileSubscriptions().catch(e => console.error('reconcile (interval):', (e && e.message) || e)); }, RECONCILE_MS);
 }
+
+// ── Boot-time email configuration audit ─────────────────────────────────────────
+// Every email path in this file is best-effort and fails QUIETLY by design (a bad send must
+// never break provisioning). The cost of that is a misconfigured instance that looks perfectly
+// healthy while no customer email has been delivered for weeks. This prints the truth into the
+// deploy log at boot, once, so a missing env var is visible immediately instead of being
+// discovered when a customer says "I never got the invite."
+(function auditEmailConfig() {
+  try {
+    const has = (v) => !!(process.env[v] || '').trim();
+    const sender = (process.env.BUG_REPORT_SENDER || '').trim();
+    const welcome = (process.env.WELCOME_SENDER || sender || '').trim();
+    const problems = [], notes = [];
+
+    if (!has('RESEND_API_KEY')) problems.push('RESEND_API_KEY missing — NO email of any kind will send.');
+    if (!sender) problems.push('BUG_REPORT_SENDER missing — sends fall back to onboarding@resend.dev, which is Resend\'s SANDBOX domain: it can only deliver to your own Resend account address, so CUSTOMER email (welcome) silently goes nowhere.');
+    else if (/resend\.dev$/i.test(sender)) problems.push('BUG_REPORT_SENDER is a resend.dev sandbox address — customer email will not deliver.');
+    if (/resend\.dev$/i.test(welcome)) problems.push('Welcome email sender is a resend.dev sandbox address — new subscribers get no welcome email.');
+    if (!has('OPS_ALERT_EMAIL') && !has('BUG_REPORT_NOTIFY_EMAIL')) problems.push('OPS_ALERT_EMAIL and BUG_REPORT_NOTIFY_EMAIL both missing — ops alerts and the daily error digest are DISABLED.');
+    if (!has('SUPPORT_NOTIFY_EMAIL')) notes.push('SUPPORT_NOTIFY_EMAIL not set (support messages fall back to the bug-report address).');
+
+    // Staff invites and password resets do NOT go through Resend — they use Supabase Auth's
+    // built-in mailer, which Supabase documents as development-only and rate-limits hard.
+    notes.push('Invites + password resets use SUPABASE AUTH email, not Resend. If custom SMTP is not configured in the Supabase dashboard, those are rate-limited to a couple per hour and send from a Supabase domain — see the deliverability notes.');
+
+    if (problems.length) {
+      console.error('================ EMAIL CONFIG PROBLEMS ================');
+      problems.forEach(p => console.error('  !! ' + p));
+      console.error('=======================================================');
+    } else {
+      console.log('email config: OK (sender=' + sender + ')');
+    }
+    notes.forEach(n => console.log('email config note: ' + n));
+  } catch (e) { console.error('auditEmailConfig failed (non-fatal):', e.message); }
+})();
 
 // Daily client-error digest. Independent of Stripe, so it is gated separately — observability
 // must keep working even on an instance with no billing key. First pass 10 min after boot
