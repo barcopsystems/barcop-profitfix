@@ -596,6 +596,14 @@ S.HubSettings = {
       // not write settings, nothing was changed" ended with the backup's opening cash and credit
       // line on a live account. The preflight guarantees this queue started empty, so restoring
       // the snapshot is an exact undo rather than a guess.
+      // CLEAR THE EVENT QUEUE FIRST. Anything in it is THIS restore's rows: the preflight refuses
+      // to start while anything is queued, and seedEventStores retries a failed putEventsBulk
+      // three times with EVERY failed attempt calling queueAll() — so one transient blip parks
+      // the whole backup there even when the retry then succeeds. Leaving those rows meant the
+      // abandoned backup replayed into the live account at an arbitrary later date. Cleared
+      // BEFORE the blob list is restored, because _pendingList now derives an 'events' entry from
+      // this queue — restoring an empty list first would leave that entry synthesised right back.
+      try { DB._setEventQueue([]); } catch (_) {}
       if (_prevPending) { try { DB._setPendingList(_prevPending); } catch (_) {} }
       // A committed blob cannot be un-written, so memory and the server may still disagree. Only a
       // reload settles that; the callers paint the message first, then reload.
