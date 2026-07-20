@@ -696,6 +696,25 @@ const App = {
     };
   },
 
+  // Device storage is full and a write could NOT be stored. This is the one failure the app
+  // must never swallow: the operator's entry is gone the moment they reload, so say so loudly
+  // and keep saying it until the tab is reloaded. DB._lsSafeSet fires this via DB._onStorageFull
+  // after it has already tried evicting the disposable pfev_* caches.
+  _showStorageFullBanner() {
+    if (document.getElementById('storage-full-banner')) return;
+    const bar = document.createElement('div');
+    bar.id = 'storage-full-banner';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9600;background:#7F1D1D;'
+      + 'color:#fff;display:flex;align-items:center;gap:14px;padding:9px 18px;'
+      + 'font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.45);';
+    bar.innerHTML = '<span style="flex:1;">This device is out of storage, so your last entry could NOT be saved. '
+      + 'Write it down before you leave this page. Close other tabs or clear your browser data, then re-enter it.</span>'
+      + '<button id="storage-full-dismiss" class="btn btn-ghost btn-sm" style="flex-shrink:0;color:#fff;border-color:#fff;">Dismiss</button>';
+    document.body.appendChild(bar);
+    const btn = document.getElementById('storage-full-dismiss');
+    if (btn) btn.onclick = () => bar.remove();
+  },
+
   // ── Offline sync lifecycle ──────────────────────────────────────────────────
   // Three pieces wired once at init time:
   //   Fix A — offline indicator pill while navigator.onLine is false
@@ -703,6 +722,10 @@ const App = {
   //   Fix C — surface the sync banner the moment a write lands in the pending
   //           queue (rather than waiting for next page reload)
   _wireSyncLifecycle() {
+    // DB has no UI of its own; give it the one callback it needs so a refused localStorage
+    // write reaches the operator instead of only console.warn.
+    DB._onStorageFull = () => this._showStorageFullBanner();
+    if (DB._storageFull) this._showStorageFullBanner();   // fired before this wired up
     window.addEventListener('offline', () => this._showOfflinePill());
     window.addEventListener('online', () => {
       this._hideOfflinePill();
@@ -2796,6 +2819,9 @@ const App = {
     // deliveries, orders, transfers, empties, adjustments, spot checks. Shift:
     // shifts, void/comps, cash drops, variances, safe log, 86 list,
     // maintenance, walked tabs, waste, checklist runs.)
+    // How many kinds were already known-migrated before this load, so the write at the end
+    // fires only when loadEventStores actually learned something new.
+    const _migCountBefore = Object.keys((this.data && this.data.migrated_kinds) || {}).length;
     await this.loadEventStores('ic');
     // ic_locations is row-per-record now (no inherent array order), but its array position IS
     // the count-sheet order — so restore it from each location's sort_order (a reorder sets it;
@@ -2835,6 +2861,13 @@ const App = {
     DB._controlNonEmpty['ic_data'] = DB._blobHasArrayData(this.inventoryData);
     DB._controlNonEmpty['lc_data'] = DB._blobHasArrayData(this.laborData);
     DB._controlNonEmpty['sc_data'] = DB._blobHasArrayData(this.shiftData);
+    // Persist the migration markers loadEventStores just learned, ONCE, now that every store has
+    // loaded and the backstop flags above are accurate. Only writes when something actually
+    // changed, so this is a no-op on every login after the first. Without it the marker never
+    // survives a reload and "deleted to empty" stays indistinguishable from "not yet migrated".
+    if (_migCountBefore !== Object.keys(this.data.migrated_kinds || {}).length) {
+      await this.saveKey('migrated_kinds');
+    }
     // Pre-fetch the accounts list so the Hub sidebar can render the
     // Locations section synchronously (multi-account users only).
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
@@ -5223,15 +5256,32 @@ const App = {
     // MIGRATED array (its rows not written yet) is backfilled from the blob instead of
     // being discarded (loadEvents returns [] until its rows exist). See the migration plan.
     const blobCopy = {}; kinds.forEach(k => { const arr = store.kinds[k]; blobCopy[arr] = Array.isArray(dataObj[arr]) ? dataObj[arr].slice() : []; });
+    // Per-kind "this array already lives in rows" marker. Lives in the CORE config blob as a
+    // plain object (so _configBlob never strips it) and covers every module's kinds, since kind
+    // names are unique account-wide. Mutated in memory here; loadAllData persists it once at the
+    // end, after every store has loaded (persisting mid-load would hit the total-wipe backstop,
+    // because the core arrays aren't filled yet when the ic/lc/sc passes run).
+    if (!this.data.migrated_kinds || typeof this.data.migrated_kinds !== 'object') this.data.migrated_kinds = {};
+    const migrated = this.data.migrated_kinds;
+    const migratedBefore = Object.assign({}, migrated);
     const results = await Promise.all(kinds.map(k => DB.loadEvents(store.table, k)));
     for (let i = 0; i < kinds.length; i++) {
       const k = kinds[i], arr = store.kinds[k], rows = results[i] || [], prior = blobCopy[arr];
-      if (rows.length) { dataObj[arr] = rows; continue; }               // rows exist: already row-per-record
-      if (prior.length) {                                               // no rows but the blob still has data: one-time backfill
+      if (rows.length) { dataObj[arr] = rows; migrated[k] = true; continue; }   // rows exist: already row-per-record
+      // No rows. That is AMBIGUOUS on its own — it means either "this array has never been
+      // migrated" or "the operator deleted every record". The marker below is what tells them
+      // apart. Without it, emptying a list (all your permits expired, you cleared the calendar)
+      // let the STALE blob copy back-fill itself on the very next login, resurrecting records
+      // the operator deliberately deleted — and re-persisting them as rows so they stuck.
+      if (prior.length && !migratedBefore[k]) {                         // never migrated: one-time backfill
         const r = await DB.putEventsBulk(store.table, k, prior);
         dataObj[arr] = prior;                                           // keep the data either way — never lose it
-        if (!(r && r.ok)) DB._backfillPending[k] = true;                // rows not CONFIRMED on the server (failed OR merely queued offline): keep the array in the blob too (see _configBlob) until a real server write confirms them, so a never-draining queue can't orphan the only copy
-      } else { dataObj[arr] = []; }                                     // genuinely empty
+        if (r && r.ok) migrated[k] = true;
+        else DB._backfillPending[k] = true;                             // rows not CONFIRMED on the server (failed OR merely queued offline): keep the array in the blob too (see _configBlob) until a real server write confirms them, so a never-draining queue can't orphan the only copy
+      } else {
+        dataObj[arr] = [];                                              // genuinely empty (new account, or deleted to empty post-migration)
+        if (migratedBefore[k]) migrated[k] = true;                      // stay migrated: an empty migrated array must never fall back to the blob
+      }
     }
     this.resetListState(mod);
   },
@@ -5316,7 +5366,10 @@ const App = {
     // Saved, offline, or safely queued for replay (a dropped connection with
     // navigator.onLine still true) — keep the row in the list; it will sync.
     // Only a genuine rejection (viewer read-only) falls through to the revert.
-    if (r.ok || r.offline || r.queued) return true;
+    // storageFull is NOT safely queued: localStorage refused the write even after evicting the
+    // disposable caches, so nothing is on disk and nothing will sync. Revert and report failure
+    // rather than showing a save that silently disappears on the next reload.
+    if (r.ok || ((r.offline || r.queued) && !r.storageFull)) return true;
     const back = arr.findIndex(x => x && x.id === rec.id);
     if (prev) { if (back >= 0) arr[back] = prev; }
     else if (back >= 0) arr.splice(back, 1);
@@ -5335,8 +5388,9 @@ const App = {
     if (!list.length) return true;
     const res = await DB.putEventsBulk(store.table, kind, list);
     // Saved, offline, or safely queued for replay all count as success — the
-    // caller's in-memory rows stay put and the queue will sync them.
-    return !!(res && (res.ok || res.offline || res.queued));
+    // caller's in-memory rows stay put and the queue will sync them. storageFull does NOT:
+    // nothing reached disk, so reporting success would lose the batch on reload.
+    return !!(res && (res.ok || ((res.offline || res.queued) && !res.storageFull)));
   },
 
   async removeRecord(mod, kind, id) {
@@ -5350,9 +5404,9 @@ const App = {
     const removed = idx >= 0 ? arr[idx] : null;
     if (idx >= 0) arr.splice(idx, 1);
     const r = await DB.removeEvent(store.table, kind, id);
-    // Removed, offline, or safely queued for replay — keep it removed; the
-    // delete will sync. Only a viewer rejection falls through to restore the row.
-    if (r.ok || r.offline || r.queued) return true;
+    // Removed, offline, or safely queued for replay — keep it removed; the delete will sync.
+    // Only a viewer rejection (or a full disk, where nothing was queued) restores the row.
+    if (r.ok || ((r.offline || r.queued) && !r.storageFull)) return true;
     if (removed) arr.splice(idx, 0, removed);
     return false;
   },

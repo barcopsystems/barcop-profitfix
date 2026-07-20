@@ -776,6 +776,11 @@ const DB = {
         localStorage.setItem(key, value); return true;
       } catch (e3) {
         console.warn('localStorage full — an unsynced write may be dropped:', key, (e3 && e3.message) || '');
+        // The operator MUST be told. Callers propagate the false so the record reverts and the
+        // form reports failure; this flag+hook drives the persistent banner, because a silent
+        // "saved" that vanishes on reload is the worst outcome this whole file exists to prevent.
+        this._storageFull = true;
+        try { if (this._onStorageFull) this._onStorageFull(key); } catch (e4) {}
         return false;
       }
     }
@@ -1180,16 +1185,18 @@ const DB = {
       // Viewer is read-only — reject BEFORE queuing (a queued write would only
       // fail RLS forever on replay and sit in the pending queue permanently).
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
-      const queue = () => { this._queueEvent(table, kind, 'put', rec); this._patchEventCache(table, kind, [rec], []); };
+      // queue() now REPORTS whether the op actually reached disk. On a full localStorage it
+      // returns false and the caller must treat the write as failed, not as "pending sync".
+      const queue = () => { const q = this._queueEvent(table, kind, 'put', rec); if (q) this._patchEventCache(table, kind, [rec], []); return q; };
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        queue(); return { ok: false, offline: true, queued: true };
+        const q = queue(); return { ok: false, offline: true, queued: q, storageFull: !q };
       }
       const accountId = await this._ensureAccountId();
       // queued:true — the op is safely in the local replay queue and WILL sync,
       // so the caller keeps it in the in-memory list (not revert it). Only claim
       // it when the queue is actually account-scoped, else the replay is orphaned.
       if (!accountId) {
-        if (this._acctScopeAvailable()) { queue(); return { ok: false, queued: true, error: 'no account membership found' }; }
+        if (this._acctScopeAvailable()) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: 'no account membership found' }; }
         return { ok: false, error: 'no account membership found' };
       }
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
@@ -1198,9 +1205,9 @@ const DB = {
           account_id: accountId, kind: kind, id: String(rec.id),
           date: this._rowDate(kind, rec), payload: rec, updated_at: new Date().toISOString()
         }, { onConflict: 'account_id,kind,id' });
-        if (error) { queue(); return { ok: false, queued: true, error }; }
+        if (error) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error }; }
         return { ok: true };
-      } catch (e) { queue(); return { ok: false, queued: true, error: e }; }
+      } catch (e) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: e }; }
     }
     // No client and not demo: nothing was written and nothing would survive a reload,
     // so never claim success here. App.start() refuses to boot into this state at all
@@ -1213,24 +1220,24 @@ const DB = {
     if (this._demo || id == null) return { ok: this._demo === true };
     if (this._sb && this._user) {
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
-      const queue = () => { this._queueEvent(table, kind, 'del', { id }); this._patchEventCache(table, kind, [], [id]); };
+      const queue = () => { const q = this._queueEvent(table, kind, 'del', { id }); if (q) this._patchEventCache(table, kind, [], [id]); return q; };
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        queue(); return { ok: false, offline: true, queued: true };
+        const q = queue(); return { ok: false, offline: true, queued: q, storageFull: !q };
       }
       const accountId = await this._ensureAccountId();
-      // queued:true — see putEvent: the delete is safely queued for replay, so
-      // the caller keeps the row removed. Only claim it when account-scoped.
+      // queued — see putEvent: the delete is safely queued for replay, so the caller keeps the
+      // row removed. Only claim it when account-scoped AND the queue actually reached disk.
       if (!accountId) {
-        if (this._acctScopeAvailable()) { queue(); return { ok: false, queued: true, error: 'no account membership found' }; }
+        if (this._acctScopeAvailable()) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: 'no account membership found' }; }
         return { ok: false, error: 'no account membership found' };
       }
       if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
       try {
         const { error } = await this._sb.from(table).delete()
           .eq('account_id', accountId).eq('kind', kind).eq('id', String(id));
-        if (error) { queue(); return { ok: false, queued: true, error }; }
+        if (error) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error }; }
         return { ok: true };
-      } catch (e) { queue(); return { ok: false, queued: true, error: e }; }
+      } catch (e) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: e }; }
     }
     // Same as putEvent: no client and not demo means the delete never happened.
     return { ok: false, error: 'No connection to Bar Cop.' };
@@ -1245,13 +1252,19 @@ const DB = {
     const list = (recs || []).filter(r => r && r.id != null);
     if (!list.length) return { ok: true };
     if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
-    const queueAll = () => { list.forEach(rec => this._queueEvent(table, kind, 'put', rec)); this._patchEventCache(table, kind, list, []); };
+    // Every row must land, not just some: a partially-stored batch is a silent partial save.
+    const queueAll = () => {
+      let ok = true;
+      list.forEach(rec => { if (!this._queueEvent(table, kind, 'put', rec)) ok = false; });
+      if (ok) this._patchEventCache(table, kind, list, []);
+      return ok;
+    };
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      queueAll(); return { ok: false, offline: true, queued: true };
+      const q = queueAll(); return { ok: false, offline: true, queued: q, storageFull: !q };
     }
     const accountId = await this._ensureAccountId();
     if (!accountId) {
-      if (this._acctScopeAvailable()) { queueAll(); return { ok: false, queued: true, error: 'no account membership found' }; }
+      if (this._acctScopeAvailable()) { const q = queueAll(); return { ok: false, queued: q, storageFull: !q, error: 'no account membership found' }; }
       return { ok: false, error: 'no account membership found' };
     }
     const rows = list.map(rec => ({
@@ -1262,10 +1275,10 @@ const DB = {
       // Chunk to keep each request small.
       for (let i = 0; i < rows.length; i += 500) {
         const { error } = await this._sb.from(table).upsert(rows.slice(i, i + 500), { onConflict: 'account_id,kind,id' });
-        if (error) { queueAll(); return { ok: false, queued: true, error }; }
+        if (error) { const q = queueAll(); return { ok: false, queued: q, storageFull: !q, error }; }
       }
       return { ok: true };
-    } catch (e) { queueAll(); return { ok: false, queued: true, error: e }; }
+    } catch (e) { const q = queueAll(); return { ok: false, queued: q, storageFull: !q, error: e }; }
   },
 
   // Delete every row for this account in an events table (sample reload / clear
@@ -1296,12 +1309,15 @@ const DB = {
     try { return JSON.parse(localStorage.getItem(this._acctKey(this._EVENTQ_KEY)) || '[]'); }
     catch (e) { return []; }
   },
+  // Returns true only if the queue actually landed on disk. Callers MUST honour it: a queued
+  // op that was never stored is not "pending sync", it is lost.
   _setEventQueue(list) {
     try {
       const k = this._acctKey(this._EVENTQ_KEY);
-      if (list && list.length) this._lsSafeSet(k, JSON.stringify(list));   // the event replay queue is unsynced work — evict caches to fit
-      else localStorage.removeItem(k);
-    } catch (e) {}
+      if (list && list.length) return this._lsSafeSet(k, JSON.stringify(list));   // the event replay queue is unsynced work — evict caches to fit
+      localStorage.removeItem(k);
+      return true;
+    } catch (e) { return false; }
   },
   _queueEvent(table, kind, op, rec) {
     const list = this._eventQueue();
@@ -1309,8 +1325,9 @@ const DB = {
     const id = String(rec.id);
     const filtered = list.filter(e => !(e.table === table && e.kind === kind && e.id === id));
     filtered.push({ table, kind, op, id, payload: op === 'put' ? rec : null });
-    this._setEventQueue(filtered);
-    this._markPending('events');
+    const stored = this._setEventQueue(filtered);
+    if (stored) this._markPending('events');
+    return stored;
   },
   hasPendingEvents() {
     return !!(this._sb && this._user && this._eventQueue().length > 0);
