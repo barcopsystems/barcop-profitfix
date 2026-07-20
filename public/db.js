@@ -1275,11 +1275,17 @@ const DB = {
   // Is a local key actually account-scoped? (else _acctKey falls back to the base
   // key and any queued op would be orphaned once the account resolves).
   _acctScopeAvailable() { return !!(this._accountId || this._getStoredActiveAccountId()); },
-  // Keep the local window cache in step with an offline/queued op so an offline
-  // reload shows the operator's own just-made work (puts) and hides deletes —
-  // otherwise loadEvents would overwrite the in-memory array with a stale cache
-  // that predates the offline change, making it vanish (and inviting a duplicate
-  // re-entry). Only called on queued paths; online writes are re-fetched.
+  // Keep the local window cache in step with EVERY write — queued AND online — so an offline
+  // reload shows the operator's own work (puts) and hides deletes. Otherwise loadEvents
+  // overwrites the in-memory array with a stale cache that predates the change, making it
+  // vanish and inviting a duplicate re-entry.
+  // ⚠ This used to say "Only called on queued paths; online writes are re-fetched." Online
+  // writes are re-fetched on the next ONLINE load — so if the next boot had no connection, the
+  // cache still held whatever the last full load saw and every online write since was invisible.
+  // Worst case was the migration boot: loadEvents cached [] (zero rows yet), the backfill then
+  // succeeded against the server, and the next offline boot showed a completely empty app.
+  // Before row-per-record this data lived in the config blob, and writeData keeps the local blob
+  // in step on success — the migration dropped that guarantee without replacing it.
   _patchEventCache(table, kind, putRecs, delIds) {
     try {
       const delSet = new Set((delIds || []).map(String));
@@ -1383,6 +1389,8 @@ const DB = {
           date: this._rowDate(kind, rec), payload: rec, updated_at: new Date().toISOString()
         }, { onConflict: 'account_id,kind,id' });
         if (error) { this._reportRlsDenial(table, kind, error); if (this._isAuthError(error)) this._flagAuthExpired(table); const q = queue(); return { ok: false, queued: q, storageFull: !q, authExpired: this._isAuthError(error), error }; }
+        // Online success patches the cache too, so the next boot shows this even with no uplink.
+        this._patchEventCache(table, kind, [rec], []);
         return { ok: true };
       } catch (e) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: e }; }
     }
@@ -1413,6 +1421,8 @@ const DB = {
         const { error } = await this._sb.from(table).delete()
           .eq('account_id', accountId).eq('kind', kind).eq('id', String(id));
         if (error) { this._reportRlsDenial(table, kind, error); if (this._isAuthError(error)) this._flagAuthExpired(table); const q = queue(); return { ok: false, queued: q, storageFull: !q, authExpired: this._isAuthError(error), error }; }
+        // Online success drops it from the cache too, so an offline boot does not resurrect it.
+        this._patchEventCache(table, kind, [], [id]);
         return { ok: true };
       } catch (e) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: e }; }
     }
@@ -1454,6 +1464,9 @@ const DB = {
         const { error } = await this._sb.from(table).upsert(rows.slice(i, i + 500), { onConflict: 'account_id,kind,id' });
         if (error) { this._reportRlsDenial(table, kind, error); if (this._isAuthError(error)) this._flagAuthExpired(table); const q = queueAll(); return { ok: false, queued: q, storageFull: !q, authExpired: this._isAuthError(error), error }; }
       }
+      // Online success patches the cache too. This is the one that mattered most: the migration
+      // backfill runs through here, and without it the very next offline boot showed an empty app.
+      this._patchEventCache(table, kind, list, []);
       return { ok: true };
     } catch (e) { const q = queueAll(); return { ok: false, queued: q, storageFull: !q, error: e }; }
   },
