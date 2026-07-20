@@ -735,8 +735,33 @@ const DB = {
   },
 
   _pendingList() {
-    try { const r = localStorage.getItem(this._acctKey(this._PENDING_KEY)); return r ? JSON.parse(r) : []; }
-    catch (e) { return []; }
+    let list = [];
+    try {
+      const r = localStorage.getItem(this._acctKey(this._PENDING_KEY));
+      list = r ? JSON.parse(r) : [];
+    } catch (e) { return []; }
+    // The synthesis below gets its OWN try. Sharing one with the read above meant a failure
+    // reading the EVENT queue discarded the blob list that had just been read successfully —
+    // turning a best-effort extra into a way to lose the whole queue. Two harnesses caught it
+    // within a minute of the change, because their fixtures had no _eventQueue and every pending
+    // check came back empty. A helper added for safety must not be able to break the thing it
+    // was added to protect.
+    try {
+      // SYNTHESISE the 'events' entry whenever the event queue is non-empty. That queue lives
+      // under its OWN key (_EVENTQ_KEY); the entry here is only a SENTINEL — and it is the ONLY
+      // route to it, because syncPending reaches syncPendingEvents solely by seeing it and
+      // hasPendingEvents() has no callers anywhere in the app. So ANYTHING that rewrites this
+      // list can orphan a loaded queue. Today's restore-abort fix did exactly that: it restores
+      // this list to the pre-restore state, which the preflight guarantees is EMPTY, and
+      // _setPendingList removes the key wholesale — sentinel included — while a mid-restore
+      // putEventsBulk had already parked the backup's rows in the queue. Those rows then sat
+      // invisible (no banner, no drain, operator told the restore did not happen) until one
+      // unrelated offline edit re-armed the sentinel weeks later and replayed the entire
+      // abandoned backup over live records. Deriving the entry from the queue ITSELF makes that
+      // whole class impossible instead of patching the one caller that hit it.
+      if (list.indexOf('events') < 0 && this._eventQueue && this._eventQueue().length) list.push('events');
+    } catch (e) { /* synthesis is best-effort — the stored list stands regardless */ }
+    return list;
   },
   _setPendingList(list) {
     try {
