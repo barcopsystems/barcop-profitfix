@@ -485,7 +485,7 @@ async function sendErrorDigest() {
       }
     });
     // Most-frequent first, but the data-safety kinds always read as urgent regardless of count.
-    const URGENT = ['wipe_blocked', 'restore_aborted', 'rls_denied', 'backfill_failed', 'storage_full'];
+    const URGENT = ['wipe_blocked', 'restore_aborted', 'rls_denied', 'backfill_failed', 'storage_full', 'session_expired'];
     const lines = Object.keys(byKind)
       .sort((a, b) => (URGENT.includes(b) - URGENT.includes(a)) || (byKind[b].n - byKind[a].n))
       .map(k => (URGENT.includes(k) ? '!! ' : '   ') + k + ' — ' + byKind[k].n + ' event(s), '
