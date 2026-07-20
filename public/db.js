@@ -372,9 +372,21 @@ const DB = {
 
   // Switch which account is active. Stores in localStorage and reloads so
   // every cached data structure starts fresh under the new account context.
+  // TRUE while a restore is running, and through the reload that settles a failed one. Lives on
+  // DB rather than the settings screen so the bar switcher can see it too.
+  _restoreBusy: false,
   setActiveAccount(accountId) {
+    // Refuse during a restore. This reloads the page IMMEDIATELY, and a restore takes 20-30s —
+    // the reload would land between clearEvents and putEventsBulk, leaving a module's rows
+    // deleted and nothing written, with no error, nothing queued and nothing on screen. A
+    // multi-bar owner has this dropdown in the topbar on every screen.
+    if (this._restoreBusy) {
+      console.warn('setActiveAccount: refused, a restore is in progress');
+      return false;
+    }
     this._setStoredActiveAccountId(accountId);
     window.location.reload();
+    return true;
   },
 
   // Current user's role in their active account. 'admin' | 'staff' | null if not
