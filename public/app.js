@@ -478,6 +478,17 @@ const App = {
      gated via demoBlock() so a visitor can't rename the bar or reach our inbox. */
   demoMode: false,
 
+  // ── SIGNUPS CLOSED ────────────────────────────────────────────────────────────────────────
+  // Flip to true to reopen public signup. Set false 2026-07-20, with ZERO live accounts, while
+  // the pre-live hardening is taken to completion. The 07-19 hardening got one deep adversarial
+  // pass that found real data-destroying regressions (a restore that could wipe an account, a
+  // server job that could cancel every subscription), but it was never taken to the point where
+  // a round came back clean. Hardening a live system while a stranger could walk in mid-change
+  // is the one way this ends badly, and at zero users closing the door costs nothing.
+  // ⚠ There is a MATCHING constant in server/index.js (SIGNUPS_OPEN) that blocks checkout.
+  // CHANGE BOTH. verify-signups-closed.js FAILS if they disagree, so reopening is one decision.
+  SIGNUPS_OPEN: false,
+
   // Hard stop when Bar Cop cannot reach its backend at boot (see the SUPABASE_URL gate
   // in start()). Reuses the auth card so it reads as Bar Cop, not a browser error.
   _bootUnavailable() {
@@ -7187,6 +7198,22 @@ function wireAuth() {
   document.getElementById('show-reset')?.addEventListener('click',  () => show('auth-reset'));
   document.getElementById('show-login2')?.addEventListener('click', () => show('auth-login'));
   document.getElementById('show-signup')?.addEventListener('click', () => show('auth-signup'));
+
+  // Signups closed: replace the whole card so EVERY route into it lands on the same message —
+  // the login link, the demo's "Set Up My Bar" button, and a bookmarked /?signup=1. The button
+  // handler refuses independently below, so a hidden form is not the only stop.
+  if (!App.SIGNUPS_OPEN) {
+    const _sc = document.querySelector('#auth-signup .auth-card');
+    if (_sc) {
+      _sc.innerHTML =
+        '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
+        + '<div class="auth-heading">Bar Cop is not taking new accounts right now</div>'
+        + '<div class="auth-sub" style="line-height:1.6;">We are doing some work under the hood. '
+        + 'New signups are paused while we finish up. Check back shortly.</div>'
+        + '<div style="font-size:12px;color:var(--t2);margin-top:20px;text-align:center;">'
+        + 'Already have an account? Use Log In.</div>';
+    }
+  }
   document.getElementById('show-login-from-signup')?.addEventListener('click', () => show('auth-login'));
 
   // Plan pickers (signup + paywall): click a card to select it. Selection is
@@ -7228,6 +7255,14 @@ function wireAuth() {
   };
 
   document.getElementById('signup-btn')?.addEventListener('click', async () => {
+    // Independent of the card swap in wireAuth. That one hides the form; this one is the stop
+    // that survives a stale cached page or a console call, and it fires BEFORE DB.signUp so no
+    // auth user is ever minted while the door is shut.
+    if (!App.SIGNUPS_OPEN) {
+      const e0 = document.getElementById('signup-error');
+      if (e0) { e0.textContent = 'Bar Cop is not taking new accounts right now. Check back shortly.'; e0.style.display = 'block'; }
+      return;
+    }
     const email = document.getElementById('signup-email').value.trim();
     const pw1   = document.getElementById('signup-pw1').value;
     const pw2   = document.getElementById('signup-pw2').value;
