@@ -176,6 +176,37 @@ const ALL_MODULES     = ['profit', 'revenue'];
 // incomplete_expired) are absent so reactivation / a genuine fresh start still works.
 const LIVE_SUB_STATES = ['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused'];
 
+// ...but 'incomplete' must NOT block a new CHECKOUT. An 'incomplete' subscription is one whose
+// very first payment never succeeded (declined card, abandoned 3-D Secure). Treating it as live
+// trapped the customer between two closed doors: "Continue to Payment" 409'd here, and
+// abandon-account refused to let them start over — so a failed card meant a locked Hub with no
+// way out until Stripe expired the sub (~23h) or reconcile ran. Nothing is being billed on an
+// incomplete sub, so retrying is safe; the handler cancels the stale one first so no orphan is
+// left behind. Same reasoning for abandon-account: no money is at stake, let them start over.
+const CHECKOUT_BLOCK_STATES = LIVE_SUB_STATES.filter(s => s !== 'incomplete');
+
+// Parse a timestamp to epoch ms, forcing UTC when the string carries NO timezone.
+// Why this exists: the webhook ordering guard compares subscriptions.updated_at against the
+// Stripe event time (always UTC 'Z'). If that column is `timestamp` rather than `timestamptz`,
+// PostgREST returns "2026-07-19T12:00:00.123456" with no offset and JS parses it as SERVER-LOCAL
+// time. On a UTC-5 host every stored stamp then reads 5 hours in the FUTURE, so the guard drops
+// genuinely newer events for 5 hours after each write — a customer who just fixed their card
+// stays locked out. Rather than depend on the column type being right, normalise here: a
+// date-time string with no 'Z' and no ±HH:MM offset is treated as UTC, which is what Postgres
+// means by it. Returns 0 for null/unparseable so the guard fails OPEN (event applies).
+function tsToMs(v) {
+  if (!v) return 0;
+  let s = String(v).trim();
+  if (!s) return 0;
+  // "YYYY-MM-DD HH:MM:SS[.ffffff]" -> ISO, then stamp UTC if no zone designator is present.
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s)) {
+    s = s.replace(' ', 'T');
+    if (!/(Z|[+-]\d{2}:?\d{2})$/.test(s)) s += 'Z';
+  }
+  const ms = Date.parse(s);
+  return isNaN(ms) ? 0 : ms;
+}
+
 app.post('/api/create-checkout-session', async (req, res) => {
   const { accountId, plan } = req.body || {};
   if (!accountId) return res.status(400).json({ error: 'Missing accountId' });
@@ -216,7 +247,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
     // here would mint a SECOND recurring subscription for the same bar (the webhook upsert
     // then orphans the first in the DB while it keeps billing in Stripe). Only terminal
     // states (canceled, incomplete_expired) fall through so reactivation still works.
-    if (existingSub && LIVE_SUB_STATES.includes(existingSub.subscription_status)) {
+    if (existingSub && CHECKOUT_BLOCK_STATES.includes(existingSub.subscription_status)) {
       return res.status(409).json({ error: 'This bar already has a subscription. Manage it under Billing.' });
     }
 
@@ -235,10 +266,16 @@ app.post('/api/create-checkout-session', async (req, res) => {
         const custs = await stripe.customers.list({ email: userData.user.email, limit: 20 });
         for (const cust of (custs && custs.data) || []) {
           const subs = await stripe.subscriptions.list({ customer: cust.id, status: 'all', limit: 20 });
-          const liveHere = ((subs && subs.data) || []).some(s =>
-            LIVE_SUB_STATES.includes(s.status) && s.metadata && s.metadata.account_id === accountId);
-          if (liveHere) {
+          const mine = ((subs && subs.data) || []).filter(s => s.metadata && s.metadata.account_id === accountId);
+          if (mine.some(s => CHECKOUT_BLOCK_STATES.includes(s.status))) {
             return res.status(409).json({ error: 'This bar already has a subscription. Manage it under Billing.' });
+          }
+          // Retiring the customer's failed attempt before opening a new one keeps a dead
+          // 'incomplete' sub from lingering in Stripe (and from being counted by any future
+          // guard). Best-effort — a failure here must never block the retry.
+          for (const s of mine.filter(s => s.status === 'incomplete')) {
+            try { await stripe.subscriptions.cancel(s.id); console.log('checkout: canceled stale incomplete sub ' + s.id); }
+            catch (e2) { console.error('checkout: could not cancel incomplete sub ' + s.id + ':', e2.message); }
           }
         }
       } catch (e) {
@@ -464,8 +501,8 @@ async function applySubUpdate(sub, update, eventIso) {
     .from('subscriptions').select('account_id, updated_at')
     .eq('stripe_subscription_id', subId).maybeSingle();
   if (existing) {
-    const storedMs = existing.updated_at ? new Date(existing.updated_at).getTime() : 0;
-    const eventMs  = eventIso ? new Date(eventIso).getTime() : 0;
+    const storedMs = tsToMs(existing.updated_at);
+    const eventMs  = tsToMs(eventIso);
     // Drop only a STRICTLY-older event (same-second transitions still apply, last wins).
     if (eventMs && storedMs && storedMs > eventMs) return;
     await supabaseAdmin
@@ -1592,7 +1629,10 @@ app.post('/api/abandon-account', async (req, res) => {
     // hard-deleted (which cascades away its data).
     const { data: sub } = await supabaseAdmin
       .from('subscriptions').select('subscription_status').eq('account_id', accountId).maybeSingle();
-    if (sub && LIVE_SUB_STATES.includes(sub.subscription_status)) {
+    // CHECKOUT_BLOCK_STATES, not LIVE_SUB_STATES: an 'incomplete' sub never billed successfully,
+    // so it must not trap the customer here either. Blocking both this AND checkout on
+    // 'incomplete' is what left a failed-card customer with no way forward and no way back.
+    if (sub && CHECKOUT_BLOCK_STATES.includes(sub.subscription_status)) {
       return res.status(400).json({ error: 'This account has an active subscription and cannot be discarded.' });
     }
 
