@@ -721,11 +721,19 @@ window.CashEngine = {
       const wk = this._mondayOf(new Date(d + 'T00:00:00'));
       byWeek[wk] = (byWeek[wk] || 0) + (parseFloat(sh.bar_revenue) || 0) + (parseFloat(sh.floor_revenue) || 0);
     });
+    // Whole + confirmed -> the exact reconciled figure. Everything else -> raw, corrected by the
+    // bounded ratio. Leaving partial weeks RAW created a discontinuity: setAside()'s period runs
+    // month-to-DATE, so for roughly the first 11 days of every month no week is yet whole and the
+    // correction applied to 0% of the window — then jumped to ~70% coverage the day the first
+    // week closed. Cash Position's "Sales tax collected" (and Safe to Spend behind it) would move
+    // ~30% overnight with no data having changed. Exact where we have it, corrected where we
+    // don't, is both more accurate than the old blend and continuous across the month.
+    const ratio = this._confirmationRatio();
     let t = 0;
     Object.keys(byWeek).forEach(wk => {
       const whole = wk >= s && this._addDays(wk, 6) <= e;
       const conf = whole ? this._confirmedWeekTotal(wk) : null;
-      t += (conf != null ? conf : byWeek[wk]);
+      t += (conf != null ? conf : byWeek[wk] * ratio);
     });
     return t;
   },
