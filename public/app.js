@@ -742,6 +742,30 @@ const App = {
     if (btn) btn.onclick = () => bar.remove();
   },
 
+  // The session died and writes are no longer reaching the server. Deliberately NOT the same
+  // banner as the offline one: offline says "this will sync on its own", which is true for a
+  // dropped connection and a lie for a dead session — the replay needs the very session that
+  // expired, so it can never drain until the operator signs in. Their work is queued and safe,
+  // so this asks rather than alarms, and stays up until auth is genuinely restored.
+  _showSessionExpiredBanner() {
+    if (document.getElementById('session-expired-banner')) return;
+    const bar = document.createElement('div');
+    bar.id = 'session-expired-banner';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9650;background:#7A5B16;'
+      + 'color:#fff;display:flex;align-items:center;gap:14px;padding:9px 18px;'
+      + 'font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.45);';
+    bar.innerHTML = '<span style="flex:1;">You have been signed out. '
+      + 'What you entered is held on this device and will save when you sign back in.</span>'
+      + '<button id="session-expired-signin" class="btn btn-primary btn-sm" style="flex-shrink:0;">Sign In</button>';
+    document.body.appendChild(bar);
+    const btn = document.getElementById('session-expired-signin');
+    if (btn) btn.onclick = () => window.location.reload();   // reload lands on the auth screen; the queue survives in localStorage
+  },
+  _hideSessionExpiredBanner() {
+    const el = document.getElementById('session-expired-banner');
+    if (el) el.remove();
+  },
+
   // ── Offline sync lifecycle ──────────────────────────────────────────────────
   // Three pieces wired once at init time:
   //   Fix A — offline indicator pill while navigator.onLine is false
@@ -753,6 +777,20 @@ const App = {
     // write reaches the operator instead of only console.warn.
     DB._onStorageFull = () => this._showStorageFullBanner();
     if (DB._storageFull) this._showStorageFullBanner();   // fired before this wired up
+    DB._onAuthExpired  = () => this._showSessionExpiredBanner();
+    DB._onAuthRestored = () => { this._hideSessionExpiredBanner(); this._autoSync(); };
+    if (DB._authExpired) this._showSessionExpiredBanner();
+    // A bar tablet sits on one screen all shift and the tab sleeps. Don't wait for the operator
+    // to lose a save before telling them: the moment the tab wakes, confirm the session is still
+    // real. getSession() also gives supabase-js a chance to refresh, so a recoverable session
+    // just quietly recovers and nothing is shown.
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState !== 'visible' || !this.data) return;
+      try {
+        const live = await DB.hasLiveSession();
+        if (!live) DB._flagAuthExpired('tab-wake'); else DB._clearAuthExpired();
+      } catch (e) {}
+    });
     window.addEventListener('offline', () => this._showOfflinePill());
     window.addEventListener('online', () => {
       this._hideOfflinePill();

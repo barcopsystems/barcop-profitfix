@@ -36,6 +36,19 @@ const DB = {
     return data?.session || null;
   },
 
+  // Non-destructive "is the session still real?" probe. Deliberately NOT getSession(): that one
+  // clears the cached account / role / permissions on EVERY call, and wiping those on a routine
+  // tab-focus check is exactly what once hid the Team card after a token refresh. This only
+  // reads. Fails SAFE — a probe that errors returns true, because "I couldn't check" is not
+  // evidence of expiry and a false banner is worse than a late one.
+  async hasLiveSession() {
+    try {
+      if (!this._sb) return true;                 // local / demo mode: never claim expiry
+      const { data } = await this._sb.auth.getSession();
+      return !!(data && data.session);
+    } catch (e) { return true; }
+  },
+
   onAuthChange(cb) {
     if (!this._sb) return;
     this._sb.auth.onAuthStateChange((event, session) => {
@@ -51,6 +64,11 @@ const DB = {
         this._ownerUserId = null;
         this._permissions = null;
         this._accountsCache = null;
+      }
+      // A live session again: drop the expired flag and let the app take its banner down. The
+      // queued work drains on the next syncPending, so re-signing-in is genuinely the whole fix.
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+        this._clearAuthExpired();
       }
       cb(event, session);
     });
@@ -630,9 +648,10 @@ const DB = {
 
         if (error) {
           console.error('writeData error:', error);
+          if (this._isAuthError(error)) this._flagAuthExpired('user_data');
           this._localWrite(appData);
           this._markPending('pf_data');
-          return { ok: false, error };
+          return { ok: false, error, authExpired: this._isAuthError(error) };
         }
         this._localWrite(appData); // keep local copy in sync
         this._clearPending('pf_data');
@@ -1051,6 +1070,40 @@ const DB = {
     } catch (e) { return null; }
   },
 
+  // ── Session expiry ────────────────────────────────────────────────────────
+  // An expired JWT and a dropped connection produce the SAME thing at the write site: an error,
+  // a queued row, and "saved" on screen. But they are not the same at all — a network outage
+  // drains the moment the wifi returns, while an expired session can NEVER drain, because the
+  // replay needs the very session that died. So the operator keeps working all shift, the sync
+  // banner reassures them their changes are "safe on this device", and the one action that would
+  // actually fix it (sign in again) is never mentioned. Telling the two apart is the whole fix.
+  _isAuthError(error) {
+    if (!error) return false;
+    const code = String(error.code || error.status || '');
+    const msg  = String(error.message || '').toLowerCase();
+    return code === '401' || code === 'PGRST301' || code === 'PGRST302'
+      || msg.includes('jwt') || msg.includes('invalid refresh token')
+      || msg.includes('not authenticated') || msg.includes('unauthorized');
+  },
+  // Raise the flag once per dead session. The work stays QUEUED (nothing is thrown away) — this
+  // only makes the truth visible so re-signing-in actually happens, after which syncPending
+  // drains the queue normally and nothing is lost.
+  _flagAuthExpired(where) {
+    try {
+      if (this._authExpired) return;
+      this._authExpired = true;
+      this.logClientError('session_expired', 'Write rejected — session expired', 'at=' + where);
+      if (this._onAuthExpired) this._onAuthExpired();
+    } catch (e) {}
+  },
+  _clearAuthExpired() {
+    try {
+      if (!this._authExpired) return;
+      this._authExpired = false;
+      if (this._onAuthRestored) this._onAuthRestored();
+    } catch (e) {}
+  },
+
   // A PostgREST 42501 is an RLS DENIAL, not a transient network failure. It will fail forever on
   // replay, so it sits in the queue looking like "pending sync" while the operator's work never
   // lands. It also means something real is misconfigured — an area-permission map that is too
@@ -1281,7 +1334,7 @@ const DB = {
           account_id: accountId, kind: kind, id: String(rec.id),
           date: this._rowDate(kind, rec), payload: rec, updated_at: new Date().toISOString()
         }, { onConflict: 'account_id,kind,id' });
-        if (error) { this._reportRlsDenial(table, kind, error); const q = queue(); return { ok: false, queued: q, storageFull: !q, error }; }
+        if (error) { this._reportRlsDenial(table, kind, error); if (this._isAuthError(error)) this._flagAuthExpired(table); const q = queue(); return { ok: false, queued: q, storageFull: !q, authExpired: this._isAuthError(error), error }; }
         return { ok: true };
       } catch (e) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: e }; }
     }
@@ -1311,7 +1364,7 @@ const DB = {
       try {
         const { error } = await this._sb.from(table).delete()
           .eq('account_id', accountId).eq('kind', kind).eq('id', String(id));
-        if (error) { this._reportRlsDenial(table, kind, error); const q = queue(); return { ok: false, queued: q, storageFull: !q, error }; }
+        if (error) { this._reportRlsDenial(table, kind, error); if (this._isAuthError(error)) this._flagAuthExpired(table); const q = queue(); return { ok: false, queued: q, storageFull: !q, authExpired: this._isAuthError(error), error }; }
         return { ok: true };
       } catch (e) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: e }; }
     }
@@ -1351,7 +1404,7 @@ const DB = {
       // Chunk to keep each request small.
       for (let i = 0; i < rows.length; i += 500) {
         const { error } = await this._sb.from(table).upsert(rows.slice(i, i + 500), { onConflict: 'account_id,kind,id' });
-        if (error) { this._reportRlsDenial(table, kind, error); const q = queueAll(); return { ok: false, queued: q, storageFull: !q, error }; }
+        if (error) { this._reportRlsDenial(table, kind, error); if (this._isAuthError(error)) this._flagAuthExpired(table); const q = queueAll(); return { ok: false, queued: q, storageFull: !q, authExpired: this._isAuthError(error), error }; }
       }
       return { ok: true };
     } catch (e) { const q = queueAll(); return { ok: false, queued: q, storageFull: !q, error: e }; }
