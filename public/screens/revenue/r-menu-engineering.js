@@ -644,7 +644,10 @@ S.RevenueMenuEngineering = {
   },
 
   reviewLogHtml() {
-    const log = (App.data.revenue_price_log || []).slice().reverse();
+    // Newest price change first. `.reverse()` did that when this was a blob insertion-order
+    // array; it is row-per-record now and loads newest-first, so reversing showed the OLDEST
+    // entries — and past 50 rows the just-made reprice fell off the visible page entirely.
+    const log = (App.data.revenue_price_log || []).slice().sort(App.cmpNewest);
     const rows = log.slice(0, App.listLimit('core', 'revenue_price_log')).map(e => this.logRow(e)).join('')
       || '<tr><td colspan="7" style="color:var(--t4);text-align:center;padding:22px;">No price changes logged yet. Reprice an item above and it lands here, verified against the real result after three weeks.</td></tr>';
     return '<div class="sh" style="margin:24px 0 10px;">Pricing Review Log</div>'
