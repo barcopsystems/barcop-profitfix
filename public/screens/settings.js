@@ -4059,7 +4059,13 @@ S.HubSettings = {
     App.inventoryData = {};
     App.laborData     = {};
     App.shiftData     = {};
+    // try/finally, matching _applyBackup. Without it, a throw anywhere in the wipe below left
+    // _allowReset stuck TRUE for the rest of the session — and App.data has ALREADY been replaced
+    // with empty defaults by this point, so every later save would write an empty blob over a
+    // populated account with the total-wipe backstop disarmed. The reload that would have reset
+    // the flag never runs on the throw path. A leaked bypass is worse than the bug it bypasses.
     DB._allowReset = true;   // intentional wipe: let the total-wipe backstop through for this explicit reset
+    try {
     await App.save();
     await App.saveInventory();
     await DB.clearEvents('ic_events');   // drop the inventory event rows too
@@ -4099,7 +4105,9 @@ S.HubSettings = {
         await CashEngine.setGiftCardLiability(null);
       }
     } catch (e) {}
-    DB._allowReset = false;   // close the reset window only after EVERY write of this wipe
+    } finally {
+      DB._allowReset = false;   // close the window after EVERY write of this wipe, throw or not
+    }
     try { ['events_step_ack_leads', 'events_step_ack_deposits', 'events_step_ack_prep', 'events_step_ack_close', 'event_agreement_terms', 'lc_sched_draft'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
     App.updatePeriod();
 
