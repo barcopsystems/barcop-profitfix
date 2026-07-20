@@ -581,9 +581,30 @@ async function sendErrorDigest() {
     let since = (mark && mark.created_at) || cutoff;
     let markUntrusted = false;
     if (since > nowIso) {
-      console.error('errorDigest: stored high-water mark is in the FUTURE (' + since + ') — ignoring it and reporting the full retained window.');
+      const poisoned = since;
+      console.error('errorDigest: stored high-water mark is in the FUTURE (' + poisoned + ') — ignoring it and reporting the full retained window.');
       since = cutoff;
       markUntrusted = true;
+      // DELETE the poisoned marker rather than merely ignoring it. The mark is read newest-first
+      // and the marker prune above only removes markers OLDER than a year, so a future-dated
+      // marker SHADOWS every marker written after it: the pass makes zero forward progress and
+      // repeats identically until wall-clock catches up. A container clock stepping back 30 days
+      // therefore meant 30 consecutive full-window emails, and a daily identical 10,000-event
+      // digest is functionally the same silence this module exists to prevent. Safe to delete
+      // because the server never writes a future marker — markAt is clamped below — so any marker
+      // ahead of now is invalid by construction rather than merely surprising.
+      const { error: badMarkErr } = await supabaseAdmin.from('client_errors')
+        .delete().gt('created_at', nowIso).eq('kind', 'digest_sent');
+      if (badMarkErr) console.error('errorDigest: could not remove the future-dated marker:', badMarkErr.message);
+      // And tell a HUMAN. Both arms of this branch were console-only, which is precisely the
+      // failure this file's own header calls out: a log on a machine nobody watches reaches no
+      // one. This is also the single condition the digest cannot report on itself, because the
+      // digest is the thing that is stuck.
+      await alertOps('Bar Cop digest: high-water mark was in the FUTURE and has been cleared', [
+        'The stored digest marker read ' + poisoned + ', which is ahead of server time (' + nowIso + ').',
+        'Retention was SKIPPED for this pass and the bad marker was deleted, so the next run should recover.',
+        'If this repeats, the cause is the container clock or a client-supplied created_at.'
+      ]);
     }
     // Prune events ONLY up to the older of (retention cutoff, high-water mark). Deleting on age
     // alone let the prune outrun the digest: if reporting ever fell more than 30 days behind,
