@@ -423,6 +423,71 @@ app.post('/api/demo-visit', async (req, res) => {
   }
 });
 
+// ── Operational alerting ────────────────────────────────────────────────────────
+// Until 2026-07-19 the ONLY way a customer's problem reached Kyle was the manual bug form.
+// Everything else — a blocked wipe, a denied write, a reconcile abort — ended in console.error
+// on a machine nobody watches. These two functions close that: alertOps() for the handful of
+// events that mean act-now, and a once-a-day digest for everything else so the immediate alerts
+// stay rare enough to still mean something.
+async function alertOps(subject, lines) {
+  try {
+    const apiKey = (process.env.RESEND_API_KEY || '').trim();
+    const to = (process.env.OPS_ALERT_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL || '').trim();
+    if (!apiKey || !to) { console.warn('alertOps: not configured, skipping:', subject); return; }
+    const from = (process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev').trim();
+    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
+    const html = '<div style="font-family:-apple-system,Segoe UI,sans-serif;max-width:640px;padding:20px;color:#111;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#C03828;">BAR COP OPS ALERT</div>'
+      + '<div style="font-size:17px;font-weight:700;margin:6px 0 14px;">' + esc(subject) + '</div>'
+      + '<pre style="font-size:12px;background:#f6f6f6;padding:12px;white-space:pre-wrap;">'
+      + esc((lines || []).join('\n')) + '</pre>'
+      + '<div style="font-size:11px;color:#888;margin-top:14px;">' + esc(new Date().toISOString()) + '</div></div>';
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, subject: 'Bar Cop ALERT: ' + subject, html })
+    });
+  } catch (e) { console.error('alertOps failed (non-fatal):', e.message); }
+}
+
+// Once-a-day roll-up of client_errors. Read with the SERVICE ROLE so it sees every account
+// (the table's RLS scopes operators to their own bar). Grouped by kind so a single broken screen
+// hitting 40 users reads as one line, not 40 alerts.
+async function sendErrorDigest() {
+  try {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const { data, error } = await supabaseAdmin
+      .from('client_errors')
+      .select('kind, message, user_email, app_version, screen, created_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (error) { console.error('errorDigest read failed:', error.message); return; }
+    if (!data || !data.length) { console.log('errorDigest: nothing in the last 24h'); return; }
+    const byKind = {};
+    data.forEach(r => {
+      const k = r.kind || 'unknown';
+      if (!byKind[k]) byKind[k] = { n: 0, users: new Set(), samples: [] };
+      byKind[k].n++;
+      if (r.user_email) byKind[k].users.add(r.user_email);
+      if (byKind[k].samples.length < 3) {
+        byKind[k].samples.push('    ' + (r.message || '').slice(0, 140)
+          + (r.screen ? '  [' + r.screen + ']' : '') + (r.app_version ? '  (' + r.app_version + ')' : ''));
+      }
+    });
+    // Most-frequent first, but the data-safety kinds always read as urgent regardless of count.
+    const URGENT = ['wipe_blocked', 'restore_aborted', 'rls_denied', 'backfill_failed', 'storage_full'];
+    const lines = Object.keys(byKind)
+      .sort((a, b) => (URGENT.includes(b) - URGENT.includes(a)) || (byKind[b].n - byKind[a].n))
+      .map(k => (URGENT.includes(k) ? '!! ' : '   ') + k + ' — ' + byKind[k].n + ' event(s), '
+        + byKind[k].users.size + ' user(s)\n' + byKind[k].samples.join('\n'));
+    const urgentHit = Object.keys(byKind).filter(k => URGENT.includes(k));
+    await alertOps('Daily error digest — ' + data.length + ' event(s)'
+      + (urgentHit.length ? ' — INCLUDES ' + urgentHit.join(', ') : ''), lines);
+    console.log('errorDigest: sent, ' + data.length + ' events');
+  } catch (e) { console.error('sendErrorDigest failed (non-fatal):', e.message); }
+}
+
 // Best-effort "Welcome to Bar Cop" email, sent from the checkout webhook once a NEW
 // subscriber is active (on top of Stripe's own receipt). Never throws — a failed or
 // unconfigured send must not break account provisioning.
@@ -569,10 +634,20 @@ async function reconcileSubscriptions() {
       if (!probe || !probe.data || !probe.data.length) {
         console.error('reconcile: ABORT — Stripe reports no subscriptions at all while the DB holds '
           + rows.length + '. Refusing to run: this is the signature of a key pointed at the wrong Stripe account.');
+        await alertOps('Reconcile aborted — Stripe key may point at the wrong account', [
+          'Stripe returned ZERO subscriptions while the database holds ' + rows.length + '.',
+          'The pass was refused. No subscription was changed.',
+          'Check STRIPE_SECRET_KEY on this instance (test key against live data?).'
+        ]);
         return { checked: 0, fixed: 0, aborted: 'stripe-empty' };
       }
     } catch (e) {
       console.error('reconcile: ABORT — could not reach Stripe:', (e && e.message) || e);
+      await alertOps('Reconcile aborted — Stripe unreachable', [
+        'Could not reach Stripe to verify subscriptions.',
+        'The pass was refused. No subscription was changed.',
+        String((e && e.message) || e)
+      ]);
       return { checked: 0, fixed: 0, aborted: 'stripe-unreachable' };
     }
   }
@@ -602,6 +677,11 @@ async function reconcileSubscriptions() {
         if (++canceled > cancelCap) {
           console.error('reconcile: ABORT — more than ' + cancelCap + ' subscriptions reported missing in Stripe. '
             + 'That is a wrong-key/wrong-account signature, not real churn. No further cancels applied.');
+          await alertOps('Reconcile hit the cancel cap — possible wrong Stripe account', [
+            'More than ' + cancelCap + ' subscriptions reported missing in Stripe in one pass.',
+            'The pass STOPPED. ' + (canceled - 1) + ' row(s) were already marked canceled before the cap tripped.',
+            'If this was not real churn, verify STRIPE_SECRET_KEY and restore those rows from Stripe.'
+          ]);
           break;
         }
         await supabaseAdmin.from('subscriptions')
@@ -1674,4 +1754,12 @@ if ((process.env.STRIPE_SECRET_KEY || '').trim()) {
   const RECONCILE_MS = 24 * 60 * 60 * 1000;
   setTimeout(() => { reconcileSubscriptions().catch(e => console.error('reconcile (startup):', (e && e.message) || e)); }, 5 * 60 * 1000);
   setInterval(() => { reconcileSubscriptions().catch(e => console.error('reconcile (interval):', (e && e.message) || e)); }, RECONCILE_MS);
+}
+
+// Daily client-error digest. Independent of Stripe, so it is gated separately — observability
+// must keep working even on an instance with no billing key. First pass 10 min after boot
+// (offset from reconcile so the two never email at once), then every 24h.
+if ((process.env.OPS_ALERT_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL || '').trim()) {
+  setTimeout(() => { sendErrorDigest(); }, 10 * 60 * 1000);
+  setInterval(() => { sendErrorDigest(); }, 24 * 60 * 60 * 1000);
 }
