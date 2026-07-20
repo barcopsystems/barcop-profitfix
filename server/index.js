@@ -155,7 +155,41 @@ async function generateRevenueAudit(apiKey, files, appData, practices, controlDa
 // as long as the Node server is up and routing /api. No DB call on purpose, so a
 // transient Supabase blip can't false-alarm the monitor — this checks "is the
 // backend running," not "is every dependency healthy."
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+// Health check. Was a bare {ok:true} liveness ping, which only proved Node was running — it
+// would happily report healthy while Supabase was unreachable and every customer save was
+// failing. Now it actually probes the dependencies, so an external uptime monitor (UptimeRobot
+// or similar, free) can watch this URL and tell you the app is BROKEN, not just "up".
+//
+// Safe to leave unauthenticated: it returns BOOLEANS only, never a key, an env value, a count or
+// any customer data. The DB probe is cached for 30s so hammering this endpoint cannot turn into
+// a database load amplifier.
+let _healthCache = { at: 0, dbOk: null };
+app.get('/api/health', async (req, res) => {
+  const out = {
+    ok: true,                                   // kept for anything already pinging this
+    uptime_s: Math.round(process.uptime()),
+    stripe_configured: !!(process.env.STRIPE_SECRET_KEY || '').trim(),
+    email_configured: !!(process.env.RESEND_API_KEY || '').trim()
+      && !/resend\.dev$/i.test((process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev').trim()),
+    alerts_configured: !!((process.env.OPS_ALERT_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL || '').trim())
+  };
+  try {
+    const now = Date.now();
+    if (now - _healthCache.at > 30000) {
+      const { error } = await supabaseAdmin.from('accounts').select('id', { head: true, count: 'exact' }).limit(1);
+      _healthCache = { at: now, dbOk: !error };
+      if (error) console.error('health: database probe failed:', error.message);
+    }
+    out.database = _healthCache.dbOk === null ? 'unknown' : (_healthCache.dbOk ? 'ok' : 'unreachable');
+  } catch (e) {
+    out.database = 'unreachable';
+    console.error('health: database probe threw:', e.message);
+  }
+  // A reachable server with an unreachable database is NOT healthy — say so with a 503 so a
+  // monitor actually pages instead of seeing 200 and staying quiet.
+  if (out.database === 'unreachable') { out.ok = false; return res.status(503).json(out); }
+  res.json(out);
+});
 
 // ── Stripe checkout session ───────────────────────────────────────────────────
 // Per-bar billing, two prices on the one "Bar Cop" product. Price IDs come ONLY
