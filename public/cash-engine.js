@@ -310,8 +310,16 @@ window.CashEngine = {
     // on period_end, which is identical across the duplicates by definition.
     const rw = matches.length < 2 ? matches[0]
       : matches.slice().sort((a, b) => {
-          const k = r => String((r && (r.saved_at || r.created_at || r.id)) || '');
-          return k(b).localeCompare(k(a));
+          // TIMESTAMP ONLY. `|| r.id` used to sit at the end of this chain, and it inverted the
+          // whole thing: App.uid() is Date.now().toString(36), which in 2026 begins with a LETTER,
+          // and under localeCompare letters sort after digits — so an id-only row outranked every
+          // ISO saved_at and this returned the one row it could not date. A record with no
+          // timestamp must never beat one that has it. id stays as a deterministic TIEBREAK only,
+          // so two undated rows still cannot be decided by array order.
+          const ts = r => String((r && (r.saved_at || r.created_at)) || '');
+          const ta = ts(a), tb = ts(b);
+          if (ta !== tb) return tb.localeCompare(ta);
+          return String((b && b.id) || '').localeCompare(String((a && a.id) || ''));
         })[0];
     if (!rw) return null;
     const bar = parseFloat(rw.bar_revenue), flo = parseFloat(rw.floor_revenue);
@@ -367,7 +375,13 @@ window.CashEngine = {
     // `logged` stays 0 for these — nothing WAS logged — and _confirmedWeekTotal supplies `total`.
     ((App.data && App.data.revenue_weeks) || []).forEach(w => {
       const pe = String(w.period_end || '').slice(0, 10); if (!pe) return;
-      const wk = this._addDays(pe, -6);
+      // _mondayOf, NOT _addDays(pe, -6). The shift loop above keys on _mondayOf, which is always a
+      // Monday; period_end - 6 only lands on a Monday when period_end IS a Sunday. Any other
+      // weekday minted a SECOND, non-colliding key for the same calendar week, so the
+      // `byWeek[wk] != null` guard below stopped guarding and the week was counted twice — once
+      // raw from the log, once confirmed. Identical to the old form for every Sunday, and every
+      // writer produces a Sunday today, so this only closes a latent hole.
+      const wk = this._mondayOf(new Date(pe + 'T00:00:00'));
       if (wk >= curMon || byWeek[wk] != null) return;   // in-progress week out; never overwrite logged data
       // Null means "no bar/floor figure to substitute" (a catering-only week). Adding it as a $0
       // week would drag the trailing average down with revenue that belongs to eventInflow.
@@ -767,7 +781,7 @@ window.CashEngine = {
     // is no daily granularity to prorate, so it stays out rather than being guessed at.
     ((App.data && App.data.revenue_weeks) || []).forEach(w => {
       const pe = String(w.period_end || '').slice(0, 10); if (!pe) return;
-      const wk = this._addDays(pe, -6);
+      const wk = this._mondayOf(new Date(pe + 'T00:00:00'));  // see _recentWeeklySales: never period_end - 6
       if (byWeek[wk] != null) return;                   // never overwrite logged data
       if (!(wk >= s && pe <= e)) return;                 // the whole Mon..Sun span must be in range
       if (this._confirmedWeekTotal(wk) == null) return;  // catering-only week: nothing to substitute
