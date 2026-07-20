@@ -5413,7 +5413,19 @@ const App = {
     if (!store) return { ok: true };
     const dataObj = store.data();
     if (!dataObj) return { ok: true };
-    await DB.clearEvents(store.table);
+    // A restore/seed REPLACES, so a failed clear must write NOTHING. putEventsBulk upserts on
+    // (account_id, kind, id): records the operator created AFTER the backup carry DIFFERENT ids,
+    // so they survive a failed clear and coexist with the restored rows, and loadEventStores
+    // treats rows as authoritative on the next boot — the account comes back as the UNION of the
+    // backup and the very data they were rolling back, under a "Backup restored" message. This
+    // result was being discarded while `ok` tracked only putEventsBulk, so the whole path
+    // reported success. Reporting the failure having written nothing is recoverable; a silent
+    // merge is not.
+    const cleared = await DB.clearEvents(store.table);
+    if (cleared && cleared.ok === false) {
+      console.error('seedEventStores ' + mod + ': clearEvents failed, writing nothing', cleared.error);
+      return { ok: false };
+    }
     let ok = true;
     for (const kind of Object.keys(store.kinds)) {
       const recs = dataObj[store.kinds[kind]] || [];
