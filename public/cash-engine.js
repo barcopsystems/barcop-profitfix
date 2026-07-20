@@ -702,20 +702,32 @@ window.CashEngine = {
     }
     return { start: App.ymdLocal(new Date(now.getFullYear(), now.getMonth(), 1)), end: App.ymdLocal(now), label: 'this month' };
   },
-  // Logged bar + floor sales in a date window, CARRYING the operator's Confirm-the-Week
-  // corrections (see _confirmationRatio). Both callers are money you owe rather than money you
-  // have — the sales-tax hold behind Safe to Spend, and the projected remittances — so they must
-  // read the revenue the operator reconciled, not the raw shift log they already corrected.
-  // A tax hold computed on a rejected number is wrong in whichever direction the error ran.
-  // The window is an arbitrary date range while confirmations are weekly, so the correction is
-  // applied as the bounded ratio rather than a per-week substitution.
+  // Bar + floor sales in a date window, preferring the operator's Confirm-the-Week figure over
+  // the raw shift log wherever a whole week is covered. (This block used to say the correction
+  // was applied as a bounded ratio — that is no longer true; see below.)
   _salesBetween(s, e) {
-    let t = 0;
+    // EXACT confirmed substitution, not a blended ratio. Both callers are money you OWE — the
+    // sales-tax hold behind Safe to Spend and the projected remittances — so they must read the
+    // revenue the operator reconciled. The first cut multiplied the raw total by
+    // _confirmationRatio(), which was doubly wrong: it approximated when the exact confirmed
+    // figure was sitting right there, and Cash Position prints this verbatim as "Tax on your $X
+    // sales", so it put a dollar amount on screen that reconciled against no other view in the
+    // app. Substitute per WEEK instead.
+    // A week only qualifies if its ENTIRE Mon..Sun span is inside the range — a partial week
+    // cannot take a whole-week total, so those keep the raw daily sum.
+    const byWeek = {};
     ((App.shiftData && App.shiftData.sc_shifts) || []).forEach(sh => {
       const d = String(sh.date || '').slice(0, 10); if (!d || d < s || d > e) return;
-      t += (parseFloat(sh.bar_revenue) || 0) + (parseFloat(sh.floor_revenue) || 0);
+      const wk = this._mondayOf(new Date(d + 'T00:00:00'));
+      byWeek[wk] = (byWeek[wk] || 0) + (parseFloat(sh.bar_revenue) || 0) + (parseFloat(sh.floor_revenue) || 0);
     });
-    return t * this._confirmationRatio();
+    let t = 0;
+    Object.keys(byWeek).forEach(wk => {
+      const whole = wk >= s && this._addDays(wk, 6) <= e;
+      const conf = whole ? this._confirmedWeekTotal(wk) : null;
+      t += (conf != null ? conf : byWeek[wk]);
+    });
+    return t;
   },
   _wagesBetween(s, e) {
     let t = 0;
