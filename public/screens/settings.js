@@ -436,9 +436,17 @@ S.HubSettings = {
 
   async _applyBackupInner(backup, hasData) {
     // A save that reports failure must stop the restore BEFORE seedEventStores clears rows.
+    // ⚠ These callers return a BOOLEAN, not a result object: App.save() is `return r.ok`
+    // (app.js) and saveInventory/saveLabor/saveShift are `return r.ok || !!r.offline`. The first
+    // version of this guard tested `r.ok === false`, which on a boolean is always false — `false`
+    // short-circuits on `r &&`, and `true.ok` is undefined. It could not throw for ANY input, so
+    // the abort it exists to perform never happened and seedEventStores went on to clear every
+    // event row after a failed blob write. Test the boolean.
+    // An offline restore is also refused, deliberately: a restore CLEARS event rows before
+    // reseeding, and doing that without a confirmed connection is how an account ends up empty.
     const must = async (label, p) => {
-      const r = await p;
-      if (r && r.ok === false && !r.offline && !r.queued) {
+      const ok = await p;
+      if (ok !== true) {
         // An aborted restore means an owner tried to roll their account back and could not.
         // They are safe (nothing was erased) but they are also stuck, and they may not say so.
         DB.logClientError('restore_aborted', 'Restore aborted before clearing rows', 'step=' + label);
