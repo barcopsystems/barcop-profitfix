@@ -1373,9 +1373,14 @@ app.post('/api/invite-user', async (req, res) => {
 
     // SECURITY: write the invite to a SERVER-ONLY table (service-role; no anon/user RLS
     // policy, so the browser can't read or forge it). The signup trigger provisions the
-    // membership from THIS record, matched by the new user's verified email, and IGNORES
+    // membership from THIS record, matched by the new user's signup email, and IGNORES
     // the signup metadata below. This is what stops a self-signup with a forged
     // invited_to_account_id from joining an account it was never invited to.
+    // ⚠ That email is NOT verified — confirmations are off, so the trigger only honours invites
+    // newer than 7 days (see handle_new_user in SUPABASE_SETUP.sql). created_at is stamped
+    // EXPLICITLY here because this is an upsert on (email, account_id): without it a re-invite
+    // kept the ORIGINAL timestamp, so re-sending an invite to someone who was slow would hand
+    // them an already-expired one and the owner would have no way to tell why it did not work.
     const { error: inviteRecErr } = await supabaseAdmin
       .from('account_invites')
       .upsert({
@@ -1383,7 +1388,8 @@ app.post('/api/invite-user', async (req, res) => {
         account_id: accountId,
         role: inviteRole,
         permissions: grantPerms,
-        invited_by: inviterUserId
+        invited_by: inviterUserId,
+        created_at: new Date().toISOString()
       }, { onConflict: 'email,account_id' });
     if (inviteRecErr) {
       console.error('invite record write failed:', inviteRecErr.message);
