@@ -531,6 +531,17 @@ async function sendErrorDigest() {
     // 'digest_sent'), so this survives a restart with no extra table and no SQL for Kyle to
     // run. The server reads with the service role, which bypasses RLS, so a null account/user
     // on the marker is fine.
+    // Retention FIRST, before any early return. client_errors is writable by any authenticated
+    // user and nothing else bounds it, so without a prune it grows forever — on a small Supabase
+    // tier that becomes a disk-pressure event that takes the actual product down. This has to run
+    // on EVERY pass, not just the ones that send: the table grows most quietly on the days there
+    // is nothing to report, which is exactly when the send path returns early. 30 days is well
+    // past the point a row is useful (the digest reports within a day) and it bounds the marker
+    // rows too. Piggy-backed on the daily job, so no scheduler and no pg_cron needed.
+    const cutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    const { error: pruneErr } = await supabaseAdmin.from('client_errors').delete().lt('created_at', cutoff);
+    if (pruneErr) console.error('errorDigest: retention prune failed (non-fatal):', pruneErr.message);
+
     const { data: mark } = await supabaseAdmin
       .from('client_errors')
       .select('created_at').eq('kind', 'digest_sent')
