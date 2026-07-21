@@ -196,47 +196,58 @@ S.PrepBatches = {
   // Keep stored batch costs in sync with current product costs so the list, and any menu item
   // that rolls up cost_per_serving, never show a stale number after an ingredient's price moved.
   //
-  // ⚠ THE ROLLBACK IS THE POINT. This mutates the batch in memory BEFORE it can write, and
-  // putRecordsBulk — unlike the single-row putRecord — does NOT revert on failure. Discarding
-  // the result (which is what shipped) meant: on a failed write memory held the corrected cost
-  // while the server kept the stale one, AND the drift check then compared memory against the
-  // same computed value and PASSED, so it never retried. The correction vanished on the next
-  // reload and the list had been showing a figure the server did not have. Rolling back keeps
-  // memory and server honest and lets the next render retry on its own.
+  // ⚠ WRITE FIRST, APPLY TO MEMORY ONLY ON SUCCESS. Two earlier shapes were both wrong:
+  //   • The shipped one mutated memory, fired the write and DISCARDED the result. putRecordsBulk
+  //     does NOT revert (only single-row putRecord does), so a failed write left memory holding
+  //     the corrected cost while the server kept the stale one — and the drift check then compared
+  //     memory against the same computed value and PASSED, so it never retried. The correction
+  //     vanished on reload while the list had been showing a figure the server did not have.
+  //   • Mutate-then-roll-back was no better: renderList is SYNCHRONOUS and does not await this, so
+  //     the table is built from the mutated objects and the rollback lands after, with nothing
+  //     re-rendering. The list would show the corrected cost while `ic_prep_batches` held the old
+  //     one — and App.menuItemCost / explodeMenuItem read `cost_per_serving` off that same live
+  //     array, so Menu Items and Recipe Cost Analysis would quote a different number than the
+  //     batch list, in the same session.
+  // So: compute into a DETACHED payload, write that, and only touch memory once the server has it.
+  // Memory therefore always equals the server, and the screen always equals memory. On failure
+  // nothing moved anywhere and the next render retries by itself.
+  //
+  // The re-render is deliberately on SUCCESS only, which is also why it cannot loop: by then the
+  // drift is resolved, so the re-entry finds nothing to write and returns immediately. Re-rendering
+  // on FAILURE would loop forever (stale -> drift -> write -> fail -> render -> stale).
   //
   // `quiet` because this fires from a RENDER, not from anything the operator did — an unattended
   // write must never pop a failure toast over a page they merely opened.
   async _resyncCosts(batches) {
-    const touched = [], prior = [];
+    const pending = [];
     (batches || []).forEach(b => {
-      const ingRows = (b.ingredients || []).map(i => ({ cost_per_unit: this.unitCost(this.prodById(i.product_id)), quantity: i.quantity || 0 }));
-      const out = this.computeRows(ingRows, b.batch_yield, b.batch_yield_unit, b.serving_size, b.serving_size_unit);
+      const ings = (b.ingredients || []).map(i => {
+        const cpu = this.unitCost(this.prodById(i.product_id));
+        return { ...i, cost_per_unit: cpu, total_cost: (cpu || 0) * (i.quantity || 0) };
+      });
+      const out = this.computeRows(ings.map(i => ({ cost_per_unit: i.cost_per_unit, quantity: i.quantity || 0 })),
+        b.batch_yield, b.batch_yield_unit, b.serving_size, b.serving_size_unit);
       if (Math.abs((b.total_cost || 0) - (out.total_cost || 0)) > 0.005
           || Math.abs((b.cost_per_serving || 0) - (out.cost_per_serving || 0)) > 0.005) {
-        prior.push({
-          b, total_cost: b.total_cost, cost_per_serving: b.cost_per_serving, servings_per_batch: b.servings_per_batch,
-          ings: (b.ingredients || []).map(i => ({ i, cost_per_unit: i.cost_per_unit, total_cost: i.total_cost }))
-        });
-        b.total_cost = out.total_cost;
-        b.cost_per_serving = out.cost_per_serving;
-        b.servings_per_batch = out.servings_per_batch;
-        (b.ingredients || []).forEach(ing => {
-          ing.cost_per_unit = this.unitCost(this.prodById(ing.product_id));
-          ing.total_cost = (ing.cost_per_unit || 0) * (ing.quantity || 0);
-        });
-        touched.push(b);
+        pending.push({ b, ings, total_cost: out.total_cost, cost_per_serving: out.cost_per_serving, servings_per_batch: out.servings_per_batch });
       }
     });
-    if (!touched.length) return true;
-    // Row-per-record: persist only the batches whose cost drifted (one bulk upsert).
-    const ok = await App.putRecordsBulk('ic', 'prep_batch', touched, { quiet: true });
-    if (!ok) prior.forEach(p => {
+    if (!pending.length) return true;
+    // Row-per-record: persist only the batches whose cost drifted (one bulk upsert). The payload is
+    // a COPY — putRecordsBulk writes what it is handed and never touches the in-memory list.
+    const payload = pending.map(p => ({ ...p.b, ingredients: p.ings, total_cost: p.total_cost, cost_per_serving: p.cost_per_serving, servings_per_batch: p.servings_per_batch }));
+    const ok = await App.putRecordsBulk('ic', 'prep_batch', payload, { quiet: true });
+    if (!ok) return false;   // memory never diverged; the next render tries again
+    pending.forEach(p => {
       p.b.total_cost = p.total_cost;
       p.b.cost_per_serving = p.cost_per_serving;
       p.b.servings_per_batch = p.servings_per_batch;
-      p.ings.forEach(x => { x.i.cost_per_unit = x.cost_per_unit; x.i.total_cost = x.total_cost; });
+      p.b.ingredients = p.ings;
     });
-    return ok;
+    // Only if this screen is still on the page — the operator may have navigated away while the
+    // write was in flight, and re-rendering into a detached container would do nothing useful.
+    if (this.container && this.container.isConnected !== false) this.renderList();
+    return true;
   },
 
   renderList() {
