@@ -242,9 +242,12 @@ const InitiativeTracker = {
       btn.addEventListener('click', async () => {
         const i = this.list(module).find(x => x.id === btn.dataset.id);
         if (!i) return;
+        // Live row: putRecord cannot revert it for us (see App.putRecord). restoreRows also puts a
+        // DELETED key back, so a refused reactivate does not strip the completion date.
+        const undo = App.snapshotRows([i]);
         i.status = 'Active';
         delete i.completed_at;
-        await App.putRecord('core', kind, i);   // row-per-record
+        if (!(await App.putRecord('core', kind, i))) App.restoreRows(undo);   // row-per-record
         rerender();
       });
     });
@@ -252,9 +255,10 @@ const InitiativeTracker = {
       btn.addEventListener('click', async () => {
         const i = this.list(module).find(x => x.id === btn.dataset.id);
         if (!i) return;
+        const undo = App.snapshotRows([i]);   // live row — putRecord cannot revert it for us
         i.status = 'Completed';
         i.completed_at = new Date().toISOString();
-        await App.putRecord('core', kind, i);   // row-per-record
+        if (!(await App.putRecord('core', kind, i))) App.restoreRows(undo);   // row-per-record
         rerender();
       });
     });
