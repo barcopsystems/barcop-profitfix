@@ -382,10 +382,17 @@ const ConfirmWeek = {
       // every later week's number shifts up one. Re-rank both stores off period_end
       // and persist only the records that actually moved (none on the normal path,
       // where the week being confirmed is already the latest).
+      // renumberWeekStore re-ranks IN PLACE and hands back only the rows that moved. A bulk write
+      // cannot revert itself, so a failed re-rank used to leave memory showing week numbers the
+      // server does not have. The confirm itself already succeeded above and stands; only the
+      // renumbering is rolled back, and the next confirm re-ranks from the server's truth.
+      const undoP = App.snapshotRows(App.data.weeks || []);
+      const undoR = App.snapshotRows(App.data.revenue_weeks || []);
       const movedP = App.renumberWeekStore(App.data.weeks || []);
       const movedR = App.renumberWeekStore(App.data.revenue_weeks || []);
-      if (movedP.length) await App.putRecordsBulk('core', 'week', movedP);
-      if (movedR.length) await App.putRecordsBulk('core', 'revenue_week', movedR);
+      let okRank = movedP.length ? await App.putRecordsBulk('core', 'week', movedP) : true;
+      if (okRank && movedR.length) okRank = await App.putRecordsBulk('core', 'revenue_week', movedR);
+      if (!okRank) { App.restoreRows(undoP); App.restoreRows(undoR); }
       if (App.markSetupDone) { App.markSetupDone('gs_p_week'); App.markSetupDone('gs_r_week'); }
       if (App.updatePeriod) App.updatePeriod();
       App.closeModal(this.MODAL_ID);
