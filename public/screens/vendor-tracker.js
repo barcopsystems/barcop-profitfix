@@ -600,25 +600,29 @@ S.VendorTracker = {
       + '<button class="btn btn-danger" id="vdm-del" style="margin-left:auto;">Delete</button></div>';
 
     const flushNotes = () => { const ta = card.querySelector('#vdm-notes-w'); if (ta) r.notes = ta.value; };
-    card.querySelector('#vdm-notes-w')?.addEventListener('change', () => { flushNotes(); App.putRecord('core', 'vendor_discrepancy', r); });
+    // redrawOnSuccess = false here only: redrawing the card on every notes blur would yank focus.
+    card.querySelector('#vdm-notes-w')?.addEventListener('change', () => this._vdSave(r, flushNotes, discId, false));
     card.querySelector('#vdm-credit')?.addEventListener('click', () => {
-      flushNotes();
       window.location.href = this._creditMailtoHref(r);
-      r.status = 'Credit Requested'; r.credit_requested_at = new Date().toISOString();
-      App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
+      this._vdSave(r, () => {
+        flushNotes();
+        r.status = 'Credit Requested'; r.credit_requested_at = new Date().toISOString();
+      }, discId, true);
     });
     card.querySelector('#vdm-resolve')?.addEventListener('click', () => {
-      flushNotes();
       const amt = parseFloat(card.querySelector('#vdm-recovered')?.value);
       if (isNaN(amt) || amt < 0) return;
-      r.status = 'Resolved'; r.resolved_at = new Date().toISOString(); r.recovered_amount = amt;
-      App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
+      this._vdSave(r, () => {
+        flushNotes();
+        r.status = 'Resolved'; r.resolved_at = new Date().toISOString(); r.recovered_amount = amt;
+      }, discId, true);
     });
     card.querySelector('#vdm-followup')?.addEventListener('click', () => {
-      flushNotes();
-      if (!Array.isArray(r.followups)) r.followups = [];
-      r.followups.push(new Date().toISOString());
-      App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
+      this._vdSave(r, () => {
+        flushNotes();
+        if (!Array.isArray(r.followups)) r.followups = [];
+        r.followups.push(new Date().toISOString());
+      }, discId, true);
     });
     card.querySelector('#vdm-closenc')?.addEventListener('click', async () => {
       flushNotes();
@@ -628,14 +632,37 @@ S.VendorTracker = {
         confirmText: 'Close, no credit'
       });
       if (!ok) return;
-      r.status = 'Resolved'; r.resolved_at = new Date().toISOString(); r.recovered_amount = 0; r.no_credit = true;
-      App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
+      this._vdSave(r, () => {
+        r.status = 'Resolved'; r.resolved_at = new Date().toISOString(); r.recovered_amount = 0; r.no_credit = true;
+      }, discId, true);
     });
     card.querySelector('#vdm-reopen')?.addEventListener('click', () => {
-      r.status = 'Credit Requested'; delete r.resolved_at; delete r.recovered_amount; delete r.no_credit;
-      App.putRecord('core', 'vendor_discrepancy', r).then(() => this._renderVdBody(discId));
+      // ⚠ Reopen DELETES keys. restoreRows puts deleted keys back (it Object.assigns the snapshot
+      // over the row), so a refused reopen does not silently strip a resolved claim's recovered
+      // amount off the record.
+      this._vdSave(r, () => {
+        r.status = 'Credit Requested'; delete r.resolved_at; delete r.recovered_amount; delete r.no_credit;
+      }, discId, true);
     });
     card.querySelector('#vdm-del')?.addEventListener('click', async () => { if (!(await App.confirmDelete())) return; await App.removeRecord('core', 'vendor_discrepancy', r.id); this._vdClose(); });
+  },
+  // ⚠ ONE DOOR for every write to a vendor claim from this card, and it exists because `r` is the
+  // LIVE record out of discRecords(). App.putRecord's revert re-seats the array slot with the very
+  // object we just mutated, so it undoes NOTHING for us (see the note in App.putRecord) — and these
+  // handlers discarded the result on top of that. A rejected save left the card reading
+  // "Resolved · Recovered $340" while the server still had the claim open, and
+  // hub-bar-cop-audit.js:530 counted that $340 into the audit's recovered total until the next
+  // reload took it away again.
+  // Snapshot BEFORE mutating, put it back if the save is refused, and always redraw on failure so
+  // the card can never sit there showing a state the server rejected.
+  _vdSave(r, mutate, discId, redrawOnSuccess) {
+    const undo = App.snapshotRows([r]);
+    mutate();
+    return App.putRecord('core', 'vendor_discrepancy', r).then(ok => {
+      if (!ok) App.restoreRows(undo);
+      if (!ok || redrawOnSuccess) this._renderVdBody(discId);
+      return ok;
+    });
   },
   _vdFile() {
     const card = document.getElementById('vdm-card'); if (!card) return;
@@ -661,7 +688,13 @@ S.VendorTracker = {
       delivery_id: pf.delivery_id || null,
       created_at: new Date().toISOString()
     };
-    App.putRecord('core', 'vendor_discrepancy', rec).then(() => {
+    // A NEW claim, so putRecord's own revert DOES work here (no prior row, so it splices this one
+    // back out) — this one needs no snapshot. What it was missing is the result check: onFiled()
+    // stamps li.discrepancy_id onto the delivery line, so a refused file pointed a delivery at a
+    // claim that does not exist, and _renderVdBody then opened a card for a record no longer in
+    // the list.
+    App.putRecord('core', 'vendor_discrepancy', rec).then(ok => {
+      if (!ok) { fail('Could not file the claim. Check your connection and try again.'); return; }
       if (this._vd && typeof this._vd.onFiled === 'function') this._vd.onFiled(rec);
       this._renderVdBody(rec.id);
     });
