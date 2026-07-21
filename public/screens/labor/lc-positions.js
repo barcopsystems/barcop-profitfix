@@ -59,7 +59,7 @@ S.LaborPositions = {
     // flag first (and not awaiting the write) meant a failed bulk write left the flag durably
     // true, the array stripped from the blob, and no rows — so the starters never appeared and
     // could never re-seed, permanently blocking the roster behind "Add your positions first".
-    const ok = await App.putRecordsBulk('lc', 'position', seeded);
+    const ok = await App.putRecordsBulk('lc', 'position', seeded, { quiet: true });   // fires from render(), never shout
     if (!ok) { seeded.forEach(p => { const i = list.indexOf(p); if (i >= 0) list.splice(i, 1); }); return; }
     App.laborData.lc_positions_seeded = true;
     await App.saveLabor();                                 // the lc_positions_seeded flag stays in the blob
