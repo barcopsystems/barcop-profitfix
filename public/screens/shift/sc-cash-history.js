@@ -217,8 +217,11 @@ S.ShiftCashHistory = {
       const vc = nc ? '-' : (vr > 0 ? '+' : '') + App.fmtCurrency(vr);
       return '<tr><td><div class="val">' + this.fmtDate(v.date) + '</div></td>'
         + '<td>' + esc(v.drawer || '-') + '</td>'
-        + '<td>' + esc(v.cashier || '-') + '</td><td>' + App.fmtCurrency(v.expected_cash || 0) + '</td>'
-        + '<td>' + App.fmtCurrency(v.counted_cash || 0) + '</td><td><span style="color:' + col + ';">' + vc + '</span></td>'
+        // ⚠ buildCash leaves these NULL when the POS report carried only an Over/Short column — a
+        // supported shape. `|| 0` turned that into "Counted $0.00", which reads as an EMPTY DRAWER
+        // for a register that took $900 and came up $45 light. A figure we do not have is a dash.
+        + '<td>' + esc(v.cashier || '-') + '</td><td>' + (v.expected_cash != null ? App.fmtCurrency(v.expected_cash) : '-') + '</td>'
+        + '<td>' + (v.counted_cash != null ? App.fmtCurrency(v.counted_cash) : '-') + '</td><td><span style="color:' + col + ';">' + vc + '</span></td>'
         + '<td>' + S.ShiftVarianceLog.statusBadge(v.status) + '</td></tr>';
     }).join('');
     const table = this.dataCard('<th>Date</th><th>Drawer</th><th>Cashier</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th>', rows)

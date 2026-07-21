@@ -717,6 +717,25 @@ S.ShiftCashControl = {
     const existing = editId ? this.variances().find(x => x.id === editId) : null;
     const variance = Math.round((cnt - exp) * 100) / 100;
     const drawerId = document.getElementById('ccv-drawer')?.value || '';
+    // ⚠ There was NO duplicate check here at all: this minted a fresh id and wrote, so counting the
+    // same register twice for one day (a typo re-entered instead of using Edit, or a recount) put
+    // TWO rows in and that drawer-day was counted twice in Drawer Net, the short rate, Loss
+    // Prevention and the Books cash sheet. Ask rather than refuse — an off-cycle second count is a
+    // real thing, it just must not happen by accident. `editId` excluded so editing a count is
+    // never treated as a duplicate of itself.
+    const sameDay = this.variances().filter(x => x && x.id !== editId
+      && x.date === date && (x.drawer_id || '') === drawerId);
+    if (sameDay.length) {
+      const prior = sameDay[0];
+      const ok = await App.confirm({
+        title: 'This register is already counted for that day',
+        message: (prior.drawer || 'That register') + ' on ' + date + ' is already logged at '
+          + App.fmtCurrency(prior.variance || 0) + '. Adding another counts the day twice everywhere.'
+          + ' Cancel and use Edit on the existing count unless this really is a second, separate count.',
+        confirmText: 'Add anyway', cancelText: 'Cancel', danger: true
+      });
+      if (!ok) return;   // runs before the Save button is disabled below, so nothing to restore
+    }
     const cashId   = document.getElementById('ccv-cashier')?.value || '';
     const rec = {
       id: editId || App.uid(),
