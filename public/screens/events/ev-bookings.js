@@ -714,8 +714,30 @@ S.EventsBookings = {
     });
   },
 
+  // Whatever the operator has typed into the step they are looking at. Each step's card has its
+  // own Save button, but the stage buttons sit in the SAME action row — and on Quote Sent, Mark
+  // Booked is the PRIMARY button sitting to the LEFT of Update Quote. So a renegotiated per-head
+  // was typed, the breakdown updated on screen, Mark Booked was pressed, and the booking saved at
+  // the OLD price: the screen showed one total and the agreement stored another.
+  // ⚠ EVERY read is gated on the input existing. These cards render one step at a time, and
+  // `parseFloat(missing?.value) || 0` is 0 — an ungated collect would zero a banked deposit on
+  // Mark Completed, which is worse than the bug it fixes.
+  openEdits() {
+    const g = id => document.getElementById(id);
+    const f = {};
+    if (g('eb-q-ph') || g('eb-q-party') || g('eb-q-fb')) Object.assign(f, this.collectQuote());
+    if (g('eb-dep')) f.deposit_amount = parseFloat(g('eb-dep').value) || 0;
+    if (g('eb-pl-food') || g('eb-pl-bar') || g('eb-pl-other')) {
+      if (g('eb-pl-food'))  f.event_food_cost  = parseFloat(g('eb-pl-food').value) || 0;
+      if (g('eb-pl-bar'))   f.event_bar_cost   = parseFloat(g('eb-pl-bar').value) || 0;
+      if (g('eb-pl-other')) f.event_other_cost = parseFloat(g('eb-pl-other').value) || 0;
+      if (g('eb-pl-actual')) f.actual_revenue  = parseFloat(g('eb-pl-actual').value) || 0;
+    }
+    return f;
+  },
+
   async changeStage(id, to) {
-    const fields = { stage: to };
+    const fields = Object.assign(this.openEdits(), { stage: to });
     const b = this.bookings().find(x => x.id === id);
     if (to === 'Booked' && b && !b.date_received) fields.date_received = App.todayLocal();
     await this.patch(id, fields);
