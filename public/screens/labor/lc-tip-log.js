@@ -667,7 +667,10 @@ S.LaborTipLog = {
     const rows = [];
     [...schedHrs.keys()].forEach(id => {
       if (already.has(id)) return;
-      const logged = App.hoursFor(id, date);
+      // Scoped to the period being logged: `period` is '' for the whole-day Tip Pool (which is how
+      // crewForDate calls in), and a service period for a per-period Log Tips batch. Filling a
+      // lunch row with a split shift's dinner hours is the same lie as filling the pool with one leg.
+      const logged = App.hoursFor(id, date, period);
       const hours = (logged != null && logged > 0) ? logged : (schedHrs.get(id) || '');
       rows.push({ staff_id: id, hours: hours || '', cash: '', card: '', sales: '', received: '' });
     });
@@ -740,7 +743,7 @@ S.LaborTipLog = {
           const hoursInp = ev.target.closest('.tl-line')?.querySelector('.tl-b-hours');
           const date = this.batchDate();
           if (hoursInp && !hoursInp.value && date) {
-            const hrs = App.hoursFor(ev.target.value, date);
+            const hrs = App.hoursFor(ev.target.value, date, this._addShiftType);
             if (hrs != null && hrs > 0) hoursInp.value = hrs;
           }
           // Reshape the row to the picked staff's role (earner = Sales box,
@@ -912,7 +915,7 @@ S.LaborTipLog = {
     const hoursInp = document.getElementById(p + 'hours');
     if (!hoursInp) return;
     if (existingRec && hoursInp.value && parseFloat(hoursInp.value) > 0) return;
-    const hrs = App.hoursFor(staffId, date);
+    const hrs = App.hoursFor(staffId, date, this._ePeriod);
     if (hrs != null && hrs > 0) hoursInp.value = hrs;
   },
 
