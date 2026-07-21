@@ -140,7 +140,14 @@ S.HubOperatingExpenses = {
   // each elapsed month is calculating from what they entered.
   _daysInMonth(y, m0) { return new Date(y, m0 + 1, 0).getDate(); },
 
-  catchUpRecurring() {
+  // ⚠ Generated rows are NOT put into memory until the server has them. What shipped pushed each
+  // child into the live list and then fired the write without awaiting or checking it — so a
+  // failed write left Books, the P&L and breakeven counting operating expenses the server never
+  // received, until the next reload silently removed them. This runs from App.boot(), so it is
+  // every login. These rows are derived (regenerated from the parent on any later load), which is
+  // exactly why waiting for confirmation costs nothing.
+  // No caller uses the return value, so making this async is safe.
+  async catchUpRecurring() {
     const arr = this.records();
     const now = new Date();
     const curIdx = now.getFullYear() * 12 + now.getMonth();
@@ -170,12 +177,20 @@ S.HubOperatingExpenses = {
           recurring_parent: p.id,
           created_at: new Date().toISOString()
         };
-        arr.push(child); newRecs.push(child);
+        newRecs.push(child);   // NOT pushed into arr yet — see the note on this function
         have.add(mk);
         added = true;
       }
     });
-    if (newRecs.length) App.putRecordsBulk('core', 'operating_expense', newRecs, { quiet: true });   // fires from App.boot(), never shout
+    if (!newRecs.length) return false;
+    // quiet: this fires from a boot and from a render, never from something the operator did.
+    if (!(await App.putRecordsBulk('core', 'operating_expense', newRecs, { quiet: true }))) return false;
+    arr.push(...newRecs);
+    // Re-render once, and only on success, so the screen picks up the caught-up months. Cannot
+    // loop: the dedupe above finds them already present next time and generates nothing.
+    if (this.container && this.container.isConnected !== false) {
+      if (this._view === 'history') this.renderHistory(); else this.renderMain();
+    }
     return added;
   },
 
