@@ -351,7 +351,12 @@ S.LaborPayPeriods = {
     const list = this.periods();
     const existing = list.find(p => p.week_start === weekStart);
     // Resolve the canonical period id first so each locked actual links to it.
-    const periodId = (existing && existing.id) || App.uid();
+    // ⚠ DERIVED FROM THE WEEK, not a fresh uid. A failed close drops the minted row out of memory,
+    // so the RETRY found no `existing`, minted a new App.uid(), and the server ended up holding TWO
+    // pay_period rows for one week_start — the list showed the week twice and
+    // periods().find(week_start) returned whichever loaded first. Keyed on the week, any number of
+    // retries upsert the same row.
+    const periodId = (existing && existing.id) || ('pp-' + weekStart);
     // Stamp locked + pay_period_id on each lc_actuals in range.
     const affected = this.actuals().filter(a => (a.date || '') >= weekStart && (a.date || '') <= weekEnd);
     // Snapshot BEFORE the in-place stamp. putRecordsBulk cannot revert (see App.snapshotRows), and
@@ -384,13 +389,41 @@ S.LaborPayPeriods = {
     // Persist the period row, then every locked actual in one bulk write (one
     // round-trip instead of one per entry). Both results are checked: a half-written close (period
     // row saved, entries not) is the state that reads Closed while the hours are still editable.
-    const okPeriod = await App.putRecord('lc', 'pay_period', savedPeriod);
-    const okRows = okPeriod && await App.putRecordsBulk('lc', 'actual', affected);
+    // ⚠ THE HOURS GO FIRST. The old order wrote the PERIOD first, so a failed hours write left the
+    // server holding a CLOSED week over hours that were still unlocked and still editable in Log
+    // Hours — and payroll export reads that week. That is exactly the half-written close the comment
+    // above says these checks exist to prevent. Hours first means a failure there has changed
+    // nothing at all on the server.
+    const okRows = await App.putRecordsBulk('lc', 'actual', affected);
     if (!okRows) {
       App.restoreRows(undoActuals);
       if (undoPeriod) App.restoreRows(undoPeriod);
       else App.dropRows(list, [rec]);   // the period row we had just appended
       this.renderList();
+      return;
+    }
+    const okPeriod = await App.putRecord('lc', 'pay_period', savedPeriod);
+    if (!okPeriod) {
+      // The hours are locked on the server but nothing closed them. Compensate: put memory back
+      // first, then write THAT state out, so the unlock payload is exactly the pre-close values.
+      App.restoreRows(undoActuals);
+      const undone = await App.putRecordsBulk('lc', 'actual', affected);
+      if (!undone) {
+        // Could not undo either. Leave MEMORY MATCHING THE SERVER (locked) rather than showing a
+        // comfortable lie, and tell the operator what actually fixes it. A lockout they can see is
+        // recoverable; a silent one is not.
+        affected.forEach(a => { a.locked = true; a.pay_period_id = periodId; });
+      }
+      if (undoPeriod) App.restoreRows(undoPeriod);
+      else App.dropRows(list, [rec]);
+      this.renderList();
+      if (!undone) {
+        App.confirm({
+          title: 'The week did not close',
+          message: 'The logged hours for this week are locked on the server, but the pay period was not saved. Close the week again to finish it.',
+          confirmText: 'OK', cancelText: 'Dismiss', danger: false
+        });
+      }
       return;
     }
     this.detailWeekStart = weekStart;
@@ -419,13 +452,32 @@ S.LaborPayPeriods = {
       existing.status = 'Open';
       existing.reopened_at = new Date().toISOString();
     }
-    // Persist the reopened period, then every unlocked actual in one bulk write.
-    const okPeriod = existing ? await App.putRecord('lc', 'pay_period', existing) : true;
-    const okRows = okPeriod && await App.putRecordsBulk('lc', 'actual', affected);
+    // ⚠ Mirror of closePeriod, same reason: the HOURS go first. Writing the period first meant a
+    // failed hours write left the server holding an OPEN week over hours that were still LOCKED, so
+    // Log Hours silently refused edits on a week the operator had just been told was editable.
+    const okRows = await App.putRecordsBulk('lc', 'actual', affected);
     if (!okRows) {
       App.restoreRows(undoActuals);
       if (undoPeriod) App.restoreRows(undoPeriod);
       this.renderList();
+      return;
+    }
+    const okPeriod = existing ? await App.putRecord('lc', 'pay_period', existing) : true;
+    if (!okPeriod) {
+      // Unlocked on the server with the period still reading Closed. Put the lock back so the two
+      // agree, and say so if even that fails.
+      App.restoreRows(undoActuals);
+      const undone = await App.putRecordsBulk('lc', 'actual', affected);
+      if (!undone) affected.forEach(a => { a.locked = false; });   // memory matches the server
+      if (undoPeriod) App.restoreRows(undoPeriod);
+      this.renderList();
+      if (!undone) {
+        App.confirm({
+          title: 'The week did not reopen',
+          message: 'The logged hours are unlocked on the server, but the pay period still reads Closed. Reopen the week again to finish it.',
+          confirmText: 'OK', cancelText: 'Dismiss', danger: false
+        });
+      }
       return;
     }
     if (this.detailWeekStart) this.renderDetail(weekStart);
