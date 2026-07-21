@@ -695,13 +695,27 @@ S.ShiftDashboard = {
     // would otherwise appear multiple times in one bulk upsert (Postgres rejects a duplicate
     // id in a single ON CONFLICT chunk). The Map keeps the last-mutated copy (all aliases added).
     const touched = new Map();
+    const created = [];   // brand-new registers, appended to sc_drawers by _addRegister
+    const undo = [];      // existing registers, snapshotted before their aliases are appended
     [...document.querySelectorAll('.sc-cm-sel')].forEach(sel => {
       const name = sel.dataset.name;
-      if (sel.value === '__add') { const r = this._addRegister(name); touched.set(r.id, r); return; }
+      if (sel.value === '__add') { const r = this._addRegister(name); created.push(r); touched.set(r.id, r); return; }
       const d = ((App.shiftData && App.shiftData.sc_drawers) || []).find(x => x.id === sel.value);
-      if (d) { if (!Array.isArray(d.pos_aliases)) d.pos_aliases = []; if (!d.pos_aliases.some(a => keyOf(a) === keyOf(name))) d.pos_aliases.push(name); touched.set(d.id, d); }
+      if (d) {
+        if (!touched.has(d.id)) undo.push(...App.snapshotRows([d]));   // once, before the first alias lands
+        if (!Array.isArray(d.pos_aliases)) d.pos_aliases = []; if (!d.pos_aliases.some(a => keyOf(a) === keyOf(name))) d.pos_aliases.push(name); touched.set(d.id, d);
+      }
     });
-    await App.putRecordsBulk('sc', 'drawer', [...touched.values()]);   // row-per-record
+    // Same reasoning as the blank-slate branch above: _commitCash mints variance rows stamped with
+    // these drawer_ids, so if the registers did not persist those reconciles would point at
+    // registers that vanish on reload. Put memory back and stop rather than commit against them.
+    if (!(await App.putRecordsBulk('sc', 'drawer', [...touched.values()]))) {   // row-per-record
+      App.restoreRows(undo);
+      App.dropRows((App.shiftData && App.shiftData.sc_drawers) || [], created);
+      const res = document.getElementById('sc-ck-cash-res');
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the register setup, so the cash counts were not imported. Try again.</div>';
+      return;
+    }
     return this._commitCash(this._pendingCashRows);
   },
   async _commitCash(rows) {
