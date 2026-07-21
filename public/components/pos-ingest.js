@@ -471,12 +471,15 @@ const PosIngest = {
       if (prior) { prior.covers += units; merged++; }
       else byItem.set(it.id, { item_id: it.id, covers: units });
     });
-    // Drop an item whose NET units come out <= 0 (returns met or exceeded sales in this file, or a
-    // returns-only export dropped by mistake). _commitPmix REPLACES weekly_covers, so writing a 0
-    // or a negative would overwrite the item's real prior figure — showing "-3 sold/wk" on Menu
-    // Engineering and dragging the category classification. The same guard buildSales applies to a
-    // non-positive DAY; leave the prior figure untouched rather than replace it with garbage.
-    const toAdd = [...byItem.values()].filter(u => u.covers > 0);
+    // Drop an item whose NET units come out NEGATIVE (returns exceeded sales in this file, or a
+    // returns-only export dropped by mistake). _commitPmix REPLACES weekly_covers, so writing a
+    // negative would overwrite the real prior figure and show "-3 sold/wk" on Menu Engineering,
+    // dragging the category classification.
+    // ⚠ ZERO IS KEPT, deliberately. An item listed at 0 units (or whose dayparts net to 0) genuinely
+    // sold none this week, and that is a TRUE figure that must overwrite. Filtering it out left last
+    // week's number on screen as if it were current — and a zero-seller is exactly what the Dog Test
+    // exists to surface, so hiding it behind a stale figure is the worse lie. `> 0` was too greedy.
+    const toAdd = [...byItem.values()].filter(u => u.covers >= 0);
     // `merged`, NOT dupCount. In every other builder in this file dupCount means rows SKIPPED
     // because they were already logged, and every screen renders it as "N already logged" — the
     // opposite of what happened here, where N rows were FOLDED INTO a total. Reusing the name
