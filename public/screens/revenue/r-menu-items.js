@@ -431,7 +431,15 @@ S.RevenueMenuItems = {
     this.container.querySelectorAll('.mi-restore').forEach(b =>
       b.addEventListener('click', async () => {
         const item = this.items().find(i => i.id === b.dataset.id);
-        if (item) { item.archived = false; await App.putRecord('core', 'menu_item', item); this.renderLanding(); }
+        // Live row: putRecord cannot revert it for us. A refused restore put the dish back on the
+        // menu on screen while the server kept it archived, so it read as selling and was priced
+        // and costed as live until the next reload.
+        if (item) {
+          const undo = App.snapshotRows([item]);
+          item.archived = false;
+          if (!(await App.putRecord('core', 'menu_item', item))) App.restoreRows(undo);
+          this.renderLanding();
+        }
       }));
     this.container.querySelectorAll('.mi-delperm').forEach(b =>
       b.addEventListener('click', async () => {

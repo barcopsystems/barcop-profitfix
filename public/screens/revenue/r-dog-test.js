@@ -225,6 +225,9 @@ S.RevenueDogTest = {
     // Snapshot the live volume at decision time so the history record is
     // stable even if weekly_covers on the item changes later.
     const item = t.item_id ? (App.data.menu_items || []).find(m => m.id === t.item_id) : null;
+    // Both `t` and `item` are LIVE rows, so putRecord cannot revert either for us (see App.putRecord).
+    const undoT = App.snapshotRows([t]);
+    const undoI = item ? App.snapshotRows([item]) : null;
     if (item && item.weekly_covers != null) t.current_volume = item.weekly_covers;
     t.status = status;
     t.decided_at = new Date().toISOString();
@@ -233,10 +236,19 @@ S.RevenueDogTest = {
     // can be restored or deleted for good. Keep leaves the item live.
     if (status === 'Cut' && item) {
       item.archived = true;
-      App.putRecord('core', 'menu_dog_test', t).then(() => App.putRecord('core', 'menu_item', item)).then(() => this.draw());
+      // ⚠ ORDER MATTERS: pull the dish FIRST, record the decision second. The old order wrote the
+      // decision first, so if the archive was refused the test read "Cut" while the dish was still
+      // on the menu and still selling — the report says you cut it and you did not. This order's
+      // worst case is a dish archived with no decision row, which is visible in Archived on Menu
+      // Items and can simply be decided again.
+      App.putRecord('core', 'menu_item', item).then(async okI => {
+        if (!okI) { App.restoreRows(undoI); App.restoreRows(undoT); this.draw(); return; }
+        if (!(await App.putRecord('core', 'menu_dog_test', t))) App.restoreRows(undoT);
+        this.draw();
+      });
       return;
     }
-    App.putRecord('core', 'menu_dog_test', t).then(() => this.draw());
+    App.putRecord('core', 'menu_dog_test', t).then(ok => { if (!ok) App.restoreRows(undoT); this.draw(); });
   },
 
   del(id) {
