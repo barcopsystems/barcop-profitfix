@@ -507,9 +507,14 @@ const PosIngest = {
     const items = (App.data && App.data.menu_items) || [];
     const byId = {};
     items.forEach(it => { if (it) byId[it.id] = it; });
-    const touched = [];
+    const touched = [], undo = [], seen = new Set();
     (toAdd || []).forEach(u => {
       const it = byId[u.item_id]; if (!it) return;
+      // ⚠ Snapshot BEFORE this item's first mutation, and only ONCE. A second snapshot would capture
+      // the already-changed values and "restore" the wrong number. buildPmix aggregates, so a
+      // duplicate row for one item should not reach here, but the guard costs nothing and that
+      // failure would be silent.
+      if (!seen.has(it.id)) { seen.add(it.id); undo.push(...App.snapshotRows([it])); }
       if (it.weekly_covers != null && u.covers !== it.weekly_covers) {
         it.prev_weekly_covers = it.weekly_covers;
         it.weekly_covers_updated_at = new Date().toISOString();
@@ -517,7 +522,16 @@ const PosIngest = {
       it.weekly_covers = u.covers;
       touched.push(it);
     });
-    return App.putRecordsBulk('core', 'menu_item', touched);
+    // ⚠ These are LIVE menu_items rows, so putRecordsBulk cannot revert them (by contract the caller
+    // has already mutated in place), and both callers redraw off memory the moment this returns.
+    // The result was RETURNED and honoured — so the operator did see "Save failed" — but nothing put
+    // the numbers back, so the whole Menu Engineering board (Star / Plowhorse / Dog, suggested
+    // prices, the reprice count, the weekly upside) sat there recomputed from covers the server had
+    // rejected. Marking those prices live then succeeds for real and is permanent, while the volume
+    // that justified them existed only in that tab.
+    const ok = await App.putRecordsBulk('core', 'menu_item', touched);
+    if (!ok) App.restoreRows(undo);
+    return ok;
   },
 
   // Sales upserts by DATE: a re-import of the same week replaces those days'
