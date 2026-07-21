@@ -358,7 +358,14 @@ S.RevenueMenuItems = {
       + (!ok ? (App.menuItemMissingIngredients(item).length
           ? '<div style="font-size:10px;font-weight:700;color:var(--amber);">INGREDIENT DELETED</div>'
             + '<div style="font-size:10px;color:var(--t3);">Not costed until you replace or remove it. Bar Cop will not price it cheaper in the meantime.</div>'
-          : '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>') : '') + '</td>'
+          : '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>') : '')
+      // Inactive is NOT an alarm — this dish costs correctly and stays on every board. Grey note so
+      // the operator can see at a glance which dishes lean on something they stopped stocking.
+      + (App.menuItemInactiveProducts(item).length
+          ? '<div style="font-size:10px;color:var(--t3);">Uses ' + App.menuItemInactiveProducts(item).length
+            + ' inactive product' + (App.menuItemInactiveProducts(item).length === 1 ? '' : 's') + ': '
+            + App.menuItemInactiveProducts(item).map(p => esc(p.name)).join(', ') + '</div>'
+          : '') + '</td>'
       + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
       + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + '</td>'
       + '<td class="' + (pct != null && tgt ? (pct > tgt ? 'neg' : 'pos') : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
