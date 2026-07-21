@@ -63,12 +63,47 @@ S.InventoryOrderSheet = {
     ]);
   },
 
+  // Units RECEIVED for each product since the count its on-hand came from.
+  // ⚠ This is deliberately NOT added into on-hand. On-hand moves only when you COUNT, and nothing
+  // subtracts what you POUR between counts — so folding receipts in alone would bias on-hand HIGH
+  // and start SUPPRESSING orders you actually need. Running dry mid-service is a worse failure than
+  // ordering a case twice. So the receipt is SURFACED on the line instead, and the operator decides.
+  // Per PRODUCT, not per file: a count can skip products, so each product's on-hand can come from a
+  // different (older) count, and what matters is everything received after THAT product's count.
+  receivedSinceCount() {
+    const lastCounted = {};   // product_id -> newest date that product was actually counted
+    ((App.inventoryData && App.inventoryData.ic_counts) || []).forEach(cnt => {
+      const d = String((cnt && cnt.date) || '').slice(0, 10);
+      if (!d) return;
+      (cnt.items || []).forEach(it => {
+        // `counted === false` never sets on-hand, so it must not count as "you counted this" here.
+        if (!it || it.counted === false || !it.product_id) return;
+        if (!lastCounted[it.product_id] || d > lastCounted[it.product_id]) lastCounted[it.product_id] = d;
+      });
+    });
+    const out = {};
+    ((App.inventoryData && App.inventoryData.ic_deliveries) || []).forEach(dv => {
+      const d = String((dv && dv.date) || '').slice(0, 10);
+      if (!d) return;
+      (dv.line_items || []).forEach(li => {
+        const pid = li && li.product_id;
+        if (!pid) return;
+        const since = lastCounted[pid];
+        if (!since || d <= since) return;   // counted on/after the delivery: already reflected in on-hand
+        // Delivery qty is stored in the same container unit as on-hand and par (cases for bottle beer).
+        out[pid] = (out[pid] || 0) + (App.unitsFromDeliveryLine ? App.unitsFromDeliveryLine(li) : (parseFloat(li.qty) || 0));
+      });
+    });
+    return out;
+  },
+
   // products below par in the latest count, grouped by vendor.
   belowParByVendor() {
     const asc = this.countsAsc();
     if (asc.length === 0) return null;
     const latest = asc[asc.length - 1];   // kept for the "suggestions based on your … count" date line
     const onHand = App.currentOnHand();
+    const received = this.receivedSinceCount();
 
     const groups = {};
     Object.keys(onHand).forEach(pid => {
@@ -86,7 +121,9 @@ S.InventoryOrderSheet = {
         par: p.par_level,
         suggested: Math.max(1, Math.ceil(p.par_level - oh)),
         unit_cost: p.unit_cost != null ? p.unit_cost : 0,
-        is_case_beer: isCaseBeer
+        is_case_beer: isCaseBeer,
+        // Surfaced, never folded into on_hand or suggested — see receivedSinceCount().
+        received_since: received[pid] || 0
       });
     });
     return { latest, groups };
@@ -513,13 +550,20 @@ S.InventoryOrderSheet = {
   // ── Line row builder (ing-tbl row for a known product: suggested + added) ──
   // For bottle beer with case_size, qty/unit cost are in CASES (par is already
   // in cases). Quantities carry the abbreviated container unit (cs / btls).
-  lineRowHTML(product, qty, onHand, par) {
+  lineRowHTML(product, qty, onHand, par, recvd) {
     const unitCost = product.unit_cost != null ? product.unit_cost : 0;
     const unit = App.unitAbbr(App.productUnit(product));
+    // A delivery received AFTER this product's last count is NOT in on-hand — on-hand only moves
+    // when you count — so the line still reads below par and would be re-ordered. Say it on the row
+    // rather than folding it into the number (see receivedSinceCount() for why folding it in is
+    // unsafe). Formatted through onHandText so bottle beer still reads in cases.
+    const recvNote = (recvd > 0)
+      ? '<div style="font-size:10px;color:var(--gold);margin-top:2px;">+' + esc(this.onHandText(product, recvd, unit)) + ' received since</div>'
+      : '';
     return '<tr class="os-line" data-product-id="' + esc(product.id || '') + '">'
       + '<td><div class="val">' + esc(product.name || '') + '</div>'
       + '<div style="font-size:10px;color:var(--t3);">' + esc(product.category || '') + '</div></td>'
-      + '<td class="os-onhand">' + this.onHandText(product, onHand, unit) + '</td>'
+      + '<td class="os-onhand">' + this.onHandText(product, onHand, unit) + recvNote + '</td>'
       + '<td class="os-par">' + this.parText(par, unit) + '</td>'
       + '<td><input type="number" class="os-qty form-input" data-cost="' + unitCost + '" data-product-id="' + esc(product.id || '') + '" min="0" step="1" '
       + 'value="' + qty + '" style="width:80px;"/>' + (unit ? ' <span class="os-unit" style="font-size:10px;color:var(--t3);">' + unit + '</span>' : '<span class="os-unit"></span>') + '</td>'
@@ -587,7 +631,7 @@ S.InventoryOrderSheet = {
   },
 
   vendorCard(vendor, lines) {
-    const rows = lines.map(l => this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par)).join('');
+    const rows = lines.map(l => this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par, l.received_since)).join('');
     return this.vendorCardShell(vendor, rows, lines.map(l => l.product), { mode: 'create' });
   },
 
