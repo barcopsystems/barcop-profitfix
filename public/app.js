@@ -5578,6 +5578,57 @@ const App = {
     return record;
   },
 
+  // ── Write-failure reporting: ONE door for every row write ───────────────────
+  // 105 of the 239 call sites discarded the result of putRecord / putRecordsBulk /
+  // removeRecord. Nothing is corrupted when a write fails — putRecord REVERTS the row — but
+  // the record then silently DISAPPEARS on the next render with no explanation, which is its
+  // own kind of lie. Reporting here covers every site at once and leaves all three return
+  // values untouched, so the 134 callers that DO check keep working exactly as before.
+  //
+  // ⚠ THE SILENCE MATTERS MORE THAN THE MESSAGE. Three results look like failures and are not:
+  //   • offline / queued (and not storageFull) — it IS on disk and it WILL sync. The offline
+  //     pill already says so; a red "not saved" here would be a lie that teaches operators to
+  //     distrust every save they make.
+  //   • deferred — a save that fired before the initial load finished. Deliberately dropped;
+  //     the next real edit saves normally (see DB.writeData).
+  //   • blocked — the total-wipe backstop caught an all-empty write over a populated account.
+  //     The data was PROTECTED and ops is already alerted. "Save failed" is exactly backwards.
+  // Returns the message to show, or null to stay quiet.
+  _writeFailMsg(r) {
+    if (!r) return 'Not saved. Check your connection and try again.';
+    if (r.ok || r.deferred || r.blocked) return null;
+    if ((r.offline || r.queued) && !r.storageFull) return null;
+    if (r.storageFull) return 'Out of space on this device. Nothing was saved — free up some space and try again.';
+    const err = String((r.error && r.error.message) || r.error || '');
+    if (/read-only|viewer/i.test(err)) return 'Your access is view-only, so nothing was saved.';
+    return 'Not saved. Check your connection and try again.';
+  },
+  // Show a write failure once. COALESCED on purpose: a bulk write, or a burst of row writes from
+  // one handler, must leave ONE message on screen rather than a wall of them. Wrapped so a broken
+  // reporter can never break the save path itself.
+  _reportWriteFail(r) {
+    try {
+      const msg = this._writeFailMsg(r);
+      if (!msg) return;
+      const ID = 'write-fail-toast';
+      const prior = document.getElementById(ID);
+      if (prior) prior.remove();
+      const el = document.createElement('div');
+      el.id = ID;
+      el.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;'
+        + 'background:var(--red);color:var(--w);border-radius:3px;padding:8px 18px;max-width:92vw;'
+        + 'font-size:11px;font-weight:800;letter-spacing:.5px;box-shadow:0 2px 10px rgba(0,0,0,0.5);';
+      el.textContent = msg;
+      document.body.appendChild(el);
+      clearTimeout(this._writeFailTimer);
+      this._writeFailTimer = setTimeout(() => {
+        const n = document.getElementById(ID);
+        if (n) n.remove();
+      }, 6000);
+    } catch (e) { /* never let the reporter break a save */ }
+  },
+  _writeFailTimer: null,
+
   async putRecord(mod, kind, rec) {
     const store = this.EVENT_STORES[mod];
     if (!store) return false;
@@ -5600,6 +5651,7 @@ const App = {
     const back = arr.findIndex(x => x && x.id === rec.id);
     if (prev) { if (back >= 0) arr[back] = prev; }
     else if (back >= 0) arr.splice(back, 1);
+    this._reportWriteFail(r);   // the row just vanished from the screen — say why
     return false;
   },
 
@@ -5617,7 +5669,9 @@ const App = {
     // Saved, offline, or safely queued for replay all count as success — the
     // caller's in-memory rows stay put and the queue will sync them. storageFull does NOT:
     // nothing reached disk, so reporting success would lose the batch on reload.
-    return !!(res && (res.ok || ((res.offline || res.queued) && !res.storageFull)));
+    const ok = !!(res && (res.ok || ((res.offline || res.queued) && !res.storageFull)));
+    if (!ok) this._reportWriteFail(res);   // one message for the whole batch, not one per row
+    return ok;
   },
 
   async removeRecord(mod, kind, id) {
@@ -5663,6 +5717,7 @@ const App = {
       return true;
     }
     if (removed) arr.splice(idx, 0, removed);
+    this._reportWriteFail(r);   // the row just came BACK on screen — say why
     return false;
   },
 
