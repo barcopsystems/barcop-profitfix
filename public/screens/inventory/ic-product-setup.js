@@ -346,6 +346,19 @@ S.InventoryProducts = {
   // ── Landing: six category cards on top, filterable list below ────────────
   renderLanding() {
     const all = this.products();
+    // ⚠ THE SELECTION MAY ONLY EVER HOLD ROWS THAT ARE ON SCREEN, and it is enforced
+    // here rather than at each action so a new door cannot reintroduce it. Make Inactive
+    // moves products off the working tab while the operator stays on that tab, and the
+    // selection used to survive it: the toolbar kept offering "Delete 5 Selected" with
+    // nothing ticked, and the next click acted on five records with no visible
+    // representation on the page. (Switching tabs already clears the selection outright,
+    // so "visible" is exactly visibleProducts().) This cannot fight confirmDel's
+    // deliberate keep-the-failures-selected retry: a product whose delete was REFUSED is
+    // still present and still rendered, so it survives the prune.
+    if (this._selected && this._selected.size) {
+      const onScreen = new Set(this.visibleProducts().map(p => p.id));
+      [...this._selected].forEach(id => { if (!onScreen.has(id)) this._selected.delete(id); });
+    }
     // Short, category-specific labels for the per-card upload button.
     const UPLOAD_LABEL = { 'Liquor': 'Liquor', 'Wine': 'Wine', 'Bottle Beer': 'Btl Beer', 'Draft Beer': 'Draft', 'Food': 'Food', 'Misc': 'Misc' };
     const cards = this.CATEGORIES.map(c => {
@@ -565,7 +578,15 @@ S.InventoryProducts = {
       if (edit)    { ev.stopPropagation(); this.showFormForId(edit.dataset.id); return; }
       if (del)     { ev.stopPropagation(); this.confirmDel([del.dataset.id], 'Delete this product?'); return; }
       if (dismiss) { ev.stopPropagation(); (this._dismissedAlerts = this._dismissedAlerts || new Set()).add(this.activeCat); this.renderLanding(); return; }
-      if (selAll)  { ev.stopPropagation(); this._selected = new Set(this.products().filter(p => (p.category || '') === this.activeCat).map(p => p.id)); this.renderLanding(); return; }
+      // ⚠ Through visibleProducts(), the ONE door for what a tab lists. This used to
+      // filter on category alone, which meant two opposite failures from one line: on a
+      // working tab it also selected that category's INACTIVE products, which are not
+      // rendered — so after archiving 40 mis-imported wines, Select All on Wine to clear
+      // 12 bad rows read "Delete 52 Selected" over 12 rows and permanently deleted all 40
+      // archived ones, none of which had ever been shown. And on the Inactive tab it
+      // selected NOTHING, because no product has category 'Inactive', so the tab's whole
+      // purpose (clearing 100 mis-imported wines) had no bulk path at all.
+      if (selAll)  { ev.stopPropagation(); this._selected = new Set(this.visibleProducts().map(p => p.id)); this.renderLanding(); return; }
       if (selClr)  { ev.stopPropagation(); this._selected = new Set(); this.renderLanding(); return; }
       if (selEdit) { ev.stopPropagation(); this.openBulkEdit(); return; }
       if (selDel)  { ev.stopPropagation(); this.confirmDel([...(this._selected || [])]); return; }
