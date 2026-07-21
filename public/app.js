@@ -1380,9 +1380,19 @@ const App = {
   // light up the matching nav item. Back to Dashboard re-renders the Hub
   // via App.showHub(), restoring the default topbar (bar name + date) and
   // putting the active state back on "The Hub".
+  // ⚠ Bumped on EVERY screen mount, module page or Hub full page. This is the only honest answer to
+  // "am I still the screen on the page?", because both mount hosts (#content-area and
+  // .hub-app .content) are PERMANENT and merely have their innerHTML replaced — so
+  // `container.isConnected` is always true and can never tell a screen it has been navigated away
+  // from. Any screen that writes in the background and then re-renders MUST capture this at render
+  // time and compare before repainting, or a late write paints it over whatever the operator went
+  // to next (a half-entered count sheet, in the worst case found).
+  _mountSeq: 0,
+
   openHubFullPage(title, renderFn, activeAction) {
     // Backward-compat: caller can pass just renderFn if title is unused.
     if (typeof title === 'function') { renderFn = title; title = ''; }
+    ++this._mountSeq;
     const wrap = document.getElementById('hub-wrapper');
     const wrapVisible = wrap && wrap.style.display !== 'none';
     if (!wrapVisible) this.showHub();
@@ -6117,6 +6127,7 @@ const App = {
     this._viewCur = () => this.navigate(id);
     this._updateFloatNav();
     try {
+    ++this._mountSeq;               // a new screen is going up — see App._mountSeq
     this._activeScreenObj = null;   // set per module block below; drives the nav "i" page-help button
     this.updateNav(id);
     // Hide the old topbar title bar on pages converted to the un-box language
