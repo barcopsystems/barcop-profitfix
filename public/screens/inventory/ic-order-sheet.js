@@ -343,9 +343,11 @@ S.InventoryOrderSheet = {
       window.location.href = S.InventoryOrderHistory.buildMailto(order);
     }
     if (order.status === 'Open') {
+      // Twin of ic-order-history.emailOrder — same live-row shape, fixed with it.
+      const undo = App.snapshotRows([order]);
       order.status = 'Submitted';
       order.submitted_at = new Date().toISOString();
-      await App.putRecord('ic', 'order', order);
+      if (!(await App.putRecord('ic', 'order', order))) App.restoreRows(undo);
       this.renderMain();
     }
   },

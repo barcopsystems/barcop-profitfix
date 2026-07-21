@@ -306,11 +306,16 @@ S.InventoryParSuggestions = {
     const products = (App.inventoryData && App.inventoryData.ic_products) || [];
     const p = products.find(x => x.id === productId);
     if (!p) return;
+    // LIVE row: putRecord cannot revert this for us (see App.putRecord). par_level is what the Order
+    // Sheet reorders against, so a refused save left the operator ordering to a par the server never
+    // took. restoreRows also puts the DELETED par_kept back, so a refused accept does not silently
+    // strip a Keep the operator had set.
+    const undo = App.snapshotRows([p]);
     p.par_level = suggested;
     p.par_updated_at = new Date().toISOString();
     p.par_source = 'auto-suggestion';
     if (p.par_kept) delete p.par_kept;   // accepting clears any prior Keep
-    await App.putRecord('ic', 'product', p);   // row-per-record: one product row
+    if (!(await App.putRecord('ic', 'product', p))) App.restoreRows(undo);   // row-per-record: one product row
     this.draw();
   },
 
@@ -319,8 +324,9 @@ S.InventoryParSuggestions = {
     const products = (App.inventoryData && App.inventoryData.ic_products) || [];
     const p = products.find(x => x.id === productId);
     if (!p) return;
+    const undo = App.snapshotRows([p]);   // live row — putRecord cannot revert it for us
     p.par_kept = { usage: (usage != null && !isNaN(usage)) ? usage : null, at: new Date().toISOString() };
-    await App.putRecord('ic', 'product', p);   // row-per-record: one product row
+    if (!(await App.putRecord('ic', 'product', p))) App.restoreRows(undo);   // row-per-record: one product row
     this.draw();
   }
 };

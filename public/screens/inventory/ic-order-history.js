@@ -400,9 +400,13 @@ S.InventoryOrderHistory = {
     if (!o) return;
     window.location.href = this.buildMailto(o);
     if (o.status === 'Open') {
+      // LIVE row: putRecord cannot revert our change (see App.putRecord). A refused save left the
+      // order reading Submitted on screen while the server still had it Open, so the vendor stayed
+      // in "Still to Order" on the next login and the same order could go out twice.
+      const undo = App.snapshotRows([o]);
       o.status = 'Submitted';
       o.submitted_at = new Date().toISOString();
-      await App.putRecord('ic', 'order', o);
+      if (!(await App.putRecord('ic', 'order', o))) App.restoreRows(undo);
       this.renderDetail(id);
     }
   },
@@ -429,9 +433,10 @@ S.InventoryOrderHistory = {
   async toggleStatus(id) {
     const o = this.orders().find(x => x.id === id);
     if (!o) return;
+    const undo = App.snapshotRows([o]);   // live row — putRecord cannot revert it for us
     o.status = o.status === 'Received' ? 'Open' : 'Received';
     o.received_at = o.status === 'Received' ? new Date().toISOString() : null;
-    await App.putRecord('ic', 'order', o);
+    if (!(await App.putRecord('ic', 'order', o))) App.restoreRows(undo);
     this.renderDetail(id);
   },
 
