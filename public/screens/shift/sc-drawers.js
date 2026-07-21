@@ -10,7 +10,20 @@
    pop-up. (Store stays sc_drawers; only the user-facing word is "Register".) */
 
 S.ShiftDrawers = {
-  editId: null,
+  // ⚠ There is deliberately NO `editId` here. There used to be, and it was the whole
+  // bug: `openEditModal` set it, but it was cleared ONLY by `renderList()` or a
+  // SUCCESSFUL `saveEdit`. The edit pop-up asks for `noClose:true`, which App.openModal
+  // does not read (it honours `opts.noX`), so the corner X renders and its handler just
+  // removes the overlay — leaving `editId` armed. The Add Register card is INLINE on the
+  // page, not in the pop-up, and its `save()` branched on `editId`: so Edit a register,
+  // close with the X, then add a new one, and the ADD form's values were written over the
+  // register you had been looking at. Its name, opening bank, cash tolerance and notes
+  // were replaced and no new register was created. Cash tolerance is the threshold that
+  // decides whether a count reads "out of tolerance", so it silently moved the line that
+  // flags a short drawer. `saveEdit(id)` takes the id as a PARAMETER and never read
+  // `editId`, so the property served nothing but the bug — removing it makes the Add card
+  // structurally incapable of touching an existing row, rather than relying on some other
+  // code path remembering to clear a flag. Pinned by verify-drawer-add-vs-edit.js case E.
   _pendingDelId: null,
   _draft: null,            // in-memory inline-form draft (survives leave/return)
 
@@ -54,7 +67,6 @@ S.ShiftDrawers = {
   },
 
   renderList() {
-    this.editId = null;
     // Name-sorted, matching App.drawerOptions (the dropdowns). Unsorted, the register table
     // inherited row order (newest-first) and disagreed with every picker built from the same data.
     const all = this.drawers().slice()
@@ -153,7 +165,7 @@ S.ShiftDrawers = {
   openEditModal(id) {
     const d = this.drawers().find(x => x.id === id);
     if (!d) return;
-    this.editId = id;
+    // No screen state is set here on purpose — `saveEdit(id)` is wired with the id below.
     const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Register</div>'
       + this.fieldsHtml(d, 'dre-')
       + '<div class="card-actions">'
@@ -187,7 +199,7 @@ S.ShiftDrawers = {
     const btn = document.getElementById('dre-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'drawer', d);   // row-per-record
-    if (ok) { this.editId = null; App.closeModal('dr-edit-modal'); this.renderList(); }
+    if (ok) { App.closeModal('dr-edit-modal'); this.renderList(); }
     else { App.restoreRows(undo); if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
   },
 
@@ -196,38 +208,29 @@ S.ShiftDrawers = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const name = document.getElementById('dr-name')?.value.trim();
     if (!name) { fail('Register name required.'); return; }
-    const dup = this.drawers().some(d => d.id !== this.editId && (d.name || '').toLowerCase() === name.toLowerCase());
+    const dup = this.drawers().some(d => (d.name || '').toLowerCase() === name.toLowerCase());
     if (dup) { fail('A register with that name already exists.'); return; }
 
     const numOr = (id, def) => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? def : n; };
 
-    // Row-per-record: mutate/build the one drawer record and write just that row.
-    let rec = null;
-    if (this.editId) {
-      const d = this.drawers().find(x => x.id === this.editId);
-      if (d) {
-        d.name                  = name;
-        d.default_opening_bank  = numOr('dr-bank', null);
-        d.cash_tolerance        = numOr('dr-tol', 10);
-        d.notes                 = document.getElementById('dr-notes')?.value.trim() || '';
-        rec = d;
-      }
-    } else {
-      rec = {
-        id:                    App.uid(),
-        name,
-        default_opening_bank:  numOr('dr-bank', null),
-        cash_tolerance:        numOr('dr-tol', 10),
-        notes:                 document.getElementById('dr-notes')?.value.trim() || '',
-        active:                true,
-        created_at:            new Date().toISOString()
-      };
-    }
+    // Row-per-record: build the one NEW drawer record and write just that row.
+    // ⚠ This is the ADD card and it only ever ADDS. It used to branch on a screen-level
+    // `editId`, which meant an abandoned edit could redirect this write onto an existing
+    // register — see the note at the top of this object. Editing lives entirely in
+    // `saveEdit(id)`, which is given its id explicitly.
+    const rec = {
+      id:                    App.uid(),
+      name,
+      default_opening_bank:  numOr('dr-bank', null),
+      cash_tolerance:        numOr('dr-tol', 10),
+      notes:                 document.getElementById('dr-notes')?.value.trim() || '',
+      active:                true,
+      created_at:            new Date().toISOString()
+    };
 
     const btn = document.getElementById('dr-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = rec ? await App.putRecord('sc', 'drawer', rec) : true;
-    this.editId = null;
+    const ok = await App.putRecord('sc', 'drawer', rec);
     if (ok) {
       this._draft = null;
       this.renderList();
