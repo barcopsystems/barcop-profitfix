@@ -81,25 +81,57 @@ const CSVMapper = {
     }
   },
 
+  // Parse the WHOLE text character by character. The old shape split on newlines FIRST and only
+  // then parsed quotes, so a quoted field CONTAINING a line break was torn in half: the real row
+  // lost its trailing values and a phantom row appeared beside it. Any notes/reason cell with a
+  // line break does this, and the voids/comps import maps exactly such a field
+  // (note/notes/memo/comment). Quote state has to survive newlines, so it is tracked across them.
   _parseCSV(text) {
-    const lines = text.trim().split(/\r?\n/);
-    if (lines.length < 2) return null;
-    const parseLine = line => {
-      const out = []; let inQ = false, cur = '';
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
+    // Strip a BOM and any leading blank lines before anything reads column 0. (Neither can sit
+    // inside a quoted field at position 0, so this is safe to do up front.)
+    const src = String(text == null ? '' : text).replace(/^﻿/, '').replace(/^[\r\n]+/, '');
+    const rows = [];
+    let row = [], cur = '', inQ = false;
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+      if (inQ) {
         if (ch === '"') {
-          if (inQ && line[i + 1] === '"') { cur += '"'; i++; }   // escaped "" inside a quoted field -> one literal quote (O""Brien -> O"Brien)
-          else inQ = !inQ;
-        } else if (ch === ',' && !inQ) { out.push(cur.trim()); cur = ''; }
-        else cur += ch;
+          if (src[i + 1] === '"') { cur += '"'; i++; }   // escaped "" inside a quoted field -> one literal quote (O""Brien -> O"Brien)
+          else inQ = false;
+        } else cur += ch;                               // a newline in here is DATA, not a row break
+        continue;
       }
-      out.push(cur.trim());
-      return out;
-    };
-    const headers = parseLine(lines[0]).map(h => h.replace(/^"|"$/g, ''));
-    const rows = lines.slice(1).filter(l => l.trim()).map(parseLine);
-    return { headers, rows };
+      if (ch === '"') { inQ = true; continue; }
+      if (ch === ',') { row.push(cur.trim()); cur = ''; continue; }
+      if (ch === '\r') continue;                        // CRLF: ignore the CR, break on the LF
+      if (ch === '\n') { row.push(cur.trim()); rows.push(row); row = []; cur = ''; continue; }
+      cur += ch;
+    }
+    row.push(cur.trim());
+    rows.push(row);
+    // A file ending in a newline leaves one empty row; drop those rather than import blanks.
+    while (rows.length && rows[rows.length - 1].every(c => c === '')) rows.pop();
+    if (rows.length < 2) return null;
+    const headers = rows[0].map(h => h.replace(/^"|"$/g, ''));
+    return { headers, rows: rows.slice(1).filter(r => r.some(c => c !== '')) };
+  },
+
+  // Resolve the operator's picks to COLUMN POSITIONS and read each row. `sels` holds a column INDEX
+  // as a string ('' = the "(skip)" option) — never a header NAME. Identifying a column by name is
+  // what let a BLANK header cell capture every skipped field (headers.indexOf('') returns a real
+  // index, not -1) and made the second of two identically-named columns unreachable.
+  _mapRows(rows, sels) {
+    const idx = {};
+    Object.keys(sels || {}).forEach(k => {
+      const v = sels[k];
+      idx[k] = (v === '' || v == null) ? -1 : Number(v);
+    });
+    return (rows || []).map(row => {
+      const o = {};
+      // `!= null`, not `||` — a legitimate "0" cell must survive.
+      Object.keys(idx).forEach(k => { o[k] = (idx[k] >= 0 && row[idx[k]] != null) ? row[idx[k]] : ''; });
+      return o;
+    });
   },
 
   _parseXLSX(buffer, container, opts) {
@@ -136,26 +168,36 @@ const CSVMapper = {
   // (a later field, exact candidate 'transaction date') ever got to claim it, so
   // every comp imported as a Void stamped today. An exact header match now always
   // beats another field's fuzzy guess, whatever order the fields are declared in.
-  _autoMap(headers, fields) {
+  // Returns { fieldKey: columnINDEX }. Indexes, not names: two columns can share a name, and a
+  // blank name is not a name at all. `takenIdx` marks columns already claimed by a remembered map.
+  _autoMap(headers, fields, takenIdx) {
     const map = {};
-    const used = {};
+    const used = Object.assign({}, takenIdx || {});   // keyed by INDEX, so duplicate NAMES don't block each other
     const esc = c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const candsFor = f => [f.key, f.label, ...(f.match || [])].map(s => String(s).toLowerCase());
     const norm = h => String(h).toLowerCase().trim();
-    const claim = (f, hit) => { if (hit) { map[f.key] = hit; used[hit] = true; } };
+    const claim = (f, i) => { if (i > -1) { map[f.key] = i; used[i] = true; } };
+    // An UNNAMED column is never auto-claimed — there is nothing to match on, and guessing it is
+    // how a row-number column ends up imported as covers.
+    const findIdx = pred => {
+      for (let i = 0; i < headers.length; i++) {
+        if (used[i] || String(headers[i]).trim() === '') continue;
+        if (pred(headers[i])) return i;
+      }
+      return -1;
+    };
 
     fields.forEach(f => {
       const cands = candsFor(f);
-      claim(f, headers.find(h => !used[h] && cands.includes(norm(h))));
+      claim(f, findIdx(h => cands.includes(norm(h))));
     });
     // Whatever is still unmapped falls back to a WORD-BOUNDARY match, not a raw
     // substring, so "count" no longer matches inside "account" and a candidate only
     // hits a whole token.
     fields.forEach(f => {
-      if (map[f.key]) return;
+      if (map[f.key] != null) return;   // `!= null`: column 0 is a real match, not "unmapped"
       const cands = candsFor(f);
-      claim(f, headers.find(h => {
-        if (used[h]) return false;
+      claim(f, findIdx(h => {
         const hl = norm(h);
         return cands.some(c => c.length >= 3 && new RegExp('(^|[^a-z])' + esc(c) + '([^a-z]|$)').test(hl));
       }));
@@ -175,18 +217,33 @@ const CSVMapper = {
     // suppresses a column the file clearly has — auto-detect still fills it.
     const saved = this._savedMaps()[sig] || {};
     const map = {}, taken = {};
-    opts.fields.forEach(f => { if (saved[f.key] && headers.includes(saved[f.key])) { map[f.key] = saved[f.key]; taken[saved[f.key]] = true; } });
-    const remaining = opts.fields.filter(f => !map[f.key]);
+    opts.fields.forEach(f => {
+      // Saved maps hold a column INDEX. A map saved by an older build held a header NAME, which
+      // Number() turns into NaN — ignore it rather than mis-resolve it, and let auto-detect fill in.
+      const v = saved[f.key];
+      const i = (v === '' || v == null) ? -1 : Number(v);
+      if (Number.isInteger(i) && i >= 0 && i < headers.length) { map[f.key] = i; taken[i] = true; }
+    });
+    const remaining = opts.fields.filter(f => map[f.key] == null);
     if (remaining.length) {
-      const auto = this._autoMap(headers.filter(h => !taken[h]), remaining);
+      // Pass the FULL header list plus the claimed indexes — filtering the array here would have
+      // shifted every index auto-detect returned.
+      const auto = this._autoMap(headers, remaining, taken);
       Object.keys(auto).forEach(k => { map[k] = auto[k]; });
     }
     this._renderMapper(headers, rows, map, sig, container, opts);
   },
 
   _renderMapper(headers, rows, map, sig, container, opts) {
+    // Option VALUES are column INDEXES, never header names. With names, an unnamed column emitted a
+    // second <option value="">, indistinguishable from "(skip)" and silently importing column 0 for
+    // every skipped field; and two columns sharing a name made the second one unreachable. An
+    // unnamed column also gets a visible label so it can be picked on purpose.
     const optsFor = sel => '<option value="">(skip)</option>'
-      + headers.map(h => '<option value="' + esc(h) + '"' + (h === sel ? ' selected' : '') + '>' + esc(h) + '</option>').join('');
+      + headers.map((h, i) => {
+          const label = String(h).trim() === '' ? '(column ' + (i + 1) + ', no header)' : h;
+          return '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>' + esc(label) + '</option>';
+        }).join('');
     // No card wrapper: the mapper sits directly on the canvas of whatever card it
     // was mounted in, laying out like the manual entry form (a thin divider off
     // the drop zone, a section heading, the field grid, then the action row).
@@ -205,7 +262,7 @@ const CSVMapper = {
     opts.fields.forEach(f => {
       html += '<div class="f" style="width:210px;flex-shrink:0;"><label>' + esc(f.label)
         + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</label>'
-        + '<select class="csvm-sel" data-key="' + f.key + '">' + optsFor(map[f.key] || '') + '</select></div>';
+        + '<select class="csvm-sel" data-key="' + f.key + '">' + optsFor(map[f.key] != null ? map[f.key] : -1) + '</select></div>';
     });
     html += '</div>';
     // First rows preview so the operator can confirm they mapped the right columns.
@@ -243,14 +300,8 @@ const CSVMapper = {
         return;
       }
       this._saveMap(sig, sels);
-      const idx = {};
-      Object.keys(sels).forEach(k => { idx[k] = headers.indexOf(sels[k]); });
-      const mapped = rows.map(row => {
-        const o = {};
-        Object.keys(idx).forEach(k => { o[k] = idx[k] >= 0 ? (row[idx[k]] || '') : ''; });
-        return o;
-      });
-      opts.onComplete(mapped);
+      // sels holds column INDEXES ('' = skip); _mapRows resolves them by position.
+      opts.onComplete(this._mapRows(rows, sels));
     });
     if (typeof opts.onState === 'function') opts.onState('map');
   }
