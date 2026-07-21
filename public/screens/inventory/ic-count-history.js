@@ -23,6 +23,23 @@ S.InventoryCountHistory = {
   sorted() {
     return [...this.counts()].sort(App.cmpOldest);
   },
+  // A count deliberately SKIPS products: Take Inventory tags them "Not Counted" and stores
+  // counted:false with total:0, meaning "I did not touch this shelf", not "this shelf is empty".
+  // This screen IS the permanent record of that count and was rendering every skipped product as
+  // a row of zeros, counting them all in "Products". Count 12 of your 42 and the record read 42,
+  // with 30 sitting at zero. One split now feeds the stat, the tag and the list column so they can
+  // never disagree. Legacy counts predate the flag, so an item without it is treated as counted.
+  // ⚠ The readers that honour the flag are App._perpetualInventory, ic-dashboard._onHand,
+  // CashEngine.computeUsagePair / _onHandFromCount / avgCategoryValue, ic-par-suggestions,
+  // ic-order-sheet.receivedSinceCount, and the compare view below. These do NOT, and each reads a
+  // skipped product as a real zero: this-week.js icCOGS (bills the whole shelf as used — a wrong
+  // weekly COGS and prime cost), theft-risk.js, hub-books.js, ic-report-stock.js. Open, reported
+  // 2026-07-21, not fixed here.
+  splitItems(count) {
+    const items = (count && count.items) || [];
+    const counted = items.filter(it => it && it.counted !== false);
+    return { items, counted, skipped: items.length - counted.length };
+  },
   fmtDate(str) {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
@@ -121,7 +138,7 @@ S.InventoryCountHistory = {
           + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
           + '<td>' + esc(c.type || '-') + '</td>'
           + '<td>' + esc(c.counted_by || '-') + '</td>'
-          + '<td>' + (c.item_count || (c.items ? c.items.length : 0)) + '</td>'
+          + '<td>' + this.splitItems(c).counted.length + '</td>'
           + '<td class="val">' + App.fmtCurrency(c.total_value || 0) + '</td>'
           + '<td>' + varCell + '</td>'
           + '<td>' + status + '</td>'
@@ -130,7 +147,7 @@ S.InventoryCountHistory = {
           + '</div></td></tr>';
       }).join('');
       const listCard = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-        + '<th>Date</th><th>Type</th><th>Counted By</th><th>Items</th>'
+        + '<th>Date</th><th>Type</th><th>Counted By</th><th>Counted</th>'
         + '<th>Total Value</th><th>Variance vs Prior</th><th>Status</th><th></th>'
         + '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" style="color:var(--t3);padding:12px 8px;">No counts in this range. Pick a wider range above.</td></tr>') + '</tbody></table></div>'
         + App.showOlderBar('ic', 'count', ordered, this.filterPreset !== 'all');
@@ -182,7 +199,7 @@ S.InventoryCountHistory = {
       return '<tr><td>' + this.fmtDate(c.date) + '</td>'
         + '<td>' + esc(c.type || '-') + '</td>'
         + '<td>' + esc(c.counted_by || '-') + '</td>'
-        + '<td>' + (c.item_count || (c.items ? c.items.length : 0)) + '</td>'
+        + '<td>' + this.splitItems(c).counted.length + '</td>'
         + '<td>' + App.fmtCurrency(c.total_value || 0) + '</td>'
         + '<td>' + varCell + '</td>'
         + '<td>' + (r.isLatest ? 'Latest' : 'Past') + '</td></tr>';
@@ -192,7 +209,7 @@ S.InventoryCountHistory = {
     node.style.cssText = 'position:absolute;left:-99999px;top:0;';
     node.innerHTML = '<div class="card"><div class="card-title">Count History</div>'
       + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Type</th><th>Counted By</th><th>Items</th><th>Total Value</th><th>Variance vs Prior</th><th>Status</th>'
+      + '<th>Date</th><th>Type</th><th>Counted By</th><th>Counted</th><th>Total Value</th><th>Variance vs Prior</th><th>Status</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     document.body.appendChild(node);
     Promise.resolve(App.exportPDF({ title: 'Count History', root: node })).finally(() => node.remove());
@@ -229,6 +246,7 @@ S.InventoryCountHistory = {
     const prodFor = id => ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id);
     // One count row. The category is the table header (the count groups by
     // category), so there is no Category column here.
+    const dash = '<span style="color:var(--t4);">-</span>';
     const rowHtml = it => {
       const p = prodFor(it.product_id);
       const caseSize = it.case_size_at_count || (p && p.case_size) || 0;
@@ -237,15 +255,20 @@ S.InventoryCountHistory = {
       const cols = App.countCols(p, { category: it.category, unit_type: it.unit_type, caseSize, fulls: it.fulls, partial: it.partial, total: it.total, cases: it.cases, loose: it.loose });
       const unitCostCol = it.unit_cost != null
         ? App.fmtCurrency(it.unit_cost)
-        : '<span style="color:var(--t4);">-</span>';
+        : dash;
+      // A skipped product has no numbers to show. Printing its stored 0 would read as
+      // "we counted this and it was empty" — the one thing counted:false exists to deny.
+      // Tagged and dashed, exactly the way the Take Inventory review showed it.
+      const skipped = it.counted === false;
       return '<tr>'
-        + '<td><div class="val">' + esc(it.name) + '</div>'
+        + '<td><div class="val">' + esc(it.name)
+        + (skipped ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--amber);">NOT COUNTED</span>' : '') + '</div>'
         + (it.notes ? '<div style="font-size:10px;color:var(--t3);">' + esc(it.notes) + '</div>' : '') + '</td>'
-        + '<td>' + cols.full + '</td>'
-        + '<td>' + cols.open + '</td>'
-        + '<td class="val">' + cols.total + '</td>'
+        + '<td>' + (skipped ? dash : cols.full) + '</td>'
+        + '<td>' + (skipped ? dash : cols.open) + '</td>'
+        + '<td class="val">' + (skipped ? dash : cols.total) + '</td>'
         + '<td>' + unitCostCol + '</td>'
-        + '<td>' + (it.value != null ? App.fmtCurrency(it.value) : '<span style="color:var(--t4);">-</span>') + '</td>'
+        + '<td>' + (skipped ? dash : (it.value != null ? App.fmtCurrency(it.value) : dash)) + '</td>'
         + '</tr>';
     };
 
@@ -319,10 +342,23 @@ S.InventoryCountHistory = {
       }).join('');
     }
 
+    // Products / Counted as a pair, the same two stats and the same banner wording the operator
+    // saw on the Take Inventory review screen when they submitted this count. [[two-doors-same-data]]
+    const split = this.splitItems(count);
+    const skipBanner = split.skipped > 0
+      ? '<div style="display:flex;align-items:flex-start;gap:10px;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 13px;margin-bottom:16px;">'
+        + '<span style="color:var(--amber);font-weight:800;font-size:14px;line-height:1.3;flex-shrink:0;">!</span>'
+        + '<div style="font-size:12px;color:var(--t1);line-height:1.5;"><strong>' + split.skipped + ' of ' + split.items.length
+        + ' products were not counted.</strong> They kept their last count and did not change in this one. They are tagged below.</div>'
+        + '</div>'
+      : '';
+
     this.container.innerHTML = '<div class="screen">'
+      + skipBanner
       + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + meta('Counted By', esc(count.counted_by || '-'))
       + meta('Products', count.item_count || items.length)
+      + meta('Counted', split.counted.length)
       + meta('Total Value', App.fmtCurrency(count.total_value || 0))
       + meta('Locations', esc((count.locations || []).join(', ') || '-'))
       + meta('Count Date', this.fmtDate(count.date))

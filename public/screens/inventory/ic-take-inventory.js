@@ -799,14 +799,18 @@ S.InventoryTakeInventory = {
   },
 
   renderDone(record) {
+    const counted = ((record && record.items) || []).filter(it => it && it.counted !== false).length;
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="text-align:center;padding:14px 0;">'
       + '<svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px;">'
       + '<circle cx="20" cy="20" r="17" stroke="var(--green)" stroke-width="1.8"/>'
       + '<path d="M12 20.5l5.5 5.5L28 14" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
       + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:6px;">Count Submitted</div>'
-      + '<div style="font-size:12px;color:var(--t3);">' + esc(record.type) + ' count &middot; ' + record.item_count
-      + ' products &middot; ' + App.fmtCurrency(record.total_value) + ' total value</div>'
+      // item_count is everything on the sheet, including the products the operator skipped.
+      // The review screen right before this said "Counted 12", so the confirmation says 12 too —
+      // reporting 42 here contradicted the screen it followed. Count History uses the same basis.
+      + '<div style="font-size:12px;color:var(--t3);">' + esc(record.type) + ' count &middot; ' + counted
+      + ' product' + (counted === 1 ? '' : 's') + ' &middot; ' + App.fmtCurrency(record.total_value) + ' total value</div>'
       + '</div>'
       + '<div class="card-actions" style="justify-content:center;">'
       + '<button class="btn btn-primary" id="ti-again">Take Another Count</button>'

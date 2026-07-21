@@ -710,18 +710,41 @@ S.InventoryLocations = {
     const l = this.locationById(id);
     if (!l) { this.renderList(); return; }
     const old = l.name;
+    // A half-written rename is LOAD-BEARING now that prior_names drives App._perpetualInventory:
+    // the location row saying "renamed" while the products still hold the old name (or the
+    // reverse) points every count row at a shelf nobody lives on. Snapshot enough to put memory
+    // back if the writes do not land, so the retry starts from a clean, un-renamed state instead
+    // of seeing old === name and skipping the whole cascade.
+    const before = { name: l.name, service_bar: l.service_bar, prior_names: (l.prior_names || []).slice() };
+    const prodBefore = new Map();
     l.name = name;
     l.service_bar = !!document.getElementById('il-servicebar')?.checked;
     // Collect every product the rename actually touched, deduped by id, so the
     // rename cascade persists as rows (the location record itself saves to the blob).
     const touched = new Map();
+    const snap = p => {
+      if (prodBefore.has(p.id)) return;
+      // location_sequences is mutated IN PLACE below, so it needs its own copy.
+      prodBefore.set(p.id, {
+        primary_location: p.primary_location, secondary_location: p.secondary_location,
+        locations: Array.isArray(p.locations) ? p.locations.slice() : p.locations,
+        location_sequences: p.location_sequences ? Object.assign({}, p.location_sequences) : p.location_sequences
+      });
+    };
     if (old !== name) {
+      // Count items are keyed to the location NAME they were taken at, and a finalized count is
+      // never rewritten. Keeping the old name on the record lets App._perpetualInventory resolve
+      // those rows forward, so a rename no longer strands them (they used to be summed alongside
+      // the new location's rows and double-count on-hand forever).
+      const trail = Array.isArray(l.prior_names) ? l.prior_names : [];
+      l.prior_names = [...new Set([...trail, old])].filter(n => n && n !== name);
       this.products().forEach(p => {
         let changed = false;
-        if (p.primary_location === old)   { p.primary_location = name; changed = true; }
-        if (p.secondary_location === old) { p.secondary_location = name; changed = true; }
-        if (Array.isArray(p.locations) && p.locations.includes(old)) { p.locations = p.locations.map(x => x === old ? name : x); changed = true; }
+        if (p.primary_location === old)   { snap(p); p.primary_location = name; changed = true; }
+        if (p.secondary_location === old) { snap(p); p.secondary_location = name; changed = true; }
+        if (Array.isArray(p.locations) && p.locations.includes(old)) { snap(p); p.locations = p.locations.map(x => x === old ? name : x); changed = true; }
         if (p.location_sequences && p.location_sequences[old] != null) {
+          snap(p);
           p.location_sequences[name] = p.location_sequences[old];
           delete p.location_sequences[old];
           changed = true;
@@ -732,8 +755,10 @@ S.InventoryLocations = {
     if (this.editMode === 'products') this._reconcileProducts(name, this.editChecked).forEach(p => touched.set(p.id, p));
     const btn = document.getElementById('il-update-loc');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('ic', 'location', l);   // renamed location -> row
-    if (touched.size) await App.putRecordsBulk('ic', 'product', [...touched.values()]);   // rename cascade -> rows
+    // Both writes are checked. The product cascade's result used to be discarded, so a location
+    // row that landed while its products did not reported a clean save over a split state.
+    let ok = await App.putRecord('ic', 'location', l);   // renamed location -> row
+    if (touched.size && !(await App.putRecordsBulk('ic', 'product', [...touched.values()]))) ok = false;   // rename cascade -> rows
     if (ok) {
       App.markSetupDone('gs_ic_locations');
       this.editMode = 'arrange';
@@ -741,6 +766,11 @@ S.InventoryLocations = {
       this._nameDraft = null;
       this._renderEdit(id);
     } else {
+      Object.assign(l, before);
+      prodBefore.forEach((snapshot, pid) => {
+        const p = this.products().find(x => x.id === pid);
+        if (p) Object.assign(p, snapshot);
+      });
       if (btn) { btn.disabled = false; btn.textContent = 'Update Location'; }
       fail('Save failed. Try again.');
     }

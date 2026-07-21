@@ -579,6 +579,8 @@ S.InventoryVendors = {
 
     let savedId = vendorId;
     const touched = [];   // products whose vendor name changed on a rename (row-per-record)
+    const carried = [];   // other stores the rename touched: [{ mod, kind, recs }]
+    let renamedFrom = null;   // the name this save is renaming AWAY from (null = no rename)
     let vendorRec = null;
     if (vendorId) {
       const v = this.vendorById(vendorId);
@@ -587,7 +589,34 @@ S.InventoryVendors = {
         Object.assign(v, fields);
         vendorRec = v;
         if (old !== name) {
-          this.products().forEach(p => { if (p.vendor === old) { p.vendor = name; touched.push(p); } });
+          renamedFrom = old;
+          this.products().forEach(p => {
+            let hit = false;
+            if (p.vendor === old) { p.vendor = name; hit = true; }
+            // Each cost-history entry carries the vendor NAME, and that is what the Vendor
+            // Tracker filters on for Annual Drift and the Clean / Watch / High status. Left
+            // behind, a renamed vendor's drift reads $0.00 forever and its status flips to
+            // Clean — while the Price Changes tab, which reads deliveries, still shows every
+            // increase. Note a product bought from someone else can still hold an entry from
+            // this vendor, so this is not scoped to p.vendor.
+            (p.cost_history || []).forEach(h => { if (h && h.vendor === old) { h.vendor = name; hit = true; } });
+            if (hit) touched.push(p);
+          });
+          // Orders, deliveries and discrepancy claims name their vendor by NAME too, and every
+          // lookup that closes a PO or scores a vendor matches on it (openOrderForVendor on the
+          // Order Sheet, openOrdersForVendor in Receive Delivery, the Vendor Tracker). Leaving
+          // them on the old name orphaned the open PO: the vendor dropped straight back into
+          // "Still to Order" and the delivery could never be matched to it.
+          const carry = (list, mod, kind) => {
+            const hit = (list || []).filter(r => r && r.vendor === old);
+            if (!hit.length) return;
+            hit.forEach(r => { r.vendor = name; });
+            carried.push({ mod, kind, recs: hit });
+          };
+          const inv = App.inventoryData || {};
+          carry(inv.ic_orders,     'ic', 'order');
+          carry(inv.ic_deliveries, 'ic', 'delivery');
+          carry((App.data || {}).vendor_discrepancies, 'core', 'vendor_discrepancy');
         }
       }
     } else {
@@ -597,14 +626,32 @@ S.InventoryVendors = {
 
     const btn = document.getElementById('iv-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    // Vendor record is row-per-record now; the rename cascade to the affected products
-    // persists as rows too.
-    const ok = vendorRec ? await App.putRecord('ic', 'vendor', vendorRec) : true;
-    if (touched.length) await App.putRecordsBulk('ic', 'product', touched);
+    // Vendor record is row-per-record now; the rename cascade to the affected products,
+    // orders, deliveries and claims persists as rows too. Every write result is checked —
+    // a cascade that never reached storage must not be reported as a clean save, or the
+    // rename looks done on screen and comes back on the next load.
+    let ok = vendorRec ? await App.putRecord('ic', 'vendor', vendorRec) : true;
+    if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) ok = false;
+    for (const c of carried) {
+      if (!(await App.putRecordsBulk(c.mod, c.kind, c.recs))) ok = false;
+    }
     if (ok) {
       if (vendorId) this.openEdit(savedId);
       else { this.editId = null; this._draft = null; this.renderList(); }
     } else {
+      // Nothing landed, so put memory back the way it was. The rename happens in memory BEFORE
+      // any write; leave it renamed and the operator's retry sees old === name, skips the cascade
+      // entirely, and writes the vendor row under the new name with its orders still on the old
+      // one — the orphaned open PO this cascade exists to prevent, reintroduced by the retry.
+      if (renamedFrom != null) {
+        const back = renamedFrom;
+        if (vendorRec) vendorRec.name = back;
+        touched.forEach(p => {
+          if (p.vendor === name) p.vendor = back;
+          (p.cost_history || []).forEach(h => { if (h && h.vendor === name) h.vendor = back; });
+        });
+        carried.forEach(c => c.recs.forEach(r => { r.vendor = back; }));
+      }
       if (btn) { btn.disabled = false; btn.textContent = vendorId ? 'Update Vendor' : 'Save Vendor'; }
       fail('Save failed. Try again.');
     }
