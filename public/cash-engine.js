@@ -472,7 +472,17 @@ window.CashEngine = {
     // cut weeks at each edge against 40, they never reached it, and the estimate this
     // feeds (runway, the stress test, the lender PDF) always ran light.
     cost += App.otPremiumInWindow ? App.otPremiumInWindow(actuals, start, end).total : 0;
-    const hourlyWeekly = rows.length ? cost / 4 : 0;
+    // Divide by the WEEKS actually logged, not a flat 4. With < 4 weeks of history the old /4
+    // understated labor by up to 4x — and understating an outflow OVERSTATES cash (runway, low
+    // point, "Can I Afford It", the lender PDF), the one direction this file fears most. Its sibling
+    // _trailingWeeklySales already averages over weeks-present. The window is four aligned 7-day
+    // buckets ending yesterday; count how many hold a logged row (a full history still divides by 4).
+    // Round the day gap so a DST hour offset can't shift a boundary date into the wrong bucket.
+    const dayIdx = ymd => Math.round((new Date(end + 'T00:00:00') - new Date(ymd + 'T00:00:00')) / 86400000);
+    const weeksPresent = new Set();
+    rows.forEach(a => { const di = dayIdx(String(a.date).slice(0, 10)); if (di >= 0 && di < 28) weeksPresent.add(Math.floor(di / 7)); });
+    const wkCount = Math.max(1, weeksPresent.size);
+    const hourlyWeekly = rows.length ? cost / wkCount : 0;
     const salaried = App.salariedCost ? App.salariedCost(dayBefore(today, 7), end).total : 0;
     return hourlyWeekly + salaried;
   },

@@ -1597,7 +1597,12 @@ const DB = {
   // replay and cached locally, so a batch operation (e.g. locking a whole week of
   // logged hours when a pay period closes) is never silently lost.
   async putEventsBulk(table, kind, recs) {
-    if (this._demo || !this._sb || !this._user) return { ok: true };
+    if (this._demo) return { ok: true };
+    // A dead/absent session must report FAILURE, not phantom success — same contract as putEvent /
+    // removeEvent. The old `demo || !_sb || !_user -> ok:true` claimed a bulk save succeeded with no
+    // user, so the caller kept its in-memory rows, wrote nothing, queued nothing, and (via the
+    // backfill migration marker) could strip the kind from the blob backup — permanent silent loss.
+    if (!this._sb || !this._user) return { ok: false, error: 'No connection to Bar Cop.' };
     const list = (recs || []).filter(r => r && r.id != null);
     if (!list.length) return { ok: true };
     if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
@@ -1653,7 +1658,10 @@ const DB = {
           .forEach(k => { delete this._evCachePending[k]; });
       }
     } catch (e) {}
-    if (this._demo || !this._sb || !this._user) return { ok: true };
+    if (this._demo) return { ok: true };
+    // Same contract as putEventsBulk: a dead/absent session is a FAILURE, not a silent success —
+    // clearEvents feeds the restore/reseed path, where a false ok would report the wipe done.
+    if (!this._sb || !this._user) return { ok: false, error: 'No connection to Bar Cop.' };
     const accountId = await this._ensureAccountId();
     if (!accountId) return { ok: false, error: 'no account membership found' };
     try {
