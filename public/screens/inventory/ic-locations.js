@@ -930,8 +930,17 @@ S.InventoryLocations = {
       if (p.location_sequences && p.location_sequences[l.name] != null) { delete p.location_sequences[l.name]; changed = true; }
       if (changed) touched.push(p);
     });
+    // ⚠ ORDER MATTERS, and it used to be the other way round. Clear the name off the products FIRST
+    // and delete the location only once that has landed. Deleting first meant a failed product write
+    // ran restoreRows and put the DEAD location's name back on every product — so the server held a
+    // location that no longer existed, named by products that fell through BOTH nets: no location
+    // record holds them, so they never reach a count sheet, and productLocations(p).length is
+    // non-zero, so they never reach "Need a Location" either. Forty products silently out of
+    // inventory, variance and COGS with nothing in the UI to notice.
+    // This order fails safe: if the delete fails after the products are cleared, the shelf is simply
+    // still listed holding nothing, which is visible and can be deleted again.
+    if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) { App.restoreRows(undo); this.renderList(); return; }
     await App.removeRecord('ic', 'location', id);   // location removed -> row deleted
-    if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(undo);   // location cleared off products -> rows
     this.renderList();
   },
 
@@ -940,7 +949,15 @@ S.InventoryLocations = {
     let seq = this._nextLocSeq();
     const add = this.DEFAULTS.filter(n => !have.includes(n.toLowerCase()))
       .map(n => ({ id: App.uid(), name: n, archived: false, sort_order: seq++ }));
-    if (add.length && !(await App.putRecordsBulk('ic', 'location', add))) App.dropRows(this.locations(), add);
+    // ⚠ putRecordsBulk NEVER touches memory (unlike putRecord, which upserts the row into the list
+    // itself). The bulk-write conversion deleted the `this.locations().push(...add)` that used to sit
+    // here and replaced it with a dropRows that could not bite, so the five shelves reached the
+    // server and THE SCREEN NEVER CHANGED — same empty state, same button. A second click re-filtered
+    // against a still-empty list and minted five MORE with fresh ids. Three clicks, fifteen shelves,
+    // and a count sheet listing Front Bar three times.
+    // Write FIRST, put them in memory only once the server has them: a failed write then leaves
+    // nothing behind on screen and there is nothing to drop.
+    if (add.length && await App.putRecordsBulk('ic', 'location', add)) this.locations().push(...add);
     this.renderList();
   },
 
@@ -974,6 +991,14 @@ S.InventoryLocations = {
       const numCell = tr.children[1];   // the "#" cell
       if (numCell) numCell.textContent = i + 1;
     });
-    if (!(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(undo);   // only products change here -> rows
+    // Put the SCREEN back, not just memory. The "#" cells above were already renumbered and the rows
+    // are already sitting where they were dropped, so a memory-only revert leaves the operator
+    // looking at an order the app has just thrown away — and they keep dragging, believing it saves,
+    // until the count sheet prints the old walking order. The twin _persistLocationOrder has always
+    // redrawn on failure; this one did not.
+    if (!(await App.putRecordsBulk('ic', 'product', touched))) {   // only products change here -> rows
+      App.restoreRows(undo);
+      this._renderEdit(this.editId);
+    }
   }
 };

@@ -644,21 +644,29 @@ S.InventorySpotCheck = {
     };
   },
 
+  // "Nothing was recorded on this line" — which is NOT the same as "this line measured zero".
+  // The POS importer fills the Sold box on every product whose name it matched, so a product that
+  // was added to the check and never counted resolves to variance = 0 - pos_sold: the register's
+  // whole sale booked as an Under, against a bottle nobody touched. Same rule Count History runs on
+  // a skipped product — a skip is not a counted zero.
+  // ⚠ RESTOCKED counts as recorded. Pre 0, post 0, brought up 3 containers and poured them all is a
+  // REAL measurement; the old `preTotal === 0 && postTotal === 0` test suppressed its message while
+  // still counting its dollars, so the two halves of this guard disagreed in opposite directions.
+  _notRecorded(r) { return !r || (r.preTotal === 0 && r.postTotal === 0 && !r.added); },
+
   recalcLine(line) {
     const r = this.lineCalc(line);
     const res = line.querySelector('.sp-result');
-    if (!r) {
+    // ⚠ dataset.vd is cleared HERE, inside the guard. It used to be assigned ABOVE the
+    // nothing-recorded check and the early return left it standing, so recalcTotal summed a
+    // variance the line itself was printing "no variance yet" for.
+    if (this._notRecorded(r)) {
       line.dataset.vd = '0'; line.dataset.flag = '0';
       if (res) res.innerHTML = 'Set the pre and post counts to start the variance calculation.';
       return;
     }
     const sw = this._servingWord(r.p);
     line.dataset.vd = r.vd != null ? r.vd : '0';
-    if (r.preTotal === 0 && r.postTotal === 0) {
-      line.dataset.flag = '0';
-      if (res) res.innerHTML = 'Set the pre and post counts to start the variance calculation.';
-      return;
-    }
     const usedTxt = 'Used ' + r.used.toFixed(2) + ' container'
       + (Math.abs(r.used - 1) < 0.001 ? '' : 's')
       + (r.added > 0 ? ' (restocked ' + r.added + ' mid-shift)' : '')
@@ -719,27 +727,35 @@ S.InventorySpotCheck = {
       const r = this.lineCalc(line);
       const p = this.productById(line.dataset.pid);
       if (!p) return;
-      if (r && (r.preTotal > 0 || r.postTotal > 0)) valid = true;
+      // A line with nothing entered is stored as what it is: a product that was ON the check and
+      // never counted. Every measured field stays null so the detail view dashes it out the way
+      // Count History does, and it carries no variance — so it cannot reach the Bar Cop Audit's
+      // shrink figure, and it cannot cancel a REAL overpour on another bottle down to a clean check.
+      // pos_sold is deliberately KEPT: "the register rang 30 and nobody counted the bottle" is the
+      // useful half of the record, and it is the thing that tells the operator what they missed.
+      const skipped = this._notRecorded(r);
+      if (!skipped) valid = true;
       items.push({
         product_id:      p.id,
         name:            p.name,
         category:        p.category || '',
         pours_per_container: this.poursPer(p),
         cost_per_pour:   this.costPer(p),
-        pre_value:       r ? r.pre_value : null,
-        pre_fulls:       r ? r.pre_fulls : null,
-        pre_total:       r ? r.preTotal : null,
-        post_value:      r ? r.post_value : null,
-        post_fulls:      r ? r.post_fulls : null,
-        post_total:      r ? r.postTotal : null,
-        pre:             r ? r.preTotal : null,
-        post:            r ? r.postTotal : null,
-        added:           r ? r.added : null,
+        not_counted:     skipped,
+        pre_value:       skipped ? null : r.pre_value,
+        pre_fulls:       skipped ? null : r.pre_fulls,
+        pre_total:       skipped ? null : r.preTotal,
+        post_value:      skipped ? null : r.post_value,
+        post_fulls:      skipped ? null : r.post_fulls,
+        post_total:      skipped ? null : r.postTotal,
+        pre:             skipped ? null : r.preTotal,
+        post:            skipped ? null : r.postTotal,
+        added:           skipped ? null : r.added,
         pos_sold:        r ? r.sold : null,
-        used_containers: r ? r.used : null,
-        poured:          r ? r.poured : null,
-        variance_pours:  r ? r.variance : null,
-        variance_dollar: r ? r.vd : null,
+        used_containers: skipped ? null : r.used,
+        poured:          skipped ? null : r.poured,
+        variance_pours:  skipped ? null : r.variance,
+        variance_dollar: skipped ? null : r.vd,
         flagged:         line.dataset.flag === '1'
       });
     });
@@ -788,7 +804,11 @@ S.InventorySpotCheck = {
       const action = (it.product_id && (it.flagged || invOpen || invResolved))
         ? '<button class="btn btn-ghost btn-sm sp-review" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '" style="' + (invResolved ? 'color:var(--green);' : 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);') + '">' + (invOpen ? 'Reviewing' : invResolved ? 'Resolved' : 'Review') + '</button>'
         : '';
-      return '<tr><td><div class="val">' + esc(it.name) + '</div></td>'
+      // A product that was on the check but never counted is LABELLED, not printed as a row of
+      // zeros. Same treatment as a skipped product in Count History.
+      const skipped = !!it.not_counted;
+      return '<tr><td><div class="val">' + esc(it.name)
+        + (skipped ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--amber);">NOT COUNTED</span>' : '') + '</div></td>'
         + '<td>' + esc(it.category || '-') + '</td>'
         + '<td>' + (it.pre != null ? it.pre.toFixed(1) + cus : '-') + '</td>'
         + '<td>' + (it.post != null ? it.post.toFixed(1) + cus : '-') + '</td>'
