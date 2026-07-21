@@ -338,10 +338,16 @@ S.RevenueMenuEngineering = {
   savePlanned(itemId, newPrice, volPct) {
     const item = (App.data.menu_items || []).find(i => i.id === itemId);
     if (!item || !(newPrice > 0)) return;
+    const undo = App.snapshotRows([item]);   // live row: putRecord cannot revert it for us
     item.planned_price = Math.round(newPrice * 100) / 100;
     item.planned_vol_pct = parseFloat(volPct) || 0;
     item.planned_at = new Date().toISOString();
-    App.putRecord('core', 'menu_item', item).then(() => { App.closeModal('re-modal'); this.draw(); });
+    // Returns the promise so a caller (and the harness) can wait for the outcome. Callers use it
+    // fire-and-forget; handing it back costs nothing and makes the failure path testable.
+    return App.putRecord('core', 'menu_item', item).then(ok => {
+      if (!ok) { App.restoreRows(undo); this.draw(); return; }   // leave the modal open to retry
+      App.closeModal('re-modal'); this.draw();
+    });
   },
 
   // Roll it out now: set the live price + log the change at this moment.
@@ -350,9 +356,20 @@ S.RevenueMenuEngineering = {
     if (!item || !(newPrice > 0)) return;
     const np = Math.round(newPrice * 100) / 100;
     const old = item.price;
+    // ⚠ Snapshot BEFORE mutating. `item` is the live row out of App.data, so putRecord's own revert
+    // is a no-op for us (it re-seats the array slot with the very object we just changed — see the
+    // note in App.putRecord). Without this, a rejected save left the new price on screen and in
+    // memory for the rest of the session while the register was never told.
+    const undo = App.snapshotRows([item]);
     item.price = np;
     item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
-    await App.putRecord('core', 'menu_item', item);
+    // ⚠ LOG ONLY IF IT LANDED. This discarded its result and logged regardless, so a rejected save
+    // still wrote a revenue_price_log row AND a fix_log row that Recovery counts — money reported
+    // that does not exist, against a price the register was never told about. The bulk twins
+    // (applyBatch / markAllLive) were hardened against exactly this; these single-item doors were
+    // the twins that got missed. On failure putRecord has already reverted the row and toasted, so
+    // redraw and leave the modal OPEN to retry — the same shape applyBatch uses.
+    if (!(await App.putRecord('core', 'menu_item', item))) { App.restoreRows(undo); this.draw(); return; }
     if (old != null && old !== np) await this._logPriceChange(item, old, np, volPct);
     App.closeModal('re-modal');
     this.draw();
@@ -366,23 +383,31 @@ S.RevenueMenuEngineering = {
     // This page only ever plans a RAISE, so a plan that now sits at or under the live
     // price is stale: the price moved after the plan was made. Drop it rather than
     // push it live, or Mark Live quietly CUTS the price the operator just set.
+    const undo = App.snapshotRows([item]);   // before either branch mutates the live row
     if (old != null && np <= old) {
       item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
-      await App.putRecord('core', 'menu_item', item);
+      if (!(await App.putRecord('core', 'menu_item', item))) App.restoreRows(undo);
       this.draw();
       return;
     }
     item.price = np; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
-    await App.putRecord('core', 'menu_item', item);
-    if (old != null && old !== np) await this._logPriceChange(item, old, np, vol);
+    // Same rule as saveLive: no Recovery credit for a rise the server rejected, and restore the row
+    // ourselves so the PLAN comes back too and the operator can just hit Mark Live again.
+    const ok = await App.putRecord('core', 'menu_item', item);
+    if (!ok) App.restoreRows(undo);
+    if (ok && old != null && old !== np) await this._logPriceChange(item, old, np, vol);
     this.draw();
   },
 
   cancelPlanned(itemId) {
     const item = (App.data.menu_items || []).find(i => i.id === itemId);
     if (!item) return;
+    const undo = App.snapshotRows([item]);   // live row: putRecord cannot revert it for us
     item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
-    App.putRecord('core', 'menu_item', item).then(() => this.draw());
+    return App.putRecord('core', 'menu_item', item).then(ok => {
+      if (!ok) App.restoreRows(undo);   // a failed cancel must leave the plan standing
+      this.draw();
+    });
   },
 
   // ── Reprice to Target — the batch "engineer the whole menu" pass ─────────────

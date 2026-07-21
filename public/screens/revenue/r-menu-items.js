@@ -1042,11 +1042,16 @@ S.RevenueMenuItems = {
       updated_at:         new Date().toISOString()
     };
 
-    await App.putRecord('core', 'menu_item', entry);
+    // ⚠ Only log a reprice the server actually took. This discarded its result and logged anyway,
+    // so a rejected save still credited Recovery and wrote a Pricing Review Log line for a price
+    // the register was never told about. `entry` is a FRESH object, so putRecord's own revert does
+    // put the old row back here (unlike the live-row callers in r-menu-engineering) — the missing
+    // piece was only the log gate. The import path below already gets this right.
+    const okSave = await App.putRecord('core', 'menu_item', entry);
     // A direct price edit on an existing item is a real reprice: log it through
     // the one canonical pricing logger (no prediction — that is a Menu
     // Engineering reprice thing) so the Pricing Review Log and Recovery pick it up.
-    if (priceChanged) {
+    if (okSave && priceChanged) {
       await App.logPriceChange(entry, existing.price, price, { reason: 'Direct edit on Menu Builder', source: 'menu-items-edit' });
     }
     App.markSetupDone('gs_r_menu');
