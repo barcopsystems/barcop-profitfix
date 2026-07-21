@@ -20,6 +20,9 @@ S.PrepBatches = {
   editId: null,
   rows: [],
   _saving: false,
+  // Handle on the background cost resync fired by renderList. saveBatch / deleteBatch await it so
+  // their write is always the LATER one — otherwise the resync's pre-edit payload lands on top.
+  _resyncPromise: null,
   _scope: null,           // the active form root (this.container or the edit modal)
   _editingIncomplete: false,
 
@@ -284,7 +287,10 @@ S.PrepBatches = {
     // does NOT take over the screen — see App.init's stated rejection policy: a false alarm on a
     // non-fatal rejection trains people to ignore the real ones. Nothing was mutated (memory is
     // only touched after a confirmed write), so the list simply renders the last good costs.
-    this._resyncCosts(batches).catch(e => {
+    // The handle is kept so saveBatch / deleteBatch can wait for it. Its payload was built from
+    // what was on screen BEFORE the operator touched anything, so if it landed after their write
+    // it would upsert the pre-edit values over the change, or resurrect a batch they just deleted.
+    this._resyncPromise = this._resyncCosts(batches).catch(e => {
       try { DB.logClientError('prep_batch_resync', (e && e.message) || String(e), (e && e.stack) || '', 'ic-prep-batches'); } catch (e2) {}
     });
 
@@ -556,6 +562,10 @@ S.PrepBatches = {
       created_at: this.editId ? (this.byId(this.editId)?.created_at || new Date().toISOString()) : new Date().toISOString()
     };
 
+    // A background cost resync may still be in flight from the render that got us here, carrying a
+    // payload built before this edit. Let it land first so THIS write is the later one; otherwise
+    // it upserts the pre-edit values straight over the operator's change.
+    try { await this._resyncPromise; } catch (e) {}
     // Row-per-record: putRecord updates the in-memory list (replace by id / push) and writes one row.
     await App.putRecord('ic', 'prep_batch', rec);
     this.editId = null;
@@ -569,6 +579,9 @@ S.PrepBatches = {
     if (!b) return;
     const ok = await App.confirmDelete();
     if (!ok) return;
+    // Same as saveBatch: an in-flight resync upserting this batch after the delete would bring it
+    // straight back. Wait for it, then delete.
+    try { await this._resyncPromise; } catch (e) {}
     await App.removeRecord('ic', 'prep_batch', id);   // row-per-record
     this.renderList();
   }
