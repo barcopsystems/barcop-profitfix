@@ -346,7 +346,13 @@ S.ShiftPreShift = {
     // item is featured, any shift.
     c.querySelectorAll('.pb-pitch').forEach(inp => inp.addEventListener('change', () => {
       const item = ((App.data && App.data.menu_items) || []).find(m => m.id === inp.dataset.id);
-      if (item) { item.server_pitch = inp.value.trim(); App.putRecord('core', 'menu_item', item); }
+      if (item) {
+        // Live row: putRecord cannot revert it for us (see App.putRecord). Without this a refused
+        // save left the pitch on screen, so the manager believed the floor would see it tonight.
+        const undo = App.snapshotRows([item]);
+        item.server_pitch = inp.value.trim();
+        App.putRecord('core', 'menu_item', item).then(ok => { if (!ok) App.restoreRows(undo); });
+      }
     }));
     c.querySelectorAll('.pb-swap').forEach(b => b.addEventListener('click', () => this._openPicker('swap', parseInt(b.dataset.idx, 10))));
     c.querySelectorAll('.pb-fremove').forEach(b => b.addEventListener('click', () => {
