@@ -7500,10 +7500,17 @@ const App = {
     return moved;
   },
 
+  // The Sunday that ENDS the current Mon-Sun week. On a Sunday that is TODAY.
+  // ⚠ This used to read `(7 - d.getDay()) % 7 || 7`, and on a Sunday getDay() is 0, so the `|| 7`
+  // pushed it a full week forward — the "current" week started TOMORROW and today was not in it.
+  // It drives weekEnd() on the Shift cockpit, the Revenue dashboard, Confirm the Week, breakeven and
+  // the Hub, so every Sunday: a close finished on Saturday read as undone (the done-key is built
+  // from weekEnd, so redoing it stamped NEXT week's key and Monday opened already showing 4 of 4
+  // done), "this week" counts of voids and comps read 0 with today's entries logged, and the manual
+  // sales grid offered a week that had not started with no row for today.
   nextSunday() {
     const d = new Date();
-    const diff = (7 - d.getDay()) % 7 || 7;
-    d.setDate(d.getDate() + diff);
+    d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
     return this.ymdLocal(d);
   },
 
@@ -7515,9 +7522,15 @@ const App = {
     if (!Array.isArray(arr) || !arr.length) return null;
     // Same business-date field union as _recDate (keep in sync), with created_at as the last
     // resort so a record with only created_at still orders instead of collapsing to index 0.
-    const dk = r => (String((r && (r.date || r.period_end || r.event_date || r.date_time || r.opened_date
+    // ⚠ created_at is a TIEBREAKER, not just a fallback. It used to be `|| r.created_at`, so once a
+    // business date existed it was never consulted — two records on the SAME date compared equal and
+    // Array.sort stability returned whichever sat earlier in the array. A manager who reconciles a
+    // register at close (-$60) and recounts an hour later (-$4) could have the tile show the -$60.
+    // The business date still dominates; created_at only separates records that share one.
+    const bd = r => String((r && (r.date || r.period_end || r.event_date || r.date_time || r.opened_date
       || r.resolved_date || r.date_reported || r.date_86 || r.filed_at || r.closed_at
-      || r.generated_at || r.saved_at)) || '') || (r && r.created_at) || '') + '';
+      || r.generated_at || r.saved_at)) || '');
+    const dk = r => (bd(r) || (r && r.created_at) || '') + '|' + ((r && r.created_at) || '');
     return arr.slice().sort((x, y) => dk(y).localeCompare(dk(x)))[0];
   },
 
