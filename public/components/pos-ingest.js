@@ -392,8 +392,16 @@ const PosIngest = {
       const cName = (r.cashier || '').trim();
       const staff = cName ? staffByName[cName.toLowerCase()] : null;
       const cashier = staff ? staff.name : cName;
-      if (this._isDup(existing, used, x => x.date === date && (x.drawer || '') === drawer
-            && Math.abs((x.variance || 0) - variance) < 0.001)) { dupCount++; return; }
+      // ⚠ NO variance term. Matching on the figure meant a drawer-day ALREADY reconciled by hand
+      // imported a SECOND row whenever the POS's own blind-close figure differed by more than a
+      // cent — and a figure that differs is exactly the case where a second row is wrong: it is the
+      // same drawer-day measured twice, not two events. A hand count of -$47.50 plus a POS -$47.00
+      // made Main Bar Friday -$94.50 in Drawer Net, the Hub over/short stat, the short RATE (2 of 2
+      // instead of 1 of 1), Loss Prevention and the Books cash sheet. The app's own help invites the
+      // collision: "Reconcile by Hand here is for an off-cycle count, a register with no POS export,
+      // or a recount." Date + drawer only, so the existing count wins and the import reports it as
+      // already logged. Still keyed on the DRAWER, so other registers that day import normally.
+      if (this._isDup(existing, used, x => x.date === date && (x.drawer || '') === drawer)) { dupCount++; return; }
       // Tolerance is the matched register's own (App.drawerTolerance); $10 when
       // the register is unrecognized or unmapped.
       const tol = (window.App && App.drawerTolerance) ? App.drawerTolerance(dRec || null) : 10;
