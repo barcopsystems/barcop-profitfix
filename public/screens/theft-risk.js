@@ -372,16 +372,15 @@ S.TheftRisk = {
     let step2Html = '';
     if (counts.length >= 2) {
       const start = counts[counts.length - 2], end = counts[counts.length - 1];
-      const si = (start.items || []).find(it => it.product_id === productId);
-      const ei = (end.items || []).find(it => it.product_id === productId);
-      if (si && ei) {
-        let purch = 0;
-        ((App.inventoryData && App.inventoryData.ic_deliveries) || [])
-          .filter(d => d.date > start.date && d.date <= end.date)
-          .forEach(d => (d.line_items || []).forEach(li => {
-            if (li.product_id === productId) purch += (App.unitsFromDeliveryLine ? App.unitsFromDeliveryLine(li) : (li.qty || 0));
-          }));
-        const used = (si.total || 0) + purch - (ei.total || 0);
+      // App.computeUsagePair, not a local read. The `.find()` this replaces took the FIRST
+      // location only, so a bottle kept behind two bars reported a fraction of its real usage —
+      // and it ignored counted:false, so a product SKIPPED in the closing count reported its whole
+      // shelf as used. On a THEFT investigation screen, either one points at a person.
+      const pair = App.computeUsagePair(start, end, (App.inventoryData && App.inventoryData.ic_deliveries) || []);
+      const u = pair[productId];
+      if (u) {
+        const purch = u.purchases;
+        const used = u.rawUsed;
         const isCaseBeer = p.category === 'Bottle Beer' && p.case_size > 0;
         const pp = isCaseBeer ? p.case_size
           : (p.pours_per_container || (p.container_size_oz && p.pour_size_oz ? p.container_size_oz / p.pour_size_oz : 0));
@@ -391,7 +390,7 @@ S.TheftRisk = {
         step2Html = '<div style="font-size:11px;color:var(--t2);margin-bottom:8px;padding:10px 12px;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;">'
           + '<div style="font-weight:700;color:var(--gold);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">Live Data &middot; ' + esc(start.date) + ' to ' + esc(end.date) + '</div>'
           + '<div>Used: <strong>' + used.toFixed(2) + ' containers</strong> (' + actualPours.toFixed(1) + ' pours, ' + App.fmtCurrency(actualDollars) + ')</div>'
-          + '<div style="color:var(--t3);margin-top:4px;">Starting count ' + (si.total || 0).toFixed(2) + ' + purchases ' + purch.toFixed(2) + ' - ending count ' + (ei.total || 0).toFixed(2) + '</div>'
+          + '<div style="color:var(--t3);margin-top:4px;">Starting count ' + u.starting.toFixed(2) + ' + purchases ' + purch.toFixed(2) + ' - ending count ' + u.ending.toFixed(2) + '</div>'
           + '<div style="color:var(--t3);margin-top:4px;">Compare against your POS pours sold for the same window.</div>'
           + '</div>';
       } else {

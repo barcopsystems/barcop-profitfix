@@ -75,23 +75,28 @@ S.ThisWeek = {
       //    their newest count. Beyond that the pair belongs to an earlier week.
       if (gap(periodEnd, eD) > 7 + TOL) return null;
     }
-    const prods = (App.inventoryData && App.inventoryData.ic_products) || [];
-    const sMap = {}; (startC.items || []).forEach(it => sMap[it.product_id] = it);
-    const eMap = {}; (endC.items || []).forEach(it => eMap[it.product_id] = it);
-    const purch = {};
-    ((App.inventoryData && App.inventoryData.ic_deliveries) || [])
-      .filter(d => d.date > startC.date && d.date <= endC.date)
-      .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + App.unitsFromDeliveryLine(li);
-      }));
+    // ⚠ This was a hand-rolled copy of the usage math and it had drifted TWICE from
+    // App.computeUsagePair, the canonical reader every other usage screen goes through:
+    //   1. it read a product the operator SKIPPED in the closing count (counted:false, stored
+    //      total:0) as a real zero, so used = starting + purchases billed the WHOLE SHELF as
+    //      consumed — and partial counts are the normal case, not the edge case;
+    //   2. `sMap[pid] = it` kept only the LAST row for a product counted in several locations,
+    //      so both ends were understated, and not symmetrically.
+    // This is weekly COGS and prime cost on the Dashboard, and it is what Confirm the Week writes
+    // down. It goes through the same door as everything else now. computeUsagePair also drops any
+    // product without a real value at BOTH ends, which is the same "say nothing rather than invent
+    // a number" stance as the guards above.
+    const pair = App.computeUsagePair(startC, endC, (App.inventoryData && App.inventoryData.ic_deliveries) || []);
     let cogs = 0, any = false;
-    Object.keys(eMap).forEach(pid => {
-      if (!sMap[pid]) return;
-      const p = prods.find(x => x.id === pid);
-      if (!p || !cats.includes(p.category)) return;
-      const used = (sMap[pid].total || 0) + (purch[pid] || 0) - (eMap[pid].total || 0);
-      const c = (p.unit_cost != null) ? App.unitCost(p) : App.unitCostFromCountItem(eMap[pid]);
-      if (c != null) { cogs += used * c; any = true; }
+    Object.keys(pair).forEach(pid => {
+      const u = pair[pid];
+      // Live product category first (a recategorised product buckets where it lives NOW), falling
+      // back to the category the count itself recorded so a since-deleted product still counts —
+      // its stock was poured either way, and every other usage screen already includes it.
+      const cat = (u.product && u.product.category) || u.category || '';
+      if (!cats.includes(cat) || u.unitCost == null) return;
+      cogs += u.rawUsed * u.unitCost;
+      any = true;
     });
     return any ? cogs : null;
   },

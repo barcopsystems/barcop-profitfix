@@ -1199,43 +1199,19 @@ S.HubBooks = {
       return this._finishSheet(wsEmpty, rows.length, merges, COL_WIDTHS);
     }
 
-    // Build the usage map per product. A product can be counted in several
-    // locations, so sum its lines into one entry (keep metadata from the first).
-    const sMap = {}; (startCount.items || []).forEach(it => {
-      if (sMap[it.product_id]) sMap[it.product_id].total = (sMap[it.product_id].total || 0) + (it.total || 0);
-      else sMap[it.product_id] = { ...it };
-    });
-    const eMap = {}; (endCount.items   || []).forEach(it => {
-      if (eMap[it.product_id]) eMap[it.product_id].total = (eMap[it.product_id].total || 0) + (it.total || 0);
-      else eMap[it.product_id] = { ...it };
-    });
-
-    const purch = {};
-    (App.inventoryData?.ic_deliveries || [])
-      .filter(d => d.date && d.date > startCount.date && d.date <= endCount.date)
-      .forEach(d => (d.line_items || []).forEach(li => {
-        purch[li.product_id] = (purch[li.product_id] || 0) + App.unitsFromDeliveryLine(li);
-      }));
-
-    const products = (App.inventoryData?.ic_products || []);
-    const productById = {};
-    products.forEach(p => { productById[p.id] = p; });
-
-    const detail = [];
-    Object.keys(eMap).forEach(pid => {
-      if (!sMap[pid]) return;
-      const p = productById[pid] || {};
-      const startQty = parseFloat(sMap[pid].total) || 0;
-      const endQty   = parseFloat(eMap[pid].total) || 0;
-      const purchQty = purch[pid] || 0;
-      const usedQty  = startQty + purchQty - endQty;
-      const unitCost = (p.unit_cost != null) ? App.unitCost(p) : App.unitCostFromCountItem(eMap[pid]);
-      const usedValue = unitCost != null ? usedQty * unitCost : 0;
-      detail.push({
-        name: eMap[pid].name || p.name || '(unnamed)',
-        category: eMap[pid].category || p.category || '',
-        startQty, purchQty, endQty, usedQty, usedValue
-      });
+    // Usage per product via App.computeUsagePair, the canonical reader. This was a local copy that
+    // summed multiple locations correctly but ignored counted:false, so a product the operator
+    // SKIPPED in the closing count read as a real zero and its whole shelf was exported to the
+    // accountant as usage. computeUsagePair also drops any product without a real value at BOTH
+    // ends, which is what an honest variance period needs.
+    const pair = App.computeUsagePair(startCount, endCount, App.inventoryData?.ic_deliveries || []);
+    const detail = Object.keys(pair).map(pid => {
+      const u = pair[pid];
+      return {
+        name: u.name, category: u.category,
+        startQty: u.starting, purchQty: u.purchases, endQty: u.ending, usedQty: u.rawUsed,
+        usedValue: u.unitCost != null ? u.rawUsed * u.unitCost : 0
+      };
     });
 
     // Sort by used value, biggest first.

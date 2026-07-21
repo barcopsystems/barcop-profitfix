@@ -265,18 +265,20 @@ S.VendorTracker = {
       .sort(App.cmpOldest);
     if (counts.length < 2) return null;
     const s = counts[counts.length - 2], e = counts[counts.length - 1];
-    const si = (s.items || []).find(it => it.product_id === pid);
-    const ei = (e.items || []).find(it => it.product_id === pid);
-    if (!si || !ei) return null;
-    let purch = 0;
-    this.deliveries().filter(d => d.date > s.date && d.date <= e.date)
-      .forEach(d => (d.line_items || []).forEach(li => { if (li.product_id === pid) purch += App.unitsFromDeliveryLine(li); }));
-    // Floor at zero: the policy App.computeUsagePair's contract says every caller layers
-    // on top of rawUsed. This one hand-rolls the math and skipped it. A negative "used"
-    // means the count came out higher than purchases explain (a correction, a transfer
-    // in, a miscount). That is not negative consumption, and multiplying a price INCREASE
-    // by it rendered "-$312.86/yr" in GREEN beside a red +9.1%.
-    const used = Math.max(0, (si.total || 0) + purch - (ei.total || 0));
+    // ⚠ This was the FIFTH hand-rolled copy of the usage math, and it carried the same two drifts
+    // the other four did — then annualised them by 52. `.find()` read only the FIRST location a
+    // product is counted in, and a product the operator SKIPPED at the close (counted:false,
+    // stored total:0) read as a real zero, so used = starting + purchases billed the whole shelf.
+    // These numbers are "Annual Impact" on Vendor Watch and the Annual Price Drift that sets a
+    // vendor's Clean / Watch / High status. computeUsagePair also drops any product without a real
+    // value at BOTH ends, which is the old `!si || !ei` guard done properly.
+    const u = App.computeUsagePair(s, e, this.deliveries())[pid];
+    if (!u) return null;
+    // Floor at zero: the policy computeUsagePair's contract says every caller layers on top of
+    // rawUsed. A negative "used" means the count came out higher than purchases explain (a
+    // correction, a transfer in, a miscount). That is not negative consumption, and multiplying a
+    // price INCREASE by it rendered "-$312.86/yr" in GREEN beside a red +9.1%.
+    const used = Math.max(0, u.rawUsed);
     const days = Math.round((new Date(e.date + 'T00:00:00').getTime() - new Date(s.date + 'T00:00:00').getTime()) / 86400000);
     if (days <= 0) return null;
     return used / days * 365;
