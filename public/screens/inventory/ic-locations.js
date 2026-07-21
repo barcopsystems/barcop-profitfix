@@ -439,9 +439,17 @@ S.InventoryLocations = {
     const ordered = [...actives, ...archived];
     // Row-per-record: the count-sheet order is a per-location sort_order now (rows have no
     // inherent array order). Stamp each, keep the in-memory order, and write the rows.
+    const undo = App.snapshotRows(ordered);
+    const priorArr = App.inventoryData.ic_locations;
     ordered.forEach((l, i) => { l.sort_order = i; });
     App.inventoryData.ic_locations = ordered;
-    await App.putRecordsBulk('ic', 'location', ordered);
+    // Count-sheet order is what Take Inventory walks. A failed write cannot revert itself, so
+    // without this the new order stuck on screen while every count sheet used the old one.
+    if (!(await App.putRecordsBulk('ic', 'location', ordered))) {
+      App.restoreRows(undo);
+      App.inventoryData.ic_locations = priorArr;
+      this.renderList();
+    }
   },
 
   // Start Over: close the Add Products picker and wipe the half-built location
@@ -468,11 +476,13 @@ S.InventoryLocations = {
     const id = App.uid();
     const loc = { id, name, archived: false, service_bar: !!document.getElementById('il-new-servicebar')?.checked, sort_order: this._nextLocSeq() };
     this.locations().push(loc);
-    const touched = this._reconcileProducts(name, this.newChecked);   // assign every checked product
+    const _undoProd = [];
+    const touched = this._reconcileProducts(name, this.newChecked, _undoProd);   // assign every checked product
     const btn = document.getElementById('il-new-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('ic', 'location', loc);   // new location -> row
-    if (touched.length) await App.putRecordsBulk('ic', 'product', touched);   // product assignments -> rows
+    // The product cascade cannot revert itself; put the assignments back if they did not land.
+    if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(_undoProd);   // product assignments -> rows
     // Drop straight into the new location's arrange page (build → order in one flow).
     if (ok) { App.markSetupDone('gs_ic_locations'); this.openEdit(id); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save Location'; } fail('Save failed. Try again.'); }
@@ -499,10 +509,11 @@ S.InventoryLocations = {
     if (link) { link.textContent = 'Saving...'; link.style.opacity = '0.6'; link.style.pointerEvents = 'none'; }
     const loc = { id, name, archived: false, service_bar: !!document.getElementById('il-new-servicebar')?.checked, sort_order: this._nextLocSeq() };
     this.locations().push(loc);
-    const touched = this._reconcileProducts(name, this.newChecked);
+    const _undoProd = [];
+    const touched = this._reconcileProducts(name, this.newChecked, _undoProd);
     const savedCount = this.newChecked.size;
     await App.putRecord('ic', 'location', loc);   // new location -> row
-    if (touched.length) await App.putRecordsBulk('ic', 'product', touched);   // product assignments -> rows
+    if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(_undoProd);   // product assignments -> rows
     this._savingProducts = false;
     App.markSetupDone('gs_ic_locations');
     // Reset the box for the next location; show the saved feedback until they start one.
@@ -660,11 +671,15 @@ S.InventoryLocations = {
   // checked ones that are not in it, drop the unchecked ones that are.
   // Returns the products whose location membership actually changed, so the caller
   // can persist just those as rows (row-per-record migration).
-  _reconcileProducts(name, want) {
+  // `undo` is an optional out-param: pass an array and it receives an App.snapshotRows entry for
+  // every product BEFORE that product is mutated, so a caller whose bulk write fails can put the
+  // list back. The snapshot has to happen in here because this is where the mutation happens.
+  _reconcileProducts(name, want, undo) {
     const touched = [];
     this.products().forEach(p => {
       const has = App.productLocations(p).includes(name);
       const wanted = want.has(p.id);
+      if ((wanted && !has) || (!wanted && has)) { if (undo) undo.push(...App.snapshotRows([p])); }
       if (wanted && !has) {
         const set = new Set(App.productLocations(p)); set.add(name);
         p.locations = [...set];
@@ -690,8 +705,9 @@ S.InventoryLocations = {
     this._savingProducts = true;
     const link = this.container.querySelector('.il-editprod-link');
     if (link) { link.textContent = 'Saving...'; link.style.opacity = '0.6'; link.style.pointerEvents = 'none'; }
-    const touched = this._reconcileProducts(l.name, this.editChecked);
-    await App.putRecordsBulk('ic', 'product', touched);   // only products change here -> rows
+    const _undoProd = [];
+    const touched = this._reconcileProducts(l.name, this.editChecked, _undoProd);
+    if (!(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(_undoProd);   // only products change here -> rows
     this._savingProducts = false;
     App.markSetupDone('gs_ic_locations');
     this.editMode = 'arrange';
@@ -853,16 +869,17 @@ S.InventoryLocations = {
     const locName = this._triageDest;
     const checked = this.triageChecked;
     if (!locName || !checked || !checked.size) return;
-    const touched = [];
+    const touched = [], undo = [];
     this.products().forEach(p => {
       if (!checked.has(p.id)) return;
+      undo.push(...App.snapshotRows([p]));   // before the placement below
       const set = new Set(App.productLocations(p)); set.add(locName);
       p.locations = [...set];
       if (!p.primary_location || !p.locations.includes(p.primary_location)) p.primary_location = p.locations[0];
       touched.push(p);
     });
     this.triageChecked = new Set();
-    await App.putRecordsBulk('ic', 'product', touched);   // only products change here -> rows
+    if (!(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(undo);   // only products change here -> rows
     App.markSetupDone('gs_ic_locations');
     if (this.unplacedProducts().length) {
       const el = document.getElementById('il-triage-filter');
@@ -898,9 +915,10 @@ S.InventoryLocations = {
       confirmText: 'Delete Permanently', danger: true
     });
     if (!ok) return;
-    const touched = [];
+    const touched = [], undo = [];
     this.products().forEach(p => {
       let changed = false;
+      undo.push(...App.snapshotRows([p]));   // before the location is stripped off below
       if (Array.isArray(p.locations) && p.locations.includes(l.name)) {
         p.locations = p.locations.filter(x => x !== l.name);
         if (p.primary_location === l.name) p.primary_location = p.locations[0] || '';
@@ -913,7 +931,7 @@ S.InventoryLocations = {
       if (changed) touched.push(p);
     });
     await App.removeRecord('ic', 'location', id);   // location removed -> row deleted
-    if (touched.length) await App.putRecordsBulk('ic', 'product', touched);   // location cleared off products -> rows
+    if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(undo);   // location cleared off products -> rows
     this.renderList();
   },
 
@@ -922,7 +940,7 @@ S.InventoryLocations = {
     let seq = this._nextLocSeq();
     const add = this.DEFAULTS.filter(n => !have.includes(n.toLowerCase()))
       .map(n => ({ id: App.uid(), name: n, archived: false, sort_order: seq++ }));
-    if (add.length) { this.locations().push(...add); await App.putRecordsBulk('ic', 'location', add); }
+    if (add.length && !(await App.putRecordsBulk('ic', 'location', add))) App.dropRows(this.locations(), add);
     this.renderList();
   },
 
@@ -942,10 +960,11 @@ S.InventoryLocations = {
   // to top) and persist — the order sticks whether or not Update Location is used.
   async _persistProductOrder(locationName, idsInOrder) {
     const prods = this.products();
-    const touched = [];
+    const touched = [], undo = [];
     idsInOrder.forEach((pid, i) => {
       const p = prods.find(x => x.id === pid);
       if (!p) return;
+      undo.push(...App.snapshotRows([p]));   // before the per-location sequence is stamped
       if (!p.location_sequences) p.location_sequences = {};
       p.location_sequences[locationName] = i + 1;
       touched.push(p);
@@ -955,6 +974,6 @@ S.InventoryLocations = {
       const numCell = tr.children[1];   // the "#" cell
       if (numCell) numCell.textContent = i + 1;
     });
-    await App.putRecordsBulk('ic', 'product', touched);   // only products change here -> rows
+    if (!(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(undo);   // only products change here -> rows
   }
 };

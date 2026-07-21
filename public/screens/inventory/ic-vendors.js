@@ -323,9 +323,12 @@ S.InventoryVendors = {
       danger: true
     });
     if (!ok) return;
+    // Snapshot before the in-place clear: a bulk write cannot revert itself, so a failed write
+    // would show the vendor gone from every product while the server still has it.
+    const undo = App.snapshotRows(matches);
     matches.forEach(p => { p.vendor = ''; });
     // Row-per-record: only the affected products change — write them as rows.
-    await App.putRecordsBulk('ic', 'product', matches);
+    if (!(await App.putRecordsBulk('ic', 'product', matches))) App.restoreRows(undo);
     this.renderList();
   },
 
