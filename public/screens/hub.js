@@ -1510,7 +1510,12 @@ S.Hub = {
     // (Shift Control sc_variances, the owner of cash data).
     const variances = (App.shiftData || {}).sc_variances || [];
     if (variances.length >= 2) {
-      const recent = variances.slice(0, 6);
+      // ⚠ SORT BEFORE SLICING. db.js loads events newest-first, but every write APPENDS
+      // (App.putRecord does arr.push), so after importing this week's reconciles the new rows sit at
+      // the END and slice(0,6) read LAST week's — firing a red "cash came up short in 3 of the last
+      // 6 counts" about a week already closed, or staying silent through a bad week. Ninth time this
+      // ordering class has bitten; _byDateDesc is defined sixty lines above, in this same function.
+      const recent = _byDateDesc(variances).slice(0, 6);
       const shorts = recent.filter(r => r.status === 'Short').length;
       if (shorts >= 2) out.push({
         sev: shorts >= 3 ? 'bad' : 'warn',
