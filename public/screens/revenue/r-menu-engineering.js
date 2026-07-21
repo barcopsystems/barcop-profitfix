@@ -611,8 +611,12 @@ S.RevenueMenuEngineering = {
     const { toAdd, skipped, merged } = PosIngest.build('pmix', rows);
     let updated = 0, failed = false;
     if (toAdd.length) {
-      // Honor the commit result: discarding it reported "Updated units sold on N items"
-      // after a save that was rejected and rolled back.
+      // Honor the commit result: discarding it reported "Updated units sold on N items" after a
+      // save the server had rejected.
+      // ⚠ This comment used to say the rejected save was "rolled back". It was NOT — _commitPmix
+      // mutated the live menu items in place and nothing put them back, so this screen redrew the
+      // whole board off covers the server never took. The rollback is real now (PosIngest._commitPmix
+      // snapshots and restores); do not weaken that comment again without checking the code.
       const ok = await PosIngest.commit('pmix', toAdd);
       if (ok) updated = toAdd.length; else failed = true;
     }
