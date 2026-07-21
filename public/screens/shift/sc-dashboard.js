@@ -741,17 +741,27 @@ S.ShiftDashboard = {
     return this._commitCash(this._pendingCashRows);
   },
   async _commitCash(rows) {
-    const { toAdd, dupCount } = PosIngest.build('cash', rows);
+    const { toAdd, dupCount, keptManual } = PosIngest.build('cash', rows);
     const res = document.getElementById('sc-ck-cash-res');
+    // ⚠ It used to say "N already logged" for every skipped row, which was untrue in the
+    // case that mattered: a corrected report was DISCARDED and reported as though it had
+    // been filed before. Cash now follows the sales rule, so there are two honest
+    // outcomes to report and they mean opposite things — a figure was replaced, or the
+    // operator's own hand count was left alone.
     if (!toAdd.length) {
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (dupCount ? 'No new rows imported. ' + dupCount + ' already logged.' : 'No rows imported. Each row needs a date plus an over/short, or expected and counted cash.') + '</div>';
+      const why = keptManual
+        ? 'No rows imported. ' + keptManual + ' register-day' + (keptManual === 1 ? ' was' : 's were')
+          + ' already counted by hand, so your own count was kept.'
+        : 'No rows imported. Each row needs a date plus an over/short, or expected and counted cash.';
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + why + '</div>';
       return;
     }
     const ok = await PosIngest.commit('cash', toAdd);
     if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
     this._pendingCashRows = null;
-    this._flash = toAdd.length + ' reconcile' + (toAdd.length === 1 ? '' : 's') + ' imported' + (dupCount ? ' (' + dupCount + ' already logged)' : '') + '.';
+    this._flash = toAdd.length + ' reconcile' + (toAdd.length === 1 ? '' : 's') + ' imported'
+      + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
+      + (keptManual ? ' (' + keptManual + ' hand count' + (keptManual === 1 ? '' : 's') + ' kept)' : '') + '.';
     this._openStep = 'exc';
     this.render(this.container, this.actions);
   },
