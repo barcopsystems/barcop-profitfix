@@ -5199,6 +5199,51 @@ const App = {
   },
   // Menu items that reference any of the given inventory product ids — either a
   // linked product or a recipe ingredient sourced from a product. idSet = a Set.
+  // Every LIVE place an inventory product is used, for the delete cross-check.
+  // Returns { menuItems, prepBatches, openOrders, total, any }.
+  //
+  // ⚠ LIVE ONLY, and that is the whole design. HISTORY — past counts, deliveries, waste, spot
+  // checks, adjustments, variance runs — is never reported here and is never touched by a delete.
+  // Pulling a product out of last month's count would rewrite a closed period's COGS and change
+  // numbers the operator may already have handed their accountant. A count is a record of what was
+  // counted, not a list of what you currently stock.
+  //
+  // ⚠ WHY THIS EXISTS RATHER THAN REUSING menuItemsUsingProducts: that helper covers menu recipes
+  // and linked products but NOT prep batches. A check built on it alone reports "nothing uses this"
+  // for a product sitting in a batch recipe — and deleting it re-costs that batch cheaper, which is
+  // the exact silent-discount ic-prep-batches.missingIngredients was built to stop.
+  //
+  // A RECEIVED order is history too (it arrived; its line items are the cost record), so only a
+  // not-yet-Received order is live. Same test the Order Sheet uses to decide a vendor still has
+  // something outstanding.
+  //
+  // ARCHIVED menu items ARE reported: they can be restored, and restoring one must not quietly
+  // produce a cheaper dish. So this reads data.menu_items raw, not this.menuItems().
+  productReferences(idSet) {
+    const none = { menuItems: [], prepBatches: [], openOrders: [], total: 0, any: false };
+    if (!idSet || !idSet.size) return none;
+    const inv = this.inventoryData || {};
+    const allItems = (this.data && Array.isArray(this.data.menu_items)) ? this.data.menu_items : [];
+    const menuItems = allItems.filter(it => {
+      if (!it) return false;
+      if (it.linked_product_id && idSet.has(it.linked_product_id)) return true;
+      const ings = (it.recipe && Array.isArray(it.recipe.ingredients)) ? it.recipe.ingredients : [];
+      return ings.some(ing => {
+        const src = ing.source || (ing.product_id ? 'product' : null);
+        const id  = ing.id || ing.product_id;
+        return src === 'product' && id && idSet.has(id);
+      });
+    });
+    const prepBatches = (Array.isArray(inv.ic_prep_batches) ? inv.ic_prep_batches : []).filter(b =>
+      b && Array.isArray(b.ingredients)
+      && b.ingredients.some(i => i && i.product_id && idSet.has(i.product_id)));
+    const openOrders = (Array.isArray(inv.ic_orders) ? inv.ic_orders : []).filter(o =>
+      o && o.status !== 'Received' && Array.isArray(o.line_items)
+      && o.line_items.some(li => li && li.product_id && idSet.has(li.product_id)));
+    const total = menuItems.length + prepBatches.length + openOrders.length;
+    return { menuItems, prepBatches, openOrders, total, any: total > 0 };
+  },
+
   menuItemsUsingProducts(idSet) {
     if (!idSet || !idSet.size) return [];
     return this.menuItems().filter(it => {
