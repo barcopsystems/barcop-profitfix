@@ -44,9 +44,15 @@ S.InventoryStockReport = {
   // entry per product (summed value + on-hand) for the per-product views
   // (Products tile, By Category, Highest/Lowest, Dead Stock); By Location keeps
   // the raw per-line data so each location shows its own share.
+  // The items of a count that were actually COUNTED. A skipped product stores counted:false with
+  // total:0, meaning "I did not touch this shelf" — carrying it here made it a real $0 product in
+  // the Products stat, in By Category / By Location, and at the top of "Lowest Value".
+  countedItems(c) {
+    return ((c && c.items) || []).filter(it => it && it.counted !== false);
+  },
   itemsByProduct(items) {
     const m = {};
-    (items || []).forEach(it => {
+    (items || []).filter(it => it && it.counted !== false).forEach(it => {
       const k = it.product_id || it.name;
       if (!m[k]) m[k] = { product_id: it.product_id, name: it.name, category: it.category, total: 0, value: 0 };
       m[k].total += (it.total || 0);
@@ -149,12 +155,12 @@ S.InventoryStockReport = {
     const idx = this.selectedIdx(asc);
     const latest = asc[idx];
     const prior = idx > 0 ? asc[idx - 1] : null;
-    const items = latest.items || [];
+    const items = this.countedItems(latest);
 
     const totalValue = items.reduce((s, it) => s + this.itemValue(it), 0);
     let changeStat = '';
     if (prior) {
-      const priorVal = (prior.items || []).reduce((s, it) => s + this.itemValue(it), 0);
+      const priorVal = this.countedItems(prior).reduce((s, it) => s + this.itemValue(it), 0);
       const change = totalValue - priorVal;
       changeStat = this.statItem('vs Last Count', (change > 0 ? '+' : '') + App.fmtCurrency(change));
     }
@@ -185,7 +191,7 @@ S.InventoryStockReport = {
   },
 
   body(latest, prior) {
-    const items = latest.items || [];
+    const items = this.countedItems(latest);
     switch (this.tab) {
       case 'location': return this.tabGroup(items, it => this.itemLoc(it), 'Location');
       case 'vsprior':  return this.tabVsPrior(latest, prior);
@@ -218,7 +224,7 @@ S.InventoryStockReport = {
     if (!prior) return this.note('No earlier count to compare against. Pick a count that has one before it.');
     const catVal = c => {
       const m = {};
-      (c.items || []).forEach(it => { const k = it.category || 'Uncategorized'; m[k] = (m[k] || 0) + this.itemValue(it); });
+      this.countedItems(c).forEach(it => { const k = it.category || 'Uncategorized'; m[k] = (m[k] || 0) + this.itemValue(it); });
       return m;
     };
     const la = catVal(latest), pb = catVal(prior);
@@ -257,7 +263,7 @@ S.InventoryStockReport = {
   tabDead(latest, prior) {
     if (!prior) return this.note('Dead stock needs a prior count to measure movement. Pick a count that has one before it.');
     const base = App.computeUsagePair(prior, latest, this.deliveries());
-    const items = this.itemsByProduct(latest.items).map(it => {
+    const items = this.itemsByProduct(this.countedItems(latest)).map(it => {
       const p = this.productById(it.product_id) || {};
       const b = base[it.product_id];
       // Only products counted in BOTH periods have measurable usage; a product

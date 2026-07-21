@@ -527,7 +527,16 @@ S.InventoryOrderSheet = {
     }
   },
 
+  // ⚠ TWO DIFFERENT ESCAPES — do not mix them. cssEsc builds the HTML ATTRIBUTE, where a double
+  // quote has to become &quot; and the DOM then holds a real ". selEsc builds the CSS SELECTOR that
+  // has to MATCH that DOM value. Feeding cssEsc into a selector produced
+  // [data-vendor="Bob&quot;s Beverage"], which matches nothing — querySelector returned null and
+  // Create Order hit its `if (!card) return`, so the button did nothing and said nothing. A vendor
+  // name is free-typed operator text. (bottle-slider.js:135 reaches for CSS.escape, but that
+  // escapes an IDENTIFIER; the value here sits inside quotes, where escaping " and \ is the whole
+  // job and CSS.escape would only add noise like \32  for a leading digit.)
   cssEsc(s) { return String(s).replace(/"/g, '&quot;'); },
+  selEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); },
 
   // On-hand cell text. Bottle beer reads in cases + loose bottles; everything
   // else in its abbreviated container unit.
@@ -877,9 +886,9 @@ S.InventoryOrderSheet = {
   },
 
   async createOrder(vendor) {
-    const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(vendor) + '"]');
+    const card = this.container.querySelector('.os-vcard[data-vendor="' + this.selEsc(vendor) + '"]');
     if (!card) return;
-    const actions = this.container.querySelector('.os-create-row[data-vendor="' + this.cssEsc(vendor) + '"]');
+    const actions = this.container.querySelector('.os-create-row[data-vendor="' + this.selEsc(vendor) + '"]');
     const err = actions ? actions.querySelector('.os-verr') : null;
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
 
@@ -1002,9 +1011,9 @@ S.InventoryOrderSheet = {
   },
 
   async updateOrder(vendor) {
-    const card = this.container.querySelector('.os-vcard[data-vendor="' + this.cssEsc(vendor) + '"]');
+    const card = this.container.querySelector('.os-vcard[data-vendor="' + this.selEsc(vendor) + '"]');
     if (!card) return;
-    const actions = this.container.querySelector('.os-create-row[data-vendor="' + this.cssEsc(vendor) + '"]');
+    const actions = this.container.querySelector('.os-create-row[data-vendor="' + this.selEsc(vendor) + '"]');
     const err = actions ? actions.querySelector('.os-verr') : null;
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const order = this.orders().find(o => o.id === card.dataset.orderId);
