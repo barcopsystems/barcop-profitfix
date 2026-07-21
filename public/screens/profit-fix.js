@@ -104,7 +104,7 @@ S.ProfitFix = {
       if (this.fixLog().some(e => e.gap_id === g.id)) return;
       const start = this.firstAction(g);
       if (!start) return;
-      App.putRecord('core', 'fix_log', { id: App.uid(), module: 'profit', gap_id: g.id, gap_name: g.name, date: start, logged_at: new Date().toISOString(), auto: true });
+      App.putRecord('core', 'fix_log', { id: App.uid(), module: 'profit', gap_id: g.id, gap_name: g.name, date: start, logged_at: new Date().toISOString(), auto: true }, { quiet: true });   // fires from render(), never shout
       if (App.markSetupDone) App.markSetupDone('gs_p_fix');
     });
   },
