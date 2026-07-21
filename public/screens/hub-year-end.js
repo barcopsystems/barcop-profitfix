@@ -844,8 +844,15 @@ S.HubYearEnd = {
       const monthDrops = drops.filter(d => String(d.date).slice(0, 7) === mk);
       const dropsSum = monthDrops.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
       const varSum = monthVar.reduce((s, v) => s + (parseFloat(v.variance) || 0), 0);
-      const overCount  = monthVar.filter(v => (parseFloat(v.variance) || 0) > 0).length;
-      const shortCount = monthVar.filter(v => (parseFloat(v.variance) || 0) < 0).length;
+      // ⚠ COUNT BY STATUS, like every other screen. Raw sign ignores each register's tolerance, so a
+      // bar counting four registers nightly (~1,400 counts a year, nearly all a few dollars off but
+      // INSIDE tolerance) got "Short Count: 680" here while Cash History and Over-and-Short both
+      // said 11 out of tolerance. Same words, wildly different numbers, and this is the sheet an
+      // accountant reads. Sign is kept only as a fallback for a row with no status recorded.
+      const isOver  = v => (v.status ? v.status === 'Over'  : (parseFloat(v.variance) || 0) > 0);
+      const isShort = v => (v.status ? v.status === 'Short' : (parseFloat(v.variance) || 0) < 0);
+      const overCount  = monthVar.filter(isOver).length;
+      const shortCount = monthVar.filter(isShort).length;
       rows.push([this.MONTHS_FULL[m - 1], dropsSum, monthDrops.length, varSum, overCount, shortCount]);
       yrDrops += dropsSum; yrDropCount += monthDrops.length;
       yrVar += varSum; yrOver += overCount; yrShort += shortCount;
