@@ -81,8 +81,15 @@ S.PrepBatches = {
 
   products() { return (App.inventoryData && App.inventoryData.ic_products) || []; },
   prodById(id) { return this.products().find(p => p.id === id) || null; },
+  // ⚠ Inactive products are kept OUT of the picker on purpose — a discontinued product should not
+  // be addable to a new row. But the one ALREADY on this row has to stay selectable, or a recipe
+  // that still costs perfectly well renders as "Select ingredient..." and the operator re-picks or
+  // deletes a good ingredient by hand. (Kyle found this on Frozen Margarita Mix: a blank picker on
+  // a row still costing 32 oz x $0.96 = $30.87.) So: current selection always included, labelled.
   prodOpts(selId, mode) {
-    const all = this.products().filter(p => p.active !== false);
+    const active = this.products().filter(p => p.active !== false);
+    const cur = selId ? this.products().find(p => p && p.id === selId) : null;
+    const all = (cur && cur.active === false) ? active.concat([cur]) : active;
     if (!all.length) return '<option value="">No products set up</option>';
     let cats;
     if (mode === 'bar')       cats = this.BAR_CATS;
@@ -96,7 +103,8 @@ S.PrepBatches = {
       if (!inCat.length) return;
       h += '<optgroup label="' + esc(cat) + '">';
       inCat.forEach(p => {
-        h += '<option value="' + p.id + '"' + (p.id === selId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+        h += '<option value="' + p.id + '"' + (p.id === selId ? ' selected' : '') + '>' + esc(p.name)
+          + (p.active === false ? ' (inactive)' : '') + '</option>';
       });
       h += '</optgroup>';
     });
