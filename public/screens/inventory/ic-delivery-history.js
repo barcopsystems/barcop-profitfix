@@ -274,7 +274,15 @@ S.InventoryDeliveryHistory = {
         S.VendorTracker.openDiscrepancyModal({
           discrepancyId: disc ? disc.id : null,
           prefill: this.discPrefill(d, it),
-          onFiled: rec => { it.discrepancy_id = rec.id; d.has_discrepancy = true; App.putRecord('ic', 'delivery', d); },
+          // `d` is the LIVE delivery row, so putRecord cannot revert it for us (see App.putRecord).
+          // A refused save left the delivery flagged as having a discrepancy and its line pointing
+          // at a claim, while the server had neither — so the claim could not be reached from the
+          // delivery after a reload.
+          onFiled: rec => {
+            const undo = App.snapshotRows([d]);
+            it.discrepancy_id = rec.id; d.has_discrepancy = true;
+            App.putRecord('ic', 'delivery', d).then(ok => { if (!ok) App.restoreRows(undo); });
+          },
           onClose: () => this.renderDetail(d.id)
         });
       }

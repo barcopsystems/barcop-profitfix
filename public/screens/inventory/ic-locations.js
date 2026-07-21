@@ -795,10 +795,14 @@ S.InventoryLocations = {
   async removeProduct(locName, pid) {
     const p = this.products().find(x => x.id === pid);
     if (!p) return;
+    // Live row: putRecord cannot revert it for us. A refused removal took the product off the shelf
+    // on screen while the server kept it there, so it dropped off the count sheet for the session
+    // and quietly came back on the next login.
+    const undo = App.snapshotRows([p]);
     p.locations = App.productLocations(p).filter(x => x !== locName);
     if (p.primary_location === locName) p.primary_location = p.locations[0] || '';
     if (p.location_sequences) delete p.location_sequences[locName];
-    await App.putRecord('ic', 'product', p);   // one product changes -> one row
+    if (!(await App.putRecord('ic', 'product', p))) App.restoreRows(undo);   // one product changes -> one row
     this._renderEdit(this.editId);
   },
 
@@ -895,8 +899,12 @@ S.InventoryLocations = {
   async setArchived(id, val) {
     const l = this.locations().find(x => x.id === id);
     if (!l) return;
+    // Live row: putRecord cannot revert it for us. Archiving a shelf is load-bearing — an archived
+    // location can never be recounted, and _perpetualInventory treats it as no longer a home — so a
+    // refused archive that still reads archived on screen changes what the count sheet offers.
+    const undo = App.snapshotRows([l]);
     l.archived = val;
-    await App.putRecord('ic', 'location', l);   // row-per-record
+    if (!(await App.putRecord('ic', 'location', l))) App.restoreRows(undo);   // row-per-record
     this.renderList();
   },
 

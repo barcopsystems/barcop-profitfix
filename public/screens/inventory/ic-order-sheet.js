@@ -1004,11 +1004,17 @@ S.InventoryOrderSheet = {
     if (!order || !card) return { ok: false };
     const lineItems = this.collectLines(card);
     if (lineItems.length === 0) return { ok: false, empty: true };
+    // `order` is the LIVE row, so putRecord cannot revert it for us (see App.putRecord). Callers do
+    // check the returned ok and say "Could not update the order" — but memory kept the new line
+    // quantities and the new TOTAL, so the order read as edited on screen while the server and the
+    // vendor still had the old one.
+    const undo = App.snapshotRows([order]);
     order.line_items = lineItems;
     order.item_count = lineItems.length;
     order.total = lineItems.reduce((t, i) => t + i.extended, 0);
     order.updated_at = new Date().toISOString();
     const ok = await App.putRecord('ic', 'order', order);
+    if (!ok) App.restoreRows(undo);
     return { ok: !!ok };
   },
 
