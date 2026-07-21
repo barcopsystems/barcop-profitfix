@@ -94,7 +94,7 @@ S.RevenueFix = {
       if (this.fixLog().some(e => e.gap_id === g.id)) return;
       const start = this.firstAction(g);
       if (!start) return;
-      App.putRecord('core', 'fix_log', { id: App.uid(), module: 'revenue', gap_id: g.id, gap_name: g.name, date: start, logged_at: new Date().toISOString(), auto: true });
+      App.putRecord('core', 'fix_log', { id: App.uid(), module: 'revenue', gap_id: g.id, gap_name: g.name, date: start, logged_at: new Date().toISOString(), auto: true }, { quiet: true });   // fires from render(), never shout
     });
   },
   daysSince(d) {
