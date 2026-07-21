@@ -344,7 +344,14 @@ S.RevenueMenuItems = {
       + '<td style="width:40px;text-align:center;"><input type="checkbox" class="bc-check mi-sel" data-id="' + esc(item.id) + '"' + checked + '/></td>'
       + '<td><div class="val" style="color:' + (ok ? 'var(--t1)' : 'var(--red)') + ';">' + esc(item.name) + '</div>'
       + (src ? '<div style="font-size:10px;color:var(--t3);">' + src + '</div>' : '')
-      + (!ok ? '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>' : '') + '</td>'
+      // "Incomplete" is right but not enough when the cause is a DELETED ingredient: the operator
+      // did finish this recipe, and something was taken out from under it. Name it, and say what
+      // Bar Cop did about the cost, so the row is not just red with no explanation.
+      // Same treatment ic-prep-batches gives a batch whose product was deleted.
+      + (!ok ? (App.menuItemMissingIngredients(item).length
+          ? '<div style="font-size:10px;font-weight:700;color:var(--amber);">INGREDIENT DELETED</div>'
+            + '<div style="font-size:10px;color:var(--t3);">Not costed until you replace or remove it. Bar Cop will not price it cheaper in the meantime.</div>'
+          : '<div style="font-size:10px;font-weight:700;color:var(--red);">Incomplete</div>') : '') + '</td>'
       + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
       + '<td>' + (cost ? App.fmtCurrency(cost) : '-') + '</td>'
       + '<td class="' + (pct != null && tgt ? (pct > tgt ? 'neg' : 'pos') : '') + '">' + (pct != null ? pct.toFixed(1) + '%' : '-') + '</td>'
