@@ -845,8 +845,12 @@ S.InventoryReceiveDelivery = {
       if (!li.discrepancy_id) continue;
       const rec = all.find(x => x && x.id === li.discrepancy_id);
       if (!rec || rec.delivery_id) continue;
+      // `rec` is the LIVE claim row, so putRecord cannot revert our change for us (see the note in
+      // App.putRecord). Put the link back ourselves if the save is refused, otherwise memory claims
+      // a delivery link the server never got and the backfill never retries it.
+      const undo = App.snapshotRows([rec]);
       rec.delivery_id = record.id;
-      await App.putRecord('core', 'vendor_discrepancy', rec);
+      if (!(await App.putRecord('core', 'vendor_discrepancy', rec))) App.restoreRows(undo);
     }
   },
 
