@@ -136,6 +136,7 @@ S.PrepBatches = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
+    this._mountedAt = App._mountSeq;   // stamp this mount; a background resync compares it before repainting
     this.editId = null;
     this.renderList();
   },
@@ -248,6 +249,15 @@ S.PrepBatches = {
       .map(i => i.product_id));
   },
 
+  // ⚠ Is this screen still the one on the page? `this.container.isConnected` USED to be asked here
+  // and could never say no: #content-area is a permanent <main> that navigation merely empties and
+  // refills (app.js says so — "The content host is reused across every module screen"). So a resync
+  // that landed a second after the operator moved on repainted Prep Batches over their new screen,
+  // mid-task. App._mountSeq is bumped on every mount, so a changed value means "not us any more" —
+  // and a token from an EARLIER visit is refused too, so navigating away and back cannot let a
+  // stale write fight the fresh render.
+  _resyncStillCurrent() { return this._mountedAt === App._mountSeq; },
+
   async _resyncCosts(batches) {
     const pending = [];
     (batches || []).forEach(b => {
@@ -282,7 +292,7 @@ S.PrepBatches = {
     });
     // Only if this screen is still on the page — the operator may have navigated away while the
     // write was in flight, and re-rendering into a detached container would do nothing useful.
-    if (this.container && this.container.isConnected !== false) this.renderList();
+    if (this._resyncStillCurrent()) this.renderList();
     return true;
   },
 
@@ -491,7 +501,14 @@ S.PrepBatches = {
         const cost = this.unitCost(prod);
         const costD = cost > 0 ? App.fmtCurrency(cost) : (prod ? '<span style="color:var(--red);font-size:10px;">Add cost</span>' : '-');
         const lineD = ing.total_cost > 0 ? App.fmtCurrency(ing.total_cost) : '-';
-        return '<tr class="pb-line"><td><select class="form-input pb-ing-prod" data-i="' + idx + '" style="width:100%;">' + this.prodOpts(ing.product_id, mode) + '</select></td>'
+        // ⚠ prodOpts cannot offer a product that no longer exists, so the picker rests on
+        // "Select ingredient..." and this row looks exactly like an ordinary blank one — on the
+        // very screen the operator was sent to in order to fix it. Say which row is the problem.
+        const gone = !!(ing.product_id && !prod);
+        return '<tr class="pb-line"><td><select class="form-input pb-ing-prod" data-i="' + idx + '" style="width:100%;">' + this.prodOpts(ing.product_id, mode) + '</select>'
+          + (gone ? '<div style="font-size:10px;font-weight:700;color:var(--amber);margin-top:4px;">This ingredient no longer exists</div>'
+                  + '<div style="font-size:10px;color:var(--t3);">Pick a replacement or delete the row. The batch cost stays held until you do.</div>' : '')
+          + '</td>'
           + '<td><input class="form-input pb-ing-qty" type="number" data-i="' + idx + '" value="' + (ing.quantity || '') + '" min="0" step="0.25" style="width:100%;"/></td>'
           + '<td style="color:var(--t2);font-size:12px;">' + unit + '</td>'
           + '<td style="font-size:12px;">' + costD + '</td>'
@@ -572,16 +589,29 @@ S.PrepBatches = {
     const su = this._el('pb-serv-unit')?.value || 'oz';
     const out = this.computeRows(this.rows, by, bu, ss, su);
 
+    const ings = this.rows.filter(r => r.product_id && r.quantity > 0).map(r => ({ product_id: r.product_id, quantity: r.quantity }));
+    // ⚠ THIS IS THE REPAIR PATH FOR THE "INGREDIENT DELETED" FLAG, AND IT USED TO DEFEAT IT.
+    // unitCost(null) is 0, so computeRows above prices a deleted ingredient at nothing. The operator
+    // follows the instruction printed on the row ("edit the batch to replace or remove the missing
+    // product"), changes the name or the yield, hits Update — and the batch was written CHEAPER
+    // while the row still read "Cost is held at its last good value". Every menu item built on the
+    // batch then under-costs, because App.menuItemCost reads cost_per_serving straight off it.
+    // Same rule the background resync follows: HOLD the stored cost while one is still missing.
+    // Removing or replacing the row clears this and the cost recomputes for real — that is the
+    // repair working, and it is the only way the held value is ever released.
+    const prior = this.editId ? this.byId(this.editId) : null;
+    const held = (prior && ings.some(i => !this.prodById(i.product_id))) ? prior : null;
+
     const rec = {
       id: this.editId || App.uid(),
       name,
       category: this._el('pb-cat')?.value || '',
       batch_yield: by, batch_yield_unit: bu,
       serving_size: ss, serving_size_unit: su,
-      ingredients: this.rows.filter(r => r.product_id && r.quantity > 0).map(r => ({ product_id: r.product_id, quantity: r.quantity })),
-      servings_per_batch: out.servings_per_batch,
-      total_cost: out.total_cost,
-      cost_per_serving: out.cost_per_serving,
+      ingredients: ings,
+      servings_per_batch: held ? held.servings_per_batch : out.servings_per_batch,
+      total_cost:         held ? held.total_cost         : out.total_cost,
+      cost_per_serving:   held ? held.cost_per_serving   : out.cost_per_serving,
       updated_at: new Date().toISOString(),
       created_at: this.editId ? (this.byId(this.editId)?.created_at || new Date().toISOString()) : new Date().toISOString()
     };
