@@ -5718,6 +5718,18 @@ const App = {
     // rather than showing a save that silently disappears on the next reload.
     if (r.ok || ((r.offline || r.queued) && !r.storageFull)) return true;
     const back = arr.findIndex(x => x && x.id === rec.id);
+    // ⚠ THE LIMIT OF THIS REVERT, and it is load-bearing — read it before assuming you are covered.
+    // It restores the ARRAY SLOT. It can only undo your change if you handed us a DIFFERENT object
+    // than the one already in the list. The very common shape
+    //     const it = list.find(i => i.id === id);  it.price = np;  await App.putRecord(..., it);
+    // makes `prev` and `rec` THE SAME OBJECT, so this line assigns it to itself and undoes NOTHING —
+    // and putRecord cannot fix that from in here, because the mutation happened before it was
+    // called and the old values are already gone. A same-object caller MUST snapshot for itself:
+    //     const undo = App.snapshotRows([it]);  it.price = np;
+    //     if (!(await App.putRecord(...))) App.restoreRows(undo);
+    // (see App.snapshotRows). r-menu-engineering's four price doors were rebuilt this way on
+    // 2026-07-21 after a rejected save left the new price on screen all session while the server
+    // kept the old one.
     if (prev) { if (back >= 0) arr[back] = prev; }
     else if (back >= 0) arr.splice(back, 1);
     if (!(opts && opts.quiet)) this._reportWriteFail(r);   // the row just vanished from the screen — say why
