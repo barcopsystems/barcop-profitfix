@@ -6751,6 +6751,13 @@ const App = {
   async updateActual(rec, fields) {
     fields = fields || {};
     if (!rec || rec.locked) return false;
+    // ⚠ Every caller hands us the LIVE lc_actuals row, so putRecord's revert is a no-op for it (it
+    // re-seats the array slot with the object we just changed — see App.putRecord). This is the one
+    // owner of the hours -> wage -> cost math, so undoing here fixes it for every caller at once
+    // rather than each screen having to remember. Without it a refused edit left Daily View and the
+    // Weekly Summary showing hours and a payroll cost the server never took, and payroll export
+    // reads what is on screen.
+    const undo = this.snapshotRows([rec]);
     if (fields.hours != null && !isNaN(fields.hours) && fields.hours >= 0) {
       rec.hours = fields.hours;
       const wage = rec.wage != null ? rec.wage
@@ -6759,7 +6766,9 @@ const App = {
     }
     if (fields.notes != null) rec.notes = String(fields.notes).trim();
     rec.updated_at = new Date().toISOString();
-    return await this.putRecord('lc', 'actual', rec);
+    const ok = await this.putRecord('lc', 'actual', rec);
+    if (!ok) this.restoreRows(undo);
+    return ok;
   },
 
   // Logged hours for a staff member on a date, read from lc_actuals. Tip Log
