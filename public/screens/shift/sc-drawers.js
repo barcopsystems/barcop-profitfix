@@ -139,8 +139,13 @@ S.ShiftDrawers = {
   async setArchived(id, archived) {
     const d = this.drawers().find(x => x.id === id);
     if (!d) return;
+    // `d` is the LIVE row, so putRecord's revert cannot undo this for us (it re-seats the array slot
+    // with the object we just changed — see App.putRecord). Without the snapshot a refused archive
+    // dropped the register off the list on screen while the server still had it active, and it
+    // silently reappeared on the next login.
+    const undo = App.snapshotRows([d]);
     d.active = !archived;
-    await App.putRecord('sc', 'drawer', d);   // row-per-record
+    if (!(await App.putRecord('sc', 'drawer', d))) App.restoreRows(undo);   // row-per-record
     this.renderList();
   },
 
@@ -170,6 +175,11 @@ S.ShiftDrawers = {
     const numOr = (eid, def) => { const n = parseFloat(document.getElementById(eid)?.value); return isNaN(n) ? def : n; };
     const d = this.drawers().find(x => x.id === id);
     if (!d) { fail('Register not found.'); return; }
+    // ⚠ This one already CHECKED its write and told the operator it failed — but it never put the
+    // live row back, so the list behind the modal kept showing the new name and the new
+    // cash_tolerance. That tolerance is the threshold deciding whether a drawer count reads "out of
+    // tolerance", so the operator saw a widened threshold while the flags kept firing on the old one.
+    const undo = App.snapshotRows([d]);
     d.name                 = name;
     d.default_opening_bank = numOr('dre-bank', null);
     d.cash_tolerance       = numOr('dre-tol', 10);
@@ -178,7 +188,7 @@ S.ShiftDrawers = {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'drawer', d);   // row-per-record
     if (ok) { this.editId = null; App.closeModal('dr-edit-modal'); this.renderList(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
+    else { App.restoreRows(undo); if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
   },
 
   async save() {
