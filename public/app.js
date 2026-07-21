@@ -5603,9 +5603,19 @@ const App = {
   //     page". Being later in the DOM, the toast painted straight over that instruction and
   //     offered a different remedy underneath it.
   //   • viewer — App._showViewerBanner keeps "Viewer access, read-only" up for the whole session.
-  //     Worse: three screens WRITE during render() (ic-prep-batches, profit-fix, r-fix), so a
-  //     viewer got a red toast just for OPENING a page, on every render, having done nothing at
-  //     all. The banner already explains it, permanently.
+  //     ⚠⚠ THE `viewer` ROLE IS NOT REACHABLE FROM THE PRODUCT AND MAY NEVER BE. Verified
+  //     2026-07-21: the invite form offers Staff/Admin only (hub-user-accounts.js:144), the
+  //     change-role dropdown offers Admin/Staff only (:475-476), the server hard-clamps to
+  //     `validRoles = ['admin','staff']` (server/index.js:1407), the memberships default is
+  //     'staff', and the per-area access grid is TWO options — No Access / Full Access
+  //     (hub-user-accounts.js:173-174). "View Only" was deliberately REMOVED from the product
+  //     because it kept causing problems. The only way into this state is editing the
+  //     memberships table by hand in Supabase.
+  //     KEPT ON PURPOSE, not because anything needs it: db.js still enforces read-only on the
+  //     role at every write, so if the tier is ever offered again the enforcement and this
+  //     message are already correct. Treat it as dormant, not as evidence the feature exists —
+  //     do not build anything on top of it, and do not "fix" a bug reported against it without
+  //     first checking whether a real person can reach it.
   // Each still falls through to a toast if its banner is somehow not up, so nothing goes unsaid.
   _writeFailMsg(r) {
     const generic = { msg: 'Not saved. Check your connection and try again.', ownedBy: '' };
