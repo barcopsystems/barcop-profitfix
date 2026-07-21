@@ -147,7 +147,35 @@ S.HubOperatingExpenses = {
   // every login. These rows are derived (regenerated from the parent on any later load), which is
   // exactly why waiting for confirmation costs nothing.
   // No caller uses the return value, so making this async is safe.
-  async catchUpRecurring() {
+  //
+  // ⚠ SERIALIZED, and it has to be. The dedupe set `have` below is built from `arr`, but the
+  // generated rows deliberately do not reach `arr` until the server confirms them — so for the whole
+  // round-trip the dedupe is BLIND to them. All three callers fire without awaiting (App.boot():676
+  // at every login, plus renderMain / renderHistory), so a second pass entered inside that window
+  // saw an empty `have` and regenerated every owed month with fresh App.uid()s. Both sets persist
+  // (the server key is the id) and the rows are byte-identical apart from it, so a $4,200 rent with
+  // three owed months landed in Books, the P&L, breakeven and prime cost as $25,200 instead of
+  // $12,600, permanently and invisibly. One click inside the round-trip on the first login of a new
+  // month is enough: Expense History, saving, deleting, or stopping a bill all reach _rerender.
+  // CHAINING, not dropping the second call: an operator who adds a back-dated bill while the boot
+  // pass is still in flight must still get that bill's months. Each pass reads `arr` only after the
+  // previous one has pushed into it, so overlap is impossible and nothing is skipped.
+  catchUpRecurring() {
+    const run = () => this._catchUpOnce();
+    this._catchUpChain = this._catchUpChain ? this._catchUpChain.then(run, run) : run();
+    return this._catchUpChain;
+  },
+  _catchUpChain: null,
+
+  async _catchUpOnce() {
+    // Never generate derived rows from a picture the app admits is incomplete. Its peers already
+    // refuse to (profit-fix.js:101 and r-fix.js open with the same _dataReady test, and
+    // App._maybeAutoBackup bails on _loadDegraded); this one checked neither. A degraded load is
+    // served from a cache that can be months stale and is missing the children, so the dedupe cannot
+    // see them and would mint new ids for months that already exist — the same double-booking by a
+    // different door. Nothing is lost by waiting: these rows are derived and regenerate from the
+    // parent on any later clean load.
+    if (!App.data || !DB._dataReady || DB._loadDegraded) return false;
     const arr = this.records();
     const now = new Date();
     const curIdx = now.getFullYear() * 12 + now.getMonth();
