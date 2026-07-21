@@ -42,9 +42,14 @@ S.HubOperatingExpenses = {
   },
 
   // ── Entry ───────────────────────────────────────────────────────────────
+  // Is this page still the one on screen? See the note in App._mountSeq — the Hub content host is
+  // permanent, so isConnected can never answer this.
+  _catchUpStillCurrent() { return this._mountedAt === App._mountSeq; },
+
   open() {
     App.openHubFullPage('Operating Expenses', (mount) => {
       this.container = mount;
+      this._mountedAt = App._mountSeq;   // stamped inside the mount callback, AFTER openHubFullPage bumps it
       this.renderMain();
     }, 'operating-expenses');
   },
@@ -216,7 +221,12 @@ S.HubOperatingExpenses = {
     arr.push(...newRecs);
     // Re-render once, and only on success, so the screen picks up the caught-up months. Cannot
     // loop: the dedupe above finds them already present next time and generates nothing.
-    if (this.container && this.container.isConnected !== false) {
+    // ⚠ This USED to ask `this.container.isConnected`, which can never be false: `.hub-app .content`
+    // is a permanent host that navigation merely empties and refills. So a catch-up that landed
+    // after the operator clicked Permits repainted Operating Expenses over it, with the sidebar
+    // still highlighting Permits. App._mountSeq is bumped on every mount, so a changed value means
+    // this page is no longer the one on screen.
+    if (this._catchUpStillCurrent()) {
       if (this._view === 'history') this.renderHistory(); else this.renderMain();
     }
     return added;
