@@ -256,8 +256,12 @@ S.TheftRisk = {
     if (v.spotCheckId) inv.spot_check_id = v.spotCheckId;
     if (v.vrTab) inv.vr_tab = v.vrTab;            // variance: the report + run it flagged on
     if (v.vrRunId) inv.vr_run_id = v.vrRunId;
-    App.putRecord('core', 'variance_investigation', inv);
-    this._renderVimBody(inv.id);
+    // A NEW record, so putRecord's own revert works here (it splices this one back out). What was
+    // missing is the result check: opening the working card for an investigation the server refused
+    // meant every step ticked afterwards was written against a record that does not exist.
+    App.putRecord('core', 'variance_investigation', inv).then(ok => {
+      if (ok) this._renderVimBody(inv.id);
+    });
   },
   _renderVimBody(invId) {
     const card = document.getElementById('vim-card'); if (!card) return;
@@ -324,20 +328,31 @@ S.TheftRisk = {
     card.querySelectorAll('.vim-check').forEach(c => c.addEventListener('click', () => {
       const idx = +c.dataset.step;
       const now = !inv.steps[idx].done;
-      inv.steps[idx].done = now;
+      // The tick below is optimistic; a refused save restores `inv` and re-renders the whole card,
+      // which redraws the tick from the record rather than leaving it green over nothing saved.
+      this._vimSave(inv, () => { inv.steps[idx].done = now; }, invId, false);
       c.style.background = now ? 'var(--green)' : 'transparent';
       c.style.color = now ? 'var(--bg)' : 'transparent';
       c.style.borderColor = now ? 'var(--green)' : 'var(--t3)';
       const t = card.querySelector('.vim-step-title[data-step="' + idx + '"]'); if (t) t.style.color = now ? 'var(--t3)' : 'var(--t1)';
       const n = inv.steps.filter(s => s.done).length;
       const pr = document.getElementById('vim-progress'); if (pr) { pr.textContent = n + ' / ' + total + ' steps'; pr.style.color = n === total ? 'var(--green)' : 'var(--t3)'; }
-      App.putRecord('core', 'variance_investigation', inv);
     }));
-    card.querySelectorAll('.vim-finding').forEach(i => i.addEventListener('change', () => { inv.steps[+i.dataset.step].finding = i.value; App.putRecord('core', 'variance_investigation', inv); }));
-    card.querySelector('.vim-resolution')?.addEventListener('change', e => { inv.resolution = e.target.value; App.putRecord('core', 'variance_investigation', inv); });
-    card.querySelector('#vim-save')?.addEventListener('click', () => { flush(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
-    card.querySelector('#vim-resolve')?.addEventListener('click', () => { flush(); inv.status = 'resolved'; inv.resolved_date = App.todayLocal(); App.putRecord('core', 'variance_investigation', inv).then(() => this._vimClose()); });
-    card.querySelector('#vim-reopen')?.addEventListener('click', () => { inv.status = 'open'; delete inv.resolved_date; App.putRecord('core', 'variance_investigation', inv).then(() => this._renderVimBody(invId)); });
+    // findings + resolution: no redraw on success (it would yank focus out of the box they just left)
+    card.querySelectorAll('.vim-finding').forEach(i => i.addEventListener('change', () =>
+      this._vimSave(inv, () => { inv.steps[+i.dataset.step].finding = i.value; }, invId, false)));
+    card.querySelector('.vim-resolution')?.addEventListener('change', e =>
+      this._vimSave(inv, () => { inv.resolution = e.target.value; }, invId, false));
+    // Close ONLY if it actually saved — closing on a refused save is how the findings vanish silently.
+    card.querySelector('#vim-save')?.addEventListener('click', () =>
+      this._vimSave(inv, flush, invId, false).then(ok => { if (ok) this._vimClose(); }));
+    card.querySelector('#vim-resolve')?.addEventListener('click', () =>
+      this._vimSave(inv, () => { flush(); inv.status = 'resolved'; inv.resolved_date = App.todayLocal(); }, invId, false)
+        .then(ok => { if (ok) this._vimClose(); }));
+    // Reopen DELETES resolved_date; restoreRows re-adds keys a mutation removed, so a refused reopen
+    // does not strip the resolution date off a closed investigation.
+    card.querySelector('#vim-reopen')?.addEventListener('click', () =>
+      this._vimSave(inv, () => { inv.status = 'open'; delete inv.resolved_date; }, invId, true));
     card.querySelector('#vim-del')?.addEventListener('click', async () => { if (!(await App.confirmDelete())) return; await App.removeRecord('core', 'variance_investigation', inv.id); this._vimClose(); });
   },
 
@@ -359,6 +374,25 @@ S.TheftRisk = {
   ],
 
   _inv(id) { return (App.data.variance_investigations || []).find(x => x.id === id); },
+
+  // ⚠ ONE DOOR for every write to an open investigation. `inv` is the LIVE record out of
+  // variance_investigations, so App.putRecord's revert re-seats the array slot with the very object
+  // we just mutated and undoes NOTHING (see the note in App.putRecord) — and all six handlers
+  // discarded the result on top of that. This is the written record of a suspected theft: the steps
+  // worked, what was found at each one, the resolution, and whether it is closed. A refused save
+  // left every one of those on screen looking recorded while the server had none of it, and it is
+  // the document an owner would rely on before confronting or firing somebody.
+  // Snapshot before mutating, put it back on refusal, and always re-render on failure so the card
+  // cannot sit there showing a state the server rejected.
+  _vimSave(inv, mutate, invId, redrawOnSuccess) {
+    const undo = App.snapshotRows([inv]);
+    mutate();
+    return App.putRecord('core', 'variance_investigation', inv).then(ok => {
+      if (!ok) { App.restoreRows(undo); this._renderVimBody(invId); return false; }
+      if (redrawOnSuccess) this._renderVimBody(invId);
+      return true;
+    });
+  },
 
   investigationLiveData(productId) {
     if (!productId) {
