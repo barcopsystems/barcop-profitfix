@@ -354,6 +354,10 @@ S.LaborPayPeriods = {
     const periodId = (existing && existing.id) || App.uid();
     // Stamp locked + pay_period_id on each lc_actuals in range.
     const affected = this.actuals().filter(a => (a.date || '') >= weekStart && (a.date || '') <= weekEnd);
+    // Snapshot BEFORE the in-place stamp. putRecordsBulk cannot revert (see App.snapshotRows), and
+    // this write was discarded — so a failed close showed a CLOSED pay period the server still had
+    // OPEN, with every entry reading locked. Payroll export reads what is on screen.
+    const undoActuals = App.snapshotRows(affected);
     affected.forEach(a => { a.locked = true; a.pay_period_id = periodId; });
     // Build the period record.
     const rec = {
@@ -373,13 +377,22 @@ S.LaborPayPeriods = {
         wage: r.wage, regular_cost: r.regular_cost, ot_cost: r.ot_cost, gross: r.gross
       }))
     };
+    const undoPeriod = existing ? App.snapshotRows([existing]) : null;
     if (existing) Object.assign(existing, rec);
     else list.push(rec);
     const savedPeriod = existing || rec;
     // Persist the period row, then every locked actual in one bulk write (one
-    // round-trip instead of one per entry).
-    await App.putRecord('lc', 'pay_period', savedPeriod);
-    await App.putRecordsBulk('lc', 'actual', affected);
+    // round-trip instead of one per entry). Both results are checked: a half-written close (period
+    // row saved, entries not) is the state that reads Closed while the hours are still editable.
+    const okPeriod = await App.putRecord('lc', 'pay_period', savedPeriod);
+    const okRows = okPeriod && await App.putRecordsBulk('lc', 'actual', affected);
+    if (!okRows) {
+      App.restoreRows(undoActuals);
+      if (undoPeriod) App.restoreRows(undoPeriod);
+      else App.dropRows(list, [rec]);   // the period row we had just appended
+      this.renderList();
+      return;
+    }
     this.detailWeekStart = weekStart;
     this.renderDetail(weekStart);
   },
@@ -395,16 +408,26 @@ S.LaborPayPeriods = {
     const agg = this.aggregateWeek(weekStart);
     const weekEnd = agg.weekEnd;
     const affected = this.actuals().filter(a => (a.date || '') >= weekStart && (a.date || '') <= weekEnd);
+    // Mirror of closePeriod: snapshot before the in-place unlock so a failed reopen does not leave
+    // the week reading editable while the server still has every entry locked.
+    const undoActuals = App.snapshotRows(affected);
     affected.forEach(a => { a.locked = false; });
     const list = this.periods();
     const existing = list.find(p => p.week_start === weekStart);
+    const undoPeriod = existing ? App.snapshotRows([existing]) : null;
     if (existing) {
       existing.status = 'Open';
       existing.reopened_at = new Date().toISOString();
     }
     // Persist the reopened period, then every unlocked actual in one bulk write.
-    if (existing) await App.putRecord('lc', 'pay_period', existing);
-    await App.putRecordsBulk('lc', 'actual', affected);
+    const okPeriod = existing ? await App.putRecord('lc', 'pay_period', existing) : true;
+    const okRows = okPeriod && await App.putRecordsBulk('lc', 'actual', affected);
+    if (!okRows) {
+      App.restoreRows(undoActuals);
+      if (undoPeriod) App.restoreRows(undoPeriod);
+      this.renderList();
+      return;
+    }
     if (this.detailWeekStart) this.renderDetail(weekStart);
     else this.renderList();
   },
