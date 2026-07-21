@@ -1366,14 +1366,104 @@ S.InventoryProducts = {
   },
 
   // ── Delete ────────────────────────────────────────────────────────────────
+  // ── Delete guard ────────────────────────────────────────────────────────────
+  // Plain-English summary of every LIVE place these products are used, for the delete dialog.
+  // History is named but explicitly EXCLUDED: past counts, deliveries, waste and spot checks are a
+  // record of what happened. Pulling a product out of last month's count would rewrite a closed
+  // period's COGS, so a delete never touches them and the dialog says so.
+  _delRefsSummary(refs) {
+    const names = (arr, key) => {
+      const list = arr.map(x => (x && x[key]) || '').filter(Boolean);
+      const shown = list.slice(0, 4).map(n => esc(n)).join(', ');
+      return list.length > 4 ? shown + ' and ' + (list.length - 4) + ' more' : shown;
+    };
+    const line = (n, one, many, detail) => n
+      ? '<div style="font-size:12px;color:var(--t1);line-height:1.6;margin-bottom:6px;">'
+        + '<strong>' + n + ' ' + (n === 1 ? one : many) + '</strong>'
+        + (detail ? '<span style="color:var(--t3);"> &middot; ' + detail + '</span>' : '') + '</div>'
+      : '';
+    return line(refs.menuItems.length, 'menu item', 'menu items', names(refs.menuItems, 'name'))
+      + line(refs.prepBatches.length, 'prep batch', 'prep batches', names(refs.prepBatches, 'name'))
+      + line(refs.openOrders.length, 'open order', 'open orders', names(refs.openOrders, 'vendor'))
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:10px;">'
+      + 'Your count, delivery, waste and spot-check history also mentions '
+      + (refs.total === 1 ? 'it' : 'them') + '. That is a record of what happened and is never changed.'
+      + '</div>';
+  },
+  // Three-way, because "delete or cancel" is the wrong question when something still uses it.
+  // Make Inactive leads: verified in code, an inactive product drops off the count sheet, par
+  // suggestions, spot checks and the order sheet, while every recipe that uses it keeps costing
+  // correctly (App.menuItemCost and ic-prep-batches both read the product list unfiltered).
+  _confirmDelInUse(ids, refs) {
+    const what = ids.length > 1 ? 'these ' + ids.length + ' products' : 'this product';
+    return new Promise(resolve => {
+      const html = '<div class="card" style="margin:0;">'
+        + '<div class="card-title">Something still uses ' + what + '</div>'
+        + this._delRefsSummary(refs)
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:14px 0 4px;">'
+        + '<strong>Make Inactive</strong> keeps every recipe costing correctly and every past number '
+        + 'true. It just stops showing on your count sheets, par suggestions, spot checks and order sheet.</div>'
+        + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
+        + 'Deleting permanently leaves those recipes missing an ingredient. Bar Cop flags them rather '
+        + 'than quietly costing the dish cheaper, but you will have to fix each one.</div>'
+        + '<div class="card-actions" style="flex-wrap:wrap;">'
+        + '<button class="btn btn-primary" data-act="inactive">Make Inactive</button>'
+        + '<button class="btn btn-ghost" data-act="cancel">Cancel</button>'
+        + '<button class="btn btn-danger" data-act="delete" style="margin-left:auto;">Delete Permanently</button>'
+        + '</div></div>';
+      App.openModal(html, { id: 'ip-del-guard', maxWidth: 560, noClose: true });
+      const root = document.getElementById('ip-del-guard');
+      if (!root) { resolve(null); return; }   // no DOM: refuse rather than delete blind
+      root.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-act]');
+        if (!b) return;
+        App.closeModal('ip-del-guard');
+        resolve(b.dataset.act === 'cancel' ? null : b.dataset.act);
+      });
+    });
+  },
+  // ⚠ LIVE rows, so putRecordsBulk cannot revert them for us (see App.putRecord). Snapshot first,
+  // or a refused write leaves the list showing an archive the server never took.
+  async setActiveBulk(ids, active) {
+    const idSet = new Set(ids);
+    const touched = this.products().filter(p => p && idSet.has(p.id));
+    if (!touched.length) return true;
+    const undo = App.snapshotRows(touched);
+    touched.forEach(p => { p.active = active; });
+    const ok = await App.putRecordsBulk('ic', 'product', touched);
+    if (!ok) App.restoreRows(undo);
+    return ok;
+  },
+
   async confirmDel(ids, msg) {
     if (!ids.length) return;
-    if (!(await App.confirmDelete(ids.length > 1 ? ids.length + ' products' : null))) return;
+    // Cross-check every LIVE use first. Deleting an ingredient out from under a recipe used to be
+    // silent at both ends: no warning here, and the dish just re-costed cheaper.
+    const refs = App.productReferences(new Set(ids));
+    if (refs.any) {
+      const choice = await this._confirmDelInUse(ids, refs);
+      if (choice === 'inactive') { await this.setActiveBulk(ids, false); this.renderLanding(); return; }
+      if (choice !== 'delete') return;
+    } else if (!(await App.confirmDelete(ids.length > 1 ? ids.length + ' products' : null))) {
+      return;
+    }
     // Row-per-record: delete one row per id (removeRecord also drops it from the
     // in-memory list), so a delete only ever touches those rows, never the set.
-    for (const id of ids) await App.removeRecord('ic', 'product', id);
-    if (this._selected) ids.forEach(id => this._selected.delete(id));
+    // ⚠ Report the TRUTH about a partial delete (S4). This loop discarded every result, so 3
+    // failures out of 100 looked identical to a clean sweep — and removeRecord's toast is coalesced
+    // to one line that never says WHICH. At 100 rows that is exactly when it matters.
+    const failed = [];
+    for (const id of ids) { if (!(await App.removeRecord('ic', 'product', id))) failed.push(id); }
+    // Keep the failures SELECTED so a retry is one click; clear only what actually went.
+    if (this._selected) ids.forEach(id => { if (failed.indexOf(id) < 0) this._selected.delete(id); });
     this.renderLanding();
+    if (failed.length) {
+      App.confirm({
+        title: failed.length + ' of ' + ids.length + ' could not be deleted',
+        message: (ids.length - failed.length) + ' deleted. The rest are still here and still selected, so you can try again.',
+        confirmText: 'OK', cancelText: 'Dismiss', danger: false
+      });
+    }
   },
 
   // ── Bulk edit (set the same field across many selected products) ─────────────
