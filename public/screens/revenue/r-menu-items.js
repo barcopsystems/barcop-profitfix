@@ -67,12 +67,19 @@ S.RevenueMenuItems = {
       // Keep pure operating supplies (paper, cleaning) out of the recipe
       // ingredient picker — only mixers, food ingredients, and NA beverages
       // belong in a recipe.
-      const inCat = prods.filter(p => (p.category || '') === cat && p.active !== false && !(cat === 'Misc' && App.miscIsSupply(p)))
+      // ⚠ Inactive products stay OUT on purpose (you should not be able to add a discontinued
+      // product to a recipe) — EXCEPT the one already selected on this row. Without that exception
+      // a recipe that still costs correctly renders as "Select ingredient..." and the operator
+      // re-picks or deletes a good ingredient by hand. Same fix as ic-prep-batches.prodOpts.
+      const inCat = prods.filter(p => (p.category || '') === cat
+          && (p.active !== false || selKey === 'p:' + p.id)
+          && !(cat === 'Misc' && App.miscIsSupply(p)))
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!inCat.length) return;
       h += '<optgroup label="' + esc(cat) + '">';
       inCat.forEach(p => {
-        h += '<option value="p:' + p.id + '"' + (selKey === 'p:' + p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+        h += '<option value="p:' + p.id + '"' + (selKey === 'p:' + p.id ? ' selected' : '') + '>' + esc(p.name)
+          + (p.active === false ? ' (inactive)' : '') + '</option>';
       });
       h += '</optgroup>';
     });
