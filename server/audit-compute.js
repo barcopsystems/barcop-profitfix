@@ -184,9 +184,18 @@ function computeProfitAudit(appData, controlData) {
     : invCounts >= expectedCounts ? 'Weekly'
     : invCounts >= Math.max(1, Math.round(expectedCounts / 2)) ? 'Every other week'
     : 'Monthly or less';
-  const haveShrink = invVarDollar != null || spotChecks > 0 || wasteTotal != null || invCounts > 0;
+  // ⚠ Count FREQUENCY alone cannot grade shrink. It says you counted; it says nothing about what
+  // went missing. Because it is a scorable part, being the ONLY part made it the whole section
+  // score — so counting weekly with no variance run, no waste log and no spot check returned
+  // "Shrink & Waste 100/100" with every one of its measurements N/A. That is the false clean bill
+  // of health on the surface that exists to catch over-pour and theft, and it is exactly the
+  // "fabricated placeholder" rule 5 of the honesty contract at the top of this file forbids.
+  // Require a real shrink MEASUREMENT before the section scores at all; frequency then modulates
+  // it. With none, S3 is N/A and drops out of the overall (avg() skips nulls). The count-frequency
+  // string is still returned as context.
+  const haveShrinkGrade = invVarPct != null || spotChecks > 0;
   let s3 = null;
-  if (haveShrink) {
+  if (haveShrinkGrade) {
     const parts = [];
     // Score the MAGNITUDE: a variance is a control failure in either direction, and a
     // signed -4% would otherwise sail past the <= 1 test and score better than a real
@@ -223,15 +232,16 @@ function computeProfitAudit(appData, controlData) {
   const monthlyTotalRev = (monthlyBarRev || 0) + (monthlyFoodRev || 0);
   const s4MonthlyGap = (voidCompPct != null && voidCompPct > VOID_COMP_BENCHMARK_PCT && monthlyTotalRev > 0)
     ? round0(((voidCompPct - VOID_COMP_BENCHMARK_PCT) / 100) * monthlyTotalRev) : 0;
-  const haveS4 = voidCompPct != null || cashShortRate != null || walkedTotal != null || siFlags != null || haveCashRecon || voidsNoApprovalPct != null;
+  // ⚠ The void/comp RATE is the only gradeable base this section has — everything below it
+  // (unapproved %, cash-short rate, integrity flags, the reconciling bonus) is a MODIFIER applied
+  // to that base, not a grade of its own. With no rate, the old code invented `s4 = 55` and then
+  // modified it, so an operator who merely reconciled drawers got a fabricated 55/60 for "Theft &
+  // Cash Loss" — a mid-score for a surface that was never measured, which rule 5 of the honesty
+  // contract at the top of this file explicitly forbids. No base -> N/A, excluded from the overall.
   let s4 = null;
-  if (haveS4) {
-    if (voidCompPct != null) {
-      const over = voidCompPct - VOID_COMP_BENCHMARK_PCT;
-      s4 = over <= 0 ? 85 : over <= 1 ? 65 : over <= 2 ? 45 : 25;
-    } else {
-      s4 = 55;   // cash/loss signals on file but no void/comp rate to grade
-    }
+  if (voidCompPct != null) {
+    const over = voidCompPct - VOID_COMP_BENCHMARK_PCT;
+    s4 = over <= 0 ? 85 : over <= 1 ? 65 : over <= 2 ? 45 : 25;
     if (voidsNoApprovalPct != null) { if (voidsNoApprovalPct > 25) s4 -= 15; else if (voidsNoApprovalPct > 10) s4 -= 8; }
     if (cashShortRate != null) { if (cashShortRate > 30) s4 -= 10; else if (cashShortRate > 15) s4 -= 5; }
     if (siFlags != null && siFlags > 0) s4 -= Math.min(15, siFlags * 5);
@@ -404,8 +414,14 @@ function computeRevenueAudit(appData, controlData) {
   // and inflating the S4 recoverable dollar under a header that reads "4 weeks
   // ending ...". Mirrors the S5 events window below.
   const _shiftYmd = (ymd, days) => { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+  // The REAL number of weeks scored — the same basis AUDIT_PERIOD prints. A hardcoded PERIOD_WEEKS
+  // made these windows 28 days under an "N weeks ending ..." heading, so a bar with 2 confirmed
+  // weeks had 4 weeks of events and server checks summed into figures labelled 2 weeks. This is the
+  // fix already applied to S2_LABOR_PERIOD (see the comment near AUDIT_PERIOD); S4 and S5 were the
+  // twins it missed.
+  const _winWeeks = weeks.length || PERIOD_WEEKS;
   const _scWinEnd = weeks.length ? String(weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end || '').slice(0, 10) : '';
-  const _scWinStart = _scWinEnd ? _shiftYmd(_scWinEnd, -(PERIOD_WEEKS * 7 - 1)) : '';
+  const _scWinStart = _scWinEnd ? _shiftYmd(_scWinEnd, -(_winWeeks * 7 - 1)) : '';
   const serverChecks = (appData.revenue_server_checks || [])
     .filter(c => (num(c.covers) > 0) && num(c.sales) != null)
     .filter(c => {
@@ -563,12 +579,12 @@ function computeRevenueAudit(appData, controlData) {
     const winEnd = weeks.length
       ? String(weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end || '').slice(0, 10)
       : (events.map(evDate).filter(Boolean).sort().slice(-1)[0] || '');
-    const winStart = winEnd ? shiftYmd(winEnd, -(PERIOD_WEEKS * 7 - 1)) : '';
+    const winStart = winEnd ? shiftYmd(winEnd, -(_winWeeks * 7 - 1)) : '';
     const windowEvents = (winStart && winEnd)
       ? events.filter(e => { const d = evDate(e); return d && d >= winStart && d <= winEnd; })
       : events;
     if (windowEvents.length > 0) {
-      const monthsInPeriod = PERIOD_WEEKS / WEEKS_PER_MONTH;   // the real length of the audit window, not an assumed 3
+      const monthsInPeriod = _winWeeks / WEEKS_PER_MONTH;   // the REAL length of the audit window, not an assumed 3 or a hardcoded 4
       eventRevPeriod = round0(windowEvents.reduce((s, e) => s + (num(e.actual_revenue) || 0), 0));
       eventsPerMonth = round1(windowEvents.length / monthsInPeriod);
       avgEventRev = round0(eventRevPeriod / windowEvents.length);
@@ -742,6 +758,25 @@ if (require.main === module) {
     { bar_cost_pct: 22, food_cost_pct: 31, sources: ['x'] });
   checks.push(['no inventory data: S3 N/A', noInv.S3_SCORE, null]);
 
+  // ⚠ HONESTY CONTRACT (rule 5 at the top of this file): never a fabricated placeholder or a
+  // defaulted mid-score. These two pin the sections that were violating it.
+  //
+  // S3 is "Shrink & Waste". Count FREQUENCY says you counted — not what went missing — so it
+  // cannot grade shrink on its own. Counting weekly with no variance run, no waste log and no spot
+  // check used to score the section 100/100 with every one of its measurements N/A: a perfect
+  // score for the surface that exists to catch over-pour and theft.
+  const countsOnly = computeProfitAudit({ settings: { week_sales_estimate: { bar: 11500, food: 6900 }, targets: {} } },
+    { bar_cost_pct: 22, food_cost_pct: 31, inventory_counts: 4, sources: ['x'] });
+  checks.push(['S3 N/A when only COUNTS exist (shrink never measured)', countsOnly.S3_SCORE, null]);
+  checks.push(['S3 count frequency still reported as context', countsOnly.S3_COUNT_FREQ, 'Weekly']);
+
+  // S4 is "Theft & Cash Loss". With no void/comp rate there is no gradeable base, so the section
+  // must be N/A — it used to return a hardcoded 55 (+5 for reconciling) off cash signals alone.
+  const noVoids = computeProfitAudit({ settings: { week_sales_estimate: { bar: 11500, food: 6900 }, targets: {} } },
+    { bar_cost_pct: 22, food_cost_pct: 31, cash_reconciliations: 20, cash_short_count: 2,
+      sales_integrity_flags: 0, sources: ['x'] });
+  checks.push(['S4 N/A with no void/comp rate (no fabricated 55)', noVoids.S4_SCORE, null]);
+
   let pass = 0;
   for (const [label, got, exp] of checks) {
     const ok = got === exp; if (ok) pass++;
@@ -798,6 +833,24 @@ if (require.main === module) {
   rChecks.push(['Rev S5 scores when events exist', revEv.S5_SCORE > 0, true]);
   const revNoServer = computeRevenueAudit({ settings: {}, revenue_settings: { targets: {} }, revenue_server_checks: [{ server_name: 'A', covers: 10, sales: 300 }] }, null);
   rChecks.push(['Rev S4 N/A with <3 checks and no comp data', revNoServer.S4_SCORE, null]);
+
+  // The S5 event window must follow the REAL number of confirmed weeks, not a hardcoded 4 — the
+  // same fix already applied to S2_LABOR_PERIOD. With 2 confirmed weeks the heading reads "2 weeks
+  // ending 2026-04-08", so an event 19 days back is OUTSIDE the period and must not be summed into
+  // a figure rendered under that heading.
+  const rev2wk = computeRevenueAudit({
+    settings: {}, revenue_settings: { targets: {} },
+    revenue_weeks: [
+      { period_end: '2026-04-01', total_revenue: 18000, covers: 600 },
+      { period_end: '2026-04-08', total_revenue: 18000, covers: 600 }
+    ],
+    bookings: [
+      { stage: 'Completed', actual_revenue: 4000, event_date: '2026-04-05' },   // inside the 2-week window
+      { stage: 'Completed', actual_revenue: 8000, event_date: '2026-03-20' }    // inside a 4-week window, OUTSIDE the real 2-week one
+    ]
+  }, null);
+  rChecks.push(['Rev S5 event window follows the REAL weeks (2wk, not a hardcoded 4)', rev2wk.S5_EVENT_REV_PERIOD, 4000]);
+  rChecks.push(['Rev AUDIT_PERIOD reports the real week count', rev2wk.AUDIT_PERIOD, '2 weeks ending 2026-04-08']);
 
   let rPass = 0;
   for (const [label, got, exp] of rChecks) {
