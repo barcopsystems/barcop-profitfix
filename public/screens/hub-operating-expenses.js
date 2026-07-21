@@ -175,7 +175,7 @@ S.HubOperatingExpenses = {
         added = true;
       }
     });
-    if (newRecs.length) App.putRecordsBulk('core', 'operating_expense', newRecs);
+    if (newRecs.length) App.putRecordsBulk('core', 'operating_expense', newRecs, { quiet: true });   // fires from App.boot(), never shout
     return added;
   },
 
