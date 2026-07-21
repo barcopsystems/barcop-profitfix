@@ -100,11 +100,20 @@ S.ShiftDashboard = {
       const wkS = this.shifts().filter(s => this.inWeek(s.date));
       const rev = wkS.reduce((t, s) => t + (s.total_revenue || 0), 0);
       const voidTot = this.voidComps().filter(r => this.inWeek(r.date) && r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
-      const netVar = this.variances().filter(v => this.inWeek(v.date)).reduce((t, v) => t + (v.variance || 0), 0);
+      // ⚠ ZERO COUNTS IS NOT ZERO OVER/SHORT. An empty list reduces to 0, and $0.00 reads as a
+      // perfectly balanced week — indistinguishable from one that actually balanced. That is the
+      // normal mid-close state (sales imported, cash not reconciled yet) and the permanent state of
+      // any bar that has not started counting drawers. Say "Not counted" instead; the app already
+      // uses that exact word as a variance status elsewhere.
+      const wkVar = this.variances().filter(v => this.inWeek(v.date));
+      const varCount = wkVar.length;
+      const netVar = wkVar.reduce((t, v) => t + (v.variance || 0), 0);
       const stats = [
         { label: 'Revenue', value: App.fmtCurrency(rev) },
         { label: 'Voids', value: App.fmtCurrency(voidTot) },
-        { label: 'Over / Short', value: (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), warn: netVar < 0 }
+        varCount
+          ? { label: 'Over / Short', value: (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), warn: netVar < 0 }
+          : { label: 'Over / Short', value: 'Not counted' }
       ];
       return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length, lastWk: sw.lastWk };
     } finally { this._weekEnd = sv; }
@@ -327,8 +336,11 @@ S.ShiftDashboard = {
       const wkVC = this.voidComps().filter(r => this.inWeek(r.date));
       const voidTot = wkVC.filter(r => r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
       const compTot = wkVC.filter(r => r.type === 'Comp').reduce((t, r) => t + (r.amount || 0), 0);
-      const netVar = this.variances().filter(v => this.inWeek(v.date)).reduce((t, v) => t + (v.variance || 0), 0);
-      return { wkS, rev, covers, checkAvg, voidTot, compTot, netVar, days: wkS.length, hasSales: wkS.length > 0, lastWk: sw.lastWk };
+      // varCount carries "was the drawer counted at all", which netVar alone cannot express — see
+      // the note in hubSteps. Every consumer of netVar must check it before showing a figure.
+      const wkVar = this.variances().filter(v => this.inWeek(v.date));
+      const netVar = wkVar.reduce((t, v) => t + (v.variance || 0), 0);
+      return { wkS, rev, covers, checkAvg, voidTot, compTot, netVar, varCount: wkVar.length, days: wkS.length, hasSales: wkS.length > 0, lastWk: sw.lastWk };
     } finally { this._weekEnd = sv; }
   },
 
@@ -353,7 +365,9 @@ S.ShiftDashboard = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Where The Money Walked</div>'
       + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
       +   mini('Covers', String(st.covers)) + vdiv
-      +   mini('Cash Over / Short', (st.netVar > 0 ? '+' : '') + App.fmtCurrency(st.netVar, 0), st.netVar < 0 ? 'var(--red)' : 'var(--t1)') + vdiv
+      +   (st.varCount
+            ? mini('Cash Over / Short', (st.netVar > 0 ? '+' : '') + App.fmtCurrency(st.netVar, 0), st.netVar < 0 ? 'var(--red)' : 'var(--t1)')
+            : mini('Cash Over / Short', 'Not counted', 'var(--t3)')) + vdiv
       +   mini('Voids + Comps', App.fmtCurrency(vcTot, 0))
       + '</div>'
       + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="theft-risk">Loss Prevention</button></div>'
@@ -392,7 +406,15 @@ S.ShiftDashboard = {
     if (oot > 0) walks.push(oot + ' drawer' + (oot === 1 ? '' : 's') + ' out of tolerance');
     if ((st.voidTot || 0) + (st.compTot || 0) > 0) walks.push(m(st.voidTot) + ' in voids and ' + m(st.compTot) + ' in comps');
     if (walked > 0) walks.push(walked + ' walked tab' + (walked === 1 ? '' : 's'));
-    paras.push(walks.length ? 'Where money is walking: ' + walks.join(', ') + '.' : 'The register is clean this week. Drawer is in tolerance and voids and comps are quiet.');
+    // ⚠ "Clean" is a CLAIM, and it must not be made about a drawer nobody counted. With no counts
+    // netVar is 0 and oot is 0, so `walks` came out empty and this printed "The register is clean
+    // this week" over a week with no cash reconciliation at all — the owner reads that, skips the
+    // reconcile step, and a week of shortages is never looked at.
+    paras.push(walks.length
+      ? 'Where money is walking: ' + walks.join(', ') + '.'
+      : (st.varCount
+          ? 'The register is clean this week. Drawer is in tolerance and voids and comps are quiet.'
+          : 'No drawer was counted this week, so there is nothing to say about cash yet. Reconcile the drawers and this fills in.'));
 
     // 3 — the single move
     let move;
