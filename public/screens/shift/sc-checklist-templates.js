@@ -98,7 +98,7 @@ S.ShiftChecklistTemplates = {
     // flag first (and not awaiting the write) meant a failed bulk write left the flag durably
     // true, the array stripped from the blob, and no rows — so Checklist Templates stayed
     // permanently empty and could never re-seed.
-    const ok = await App.putRecordsBulk('sc', 'checklist_template', seeded);
+    const ok = await App.putRecordsBulk('sc', 'checklist_template', seeded, { quiet: true });   // fires from render(), never shout
     if (!ok) { seeded.forEach(t => { const i = list.indexOf(t); if (i >= 0) list.splice(i, 1); }); return; }
     App.shiftData.sc_starter_seeded = true;
     await App.saveShift();                                       // the sc_starter_seeded flag stays in the blob
