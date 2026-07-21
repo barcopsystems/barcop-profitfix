@@ -279,7 +279,14 @@ S.PrepBatches = {
     const batches = this.list().slice()
       .sort((a, b) => String((a && a.name) || '').localeCompare(String((b && b.name) || '')));
 
-    this._resyncCosts(batches);
+    // Reported explicitly rather than left to the global unhandledrejection handler, so a
+    // repeatedly-failing resync is identifiable in the digest instead of anonymous. Deliberately
+    // does NOT take over the screen — see App.init's stated rejection policy: a false alarm on a
+    // non-fatal rejection trains people to ignore the real ones. Nothing was mutated (memory is
+    // only touched after a confirmed write), so the list simply renders the last good costs.
+    this._resyncCosts(batches).catch(e => {
+      try { DB.logClientError('prep_batch_resync', (e && e.message) || String(e), (e && e.stack) || '', 'ic-prep-batches'); } catch (e2) {}
+    });
 
     let listSection;
     if (!batches.length) {
