@@ -5088,6 +5088,24 @@ const App = {
     return { measure: 'unit', unitLabel: (p.unit_type || 'units'), costPerUnit: parseFloat(p.unit_cost) || 0 };
   },
 
+  // Ingredient ids in this item's recipe whose product or prep batch no longer exists. Mirrors
+  // ic-prep-batches.missingIngredients, which does the same job one level down.
+  // ⚠ A row with NO source/id is a hand-entered line carrying its own cost_per_unit. That is a
+  // legitimate shape, not a missing ingredient, and it must keep costing.
+  menuItemMissingIngredients(item) {
+    const ings = (item && item.recipe && Array.isArray(item.recipe.ingredients)) ? item.recipe.ingredients : [];
+    if (!ings.length) return [];
+    const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+    const batches = (this.inventoryData && this.inventoryData.ic_prep_batches) || [];
+    return ings.map(ing => {
+      const src = ing.source || (ing.product_id ? 'product' : null);
+      const id  = ing.id || ing.product_id;
+      if (!src || !id) return null;
+      const found = src === 'batch' ? batches.some(b => b && b.id === id) : prods.some(p => p && p.id === id);
+      return found ? null : id;
+    }).filter(Boolean);
+  },
+
   menuItemCost(item) {
     if (!item) return null;
 
@@ -5102,6 +5120,20 @@ const App = {
     if (item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length) {
       const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
       const batches = (this.inventoryData && this.inventoryData.ic_prep_batches) || [];
+
+      // ⚠ A DELETED INGREDIENT IS NOT A FREE ONE. A missing product used to fall through to
+      // `ing.cost_per_unit` — which recipe rows do not store (r-menu-items persists {source, id,
+      // quantity} only) — and a missing batch returned 0 outright. So deleting the ground beef
+      // dropped the Smash Burger from $4.20 to $0.85 silently, and every margin, food-cost %,
+      // Star/Dog rating and reprice suggestion built on it moved the flattering way.
+      // Unlike a prep batch there is no stored "last good" cost to hold here: a menu item's cost is
+      // recomputed from its recipe on every read. So the honest answer is to REFUSE to cost it.
+      // null flows through menuItemPct's `costed` flag, and the item then reads "not costed"
+      // everywhere instead of cheap — off the Menu Engineering board (it filters on a truthy cost),
+      // dashed out on Recipe Cost Analysis, Incomplete in the Menu Builder.
+      // Costing the REST and calling that the dish cost would be the same lie in a smaller font: a
+      // partial cost is not a cost.
+      if (this.menuItemMissingIngredients(item).length) return null;
 
       const ingCost = ing => {
         const qty = parseFloat(ing.quantity) || 0;
