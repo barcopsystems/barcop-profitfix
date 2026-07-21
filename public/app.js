@@ -3003,7 +3003,7 @@ const App = {
     // server but missing from the cache would be numbered on a different scale, persisting a
     // scrambled count-sheet order instead of fixing it.
     if (_locsStamped.length && !(_locs && _locs._fromCache)) {
-      await this.putRecordsBulk('ic', 'location', _locsStamped);
+      await this.putRecordsBulk('ic', 'location', _locsStamped, { quiet: true });
     }
     // Pre-fetch the accounts list so the Hub sidebar can render the
     // Locations section synchronously (multi-account users only).
