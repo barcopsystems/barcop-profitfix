@@ -232,6 +232,16 @@ S.PrepBatches = {
   // Ingredient product_ids on this batch that no longer exist in ic_products. Deleting a product
   // does NOT cascade into prep-batch recipes (ic-product-setup confirmDel removes the product row
   // and nothing else), so the reference just dangles.
+  // Ingredients still on file but marked INACTIVE. Deliberately separate from missingIngredients:
+  // a deleted product means the cost is UNKNOWN (load-bearing, blocks the resync), an inactive one
+  // means the cost is KNOWN and correct and only the operational picture changed. So this changes
+  // no math — it is a note, not an alarm.
+  inactiveIngredients(b) {
+    return (((b && b.ingredients) || [])
+      .map(i => (i && i.product_id) ? this.prodById(i.product_id) : null)
+      .filter(p => p && p.active === false));
+  },
+
   missingIngredients(b) {
     return (((b && b.ingredients) || [])
       .filter(i => i && i.product_id && !this.prodById(i.product_id))
@@ -316,7 +326,13 @@ S.PrepBatches = {
         + (this.missingIngredients(b).length
             ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--amber);">INGREDIENT DELETED</span>'
               + '<div style="font-size:10px;color:var(--t3);">Cost is held at its last good value. Edit the batch to replace or remove the missing product.</div>'
-            : '') + '</div></td>'
+            // Inactive is NOT an alarm: the cost below is correct. Grey note, no badge, no colour —
+            // it tells the operator this batch leans on something they have stopped stocking.
+            : (this.inactiveIngredients(b).length
+                ? '<div style="font-size:10px;color:var(--t3);">Uses ' + this.inactiveIngredients(b).length
+                  + ' inactive product' + (this.inactiveIngredients(b).length === 1 ? '' : 's') + ': '
+                  + this.inactiveIngredients(b).map(p => esc(p.name)).join(', ') + '</div>'
+                : '')) + '</div></td>'
         + '<td>' + esc(b.category || '-') + '</td>'
         + '<td>' + (b.batch_yield || '-') + ' ' + esc(b.batch_yield_unit || '') + '</td>'
         + '<td>' + (b.servings_per_batch ? b.servings_per_batch.toFixed(1) + ' servings' : '-') + '</td>'
