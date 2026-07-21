@@ -157,11 +157,17 @@ const PosIngest = {
   // two legitimately-identical rows (a split shift, two same-value sittings) isn't
   // collapsed to one, while a full re-import of the same file still dedups cleanly.
   _isDup(existing, used, pred) {
+    return !!this._findDup(existing, used, pred);
+  },
+  // Same consume-once search, but hands back the RECORD it matched. buildCash needs
+  // to read the match's `source` to decide replace-or-protect, and a bare boolean
+  // cannot carry that. _isDup delegates so every other builder is untouched.
+  _findDup(existing, used, pred) {
     for (const x of existing) {
       if (used.has(x.id) || !pred(x)) continue;
-      used.add(x.id); return true;
+      used.add(x.id); return x;
     }
-    return false;
+    return null;
   },
 
   // Normalize a POS date cell to canonical local YYYY-MM-DD (App.ymdLocal's
@@ -369,15 +375,23 @@ const PosIngest = {
     // Match by the register's name OR any saved POS alias (a report calls a
     // register "Main Bar" that the operator named "Bar 1" — the alias links them).
     const drawerByName = {};
-    ((App.shiftData && App.shiftData.sc_drawers) || []).forEach(d => {
-      if (!d || d.active === false) return;
+    const activeDrawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d && d.active !== false);
+    activeDrawers.forEach(d => {
       if (d.name) drawerByName[String(d.name).trim().toLowerCase()] = d;
       (d.pos_aliases || []).forEach(a => { if (a) drawerByName[String(a).trim().toLowerCase()] = d; });
     });
+    // A cash report with no Register column, on a bar that runs exactly ONE register,
+    // is unambiguously that register. Resolving it is what lets the import recognise
+    // the operator's own hand count of the same register-day: the two sides used to
+    // compare a blank against 'Main Bar' and never match, so the day was counted twice
+    // in Drawer Net, the short rate, Loss Prevention and the Books cash sheet.
+    // With TWO OR MORE registers a column-less row is a whole-day figure and is
+    // deliberately left day-level — attributing it to one register would invent data.
+    const soleDrawer = activeDrawers.length === 1 ? activeDrawers[0] : null;
     const staffByName = this._staffByName();
     const existing = (App.shiftData && App.shiftData.sc_variances) || [];
     const has = v => v != null && String(v).trim() !== '';
-    const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
+    const toAdd = []; const skipped = []; let dupCount = 0; let keptManual = 0; const used = new Set();
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
       if (!date) { skipped.push('(no date)'); return; }
@@ -387,8 +401,9 @@ const PosIngest = {
       else if (has(r.over_short)) { variance = Math.round(os * 100) / 100; }   // a "($50)" shortage now correctly reads -50, not +50
       else { skipped.push(date); return; }            // no over/short derivable
       const dName = (r.drawer || '').trim();
-      const dRec = dName ? drawerByName[dName.toLowerCase()] : null;
+      const dRec = dName ? drawerByName[dName.toLowerCase()] : soleDrawer;
       const drawer = dRec ? dRec.name : dName;
+      const drawerId = dRec ? dRec.id : '';
       const cName = (r.cashier || '').trim();
       const staff = cName ? staffByName[cName.toLowerCase()] : null;
       const cashier = staff ? staff.name : cName;
@@ -397,11 +412,23 @@ const PosIngest = {
       // cent — and a figure that differs is exactly the case where a second row is wrong: it is the
       // same drawer-day measured twice, not two events. A hand count of -$47.50 plus a POS -$47.00
       // made Main Bar Friday -$94.50 in Drawer Net, the Hub over/short stat, the short RATE (2 of 2
-      // instead of 1 of 1), Loss Prevention and the Books cash sheet. The app's own help invites the
-      // collision: "Reconcile by Hand here is for an off-cycle count, a register with no POS export,
-      // or a recount." Date + drawer only, so the existing count wins and the import reports it as
-      // already logged. Still keyed on the DRAWER, so other registers that day import normally.
-      if (this._isDup(existing, used, x => x.date === date && (x.drawer || '') === drawer)) { dupCount++; return; }
+      // instead of 1 of 1), Loss Prevention and the Books cash sheet.
+      //
+      // ⚠ KEYED ON drawer_id, NOT the register NAME. The hand form dedupes on `drawer_id`
+      // (sc-cash-control saveCountDrawer) and this side used to dedupe on `drawer`, so the two
+      // halves of one check compared DIFFERENT FIELDS and a blank never lined up with a named
+      // register — the collision above went undetected in both directions.
+      //
+      // ⚠ REPLACE-OR-PROTECT, the same rule buildSales already applies (Kyle 2026-07-21):
+      //   prior was IMPORTED -> the new figure REPLACES it, so a CORRECTED drawer report
+      //     actually lands. This used to `return` and DISCARD the correction, leaving the wrong
+      //     number on file while the screen said "already logged".
+      //   prior was entered BY HAND -> untouchable. buildSales protects a manual close the same
+      //     way (`manualDates`), so a bulk import can never overwrite the operator's own work.
+      // The superseded imported row is deleted in _commitCashRows, mirroring _commitSales.
+      const prior = this._findDup(existing, used, x => x.date === date && (x.drawer_id || '') === drawerId);
+      if (prior && prior.source === 'manual') { keptManual++; return; }
+      if (prior) dupCount++;
       // Tolerance is the matched register's own (App.drawerTolerance); $10 when
       // the register is unrecognized or unmapped.
       const tol = (window.App && App.drawerTolerance) ? App.drawerTolerance(dRec || null) : 10;
@@ -409,14 +436,16 @@ const PosIngest = {
                    : (Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over');
       toAdd.push({
         id: App.uid(), date, shift_type: '',
-        drawer_id: dRec ? dRec.id : '', drawer,
+        drawer_id: drawerId, drawer,
         cashier_id: staff ? staff.id : '', cashier,
         source: 'import', expected_cash, counted_cash, variance,
         tolerance: tol, status, reason: '', notes: '',
         imported: true, created_at: new Date().toISOString()
       });
     });
-    return { toAdd, skipped, dupCount };
+    // `dupCount` now means REPLACED (the sales importer's meaning), and `keptManual`
+    // counts register-days the operator had already counted by hand, which are left alone.
+    return { toAdd, skipped, dupCount, keptManual };
   },
 
   // A POS per-server sales report: one row per server (per day) with covers +
@@ -500,6 +529,7 @@ const PosIngest = {
   async commit(type, toAdd) {
     if (type === 'sales') return this._commitSales(toAdd);
     if (type === 'pmix')  return this._commitPmix(toAdd);
+    if (type === 'cash')  return this._commitCashRows(toAdd);
     const t = this.TYPES[type];
     if (!t) return false;
     let ok = true;
@@ -545,6 +575,35 @@ const PosIngest = {
   // Sales upserts by DATE: a re-import of the same week replaces those days'
   // figures (one record per day), so it never double-counts and supersedes any
   // older record for the day.
+  // Cash re-import: the MIRROR of _commitSales. A corrected drawer report has to
+  // land, so a register-day that was previously IMPORTED is replaced rather than
+  // skipped. Insert the new records FIRST, then remove the superseded ones, so a
+  // failure mid-way never leaves a register-day with no record at all.
+  // ⚠ `stale` is computed BEFORE the inserts: putRecord pushes the new row into the
+  // same array, and it shares the key, so computing it afterwards would delete the
+  // row that was just written.
+  // ⚠ `source !== 'manual'` is what protects a hand count. buildCash already refuses
+  // to queue a row over one, so this is belt-and-braces at the second door: nothing
+  // here may ever delete an operator's own reconcile.
+  async _commitCashRows(toAdd) {
+    const keys = new Set((toAdd || []).map(r => r.date + '|' + (r.drawer_id || '')));
+    const fresh = new Set((toAdd || []).map(r => r.id));
+    const stale = (((App.shiftData && App.shiftData.sc_variances) || []))
+      .filter(v => v && v.source !== 'manual' && !fresh.has(v.id)
+        && keys.has(v.date + '|' + (v.drawer_id || '')));
+    let ok = true;
+    try {
+      for (const rec of (toAdd || [])) { ok = (await App.putRecord('sc', 'variance', rec)) && ok; }
+      // ⚠ Retire the superseded rows ONLY once the replacements actually landed.
+      // Removing them after a refused insert leaves the register-day with NO record
+      // at all — the exact outcome the insert-first ordering exists to prevent.
+      // Worst case now is the old figure surviving next to the new one, which is
+      // visible and re-importable; the alternative is a silently empty day.
+      if (ok) for (const e of stale) { ok = (await App.removeRecord('sc', 'variance', e.id)) && ok; }
+    } catch (e) { return false; }
+    return ok;
+  },
+
   async _commitSales(toAdd) {
     const dates = new Set((toAdd || []).map(r => r.date));
     // Replace only prior IMPORTED days for these dates — never a hand-entered
@@ -556,7 +615,11 @@ const PosIngest = {
     let ok = true;
     try {
       for (const rec of (toAdd || [])) { ok = (await App.putRecord('sc', 'shift', rec)) && ok; }
-      for (const e of stale) { ok = (await App.removeRecord('sc', 'shift', e.id)) && ok; }
+      // ⚠ Guarded 2026-07-21. The comment above promised "a failure mid-way never
+      // leaves a date with no record at all", but the removals ran unconditionally —
+      // so if every insert was refused, the previous day's record was deleted anyway
+      // and the date ended up EMPTY. Found by the cash twin's write-failure case.
+      if (ok) for (const e of stale) { ok = (await App.removeRecord('sc', 'shift', e.id)) && ok; }
     } catch (e) { return false; }
     return ok;
   }
