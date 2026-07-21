@@ -5106,6 +5106,29 @@ const App = {
     }).filter(Boolean);
   },
 
+  // Products in this item's recipe that are still on file but marked INACTIVE.
+  // ⚠ DELIBERATELY SEPARATE from menuItemMissingIngredients, and it must stay that way.
+  //   deleted  = the cost is UNKNOWN. menuItemCost refuses to cost the dish. Load-bearing, amber.
+  //   inactive = the cost is KNOWN and CORRECT. Nothing is lying. The only issue is operational:
+  //              you may not be able to make this right now.
+  // So this changes NO math and no ranking. The app's own help documents Hide from operations as
+  // covering "a seasonal pour or a discontinued item" — a seasonal ingredient going inactive in
+  // January must not strip a dish out of Menu Engineering or Pre-Shift. If "cannot make this
+  // tonight" is ever wanted, that is a stronger, separate concept (an 86) and deserves its own flag
+  // rather than being smuggled in on this one.
+  menuItemInactiveProducts(item) {
+    const ings = (item && item.recipe && Array.isArray(item.recipe.ingredients)) ? item.recipe.ingredients : [];
+    if (!ings.length) return [];
+    const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+    return ings.map(ing => {
+      const src = ing.source || (ing.product_id ? 'product' : null);
+      const id  = ing.id || ing.product_id;
+      if (src !== 'product' || !id) return null;
+      const p = prods.find(x => x && x.id === id);
+      return (p && p.active === false) ? p : null;
+    }).filter(Boolean);
+  },
+
   menuItemCost(item) {
     if (!item) return null;
 
