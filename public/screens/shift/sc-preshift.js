@@ -79,8 +79,12 @@ S.ShiftPreShift = {
     // through App.menuItemCost (a bare i.cost is null for most items).
     const items = ((App.data && App.data.menu_items) || [])
       .filter(i => !i.archived)
-      .map(i => ({ item: i, price: this.n(i.price), cost: this.n(App.menuItemCost(i)), covers: this.n(i.weekly_covers) }))
-      .filter(x => x.price != null && x.cost != null && x.covers != null && x.covers > 0);
+      // ⚠ costed: an item with NO cost is not an item with a ZERO cost. Ranking is by margin
+      // (price - cost), so a fabricated 0 makes the margin the FULL menu price and every uncosted
+      // item outranks every correctly costed one. These five go on the briefing the shift lead
+      // reads to the floor, with a Margin column, so it has to be a margin we actually know.
+      .map(i => ({ item: i, price: this.n(i.price), cost: this.n(App.menuItemCost(i)), covers: this.n(i.weekly_covers), costed: App.menuItemPct(i).costed }))
+      .filter(x => x.costed && x.price != null && x.cost != null && x.covers != null && x.covers > 0);
     if (items.length < 4) return [];
     const avgCM = items.reduce((s, x) => s + (x.price - x.cost), 0) / items.length;
     const avgCov = items.reduce((s, x) => s + x.covers, 0) / items.length;
@@ -123,8 +127,10 @@ S.ShiftPreShift = {
   _recommendedFor(period) {
     const all = ((App.data && App.data.menu_items) || [])
       .filter(i => !i.archived)
-      .map(i => ({ item: i, price: this.n(i.price), cost: this.n(App.menuItemCost(i)), covers: this.n(i.weekly_covers) }))
-      .filter(x => x.price != null && x.cost != null && x.covers != null && x.covers > 0 && (x.price - x.cost) > 0);
+      // costed: same rule as todayStars — the score below is built on (price - cost), so an item
+      // whose cost we do not know would score its entire menu price and take the top slot.
+      .map(i => ({ item: i, price: this.n(i.price), cost: this.n(App.menuItemCost(i)), covers: this.n(i.weekly_covers), costed: App.menuItemPct(i).costed }))
+      .filter(x => x.costed && x.price != null && x.cost != null && x.covers != null && x.covers > 0 && (x.price - x.cost) > 0);
     if (all.length < 4) return this.todayStars();
     // Prefer items that actually sell (above the menu average), unless that
     // leaves too few to fill the list.
