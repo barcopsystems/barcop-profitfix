@@ -1097,6 +1097,12 @@ S.RevenueMenuItems = {
     existing.forEach(it => { byKey[keyOf(it.type, it.name)] = it; });
     let added = 0, updated = 0;
     const repriced = [];
+    // Snapshot the whole menu before the import touches it, and track the rows it appends. The
+    // bulk write below cannot revert itself, so without these a failed import left the new prices
+    // and new items on screen while the server kept the old menu — and the repricing below would
+    // log price changes to Recovery for prices the register never got.
+    const undoAll = App.snapshotRows(existing);
+    const addedRecs = [];
     rows.forEach(r => {
       const name = (r.name || '').trim();
       if (!name) return;
@@ -1142,7 +1148,7 @@ S.RevenueMenuItems = {
           created_at:         new Date().toISOString(),
           updated_at:         new Date().toISOString()
         };
-        existing.push(it);
+        existing.push(it); addedRecs.push(it);
         byKey[keyOf(this.activeType, name)] = it;
         added++;
       }
@@ -1154,7 +1160,13 @@ S.RevenueMenuItems = {
       return;
     }
 
-    await App.putRecordsBulk('core', 'menu_item', this.items());
+    if (!(await App.putRecordsBulk('core', 'menu_item', this.items()))) {
+      App.restoreRows(undoAll);
+      App.dropRows(existing, addedRecs);
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the import. Nothing was changed — check your connection and try again.</div>';
+      this.render(this.container, this.actions);
+      return;
+    }
     // Every reprice the file carried goes through the one canonical pricing logger,
     // same as a direct edit, so the Pricing Review Log and Recovery see it. Without
     // this the audit told the operator to reprice the day after they repriced.

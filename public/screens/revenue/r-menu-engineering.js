@@ -490,7 +490,7 @@ S.RevenueMenuEngineering = {
   async applyBatch(live) {
     const ids = [...document.querySelectorAll('.batch-chk')].filter(c => c.checked).map(c => c.dataset.id);
     if (!ids.length) { App.closeModal('batch-modal'); return; }
-    const logs = [], touched = [];
+    const logs = [], touched = [], undo = [];
     ids.forEach(id => {
       const item = (App.data.menu_items || []).find(x => x.id === id);
       if (!item) return;
@@ -498,6 +498,7 @@ S.RevenueMenuEngineering = {
       const sugg = this.suggested(item, cost);
       if (!sugg) return;
       touched.push(item);
+      undo.push(...App.snapshotRows([item]));   // captured BEFORE the price is changed below
       if (live) {
         const old = item.price;
         item.price = sugg; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
@@ -506,7 +507,15 @@ S.RevenueMenuEngineering = {
         item.planned_price = sugg; item.planned_vol_pct = 0; item.planned_at = new Date().toISOString();
       }
     });
-    await App.putRecordsBulk('core', 'menu_item', touched);
+    // A bulk write cannot revert itself. Without this, a failed write left the new prices on the
+    // menu screen while the server kept the old ones — and Recovery got a logged price rise that
+    // never actually happened, so the scoreboard credited money the bar never charged.
+    if (!(await App.putRecordsBulk('core', 'menu_item', touched))) {
+      App.restoreRows(undo);
+      App.closeModal('batch-modal');
+      this.draw();
+      return;
+    }
     for (const [item, old, np, vol] of logs) await this._logPriceChange(item, old, np, vol);
     App.closeModal('batch-modal');
     this.draw();
@@ -519,6 +528,7 @@ S.RevenueMenuEngineering = {
     const ok = await App.confirm({ title: 'Mark all planned prices live?', message: planned.length + ' planned price' + (planned.length === 1 ? '' : 's') + ' will become your live menu prices now, and Bar Cop will log the change to Recovery. Do this the day the new menu actually goes into service.', confirmText: 'Mark All Live', cancelText: 'Not Yet' });
     if (!ok) return;
     const logs = [];
+    const undo = App.snapshotRows(planned);   // before any price moves
     planned.forEach(item => {
       const old = item.price, np = item.planned_price, vol = item.planned_vol_pct;
       // Raise-only: never CUT a live price in bulk. If the planned price is at/below live,
@@ -527,7 +537,8 @@ S.RevenueMenuEngineering = {
       item.price = np; item.planned_price = null; item.planned_at = null; item.planned_vol_pct = null;
       if (old != null && old !== np) logs.push([item, old, np, vol]);
     });
-    await App.putRecordsBulk('core', 'menu_item', planned);
+    // Same as the batch apply above: never log a price change to Recovery that did not land.
+    if (!(await App.putRecordsBulk('core', 'menu_item', planned))) { App.restoreRows(undo); this.draw(); return; }
     for (const [item, old, np, vol] of logs) await this._logPriceChange(item, old, np, vol);
     this.draw();
   },
