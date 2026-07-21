@@ -485,6 +485,7 @@ S.HubOperatingExpenses = {
 
   async _importRows(rows) {
     const arr = this.records();
+    const _added = [];   // rows appended here, so a failed write can take them back out
     (rows || []).forEach((r, i) => {
       const date = this._normDate(r.date);
       const amount = parseFloat(String(r.amount || '').replace(/[^0-9.\-]/g, ''));
@@ -494,9 +495,12 @@ S.HubOperatingExpenses = {
       const notes = (r.notes || '').trim();
       // Skip a row already logged (same date, amount, vendor, category).
       if (arr.some(x => x.date === date && Math.abs((parseFloat(x.amount) || 0) - amount) < 0.005 && (x.vendor || '') === vendor && (x.category || '') === category)) return;
-      arr.push({ id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date, category, vendor, amount, notes, created_at: new Date().toISOString() });
+      const row = { id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date, category, vendor, amount, notes, created_at: new Date().toISOString() };
+      arr.push(row); _added.push(row);
     });
-    await App.putRecordsBulk('core', 'operating_expense', this.records());
+    // Imported rows were pushed into the live list before the write, and a bulk write cannot revert
+    // itself — take them back out rather than showing an import Books counts and the server lacks.
+    if (!(await App.putRecordsBulk('core', 'operating_expense', this.records()))) App.dropRows(arr, _added);
     this._entryMode = 'manual';
     this.renderMain();
   },
@@ -709,6 +713,11 @@ S.HubOperatingExpenses = {
       const termV = parseInt(document.getElementById('oex-f-term')?.value, 10);
       if (recChecked && document.getElementById('oex-f-term')?.value && (isNaN(termV) || termV < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
       const touched = [];
+      // ⚠ This branch REPLACES array slots (arr[idx] = Object.assign({}, ...)) rather than mutating
+      // the records, so snapshotting the record objects would capture the new ones. Snapshot the
+      // ARRAY instead. A bulk write cannot revert itself, and this one was discarded — so a failed
+      // save left the edited bill on screen and in Books while the server kept the old one.
+      const undoArr = arr.slice();
       if (isEdit) {
         const idx = arr.findIndex(r => r.id === rec.id);
         if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], updates);
@@ -729,7 +738,11 @@ S.HubOperatingExpenses = {
         arr.push(newRec);
         touched.push(newRec);
       }
-      await App.putRecordsBulk('core', 'operating_expense', touched);
+      if (!(await App.putRecordsBulk('core', 'operating_expense', touched))) {
+        arr.length = 0; arr.push(...undoArr);
+        showErr('Could not save. Nothing was changed — check your connection and try again.');
+        return;
+      }
       App.closeModal(id);
       this._rerender();
     });
