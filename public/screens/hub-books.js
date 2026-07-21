@@ -886,13 +886,21 @@ S.HubBooks = {
       sortedShifts.forEach(s => accountedFor.add(vKey(s.date, s.shift_type)));
       variances.forEach(v => {
         if (accountedFor.has(vKey(v.date, v.shift_type))) return;
-        const exp = parseFloat(v.expected_cash) || 0;
-        const cnt = parseFloat(v.counted_cash)  || 0;
-        const varc = parseFloat(v.variance) || (cnt - exp);
+        // ⚠ NULL, not 0. buildCash leaves expected/counted absent when the POS report carried only
+        // an Over/Short column. Printing $0.00 on the Cash Reconciliation sheet — the one this file
+        // calls "the documentation the IRS looks for in a cash-heavy business" — states that the
+        // drawer was empty. hub-year-end.js:871 already uses `|| null` for these same fields.
+        // The VARIANCE is always real, so it still totals; only the two figures we may not have are
+        // withheld, and they only reach the totals when they exist.
+        const exp = v.expected_cash != null ? (parseFloat(v.expected_cash) || 0) : null;
+        const cnt = v.counted_cash  != null ? (parseFloat(v.counted_cash)  || 0) : null;
+        const varc = parseFloat(v.variance) || ((cnt != null && exp != null) ? (cnt - exp) : 0);
         rows.push([v.date || '', v.shift_type || '', v.cashier || '', null, exp, cnt, varc, v.status || '', v.reason || '']);
-        totalExp += exp;
-        totalCnt += cnt;
-        totalVar += varc;
+        // Same guards the shift-joined block above already uses: a figure we do not have does not
+        // enter the totals (and must not turn them into NaN).
+        if (exp  != null) totalExp += exp;
+        if (cnt  != null) totalCnt += cnt;
+        if (varc != null) totalVar += varc;
       });
     }
 
