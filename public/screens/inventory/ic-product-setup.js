@@ -22,6 +22,23 @@ S.InventoryProducts = {
   _dismissedAlerts: null,  // Set of categories whose incomplete-data bar was dismissed
 
   get CATEGORIES() { return App.IC_CATEGORIES; },   // single source on App
+  // The one extra tab after the real categories. Named to match the action (Make Inactive) and the
+  // list badge (Inactive) — deliberately NOT "Archived", which is ic-locations' vocabulary.
+  // Held as a constant so the string is never spelled out in the filter, the tab bar and the
+  // click handler separately.
+  INACTIVE_TAB: 'Inactive',
+
+  // What the current tab should list. Inactive products LEAVE the working category tabs and live in
+  // the Inactive tab instead — Kyle's call 2026-07-21, over a per-category section: you will not
+  // remember whether something was Food or Misc, Delete Permanently belongs in one labelled place
+  // rather than scattered across six tabs you use for routine edits, and archiving 100 mis-imported
+  // wines should leave every working tab clean.
+  visibleProducts() {
+    const all = this.products();
+    return this.activeCat === this.INACTIVE_TAB
+      ? all.filter(p => p && p.active === false)
+      : all.filter(p => p && (p.category || '') === this.activeCat && p.active !== false);
+  },
 
   // Per-category form spec: labels, defaults, which fields show.
   // The single renderForm() method reads this to assemble each form.
@@ -322,7 +339,7 @@ S.InventoryProducts = {
       { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. The category is locked to the card you uploaded from, so the columns offered match that category and Bar Cop never figures a cost per pour with the wrong divisor.'] },
       { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Every row comes in as a product in that category, and any row missing required data shows as Incomplete so you can finish it later.'] },
       { h: 'Bulk Edit Many At Once', p: ['After an upload you often need the same value across a whole category: a 1.5 oz pour on every liquor, one vendor or storage location across a list, the same par. Check the products you want, or use Select All on the category tab, then tap Bulk Edit. Turn on only the fields you want to change, set each value, and Apply. Bar Cop writes those fields to every selected product at once and leaves everything else untouched, then refigures pours per container, cost per pour, and pour cost percent for each one. Anything that was Incomplete and now has what it needs clears its flag.'] },
-      { h: 'Hiding A Product', p: ['When you Edit a product, the status across from the title reads ACTIVE or HIDDEN. Hit Hide from operations to pull a seasonal pour or a discontinued item out of counts, orders, and the menu side without throwing away its history, then Update to commit. A hidden product reads Inactive on the list; open it again and Make active brings it back.'] }
+      { h: 'Hiding A Product', p: ['When you Edit a product, the status across from the title reads ACTIVE or INACTIVE. Hit Hide from operations to pull a seasonal pour or a discontinued item out of counts, orders, and the menu side without throwing away its history, then Update to commit. An inactive product moves to the Inactive tab after Misc, so your category lists stay clean; open it there and Make active brings it back.'] }
     ]);
   },
 
@@ -354,7 +371,10 @@ S.InventoryProducts = {
       + cards + '</div>';
 
     // Existing-products table, filtered by activeCat. Tabs flip the filter.
-    const prods = all.filter(p => (p.category || '') === this.activeCat);
+    // One door: the working tabs list ACTIVE products of that category, the Inactive tab lists every
+    // inactive product whatever category it came from. See visibleProducts.
+    const prods = this.visibleProducts();
+    const onInactiveTab = this.activeCat === this.INACTIVE_TAB;
     const target = App.data?.settings?.targets?.bar_pour_cost_pct ?? 22;
     const incompleteHere = prods.filter(p => !this.isComplete(p));
 
@@ -507,13 +527,19 @@ S.InventoryProducts = {
   // Category filter tabs, styled to match the report tab bar (.rpt-tabs).
   catTabs() {
     const all = this.products();
+    // ⚠ Counts are of ACTIVE products only, matching what the tab actually lists. Counting every
+    // product would make Liquor read 35 and then show 34.
+    const tab = (label, n, key) => {
+      const on = (key || label) === this.activeCat;
+      return '<button class="ch-tab' + (on ? ' on' : '') + '" data-cat="' + esc(key || label) + '">'
+        + esc(label) + (n ? ' <span style="opacity:0.55;">' + n + '</span>' : '') + '</button>';
+    };
+    const inactiveN = all.filter(p => p && p.active === false).length;
     return '<div class="ch-tabs no-print">'
-      + this.CATEGORIES.map(c => {
-          const n = all.filter(p => (p.category || '') === c).length;
-          const on = c === this.activeCat;
-          return '<button class="ch-tab' + (on ? ' on' : '') + '" data-cat="' + esc(c) + '">'
-            + esc(c) + (n ? ' <span style="opacity:0.55;">' + n + '</span>' : '') + '</button>';
-        }).join('')
+      + this.CATEGORIES.map(c =>
+          tab(c, all.filter(p => p && (p.category || '') === c && p.active !== false).length)).join('')
+      // Last, after Misc: one place for everything retired, whatever category it came from.
+      + tab(this.INACTIVE_TAB, inactiveN)
       + '</div>';
   },
 
@@ -610,7 +636,7 @@ S.InventoryProducts = {
           + 'background:' + (isActive ? 'rgba(125,199,125,0.12)' : 'rgba(199,125,125,0.12)') + ';'
           + 'color:' + (isActive ? 'var(--green)' : 'var(--red)') + ';">'
           + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span>'
-          + (isActive ? 'ACTIVE' : 'HIDDEN')
+          + (isActive ? 'ACTIVE' : 'INACTIVE')
         + '</span>'
         + '<button type="button" class="btn btn-ghost btn-sm" id="ip-toggle-active">'
           + (isActive ? 'Hide from operations' : 'Make active')
@@ -878,7 +904,7 @@ S.InventoryProducts = {
       el.dataset.active = nowActive ? 'true' : 'false';
       el.style.background = nowActive ? 'rgba(125,199,125,0.12)' : 'rgba(199,125,125,0.12)';
       el.style.color = nowActive ? 'var(--green)' : 'var(--red)';
-      el.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span>' + (nowActive ? 'ACTIVE' : 'HIDDEN');
+      el.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span>' + (nowActive ? 'ACTIVE' : 'INACTIVE');
       document.getElementById('ip-toggle-active').textContent = nowActive ? 'Hide from operations' : 'Make active';
     });
 
