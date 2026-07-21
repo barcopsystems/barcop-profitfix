@@ -193,6 +193,52 @@ S.PrepBatches = {
   },
 
   // Landing: the add form on top, the batch list below.
+  // Keep stored batch costs in sync with current product costs so the list, and any menu item
+  // that rolls up cost_per_serving, never show a stale number after an ingredient's price moved.
+  //
+  // ⚠ THE ROLLBACK IS THE POINT. This mutates the batch in memory BEFORE it can write, and
+  // putRecordsBulk — unlike the single-row putRecord — does NOT revert on failure. Discarding
+  // the result (which is what shipped) meant: on a failed write memory held the corrected cost
+  // while the server kept the stale one, AND the drift check then compared memory against the
+  // same computed value and PASSED, so it never retried. The correction vanished on the next
+  // reload and the list had been showing a figure the server did not have. Rolling back keeps
+  // memory and server honest and lets the next render retry on its own.
+  //
+  // `quiet` because this fires from a RENDER, not from anything the operator did — an unattended
+  // write must never pop a failure toast over a page they merely opened.
+  async _resyncCosts(batches) {
+    const touched = [], prior = [];
+    (batches || []).forEach(b => {
+      const ingRows = (b.ingredients || []).map(i => ({ cost_per_unit: this.unitCost(this.prodById(i.product_id)), quantity: i.quantity || 0 }));
+      const out = this.computeRows(ingRows, b.batch_yield, b.batch_yield_unit, b.serving_size, b.serving_size_unit);
+      if (Math.abs((b.total_cost || 0) - (out.total_cost || 0)) > 0.005
+          || Math.abs((b.cost_per_serving || 0) - (out.cost_per_serving || 0)) > 0.005) {
+        prior.push({
+          b, total_cost: b.total_cost, cost_per_serving: b.cost_per_serving, servings_per_batch: b.servings_per_batch,
+          ings: (b.ingredients || []).map(i => ({ i, cost_per_unit: i.cost_per_unit, total_cost: i.total_cost }))
+        });
+        b.total_cost = out.total_cost;
+        b.cost_per_serving = out.cost_per_serving;
+        b.servings_per_batch = out.servings_per_batch;
+        (b.ingredients || []).forEach(ing => {
+          ing.cost_per_unit = this.unitCost(this.prodById(ing.product_id));
+          ing.total_cost = (ing.cost_per_unit || 0) * (ing.quantity || 0);
+        });
+        touched.push(b);
+      }
+    });
+    if (!touched.length) return true;
+    // Row-per-record: persist only the batches whose cost drifted (one bulk upsert).
+    const ok = await App.putRecordsBulk('ic', 'prep_batch', touched, { quiet: true });
+    if (!ok) prior.forEach(p => {
+      p.b.total_cost = p.total_cost;
+      p.b.cost_per_serving = p.cost_per_serving;
+      p.b.servings_per_batch = p.servings_per_batch;
+      p.ings.forEach(x => { x.i.cost_per_unit = x.cost_per_unit; x.i.total_cost = x.total_cost; });
+    });
+    return ok;
+  },
+
   renderList() {
     this.actions.innerHTML = '';
     this.editId = null;
@@ -207,27 +253,7 @@ S.PrepBatches = {
     const batches = this.list().slice()
       .sort((a, b) => String((a && a.name) || '').localeCompare(String((b && b.name) || '')));
 
-    // Keep stored batch costs in sync with current product costs so the list and
-    // any menu item that rolls up cost_per_serving never show a stale number when
-    // an ingredient's price has changed since the batch was last edited.
-    const _costTouched = [];
-    batches.forEach(b => {
-      const ingRows = (b.ingredients || []).map(i => ({ cost_per_unit: this.unitCost(this.prodById(i.product_id)), quantity: i.quantity || 0 }));
-      const out = this.computeRows(ingRows, b.batch_yield, b.batch_yield_unit, b.serving_size, b.serving_size_unit);
-      if (Math.abs((b.total_cost || 0) - (out.total_cost || 0)) > 0.005
-          || Math.abs((b.cost_per_serving || 0) - (out.cost_per_serving || 0)) > 0.005) {
-        b.total_cost = out.total_cost;
-        b.cost_per_serving = out.cost_per_serving;
-        b.servings_per_batch = out.servings_per_batch;
-        (b.ingredients || []).forEach(ing => {
-          ing.cost_per_unit = this.unitCost(this.prodById(ing.product_id));
-          ing.total_cost = (ing.cost_per_unit || 0) * (ing.quantity || 0);
-        });
-        _costTouched.push(b);
-      }
-    });
-    // Row-per-record: persist only the batches whose cost drifted (one bulk upsert).
-    if (_costTouched.length) App.putRecordsBulk('ic', 'prep_batch', _costTouched);
+    this._resyncCosts(batches);
 
     let listSection;
     if (!batches.length) {
