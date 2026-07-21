@@ -5212,20 +5212,70 @@ const App = {
   // `counted:false` (operator skipped it) never overwrites a prior value, so a
   // count submitted with everything not counted changes nothing. Older counts
   // predate the flag, so their items are treated as counted. { pid: {onHand,value} }.
+  //
+  // A count item is keyed to the location NAME it was taken at, and nothing ever
+  // rewrites a finalized count. So a shelf the operator RENAMED, or one a product
+  // no longer lives in, left rows behind that nothing superseded — they kept being
+  // summed next to the current rows and on-hand DOUBLE-COUNTED forever, which
+  // suppresses reorders (running dry mid-service is the worse failure). Two guards:
+  // a location's prior names resolve forward to its current name, and a row at a
+  // location the product no longer occupies is dropped.
   _perpetualInventory() {
     const counts = [...((this.inventoryData && this.inventoryData.ic_counts) || [])]
       .sort(App.cmpNewest);   // newest first by record date
+    const locs = (this.inventoryData && this.inventoryData.ic_locations) || [];
+    // A name that is CURRENTLY a live location is never remapped, so two shelves that
+    // swapped names cannot absorb each other's stock through a stale trail.
+    const live = new Set(locs.map(l => l && l.name).filter(Boolean));
+    const canon = {};   // a location's PRIOR name -> the name it goes by now
+    locs.forEach(l => ((l && l.prior_names) || []).forEach(pn => { if (pn && !live.has(pn)) canon[pn] = l.name; }));
+    // An ARCHIVED shelf is pulled out of the count picker but stays on its products, so its rows
+    // could never be superseded and were summed forever — the same permanent double-count as a
+    // rename, on the archive path. It is not a home any more.
+    const archived = new Set(locs.filter(l => l && l.archived).map(l => l.name).filter(Boolean));
+    // pid -> the locations it lives in now. null means "keep every row": an unplaced
+    // product, or one whose locations were all deleted, can never be counted again, so
+    // its last known figures are all there is and zeroing it would invent a shortage.
+    const homes = {};
+    ((this.inventoryData && this.inventoryData.ic_products) || []).forEach(p => {
+      if (!p || !p.id) return;
+      const pl = this.productLocations(p).filter(n => !archived.has(n));
+      homes[p.id] = pl.length ? new Set(pl) : null;
+    });
     const seen = {};      // "pid@@loc" already resolved to its newest counted value
     const byProd = {};
+    const stale = {};     // pid -> { key: item } dropped as stale, held in reserve
     counts.forEach(cnt => {
       (cnt.items || []).forEach(it => {
         if (it.counted === false) return;
-        const key = it.product_id + '@@' + (it.location || 'Unassigned');
+        const loc = it.location ? (canon[it.location] || it.location) : '';
+        const home = homes[it.product_id];
+        const key = it.product_id + '@@' + (loc || 'Unassigned');
+        // Legacy rows carry no location at all, so they are always kept.
+        if (loc && home && !home.has(loc)) {
+          // ⚠ Stale, but NOT thrown away yet. Every consumer walks Object.keys(currentOnHand()) —
+          // the Order Sheet's belowParByVendor, the IC dashboard reorder plan, the cash engine's
+          // trapped(). A product with no key does not read zero, it VANISHES: no line on the order
+          // sheet, never reordered, run dry. So if scoping would empty a product out completely
+          // (moved to a shelf not yet counted, or its only shelf renamed then re-created), its
+          // last known figures stand. Held per key so the newest stale count still wins.
+          const bucket = stale[it.product_id] || (stale[it.product_id] = {});
+          if (!bucket[key]) bucket[key] = it;
+          return;
+        }
         if (seen[key]) return;
         seen[key] = true;
         const rec = byProd[it.product_id] || (byProd[it.product_id] = { onHand: 0, value: 0 });
         rec.onHand += (it.total || 0);
         rec.value  += (it.value || 0);
+      });
+    });
+    Object.keys(stale).forEach(pid => {
+      if (byProd[pid]) return;   // a live row exists — the stale ones stay dropped
+      const rec = byProd[pid] = { onHand: 0, value: 0 };
+      Object.keys(stale[pid]).forEach(k => {
+        rec.onHand += (stale[pid][k].total || 0);
+        rec.value  += (stale[pid][k].value || 0);
       });
     });
     return byProd;
@@ -6578,10 +6628,23 @@ const App = {
 
   // Logged hours for a staff member on a date, read from lc_actuals. Tip Log
   // and Tip Pool both auto-fill hours from here, so the lookup lives once.
-  hoursFor(staffId, date) {
+  //
+  // A SPLIT SHIFT is two records: Log Hours dedupes on staff_id + date + shift_type, so lunch and
+  // dinner are separate rows by design. Picking one with .find() reported 4 hours for a 9-hour day
+  // — and that figure is the TIP POOL denominator, so it short-paid that person and over-paid
+  // everyone else. Pass `shiftType` for a single service period (Log Tips is per period); leave it
+  // off and the whole day is summed, which is what the per-day Tip Pool wants. Null when nothing is
+  // logged, so callers can still fall back to the schedule.
+  hoursFor(staffId, date, shiftType) {
     if (!staffId || !date) return null;
-    const a = ((this.laborData && this.laborData.lc_actuals) || []).find(x => x.staff_id === staffId && x.date === date);
-    return a ? (a.hours || null) : null;
+    let rows = ((this.laborData && this.laborData.lc_actuals) || [])
+      .filter(x => x && x.staff_id === staffId && x.date === date);
+    if (shiftType) {
+      rows = rows.filter(x => (x.shift_type || '') === shiftType);
+      if (!rows.length) return null;
+    }
+    const total = rows.reduce((t, x) => t + (parseFloat(x.hours) || 0), 0);
+    return total || null;
   },
 
   // Currently-open shift, if any. The 3rd+ consumer of this pattern, so it
