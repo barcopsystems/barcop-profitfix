@@ -658,8 +658,15 @@ S.HubSettings = {
     // load confirmed the account (or of an account with no records) becomes an indistinguishable
     // one-click "restore" target in the list that would wipe the bar. _applyBackup refuses such
     // a snapshot too; refusing to create it keeps it out of the list in the first place.
-    if (!DB._dataReady || !this._sectionHasRecords(App.data)) {
-      this._backupMsg('Nothing to back up yet — your account data is still loading. Try again in a moment.', 'var(--red)');
+    // ⚠ ...and refuse a DEGRADED load — the same guard _maybeAutoBackup carries. If any event kind
+    // fell back to the offline cache or a truncated page this session (DB._loadDegraded), the
+    // some()-based record test still passes on one populated array while others are silently short;
+    // capturing that and later restoring it deletes the missing kinds under "Backup restored". The
+    // manual button was the twin the auto-backup guard missed.
+    if (!DB._dataReady || !this._sectionHasRecords(App.data) || DB._loadDegraded) {
+      this._backupMsg(DB._loadDegraded
+        ? 'Your account did not fully load this session. Reload before backing up so the snapshot is complete.'
+        : 'Nothing to back up yet — your account data is still loading. Try again in a moment.', 'var(--red)');
       return false;
     }
     this._backupMsg('Saving a backup...', 'var(--t3)');

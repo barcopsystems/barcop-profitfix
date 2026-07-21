@@ -1471,6 +1471,10 @@ S.Hub = {
     Object.keys(otMap).forEach(id => {
       const e = otMap[id];
       const st = (ld.lc_staff || []).find(s => s.id === id);
+      // Exempt (salaried) staff cannot earn an OT premium, so they must not appear in an OT alert —
+      // the canonical projection (lc-dashboard.weekProjection) skips them; this re-derivation didn't,
+      // so a salaried GM logging 50h showed as "1 staff over 40 hours · ~$X premium" they can't earn.
+      if (st && App.isSalaried(st)) return;
       const wage = st && st.wage != null ? st.wage : (e.wage || 0);
       const otHrs = Math.max(0, Math.max(e.actual, e.scheduled) - 40);
       if (otHrs > 0) { otCount++; otCost += otHrs * wage * 0.5; }
@@ -1488,7 +1492,11 @@ S.Hub = {
     const primeT = ((data.settings || {}).targets || {}).prime_cost_pct ?? 60;
     if (lw && lw.prime_cost_pct != null && lw.prime_cost_pct > primeT) {
       const gap = lw.prime_cost_pct - primeT;
-      const monthlyRev = (((lw.bar || {}).revenue || 0) + ((lw.food || {}).revenue || 0)) * 4.345;
+      // prime_cost_pct is measured against TOTAL sales (bar + food + catering + ancillary — see
+      // confirm-week), so the dollarized overage must use that SAME base. Bar+food only understated
+      // "the month closes about $X over" by the catering + ancillary share of sales.
+      const monthlyRev = (((lw.bar || {}).revenue || 0) + ((lw.food || {}).revenue || 0)
+        + ((lw.catering || {}).revenue || 0) + ((lw.other || {}).revenue || 0)) * 4.345;
       const monthlyOver = (gap / 100) * monthlyRev;
       out.push({
         sev: gap > 3 ? 'bad' : 'warn',
