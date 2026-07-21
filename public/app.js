@@ -5657,6 +5657,43 @@ const App = {
   },
   _writeFailTimer: null,
 
+  // ── Undo for an in-place BULK mutation ─────────────────────────────────────
+  // putRecordsBulk cannot revert a failed write the way putRecord does: by contract the caller has
+  // ALREADY mutated the records in place, so the pre-change values are gone before it is called.
+  // Unchecked, that means a failed bulk write keeps the change on screen, never gets it to the
+  // server, never retries, and loses it on the next reload — a pay period reading Closed while the
+  // server has it Open (and payroll export reads the screen), a menu price the register never gets.
+  // Snapshot BEFORE mutating, restore if the write comes back false:
+  //   const undo = App.snapshotRows(rows);
+  //   rows.forEach(r => { ...mutate... });
+  //   if (!(await App.putRecordsBulk(mod, kind, rows))) App.restoreRows(undo);
+  // DEEP copies on purpose — several callers mutate nested values (pos_aliases, participants,
+  // location_sequences) and a shallow copy would share them and restore nothing.
+  snapshotRows(rows) {
+    return (rows || []).filter(Boolean).map(row => {
+      let copy;
+      try { copy = JSON.parse(JSON.stringify(row)); } catch (e) { copy = Object.assign({}, row); }
+      return { row, copy };
+    });
+  },
+  restoreRows(snap) {
+    (snap || []).forEach(s => {
+      if (!s || !s.row || !s.copy) return;
+      // Delete keys the mutation ADDED (pay_period_id on a close), then put the rest back. The
+      // live object is restored in place, never replaced, so every holder of the reference sees it.
+      Object.keys(s.row).forEach(k => { if (!(k in s.copy)) delete s.row[k]; });
+      Object.assign(s.row, s.copy);
+    });
+  },
+  // The other half: records APPENDED to a live list that never reached the server. There is nothing
+  // to restore them to, so take them back out.
+  dropRows(list, recs) {
+    if (!Array.isArray(list)) return;
+    const ids = new Set((recs || []).map(r => r && r.id).filter(x => x != null));
+    if (!ids.size) return;
+    for (let i = list.length - 1; i >= 0; i--) if (list[i] && ids.has(list[i].id)) list.splice(i, 1);
+  },
+
   // `opts.quiet` suppresses the failure toast for an UNATTENDED write — one fired by a render or a
   // background resync rather than by something the operator just did. Reporting those pops a red
   // message over a page they merely opened, having done nothing. It never changes the return value,
