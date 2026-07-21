@@ -230,8 +230,10 @@ S.EventsRegulars = {
       this.regulars().push(rec);
       added.push(rec);
     });
-    // Row-per-record: persist just the imported regulars in one bulk upsert.
-    await App.putRecordsBulk('core', 'event_regular', added);
+    // Row-per-record: persist just the imported regulars in one bulk upsert. They were pushed into
+    // the live list before the write, and a bulk write cannot revert itself — so on failure take
+    // them back out rather than showing an import the server never received.
+    if (!(await App.putRecordsBulk('core', 'event_regular', added))) App.dropRows(this.regulars(), added);
     this.entryMode = 'manual';
     this.renderList();
   },
