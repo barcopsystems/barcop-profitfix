@@ -2172,19 +2172,22 @@ S.HubSettings = {
         const whole = Math.floor(qty);
         const loose = Math.round((qty - whole) * p.case_size);
         const total = whole + loose / p.case_size;
-        return { product_id:p.id, name:p.name, category:p.category,
+        return { product_id:p.id, name:p.name, category:p.category, location:p.primary_location || '',
           cases:whole, loose, case_size_at_count:p.case_size,
           fulls:whole, partial:0, total,
           unit_cost:p.unit_cost, value:+(total * (p.unit_cost || 0)).toFixed(2), notes:'' };
       }
-      return { product_id:p.id, name:p.name, category:p.category,
+      return { product_id:p.id, name:p.name, category:p.category, location:p.primary_location || '',
         fulls:Math.floor(qty), partial:+(qty - Math.floor(qty)).toFixed(2), total:qty,
         unit_cost:p.unit_cost, value:+(qty * (p.unit_cost || 0)).toFixed(2), notes:'' };
     };
     const mkCount = (daysAgo, pick, countedBy) => {
       const items = icProducts.map((p, i) => icCountItem(p, pick(i)));
       return { id:uid(), date:dateStr(daysAgo), type:'Full', counted_by:countedBy || 'Maria G.',
-        locations:['Liquor Room','Back Bar','Walk-in Cooler','Kitchen Line'],
+        // Derived from the items, not a hardcoded list: Take Inventory writes exactly the
+        // locations it counted, and a seeded count that names a different set is a count the
+        // form could never have produced.
+        locations:[...new Set(items.map(it => it.location).filter(Boolean))],
         items:items, item_count:items.length,
         total_value:+items.reduce((s, it) => s + it.value, 0).toFixed(2),
         created_at:daysAgoISO(daysAgo) };
