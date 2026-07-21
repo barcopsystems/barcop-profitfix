@@ -289,7 +289,19 @@ S.HubOperatingExpenses = {
 
   // ── Expense History (its own Books page; the read-only log of past months) ──
   renderHistory(mount) {
-    if (mount) this.container = mount;
+    // ⚠ A `mount` argument means this is a FRESH mount (openHubFullPage has just
+    // bumped App._mountSeq), so the token is stamped HERE, exactly as open() does at
+    // :52. S.HubExpenseHistory.open() delegated straight into this function without
+    // stamping, so `_mountedAt` was permanently stale and `_catchUpStillCurrent()`
+    // could only ever be FALSE — the catch-up repaint below was refused 100% of the
+    // time. The operator opened Expense History on the first login of a new month,
+    // this month's rent was written to the server and pushed into memory, and the
+    // page they were looking at never showed it. Adding it by hand then double-booked
+    // it into Books, the P&L, breakeven and prime cost. Stamping at the mount entry
+    // point rather than in the caller covers any future door into this page.
+    // (It also un-deadened `:230`'s history branch, which was unreachable because
+    // `_view` only becomes 'history' by way of this never-stamped mount.)
+    if (mount) { this.container = mount; this._mountedAt = App._mountSeq; }
     this.catchUpRecurring();
     this._view = 'history';
     this.container.innerHTML = '<div class="screen">' + this._historyStats() + this._renderHistory() + '</div>';
