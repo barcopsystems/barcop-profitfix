@@ -218,9 +218,24 @@ S.PrepBatches = {
   //
   // `quiet` because this fires from a RENDER, not from anything the operator did — an unattended
   // write must never pop a failure toast over a page they merely opened.
+  // Ingredient product_ids on this batch that no longer exist in ic_products. Deleting a product
+  // does NOT cascade into prep-batch recipes (ic-product-setup confirmDel removes the product row
+  // and nothing else), so the reference just dangles.
+  missingIngredients(b) {
+    return (((b && b.ingredients) || [])
+      .filter(i => i && i.product_id && !this.prodById(i.product_id))
+      .map(i => i.product_id));
+  },
+
   async _resyncCosts(batches) {
     const pending = [];
     (batches || []).forEach(b => {
+      // ⚠ A DELETED ingredient is not a free one. unitCost(null) is 0, so resyncing a batch whose
+      // product has been deleted recomputes it CHEAPER and — from a render — writes that to the
+      // server. App.menuItemCost reads cost_per_serving off the batch, so every menu item built on
+      // it silently under-costs and the margin reads better than it is. Leave the stored cost
+      // alone and flag the batch instead; the operator decides.
+      if (this.missingIngredients(b).length) return;
       const ings = (b.ingredients || []).map(i => {
         const cpu = this.unitCost(this.prodById(i.product_id));
         return { ...i, cost_per_unit: cpu, total_cost: (cpu || 0) * (i.quantity || 0) };
@@ -274,7 +289,13 @@ S.PrepBatches = {
     } else {
       const rows = batches.map(b =>
         '<tr>'
-        + '<td><div class="val">' + esc(b.name) + '</div></td>'
+        + '<td><div class="val">' + esc(b.name)
+        // The cost below is deliberately NOT recalculated while an ingredient is missing, so say so
+        // rather than showing a stale figure with no explanation.
+        + (this.missingIngredients(b).length
+            ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--amber);">INGREDIENT DELETED</span>'
+              + '<div style="font-size:10px;color:var(--t3);">Cost is held at its last good value. Edit the batch to replace or remove the missing product.</div>'
+            : '') + '</div></td>'
         + '<td>' + esc(b.category || '-') + '</td>'
         + '<td>' + (b.batch_yield || '-') + ' ' + esc(b.batch_yield_unit || '') + '</td>'
         + '<td>' + (b.servings_per_batch ? b.servings_per_batch.toFixed(1) + ' servings' : '-') + '</td>'
