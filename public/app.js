@@ -5657,7 +5657,11 @@ const App = {
   },
   _writeFailTimer: null,
 
-  async putRecord(mod, kind, rec) {
+  // `opts.quiet` suppresses the failure toast for an UNATTENDED write — one fired by a render or a
+  // background resync rather than by something the operator just did. Reporting those pops a red
+  // message over a page they merely opened, having done nothing. It never changes the return value,
+  // and it never suppresses anything for an operator-initiated save.
+  async putRecord(mod, kind, rec, opts) {
     const store = this.EVENT_STORES[mod];
     if (!store) return false;
     const dataObj = store.data();
@@ -5679,7 +5683,7 @@ const App = {
     const back = arr.findIndex(x => x && x.id === rec.id);
     if (prev) { if (back >= 0) arr[back] = prev; }
     else if (back >= 0) arr.splice(back, 1);
-    this._reportWriteFail(r);   // the row just vanished from the screen — say why
+    if (!(opts && opts.quiet)) this._reportWriteFail(r);   // the row just vanished from the screen — say why
     return false;
   },
 
@@ -5688,7 +5692,7 @@ const App = {
   // records in place — this only writes them. Used where a batch changes at once
   // (close / reopen a pay period locks or unlocks a whole week of logged hours);
   // turns a 5-10s per-row loop into one bulk upsert.
-  async putRecordsBulk(mod, kind, recs) {
+  async putRecordsBulk(mod, kind, recs, opts) {
     const store = this.EVENT_STORES[mod];
     if (!store) return false;
     const list = (recs || []).filter(r => r && r.id != null);
@@ -5698,7 +5702,7 @@ const App = {
     // caller's in-memory rows stay put and the queue will sync them. storageFull does NOT:
     // nothing reached disk, so reporting success would lose the batch on reload.
     const ok = !!(res && (res.ok || ((res.offline || res.queued) && !res.storageFull)));
-    if (!ok) this._reportWriteFail(res);   // one message for the whole batch, not one per row
+    if (!ok && !(opts && opts.quiet)) this._reportWriteFail(res);   // one message for the whole batch, not one per row
     return ok;
   },
 
