@@ -5593,32 +5593,50 @@ const App = {
   //     the next real edit saves normally (see DB.writeData).
   //   • blocked — the total-wipe backstop caught an all-empty write over a populated account.
   //     The data was PROTECTED and ops is already alerted. "Save failed" is exactly backwards.
-  // Returns the message to show, or null to stay quiet.
+  // Returns null to stay quiet, else { msg, ownedBy } — `ownedBy` naming a PERSISTENT banner that
+  // already reports this failure and says it better than a 6-second toast can. Pure: the DOM check
+  // lives in _reportWriteFail so this stays testable on its own.
+  //
+  // ⚠ TWO FAILURES ALREADY OWN A BANNER, and stacking on them is worse than silence:
+  //   • storageFull — DB._lsSafeSet fires App._showStorageFullBanner, a full-width bar at the SAME
+  //     z-index as this toast carrying the load-bearing line "write it down before you leave this
+  //     page". Being later in the DOM, the toast painted straight over that instruction and
+  //     offered a different remedy underneath it.
+  //   • viewer — App._showViewerBanner keeps "Viewer access, read-only" up for the whole session.
+  //     Worse: three screens WRITE during render() (ic-prep-batches, profit-fix, r-fix), so a
+  //     viewer got a red toast just for OPENING a page, on every render, having done nothing at
+  //     all. The banner already explains it, permanently.
+  // Each still falls through to a toast if its banner is somehow not up, so nothing goes unsaid.
   _writeFailMsg(r) {
-    if (!r) return 'Not saved. Check your connection and try again.';
+    const generic = { msg: 'Not saved. Check your connection and try again.', ownedBy: '' };
+    if (!r) return generic;
     if (r.ok || r.deferred || r.blocked) return null;
     if ((r.offline || r.queued) && !r.storageFull) return null;
-    if (r.storageFull) return 'Out of space on this device. Nothing was saved — free up some space and try again.';
+    if (r.storageFull) return { msg: 'Out of space on this device. Nothing was saved — free up some space and try again.', ownedBy: 'storage-full-banner' };
     const err = String((r.error && r.error.message) || r.error || '');
-    if (/read-only|viewer/i.test(err)) return 'Your access is view-only, so nothing was saved.';
-    return 'Not saved. Check your connection and try again.';
+    if (/read-only|viewer/i.test(err)) return { msg: 'Your access is view-only, so nothing was saved.', ownedBy: 'viewer-banner' };
+    return generic;
   },
   // Show a write failure once. COALESCED on purpose: a bulk write, or a burst of row writes from
   // one handler, must leave ONE message on screen rather than a wall of them. Wrapped so a broken
   // reporter can never break the save path itself.
   _reportWriteFail(r) {
     try {
-      const msg = this._writeFailMsg(r);
-      if (!msg) return;
+      const f = this._writeFailMsg(r);
+      if (!f) return;
+      if (f.ownedBy && document.getElementById(f.ownedBy)) return;   // a banner already says it
       const ID = 'write-fail-toast';
       const prior = document.getElementById(ID);
       if (prior) prior.remove();
       const el = document.createElement('div');
       el.id = ID;
-      el.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;'
+      // Sits BELOW the top bars on purpose. At top:10px it shared exact coordinates with the
+      // offline pill and the "Synced N offline changes" toast, and overlapped every full-width
+      // banner (storage-full, viewer, session-expired).
+      el.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:9600;'
         + 'background:var(--red);color:var(--w);border-radius:3px;padding:8px 18px;max-width:92vw;'
         + 'font-size:11px;font-weight:800;letter-spacing:.5px;box-shadow:0 2px 10px rgba(0,0,0,0.5);';
-      el.textContent = msg;
+      el.textContent = f.msg;
       document.body.appendChild(el);
       clearTimeout(this._writeFailTimer);
       this._writeFailTimer = setTimeout(() => {
