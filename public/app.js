@@ -5178,12 +5178,24 @@ const App = {
     return null;
   },
   // Live cost percentage of a menu item against its menu price, plus its target.
+  // ⚠ AN ITEM WITH NO COST IS NOT AN ITEM WITH A ZERO COST. menuItemCost returns 0 for an item with
+  // no recipe, no linked product and a blank cost field — the day-one state of any menu imported
+  // from a CSV without a cost column, which the importer deliberately makes optional. Zero is the
+  // most flattering number possible: it says the plate is pure profit. So `pct` is NULL when the
+  // cost is not a real figure, and `costed` says so out loud.
+  // Every consumer already guards on `pct != null`, so this alone stops Recipe Cost Analysis
+  // printing "0.0% · ON TARGET" beside a dashed-out Cost and Margin on the one screen whose job is
+  // finding margin leaks, and keeps menuItemsOverTarget from grading an item it cannot measure.
+  // `cost` stays a NUMBER on purpose: recipe-cost-analysis already prints `cost ? ... : '-'` so 0
+  // dashes out on its own, and ic-receive-delivery's cost-creep comparison does arithmetic on it.
   menuItemPct(item) {
-    const cost = this.menuItemCost(item) || 0;
+    const raw = this.menuItemCost(item);
+    const cost = raw || 0;
     const price = parseFloat(item && item.price) || 0;
-    const pct = price > 0 ? cost / price * 100 : null;
+    const costed = raw != null && raw > 0;
+    const pct = (costed && price > 0) ? cost / price * 100 : null;
     const target = this.menuTargetPct(item);
-    return { cost, price, pct, target, over: (pct != null && target != null && pct > target + 0.05) };
+    return { cost, price, pct, target, costed, over: (pct != null && target != null && pct > target + 0.05) };
   },
   // Menu items that reference any of the given inventory product ids — either a
   // linked product or a recipe ingredient sourced from a product. idSet = a Set.
