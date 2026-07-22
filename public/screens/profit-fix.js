@@ -101,8 +101,15 @@ S.ProfitFix = {
     if (!App.data || !DB._dataReady) return;   // never write from render before the initial load has confirmed the account
     if (!Array.isArray(App.data.fix_log)) App.data.fix_log = [];
     this.gaps().forEach(g => {
-      if (this.fixLog().some(e => e.gap_id === g.id)) return;
       const start = this.firstAction(g);
+      // ⚠ PROMOTE/BACKFILL THE DURABLE BASELINE (S168). The baseline lives in account_state now, not
+      // on the windowed fix_log row. Record the EARLIEST of this gap's current firstAction and any
+      // existing fix_log row's date, so a fix already running gets its true start captured BEFORE
+      // that row can age out. ensureBaseline is idempotent — it only writes when it lowers the date.
+      const existing = this.fixLog().filter(e => e.gap_id === g.id).map(e => e.date).filter(Boolean).sort()[0];
+      const baseline = [start, existing].filter(Boolean).sort()[0];
+      if (baseline && window.Recovery) Recovery.ensureBaseline('profit', g.id, g.name, baseline);
+      if (this.fixLog().some(e => e.gap_id === g.id)) return;   // activity row already present
       if (!start) return;
       App.putRecord('core', 'fix_log', { id: App.uid(), module: 'profit', gap_id: g.id, gap_name: g.name, date: start, logged_at: new Date().toISOString(), auto: true }, { quiet: true });   // fires from render(), never shout
       if (App.markSetupDone) App.markSetupDone('gs_p_fix');
