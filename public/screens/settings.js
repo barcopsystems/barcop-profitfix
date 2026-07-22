@@ -486,8 +486,16 @@ S.HubSettings = {
     DB._restoreBusy = true;
     try {
       await this._applyBackupInner(backup, hasData);
-      // Success. The caller reloads shortly; nothing left to protect, so release.
-      DB._restoreBusy = false;
+      // ⚠ STAY BUSY (S12). This used to release here, reasoning "the caller reloads shortly;
+      // nothing left to protect" — but the caller reloads on a 1200ms TIMER and the restore
+      // controls are never disabled, so for that whole window a second restore could be started
+      // and would then be killed mid-flight by the first attempt's timer, between clearEvents and
+      // putEventsBulk: rows deleted, nothing written. That is the EXACT failure the catch below
+      // was fixed for, and the success path never got the same treatment — the reload is what
+      // makes the window safe, so the guard has to hold until it lands.
+      // Latching here is correct and cannot strand the app: on success the page always reloads
+      // (both callers), and a restore that changed NOTHING never reaches this line — a preflight
+      // refusal throws before the flag is set, and an inner failure releases in the catch.
     } catch (e) {
       // STAY BUSY only while a reload is actually coming to settle the account. That reload is
       // what makes the 2.5s window safe: the restore controls are never disabled, and the failure
