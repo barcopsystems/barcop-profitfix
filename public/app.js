@@ -5207,9 +5207,14 @@ const App = {
       // true`, an empty missing list and therefore no flag anywhere, while the identical delete one
       // level up correctly returned null. Measured: a Margarita printed 8.75% food cost off a
       // batch whose ingredient no longer existed. The deletion was visible only on Prep Batches.
+      // ⚠⚠ AND A BATCH WITH NO PER-SERVING COST IS EQUALLY UNUSABLE (S26). computeRows now returns
+      // null rather than falling back to the whole batch cost when servings-per-batch is unknown.
+      // Three consumers read `b.cost_per_serving || 0`, so WITHOUT this line that null would cost
+      // the dish at ZERO — making it look CHEAPER, which is precisely the S14/S107 failure this
+      // whole guard exists to stop. Refuse instead, and the dish presents as not costed.
       if (src === 'batch') {
         const b = batches.find(x => x && x.id === id);
-        if (!b || this.batchMissingIngredients(b).length) out.push(id);
+        if (!b || this.batchMissingIngredients(b).length || b.cost_per_serving == null) out.push(id);
         return;
       }
       if (!prods.some(p => p && p.id === id)) out.push(id);
