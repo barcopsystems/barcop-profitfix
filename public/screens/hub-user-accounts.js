@@ -93,6 +93,16 @@ S.HubUserAccounts = {
       +   '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Bar Cop saves a full backup of this bar automatically, about once a day. Pick a point below to roll the whole account back to how it was then.</div>'
       +   '<button class="btn btn-ghost" id="ua-backup-now" style="margin-bottom:22px;">Create Restore Point</button>'
       +   '<div id="ua-snap-list" style="font-size:12px;color:var(--t3);">Loading saved backups...</div>'
+      + '</div>'
+      // ── Changes the server refused (S10) ──────────────────────────────────────────────────
+      // Sits directly under Restore on purpose: a stuck change used to BLOCK restoring, with
+      // nothing on any screen naming it. It is hidden entirely when the queue is clean, so a
+      // healthy account never sees an alarming empty panel ([[empty-state-day1]] does not apply —
+      // there is no useful day-one state for "things that went wrong").
+      + '<div id="ua-stuck-wrap" style="margin-top:22px;border-top:1px solid var(--b-edge);padding-top:16px;display:none;">'
+      +   '<div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--amber);margin-bottom:12px;">Changes The Server Would Not Take</div>'
+      +   '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">These were saved on this device but the server refused them, so Bar Cop stopped retrying. Nothing has been deleted. They are not counted as unsynced work and they do not block a restore. Try Again if you think the cause is fixed, or Discard to drop the change for good.</div>'
+      +   '<div id="ua-stuck-list" style="font-size:12px;color:var(--t3);"></div>'
       + '</div>';
     const testBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Load sample data to test, or clear everything and start fresh.</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
@@ -239,6 +249,36 @@ S.HubUserAccounts = {
       });
       this._renderSnapshots();
     }
+    // Stuck (quarantined) sync entries — S10. Discard is DESTRUCTIVE and irreversible, so it
+    // names the exact change in the confirm rather than asking "are you sure".
+    const stuckList = document.getElementById('ua-stuck-list');
+    if (stuckList) {
+      stuckList.addEventListener('click', async (e) => {
+        const r = e.target.closest('.ua-stuck-retry');
+        if (r) {
+          DB.retryQueued([r.dataset.id]);
+          this._renderStuck();
+          const res = await DB.syncPending();
+          this._renderStuck();
+          S.HubSettings._backupMsg(
+            (res && res.synced) ? 'That change is saved.' : 'The server refused it again. Nothing was lost.',
+            (res && res.synced) ? 'var(--green)' : 'var(--amber)');
+          return;
+        }
+        const d = e.target.closest('.ua-stuck-del');
+        if (!d) return;
+        const ok = await App.confirm({
+          title: 'Discard this change for good?',
+          message: (d.dataset.what || 'This change') + ' was never accepted by the server. Discarding drops it '
+            + 'permanently and it cannot be recovered. The rest of your data is not affected.',
+          confirmText: 'Discard', cancelText: 'Cancel', danger: true
+        });
+        if (!ok) return;
+        DB.discardQueued([d.dataset.id]);
+        this._renderStuck();
+      });
+      this._renderStuck();
+    }
     document.getElementById('ua-add-bar')?.addEventListener('click', () => this._addBar());
     document.getElementById('ua-load-sample')?.addEventListener('click', () => this.loadSample());
     document.getElementById('ua-clear-all')?.addEventListener('click', () => this.clearAll());
@@ -359,6 +399,32 @@ S.HubUserAccounts = {
         + (r.reason === 'manual'
             ? '<button class="btn btn-danger btn-sm ua-snap-del" data-id="' + esc(r.id) + '" data-when="' + esc(when) + '">Delete</button>'
             : '')
+        + '</div></td></tr>';
+    }).join('') + '</tbody></table>';
+  },
+  // Render the stuck (quarantined) sync entries, newest-queued first (S10). Hidden entirely when
+  // there are none — this panel only exists to get an operator out of a hole.
+  _renderStuck() {
+    const wrap = document.getElementById('ua-stuck-wrap');
+    const el = document.getElementById('ua-stuck-list');
+    if (!wrap || !el) return;
+    const rows = (window.DB && DB.quarantinedEvents) ? DB.quarantinedEvents() : [];
+    if (!rows.length) { wrap.style.display = 'none'; el.innerHTML = ''; return; }
+    wrap.style.display = '';
+    const fmt = ts => { if (!ts) return 'unknown date'; const d = new Date(ts);
+      return isNaN(d) ? 'unknown date' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+    // The operator thinks in records, not tables: say "Product" not "ic_events/product".
+    const label = k => String(k || 'record').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const nameOf = e => (e.payload && (e.payload.name || e.payload.title)) || '';
+    el.innerHTML = '<table class="pnl-list" style="width:100%;"><tbody>' + rows.map(e => {
+      const what = (e.op === 'delete' ? 'Delete ' : 'Save ') + label(e.kind);
+      const who = nameOf(e) ? ' "' + esc(nameOf(e)) + '"' : '';
+      return '<tr><td style="font-size:12px;color:var(--t1);">' + esc(what) + who
+        + '<div style="font-size:11px;color:var(--t3);margin-top:3px;">Queued ' + esc(fmt(e.queuedAt))
+        + (e.lastError ? ' &middot; ' + esc(String(e.lastError).slice(0, 120)) : '') + '</div></td>'
+        + '<td style="text-align:right;"><div class="row-actions" style="justify-content:flex-end;">'
+        + '<button class="btn btn-ghost btn-sm ua-stuck-retry" data-id="' + esc(e.id) + '">Try Again</button>'
+        + '<button class="btn btn-danger btn-sm ua-stuck-del" data-id="' + esc(e.id) + '" data-what="' + esc(what + who) + '">Discard</button>'
         + '</div></td></tr>';
     }).join('') + '</tbody></table>';
   },
