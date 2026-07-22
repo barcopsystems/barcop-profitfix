@@ -611,14 +611,24 @@ const PosIngest = {
       .filter(v => v && v.source !== 'manual' && !fresh.has(v.id)
         && keys.has(v.date + '|' + (v.drawer_id || '')));
     let ok = true;
+    const landed = new Set();
     try {
-      for (const rec of (toAdd || [])) { ok = (await App.putRecord('sc', 'variance', rec)) && ok; }
-      // ⚠ Retire the superseded rows ONLY once the replacements actually landed.
-      // Removing them after a refused insert leaves the register-day with NO record
-      // at all — the exact outcome the insert-first ordering exists to prevent.
-      // Worst case now is the old figure surviving next to the new one, which is
-      // visible and re-importable; the alternative is a silently empty day.
-      if (ok) for (const e of stale) { ok = (await App.removeRecord('sc', 'variance', e.id)) && ok; }
+      for (const rec of (toAdd || [])) {
+        const good = await App.putRecord('sc', 'variance', rec);
+        if (good) landed.add(rec.date + '|' + (rec.drawer_id || ''));
+        ok = good && ok;
+      }
+      // ⚠ RETIRE PER REGISTER-DAY, not all-or-nothing (S102) — the same correction as _commitSales
+      // above, and for the same reason. Retiring unconditionally left a register-day with NO
+      // record when every insert was refused; retiring behind one shared `ok` meant a single
+      // refused insert stopped every retirement, so each register-day whose insert DID land held
+      // the old figure beside the new one and was counted twice in Drawer Net, the short rate,
+      // Loss Prevention and the Books cash sheet. Keyed on what actually landed, the worst case is
+      // the refused register-day keeping its OLD figure — visible and re-importable.
+      for (const e of stale) {
+        if (!landed.has(e.date + '|' + (e.drawer_id || ''))) continue;
+        ok = (await App.removeRecord('sc', 'variance', e.id)) && ok;
+      }
     } catch (e) { return false; }
     return ok;
   },
@@ -632,13 +642,27 @@ const PosIngest = {
     const stale = (((App.shiftData && App.shiftData.sc_shifts) || []))
       .filter(s => s && dates.has(s.date) && s.imported === true);
     let ok = true;
+    const landed = new Set();
     try {
-      for (const rec of (toAdd || [])) { ok = (await App.putRecord('sc', 'shift', rec)) && ok; }
-      // ⚠ Guarded 2026-07-21. The comment above promised "a failure mid-way never
-      // leaves a date with no record at all", but the removals ran unconditionally —
-      // so if every insert was refused, the previous day's record was deleted anyway
-      // and the date ended up EMPTY. Found by the cash twin's write-failure case.
-      if (ok) for (const e of stale) { ok = (await App.removeRecord('sc', 'shift', e.id)) && ok; }
+      for (const rec of (toAdd || [])) {
+        const good = await App.putRecord('sc', 'shift', rec);
+        if (good) landed.add(rec.date);
+        ok = good && ok;
+      }
+      // ⚠ RETIRE PER DATE, not all-or-nothing (S102). Two earlier shapes were both wrong:
+      //   unconditional  — every insert refused still DELETED the prior record, leaving the date
+      //                    EMPTY (fixed 2026-07-21, S86);
+      //   behind one `ok` — one refused insert stopped EVERY retirement, so each date whose
+      //                    insert DID land kept the old record beside the new one and was counted
+      //                    TWICE. Every consumer sums the window (Confirm the Week's auto-fill,
+      //                    the cash-forecast baseline, the sales-tax hold), so a $3,100 week
+      //                    reported $4,600 while the screen said only "Save failed".
+      // Keyed on what actually landed, the worst case is the refused date keeping its OLD figure —
+      // visible, re-importable, and never empty or doubled.
+      for (const e of stale) {
+        if (!landed.has(e.date)) continue;   // its replacement never arrived — leave it alone
+        ok = (await App.removeRecord('sc', 'shift', e.id)) && ok;
+      }
     } catch (e) { return false; }
     return ok;
   }
