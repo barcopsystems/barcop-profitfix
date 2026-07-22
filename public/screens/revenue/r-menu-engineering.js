@@ -697,6 +697,12 @@ S.RevenueMenuEngineering = {
   // shows only when the captured baseline and current covers both exist. ────────
   verify(entry) {
     if (!entry || !entry.date || entry.covers_at_change == null || entry.cost == null) return { status: 'old-format' };
+    // ⚠ A ZERO cost is not a cost. `entry.cost == null` let it through, and the margins
+    // below are `price - cost`, so a 0 makes the ENTIRE menu price the margin and
+    // `actualWeekly` comes out badly wrong while being labelled "actual" on screen.
+    // Refusing here also covers every row already written with a 0 before
+    // App.logPriceChange started storing null.
+    if (!entry.cost) return { status: 'no-cost' };
     const t = new Date(entry.date + 'T00:00:00').getTime();
     if (isNaN(t)) return { status: 'old-format' };
     const weeks = Math.floor((Date.now() - t) / (7 * 86400000));
@@ -728,6 +734,9 @@ S.RevenueMenuEngineering = {
         + '<div style="font-size:10px;color:var(--t3);">sold ' + v.coversThen + ' to ' + v.coversNow + ', ' + pred + '</div>';
     } else if (v.status === 'pending') {
       vCell = '<span style="color:var(--t3);">Measuring, week ' + v.weeks + ' of 3</span>';
+    } else if (v.status === 'no-cost') {
+      // Say WHY rather than a bare "Not verifiable": the operator can act on this one.
+      vCell = '<span style="color:var(--t3);">Not costed when the price changed, so the result cannot be measured</span>';
     } else {
       vCell = '<span style="color:var(--t4);">Not verifiable</span>';
     }
