@@ -37,7 +37,23 @@ S.InventoryProducts = {
     const all = this.products();
     return this.activeCat === this.INACTIVE_TAB
       ? all.filter(p => p && p.active === false)
-      : all.filter(p => p && (p.category || '') === this.activeCat && p.active !== false);
+      : all.filter(p => p && this._tabFor(p) === this.activeCat && p.active !== false);
+  },
+
+  // ⚠ THE ONE DOOR FOR "WHICH TAB DOES THIS PRODUCT BELONG ON" (S124). Both the tab filter above
+  // and the category CARD counts used a bare `(p.category || '') === c`, so an ACTIVE product whose
+  // category is missing, '' or a legacy value ('Beer') was listed by NO tab and counted by NO card
+  // — invisible on both axes, and therefore impossible to edit or delete from this screen. (The
+  // INACTIVE tab would still have shown it, since that one filters on `active === false` alone.)
+  // Nothing in this screen creates one — showForm coerces the category, runImport sets the tab's —
+  // so it is a restore / legacy-data hazard; but "structurally unable to show it" has no way out.
+  // Misc is the catch-all category by design, so anything unrecognised lands there. Card and tab
+  // share this door so they cannot disagree, which is what keeps the S53 three-way tie-out true.
+  _tabFor(p) {
+    const c = (p && p.category) || '';
+    // `this.CATEGORIES` is the screen's getter onto App.IC_CATEGORIES (:24) — the single source.
+    // There is no `this.IC_CATEGORIES`; reaching for it throws on every render.
+    return this.CATEGORIES.indexOf(c) > -1 ? c : 'Misc';
   },
 
   // Per-category form spec: labels, defaults, which fields show.
@@ -372,8 +388,10 @@ S.InventoryProducts = {
       // incomplete product made the card advertise "1 incomplete" that no working tab
       // could list and no alert mentioned — sending the operator hunting for a product
       // the screen is structurally unable to show them.
-      const n = all.filter(p => (p.category || '') === c && p.active !== false).length;
-      const incomplete = all.filter(p => (p.category || '') === c && p.active !== false && !this.isComplete(p)).length;
+      // Same door as the tab filter (S124), so a card can never advertise a count the tab beneath
+      // it cannot list — that is the S53 tie-out, and a catch-all would break it otherwise.
+      const n = all.filter(p => this._tabFor(p) === c && p.active !== false).length;
+      const incomplete = all.filter(p => this._tabFor(p) === c && p.active !== false && !this.isComplete(p)).length;
       const incText = incomplete > 0
         ? '<div style="font-size:10px;color:var(--t4);margin-top:6px;">' + incomplete + ' incomplete</div>'
         : '';
@@ -1904,7 +1922,14 @@ S.InventoryProducts = {
     // Snap an imported Misc Type to a known tag (case-insensitive); an unknown
     // value is kept as typed and simply behaves as a recipe ingredient.
     const normMiscType = v => { const s = (v || '').trim().toLowerCase(); return (App.MISC_TYPES || []).find(t => t.toLowerCase() === s) || (v || '').trim(); };
-    const note = (txt, color) => { const a = document.getElementById('ip-csv-actions'); if (a) a.insertAdjacentHTML('beforeend', '<span style="color:' + (color || 'var(--red)') + ';font-size:12px;margin-left:10px;">' + esc(txt) + '</span>'); };
+    // ⚠ CLEAR THE PREVIOUS ONE FIRST (S125). This appended without clearing, so two refused import
+    // attempts rendered "Save failed. Try again. Save failed. Try again." beside the Import button.
+    const note = (txt, color) => {
+      const a = document.getElementById('ip-csv-actions');
+      if (!a) return;
+      a.querySelectorAll('.ip-csv-note').forEach(n => n.remove());
+      a.insertAdjacentHTML('beforeend', '<span class="ip-csv-note" style="color:' + (color || 'var(--red)') + ';font-size:12px;margin-left:10px;">' + esc(txt) + '</span>');
+    };
 
     const imported = [];
     // Block duplicate names the same way the manual Save does (case-insensitive,
