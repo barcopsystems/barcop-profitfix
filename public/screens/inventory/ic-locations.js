@@ -485,7 +485,19 @@ S.InventoryLocations = {
     if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(_undoProd);   // product assignments -> rows
     // Drop straight into the new location's arrange page (build → order in one flow).
     if (ok) { App.markSetupDone('gs_ic_locations'); this.openEdit(id); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Save Location'; } fail('Save failed. Try again.'); }
+    else {
+      // ⚠ TAKE THE ROW BACK OUT. It was pushed into the live list above, and putRecord's
+      // revert restores the ARRAY SLOT — but the caller handed it the very object it had
+      // already pushed, so `prev` and `rec` are the same reference and the revert re-seats
+      // the row instead of splicing it out (that limit is documented in putRecord itself).
+      // The duplicate guard at the top of this function reads the same list, so the
+      // un-saved location blocked the operator from re-entering the name they had just
+      // failed to save: "A location with that name already exists."
+      App.dropRows(this.locations(), [loc]);
+      App.restoreRows(_undoProd);
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Location'; }
+      fail('Save failed. Try again.');
+    }
   },
 
   // "✓ Save Products" link (picker open): create the location + assign the checked
@@ -512,9 +524,23 @@ S.InventoryLocations = {
     const _undoProd = [];
     const touched = this._reconcileProducts(name, this.newChecked, _undoProd);
     const savedCount = this.newChecked.size;
-    await App.putRecord('ic', 'location', loc);   // new location -> row
+    const okLoc = await App.putRecord('ic', 'location', loc);   // new location -> row
     if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(_undoProd);   // product assignments -> rows
     this._savingProducts = false;
+    // ⚠ THE LOCATION WRITE WAS DISCARDED. So a refused save reported success: the form
+    // reset, the shelf rendered as saved, and any checked products were left naming a
+    // location the server does not have — invisible from both directions, the same strand
+    // S20 closed on the delete path. And the un-saved row stayed in the list (putRecord's
+    // revert cannot splice out a row the caller pushed itself), so the duplicate guard
+    // above then refused the name on the retry. Take it back out and say so, keeping the
+    // picker open with the operator's name and ticks intact so a retry is one click.
+    if (!okLoc) {
+      App.dropRows(this.locations(), [loc]);
+      App.restoreRows(_undoProd);
+      if (link) { link.textContent = '✓ Save Products'; link.style.opacity = ''; link.style.pointerEvents = ''; }
+      if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
+      return;
+    }
     App.markSetupDone('gs_ic_locations');
     // Reset the box for the next location; show the saved feedback until they start one.
     this.pickerOpen = false;
