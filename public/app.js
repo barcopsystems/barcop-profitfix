@@ -305,6 +305,12 @@ const App = {
           (err && err.stack ? err.stack : '') + '\nat ' + (src || '?') + ':' + (line || '?') + ':' + (col || '?'),
           this._currentScreenId || '');
       } catch (e) {}
+      // ⚠⚠ BUMP BEFORE TAKING THE CONTENT OVER (S70) — this is the sharpest of the three. Without
+      // it a background write still holding a token that looks current repaints the CRASHED screen
+      // straight over this card, deleting the operator's only route back. Dismiss the write toast
+      // for the same reason every other takeover does (S3): it names a row on a screen that is gone.
+      ++this._mountSeq;
+      this._dismissWriteFail();
       const el = document.getElementById('content-area');
       if (el) el.innerHTML = '<div class="screen"><div class="card" style="max-width:520px;margin:40px auto;text-align:center;">'
         + '<div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:10px;">This screen ran into a problem</div>'
@@ -903,6 +909,13 @@ const App = {
         return;
       }
     }
+    // ⚠ A NEW VIEW IS GOING UP, SO BUMP THE MOUNT TOKEN (S70). Only navigate() and
+    // openHubFullPage() used to bump, but this replaces the whole view — so a background write
+    // that captured its token before the operator came back to the Hub still looked CURRENT and
+    // could repaint the screen they had just left. Deliberately AFTER the overlay-close early
+    // return above, which closes a modal over an already-rendered dashboard and is not a takeover.
+    ++this._mountSeq;
+    this._dismissWriteFail();       // the old screen's failure message must not follow it here (S3)
     // Full screen hub - hide the app shell, show a standalone container
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('ob-overlay').classList.add('hidden');
