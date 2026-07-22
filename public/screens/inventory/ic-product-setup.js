@@ -412,8 +412,14 @@ S.InventoryProducts = {
     // "Par", and a Food row's recipe cost printed under a "Cost %" header — a dollar
     // figure beneath a percent heading. Per-category columns are meaningless on a
     // cross-category list anyway, so it shows what all products share.
+    // ⚠ NO Category column: the rows are already GROUPED into category sections on this
+    // tab, so a per-row category repeats the heading above it (Kyle 2026-07-21). Same
+    // reason there is no "Inactive" badge on the name — every row here is inactive.
+    // Size IS worth a column and is read per ROW, since the categories are mixed here:
+    // a container size for pourables, the case size for bottle beer, the unit for
+    // food/misc.
     const headerCols = onInactiveTab
-      ? '<th>Vendor</th><th>Category</th><th>Cost</th><th>Par</th><th></th>'
+      ? '<th>Vendor</th><th>Size</th><th>Cost</th><th>Par</th><th></th>'
       : isFoodMisc
       ? '<th>Vendor</th><th>Unit</th><th>Per Unit</th><th>Cost/Unit</th><th style="white-space:nowrap;">Recipe Cost</th><th>Par</th><th></th>'
       : isBottleBeer
@@ -423,7 +429,7 @@ S.InventoryProducts = {
     // Percentage widths (not fixed px): the columns stay aligned across the Vodka/
     // Gin/Rum tables AND the table always fits its card, so it never scrolls sideways.
     const colgroup = onInactiveTab
-      ? '<colgroup><col style="width:4%;"/><col style="width:30%;"/><col style="width:18%;"/><col style="width:14%;"/><col style="width:14%;"/><col style="width:9%;"/><col style="width:11%;"/></colgroup>'
+      ? '<colgroup><col style="width:4%;"/><col style="width:28%;"/><col style="width:18%;"/><col style="width:13%;"/><col style="width:13%;"/><col style="width:9%;"/><col style="width:15%;"/></colgroup>'
       : isFoodMisc
       ? '<colgroup><col style="width:4%;"/><col style="width:20%;"/><col style="width:14%;"/><col style="width:8%;"/><col style="width:11%;"/><col style="width:11%;"/><col style="width:11%;"/><col style="width:9%;"/><col style="width:12%;"/></colgroup>'
       : isBottleBeer
@@ -508,13 +514,17 @@ S.InventoryProducts = {
     // Per-category data cells. Food / Misc show the recipe-costing breakdown (per
     // unit servings/oz + the recipe cost); pourable + bottle beer keep pour cols.
     let tds;
-    // ⚠ The Inactive tab holds every category at once, so its cells are chosen from the
-    // TAB rather than from p.category — otherwise the row disagrees with the header,
+    // ⚠ The Inactive tab holds every category at once, so its cell COUNT is chosen from
+    // the TAB rather than from p.category — otherwise the row disagrees with the header,
     // which is exactly what happened here (see the headerCols note in renderLanding).
-    // Category is shown because on this one list it differs row to row.
+    // The size VALUE still reads per row, because the categories are mixed: `szL` already
+    // gives the unit for Food/Misc and the container size for pourables, and bottle beer
+    // is tracked by the CASE so it shows the case size instead.
     if (this.activeCat === this.INACTIVE_TAB) {
-      tds = '<td>' + esc(p.category || '-') + '</td>'
-          + '<td>' + costDisplay + '</td>';
+      const sizeCell = p.category === 'Bottle Beer'
+        ? (p.case_size ? esc(p.case_size + ' btl') : dash)
+        : szL;
+      tds = '<td>' + sizeCell + '</td><td>' + costDisplay + '</td>';
     } else if (p.category === 'Food' || p.category === 'Misc') {
       const basis = App.recipeBasis ? App.recipeBasis(p) : null;
       const uEach = String(p.unit_type || '').toLowerCase() === 'each';
@@ -551,8 +561,11 @@ S.InventoryProducts = {
     }
     return '<tr style="' + dim + '">'
       + '<td class="cb-left" style="width:40px;text-align:center;"><input type="checkbox" class="bc-check ip-sel" data-id="' + p.id + '"' + checked + '/></td>'
-      + '<td><div class="val">' + esc(p.name)
-      + (p.active === false ? ' <span style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:0.5px;">Inactive</span>' : '') + '</div>'
+      // ⚠ No "Inactive" tag on the name. An inactive product is only ever rendered on the
+      // Inactive tab (visibleProducts keeps `active !== false` on every working tab), so
+      // the tag could only ever appear where every single row is inactive — it labelled
+      // nothing. Kyle 2026-07-21.
+      + '<td><div class="val">' + esc(p.name) + '</div>'
       + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
       + (!complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '')
       + (App.productLocations(p).length === 0 ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Needs a location</div>' : '') + '</td>'
@@ -560,6 +573,11 @@ S.InventoryProducts = {
       + tds
       + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
       + '<td><div class="row-actions">'
+      // One-click restore, so putting a product back does not mean opening the editor
+      // and hunting for the status toggle (Kyle 2026-07-21). Only on the Inactive tab,
+      // which is the only place an inactive product is ever listed.
+      + (this.activeCat === this.INACTIVE_TAB
+          ? '<button class="btn btn-ghost btn-sm ip-activate" data-id="' + p.id + '">Make Active</button>' : '')
       + '<button class="btn btn-ghost btn-sm ip-edit" data-id="' + p.id + '">Edit</button>'
       + '<button class="btn btn-danger btn-sm ip-del" data-id="' + p.id + '">Delete</button>'
       + '</div></td></tr>';
@@ -591,6 +609,7 @@ S.InventoryProducts = {
       const tab     = ev.target.closest('.ch-tab');
       const edit    = ev.target.closest('.ip-edit');
       const del     = ev.target.closest('.ip-del');
+      const activate = ev.target.closest('.ip-activate');
       const dismiss = ev.target.closest('.ip-alert-dismiss');
       const selAll  = ev.target.closest('.ip-sel-all');
       const selClr  = ev.target.closest('.ip-sel-clear');
@@ -604,6 +623,10 @@ S.InventoryProducts = {
       if (impLink) { ev.stopPropagation(); this._import = { cat: impLink.dataset.cat }; this._formCategory = impLink.dataset.cat; this.renderLanding(); setTimeout(() => document.getElementById('ip-import-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); return; }
       if (tab)     { ev.stopPropagation(); this.activeCat = tab.dataset.cat; this._selected = new Set(); this.renderLanding(); return; }
       if (edit)    { ev.stopPropagation(); this.showFormForId(edit.dataset.id); return; }
+      // Restore in one click. Routed through setActiveBulk, which is the door that already
+      // snapshots and puts the row back if the write is refused, so this cannot leave the
+      // product looking restored when the server never took it.
+      if (activate) { ev.stopPropagation(); this.setActiveBulk([activate.dataset.id], true).then(() => this.renderLanding()); return; }
       if (del)     { ev.stopPropagation(); this.confirmDel([del.dataset.id], 'Delete this product?'); return; }
       if (dismiss) { ev.stopPropagation(); (this._dismissedAlerts = this._dismissedAlerts || new Set()).add(this.activeCat); this.renderLanding(); return; }
       // ⚠ Through visibleProducts(), the ONE door for what a tab lists. This used to
