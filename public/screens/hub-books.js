@@ -779,17 +779,20 @@ S.HubBooks = {
 
     const periodEnd = this._monthEndDate(monthKey);
     const periodStart = this._monthStartDate(monthKey);
-    const counts = (App.inventoryData?.ic_counts || [])
-      .slice()
-      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-
-    const endingCount    = counts.filter(c => c.date && c.date <= periodEnd).slice(-1)[0] || null;
-    const beginningCount = counts.filter(c => c.date && c.date <  periodStart).slice(-1)[0] || null;
-
     const inMonth = (d) => d && String(d).slice(0, 7) === monthKey;
     const purchases = (App.inventoryData?.ic_deliveries || [])
       .filter(d => inMonth(d.date))
       .reduce((s, d) => s + (parseFloat(d.total) || 0), 0);
+
+    // ⚠ THE BOUNDARY COUNTS COME FROM THE READER, NOT FROM A SECOND DERIVATION HERE (S96). This
+    // used to re-sort ic_counts by date alone and take `.slice(-1)[0]`, which ties on two counts
+    // sharing a date and returns whichever sat last in the array, while inventoryValueAsOf sorts
+    // with cmpNewest and tiebreaks on created_at — so the figure and the Source footer could name
+    // DIFFERENT counts. One door, the same lesson as App.computeUsagePair.
+    const beginAsOf   = App.inventoryValueAsOf(periodStart, true);   // strictly BEFORE the period
+    const endAsOf     = App.inventoryValueAsOf(periodEnd);
+    const endingCount    = endAsOf.count;
+    const beginningCount = beginAsOf.count;
 
     const blank = () => this._blankRow(COL_COUNT);
     const rows = [];
@@ -818,8 +821,6 @@ S.HubBooks = {
     // understating taxable profit, on the sheet an accountant transcribes. The as-of
     // reader carries a skipped product forward at its last counted value, which is what
     // the Inventory dashboard has always done, so the two finally agree.
-    const beginAsOf   = App.inventoryValueAsOf(periodStart, true);   // strictly BEFORE the period
-    const endAsOf     = App.inventoryValueAsOf(periodEnd);
     const beginValue  = beginAsOf.value;
     const endingValue = endAsOf.value != null ? endAsOf.value : 0;
     const calcCogs    = (beginValue != null) ? (beginValue + purchases - endingValue) : null;
@@ -1636,16 +1637,16 @@ S.HubBooks = {
     const YTD = this._aggregateYTD(year + '-12');
 
     // Beginning and ending inventory from counts
-    const counts = (App.inventoryData?.ic_counts || []).slice()
-      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    const beginCount = counts.filter(c => c.date && c.date < yearStart).slice(-1)[0] || null;
-    const endCount   = counts.filter(c => c.date && c.date <= yearEnd).slice(-1)[0] || null;
+    // ⚠ Boundary counts come from the reader (S96) — see _buildInventoryValuation for why a second
+    // date-only derivation here could name a different count than the figure came from.
     // Same as-of basis as the monthly sheet — a skipped product carries forward rather
     // than reading as an empty shelf. See _buildInventoryValuation for why.
     const beginAsOfY = App.inventoryValueAsOf(yearStart, true);
     const endAsOfY   = App.inventoryValueAsOf(yearEnd);
-    const beginValue = beginCount ? beginAsOfY.value : null;
-    const endValue   = endCount   ? endAsOfY.value   : null;
+    const beginCount = beginAsOfY.count;
+    const endCount   = endAsOfY.count;
+    const beginValue = beginAsOfY.value;
+    const endValue   = endAsOfY.value;
 
     // Total purchases from receive-delivery log over the year
     const inYear = (d) => d && String(d).slice(0, 4) === year;

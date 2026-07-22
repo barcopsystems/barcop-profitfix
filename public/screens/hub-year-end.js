@@ -574,10 +574,8 @@ S.HubYearEnd = {
     mergeFull(0);
     rows.push(blank());
 
-    const counts = (App.inventoryData?.ic_counts || []).slice()
-      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    const beginCount = counts.filter(c => c.date && c.date < yearStart).slice(-1)[0] || null;
-    const endCount   = counts.filter(c => c.date && c.date <= yearEnd).slice(-1)[0] || null;
+    // ⚠ Boundary counts come from the reader (S96) — a second date-only derivation here could name
+    // a different count than the figure actually came from. See hub-books._buildInventoryValuation.
     // ⚠ Valued through App.inventoryValueAsOf, not a count's stored `total_value`.
     // A count that SKIPPED products stores them at 0, so the ending figure read light
     // and Calculated COGS came out HIGH — overstating cost of goods and understating
@@ -586,8 +584,10 @@ S.HubYearEnd = {
     // AND disclose), and the note pushed below names which ones and from when.
     const beginAsOf = App.inventoryValueAsOf(yearStart, true);
     const endAsOf   = App.inventoryValueAsOf(yearEnd);
-    const beginValue = beginCount ? beginAsOf.value : null;
-    const endValue   = endCount   ? endAsOf.value   : null;
+    const beginCount = beginAsOf.count;
+    const endCount   = endAsOf.count;
+    const beginValue = beginAsOf.value;
+    const endValue   = endAsOf.value;
 
     const inYear = (d) => d && String(d).slice(0, 4) === year;
     const yearDeliveries = (App.inventoryData?.ic_deliveries || []).filter(d => inYear(d.date));
