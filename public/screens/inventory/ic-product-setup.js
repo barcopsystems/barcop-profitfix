@@ -1967,6 +1967,16 @@ S.InventoryProducts = {
       this._import = null;
       this.renderLanding();
     } else {
+      // ⚠ TAKE THEM BACK OUT. They were pushed into the live list above and
+      // putRecordsBulk cannot revert, so a refused import used to leave every parsed
+      // product sitting in memory. The duplicate guard at the top of this function builds
+      // `taken` from that SAME list, so the retry then found every row already taken and
+      // reported "No new products imported. N duplicate names skipped." — following the
+      // instruction the operator was just given was the one thing that could not work,
+      // until a reload silently threw the whole import away. Every sibling importer
+      // (ev-regulars, hub-operating-expenses, ic-vendors, lc-staff-roster, r-menu-items)
+      // already did this; this one was missed.
+      App.dropRows(this.products(), imported);
       note('Save failed. Try again.');
     }
   }
