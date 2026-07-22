@@ -458,12 +458,18 @@ S.ShiftDashboard = {
   // be told to go check the file's columns. opts.cleared = days zeroed out by that grid.
   async importSales(rows, opts) {
     opts = opts || {};
-    const { toAdd, dupCount, merged } = PosIngest.build('sales', rows);
+    const { toAdd, skipped, dupCount, merged, keptManual } = PosIngest.build('sales', rows);
     const res = document.getElementById('sc-ck-import-res');
     if (!toAdd.length) {
+      // ⚠ Say the TRUE reason (S105). When every day in the file was already closed by hand this
+      // used to blame the operator's file for missing a Date column, which is both wrong and
+      // insulting — nothing was broken, we protected their own work. Mirrors the cash twin.
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (opts.manual ? 'No days saved. Enter sales for at least one day.'
-                       : 'No days imported. Check that the file has a Date column and sales values.')
+        + (keptManual
+            ? 'No days imported. ' + keptManual + ' day' + (keptManual === 1 ? ' was' : 's were')
+              + ' already closed by hand, so your own figures were kept.'
+            : opts.manual ? 'No days saved. Enter sales for at least one day.'
+                          : 'No days imported. Check that the file has a Date column and sales values.')
         + '</div>';
       return;
     }
@@ -481,6 +487,13 @@ S.ShiftDashboard = {
     this._flash = toAdd.length + ' day' + (toAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
       + (merged ? ' (' + merged + ' extra row' + (merged === 1 ? '' : 's') + ' combined into day totals)' : '')
       + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
+      + (keptManual ? ' (' + keptManual + ' day' + (keptManual === 1 ? '' : 's')
+          + ' already closed by hand, kept)' : '')
+      // ⚠ A dropped row is a MEASUREMENT THAT WENT MISSING (S105) — a junk date, or a day whose
+      // revenue came through zero or negative. Saying nothing let the operator read "3 days
+      // imported" off a 5-day file and believe the week was in.
+      + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
+          + ' skipped, no usable date or sales figure)' : '')
       + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + '.';
     this._openStep = 'cash';
     this.render(this.container, this.actions);
@@ -750,7 +763,7 @@ S.ShiftDashboard = {
     return this._commitCash(this._pendingCashRows);
   },
   async _commitCash(rows) {
-    const { toAdd, dupCount, keptManual } = PosIngest.build('cash', rows);
+    const { toAdd, skipped, dupCount, keptManual } = PosIngest.build('cash', rows);
     const res = document.getElementById('sc-ck-cash-res');
     // ⚠ It used to say "N already logged" for every skipped row, which was untrue in the
     // case that mattered: a corrected report was DISCARDED and reported as though it had
@@ -770,7 +783,11 @@ S.ShiftDashboard = {
     this._pendingCashRows = null;
     this._flash = toAdd.length + ' reconcile' + (toAdd.length === 1 ? '' : 's') + ' imported'
       + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
-      + (keptManual ? ' (' + keptManual + ' hand count' + (keptManual === 1 ? '' : 's') + ' kept)' : '') + '.';
+      + (keptManual ? ' (' + keptManual + ' hand count' + (keptManual === 1 ? '' : 's') + ' kept)' : '')
+      // ⚠ A skipped cash row is a register-day with NO over/short at all (S105). Silence let the
+      // operator read "4 reconciles imported" off a 6-row file and believe the week was counted.
+      + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
+          + ' skipped, no over/short figure)' : '') + '.';
     this._openStep = 'exc';
     this.render(this.container, this.actions);
   },
