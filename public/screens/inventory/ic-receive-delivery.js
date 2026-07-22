@@ -321,6 +321,14 @@ S.InventoryReceiveDelivery = {
   startOver() {
     this._draft = null;
     this._draftLines = null;
+    // ⚠ THE ID GOES TOO (S112). The delivery row is written FIRST, so a save that failed at the
+    // product or order write has already put it on the server, and `_pendingDeliveryId` exists so
+    // the operator's RETRY reuses that row instead of booking a second delivery for one invoice
+    // (S56). Start Over is not a retry — it abandons this delivery. Leaving the id set meant the
+    // next, unrelated delivery reused it at save()'s `|| App.uid()` and UPSERTED OVER the first:
+    // one row where there were two, and the abandoned delivery's cases silently gone from
+    // purchases, COGS, usage variance and shrink. The other two clear sites already did this.
+    this._pendingDeliveryId = null;
     this.renderForm();
   },
 
