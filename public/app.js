@@ -4646,7 +4646,15 @@ const App = {
         body.forEach(r => r.splice(c, 1));
       }
     }
-    return { head, body, cols: (head[0] ? head[0].length : (body[0] ? body[0].length : 0)) };
+    const outCols = (head[0] ? head[0].length : (body[0] ? body[0].length : 0));
+    // ⚠ NULL WHEN NOTHING SURVIVES (S130). An all-blank table (blank headers + empty body) drops
+    // every column and reaches 0 columns. Pushed as a block it went to autoTable with head:[[]],
+    // body:[] — which can leave lastAutoTable unset, so the next block's `y = lastAutoTable.finalY`
+    // reads the PREVIOUS table's position and paints over it. There is nothing to render, so skip
+    // it: the caller's `if (t)` already handles null. A header-only table with REAL headers keeps
+    // its columns (headEmpty is false), so this only drops the genuinely-empty case.
+    if (!outCols) return null;
+    return { head, body, cols: outCols };
   },
 
   // Walk a report container into ordered PDF blocks: headings, key/value tiles,
