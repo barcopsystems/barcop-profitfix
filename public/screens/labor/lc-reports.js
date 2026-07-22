@@ -277,7 +277,7 @@ S.LaborReports = {
         const locked = !!a.locked;
         const editBtn = canEdit && !locked
           ? '<button class="btn btn-ghost btn-sm dv-edit" data-id="' + a.id + '">Edit Hours</button>'
-          : locked ? '<span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">LOCKED</span>' : '';
+          : locked ? '<span class="no-print" style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">LOCKED</span>' : '';
         const sal = App.isSalaried(a.staff_id);
         const wageCell = sal ? '<span style="color:var(--t3);">Salary</span>' : (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-');
         const costCell = sal ? '<span style="color:var(--t3);">Salary</span>' : App.fmtCurrency(a.cost || 0);
@@ -427,7 +427,7 @@ S.LaborReports = {
         const anyLocked = recs.some(r => r.locked);
         const editBtn = canEdit && !anyLocked && recs.length > 0
           ? '<button class="btn btn-ghost btn-sm ws-edit" data-key="' + esc(k) + '">Edit Hours</button>'
-          : anyLocked ? '<span style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">LOCKED</span>' : '';
+          : anyLocked ? '<span class="no-print" style="font-size:9px;color:var(--gold);font-weight:700;letter-spacing:1px;">LOCKED</span>' : '';
         return '<tr><td><div class="val">' + esc(s.name) + '</div></td>'
           + '<td>' + Object.keys(s.days).length + '</td>'
           + '<td>' + s.hours.toFixed(1) + '</td>'
