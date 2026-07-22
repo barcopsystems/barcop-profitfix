@@ -659,7 +659,7 @@ async function sendErrorDigest() {
     let cursor = since, truncated = false;
     for (let page = 0; ; page++) {
       if (page >= MAX_PAGES) { truncated = true; break; }
-      const { data: chunk, error } = await supabaseAdmin
+      let { data: chunk, error } = await supabaseAdmin   // `chunk` is trimmed below, so not const
         .from('client_errors')
         .select('kind, message, user_email, app_version, screen, created_at')
         .gt('created_at', cursor)
@@ -673,9 +673,28 @@ async function sendErrorDigest() {
         break;                            // partial gather: report what we have, mark advances only that far
       }
       if (!chunk || !chunk.length) break;
+      // ⚠ THE CURSOR IS created_at ALONE WHILE THE SORT IS (created_at, id) — so when a group of
+      // rows sharing ONE exact timestamp straddles the page boundary, the next .gt(created_at)
+      // JUMPS OVER every remaining member of that group. They are never reported and the prune
+      // below then deletes them, so the events are gone and the digest looks healthy while it
+      // happens. Rather than build a composite keyset filter out of a timestamp string (PostgREST
+      // .or() would need the value quoted, and this query cannot be exercised locally), TRIM the
+      // trailing rows that share this page's newest timestamp and let the next page re-read them.
+      // Costs at most one partial page of re-reads; never skips.
+      const wasFull = chunk.length === PAGE;
+      if (wasFull) {
+        const lastTs = chunk[chunk.length - 1].created_at;
+        let cut = chunk.length;
+        while (cut > 0 && chunk[cut - 1].created_at === lastTs) cut--;
+        // cut === 0 means all PAGE rows share one timestamp. Trimming would empty the page and
+        // spin forever, so keep it whole and accept the jump — it needs 500+ rows written inside
+        // one clock tick, and stalling the digest permanently is the worse failure.
+        if (cut > 0) chunk = chunk.slice(0, cut);
+        else console.warn('errorDigest: ' + PAGE + ' rows share one timestamp; cannot page past them safely.');
+      }
       data.push(...chunk);
       cursor = chunk[chunk.length - 1].created_at;
-      if (chunk.length < PAGE) break;
+      if (!wasFull) break;
     }
     if (!data.length) { console.log('errorDigest: nothing new since ' + since); return; }
     if (truncated) console.warn('errorDigest: hit the ' + (PAGE * MAX_PAGES) + '-event page cap; the remainder reports on the next run.');
