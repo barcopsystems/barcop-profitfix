@@ -771,7 +771,13 @@ const DB = {
       // unrelated offline edit re-armed the sentinel weeks later and replayed the entire
       // abandoned backup over live records. Deriving the entry from the queue ITSELF makes that
       // whole class impossible instead of patching the one caller that hit it.
-      if (list.indexOf('events') < 0 && this._eventQueue && this._eventQueue().length) list.push('events');
+      // ⚠ LIVE entries only (S10). A QUARANTINED entry is work the server has refused
+      // _MAX_SYNC_ATTEMPTS times; counting it here is what locked an owner out of restoring
+      // permanently, because the preflight (settings.js) refuses on any pending entry and this
+      // sentinel is the only route to the event queue. It is still on disk and still listed for
+      // the operator by quarantinedEvents() — it just stops being called "waiting to sync",
+      // which was never true of it.
+      if (list.indexOf('events') < 0 && this._liveEvents && this._liveEvents().length) list.push('events');
     } catch (e) { /* synthesis is best-effort — the stored list stands regardless */ }
     return list;
   },
@@ -812,11 +818,16 @@ const DB = {
     const accountId = await this._ensureAccountId();
     if (!accountId) return { ok: false, synced: 0, failed: 0, error: 'No account membership' };
     const tableOf = { pf_data: 'user_data', pf_ic_data: 'ic_data', pf_lc_data: 'lc_data', pf_sc_data: 'sc_data' };
-    let synced = 0, failed = 0;
+    let synced = 0, failed = 0, quarantined = 0, lastError = '';
     for (const lsKey of this._pendingList()) {
       if (lsKey === 'events') {
         const er = await this.syncPendingEvents();
         synced += er.synced; failed += er.failed;
+        // Carried up so the banner can tell a REJECTION from an unreachable server (S10). Saying
+        // "check your connection" about an RLS denial sends the operator after something that
+        // will never resolve, and the old code had no way to know the difference.
+        quarantined += (er.quarantined || 0);
+        if (er.lastError) lastError = er.lastError;
         continue; // syncPendingEvents clears 'events' itself once the queue drains
       }
       const table = tableOf[lsKey];
@@ -860,7 +871,9 @@ const DB = {
     // `remaining` lets the caller tell a SKIP apart from a FAILURE and say something true about
     // each, instead of blaming the connection for a load that had not finished.
     const remaining = this._pendingList().length;
-    return { ok: failed === 0 && remaining === 0, synced: synced, failed: failed, remaining: remaining };
+    const stuck = this.quarantinedEvents().length;
+    return { ok: failed === 0 && remaining === 0, synced: synced, failed: failed, remaining: remaining,
+             quarantined: quarantined, stuck: stuck, lastError: lastError };
   },
 
   // ── Local storage fallback ────────────────────────────────────────────────
@@ -1673,6 +1686,47 @@ const DB = {
   // ── Event offline queue ───────────────────────────────────────────────────
   // Scoped to the active account (like every other local key) so a queued op
   // created under one bar can never replay into another after an account switch.
+  // ── QUARANTINE FOR A PERMANENTLY-FAILING QUEUE ENTRY (S10) ───────────────────────────────────
+  // Some ops the server will NEVER accept: an RLS denial after the user is removed from an
+  // account, a constraint violation, an oversized payload, a kind that no longer exists. The old
+  // loop pushed every failure straight back with no counter, so one poisoned row blocked the
+  // restore preflight (settings.js) forever while the banner blamed the connection.
+  // ⭐ Kyle's call 2026-07-23: QUARANTINE, NEVER AUTO-DELETE. After this many attempts the entry
+  // stops being retried and stops holding the restore lock, but it stays on disk with its payload
+  // intact and becomes visible and discardable. Quarantine breaks the deadlock WITHOUT making the
+  // operator choose to delete work they have no way to judge; a bare discard button would.
+  // ⚠ Do NOT lower this to 1-2: a genuine offline stretch must keep retrying, and a SUCCESS
+  // resets the count, so only a consistently-rejected op ever reaches the ceiling.
+  _MAX_SYNC_ATTEMPTS: 5,
+  _isQuarantined(e) { return !!e && (e.attempts || 0) >= this._MAX_SYNC_ATTEMPTS; },
+  // The live (still-retrying) part of the queue — what "unsynced work" actually means everywhere.
+  _liveEvents() { return this._eventQueue().filter(e => !this._isQuarantined(e)); },
+  // The stuck part, for the operator to look at and decide about.
+  quarantinedEvents() { return this._eventQueue().filter(e => this._isQuarantined(e)); },
+  // Explicit operator actions. Neither is ever called automatically.
+  discardQueued(ids) {
+    const drop = new Set((ids || []).map(String));
+    if (!drop.size) return 0;
+    const list = this._eventQueue();
+    const keep = list.filter(e => !drop.has(String(e.id)));
+    this._setEventQueue(keep);
+    if (!keep.some(e => !this._isQuarantined(e))) this._clearPending('events');
+    return list.length - keep.length;
+  },
+  // Put a quarantined entry back in play once the operator has fixed whatever rejected it.
+  retryQueued(ids) {
+    const want = new Set((ids || []).map(String));
+    if (!want.size) return 0;
+    let n = 0;
+    const list = this._eventQueue().map(e => {
+      if (!want.has(String(e.id))) return e;
+      n++;
+      return Object.assign({}, e, { attempts: 0, lastError: '' });
+    });
+    this._setEventQueue(list);
+    if (n) this._markPending('events');   // it is live work again, so it blocks a restore again
+    return n;
+  },
   _eventQueue() {
     try { return JSON.parse(localStorage.getItem(this._acctKey(this._EVENTQ_KEY)) || '[]'); }
     catch (e) { return []; }
@@ -1692,22 +1746,29 @@ const DB = {
     // Collapse to the latest op for a given row so replays stay minimal.
     const id = String(rec.id);
     const filtered = list.filter(e => !(e.table === table && e.kind === kind && e.id === id));
-    filtered.push({ table, kind, op, id, payload: op === 'put' ? rec : null });
+    // queuedAt so the stuck-changes list can tell the operator HOW OLD a rejected op is, which is
+    // most of what decides whether it is worth keeping (S10). attempts starts explicit rather
+    // than undefined so a legacy entry and a new one are not two different shapes.
+    filtered.push({ table, kind, op, id, payload: op === 'put' ? rec : null,
+                    attempts: 0, lastError: '', queuedAt: new Date().toISOString() });
     const stored = this._setEventQueue(filtered);
     if (stored) this._markPending('events');
     return stored;
   },
   hasPendingEvents() {
-    return !!(this._sb && this._user && this._eventQueue().length > 0);
+    return !!(this._sb && this._user && this._liveEvents().length > 0);
   },
   // Replay queued record ops. Each op clears only on its own success.
   async syncPendingEvents() {
     if (!this._sb || !this._user) return { ok: false, synced: 0, failed: 0 };
     const accountId = await this._ensureAccountId();
     if (!accountId) return { ok: false, synced: 0, failed: 0, error: 'no account' };
-    let synced = 0, failed = 0;
+    let synced = 0, failed = 0, quarantined = 0, lastError = '';
     const remaining = [];
     for (const e of this._eventQueue()) {
+      // Already given up on: keep it (never auto-delete) but stop burning a round trip on it every
+      // sync, forever. retryQueued() is the only way back into the live set.
+      if (this._isQuarantined(e)) { remaining.push(e); quarantined++; continue; }
       try {
         let error;
         if (e.op === 'put') {
@@ -1719,12 +1780,33 @@ const DB = {
           ({ error } = await this._sb.from(e.table).delete()
             .eq('account_id', accountId).eq('kind', e.kind).eq('id', e.id));
         }
-        if (error) { failed++; remaining.push(e); } else { synced++; }
-      } catch (err) { failed++; remaining.push(e); }
+        // ⚠ COUNT THE ATTEMPT AND KEEP THE REASON. Without a counter nothing could ever tell a
+        // network blip from an op the server will never take; without the message the operator is
+        // shown "check your connection" for an RLS denial and sent chasing something that will
+        // never resolve. A SUCCESS drops the entry entirely, so the count only ever climbs on a
+        // run of consecutive failures.
+        if (error) {
+          failed++;
+          const att = (e.attempts || 0) + 1;
+          const msg = String((error && error.message) || error || 'rejected');
+          lastError = msg;
+          remaining.push(Object.assign({}, e, { attempts: att, lastError: msg }));
+          if (att >= this._MAX_SYNC_ATTEMPTS) quarantined++;
+        } else { synced++; }
+      } catch (err) {
+        failed++;
+        const att = (e.attempts || 0) + 1;
+        const msg = String((err && err.message) || err || 'failed');
+        lastError = msg;
+        remaining.push(Object.assign({}, e, { attempts: att, lastError: msg }));
+        if (att >= this._MAX_SYNC_ATTEMPTS) quarantined++;
+      }
     }
     this._setEventQueue(remaining);
-    if (!remaining.length) this._clearPending('events');
-    return { ok: failed === 0, synced, failed };
+    // Clear the sentinel when nothing LIVE is left. Quarantined rows stay on disk and stay listed,
+    // but they must stop blocking the restore preflight — that lock was the whole defect (S10).
+    if (!remaining.some(e => !this._isQuarantined(e))) this._clearPending('events');
+    return { ok: failed === 0, synced, failed, quarantined, lastError };
   },
 
   // ── Merge defaults (ensures all keys exist after updates) ─────────────────

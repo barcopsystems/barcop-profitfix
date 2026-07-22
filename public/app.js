@@ -741,13 +741,35 @@ const App = {
         // something that will never resolve. An offline boot never resolves an account id, so
         // that is the COMMON path here, not an edge case. Only a run that skipped because the
         // load had not finished gets the loading message.
-        if (span) span.textContent = (r.failed || r.error)
-          ? 'Still cannot reach the server. Your changes are safe on this device. '
-            + 'Try again once you have a connection.'
-          : 'Your account is still loading. Your changes are safe on this device — '
-            + 'tap Sync Now again in a moment.';
+        if (span) span.textContent = this._syncMsgFor(r);
       }
     };
+  },
+
+  // What to tell the operator after a Sync Now that did not fully drain. THREE outcomes, and
+  // getting any of them wrong sends them after the wrong thing.
+  // ⚠ Extracted from inside the Sync Now click handler ON PURPOSE (S10). Buried in that closure
+  // the only way to test it was a regex over the source, and that regex passed a mutation that
+  // gutted the branch — because the strings it matched still appeared in the message text. A pure
+  // function can be lifted and RUN, so the assertion is on the sentence the operator actually
+  // reads. Message logic that cannot be executed is message logic that is not tested.
+  _syncMsgFor(r) {
+    r = r || {};
+    // A REFUSED change is not a connection problem. Saying "check your connection" about an RLS
+    // denial sends the operator chasing something that will never resolve — that message is what
+    // made S10 a permanent trap. A refused change is quarantined after DB._MAX_SYNC_ATTEMPTS: it
+    // stops blocking a restore, it is never deleted, and it is waiting in Settings.
+    if (r.stuck) {
+      return r.stuck + ' change' + (r.stuck === 1 ? '' : 's') + ' could not be saved to the server '
+        + 'and ' + (r.stuck === 1 ? 'is' : 'are') + ' waiting for you in Settings > Backup & Restore. '
+        + 'Nothing has been lost. Everything else is synced.';
+    }
+    if (r.failed || r.error) {
+      return 'Still cannot reach the server. Your changes are safe on this device. '
+        + 'Try again once you have a connection.';
+    }
+    return 'Your account is still loading. Your changes are safe on this device — '
+      + 'tap Sync Now again in a moment.';
   },
 
   // Device storage is full and a write could NOT be stored. This is the one failure the app
