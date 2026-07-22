@@ -3909,8 +3909,17 @@ const App = {
   // records do not lose their drawer association on edit.
   drawerOptions(selectedId, opts) {
     opts = opts || {};
-    const all = ((this.shiftData && this.shiftData.sc_drawers) || [])
-      .filter(d => d.active !== false);
+    const every = ((this.shiftData && this.shiftData.sc_drawers) || []);
+    const active = every.filter(d => d.active !== false);
+    // ⚠ An ARCHIVED register that is CURRENTLY SELECTED stays on the list (S132) — the same rule
+    // as S35/S54: whatever a picker excludes, it must still show what is selected. Without it the
+    // "(unsaved)" fallback below rendered the raw internal id in front of the operator
+    // ("d2 (unsaved)"), which S104 made common by stamping imported rows with an archived
+    // register's id. It is still never offered for a NEW count.
+    const archivedSel = selectedId
+      ? every.find(d => d.active === false && (d.id === selectedId || d.name === selectedId))
+      : null;
+    const all = archivedSel ? active.concat([archivedSel]) : active;
 
     let resolvedId = selectedId || '';
     if (resolvedId && !all.some(d => d.id === resolvedId)) {
@@ -3920,7 +3929,8 @@ const App = {
 
     let h = '<option value="">' + esc(opts.placeholder || 'Select drawer...') + '</option>';
     all.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(d => {
-      h += '<option value="' + esc(d.id) + '"' + (resolvedId === d.id ? ' selected' : '') + '>' + esc(d.name) + '</option>';
+      h += '<option value="' + esc(d.id) + '"' + (resolvedId === d.id ? ' selected' : '') + '>'
+        + esc(d.name) + (d.active === false ? ' (archived)' : '') + '</option>';
     });
 
     if (selectedId && !all.some(d => d.id === selectedId) && !all.some(d => d.name === selectedId)) {
