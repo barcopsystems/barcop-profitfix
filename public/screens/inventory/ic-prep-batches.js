@@ -130,7 +130,13 @@ S.PrepBatches = {
     const by = parseFloat(batch_yield) || 0;
     const ss = parseFloat(serving_size) || 0;
     const spb = (by > 0 && ss > 0) ? this.toOz(by, batch_yield_unit || 'oz') / this.toOz(ss, serving_size_unit || 'oz') : null;
-    const cps = (spb && spb > 0) ? tc / spb : tc;
+    // ⚠ NULL, NOT THE WHOLE BATCH COST (S26). This fell back to `tc` — so a batch with no yield
+    // reported the ENTIRE batch as the cost of ONE serving: a $60 mix costed every drink at $60.
+    // saveBatch validates only the name, so a yield-less batch saves fine and the resync then
+    // WRITES that figure. Servings-per-batch is unknowable here, so the per-serving cost is
+    // unknowable too, and the app's rule for that is to refuse rather than invent a number.
+    // A batch that genuinely costs zero still reports 0 — the test is on the SERVINGS, not the cost.
+    const cps = (spb && spb > 0) ? tc / spb : null;
     return { total_cost: tc, servings_per_batch: spb, cost_per_serving: cps };
   },
 
@@ -257,6 +263,27 @@ S.PrepBatches = {
       .map(i => i.product_id));
   },
 
+  // Ingredients still ON FILE but carrying NO COST (S26). Deliberately separate from
+  // missingIngredients, which only catches a DELETED product: a product that exists with a null
+  // unit_cost slips straight through it, `unitCost` returns 0, and the line contributes nothing —
+  // so the batch UNDERSTATES and the resync writes the understatement, which every dish built on
+  // the batch then inherits. Same family as the skipped-is-not-zero class.
+  // ⚠ A REAL zero is not uncosted. A product priced at 0.00 on purpose (tap water, garnish from
+  // a case already expensed) is a measurement; only a null/absent cost is an absence of one.
+  uncostedIngredients(b) {
+    return (((b && b.ingredients) || [])
+      .filter(i => {
+        if (!i || !i.product_id) return false;
+        const p = this.prodById(i.product_id);
+        if (!p) return false;                       // that is missingIngredients' job, not this one
+        // ⚠ Read the product's RAW cost, NOT recipeBasis().costPerUnit — that returns
+        // `costPerOz(p) || 0`, so it has already flattened "no cost on file" into a hard 0 and
+        // cannot tell the two apart. Asking it would make this predicate permanently false.
+        return p.unit_cost == null || p.unit_cost === '';
+      })
+      .map(i => i.product_id));
+  },
+
   // ⚠ Is the visit that STARTED this work still the one on the page? `container.isConnected` used
   // to be asked here and could never say no: #content-area is a permanent <main> that navigation
   // merely empties and refills (app.js says so — "The content host is reused across every module
@@ -273,6 +300,13 @@ S.PrepBatches = {
   _resyncStillCurrent(token) { return token === App._mountSeq; },
 
   async _resyncCosts(batches, token) {
+    // ⚠ NEVER RECOMPUTE FROM A PICTURE THE APP ADMITS IS INCOMPLETE (S26). A degraded load is
+    // served from a cache that can be stale and missing rows, so an ingredient list read from it
+    // may be short — and this function WRITES what it computes, as authoritative, from a render.
+    // The twin already refuses for exactly this reason and says so in its own words
+    // (hub-operating-expenses.catchUpRecurring: "a cache that can be months stale ... the dedupe
+    // cannot see them"). Nothing is lost by waiting: the next clean load recomputes it.
+    if (typeof DB !== 'undefined' && (!DB._dataReady || DB._loadDegraded)) return false;
     const pending = [];
     (batches || []).forEach(b => {
       // ⚠ A DELETED ingredient is not a free one. unitCost(null) is 0, so resyncing a batch whose
@@ -280,7 +314,10 @@ S.PrepBatches = {
       // server. App.menuItemCost reads cost_per_serving off the batch, so every menu item built on
       // it silently under-costs and the margin reads better than it is. Leave the stored cost
       // alone and flag the batch instead; the operator decides.
-      if (this.missingIngredients(b).length) return;
+      // Hold the last-good cost for a batch we cannot cost honestly, exactly as the dangling
+      // case does (S25: flag it, do not recost it cheaper). An ingredient with no cost on file
+      // would otherwise be recomputed as a 0 contribution and WRITTEN (S26).
+      if (this.missingIngredients(b).length || this.uncostedIngredients(b).length) return;
       const ings = (b.ingredients || []).map(i => {
         const cpu = this.unitCost(this.prodById(i.product_id));
         return { ...i, cost_per_unit: cpu, total_cost: (cpu || 0) * (i.quantity || 0) };
