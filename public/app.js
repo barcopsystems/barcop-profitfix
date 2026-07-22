@@ -5437,6 +5437,8 @@ const App = {
     const seen = {};      // "pid@@loc" already resolved to its newest counted value
     const byProd = {};
     const stale = {};     // pid -> { key: {it,date} } dropped as stale, held in reserve
+    const newestSeen = {};// pid -> date of the NEWEST count that measured it anywhere (see the
+                          // as-of rule below). Counts are newest-first, so first write wins.
     // Which counts fed this product's figure. `oldest` is what a disclosure should
     // quote: it is the weakest link, the part of the number resting furthest back.
     const stampDate = (rec, d) => {
@@ -5448,6 +5450,9 @@ const App = {
     counts.forEach(cnt => {
       (cnt.items || []).forEach(it => {
         if (it.counted === false) return;
+        // A real measurement, so this count COVERS the product. Skipped rows deliberately do not
+        // establish a date (the same rule receivedSinceCount follows).
+        if (!newestSeen[it.product_id]) newestSeen[it.product_id] = cnt.date || '';
         const loc = it.location ? (canon[it.location] || it.location) : '';
         const home = homes[it.product_id];
         const key = it.product_id + '@@' + (loc || 'Unassigned');
@@ -5471,13 +5476,31 @@ const App = {
         stampDate(rec, cnt.date);
       });
     });
+    // ⚠⚠ TWO DIFFERENT QUESTIONS, TWO DIFFERENT RULES. Do not collapse them (S88).
+    // A CURRENT read asks "what do I reorder against TODAY", so today's shelf layout is exactly
+    // the right lens: a shelf the operator took this product off is not stock any more, and
+    // carrying it forever suppresses reorders (running dry mid-service is the worse failure).
+    // That behaviour is UNCHANGED and is pinned by verify-onhand-stale-location.js.
+    // An AS-OF read asks "what was on the shelf on DATE D". A Product Setup edit made LATER is
+    // not evidence about D — the count taken on or before D is. Scoping a historical row against
+    // TODAY's layout rewrote a past month's ending inventory and INVENTED cost of goods on a
+    // Schedule C sheet: the emptiness test below resolves differently at the two ends of a
+    // period, so one shelf counted in full at the period START was dropped at the period END and
+    // the difference surfaced as usage nobody poured ($320 on the harness fixture, undisclosed).
+    // So on the as-of path a vacated shelf is retired only by a STRICTLY NEWER COUNT that also
+    // measured the product. That still retires the renamed/archived shelf the original guard was
+    // built for (a later count supersedes it) and treats both boundaries identically.
     Object.keys(stale).forEach(pid => {
-      if (byProd[pid]) return;   // a live row exists — the stale ones stay dropped
-      const rec = byProd[pid] = { onHand: 0, value: 0, oldest: null, newest: null };
-      Object.keys(stale[pid]).forEach(k => {
-        rec.onHand += (stale[pid][k].it.total || 0);
-        rec.value  += (stale[pid][k].it.value || 0);
-        stampDate(rec, stale[pid][k].date);
+      const bucket = stale[pid];
+      const keep = asOf
+        ? Object.keys(bucket).filter(k => !(newestSeen[pid] && bucket[k].date < newestSeen[pid]))
+        : (byProd[pid] ? [] : Object.keys(bucket));   // current read: a live row wins outright
+      if (!keep.length) return;
+      const rec = byProd[pid] || (byProd[pid] = { onHand: 0, value: 0, oldest: null, newest: null });
+      keep.forEach(k => {
+        rec.onHand += (bucket[k].it.total || 0);
+        rec.value  += (bucket[k].it.value || 0);
+        stampDate(rec, bucket[k].date);
       });
     });
     return byProd;
