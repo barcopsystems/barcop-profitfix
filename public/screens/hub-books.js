@@ -840,10 +840,20 @@ S.HubBooks = {
       const src = (endingCount.items || []).find(i => i && i.product_id === pid) || {};
       return {
         product_id: pid,
-        name:      p.name || src.name || '',
-        category:  p.category || src.category || '',
+        // ⚠ `r.name` / `r.category` are the LAST fallback and they matter: a carried-only product
+        // is in neither ic_products (deleted) nor this count, so both other lookups come back
+        // empty and the row printed blank under an "Uncategorized" subtotal (S95).
+        name:      p.name || src.name || r.name || '',
+        category:  p.category || src.category || r.category || '',
         total:     r.onHand || 0,
-        unit_cost: p.unit_cost != null ? p.unit_cost : src.unit_cost,
+        // ⚠ DERIVED from the figures actually printed on this row (S91). `value` comes from the
+        // count, so reading unit cost off the LIVE product made Units x Unit Cost stop equalling
+        // Extended Value after any vendor price move — every extension on the supporting schedule
+        // failing to foot, which is what an accountant spot-checks first. Deriving it also gives a
+        // carried-only product a real unit cost instead of $0.00 beside a real extended value.
+        unit_cost: r.onHand ? (r.value / r.onHand)
+                   : (r.unitCost != null ? r.unitCost
+                      : (p.unit_cost != null ? p.unit_cost : src.unit_cost)),
         value:     r.value || 0,
         carried:   carriedIds.has(pid),
         carriedFrom: (((endAsOf.carried) || []).find(c => c.id === pid) || {}).date || ''
