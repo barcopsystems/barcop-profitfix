@@ -4561,6 +4561,17 @@ const App = {
     if (!node) return '';
     const clone = node.cloneNode(true);
     clone.querySelectorAll('button, .no-print, .tt, .tt-badge, [data-tt]').forEach(el => el.remove());
+    // ⚠ STACKED BLOCK CHILDREN MUST NOT RUN TOGETHER. `textContent` concatenates every
+    // descendant with no separator, so a cell holding
+    //     <div class="val">Avocado Toast</div><div>from recipe</div>
+    // exported as "Avocado Toastfrom recipe" — in EVERY PDF the app produces, not just
+    // the one it was reported on. Worse, the run-on string then drives the column widths
+    // (see _pdfColWidths), so a cell carrying a name plus an explanation claimed half the
+    // page and squeezed the numeric columns until they wrapped mid-figure.
+    // A space before each block-level child, then the existing whitespace collapse.
+    clone.querySelectorAll('div, p, li, br, tr, h1, h2, h3, h4, h5, h6').forEach(el => {
+      if (el.parentNode) el.parentNode.insertBefore(clone.ownerDocument.createTextNode(' '), el);
+    });
     return this._pdfSafe((clone.textContent || '').replace(/\s+/g, ' ').trim());
   },
 
@@ -4571,7 +4582,11 @@ const App = {
       .filter(tr => !tr.closest('.no-print'))
       .map(tr => Array.from(tr.children).map(td => this._pdfNodeText(td)));
     if (!body.length && !head.length) return null;
-    // Drop trailing columns that are empty across every row + header (action cols).
+    // Drop EVERY column that is empty across the header and every row — action columns
+    // at the end, and equally the row-select checkbox column at the START, which used to
+    // survive (the loop stopped at the first non-empty column) and exported as a
+    // permanent empty stripe down the left of every table in every report.
+    // Walking backwards keeps the indices valid as columns are spliced out.
     const cols = Math.max(head[0] ? head[0].length : 0, ...body.map(r => r.length), 0);
     for (let c = cols - 1; c >= 0; c--) {
       const headEmpty = !head[0] || !(head[0][c] || '').trim();
@@ -4579,7 +4594,7 @@ const App = {
       if (headEmpty && bodyEmpty) {
         if (head[0]) head[0].splice(c, 1);
         body.forEach(r => r.splice(c, 1));
-      } else break;
+      }
     }
     return { head, body, cols: (head[0] ? head[0].length : (body[0] ? body[0].length : 0)) };
   },
@@ -4616,6 +4631,30 @@ const App = {
       }
     });
     return blocks;
+  },
+
+  // Shared column widths for every table of the same shape in one export, so the
+  // sections line up down the page instead of each sizing itself.
+  // ⚠ THE CAP IS THE POINT. Widths are proportional to the LONGEST cell in a column, and
+  // a single explanatory cell — a dish name plus "INGREDIENT DELETED" plus "Not costed
+  // until you replace or remove it. Bar Cop will not price it cheaper in the meantime."
+  // — runs to about 95 characters. Uncapped, that column took over half the page and
+  // "$12.00" and "Sold/wk" wrapped mid-figure. Capping the character count a column may
+  // CLAIM leaves the long text to wrap (which is exactly what overflow:'linebreak' is
+  // for) without starving the columns beside it.
+  _pdfColWidths(tbls, n, availW) {
+    const clen = c => { const s = (c && typeof c === 'object' && c.content != null) ? c.content : c; return String(s == null ? '' : s).length; };
+    const maxLen = new Array(n).fill(1);
+    (tbls || []).forEach(b => {
+      (b.head || []).forEach(hr => (hr || []).forEach((c, i) => { if (i < n) maxLen[i] = Math.max(maxLen[i], clen(c)); }));
+      (b.body || []).forEach(row => (row || []).forEach((c, i) => { if (i < n) maxLen[i] = Math.max(maxLen[i], clen(c)); }));
+    });
+    const CAP = 28;
+    const capped = maxLen.map(v => Math.min(v, CAP));
+    const total = capped.reduce((s, v) => s + v, 0) || 1;
+    const styles = {};
+    capped.forEach((v, i) => { styles[i] = { cellWidth: (v / total) * availW }; });
+    return styles;
   },
 
   async exportPDF(opts) {
@@ -4672,22 +4711,13 @@ const App = {
     // sections line up down the whole export (autoTable otherwise sizes each table
     // on its own content and they drift). Widths track the widest cell per column.
     const availW = pageW - 2 * margin;
-    const clen = c => { const s = (c && typeof c === 'object' && c.content != null) ? c.content : c; return String(s == null ? '' : s).length; };
     const _wGroups = {};
     blocks.forEach(b => { if (b.type === 'table' && b.cols) (_wGroups[b.cols] = _wGroups[b.cols] || []).push(b); });
     const _sharedCols = {};
     Object.keys(_wGroups).forEach(cc => {
       const n = parseInt(cc), tbls = _wGroups[cc];
       if (tbls.length < 2) return;   // only align when 2+ tables share the shape
-      const maxLen = new Array(n).fill(1);
-      tbls.forEach(b => {
-        (b.head || []).forEach(hr => (hr || []).forEach((c, i) => { if (i < n) maxLen[i] = Math.max(maxLen[i], clen(c)); }));
-        (b.body || []).forEach(row => (row || []).forEach((c, i) => { if (i < n) maxLen[i] = Math.max(maxLen[i], clen(c)); }));
-      });
-      const total = maxLen.reduce((s, v) => s + v, 0) || 1;
-      const styles = {};
-      maxLen.forEach((v, i) => { styles[i] = { cellWidth: (v / total) * availW }; });
-      _sharedCols[n] = styles;
+      _sharedCols[n] = this._pdfColWidths(tbls, n, availW);
     });
 
     blocks.forEach(b => {
