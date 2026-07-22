@@ -362,8 +362,18 @@ S.InventoryProducts = {
     // Short, category-specific labels for the per-card upload button.
     const UPLOAD_LABEL = { 'Liquor': 'Liquor', 'Wine': 'Wine', 'Bottle Beer': 'Btl Beer', 'Draft Beer': 'Draft', 'Food': 'Food', 'Misc': 'Misc' };
     const cards = this.CATEGORIES.map(c => {
-      const n = all.filter(p => (p.category || '') === c).length;
-      const incomplete = all.filter(p => (p.category || '') === c && !this.isComplete(p)).length;
+      // ⚠ ACTIVE ONLY, matching the tab and the list. Three numbers on this one screen
+      // describe the same category — this card, the tab below it (catTabs) and the rows
+      // themselves (visibleProducts) — and the active-only rule had been applied to the
+      // last two and not to the cards, so a bar that archived one liquor saw a card
+      // reading 35, a tab reading 34, and 34 rows.
+      // The incomplete count is the worse half: it counted archived products too, while
+      // the alert bar under the tabs is built from visibleProducts. So an archived,
+      // incomplete product made the card advertise "1 incomplete" that no working tab
+      // could list and no alert mentioned — sending the operator hunting for a product
+      // the screen is structurally unable to show them.
+      const n = all.filter(p => (p.category || '') === c && p.active !== false).length;
+      const incomplete = all.filter(p => (p.category || '') === c && p.active !== false && !this.isComplete(p)).length;
       const incText = incomplete > 0
         ? '<div style="font-size:10px;color:var(--t4);margin-top:6px;">' + incomplete + ' incomplete</div>'
         : '';
