@@ -1778,9 +1778,17 @@ S.InventoryProducts = {
     };
     const getUnit = () => document.getElementById('be-unit')?.value || null;
     const idSet = new Set(ids);
-    const touched = [];
-    this.products().forEach(p => {
-      if (!idSet.has(p.id)) return;
+    // ⚠ LIVE rows, so putRecordsBulk cannot revert them for us (see App.putRecord) — the same
+    // reason setActiveBulk above snapshots. SELECT FIRST, snapshot, THEN mutate: this used to
+    // mutate as it collected, so a refused write left every edited product holding the new
+    // pour / par / vendor AND the derived cost_per_pour and pour_cost_pct the list colours
+    // red or green off — a percentage the server never took.
+    // ⚠⚠ THE RETRY IS THE WORSE HALF. The modal stays open on a failure, and applyBulk assigns
+    // only the fields ticked THIS time — so a refused value left standing in memory is written
+    // by the NEXT attempt, and the change the server refused becomes permanent.
+    const touched = this.products().filter(p => p && idSet.has(p.id));
+    const undo = App.snapshotRows(touched);
+    touched.forEach(p => {
       if (applied.size)    { p.container_size_oz = getSize(); p.container_size_label = getSizeLabel(); }
       if (applied.pour)    p.pour_size_oz = num('be-pour');
       if (applied.case)    p.case_size = intVal('be-case');
@@ -1801,7 +1809,6 @@ S.InventoryProducts = {
       if (applied.par)     p.par_level = num('be-par');
       if (applied.reorder) p.reorder_point = num('be-reorder');
       this.recomputeDerived(p);
-      touched.push(p);
     });
     const btn = document.getElementById('be-apply-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Applying...'; }
@@ -1811,9 +1818,13 @@ S.InventoryProducts = {
       App.closeModal('ip-bulk-modal');
       this._selected = new Set();
       this.renderLanding();
-    } else if (err) {
+    } else {
+      // Memory goes back FIRST, and never gated on the error element being on screen — this
+      // whole branch used to hang off `else if (err)`, so a missing #be-err would have kept the
+      // refused values AND left the button stuck reading "Applying...".
+      App.restoreRows(undo);
       if (btn) { btn.disabled = false; btn.textContent = 'Apply to ' + ids.length + ' Product' + (ids.length === 1 ? '' : 's'); }
-      err.textContent = 'Save failed. Try again.'; err.style.display = 'inline';
+      if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
     }
   },
 
