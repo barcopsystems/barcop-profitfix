@@ -5103,17 +5103,28 @@ const App = {
   // ⚠ A row with NO source/id is a hand-entered line carrying its own cost_per_unit. That is a
   // legitimate shape, not a missing ingredient, and it must keep costing.
   menuItemMissingIngredients(item) {
-    const ings = (item && item.recipe && Array.isArray(item.recipe.ingredients)) ? item.recipe.ingredients : [];
-    if (!ings.length) return [];
     const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+    const out = [];
+    // ⚠ A DELETED LINKED PRODUCT BELONGS ON THIS LIST TOO. menuItemCost gives
+    // `linked_product_id` priority, so a deleted link leaves the cost exactly as
+    // unknowable as a deleted recipe ingredient — and it was worse in practice, because
+    // the link path fell straight through to the STALE stored `item.cost` while this list
+    // came back empty, so nothing anywhere flagged it and menuItemPct said `costed: true`.
+    // A pint kept reporting last season's keg price and "on target" for ever.
+    if (item && item.linked_product_id && !prods.some(p => p && p.id === item.linked_product_id)) {
+      out.push(item.linked_product_id);
+    }
+    const ings = (item && item.recipe && Array.isArray(item.recipe.ingredients)) ? item.recipe.ingredients : [];
+    if (!ings.length) return out;
     const batches = (this.inventoryData && this.inventoryData.ic_prep_batches) || [];
-    return ings.map(ing => {
+    ings.forEach(ing => {
       const src = ing.source || (ing.product_id ? 'product' : null);
       const id  = ing.id || ing.product_id;
-      if (!src || !id) return null;
+      if (!src || !id) return;
       const found = src === 'batch' ? batches.some(b => b && b.id === id) : prods.some(p => p && p.id === id);
-      return found ? null : id;
-    }).filter(Boolean);
+      if (!found) out.push(id);
+    });
+    return out;
   },
 
   // Products in this item's recipe that are still on file but marked INACTIVE.
@@ -5148,6 +5159,21 @@ const App = {
       const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
       const p = prods.find(x => x.id === item.linked_product_id);
       if (p) return this.menuLinkCost(p, (p.category === 'Food' || p.category === 'Misc') ? item.portion : item.pour_size_oz);
+      // ⚠ THE LINKED PRODUCT HAS BEEN DELETED, so the cost is UNKNOWN — the same rule the
+      // recipe branch below applies to a deleted ingredient. This used to fall through to
+      // `return parseFloat(item.cost) || 0` at the bottom, handing back whatever was stored
+      // at the item's last save as though it were live: a keg goes $180 -> $260, the vendor
+      // is dropped, the product is deleted, and the pint reports its old cost and "on
+      // target" for ever. Refusing is what makes `costed` false everywhere downstream.
+      // ⚠ UNCONDITIONAL, including when the item also carries a recipe. An item with a
+      // linked product is configured as inventory-sourced (r-menu-items.sourceOf returns
+      // 'inventory' on the link alone), so a dead link is BROKEN CONFIGURATION, not a cue
+      // to quietly cost from a different basis. Refusing surfaces it — the row shows
+      // INGREDIENT DELETED and the operator clears the stale link or replaces it — and a
+      // refusal is visible and recoverable, where a silent switch of basis is neither.
+      // This also keeps one rule: menuItemMissingIngredients reports the dead link, and
+      // every branch of this function refuses whenever that list is non-empty.
+      return null;
     }
 
     if (item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length) {
