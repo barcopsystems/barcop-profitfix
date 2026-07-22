@@ -711,6 +711,19 @@ S.HubSettings = {
     }
   },
 
+  // Remove every cockpit "done" stamp from the ACCOUNT blob (S72). The stamps are keyed
+  // `<mod>_cockpit_done_<week>` and stored in App.data.account_state via App.acctSet, so a
+  // localStorage sweep never touched them. Filtered on the shared `cockpit_done_` substring so all
+  // six cockpits are covered by one pass, and NOTHING else in account_state (recovery targets,
+  // cash config, saved import maps) is disturbed.
+  _clearCockpitStamps() {
+    try {
+      const s = (App.data && App.data.account_state) || null;
+      if (!s) return;
+      Object.keys(s).forEach(k => { if (k.indexOf('cockpit_done_') !== -1) delete s[k]; });
+    } catch (e) {}
+  },
+
   async loadSample() {
     // Destructive + dev-only. The live demo (App.startDemo, demoMode) reseeds silently and
     // the real-account Testing Tools button is dev-gated in the UI — refuse any OTHER caller
@@ -746,9 +759,15 @@ S.HubSettings = {
     // fixed order through loadSample, so the sequence is stable.
     const rnd = (() => { let s = 987654321; return () => { s = (1103515245 * s + 12345) & 0x7fffffff; return s / 0x7fffffff; }; })();
 
-    // Drop the cockpit's per-week "done" stamps (localStorage) so a fresh sample
-    // does not inherit phantom step checks from a prior session.
-    try { Object.keys(localStorage).filter(k => k.indexOf('cockpit_done_') !== -1).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    // Drop the cockpit's per-week "done" stamps so a fresh sample does not inherit phantom step
+    // checks from a prior session. ⚠ THESE LIVE IN App.data.account_state, NOT localStorage (S72):
+    // the six cockpits stamp through App.acctSet, which writes the account blob, and acctGet has no
+    // localStorage fallback. loadSample never reassigns App.data (only clearAll and the restore
+    // paths do), so account_state SURVIVES a re-seed, and the seed re-stamps only the CURRENT
+    // week's cash keys — leaving a prior session's pf_/rev_/ic_/lc_/sc_ checks on OTHER weeks
+    // ticked in the fresh sample, visible in the public rolling re-seed demo. The old line here
+    // swept localStorage and therefore cleared nothing.
+    this._clearCockpitStamps();
     // Same reason, and it bites harder: Build Schedule keeps an unsaved draft on the
     // device (lc_sched_draft) holding a week_start and shifts keyed by staff_id. Every
     // seed mints NEW staff ids, so a draft from a prior session survives with shifts
@@ -4282,9 +4301,12 @@ S.HubSettings = {
     // liability — the exact outcome the comment below says this block exists to prevent. Caught
     // in the wild 2026-07-20 by the wipe_blocked alert (stack: clearAll -> setTaxFrequency).
     // The window now closes in the finally after EVERY write of this intentional wipe.
-    // The cockpit's per-week "done" stamps live in localStorage (per device), so
-    // clear them too or past weeks keep phantom checks after a wipe.
-    try { Object.keys(localStorage).filter(k => k.indexOf('cockpit_done_') !== -1).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    // ⚠ The cockpit "done" stamps live in App.data.account_state, NOT localStorage (S72), so this
+    // localStorage sweep never cleared them. It is HARMLESS here — clearAll assigns
+    // App.data = { ...DB._defaultData(), settings } above, and _defaultData carries no
+    // account_state, so the stamps are already gone before this line runs. Kept as a belt-and-braces
+    // account clear via the real helper, which is what the false comment always meant to do.
+    this._clearCockpitStamps();
     // Cash Recovery device-local config also lives in localStorage. Clear it too,
     // or a wiped account keeps the seeded opening balance, tax rate, and reserve
     // and reads as if the opening balance is already set (Cash Audit step 1 checks
