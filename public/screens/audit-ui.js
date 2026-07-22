@@ -257,7 +257,11 @@ const AuditUI = {
     // Metrics as flush recessed rows (the Hub card-row look, no bordered box):
     // label left, value right, #0D181E with row dividers, full-bleed in the card.
     const rows = (items||[]).filter(([,v]) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== '0')
-      .map(([label, val, hl]) => ({ label: label, value: String(val), valColor: hl==='warn'?'var(--red)':hl==='good'?'var(--green)':'var(--t1)' }));
+      // 4th element = an optional BASIS note, rendered by metricRows as a dimmed parenthetical.
+      // It exists so a row can say which basis its number is on (S9): c-audit prints an on-hand
+      // value directly above turns computed from the 4-count average, and a reader who does not
+      // know that tries to divide one into the other and cannot make it reconcile.
+      .map(([label, val, hl, extra]) => ({ label: label, value: String(val), extra: extra || '', valColor: hl==='warn'?'var(--red)':hl==='good'?'var(--green)':'var(--t1)' }));
     const rowsHtml = AuditUI.metricRows(rows);
     const sigRows = (signals||[]).map(sig => {
       const sc = (sig.score||'').toUpperCase();
