@@ -31,9 +31,28 @@ S.RevenueAudit = {
       App.handleShowOlder(e.target, () => this.renderMain()));
   },
 
+  // ⚠ THE ONE CLIENT-SIDE MIRROR of the server's scorable-menu filter. It MUST stay
+  // identical to `server/audit-compute.js` (`num(i.price) > 0 && num(i.cost) > 0 &&
+  // num(i.weekly_covers) > 0 && !i.archived`), because this is what tells the operator
+  // whether a run will be able to score the menu section.
+  // It used to read `price != null && cost != null && weekly_covers != null` with no
+  // archived test, and `0 != null` is true while `0 > 0` is false — so the two sides
+  // split on FOUR shapes at once: an item imported with no cost column (r-menu-items
+  // stores cost 0), an archived Dog-Test-cut dish, a dish that never sells, and a dish
+  // with no price. A 40-item POS import therefore ticked "Menu items priced with units
+  // sold" and earned the "Full data" badge while the server could score NONE of it and
+  // recipeCoverage reported 0%, costing S2 up to 10 points. Bar Cop promised a score and
+  // then quietly did not deliver it.
+  // Both readiness readers go through here so the two copies cannot drift apart again.
+  // Pinned as a tie-out by verify-audit-readiness-tieout.js, which lifts BOTH filters
+  // from source and asserts they classify the same menu identically.
+  _costedMenu() {
+    return (App.data.menu_items || []).filter(i => +i.price > 0 && +i.cost > 0 && +i.weekly_covers > 0 && !i.archived);
+  },
+
   _readinessSteps() {
     const cd = this.buildControlData() || {};
-    const costedMenu = (App.data.menu_items || []).filter(i => i.price != null && i.cost != null && i.weekly_covers != null);
+    const costedMenu = this._costedMenu();
     return [
       { label: 'Hours logged in Labor',                done: cd.labor_pct_blended != null || cd.rplh_blended != null, go: 'lc-log-hours' },
       { label: 'Menu items priced with units sold',        done: costedMenu.length >= 4, go: 'r-menu-items' },
@@ -94,7 +113,7 @@ S.RevenueAudit = {
   // projected data badge so it matches what a run would produce.
   _sectionsReady() {
     const cd = this.buildControlData() || {};
-    const costedMenu = (App.data.menu_items || []).filter(i => i.price != null && i.cost != null && i.weekly_covers != null);
+    const costedMenu = this._costedMenu();
     return [
       cd.check_average != null,                                             // S1 Check Average
       cd.labor_pct_blended != null || cd.rplh_blended != null,              // S2 Labor
