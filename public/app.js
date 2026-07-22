@@ -7866,7 +7866,26 @@ const App = {
     const bd = r => String((r && (r.date || r.period_end || r.event_date || r.date_time || r.opened_date
       || r.resolved_date || r.date_reported || r.date_86 || r.filed_at || r.closed_at
       || r.generated_at || r.saved_at)) || '');
-    const dk = r => (bd(r) || (r && r.created_at) || '') + '|' + ((r && r.created_at) || '');
+    // ⚠ created_at is NORMALISED, not compared as raw text (S69). The key is compared with
+    // localeCompare, so a numeric epoch ("1782000000000") and an ISO string ("2026-07-01T...") on
+    // the SAME business date order by their first byte — '1' before '2' — and the ISO one wins no
+    // matter which is actually newer. Every producer in the tree writes ISO today, so nothing mixes
+    // and there is no live wrong number; this makes the function correct BY CONSTRUCTION instead of
+    // by that accident. An all-ISO list is byte-for-byte unaffected (pinned).
+    const ts = r => {
+      const c = r && r.created_at;
+      if (c == null || c === '') return '';
+      const n = typeof c === 'number' ? c : (/^\d+$/.test(String(c)) ? Number(c) : NaN);
+      if (!isNaN(n)) { const d = new Date(n); return isNaN(d.getTime()) ? '' : d.toISOString(); }
+      return String(c);
+    };
+    // ⛔⛔ DO NOT "SIMPLIFY" THIS BY TRUNCATING THE BUSINESS DATE (`bd(r).slice(0,10)`). That was
+    // proposed, implemented and REJECTED: it makes a same-day timestamped record and a date-only
+    // record produce BYTE-IDENTICAL keys, localeCompare returns 0, and Array.sort stability hands
+    // the answer back to ARRAY POSITION — the class that has bitten this repo ten times and the
+    // exact thing this composite key exists to end. verify-latest-event-order.js case E runs that
+    // shape and proves the answer flips with input order.
+    const dk = r => (bd(r) || ts(r) || '') + '|' + ts(r);
     return arr.slice().sort((x, y) => dk(y).localeCompare(dk(x)))[0];
   },
 
