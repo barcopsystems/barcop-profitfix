@@ -29,12 +29,14 @@ S.InventoryCountHistory = {
   // a row of zeros, counting them all in "Products". Count 12 of your 42 and the record read 42,
   // with 30 sitting at zero. One split now feeds the stat, the tag and the list column so they can
   // never disagree. Legacy counts predate the flag, so an item without it is treated as counted.
-  // ⚠ The readers that honour the flag are App._perpetualInventory, ic-dashboard._onHand,
-  // CashEngine.computeUsagePair / _onHandFromCount / avgCategoryValue, ic-par-suggestions,
-  // ic-order-sheet.receivedSinceCount, and the compare view below. These do NOT, and each reads a
-  // skipped product as a real zero: this-week.js icCOGS (bills the whole shelf as used — a wrong
-  // weekly COGS and prime cost), theft-risk.js, hub-books.js, ic-report-stock.js. Open, reported
-  // 2026-07-21, not fixed here.
+  // ⚠ EVERY reader now honours the flag: App._perpetualInventory (and App.inventoryValueAsOf on
+  // top of it), ic-dashboard._onHand, CashEngine.computeUsagePair / _onHandFromCount /
+  // avgCategoryValue, ic-par-suggestions, ic-order-sheet.receivedSinceCount, and the compare view
+  // below. The four that used to read a skipped product as a real zero were all closed on
+  // 2026-07-21/22 — this-week.js icCOGS, theft-risk.js and ic-report-stock.js route through
+  // App.computeUsagePair, and hub-books.js through App.inventoryValueAsOf.
+  // ⚠ THIS LIST IS LOAD-BEARING: if you add a reader of count items, add it here. It went stale
+  // once already (it named four fixed files as open, S98), which is worse than no list at all.
   splitItems(count) {
     const items = (count && count.items) || [];
     const counted = items.filter(it => it && it.counted !== false);
