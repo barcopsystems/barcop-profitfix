@@ -718,12 +718,24 @@ S.HubBooks = {
     const which = label || 'Ending inventory';
     const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: colCount - 1 } });
     rows.push(this._blankRow(colCount));
-    rows.push(this._lineRow('Carried forward - ' + which + ': ' + carried.length + ' product'
-      + (carried.length === 1 ? ' was' : 's were') + ' not counted on ' + asOf.countDate
-      + ', so the last counted figure was used. Everything else is from that count.', colCount));
+    // ⚠ TWO DIFFERENT REASONS, said separately (S89). "Nobody got to it on the night" is
+    // actionable — count it. "It is hidden from operations" is not, because take-inventory will
+    // never list it again; the operator has to un-hide it or accept the figure. Rolling both into
+    // "was not counted" sent them looking for a bottle on a shelf that no count sheet shows.
+    const hidden = carried.filter(c => c.inactive);
+    const missed = carried.filter(c => !c.inactive);
+    const bits = [];
+    if (missed.length) bits.push(missed.length + ' product' + (missed.length === 1 ? ' was' : 's were')
+      + ' not counted on ' + asOf.countDate);
+    if (hidden.length) bits.push(hidden.length + ' product' + (hidden.length === 1 ? ' is' : 's are')
+      + ' hidden from operations and can no longer be counted');
+    rows.push(this._lineRow('Carried forward - ' + which + ': ' + bits.join(', and ')
+      + '. The last counted figure was used for ' + (carried.length === 1 ? 'it' : 'each')
+      + '. Everything else is from that count.', colCount));
     mergeFull(rows.length - 1);
     carried.forEach(c => {
-      rows.push(['  ' + (c.name || 'Unnamed product') + ' - carried forward from '
+      rows.push(['  ' + (c.name || 'Unnamed product')
+        + (c.inactive ? ' - hidden from operations, last counted ' : ' - carried forward from ')
         + c.date, c.value, '', '', ''].slice(0, colCount));
     });
   },
