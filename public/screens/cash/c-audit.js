@@ -393,8 +393,16 @@ S.CashAudit = {
         ['Trapped Cash', cur(d.TRAPPED_CASH), d.TRAPPED_CASH > 0 ? 'warn' : 'good'],
         ['In Dead Stock', cur(d.DEAD_STOCK), d.DEAD_STOCK > 0 ? 'warn' : ''],
         ['Above Par', cur(d.OVERSTOCK), d.OVERSTOCK > 0 ? 'warn' : ''],
-        ['Inventory Value', cur(d.INVENTORY_VALUE)],
-        ['Blended Turns', d.BLENDED_TURNS != null ? d.BLENDED_TURNS.toFixed(1) + 'x' : '']
+        // ⚠ TWO BASES SITTING NEXT TO EACH OTHER, AND THEY DO NOT MIX (S9; the rule is stated in
+        // cash-engine.js:39-46). Inventory Value is E.onHand() — the shelf right now. Blended Turns
+        // comes from E.capitalSummary(), which is built on the 4-count AVERAGE, because turns and
+        // GMROI are only honest against average inventory. So turns was never computed from the
+        // value printed above it, and a reader who divides one into the other cannot make it
+        // reconcile. Say which basis each is on. **DO NOT "tidy" these onto one basis** — mixing
+        // them is what scored one bar 0 while it built stock and 65 while it drew the same stock
+        // down at an unchanged 50% lazy. c-capital.js:50-57 fixed the same defect the same way.
+        ['Inventory Value', cur(d.INVENTORY_VALUE), '', 'on the shelf now'],
+        ['Blended Turns', d.BLENDED_TURNS != null ? d.BLENDED_TURNS.toFixed(1) + 'x' : '', '', 'against average capital']
       ], null, d),
       AuditUI.sectionBlock(2, N[1], sx[N[1]], [
         ['Cash Locked', d.CYCLE_DAYS != null ? days(d.CYCLE_DAYS) : '', (d.CYCLE_DAYS != null && d.CYCLE_DAYS > 30) ? 'warn' : 'good'],
