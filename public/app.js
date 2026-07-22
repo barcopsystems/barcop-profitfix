@@ -1393,6 +1393,7 @@ const App = {
     // Backward-compat: caller can pass just renderFn if title is unused.
     if (typeof title === 'function') { renderFn = title; title = ''; }
     ++this._mountSeq;
+    this._dismissWriteFail();       // the old screen's failure message must not follow it here (S3)
     const wrap = document.getElementById('hub-wrapper');
     const wrapVisible = wrap && wrap.style.display !== 'none';
     if (!wrapVisible) this.showHub();
@@ -2789,6 +2790,10 @@ const App = {
   },
 
   showAuth() {
+    // Signing out is a view switch, not a navigate, so this is the third and last door (S3).
+    // Without it a failed save leaves a red "Not saved" bar over the login card of the account
+    // that was just signed out of, where it is both alarming and impossible to act on.
+    this._dismissWriteFail();
     document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('app').classList.add('hidden');
     document.body.classList.remove('chrome-on');
@@ -6041,6 +6046,21 @@ const App = {
     } catch (e) { /* never let the reporter break a save */ }
   },
   _writeFailTimer: null,
+  // Take the write-failure toast down (S3). It was body-level with nothing but a 6s timer holding
+  // it, so a failed save followed by Sign Out left a red failure message floating over the login
+  // card of the account they had just left — and on any navigation it named a row that was no
+  // longer on the page, so it could not be acted on. Called from the two ++this._mountSeq sites
+  // (the app's canonical "a new screen is going up" signal) and from showAuth, which is a view
+  // switch that routes through neither. The pending timer is cleared too: left alive it would fire
+  // over whatever screen came next and delete a toast that belongs to it.
+  _dismissWriteFail() {
+    try {
+      clearTimeout(this._writeFailTimer);
+      this._writeFailTimer = null;
+      const n = document.getElementById('write-fail-toast');
+      if (n) n.remove();
+    } catch (e) { /* never let the dismisser break a navigation */ }
+  },
 
   // ── Undo for an in-place BULK mutation ─────────────────────────────────────
   // putRecordsBulk cannot revert a failed write the way putRecord does: by contract the caller has
@@ -6391,6 +6411,7 @@ const App = {
     this._updateFloatNav();
     try {
     ++this._mountSeq;               // a new screen is going up — see App._mountSeq
+    this._dismissWriteFail();       // the old screen's failure message must not follow it here (S3)
     this._activeScreenObj = null;   // set per module block below; drives the nav "i" page-help button
     this.updateNav(id);
     // Hide the old topbar title bar on pages converted to the un-box language
