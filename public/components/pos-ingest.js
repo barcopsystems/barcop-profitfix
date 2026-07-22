@@ -325,12 +325,19 @@ const PosIngest = {
     const byDate = new Map();
     const skipped = []; let dupCount = 0; let merged = 0;
     const skippedDates = new Set();   // a skipped DAY is reported once, not once per row of it
+    let keptManual = 0;
+    const keptDates = new Set();      // ...and the same for a protected hand close
     const cents = n => Math.round(n * 100) / 100;   // summing floats across services must not drift
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
       if (!date) { skipped.push('(no date)'); return; }
       if (manualDates.has(date)) {
-        if (!skippedDates.has(date)) { skippedDates.add(date); skipped.push(date + ' (manual close kept)'); }
+        // ⚠ NOT `skipped` (S105). A protected hand close is a GOOD outcome, not a row we could not
+        // use, and it has to be reported in different words — counting it as skipped made the
+        // cockpit call the operator's own close a problem, and when EVERY day was protected it
+        // blamed the file for missing a Date column. Cash already splits this out as `keptManual`;
+        // this is the twin catching up.
+        if (!keptDates.has(date)) { keptDates.add(date); keptManual++; }
         return;
       }
       const bar = this._num(r.bar), food = this._num(r.food);
@@ -362,7 +369,7 @@ const PosIngest = {
     // `merged`, NOT dupCount — the same reasoning spelled out in buildPmix. dupCount means "rows
     // already logged" in every other builder here and the cockpit renders it as "N replaced
     // earlier figures"; rows FOLDED INTO a total are the opposite of that.
-    return { toAdd, skipped, dupCount, merged };
+    return { toAdd, skipped, dupCount, merged, keptManual };
   },
 
   // A row is one drawer's (or the day's) over/short. Resolves Register + Cashier
