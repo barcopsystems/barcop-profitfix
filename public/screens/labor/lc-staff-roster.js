@@ -552,9 +552,23 @@ S.LaborStaffRoster = {
       const list = this.staff();
       const i = list.findIndex(x => x.id === staffId);
       if (i > -1 && Array.isArray(list[i].wage_history) && list[i].wage_history[idx]) {
-        list[i].wage_history[idx].effective_date = v;
-        list[i].wage_history[idx].updated_at = new Date().toISOString();
-        await App.putRecord('lc', 'staff', list[i]);   // wage_history is a field on the staff row
+        // ⚠ NEVER MUTATE THE LIVE ROW AND NEVER DISCARD THE RESULT (S61). putRecord's revert
+        // restores the ARRAY SLOT, so it can only undo a change when it is handed a DIFFERENT
+        // object than the one already in the list (app.js says so at the revert itself). This used
+        // to edit list[i].wage_history[idx] in place and hand list[i] — making prev === rec, so the
+        // revert assigned the row to itself and undid nothing, while renderUnified repainted the
+        // new date as saved and the server kept the old one. App.wageForStaffOn reads wage_history
+        // to cost PAST hours, so a phantom effective date re-prices historical labour.
+        // ⚠⚠ A FLAT SPREAD IS NOT ENOUGH: wage_history is NESTED, so { ...list[i] } still shares
+        // the same array. Copy the array AND the entry being edited. (The correct twin in this file
+        // is saveProfile, but it only spreads flat fields, so it never had to solve this part.)
+        const hist = list[i].wage_history.map((h, n) =>
+          (n === idx ? { ...h, effective_date: v, updated_at: new Date().toISOString() } : h));
+        const out = { ...list[i], wage_history: hist };
+        if (!(await App.putRecord('lc', 'staff', out))) {
+          if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
+          return;   // leave the box open so the retry is one click; putRecord already reverted
+        }
       }
       App.closeModal('wh-modal');
       this.renderUnified(staffId);
@@ -571,8 +585,13 @@ S.LaborStaffRoster = {
     const list = this.staff();
     const i = list.findIndex(x => x.id === staffId);
     if (i > -1 && Array.isArray(list[i].wage_history)) {
-      list[i].wage_history.splice(idx, 1);
-      await App.putRecord('lc', 'staff', list[i]);   // wage_history is a field on the staff row
+      // Same rule as the wage-date save above (S61): a FRESH row object carrying a FRESH array, so
+      // putRecord's slot revert can actually put the entry back, and the result is CHECKED. The old
+      // shape spliced the live array and handed the same row, so a refused delete removed the raise
+      // from memory anyway and the next render showed it gone.
+      const hist = list[i].wage_history.filter((_, n) => n !== idx);
+      const out = { ...list[i], wage_history: hist };
+      if (!(await App.putRecord('lc', 'staff', out))) return;   // reverted; putRecord reports it
     }
     this.renderUnified(staffId);
   },
