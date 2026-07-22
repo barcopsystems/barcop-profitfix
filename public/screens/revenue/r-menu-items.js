@@ -71,15 +71,22 @@ S.RevenueMenuItems = {
       // product to a recipe) — EXCEPT the one already selected on this row. Without that exception
       // a recipe that still costs correctly renders as "Select ingredient..." and the operator
       // re-picks or deletes a good ingredient by hand. Same fix as ic-prep-batches.prodOpts.
+      // ⚠ THE EXCEPTION APPLIES TO EVERY EXCLUSION, not just `active`. It was added to the
+      // inactive test alone, so a Misc product already in a recipe that was later switched
+      // to a supply type (Bar Supplies / Paper & To-Go / Cleaning & Supplies) dropped out
+      // and the row rendered "Select ingredient..." over a line that was still costing
+      // correctly — the identical symptom Kyle found on Frozen Margarita Mix, on a second
+      // axis. Keeping a product out of being CHOSEN is right; hiding one that is already
+      // there is not.
       const inCat = prods.filter(p => (p.category || '') === cat
           && (p.active !== false || selKey === 'p:' + p.id)
-          && !(cat === 'Misc' && App.miscIsSupply(p)))
+          && !(cat === 'Misc' && App.miscIsSupply(p) && selKey !== 'p:' + p.id))
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!inCat.length) return;
       h += '<optgroup label="' + esc(cat) + '">';
       inCat.forEach(p => {
         h += '<option value="p:' + p.id + '"' + (selKey === 'p:' + p.id ? ' selected' : '') + '>' + esc(p.name)
-          + (p.active === false ? ' (inactive)' : '') + '</option>';
+          + (p.active === false ? ' (inactive)' : (App.miscIsSupply(p) ? ' (supply)' : '')) + '</option>';
       });
       h += '</optgroup>';
     });
@@ -129,10 +136,23 @@ S.RevenueMenuItems = {
     return '';
   },
   inventoryProductOptions(selectedId) {
-    const prods = this.products().filter(p => p.active !== false && this._sellableInventory(p));
+    // ⚠ The CURRENTLY LINKED product is always kept, whatever excludes it. This picker had
+    // no such exception at all — S35 only fixed the recipe pickers — so a menu item linked
+    // to a product that was later made inactive, un-ticked from "Sold on the menu", or
+    // switched to a supply type rendered "Select inventory product..." over a link that
+    // was still costing correctly. Three more doors onto the same blank-row symptom Kyle
+    // found on Frozen Margarita Mix. Keeping a product out of being CHOSEN is right;
+    // hiding one that is already linked is not.
+    const keep = (p) => (p.active !== false && this._sellableInventory(p)) || p.id === selectedId;
+    const prods = this.products().filter(keep);
     let h = '<option value="">Select inventory product...</option>';
     const ORDER = ['Draft Beer', 'Bottle Beer', 'Wine', 'Food', 'Misc'];
     let total = 0;
+    let renderedSelected = false;
+    // Why a kept option is unusual, so a supply sitting in this list is not a mystery.
+    const label = (p) => esc(p.name)
+      + (p.active === false ? ' (inactive)'
+        : (!this._sellableInventory(p) ? ' (not sold on the menu)' : ''));
     ORDER.forEach(cat => {
       const inGrp = prods.filter(p => p.category === cat)
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -140,10 +160,22 @@ S.RevenueMenuItems = {
       total += inGrp.length;
       h += '<optgroup label="' + esc(cat) + '">';
       inGrp.forEach(p => {
-        h += '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + esc(p.name) + '</option>';
+        if (p.id === selectedId) renderedSelected = true;
+        h += '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + label(p) + '</option>';
       });
       h += '</optgroup>';
     });
+    // ⚠ ORDER does not cover every category (a product re-categorised to Liquor after it
+    // was linked would fall through every group), so the selected option is guaranteed
+    // here rather than assumed. The rule is that it is ALWAYS present.
+    if (selectedId && !renderedSelected) {
+      const sel = this.prodById(selectedId);
+      if (sel) {
+        h += '<optgroup label="Currently linked">'
+          + '<option value="' + sel.id + '" selected>' + label(sel) + '</option></optgroup>';
+        total++;
+      }
+    }
     if (!total) h += '<option value="" disabled>No sellable products yet — mark a Food/Misc item "Sold on the menu" in Add Products, or add beer/wine.</option>';
     return h;
   },
