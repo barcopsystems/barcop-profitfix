@@ -876,7 +876,16 @@ S.HubSettings = {
     // re-deriving it from Control. sunOff = today's weekday (0=Sun..6=Sat); the
     // most recent week ends on the last Sunday on/before today, and every daily
     // Control record shifts with it so the weekdays land correctly too.
-    const sunOff = new Date(App.todayLocal() + 'T00:00:00').getDay();
+    // ⚠ `|| 7` — TREAT SUNDAY AS 7, NOT 0 (S73). getDay() is 0 on a Sunday, which made the newest
+    // seeded confirmed week (dateStr(sunOff)) land on TODAY = this Sunday = nextSunday(), so the
+    // Profit/Revenue cockpits opened with "Confirm the Week" already ticked, and curBaseAgo
+    // (sunOff - 7 = -7) put the current-week daily seed on NEXT Sunday's week instead of this one.
+    // With 7, the newest confirmed week is LAST Sunday and curBaseAgo becomes 0 = today, aligning
+    // the current-week seed with nextSunday(). No-op Mon-Sat (getDay() 1..6 are truthy).
+    // ⛔ NOT the S27e trap: that `|| 7` was on nextSunday's `(7 - getDay()) % 7` and pushed the
+    // week-END a week FORWARD. This is on the seed's days-since-Sunday reference and makes the seed
+    // AGREE with the already-correct nextSunday(). Removing it re-opens the bug.
+    const sunOff = new Date(App.todayLocal() + 'T00:00:00').getDay() || 7;
     const weeks = window.ANCHOR.weeks.map(a => {
       const endDate = dateStr(sunOff + window.ANCHOR.endAgo(a));
       // Merch and vending as Other on every fourth week, plus weekly 3rd-party platform
