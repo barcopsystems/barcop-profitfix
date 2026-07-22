@@ -5142,6 +5142,17 @@ const App = {
   // ic-prep-batches.missingIngredients, which does the same job one level down.
   // ⚠ A row with NO source/id is a hand-entered line carrying its own cost_per_unit. That is a
   // legitimate shape, not a missing ingredient, and it must keep costing.
+  // Products a PREP BATCH names that are no longer on file. The one definition of "this batch is
+  // broken", used by menuItemMissingIngredients below and delegated to by ic-prep-batches so the
+  // screen and the menu cannot drift apart on it — two copies of one predicate is the mechanism
+  // that gave computeUsagePair five copies and split the client from the server in S49.
+  batchMissingIngredients(b) {
+    const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+    return (((b && b.ingredients) || [])
+      .filter(i => i && i.product_id && !prods.some(p => p && p.id === i.product_id))
+      .map(i => i.product_id));
+  },
+
   menuItemMissingIngredients(item) {
     const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
     const out = [];
@@ -5161,8 +5172,20 @@ const App = {
       const src = ing.source || (ing.product_id ? 'product' : null);
       const id  = ing.id || ing.product_id;
       if (!src || !id) return;
-      const found = src === 'batch' ? batches.some(b => b && b.id === id) : prods.some(p => p && p.id === id);
-      if (!found) out.push(id);
+      // ⚠ A BATCH IS MISSING WHEN IT IS GONE **OR WHEN IT IS ITSELF BROKEN** (S107). This used to
+      // ask only whether the batch existed. Meanwhile ic-prep-batches deliberately HOLDS a batch's
+      // last-good cost_per_serving when one of ITS products is deleted (S25: flag it, do not recost
+      // it cheaper), and menuItemCost's batch branch reads that held number — so deleting the only
+      // product inside a batch left every dish built on it reporting a confident cost, `costed:
+      // true`, an empty missing list and therefore no flag anywhere, while the identical delete one
+      // level up correctly returned null. Measured: a Margarita printed 8.75% food cost off a
+      // batch whose ingredient no longer existed. The deletion was visible only on Prep Batches.
+      if (src === 'batch') {
+        const b = batches.find(x => x && x.id === id);
+        if (!b || this.batchMissingIngredients(b).length) out.push(id);
+        return;
+      }
+      if (!prods.some(p => p && p.id === id)) out.push(id);
     });
     return out;
   },
