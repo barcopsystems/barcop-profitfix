@@ -5569,9 +5569,17 @@ const App = {
     const counts = ((this.inventoryData && this.inventoryData.ic_counts) || [])
       .filter(c => c && c.date && (exclusive ? String(c.date) < asOf : String(c.date) <= asOf))
       .slice().sort(App.cmpNewest);
+    const NO_FIGURE = { value: null, countDate: null, count: null, carried: [], byProduct: {} };
     const boundary = counts.length ? counts[0] : null;
-    if (!boundary) return { value: null, countDate: null, carried: [], byProduct: {} };
+    if (!boundary) return NO_FIGURE;
     const m = this._perpetualInventory(asOf, exclusive);
+    // ⚠ A COUNT RECORD IS NOT A MEASUREMENT (S97). The boundary is picked from count RECORDS, so a
+    // count whose items are ALL `counted:false` — with nothing earlier to carry forward — used to
+    // give a truthy boundary, an empty map, and a value that summed to 0. That printed "$0.00" as
+    // ending inventory: the skipped-is-not-zero failure surviving one line before the null that
+    // exists to prevent it. Emptiness of the MAP is the right test, not a zero value: a count that
+    // genuinely finds every shelf empty is a real measurement and must still report 0.
+    if (!Object.keys(m).length) return NO_FIGURE;
     // ⚠ A STOCKTAKE IS OFTEN SEVERAL COUNTS (S93). A big place counts the bar one night, the
     // cooler the next and the store room the night after — that is ONE measurement of the shelf,
     // not three. Treating each count record as its own boundary made the sheet announce that two
@@ -5625,7 +5633,13 @@ const App = {
       }
     });
     carried.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-    return { value: Math.round(value * 100) / 100, countDate: boundary.date, carried, byProduct: m };
+    // ⚠ RETURNS THE BOUNDARY RECORD ITSELF (S96). Callers used to re-derive "the latest count" with
+    // their own date-only sort plus `.slice(-1)[0]`, which ties on two counts sharing a date and
+    // hands back whichever sat last in the ARRAY — while this reader sorts with cmpNewest, which
+    // tiebreaks on created_at. So the ending FIGURE came from one count and the Source footer named
+    // the other, on a tax sheet's provenance line. One door, so they cannot disagree.
+    return { value: Math.round(value * 100) / 100, countDate: boundary.date, count: boundary,
+      carried, byProduct: m };
   },
 
   // True when every Getting Started step is checked off. The Hub sidebar uses
