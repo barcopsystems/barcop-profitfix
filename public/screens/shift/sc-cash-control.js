@@ -744,7 +744,17 @@ S.ShiftCashControl = {
       drawer:        (App.drawerById(drawerId) || {}).name || '',
       cashier_id:    cashId,
       cashier:       (App.staffById(cashId) || {}).name || '',
-      source:        (existing && existing.source) ? existing.source : 'manual',
+      // ⚠ ALWAYS 'manual', never the row's previous source (S100). This function is only ever
+      // reached by a human filling in the hand form and pressing Save, so whatever comes out of
+      // it IS a hand count — including a correction to a figure that originally arrived by
+      // import. Carrying the old 'import' through meant buildCash's protect gate did not
+      // recognise the operator's own recount, so the next cash file REPLACED it and reported
+      // "1 replaced earlier figures": they imported -47.00, opened it, counted the drawer
+      // properly, saved -63.25, and a re-drop silently put -47.00 back.
+      // All three readers of this field agree with that reading — pos-ingest's manualKeys (never
+      // queue over it), _findDup (never a replacement candidate) and _commitCashRows (never
+      // retire it) — and `source` is not displayed anywhere, so nothing else shifts.
+      source:        'manual',
       expected_cash: exp,
       counted_cash:  cnt,
       variance,
