@@ -31,6 +31,61 @@ window.Recovery = {
     return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
   },
 
+  // ── DURABLE FIX BASELINES (S168) ─────────────────────────────────────────────────────────────
+  // A fix's start date IS its recovery baseline (compute() measures weeks >= it). It used to live
+  // only on the windowed fix_log row, so after 24 months that row stopped loading, _autoStart
+  // re-fired with a LATER date, the baseline jumped forward, and "Recovered to date" collapsed —
+  // or the gap dropped out of the summary entirely. The baseline now lives in account_state (the
+  // per-account config blob, which is NEVER windowed), keyed by module|gap_id, holding the EARLIEST
+  // start ever recorded. The fix_log stays windowed — it is only the activity/timeline log now.
+  _baselineKey(module, gapId) { return String(module) + '|' + String(gapId); },
+  // ⚠ BARE `App`, NOT `window.App` — App is a top-level const (app.js:244), not on window, so
+  // window.App is undefined in the browser and would make every read here empty (moduleSummary
+  // would return $0 recovered). The rest of recovery.js references bare App.data for this reason.
+  _fixBaselines() { return (typeof App !== 'undefined' && App.acctGet) ? (App.acctGet('fix_baselines', {}) || {}) : {}; },
+  // The measurement start for an entry: the durable baseline if we have one, else the entry's own
+  // date (backward-compat for a fix whose baseline was never promoted). Always the string date or null.
+  baselineFor(entry) {
+    if (!entry) return null;
+    const b = this._fixBaselines()[this._baselineKey(entry.module, entry.gap_id)];
+    return (b && b.date) || entry.date || null;
+  },
+  // Record the durable baseline, keeping the EARLIEST date. Idempotent: writes only when it adds a
+  // gap or moves the date earlier, so calling it every render does not churn account_state.
+  ensureBaseline(module, gapId, gapName, date) {
+    if (!module || gapId == null || !date || !(typeof App !== 'undefined' && App.acctSet)) return false;
+    const d = String(date).slice(0, 10);
+    const map = this._fixBaselines();
+    const key = this._baselineKey(module, gapId);
+    const cur = map[key];
+    if (cur && cur.date && String(cur.date) <= d) return false;   // already earliest-or-equal
+    const next = Object.assign({}, map);
+    next[key] = { date: d, gap_name: gapName || (cur && cur.gap_name) || '' };
+    App.acctSet('fix_baselines', next);
+    return true;
+  },
+  // Every active fix as one synthetic entry per gap, from the UNION of durable baselines and the
+  // windowed fix_log — so a gap keeps scoring after its log row ages out. moduleKey null = all.
+  // Composite gaps are excluded here, matching the old _oneFixPerGap callers.
+  _gapEntries(moduleKey) {
+    const out = {};
+    const add = (module, gapId, gapName, date) => {
+      if (gapId == null || this.COMPOSITE_GAPS.indexOf(gapId) !== -1) return;
+      if (moduleKey && module !== moduleKey) return;
+      const k = this._baselineKey(module, gapId);
+      if (!out[k]) out[k] = { module: module, gap_id: gapId, gap_name: gapName || '', date: date || null };
+      else {
+        if (date && (!out[k].date || String(date) < String(out[k].date))) out[k].date = date;
+        if (!out[k].gap_name && gapName) out[k].gap_name = gapName;
+      }
+    };
+    const bl = this._fixBaselines();
+    Object.keys(bl).forEach(k => { const i = k.indexOf('|'); add(k.slice(0, i), k.slice(i + 1), bl[k].gap_name, bl[k].date); });
+    const log = (typeof App !== 'undefined' && App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
+    log.forEach(e => { if (e) add(e.module, e.gap_id, e.gap_name, e.date); });
+    return Object.keys(out).map(k => out[k]);
+  },
+
   // Gap-area id -> metric. Only gap-areas whose recovered dollars compute
   // honestly from existing weekly data appear here. baseKind 'pts' means the
   // metric is a percentage and dollars = (improvement / 100) x base x 52;
@@ -151,7 +206,10 @@ window.Recovery = {
        dollars may be null, positive (recovered) or negative (slipping below start). */
   compute(entry) {
     const m = entry && this.METRICS[entry.gap_id];
-    if (!m || !entry.date) return { status: 'untracked' };
+    // ⚠ The measurement start is the DURABLE baseline (S168), not entry.date — so a re-fired
+    // fix_log row carrying a later date can never move the baseline forward.
+    const start = this.baselineFor(entry);
+    if (!m || !start) return { status: 'untracked' };
 
     // Recovery dollars use the metric's recoverValue when defined (labor dollarizes
     // HOURLY labor %, not total), falling back to value for every other metric.
@@ -164,7 +222,7 @@ window.Recovery = {
     // The baseline is their own first weeks, not a pre-start history a new user
     // never has.
     const operating = this._series(m.series)
-      .filter(w => w.period_end && w.period_end >= entry.date && vf(w) != null)
+      .filter(w => w.period_end && w.period_end >= start && vf(w) != null)
       .slice()
       .sort((a, b) => a.period_end.localeCompare(b.period_end));
 
@@ -246,8 +304,9 @@ window.Recovery = {
   moduleSummary(moduleKey) {
     const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
     const mine = log.filter(e => e.module === moduleKey);
-    // Money + measured-fix counts dedupe by gap; `logged` stays the literal count.
-    const scored = this._oneFixPerGap(mine.filter(e => this.COMPOSITE_GAPS.indexOf(e.gap_id) === -1));
+    // ⚠ Scored set is the UNION of durable baselines + windowed fix_log (S168), one per gap, so a
+    // fix keeps scoring after its log row ages out. `logged` stays the literal fix_log count.
+    const scored = this._gapEntries(moduleKey);
     let recovered = 0, annual = 0, withFigure = 0, measuring = 0;
     scored.forEach(e => {
       const r = this.compute(e);
@@ -262,10 +321,9 @@ window.Recovery = {
      cost recovery separate from revenue growth. `annualRunRate` is the forward
      pace, for an "on pace for" line only. */
   total() {
-    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
-    // One entry per gap-area (see moduleSummary) so a second fix in the same gap
-    // never double-counts the headline "Recovered to Date" / Hub total.
-    const scored = this._oneFixPerGap(log.filter(e => this.COMPOSITE_GAPS.indexOf(e.gap_id) === -1));
+    // One entry per gap-area (see moduleSummary), from the durable-baseline + fix_log union (S168),
+    // so a fix never double-counts AND never drops out of the headline after 24 months.
+    const scored = this._gapEntries(null);
     let dollars = 0, annual = 0, cost = 0, revenue = 0, fixes = 0;
     scored.forEach(e => {
       const r = this.compute(e);
