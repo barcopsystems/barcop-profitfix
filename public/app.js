@@ -5232,7 +5232,14 @@ const App = {
   // invented recovered figure.
   async logPriceChange(item, oldPrice, newPrice, opts) {
     opts = opts || {};
-    const cost = this.menuItemCost(item) || 0;
+    // ⚠ NULL, not a fabricated 0. This used to be `menuItemCost(item) || 0`, so an item
+    // Bar Cop cannot cost was logged with cost 0 — and the verification that reads this
+    // row back treats the whole menu price as margin, printing a wrong dollar figure
+    // under the word "actual" (a $16 -> $17 change on a dish whose real cost is $4.15
+    // read as -$220/wk instead of -$137/wk). A cost we do not have is not zero.
+    // Same canonical rule as App.menuItemPct's `costed`: real means non-null AND > 0.
+    const raw = this.menuItemCost(item);
+    const cost = (raw != null && raw > 0) ? raw : null;
     await this.putRecord('core', 'revenue_price_log', {
       id: this.uid(), date: this.todayLocal(), item_id: item.id, item_name: item.name,
       old_price: oldPrice, new_price: newPrice, cost,
