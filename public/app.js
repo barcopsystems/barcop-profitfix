@@ -6078,7 +6078,14 @@ const App = {
       // Sits BELOW the top bars on purpose. At top:10px it shared exact coordinates with the
       // offline pill and the "Synced N offline changes" toast, and overlapped every full-width
       // banner (storage-full, viewer, session-expired).
-      el.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:9600;'
+      // ⚠ OFF --navh, NOT A HARDCODED 52px (S31, my own-goal from that move). style.css declares
+      // `--navh: 118px` as "row1 52 + row2 66", so 52px is the SEAM between the two nav rows: on
+      // desktop the toast painted over the section-pill row. Deriving it from the variable also
+      // follows the nav collapsing to one row on mobile, where 52px happened to be correct.
+      // ⚠ pointer-events:none because this is purely informational. Without it the toast sat over
+      // live controls and swallowed every click there for the full 6 seconds, and no amount of
+      // repositioning makes an unclickable overlay safe on a screen it does not own.
+      el.style.cssText = 'position:fixed;top:calc(var(--navh) + 10px);left:50%;transform:translateX(-50%);z-index:9600;pointer-events:none;'
         + 'background:var(--red);color:var(--w);border-radius:3px;padding:8px 18px;max-width:92vw;'
         + 'font-size:11px;font-weight:800;letter-spacing:.5px;box-shadow:0 2px 10px rgba(0,0,0,0.5);';
       el.textContent = f.msg;
