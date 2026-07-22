@@ -932,13 +932,26 @@ S.HubBooks = {
     const shifts    = (App.shiftData?.sc_shifts    || []).filter(s => inMonth(s.date));
     const variances = (App.shiftData?.sc_variances || []).filter(v => inMonth(v.date));
 
-    const vKey = (date, type) => (date || '') + '|' + (type || '');
+    // ⚠⚠ KEYED ON DATE ALONE (S27f / S81 / S44). This used to be `date|shift_type`, and shift_type
+    // is DEAD on the variance side: every sc_shifts row is stamped 'Full Day' (pos-ingest.js:376,
+    // settings.js:2524/2544) while every sc_variances row is '' (pos-ingest.js:500) or never set at
+    // all (the hand path). So the key compared 'date|Full Day' against 'date|' and the join NEVER
+    // matched — measured 0 of 2 rows. Every shift row printed blank Expected / Counted / Variance /
+    // Status / Reason, and every count was re-listed underneath with a blank Total Revenue: a
+    // four-register bar got five rows a day that never lined up, on the sheet this file calls the
+    // documentation the IRS looks for in a cash-heavy business.
+    // The relationship is ONE-TO-MANY anyway — one shift row a day, one count per REGISTER — so no
+    // single shared key could have joined them one-to-one even with shift_type alive.
     const vIndex = {};
     variances.forEach(v => {
-      const k = vKey(v.date, v.shift_type);
+      const k = v.date || '';
       if (!vIndex[k]) vIndex[k] = [];
       vIndex[k].push(v);
     });
+    // Which variance RECORDS the shift block below has already printed. Tracked by id, not by key:
+    // the block consumes every count for a date it printed, and a key-based test would either
+    // re-print them or hide a genuinely orphaned one.
+    const accounted = new Set();
 
     const blank = () => this._blankRow(COL_COUNT);
     const rows = [];
@@ -949,7 +962,10 @@ S.HubBooks = {
     merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
     rows.push(blank());
 
-    rows.push(['Date', 'Shift', 'Manager', 'Total Revenue', 'Expected Cash', 'Counted Cash', 'Variance', 'Status', 'Reason']);
+    // "Shift / Register": the rows are now one per REGISTER, and shift_type is 'Full Day' on every
+    // row it could come from, so labelling the column "Shift" alone named the least useful of the
+    // two things it can hold.
+    rows.push(['Date', 'Shift / Register', 'Manager', 'Total Revenue', 'Expected Cash', 'Counted Cash', 'Variance', 'Status', 'Reason']);
 
     let totalRev = 0, totalExp = 0, totalCnt = 0, totalVar = 0;
     const sortedShifts = shifts.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -959,24 +975,39 @@ S.HubBooks = {
       merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
     } else {
       sortedShifts.forEach(s => {
-        const k = vKey(s.date, s.shift_type);
-        const v = (vIndex[k] || [])[0] || null;
         const rev = parseFloat(s.total_revenue) || 0;
-        const exp = v ? (parseFloat(v.expected_cash) || 0) : null;
-        const cnt = v ? (parseFloat(v.counted_cash)  || 0) : null;
-        const varc = v ? (parseFloat(v.variance) || (cnt - exp)) : null;
-        rows.push([s.date || '', s.shift_type || '', s.manager || '', rev, exp, cnt, varc, v ? (v.status || '') : '', v ? (v.reason || '') : '']);
-        totalRev += rev;
-        if (exp  != null) totalExp += exp;
-        if (cnt  != null) totalCnt += cnt;
-        if (varc != null) totalVar += varc;
+        const vs = vIndex[s.date || ''] || [];
+        totalRev += rev;   // once per DAY, never once per register
+        if (!vs.length) {
+          // A day that was traded but never counted. BLANK cash cells, not 0.00 — printing zero
+          // states the drawer was counted and found empty, which is the same lie the orphan branch
+          // below was fixed for (S27d).
+          rows.push([s.date || '', s.shift_type || '', s.manager || '', rev, null, null, null, '', '']);
+          return;
+        }
+        // ⚠ ONE ROW PER REGISTER, not `(vIndex[k] || [])[0]`. A day carries one count per register,
+        // so taking the first silently dropped every other drawer off the reconciliation. The day's
+        // revenue rides on the FIRST row only, or a four-register day multiplies it by four.
+        vs.forEach((v, i) => {
+          // The null-safe shape the orphan branch already uses: buildCash leaves expected/counted
+          // absent when the POS report carried only an Over/Short column, and `|| 0` would print
+          // $0.00 for a figure we simply do not have. The VARIANCE is always real, so it still totals.
+          const exp = v.expected_cash != null ? (parseFloat(v.expected_cash) || 0) : null;
+          const cnt = v.counted_cash  != null ? (parseFloat(v.counted_cash)  || 0) : null;
+          const varc = parseFloat(v.variance) || ((cnt != null && exp != null) ? (cnt - exp) : 0);
+          rows.push([s.date || '', v.drawer || s.shift_type || '', v.cashier || s.manager || '',
+                     i === 0 ? rev : null, exp, cnt, varc, v.status || '', v.reason || '']);
+          if (exp  != null) totalExp += exp;
+          if (cnt  != null) totalCnt += cnt;
+          if (varc != null) totalVar += varc;
+          if (v.id != null) accounted.add(v.id);
+        });
       });
 
-      // Orphan variances (no matching shift)
-      const accountedFor = new Set();
-      sortedShifts.forEach(s => accountedFor.add(vKey(s.date, s.shift_type)));
+      // Counts with no shift row for that date. Tested by RECORD ID against what the block above
+      // actually printed — the old key-based test could not survive the join being keyed on date.
       variances.forEach(v => {
-        if (accountedFor.has(vKey(v.date, v.shift_type))) return;
+        if (v.id != null && accounted.has(v.id)) return;
         // ⚠ NULL, not 0. buildCash leaves expected/counted absent when the POS report carried only
         // an Over/Short column. Printing $0.00 on the Cash Reconciliation sheet — the one this file
         // calls "the documentation the IRS looks for in a cash-heavy business" — states that the
