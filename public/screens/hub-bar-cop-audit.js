@@ -644,7 +644,7 @@ S.HubBarCopAudit = {
   _recurringPatterns() {
     const out = [];
     const variances  = (App.shiftData?.sc_variances)    || [];
-    const voidComps  = (App.shiftData?.sc_void_comps)   || [];
+    // (sc_void_comps is no longer read here — Rule 2 was its only consumer. See the note below.)
     const actuals    = (App.laborData?.lc_actuals)      || [];
     const discrep    = (App.data?.vendor_discrepancies) || [];
     const counts     = (App.inventoryData?.ic_counts)   || [];
@@ -677,23 +677,23 @@ S.HubBarCopAudit = {
       }
     });
 
-    // Rule 2: same shift type plus recurring void/comp pattern
-    const wkVoids = voidComps.filter(v => since90(v.date));
-    const byShiftType = {};
-    wkVoids.forEach(v => {
-      const t = v.shift_type || 'unknown';
-      if (!byShiftType[t]) byShiftType[t] = 0;
-      byShiftType[t]++;
-    });
-    Object.keys(byShiftType).forEach(t => {
-      if (byShiftType[t] >= 10 && t !== 'unknown') {
-        out.push({
-          label: 'Void/comp concentration on ' + t + ' shifts',
-          detail: byShiftType[t] + ' events in last 90 days on ' + t + '. Pattern worth investigating.',
-          screen: 'sc-void-comp'
-        });
-      }
-    });
+    // (Rule 2, "Void/comp concentration on <shift>", was REMOVED — the same call as Rule 4 below,
+    // and for a stronger reason. It bucketed void/comps by `v.shift_type || 'unknown'` and fired at
+    // >= 10 in 90 days, guarded by `t !== 'unknown'`. The voids/comps import has NO shift column in
+    // its field map (pos-ingest.js: date, amount, type, item, server, reason), so pos-ingest writes
+    // shift_type: '' unconditionally and every LIVE record buckets to 'unknown'. Only the demo seed
+    // writes real shift types, so the rule fired on sample data and never once on a real bar.
+    // ⭐ THE DECIDING REASON IS NOT THE MISSING COLUMN — it is that the test was a RAW COUNT WITH
+    // NO DENOMINATOR. The busiest daypart always carries the most voids and comps because it
+    // carries the most transactions, so even a fully working version would fire on Friday night for
+    // essentially every bar: exactly the noise Rule 4 was removed for.
+    // AN HONEST REBUILD NEEDS BOTH a real shift dimension (a mapped column, or a daypart derived
+    // from a timestamp through service periods) AND a per-shift denominator to normalise against.
+    // Do not re-add a bare counter. Nothing was lost here: Rule 1 above is the strong theft signal
+    // (recurring cash variance by PERSON), and Loss Prevention owns per-server void/comp analysis
+    // on its own 90-day window.
+    // ⚠ `shift_type` is deliberately LEFT on the void/comp record. It is written as '' and read by
+    // nothing now; removing a stored field is a migration, and the dead field costs nothing.
 
     // (Chronic per-product shrinkage is not a pattern rule here: variance is not
     // stored on a count item, it is computed by the Variance Report. The Loss
