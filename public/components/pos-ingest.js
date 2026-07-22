@@ -106,15 +106,29 @@ const PosIngest = {
     pmix:  { label: 'Menu Sales Mix', module: 'core', kind: 'menu_item' }
   },
 
+  // Is this cell NEGATIVE? Accounting "(15)", leading "-15", or trailing "15-".
+  // ⚠ THE SYMBOL IS STRIPPED BEFORE THE TEST, NOT AFTER (S139). Every branch is anchored to the
+  // START or the END of the cell, so ANY character in front of the sign defeats all three — and
+  // "$" is always there. "($50)" worked while "$(50.00)" did not, and `$(1,234.56)` is EXCEL'S
+  // DEFAULT Accounting format for a negative, i.e. what a POS export becomes the moment it is
+  // opened and re-saved. A -$75 drawer stored as +$75 is a $150-wide error that also flips Short
+  // to Over, so it reads green everywhere and Loss Prevention never sees it.
+  // ⚠ ONE COPY ON PURPOSE. _num and _count both parse signed POS cells and this test had already
+  // drifted once — the paren form was fixed for "($15)" and never for "$(15)". A third copy would
+  // drift again. _hours delegates to _num, so it is covered by the same door.
+  _isNeg(s) {
+    const t = String(s == null ? '' : s).replace(/[^0-9.,()\-]/g, '');
+    return /^\(.*\)$/.test(t) || /^-/.test(t) || /-$/.test(t);
+  },
+
   // Parse a POS number cleanly: strips $ and thousands commas AND handles a
   // NEGATIVE in any common export form — leading "-15", accounting "(15)", or
-  // trailing "15-". The old cleaner kept "-" but stripped "()", so a "($50)"
-  // drawer shortage read as +50 (a shortage stored as a surplus).
+  // trailing "15-", with or without a currency symbol in front of the sign.
   _num(v) {
     if (v == null) return 0;
     const s = String(v).trim();
     if (!s) return 0;
-    const neg = /^\(.*\)$/.test(s) || /^-/.test(s) || /-\s*$/.test(s);
+    const neg = this._isNeg(s);
     const n = parseFloat(s.replace(/[^0-9.]/g, ''));
     if (isNaN(n)) return 0;
     return neg ? -n : n;
@@ -128,7 +142,7 @@ const PosIngest = {
   _count(v) {
     const s = String(v == null ? '' : v).trim();
     if (!s) return NaN;
-    const neg = /^\(.*\)$/.test(s) || /^-/.test(s) || /-\s*$/.test(s);
+    const neg = this._isNeg(s);
     const n = parseFloat(s.replace(/[^0-9.]/g, ''));
     if (isNaN(n)) return NaN;
     return Math.round(neg ? -n : n);
@@ -143,10 +157,17 @@ const PosIngest = {
     const s = String(v).trim();
     if (!s) return NaN;
     if (s.indexOf(':') !== -1) {
-      const p = s.split(':');
+      // ⚠ THE SIGN BELONGS TO THE WHOLE VALUE, NOT THE HOURS HALF (S139, the twin inside this
+      // function). This branch does its own parse, so it never saw _isNeg: parseInt('-8') + 30/60
+      // returned -7.5 for minus eight and a half hours, wrong by a full hour on a payroll figure,
+      // and the accounting form '(8:30)' was NaN. Strip to digits and the colon, then apply the
+      // sign once — which also fixes '$8:30', where parseInt('$8') was already NaN.
+      const neg = this._isNeg(s);
+      const p = s.replace(/[^0-9:.]/g, '').split(':');
       const h = parseInt(p[0], 10), mn = parseInt(p[1], 10);
       if (isNaN(h) || isNaN(mn)) return NaN;
-      return h + mn / 60;
+      const val = h + mn / 60;
+      return neg ? -val : val;
     }
     return this._num(s);
   },
