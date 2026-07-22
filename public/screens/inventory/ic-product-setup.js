@@ -1492,7 +1492,12 @@ S.InventoryProducts = {
     this._formCategory = null;
     if (ok) {
       App.markSetupDone('gs_ic_products');
-      this.activeCat = prod.category;
+      // ⚠ LAND ON A TAB THAT ACTUALLY LISTS IT (S120). This was `prod.category` unconditionally,
+      // which was right while inactive products still sat on their category tab — visibleProducts()
+      // now keeps `active !== false` on every working tab, so fixing an archived liquor's cost and
+      // hitting Update threw the operator onto Liquor, where the row they had just edited does not
+      // appear and nothing says where it went. Edit is one of only three buttons on that row.
+      this.activeCat = (prod.active === false) ? this.INACTIVE_TAB : prod.category;
       App.closeModal('ip-form-modal');
       this.renderLanding();
     } else if (btn) {
@@ -1533,18 +1538,31 @@ S.InventoryProducts = {
   // correctly (App.menuItemCost and ic-prep-batches both read the product list unfiltered).
   _confirmDelInUse(ids, refs) {
     const what = ids.length > 1 ? 'these ' + ids.length + ' products' : 'this product';
+    // ⚠ DO NOT OFFER MAKE INACTIVE TO SOMETHING ALREADY INACTIVE (S121). App.productReferences does
+    // not filter on `active`, so an archived product still sitting in a recipe opens this guard —
+    // and every row on the Inactive tab is archived, so 100% of guard hits there led with a blue
+    // PRIMARY button that runs setActiveBulk(ids, false): a real write that changes nothing, under
+    // copy describing the state the product is already in. A MIXED selection keeps the offer,
+    // because it is still meaningful for the active ones.
+    const sel = this.products().filter(p => p && ids.indexOf(p.id) > -1);
+    const canInactivate = sel.some(p => p.active !== false);
     return new Promise(resolve => {
       const html = '<div class="card" style="margin:0;">'
         + '<div class="card-title">Something still uses ' + what + '</div>'
         + this._delRefsSummary(refs)
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:14px 0 4px;">'
-        + '<strong>Make Inactive</strong> keeps every recipe costing correctly and every past number '
-        + 'true. It just stops showing on your count sheets, par suggestions, spot checks and order sheet.</div>'
+        + (canInactivate
+            ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:14px 0 4px;">'
+              + '<strong>Make Inactive</strong> keeps every recipe costing correctly and every past number '
+              + 'true. It just stops showing on your count sheets, par suggestions, spot checks and order sheet.</div>'
+            : '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:14px 0 4px;">'
+              + (ids.length > 1 ? 'These are already inactive' : 'This is already inactive')
+              + ', so they are off your count sheets, par suggestions, spot checks and order sheet — '
+              + 'while still costing every recipe correctly. Deleting is the only step left.</div>')
         + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:14px;">'
         + 'Deleting permanently leaves those recipes missing an ingredient. Bar Cop flags them rather '
         + 'than quietly costing the dish cheaper, but you will have to fix each one.</div>'
         + '<div class="card-actions" style="flex-wrap:wrap;">'
-        + '<button class="btn btn-primary" data-act="inactive">Make Inactive</button>'
+        + (canInactivate ? '<button class="btn btn-primary" data-act="inactive">Make Inactive</button>' : '')
         + '<button class="btn btn-ghost" data-act="cancel">Cancel</button>'
         + '<button class="btn btn-danger" data-act="delete" style="margin-left:auto;">Delete Permanently</button>'
         + '</div></div>';
