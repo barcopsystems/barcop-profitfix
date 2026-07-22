@@ -239,6 +239,7 @@ S.InventoryReceiveDelivery = {
     this._pendingOrderId = null;
     if (pendingId) {
       this._draft = null; this._draftLines = null;
+      this._pendingDeliveryId = null;   // filed — the next delivery gets its own id
       const order = this.orders().find(o => o.id === pendingId);
       const vSel = document.getElementById('rd-vendor');
       if (order && vSel) {
@@ -680,8 +681,16 @@ S.InventoryReceiveDelivery = {
 
     const matchedOrderId = document.getElementById('rd-order')?.value || '';
 
+    // ⚠ STABLE ACROSS RETRIES. This was a fresh App.uid() on every attempt, and the
+    // delivery is written FIRST — so when a later write failed and the operator hit Save
+    // Delivery again, the second attempt wrote a SECOND delivery row for the same invoice.
+    // App.computeUsagePair sums line_items into purchases, so 12 bottles were counted where
+    // 6 arrived, and that flows into COGS, usage variance and shrink. Held on the screen
+    // for this draft and cleared once the delivery is filed, so the retry upserts the same
+    // row instead of minting another.
+    this._pendingDeliveryId = this._pendingDeliveryId || App.uid();
     const record = {
-      id:             App.uid(),
+      id:             this._pendingDeliveryId,
       vendor,
       date:           document.getElementById('rd-date')?.value || App.todayLocal(),
       invoice_number: document.getElementById('rd-invoice')?.value.trim() || '',
@@ -713,6 +722,14 @@ S.InventoryReceiveDelivery = {
     // form), so divide by case_size before computing cost_per_pour and
     // pour_cost_pct. Every applied update appends a cost_history entry so
     // price drift is auditable.
+    // ⚠ SNAPSHOT BEFORE THE FIRST MUTATION. These are the LIVE ic_products rows, and
+    // putRecordsBulk cannot revert by contract — so a refused write used to leave memory
+    // holding the new cost while the server kept the old one, for the whole session.
+    // Every pour cost %, recipe cost, variance dollar and Menu Engineering class then ran
+    // on a price the register and every export did not have. restoreRows also DELETES keys
+    // the mutation added, which is what removes the cost_history entry below: a price move
+    // the server never received must not sit in the Vendor Tracker's drift as though it did.
+    const _undoProducts = App.snapshotRows(appliedUpdates.map(u => u.product));
     appliedUpdates.forEach(({ product, newPrice, prevPrice }) => {
       product.unit_cost = newPrice;
       const derivedPours = product.container_size_oz && product.pour_size_oz
@@ -763,9 +780,12 @@ S.InventoryReceiveDelivery = {
     // hiding the vendor and the operator gets a clean inventory picture
     // for the next order cycle.
     let matchedOrder = null;
+    let _undoOrder = null;
     if (matchedOrderId) {
       const order = this.orders().find(o => o.id === matchedOrderId);
       if (order && order.status !== 'Received') {
+        // Same rule as the products above: this is the live order row.
+        _undoOrder = App.snapshotRows([order]);
         order.status = 'Received';
         order.received_at = new Date().toISOString();
         order.received_delivery_id = record.id;
@@ -790,10 +810,18 @@ S.InventoryReceiveDelivery = {
     if (ok) {
       App.markSetupDone('gs_ic_delivery');
       this._draft = null; this._draftLines = null;
+      this._pendingDeliveryId = null;   // filed — the next delivery gets its own id
       const filed = await this._autoFileDisputes(disputedUpdates, { vendor, date: record.date, invoice: record.invoice_number, deliveryId: record.id });
       await this._linkFiledDisputes(record);
       this.renderDone(record, filed, creepHits);
     } else {
+      // ⚠ Put memory back, or the RETRY is blind. `changed` (in the line loop above)
+      // compares the invoice price against `p.unit_cost` — which the mutation already
+      // moved — so a second Save Delivery detected ZERO price changes, reported success,
+      // and the new cost never reached the server at all. Restoring makes the retry see
+      // the change again and actually save it.
+      App.restoreRows(_undoProducts);
+      if (_undoOrder) App.restoreRows(_undoOrder);
       if (btn) { btn.disabled = false; btn.textContent = 'Save Delivery'; }
       fail('Save failed. Try again.');
     }
