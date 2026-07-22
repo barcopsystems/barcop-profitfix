@@ -162,9 +162,17 @@ S.ShiftPreShift = {
     return this._curFeatured().map(id => menu.find(m => m.id === id)).filter(Boolean);
   },
   _itemMargin(it) {
-    const cost = App.menuItemCost(it);
-    if (this.n(it && it.price) == null || this.n(cost) == null) return null;
-    return it.price - cost;
+    // ⚠ `costed` is the canonical test (App.menuItemPct: `raw != null && raw > 0`), and it
+    // is stricter than the `!= null` this used to use — a ZERO cost passed that guard, and
+    // with cost 0 the contribution margin IS the entire menu price. A menu imported from a
+    // POS export with no cost column therefore produced "Strong $34.00 margin." on the
+    // briefing the shift lead reads to the floor, and in the exported PDF.
+    // The trap is that this is reached BY the correct guard elsewhere: todayStars() and
+    // _recommendedFor() do check `costed` and return nothing, which is exactly what sends
+    // the operator to the "+ Add Item" picker that lands here.
+    const m = App.menuItemPct(it);
+    if (this.n(it && it.price) == null || !m.costed) return null;
+    return it.price - m.cost;
   },
 
   // Why we feature this item: a tight one-liner from the Menu Rundown (class +
