@@ -5611,8 +5611,17 @@ const App = {
       if (cv || cu) {
         // A DELETED product is not in ic_products, so fall back to the name the count recorded
         // rather than printing "Unnamed product" next to a real dollar figure (S95).
-        carried.push({ id: pid, name: nameOf(pid) || r.name || '', date: oldest,
-          value: Math.round(cv * 100) / 100, onHand: cu });
+        const live = prods.find(p => p && p.id === pid) || null;
+        carried.push({ id: pid, name: (live && live.name) || r.name || '', date: oldest,
+          value: Math.round(cv * 100) / 100, onHand: cu,
+          // ⚠ HIDDEN FROM OPERATIONS is a different fact from NOT COUNTED, and the sheet has to
+          // say which (S89). ic-take-inventory.products() drops an inactive product, so once
+          // hidden it can NEVER appear in a count again and its figure can never be corrected or
+          // zeroed — it just sits on Line 41. Reported as "was not counted on <date>" it read as
+          // somebody forgetting, and sent the operator hunting for a bottle on a shelf no count
+          // sheet will ever list. The FIGURE is deliberately still held (Kyle's S5 call, and the
+          // order sheet's "flag it, don't change the math"); only the explanation changed.
+          inactive: !!(live && live.active === false) });
       }
     });
     carried.sort((a, b) => String(a.name).localeCompare(String(b.name)));
