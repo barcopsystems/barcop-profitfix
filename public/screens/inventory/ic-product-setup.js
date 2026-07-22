@@ -401,7 +401,20 @@ S.InventoryProducts = {
     // state so the headers always show and the empty message sits in the data row.
     // Food / Misc show recipe-costing columns; Bottle Beer drops the Pour column
     // (tracked by the case, never poured); poured drinks keep size + pour.
-    const headerCols = isFoodMisc
+    // ⚠ The INACTIVE tab gets its own category-agnostic layout, and it must, because it
+    // is the one tab that holds products from EVERY category at once. The headers here
+    // are chosen from `this.activeCat` while each row's cells are chosen from
+    // `p.category` in _productRowHtml — on a working tab those are the same value so they
+    // always agree, but on the Inactive tab activeCat is 'Inactive', which is neither
+    // Food/Misc nor Bottle Beer, so this used to fall through to the poured-drinks
+    // header while the rows still emitted their own category's cells. A Bottle Beer row
+    // came out one cell short, shifting every column left so Edit/Delete rendered under
+    // "Par", and a Food row's recipe cost printed under a "Cost %" header — a dollar
+    // figure beneath a percent heading. Per-category columns are meaningless on a
+    // cross-category list anyway, so it shows what all products share.
+    const headerCols = onInactiveTab
+      ? '<th>Vendor</th><th>Category</th><th>Cost</th><th>Par</th><th></th>'
+      : isFoodMisc
       ? '<th>Vendor</th><th>Unit</th><th>Per Unit</th><th>Cost/Unit</th><th style="white-space:nowrap;">Recipe Cost</th><th>Par</th><th></th>'
       : isBottleBeer
         ? '<th>Vendor</th><th>Case Size</th><th>Cost Per</th><th>Cost %</th><th>Par</th><th></th>'
@@ -409,12 +422,14 @@ S.InventoryProducts = {
     // Each layout gets an even, aligned column set so cards line up down the page.
     // Percentage widths (not fixed px): the columns stay aligned across the Vodka/
     // Gin/Rum tables AND the table always fits its card, so it never scrolls sideways.
-    const colgroup = isFoodMisc
+    const colgroup = onInactiveTab
+      ? '<colgroup><col style="width:4%;"/><col style="width:30%;"/><col style="width:18%;"/><col style="width:14%;"/><col style="width:14%;"/><col style="width:9%;"/><col style="width:11%;"/></colgroup>'
+      : isFoodMisc
       ? '<colgroup><col style="width:4%;"/><col style="width:20%;"/><col style="width:14%;"/><col style="width:8%;"/><col style="width:11%;"/><col style="width:11%;"/><col style="width:11%;"/><col style="width:9%;"/><col style="width:12%;"/></colgroup>'
       : isBottleBeer
         ? '<colgroup><col style="width:4%;"/><col style="width:20%;"/><col style="width:16%;"/><col style="width:13%;"/><col style="width:14%;"/><col style="width:9%;"/><col style="width:10%;"/><col style="width:14%;"/></colgroup>'
         : '<colgroup><col style="width:4%;"/><col style="width:19%;"/><col style="width:14%;"/><col style="width:13%;"/><col style="width:8%;"/><col style="width:12%;"/><col style="width:8%;"/><col style="width:8%;"/><col style="width:14%;"/></colgroup>';
-    const nCols = isBottleBeer ? 8 : 9;
+    const nCols = onInactiveTab ? 7 : (isBottleBeer ? 8 : 9);
 
     let body;
     if (prods.length === 0) {
@@ -446,7 +461,13 @@ S.InventoryProducts = {
       // Group the list by Sub-Category (Misc Type for Misc) into its own card so a
       // manager can scan each style — "Vodka Products (18)" — and spot what is
       // missing. Products with no sub-category fall into an "Uncategorized" card.
-      const tables = App.subcatGroups(prods, this.activeCat).map((g, gi) => {
+      // ⚠ 'All' on the Inactive tab so App.subcatGroups groups by CATEGORY. Passing
+      // 'Inactive' made it group by SUB-category, and an archived product rarely has one,
+      // so every inactive product in the bar landed under a single "Uncategorized"
+      // heading. Kyle's design call for this tab (2026-07-21) was explicitly "grouped by
+      // category inside, category shown per row" — you will not remember whether
+      // something was Food or Misc, which is the whole reason the tab exists.
+      const tables = App.subcatGroups(prods, onInactiveTab ? 'All' : this.activeCat).map((g, gi) => {
         const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
         const groupRows = g.items.map(p => this._productRowHtml(p, pourable, target)).join('');
         return '<div class="card" style="overflow-x:auto;margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
@@ -487,7 +508,14 @@ S.InventoryProducts = {
     // Per-category data cells. Food / Misc show the recipe-costing breakdown (per
     // unit servings/oz + the recipe cost); pourable + bottle beer keep pour cols.
     let tds;
-    if (p.category === 'Food' || p.category === 'Misc') {
+    // ⚠ The Inactive tab holds every category at once, so its cells are chosen from the
+    // TAB rather than from p.category — otherwise the row disagrees with the header,
+    // which is exactly what happened here (see the headerCols note in renderLanding).
+    // Category is shown because on this one list it differs row to row.
+    if (this.activeCat === this.INACTIVE_TAB) {
+      tds = '<td>' + esc(p.category || '-') + '</td>'
+          + '<td>' + costDisplay + '</td>';
+    } else if (p.category === 'Food' || p.category === 'Misc') {
       const basis = App.recipeBasis ? App.recipeBasis(p) : null;
       const uEach = String(p.unit_type || '').toLowerCase() === 'each';
       let perU = dash;
