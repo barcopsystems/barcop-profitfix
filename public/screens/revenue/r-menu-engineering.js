@@ -123,13 +123,62 @@ S.RevenueMenuEngineering = {
     }
   },
 
+  // ── Dishes that could not be costed, and what that cost the ranking ──────────
+  // A dish with no usable cost is correctly left out of the Star/Plowhorse/Puzzle/Dog
+  // math, but that exclusion used to be completely silent: the dish vanished off this
+  // page, and if its absence dropped its category under MIN_PER_CAT then every OTHER
+  // dish in that category quietly lost its class too. An operator who deleted one
+  // inventory product saw three unrelated dishes fall off the board with nothing
+  // linking the two events.
+  // This says it out loud instead. It NAMES the dishes and NAMES the categories that
+  // stopped ranking as a result, so there is something to act on. It changes no math.
+  _uncostedNote(uncosted, byCat) {
+    if (!uncosted || !uncosted.length) return '';
+    const names = uncosted.map(i => i.name).filter(Boolean);
+    // Categories held below the ranking threshold that WOULD clear it if these were costed.
+    const blocked = [];
+    const byCatUncosted = {};
+    uncosted.forEach(i => { const c = i.category || 'Uncategorized'; byCatUncosted[c] = (byCatUncosted[c] || 0) + 1; });
+    Object.keys(byCatUncosted).forEach(cat => {
+      const costedHere = ((byCat && byCat[cat]) || []).length;
+      if (costedHere < this.MIN_PER_CAT && costedHere + byCatUncosted[cat] >= this.MIN_PER_CAT) blocked.push(cat);
+    });
+    const lead = names.length === 1
+      ? '1 dish is not costed and cannot be ranked: ' + esc(names[0]) + '.'
+      : names.length + ' dishes are not costed and cannot be ranked: ' + esc(names.join(', ')) + '.';
+    const why = blocked.length
+      ? ' That also leaves ' + esc(blocked.join(', ')) + ' below the ' + this.MIN_PER_CAT
+        + ' costed dishes Bar Cop needs before it can rank a category, so nothing in '
+        + (blocked.length === 1 ? 'it' : 'them') + ' is ranked either. Cost '
+        + (names.length === 1 ? 'it' : 'them') + ' and the ranking comes back.'
+      : ' Cost ' + (names.length === 1 ? 'it' : 'them') + ' to bring '
+        + (names.length === 1 ? 'it' : 'them') + ' into the ranking.';
+    return '<div class="card" style="margin-top:14px;">'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">'
+      + '<span style="color:var(--gold);font-weight:700;">Not costed</span> &middot; ' + lead + why
+      + '</div></div>';
+  },
+
   // ── The page: diagnosis (quadrant) + prescription (suggested price + action) ─
   classificationHtml() {
     // Inject the effective cost (auto-computed from recipe when attached, else
     // the manually-entered cost) so the math always sees a current number.
     // draw() gates on < 4 costed items with the setup card, so this only runs
     // with a rankable menu.
-    const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
+    const priced = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 }))
+      .filter(i => i.price && i.weekly_covers && !i.archived);
+    const items = priced.filter(i => i.cost);
+    // ⚠ The dishes we just dropped for having no cost. Excluding them from the ranking is
+    // CORRECT — a Star/Dog class is relative to the category average and you cannot place
+    // a dish you cannot cost. But the exclusion SHRINKS the category, and a category that
+    // falls under MIN_PER_CAT has every remaining item's class nulled, so deleting one
+    // inventory product silently took three untouched, correctly-costed dishes off the
+    // board with it. Worse, these dishes were filtered out before anything rendered, so
+    // they did not appear on this page at all and there was no thread to pull.
+    // They are surfaced below instead. The math is untouched: lowering MIN_PER_CAT would
+    // hand back confident labels computed against three dishes, which is the fabrication
+    // this page exists to avoid.
+    const uncosted = priced.filter(i => !i.cost);
     App.markSetupDone('gs_r_eng');
 
     const SINGULAR = { STAR: 'Star', PLOWHORSE: 'Plowhorse', PUZZLE: 'Puzzle', DOG: 'Dog' };
@@ -257,7 +306,8 @@ S.RevenueMenuEngineering = {
       + calcItem('Weekly Upside', '<span style="color:var(--gold);">+' + f(upside) + '</span>')
       + '</div></div>';
 
-    return '<div id="me-export-root">' + statBox + cards + unrankedCard + this.reviewLogHtml() + '</div>';
+    return '<div id="me-export-root">' + statBox + cards + unrankedCard
+      + this._uncostedNote(uncosted, byCat) + this.reviewLogHtml() + '</div>';
   },
 
   // ── Reprice step (the focused pricing modal) ─────────────────────────────────
