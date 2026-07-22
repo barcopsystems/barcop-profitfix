@@ -375,8 +375,15 @@ const PosIngest = {
     // Match by the register's name OR any saved POS alias (a report calls a
     // register "Main Bar" that the operator named "Bar 1" — the alias links them).
     const drawerByName = {};
-    const activeDrawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d && d.active !== false);
-    activeDrawers.forEach(d => {
+    const allDrawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(Boolean);
+    const activeDrawers = allDrawers.filter(d => d.active !== false);
+    // ⚠ NAME MATCHING USES EVERY REGISTER, ARCHIVED ONES INCLUDED (S104). Archiving a register
+    // does not erase its history: matching only active registers made a file still naming it
+    // resolve to drawer_id '' — a day-level row that no longer shared a key with that register's
+    // own prior rows, so the register-day DUPLICATED instead of replacing. Same rule as S33 and
+    // S54: a filter that is right for "what may I PICK for new work" is wrong for "what already
+    // EXISTS". Archived first, then active, so a live register always wins a name collision.
+    allDrawers.filter(d => d.active === false).concat(activeDrawers).forEach(d => {
       if (d.name) drawerByName[String(d.name).trim().toLowerCase()] = d;
       (d.pos_aliases || []).forEach(a => { if (a) drawerByName[String(a).trim().toLowerCase()] = d; });
     });
@@ -387,6 +394,14 @@ const PosIngest = {
     // in Drawer Net, the short rate, Loss Prevention and the Books cash sheet.
     // With TWO OR MORE registers a column-less row is a whole-day figure and is
     // deliberately left day-level — attributing it to one register would invent data.
+    // ⚠ soleDrawer DELIBERATELY counts ACTIVE registers only — do NOT widen it to allDrawers.
+    // A bar now running one register (having archived a second) would go back to writing
+    // day-level rows that do not match its own hand counts, which is the S42 DOUBLE-COUNT: a
+    // wrong TOTAL in Drawer Net, the short rate, Loss Prevention and the Books cash sheet.
+    // Attributing a column-less whole-day figure to the surviving register can only get the
+    // per-register SPLIT wrong, while the total and the dedupe stay right — and nothing records
+    // WHEN the other register was archived, so the split is unknowable either way. A wrong total
+    // is worse than a wrong split. Pinned by verify-cash-archived-register.js case D.
     const soleDrawer = activeDrawers.length === 1 ? activeDrawers[0] : null;
     const staffByName = this._staffByName();
     const existing = (App.shiftData && App.shiftData.sc_variances) || [];
