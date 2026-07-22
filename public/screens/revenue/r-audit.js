@@ -46,8 +46,26 @@ S.RevenueAudit = {
   // Both readiness readers go through here so the two copies cannot drift apart again.
   // Pinned as a tie-out by verify-audit-readiness-tieout.js, which lifts BOTH filters
   // from source and asserts they classify the same menu identically.
+  // ⚠ THE AUDIT SCORES THE LIVE COST, NOT THE SAVED SNAPSHOT (S106 — Kyle's call, option B,
+  // 2026-07-22). A menu item's `cost` is written ONCE, at save time (r-menu-items.js), while every
+  // other screen recomputes it through App.menuItemCost. The audit is computed on the SERVER, and
+  // the server never receives inventory — audit-compute.js cannot see ic_products at all — so that
+  // snapshot was the only figure it had, and nothing refreshed it until somebody happened to
+  // re-save the dish. A keg going $180 -> $320 left the audit scoring $5.55/pint margin against a
+  // truth of $4.42; five deleted products left it awarding the "Full data" badge and a full
+  // Star/Dog mix while Menu Engineering on the next screen said "Price your menu items first".
+  // Returns COPIES, so nothing stored changes and no background write is added — the server's own
+  // filter is untouched and correct; what changed is the data fed to it.
+  // A cost of null (deleted ingredient) stays NULL, so `> 0` drops the dish out of the scored set
+  // rather than scoring it at zero — an unknown cost is not a free one.
+  _auditMenuItems() {
+    return (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) }));
+  },
+  // ⚠ Reads the same live view as the payload, or readiness would judge the snapshot while the
+  // server judges the live figure — which is S49's client/server tie-out broken from the other
+  // side. verify-audit-live-cost.js case C pins that the two classify a menu identically.
   _costedMenu() {
-    return (App.data.menu_items || []).filter(i => +i.price > 0 && +i.cost > 0 && +i.weekly_covers > 0 && !i.archived);
+    return this._auditMenuItems().filter(i => +i.price > 0 && +i.cost > 0 && +i.weekly_covers > 0 && !i.archived);
   },
 
   _readinessSteps() {
@@ -367,6 +385,10 @@ S.RevenueAudit = {
       // self-reported operating practices feed the score, so the number an owner
       // relies on cannot be inflated by a claim the data does not back up.
       const auditAppData = JSON.parse(JSON.stringify(App.data));
+      // ⚠ Ship the LIVE cost (S106). The deep copy above carries each dish's save-time snapshot,
+      // which the server has no way to refresh. Replacing it here costs nothing, changes nothing
+      // stored, and leaves the server's filter exactly as it was.
+      auditAppData.menu_items = this._auditMenuItems();
 
       const form = new FormData();
       form.append('appData', JSON.stringify(auditAppData));
