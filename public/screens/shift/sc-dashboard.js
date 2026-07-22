@@ -660,7 +660,12 @@ S.ShiftDashboard = {
   // alias), so we never make duplicate registers and never ask twice.
   async importCash(rows) {
     this._pendingCashRows = rows;
-    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d.active !== false);
+    // ⚠ EVERY register, archived ones included (S104). Matching only active registers made an
+    // ARCHIVED register's own name count as unmatched, so the mapping prompt fired for a register
+    // the bar already has — and the dropdown did not offer it, so the only way out was minting a
+    // duplicate name with a fresh id. This also keeps the blank-slate test below honest: a bar
+    // whose only register is archived is not a blank slate.
+    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(Boolean);
     const key = s => String(s || '').trim().toLowerCase();
     const known = new Set();
     drawers.forEach(d => { if (d.name) known.add(key(d.name)); (d.pos_aliases || []).forEach(a => known.add(key(a))); });
@@ -695,8 +700,12 @@ S.ShiftDashboard = {
   _showCashMap(unmatched) {
     const res = document.getElementById('sc-ck-cash-res');
     if (!res) return;
-    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d.active !== false);
-    const opts = drawers.map(d => '<option value="' + esc(d.id) + '">' + esc(d.name) + '</option>').join('');
+    // ⚠ EVERY register, archived ones LABELLED (S104). An archived register was unreachable here,
+    // so a POS name that belonged to one could only be mapped to the wrong register or added as a
+    // duplicate — orphaning every prior reconcile keyed to the original id.
+    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(Boolean);
+    const opts = drawers.map(d => '<option value="' + esc(d.id) + '">' + esc(d.name)
+      + (d.active === false ? ' (archived)' : '') + '</option>').join('');
     const rows = unmatched.map(n =>
       '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0;">'
       + '<span style="font-size:13px;font-weight:700;color:var(--t1);min-width:130px;">' + esc(n) + '</span>'
