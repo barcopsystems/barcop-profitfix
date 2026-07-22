@@ -709,11 +709,20 @@ S.RevenueMenuEngineering = {
   // Recovery Scoreboard both pick it up. Pricing is a no-dollar metric, so this
   // logs the change and its date, never an invented recovered figure.
   async _logPriceChange(item, oldPrice, newPrice, volPct) {
-    const cost = App.menuItemCost(item) || 0;
+    // ⚠ AN UNKNOWN COST MUST NOT BECOME A PREDICTION (S111). This was `menuItemCost(item) || 0`,
+    // so a dish whose ingredient had been deleted costed at ZERO and the whole menu price became
+    // the margin — persisting a fabricated `predicted_weekly_impact` on the Pricing Review Log
+    // row. It was invisible only because verify() returns 'no-cost' before it ever renders (S48),
+    // which is a second guard, not a reason to store an invented number. App.logPriceChange
+    // already persists `cost: null` for this case; the prediction now matches it.
+    const raw = App.menuItemCost(item);
+    const cost = raw || 0;
     const covers = item.weekly_covers || 0;
     const vp = parseFloat(volPct) || 0;
     const oldCM = oldPrice - cost, newCM = newPrice - cost;
-    const predWk = (newCM * (covers * (1 + vp / 100))) - (oldCM * covers);
+    const predWk = (raw == null || !(raw > 0))
+      ? null
+      : (newCM * (covers * (1 + vp / 100))) - (oldCM * covers);
     await App.logPriceChange(item, oldPrice, newPrice, { volPct: vp, predictedWeekly: predWk, reason: 'Reprice from Menu Engineering', source: 'menu-engineering' });
   },
 
@@ -734,7 +743,12 @@ S.RevenueMenuEngineering = {
     const weeks = Math.floor((Date.now() - t) / (7 * 86400000));
     if (weeks < 3) return { status: 'pending', weeks: Math.max(weeks, 0) };
     const baseItem = (App.data.menu_items || []).find(i => i.id === entry.item_id);
-    const item = baseItem ? { ...baseItem, cost: App.menuItemCost(baseItem) || baseItem.cost } : null;
+    // ⚠ NO `|| baseItem.cost` (S111). That fell back to the STORED save-time snapshot in exactly
+    // the case menuItemCost had just refused to price — re-fabricating the number the null exists
+    // to prevent. Inert today because the arithmetic below reads `entry.cost` and `item` is used
+    // only for weekly_covers, which is precisely why it is a trap: the next edit to reach for
+    // `item.cost` inherits a stale figure silently.
+    const item = baseItem ? { ...baseItem, cost: App.menuItemCost(baseItem) } : null;
     if (!item || item.weekly_covers == null) return { status: 'no-item' };
     const coversThen = entry.covers_at_change, coversNow = item.weekly_covers;
     if (!coversThen) return { status: 'no-baseline' };
