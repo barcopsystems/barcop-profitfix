@@ -5948,7 +5948,25 @@ const App = {
     // result was being discarded while `ok` tracked only putEventsBulk, so the whole path
     // reported success. Reporting the failure having written nothing is recoverable; a silent
     // merge is not.
-    const cleared = await DB.clearEvents(store.table);
+    // ⚠ RETRY THE CLEAR, exactly as the write below is retried (S11). Two reasons, and the second
+    // is the one that loses data. First, the retry loop below exists because "a transient hiccup
+    // must not clear the rows and leave nothing written" — and the step that CLEARS THE ROWS had
+    // no such protection, so one blip abandoned the seed. Second, `clearEvents`' own catch
+    // (db.js) fires on a NETWORK throw, which includes the DELETE reaching Supabase and
+    // COMMITTING while the response is lost: the client reports failure, the rows are already
+    // gone server-side, and returning here writes nothing back. The module's data is then lost.
+    // A DELETE scoped to account_id is IDEMPOTENT — deleting already-deleted rows succeeds and
+    // removes nothing — so a retry is safe and resolves that ambiguity: once one returns ok, the
+    // end state is known-cleared and seeding can proceed.
+    // ⚠ A PERSISTENT failure must still write NOTHING. Clearing and then failing to seed is the
+    // exact data-loss shape this guard exists to prevent, so the give-up path is unchanged.
+    let cleared = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      cleared = await DB.clearEvents(store.table);
+      if (!cleared || cleared.ok !== false) break;
+      console.error('seedEventStores ' + mod + ': clearEvents attempt ' + attempt + ' failed', cleared.error);
+      if (attempt < 3) await new Promise(r => setTimeout(r, 500));
+    }
     if (cleared && cleared.ok === false) {
       console.error('seedEventStores ' + mod + ': clearEvents failed, writing nothing', cleared.error);
       return { ok: false };
