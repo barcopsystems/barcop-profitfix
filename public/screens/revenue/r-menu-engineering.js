@@ -134,25 +134,51 @@ S.RevenueMenuEngineering = {
   // stopped ranking as a result, so there is something to act on. It changes no math.
   _uncostedNote(uncosted, byCat) {
     if (!uncosted || !uncosted.length) return '';
-    const names = uncosted.map(i => i.name).filter(Boolean);
-    // Categories held below the ranking threshold that WOULD clear it if these were costed.
-    const blocked = [];
+    // ⚠ TWO DIFFERENT REASONS A DISH IS UNCOSTED, AND ONLY ONE OF THEM IS "COST IT" (S110).
+    // A dish whose ingredient or linked product was DELETED has no cost to type: an
+    // inventory-linked item has no Cost field at all (ri-cost lives only in the plate/cocktail
+    // form) and the save path refuses with "Linked product not found." Telling the operator to
+    // cost it is a dead end — and DELETED is the word the Menu Builder already uses on that dish.
+    const broken = uncosted.filter(i => App.menuItemMissingIngredients(i).length);
+    const plain  = uncosted.filter(i => !App.menuItemMissingIngredients(i).length);
+    const nm = arr => esc(arr.map(i => i.name).filter(Boolean).join(', '));
+    const parts = [];
+    if (plain.length) parts.push((plain.length === 1
+      ? '1 dish is not costed and cannot be ranked: '
+      : plain.length + ' dishes are not costed and cannot be ranked: ') + nm(plain) + '.');
+    if (broken.length) parts.push((broken.length === 1
+      ? '1 dish cannot be costed because an ingredient was deleted: '
+      : broken.length + ' dishes cannot be costed because an ingredient was deleted: ')
+      + nm(broken) + '. Replace or remove the missing ingredient.');
+    const lead = parts.join(' ');
+    // Categories below the ranking threshold, split by whether costing these would actually clear
+    // it. `stuck` is the case the old copy lied about: it promised "cost it and it joins the
+    // ranking" even when the category would STILL be short afterwards.
+    const blocked = [], stuck = [];
     const byCatUncosted = {};
     uncosted.forEach(i => { const c = i.category || 'Uncategorized'; byCatUncosted[c] = (byCatUncosted[c] || 0) + 1; });
     Object.keys(byCatUncosted).forEach(cat => {
       const costedHere = ((byCat && byCat[cat]) || []).length;
-      if (costedHere < this.MIN_PER_CAT && costedHere + byCatUncosted[cat] >= this.MIN_PER_CAT) blocked.push(cat);
+      if (costedHere >= this.MIN_PER_CAT) return;   // already ranks; costing simply adds this dish
+      if (costedHere + byCatUncosted[cat] >= this.MIN_PER_CAT) blocked.push(cat);
+      else stuck.push({ cat, need: this.MIN_PER_CAT - costedHere - byCatUncosted[cat] });
     });
-    const lead = names.length === 1
-      ? '1 dish is not costed and cannot be ranked: ' + esc(names[0]) + '.'
-      : names.length + ' dishes are not costed and cannot be ranked: ' + esc(names.join(', ')) + '.';
-    const why = blocked.length
-      ? ' That also leaves ' + esc(blocked.join(', ')) + ' below the ' + this.MIN_PER_CAT
+    let why = '';
+    if (blocked.length) {
+      why = ' That also leaves ' + esc(blocked.join(', ')) + ' below the ' + this.MIN_PER_CAT
         + ' costed dishes Bar Cop needs before it can rank a category, so nothing in '
         + (blocked.length === 1 ? 'it' : 'them') + ' is ranked either. Cost '
-        + (names.length === 1 ? 'it' : 'them') + ' and the ranking comes back.'
-      : ' Cost ' + (names.length === 1 ? 'it' : 'them') + ' to bring '
-        + (names.length === 1 ? 'it' : 'them') + ' into the ranking.';
+        + (uncosted.length === 1 ? 'it' : 'them') + ' and the ranking comes back.';
+    } else if (stuck.length) {
+      why = ' ' + stuck.map(s => esc(s.cat) + ' still needs ' + s.need + ' more costed dish'
+        + (s.need === 1 ? '' : 'es')).join(', ') + ' before Bar Cop can rank '
+        + (stuck.length === 1 ? 'it' : 'them') + ', so fixing '
+        + (uncosted.length === 1 ? 'this one' : 'these') + ' will not bring '
+        + (uncosted.length === 1 ? 'it' : 'them') + ' into the ranking on its own.';
+    } else if (plain.length) {
+      why = ' Cost ' + (plain.length === 1 ? 'it' : 'them') + ' to bring '
+        + (plain.length === 1 ? 'it' : 'them') + ' into the ranking.';
+    }
     return '<div class="card" style="margin-top:14px;">'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;">'
       + '<span style="color:var(--gold);font-weight:700;">Not costed</span> &middot; ' + lead + why
