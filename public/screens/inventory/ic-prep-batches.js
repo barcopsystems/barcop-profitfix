@@ -249,16 +249,22 @@ S.PrepBatches = {
       .map(i => i.product_id));
   },
 
-  // ⚠ Is this screen still the one on the page? `this.container.isConnected` USED to be asked here
-  // and could never say no: #content-area is a permanent <main> that navigation merely empties and
-  // refills (app.js says so — "The content host is reused across every module screen"). So a resync
-  // that landed a second after the operator moved on repainted Prep Batches over their new screen,
-  // mid-task. App._mountSeq is bumped on every mount, so a changed value means "not us any more" —
-  // and a token from an EARLIER visit is refused too, so navigating away and back cannot let a
-  // stale write fight the fresh render.
-  _resyncStillCurrent() { return this._mountedAt === App._mountSeq; },
+  // ⚠ Is the visit that STARTED this work still the one on the page? `container.isConnected` used
+  // to be asked here and could never say no: #content-area is a permanent <main> that navigation
+  // merely empties and refills (app.js says so — "The content host is reused across every module
+  // screen"). So a resync landing after the operator moved on repainted Prep Batches over their
+  // new screen, mid-task.
+  // ⚠⚠ TAKES THE TOKEN CAPTURED WHEN THE WORK BEGAN. It used to read `this._mountedAt` live, and
+  // that is a property on the screen object, not a value belonging to the visit — so navigating
+  // away and BACK restamped it and the stale visit's write was waved through by the very check
+  // written to stop it (visit 1 token 2, visit 2 restamps to 6, App._mountSeq 6, guard says 6===6).
+  // The comment here previously claimed an earlier visit was refused. It was not. A comment
+  // asserting a guarantee that is not there is worse than none, because the next reader stops
+  // looking. Passing the token in makes the answer belong to the visit, so a remount cannot
+  // change it.
+  _resyncStillCurrent(token) { return token === App._mountSeq; },
 
-  async _resyncCosts(batches) {
+  async _resyncCosts(batches, token) {
     const pending = [];
     (batches || []).forEach(b => {
       // ⚠ A DELETED ingredient is not a free one. unitCost(null) is 0, so resyncing a batch whose
@@ -282,6 +288,16 @@ S.PrepBatches = {
     // Row-per-record: persist only the batches whose cost drifted (one bulk upsert). The payload is
     // a COPY — putRecordsBulk writes what it is handed and never touches the in-memory list.
     const payload = pending.map(p => ({ ...p.b, ingredients: p.ings, total_cost: p.total_cost, cost_per_serving: p.cost_per_serving, servings_per_batch: p.servings_per_batch }));
+    // ⚠ THE WRITE IS GUARDED, NOT JUST THE REPAINT. Only the re-render used to check the mount,
+    // so an orphaned resync still upserted — and its payload was built from what was on screen
+    // BEFORE the operator touched anything, so landing after their save put the pre-edit
+    // total_cost / cost_per_serving / ingredients back over the change. App.menuItemCost reads
+    // cost_per_serving off the batch, so every menu item built on it silently follows.
+    // The `await this._resyncPromise` barriers in saveBatch/deleteBatch cannot cover this case:
+    // renderList REASSIGNS _resyncPromise on the remount, so they wait on the new resync and
+    // never on the orphan. Abandoning is safe — this is a background correction and the next
+    // render recomputes it.
+    if (!this._resyncStillCurrent(token)) return false;
     const ok = await App.putRecordsBulk('ic', 'prep_batch', payload, { quiet: true });
     if (!ok) return false;   // memory never diverged; the next render tries again
     pending.forEach(p => {
@@ -292,7 +308,7 @@ S.PrepBatches = {
     });
     // Only if this screen is still on the page — the operator may have navigated away while the
     // write was in flight, and re-rendering into a detached container would do nothing useful.
-    if (this._resyncStillCurrent()) this.renderList();
+    if (this._resyncStillCurrent(token)) this.renderList();
     return true;
   },
 
@@ -318,9 +334,23 @@ S.PrepBatches = {
     // The handle is kept so saveBatch / deleteBatch can wait for it. Its payload was built from
     // what was on screen BEFORE the operator touched anything, so if it landed after their write
     // it would upsert the pre-edit values over the change, or resurrect a batch they just deleted.
-    this._resyncPromise = this._resyncCosts(batches).catch(e => {
+    // The token is captured HERE, at the moment this visit's resync begins, so the work carries
+    // the identity of the visit that started it rather than reading a property a later mount can
+    // overwrite.
+    const _resyncToken = this._mountedAt;
+    const _p = this._resyncCosts(batches, _resyncToken).catch(e => {
       try { DB.logClientError('prep_batch_resync', (e && e.message) || String(e), (e && e.stack) || '', 'ic-prep-batches'); } catch (e2) {}
     });
+    // ⚠ A SET, NOT A SINGLE HANDLE. `_resyncPromise` was reassigned by every render, so a resync
+    // orphaned by an earlier visit was no longer reachable — and saveBatch/deleteBatch's
+    // `await this._resyncPromise` then waited on the CURRENT resync while the orphan was still in
+    // flight, free to land its pre-edit payload on top of the operator's save. The write cannot be
+    // called back once it is in flight, so ORDERING is the only real protection: every in-flight
+    // resync stays reachable until it settles, and the save waits for all of them.
+    this._resyncInflight = this._resyncInflight || new Set();
+    this._resyncInflight.add(_p);
+    _p.then(() => this._resyncInflight.delete(_p), () => this._resyncInflight.delete(_p));
+    this._resyncPromise = _p;   // kept for anything reading the latest handle
 
     let listSection;
     if (!batches.length) {
@@ -619,7 +649,9 @@ S.PrepBatches = {
     // A background cost resync may still be in flight from the render that got us here, carrying a
     // payload built before this edit. Let it land first so THIS write is the later one; otherwise
     // it upserts the pre-edit values straight over the operator's change.
-    try { await this._resyncPromise; } catch (e) {}
+    // Waits for EVERY in-flight resync, including one orphaned by an earlier visit — a
+    // single handle was reassigned by each render and left the orphan unreachable.
+    try { await Promise.allSettled([...(this._resyncInflight || [])]); } catch (e) {}
     // Row-per-record: putRecord updates the in-memory list (replace by id / push) and writes one row.
     await App.putRecord('ic', 'prep_batch', rec);
     this.editId = null;
@@ -635,7 +667,9 @@ S.PrepBatches = {
     if (!ok) return;
     // Same as saveBatch: an in-flight resync upserting this batch after the delete would bring it
     // straight back. Wait for it, then delete.
-    try { await this._resyncPromise; } catch (e) {}
+    // Waits for EVERY in-flight resync, including one orphaned by an earlier visit — a
+    // single handle was reassigned by each render and left the orphan unreachable.
+    try { await Promise.allSettled([...(this._resyncInflight || [])]); } catch (e) {}
     await App.removeRecord('ic', 'prep_batch', id);   // row-per-record
     this.renderList();
   }
