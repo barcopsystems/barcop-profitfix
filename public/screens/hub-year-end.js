@@ -578,8 +578,16 @@ S.HubYearEnd = {
       .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
     const beginCount = counts.filter(c => c.date && c.date < yearStart).slice(-1)[0] || null;
     const endCount   = counts.filter(c => c.date && c.date <= yearEnd).slice(-1)[0] || null;
-    const beginValue = beginCount ? (parseFloat(beginCount.total_value) || 0) : null;
-    const endValue   = endCount   ? (parseFloat(endCount.total_value)   || 0) : null;
+    // ⚠ Valued through App.inventoryValueAsOf, not a count's stored `total_value`.
+    // A count that SKIPPED products stores them at 0, so the ending figure read light
+    // and Calculated COGS came out HIGH — overstating cost of goods and understating
+    // taxable profit on a Schedule C worksheet. The as-of reader carries a skipped
+    // product forward at its last counted value (Kyle's call 2026-07-21: carry forward
+    // AND disclose), and the note pushed below names which ones and from when.
+    const beginAsOf = App.inventoryValueAsOf(yearStart, true);
+    const endAsOf   = App.inventoryValueAsOf(yearEnd);
+    const beginValue = beginCount ? beginAsOf.value : null;
+    const endValue   = endCount   ? endAsOf.value   : null;
 
     const inYear = (d) => d && String(d).slice(0, 4) === year;
     const yearDeliveries = (App.inventoryData?.ic_deliveries || []).filter(d => inYear(d.date));
@@ -591,6 +599,9 @@ S.HubYearEnd = {
     rows.push(['  Total purchases',           totalPurchases, '', 'Sum of receive-delivery records for ' + year]);
     rows.push(['  Ending inventory value',    endValue, '', endCount ? ('Count dated ' + endCount.date) : 'No count on file at or before ' + yearEnd]);
     rows.push(['  Calculated COGS',           calcCogs, '', 'Begin + Purchases - End']);
+    // The DISCLOSE half: name the products resting on an older count. Shared helper on
+    // HubBooks so this sheet and the two in Books cannot drift apart.
+    S.HubBooks._pushCarriedNote(rows, merges, endAsOf, COL_COUNT);
     rows.push(blank());
 
     // Purchases by month

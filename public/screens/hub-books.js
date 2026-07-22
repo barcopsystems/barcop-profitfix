@@ -700,6 +700,29 @@ S.HubBooks = {
     });
   },
 
+  // ── Carried-forward disclosure ────────────────────────────────────────────
+  // Kyle's rule 2026-07-21 is "carry forward AND disclose": a skipped product keeps
+  // its last counted value so the shelf still counts, and the sheet SAYS which
+  // products those are and when each was last counted. Silently carrying a value
+  // into a tax figure would be its own dishonesty. Emits nothing when a count
+  // covered everything, so a clean month reads exactly as it did before.
+  // Shared by the Books monthly sheet, the Books Year-End Tax Helper and the Year
+  // End export, so the three cannot drift.
+  _pushCarriedNote(rows, merges, asOf, colCount) {
+    const carried = (asOf && asOf.carried) || [];
+    if (!carried.length) return;
+    const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: colCount - 1 } });
+    rows.push(this._blankRow(colCount));
+    rows.push(this._lineRow('Carried forward: ' + carried.length + ' product'
+      + (carried.length === 1 ? ' was' : 's were') + ' not counted on ' + asOf.countDate
+      + ', so the last counted figure was used. Everything else is from that count.', colCount));
+    mergeFull(rows.length - 1);
+    carried.forEach(c => {
+      rows.push(['  ' + (c.name || 'Unnamed product') + ' - carried forward from '
+        + c.date, c.value, '', '', ''].slice(0, colCount));
+    });
+  },
+
   // Make a blank row with the right column count.
   _blankRow(colCount) {
     const r = [];
@@ -770,9 +793,18 @@ S.HubBooks = {
       return this._finishSheet(wsEmpty, rows.length, merges, COL_WIDTHS);
     }
 
-    // Schedule C COGS math
-    const beginValue  = beginningCount ? (parseFloat(beginningCount.total_value) || 0) : null;
-    const endingValue = parseFloat(endingCount.total_value) || 0;
+    // Schedule C COGS math.
+    // ⚠ Valued through App.inventoryValueAsOf, NOT a count's stored `total_value`.
+    // A count that SKIPPED products stores them at 0 (ic-take-inventory gives a skipped
+    // row total 0, so value 0, and total_value is a flat sum over every item), so the
+    // ending figure read light and COGS came out HIGH — overstating cost of goods and
+    // understating taxable profit, on the sheet an accountant transcribes. The as-of
+    // reader carries a skipped product forward at its last counted value, which is what
+    // the Inventory dashboard has always done, so the two finally agree.
+    const beginAsOf   = App.inventoryValueAsOf(periodStart, true);   // strictly BEFORE the period
+    const endAsOf     = App.inventoryValueAsOf(periodEnd);
+    const beginValue  = beginAsOf.value;
+    const endingValue = endAsOf.value != null ? endAsOf.value : 0;
     const calcCogs    = (beginValue != null) ? (beginValue + purchases - endingValue) : null;
 
     rows.push(['Schedule C COGS Math (for the accountant)', '', '', '', '']);
@@ -780,12 +812,37 @@ S.HubBooks = {
     rows.push(['  Plus Purchases (from receive-delivery log this month)', purchases, '', '', '']);
     rows.push(['  Less Ending Inventory (count dated ' + endingCount.date + ')', endingValue != null ? -endingValue : null, '', '', '']);
     rows.push(['  Cost of Goods Sold (calculated)', calcCogs, '', '', '']);
+    // The DISCLOSE half of the rule: a carried-forward figure is honest only if the
+    // accountant can see which products rest on an older count, and how old.
+    this._pushCarriedNote(rows, merges, endAsOf, COL_COUNT);
     rows.push(this._lineRow('Note: this is the count-based Schedule C COGS (beginning + purchases - ending). It will not exactly match the Total COGS on the Income Statement, which is summed from your weekly numbers. The count-based figure here is the more accurate physical cost of goods. Give your accountant both.', COL_COUNT));
     merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
     rows.push(blank());
 
-    // Subtotal by category
-    const items = endingCount.items || [];
+    // Subtotal by category.
+    // ⚠ Built from the SAME as-of picture as the COGS math above, not from
+    // `endingCount.items` raw. Reading the raw list summed every SKIPPED product in as
+    // a real 0, so a category subtotal silently lost the value of anything the operator
+    // did not get to — and the subtotals then disagreed with the Total Ending Inventory
+    // printed directly beneath them.
+    const prodById = {};
+    ((App.inventoryData?.ic_products) || []).forEach(p => { if (p && p.id) prodById[p.id] = p; });
+    const carriedIds = new Set(((endAsOf.carried) || []).map(c => c.id));
+    const items = Object.keys(endAsOf.byProduct || {}).map(pid => {
+      const r = endAsOf.byProduct[pid];
+      const p = prodById[pid] || {};
+      const src = (endingCount.items || []).find(i => i && i.product_id === pid) || {};
+      return {
+        product_id: pid,
+        name:      p.name || src.name || '',
+        category:  p.category || src.category || '',
+        total:     r.onHand || 0,
+        unit_cost: p.unit_cost != null ? p.unit_cost : src.unit_cost,
+        value:     r.value || 0,
+        carried:   carriedIds.has(pid),
+        carriedFrom: (((endAsOf.carried) || []).find(c => c.id === pid) || {}).date || ''
+      };
+    });
     const byCat = {};
     items.forEach(it => {
       const cat = it.category || 'Uncategorized';
@@ -803,12 +860,17 @@ S.HubBooks = {
     rows.push(['Total Ending Inventory', '', endingValue, '', '']);
     rows.push(blank());
 
-    // Bottle-level detail
+    // Bottle-level detail.
+    // ⚠ A product the count SKIPPED used to print here as "0 units - $0.00", which
+    // reads as counted-and-found-empty rather than not-counted. It now shows its
+    // carried-forward figure with the date it was last counted appended to the name,
+    // so no line on this sheet claims a measurement that was never taken.
     rows.push(['Bottle Detail', '', '', '', '']);
     rows.push(['Product', 'Category', 'Units', 'Unit Cost', 'Extended Value']);
     items.slice().sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''))
       .forEach(it => {
-        rows.push([it.name || '', it.category || '', parseFloat(it.total) || 0, parseFloat(it.unit_cost) || 0, parseFloat(it.value) || 0]);
+        const label = (it.name || '') + (it.carried ? ' (carried forward from ' + it.carriedFrom + ')' : '');
+        rows.push([label, it.category || '', parseFloat(it.total) || 0, parseFloat(it.unit_cost) || 0, parseFloat(it.value) || 0]);
       });
 
     // Source + disclaimer footer
@@ -1550,8 +1612,12 @@ S.HubBooks = {
       .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
     const beginCount = counts.filter(c => c.date && c.date < yearStart).slice(-1)[0] || null;
     const endCount   = counts.filter(c => c.date && c.date <= yearEnd).slice(-1)[0] || null;
-    const beginValue = beginCount ? (parseFloat(beginCount.total_value) || 0) : null;
-    const endValue   = endCount   ? (parseFloat(endCount.total_value)   || 0) : null;
+    // Same as-of basis as the monthly sheet — a skipped product carries forward rather
+    // than reading as an empty shelf. See _buildInventoryValuation for why.
+    const beginAsOfY = App.inventoryValueAsOf(yearStart, true);
+    const endAsOfY   = App.inventoryValueAsOf(yearEnd);
+    const beginValue = beginCount ? beginAsOfY.value : null;
+    const endValue   = endCount   ? endAsOfY.value   : null;
 
     // Total purchases from receive-delivery log over the year
     const inYear = (d) => d && String(d).slice(0, 4) === year;
