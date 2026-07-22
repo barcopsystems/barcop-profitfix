@@ -6081,6 +6081,12 @@ const App = {
     if (r.storageFull) return { msg: 'Out of space on this device. Nothing was saved — free up some space and try again.', ownedBy: 'storage-full-banner' };
     const err = String((r.error && r.error.message) || r.error || '');
     if (/read-only|viewer/i.test(err)) return { msg: 'Your access is view-only, so nothing was saved.', ownedBy: 'viewer-banner' };
+    // ⚠ A MEMBERSHIP FAILURE IS NOT A CONNECTION PROBLEM (S167). db.js returns this when the write
+    // reaches the server but the user has no membership row for the active account (removed from a
+    // bar, an account switch that did not settle). "Check your connection" sends the operator after
+    // something no connection can fix — the same wrong-diagnosis class as the S10 banner. Reloading
+    // re-resolves the account, which is the actual remedy.
+    if (/account membership|no account/i.test(err)) return { msg: 'Your account access could not be confirmed, so nothing was saved. Reload Bar Cop and try again.', ownedBy: '' };
     return generic;
   },
   // Show a write failure once. COALESCED on purpose: a bulk write, or a burst of row writes from
