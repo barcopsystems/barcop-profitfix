@@ -768,7 +768,15 @@ S.InventoryLocations = {
         if (changed) touched.set(p.id, p);
       });
     }
-    if (this.editMode === 'products') this._reconcileProducts(name, this.editChecked).forEach(p => touched.set(p.id, p));
+    // ⚠ The undo out-param was NOT passed here, and this was the only one of the four
+    // callers that skipped it. The failure path below restores `prodBefore`, which is
+    // filled only by the `snap(p)` calls in the RENAME branch — so when the operator
+    // changed the product SET without renaming the shelf, nothing was restored at all.
+    // That made the retry blind: _reconcileProducts compares against MEMORY, which already
+    // matched what was ticked, so it returned nothing to write, the bulk write was skipped,
+    // and the location row alone succeeded — a clean save reported over an empty write.
+    const _undoProd = [];
+    if (this.editMode === 'products') this._reconcileProducts(name, this.editChecked, _undoProd).forEach(p => touched.set(p.id, p));
     const btn = document.getElementById('il-update-loc');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     // Both writes are checked. The product cascade's result used to be discarded, so a location
@@ -787,8 +795,14 @@ S.InventoryLocations = {
         const p = this.products().find(x => x.id === pid);
         if (p) Object.assign(p, snapshot);
       });
+      App.restoreRows(_undoProd);   // the product-SET edit; prodBefore only covers a rename
       if (btn) { btn.disabled = false; btn.textContent = 'Update Location'; }
       fail('Save failed. Try again.');
+      // ⚠ REDRAW. Without it the checklist keeps showing the set the operator just ticked
+      // while memory has been put back, so the screen and the data disagree and the next
+      // click is made against something that is no longer true. The twin _persistProductOrder
+      // was given the same treatment for the same reason.
+      this._renderEdit(id);
     }
   },
 
