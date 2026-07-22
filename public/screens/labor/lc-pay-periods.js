@@ -338,7 +338,36 @@ S.LaborPayPeriods = {
   },
 
   // ── Close / Reopen ──────────────────────────────────────────────────
+  // Never lock or unlock a week off a picture the app admits is incomplete. Its peers
+  // already refuse to act on one (hub-operating-expenses.js opens _catchUpOnce with the
+  // same test, and App._maybeAutoBackup bails on _loadDegraded); these two doors checked
+  // neither. A degraded load is served from a cache that can be months stale and is
+  // MISSING CHILDREN, so `lc_actuals` comes back short: every trailing week then renders
+  // as Open with a live Close & Lock button, and closing one stamps `locked` on only the
+  // rows that happened to load. A later clean load brings the rest back UNLOCKED, leaving
+  // a CLOSED week sitting over editable hours — verbatim the half-written close the
+  // comments further down say these checks exist to prevent, reached through a door they
+  // do not cover. Reopen is the same defect pointed the other way.
+  // ⚠ Refuses BEFORE the confirm: asking someone to confirm an action that is about to
+  // be refused is its own small lie. Nothing is lost by waiting — _loadDegraded is reset
+  // per load (app.js:2929), so a reload restores the button.
+  _loadIsWhole(action) {
+    // ⚠ `App.laborData`, not `App.data`. The peer checks App.data because that is the
+    // store IT reads; this screen's actuals() and periods() read App.laborData (:22-25),
+    // so that is the one whose absence means an incomplete picture here. Copying the
+    // peer's store name would have been checking a different bucket.
+    if (App.laborData && DB._dataReady && !DB._loadDegraded) return true;
+    App.confirm({
+      title: 'Bar Cop is still finishing loading',
+      message: 'Your logged hours have not all loaded yet, so Bar Cop cannot ' + action
+        + ' this week without risking locking a partial set. Refresh the page and try again.',
+      confirmText: 'OK', cancelText: '', danger: false
+    });
+    return false;
+  },
+
   async closePeriod(weekStart) {
+    if (!this._loadIsWhole('close')) return;
     const agg = this.aggregateWeek(weekStart);
     const ok = await App.confirm({
       title: 'Close and lock this period?',
@@ -431,6 +460,7 @@ S.LaborPayPeriods = {
   },
 
   async reopenPeriod(weekStart) {
+    if (!this._loadIsWhole('reopen')) return;
     const ok = await App.confirm({
       title: 'Reopen this pay period?',
       message: 'This unlocks the logged-hours entries in this period so Log Hours accepts edits again. The saved period summary stays as a record.',
