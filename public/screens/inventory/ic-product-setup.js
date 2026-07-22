@@ -399,7 +399,10 @@ S.InventoryProducts = {
     const prods = this.visibleProducts();
     const onInactiveTab = this.activeCat === this.INACTIVE_TAB;
     const target = App.data?.settings?.targets?.bar_pour_cost_pct ?? 22;
-    const incompleteHere = prods.filter(p => !this.isComplete(p));
+    // ⚠ ACTIVE ONLY (S123). On the Inactive tab `prods` is every archived product, so this alert
+    // counted retired products as a problem — the same active-only rule the tab counts and the row
+    // flags already follow.
+    const incompleteHere = prods.filter(p => p.active !== false && !this.isComplete(p));
 
     const tabs = this.catTabs();
 
@@ -530,7 +533,11 @@ S.InventoryProducts = {
       ? (esc(p.unit_type || '-') + (p.pack_size > 0 ? ' <span style="font-size:9px;color:var(--t3);">&middot; ' + p.pack_size + ' ea</span>' : ''))
       : (sz ? sz.l : (p.container_size_oz ? (p.container_size_label ? esc(p.container_size_label) + ' (' + p.container_size_oz + ' oz)' : p.container_size_oz + ' oz') : '-'));
     const pc  = p.pour_cost_pct != null ? (p.pour_cost_pct > target ? 'neg' : 'pos') : '';
-    const dim = p.active === false ? 'opacity:0.5;' : '';
+    // ⚠ NO 50% DIM (S122). It was the THIRD marker for the same fact, and the other two were cut on
+    // exactly this reasoning — the per-row "Inactive" name badge and a Category column repeating the
+    // heading above it. It is STRUCTURALLY DEAD on every working tab (visibleProducts() guarantees
+    // active !== false there) and UNIVERSAL on the Inactive tab, so it labelled nothing anywhere
+    // while making the one screen used to clear 100 mis-imported wines half-legible.
     const costUnit = ((this.FORM_SPEC[p.category] || {}).costLabel || 'Cost per Unit').split(' ').pop().toLowerCase();
     const piece = App.piecePrice ? App.piecePrice(p) : null;
     const costDisplay = p.unit_cost != null
@@ -593,7 +600,7 @@ S.InventoryProducts = {
         + '<td>' + costDisplay + '</td>'
         + '<td class="' + pc + '">' + (pourable && p.pour_cost_pct != null ? App.fmtPct(p.pour_cost_pct) : dash) + '</td>';
     }
-    return '<tr style="' + dim + '">'
+    return '<tr>'
       + '<td class="cb-left" style="width:40px;text-align:center;"><input type="checkbox" class="bc-check ip-sel" data-id="' + p.id + '"' + checked + '/></td>'
       // ⚠ No "Inactive" tag on the name. An inactive product is only ever rendered on the
       // Inactive tab (visibleProducts keeps `active !== false` on every working tab), so
@@ -601,8 +608,14 @@ S.InventoryProducts = {
       // nothing. Kyle 2026-07-21.
       + '<td><div class="val">' + esc(p.name) + '</div>'
       + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '')
-      + (!complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '')
-      + (App.productLocations(p).length === 0 ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Needs a location</div>' : '') + '</td>'
+      // ⚠ NEITHER FLAG APPLIES TO A RETIRED PRODUCT (S123). An inactive product is off the count
+      // sheets, par suggestions, spot checks and order sheet BY DESIGN, so it does not need a shelf
+      // and its missing cost is not blocking anything — nagging in red about products the operator
+      // deliberately retired fired on the tab whose whole purpose is holding junk, with the exact
+      // fixture it was built for (100 mis-imported wines: 8 red "Incomplete" plus 8 "Needs a
+      // location"). Still flagged for an ACTIVE product, which is the point of the flags.
+      + (p.active !== false && !complete ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Incomplete</div>' : '')
+      + (p.active !== false && App.productLocations(p).length === 0 ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Needs a location</div>' : '') + '</td>'
       + '<td>' + esc(p.vendor || '-') + '</td>'
       + tds
       + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
