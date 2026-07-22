@@ -1597,7 +1597,16 @@ S.InventoryProducts = {
         + '<button class="btn btn-ghost" data-act="cancel">Cancel</button>'
         + '<button class="btn btn-danger" data-act="delete" style="margin-left:auto;">Delete Permanently</button>'
         + '</div></div>';
-      App.openModal(html, { id: 'ip-del-guard', maxWidth: 560, noClose: true });
+      // ⚠ THE CORNER X IS A REAL EXIT AND THE PROMISE HAS TO SURVIVE IT (S37). `noClose` was dead
+      // (App.openModal reads opts.noX), and it stays dead deliberately: 36 of the 44 modals in the
+      // app carry no Cancel button at all, so honouring it would turn them into rooms with no door.
+      // The click handler below only resolves for a [data-act] button, so closing any other way
+      // left confirmDel parked on its await with nothing after it ever running — no delete (the
+      // safe direction) but also no feedback and no recovery.
+      // ⚠ app.js:3134 — `doClose` calls opts.onClose() INSTEAD of App.closeModal, so this handler
+      // must close the modal itself or the box stays on screen over a resolved promise.
+      App.openModal(html, { id: 'ip-del-guard', maxWidth: 560,
+        onClose: () => { App.closeModal('ip-del-guard'); resolve(null); } });
       const root = document.getElementById('ip-del-guard');
       if (!root) { resolve(null); return; }   // no DOM: refuse rather than delete blind
       root.addEventListener('click', ev => {
@@ -1740,7 +1749,10 @@ S.InventoryProducts = {
         + '<span id="be-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + '</div>'
     + '</div>';
-    App.openModal(body, { id: 'ip-bulk-modal', layer: 9000, maxWidth: 640, noClose: true });
+    // `noClose` removed: it was never read (App.openModal reads opts.noX) and the X stays by design
+    // (S37). Nothing hangs on this one — applyBulk is fired by a button and nothing awaits the box —
+    // so closing with the X simply abandons the edit, which is what it looks like it does.
+    App.openModal(body, { id: 'ip-bulk-modal', layer: 9000, maxWidth: 640 });
     this._wireBulk(cat, spec, ids);
   },
 
