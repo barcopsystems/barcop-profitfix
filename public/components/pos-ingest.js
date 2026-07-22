@@ -390,6 +390,17 @@ const PosIngest = {
     const soleDrawer = activeDrawers.length === 1 ? activeDrawers[0] : null;
     const staffByName = this._staffByName();
     const existing = (App.shiftData && App.shiftData.sc_variances) || [];
+    // ⚠⚠ THE HAND-COUNT PROTECTION IS A SET, NOT A _findDup SEARCH (S99/S103). _findDup CONSUMES
+    // its match, so it could only ever test the FIRST file row that landed on a register-day —
+    // an AM/PM or daypart-split cash report (buildSales calls that "an ordinary export shape")
+    // had every later row find nothing unused and get queued straight ON TOP of the operator's
+    // own count. It also returned the FIRST ARRAY MATCH, so once a register-day legitimately
+    // held both a manual and an import row (the supported "Add anyway" flow), whichever one the
+    // events query happened to return first decided protect-vs-replace. This mirrors buildSales'
+    // `manualDates`: order-independent, re-consulted for every row, never consumed.
+    const manualKeys = new Set(existing.filter(x => x && x.source === 'manual')
+      .map(x => x.date + '|' + (x.drawer_id || '')));
+    const keptKeys = new Set();   // register-DAYS already reported as kept, so N counts days not rows
     const has = v => v != null && String(v).trim() !== '';
     const toAdd = []; const skipped = []; let dupCount = 0; let keptManual = 0; const used = new Set();
     (rows || []).forEach(r => {
@@ -426,8 +437,16 @@ const PosIngest = {
       //   prior was entered BY HAND -> untouchable. buildSales protects a manual close the same
       //     way (`manualDates`), so a bulk import can never overwrite the operator's own work.
       // The superseded imported row is deleted in _commitCashRows, mirroring _commitSales.
-      const prior = this._findDup(existing, used, x => x.date === date && (x.drawer_id || '') === drawerId);
-      if (prior && prior.source === 'manual') { keptManual++; return; }
+      const dayKey = date + '|' + drawerId;
+      if (manualKeys.has(dayKey)) {
+        if (!keptKeys.has(dayKey)) { keptKeys.add(dayKey); keptManual++; }
+        return;
+      }
+      // Only IMPORTED rows are candidates for replacement, so the manual row above can never be
+      // reached through this path and array order cannot change the verdict. The search stays
+      // CONSUME-ONCE on purpose: a file that legitimately lists a register-day twice must import
+      // both rows, and only the first of them is replacing anything.
+      const prior = this._findDup(existing, used, x => x.date === date && (x.drawer_id || '') === drawerId && x.source !== 'manual');
       if (prior) dupCount++;
       // Tolerance is the matched register's own (App.drawerTolerance); $10 when
       // the register is unrecognized or unmapped.
