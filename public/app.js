@@ -5342,8 +5342,15 @@ const App = {
   // suppresses reorders (running dry mid-service is the worse failure). Two guards:
   // a location's prior names resolve forward to its current name, and a row at a
   // location the product no longer occupies is dropped.
-  _perpetualInventory() {
+  // `asOf` (optional 'YYYY-MM-DD') values the shelf as it stood on a date: counts
+  // after it are invisible. The tax sheets need that — a Schedule C figure is the
+  // shelf at period end, not the shelf today. `exclusive` makes the boundary `<`
+  // instead of `<=`, which is what a BEGINNING-of-period figure wants.
+  // Each product also carries the oldest/newest count date that fed it, so a caller
+  // can say WHICH figures rest on an older count instead of quietly mixing them.
+  _perpetualInventory(asOf, exclusive) {
     const counts = [...((this.inventoryData && this.inventoryData.ic_counts) || [])]
+      .filter(c => !asOf || (c && c.date && (exclusive ? String(c.date) < asOf : String(c.date) <= asOf)))
       .sort(App.cmpNewest);   // newest first by record date
     const locs = (this.inventoryData && this.inventoryData.ic_locations) || [];
     // A name that is CURRENTLY a live location is never remapped, so two shelves that
@@ -5366,7 +5373,15 @@ const App = {
     });
     const seen = {};      // "pid@@loc" already resolved to its newest counted value
     const byProd = {};
-    const stale = {};     // pid -> { key: item } dropped as stale, held in reserve
+    const stale = {};     // pid -> { key: {it,date} } dropped as stale, held in reserve
+    // Which counts fed this product's figure. `oldest` is what a disclosure should
+    // quote: it is the weakest link, the part of the number resting furthest back.
+    const stampDate = (rec, d) => {
+      if (!d) return;
+      const s = String(d);
+      if (!rec.oldest || s < rec.oldest) rec.oldest = s;
+      if (!rec.newest || s > rec.newest) rec.newest = s;
+    };
     counts.forEach(cnt => {
       (cnt.items || []).forEach(it => {
         if (it.counted === false) return;
@@ -5382,22 +5397,24 @@ const App = {
           // (moved to a shelf not yet counted, or its only shelf renamed then re-created), its
           // last known figures stand. Held per key so the newest stale count still wins.
           const bucket = stale[it.product_id] || (stale[it.product_id] = {});
-          if (!bucket[key]) bucket[key] = it;
+          if (!bucket[key]) bucket[key] = { it, date: cnt.date || '' };
           return;
         }
         if (seen[key]) return;
         seen[key] = true;
-        const rec = byProd[it.product_id] || (byProd[it.product_id] = { onHand: 0, value: 0 });
+        const rec = byProd[it.product_id] || (byProd[it.product_id] = { onHand: 0, value: 0, oldest: null, newest: null });
         rec.onHand += (it.total || 0);
         rec.value  += (it.value || 0);
+        stampDate(rec, cnt.date);
       });
     });
     Object.keys(stale).forEach(pid => {
       if (byProd[pid]) return;   // a live row exists — the stale ones stay dropped
-      const rec = byProd[pid] = { onHand: 0, value: 0 };
+      const rec = byProd[pid] = { onHand: 0, value: 0, oldest: null, newest: null };
       Object.keys(stale[pid]).forEach(k => {
-        rec.onHand += (stale[pid][k].total || 0);
-        rec.value  += (stale[pid][k].value || 0);
+        rec.onHand += (stale[pid][k].it.total || 0);
+        rec.value  += (stale[pid][k].it.value || 0);
+        stampDate(rec, stale[pid][k].date);
       });
     });
     return byProd;
@@ -5411,6 +5428,55 @@ const App = {
   currentInventoryValue() {
     const m = this._perpetualInventory();
     return Object.keys(m).reduce((s, pid) => s + (m[pid].value || 0), 0);
+  },
+
+  // ── Inventory value AS OF a date — the ONE door for the tax sheets ──────────
+  // Schedule C COGS is `beginning + purchases - ending`, so a deflated ending figure
+  // OVERSTATES COGS and understates taxable profit. Every tax sheet used to read a
+  // single count's stored `total_value`, which is a flat sum over ALL of that count's
+  // items — and `ic-take-inventory` gives a SKIPPED product total 0 and therefore
+  // value 0. So one shelf the operator did not get to made the whole shelf read as
+  // consumed, on Books, the Year-End Tax Helper and the Year End export at once.
+  //
+  // Kyle's call 2026-07-21: CARRY FORWARD + DISCLOSE. A skipped product keeps its last
+  // counted value, so the bottle that is physically still on the shelf still counts —
+  // and the sheet NAMES which products rest on an older count and when it was taken,
+  // because carrying a value forward silently would be its own dishonesty.
+  // Rejected: refusing to print a COGS figure at all on a partial count (one skipped
+  // bottle would kill the whole sheet, and a bar that never counts perfectly would
+  // never get a figure), and keeping the wrong math behind a warning stamp.
+  //
+  // Routed through _perpetualInventory deliberately — that reader ALREADY carries a
+  // skipped product forward for the Inventory dashboard, so the tax sheets and the
+  // dashboard now read the same shelf. Hand-rolling a second copy is exactly the
+  // five-drifted-copies failure App.computeUsagePair was created to end.
+  //
+  // Returns { value, countDate, carried: [{id,name,date,value,onHand}], byProduct }.
+  // `value` is null when no count exists on or before the date — an honest "cannot
+  // say", never a $0 that reads as an empty shelf.
+  inventoryValueAsOf(asOf, exclusive) {
+    const counts = ((this.inventoryData && this.inventoryData.ic_counts) || [])
+      .filter(c => c && c.date && (exclusive ? String(c.date) < asOf : String(c.date) <= asOf))
+      .slice().sort(App.cmpNewest);
+    const boundary = counts.length ? counts[0] : null;
+    if (!boundary) return { value: null, countDate: null, carried: [], byProduct: {} };
+    const m = this._perpetualInventory(asOf, exclusive);
+    const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+    const nameOf = (pid) => (prods.find(p => p && p.id === pid) || {}).name || '';
+    let value = 0;
+    const carried = [];
+    Object.keys(m).forEach(pid => {
+      const r = m[pid];
+      value += (r.value || 0);
+      // Carried when ANY part of the figure came from a count other than the boundary
+      // one — including a product counted at one shelf and skipped at another, which
+      // is a real and easy-to-miss shape.
+      if (r.oldest && r.oldest !== boundary.date) {
+        carried.push({ id: pid, name: nameOf(pid), date: r.oldest, value: r.value || 0, onHand: r.onHand || 0 });
+      }
+    });
+    carried.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    return { value: Math.round(value * 100) / 100, countDate: boundary.date, carried, byProduct: m };
   },
 
   // True when every Getting Started step is checked off. The Hub sidebar uses
