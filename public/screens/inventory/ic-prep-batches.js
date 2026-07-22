@@ -245,6 +245,12 @@ S.PrepBatches = {
       .filter(p => p && p.active === false));
   },
 
+  // ⚠ App.batchMissingIngredients (S107) applies the IDENTICAL rule, because
+  // App.menuItemMissingIngredients needs it to decide whether a DISH built on this batch can be
+  // costed. The two are kept separate deliberately: this one goes through `prodById`, the screen's
+  // own lookup, while App's reads App.inventoryData.ic_products — in production `products()` IS
+  // that array, so they agree by construction. verify-broken-batch-propagates.js case E is a
+  // TIE-OUT that runs both over the same batch and fails if they ever diverge.
   missingIngredients(b) {
     return (((b && b.ingredients) || [])
       .filter(i => i && i.product_id && !this.prodById(i.product_id))
