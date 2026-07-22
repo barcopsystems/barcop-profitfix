@@ -463,7 +463,21 @@ S.InventoryProducts = {
       const toolbar = '<div class="no-print" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost btn-sm ip-sel-all">Select All</button>'
         + '<button class="btn btn-ghost btn-sm ip-sel-clear">Clear</button>'
-        + (selCount > 0 ? '<button class="btn btn-ghost btn-sm ip-sel-edit">Bulk Edit ' + selCount + ' Selected</button>' : '')
+        // ⚠ NO Bulk Edit on the Inactive tab. Bulk edit is inherently PER-CATEGORY (the
+        // fields differ by category) and this is the one list that is deliberately
+        // cross-category, so no single form can be right for it: `FORM_SPEC['Inactive']`
+        // does not exist, so it silently fell back to the MISC form and offered Misc's
+        // fields over liquor, wine and food at once — and because `cat` was 'Inactive'
+        // rather than 'Misc' it also offered a Sub-Category dropdown built from
+        // `subcatSuggestions('Inactive')`, which is empty, so one stray touch wrote
+        // sub_category = '' across the whole selection and wiped Vodka / Bourbon /
+        // Chardonnay in a single action.
+        // The tab's real jobs are RESTORE and DELETE, so bulk Make Active takes its place
+        // — and that was missing anyway, leaving "restore 100 mis-imported wines" as 100
+        // separate clicks.
+        + (selCount > 0 ? (onInactiveTab
+            ? '<button class="btn btn-ghost btn-sm ip-sel-activate">Make Active ' + selCount + ' Selected</button>'
+            : '<button class="btn btn-ghost btn-sm ip-sel-edit">Bulk Edit ' + selCount + ' Selected</button>') : '')
         + (selCount > 0 ? '<button class="btn btn-danger btn-sm ip-sel-del">Delete ' + selCount + ' Selected</button>' : '')
         + '<button class="btn btn-ghost btn-sm" id="ip-export" style="margin-left:auto;">Export PDF</button>'
         + '</div>';
@@ -624,6 +638,7 @@ S.InventoryProducts = {
       const selAll  = ev.target.closest('.ip-sel-all');
       const selClr  = ev.target.closest('.ip-sel-clear');
       const selEdit = ev.target.closest('.ip-sel-edit');
+      const selAct  = ev.target.closest('.ip-sel-activate');
       const selDel  = ev.target.closest('.ip-sel-del');
       const selBox  = ev.target.closest('.ip-sel');
       const exp     = ev.target.closest('#ip-export');
@@ -650,6 +665,10 @@ S.InventoryProducts = {
       if (selAll)  { ev.stopPropagation(); this._selected = new Set(this.visibleProducts().map(p => p.id)); this.renderLanding(); return; }
       if (selClr)  { ev.stopPropagation(); this._selected = new Set(); this.renderLanding(); return; }
       if (selEdit) { ev.stopPropagation(); this.openBulkEdit(); return; }
+      // Bulk restore. Through setActiveBulk, the door that snapshots and puts every row
+      // back if the write is refused. The selection is left alone — renderLanding prunes
+      // it to what is still on screen, so the restored products drop out of it on their own.
+      if (selAct)  { ev.stopPropagation(); this.setActiveBulk([...(this._selected || [])], true).then(() => this.renderLanding()); return; }
       if (selDel)  { ev.stopPropagation(); this.confirmDel([...(this._selected || [])]); return; }
       if (selBox)  { const id = selBox.dataset.id; this._selected = this._selected || new Set(); if (this._selected.has(id)) this._selected.delete(id); else this._selected.add(id); this.renderLanding(); return; }
     };
@@ -1637,6 +1656,13 @@ S.InventoryProducts = {
     const ids = [...(this._selected || [])];
     if (!ids.length) return;
     const cat = this.activeCat;
+    // ⚠ Guarded, not just hidden. The toolbar no longer offers Bulk Edit on the Inactive
+    // tab, but a UI-only fix would leave the data-wiping path one stale click away — the
+    // form built here from `FORM_SPEC['Misc']` (the silent fallback for a category that
+    // has no spec) offered an EMPTY Sub-Category dropdown whose every touch wrote
+    // sub_category = '' across a mixed-category selection. There is no correct
+    // bulk-edit form for a cross-category list, so this door is simply shut.
+    if (cat === this.INACTIVE_TAB) return;
     const spec = this.FORM_SPEC[cat] || this.FORM_SPEC['Misc'];
     const n = ids.length;
     const fieldsHTML = this.bulkFieldDefs(cat, spec).map(def =>
