@@ -481,10 +481,18 @@ S.InventoryLocations = {
     const btn = document.getElementById('il-new-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('ic', 'location', loc);   // new location -> row
-    // The product cascade cannot revert itself; put the assignments back if they did not land.
-    if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(_undoProd);   // product assignments -> rows
-    // Drop straight into the new location's arrange page (build → order in one flow).
-    if (ok) { App.markSetupDone('gs_ic_locations'); this.openEdit(id); }
+    // ⚠ THE CASCADE ONLY FIRES IF THE SHELF ITSELF LANDED (S63). It used to run on the next line
+    // regardless of `ok`, so a refused location write with a successful product write left the
+    // SERVER holding products naming a shelf that does not exist. Memory was rolled back, so the
+    // screen looked clean — and on the next login those products reach neither "Need a Location"
+    // (unplacedProducts filters on productLocations(p).length === 0) nor any count sheet, because
+    // no location record holds them. Invisible from both directions: the S20 strand, again.
+    if (ok) {
+      // The product cascade cannot revert itself; put the assignments back if they did not land.
+      if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(_undoProd);   // product assignments -> rows
+      // Drop straight into the new location's arrange page (build → order in one flow).
+      App.markSetupDone('gs_ic_locations'); this.openEdit(id);
+    }
     else {
       // ⚠ TAKE THE ROW BACK OUT. It was pushed into the live list above, and putRecord's
       // revert restores the ARRAY SLOT — but the caller handed it the very object it had
@@ -525,7 +533,12 @@ S.InventoryLocations = {
     const touched = this._reconcileProducts(name, this.newChecked, _undoProd);
     const savedCount = this.newChecked.size;
     const okLoc = await App.putRecord('ic', 'location', loc);   // new location -> row
-    if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(_undoProd);   // product assignments -> rows
+    // ⚠ Cascade only if the shelf landed (S63) — see saveNewLocation for what the old
+    // unconditional write left on the server. And the cascade's own result now decides whether
+    // "N products saved" may be reported (S118): `savedCount` is read BEFORE the write, and it
+    // used to print on a location-only success with zero products assigned anywhere.
+    const okProd = okLoc && (!touched.length || await App.putRecordsBulk('ic', 'product', touched));
+    if (okLoc && !okProd) App.restoreRows(_undoProd);
     this._savingProducts = false;
     // ⚠ THE LOCATION WRITE WAS DISCARDED. So a refused save reported success: the form
     // reset, the shelf rendered as saved, and any checked products were left naming a
@@ -534,11 +547,15 @@ S.InventoryLocations = {
     // revert cannot splice out a row the caller pushed itself), so the duplicate guard
     // above then refused the name on the retry. Take it back out and say so, keeping the
     // picker open with the operator's name and ticks intact so a retry is one click.
-    if (!okLoc) {
-      App.dropRows(this.locations(), [loc]);
+    if (!okLoc || !okProd) {
+      if (!okLoc) App.dropRows(this.locations(), [loc]);
       App.restoreRows(_undoProd);
       if (link) { link.textContent = '✓ Save Products'; link.style.opacity = ''; link.style.pointerEvents = ''; }
-      if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
+      if (err) {
+        err.textContent = okLoc ? 'The shelf saved, but the products did not. Try again.'
+                                : 'Save failed. Try again.';
+        err.style.display = 'inline';
+      }
       return;
     }
     App.markSetupDone('gs_ic_locations');
@@ -745,8 +762,9 @@ S.InventoryLocations = {
   // products to whatever is checked, then returns to the arrange view.
   async updateLocation(id) {
     const name = document.getElementById('il-name')?.value.trim();
-    const err  = document.getElementById('il-err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    // ⚠ Resolved LAZILY (S116). This used to close over one #il-err looked up here, and the
+    // failure path redraws the whole container — so the message landed on a detached node.
+    const fail = m => { const e = document.getElementById('il-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
     if (!name) { fail('Location name required.'); return; }
     if (this.locations().some(l => l.id !== id && l.name.toLowerCase() === name.toLowerCase())) { fail('That name already exists.'); return; }
     const l = this.locationById(id);
@@ -807,8 +825,10 @@ S.InventoryLocations = {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     // Both writes are checked. The product cascade's result used to be discarded, so a location
     // row that landed while its products did not reported a clean save over a split state.
+    // ⚠ The cascade only fires if the location row landed (S63) — firing it regardless left the
+    // server holding products that name a shelf the write never created.
     let ok = await App.putRecord('ic', 'location', l);   // renamed location -> row
-    if (touched.size && !(await App.putRecordsBulk('ic', 'product', [...touched.values()]))) ok = false;   // rename cascade -> rows
+    if (ok && touched.size && !(await App.putRecordsBulk('ic', 'product', [...touched.values()]))) ok = false;   // rename cascade -> rows
     if (ok) {
       App.markSetupDone('gs_ic_locations');
       this.editMode = 'arrange';
@@ -817,18 +837,28 @@ S.InventoryLocations = {
       this._renderEdit(id);
     } else {
       Object.assign(l, before);
+      // ⚠ ORDER MATTERS, AND IT USED TO BE THE WRONG WAY ROUND (S115). `_undoProd` is filled by
+      // _reconcileProducts, which runs AFTER the rename branch has already mutated products in
+      // place — so it snapshots the RENAMED rows. Applying it last therefore re-applied the
+      // post-rename state for any product touched by BOTH a rename and a set change, which is
+      // exactly what the one-button design invites. `prodBefore` holds the true pre-rename state,
+      // so it must win: undo the set edit first, then put the names back.
+      App.restoreRows(_undoProd);   // the product-SET edit; prodBefore only covers a rename
       prodBefore.forEach((snapshot, pid) => {
         const p = this.products().find(x => x.id === pid);
         if (p) Object.assign(p, snapshot);
       });
-      App.restoreRows(_undoProd);   // the product-SET edit; prodBefore only covers a rename
       if (btn) { btn.disabled = false; btn.textContent = 'Update Location'; }
-      fail('Save failed. Try again.');
       // ⚠ REDRAW. Without it the checklist keeps showing the set the operator just ticked
       // while memory has been put back, so the screen and the data disagree and the next
       // click is made against something that is no longer true. The twin _persistProductOrder
       // was given the same treatment for the same reason.
       this._renderEdit(id);
+      // ⚠ AND THE MESSAGE GOES AFTER IT (S116). The redraw rebuilds the container, so a `fail()`
+      // call placed before it wrote into an element that was then thrown away — the operator's
+      // rename was silently reverted with nothing on screen saying why. `fail` resolves #il-err
+      // lazily so it finds the NEW element rather than the detached one it closed over.
+      fail('Save failed. Try again.');
     }
   },
 
