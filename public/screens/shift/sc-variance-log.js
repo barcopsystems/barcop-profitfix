@@ -36,8 +36,16 @@ S.ShiftVarianceLog = {
   async persistVariance(rec) {
     const list = this.variances();
     const i = list.findIndex(x => x.id === rec.id);
-    if (i > -1) list[i] = { ...list[i], ...rec }; else list.push(rec);
-    const saved = i > -1 ? list[i] : rec;
+    // ⚠ DO NOT place the row in `list` before the write (S101). putRecord places it itself, and
+    // it can only undo that if it is handed a DIFFERENT object than the one already in the array:
+    // pre-placing made `prev` the very object being saved, so the failure branch `arr[back] = prev`
+    // assigned the row to itself, and the `arr.splice` branch that removes a refused NEW row is
+    // only reached when `prev === null`. A refused save therefore left a PHANTOM behind — which
+    // then made the hand form's duplicate guard refuse the RETRY ("already logged at $47.50" for a
+    // count that was never logged) and made buildCash treat the register-day as hand-counted and
+    // skip the whole import. The merge below is load-bearing: callers do not always supply every
+    // field, so build the merged object WITHOUT touching the list.
+    const saved = i > -1 ? { ...list[i], ...rec } : rec;
     return await App.putRecord('sc', 'variance', saved);
   },
 

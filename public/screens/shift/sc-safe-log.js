@@ -38,8 +38,12 @@ S.ShiftSafeLog = {
   async persistEntry(rec) {
     const list = this.entries();
     const i = list.findIndex(x => x.id === rec.id);
-    if (i > -1) list[i] = { ...list[i], ...rec }; else list.push(rec);
-    const saved = i > -1 ? list[i] : rec;
+    // ⚠ DO NOT place the row in `list` before the write (S131) — see the full note in
+    // sc-variance-log.persistVariance. Pre-placing kills BOTH of putRecord's recovery branches,
+    // so a refused deposit / bank run / paid-out stayed on screen and kept moving the running
+    // safe balance, which is the figure an owner counts the physical safe against. The merge is
+    // load-bearing, so build it without touching the list.
+    const saved = i > -1 ? { ...list[i], ...rec } : rec;
     return await App.putRecord('sc', 'safe_log', saved);
   },
 
