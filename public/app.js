@@ -5457,6 +5457,27 @@ const App = {
       if (!rec.oldest || s < rec.oldest) rec.oldest = s;
       if (!rec.newest || s > rec.newest) rec.newest = s;
     };
+    // ⚠ Each product records WHICH COUNT each part of its figure came from (`byDate`), plus the
+    // name / category / unit cost of the item that fed it. Both are what an honest disclosure
+    // needs: a sheet has to say HOW MUCH of a value rests on an older count, not merely that some
+    // of it does (S92) — and a product since DELETED is not in ic_products at all, so the count
+    // row is the only place its name and category still exist (S95). Counts run newest-first, so
+    // the first item to fill the identity fields is the most recent record of them.
+    const newRec = () => ({ onHand: 0, value: 0, oldest: null, newest: null, byDate: {},
+      name: '', category: '', unitCost: null });
+    const contribute = (rec, item, date) => {
+      const units = item.total || 0, val = item.value || 0;
+      rec.onHand += units;
+      rec.value  += val;
+      const d = String(date || '');
+      const slot = rec.byDate[d] || (rec.byDate[d] = { onHand: 0, value: 0 });
+      slot.onHand += units;
+      slot.value  += val;
+      if (!rec.name && item.name) rec.name = item.name;
+      if (!rec.category && item.category) rec.category = item.category;
+      if (rec.unitCost == null && item.unit_cost != null) rec.unitCost = parseFloat(item.unit_cost);
+      stampDate(rec, date);
+    };
     counts.forEach(cnt => {
       (cnt.items || []).forEach(it => {
         if (it.counted === false) return;
@@ -5480,10 +5501,8 @@ const App = {
         }
         if (seen[key]) return;
         seen[key] = true;
-        const rec = byProd[it.product_id] || (byProd[it.product_id] = { onHand: 0, value: 0, oldest: null, newest: null });
-        rec.onHand += (it.total || 0);
-        rec.value  += (it.value || 0);
-        stampDate(rec, cnt.date);
+        const rec = byProd[it.product_id] || (byProd[it.product_id] = newRec());
+        contribute(rec, it, cnt.date);
       });
     });
     // ⚠⚠ TWO DIFFERENT QUESTIONS, TWO DIFFERENT RULES. Do not collapse them (S88).
@@ -5506,12 +5525,8 @@ const App = {
         ? Object.keys(bucket).filter(k => !(newestSeen[pid] && bucket[k].date < newestSeen[pid]))
         : (byProd[pid] ? [] : Object.keys(bucket));   // current read: a live row wins outright
       if (!keep.length) return;
-      const rec = byProd[pid] || (byProd[pid] = { onHand: 0, value: 0, oldest: null, newest: null });
-      keep.forEach(k => {
-        rec.onHand += (bucket[k].it.total || 0);
-        rec.value  += (bucket[k].it.value || 0);
-        stampDate(rec, bucket[k].date);
-      });
+      const rec = byProd[pid] || (byProd[pid] = newRec());
+      keep.forEach(k => contribute(rec, bucket[k].it, bucket[k].date));
     });
     return byProd;
   },
@@ -5557,6 +5572,22 @@ const App = {
     const boundary = counts.length ? counts[0] : null;
     if (!boundary) return { value: null, countDate: null, carried: [], byProduct: {} };
     const m = this._perpetualInventory(asOf, exclusive);
+    // ⚠ A STOCKTAKE IS OFTEN SEVERAL COUNTS (S93). A big place counts the bar one night, the
+    // cooler the next and the store room the night after — that is ONE measurement of the shelf,
+    // not three. Treating each count record as its own boundary made the sheet announce that two
+    // thirds of the inventory "was not counted" when all of it had been, days apart, and buried
+    // the COGS block under 80 rows of it. Counts within a week of the boundary are part of the
+    // same stocktake; a figure older than that really is resting on an earlier measurement.
+    // ⚠ Do NOT widen this to the reporting period. On an ANNUAL sheet that would call a product
+    // last counted in May "current" against a stocktake dated 28 June — five weeks stale, exactly
+    // the disclosure this whole mechanism exists to make. verify-partial-count-cogs case D pins it.
+    const STOCKTAKE_MS = 7 * 24 * 60 * 60 * 1000;
+    const bTime = new Date(boundary.date + 'T00:00:00').getTime();
+    let stocktakeStart = boundary.date;
+    counts.forEach(c => {
+      const t = new Date(c.date + 'T00:00:00').getTime();
+      if (!isNaN(t) && (bTime - t) <= STOCKTAKE_MS && String(c.date) < stocktakeStart) stocktakeStart = String(c.date);
+    });
     const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
     const nameOf = (pid) => (prods.find(p => p && p.id === pid) || {}).name || '';
     let value = 0;
@@ -5564,11 +5595,24 @@ const App = {
     Object.keys(m).forEach(pid => {
       const r = m[pid];
       value += (r.value || 0);
-      // Carried when ANY part of the figure came from a count other than the boundary
-      // one — including a product counted at one shelf and skipped at another, which
-      // is a real and easy-to-miss shape.
-      if (r.oldest && r.oldest !== boundary.date) {
-        carried.push({ id: pid, name: nameOf(pid), date: r.oldest, value: r.value || 0, onHand: r.onHand || 0 });
+      // ⚠ Report the CARRIED PART, not the whole product (S92): a product counted at one shelf on
+      // the boundary date and carried at another used to disclose its entire value as resting on
+      // the older count. And "carried" now means the figure predates the WINDOW, not the boundary
+      // count RECORD (S93) — the old rule flagged every product on a stocktake spread across two
+      // or three days, which is ordinary practice, and told the accountant most of the inventory
+      // had never been counted when all of it had.
+      let cv = 0, cu = 0, oldest = null;
+      Object.keys(r.byDate || {}).forEach(d => {
+        if (!(d < stocktakeStart)) return;
+        cv += r.byDate[d].value  || 0;
+        cu += r.byDate[d].onHand || 0;
+        if (!oldest || d < oldest) oldest = d;
+      });
+      if (cv || cu) {
+        // A DELETED product is not in ic_products, so fall back to the name the count recorded
+        // rather than printing "Unnamed product" next to a real dollar figure (S95).
+        carried.push({ id: pid, name: nameOf(pid) || r.name || '', date: oldest,
+          value: Math.round(cv * 100) / 100, onHand: cu });
       }
     });
     carried.sort((a, b) => String(a.name).localeCompare(String(b.name)));
