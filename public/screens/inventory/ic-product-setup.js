@@ -429,7 +429,11 @@ S.InventoryProducts = {
     // Percentage widths (not fixed px): the columns stay aligned across the Vodka/
     // Gin/Rum tables AND the table always fits its card, so it never scrolls sideways.
     const colgroup = onInactiveTab
-      ? '<colgroup><col style="width:4%;"/><col style="width:28%;"/><col style="width:18%;"/><col style="width:13%;"/><col style="width:13%;"/><col style="width:9%;"/><col style="width:15%;"/></colgroup>'
+      // ⚠ The actions cell carries THREE buttons here (Make Active / Edit / Delete), not
+      // two, so it needs materially more room than the working tabs give it — at 15% the
+      // Par value ran straight into the Make Active button. Everything from Vendor on
+      // moves left to pay for it.
+      ? '<colgroup><col style="width:4%;"/><col style="width:25%;"/><col style="width:15%;"/><col style="width:13%;"/><col style="width:13%;"/><col style="width:7%;"/><col style="width:23%;"/></colgroup>'
       : isFoodMisc
       ? '<colgroup><col style="width:4%;"/><col style="width:20%;"/><col style="width:14%;"/><col style="width:8%;"/><col style="width:11%;"/><col style="width:11%;"/><col style="width:11%;"/><col style="width:9%;"/><col style="width:12%;"/></colgroup>'
       : isBottleBeer
@@ -507,7 +511,13 @@ S.InventoryProducts = {
     const piece = App.piecePrice ? App.piecePrice(p) : null;
     const costDisplay = p.unit_cost != null
       ? App.fmtCurrency(p.unit_cost) + ' <span style="font-size:9px;color:var(--t3);">/' + costUnit + '</span>'
-        + (p.pack_size > 0 && piece != null ? ' <span style="font-size:9px;color:var(--t3);">&middot; ' + App.fmtCurrency(piece, piece < 1 ? 3 : 2) + '/ea</span>' : '')
+        // ⚠ TWO decimals, always. A sub-dollar per-each price used to print three
+        // ("$0.406/ea"), which is the only money on any product list that does not look
+        // like money. The extra digit was display-only — every calculation reads the
+        // underlying value, not this string — so nothing is lost by rounding it here.
+        // Kyle 2026-07-21. Applies to the Food and Misc tabs as well, since this is the
+        // one shared product-row builder.
+        + (p.pack_size > 0 && piece != null ? ' <span style="font-size:9px;color:var(--t3);">&middot; ' + App.fmtCurrency(piece, 2) + '/ea</span>' : '')
       : '<span style="color:var(--t4);">-</span>';
     const checked = (this._selected && this._selected.has(p.id)) ? ' checked' : '';
     const dash = '<span style="color:var(--t4);">-</span>';
