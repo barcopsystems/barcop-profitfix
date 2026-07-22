@@ -20,9 +20,11 @@ S.PrepBatches = {
   editId: null,
   rows: [],
   _saving: false,
-  // Handle on the background cost resync fired by renderList. saveBatch / deleteBatch await it so
-  // their write is always the LATER one — otherwise the resync's pre-edit payload lands on top.
-  _resyncPromise: null,
+  // Every in-flight background cost resync fired by renderList. saveBatch / deleteBatch await this
+  // SET so their write is always the LATER one — otherwise a resync's pre-edit payload lands on
+  // top. It must be a set, not one handle: a single handle was reassigned by every render, which
+  // left a resync orphaned by an earlier visit unreachable and unawaited (S55).
+  _resyncInflight: null,
   _scope: null,           // the active form root (this.container or the edit modal)
   _editingIncomplete: false,
 
@@ -293,9 +295,9 @@ S.PrepBatches = {
     // BEFORE the operator touched anything, so landing after their save put the pre-edit
     // total_cost / cost_per_serving / ingredients back over the change. App.menuItemCost reads
     // cost_per_serving off the batch, so every menu item built on it silently follows.
-    // The `await this._resyncPromise` barriers in saveBatch/deleteBatch cannot cover this case:
-    // renderList REASSIGNS _resyncPromise on the remount, so they wait on the new resync and
-    // never on the orphan. Abandoning is safe — this is a background correction and the next
+    // saveBatch/deleteBatch's barriers cannot cover this case even now that they await the whole
+    // _resyncInflight SET: an orphan from an EARLIER visit is not what those callers are waiting
+    // on at the moment they run. Abandoning is safe — this is a background correction and the next
     // render recomputes it.
     if (!this._resyncStillCurrent(token)) return false;
     const ok = await App.putRecordsBulk('ic', 'prep_batch', payload, { quiet: true });
@@ -308,7 +310,15 @@ S.PrepBatches = {
     });
     // Only if this screen is still on the page — the operator may have navigated away while the
     // write was in flight, and re-rendering into a detached container would do nothing useful.
-    if (this._resyncStillCurrent(token)) this.renderList();
+    // ⚠⚠ AND NEVER UNDER AN OPEN EDITOR (S113). renderList() nulls `editId` and rebuilds `rows`
+    // from the LANDING draft, while the edit modal is a separate overlay that survives it — so a
+    // resync landing mid-edit turned the operator's next Update Batch into
+    // `rec.id = this.editId || App.uid()` carrying the landing form's rows: a SECOND batch with
+    // their name and ZERO ingredients, while the real batch went unchanged. App.menuItemCost reads
+    // cost_per_serving off a batch, so anything pointed at the duplicate then costs at nothing.
+    // The mount token cannot catch this — it is the SAME visit, so the guard correctly says yes.
+    // The correction above has already been WRITTEN; only the repaint waits for the next render.
+    if (this._resyncStillCurrent(token) && this.editId == null) this.renderList();
     return true;
   },
 
@@ -341,16 +351,15 @@ S.PrepBatches = {
     const _p = this._resyncCosts(batches, _resyncToken).catch(e => {
       try { DB.logClientError('prep_batch_resync', (e && e.message) || String(e), (e && e.stack) || '', 'ic-prep-batches'); } catch (e2) {}
     });
-    // ⚠ A SET, NOT A SINGLE HANDLE. `_resyncPromise` was reassigned by every render, so a resync
+    // ⚠ A SET, NOT A SINGLE HANDLE. A single handle was reassigned by every render, so a resync
     // orphaned by an earlier visit was no longer reachable — and saveBatch/deleteBatch's
-    // `await this._resyncPromise` then waited on the CURRENT resync while the orphan was still in
+    // barrier then waited on the CURRENT resync while the orphan was still in
     // flight, free to land its pre-edit payload on top of the operator's save. The write cannot be
     // called back once it is in flight, so ORDERING is the only real protection: every in-flight
     // resync stays reachable until it settles, and the save waits for all of them.
     this._resyncInflight = this._resyncInflight || new Set();
     this._resyncInflight.add(_p);
     _p.then(() => this._resyncInflight.delete(_p), () => this._resyncInflight.delete(_p));
-    this._resyncPromise = _p;   // kept for anything reading the latest handle
 
     let listSection;
     if (!batches.length) {
@@ -653,7 +662,18 @@ S.PrepBatches = {
     // single handle was reassigned by each render and left the orphan unreachable.
     try { await Promise.allSettled([...(this._resyncInflight || [])]); } catch (e) {}
     // Row-per-record: putRecord updates the in-memory list (replace by id / push) and writes one row.
-    await App.putRecord('ic', 'prep_batch', rec);
+    // ⚠ THE RESULT IS CHECKED, AND NOTHING IS CLEARED UNTIL IT LANDS (S117). This write moved from
+    // App.saveInventory() to putRecord, which SPLICES the pushed row back out on a refusal — so
+    // the old unconditional cleanup lost the batch AND wiped the name, category, yield, serving
+    // size and every ingredient row the operator had typed, closed the editor over them, and left
+    // a 6-second toast as the only trace. There was nothing to retry from.
+    const saved = await App.putRecord('ic', 'prep_batch', rec);
+    if (!saved) {
+      const e = this._el('pb-err');
+      if (e) { e.textContent = 'Could not save. Try again.'; e.style.display = 'inline'; }
+      this._saving = false;   // release the lock now, or the retry is dead for a second
+      return;
+    }
     this.editId = null;
     if (wasAdd) { this._draft = null; this._draftRows = null; }
     App.closeModal('pb-edit-modal');
