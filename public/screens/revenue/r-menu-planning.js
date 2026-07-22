@@ -114,8 +114,12 @@ S.RevenueMenuPlanning = {
       const QN = { STAR: 'A Star', PLOWHORSE: 'A Plowhorse', PUZZLE: 'A Puzzle', DOG: 'A Dog' };
       const head = QN[quad];
       if (!head || !cs || !cs.ranked || !cs.mRank[item.id]) {
-        const cost = App.menuItemCost(item);
-        return (item.price != null && cost != null) ? 'Strong ' + App.fmtCurrency(item.price - cost) + ' margin.' : 'Feature it.';
+        // ⚠ `costed`, not `cost != null`. A ZERO cost passed the old test, and a zero cost
+        // makes the "margin" the whole menu price — so an uncosted dish read as the best
+        // thing on the menu. Same fix as sc-preshift._itemMargin; both now use the one
+        // definition in App.menuItemPct rather than each inventing their own.
+        const m = App.menuItemPct(item);
+        return (item.price != null && m.costed) ? 'Strong ' + App.fmtCurrency(item.price - m.cost) + ' margin.' : 'Feature it.';
       }
       const rn = cs.rankedN;
       const band = r => r === 1 ? 'top' : r <= Math.ceil(rn * 0.34) ? 'high' : r >= Math.ceil(rn * 0.67) ? 'low' : 'mid';
