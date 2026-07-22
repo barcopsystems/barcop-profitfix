@@ -601,7 +601,8 @@ S.HubYearEnd = {
     rows.push(['  Calculated COGS',           calcCogs, '', 'Begin + Purchases - End']);
     // The DISCLOSE half: name the products resting on an older count. Shared helper on
     // HubBooks so this sheet and the two in Books cannot drift apart.
-    S.HubBooks._pushCarriedNote(rows, merges, endAsOf, COL_COUNT);
+    S.HubBooks._pushCarriedNote(rows, merges, beginAsOf, COL_COUNT, 'Beginning inventory');
+    S.HubBooks._pushCarriedNote(rows, merges, endAsOf, COL_COUNT, 'Ending inventory');
     rows.push(blank());
 
     // Purchases by month

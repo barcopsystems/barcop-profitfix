@@ -708,12 +708,17 @@ S.HubBooks = {
   // covered everything, so a clean month reads exactly as it did before.
   // Shared by the Books monthly sheet, the Books Year-End Tax Helper and the Year
   // End export, so the three cannot drift.
-  _pushCarriedNote(rows, merges, asOf, colCount) {
+  // ⚠ LABELLED, because a sheet carries TWO of these (S94). COGS = beginning + purchases -
+  // ending, so a carried BEGINNING figure is exactly as material as a carried ending one, on the
+  // opposite side of the subtraction — and it was disclosed on none of the three sheets. Two
+  // unlabelled "Carried forward:" blocks on one page would be unreadable, so each names its end.
+  _pushCarriedNote(rows, merges, asOf, colCount, label) {
     const carried = (asOf && asOf.carried) || [];
     if (!carried.length) return;
+    const which = label || 'Ending inventory';
     const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: colCount - 1 } });
     rows.push(this._blankRow(colCount));
-    rows.push(this._lineRow('Carried forward: ' + carried.length + ' product'
+    rows.push(this._lineRow('Carried forward - ' + which + ': ' + carried.length + ' product'
       + (carried.length === 1 ? ' was' : 's were') + ' not counted on ' + asOf.countDate
       + ', so the last counted figure was used. Everything else is from that count.', colCount));
     mergeFull(rows.length - 1);
@@ -814,7 +819,8 @@ S.HubBooks = {
     rows.push(['  Cost of Goods Sold (calculated)', calcCogs, '', '', '']);
     // The DISCLOSE half of the rule: a carried-forward figure is honest only if the
     // accountant can see which products rest on an older count, and how old.
-    this._pushCarriedNote(rows, merges, endAsOf, COL_COUNT);
+    this._pushCarriedNote(rows, merges, beginAsOf, COL_COUNT, 'Beginning inventory');
+    this._pushCarriedNote(rows, merges, endAsOf, COL_COUNT, 'Ending inventory');
     rows.push(this._lineRow('Note: this is the count-based Schedule C COGS (beginning + purchases - ending). It will not exactly match the Total COGS on the Income Statement, which is summed from your weekly numbers. The count-based figure here is the more accurate physical cost of goods. Give your accountant both.', COL_COUNT));
     merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
     rows.push(blank());
@@ -1671,6 +1677,15 @@ S.HubBooks = {
     rows.push(['Line 36: Purchases', purchases, 'Sum of receive-delivery records for ' + year, '']);
     rows.push(['Line 41: Ending inventory', endValue, endCount ? ('Count dated ' + endCount.date) : 'No count on file at or before ' + yearEnd, '']);
     rows.push(['Line 42: Cost of goods sold (35 + 36 - 41)', calcCogs, 'Calculated', '']);
+
+    // ⚠ THE DISCLOSE HALF (S90). Lines 35 and 41 route through App.inventoryValueAsOf, which
+    // carries a skipped product forward at its last counted value — and this sheet said nothing
+    // about it, on the one document whose rows are labelled with literal Schedule C line numbers
+    // and transcribed straight onto a tax return. Worse, _pushCarriedNote's own comment claimed
+    // it was "Shared by the Books monthly sheet, the Books Year-End Tax Helper and the Year End
+    // export, so the three cannot drift" — it was never called from here at all.
+    this._pushCarriedNote(rows, merges, beginAsOfY, COL_COUNT, 'Beginning inventory');
+    this._pushCarriedNote(rows, merges, endAsOfY, COL_COUNT, 'Ending inventory');
 
     this._pushFooter(rows, merges,
       'Line numbers match IRS Schedule C (Form 1040). For corporations, the equivalent Form 1120 line numbers should be mapped by your accountant. Bar Cop is a software tool, not a tax preparer.',
