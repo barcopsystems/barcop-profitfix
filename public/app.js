@@ -5201,16 +5201,27 @@ const App = {
   // tonight" is ever wanted, that is a stronger, separate concept (an 86) and deserves its own flag
   // rather than being smuggled in on this one.
   menuItemInactiveProducts(item) {
-    const ings = (item && item.recipe && Array.isArray(item.recipe.ingredients)) ? item.recipe.ingredients : [];
-    if (!ings.length) return [];
     const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
-    return ings.map(ing => {
+    const out = [];
+    // ⚠ A LINKED PRODUCT COUNTS TOO (S108). menuItemMissingIngredients was taught this door and its
+    // adjacent, explicitly-documented twin was not — so a pint that POURS an inactive keg directly
+    // said nothing, while a cocktail using the SAME keg in a recipe was annotated. Two items
+    // resting on one hidden product, annotated differently on one list, and the direct pour — the
+    // more common shape — was the silent one. The old early return on an empty recipe was what hid
+    // it: an inventory-linked item has no recipe at all.
+    if (item && item.linked_product_id) {
+      const lp = prods.find(x => x && x.id === item.linked_product_id);
+      if (lp && lp.active === false) out.push(lp);
+    }
+    const ings = (item && item.recipe && Array.isArray(item.recipe.ingredients)) ? item.recipe.ingredients : [];
+    ings.forEach(ing => {
       const src = ing.source || (ing.product_id ? 'product' : null);
       const id  = ing.id || ing.product_id;
-      if (src !== 'product' || !id) return null;
+      if (src !== 'product' || !id) return;
       const p = prods.find(x => x && x.id === id);
-      return (p && p.active === false) ? p : null;
-    }).filter(Boolean);
+      if (p && p.active === false) out.push(p);
+    });
+    return out;
   },
 
   menuItemCost(item) {
