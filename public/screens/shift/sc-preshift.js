@@ -364,8 +364,15 @@ S.ShiftPreShift = {
         // Live row: putRecord cannot revert it for us (see App.putRecord). Without this a refused
         // save left the pitch on screen, so the manager believed the floor would see it tonight.
         const undo = App.snapshotRows([item]);
+        const prevPitch = item.server_pitch || '';
         item.server_pitch = inp.value.trim();
-        App.putRecord('core', 'menu_item', item).then(ok => { if (!ok) App.restoreRows(undo); });
+        // On failure revert BOTH memory and the visible input — a full this.draw() would fight the
+        // operator mid-edit. The .catch means a REJECTION (not just a resolved false) reverts too,
+        // instead of leaving the pitch on screen over reverted memory as an unhandled rejection
+        // (the S15 _resyncCosts .catch shape).
+        const revert = () => { App.restoreRows(undo); inp.value = prevPitch; };
+        App.putRecord('core', 'menu_item', item).then(ok => { if (!ok) revert(); })
+          .catch(e => { revert(); try { DB.logClientError('preshift_pitch_save', (e && e.message) || String(e), (e && e.stack) || '', 'sc-preshift'); } catch (e2) {} });
       }
     }));
     c.querySelectorAll('.pb-swap').forEach(b => b.addEventListener('click', () => this._openPicker('swap', parseInt(b.dataset.idx, 10))));
