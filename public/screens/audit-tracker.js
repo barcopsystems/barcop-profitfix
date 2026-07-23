@@ -364,6 +364,16 @@ S.AuditTracker = {
     ]);
   },
 
+  // S159: the Profit Audit is scored on the SERVER, which never sees inventory, so a menu item's
+  // save-time `cost` snapshot was the only figure it had — the same S106 blind spot the Revenue
+  // Audit already fixed and this one missed. Ship a COPY with the LIVE cost (App.menuItemCost); a
+  // deleted-ingredient dish gets cost null and drops OUT of the server's costed filter rather than
+  // scoring at a stale figure. Mirror of r-audit._auditMenuItems; verify-audit-live-cost.js case F
+  // pins that BOTH audits ship the live view so the fix can never land on one side again.
+  _auditMenuItems() {
+    return (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) }));
+  },
+
   async generateAudit() {
     const btn      = document.getElementById('at-gen-btn');
     const statusEl = document.getElementById('at-gen-status');
@@ -389,6 +399,8 @@ S.AuditTracker = {
       // practices feed the score. A manager cannot inflate the number an owner
       // relies on by claiming a practice they do not actually follow.
       const auditAppData = JSON.parse(JSON.stringify(App.data));
+      // S159: score on the LIVE menu cost, not the save-time snapshot (twin of r-audit's S106 fix).
+      auditAppData.menu_items = this._auditMenuItems();
 
       const form = new FormData();
       form.append('appData', JSON.stringify(auditAppData));
