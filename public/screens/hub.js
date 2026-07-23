@@ -581,7 +581,7 @@ S.Hub = {
       + (stats || []).map((s, i) =>
           (i > 0 ? '<div style="width:1px;align-self:stretch;background:var(--b2);margin:0 11px;flex-shrink:0;"></div>' : '')
           + '<div style="min-width:0;flex:1;"><div style="font-size:8.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(s.label) + '</div>'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:21px;font-weight:600;line-height:1;margin-top:4px;color:' + (s.color || (s.warn ? 'var(--amber)' : 'var(--t1)')) + ';">' + s.value + '</div></div>'
+          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:21px;font-weight:600;line-height:1;margin-top:4px;white-space:nowrap;color:' + (s.color || (s.warn ? 'var(--amber)' : 'var(--t1)')) + ';">' + s.value + '</div></div>'
         ).join('') + '</div>';
     const progBar = (dc, total) => {
       const pct = total ? Math.round(dc / total * 100) : 0;
