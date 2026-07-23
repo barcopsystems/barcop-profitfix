@@ -431,12 +431,14 @@ S.ShiftDashboard = {
     }
     paras.push(p2);
 
-    // 3 — the single move, tied to what para 2 actually found (S78): never "nothing walking" over an
-    // uncounted week or one that came up short.
+    // 3 — the single move, tied to what para 2 actually found (S78). The final "nothing walking" is
+    // reachable ONLY when `walks` is empty, so a walked tab or a within-tolerance net short (both of
+    // which para 2 lists) never reads as "nothing walking" one line below "money is walking".
     let move;
     if (!counted) move = 'Reconcile the drawers first so cash gets read, then log the exceptions as they happen.';
     else if (oot > 0 || st.netVar < -20) move = 'Chase the cash first. Pull the out-of-tolerance drawers in Cash Control and see who counted and when.';
     else if (vc > 0) move = 'Watch the voids and comps by server in Loss Prevention. The ones who spike are the conversation.';
+    else if (walks.length) move = 'Nothing major this week, but it is not spotless. Keep the drawer counts honest and log the exceptions as they happen.';
     else move = 'Nothing walking this week. Keep the drawer counts honest and log the exceptions as they happen.';
     paras.push(move);
 
