@@ -190,10 +190,20 @@ S.LaborPayPeriods = {
     // heading carries the state).
     const openRow = ({ ws }) => {
       const agg = this.aggregateWeek(ws);
+      // Orphaned lock: a close that half-failed (closePeriod's double-failure branch) left this
+      // week's hours locked on the server with no pay_period record, so it lands here in Open while
+      // Log Hours refuses edits and tells the operator to Reopen in Pay Periods — a button that only
+      // exists on a Closed week. Surface the contradiction and point at the one action that fixes it:
+      // Close & Lock re-attempts the write. An Open week can only carry locked hours through that one
+      // path, so lockedCount > 0 here is exactly that state.
+      const orphanLocked = agg.lockedCount > 0;
       const actions = '<button class="btn btn-ghost btn-sm pp-view" data-ws="' + ws + '">View</button>'
         + (agg.totalCount > 0 ? '<button class="btn btn-primary btn-sm pp-close" data-ws="' + ws + '">Close &amp; Lock</button>' : '');
       return '<tr>'
-        + '<td><div class="val">' + esc(this.fmtDateShort(ws)) + ' &ndash; ' + esc(this.fmtDateShort(agg.weekEnd)) + '</div></td>'
+        + '<td><div class="val">' + esc(this.fmtDateShort(ws)) + ' &ndash; ' + esc(this.fmtDateShort(agg.weekEnd)) + '</div>'
+        + (orphanLocked ? '<div style="margin-top:5px;"><span class="badge badge-warn">Locked &middot; not closed</span></div>'
+            + '<div style="font-size:10px;color:var(--t3);margin-top:3px;line-height:1.5;">These hours are locked but the close did not finish. Click Close &amp; Lock to complete it.</div>' : '')
+        + '</td>'
         + '<td>' + agg.totals.hours.toFixed(1) + '</td>'
         + '<td class="' + (agg.totals.ot_hours > 0 ? 'neg' : '') + '">' + (agg.totals.ot_hours > 0 ? agg.totals.ot_hours.toFixed(1) : '-') + '</td>'
         + '<td class="val">' + App.fmtCurrency(agg.totals.gross) + '</td>'
