@@ -1558,6 +1558,7 @@ S.InventoryProducts = {
     return line(refs.menuItems.length, 'menu item', 'menu items', names(refs.menuItems, 'name'))
       + line(refs.prepBatches.length, 'prep batch', 'prep batches', names(refs.prepBatches, 'name'))
       + line(refs.openOrders.length, 'open order', 'open orders', names(refs.openOrders, 'vendor'))
+      + line((refs.investigations || []).length, 'open loss investigation', 'open loss investigations', names(refs.investigations || [], 'sku'))
       + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:10px;">'
       + 'Your count, delivery, waste and spot-check history also mentions '
       + (refs.total === 1 ? 'it' : 'them') + '. That is a record of what happened and is never changed.'
