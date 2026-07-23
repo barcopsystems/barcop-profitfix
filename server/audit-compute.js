@@ -483,17 +483,38 @@ function computeRevenueAudit(appData, controlData) {
 
   // ── S3 — Menu Performance (Dog ratio + real repricing recency + dog tests) ──
   let stars = 0, plow = 0, puzzle = 0, dog = 0, menuKnown = false, topCategory = null;
+  let menuScored = 0;                     // S160: dishes actually ranked (a category needs MENU_MIN_PER_CAT to rank)
+  const menuTotal = (appData.menu_items || []).filter(i => num(i.price) > 0 && !i.archived).length;   // S160: dishes ON THE MENU (priced, non-archived) — so uncostable / too-small-category drops from the scored set stay visible
+  const MENU_MIN_PER_CAT = 4;             // = r-menu-engineering.MIN_PER_CAT, so the audit and the screen agree
   if (menuItems.length >= 4) {
-    menuKnown = true;
-    const avgCM = avg(menuItems.map(i => i.price - i.cost));
-    const avgCov = avg(menuItems.map(i => i.weekly_covers));
-    menuItems.forEach(i => {
-      const hiM = (i.price - i.cost) >= avgCM, hiV = i.weekly_covers >= avgCov;
-      if (hiM && hiV) stars++; else if (!hiM && hiV) plow++; else if (hiM && !hiV) puzzle++; else dog++;
+    // S163: classify Stars/Dogs WITHIN each category (a dish ranks against others in its OWN category),
+    // the SAME basis as Menu Engineering (r-menu-engineering.js). The audit used to pool one average
+    // over the whole menu, so it compared a starter to a steak and named a different Star/Dog set than
+    // the screen its "cut the Dogs" action item links to. A category with fewer than MENU_MIN_PER_CAT
+    // priced items cannot be ranked, so its dishes are left unclassified — exactly as the screen does.
+    const byCat = {};
+    menuItems.forEach(i => { const c = i.category || 'Other'; (byCat[c] = byCat[c] || []).push(i); });
+    Object.keys(byCat).forEach(cat => {
+      const list = byCat[cat];
+      if (list.length < MENU_MIN_PER_CAT) return;
+      const avgCM = avg(list.map(i => i.price - i.cost));
+      const avgCov = avg(list.map(i => i.weekly_covers));
+      list.forEach(i => {
+        const hiM = (i.price - i.cost) >= avgCM, hiV = i.weekly_covers >= avgCov;
+        if (hiM && hiV) stars++; else if (!hiM && hiV) plow++; else if (hiM && !hiV) puzzle++; else dog++;
+        menuScored++;
+      });
     });
-    const catCov = {};
-    menuItems.forEach(i => { const c = i.category || 'Other'; catCov[c] = (catCov[c] || 0) + i.weekly_covers; });
-    topCategory = Object.keys(catCov).sort((a, b) => catCov[b] - catCov[a])[0] || null;
+    // S160: the menu is only "known" once at least one category could actually be ranked, so a menu
+    // whose categories are each too small does NOT score S3 at a flattering 80 on zero classified dishes.
+    menuKnown = menuScored > 0;
+    if (menuKnown) {
+      // S161: Top Category by REVENUE (price x units), not a raw unit count — a cheap high-volume
+      // category used to win the "revenue" label off sheer covers.
+      const catRev = {};
+      menuItems.forEach(i => { const c = i.category || 'Other'; catRev[c] = (catRev[c] || 0) + (num(i.price) || 0) * (num(i.weekly_covers) || 0); });
+      topCategory = Object.keys(catRev).sort((a, b) => catRev[b] - catRev[a])[0] || null;
+    }
   }
   // Real repricing recency from the price-change log (increases only). No self-
   // report: the app logs every price change, so this reads the actual last raise.
@@ -643,6 +664,8 @@ function computeRevenueAudit(appData, controlData) {
     S3_PLOWHORSES_COUNT: menuKnown ? plow : null,
     S3_PUZZLES_COUNT: menuKnown ? puzzle : null,
     S3_DOGS_COUNT: menuKnown ? dog : null,
+    S3_MENU_SCORED: menuKnown ? menuScored : null,   // S160: how many dishes were actually ranked
+    S3_MENU_TOTAL: menuTotal || null,                // S160: costable dishes the S3 score was drawn from
     S3_TOP_CATEGORY: topCategory || 'Not available',
     S3_LAST_PRICE_INCREASE: lastRaiseTxt,
     S3_REPRICE_MONTHS: repriceMonths,
@@ -790,12 +813,16 @@ if (require.main === module) {
     period_end: `2026-04-0${i}`, total_revenue: 18000, covers: 600,
     bar_revenue: 11000, floor_revenue: 7000, check_avg: 30.0, labor_pct_blended: 34.0, rplh_blended: 58
   }));
+  // S163/S161: 4 Entrees so ONE category can rank per-category (MIN_PER_CAT 4); Side + Starter are
+  // each too small to rank. Fries carries the most UNITS (400) but Entree the most REVENUE, so a
+  // correct Top Category (revenue) is Entree while the OLD unit-count basis would have named Side.
   const rMenu = [
     { name: 'Burger', category: 'Entree', price: 16, cost: 6, weekly_covers: 120 },
     { name: 'Steak', category: 'Entree', price: 38, cost: 14, weekly_covers: 40 },
-    { name: 'Fries', category: 'Side', price: 7, cost: 2, weekly_covers: 150 },
-    { name: 'Wings', category: 'Starter', price: 13, cost: 7, weekly_covers: 30 },
-    { name: 'Salad', category: 'Starter', price: 12, cost: 4, weekly_covers: 25 }
+    { name: 'Salmon', category: 'Entree', price: 26, cost: 10, weekly_covers: 60 },
+    { name: 'Pasta', category: 'Entree', price: 18, cost: 5, weekly_covers: 90 },
+    { name: 'Fries', category: 'Side', price: 7, cost: 2, weekly_covers: 400 },
+    { name: 'Wings', category: 'Starter', price: 13, cost: 7, weekly_covers: 30 }
   ];
   // Dates are REQUIRED: serverChecks is windowed to the 4 weeks ending on the last
   // period_end (here 2026-04-04, so the window opens 2026-03-08), which is what stops a
@@ -820,7 +847,9 @@ if (require.main === module) {
     ['Rev S1 gap = below x covers', rev.S1_MONTHLY_GAP, rExpS1Gap],
     ['Rev S2 labor scored', rev.S2_SCORE != null, true],
     ['Rev S2 gap is cost recovery', rev.COST_RECOVERY_MONTHLY, rev.S2_MONTHLY_GAP],
-    ['Rev S3 menu classified (5)', (rev.S3_STARS_COUNT + rev.S3_PLOWHORSES_COUNT + rev.S3_PUZZLES_COUNT + rev.S3_DOGS_COUNT), 5],
+    ['Rev S3 classified per-category: only the 4 Entrees rank (Side/Starter too small)', (rev.S3_STARS_COUNT + rev.S3_PLOWHORSES_COUNT + rev.S3_PUZZLES_COUNT + rev.S3_DOGS_COUNT), 4],
+    ['Rev S3 dishes-scored disclosed (4 of 6)', rev.S3_MENU_SCORED + '/' + rev.S3_MENU_TOTAL, '4/6'],
+    ['Rev S3 Top Category by REVENUE not units (Entree, not Fries/Side)', rev.S3_TOP_CATEGORY, 'Entree'],
     ['Rev S3 repricing recency from log', rev.S3_REPRICE_MONTHS != null, true],
     ['Rev S3 no fabricated dollar', rev.S3_MONTHLY_GAP, 0],
     ['Rev S4 spread computed', rev.S4_PERFORMANCE_SPREAD != null, true],
