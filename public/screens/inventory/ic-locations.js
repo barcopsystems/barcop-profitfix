@@ -626,7 +626,7 @@ S.InventoryLocations = {
         + '</div>';
       const arrangeCard = assigned.length
         ? '<div class="card" style="overflow-x:auto;"><table class="row-list il-arrange"><thead><tr>'
-            + '<th style="width:24px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th style="text-align:right;"></th>'
+            + '<th style="width:24px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th>'
             + '</tr></thead><tbody id="il-arrange-body">'
             + assigned.map((p, i) => '<tr data-id="' + esc(p.id) + '">'
                 + DragReorder.handleCellHTML()
@@ -635,12 +635,11 @@ S.InventoryLocations = {
                 + '<td>' + esc(p.category || '-') + '</td>'
                 + '<td>' + esc(this.sizeLabel(p)) + '</td>'
                 + '<td>' + esc(p.vendor || '-') + '</td>'
-                + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm il-remove" data-id="' + esc(p.id) + '" style="color:var(--red);">Remove</button></td>'
                 + '</tr>').join('')
             + '</tbody></table></div>'
         : '<div class="card" style="overflow-x:auto;"><table class="row-list il-arrange"><thead><tr>'
-          + '<th style="width:24px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);padding:12px 8px;">No products here yet. Tap "+ Add/Delete Products" above to add some.</td></tr></tbody></table></div>';
+          + '<th style="width:24px;"></th><th style="width:30px;">#</th><th>Product</th><th>Category</th><th>Size</th><th>Vendor</th>'
+          + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No products here yet. Tap "+ Add/Delete Products" above to add some.</td></tr></tbody></table></div>';
       middle = arrangeHeading + '<div id="il-arrange-export">' + arrangeCard + '</div>';
     }
 
@@ -697,7 +696,6 @@ S.InventoryLocations = {
         if (cb) { cb.checked = !cb.checked; this._toggleEdit(cb.value, cb.checked); }
         return;
       }
-      const rm = ev.target.closest('.il-remove'); if (rm) { this.removeProduct(l.name, rm.dataset.id); return; }
     };
     this.container.onchange = ev => {
       if (ev.target.classList && ev.target.classList.contains('il-edit-cb')) {
@@ -751,6 +749,21 @@ S.InventoryLocations = {
     if (this._savingProducts) return;
     const l = this.locationById(id);
     if (!l) { this.renderList(); return; }
+    // S181: a checklist save that UN-TICKS a product still holding COUNTED stock on this shelf must ask
+    // what happened to that stock first — the SAME disposition prompt as archiving and Update Location —
+    // then re-enter to commit. On cancel nothing changes. `_dispPending` guards the single re-entry so the
+    // prompt does not re-open on the committing pass; openEdit clears it on screen entry so it can never
+    // strand true. The editMode guard mirrors updateLocation: saveProducts only runs in products mode, so
+    // this never prompts (or reconciles) against the empty checked set that arrange mode leaves behind.
+    if (this.editMode === 'products' && !this._dispPending) {
+      const stock = this._unTickedWithStock(l.name);
+      if (stock.length) {
+        this._dispPending = true;
+        App.promptShelfDisposition(l.name, stock, () => this.saveProducts(id), { onCancel: () => { this._dispPending = false; } });
+        return;
+      }
+    }
+    this._dispPending = false;
     this._savingProducts = true;
     const link = this.container.querySelector('.il-editprod-link');
     if (link) { link.textContent = 'Saving...'; link.style.opacity = '0.6'; link.style.pointerEvents = 'none'; }
@@ -890,20 +903,6 @@ S.InventoryLocations = {
       // lazily so it finds the NEW element rather than the detached one it closed over.
       fail('Save failed. Try again.');
     }
-  },
-
-  async removeProduct(locName, pid) {
-    const p = this.products().find(x => x.id === pid);
-    if (!p) return;
-    // Live row: putRecord cannot revert it for us. A refused removal took the product off the shelf
-    // on screen while the server kept it there, so it dropped off the count sheet for the session
-    // and quietly came back on the next login.
-    const undo = App.snapshotRows([p]);
-    p.locations = App.productLocations(p).filter(x => x !== locName);
-    if (p.primary_location === locName) p.primary_location = p.locations[0] || '';
-    if (p.location_sequences) delete p.location_sequences[locName];
-    if (!(await App.putRecord('ic', 'product', p))) App.restoreRows(undo);   // one product changes -> one row
-    this._renderEdit(this.editId);
   },
 
   // ── Triage: place products that are not in any location yet ─────────────────
