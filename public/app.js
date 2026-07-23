@@ -4800,8 +4800,12 @@ const App = {
         y += 10; ensure(16); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(130, 130, 130);
         doc.text(b.text.toUpperCase(), margin, y); y += 13;
       } else if (b.type === 'kv' || b.type === 'note') {
-        ensure(15); doc.setFont('helvetica', b.type === 'kv' ? 'bold' : 'normal'); doc.setFontSize(10); doc.setTextColor(45, 45, 45);
-        doc.text(b.text, margin, y); y += 14;
+        doc.setFont('helvetica', b.type === 'kv' ? 'bold' : 'normal'); doc.setFontSize(10); doc.setTextColor(45, 45, 45);
+        // Wrap like para/fine below: a long note (e.g. an empty-state .empty-sub routed here) used to
+        // draw one unwrapped line and run ~600pt off the page. Split on newlines, then to the width.
+        this._pdfSafe(b.text).split('\n').forEach(seg => {
+          doc.splitTextToSize(seg || ' ', pageW - 2 * margin).forEach(ln => { ensure(14); doc.text(ln, margin, y); y += 14; });
+        });
       } else if (b.type === 'para') {
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(55, 55, 55);
         this._pdfSafe(b.text).split('\n').forEach(seg => {
@@ -5455,7 +5459,7 @@ const App = {
   // ARCHIVED menu items ARE reported: they can be restored, and restoring one must not quietly
   // produce a cheaper dish. So this reads data.menu_items raw, not this.menuItems().
   productReferences(idSet) {
-    const none = { menuItems: [], prepBatches: [], openOrders: [], total: 0, any: false };
+    const none = { menuItems: [], prepBatches: [], openOrders: [], investigations: [], total: 0, any: false };
     if (!idSet || !idSet.size) return none;
     const inv = this.inventoryData || {};
     const allItems = (this.data && Array.isArray(this.data.menu_items)) ? this.data.menu_items : [];
@@ -5475,8 +5479,14 @@ const App = {
     const openOrders = (Array.isArray(inv.ic_orders) ? inv.ic_orders : []).filter(o =>
       o && o.status !== 'Received' && Array.isArray(o.line_items)
       && o.line_items.some(li => li && li.product_id && idSet.has(li.product_id)));
-    const total = menuItems.length + prepBatches.length + openOrders.length;
-    return { menuItems, prepBatches, openOrders, total, any: total > 0 };
+    // Open loss investigations (theft-risk) are keyed by product_id and are a first-class store, so
+    // deleting the product out from under an OPEN one used to read as "nothing uses this". A resolved
+    // investigation is closed history and does not block. (See theft-risk investigationLiveData: a
+    // deleted product leaves that investigation's live count/spot-check wiring with nothing to read.)
+    const investigations = (Array.isArray(this.data && this.data.variance_investigations) ? this.data.variance_investigations : [])
+      .filter(iv => iv && iv.status !== 'resolved' && iv.product_id && idSet.has(iv.product_id));
+    const total = menuItems.length + prepBatches.length + openOrders.length + investigations.length;
+    return { menuItems, prepBatches, openOrders, investigations, total, any: total > 0 };
   },
 
   menuItemsUsingProducts(idSet) {
