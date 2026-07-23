@@ -2675,6 +2675,29 @@ S.HubSettings = {
         });
       }
     });
+    // Current week's drawer counts, mirroring the current-week sc_shifts block above (curBaseAgo,
+    // whole-week) so the week the operator just imported is ALSO cash-counted — otherwise the weekly
+    // rollup reads "Not counted" over a week that shows sales and a ticked Reconcile Cash step.
+    if (curWk) {
+      const improving = !curWk.loose;
+      for (let di = 0; di < 7; di++) {
+        const date = dateStr(curBaseAgo + 6 - di);
+        activeRegs.forEach((dr, ri) => {
+          const exp = 600 + Math.round(rnd() * 350);
+          const variance = improving ? Math.round((rnd() - 0.55) * 12) : Math.round((rnd() - 0.75) * 30);
+          const tol = (dr.cash_tolerance != null) ? dr.cash_tolerance : 10;
+          scVariances.push({
+            id:uid(), date:date,
+            drawer_id: dr.id, drawer: dr.name,
+            cashier:mgrs[(curWk.wk + di + ri) % 3],
+            source:'import',
+            expected_cash:exp, counted_cash:exp + variance, variance:variance,
+            tolerance:tol, status:Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over',
+            reason:'', notes:'', created_at:new Date().toISOString()
+          });
+        });
+      }
+    }
     App.shiftData.sc_variances = scVariances;
 
     // Voids and comps — fewer events and all manager-authorized after the fix.
