@@ -44,7 +44,11 @@ S.LaborPositions = {
   // async now (it awaits the row write before flagging the account seeded). Callers may still
   // fire-and-forget: the in-memory push below happens synchronously, so a render right after
   // this call still sees the starters.
-  async ensureStarters() {
+  // `token` is the App._mountSeq captured by render(). On a failed seed the phantom starters must be
+  // repainted away, but ONLY if this is still the screen on the page — #content-area is permanent
+  // (app.js:1428), so an unguarded repaint from a late failure (or from lc-staff-roster, which seeds
+  // positions in the background) would paint this screen over whatever the operator went to next.
+  async ensureStarters(token) {
     if (!App.laborData) App.laborData = {};
     if (App.laborData.lc_positions_seeded) return;
     const list = this.positions();
@@ -60,13 +64,20 @@ S.LaborPositions = {
     // true, the array stripped from the blob, and no rows — so the starters never appeared and
     // could never re-seed, permanently blocking the roster behind "Add your positions first".
     const ok = await App.putRecordsBulk('lc', 'position', seeded, { quiet: true });   // fires from render(), never shout
-    if (!ok) { seeded.forEach(p => { const i = list.indexOf(p); if (i >= 0) list.splice(i, 1); }); return; }
+    if (!ok) {
+      // render() painted these rows synchronously (this runs un-awaited); the quiet write failed, so
+      // take them back out AND re-render, or the operator is left looking at starter rows that no
+      // longer exist in memory and do nothing when clicked. Guard the repaint on the mount token.
+      seeded.forEach(p => { const i = list.indexOf(p); if (i >= 0) list.splice(i, 1); });
+      if (token != null && App._mountSeq === token) this.renderList();
+      return;
+    }
     App.laborData.lc_positions_seeded = true;
     await App.saveLabor();                                 // the lc_positions_seeded flag stays in the blob
   },
 
   render(container, actions) {
-    this.ensureStarters();
+    this.ensureStarters(App._mountSeq);   // pass the mount token so a failed seed only repaints if still current
     this.container = container;
     if (actions) actions.innerHTML = '';
     this.editId = null;
