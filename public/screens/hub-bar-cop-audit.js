@@ -403,19 +403,33 @@ S.HubBarCopAudit = {
     });
     const surfaced = gapIds.size;
 
-    // Fix log entries in the 30-day window.
-    const wkFixes = fixLog.filter(f => this._withinWindow(f.date, this.WINDOW_DAYS));
+    // ⚠ Count DISTINCT NON-COMPOSITE GAPS, not raw fix_log ROWS (S169). A batch reprice ("Mark All
+    // Live") writes one fix_log row per item but is ONE action on ONE gap (pricing), so counting rows
+    // let a single batch read as N fixes and inflate this whole sub-score. And composite gaps
+    // (prime-cost) get an AUTO fix_log row (profit-fix._autoStart) yet are NEVER surfaced and are
+    // excluded by _gapEntries — so they must be excluded here too, or actRatio (which would include
+    // them) and the conversion denominator loggedGaps (which excludes them) count on different bases,
+    // and a composite-only window shows a green "Fixes Logged" tile beside an N/A sub-score.
+    // recoveredCount below is already per-gap (S170); these counts were the twin S170 left on rows.
+    const composite = (window.Recovery && Recovery.COMPOSITE_GAPS) || [];
+    const isRealGap = gid => gid != null && composite.indexOf(gid) === -1;
+    const wkGapCount = new Set(
+      fixLog.filter(f => this._withinWindow(f.date, this.WINDOW_DAYS) && isRealGap(f.gap_id)).map(f => f.gap_id)
+    ).size;
 
-    // Matured fixes that produced positive dollar movement via Recovery.
+    // The distinct scored gaps recoveredCount ranges over (durable-baseline union, one per gap,
+    // composites excluded). Computed ONCE and reused for the recovered loop AND the conversion
+    // denominator, so numerator and denominator share a basis (S170 aligned the dollars but left
+    // these counts on raw rows); _gapEntries(null) stays a single call here.
+    const scored = (window.Recovery && typeof Recovery._gapEntries === 'function')
+      ? Recovery._gapEntries(null)
+      : [...new Set(fixLog.filter(f => isRealGap(f.gap_id)).map(f => f.gap_id))];
+    const loggedGaps = scored.length;
+
+    // Matured fixes that produced positive dollar movement via Recovery. Guarded on _gapEntries too:
+    // `scored` holds compute-able entry objects only when it came from _gapEntries.
     let recoveredCount = 0;
-    if (window.Recovery && typeof Recovery.compute === 'function') {
-      // ⚠ Source from _gapEntries so this COUNT matches the dollarsRecovered TOTAL above (S170).
-      // total() now uses the durable baseline union; counting from _oneFixPerGap(fixLog) instead
-      // dropped a gap whose fix_log row had aged out, so the count and the dollars disagreed.
-      // _gapEntries already dedupes per gap and excludes composites.
-      const scored = (typeof Recovery._gapEntries === 'function')
-        ? Recovery._gapEntries(null)
-        : fixLog.filter(f => (Recovery.COMPOSITE_GAPS || []).indexOf(f.gap_id) === -1);
+    if (window.Recovery && typeof Recovery.compute === 'function' && typeof Recovery._gapEntries === 'function') {
       scored.forEach(f => {
         try {
           const r = Recovery.compute(f);
@@ -424,22 +438,22 @@ S.HubBarCopAudit = {
       });
     }
 
-    // With zero fixes ever logged there is no recovery activity to judge yet, so
-    // the whole sub-score is N/A — never a harsh "0, you are not acting" on the
-    // day the first audit surfaced gaps but no second has come around to fix.
-    const noFixes = fixLog.length === 0;
+    // With no non-composite fix in the (24-month) window there is no recovery activity to judge yet,
+    // so the whole sub-score is N/A — never a harsh "0, you are not acting". Windowed on fix_log (NOT
+    // the durable loggedGaps, which never ages out — that flip broke the N/A for a long-dormant
+    // operation) and non-composite (so the auto prime-cost row alone is not counted as activity, which
+    // would leave the tile at 0 beside a scored sub-score).
+    const noFixes = fixLog.filter(f => isRealGap(f.gap_id)).length === 0;
 
-    // Component 1: act-on-gaps. N/A until an audit has surfaced something AND at
-    // least one fix has been logged.
-    const actRatio = (surfaced === 0 || noFixes) ? null : Math.min(1, wkFixes.length / surfaced);
+    // Component 1: act-on-gaps. N/A until an audit has surfaced something AND at least one gap fixed.
+    const actRatio = (surfaced === 0 || noFixes) ? null : Math.min(1, wkGapCount / surfaced);
 
-    // Component 2: of the fixes logged, how many produced real favorable movement.
-    // N/A until at least one fix is logged.
-    const convRatio = noFixes ? null : Math.min(1, recoveredCount / fixLog.length);
+    // Component 2: of the gaps fixed, how many produced real favorable movement. N/A until one fixed.
+    const convRatio = noFixes ? null : Math.min(1, recoveredCount / loggedGaps);
 
     const components = [
-      { label: 'Acting on surfaced gaps',                ratio: actRatio,  na: surfaced === 0 || noFixes, extra: noFixes ? 'No recovery activity yet' : (surfaced === 0 ? 'No audit has surfaced gaps yet' : (wkFixes.length + ' fixes logged in last 30 days against ' + surfaced + ' surfaced gaps')) },
-      { label: 'Fixes that produced movement',           ratio: convRatio, na: noFixes,                   extra: noFixes ? 'No fixes logged yet' : (recoveredCount + ' of ' + fixLog.length + ' logged fixes produced favorable movement') }
+      { label: 'Acting on surfaced gaps',                ratio: actRatio,  na: surfaced === 0 || noFixes, extra: noFixes ? 'No recovery activity yet' : (surfaced === 0 ? 'No audit has surfaced gaps yet' : (wkGapCount + ' gap' + (wkGapCount === 1 ? '' : 's') + ' acted on in the last 30 days against ' + surfaced + ' surfaced')) },
+      { label: 'Fixes that produced movement',           ratio: convRatio, na: noFixes,                   extra: noFixes ? 'No fixes logged yet' : (recoveredCount + ' of ' + loggedGaps + ' gap' + (loggedGaps === 1 ? '' : 's') + ' fixed produced favorable movement') }
     ];
     return this._rollup(components);
   },
@@ -755,7 +769,12 @@ S.HubBarCopAudit = {
     result.gaps = gapIds.size;
 
     const fixLog = (App.data?.fix_log) || [];
-    result.fixesLogged = fixLog.filter(f => this._withinWindow(f.date, this.WINDOW_DAYS)).length;
+    // Distinct NON-COMPOSITE gaps with a fix in the window, not raw rows (S169) — a batch reprice is
+    // one action on one gap, and the auto prime-cost composite row is excluded (as _gapEntries and the
+    // sub-score do), so this tile agrees with the Recovery Action sub-score instead of standing at a
+    // count beside its N/A. Matches _scoreRecoveryAction's wkGapCount exactly.
+    const _comp = (window.Recovery && Recovery.COMPOSITE_GAPS) || [];
+    result.fixesLogged = new Set(fixLog.filter(f => this._withinWindow(f.date, this.WINDOW_DAYS) && f.gap_id != null && _comp.indexOf(f.gap_id) === -1).map(f => f.gap_id)).size;
 
     if (window.Recovery && typeof Recovery.total === 'function') {
       try {
