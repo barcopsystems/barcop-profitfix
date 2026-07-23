@@ -585,24 +585,39 @@ S.InventoryVendors = {
     const carried = [];   // other stores the rename touched: [{ mod, kind, recs }]
     let renamedFrom = null;   // the name this save is renaming AWAY from (null = no rename)
     let vendorRec = null;
+    let vendorUndo = [];   // S164: the vendor record's full pre-edit state, for an exact rollback
     if (vendorId) {
       const v = this.vendorById(vendorId);
       if (v) {
         const old = v.name;
+        // ⚠ S164. Object.assign overwrites EVERY field on the live record (terms, account number,
+        // order minimum, delivery fee, notes...), and App.putRecord's own slot-revert is a NO-OP
+        // here because we hand it the same object already in the list (see the revert note in
+        // App.putRecord). So a rejected save left the whole form's worth of rejected values on
+        // screen — and for a plain field edit (no rename) the old failure branch, gated on
+        // renamedFrom, restored NOTHING at all. Snapshot before the assign, restore whole on failure.
+        vendorUndo = App.snapshotRows([v]);
         Object.assign(v, fields);
         vendorRec = v;
         if (old !== name) {
           renamedFrom = old;
           this.products().forEach(p => {
             let hit = false;
-            if (p.vendor === old) { p.vendor = name; hit = true; }
+            // ⚠ Snapshot BEFORE the first mutation and restore by IDENTITY (S164). A name-keyed
+            // reverse ("if p.vendor === name -> old") is an UNSOUND inverse: a consolidation rename
+            // (ABC Dist -> Acme, allowed because the dup guard only checks vendor RECORDS) can touch
+            // a product already bought from "Acme" via a cross-vendor cost-history entry alone — the
+            // forward pass leaves its vendor be, but the reverse would wrongly stamp it back to the
+            // old name, a vendor it was never on. snapshotRows/restoreRows key on the object.
+            const snap = () => { if (!hit) vendorUndo.push(...App.snapshotRows([p])); };
+            if (p.vendor === old) { snap(); p.vendor = name; hit = true; }
             // Each cost-history entry carries the vendor NAME, and that is what the Vendor
             // Tracker filters on for Annual Drift and the Clean / Watch / High status. Left
             // behind, a renamed vendor's drift reads $0.00 forever and its status flips to
             // Clean — while the Price Changes tab, which reads deliveries, still shows every
             // increase. Note a product bought from someone else can still hold an entry from
             // this vendor, so this is not scoped to p.vendor.
-            (p.cost_history || []).forEach(h => { if (h && h.vendor === old) { h.vendor = name; hit = true; } });
+            (p.cost_history || []).forEach(h => { if (h && h.vendor === old) { snap(); h.vendor = name; hit = true; } });
             if (hit) touched.push(p);
           });
           // Orders, deliveries and discrepancy claims name their vendor by NAME too, and every
@@ -613,6 +628,7 @@ S.InventoryVendors = {
           const carry = (list, mod, kind) => {
             const hit = (list || []).filter(r => r && r.vendor === old);
             if (!hit.length) return;
+            vendorUndo.push(...App.snapshotRows(hit));   // snapshot before renaming, restore by identity (S164)
             hit.forEach(r => { r.vendor = name; });
             carried.push({ mod, kind, recs: hit });
           };
@@ -633,30 +649,43 @@ S.InventoryVendors = {
     // orders, deliveries and claims persists as rows too. Every write result is checked —
     // a cascade that never reached storage must not be reported as a clean save, or the
     // rename looks done on screen and comes back on the next load.
+    // ⚠ S165. The rename cascade must land WITH the vendor row, or the vendor's open PO is orphaned.
+    // These writes are not one transaction, so two things guard a half-written rename:
+    //   1. The cascade only fires once the VENDOR row has LANDED. Writing products under the new name
+    //      while the vendor row failed leaves the reverse orphan — products naming a vendor the
+    //      server no longer holds. The twin ic-locations.updateLocation gates its cascade the same
+    //      way (S63). And on the first cascade miss we stop, so a partial spreads no further.
+    //   2. A retry loop is deliberately NOT used. App.putRecord / putRecordsBulk already queue every
+    //      offline / dropped-connection write as success, so the ONLY failures that reach here are
+    //      non-transient (storageFull, viewer read-only, no account membership) — retrying replays
+    //      the identical failure. (This is why the S11 seed-clear retry does not transfer: its
+    //      lost-response DELETE ambiguity sits BELOW this queue absorption; here there is none.)
     let ok = vendorRec ? await App.putRecord('ic', 'vendor', vendorRec) : true;
-    if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) ok = false;
+    const vendorLanded = ok;   // used to describe a partial failure precisely
+    if (ok && touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) ok = false;
     for (const c of carried) {
+      if (!ok) break;
       if (!(await App.putRecordsBulk(c.mod, c.kind, c.recs))) ok = false;
     }
     if (ok) {
       if (vendorId) this.openEdit(savedId);
       else { this.editId = null; this._draft = null; this.renderList(); }
     } else {
-      // Nothing landed, so put memory back the way it was. The rename happens in memory BEFORE
-      // any write; leave it renamed and the operator's retry sees old === name, skips the cascade
-      // entirely, and writes the vendor row under the new name with its orders still on the old
-      // one — the orphaned open PO this cascade exists to prevent, reintroduced by the retry.
-      if (renamedFrom != null) {
-        const back = renamedFrom;
-        if (vendorRec) vendorRec.name = back;
-        touched.forEach(p => {
-          if (p.vendor === name) p.vendor = back;
-          (p.cost_history || []).forEach(h => { if (h && h.vendor === name) h.vendor = back; });
-        });
-        carried.forEach(c => c.recs.forEach(r => { r.vendor = back; }));
-      }
+      // Put memory back the way it was, WHOLE and by IDENTITY — the vendor record AND every product,
+      // order, delivery and claim the rename touched were snapshotted before mutating, so one
+      // App.restoreRows restores them all (it deletes keys the assign added and reassigns the rest).
+      // The rename happens in memory BEFORE any write; leave it and the operator's retry sees
+      // old === name, skips the cascade entirely, and writes the vendor row under the new name with
+      // its orders still on the old one — the orphaned open PO this cascade exists to prevent.
+      App.restoreRows(vendorUndo);
       if (btn) { btn.disabled = false; btn.textContent = vendorId ? 'Update Vendor' : 'Save Vendor'; }
-      fail('Save failed. Try again.');
+      // Say precisely what landed (S165). When the vendor row saved but its cascade did not, the
+      // rename is half-applied ON THE SERVER even though the screen has been put back — the operator
+      // needs to know a reload would show that split, and that saving again finishes it. A total
+      // failure (nothing landed) keeps the plain message.
+      fail(vendorLanded && renamedFrom != null
+        ? 'The vendor saved but not everything linked to it did. The rename is only half saved. Save again to finish it.'
+        : 'Save failed. Try again.');
     }
   },
 
