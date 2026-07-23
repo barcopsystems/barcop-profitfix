@@ -605,7 +605,11 @@ S.InventoryLocations = {
 
     const nameCard = '<div class="card form-card">'
       + '<div class="card-title">Editing ' + esc(l.name) + '</div>'
-      + '<div class="f" style="max-width:300px;margin:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(nameVal) + '"/></div>'
+      + '<div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">'
+        + '<div class="f" style="width:300px;max-width:100%;margin:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(nameVal) + '"/></div>'
+        + '<button class="btn btn-ghost" id="il-update-name" style="flex:0 0 auto;">Update</button>'
+        + '<span id="il-name-err" style="color:var(--red);font-size:12px;align-self:center;display:none;"></span>'
+      + '</div>'
       + '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--t1);cursor:pointer;">'
         + '<input type="checkbox" class="bc-check" id="il-servicebar"' + (l.service_bar ? ' checked' : '') + '/>'
         + 'Location with Register (for spot check)</label>'
@@ -689,6 +693,7 @@ S.InventoryLocations = {
       }
       const sa = ev.target.closest('.il-selall');   if (sa) { this.selectAllCtx(sa.dataset.ctx); return; }
       const cl = ev.target.closest('.il-clearsel'); if (cl) { this.clearSelCtx(cl.dataset.ctx); return; }
+      if (ev.target.closest('#il-update-name')) { this.updateLocation(l.id, { nameOnly: true }); return; }
       if (ev.target.closest('#il-update-loc')) { this.updateLocation(l.id); return; }
       const eprow = ev.target.closest('.il-eprow');
       if (eprow && !ev.target.closest('input')) {
@@ -794,11 +799,19 @@ S.InventoryLocations = {
       .filter(Boolean);
   },
 
-  async updateLocation(id) {
+  async updateLocation(id, opts) {
+    // opts.nameOnly (the ghost "Update" button beside the name): save the location's own fields
+    // (name + register flag) and its rename cascade, but NEVER reconcile the product checklist and
+    // NEVER open the disposition prompt — a rename strands nothing (App._perpetualInventory resolves
+    // prior_names forward). It also leaves editMode/editChecked alone so an in-progress checklist is
+    // not thrown away. Existing callers pass no opts, so their full-save behaviour is unchanged.
+    opts = opts || {};
+    const nameOnly = !!opts.nameOnly;
     const name = document.getElementById('il-name')?.value.trim();
     // ⚠ Resolved LAZILY (S116). This used to close over one #il-err looked up here, and the
     // failure path redraws the whole container — so the message landed on a detached node.
-    const fail = m => { const e = document.getElementById('il-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
+    // A name-only error surfaces beside the ghost button (#il-name-err); the full save uses #il-err.
+    const fail = m => { const e = document.getElementById(nameOnly ? 'il-name-err' : 'il-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
     if (!name) { fail('Location name required.'); return; }
     if (this.locations().some(l => l.id !== id && l.name.toLowerCase() === name.toLowerCase())) { fail('That name already exists.'); return; }
     const l = this.locationById(id);
@@ -807,7 +820,7 @@ S.InventoryLocations = {
     // ask what happened to the stock first (the same disposition prompt as archiving), then re-enter
     // to commit. On cancel nothing changes. `_dispPending` guards the single re-entry so the prompt
     // does not re-open on the committing pass.
-    if (this.editMode === 'products' && !this._dispPending) {
+    if (this.editMode === 'products' && !nameOnly && !this._dispPending) {
       const stock = this._unTickedWithStock(l.name);
       if (stock.length) {
         this._dispPending = true;
@@ -867,8 +880,8 @@ S.InventoryLocations = {
     // matched what was ticked, so it returned nothing to write, the bulk write was skipped,
     // and the location row alone succeeded — a clean save reported over an empty write.
     const _undoProd = [];
-    if (this.editMode === 'products') this._reconcileProducts(name, this.editChecked, _undoProd).forEach(p => touched.set(p.id, p));
-    const btn = document.getElementById('il-update-loc');
+    if (this.editMode === 'products' && !nameOnly) this._reconcileProducts(name, this.editChecked, _undoProd).forEach(p => touched.set(p.id, p));
+    const btn = document.getElementById(nameOnly ? 'il-update-name' : 'il-update-loc');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     // Both writes are checked. The product cascade's result used to be discarded, so a location
     // row that landed while its products did not reported a clean save over a split state.
@@ -878,8 +891,8 @@ S.InventoryLocations = {
     if (ok && touched.size && !(await App.putRecordsBulk('ic', 'product', [...touched.values()]))) ok = false;   // rename cascade -> rows
     if (ok) {
       App.markSetupDone('gs_ic_locations');
-      this.editMode = 'arrange';
-      this.editChecked = new Set();
+      // name-only keeps you where you are (an in-progress checklist survives); the full save returns to arrange.
+      if (!nameOnly) { this.editMode = 'arrange'; this.editChecked = new Set(); }
       this._nameDraft = null;
       this._renderEdit(id);
     } else {
@@ -895,7 +908,7 @@ S.InventoryLocations = {
         const p = this.products().find(x => x.id === pid);
         if (p) Object.assign(p, snapshot);
       });
-      if (btn) { btn.disabled = false; btn.textContent = 'Update Location'; }
+      if (btn) { btn.disabled = false; btn.textContent = nameOnly ? 'Update' : 'Update Location'; }
       // ⚠ REDRAW. Without it the checklist keeps showing the set the operator just ticked
       // while memory has been put back, so the screen and the data disagree and the next
       // click is made against something that is no longer true. The twin _persistProductOrder
