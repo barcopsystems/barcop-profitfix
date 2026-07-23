@@ -224,12 +224,15 @@ const PosIngest = {
   },
 
   // ── Pure builders (no save) ────────────────────────────────────────────────
-  build(type, rows) {
+  // `opts` is threaded to the two builders that need it: buildSales reads opts.manual to know the
+  // Enter-Manually grid from a POS file (a hand entry is source:'manual' and never raises a
+  // conflict against itself), and the signature is uniform so any builder can grow one.
+  build(type, rows, opts) {
     if (type === 'hours') return this.buildHours(rows);
     if (type === 'tips')  return this.buildTips(rows);
     if (type === 'voids') return this.buildVoids(rows);
-    if (type === 'sales') return this.buildSales(rows);
-    if (type === 'cash')  return this.buildCash(rows);
+    if (type === 'sales') return this.buildSales(rows, opts);
+    if (type === 'cash')  return this.buildCash(rows, opts);
     if (type === 'server') return this.buildServer(rows);
     if (type === 'pmix')  return this.buildPmix(rows);
     return { toAdd: [], skipped: [], dupCount: 0 };
@@ -326,71 +329,107 @@ const PosIngest = {
     return { toAdd, skipped, dupCount };
   },
 
-  buildSales(rows) {
+  // rows -> one per-day sc_shifts record. `opts.manual` = the Enter-Manually grid (a hand entry,
+  // stamped source:'manual'); otherwise a POS import (source:'import'). Returns the usual
+  // { toAdd, skipped, dupCount, merged, keptManual } PLUS `conflicts` — days already entered BY
+  // HAND that the file DISAGREES with. Bar Cop never silently decides between two figures the
+  // operator entered themselves ([[user-chooses-conflicts]]): a conflict is handed to the screen,
+  // which prompts, and only the operator's choice is written. See _commitSales for the retire rule.
+  buildSales(rows, opts) {
+    opts = opts || {};
+    const manualEntry = !!opts.manual;   // the grid is an EDIT — the operator IS choosing — never a conflict
     const existingShifts = ((App.shiftData && App.shiftData.sc_shifts) || []);
-    // A hand-entered close (imported !== true) is richer + authoritative; never
-    // let a bulk sales import overwrite it. Only a prior IMPORTED day is replaced.
-    const manualDates   = new Set(existingShifts.filter(s => s && s.imported !== true).map(s => s.date));
-    const importedDates = new Set(existingShifts.filter(s => s && s.imported === true).map(s => s.date));
+    // Provenance is `source` now, NOT the old `imported !== true` guard (S140). Every writer
+    // stamped imported:true, so that guard was DEAD — a bulk sales import silently overwrote a hand
+    // close, and worse PARTIALLY (a bar-only file zeroed the typed food + covers). sc_shifts is one
+    // record per date, so keep the prior record for a date to compare against.
+    const priorByDate = new Map();
+    existingShifts.forEach(s => { if (s && s.date != null) priorByDate.set(String(s.date), s); });
     // AGGREGATE BY DATE — never one record per CSV row. A sales export split by daypart, revenue
     // centre or service period lists the same date several times, which is an ordinary export
     // shape, and the day's sales are their SUM. The old line was a bare `if (seen.has(date))
-    // return;` — no skipped.push, no dupCount++ — so every service after the FIRST was discarded
-    // in silence while the cockpit reported "7 days imported". A real $18,200 bar / $18,340 food
-    // week imported as $2,940 / $6,860, and sc_shifts is the spine under Where You Stand, the Hub,
-    // Confirm the Week, labour % / RPLH, the cash-forecast baseline and the sales-tax hold — all
-    // of them quietly low, with nothing on any screen saying rows had been dropped.
-    // This is the same bug and the same fix as buildPmix below (that one is units; this one is
-    // money). Aggregating HERE also guarantees one record per date in toAdd, which _commitSales
-    // depends on: a duplicate id inside one ON CONFLICT chunk makes Postgres reject the chunk.
-    const byDate = new Map();
-    const skipped = []; let dupCount = 0; let merged = 0;
-    const skippedDates = new Set();   // a skipped DAY is reported once, not once per row of it
-    let keptManual = 0;
-    const keptDates = new Set();      // ...and the same for a protected hand close
+    // return;` — every service after the FIRST was discarded in silence while the cockpit reported
+    // "7 days imported". A real $18,200 / $18,340 week imported as $2,940 / $6,860. Same bug and
+    // fix as buildPmix (that one is units; this one is money). Aggregating HERE also guarantees one
+    // record per date, which _commitSales depends on (a duplicate id in one ON CONFLICT chunk is
+    // rejected whole).
+    const byDate = new Map();          // date -> aggregated { bar, food, covers } from the file
+    const carry  = new Map();          // date -> { bar, food, covers } booleans: which columns the file CARRIES
+    const skipped = []; let dupCount = 0; let merged = 0; let keptManual = 0;
+    const keptDates = new Set();       // a kept hand day reported once, not once per row
     const cents = n => Math.round(n * 100) / 100;   // summing floats across services must not drift
+    // A column "carries" a value only if the cell PARSES to a number. A junk cell ("N/A", "-", a
+    // stray footer label) is non-blank but not a value — treating it as a carried 0 would raise a
+    // FALSE conflict against a differing prior and, on "use the file", ZERO the column (S140 scan).
+    // A real "0" DOES carry (the file says zero) and overwrites.
+    const numeric = v => { if (v == null) return false; const s = String(v).trim(); return s !== '' && !isNaN(parseFloat(s.replace(/[^0-9.\-]/g, ''))); };
+    const covOf = v => Math.round(parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, ''))) || 0;   // "12.00" is 12, not 1200
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
       if (!date) { skipped.push('(no date)'); return; }
-      if (manualDates.has(date)) {
-        // ⚠ NOT `skipped` (S105). A protected hand close is a GOOD outcome, not a row we could not
-        // use, and it has to be reported in different words — counting it as skipped made the
-        // cockpit call the operator's own close a problem, and when EVERY day was protected it
-        // blamed the file for missing a Date column. Cash already splits this out as `keptManual`;
-        // this is the twin catching up.
-        if (!keptDates.has(date)) { keptDates.add(date); keptManual++; }
+      const bar = this._num(r.bar), food = this._num(r.food), covers = covOf(r.covers);
+      const c = carry.get(date) || { bar: false, food: false, covers: false };
+      if (numeric(r.bar)) c.bar = true; if (numeric(r.food)) c.food = true; if (numeric(r.covers)) c.covers = true;
+      carry.set(date, c);
+      const prior = byDate.get(date);
+      if (prior) { prior.bar = cents(prior.bar + bar); prior.food = cents(prior.food + food); prior.covers += covers; merged++; }
+      else byDate.set(date, { bar, food, covers });
+    });
+    const toAdd = []; const conflicts = [];
+    const pv = v => Math.round((+v || 0) * 100) / 100;
+    const mkRec = (date, bar, food, covers, manual) => ({
+      id: App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
+      total_revenue: cents(bar + food), shift_type: 'Full Day', status: 'Closed',
+      source: manual ? 'manual' : 'import', imported: !manual, created_at: new Date().toISOString()
+    });
+    // "Did this day sell anything" is a question about the DAY (a refund line "(50)" REDUCES it),
+    // asked once all of its services are in.
+    byDate.forEach((agg, date) => {
+      const c = carry.get(date) || {};
+      // The grid writes straight through: an edit is the operator's own choice, so there is no
+      // conflict to raise, and _commitSales retires whatever record held the date.
+      if (manualEntry) {
+        if (cents(agg.bar + agg.food) <= 0) { skipped.push(date); return; }
+        toAdd.push(mkRec(date, agg.bar, agg.food, agg.covers, true));
         return;
       }
-      const bar = this._num(r.bar), food = this._num(r.food);
-      const covers = Math.round(parseFloat(String(r.covers == null ? '' : r.covers).replace(/[^0-9.]/g, ''))) || 0;   // keep the decimal point: "12.00" is 12, not 1200; strip only commas/currency
-      const prior = byDate.get(date);
-      if (prior) {
-        prior.bar_revenue = cents(prior.bar_revenue + bar);
-        prior.floor_revenue = cents(prior.floor_revenue + food);
-        prior.covers += covers;
-        prior.total_revenue = cents(prior.bar_revenue + prior.floor_revenue);
-        merged++;
-      } else {
-        byDate.set(date, {
-          id: App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
-          total_revenue: cents(bar + food), shift_type: 'Full Day', status: 'Closed',
-          imported: true, created_at: new Date().toISOString()
-        });
+      const prior = priorByDate.get(date);
+      if (!prior) {   // a brand-new day: a column the file omits is genuinely 0 (nothing to preserve)
+        if (cents(agg.bar + agg.food) <= 0) { skipped.push(date); return; }
+        toAdd.push(mkRec(date, agg.bar, agg.food, agg.covers, false));
+        return;
       }
-    });
-    // "Did this day sell anything" is now a question about the DAY, not about each row. A refund
-    // line ("(50)", which _num correctly reads as -50) has to REDUCE the day rather than be
-    // dropped as a non-positive row, and a day is only empty once all of its services are in.
-    const toAdd = [];
-    byDate.forEach((rec, date) => {
-      if (rec.total_revenue <= 0) { skipped.push(date); return; }
-      if (importedDates.has(date)) dupCount++;   // this day already has an imported record — it gets replaced
-      toAdd.push(rec);
+      // A record already exists for this date. NEVER zero a column the file does not carry (S140):
+      // "Use the file" overlays ONLY the columns the file actually has onto the prior figures.
+      const mBar  = c.bar    ? agg.bar    : pv(prior.bar_revenue);
+      const mFood = c.food   ? agg.food   : pv(prior.floor_revenue);
+      const mCov  = c.covers ? agg.covers : (prior.covers || 0);
+      const useRec = mkRec(date, mBar, mFood, mCov, false);   // what "Use the file" would write
+      if (prior.source === 'manual') {
+        // Only a DIFFERING carried column is a conflict — never prompt when the numbers MATCH; the
+        // hand close simply stands, reported as kept.
+        const diff = (c.bar    && pv(agg.bar)    !== pv(prior.bar_revenue))
+                  || (c.food   && pv(agg.food)   !== pv(prior.floor_revenue))
+                  || (c.covers && (agg.covers || 0) !== (prior.covers || 0));
+        if (!diff) { if (!keptDates.has(date)) { keptDates.add(date); keptManual++; } return; }
+        conflicts.push({
+          key: date, date,
+          mine:   { bar_revenue: pv(prior.bar_revenue), floor_revenue: pv(prior.floor_revenue), covers: prior.covers || 0 },
+          theirs: { bar_revenue: c.bar ? pv(agg.bar) : null, floor_revenue: c.food ? pv(agg.food) : null, covers: c.covers ? (agg.covers || 0) : null },
+          useRec: useRec
+        });
+        return;
+      }
+      // Prior is an import / seed: replace it, carrying forward any column the file omits. Not a
+      // user-vs-user conflict (replacing your own machine import), so no prompt.
+      if (useRec.total_revenue <= 0) { skipped.push(date); return; }
+      dupCount++;
+      toAdd.push(useRec);
     });
     // `merged`, NOT dupCount — the same reasoning spelled out in buildPmix. dupCount means "rows
-    // already logged" in every other builder here and the cockpit renders it as "N replaced
-    // earlier figures"; rows FOLDED INTO a total are the opposite of that.
-    return { toAdd, skipped, dupCount, merged, keptManual };
+    // already logged" everywhere else and the cockpit renders it as "N replaced earlier figures";
+    // rows FOLDED INTO a total are the opposite of that.
+    return { toAdd, skipped, dupCount, merged, keptManual, conflicts };
   },
 
   // A row is one drawer's (or the day's) over/short. Resolves Register + Cashier
@@ -398,7 +437,8 @@ const PosIngest = {
   // patterns still build from an import. Dedup on date + register + variance so a
   // re-dropped cash report never double-logs. source:'import' tags it apart from
   // a hand reconcile. Writes sc_variances.
-  buildCash(rows) {
+  buildCash(rows, opts) {
+    opts = opts || {};
     const VL = (window.S && S.ShiftVarianceLog) || null;
     // Match by the register's name OR any saved POS alias (a report calls a
     // register "Main Bar" that the operator named "Bar 1" — the alias links them).
@@ -433,26 +473,29 @@ const PosIngest = {
     const soleDrawer = activeDrawers.length === 1 ? activeDrawers[0] : null;
     const staffByName = this._staffByName();
     const existing = (App.shiftData && App.shiftData.sc_variances) || [];
-    // ⚠⚠ THE HAND-COUNT PROTECTION IS A SET, NOT A _findDup SEARCH (S99/S103). _findDup CONSUMES
-    // its match, so it could only ever test the FIRST file row that landed on a register-day —
-    // an AM/PM or daypart-split cash report (buildSales calls that "an ordinary export shape")
-    // had every later row find nothing unused and get queued straight ON TOP of the operator's
-    // own count. It also returned the FIRST ARRAY MATCH, so once a register-day legitimately
-    // held both a manual and an import row (the supported "Add anyway" flow), whichever one the
-    // events query happened to return first decided protect-vs-replace. This mirrors buildSales'
-    // `manualDates`: order-independent, re-consulted for every row, never consumed.
-    const manualKeys = new Set(existing.filter(x => x && x.source === 'manual')
-      .map(x => x.date + '|' + (x.drawer_id || '')));
-    const keptKeys = new Set();   // register-DAYS already reported as kept, so N counts days not rows
+    // ⚠⚠ THE HAND COUNT IS FOUND BY KEY, NOT A _findDup SEARCH (S99/S103). _findDup CONSUMES its
+    // match, so it could only ever test the FIRST file row that landed on a register-day — an
+    // AM/PM or daypart-split cash report (buildSales calls that "an ordinary export shape") had
+    // every later row find nothing unused. And it returned the FIRST ARRAY MATCH, so array order
+    // decided protect-vs-replace. This map is order-independent, re-consulted for every row.
+    // S140: a hand count is no longer SILENTLY protected. If the file's figure for the
+    // register-day DIFFERS from the hand count it becomes a conflict the operator resolves (keep
+    // mine / use the file); if it MATCHES, the hand count simply stands (keptManual). Bar Cop never
+    // picks between two figures the operator entered themselves ([[user-chooses-conflicts]]).
+    const manualByKey = new Map();
+    existing.forEach(x => { if (x && x.source === 'manual') manualByKey.set(x.date + '|' + (x.drawer_id || ''), x); });
+    const keptKeys = new Set();       // register-DAYS reported as kept (file matched), N counts days not rows
+    const conflictKeys = new Set();   // register-days already raised as a conflict (first file row establishes it)
     const has = v => v != null && String(v).trim() !== '';
-    const toAdd = []; const skipped = []; let dupCount = 0; let keptManual = 0; const used = new Set();
+    const cents = n => Math.round(n * 100) / 100;
+    const toAdd = []; const skipped = []; const conflicts = []; let dupCount = 0; let keptManual = 0; const used = new Set();
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
       if (!date) { skipped.push('(no date)'); return; }
       const exp = this._num(r.expected), cnt = this._num(r.counted), os = this._num(r.over_short);
       let expected_cash = null, counted_cash = null, variance;
-      if (has(r.expected) && has(r.counted)) { expected_cash = exp; counted_cash = cnt; variance = Math.round((cnt - exp) * 100) / 100; }
-      else if (has(r.over_short)) { variance = Math.round(os * 100) / 100; }   // a "($50)" shortage now correctly reads -50, not +50
+      if (has(r.expected) && has(r.counted)) { expected_cash = exp; counted_cash = cnt; variance = cents(cnt - exp); }
+      else if (has(r.over_short)) { variance = cents(os); }   // a "($50)" shortage now correctly reads -50, not +50
       else { skipped.push(date); return; }            // no over/short derivable
       const dName = (r.drawer || '').trim();
       const dRec = dName ? drawerByName[dName.toLowerCase()] : soleDrawer;
@@ -461,53 +504,66 @@ const PosIngest = {
       const cName = (r.cashier || '').trim();
       const staff = cName ? staffByName[cName.toLowerCase()] : null;
       const cashier = staff ? staff.name : cName;
-      // ⚠ NO variance term. Matching on the figure meant a drawer-day ALREADY reconciled by hand
-      // imported a SECOND row whenever the POS's own blind-close figure differed by more than a
-      // cent — and a figure that differs is exactly the case where a second row is wrong: it is the
-      // same drawer-day measured twice, not two events. A hand count of -$47.50 plus a POS -$47.00
-      // made Main Bar Friday -$94.50 in Drawer Net, the Hub over/short stat, the short RATE (2 of 2
-      // instead of 1 of 1), Loss Prevention and the Books cash sheet.
-      //
       // ⚠ KEYED ON drawer_id, NOT the register NAME. The hand form dedupes on `drawer_id`
       // (sc-cash-control saveCountDrawer) and this side used to dedupe on `drawer`, so the two
       // halves of one check compared DIFFERENT FIELDS and a blank never lined up with a named
-      // register — the collision above went undetected in both directions.
-      //
-      // ⚠ REPLACE-OR-PROTECT, the same rule buildSales already applies (Kyle 2026-07-21):
-      //   prior was IMPORTED -> the new figure REPLACES it, so a CORRECTED drawer report
-      //     actually lands. This used to `return` and DISCARD the correction, leaving the wrong
-      //     number on file while the screen said "already logged".
-      //   prior was entered BY HAND -> untouchable. buildSales protects a manual close the same
-      //     way (`manualDates`), so a bulk import can never overwrite the operator's own work.
-      // The superseded imported row is deleted in _commitCashRows, mirroring _commitSales.
-      const dayKey = date + '|' + drawerId;
-      if (manualKeys.has(dayKey)) {
-        if (!keptKeys.has(dayKey)) { keptKeys.add(dayKey); keptManual++; }
-        return;
-      }
-      // Only IMPORTED rows are candidates for replacement, so the manual row above can never be
-      // reached through this path and array order cannot change the verdict. The search stays
-      // CONSUME-ONCE on purpose: a file that legitimately lists a register-day twice must import
-      // both rows, and only the first of them is replacing anything.
-      const prior = this._findDup(existing, used, x => x.date === date && (x.drawer_id || '') === drawerId && x.source !== 'manual');
-      if (prior) dupCount++;
-      // Tolerance is the matched register's own (App.drawerTolerance); $10 when
-      // the register is unrecognized or unmapped.
+      // register — the collision went undetected in both directions.
+      // Tolerance is the matched register's own (App.drawerTolerance); $10 when unrecognized.
       const tol = (window.App && App.drawerTolerance) ? App.drawerTolerance(dRec || null) : 10;
       const status = (expected_cash != null && VL) ? VL.statusOf(variance, expected_cash, counted_cash, dRec ? dRec.id : null)
                    : (Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over');
-      toAdd.push({
+      const rec = {
         id: App.uid(), date, shift_type: '',
         drawer_id: drawerId, drawer,
         cashier_id: staff ? staff.id : '', cashier,
         source: 'import', expected_cash, counted_cash, variance,
         tolerance: tol, status, reason: '', notes: '',
         imported: true, created_at: new Date().toISOString()
-      });
+      };
+      const dayKey = date + '|' + drawerId;
+      const manual = manualByKey.get(dayKey);
+      if (manual) {
+        // The operator counted this register-day by hand. Only a DIFFERING figure is a conflict; an
+        // identical one is not — never prompt when they match. The FIRST file row per register-day
+        // establishes the comparison (the same per-day scope S99/S103 already use; a file that
+        // lists the register-day twice is S141, deliberately still scoped per-day here).
+        if (conflictKeys.has(dayKey) || keptKeys.has(dayKey)) return;
+        if (this._sameVariance(manual, rec)) { keptKeys.add(dayKey); keptManual++; return; }
+        conflictKeys.add(dayKey);
+        conflicts.push({
+          key: dayKey, date, drawer_id: drawerId, drawer,
+          mine:   { variance: cents(+manual.variance || 0),
+                    expected_cash: manual.expected_cash != null ? cents(+manual.expected_cash) : null,
+                    counted_cash:  manual.counted_cash  != null ? cents(+manual.counted_cash)  : null },
+          theirs: { variance: variance, expected_cash: expected_cash, counted_cash: counted_cash },
+          useRec: rec
+        });
+        return;
+      }
+      // ⚠ REPLACE a prior IMPORT so a CORRECTED drawer report actually lands (this used to `return`
+      // and DISCARD the correction while the screen said "already logged"). Only IMPORTED rows are
+      // candidates: a manual row is handled above, so array order cannot change the verdict. The
+      // search stays CONSUME-ONCE on purpose — a file that legitimately lists a register-day twice
+      // must import both rows, and only the first replaces anything. The superseded imported row is
+      // deleted in _commitCashRows, mirroring _commitSales.
+      const prior = this._findDup(existing, used, x => x.date === date && (x.drawer_id || '') === drawerId && x.source !== 'manual');
+      if (prior) dupCount++;
+      toAdd.push(rec);
     });
-    // `dupCount` now means REPLACED (the sales importer's meaning), and `keptManual`
-    // counts register-days the operator had already counted by hand, which are left alone.
-    return { toAdd, skipped, dupCount, keptManual };
+    // `dupCount` means REPLACED (an earlier import), `keptManual` counts register-days the file
+    // matched a hand count on, and `conflicts` are register-days the operator must choose on.
+    return { toAdd, skipped, dupCount, keptManual, conflicts };
+  },
+
+  // Two drawer figures are "the same" for conflict purposes when their over/short agrees to the
+  // cent AND — where BOTH sides carry expected + counted — those agree too. A file that reports
+  // only an over/short (no expected/counted) is compared on the over/short alone.
+  _sameVariance(a, b) {
+    const c = n => Math.round((+n || 0) * 100) / 100;
+    if (c(a.variance) !== c(b.variance)) return false;
+    if (a.expected_cash != null && b.expected_cash != null && c(a.expected_cash) !== c(b.expected_cash)) return false;
+    if (a.counted_cash  != null && b.counted_cash  != null && c(a.counted_cash)  !== c(b.counted_cash))  return false;
+    return true;
   },
 
   // A POS per-server sales report: one row per server (per day) with covers +
@@ -638,20 +694,22 @@ const PosIngest = {
   // figures (one record per day), so it never double-counts and supersedes any
   // older record for the day.
   // Cash re-import: the MIRROR of _commitSales. A corrected drawer report has to
-  // land, so a register-day that was previously IMPORTED is replaced rather than
+  // land, so a register-day that was previously written is replaced rather than
   // skipped. Insert the new records FIRST, then remove the superseded ones, so a
   // failure mid-way never leaves a register-day with no record at all.
   // ⚠ `stale` is computed BEFORE the inserts: putRecord pushes the new row into the
   // same array, and it shares the key, so computing it afterwards would delete the
   // row that was just written.
-  // ⚠ `source !== 'manual'` is what protects a hand count. buildCash already refuses
-  // to queue a row over one, so this is belt-and-braces at the second door: nothing
-  // here may ever delete an operator's own reconcile.
+  // ⚠ RETIRE REGARDLESS OF SOURCE (S140). This no longer skips `source:'manual'`. In the ordinary
+  // import path buildCash only lets a register-day reach toAdd if it had NO hand count (a differing
+  // hand count becomes a conflict the operator resolves, a matching one is kept — neither reaches
+  // here), so the only 'manual' row this can retire is one the operator EXPLICITLY chose to
+  // overwrite with the file (its resolved row is in toAdd). Retiring it is exactly that choice.
   async _commitCashRows(toAdd) {
     const keys = new Set((toAdd || []).map(r => r.date + '|' + (r.drawer_id || '')));
     const fresh = new Set((toAdd || []).map(r => r.id));
     const stale = (((App.shiftData && App.shiftData.sc_variances) || []))
-      .filter(v => v && v.source !== 'manual' && !fresh.has(v.id)
+      .filter(v => v && !fresh.has(v.id)
         && keys.has(v.date + '|' + (v.drawer_id || '')));
     let ok = true;
     const landed = new Set();
@@ -678,12 +736,15 @@ const PosIngest = {
 
   async _commitSales(toAdd) {
     const dates = new Set((toAdd || []).map(r => r.date));
-    // Replace only prior IMPORTED days for these dates — never a hand-entered
-    // manual close (buildSales already skips those dates). Insert the new records
-    // FIRST, then remove the superseded imports, so a failure mid-way never leaves
-    // a date with no record at all.
+    const fresh = new Set((toAdd || []).map(r => r.id));
+    // sc_shifts is ONE record per date. RETIRE REGARDLESS OF SOURCE (S140): a manual re-save (now
+    // source:'manual', imported:false) or a resolved "use the file over my hand entry" must not
+    // leave the old row beside the new one and double the day. Only a date being WRITTEN is touched
+    // (`dates`), so a hand day the operator KEPT — never in toAdd — is never retired. `!fresh`
+    // guards the rows we are writing. Insert the new records FIRST, then remove the superseded ones,
+    // so a failure mid-way never leaves a date with no record at all.
     const stale = (((App.shiftData && App.shiftData.sc_shifts) || []))
-      .filter(s => s && dates.has(s.date) && s.imported === true);
+      .filter(s => s && dates.has(s.date) && !fresh.has(s.id));
     let ok = true;
     const landed = new Set();
     try {
