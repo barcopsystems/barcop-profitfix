@@ -83,7 +83,9 @@ S.ShiftChecklistTemplates = {
   // async now (it awaits the row write before flagging the account seeded). Callers may still
   // fire-and-forget: the in-memory push below happens synchronously, so a render right after
   // this call still sees the starters.
-  async ensureStarters() {
+  // `token` is the App._mountSeq captured by render() — see lc-positions.ensureStarters. The failed-
+  // seed repaint is guarded on it so a late failure never paints this screen over the next one.
+  async ensureStarters(token) {
     if (!App.shiftData) App.shiftData = {};
     if (App.shiftData.sc_starter_seeded) return;
     const list = this.templates();
@@ -99,13 +101,19 @@ S.ShiftChecklistTemplates = {
     // true, the array stripped from the blob, and no rows — so Checklist Templates stayed
     // permanently empty and could never re-seed.
     const ok = await App.putRecordsBulk('sc', 'checklist_template', seeded, { quiet: true });   // fires from render(), never shout
-    if (!ok) { seeded.forEach(t => { const i = list.indexOf(t); if (i >= 0) list.splice(i, 1); }); return; }
+    if (!ok) {
+      // render() painted these synchronously; the quiet write failed, so splice them out AND
+      // re-render — but only if this is still the current screen (app.js:1428).
+      seeded.forEach(t => { const i = list.indexOf(t); if (i >= 0) list.splice(i, 1); });
+      if (token != null && App._mountSeq === token) this.renderList();
+      return;
+    }
     App.shiftData.sc_starter_seeded = true;
     await App.saveShift();                                       // the sc_starter_seeded flag stays in the blob
   },
 
   render(container, actions) {
-    this.ensureStarters();
+    this.ensureStarters(App._mountSeq);   // pass the mount token — a failed seed only repaints if still current
     this.container = container;
     this.actions = actions;
     if (this.actions) this.actions.innerHTML = '';
