@@ -387,8 +387,23 @@ S.TheftRisk = {
   _vimSave(inv, mutate, invId, redrawOnSuccess) {
     const undo = App.snapshotRows([inv]);
     mutate();
+    // Concurrency guard: two overlapping saves to the SAME investigation share the live `inv`, so a
+    // slow-failing FIRST save (storageFull + a server rejection is the only false path that awaits the
+    // network) would restoreRows past a SECOND edit's change — which putRecord has already written to
+    // the server as part of the whole record — and re-render it away. Only the LATEST save owns the
+    // revert; a superseded failure leaves the newer state (which matches the server) in place. The
+    // non-overlapping case is unchanged: a lone save is always its own latest.
+    // ⚠ Residual, deliberately not chased: if BOTH overlapping saves fail (storageFull + the server
+    // rejecting both), the latest reverts to its own pre-edit snapshot, which still shows the earlier
+    // failed edit until a reload heals it. It is doubly-pathological and self-correcting — do NOT add
+    // cross-save coordination for it (poor risk/reward).
+    const token = (this._vimTok = (this._vimTok || 0) + 1);
+    (this._vimLatest || (this._vimLatest = {}))[inv.id] = token;
     return App.putRecord('core', 'variance_investigation', inv).then(ok => {
-      if (!ok) { App.restoreRows(undo); this._renderVimBody(invId); return false; }
+      if (!ok) {
+        if (this._vimLatest[inv.id] === token) { App.restoreRows(undo); this._renderVimBody(invId); }
+        return false;
+      }
       if (redrawOnSuccess) this._renderVimBody(invId);
       return true;
     });
@@ -399,7 +414,12 @@ S.TheftRisk = {
       return { step2: '<div style="font-size:11px;color:var(--t4);margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px dashed var(--b2);border-radius:3px;">Open this investigation from a product to wire live count + spot-check data into this step.</div>', step3: '' };
     }
     const p = this.productById(productId);
-    if (!p) return { step2: '', step3: '' };
+    if (!p) {
+      // The product this investigation was opened on has since been deleted. The record survives
+      // (it still carries its sku), so say that rather than render two blank steps on a document
+      // about a suspected theft — same shape as the no-productId branch above.
+      return { step2: '<div style="font-size:11px;color:var(--t4);margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px dashed var(--b2);border-radius:3px;">The product for this investigation has been deleted, so live count and spot-check data are no longer available. Your recorded findings below are unchanged.</div>', step3: '' };
+    }
 
     const counts = ((App.inventoryData && App.inventoryData.ic_counts) || []).slice()
       .sort(App.cmpOldest);

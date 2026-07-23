@@ -167,7 +167,12 @@ S.HubOperatingExpenses = {
   // previous one has pushed into it, so overlap is impossible and nothing is skipped.
   catchUpRecurring() {
     const run = () => this._catchUpOnce();
-    this._catchUpChain = this._catchUpChain ? this._catchUpChain.then(run, run) : run();
+    const chain = this._catchUpChain ? this._catchUpChain.then(run) : run();
+    // A rejected pass must not become an unhandledrejection: App.boot() (app.js:682) fires this
+    // without awaiting or catching, and a call with nothing chained after it has no other handler.
+    // Swallow+log at the tail; the caught promise is what the next call chains onto, so a failed
+    // pass still lets a later back-dated bill catch up, and passes stay serialized (never overlap).
+    this._catchUpChain = chain.catch(e => { try { DB.logClientError('opex_catchup', (e && e.message) || String(e), (e && e.stack) || '', 'hub-operating-expenses'); } catch (e2) {} });
     return this._catchUpChain;
   },
   _catchUpChain: null,
