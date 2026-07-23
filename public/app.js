@@ -7640,6 +7640,7 @@ const App = {
     const confirmText = opts.confirmText || 'Confirm';
     const cancelText  = opts.cancelText  || 'Cancel';
     const danger      = opts.danger !== false; // default to danger (red) confirm button
+    const oneButton   = opts.oneButton === true;   // ack-only dialog: render just the confirm button
     return new Promise(resolve => {
       const overlay = document.createElement('div');
       // z defaults to 9500; callers layering over the plan gate (9700) pass higher.
@@ -7648,7 +7649,7 @@ const App = {
         + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:' + (message ? '10' : '18') + 'px;">' + (opts.titleHtml || esc(title)) + '</div>'
         + (message ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">' + esc(message) + '</div>' : '')
         + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
-          + '<button class="btn btn-ghost" data-act="cancel">' + esc(cancelText) + '</button>'
+          + (oneButton ? '' : '<button class="btn btn-ghost" data-act="cancel">' + esc(cancelText) + '</button>')
           + '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + '" data-act="confirm">' + esc(confirmText) + '</button>'
         + '</div></div>';
       document.body.appendChild(overlay);
