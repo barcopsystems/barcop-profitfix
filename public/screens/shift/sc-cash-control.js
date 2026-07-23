@@ -726,7 +726,9 @@ S.ShiftCashControl = {
     const sameDay = this.variances().filter(x => x && x.id !== editId
       && x.date === date && (x.drawer_id || '') === drawerId);
     if (sameDay.length) {
-      const prior = sameDay[0];
+      // Show the MOST RECENT prior count, not sameDay[0] (array position) — the ordering-flip class.
+      // Reachable once a deliberate "Add anyway" second count exists, or from imported duplicates.
+      const prior = sameDay.sort(App.cmpNewest)[0];
       const ok = await App.confirm({
         title: 'This register is already counted for that day',
         message: (prior.drawer || 'That register') + ' on ' + date + ' is already logged at '

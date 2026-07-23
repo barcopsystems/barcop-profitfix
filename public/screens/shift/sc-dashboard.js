@@ -113,7 +113,7 @@ S.ShiftDashboard = {
         { label: 'Voids', value: App.fmtCurrency(voidTot) },
         varCount
           ? { label: 'Over / Short', value: (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), warn: netVar < 0 }
-          : { label: 'Over / Short', value: 'Not counted' }
+          : { label: 'Over / Short', value: 'Not counted', color: 'var(--t3)' }
       ];
       return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length, lastWk: sw.lastWk };
     } finally { this._weekEnd = sv; }
@@ -312,8 +312,11 @@ S.ShiftDashboard = {
     const compTot = wkVC.filter(r => r.type === 'Comp').reduce((s, r) => s + (r.amount || 0), 0);
     const line = (label, val, warn) => '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:12px;">'
       + '<span style="color:var(--t2);">' + label + '</span><span style="font-weight:700;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + '</span></div>';
-    return line('Cash shorts this week', String(shorts), shorts > 0)
-      + line('Drawers out of tolerance', String(oot), oot > 0)
+    // ⚠ Not counted ≠ zero shorts (S77): a $0/0 read over a week nobody reconciled is the same
+    // "clean" lie the "Not counted" tile above already avoids — mirror it here.
+    const counted = wkVar.length > 0;
+    return line('Cash shorts this week', counted ? String(shorts) : 'Not counted', counted && shorts > 0)
+      + line('Drawers out of tolerance', counted ? String(oot) : 'Not counted', counted && oot > 0)
       + line('Voids', App.fmtCurrency(voidTot), false)
       + line('Comps', App.fmtCurrency(compTot), false)
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
@@ -340,7 +343,13 @@ S.ShiftDashboard = {
       // the note in hubSteps. Every consumer of netVar must check it before showing a figure.
       const wkVar = this.variances().filter(v => this.inWeek(v.date));
       const netVar = wkVar.reduce((t, v) => t + (v.variance || 0), 0);
-      return { wkS, rev, covers, checkAvg, voidTot, compTot, netVar, varCount: wkVar.length, days: wkS.length, hasSales: wkS.length > 0, lastWk: sw.lastWk };
+      // shorts/oot/walked computed HERE, in the stat-week context, so _insBriefing reads them off `st`
+      // instead of recomputing against the (often empty) selected week — that mismatch printed last
+      // week's net short with this week's zero shift/walked counts (S76).
+      const shorts = wkVar.filter(v => v.status === 'Short').length;
+      const oot = wkVar.filter(v => v.status === 'Over' || v.status === 'Short').length;
+      const walked = this.walkedTabs().filter(r => this.inWeek(r.date)).length;
+      return { wkS, rev, covers, checkAvg, voidTot, compTot, netVar, varCount: wkVar.length, shorts, oot, walked, days: wkS.length, hasSales: wkS.length > 0, lastWk: sw.lastWk };
     } finally { this._weekEnd = sv; }
   },
 
@@ -388,10 +397,12 @@ S.ShiftDashboard = {
 
   _insBriefing(st) {
     const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
-    const wkVar = this.variances().filter(v => this.inWeek(v.date));
-    const shorts = wkVar.filter(v => v.status === 'Short').length;
-    const oot = wkVar.filter(v => v.status === 'Over' || v.status === 'Short').length;
-    const walked = this.walkedTabs().filter(r => this.inWeek(r.date)).length;
+    // Read off `st` (the stat week _wys resolved), NOT a recompute against the selected week — the two
+    // disagree on a fresh Monday and the Briefing printed last week's net short with this week's zero
+    // counts (S76). `counted` gates every cash claim so an uncounted week never reads clean.
+    const shorts = st.shorts || 0, oot = st.oot || 0, walked = st.walked || 0;
+    const counted = st.varCount > 0;
+    const vc = (st.voidTot || 0) + (st.compTot || 0);
     const paras = [];
 
     // 1 — where sales stand
@@ -399,27 +410,33 @@ S.ShiftDashboard = {
     p1 += st.checkAvg != null ? ', a ' + m(st.checkAvg) + ' check.' : '.';
     paras.push(p1);
 
-    // 2 — where money is walking
+    // 2 — where money is walking. Cash figures are gated on `counted`, and the "no drawer counted"
+    // note is INDEPENDENT of voids/comps (S79): an ordinary week has voids, which used to fill `walks`
+    // and suppress the note while the tile above still read "Not counted".
     const walks = [];
-    if (st.netVar < 0) walks.push('the drawer came up ' + m(Math.abs(st.netVar)) + ' short net' + (shorts > 0 ? ' across ' + shorts + ' short shift' + (shorts === 1 ? '' : 's') : ''));
-    else if (st.netVar > 0) walks.push('the drawer ran ' + m(st.netVar) + ' over net, which is its own flag');
+    if (counted && st.netVar < 0) walks.push('the drawer came up ' + m(Math.abs(st.netVar)) + ' short net' + (shorts > 0 ? ' across ' + shorts + ' short shift' + (shorts === 1 ? '' : 's') : ''));
+    else if (counted && st.netVar > 0) walks.push('the drawer ran ' + m(st.netVar) + ' over net, which is its own flag');
     if (oot > 0) walks.push(oot + ' drawer' + (oot === 1 ? '' : 's') + ' out of tolerance');
-    if ((st.voidTot || 0) + (st.compTot || 0) > 0) walks.push(m(st.voidTot) + ' in voids and ' + m(st.compTot) + ' in comps');
+    if (vc > 0) walks.push(m(st.voidTot) + ' in voids and ' + m(st.compTot) + ' in comps');
     if (walked > 0) walks.push(walked + ' walked tab' + (walked === 1 ? '' : 's'));
-    // ⚠ "Clean" is a CLAIM, and it must not be made about a drawer nobody counted. With no counts
-    // netVar is 0 and oot is 0, so `walks` came out empty and this printed "The register is clean
-    // this week" over a week with no cash reconciliation at all — the owner reads that, skips the
-    // reconcile step, and a week of shortages is never looked at.
-    paras.push(walks.length
-      ? 'Where money is walking: ' + walks.join(', ') + '.'
-      : (st.varCount
-          ? 'The register is clean this week. Drawer is in tolerance and voids and comps are quiet.'
-          : 'No drawer was counted this week, so there is nothing to say about cash yet. Reconcile the drawers and this fills in.'));
 
-    // 3 — the single move
+    let p2;
+    if (!counted) {
+      p2 = 'No drawer was counted this week, so cash is unread'
+         + (walks.length ? '. On the floor: ' + walks.join(', ') + '.' : '. Reconcile the drawers and this fills in.');
+    } else if (walks.length) {
+      p2 = 'Where money is walking: ' + walks.join(', ') + '.';
+    } else {
+      p2 = 'The register is clean this week. Drawer is in tolerance and voids and comps are quiet.';
+    }
+    paras.push(p2);
+
+    // 3 — the single move, tied to what para 2 actually found (S78): never "nothing walking" over an
+    // uncounted week or one that came up short.
     let move;
-    if (oot > 0 || st.netVar < -20) move = 'Chase the cash first. Pull the out-of-tolerance drawers in Cash Control and see who counted and when.';
-    else if ((st.voidTot || 0) + (st.compTot || 0) > 0) move = 'Watch the voids and comps by server in Loss Prevention. The ones who spike are the conversation.';
+    if (!counted) move = 'Reconcile the drawers first so cash gets read, then log the exceptions as they happen.';
+    else if (oot > 0 || st.netVar < -20) move = 'Chase the cash first. Pull the out-of-tolerance drawers in Cash Control and see who counted and when.';
+    else if (vc > 0) move = 'Watch the voids and comps by server in Loss Prevention. The ones who spike are the conversation.';
     else move = 'Nothing walking this week. Keep the drawer counts honest and log the exceptions as they happen.';
     paras.push(move);
 
