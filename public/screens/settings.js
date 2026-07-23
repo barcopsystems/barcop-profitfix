@@ -711,16 +711,20 @@ S.HubSettings = {
     }
   },
 
-  // Remove every cockpit "done" stamp from the ACCOUNT blob (S72). The stamps are keyed
-  // `<mod>_cockpit_done_<week>` and stored in App.data.account_state via App.acctSet, so a
-  // localStorage sweep never touched them. Filtered on the shared `cockpit_done_` substring so all
-  // six cockpits are covered by one pass, and NOTHING else in account_state (recovery targets,
-  // cash config, saved import maps) is disturbed.
+  // Remove every per-period "done" stamp from the ACCOUNT blob (S72). Stored in
+  // App.data.account_state via App.acctSet, so a localStorage sweep never touched them.
+  // ⚠ TWO KEY PREFIXES, NOT ONE (S172). The six cockpits key `<mod>_cockpit_done_<week>`, and Books
+  // Home keys `books_close_done_<month>` (hub-books-home.js:40) — the same per-period done-map
+  // class, a different prefix. Both must clear or the Books close flow keeps a phantom done count
+  // after a demo re-seed. Nothing else in account_state (recovery targets, cash config, saved
+  // import maps) is disturbed — every done-map key carries `_done_`, no other account key does.
   _clearCockpitStamps() {
     try {
       const s = (App.data && App.data.account_state) || null;
       if (!s) return;
-      Object.keys(s).forEach(k => { if (k.indexOf('cockpit_done_') !== -1) delete s[k]; });
+      Object.keys(s).forEach(k => {
+        if (k.indexOf('cockpit_done_') !== -1 || k.indexOf('books_close_done_') !== -1) delete s[k];
+      });
     } catch (e) {}
   },
 

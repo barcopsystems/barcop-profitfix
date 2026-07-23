@@ -444,7 +444,10 @@ S.ProfitFix = {
       body = ' is not started yet. Do its first step and Bar Cop starts measuring from that day.';
     } else {
       const r = window.Recovery ? Recovery.compute(logged) : { status: 'untracked' };
-      const since = ' running since ' + esc(logged.date) + '. ';
+      // ⚠ The "since" date must be the DURABLE baseline compute() measured from (S170), not the
+      // windowed fix_log row's date — that row can drift later, so "running since <late date>"
+      // beside a recovered figure measured from the true earlier start read as a contradiction.
+      const since = ' running since ' + esc((window.Recovery && Recovery.baselineFor(logged)) || logged.date) + '. ';
       if (this.isComposite(g.id)) {
         // Prime is the only composite. Its dollars are the parts restated, and
         // recoveredFor already returns 0 for it, so say why instead of showing a blank.

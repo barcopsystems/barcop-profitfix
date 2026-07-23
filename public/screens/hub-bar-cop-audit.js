@@ -409,11 +409,13 @@ S.HubBarCopAudit = {
     // Matured fixes that produced positive dollar movement via Recovery.
     let recoveredCount = 0;
     if (window.Recovery && typeof Recovery.compute === 'function') {
-      // Dedupe to one entry per gap-area (a gap with an auto-start + a manual mark
-      // is one recovered fix, not two), matching the Recovery Scoreboard.
-      const scored = (typeof Recovery._oneFixPerGap === 'function')
-        ? Recovery._oneFixPerGap(fixLog.filter(f => (Recovery.COMPOSITE_GAPS || []).indexOf(f.gap_id) === -1))
-        : fixLog;
+      // ⚠ Source from _gapEntries so this COUNT matches the dollarsRecovered TOTAL above (S170).
+      // total() now uses the durable baseline union; counting from _oneFixPerGap(fixLog) instead
+      // dropped a gap whose fix_log row had aged out, so the count and the dollars disagreed.
+      // _gapEntries already dedupes per gap and excludes composites.
+      const scored = (typeof Recovery._gapEntries === 'function')
+        ? Recovery._gapEntries(null)
+        : fixLog.filter(f => (Recovery.COMPOSITE_GAPS || []).indexOf(f.gap_id) === -1);
       scored.forEach(f => {
         try {
           const r = Recovery.compute(f);
@@ -763,10 +765,11 @@ S.HubBarCopAudit = {
     }
     if (window.Recovery && typeof Recovery.compute === 'function') {
       // 'building' is the real mid-measurement status compute() returns; there is
-      // no 'pending', so this counter was always 0. Dedupe per gap-area too.
-      const scored = (typeof Recovery._oneFixPerGap === 'function')
-        ? Recovery._oneFixPerGap(fixLog.filter(f => (Recovery.COMPOSITE_GAPS || []).indexOf(f.gap_id) === -1))
-        : fixLog;
+      // no 'pending', so this counter was always 0. Source from _gapEntries (durable-baseline
+      // union), matching the dollar total and the recoveredCount above (S170).
+      const scored = (typeof Recovery._gapEntries === 'function')
+        ? Recovery._gapEntries(null)
+        : fixLog.filter(f => (Recovery.COMPOSITE_GAPS || []).indexOf(f.gap_id) === -1);
       scored.forEach(f => {
         try {
           const r = Recovery.compute(f);

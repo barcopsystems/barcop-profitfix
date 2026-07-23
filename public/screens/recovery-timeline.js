@@ -140,19 +140,20 @@ S.RecoveryTimeline = {
   recoverySeries(moduleKey) {
     if (!window.Recovery) return { points: [], firstMeasure: null };
     const R = window.Recovery;
-    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
-    // Match the Recovery Scoreboard exactly so this chart never contradicts it:
-    // one entry per gap (a second fix in the same area computes the SAME dollars,
-    // so summing both double-counts), skip noDollar gaps (pricing/rplh dollarize
-    // the very signal check-average already counts), and dollarize with
-    // recoverValue (hourly labor %, not blended) just like Recovery.compute.
-    const mine = R._oneFixPerGap(log.filter(e => e.module === moduleKey && e.date
-      && R.COMPOSITE_GAPS.indexOf(e.gap_id) === -1
-      && R.METRICS[e.gap_id] && !R.METRICS[e.gap_id].noDollar));
+    // Match the Recovery Scoreboard EXACTLY so this chart never contradicts it (S170): source the
+    // gaps from _gapEntries (durable baselines UNION windowed fix_log, one per gap, composites
+    // already excluded) and measure each from baselineFor(e) — NOT from _oneFixPerGap(fix_log) +
+    // e.date, which drifted the baseline later or dropped an aged-out gap and made this chart read
+    // $0 while the Scoreboard on the same screen read the real recovered total.
+    // Skip noDollar gaps (pricing/rplh dollarize the signal check-average already counts), and
+    // dollarize with recoverValue (hourly labor %, not blended) just like Recovery.compute.
+    const mine = R._gapEntries(moduleKey).filter(e => R.METRICS[e.gap_id] && !R.METRICS[e.gap_id].noDollar);
     const byWeek = {};
     const B = R.BASELINE_WEEKS;
     mine.forEach(e => {
       const m = R.METRICS[e.gap_id];
+      const start = R.baselineFor(e);
+      if (!start) return;
       // The base has to follow the value, exactly as Recovery.compute pairs them:
       // recoverValue (hourly labor %) is measured against bar+food, so it dollarizes
       // against recoverBase. Pairing it with `base` (total sales, what the blended %
@@ -161,7 +162,7 @@ S.RecoveryTimeline = {
       const vf = m.recoverValue || m.value;
       const bf = m.recoverBase || m.base;
       const op = R._series(m.series)
-        .filter(w => w.period_end && w.period_end >= e.date && vf(w) != null)
+        .filter(w => w.period_end && w.period_end >= start && vf(w) != null)
         .slice().sort((a, b) => a.period_end.localeCompare(b.period_end));
       if (op.length <= B) return;                       // this gap still building
       const bAvg = R._avg(op.slice(0, B).map(vf));
