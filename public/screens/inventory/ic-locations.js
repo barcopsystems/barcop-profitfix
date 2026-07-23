@@ -703,7 +703,11 @@ S.InventoryLocations = {
       }
     };
     document.getElementById('il-name')?.addEventListener('input', e => { this._nameDraft = e.target.value; });
-    document.getElementById('il-name')?.addEventListener('keydown', e => { if (e.key === 'Enter') this.updateLocation(l.id); });
+    // S185: a stray Enter must not slip PAST the disposition prompt. Once the prompt is open the gate
+    // is skipped by design (_dispPending), so a second Enter would re-enter updateLocation and commit
+    // the removal under the still-open modal — and Cancel cannot undo it. Hold the Enter save inert
+    // until the prompt resolves; the one legitimate re-entry comes through the prompt's proceed().
+    document.getElementById('il-name')?.addEventListener('keydown', e => { if (e.key === 'Enter' && !this._dispPending) this.updateLocation(l.id); });
     const ab = document.getElementById('il-arrange-body');
     if (ab) DragReorder.wire({ container: ab, rowSelector: 'tr[data-id]', handleSelector: '.dr-handle', dragClass: 'il-drag', onCommit: ids => this._persistProductOrder(l.name, ids) });
     document.getElementById('il-export')?.addEventListener('click', () => App.exportPDF({ title: (l.name || 'Location') + ' Products', root: document.getElementById('il-arrange-export') }));
