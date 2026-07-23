@@ -5729,6 +5729,19 @@ const App = {
     if (!list.length) return true;   // everything stays — piece 1 carries it forward, nothing to write
     const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
     const catOf = pid => (prods.find(p => p && p.id === pid) || {}).category || '';
+    // S183: a product 'moved' to a shelf it is not assigned to now LIVES there — assign it, or the
+    // moved units land on a shelf the product does not occupy, drop into _perpetualInventory's stale
+    // bucket, and the CURRENT on-hand read (order sheet / trapped) drops them while the as-of read
+    // keeps them, so the reorder math re-orders stock that was only relocated. Snapshot for rollback;
+    // the assignment writes BEFORE the disposition so the destination row is a real home.
+    const touched = [], undo = [];
+    list.forEach(d => {
+      if (d.choice !== 'moved' || !d.destLoc) return;
+      const p = prods.find(x => x && x.id === d.product_id);
+      if (!p) return;
+      const locs = this.productLocations(p);
+      if (!locs.includes(d.destLoc)) { undo.push(...App.snapshotRows([p])); p.locations = [...locs, d.destLoc]; touched.push(p); }
+    });
     const mkItem = (d, loc, total) => ({
       product_id: d.product_id, name: d.name || '', category: catOf(d.product_id),
       location: loc, total: total,
@@ -5753,9 +5766,14 @@ const App = {
       total_value: items.reduce((s, i) => s + (i.value || 0), 0),
       disposition: true, disposition_from: fromLoc, created_at: new Date().toISOString()
     };
+    // Assign the moved products to their destinations FIRST (idempotent upserts), so the disposition's
+    // dest rows count as on-hand there; a failed assignment rolls back and aborts (no orphaned move).
+    if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) { App.restoreRows(undo); return false; }
     // Kind 'disposition' → ic_dispositions, NOT 'count' → ic_counts (S182): keeps it out of every
     // computeUsagePair usage reader while _perpetualInventory / countedStockAt still merge it.
-    return await App.putRecord('ic', 'disposition', record);
+    const ok = await App.putRecord('ic', 'disposition', record);
+    if (!ok) App.restoreRows(undo);   // roll the assignment back if the disposition did not land
+    return ok;
   },
 
   // The S133 disposition PROMPT. A shared helper: WIRED into the archive flow (ic-locations
