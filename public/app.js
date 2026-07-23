@@ -3600,8 +3600,11 @@ const App = {
     if (!p || p.unit_cost == null) return null;
     const cost = parseFloat(p.unit_cost);
     if (isNaN(cost)) return null;
-    if (p.category === 'Bottle Beer' && p.case_size && p.case_size > 0) {
-      return cost / p.case_size;
+    if (p.category === 'Bottle Beer') {
+      // unit_cost is a CASE price; with no case size there is no per-bottle cost, so REFUSE (null)
+      // rather than hand back the whole case as a per-bottle figure (~24x too high). The poured-
+      // beverage branch in menuLinkCost refuses the same way (0/Incomplete until a basis exists). S162.
+      return (p.case_size && p.case_size > 0) ? cost / p.case_size : null;
     }
     return cost;
   },
@@ -4205,7 +4208,9 @@ const App = {
     // cost (cost per case / case size) is the menu cost.
     if (p.category === 'Bottle Beer') {
       const bc = this.bottleCost(p);
-      return bc != null ? bc : (parseFloat(p.unit_cost) || 0);
+      // No case size → no per-bottle cost. Report 0 (Incomplete), the SAME as a poured beverage with
+      // no pour basis below — NOT the whole case price, which scored every bottle at ~24x. S162.
+      return bc != null ? bc : 0;
     }
     // Poured beverages (Wine, Draft Beer, Liquor) are sold by the glass/pour, so
     // the menu cost is the cost of ONE pour, NEVER the whole bottle or keg. Honor
