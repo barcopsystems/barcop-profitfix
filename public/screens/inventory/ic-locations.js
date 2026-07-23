@@ -969,6 +969,18 @@ S.InventoryLocations = {
   async setArchived(id, val) {
     const l = this.locations().find(x => x.id === id);
     if (!l) return;
+    // ⚠ S133 piece 2 (the disposition prompt) is UN-WIRED for now — see S181/S182. The prompt's
+    // write (App.disposeShelfStock) records a PARTIAL disposition into ic_counts, and that partial
+    // record becomes the newest count for every computeUsagePair reader (weekly COGS, dead-stock,
+    // variance, cash-recovery), which each treat the newest count as a FULL snapshot — so an archive
+    // silently collapsed those figures. Piece 1 (the safe floor in _perpetualInventory) already
+    // carries an archived-but-assigned shelf forward + discloses it, so archiving stays HONEST on the
+    // tax sheet without the prompt. Re-wire once dispositions live OUTSIDE ic_counts (read only by the
+    // perpetual/as-of reader). The helpers (countedStockAt/disposeShelfStock/promptShelfDisposition)
+    // stay in app.js, ready to re-wire with the corrected storage.
+    this._writeArchived(l, val);
+  },
+  async _writeArchived(l, val) {
     // Live row: putRecord cannot revert it for us. Archiving a shelf is load-bearing — an archived
     // location can never be recounted, and _perpetualInventory treats it as no longer a home — so a
     // refused archive that still reads archived on screen changes what the count sheet offers.
