@@ -5864,6 +5864,64 @@ const App = {
     });
   },
 
+  // The S140 import-conflict PROMPT. Shared by the sales and cash importers. When a POS file lands
+  // on a day / register the operator entered BY HAND and the numbers DIFFER, Bar Cop does not decide
+  // for them ([[user-chooses-conflicts]]): it shows both figures side by side and lets the operator
+  // pick which of their own numbers wins, per row, with a bulk set-all. Default is KEEP MINE (the
+  // hand-typed figure is safe — they entered it on purpose). Returns a Promise of
+  // { confirmed, useTheirs } — useTheirs is a Set of the row keys the operator chose to overwrite
+  // with the file. Cancel / X resolves { confirmed:false, useTheirs:empty } and nothing is written.
+  // opts.rows = [{ key, label, mineText, theirsText }].
+  promptImportConflicts(opts) {
+    opts = opts || {};
+    const rows = (opts.rows || []).filter(Boolean);
+    return new Promise(resolve => {
+      if (!rows.length) { resolve({ confirmed: true, useTheirs: new Set() }); return; }
+      const sel = (cls, id) => '<select class="' + cls + '"' + (id ? ' id="' + id + '"' : '') + ' style="padding:7px 9px;">'
+        + '<option value="mine" selected>Keep mine</option>'
+        + '<option value="theirs">Use the file</option>'
+        + '</select>';
+      const body = rows.map(r =>
+        '<tr data-key="' + esc(r.key) + '" style="border-bottom:1px solid var(--b2);">'
+        + '<td style="padding:9px 10px;">' + esc(r.label) + '</td>'
+        + '<td style="padding:9px 10px;white-space:nowrap;">' + esc(r.mineText) + '</td>'
+        + '<td style="padding:9px 10px;white-space:nowrap;">' + esc(r.theirsText) + '</td>'
+        + '<td style="padding:9px 10px;">' + sel('imc-choice') + '</td>'
+        + '</tr>').join('');
+      const html = '<div class="card form-card">'
+        + '<div class="card-title">' + esc(opts.title || 'These were entered by hand') + '</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
+        + esc(opts.intro || 'This file has different numbers for entries you already made by hand. Pick which to keep. Your own figures are kept unless you choose the file.') + '</div>'
+        + (rows.length > 1 ? '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><label style="margin:0;font-size:12px;color:var(--t2);">Set all to</label>'
+            + sel('', 'imc-bulk') + '</div>' : '')
+        + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+        + '<thead><tr style="text-align:left;color:var(--t3);border-bottom:1px solid var(--b2);">'
+        + '<th style="padding:9px 10px;">' + esc(opts.rowLabel || 'Entry') + '</th>'
+        + '<th style="padding:9px 10px;">' + esc(opts.colMine || 'Your figures') + '</th>'
+        + '<th style="padding:9px 10px;">' + esc(opts.colTheirs || 'This file') + '</th>'
+        + '<th style="padding:9px 10px;">Which wins</th></tr></thead>'
+        + '<tbody>' + body + '</tbody></table></div>'
+        + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">'
+        + '<button type="button" class="btn btn-ghost" id="imc-cancel">Cancel import</button>'
+        + '<button type="button" class="btn btn-primary" id="imc-confirm">Apply</button></div>'
+        + '</div>';
+      let done = false;
+      const finish = (val) => { if (done) return; done = true; App.closeModal('import-conflict'); resolve(val); };
+      // onClose fires only on the X (openModal never calls it on a programmatic closeModal); the
+      // `done` guard makes a double-close a no-op either way.
+      const overlay = App.openModal(html, { id: 'import-conflict', maxWidth: 640, onClose: () => finish({ confirmed: false, useTheirs: new Set() }) });
+      const all = () => Array.from(overlay.querySelectorAll('tr[data-key]'));
+      const bulk = overlay.querySelector('#imc-bulk');
+      if (bulk) bulk.addEventListener('change', () => all().forEach(tr => { tr.querySelector('.imc-choice').value = bulk.value; }));
+      overlay.querySelector('#imc-cancel').addEventListener('click', () => finish({ confirmed: false, useTheirs: new Set() }));
+      overlay.querySelector('#imc-confirm').addEventListener('click', () => {
+        const useTheirs = new Set();
+        all().forEach(tr => { if (tr.querySelector('.imc-choice').value === 'theirs') useTheirs.add(tr.getAttribute('data-key')); });
+        finish({ confirmed: true, useTheirs: useTheirs });
+      });
+    });
+  },
+
   // ── Inventory value AS OF a date — the ONE door for the tax sheets ──────────
   // Schedule C COGS is `beginning + purchases - ending`, so a deflated ending figure
   // OVERSTATES COGS and understates taxable profit. Every tax sheet used to read a
