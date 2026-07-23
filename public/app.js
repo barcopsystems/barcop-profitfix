@@ -4629,7 +4629,7 @@ const App = {
     // (see _pdfColWidths), so a cell carrying a name plus an explanation claimed half the
     // page and squeezed the numeric columns until they wrapped mid-figure.
     // A space before each block-level child, then the existing whitespace collapse.
-    clone.querySelectorAll('div, p, li, br, tr, h1, h2, h3, h4, h5, h6').forEach(el => {
+    clone.querySelectorAll('div, p, li, br, tr, td, th, h1, h2, h3, h4, h5, h6, option, optgroup, label, dt, dd, section, article').forEach(el => {
       if (el.parentNode) el.parentNode.insertBefore(clone.ownerDocument.createTextNode(' '), el);
     });
     return this._pdfSafe((clone.textContent || '').replace(/\s+/g, ' ').trim());
@@ -4784,7 +4784,10 @@ const App = {
     const _sharedCols = {};
     Object.keys(_wGroups).forEach(cc => {
       const n = parseInt(cc), tbls = _wGroups[cc];
-      if (tbls.length < 2) return;   // only align when 2+ tables share the shape
+      // Cap EVERY group's column widths, not just 2+-table groups (S126): a single-table report (one
+      // menu section, or a CSV import that left everything Uncategorized) otherwise fell to autoTable's
+      // own 'auto' sizing with no 28-char cap. Aligning across tables is the bonus when there are 2+;
+      // the cap is the point and applies to one table just as well.
       _sharedCols[n] = this._pdfColWidths(tbls, n, availW);
     });
 
