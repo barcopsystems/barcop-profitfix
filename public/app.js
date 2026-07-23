@@ -5532,7 +5532,12 @@ const App = {
   // Each product also carries the oldest/newest count date that fed it, so a caller
   // can say WHICH figures rest on an older count instead of quietly mixing them.
   _perpetualInventory(asOf, exclusive) {
-    const counts = [...((this.inventoryData && this.inventoryData.ic_counts) || [])]
+    // ic_counts + ic_dispositions: the two kinds that move on-hand. A disposition (S182) carries the
+    // same item shape and a date, so it flows through the per-key newest-wins logic below exactly like
+    // a count. Stored apart from ic_counts so the computeUsagePair usage readers never see it.
+    const _inv = this.inventoryData || {};
+    const counts = [...(Array.isArray(_inv.ic_counts) ? _inv.ic_counts : []),
+                    ...(Array.isArray(_inv.ic_dispositions) ? _inv.ic_dispositions : [])]
       .filter(c => !asOf || (c && c.date && (exclusive ? String(c.date) < asOf : String(c.date) <= asOf)))
       .sort(App.cmpNewest);   // newest first by record date
     const locs = (this.inventoryData && this.inventoryData.ic_locations) || [];
@@ -5676,7 +5681,11 @@ const App = {
   // [{ product_id, name, onHand, value, date, unitCost }], newest count per product at the shelf.
   countedStockAt(locName, onlyPid) {
     if (!locName) return [];
-    const counts = [...((this.inventoryData && this.inventoryData.ic_counts) || [])].sort(App.cmpNewest);
+    // Counts + dispositions (S182), same as _perpetualInventory, so a shelf already zeroed by a prior
+    // disposition reads as empty here and is not re-prompted.
+    const _inv = this.inventoryData || {};
+    const counts = [...(Array.isArray(_inv.ic_counts) ? _inv.ic_counts : []),
+                    ...(Array.isArray(_inv.ic_dispositions) ? _inv.ic_dispositions : [])].sort(App.cmpNewest);
     const locs = (this.inventoryData && this.inventoryData.ic_locations) || [];
     // Resolve a shelf's PRIOR names forward to its current name, never remapping a name that is
     // currently live (mirrors _perpetualInventory so the two never disagree on which shelf a row is).
@@ -5744,10 +5753,13 @@ const App = {
       total_value: items.reduce((s, i) => s + (i.value || 0), 0),
       disposition: true, disposition_from: fromLoc, created_at: new Date().toISOString()
     };
-    return await App.putRecord('ic', 'count', record);
+    // Kind 'disposition' → ic_dispositions, NOT 'count' → ic_counts (S182): keeps it out of every
+    // computeUsagePair usage reader while _perpetualInventory / countedStockAt still merge it.
+    return await App.putRecord('ic', 'disposition', record);
   },
 
-  // The S133 disposition PROMPT (shared by the archive + untick flows). Opened only when
+  // The S133 disposition PROMPT. A shared helper: WIRED into the archive flow (ic-locations
+  // setArchived); the untick flow (Set Locations) is S181, not yet wired. Opened only when
   // countedStockAt found real stock on the shelf being retired — an empty shelf never prompts. Asks
   // what happened to each product's stock (bulk choice with a per-product override), writes it via
   // disposeShelfStock, then runs `proceed` (the archive / untick itself). Cancel/X ABORTS: nothing is
@@ -5955,6 +5967,14 @@ const App = {
         count: 'ic_counts', delivery: 'ic_deliveries', order: 'ic_orders',
         transfer: 'ic_transfers', empty: 'ic_empties', adjustment: 'ic_adjustments',
         spot_check: 'ic_spot_checks', variance_run: 'ic_variance_runs',
+        // Shelf-retirement stock dispositions (S182): dated records of what happened to a shelf's
+        // stock when it was archived / unticked (used / moved). Stored APART from ic_counts on
+        // PURPOSE — _perpetualInventory + countedStockAt merge them for on-hand and the as-of tax
+        // value, but the computeUsagePair usage readers (weekly COGS, variance, dead-stock, cash
+        // recovery) read ic_counts ONLY and must NEVER see a disposition: it is a PARTIAL record
+        // (just the disposed products) and would collapse their newest-count-as-full-snapshot math.
+        // Windowed (carries a date), same as a count.
+        disposition: 'ic_dispositions',
         // Product master: row-per-record (data-safety migration 2026-07-19, so a bug
         // can only ever touch one product, never wipe the master list). No business
         // date -> NULL event date (NONWINDOWED_KINDS in db.js) so the whole product
