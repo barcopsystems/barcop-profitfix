@@ -770,6 +770,16 @@ const App = {
         + 'and ' + (r.stuck === 1 ? 'is' : 'are') + ' waiting for you in Settings > Backup & Restore. '
         + 'Nothing has been lost. Everything else is synced.';
     }
+    // ⚠ ON THE SYNC PATH, 'No account membership' is DELIBERATELY treated as a connection problem,
+    // and this must NOT be "fixed" to a reload message the way _writeFailMsg was (S171 tried that
+    // and it was wrong). The two paths differ for a real reason: a WRITE queues first when offline
+    // (db.js:1557), so its membership error means genuinely-no-membership → reload. But syncPending
+    // only catches offline via `!_sb || !_user` (db.js:813); a CACHED SESSION while offline has
+    // both truthy and falls through to the membership branch (db.js:819) because _ensureAccountId
+    // can't reach the server. On the sync path — which only runs when there are queued OFFLINE
+    // changes — that is the COMMON case, and "check your connection" is the right remedy (reloading
+    // offline would not help). So the membership error falls into the connection branch below on
+    // purpose. Pinned by verify-sync-reports-truth.js.
     if (r.failed || r.error) {
       return 'Still cannot reach the server. Your changes are safe on this device. '
         + 'Try again once you have a connection.';
