@@ -488,15 +488,25 @@ const PosIngest = {
     const conflictKeys = new Set();   // register-days already raised as a conflict (first file row establishes it)
     const has = v => v != null && String(v).trim() !== '';
     const cents = n => Math.round(n * 100) / 100;
-    const toAdd = []; const skipped = []; const conflicts = []; let dupCount = 0; let keptManual = 0; const used = new Set();
+    const toAdd = []; const skipped = []; const conflicts = []; let dupCount = 0; let keptManual = 0; let extraDropped = 0; const used = new Set();
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
       if (!date) { skipped.push('(no date)'); return; }
       const exp = this._num(r.expected), cnt = this._num(r.counted), os = this._num(r.over_short);
       let expected_cash = null, counted_cash = null, variance;
-      if (has(r.expected) && has(r.counted)) { expected_cash = exp; counted_cash = cnt; variance = cents(cnt - exp); }
-      else if (has(r.over_short)) { variance = cents(os); }   // a "($50)" shortage now correctly reads -50, not +50
-      else { skipped.push(date); return; }            // no over/short derivable
+      // ⚠ THE POS'S OWN OVER/SHORT IS AUTHORITATIVE (S144). When the file carries it, use it —
+      // deriving counted-minus-expected instead lost to a divergent basis (Counted often matches
+      // "deposit" / "ending cash", which includes an opening bank the Expected column omits), so a
+      // drawer the POS reported CLEAN stored as $200 Over. If a Counted figure came with it,
+      // reconstruct a CONSISTENT Expected (counted - over/short) so the stored triple balances and
+      // the row stays editable in the hand form. Only with NO over/short do we derive it.
+      // (Sign of a "($50)" shortage is handled in _num/_isNeg — S139.)
+      if (has(r.over_short)) {
+        variance = cents(os);
+        if (has(r.counted)) { counted_cash = cnt; expected_cash = cents(cnt - os); }
+      } else if (has(r.expected) && has(r.counted)) {
+        expected_cash = exp; counted_cash = cnt; variance = cents(cnt - exp);
+      } else { skipped.push(date); return; }            // no over/short derivable
       const dName = (r.drawer || '').trim();
       const dRec = dName ? drawerByName[dName.toLowerCase()] : soleDrawer;
       const drawer = dRec ? dRec.name : dName;
@@ -527,7 +537,11 @@ const PosIngest = {
         // identical one is not — never prompt when they match. The FIRST file row per register-day
         // establishes the comparison (the same per-day scope S99/S103 already use; a file that
         // lists the register-day twice is S141, deliberately still scoped per-day here).
-        if (conflictKeys.has(dayKey) || keptKeys.has(dayKey)) return;
+        // A LATER file row for a register-day already kept-or-conflicted is dropped — the per-day
+        // scope is deliberate (S99/S103) — but it must NOT be dropped in SILENCE (S141): a shift-
+        // split cash file lists a register-day more than once, and the operator has to know a row
+        // was not imported. Count it so the cockpit can say so.
+        if (conflictKeys.has(dayKey) || keptKeys.has(dayKey)) { extraDropped++; return; }
         if (this._sameVariance(manual, rec)) { keptKeys.add(dayKey); keptManual++; return; }
         conflictKeys.add(dayKey);
         conflicts.push({
@@ -551,8 +565,9 @@ const PosIngest = {
       toAdd.push(rec);
     });
     // `dupCount` means REPLACED (an earlier import), `keptManual` counts register-days the file
-    // matched a hand count on, and `conflicts` are register-days the operator must choose on.
-    return { toAdd, skipped, dupCount, keptManual, conflicts };
+    // matched a hand count on, `conflicts` are register-days the operator must choose on, and
+    // `extraDropped` counts later file rows dropped because their register-day was already handled.
+    return { toAdd, skipped, dupCount, keptManual, conflicts, extraDropped };
   },
 
   // Two drawer figures are "the same" for conflict purposes when their over/short agrees to the
