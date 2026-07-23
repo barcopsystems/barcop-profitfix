@@ -473,44 +473,74 @@ S.ShiftDashboard = {
       onComplete: rows => this.importSales(rows)
     });
   },
-  // opts.manual = came from the Enter Manually grid, which has no file, so it must never
-  // be told to go check the file's columns. opts.cleared = days zeroed out by that grid.
+  // opts.manual = came from the Enter Manually grid, which has no file, so it must never be told to
+  // go check the file's columns, and is an EDIT (never raises a conflict against itself).
+  // opts.cleared = days zeroed out by that grid.
   async importSales(rows, opts) {
     opts = opts || {};
-    const { toAdd, skipped, dupCount, merged, keptManual } = PosIngest.build('sales', rows);
+    const built = PosIngest.build('sales', rows, opts);
+    const { toAdd, skipped, dupCount, merged, keptManual, conflicts } = built;
     const res = document.getElementById('sc-ck-import-res');
-    if (!toAdd.length) {
-      // ⚠ Say the TRUE reason (S105). When every day in the file was already closed by hand this
-      // used to blame the operator's file for missing a Date column, which is both wrong and
-      // insulting — nothing was broken, we protected their own work. Mirrors the cash twin.
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (keptManual
-            ? 'No days imported. ' + keptManual + ' day' + (keptManual === 1 ? ' was' : 's were')
-              + ' already closed by hand, so your own figures were kept.'
-            : opts.manual ? 'No days saved. Enter sales for at least one day.'
-                          : 'No days imported. Check that the file has a Date column and sales values.')
-        + '</div>';
+    const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
+    const note = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">' + m + '</div>'; };
+    // A conflict: the file disagrees with days the operator entered BY HAND. Ask which wins before
+    // writing anything ([[user-chooses-conflicts]]). Never on the manual grid — that IS the choice.
+    const extra = []; let usedTheirs = 0;
+    if (conflicts && conflicts.length) {
+      const money = v => v == null ? '—' : '$' + (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const dayLabel = d => { const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
+      const salesText = v => {
+        const parts = [];
+        if (v.bar_revenue != null) parts.push('Bar ' + money(v.bar_revenue));
+        if (v.floor_revenue != null) parts.push('Food ' + money(v.floor_revenue));
+        if (v.covers != null) parts.push(v.covers + (v.covers === 1 ? ' cover' : ' covers'));
+        return parts.join(' · ') || '—';
+      };
+      const r = await App.promptImportConflicts({
+        title: 'Some days were entered by hand',
+        intro: 'This file has different sales for ' + conflicts.length + ' day' + (conflicts.length === 1 ? '' : 's')
+             + ' you already entered by hand. Pick which figures to keep. Your own are kept unless you choose the file, and only the columns this file carries are changed.',
+        rowLabel: 'Day', colMine: 'You entered', colTheirs: 'This file',
+        rows: conflicts.map(c => ({ key: c.key, label: dayLabel(c.date), mineText: salesText(c.mine), theirsText: salesText(c.theirs) }))
+      });
+      if (!r.confirmed) { note('Import cancelled. Nothing was changed.'); return; }
+      conflicts.forEach(c => { if (r.useTheirs.has(c.key)) { extra.push(c.useRec); usedTheirs++; } });
+    }
+    const keptMine = (conflicts ? conflicts.length : 0) - usedTheirs;   // hand days the operator kept at the prompt
+    const kept = (keptManual || 0) + keptMine;                          // + hand days the file simply matched
+    const allToAdd = toAdd.concat(extra);
+    if (!allToAdd.length) {
+      // ⚠ Say the TRUE reason (S105). Kept-by-hand and cleared days are real outcomes, not a broken
+      // file — never blame the operator's own work. A dropped row is still surfaced. And if days
+      // were CLEARED (deleted up in saveManualSales) but every typed day came through empty, report
+      // the clear AND re-render — otherwise the delete is silent and the grid keeps showing them.
+      const skipNote = skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
+          + ' skipped, no usable date or sales figure)' : '';
+      if (opts.cleared) {
+        this._flash = opts.cleared + ' day' + (opts.cleared === 1 ? '' : 's') + ' cleared to zero'
+          + (kept ? ', ' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as entered' : '') + skipNote + '.';
+        this._openStep = 'cash'; this.render(this.container, this.actions); return;
+      }
+      if (kept) note('No new figures written. ' + kept + ' day' + (kept === 1 ? ' was' : 's were')
+                     + ' kept as you entered ' + (kept === 1 ? 'it' : 'them') + ' by hand.' + skipNote);
+      else fail((opts.manual ? 'No days saved. Enter sales for at least one day.'
+                             : 'No days imported. Check that the file has a Date column and sales values.') + skipNote);
       return;
     }
-    const ok = await PosIngest.commit('sales', toAdd);
-    if (!ok) {
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the ' + (opts.manual ? 'save' : 'import') + ' again.</div>';
-      return;
-    }
+    const ok = await PosIngest.commit('sales', allToAdd);
+    if (!ok) { fail('Save failed. Try the ' + (opts.manual ? 'save' : 'import') + ' again.'); return; }
     if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
     this.setDone('import', true);   // a cockpit import is a deliberate "the week is in" action
-    // Say when rows were combined. A daypart-split export legitimately lists a date several times
-    // and buildSales sums them, so the operator has to be able to see why the day's total is
-    // bigger than any single row in the file they dropped. Silently folding rows into a money
-    // figure is how the old drop-the-repeats bug stayed invisible.
-    this._flash = toAdd.length + ' day' + (toAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
+    // Say when rows were combined, replaced, chosen over a hand entry, or kept — folding any of
+    // those into a money figure silently is how the old drop-the-repeats bug stayed invisible.
+    this._flash = allToAdd.length + ' day' + (allToAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
       + (merged ? ' (' + merged + ' extra row' + (merged === 1 ? '' : 's') + ' combined into day totals)' : '')
       + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
-      + (keptManual ? ' (' + keptManual + ' day' + (keptManual === 1 ? '' : 's')
-          + ' already closed by hand, kept)' : '')
-      // ⚠ A dropped row is a MEASUREMENT THAT WENT MISSING (S105) — a junk date, or a day whose
-      // revenue came through zero or negative. Saying nothing let the operator read "3 days
-      // imported" off a 5-day file and believe the week was in.
+      + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand entry)' : '')
+      + (kept ? ' (' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as you entered ' + (kept === 1 ? 'it' : 'them') + ')' : '')
+      // ⚠ A dropped row is a MEASUREMENT THAT WENT MISSING (S105): a junk date, or a day whose
+      // revenue came through zero or negative. Silence let the operator read "3 days imported" off
+      // a 5-day file and believe the week was in.
       + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
           + ' skipped, no usable date or sales figure)' : '')
       + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + '.';
@@ -579,11 +609,11 @@ S.ShiftDashboard = {
 
     let cleared = 0, broke = false;
     for (const d of zeroDays) {
-      // Scoped to imported records, the same guard buildSales and _commitSales hold: a
-      // hand-entered close (imported !== true) is the richer, authoritative record and
-      // must never be destroyed by this path. Clearing every record for the date dropped
-      // that scope.
-      const stale = ((App.shiftData && App.shiftData.sc_shifts) || []).filter(s => s && s.date === d && s.imported === true);
+      // The operator is IN the grid explicitly zeroing this day, so clear whatever record held it,
+      // WHATEVER its source (S140) — a hand entry is now source:'manual', imported:false, and the
+      // old `imported === true` filter would leave their own prior figure standing and re-render it.
+      // This IS the operator's own edit door, so clearing their prior figure for the day is the point.
+      const stale = ((App.shiftData && App.shiftData.sc_shifts) || []).filter(s => s && s.date === d);
       for (const s of stale) { if (await App.removeRecord('sc', 'shift', s.id)) cleared++; else broke = true; }
     }
     if (broke) { fail('Could not clear a day. Try the save again.'); return; }
@@ -782,27 +812,55 @@ S.ShiftDashboard = {
     return this._commitCash(this._pendingCashRows);
   },
   async _commitCash(rows) {
-    const { toAdd, skipped, dupCount, keptManual } = PosIngest.build('cash', rows);
+    const built = PosIngest.build('cash', rows);
+    const { toAdd, skipped, dupCount, keptManual, conflicts } = built;
     const res = document.getElementById('sc-ck-cash-res');
-    // ⚠ It used to say "N already logged" for every skipped row, which was untrue in the
-    // case that mattered: a corrected report was DISCARDED and reported as though it had
-    // been filed before. Cash now follows the sales rule, so there are two honest
-    // outcomes to report and they mean opposite things — a figure was replaced, or the
-    // operator's own hand count was left alone.
-    if (!toAdd.length) {
-      const why = keptManual
-        ? 'No rows imported. ' + keptManual + ' register-day' + (keptManual === 1 ? ' was' : 's were')
-          + ' already counted by hand, so your own count was kept.'
-        : 'No rows imported. Each row needs a date plus an over/short, or expected and counted cash.';
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + why + '</div>';
+    const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
+    const note = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">' + m + '</div>'; };
+    // A conflict: the file disagrees with a drawer the operator counted BY HAND. Ask which wins
+    // before writing ([[user-chooses-conflicts]]) — Bar Cop never picks between two figures the
+    // operator entered themselves. A file that MATCHES the hand count is kept silently (keptManual).
+    const extra = []; let usedTheirs = 0;
+    if (conflicts && conflicts.length) {
+      const money = v => v == null ? '—' : '$' + (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const dayLabel = d => { const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
+      const cashText = v => {
+        const os = v.variance;
+        const tag = os == null ? '' : (os < 0 ? ' short' : os > 0 ? ' over' : ' even');
+        return (os == null ? '—' : money(Math.abs(os)) + tag)
+             + (v.expected_cash != null && v.counted_cash != null ? ' (exp ' + money(v.expected_cash) + ' / count ' + money(v.counted_cash) + ')' : '');
+      };
+      const r = await App.promptImportConflicts({
+        title: 'Some drawers were counted by hand',
+        intro: 'This file has a different over/short for ' + conflicts.length + ' register-day' + (conflicts.length === 1 ? '' : 's')
+             + ' you already counted by hand. Pick which to keep. Your own count is kept unless you choose the file.',
+        rowLabel: 'Register / day', colMine: 'You counted', colTheirs: 'This file',
+        rows: conflicts.map(c => ({ key: c.key, label: (c.drawer || 'Register') + ' · ' + dayLabel(c.date), mineText: cashText(c.mine), theirsText: cashText(c.theirs) }))
+      });
+      // ⚠ NOT "nothing was changed" — importCash may have already created/persisted registers (the
+      // blank-slate auto-create, or an add/alias the operator picked in the map step) BEFORE this
+      // prompt. Those are the operator's own deliberate setup and are kept; only the over/short
+      // figures are cancelled. Say exactly that.
+      if (!r.confirmed) { note('Import cancelled. No over/short figures were imported.'); return; }
+      conflicts.forEach(c => { if (r.useTheirs.has(c.key)) { extra.push(c.useRec); usedTheirs++; } });
+    }
+    const keptMine = (conflicts ? conflicts.length : 0) - usedTheirs;   // hand counts the operator kept at the prompt
+    const kept = (keptManual || 0) + keptMine;                          // + hand counts the file matched
+    const allToAdd = toAdd.concat(extra);
+    if (!allToAdd.length) {
+      const skipNote = skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
+          + ' skipped, no over/short figure)' : '';
+      if (kept) note('No new figures written. ' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept.' + skipNote);
+      else fail('No rows imported. Each row needs a date plus an over/short, or expected and counted cash.' + skipNote);
       return;
     }
-    const ok = await PosIngest.commit('cash', toAdd);
-    if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
+    const ok = await PosIngest.commit('cash', allToAdd);
+    if (!ok) { fail('Save failed. Try the import again.'); return; }
     this._pendingCashRows = null;
-    this._flash = toAdd.length + ' reconcile' + (toAdd.length === 1 ? '' : 's') + ' imported'
+    this._flash = allToAdd.length + ' reconcile' + (allToAdd.length === 1 ? '' : 's') + ' imported'
       + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
-      + (keptManual ? ' (' + keptManual + ' hand count' + (keptManual === 1 ? '' : 's') + ' kept)' : '')
+      + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand count)' : '')
+      + (kept ? ' (' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept)' : '')
       // ⚠ A skipped cash row is a register-day with NO over/short at all (S105). Silence let the
       // operator read "4 reconciles imported" off a 6-row file and believe the week was counted.
       + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
