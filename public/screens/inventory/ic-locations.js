@@ -34,6 +34,11 @@ S.InventoryLocations = {
   _newName: '',        // typed location name, kept so a re-render does not lose it
   _newNameError: false, // landing Name box flagged red (save attempted with no name)
   _justSavedCount: null,// "X products saved" feedback after Save Products (null = hide)
+  _dispPending: false,  // S181: guards the single re-entry while the untick disposition prompt is open.
+                        // Reset on screen ENTRY (openEdit) too, NOT only on updateLocation's happy path:
+                        // if a re-entry hits an early return (e.g. the operator navigated away so the
+                        // name input is gone), the happy-path reset is skipped and the flag would
+                        // strand true, silently disabling the prompt for the rest of the session.
   DEFAULTS: ['Front Bar', 'Back Bar', 'Walk-In Cooler', 'Dry Storage', 'Office Storage'],
 
   locations() {
@@ -575,6 +580,7 @@ S.InventoryLocations = {
     this.editCat = this.firstCat();
     this.editChecked = new Set();
     this._nameDraft = null;
+    this._dispPending = false;   // S181: clear any strand from an abandoned untick-disposition prompt
     this._renderEdit(id);
   },
   // Re-render the edit screen in its CURRENT mode (keeps the name draft + mode).
@@ -760,6 +766,17 @@ S.InventoryLocations = {
 
   // One button: saves the name AND (in products mode) reconciles the location's
   // products to whatever is checked, then returns to the arrange view.
+  // S181: products being UN-TICKED from this shelf in the Set-Locations edit (on it now, not in the
+  // operator's new checked set) that still hold COUNTED stock there — one entry per product, the input
+  // to the disposition prompt. Empty when nothing is being removed or the removed shelves were never
+  // counted, so an ordinary product-set edit never prompts.
+  _unTickedWithStock(shelfName) {
+    return this.products()
+      .filter(p => p && p.id && App.productLocations(p).includes(shelfName) && !this.editChecked.has(p.id))
+      .map(p => App.countedStockAt(shelfName, p.id)[0])
+      .filter(Boolean);
+  },
+
   async updateLocation(id) {
     const name = document.getElementById('il-name')?.value.trim();
     // ⚠ Resolved LAZILY (S116). This used to close over one #il-err looked up here, and the
@@ -769,6 +786,19 @@ S.InventoryLocations = {
     if (this.locations().some(l => l.id !== id && l.name.toLowerCase() === name.toLowerCase())) { fail('That name already exists.'); return; }
     const l = this.locationById(id);
     if (!l) { this.renderList(); return; }
+    // S181: if this Set-Locations save UN-TICKS products that still hold COUNTED stock on this shelf,
+    // ask what happened to the stock first (the same disposition prompt as archiving), then re-enter
+    // to commit. On cancel nothing changes. `_dispPending` guards the single re-entry so the prompt
+    // does not re-open on the committing pass.
+    if (this.editMode === 'products' && !this._dispPending) {
+      const stock = this._unTickedWithStock(l.name);
+      if (stock.length) {
+        this._dispPending = true;
+        App.promptShelfDisposition(l.name, stock, () => this.updateLocation(id), { onCancel: () => { this._dispPending = false; } });
+        return;
+      }
+    }
+    this._dispPending = false;
     const old = l.name;
     // A half-written rename is LOAD-BEARING now that prior_names drives App._perpetualInventory:
     // the location row saying "renamed" while the products still hold the old name (or the
