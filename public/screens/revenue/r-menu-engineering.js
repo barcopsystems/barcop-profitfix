@@ -103,7 +103,7 @@ S.RevenueMenuEngineering = {
       });
       return;
     }
-    const priced = (App.data.menu_items || []).some(i => i.price && i.cost && !i.archived);
+    const priced = (App.data.menu_items || []).some(i => i.price && App.menuItemCost(i) && !i.archived);   // live cost, matching :53/:94/:194 (S111a)
     this.container.innerHTML = '<div class="screen">' + (priced ? this.coversImportHtml() : '') + this.classificationHtml() + '</div>';
     const c = this.container;
     c.querySelectorAll('.me-reprice').forEach(b => b.addEventListener('click', () => this.openReprice(b.dataset.id)));

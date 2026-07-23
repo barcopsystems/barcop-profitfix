@@ -61,6 +61,7 @@ S.RevenueMenuItems = {
     const prods = this.products();
     const batches = this.prepBatches();
     let h = '<option value="">Select ingredient...</option>';
+    let renderedSel = false;
 
     const catList = mode === 'food' ? this.PLATE_ING_CATS : this.COCKTAIL_ING_CATS;
     catList.forEach(cat => {
@@ -85,11 +86,20 @@ S.RevenueMenuItems = {
       if (!inCat.length) return;
       h += '<optgroup label="' + esc(cat) + '">';
       inCat.forEach(p => {
+        if (selKey === 'p:' + p.id) renderedSel = true;
         h += '<option value="p:' + p.id + '"' + (selKey === 'p:' + p.id ? ' selected' : '') + '>' + esc(p.name)
           + (p.active === false ? ' (inactive)' : (App.miscIsSupply(p) ? ' (supply)' : '')) + '</option>';
       });
       h += '</optgroup>';
     });
+    // Cross-category backstop, the twin of inventoryProductOptions': catList does not cover every
+    // category, so a product re-categorised OUT of the recipe cats after it was added to a recipe
+    // would fall through every group and the row would render "Select ingredient..." over a line
+    // still costing correctly. Keep the selected PRODUCT present whatever excludes it (S111b).
+    if (selKey && selKey.slice(0, 2) === 'p:' && !renderedSel) {
+      const sel = this.prodById(selKey.slice(2));
+      if (sel) h += '<optgroup label="Currently in recipe"><option value="p:' + sel.id + '" selected>' + esc(sel.name) + '</option></optgroup>';
+    }
     if (batches.length) {
       h += '<optgroup label="Prep Batches">';
       batches.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(b => {
