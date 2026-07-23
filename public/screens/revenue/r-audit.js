@@ -178,6 +178,7 @@ S.RevenueAudit = {
         ['Monthly Labor Gap',            cur(d.S2_MONTHLY_GAP), d.S2_MONTHLY_GAP > 0 ? 'warn' : ''],
       ], null, d),
       AuditUI.sectionBlock(3, 'Menu Performance', d.S3_SCORE, [
+        ['Dishes Scored',                d.S3_MENU_SCORED != null ? d.S3_MENU_SCORED + ' of ' + (d.S3_MENU_TOTAL || d.S3_MENU_SCORED) : ''],
         ['Stars on Menu',                num(d.S3_STARS_COUNT)],
         ['Plowhorses on Menu',           num(d.S3_PLOWHORSES_COUNT)],
         ['Dogs on Menu',                 num(d.S3_DOGS_COUNT), d.S3_DOGS_COUNT > 3 ? 'warn' : ''],
@@ -316,6 +317,7 @@ S.RevenueAudit = {
       ['Monthly Labor Gap',            cur(d.S2_MONTHLY_GAP)],
     ]);
     section(3, 'Menu Performance', d.S3_SCORE, [
+      ['Dishes Scored',                d.S3_MENU_SCORED != null ? d.S3_MENU_SCORED + ' of ' + (d.S3_MENU_TOTAL || d.S3_MENU_SCORED) : ''],
       ['Stars on Menu',                num(d.S3_STARS_COUNT)],
       ['Plowhorses on Menu',           num(d.S3_PLOWHORSES_COUNT)],
       ['Dogs on Menu',                 num(d.S3_DOGS_COUNT)],
