@@ -1064,11 +1064,15 @@ S.LaborBuildSchedule = {
     if (!this.editId) rec.created_at = new Date().toISOString();
 
     const list = this.schedules();
+    // Build `saved` as a FRESH object and let putRecord own the in-memory array. putRecord's
+    // slot-revert can only undo a refused write if we hand it a DIFFERENT object than the one
+    // already in the list (app.js:6216). Pre-inserting `saved` here made prev===rec, so a
+    // refused schedule save was never reverted and a phantom "Posted" week stayed in memory
+    // (Schedule History, the dashboard, and the retry's Replace prompt all read it) until reload.
     let saved = rec;
     if (this.editId) {
       const i = list.findIndex(x => x.id === this.editId);
-      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
-      else list.push(rec);
+      if (i > -1) saved = { ...list[i], ...rec };
     } else {
       // Duplicate-week guard: a second schedule for the same week would make the
       // compare screens (Daily, Weekly, OT, Pay Periods) pick one at random. Offer
@@ -1086,11 +1090,7 @@ S.LaborBuildSchedule = {
         rec.id = existing.id;
         rec.created_at = existing.created_at || rec.created_at;
         rec.updated_at = new Date().toISOString();
-        const i = list.findIndex(x => x.id === existing.id);
-        if (i > -1) list[i] = rec; else list.push(rec);
         saved = rec;
-      } else {
-        list.push(rec);
       }
     }
 
@@ -1107,11 +1107,13 @@ S.LaborBuildSchedule = {
         const tmpls = App.laborData.lc_schedule_templates;
         const tshifts = validShifts.map(s => ({ staff_id: s.staff_id, day: s.day, start: s.start, end: s.end }));
         const ex = tmpls.find(x => (x.name || '').trim().toLowerCase() === tmplName.toLowerCase());
-        // Row-per-record: mutate the existing template in place, or build a new one; putRecord
-        // handles the in-memory replace/push and writes just that row.
-        let tmpl;
-        if (ex) { ex.shifts = tshifts; ex.name = tmplName; ex.updated_at = new Date().toISOString(); tmpl = ex; }
-        else tmpl = { id: App.uid(), name: tmplName, shifts: tshifts, created_at: new Date().toISOString() };
+        // Row-per-record: build a FRESH template object (an edit spreads the existing row) and let
+        // putRecord own the in-memory replace/push. Mutating `ex` in place and handing it back made
+        // prev===rec, so a refused template write was never reverted (app.js:6216) — the operator was
+        // navigated to History with the refused shifts still in memory while the server kept the old.
+        const tmpl = ex
+          ? { ...ex, name: tmplName, shifts: tshifts, updated_at: new Date().toISOString() }
+          : { id: App.uid(), name: tmplName, shifts: tshifts, created_at: new Date().toISOString() };
         await App.putRecord('lc', 'schedule_template', tmpl);
       }
       this.editId = null;
