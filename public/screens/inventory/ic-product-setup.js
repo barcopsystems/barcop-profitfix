@@ -1524,9 +1524,15 @@ S.InventoryProducts = {
 
     const ok = await App.putRecord('ic', 'product', rec);
     this._saving = false;
-    this.editId = null;
-    this._formCategory = null;
     if (ok) {
+      // S152 (retry class): clear the edit context ONLY on success. Resetting editId/_formCategory
+      // before this check left a refused save's retry with editId null, so the duplicate-name guard
+      // (x.id !== this.editId, above) matched the product's OWN name — "already exists" on the row
+      // being edited — and following that error minted a phantom Misc duplicate. The modal stays open
+      // on failure, so the edit context MUST survive for the retry; the twin runImport clears inside
+      // its own if(ok) for exactly this reason.
+      this.editId = null;
+      this._formCategory = null;
       App.markSetupDone('gs_ic_products');
       // ⚠ LAND ON A TAB THAT ACTUALLY LISTS IT (S120). This was `prod.category` unconditionally,
       // which was right while inactive products still sat on their category tab — visibleProducts()
