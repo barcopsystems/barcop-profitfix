@@ -731,8 +731,21 @@ S.ShiftDashboard = {
     const key = s => String(s || '').trim().toLowerCase();
     const known = new Set();
     drawers.forEach(d => { if (d.name) known.add(key(d.name)); (d.pos_aliases || []).forEach(a => known.add(key(a))); });
-    const unmatched = [...new Set((rows || []).map(r => String(r.drawer || '').trim()).filter(Boolean))]
-      .filter(n => !known.has(key(n)));
+    // ⚠ DEDUP CASE-INSENSITIVELY (S143). The Set was on the trimmed-but-not-lowercased name while
+    // `known` and buildCash's drawerByName both lower-case, so "Main Bar" and "MAIN BAR" survived as
+    // TWO unmatched names — the map prompt offered the register twice, minting both put every row on
+    // the second (orphaning the first) and silently discarded an explicit mapping. Collapse by the
+    // lower-cased key, keeping the first display spelling.
+    const seenKeys = new Set();
+    const unmatched = [];
+    (rows || []).forEach(r => {
+      const raw = String(r.drawer || '').trim();
+      if (!raw) return;
+      const k = key(raw);
+      if (known.has(k) || seenKeys.has(k)) return;
+      seenKeys.add(k);
+      unmatched.push(raw);
+    });
 
     if (unmatched.length && drawers.length === 0) {        // blank slate: create silently
       const created = unmatched.map(n => this._addRegister(n));
@@ -813,7 +826,7 @@ S.ShiftDashboard = {
   },
   async _commitCash(rows) {
     const built = PosIngest.build('cash', rows);
-    const { toAdd, skipped, dupCount, keptManual, conflicts } = built;
+    const { toAdd, skipped, dupCount, keptManual, conflicts, extraDropped } = built;
     const res = document.getElementById('sc-ck-cash-res');
     const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
     const note = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">' + m + '</div>'; };
@@ -847,10 +860,15 @@ S.ShiftDashboard = {
     const keptMine = (conflicts ? conflicts.length : 0) - usedTheirs;   // hand counts the operator kept at the prompt
     const kept = (keptManual || 0) + keptMine;                          // + hand counts the file matched
     const allToAdd = toAdd.concat(extra);
+    // A later file row for a register-day already handled (kept / conflicted) was dropped — the
+    // per-day scope is deliberate (S99/S103) but the drop must be surfaced (S141), never in silence.
+    const extraNote = extraDropped ? ' (' + extraDropped + ' extra row' + (extraDropped === 1 ? '' : 's')
+        + ' for an already-counted register-day, not imported)' : '';
     if (!allToAdd.length) {
       const skipNote = skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
           + ' skipped, no over/short figure)' : '';
-      if (kept) note('No new figures written. ' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept.' + skipNote);
+      if (kept || extraDropped) note('No new figures written.'
+          + (kept ? ' ' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept.' : '') + extraNote + skipNote);
       else fail('No rows imported. Each row needs a date plus an over/short, or expected and counted cash.' + skipNote);
       return;
     }
@@ -861,6 +879,7 @@ S.ShiftDashboard = {
       + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
       + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand count)' : '')
       + (kept ? ' (' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept)' : '')
+      + extraNote
       // ⚠ A skipped cash row is a register-day with NO over/short at all (S105). Silence let the
       // operator read "4 reconciles imported" off a 6-row file and believe the week was counted.
       + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
