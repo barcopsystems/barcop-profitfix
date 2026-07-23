@@ -404,7 +404,9 @@ S.RevenueFix = {
       body = ' is not started yet. Do its first step and Bar Cop starts measuring from that day.';
     } else {
       const r = window.Recovery ? Recovery.compute(logged) : { status: 'untracked' };
-      const since = ' running since ' + esc(logged.date) + '. ';
+      // The "since" date is the DURABLE baseline, not the windowed fix_log row date (S170) — same
+      // fix as profit-fix; a drifted row date otherwise contradicts the recovered figure beside it.
+      const since = ' running since ' + esc((window.Recovery && Recovery.baselineFor(logged)) || logged.date) + '. ';
       if (r.status === 'building') {
         const wk = r.weeksIn || 0, need = (r.baselineWeeks || 3) + 1;
         body = since + 'Building your baseline, ' + wk + ' of about ' + need + ' weeks logged. The recovery number turns on around your first month.';
