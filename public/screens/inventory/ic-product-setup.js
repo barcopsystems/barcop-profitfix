@@ -477,9 +477,14 @@ S.InventoryProducts = {
       // Empty state: no rows to align, so skip the fixed colgroup + table-layout:fixed
       // (their hard pixel widths forced a min-width wider than the card and made an
       // empty table scroll sideways). Auto layout fits the container, no scroll.
+      // Tab-aware: the Inactive tab has no "Inactive card" to click and you never ADD an inactive
+      // product (they land here by being archived), so it gets its own copy instead of the add pitch.
+      const emptyMsg = onInactiveTab
+        ? 'No inactive products. Products you archive from the tabs above show up here.'
+        : 'No ' + esc(this.activeCat) + ' products yet. Click the ' + esc(this.activeCat) + ' card above to add your first one.';
       body = '<div class="card" style="margin-top:18px;"><table class="row-list" style="width:100%;">'
         + '<thead><tr><th></th><th>Product</th>' + headerCols + '</tr></thead>'
-        + '<tbody><tr><td colspan="' + nCols + '" style="color:var(--t3);">No ' + esc(this.activeCat) + ' products yet. Click the ' + esc(this.activeCat) + ' card above to add your first one.</td></tr></tbody></table></div>';
+        + '<tbody><tr><td colspan="' + nCols + '" style="color:var(--t3);">' + emptyMsg + '</td></tr></tbody></table></div>';
     } else {
       const pourable = this.isPourable(this.activeCat);
       const dismissed = this._dismissedAlerts && this._dismissedAlerts.has(this.activeCat);
@@ -1654,10 +1659,15 @@ S.InventoryProducts = {
     if (this._selected) ids.forEach(id => { if (failed.indexOf(id) < 0) this._selected.delete(id); });
     this.renderLanding();
     if (failed.length) {
+      // A single-row delete (the row's Delete button) never put anything in _selected, so it must
+      // not claim "still selected"; only a bulk delete keeps the failed rows selected for a retry.
+      const single = ids.length === 1;
       App.confirm({
-        title: failed.length + ' of ' + ids.length + ' could not be deleted',
-        message: (ids.length - failed.length) + ' deleted. The rest are still here and still selected, so you can try again.',
-        confirmText: 'OK', cancelText: 'Dismiss', danger: false
+        title: single ? 'Could not delete this product' : (failed.length + ' of ' + ids.length + ' could not be deleted'),
+        message: single
+          ? 'It is still here, so you can try again.'
+          : ((ids.length - failed.length) + ' deleted. The other ' + failed.length + ' are still here and still selected, so you can try again.'),
+        confirmText: 'OK', oneButton: true, danger: false
       });
     }
   },
