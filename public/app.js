@@ -5549,9 +5549,17 @@ const App = {
     // product, or one whose locations were all deleted, can never be counted again, so
     // its last known figures are all there is and zeroing it would invent a shortage.
     const homes = {};
+    // `assigned` is the product's TICKED locations INCLUDING archived ones; `homes` drops the
+    // archived. The as-of retirement below needs the difference (S133): a shelf the product is still
+    // ASSIGNED to but that is archived can never be recounted, so a newer count elsewhere is not
+    // evidence its stock left — it carries forward. A shelf the product was UNticked from (a move) is
+    // not assigned and is retired by a strictly newer count (the C1 pin).
+    const assigned = {};
     ((this.inventoryData && this.inventoryData.ic_products) || []).forEach(p => {
       if (!p || !p.id) return;
-      const pl = this.productLocations(p).filter(n => !archived.has(n));
+      const all = this.productLocations(p);
+      assigned[p.id] = new Set(all);
+      const pl = all.filter(n => !archived.has(n));
       homes[p.id] = pl.length ? new Set(pl) : null;
     });
     const seen = {};      // "pid@@loc" already resolved to its newest counted value
@@ -5606,7 +5614,7 @@ const App = {
           // (moved to a shelf not yet counted, or its only shelf renamed then re-created), its
           // last known figures stand. Held per key so the newest stale count still wins.
           const bucket = stale[it.product_id] || (stale[it.product_id] = {});
-          if (!bucket[key]) bucket[key] = { it, date: cnt.date || '' };
+          if (!bucket[key]) bucket[key] = { it, date: cnt.date || '', loc };
           return;
         }
         if (seen[key]) return;
@@ -5631,8 +5639,16 @@ const App = {
     // built for (a later count supersedes it) and treats both boundaries identically.
     Object.keys(stale).forEach(pid => {
       const bucket = stale[pid];
+      const asg = assigned[pid];
       const keep = asOf
-        ? Object.keys(bucket).filter(k => !(newestSeen[pid] && bucket[k].date < newestSeen[pid]))
+        ? Object.keys(bucket).filter(k => {
+            // A shelf the product is STILL ASSIGNED to (archived, so dropped from homes) can never be
+            // recounted, so a newer count at ANOTHER shelf is not evidence its stock left — carry it
+            // forward + disclose (S133). Only a shelf the product was UNticked from (a move) is
+            // retired by a strictly newer count that measured the product (the C1 double-count pin).
+            if (bucket[k].loc && asg && asg.has(bucket[k].loc)) return true;
+            return !(newestSeen[pid] && bucket[k].date < newestSeen[pid]);
+          })
         : (byProd[pid] ? [] : Object.keys(bucket));   // current read: a live row wins outright
       if (!keep.length) return;
       const rec = byProd[pid] || (byProd[pid] = newRec());
@@ -5649,6 +5665,168 @@ const App = {
   currentInventoryValue() {
     const m = this._perpetualInventory();
     return Object.keys(m).reduce((s, pid) => s + (m[pid].value || 0), 0);
+  },
+
+  // Products with COUNTED stock standing at a location right now: the newest counted on-hand for
+  // each product AT THAT SHELF (prior names resolve forward, same as _perpetualInventory). Drives
+  // the S133 disposition prompt — archiving a shelf, or unticking a product off it, must ask "what
+  // happened to the stock?" ONLY when it would strand real inventory. Empty when nothing was ever
+  // counted there or it was counted to 0, so a new operator rearranging empty shelves is never
+  // prompted. `onlyPid` limits it to one product (the untick path). Returns
+  // [{ product_id, name, onHand, value, date, unitCost }], newest count per product at the shelf.
+  countedStockAt(locName, onlyPid) {
+    if (!locName) return [];
+    const counts = [...((this.inventoryData && this.inventoryData.ic_counts) || [])].sort(App.cmpNewest);
+    const locs = (this.inventoryData && this.inventoryData.ic_locations) || [];
+    // Resolve a shelf's PRIOR names forward to its current name, never remapping a name that is
+    // currently live (mirrors _perpetualInventory so the two never disagree on which shelf a row is).
+    const liveNames = new Set(locs.map(l => l && l.name).filter(Boolean));
+    const canon = {};
+    locs.forEach(l => ((l && l.prior_names) || []).forEach(pn => { if (pn && !liveNames.has(pn)) canon[pn] = l.name; }));
+    const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+    const prodOf = pid => prods.find(p => p && p.id === pid) || null;
+    const seen = {};   // pid already resolved at this shelf (counts are newest-first, so first wins)
+    const out = [];
+    counts.forEach(cnt => {
+      (cnt.items || []).forEach(it => {
+        if (it.counted === false || !it.product_id) return;   // a skip is not a measurement
+        if (onlyPid && it.product_id !== onlyPid) return;
+        const loc = it.location ? (canon[it.location] || it.location) : '';
+        if (loc !== locName) return;
+        if (seen[it.product_id]) return;
+        seen[it.product_id] = true;
+        const onHand = it.total || 0;
+        if (onHand <= 0) return;   // counted to zero (or empty) — nothing to dispose
+        const p = prodOf(it.product_id);
+        const uc = (p && p.unit_cost != null) ? parseFloat(p.unit_cost) : (it.unit_cost != null ? parseFloat(it.unit_cost) : null);
+        out.push({ product_id: it.product_id, name: (p && p.name) || it.name || '',
+          onHand, value: it.value || 0, date: cnt.date || '', unitCost: (uc != null && !isNaN(uc)) ? uc : null });
+      });
+    });
+    return out;
+  },
+
+  // Record what the operator said happened to the stock on a shelf they are retiring (archive or
+  // untick) — the S133 clean-signal write. Each disposition is one product: 'used' (gone → it flows
+  // to THIS period's COGS), 'moved' to another shelf (total unchanged, relocated), or 'stay' (nothing
+  // written — _perpetualInventory carries the last count forward + discloses it). Writes a single
+  // DATED count today, so a past period's ending never moves. Unified across archive + untick: the
+  // retired shelf's product is written to 0 TODAY, and because today == newestSeen that 0 both wins
+  // as the current value (archived-assigned path, piece 1) AND is never retired-as-stale on the
+  // untick path (date is not < newestSeen). Returns the write's ok (true when nothing to write).
+  // dispositions: [{ product_id, name, choice:'used'|'moved'|'stay', destLoc?, onHand, unitCost }]
+  async disposeShelfStock(fromLoc, dispositions) {
+    const list = (dispositions || []).filter(d => d && d.product_id && (d.choice === 'used' || d.choice === 'moved'));
+    if (!list.length) return true;   // everything stays — piece 1 carries it forward, nothing to write
+    const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
+    const catOf = pid => (prods.find(p => p && p.id === pid) || {}).category || '';
+    const mkItem = (d, loc, total) => ({
+      product_id: d.product_id, name: d.name || '', category: catOf(d.product_id),
+      location: loc, total: total,
+      unit_cost: (d.unitCost != null ? d.unitCost : null),
+      value: (d.unitCost != null ? Math.round(d.unitCost * total * 100) / 100 : 0),
+      counted: true, disposition: true
+    });
+    const items = [];
+    list.forEach(d => {
+      items.push(mkItem(d, fromLoc, 0));   // the retired shelf holds none of it now (used, or moved away)
+      if (d.choice === 'moved' && d.destLoc) {
+        // The destination gains the moved units on top of whatever it was last counted holding.
+        const existing = this.countedStockAt(d.destLoc, d.product_id)[0];
+        const base = existing ? existing.onHand : 0;
+        items.push(mkItem(d, d.destLoc, base + (d.onHand || 0)));
+      }
+    });
+    const record = {
+      id: App.uid(), date: this.todayLocal(), type: 'Disposition',
+      locations: [...new Set(items.map(i => i.location))],
+      items: items, item_count: items.length,
+      total_value: items.reduce((s, i) => s + (i.value || 0), 0),
+      disposition: true, disposition_from: fromLoc, created_at: new Date().toISOString()
+    };
+    return await App.putRecord('ic', 'count', record);
+  },
+
+  // The S133 disposition PROMPT (shared by the archive + untick flows). Opened only when
+  // countedStockAt found real stock on the shelf being retired — an empty shelf never prompts. Asks
+  // what happened to each product's stock (bulk choice with a per-product override), writes it via
+  // disposeShelfStock, then runs `proceed` (the archive / untick itself). Cancel/X ABORTS: nothing is
+  // written and `proceed` never runs, so the shelf is not retired until the operator says where the
+  // stock went. `stock` = App.countedStockAt(fromLoc[, pid]).
+  promptShelfDisposition(fromLoc, stock, proceed, opts) {
+    opts = opts || {};
+    stock = (stock || []).filter(s => s && s.product_id && s.onHand > 0);
+    if (!stock.length) { if (typeof proceed === 'function') proceed(); return; }   // nothing to dispose
+    const money = v => '$' + (Math.round((v || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalVal = stock.reduce((s, x) => s + (x.value || 0), 0);
+    // Destinations: active, non-archived shelves other than the one being retired (you cannot move
+    // stock onto a shelf you are retiring or one already archived).
+    const dests = ((this.inventoryData && this.inventoryData.ic_locations) || [])
+      .filter(l => l && l.name && !l.archived && l.name !== fromLoc).map(l => l.name);
+    const destOpts = () => '<option value="">Pick a shelf...</option>' + dests.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
+    const choiceSel = (cls, id) => '<select class="' + cls + '"' + (id ? ' id="' + id + '"' : '') + ' style="padding:7px 9px;">'
+      + '<option value="stay">Still here — carry forward</option>'
+      + '<option value="used">Used / sold / tossed</option>'
+      + (dests.length ? '<option value="moved">Moved to another shelf</option>' : '')
+      + '</select>';
+    const rows = stock.map(s =>
+      '<tr data-pid="' + esc(s.product_id) + '" style="border-bottom:1px solid var(--b2);">'
+      + '<td style="padding:9px 10px;">' + esc(s.name || 'Product') + '</td>'
+      + '<td style="padding:9px 10px;white-space:nowrap;">' + (Math.round(s.onHand * 100) / 100) + ' <span style="color:var(--t3);">(' + money(s.value) + ')</span></td>'
+      + '<td style="padding:9px 10px;">' + choiceSel('disp-choice')
+      + (dests.length ? ' <select class="disp-dest" style="display:none;padding:7px 9px;">' + destOpts() + '</select>' : '') + '</td>'
+      + '</tr>').join('');
+    const html = '<div class="card form-card">'
+      + '<div class="card-title">What happened to the stock on ' + esc(fromLoc) + '?</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
+      + esc(fromLoc) + ' still holds ' + money(totalVal) + ' of counted stock. Tell Bar Cop where it went so your books stay right. '
+      + 'Anything left as Still here is carried forward on your inventory value and flagged on your tax worksheets until you count it again.</div>'
+      + (stock.length > 1 ? '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><label style="margin:0;font-size:12px;color:var(--t2);">Set all to</label>'
+          + choiceSel('', 'disp-bulk')
+          + (dests.length ? ' <select id="disp-bulk-dest" style="display:none;padding:7px 9px;">' + destOpts() + '</select>' : '') + '</div>' : '')
+      + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      + '<thead><tr style="text-align:left;color:var(--t3);border-bottom:1px solid var(--b2);"><th style="padding:9px 10px;">Product</th><th style="padding:9px 10px;">On hand</th><th style="padding:9px 10px;">What happened</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table></div>'
+      + '<div id="disp-err" style="display:none;color:var(--red);font-size:12px;margin-top:10px;"></div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">'
+      + '<button type="button" class="btn btn-ghost" id="disp-cancel">Cancel</button>'
+      + '<button type="button" class="btn btn-primary" id="disp-confirm">Confirm</button></div>'
+      + '</div>';
+    const cancel = () => { App.closeModal('shelf-disp'); if (typeof opts.onCancel === 'function') opts.onCancel(); };
+    const overlay = App.openModal(html, { id: 'shelf-disp', maxWidth: 660, onClose: cancel });
+    const all = () => Array.from(overlay.querySelectorAll('tr[data-pid]'));
+    const syncRow = tr => { const d = tr.querySelector('.disp-dest'); if (d) d.style.display = (tr.querySelector('.disp-choice').value === 'moved') ? '' : 'none'; };
+    all().forEach(tr => { tr.querySelector('.disp-choice').addEventListener('change', () => syncRow(tr)); syncRow(tr); });
+    const bulk = overlay.querySelector('#disp-bulk'), bulkDest = overlay.querySelector('#disp-bulk-dest');
+    if (bulk) {
+      const applyBulk = () => all().forEach(tr => {
+        tr.querySelector('.disp-choice').value = bulk.value;
+        const d = tr.querySelector('.disp-dest'); if (d && bulkDest) d.value = bulkDest.value;
+        syncRow(tr);
+      });
+      bulk.addEventListener('change', () => { if (bulkDest) bulkDest.style.display = (bulk.value === 'moved') ? '' : 'none'; applyBulk(); });
+      if (bulkDest) bulkDest.addEventListener('change', applyBulk);
+    }
+    overlay.querySelector('#disp-cancel').addEventListener('click', cancel);
+    overlay.querySelector('#disp-confirm').addEventListener('click', async () => {
+      const err = overlay.querySelector('#disp-err');
+      const dispositions = []; let bad = null;
+      all().forEach(tr => {
+        const pid = tr.getAttribute('data-pid');
+        const s = stock.find(x => x.product_id === pid) || {};
+        const choice = tr.querySelector('.disp-choice').value;
+        const destSel = tr.querySelector('.disp-dest');
+        const destLoc = (choice === 'moved' && destSel) ? destSel.value : '';
+        if (choice === 'moved' && !destLoc) bad = s.name || 'a product';
+        dispositions.push({ product_id: pid, name: s.name, choice: choice, destLoc: destLoc, onHand: s.onHand, unitCost: s.unitCost });
+      });
+      if (bad) { if (err) { err.textContent = 'Pick where "' + bad + '" moved to, or choose Used or Still here.'; err.style.display = 'block'; } return; }
+      const btn = overlay.querySelector('#disp-confirm'); btn.disabled = true; btn.textContent = 'Saving...';
+      const ok = await App.disposeShelfStock(fromLoc, dispositions);
+      if (!ok) { btn.disabled = false; btn.textContent = 'Confirm'; if (err) { err.textContent = 'Could not save that. Check your connection and try again.'; err.style.display = 'block'; } return; }
+      App.closeModal('shelf-disp');
+      if (typeof proceed === 'function') proceed();
+    });
   },
 
   // ── Inventory value AS OF a date — the ONE door for the tax sheets ──────────
