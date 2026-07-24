@@ -575,7 +575,10 @@ S.InventoryTransfers = {
 
   productOptions(selectedId) {
     const prods = this.products();
-    if (!prods.length) return '<option value="">No products set up</option>';
+    // S193: a selected product the filter would drop (inactive) stays visible + labelled — never blank the row.
+    const _cur = selectedId ? ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p && p.id === selectedId) : null;
+    const _curDropped = !!_cur && !prods.some(p => p && p.id === selectedId);
+    if (!prods.length && !_curDropped) return '<option value="">No products set up</option>';
     const cats = (S.InventoryProducts && S.InventoryProducts.CATEGORIES) || ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
     let h = '<option value="">Select product...</option>';
     cats.forEach(cat => {
@@ -587,7 +590,7 @@ S.InventoryTransfers = {
       });
       h += '</optgroup>';
     });
-    return h;
+    return h + (_curDropped ? '<optgroup label="Current selection"><option value="' + _cur.id + '" selected>' + esc(_cur.name || '') + (_cur.active === false ? ' (inactive)' : '') + '</option></optgroup>' : '');
   },
 
   locationOptions(selected) {
