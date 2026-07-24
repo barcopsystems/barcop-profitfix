@@ -2155,7 +2155,7 @@ const App = {
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'cash-outflows': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'getting-started': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'cash-outflows': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -2955,27 +2955,6 @@ const App = {
     if (this.data.hub_setup_progress[taskId]) return;
     this.data.hub_setup_progress[taskId] = new Date().toISOString();
     this.saveKey('hub_setup_progress');
-  },
-
-  // Is setup "meaningful enough" to default-land on the Hub Dashboard? Yes
-  // once Foundation is complete (profile + targets) AND at least one audit
-  // has run. Below that threshold, returning users default-land on Hub
-  // Getting Started so they have a clear next action. Catch-up banner on
-  // the Hub Dashboard handles the manual-navigation case for partial setups.
-  setupMeetsThreshold() {
-    if (!this.data) return false;
-    // Operator explicitly dismissed the Getting Started auto-redirect.
-    if (this.data.settings && this.data.settings.gs_dismissed) return true;
-    const p = this.data.hub_setup_progress || {};
-    // Count how many setup items the operator has actually checked off.
-    const checkedCount = Object.keys(p).filter(k => k.indexOf('gs_') === 0 && p[k]).length;
-    // Lenient path: 3+ items checked = operator is engaged, stop forcing them
-    // back to Getting Started on every signin. (Onboarding auto-checks one
-    // item on landing, so this is really "2 more clicks" to dismiss.)
-    if (checkedCount >= 3) return true;
-    // Strict path: Profile + Targets + at least one Audit (the original rule).
-    if (!p.gs_profile || !p.gs_targets) return false;
-    return !!(p.gs_p_audit || p.gs_r_audit || p.gs_t_audit);
   },
 
   // Load Recovery data plus the three Control data stores (Rule 21)
@@ -6084,19 +6063,6 @@ const App = {
     // the other, on a tax sheet's provenance line. One door, so they cannot disagree.
     return { value: Math.round(value * 100) / 100, countDate: boundary.date, count: boundary,
       carried, uncosted, byProduct: m };
-  },
-
-  // True when every Getting Started step is checked off. The Hub sidebar uses
-  // this to hide the Getting Started nav item once setup is fully complete,
-  // so it does not clutter the sidebar for operators who have already worked
-  // through the entire setup. Help and FAQ still deep-links to the screen for
-  // anyone who wants to revisit. Auto-resurfaces if a new step is ever added.
-  isSetupComplete() {
-    if (!this.data) return false;
-    const tasks = (window.S && S.HubGettingStarted && S.HubGettingStarted.TASKS) || [];
-    if (!tasks.length) return false;
-    const prog = this.data.hub_setup_progress || {};
-    return tasks.every(t => !!prog[t.id]);
   },
 
   // ── Event-log stores (row-per-record; see db.js loadEvents/putEvent) ───────
