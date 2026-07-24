@@ -90,12 +90,17 @@ S.ShiftChecklistTemplates = {
     if (App.shiftData.sc_starter_seeded) return;
     const list = this.templates();
     if (list.length > 0) { App.shiftData.sc_starter_seeded = true; return; }   // already has checklists
-    const mk = (name, type, items) => ({ id: App.uid(), name, type, items: (items || []).slice(), created_at: new Date().toISOString() });
+    const mk = (name, type, items) => ({ id: App.uid(), name, type, items: (items || []).slice() });
     const seeded = [];
     seeded.push(mk('Manager Opening', 'Opening', (S.ShiftOpeningChecklist && S.ShiftOpeningChecklist.DEFAULT_ITEMS) || []));
     seeded.push(mk('Manager Closing', 'Closing', (S.ShiftClosingChecklist && S.ShiftClosingChecklist.DEFAULT_ITEMS) || []));
     this.STAFF_STARTERS.forEach(s => seeded.push(mk(s.name, 'Print', s.items)));
-    seeded.forEach(t => list.push(t));
+    // S179: the whole seed loop would otherwise share ONE new Date().toISOString(), and App.byCreation
+    // ties on an identical created_at -> the starter list renders in reverse-authored order after a
+    // reload. Stamp each row one step apart so the authored order (Manager Opening ... Floor Close) is
+    // recoverable by created_at.
+    const seededAt = Date.now();
+    seeded.forEach((t, i) => { t.created_at = new Date(seededAt + i).toISOString(); list.push(t); });
     // Persist the ROWS first and only set the "already seeded" flag if they landed. Setting the
     // flag first (and not awaiting the write) meant a failed bulk write left the flag durably
     // true, the array stripped from the blob, and no rows — so Checklist Templates stayed
