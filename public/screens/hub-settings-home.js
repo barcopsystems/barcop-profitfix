@@ -2,10 +2,8 @@
 
 /* ── Settings home — the Settings section landing / account + setup hub ───────
    Opens from the top-nav gear with the Settings sidebar (Setup + Settings +
-   Account + Support). Summarizes setup completeness (read from the same
-   S.HubGettingStarted TASKS the checklist uses) and the account, and jumps to
-   the focused settings pages. The detailed step-by-step checklist still lives
-   in Getting Started; this page summarizes and links to it. */
+   Account + Support). Summarizes setup completeness and the account, and
+   jumps to the focused settings pages. */
 
 S.HubSettingsHome = {
 
