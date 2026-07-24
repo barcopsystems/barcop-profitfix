@@ -477,6 +477,20 @@ S.ShiftDashboard = {
   // go check the file's columns, and is an EDIT (never raises a conflict against itself).
   // opts.cleared = days zeroed out by that grid.
   async importSales(rows, opts) {
+    // ⚠ Re-entry guard, the twin of importCash's (S146). The CSVMapper Import button (.csvm-go) is
+    // not disabled after onComplete, and saveManualSales routes through here too — so a double-click
+    // re-enters. Unlike a re-import (idempotent via S147 id-reuse), the FIRST multi-day import while
+    // ONLINE is not: the second call's buildSales reuses only the day already written and mints FRESH
+    // ids for the rest, and each _commitSales computed its retire set before the other's rows landed,
+    // so days 2..N get written twice and double-count Confirm the Week, the cash-forecast baseline and
+    // the sales-tax hold. Held through the commit (return await) so a click during the conflict prompt
+    // or the write can't double either. The real body is _doImportSales.
+    if (this._importingSales) return;
+    this._importingSales = true;
+    try { return await this._doImportSales(rows, opts); }
+    finally { this._importingSales = false; }
+  },
+  async _doImportSales(rows, opts) {
     opts = opts || {};
     const built = PosIngest.build('sales', rows, opts);
     const { toAdd, skipped, dupCount, merged, keptManual, conflicts } = built;
@@ -721,49 +735,63 @@ S.ShiftDashboard = {
   // prompt links each to an existing register or adds it new (remembered as an
   // alias), so we never make duplicate registers and never ask twice.
   async importCash(rows) {
-    this._pendingCashRows = rows;
-    // ⚠ EVERY register, archived ones included (S104). Matching only active registers made an
-    // ARCHIVED register's own name count as unmatched, so the mapping prompt fired for a register
-    // the bar already has — and the dropdown did not offer it, so the only way out was minting a
-    // duplicate name with a fresh id. This also keeps the blank-slate test below honest: a bar
-    // whose only register is archived is not a blank slate.
-    const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(Boolean);
-    const key = s => String(s || '').trim().toLowerCase();
-    const known = new Set();
-    drawers.forEach(d => { if (d.name) known.add(key(d.name)); (d.pos_aliases || []).forEach(a => known.add(key(a))); });
-    // ⚠ DEDUP CASE-INSENSITIVELY (S143). The Set was on the trimmed-but-not-lowercased name while
-    // `known` and buildCash's drawerByName both lower-case, so "Main Bar" and "MAIN BAR" survived as
-    // TWO unmatched names — the map prompt offered the register twice, minting both put every row on
-    // the second (orphaning the first) and silently discarded an explicit mapping. Collapse by the
-    // lower-cased key, keeping the first display spelling.
-    const seenKeys = new Set();
-    const unmatched = [];
-    (rows || []).forEach(r => {
-      const raw = String(r.drawer || '').trim();
-      if (!raw) return;
-      const k = key(raw);
-      if (known.has(k) || seenKeys.has(k)) return;
-      seenKeys.add(k);
-      unmatched.push(raw);
-    });
+    // ⚠ Re-entry guard, the twin of _applyCashMap's (S146). The CSVMapper Import button (.csvm-go)
+    // is not disabled after it fires onComplete, so a double-click re-enters here. Without the guard
+    // the second call runs while the first is still awaiting the register save: on a zero-register
+    // bar the first click creates the registers synchronously, so the second skips the blank-slate
+    // branch and commits variance rows against those ids — then the first click's refused save rolls
+    // the registers back, orphaning the reconciles this branch's own comment says it exists to
+    // prevent (and flashing a false "nothing was imported"). Held through _commitCash (return await)
+    // so a click during the conflict prompt or the write can't double-commit the day either.
+    if (this._importingCash) return;
+    this._importingCash = true;
+    try {
+      this._pendingCashRows = rows;
+      // ⚠ EVERY register, archived ones included (S104). Matching only active registers made an
+      // ARCHIVED register's own name count as unmatched, so the mapping prompt fired for a register
+      // the bar already has — and the dropdown did not offer it, so the only way out was minting a
+      // duplicate name with a fresh id. This also keeps the blank-slate test below honest: a bar
+      // whose only register is archived is not a blank slate.
+      const drawers = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(Boolean);
+      const key = s => String(s || '').trim().toLowerCase();
+      const known = new Set();
+      drawers.forEach(d => { if (d.name) known.add(key(d.name)); (d.pos_aliases || []).forEach(a => known.add(key(a))); });
+      // ⚠ DEDUP CASE-INSENSITIVELY (S143). The Set was on the trimmed-but-not-lowercased name while
+      // `known` and buildCash's drawerByName both lower-case, so "Main Bar" and "MAIN BAR" survived as
+      // TWO unmatched names — the map prompt offered the register twice, minting both put every row on
+      // the second (orphaning the first) and silently discarded an explicit mapping. Collapse by the
+      // lower-cased key, keeping the first display spelling.
+      const seenKeys = new Set();
+      const unmatched = [];
+      (rows || []).forEach(r => {
+        const raw = String(r.drawer || '').trim();
+        if (!raw) return;
+        const k = key(raw);
+        if (known.has(k) || seenKeys.has(k)) return;
+        seenKeys.add(k);
+        unmatched.push(raw);
+      });
 
-    if (unmatched.length && drawers.length === 0) {        // blank slate: create silently
-      const created = unmatched.map(n => this._addRegister(n));
-      // Stop if the registers didn't persist: _commitCash below mints variance rows stamped with
-      // these drawer_ids, and the registers are stripped from the blob — so on reload every
-      // imported reconcile would point at a register that no longer exists.
-      if (!(await App.putRecordsBulk('sc', 'drawer', created))) {   // row-per-record
-        created.forEach(d => { const i = App.shiftData.sc_drawers.indexOf(d); if (i >= 0) App.shiftData.sc_drawers.splice(i, 1); });
-        return App.confirm({
-          title: 'Could not save your registers',
-          message: 'Nothing was imported, so your data is unchanged. Check your connection and run the import again.',
-          confirmText: 'OK', cancelText: '', danger: false
-        });
+      if (unmatched.length && drawers.length === 0) {        // blank slate: create silently
+        const created = unmatched.map(n => this._addRegister(n));
+        // Stop if the registers didn't persist: _commitCash below mints variance rows stamped with
+        // these drawer_ids, and the registers are stripped from the blob — so on reload every
+        // imported reconcile would point at a register that no longer exists.
+        if (!(await App.putRecordsBulk('sc', 'drawer', created))) {   // row-per-record
+          created.forEach(d => { const i = App.shiftData.sc_drawers.indexOf(d); if (i >= 0) App.shiftData.sc_drawers.splice(i, 1); });
+          return await App.confirm({
+            title: 'Could not save your registers',
+            message: 'Nothing was imported, so your data is unchanged. Check your connection and run the import again.',
+            confirmText: 'OK', cancelText: '', danger: false
+          });
+        }
+        return await this._commitCash(rows);
       }
-      return this._commitCash(rows);
+      if (unmatched.length) { this._showCashMap(unmatched); return; }   // map or add
+      return await this._commitCash(rows);
+    } finally {
+      this._importingCash = false;
     }
-    if (unmatched.length) { this._showCashMap(unmatched); return; }   // map or add
-    return this._commitCash(rows);
   },
   _addRegister(name) {
     if (!App.shiftData) App.shiftData = {};
@@ -792,37 +820,59 @@ S.ShiftDashboard = {
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">Your report has registers Bar Cop does not recognize. Match each to one of yours, or add it new. Bar Cop remembers your choice.</div>'
       + rows
       + '<div style="margin-top:12px;"><button class="btn btn-primary btn-sm" id="sc-cm-go">Match and Import</button></div>'
+      // ⚠ A dedicated error slot so a refused save shows its message WITHOUT clobbering the selects
+      // above it (S150) — those live in this same #sc-ck-cash-res, so writing the error there forced
+      // a full CSV re-drop to retry. Writing #sc-cm-err leaves the operator's mappings intact.
+      + '<div id="sc-cm-err" aria-live="polite"></div>'
       + '</div>';
     document.getElementById('sc-cm-go')?.addEventListener('click', () => this._applyCashMap());
   },
   async _applyCashMap() {
-    const keyOf = s => String(s || '').trim().toLowerCase();
-    // Dedupe by id: one existing drawer can be the target of several unmatched names, so it
-    // would otherwise appear multiple times in one bulk upsert (Postgres rejects a duplicate
-    // id in a single ON CONFLICT chunk). The Map keeps the last-mutated copy (all aliases added).
-    const touched = new Map();
-    const created = [];   // brand-new registers, appended to sc_drawers by _addRegister
-    const undo = [];      // existing registers, snapshotted before their aliases are appended
-    [...document.querySelectorAll('.sc-cm-sel')].forEach(sel => {
-      const name = sel.dataset.name;
-      if (sel.value === '__add') { const r = this._addRegister(name); created.push(r); touched.set(r.id, r); return; }
-      const d = ((App.shiftData && App.shiftData.sc_drawers) || []).find(x => x.id === sel.value);
-      if (d) {
-        if (!touched.has(d.id)) undo.push(...App.snapshotRows([d]));   // once, before the first alias lands
-        if (!Array.isArray(d.pos_aliases)) d.pos_aliases = []; if (!d.pos_aliases.some(a => keyOf(a) === keyOf(name))) d.pos_aliases.push(name); touched.set(d.id, d);
+    // ⚠ A double-click on Match and Import used to run this twice off the still-live selects,
+    // minting an "__add" register TWICE and letting the second _commitCash flash a false
+    // "(1 replaced earlier figures)" (S146). A re-entry flag holds the second call; the button is
+    // disabled for the duration too. Both are released in the finally, so a refused save can retry.
+    if (this._applyingCashMap) return;
+    this._applyingCashMap = true;
+    const goBtn = document.getElementById('sc-cm-go');
+    if (goBtn) goBtn.disabled = true;
+    try {
+      const keyOf = s => String(s || '').trim().toLowerCase();
+      // Dedupe by id: one existing drawer can be the target of several unmatched names, so it
+      // would otherwise appear multiple times in one bulk upsert (Postgres rejects a duplicate
+      // id in a single ON CONFLICT chunk). The Map keeps the last-mutated copy (all aliases added).
+      const touched = new Map();
+      const created = [];   // brand-new registers, appended to sc_drawers by _addRegister
+      const undo = [];      // existing registers, snapshotted before their aliases are appended
+      [...document.querySelectorAll('.sc-cm-sel')].forEach(sel => {
+        const name = sel.dataset.name;
+        if (sel.value === '__add') { const r = this._addRegister(name); created.push(r); touched.set(r.id, r); return; }
+        const d = ((App.shiftData && App.shiftData.sc_drawers) || []).find(x => x.id === sel.value);
+        if (d) {
+          if (!touched.has(d.id)) undo.push(...App.snapshotRows([d]));   // once, before the first alias lands
+          if (!Array.isArray(d.pos_aliases)) d.pos_aliases = []; if (!d.pos_aliases.some(a => keyOf(a) === keyOf(name))) d.pos_aliases.push(name); touched.set(d.id, d);
+        }
+      });
+      // Same reasoning as the blank-slate branch above: _commitCash mints variance rows stamped with
+      // these drawer_ids, so if the registers did not persist those reconciles would point at
+      // registers that vanish on reload. Put memory back and stop rather than commit against them.
+      if (!(await App.putRecordsBulk('sc', 'drawer', [...touched.values()]))) {   // row-per-record
+        App.restoreRows(undo);
+        App.dropRows((App.shiftData && App.shiftData.sc_drawers) || [], created);
+        // ⚠ The error goes in its OWN slot, NOT #sc-ck-cash-res — that element holds the .sc-cm-sel
+        // selects and this button, so clobbering it would force a full CSV re-drop to retry (S150).
+        const msg = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the register setup, so the cash counts were not imported. Try again.</div>';
+        const err = document.getElementById('sc-cm-err');
+        if (err) err.innerHTML = msg;
+        else { const res = document.getElementById('sc-ck-cash-res'); if (res) res.innerHTML = msg; }
+        return;
       }
-    });
-    // Same reasoning as the blank-slate branch above: _commitCash mints variance rows stamped with
-    // these drawer_ids, so if the registers did not persist those reconciles would point at
-    // registers that vanish on reload. Put memory back and stop rather than commit against them.
-    if (!(await App.putRecordsBulk('sc', 'drawer', [...touched.values()]))) {   // row-per-record
-      App.restoreRows(undo);
-      App.dropRows((App.shiftData && App.shiftData.sc_drawers) || [], created);
-      const res = document.getElementById('sc-ck-cash-res');
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the register setup, so the cash counts were not imported. Try again.</div>';
-      return;
+      return await this._commitCash(this._pendingCashRows);
+    } finally {
+      this._applyingCashMap = false;
+      const b = document.getElementById('sc-cm-go');
+      if (b) b.disabled = false;
     }
-    return this._commitCash(this._pendingCashRows);
   },
   async _commitCash(rows) {
     const built = PosIngest.build('cash', rows);
