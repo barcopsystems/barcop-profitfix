@@ -218,6 +218,35 @@
   <button type="button" id="fn-up" class="fn-btn" title="Back to top" aria-label="Back to top"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
 </div>
 
+<!-- BARCOP_LEGACY_GUARD (L10) — app.js and every screen use optional chaining (ES2020, ~1886 uses).
+     On an older engine those files are a PARSE error: nothing executes, App is never defined, and
+     app.js's own boot guard (_bootFailed) cannot help either — the operator would get a blank white
+     page with no explanation and no way forward. Hard floor: Chrome/Edge 80+, Safari 13.4+,
+     Firefox 74+ (all 2020). Runs before every other script so nothing else is even fetched.
+     ⚠ THIS BLOCK MUST STAY ES5-ONLY and stay ABOVE the app scripts, or it is dead in the one case
+     it exists for. Detection goes through new Function so the modern syntax lives in a STRING —
+     writing it inline would be the very parse error we are surviving. Pinned by
+     verify-legacy-browser-guard.js. -->
+<script>
+(function () {
+  var ok = true;
+  try { new Function('var o = {}; return o?.a;'); } catch (e) { ok = false; }
+  if (ok) return;
+  var show = function () {
+    if (!document.body) return;
+    document.body.innerHTML =
+      '<div style="font-family:system-ui,-apple-system,Arial,sans-serif;background:#0B1319;color:#E8EDF2;'
+      + 'min-height:100vh;margin:0;display:flex;align-items:center;justify-content:center;padding:24px;">'
+      + '<div style="max-width:430px;text-align:center;">'
+      + '<div style="font-size:18px;font-weight:700;margin-bottom:12px;">Bar Cop needs a newer browser</div>'
+      + '<div style="font-size:14px;line-height:1.7;color:#A8B4BF;">'
+      + 'This browser is too out of date to run Bar Cop. Update it, or open Bar Cop on a newer device. '
+      + 'Your data is safe on your account and will be waiting when you get back.</div>'
+      + '</div></div>';
+  };
+  if (document.body) { show(); } else { document.addEventListener('DOMContentLoaded', show); }
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>var S = {};</script>
