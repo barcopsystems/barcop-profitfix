@@ -99,6 +99,17 @@ S.PrepBatches = {
     else                      cats = [...new Set([...this.BAR_CATS, ...this.FOOD_CATS])]; // 'all'
 
     let h = '<option value="">Select ingredient...</option>';
+    // ⚠ S157 (the S54/S35 rule for this picker): the current selection must always render, or the
+    // row shows "Select ingredient..." beside a live quantity and cost and the operator re-picks or
+    // deletes a good ingredient. The inactive concat above keeps an inactive cur in `all`, but the
+    // per-category loop below only emits categories in `cats`, so a cur whose CATEGORY is off-mode
+    // (e.g. a bar batch ingredient re-categorised to Food) is never rendered. Emit it in its own
+    // group here — the same "Currently linked" fallback r-menu-items uses — so the rest of the
+    // picker stays scoped to the mode (an off-mode product that is NOT selected still can't be added).
+    if (cur && cats.indexOf(cur.category || '') < 0) {
+      h += '<optgroup label="Current selection"><option value="' + cur.id + '" selected>'
+        + esc(cur.name) + (cur.active === false ? ' (inactive)' : '') + '</option></optgroup>';
+    }
     cats.forEach(cat => {
       const inCat = all.filter(p => (p.category || '') === cat)
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));

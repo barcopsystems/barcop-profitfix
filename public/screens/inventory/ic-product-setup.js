@@ -657,7 +657,10 @@ S.InventoryProducts = {
   catTabs() {
     const all = this.products();
     // ⚠ Counts are of ACTIVE products only, matching what the tab actually lists. Counting every
-    // product would make Liquor read 35 and then show 34.
+    // product would make Liquor read 35 and then show 34. Route the count through _tabFor — the ONE
+    // door visibleProducts() and the category cards also use (S124/S156) — so a legacy/out-of-list
+    // category (e.g. 'Beer'), which _tabFor sends to Misc, is counted by the Misc badge too and not
+    // dropped by a bare `(p.category||'')===c` while the card and list still show it.
     const tab = (label, n, key) => {
       const on = (key || label) === this.activeCat;
       return '<button class="ch-tab' + (on ? ' on' : '') + '" data-cat="' + esc(key || label) + '">'
@@ -666,7 +669,7 @@ S.InventoryProducts = {
     const inactiveN = all.filter(p => p && p.active === false).length;
     return '<div class="ch-tabs no-print">'
       + this.CATEGORIES.map(c =>
-          tab(c, all.filter(p => p && (p.category || '') === c && p.active !== false).length)).join('')
+          tab(c, all.filter(p => p && this._tabFor(p) === c && p.active !== false).length)).join('')
       // Last, after Misc: one place for everything retired, whatever category it came from.
       + tab(this.INACTIVE_TAB, inactiveN)
       + '</div>';
@@ -1789,7 +1792,7 @@ S.InventoryProducts = {
     document.querySelectorAll('.be-apply').forEach(box => { if (box.checked) applied[box.dataset.key] = true; });
     const err = document.getElementById('be-err');
     if (!Object.keys(applied).length) {
-      if (err) { err.textContent = 'Turn on a field to apply, or Cancel.'; err.style.display = 'inline'; }
+      if (err) { err.textContent = 'Turn on at least one field to apply.'; err.style.display = 'inline'; }
       return;
     }
     const num = id => { const el = document.getElementById(id); if (!el) return null; const n = parseFloat(el.value); return isNaN(n) ? null : n; };
