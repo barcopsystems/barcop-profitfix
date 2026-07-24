@@ -2281,6 +2281,20 @@ app.post('/api/abandon-account', async (req, res) => {
     const { count } = await supabaseAdmin
       .from('memberships').select('id', { count: 'exact', head: true }).eq('user_id', userId);
     if (!count) {
+      // L18 — bug_reports.user_id is ON DELETE SET NULL, so the support record deliberately SURVIVES
+      // the user (a support history is a legitimate business record). But `user_email` is a PLAIN
+      // TEXT column, so it survived too: a deleted customer's ADDRESS sat in the table forever while
+      // we told them the account was gone. Scrub the identifier, keep the report.
+      // ⚠ THIS MUST RUN BEFORE deleteUser. That delete is what fires the SET NULL, and once user_id
+      // is blank these rows can no longer be found BY user_id — a scrub placed after it would match
+      // nothing, silently, while looking perfectly healthy.
+      try {
+        const { error: scrubErr } = await supabaseAdmin
+          .from('bug_reports').update({ user_email: null }).eq('user_id', userId);
+        // Best-effort ON PURPOSE: the account delete above has already succeeded and cannot be
+        // undone, so a scrub failure is logged loudly, never turned into a 500 on a done deletion.
+        if (scrubErr) console.error('abandon: bug_reports email scrub failed:', scrubErr.message);
+      } catch (e) { console.error('abandon: bug_reports email scrub threw:', e); }
       try { await supabaseAdmin.auth.admin.deleteUser(userId); } catch (e) { console.error('abandon deleteUser:', e); }
     }
 
