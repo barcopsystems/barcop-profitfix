@@ -687,7 +687,7 @@ S.ShiftCashControl = {
       + '<div class="calc">'
       +   '<div class="calc-item"><div class="calc-label">Variance</div><div class="calc-val" id="ccv-c-variance">-</div></div>'
       +   '<div class="calc-item"><div class="calc-label">Status</div><div class="calc-val" id="ccv-c-status">-</div></div>'
-      +   '<div class="calc-item"><div class="calc-label">Tolerance</div><div class="calc-val dim" id="ccv-c-tol">&plusmn;' + App.fmtCurrency(App.drawerTolerance(dId)) + '</div></div>'
+      +   '<div class="calc-item"><div class="calc-label">Tolerance</div><div class="calc-val dim" id="ccv-c-tol">&plusmn;' + App.fmtCurrency(App.drawerTolerance(this._effectiveDrawerId(dId))) + '</div></div>'
       + '</div>'
       + App.noteField({ id: 'ccv-notes', value: rec?.notes })
       + '<div class="card-actions"><button class="btn btn-primary" id="ccv-save">' + (editing ? 'Update' : 'Save Count') + '</button>'
@@ -695,7 +695,7 @@ S.ShiftCashControl = {
 
     App.openModal(html, { id: 'cc-modal', maxWidth: 540, noClose: true });
     const calc = () => {
-      const drawerId = document.getElementById('ccv-drawer')?.value || '';
+      const drawerId = this._effectiveDrawerId(document.getElementById('ccv-drawer')?.value || '');
       const tolEl = document.getElementById('ccv-c-tol');
       if (tolEl) tolEl.textContent = '±' + App.fmtCurrency(App.drawerTolerance(drawerId));
       const exp = parseFloat(document.getElementById('ccv-expected')?.value);
@@ -720,6 +720,16 @@ S.ShiftCashControl = {
     calc();
   },
 
+  // ⚠ S187: a blank register on a bar with exactly ONE active register resolves to that register
+  // (matching buildCash's soleDrawer over the same sc_drawers list), so the live preview AND the
+  // saved row agree on tolerance/status, and a hand count shares a key with a column-less import
+  // (date|d1) instead of keying at date|'' and being double-counted. 0 or 2+ active stays day-level.
+  _effectiveDrawerId(rawId) {
+    if (rawId) return rawId;
+    const active = ((App.shiftData && App.shiftData.sc_drawers) || []).filter(d => d && d.active !== false);
+    return active.length === 1 ? active[0].id : '';
+  },
+
   async saveCountDrawer(editId) {
     const err = document.getElementById('ccv-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
@@ -732,7 +742,10 @@ S.ShiftCashControl = {
 
     const existing = editId ? this.variances().find(x => x.id === editId) : null;
     const variance = Math.round((cnt - exp) * 100) / 100;
-    const drawerId = document.getElementById('ccv-drawer')?.value || '';
+    // ⚠ S187: normalize a blank register to the sole active drawer (see _effectiveDrawerId) so a hand
+    // count on a 1-register bar shares a buildCash key (date|d1 via soleDrawer) with a column-less
+    // import instead of keying at date|'' and being double-counted — and so the live preview agrees.
+    const drawerId = this._effectiveDrawerId(document.getElementById('ccv-drawer')?.value || '');
     // ⚠ There was NO duplicate check here at all: this minted a fresh id and wrote, so counting the
     // same register twice for one day (a typo re-entered instead of using Edit, or a recount) put
     // TWO rows in and that drawer-day was counted twice in Drawer Net, the short rate, Loss
