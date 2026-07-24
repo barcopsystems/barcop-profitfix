@@ -5497,6 +5497,24 @@ const App = {
     return { menuItems, prepBatches, openOrders, investigations, total, any: total > 0 };
   },
 
+  // Menu items that use this PREP BATCH as a recipe ingredient (source:'batch'). The batch twin of
+  // productReferences (S153): deleting a batch out from under a dish makes menuItemCost refuse to
+  // cost it (it reads cost_per_serving straight off the batch), so the delete guard names them first
+  // instead of letting the dish silently go "not costed". A batch is referenced ONLY by menu items —
+  // batch recipes hold products, not other batches (ic-prep-batches saveBatch builds {product_id,
+  // quantity} rows). Reads data.menu_items RAW so an ARCHIVED item is reported too (restoring it must
+  // not quietly produce an uncosted dish — same reasoning as productReferences).
+  batchReferences(batchId) {
+    const none = { menuItems: [], total: 0, any: false };
+    if (!batchId) return none;
+    const allItems = (this.data && Array.isArray(this.data.menu_items)) ? this.data.menu_items : [];
+    const menuItems = allItems.filter(it => {
+      const ings = (it && it.recipe && Array.isArray(it.recipe.ingredients)) ? it.recipe.ingredients : [];
+      return ings.some(ing => ing && ing.source === 'batch' && (ing.id || ing.product_id) === batchId);
+    });
+    return { menuItems, total: menuItems.length, any: menuItems.length > 0 };
+  },
+
   menuItemsUsingProducts(idSet) {
     if (!idSet || !idSet.size) return [];
     return this.menuItems().filter(it => {
