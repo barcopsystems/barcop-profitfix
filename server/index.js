@@ -1588,6 +1588,120 @@ app.post('/api/invite-user', async (req, res) => {
   }
 });
 
+// ── Pending invites: list + revoke (L17) ──────────────────────────────────────
+// An invite used to be fire-and-forget. `account_invites` is the SOURCE OF TRUTH the signup trigger
+// provisions membership from, and it is service-role only (RLS with no anon/authenticated policy),
+// so the browser cannot read or delete a row itself — both doors have to live here. Without them a
+// typo'd address or a hire who never showed left a standing grant nobody could see or withdraw,
+// bounded only by the TTL below.
+// ⚠ MUST MATCH the interval in SUPABASE_SETUP.sql's handle_new_user (`created_at > now() - interval
+// '7 days'`). THAT is what decides whether an invite still works; this constant only decides what the
+// owner is TOLD, so a drift shows "Expired" on a live invite (or the reverse). Pinned by
+// verify-invite-revoke.js, which reads the number out of BOTH files and fails if they disagree.
+const INVITE_TTL_DAYS = 7;
+
+app.post('/api/list-invites', async (req, res) => {
+  try {
+    const { accountId } = req.body || {};
+    if (!accountId) return res.status(400).json({ error: 'accountId required' });
+
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const requester = await resolveRequester(accountId, jwt);
+    if (!requester) return res.status(401).json({ error: 'Invalid auth token' });
+    // Same tier as sending an invite: owner or admin. A pending invite names an address that is
+    // about to get access, so it is not staff-visible.
+    if (!(requester.isOwner || requester.role === 'admin')) {
+      return res.status(403).json({ error: 'Only the owner or an admin can view pending invites' });
+    }
+
+    const { data: rows, error } = await supabaseAdmin
+      .from('account_invites')
+      .select('id, email, role, invited_by, created_at')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('list-invites error:', error.message);
+      return res.status(500).json({ error: 'Could not load pending invites.' });
+    }
+
+    const cutoff = Date.now() - INVITE_TTL_DAYS * 86400000;
+    const invites = (rows || []).map(r => ({
+      id: r.id,
+      email: r.email,
+      role: r.role,
+      created_at: r.created_at,
+      // Past the TTL the signup trigger ignores the row, so it no longer grants anything. Shown
+      // rather than hidden: it is the answer to "why didn't they get in?", and revoking clears it.
+      expired: !(new Date(r.created_at).getTime() > cutoff),
+      // Mirrors /api/remove-member: the owner manages everything; a non-owner admin may only
+      // withdraw invites they personally sent, never the owner's.
+      can_revoke: !!(requester.isOwner || r.invited_by === requester.userId)
+    }));
+    res.json({ ok: true, invites, requesterIsOwner: !!requester.isOwner });
+  } catch (e) {
+    console.error('list-invites exception:', e);
+    res.status(500).json({ error: e.message || 'Could not load pending invites.' });
+  }
+});
+
+app.post('/api/revoke-invite', async (req, res) => {
+  try {
+    const { accountId, inviteId } = req.body || {};
+    if (!accountId || !inviteId) {
+      return res.status(400).json({ error: 'accountId and inviteId required' });
+    }
+
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+
+    const requester = await resolveRequester(accountId, jwt);
+    if (!requester) return res.status(401).json({ error: 'Invalid auth token' });
+    if (!(requester.isOwner || requester.role === 'admin')) {
+      return res.status(403).json({ error: 'Only the owner or an admin can revoke invites' });
+    }
+
+    // Scoped to the account on the READ as well as the delete, so an id from another bar 404s
+    // instead of being withdrawn by someone who only administers this one.
+    const { data: invite, error: findErr } = await supabaseAdmin
+      .from('account_invites')
+      .select('id, email, invited_by')
+      .eq('id', inviteId)
+      .eq('account_id', accountId)
+      .maybeSingle();
+    if (findErr) {
+      console.error('revoke-invite lookup failed:', findErr.message);
+      return res.status(500).json({ error: 'Could not check the invite. Please try again.' });
+    }
+    if (!invite) return res.status(404).json({ error: 'That invite is no longer pending.' });
+
+    // Parity with /api/invite-user's owner-protection and /api/remove-member: a lower tier must not
+    // undo the owner's decision on the table that decides access.
+    if (!requester.isOwner && invite.invited_by !== requester.userId) {
+      return res.status(403).json({ error: 'You can only revoke invites you sent.' });
+    }
+
+    const { error: delErr } = await supabaseAdmin
+      .from('account_invites')
+      .delete()
+      .eq('id', inviteId)
+      .eq('account_id', accountId);
+    // CHECKED: an unchecked delete would report the invite withdrawn while the row — and the access
+    // it grants at signup — is still sitting there.
+    if (delErr) {
+      console.error('revoke-invite delete failed:', delErr.message);
+      return res.status(500).json({ error: 'Could not revoke the invite. Please try again.' });
+    }
+    res.json({ ok: true, email: invite.email });
+  } catch (e) {
+    console.error('revoke-invite exception:', e);
+    res.status(500).json({ error: e.message || 'Could not revoke the invite.' });
+  }
+});
+
 // ── List members of an account (Phase 2 multi-user) ───────────────────────────
 // Returns every member of the account along with their email and role. Caller
 // must be a member of the account (any role) to see the list.
