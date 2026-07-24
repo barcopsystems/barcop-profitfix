@@ -1639,10 +1639,12 @@ S.HubSettings = {
         requests:'', created_at:daysAgoISO(28) },
     ];
 
+    // S179: distinct ascending created_at so App.byCreation renders them in authored order (they carry
+    // no created_at otherwise, and byCreation would fall back to the random uid).
     App.data.event_rate_cards = [
-      { id:uid(), package_name:'Weeknight Private Room', event_type:'Private Dining', min_covers:15, max_covers:40, fb_minimum:1500, room_fee:0,   per_head:55 },
-      { id:uid(), package_name:'Saturday Full Buyout',   event_type:'Buyout',        min_covers:60, max_covers:110, fb_minimum:6000, room_fee:500, per_head:75 },
-      { id:uid(), package_name:'Offsite Catering',       event_type:'Catering (Offsite)', min_covers:20, max_covers:200, fb_minimum:0, room_fee:0, per_head:32 },
+      { id:uid(), package_name:'Weeknight Private Room', event_type:'Private Dining', min_covers:15, max_covers:40, fb_minimum:1500, room_fee:0,   per_head:55, created_at:daysAgoISO(30) },
+      { id:uid(), package_name:'Saturday Full Buyout',   event_type:'Buyout',        min_covers:60, max_covers:110, fb_minimum:6000, room_fee:500, per_head:75, created_at:daysAgoISO(29) },
+      { id:uid(), package_name:'Offsite Catering',       event_type:'Catering (Offsite)', min_covers:20, max_covers:200, fb_minimum:0, room_fee:0, per_head:32, created_at:daysAgoISO(28) },
     ];
 
     App.data.event_regulars = [
@@ -2618,6 +2620,9 @@ S.HubSettings = {
         'Initial the temperature log',
       ] },
     ];
+    // S179: the seed templates share one new Date().toISOString(), and byCreation ties on it, so
+    // Checklist Templates would render them reversed. Stamp each one step apart to keep authored order.
+    App.shiftData.sc_checklist_templates.forEach((t, i) => { t.created_at = new Date(Date.now() + i).toISOString(); });
     const mkChkItems = (arr, doneN) => arr.map((text, idx) => ({ text:text, done:idx < doneN }));
     const scChecklists = [];
     // Adoption ramp: the operator sets up in the first two weeks, so checklists
@@ -2976,7 +2981,7 @@ S.HubSettings = {
       // to match. She is still not IN lcBar (that list is by position name), so nothing
       // else moves.
       { name:'Assistant Manager', department:'Bar', default_wage:24, tipped:false },
-    ].map(p => ({ id:uid(), created_at:new Date().toISOString(), ...p }));
+    ].map((p, i) => ({ id:uid(), created_at:new Date(Date.now() + i).toISOString(), ...p }));   // S179: space created_at so byCreation keeps authored order
     App.laborData.lc_positions = lcPositions;
     const lcPos = n => lcPositions.find(p => p.name === n).id;
 
