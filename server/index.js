@@ -1560,6 +1560,19 @@ app.post('/api/invite-user', async (req, res) => {
           return res.status(500).json({ error: insertError.message });
         }
 
+        // S197 — CLEAN UP THE INVITE ROW WE JUST WROTE. This branch adds the membership directly
+        // because the person already has an auth account, so NO new auth.users row is inserted and
+        // handle_new_user (the only other thing that deletes from account_invites) never fires. The
+        // row would otherwise sit there forever: clutter in the pending-invite list, and a live
+        // 7-day grant re-armed on every re-invite. Membership is already confirmed above, so a
+        // failure here is cosmetic — log it, never fail the invite that actually succeeded.
+        const { error: invCleanupErr } = await supabaseAdmin
+          .from('account_invites')
+          .delete()
+          .eq('email', cleanEmail)
+          .eq('account_id', accountId);
+        if (invCleanupErr) console.error('invite cleanup after direct add failed:', invCleanupErr.message);
+
         // Also send a password recovery email so they can set (or reset) their
         // password and sign in. Triggers the recovery flow in app.js which
         // shows the set-password panel. Non-fatal if email send fails.
@@ -1766,10 +1779,22 @@ app.post('/api/list-members', async (req, res) => {
     for (const m of memberships || []) {
       let email = '(unknown)', confirmed = false;
       try {
-        const { data: u } = await supabaseAdmin.auth.admin.getUserById(m.user_id);
+        let { data: u } = await supabaseAdmin.auth.admin.getUserById(m.user_id);
+        // S196 — a JUST-INVITED member can be a beat ahead of the auth record being readable, so
+        // the owner saw "(unknown)" for the person they had only just invited (it corrected itself
+        // on the next visit, which is what proved it was a lag and not a failed lookup). One short
+        // retry closes that window. A genuinely unresolvable user still falls through to (unknown).
+        if (!u?.user?.email) {
+          await new Promise(r => setTimeout(r, 250));
+          ({ data: u } = await supabaseAdmin.auth.admin.getUserById(m.user_id));
+        }
         email = u?.user?.email || '(unknown)';
         confirmed = !!u?.user?.confirmed_at;
-      } catch (e) { /* keep defaults */ }
+      } catch (e) {
+        // NEVER silent: swallowing this is exactly why the first "(unknown)" report could not be
+        // diagnosed. The list still renders — one unresolved name must not cost the whole team page.
+        console.error('list-members: could not resolve user', m.user_id, (e && e.message) || e);
+      }
       members.push({
         id: m.id,
         user_id: m.user_id,
