@@ -232,17 +232,69 @@
   var ok = true;
   try { new Function('var o = {}; return o?.a;'); } catch (e) { ok = false; }
   if (ok) return;
+  // ⚠ THE DEMO IS THIS SAME PAGE (/demo, ?demo=1), so a PROSPECT lands here too. Telling a visitor
+  // with no account that "your data is safe on your account" is meaningless, and this is a sales
+  // surface. Detection mirrors app.js's own demo test.
+  var isDemo = false;
+  try {
+    var p = String(window.location.pathname || '').replace(/\/+$/, '').toLowerCase();
+    isDemo = String(window.location.search || '').indexOf('demo=1') > -1
+      || p === '/demo' || p === '/demo=1';
+  } catch (e2) {}
+  var body = isDemo
+    ? 'This browser is too out of date to run the Bar Cop demo. Update it, or open the demo on a '
+      + 'newer device. It will be right here when you get back.'
+    : 'This browser is too out of date to run Bar Cop. Update it, or open Bar Cop on a newer device. '
+      + 'Your data is safe on your account and will be waiting when you get back.';
+  // Someone still on a 2019 browser is the LEAST likely to know where to go, so point at the exact
+  // place for the browser they are actually holding instead of just saying "update it".
+  // ⚠ ORDER MATTERS: Edge's UA contains "Chrome", and Chrome's contains "Safari". Test most
+  // specific first. On iOS every browser is Safari underneath and updates with the system, so
+  // there is no download page to send them to; same for Safari on macOS.
+  var ua = ''; try { ua = String(navigator.userAgent || ''); } catch (e3) {}
+  var link = '', linkLabel = '', how = '';
+  if (/iPad|iPhone|iPod/.test(ua)) {
+    how = 'On an iPhone or iPad this comes with iOS: open Settings, tap General, then tap Software Update.';
+  } else if (/Android/.test(ua)) {
+    link = 'https://play.google.com/store/apps/details?id=com.android.chrome'; linkLabel = 'Update Chrome';
+  } else if (/Edg/.test(ua)) {
+    link = 'https://www.microsoft.com/edge'; linkLabel = 'Update Edge';
+  } else if (/Firefox\//.test(ua)) {
+    link = 'https://www.mozilla.org/firefox/new/'; linkLabel = 'Update Firefox';
+  } else if (/Chrome\//.test(ua)) {
+    link = 'https://www.google.com/chrome/'; linkLabel = 'Update Chrome';
+  } else if (/Safari\//.test(ua)) {
+    how = 'On a Mac, Safari updates with macOS: open the Apple menu, then System Settings, then General, then Software Update.';
+  } else {
+    link = 'https://browsehappy.com/'; linkLabel = 'Get a newer browser';
+  }
+  // Reuses the REAL login card (auth-screen / auth-card / auth-logo / auth-heading / auth-sub) so
+  // this reads as Bar Cop rather than a browser error page. style.css is linked above this script,
+  // so the classes are already available. Same shape as app.js's _bootUnavailable.
   var show = function () {
-    if (!document.body) return;
-    document.body.innerHTML =
-      '<div style="font-family:system-ui,-apple-system,Arial,sans-serif;background:#0B1319;color:#E8EDF2;'
-      + 'min-height:100vh;margin:0;display:flex;align-items:center;justify-content:center;padding:24px;">'
-      + '<div style="max-width:430px;text-align:center;">'
-      + '<div style="font-size:18px;font-weight:700;margin-bottom:12px;">Bar Cop needs a newer browser</div>'
-      + '<div style="font-size:14px;line-height:1.7;color:#A8B4BF;">'
-      + 'This browser is too out of date to run Bar Cop. Update it, or open Bar Cop on a newer device. '
-      + 'Your data is safe on your account and will be waiting when you get back.</div>'
+    var inner = '<div class="auth-view" style="display:block;"><div class="auth-card">'
+      + '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
+      + '<div class="auth-heading">Bar Cop Needs a Newer Browser</div>'
+      + '<div class="auth-sub">' + body + '</div>'
+      + (how ? '<div class="auth-sub">' + how + '</div>' : '')
+      + (link ? '<a class="btn btn-primary" href="' + link + '" rel="noopener" style="width:100%;'
+          + 'display:block;box-sizing:border-box;text-align:center;text-decoration:none;">'
+          + linkLabel + '</a>' : '')
       + '</div></div>';
+    var scr = document.getElementById('auth-screen');
+    if (scr) {
+      var appEl = document.getElementById('app');
+      if (appEl && appEl.className.indexOf('hidden') === -1) appEl.className += ' hidden';
+      scr.style.display = 'flex';
+      scr.innerHTML = inner;
+      return;
+    }
+    // Fallback if the auth shell is not in the DOM: centre it on the locked palette by hand.
+    if (document.body) {
+      document.body.innerHTML = '<div style="font-family:system-ui,-apple-system,Arial,sans-serif;'
+        + 'background:var(--bg,#070E15);min-height:100vh;margin:0;display:flex;align-items:center;'
+        + 'justify-content:center;padding:24px;color:var(--t2,rgba(200,216,232,0.66));">' + inner + '</div>';
+    }
   };
   if (document.body) { show(); } else { document.addEventListener('DOMContentLoaded', show); }
 })();
