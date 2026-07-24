@@ -768,7 +768,7 @@ S.InventoryLocations = {
       const stock = this._unTickedWithStock(l.name);
       if (stock.length) {
         this._dispPending = true;
-        App.promptShelfDisposition(l.name, stock, () => this.saveProducts(id), { onCancel: () => { this._dispPending = false; } });
+        App.promptShelfDisposition(l.name, stock, () => this.saveProducts(id), { untick: true, onCancel: () => { this._dispPending = false; } });
         return;
       }
     }
@@ -824,7 +824,7 @@ S.InventoryLocations = {
       const stock = this._unTickedWithStock(l.name);
       if (stock.length) {
         this._dispPending = true;
-        App.promptShelfDisposition(l.name, stock, () => this.updateLocation(id), { onCancel: () => { this._dispPending = false; } });
+        App.promptShelfDisposition(l.name, stock, () => this.updateLocation(id), { untick: true, onCancel: () => { this._dispPending = false; } });
         return;
       }
     }
@@ -887,7 +887,8 @@ S.InventoryLocations = {
     // row that landed while its products did not reported a clean save over a split state.
     // ⚠ The cascade only fires if the location row landed (S63) — firing it regardless left the
     // server holding products that name a shelf the write never created.
-    let ok = await App.putRecord('ic', 'location', l);   // renamed location -> row
+    const okLoc = await App.putRecord('ic', 'location', l);   // renamed location -> row
+    let ok = okLoc;
     if (ok && touched.size && !(await App.putRecordsBulk('ic', 'product', [...touched.values()]))) ok = false;   // rename cascade -> rows
     if (ok) {
       App.markSetupDone('gs_ic_locations');
@@ -918,7 +919,15 @@ S.InventoryLocations = {
       // call placed before it wrote into an element that was then thrown away — the operator's
       // rename was silently reverted with nothing on screen saying why. `fail` resolves #il-err
       // lazily so it finds the NEW element rather than the detached one it closed over.
-      fail('Save failed. Try again.');
+      // S178: if the location ROW landed and only the cascade failed, the SERVER holds a half-applied
+      // rename (the shelf renamed while its products still name the old one — the double-count the
+      // snapshot comment above guards against). Memory is rolled back so a retry re-drives the whole
+      // cascade, but the operator must be told to finish it, not shown "nothing happened". Gated on a
+      // real rename (old !== name), the same shape as S165 (saveVendor); a total failure or a set-only
+      // partial keeps the plain message.
+      fail(okLoc && old !== name
+        ? 'The location saved but not everything linked to it did. The rename is only half saved. Save again to finish it.'
+        : 'Save failed. Try again.');
     }
   },
 
