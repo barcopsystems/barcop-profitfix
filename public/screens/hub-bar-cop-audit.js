@@ -408,8 +408,9 @@ S.HubBarCopAudit = {
     // let a single batch read as N fixes and inflate this whole sub-score. And composite gaps
     // (prime-cost) get an AUTO fix_log row (profit-fix._autoStart) yet are NEVER surfaced and are
     // excluded by _gapEntries — so they must be excluded here too, or actRatio (which would include
-    // them) and the conversion denominator loggedGaps (which excludes them) count on different bases,
-    // and a composite-only window shows a green "Fixes Logged" tile beside an N/A sub-score.
+    // them) and the conversion denominator (measurableCount, from the composite-excluded scored set)
+    // would count on different bases, and a composite-only window would show a green "Fixes Logged"
+    // tile beside an N/A sub-score.
     // recoveredCount below is already per-gap (S170); these counts were the twin S170 left on rows.
     const composite = (window.Recovery && Recovery.COMPOSITE_GAPS) || [];
     const isRealGap = gid => gid != null && composite.indexOf(gid) === -1;
@@ -417,43 +418,53 @@ S.HubBarCopAudit = {
       fixLog.filter(f => this._withinWindow(f.date, this.WINDOW_DAYS) && isRealGap(f.gap_id)).map(f => f.gap_id)
     ).size;
 
-    // The distinct scored gaps recoveredCount ranges over (durable-baseline union, one per gap,
-    // composites excluded). Computed ONCE and reused for the recovered loop AND the conversion
-    // denominator, so numerator and denominator share a basis (S170 aligned the dollars but left
-    // these counts on raw rows); _gapEntries(null) stays a single call here.
+    // The scored gaps to range over: the durable-baseline union of logged fixes, one per gap, composites
+    // excluded. Computed ONCE; the loop below derives BOTH the numerator (recovered) and the honest S180
+    // denominator (measurable) from it, so they share a basis. _gapEntries(null) stays a single call here.
     const scored = (window.Recovery && typeof Recovery._gapEntries === 'function')
       ? Recovery._gapEntries(null)
       : [...new Set(fixLog.filter(f => isRealGap(f.gap_id)).map(f => f.gap_id))];
-    const loggedGaps = scored.length;
 
-    // Matured fixes that produced positive dollar movement via Recovery. Guarded on _gapEntries too:
-    // `scored` holds compute-able entry objects only when it came from _gapEntries.
-    let recoveredCount = 0;
+    // Split each scored gap's recovery result two ways (S180): measurableCount = fixes that produced a
+    // MATURED, real dollar verdict (compute -> status:'ok', dollars != null); recoveredCount = the subset
+    // that came out FAVORABLE (dollars > 0). A gap Bar Cop has no weekly dollar metric for (theft, vendor,
+    // menu-engineering, server, events, the cash levers) returns 'untracked'; a noDollar ratio metric
+    // (pricing, rplh) returns dollars:null; a too-recent fix returns 'building'. None of those can EVER be
+    // recovered, so they must NOT sit in the conversion denominator — counting them scored the operator a
+    // harsh 0 for working exactly the gaps we cannot dollarize. Guarded on _gapEntries too: `scored` holds
+    // compute-able entry objects only when it came from _gapEntries.
+    let recoveredCount = 0, measurableCount = 0;
     if (window.Recovery && typeof Recovery.compute === 'function' && typeof Recovery._gapEntries === 'function') {
       scored.forEach(f => {
         try {
           const r = Recovery.compute(f);
-          if (r.status === 'ok' && r.dollars > 0) recoveredCount++;
+          if (r.status === 'ok' && r.dollars != null) {
+            measurableCount++;                    // a real dollar outcome, favorable or not
+            if (r.dollars > 0) recoveredCount++;  // and it moved the needle up
+          }
         } catch (e) {}
       });
     }
 
     // With no non-composite fix in the (24-month) window there is no recovery activity to judge yet,
     // so the whole sub-score is N/A — never a harsh "0, you are not acting". Windowed on fix_log (NOT
-    // the durable loggedGaps, which never ages out — that flip broke the N/A for a long-dormant
+    // the durable scored set, which never ages out — that flip broke the N/A for a long-dormant
     // operation) and non-composite (so the auto prime-cost row alone is not counted as activity, which
     // would leave the tile at 0 beside a scored sub-score).
     const noFixes = fixLog.filter(f => isRealGap(f.gap_id)).length === 0;
+    // Nothing dollar-measurable among the fixes (only untracked / noDollar / still-building) -> N/A,
+    // never a 0. A theft or vendor fix is real work Bar Cop just cannot put a weekly dollar figure on.
+    const noMeasurable = measurableCount === 0;
 
     // Component 1: act-on-gaps. N/A until an audit has surfaced something AND at least one gap fixed.
     const actRatio = (surfaced === 0 || noFixes) ? null : Math.min(1, wkGapCount / surfaced);
 
-    // Component 2: of the gaps fixed, how many produced real favorable movement. N/A until one fixed.
-    const convRatio = noFixes ? null : Math.min(1, recoveredCount / loggedGaps);
+    // Component 2: of the fixes we can measure in dollars, how many produced favorable movement (S180).
+    const convRatio = (noFixes || noMeasurable) ? null : Math.min(1, recoveredCount / measurableCount);
 
     const components = [
       { label: 'Acting on surfaced gaps',                ratio: actRatio,  na: surfaced === 0 || noFixes, extra: noFixes ? 'No recovery activity yet' : (surfaced === 0 ? 'No audit has surfaced gaps yet' : (wkGapCount + ' gap' + (wkGapCount === 1 ? '' : 's') + ' acted on in the last 30 days against ' + surfaced + ' surfaced')) },
-      { label: 'Fixes that produced movement',           ratio: convRatio, na: noFixes,                   extra: noFixes ? 'No fixes logged yet' : (recoveredCount + ' of ' + loggedGaps + ' gap' + (loggedGaps === 1 ? '' : 's') + ' fixed produced favorable movement') }
+      { label: 'Fixes that produced movement',           ratio: convRatio, na: noFixes || noMeasurable,   extra: noFixes ? 'No fixes logged yet' : (noMeasurable ? 'No dollar-measurable fixes yet' : (recoveredCount + ' of ' + measurableCount + ' measurable fix' + (measurableCount === 1 ? '' : 'es') + ' produced favorable movement')) }
     ];
     return this._rollup(components);
   },
