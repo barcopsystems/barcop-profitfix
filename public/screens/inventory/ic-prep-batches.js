@@ -650,12 +650,22 @@ S.PrepBatches = {
   async saveBatch() {
     if (this._saving) return;
     this._saving = true;
-    setTimeout(() => { this._saving = false; }, 1000);
+    // ⚠ NO 1000ms self-clearing timer (S154). saveBatch awaits the in-flight resync barrier, which
+    // can outlast a fixed timeout — the lock cleared with nothing yet written, so a second click ran
+    // the whole save again and minted a SECOND identical batch (prep batches have no dup-name guard).
+    // Release the lock on every EXIT path instead, and disable the Save button while it runs (the
+    // twin ic-product-setup.save() already disables its button before the await).
+    const btn = this._el('pb-save');
+    if (btn) btn.disabled = true;
+    const unlock = () => { this._saving = false; if (btn) btn.disabled = false; };
     const wasAdd = !this.editId;
 
     const name = this._el('pb-name')?.value.trim();
     const err = this._el('pb-err');
-    if (!name) { if (err) { err.textContent = 'Batch name required.'; err.style.display = 'inline'; } return; }
+    // ⚠ RELEASE THE LOCK on the blank-name bail (S155) — the failed-write path below releases it, this
+    // twin did not, so after a blank save the operator fixed the name and the next click was swallowed
+    // by `if (this._saving) return` while the stale "Batch name required" still showed.
+    if (!name) { if (err) { err.textContent = 'Batch name required.'; err.style.display = 'inline'; } unlock(); return; }
 
     this._els('.pb-ing-qty').forEach(el => {
       const idx = parseInt(el.dataset.i);
@@ -714,9 +724,10 @@ S.PrepBatches = {
     if (!saved) {
       const e = this._el('pb-err');
       if (e) { e.textContent = 'Could not save. Try again.'; e.style.display = 'inline'; }
-      this._saving = false;   // release the lock now, or the retry is dead for a second
+      unlock();   // release the lock + re-enable the button, or the retry is dead for a second
       return;
     }
+    this._saving = false;   // released on success too (the modal + its button are about to close)
     this.editId = null;
     if (wasAdd) { this._draft = null; this._draftRows = null; }
     App.closeModal('pb-edit-modal');
@@ -726,7 +737,30 @@ S.PrepBatches = {
   async deleteBatch(id) {
     const b = this.byId(id);
     if (!b) return;
-    const ok = await App.confirmDelete();
+    // ⚠ REFERENCE GUARD (S153). A menu item can use this batch as a recipe ingredient (source:'batch');
+    // deleting it makes App.menuItemCost refuse to cost the dish — it goes "not costed", off the Menu
+    // Engineering board, with no warning. Name the affected dishes first, the batch twin of
+    // ic-product-setup.confirmDel. A batch is referenced only by menu items (batch recipes hold
+    // products, not other batches), so this is a two-way confirm — there is no Make-Inactive for a batch.
+    const refs = App.batchReferences ? App.batchReferences(id) : { menuItems: [], total: 0, any: false };
+    let ok;
+    if (refs.any) {
+      const names = refs.menuItems.map(m => (m && m.name) || '').filter(Boolean);
+      // ⚠ PLAIN TEXT — App.confirm ESCAPES its message (app.js confirm(): esc(message)), so inline
+      // HTML renders as literal tags and a pre-esc'd name double-escapes. Name the dishes in prose;
+      // App.confirm escapes the whole string once. (Richer formatting is the D1 modal design pass.)
+      const shown = names.slice(0, 4).join(', ') + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '');
+      ok = await App.confirm({
+        title: 'Something still uses this batch',
+        message: refs.total + ' menu item' + (refs.total === 1 ? '' : 's') + ' use this batch'
+          + (shown ? ' (' + shown + ')' : '') + '. Deleting it leaves ' + (refs.total === 1 ? 'that dish' : 'those dishes')
+          + ' with a missing ingredient. Bar Cop flags ' + (refs.total === 1 ? 'it' : 'them')
+          + ' as not costed rather than quietly costing the dish cheaper, but you will have to fix each one.',
+        confirmText: 'Delete anyway', cancelText: 'Keep it', danger: true
+      });
+    } else {
+      ok = await App.confirmDelete();
+    }
     if (!ok) return;
     // Same as saveBatch: an in-flight resync upserting this batch after the delete would bring it
     // straight back. Wait for it, then delete.
