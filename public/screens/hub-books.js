@@ -714,30 +714,54 @@ S.HubBooks = {
   // unlabelled "Carried forward:" blocks on one page would be unreadable, so each names its end.
   _pushCarriedNote(rows, merges, asOf, colCount, label) {
     const carried = (asOf && asOf.carried) || [];
-    if (!carried.length) return;
+    const uncosted = (asOf && asOf.uncosted) || [];
+    if (!carried.length && !uncosted.length) return;
     const which = label || 'Ending inventory';
     const mergeFull = (r) => merges.push({ s: { r, c: 0 }, e: { r, c: colCount - 1 } });
     rows.push(this._blankRow(colCount));
-    // ⚠ TWO DIFFERENT REASONS, said separately (S89). "Nobody got to it on the night" is
-    // actionable — count it. "It is hidden from operations" is not, because take-inventory will
-    // never list it again; the operator has to un-hide it or accept the figure. Rolling both into
-    // "was not counted" sent them looking for a bottle on a shelf that no count sheet shows.
-    const hidden = carried.filter(c => c.inactive);
-    const missed = carried.filter(c => !c.inactive);
-    const bits = [];
-    if (missed.length) bits.push(missed.length + ' product' + (missed.length === 1 ? ' was' : 's were')
-      + ' not counted on ' + asOf.countDate);
-    if (hidden.length) bits.push(hidden.length + ' product' + (hidden.length === 1 ? ' is' : 's are')
-      + ' hidden from operations and can no longer be counted');
-    rows.push(this._lineRow('Carried forward - ' + which + ': ' + bits.join(', and ')
-      + '. The last counted figure was used for ' + (carried.length === 1 ? 'it' : 'each')
-      + '. Everything else is from that count.', colCount));
-    mergeFull(rows.length - 1);
-    carried.forEach(c => {
-      rows.push(['  ' + (c.name || 'Unnamed product')
-        + (c.inactive ? ' - hidden from operations, last counted ' : ' - carried forward from ')
-        + c.date, c.value, '', '', ''].slice(0, colCount));
-    });
+    if (carried.length) {
+      // ⚠ THREE DIFFERENT REASONS, said separately (S89 + S134/S135). Fully NOT counted ("nobody got
+      // to it on the night") is actionable — count it. A PARTLY-carried product WAS counted (at
+      // another shelf on the boundary) with only part of its figure resting on an older count, so it
+      // must not be announced as "not counted". Hidden from operations is not actionable —
+      // take-inventory will never list it again. Rolling any into the others misled the accountant.
+      const hidden  = carried.filter(c => c.inactive);
+      const missed  = carried.filter(c => !c.inactive && c.full);
+      const partial = carried.filter(c => !c.inactive && !c.full);
+      const bits = [];
+      if (missed.length)  bits.push(missed.length + ' product' + (missed.length === 1 ? ' was' : 's were')
+        + ' not counted on ' + asOf.countDate);
+      if (partial.length) bits.push(partial.length + ' product' + (partial.length === 1 ? ' was' : 's were')
+        + ' partly carried forward from an earlier count');
+      if (hidden.length)  bits.push(hidden.length + ' product' + (hidden.length === 1 ? ' is' : 's are')
+        + ' hidden from operations and can no longer be counted');
+      rows.push(this._lineRow('Carried forward - ' + which + ': ' + bits.join(', and ')
+        + '. The last counted figure was used for ' + (carried.length === 1 ? 'it' : 'each')
+        + '. Everything else is from that count.', colCount));
+      mergeFull(rows.length - 1);
+      carried.forEach(c => {
+        const how = c.inactive ? ' - hidden from operations, last counted '
+                  : c.full     ? ' - carried forward from '
+                  :              ' - partly carried forward from ';
+        rows.push(['  ' + (c.name || 'Unnamed product') + how + c.date, c.value, '', '', ''].slice(0, colCount));
+      });
+    }
+    if (uncosted.length) {
+      // ⚠ UNCOSTED PRODUCTS (S136): real units on the shelf with no unit cost recorded, so they sum
+      // to $0 here. Disclose them, or the sheet silently understates ending inventory (Line 41).
+      // ⚠ LABELLED with `which` (S94, round-N+1 scan): _pushCarriedNote is called twice (Beginning +
+      // Ending), so an unlabelled uncosted block printed two identical unreadable copies — the exact
+      // failure the carried headline was labelled to stop.
+      rows.push(this._lineRow('Uncosted - ' + which + ': ' + uncosted.length + ' product' + (uncosted.length === 1 ? ' has' : 's have')
+        + ' units on hand but no unit cost recorded, so ' + (uncosted.length === 1 ? 'it is' : 'they are')
+        + ' valued at $0 here. Enter ' + (uncosted.length === 1 ? 'its' : 'their')
+        + ' cost in Product Setup to include ' + (uncosted.length === 1 ? 'it' : 'them') + '.', colCount));
+      mergeFull(rows.length - 1);
+      uncosted.forEach(u => {
+        rows.push(['  ' + (u.name || 'Unnamed product') + ' - no unit cost, ' + (u.onHand || 0) + ' on hand at $0',
+          0, '', '', ''].slice(0, colCount));
+      });
+    }
   },
 
   // Make a blank row with the right column count.
@@ -846,7 +870,12 @@ S.HubBooks = {
     // printed directly beneath them.
     const prodById = {};
     ((App.inventoryData?.ic_products) || []).forEach(p => { if (p && p.id) prodById[p.id] = p; });
-    const carriedIds = new Set(((endAsOf.carried) || []).map(c => c.id));
+    // S134: keep the whole carried ENTRY (not just the id) so the Bottle Detail can say whether the
+    // product is FULLY or only PARTLY carried — labelling a part-carried product's whole figure as
+    // "carried forward" contradicted the carried note four rows above it. S136: the uncosted set.
+    const carriedById = {};
+    ((endAsOf.carried) || []).forEach(c => { if (c && c.id) carriedById[c.id] = c; });
+    const uncostedIds = new Set(((endAsOf.uncosted) || []).map(u => u.id));
     const items = Object.keys(endAsOf.byProduct || {}).map(pid => {
       const r = endAsOf.byProduct[pid];
       const p = prodById[pid] || {};
@@ -868,8 +897,10 @@ S.HubBooks = {
                    : (r.unitCost != null ? r.unitCost
                       : (p.unit_cost != null ? p.unit_cost : src.unit_cost)),
         value:     r.value || 0,
-        carried:   carriedIds.has(pid),
-        carriedFrom: (((endAsOf.carried) || []).find(c => c.id === pid) || {}).date || ''
+        carried:     !!carriedById[pid],
+        carriedFull: carriedById[pid] ? !!carriedById[pid].full : false,
+        carriedFrom: (carriedById[pid] || {}).date || '',
+        uncosted:    uncostedIds.has(pid)
       };
     });
     const byCat = {};
@@ -898,7 +929,14 @@ S.HubBooks = {
     rows.push(['Product', 'Category', 'Units', 'Unit Cost', 'Extended Value']);
     items.slice().sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''))
       .forEach(it => {
-        const label = (it.name || '') + (it.carried ? ' (carried forward from ' + it.carriedFrom + ')' : '');
+        // S134/S136: FULLY carried vs PARTLY carried vs uncosted are three different facts and the
+        // row must not overstate any of them (a part-carried row used to claim the whole figure was
+        // carried, contradicting the note).
+        let tag = '';
+        if (it.uncosted) tag = ' (no unit cost recorded)';
+        else if (it.carried) tag = it.carriedFull ? ' (carried forward from ' + it.carriedFrom + ')'
+                                                   : ' (partly carried forward from ' + it.carriedFrom + ')';
+        const label = (it.name || '') + tag;
         rows.push([label, it.category || '', parseFloat(it.total) || 0, parseFloat(it.unit_cost) || 0, parseFloat(it.value) || 0]);
       });
 
@@ -1730,7 +1768,19 @@ S.HubBooks = {
     rows.push(['Line 35: Beginning inventory', beginValue, beginCount ? ('Count dated ' + beginCount.date) : 'No count on file before ' + yearStart, '']);
     rows.push(['Line 36: Purchases', purchases, 'Sum of receive-delivery records for ' + year, '']);
     rows.push(['Line 41: Ending inventory', endValue, endCount ? ('Count dated ' + endCount.date) : 'No count on file at or before ' + yearEnd, '']);
-    rows.push(['Line 42: Cost of goods sold (35 + 36 - 41)', calcCogs, 'Calculated', '']);
+    rows.push(['Line 42: Cost of goods sold (35 + 36 - 41)', calcCogs,
+      calcCogs != null ? 'Calculated'
+        : 'Cannot be computed without a beginning-of-year count; Line 4 uses weekly-summed COGS instead', '']);
+    // ⚠ FOOTING DISCLOSURE (S138, Kyle's call 2026-07-25: keep both + disclose). With no beginning
+    // count the count-based COGS (35 + 36 - 41) is uncomputable, so Line 42 is left blank while Line 4
+    // falls back to the weekly-summed figure — Part III then does not foot to Part I. Say so plainly
+    // rather than force a false consistency (mirroring Line 42 to the weekly figure would break Part
+    // III's own 35 + 36 - 41 = 42 math instead).
+    if (calcCogs == null) {
+      rows.push(this._lineRow('Note: with no inventory count on file before ' + yearStart
+        + ', the count-based Cost of Goods Sold (Line 42 = Line 35 + Line 36 - Line 41) cannot be computed and is left blank. Line 4 above instead uses your weekly-summed COGS so Part I still carries a figure; Part I and Part III will not foot until a beginning-of-year count exists. Give your accountant both.', COL_COUNT));
+      mergeFull(rows.length - 1);
+    }
 
     // ⚠ THE DISCLOSE HALF (S90). Lines 35 and 41 route through App.inventoryValueAsOf, which
     // carries a skipped product forward at its last counted value — and this sheet said nothing
