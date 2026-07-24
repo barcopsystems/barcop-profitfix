@@ -193,9 +193,6 @@ S.Hub = {
     const pAudits = data.audits || [];
     const rAudits = data.revenue_audits || [];
     const cAudits = data.cash_audits || [];
-    // Cash data is owned by Shift Control (sc_variances), not the legacy
-    // user_data reconciliations key — that key is empty for a real operator.
-    const recs    = (App.shiftData && App.shiftData.sc_variances) || [];
 
     const barName = s.bar_name || 'Your Operation';
 
