@@ -355,7 +355,7 @@ const PosIngest = {
     // rejected whole).
     const byDate = new Map();          // date -> aggregated { bar, food, covers } from the file
     const carry  = new Map();          // date -> { bar, food, covers } booleans: which columns the file CARRIES
-    const skipped = []; let dupCount = 0; let merged = 0; let keptManual = 0;
+    const skipped = []; const zeroSkipped = []; let dupCount = 0; let merged = 0; let keptManual = 0;
     const keptDates = new Set();       // a kept hand day reported once, not once per row
     const cents = n => Math.round(n * 100) / 100;   // summing floats across services must not drift
     // A column "carries" a value only if the cell PARSES to a number. A junk cell ("N/A", "-", a
@@ -396,7 +396,7 @@ const PosIngest = {
         return;
       }
       if (!prior) {   // a brand-new day: a column the file omits is genuinely 0 (nothing to preserve)
-        if (cents(agg.bar + agg.food) <= 0) { skipped.push(date); return; }
+        if (cents(agg.bar + agg.food) <= 0) { zeroSkipped.push(date); return; }   // S189: a $0 day is a deliberate zero, not an unreadable row
         toAdd.push(mkRec(date, agg.bar, agg.food, agg.covers, false));
         return;
       }
@@ -425,14 +425,14 @@ const PosIngest = {
       }
       // Prior is an import / seed: replace it, carrying forward any column the file omits. Not a
       // user-vs-user conflict (replacing your own machine import), so no prompt.
-      if (useRec.total_revenue <= 0) { skipped.push(date); return; }
+      if (useRec.total_revenue <= 0) { zeroSkipped.push(date); return; }   // S189: don't write $0 over FACT-tier sales; report it as a $0 day, not "no usable figure"
       dupCount++;
       toAdd.push(useRec);
     });
     // `merged`, NOT dupCount — the same reasoning spelled out in buildPmix. dupCount means "rows
     // already logged" everywhere else and the cockpit renders it as "N replaced earlier figures";
     // rows FOLDED INTO a total are the opposite of that.
-    return { toAdd, skipped, dupCount, merged, keptManual, conflicts };
+    return { toAdd, skipped, zeroSkipped, dupCount, merged, keptManual, conflicts };
   },
 
   // A row is one drawer's (or the day's) over/short. Resolves Register + Cashier
