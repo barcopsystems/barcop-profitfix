@@ -826,7 +826,7 @@ S.ShiftDashboard = {
   },
   async _commitCash(rows) {
     const built = PosIngest.build('cash', rows);
-    const { toAdd, skipped, dupCount, keptManual, conflicts, extraDropped } = built;
+    const { toAdd, skipped, dupCount, keptManual, conflicts, extraDropped, totalsLines } = built;
     const res = document.getElementById('sc-ck-cash-res');
     const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
     const note = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">' + m + '</div>'; };
@@ -864,11 +864,14 @@ S.ShiftDashboard = {
     // per-day scope is deliberate (S99/S103) but the drop must be surfaced (S141), never in silence.
     const extraNote = extraDropped ? ' (' + extraDropped + ' extra row' + (extraDropped === 1 ? '' : 's')
         + ' for an already-counted register-day, not imported)' : '';
+    // A column-less whole-day totals line was skipped as already covered by the per-register rows (S142).
+    const totalsNote = totalsLines ? ' (' + totalsLines + ' whole-day totals row' + (totalsLines === 1 ? '' : 's')
+        + ' skipped, already covered by the per-register rows)' : '';
     if (!allToAdd.length) {
       const skipNote = skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
           + ' skipped, no over/short figure)' : '';
-      if (kept || extraDropped) note('No new figures written.'
-          + (kept ? ' ' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept.' : '') + extraNote + skipNote);
+      if (kept || extraDropped || totalsLines) note('No new figures written.'
+          + (kept ? ' ' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept.' : '') + extraNote + totalsNote + skipNote);
       else fail('No rows imported. Each row needs a date plus an over/short, or expected and counted cash.' + skipNote);
       return;
     }
@@ -879,7 +882,7 @@ S.ShiftDashboard = {
       + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
       + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand count)' : '')
       + (kept ? ' (' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept)' : '')
-      + extraNote
+      + extraNote + totalsNote
       // ⚠ A skipped cash row is a register-day with NO over/short at all (S105). Silence let the
       // operator read "4 reconciles imported" off a 6-row file and believe the week was counted.
       + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
