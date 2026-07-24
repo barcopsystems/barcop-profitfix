@@ -495,8 +495,28 @@ const App = {
   // CHANGE BOTH. verify-signups-closed.js FAILS if they disagree, so reopening is one decision.
   SIGNUPS_OPEN: false,
 
+  // Last-resort boot guard (L14). init() IS the whole boot chain, and at page load BOTH containers
+  // are hidden (#auth-screen display:none, #app .hidden) — so a rejection anywhere in that chain
+  // used to leave the operator on a PERMANENTLY BLANK PAGE with no message and no way forward. Worse,
+  // window.onerror paints its card into #content-area, which lives INSIDE the still-hidden #app, so
+  // even that fallback was invisible. Every individual read is already defensive (readData falls back
+  // to local, loadEvents to the cache); this catches the one unguarded throw that gets added later.
+  // ⚠ ONLY takes over when boot put NOTHING on screen. A LATE rejection (after boot() rendered, or
+  // while the sign-in card is up) must never hide a working app behind an error screen.
+  _bootFailed(e) {
+    try {
+      DB.logClientError('boot_failed', (e && e.message) || String(e || 'boot failed'),
+        (e && e.stack) ? e.stack : '');
+    } catch (e2) {}
+    const appEl  = document.getElementById('app');
+    const authEl = document.getElementById('auth-screen');
+    const appShown  = !!appEl  && !appEl.classList.contains('hidden');
+    const authShown = !!authEl && authEl.style.display !== 'none';
+    if (!appShown && !authShown) this._bootUnavailable();
+  },
+
   // Hard stop when Bar Cop cannot reach its backend at boot (see the SUPABASE_URL gate
-  // in start()). Reuses the auth card so it reads as Bar Cop, not a browser error.
+  // in init()). Reuses the auth card so it reads as Bar Cop, not a browser error.
   _bootUnavailable() {
     const scr = document.getElementById('auth-screen');
     document.getElementById('app')?.classList.add('hidden');
@@ -8313,7 +8333,7 @@ function tt(id) {
 
 /* ── HTML escape ── */
 function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
 }
 
 /* ── Reviewed-on staleness note ── */
@@ -8593,7 +8613,8 @@ document.addEventListener('DOMContentLoaded', () => {
     App.navigate('settings');
   });
   wireAuth();
-  App.init();
+  // A bare App.init() left any boot-chain rejection as a silent blank page (L14) — see _bootFailed.
+  App.init().catch(e => App._bootFailed(e));
 
   // Quality-of-life: focusing any number input selects its current value, so a
   // prepopulated "0" is overwritten the moment the operator types instead of
