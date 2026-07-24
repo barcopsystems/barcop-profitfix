@@ -108,16 +108,17 @@ S.PrepBatches = {
     // picker stays scoped to the mode (an off-mode product that is NOT selected still can't be added).
     if (cur && cats.indexOf(cur.category || '') < 0) {
       h += '<optgroup label="Current selection"><option value="' + cur.id + '" selected>'
-        + esc(cur.name) + (cur.active === false ? ' (inactive)' : '') + '</option></optgroup>';
+        + esc(cur.name) + (cur.active === false ? ' (inactive)' : (App.miscIsSupply(cur) ? ' (supply)' : '')) + '</option></optgroup>';
     }
     cats.forEach(cat => {
-      const inCat = all.filter(p => (p.category || '') === cat)
+      const inCat = all.filter(p => (p.category || '') === cat
+          && !(cat === 'Misc' && App.miscIsSupply(p) && p.id !== selId))   // S192: operating supplies are not ingredients (keep one only if it IS the selection)
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!inCat.length) return;
       h += '<optgroup label="' + esc(cat) + '">';
       inCat.forEach(p => {
         h += '<option value="' + p.id + '"' + (p.id === selId ? ' selected' : '') + '>' + esc(p.name)
-          + (p.active === false ? ' (inactive)' : '') + '</option>';
+          + (p.active === false ? ' (inactive)' : (App.miscIsSupply(p) ? ' (supply)' : '')) + '</option>';
       });
       h += '</optgroup>';
     });
