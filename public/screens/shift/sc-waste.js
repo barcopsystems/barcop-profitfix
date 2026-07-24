@@ -110,6 +110,9 @@ S.ShiftWaste = {
 
   productOptions(selectedId) {
     const prods = this.products();
+    // S193: a selected product the filter would drop (inactive) stays visible + labelled — never blank the row.
+    const _cur = selectedId ? ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p && p.id === selectedId) : null;
+    const _curDropped = !!_cur && !prods.some(p => p && p.id === selectedId);
     const order = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
     const cats = [...new Set(prods.map(p => p.category || 'Other'))]
       .sort((a, b) => { const ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
@@ -120,7 +123,7 @@ S.ShiftWaste = {
         .forEach(p => { h += '<option value="' + p.id + '"' + (selectedId === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; });
       h += '</optgroup>';
     });
-    return h;
+    return h + (_curDropped ? '<optgroup label="Current selection"><option value="' + _cur.id + '" selected>' + esc(_cur.name || '') + (_cur.active === false ? ' (inactive)' : '') + '</option></optgroup>' : '');
   },
   reasonOptions(selected) {
     return '<option value="">Select reason...</option>'

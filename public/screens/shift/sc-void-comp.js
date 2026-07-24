@@ -84,6 +84,11 @@ S.ShiftVoidComp = {
       inCat.forEach(p => { const v = 'p:' + p.id; h += '<option value="' + v + '"' + (selectedKey === v ? ' selected' : '') + '>' + esc(p.name) + '</option>'; });
       h += '</optgroup>';
     });
+    // S193: keep a selected inventory product the active-only filter dropped (deactivated) visible + labelled.
+    if (selectedKey && selectedKey.slice(0, 2) === 'p:' && !this.products().some(p => p.id === selectedKey.slice(2))) {
+      const _cur = this.productById(selectedKey.slice(2));
+      if (_cur) h += '<optgroup label="Current selection"><option value="p:' + _cur.id + '" selected>' + esc(_cur.name || '') + (_cur.active === false ? ' (inactive)' : '') + '</option></optgroup>';
+    }
     return h;
   },
   // Resolve a saved record back to its picker key.
