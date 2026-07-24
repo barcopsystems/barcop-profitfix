@@ -5808,6 +5808,12 @@ const App = {
   // stock went. `stock` = App.countedStockAt(fromLoc[, pid]).
   promptShelfDisposition(fromLoc, stock, proceed, opts) {
     opts = opts || {};
+    // S184: on the UNTICK path the product is being REMOVED from this shelf, so "Still here" is a
+    // contradiction — disposeShelfStock writes nothing for 'stay' and the stock is dropped from on-hand,
+    // while the copy promises it is carried forward. Offer only Used/Moved and force an explicit pick.
+    // The ARCHIVE path (opts.untick absent) is unchanged: the shelf and its stock physically remain, so
+    // "Still here — carry forward" is correct and stays the default.
+    const untick = !!opts.untick;
     stock = (stock || []).filter(s => s && s.product_id && s.onHand > 0);
     if (!stock.length) { if (typeof proceed === 'function') proceed(); return; }   // nothing to dispose
     const money = v => '$' + (Math.round((v || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -5818,7 +5824,9 @@ const App = {
       .filter(l => l && l.name && !l.archived && l.name !== fromLoc).map(l => l.name);
     const destOpts = () => '<option value="">Pick a shelf...</option>' + dests.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
     const choiceSel = (cls, id) => '<select class="' + cls + '"' + (id ? ' id="' + id + '"' : '') + ' style="padding:7px 9px;">'
-      + '<option value="stay">Still here — carry forward</option>'
+      + (untick
+          ? '<option value="">Pick what happened...</option>'
+          : '<option value="stay">Still here — carry forward</option>')
       + '<option value="used">Used / sold / tossed</option>'
       + (dests.length ? '<option value="moved">Moved to another shelf</option>' : '')
       + '</select>';
@@ -5833,7 +5841,12 @@ const App = {
       + '<div class="card-title">What happened to the stock on ' + esc(fromLoc) + '?</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
       + esc(fromLoc) + ' still holds ' + money(totalVal) + ' of counted stock. Tell Bar Cop where it went so your books stay right. '
-      + 'Anything left as Still here is carried forward on your inventory value and flagged on your tax worksheets until you count it again.</div>'
+      + (untick
+          ? (stock.length > 1
+              ? 'You are taking these products off ' + esc(fromLoc) + ', so they cannot stay here — say whether they were used' + (dests.length ? ' or moved to another shelf.' : '.')
+              : 'You are taking it off ' + esc(fromLoc) + ', so it cannot stay here — say whether it was used' + (dests.length ? ' or moved to another shelf.' : '.'))
+          : 'Anything left as Still here is carried forward on your inventory value and flagged on your tax worksheets until you count it again.')
+      + '</div>'
       + (stock.length > 1 ? '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><label style="margin:0;font-size:12px;color:var(--t2);">Set all to</label>'
           + choiceSel('', 'disp-bulk')
           + (dests.length ? ' <select id="disp-bulk-dest" style="display:none;padding:7px 9px;">' + destOpts() + '</select>' : '') + '</div>' : '')
@@ -5863,17 +5876,19 @@ const App = {
     overlay.querySelector('#disp-cancel').addEventListener('click', cancel);
     overlay.querySelector('#disp-confirm').addEventListener('click', async () => {
       const err = overlay.querySelector('#disp-err');
-      const dispositions = []; let bad = null;
+      const dispositions = []; let bad = null, noPick = null;
       all().forEach(tr => {
         const pid = tr.getAttribute('data-pid');
         const s = stock.find(x => x.product_id === pid) || {};
         const choice = tr.querySelector('.disp-choice').value;
         const destSel = tr.querySelector('.disp-dest');
         const destLoc = (choice === 'moved' && destSel) ? destSel.value : '';
-        if (choice === 'moved' && !destLoc) bad = s.name || 'a product';
+        if (!choice) noPick = s.name || 'a product';                       // untick: the forced-pick placeholder was never changed
+        else if (choice === 'moved' && !destLoc) bad = s.name || 'a product';
         dispositions.push({ product_id: pid, name: s.name, choice: choice, destLoc: destLoc, onHand: s.onHand, unitCost: s.unitCost });
       });
-      if (bad) { if (err) { err.textContent = 'Pick where "' + bad + '" moved to, or choose Used or Still here.'; err.style.display = 'block'; } return; }
+      if (noPick) { if (err) { err.textContent = 'Tell Bar Cop what happened to "' + noPick + '" — used' + (dests.length ? ', or moved to another shelf.' : '.'); err.style.display = 'block'; } return; }
+      if (bad) { if (err) { err.textContent = 'Pick where "' + bad + '" moved to, or choose ' + (untick ? 'Used.' : 'Used or Still here.'); err.style.display = 'block'; } return; }
       const btn = overlay.querySelector('#disp-confirm'); btn.disabled = true; btn.textContent = 'Saving...';
       const ok = await App.disposeShelfStock(fromLoc, dispositions);
       if (!ok) { btn.disabled = false; btn.textContent = 'Confirm'; if (err) { err.textContent = 'Could not save that. Check your connection and try again.'; err.style.display = 'block'; } return; }
