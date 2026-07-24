@@ -53,10 +53,13 @@ S.LaborPositions = {
     if (App.laborData.lc_positions_seeded) return;
     const list = this.positions();
     if (list.length > 0) { App.laborData.lc_positions_seeded = true; return; }   // already has positions
-    const seeded = this.STARTER_POSITIONS.map(p => ({
+    // S179: space created_at one step apart. A whole map shares one new Date().toISOString(), and
+    // App.byCreation ties on it, so the roster dropdown would render in reverse-authored order after a reload.
+    const seededAt = Date.now();
+    const seeded = this.STARTER_POSITIONS.map((p, i) => ({
       id: App.uid(), name: p.name, department: p.department,
       default_wage: null, tipped: !!p.tipped, tip_out_pct: 0, notes: '',
-      created_at: new Date().toISOString()
+      created_at: new Date(seededAt + i).toISOString()
     }));
     seeded.forEach(p => list.push(p));
     // Persist the ROWS first and only set the "already seeded" flag if they landed. Setting the
