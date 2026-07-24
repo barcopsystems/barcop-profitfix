@@ -394,6 +394,7 @@ S.ShiftCashControl = {
   openDrop(rec, drawerId, onDone) {
     const editing = !!rec;
     this._dropOnDone = onDone || null;
+    this._newDropId = null;   // a fresh new-drop id per open (S148); saveDrop generates it lazily
     const active    = (App.activeShift && App.activeShift()) || null;
     const dId       = editing ? (rec.drawer_id || rec.drawer) : (drawerId || (active ? active.drawer_id || '' : ''));
     const byId      = editing ? (rec.performed_by_id || rec.performed_by) : (active ? active.manager_id || '' : '');
@@ -430,7 +431,15 @@ S.ShiftCashControl = {
     });
     document.getElementById('ccd-save')?.addEventListener('click', () => this.saveDrop(counter, editing ? rec.id : null));
     document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('cash drop', async () => {
-      await S.ShiftCashDrop.removeDrop(rec.id); App.closeModal('cc-modal'); this.draw();
+      // ⚠ HONOUR the return (S149): removeDrop returns false if the drop or its safe-log mirror did
+      // not come out. Reporting success anyway (closing + redrawing) left the operator believing the
+      // delete landed while a mirror orphan kept the safe balance $400 high with no way to clean it.
+      // Keep the form open on a failure so they can retry (removeDrop re-finds the orphan by source_id).
+      if (!(await S.ShiftCashDrop.removeDrop(rec.id))) {
+        const e = document.getElementById('ccd-err'); if (e) { e.textContent = 'Could not delete. Try again.'; e.style.display = 'inline'; }
+        return;
+      }
+      App.closeModal('cc-modal'); this.draw();
     }));
   },
 
@@ -452,12 +461,18 @@ S.ShiftCashControl = {
       return;
     }
 
-    const existing = editId ? this.drops().find(x => x.id === editId) : null;
+    // ⚠ STABLE ID ACROSS RETRIES (S148). persistDrop writes the drop THEN mirrors it into the safe
+    // log; if the drop lands but the mirror is refused it returns false, so a naive retry with a
+    // fresh App.uid() minted a SECOND drop (Total Dropped doubled, one drop left with a dangling
+    // safe_log_id). Reuse ONE id for the life of this form so the retry UPSERTS the same drop and
+    // recreates the mirror instead of duplicating. `editId` still drives the Edit-vs-new label.
+    const id = editId || (this._newDropId = this._newDropId || App.uid());
+    const existing = this.drops().find(x => x.id === id) || null;
     const drawerId = document.getElementById('ccd-drawer')?.value || '';
     const byId     = document.getElementById('ccd-by')?.value || '';
     const witId    = document.getElementById('ccd-witness')?.value || '';
     const rec = {
-      id: editId || App.uid(),
+      id,
       date,
       drop_time:       document.getElementById('ccd-time')?.value || '',
       drawer_id:       drawerId,
@@ -477,6 +492,7 @@ S.ShiftCashControl = {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await S.ShiftCashDrop.persistDrop(rec);
     if (ok) {
+      this._newDropId = null;
       App.closeModal('cc-modal');
       const cb = this._dropOnDone; this._dropOnDone = null;
       if (cb) cb(); else this.draw();

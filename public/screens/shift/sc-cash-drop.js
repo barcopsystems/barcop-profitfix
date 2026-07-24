@@ -39,14 +39,19 @@ S.ShiftCashDrop = {
   async removeDrop(id) {
     const drop = this.drops().find(x => x.id === id);
     // ⚠ THE DROP GOES FIRST, and the mirror only once that landed (S62, the twin of persistDrop).
-    // The old order pulled the safe entry out first and DISCARDED the result, so a succeeded-
-    // mirror / failed-drop pair left a drop with no mirror and the running safe balance reading
-    // $400 LOW — a wrong number. This order fails the other way: the safe entry may outlive its
-    // drop, which leaves the BALANCE STILL CORRECT (the money really did go into the safe) and
-    // the orphan visible and deletable on the Safe Log screen.
-    const ok = await App.removeRecord('sc', 'cash_drop', id);
+    // Pulling the safe entry out first and discarding the result left a drop with no mirror and the
+    // safe balance reading $400 LOW. This order can leave the MIRROR if its remove is refused — but
+    // the mirror carries `source_id === id`, so it is found by that back-reference too. A RETRY
+    // after the drop is already gone (S149) still finds and removes the orphan, instead of stranding
+    // a safe entry that no screen can edit or delete. THE CALLER MUST HONOUR THE RETURN (never report
+    // a delete as done on a false) — that was the other half of S149.
+    const log = (App.shiftData && App.shiftData.sc_safe_log) || [];
+    const mirror = (drop && drop.safe_log_id && log.find(x => x && x.id === drop.safe_log_id))
+                || log.find(x => x && x.source === 'cash-drop' && x.source_id === id);
+    let ok = true;
+    if (drop) ok = await App.removeRecord('sc', 'cash_drop', id);
     if (!ok) return false;
-    if (drop && drop.safe_log_id) return await App.removeRecord('sc', 'safe_log', drop.safe_log_id);
+    if (mirror) return await App.removeRecord('sc', 'safe_log', mirror.id);
     return true;
   },
 
