@@ -377,8 +377,8 @@ const PosIngest = {
     });
     const toAdd = []; const conflicts = [];
     const pv = v => Math.round((+v || 0) * 100) / 100;
-    const mkRec = (date, bar, food, covers, manual) => ({
-      id: App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
+    const mkRec = (date, bar, food, covers, manual, reuseId) => ({
+      id: reuseId || App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
       total_revenue: cents(bar + food), shift_type: 'Full Day', status: 'Closed',
       source: manual ? 'manual' : 'import', imported: !manual, created_at: new Date().toISOString()
     });
@@ -386,14 +386,15 @@ const PosIngest = {
     // asked once all of its services are in.
     byDate.forEach((agg, date) => {
       const c = carry.get(date) || {};
+      const prior = priorByDate.get(date);
       // The grid writes straight through: an edit is the operator's own choice, so there is no
-      // conflict to raise, and _commitSales retires whatever record held the date.
+      // conflict to raise. It REUSES any prior record's id for the date (S147) so a re-save upserts
+      // in place — a retry after a refused write can never double the day.
       if (manualEntry) {
         if (cents(agg.bar + agg.food) <= 0) { skipped.push(date); return; }
-        toAdd.push(mkRec(date, agg.bar, agg.food, agg.covers, true));
+        toAdd.push(mkRec(date, agg.bar, agg.food, agg.covers, true, prior && prior.id));
         return;
       }
-      const prior = priorByDate.get(date);
       if (!prior) {   // a brand-new day: a column the file omits is genuinely 0 (nothing to preserve)
         if (cents(agg.bar + agg.food) <= 0) { skipped.push(date); return; }
         toAdd.push(mkRec(date, agg.bar, agg.food, agg.covers, false));
@@ -401,10 +402,12 @@ const PosIngest = {
       }
       // A record already exists for this date. NEVER zero a column the file does not carry (S140):
       // "Use the file" overlays ONLY the columns the file actually has onto the prior figures.
+      // ⚠ REUSE the prior record's id (S147): an import-replace / "use the file" is an UPSERT in
+      // place, so a retry after a refused write re-upserts the same id instead of doubling the day.
       const mBar  = c.bar    ? agg.bar    : pv(prior.bar_revenue);
       const mFood = c.food   ? agg.food   : pv(prior.floor_revenue);
       const mCov  = c.covers ? agg.covers : (prior.covers || 0);
-      const useRec = mkRec(date, mBar, mFood, mCov, false);   // what "Use the file" would write
+      const useRec = mkRec(date, mBar, mFood, mCov, false, prior.id);   // what "Use the file" would write
       if (prior.source === 'manual') {
         // Only a DIFFERING carried column is a conflict — never prompt when the numbers MATCH; the
         // hand close simply stands, reported as kept.
@@ -488,7 +491,10 @@ const PosIngest = {
     const conflictKeys = new Set();   // register-days already raised as a conflict (first file row establishes it)
     const has = v => v != null && String(v).trim() !== '';
     const cents = n => Math.round(n * 100) / 100;
-    const toAdd = []; const skipped = []; const conflicts = []; let dupCount = 0; let keptManual = 0; let extraDropped = 0; const used = new Set();
+    // Which dates have a NAMED-register row? Used to recognise a column-less TOTALS line (S142).
+    const namedDates = new Set();
+    (rows || []).forEach(r => { if (String(r.drawer || '').trim()) { const d = this.normDate(r.date); if (d) namedDates.add(d); } });
+    const toAdd = []; const skipped = []; const conflicts = []; let dupCount = 0; let keptManual = 0; let extraDropped = 0; let totalsLines = 0; const used = new Set();
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
       if (!date) { skipped.push('(no date)'); return; }
@@ -511,6 +517,14 @@ const PosIngest = {
       const dRec = dName ? drawerByName[dName.toLowerCase()] : soleDrawer;
       const drawer = dRec ? dRec.name : dName;
       const drawerId = dRec ? dRec.id : '';
+      // ⚠ SKIP A WHOLE-DAY TOTALS LINE (S142). On a 2+ register bar a column-less row stays
+      // day-level (drawer_id ''); if the file ALSO has per-register rows for that date, the blank
+      // row is the day's TOTALS line and filing it beside the per-register rows double-counts the
+      // day (consumers sum by date, not by register) in Drawer Net, the short rate, Loss Prevention
+      // and the Books cash sheet. Skip + report it. A blank row on a date with NO named rows is a
+      // legitimate whole-day count and is kept. (soleDrawer resolves a column-less row to the one
+      // register, so drawerId is non-empty there and this never fires on a single-register bar.)
+      if (!dName && !drawerId && namedDates.has(date)) { totalsLines++; return; }
       const cName = (r.cashier || '').trim();
       const staff = cName ? staffByName[cName.toLowerCase()] : null;
       const cashier = staff ? staff.name : cName;
@@ -544,6 +558,7 @@ const PosIngest = {
         if (conflictKeys.has(dayKey) || keptKeys.has(dayKey)) { extraDropped++; return; }
         if (this._sameVariance(manual, rec)) { keptKeys.add(dayKey); keptManual++; return; }
         conflictKeys.add(dayKey);
+        rec.id = manual.id;   // "use the file" replaces the hand count IN PLACE (idempotent retry, S147)
         conflicts.push({
           key: dayKey, date, drawer_id: drawerId, drawer,
           mine:   { variance: cents(+manual.variance || 0),
@@ -561,13 +576,18 @@ const PosIngest = {
       // must import both rows, and only the first replaces anything. The superseded imported row is
       // deleted in _commitCashRows, mirroring _commitSales.
       const prior = this._findDup(existing, used, x => x.date === date && (x.drawer_id || '') === drawerId && x.source !== 'manual');
-      if (prior) dupCount++;
+      // ⚠ REUSE the superseded row's id (S147): a replacement is an UPSERT-in-place, so a retry
+      // (after a refused write) re-upserts the SAME id instead of inserting another row — the retry
+      // is idempotent and a register-day can never grow unbounded. _commitCashRows still retires any
+      // EXTRA prior for the key (a re-import with fewer rows than before) as the backstop.
+      if (prior) { dupCount++; rec.id = prior.id; }
       toAdd.push(rec);
     });
     // `dupCount` means REPLACED (an earlier import), `keptManual` counts register-days the file
-    // matched a hand count on, `conflicts` are register-days the operator must choose on, and
-    // `extraDropped` counts later file rows dropped because their register-day was already handled.
-    return { toAdd, skipped, dupCount, keptManual, conflicts, extraDropped };
+    // matched a hand count on, `conflicts` are register-days the operator must choose on,
+    // `extraDropped` counts later file rows dropped because their register-day was already handled,
+    // and `totalsLines` counts column-less whole-day rows skipped as a totals line (S142).
+    return { toAdd, skipped, dupCount, keptManual, conflicts, extraDropped, totalsLines };
   },
 
   // Two drawer figures are "the same" for conflict purposes when their over/short agrees to the
