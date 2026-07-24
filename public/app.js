@@ -5988,12 +5988,16 @@ const App = {
     // ⚠ Do NOT widen this to the reporting period. On an ANNUAL sheet that would call a product
     // last counted in May "current" against a stocktake dated 28 June — five weeks stale, exactly
     // the disclosure this whole mechanism exists to make. verify-partial-count-cogs case D pins it.
-    const STOCKTAKE_MS = 7 * 24 * 60 * 60 * 1000;
+    const STOCKTAKE_DAYS = 7, DAY_MS = 24 * 60 * 60 * 1000;
     const bTime = new Date(boundary.date + 'T00:00:00').getTime();
     let stocktakeStart = boundary.date;
     counts.forEach(c => {
       const t = new Date(c.date + 'T00:00:00').getTime();
-      if (!isNaN(t) && (bTime - t) <= STOCKTAKE_MS && String(c.date) < stocktakeStart) stocktakeStart = String(c.date);
+      // ⚠ CALENDAR DAYS, not raw milliseconds (S137). Two local midnights 7 calendar days apart span
+      // 7*24h + 1h across the US DST fall-back (and 7*24h - 1h across spring-forward), so a fixed
+      // 7*24*60*60*1000 window flipped the carried-forward disclosure on exactly those weeks. Round
+      // the span to whole days so the window is 7 CALENDAR days everywhere.
+      if (!isNaN(t) && Math.round((bTime - t) / DAY_MS) <= STOCKTAKE_DAYS && String(c.date) < stocktakeStart) stocktakeStart = String(c.date);
     });
     const prods = (this.inventoryData && this.inventoryData.ic_products) || [];
     const nameOf = (pid) => (prods.find(p => p && p.id === pid) || {}).name || '';
@@ -6021,6 +6025,12 @@ const App = {
         const live = prods.find(p => p && p.id === pid) || null;
         carried.push({ id: pid, name: (live && live.name) || r.name || '', date: oldest,
           value: Math.round(cv * 100) / 100, onHand: cu,
+          // ⚠ FULL vs PARTIAL carry (S134/S135). `full` = the ENTIRE product rests on the old count
+          // (nothing of it was counted inside the window). A product counted at one shelf on the
+          // boundary and carried at another is PARTIAL: it WAS counted, so it must not be announced
+          // as "not counted", and its Bottle Detail row must not claim the whole figure is carried —
+          // only the carried PART (cv/cu above) is. The sheet phrases the two cases differently.
+          full: cu >= (r.onHand || 0) - 0.001,
           // ⚠ HIDDEN FROM OPERATIONS is a different fact from NOT COUNTED, and the sheet has to
           // say which (S89). ic-take-inventory.products() drops an inactive product, so once
           // hidden it can NEVER appear in a count again and its figure can never be corrected or
@@ -6032,13 +6042,33 @@ const App = {
       }
     });
     carried.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    // ⚠ UNCOSTED PRODUCTS (S136). A product on the shelf with NO unit cost recorded stores value:null
+    // in its count (ic-take-inventory), which sums here as $0 — so real units print at $0.00 on
+    // Schedule C Line 41, inside the category subtotal and the Bottle Detail, with none of the
+    // carried/inactive machinery covering it (it is neither). Surface them so the sheet discloses the
+    // gap instead of silently understating ending inventory. `unitCost == null` (never recorded) is
+    // the test, NOT value 0 — a product genuinely priced at $0 has unitCost 0, not null.
+    const carriedIdSet = new Set(carried.map(c => c.id));
+    const uncosted = [];
+    Object.keys(m).forEach(pid => {
+      const r = m[pid];
+      if (!((r.onHand || 0) > 0 && r.unitCost == null)) return;
+      const live = prods.find(p => p && p.id === pid) || null;
+      // ⚠ DISCLOSE EACH PRODUCT ONCE (round-N+1 scan). An uncosted product that is ALSO carried (last
+      // counted before the window) or inactive is already surfaced by those notes — listing it here
+      // too announced one product as TWO, and for an inactive one gave contradictory guidance ("can
+      // no longer be counted" vs "enter its cost"). The carried/inactive note is the primary one.
+      if (carriedIdSet.has(pid) || (live && live.active === false)) return;
+      uncosted.push({ id: pid, name: (live && live.name) || r.name || '', onHand: r.onHand });
+    });
+    uncosted.sort((a, b) => String(a.name).localeCompare(String(b.name)));
     // ⚠ RETURNS THE BOUNDARY RECORD ITSELF (S96). Callers used to re-derive "the latest count" with
     // their own date-only sort plus `.slice(-1)[0]`, which ties on two counts sharing a date and
     // hands back whichever sat last in the ARRAY — while this reader sorts with cmpNewest, which
     // tiebreaks on created_at. So the ending FIGURE came from one count and the Source footer named
     // the other, on a tax sheet's provenance line. One door, so they cannot disagree.
     return { value: Math.round(value * 100) / 100, countDate: boundary.date, count: boundary,
-      carried, byProduct: m };
+      carried, uncosted, byProduct: m };
   },
 
   // True when every Getting Started step is checked off. The Hub sidebar uses
