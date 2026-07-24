@@ -257,7 +257,7 @@ S.LaborPayPeriods = {
 
     this.container.querySelector('#pp-open-export')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Periods', root: this.container }));
     this.container.querySelectorAll('.pp-view').forEach(b => b.addEventListener('click', () => { const ws = b.dataset.ws; this.detailWeekStart = ws; App.pushView(() => this.renderDetail(ws)); }));
-    this.container.querySelectorAll('.pp-close').forEach(b => b.addEventListener('click', () => this.closePeriod(b.dataset.ws)));
+    this.container.querySelectorAll('.pp-close').forEach(b => b.addEventListener('click', () => this.closePeriod(b.dataset.ws, true)));
     this.container.querySelectorAll('.pp-reopen').forEach(b => b.addEventListener('click', () => this.reopenPeriod(b.dataset.ws)));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.renderList())));
   },
@@ -376,7 +376,7 @@ S.LaborPayPeriods = {
     return false;
   },
 
-  async closePeriod(weekStart) {
+  async closePeriod(weekStart, fromList) {
     if (!this._loadIsWhole('close')) return;
     const agg = this.aggregateWeek(weekStart);
     const ok = await App.confirm({
@@ -466,7 +466,10 @@ S.LaborPayPeriods = {
       return;
     }
     this.detailWeekStart = weekStart;
-    this.renderDetail(weekStart);
+    // From the LIST, push the view so the closed-period detail gets a Back button (S177). From the
+    // detail (pp-close-detail) we are already inside the pushed detail view — just re-render it.
+    if (fromList) App.pushView(() => this.renderDetail(weekStart));
+    else this.renderDetail(weekStart);
   },
 
   async reopenPeriod(weekStart) {
@@ -484,7 +487,9 @@ S.LaborPayPeriods = {
     // Mirror of closePeriod: snapshot before the in-place unlock so a failed reopen does not leave
     // the week reading editable while the server still has every entry locked.
     const undoActuals = App.snapshotRows(affected);
-    affected.forEach(a => { a.locked = false; });
+    // Clear pay_period_id too, the inverse of closePeriod's stamp (S177). Nothing reads it today, so
+    // this is data hygiene — but a reopened, editable entry should not carry a closed-period link.
+    affected.forEach(a => { a.locked = false; a.pay_period_id = null; });
     const list = this.periods();
     const existing = list.find(p => p.week_start === weekStart);
     const undoPeriod = existing ? App.snapshotRows([existing]) : null;
