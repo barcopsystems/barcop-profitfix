@@ -124,16 +124,10 @@ S.RevenueFix = {
 
   // State check: how many menu items are still priced over their target cost %.
   repriceOver() {
-    const items = (App.data && App.data.menu_items) || [];
-    let over = 0;
-    items.forEach(i => {
-      const hasRecipe = i.recipe && Array.isArray(i.recipe.ingredients) && i.recipe.ingredients.length > 0;
-      if (!hasRecipe || !(i.price > 0)) return;
-      const cost = (App.menuItemCost ? App.menuItemCost(i) : 0) || 0;
-      const tgt = i.target_cost_pct || (App.MENU_TARGET_COST_PCT ? (i.recipe.mode === 'food' ? App.MENU_TARGET_COST_PCT.plate : App.MENU_TARGET_COST_PCT.cocktail) : 0) || 0;
-      if (tgt > 0 && (cost / i.price * 100) > tgt) over++;
-    });
-    return over;
+    // ⚠ Defer to the canonical count (S175). Re-deriving it inline dropped the +0.05 tolerance
+    // App.menuItemPct applies (app.js:5445) AND used a different target/item set, so "N items over
+    // target" here could disagree with the cockpit's App.menuItemsOverTarget(). One door now.
+    return App.menuItemsOverTarget ? App.menuItemsOverTarget().length : 0;
   },
 
   // Does the system behind a gap actually hold data yet? Gates the review steps so

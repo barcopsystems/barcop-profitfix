@@ -207,7 +207,11 @@ S.RevenueMenuItems = {
     if (!(parseFloat(item.price) > 0)) out.add('ri-price');
     const hasRecipe = !!(item.recipe && Array.isArray(item.recipe.ingredients) && item.recipe.ingredients.length);
     const hasCost   = parseFloat(item.cost) > 0;
-    if (!hasRecipe && !hasCost) out.add('ri-cost');
+    // ⚠ ri-cost means "we cannot cost this yet" — key it off the ACTUAL cost, not just the presence
+    // of a recipe (S176). A DANGLING recipe (an ingredient's product was deleted) has ingredients but
+    // App.menuItemCost returns null, so `hasRecipe` alone let it sit Complete while it was uncosted.
+    const costed = App.menuItemCost ? App.menuItemCost(item) > 0 : (hasRecipe || hasCost);
+    if (!costed) out.add('ri-cost');
     return out;
   },
   // Field-missing highlights fire ONLY when editing an INCOMPLETE record.
