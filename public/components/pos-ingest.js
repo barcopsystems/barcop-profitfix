@@ -454,10 +454,16 @@ const PosIngest = {
     // own prior rows, so the register-day DUPLICATED instead of replacing. Same rule as S33 and
     // S54: a filter that is right for "what may I PICK for new work" is wrong for "what already
     // EXISTS". Archived first, then active, so a live register always wins a name collision.
-    allDrawers.filter(d => d.active === false).concat(activeDrawers).forEach(d => {
-      if (d.name) drawerByName[String(d.name).trim().toLowerCase()] = d;
-      (d.pos_aliases || []).forEach(a => { if (a) drawerByName[String(a).trim().toLowerCase()] = d; });
-    });
+    // ⚠ TWO PASSES so a register's real NAME always beats another register's ALIAS for the same
+    // string (S145 — a row naming "Main Bar" was filing against a "Patio" that merely listed
+    // "Main Bar" as an alias, because the single pass let a later register's alias overwrite an
+    // earlier register's name, last write wins). Aliases first (weakest), then names (strongest);
+    // each still archived-then-active so a live register wins a same-kind collision. A name is a
+    // stronger identity signal than an alias, so even an archived register keeps its own name over
+    // another register's alias — which also keeps that register's history matchable (the S104 goal).
+    const ordered = allDrawers.filter(d => d.active === false).concat(activeDrawers);
+    ordered.forEach(d => (d.pos_aliases || []).forEach(a => { if (a) drawerByName[String(a).trim().toLowerCase()] = d; }));
+    ordered.forEach(d => { if (d.name) drawerByName[String(d.name).trim().toLowerCase()] = d; });
     // A cash report with no Register column, on a bar that runs exactly ONE register,
     // is unambiguously that register. Resolving it is what lets the import recognise
     // the operator's own hand count of the same register-day: the two sides used to

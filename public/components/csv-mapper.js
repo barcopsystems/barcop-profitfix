@@ -289,7 +289,16 @@ const CSVMapper = {
     const cancelBtn = scope.querySelector('.csvm-cancel');
     if (cancelBtn) cancelBtn.addEventListener('click', () => this.mount(container, opts));
 
-    scope.querySelector('.csvm-go').addEventListener('click', () => {
+    const goBtn = scope.querySelector('.csvm-go');
+    goBtn.addEventListener('click', async () => {
+      // ⚠ Re-entry guard for the WHOLE importer class (S194). This shared Import button is never
+      // disabled, so a physical double-click fires onComplete TWICE — and any importer that writes
+      // per-row or mints fresh ids then double-commits (putRecord updates memory across awaits, so
+      // the second build sees a partial set and mints fresh ids for the rest: doubled hours, tips,
+      // voids, server checks, regulars, roster). One guard here closes them all. Validation runs
+      // BEFORE the flag so a missing-field click never latches it; the flag + the button-disable are
+      // held until onComplete settles (await covers a promise-returning handler and a sync one alike).
+      if (this._importing) return;
       const sels = {};
       this._area(container).querySelectorAll('.csvm-sel').forEach(s => { sels[s.dataset.key] = s.value; });
       const missing = opts.fields.filter(f => f.required && !sels[f.key]);
@@ -299,9 +308,16 @@ const CSVMapper = {
         err.style.display = 'block';
         return;
       }
-      this._saveMap(sig, sels);
-      // sels holds column INDEXES ('' = skip); _mapRows resolves them by position.
-      opts.onComplete(this._mapRows(rows, sels));
+      this._importing = true;
+      goBtn.disabled = true;
+      try {
+        this._saveMap(sig, sels);
+        // sels holds column INDEXES ('' = skip); _mapRows resolves them by position.
+        await opts.onComplete(this._mapRows(rows, sels));
+      } finally {
+        this._importing = false;
+        goBtn.disabled = false;
+      }
     });
     if (typeof opts.onState === 'function') opts.onState('map');
   }
