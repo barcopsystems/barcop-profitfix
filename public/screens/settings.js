@@ -255,7 +255,12 @@ S.HubSettings = {
   saveSection(which) {
     const keys = this._writeSection(which);
     if (keys == null) return;  // validation failed
-    Promise.all(keys.map(k => App.saveKey(k))).then(() => {
+    Promise.all(keys.map(k => App.saveKey(k))).then(results => {
+      // S195: only claim "Saved" when the write actually landed. saveKey has already surfaced the
+      // failure, and ticking a setup task done for a save that never happened would be a second
+      // lie on top of the first. An OFFLINE save returns true (it is on-device and queued), so
+      // working offline still flashes Saved — which is the truth.
+      if (!results.every(Boolean)) return;
       this._flashSaved(which);
       App.updatePeriod();
       // Saving any target group counts as completing the Hub Getting Started
@@ -282,7 +287,8 @@ S.HubSettings = {
     ids.filter(id => id !== 'service').forEach(id => {
       (this._writeSection(id) || []).forEach(k => keys.add(k));
     });
-    Promise.all([...keys].map(k => App.saveKey(k))).then(async () => {
+    Promise.all([...keys].map(k => App.saveKey(k))).then(async (results) => {
+      if (!results.every(Boolean)) return;   // S195 — see saveSection: never flash "Saved" over a failed write
       this._flashSaved('all');
       App.updatePeriod();
       if (ids.includes('service')) App.markSetupDone('gs_service_periods');
