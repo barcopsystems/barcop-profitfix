@@ -493,7 +493,14 @@ S.ShiftDashboard = {
   async _doImportSales(rows, opts) {
     opts = opts || {};
     const built = PosIngest.build('sales', rows, opts);
-    const { toAdd, skipped, dupCount, merged, keptManual, conflicts } = built;
+    const { toAdd, skipped, zeroSkipped, dupCount, merged, keptManual, conflicts } = built;
+    // S189: days that came in at $0. An import will NOT write $0 over FACT-tier sales (a blank/partial
+    // export must not silently wipe a day), so a zero day is reported plainly and the operator is sent
+    // to Enter Manually — the sanctioned zeroing path — rather than told "no usable sales figure".
+    const zeroNote = (zeroSkipped && zeroSkipped.length)
+      ? ' (' + zeroSkipped.length + ' day' + (zeroSkipped.length === 1 ? '' : 's') + ' came in at $0 and '
+        + (zeroSkipped.length === 1 ? 'was' : 'were') + ' skipped — use Enter Manually to record a zero day)'
+      : '';
     const res = document.getElementById('sc-ck-import-res');
     const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
     const note = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">' + m + '</div>'; };
@@ -532,13 +539,17 @@ S.ShiftDashboard = {
           + ' skipped, no usable date or sales figure)' : '';
       if (opts.cleared) {
         this._flash = opts.cleared + ' day' + (opts.cleared === 1 ? '' : 's') + ' cleared to zero'
-          + (kept ? ', ' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as entered' : '') + skipNote + '.';
+          + (kept ? ', ' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as entered' : '') + skipNote + zeroNote + '.';
         this._openStep = 'cash'; this.render(this.container, this.actions); return;
       }
       if (kept) note('No new figures written. ' + kept + ' day' + (kept === 1 ? ' was' : 's were')
-                     + ' kept as you entered ' + (kept === 1 ? 'it' : 'them') + ' by hand.' + skipNote);
+                     + ' kept as you entered ' + (kept === 1 ? 'it' : 'them') + ' by hand.' + skipNote + zeroNote);
+      // S189: nothing imported and the ONLY reason is $0 days — say that plainly instead of "check the
+      // Date column", and point to the sanctioned zeroing path (Enter Manually).
+      else if (zeroSkipped.length && !skipped.length) fail((zeroSkipped.length === 1 ? 'That day' : 'Those days')
+                     + ' came in at $0, so nothing was imported. Use Enter Manually to record a zero day.');
       else fail((opts.manual ? 'No days saved. Enter sales for at least one day.'
-                             : 'No days imported. Check that the file has a Date column and sales values.') + skipNote);
+                             : 'No days imported. Check that the file has a Date column and sales values.') + skipNote + zeroNote);
       return;
     }
     const ok = await PosIngest.commit('sales', allToAdd);
@@ -557,6 +568,7 @@ S.ShiftDashboard = {
       // a 5-day file and believe the week was in.
       + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
           + ' skipped, no usable date or sales figure)' : '')
+      + zeroNote
       + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + '.';
     this._openStep = 'cash';
     this.render(this.container, this.actions);
