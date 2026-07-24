@@ -517,14 +517,14 @@ const PosIngest = {
       const dRec = dName ? drawerByName[dName.toLowerCase()] : soleDrawer;
       const drawer = dRec ? dRec.name : dName;
       const drawerId = dRec ? dRec.id : '';
-      // ⚠ SKIP A WHOLE-DAY TOTALS LINE (S142). On a 2+ register bar a column-less row stays
-      // day-level (drawer_id ''); if the file ALSO has per-register rows for that date, the blank
-      // row is the day's TOTALS line and filing it beside the per-register rows double-counts the
-      // day (consumers sum by date, not by register) in Drawer Net, the short rate, Loss Prevention
-      // and the Books cash sheet. Skip + report it. A blank row on a date with NO named rows is a
-      // legitimate whole-day count and is kept. (soleDrawer resolves a column-less row to the one
-      // register, so drawerId is non-empty there and this never fires on a single-register bar.)
-      if (!dName && !drawerId && namedDates.has(date)) { totalsLines++; return; }
+      // ⚠ SKIP A WHOLE-DAY TOTALS LINE (S142 + S190). A column-less row on a date that ALSO has
+      // per-register rows is the day's TOTALS line; filing it beside the per-register rows
+      // double-counts the day (consumers sum by date, not by register) in Drawer Net, the short
+      // rate, Loss Prevention and the Books cash sheet. Skip + report it. This fires on BOTH a 2+
+      // register bar (the blank stays day-level) AND a single-register bar (S190 — soleDrawer would
+      // otherwise resolve the blank onto the one register and double it). A blank row on a date with
+      // NO named rows is a legitimate whole-day count and is kept.
+      if (!dName && namedDates.has(date)) { totalsLines++; return; }
       const cName = (r.cashier || '').trim();
       const staff = cName ? staffByName[cName.toLowerCase()] : null;
       const cashier = staff ? staff.name : cName;
