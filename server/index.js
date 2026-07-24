@@ -46,8 +46,31 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 //  audits are computed and narrated entirely in code. Left no unauthenticated
 //  passthrough to Claude.)
 
+// ── Rate limiter for the two UNAUTHENTICATED audit-compute endpoints ──────────
+// generate-profit-audit / generate-revenue-audit take no JWT (the public demo computes audits
+// without a login) and parse up to 50MB before computing, so an un-capped flood is a CPU/bandwidth
+// DoS on every tenant sharing the box. Mirrors notifyRateLimited (global backstop FIRST to defeat
+// X-Forwarded-For spoofing, then per-IP, memory-bounded) but with its OWN state, so an audit flood
+// and an email flood cap independently. Best-effort, in-memory, per-instance. Generous caps: a real
+// operator or a demo visitor runs a handful of audits, never dozens a minute.
+const _auditHits = new Map();
+let _auditGlobal = [];
+function auditRateLimited(req, maxPerMin, globalMax) {
+  const now = Date.now();
+  _auditGlobal = _auditGlobal.filter(t => now - t < 60000);
+  if (_auditGlobal.length >= globalMax) return true;
+  const ip = String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'unknown').split(',')[0].trim();
+  const arr = (_auditHits.get(ip) || []).filter(t => now - t < 60000);
+  if (arr.length >= maxPerMin) { _auditHits.set(ip, arr); return true; }
+  arr.push(now); _auditHits.set(ip, arr);
+  _auditGlobal.push(now);
+  if (_auditHits.size > 5000) { for (const [k, v] of _auditHits) { if (!v.length || now - v[v.length - 1] > 60000) _auditHits.delete(k); } }
+  return false;
+}
+
 // ── Profit audit — JSON only, no PDF ──────────────────────────────────────────
 app.post('/api/generate-profit-audit', (req, res) => {
+  if (auditRateLimited(req, 30, 150)) return res.status(429).json({ error: 'Too many audit requests. Please wait a minute and try again.' });
   const apiKey = process.env.ANTHROPIC_API_KEY;   // unused now; audit is code-only
 
   const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
@@ -111,6 +134,7 @@ async function generateProfitAudit(apiKey, files, appData, practices, controlDat
 
 // ── Revenue audit — JSON only, no PDF ─────────────────────────────────────────
 app.post('/api/generate-revenue-audit', (req, res) => {
+  if (auditRateLimited(req, 30, 150)) return res.status(429).json({ error: 'Too many audit requests. Please wait a minute and try again.' });
   const apiKey = process.env.ANTHROPIC_API_KEY;   // unused now; audit is code-only
 
   const form = new multiparty.Form({ maxFilesSize: 50 * 1024 * 1024 });
