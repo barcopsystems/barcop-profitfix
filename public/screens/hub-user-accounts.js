@@ -148,6 +148,12 @@ S.HubUserAccounts = {
     const teamCard = showTeam ? '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:14px;">Team Members</div>'
       + '<div id="ua-team-members" style="font-size:12px;color:var(--t3);margin-bottom:2px;">Loading...</div>'
+      // Pending invites (L17). Hidden until there is at least one, so an account with none never
+      // shows an empty heading. Sits above the invite form: these are people not yet on the team.
+      + '<div id="ua-team-invites-wrap" style="display:none;">'
+      +   '<div style="font-size:14px;font-weight:700;color:var(--t3);margin:24px 0 14px;">Pending Invites</div>'
+      +   '<div id="ua-team-invites" style="font-size:12px;color:var(--t3);"></div>'
+      + '</div>'
       + '<div style="font-size:14px;font-weight:700;color:var(--t3);margin:24px 0 14px;">Invite a Member</div>'
       + '<div class="form-row" style="gap:10px;flex-wrap:wrap;align-items:flex-end;">'
       +   '<div class="f" style="width:240px;"><label>Email Address</label><input type="email" id="ua-team-email" placeholder="name@email.com" autocomplete="off"/></div>'
@@ -482,7 +488,100 @@ S.HubUserAccounts = {
     return h;
   },
 
+  // ── Pending invites (L17) ───────────────────────────────────────────────────
+  // An invited address is a STANDING GRANT until it is used or ages out: the signup trigger
+  // provisions membership straight from account_invites. That table is service-role only, so
+  // listing and withdrawing both go through the server. Before this there was no way to see a
+  // typo'd address or a hire who never showed, let alone take it back.
+  async _invitesRefresh() {
+    const wrap = document.getElementById('ua-team-invites-wrap');
+    const box = document.getElementById('ua-team-invites');
+    if (!wrap || !box) return;
+    if (App.demoMode) { wrap.style.display = 'none'; return; }
+    // ⚠ EVERY await is inside the try: this is called fire-and-forget from _teamRefresh, so a
+    // rejection here would be an unhandled rejection rather than a handled miss.
+    try {
+      const accountId = await DB._ensureAccountId();
+      if (!accountId) { wrap.style.display = 'none'; return; }
+      const headers = await this._teamAuthHeaders();
+      if (!headers) return;
+      const r = await fetch('/api/list-invites', {
+        method: 'POST', headers, body: JSON.stringify({ accountId })
+      });
+      const data = await r.json();
+      // A server without this endpoint yet (a deploy window) must not paint an error over a
+      // purely additive section — just leave it hidden.
+      if (!r.ok || !data.ok) { wrap.style.display = 'none'; return; }
+      this._renderInvites(data.invites || []);
+    } catch (e) {
+      wrap.style.display = 'none';
+    }
+  },
+
+  _renderInvites(invites) {
+    const wrap = document.getElementById('ua-team-invites-wrap');
+    const box = document.getElementById('ua-team-invites');
+    if (!wrap || !box) return;
+    if (!invites.length) { wrap.style.display = 'none'; box.innerHTML = ''; return; }
+    wrap.style.display = '';
+    box.innerHTML = invites.map(i => {
+      const when = i.created_at ? new Date(i.created_at) : null;
+      const sent = (when && !isNaN(when.getTime()))
+        ? when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      // An EXPIRED invite no longer grants anything (the signup trigger ignores it), but it is
+      // shown rather than hidden: it is the answer to "why couldn't they get in?", and revoking
+      // clears it off the list.
+      const badge = i.expired
+        ? '<span style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-left:10px;">Expired</span>'
+        : '<span style="font-size:9px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin-left:10px;">Invited</span>';
+      const btn = i.can_revoke
+        ? '<button class="btn btn-ghost btn-sm ua-invite-revoke" data-iid="' + esc(i.id) + '" data-email="' + esc(i.email) + '" style="font-size:10px;padding:3px 9px;">Revoke</button>'
+        : '';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b2);flex-wrap:wrap;">'
+        +   '<div style="flex:1;min-width:160px;font-size:13px;color:var(--t1);">' + esc(i.email) + badge + '</div>'
+        +   '<div style="width:130px;text-transform:capitalize;font-weight:600;color:var(--t1);">' + esc(i.role || 'staff') + '</div>'
+        +   '<div style="width:110px;color:var(--t3);">' + (sent ? 'Sent ' + esc(sent) : '') + '</div>'
+        +   '<div style="width:90px;text-align:right;">' + btn + '</div>'
+        + '</div>';
+    }).join('');
+    box.querySelectorAll('.ua-invite-revoke').forEach(b => {
+      b.addEventListener('click', () => this._teamRevokeInvite(b.dataset.iid, b.dataset.email));
+    });
+  },
+
+  _teamRevokeInvite(inviteId, email) {
+    this._teamModal({
+      title: 'Revoke invite',
+      message: 'Withdraw the invite for ' + (email || 'this address') + '? They will not be able to join with it. You can invite them again any time.',
+      buttons: [
+        { label: 'Cancel', act: 'cancel', kind: 'ghost' },
+        { label: 'Revoke', act: 'ok', kind: 'danger' }
+      ],
+      onAction: async (act) => {
+        if (act !== 'ok') return;
+        const accountId = await DB._ensureAccountId();
+        if (!accountId) return;
+        try {
+          const headers = await this._teamAuthHeaders();
+          if (!headers) return;
+          const r = await fetch('/api/revoke-invite', {
+            method: 'POST', headers, body: JSON.stringify({ accountId, inviteId })
+          });
+          const data = await r.json();
+          if (!r.ok || !data.ok) {
+            this._teamModal({ message: data.error || 'Could not revoke the invite.', tone: 'error' });
+          }
+          this._invitesRefresh();
+        } catch (e) {
+          this._teamModal({ message: 'Connection error.', tone: 'error' });
+          this._invitesRefresh();
+        }
+      }
+    });
+  },
+
   async _teamRefresh() {
+    this._invitesRefresh();   // L17 — independent of the member list; never blocks it
     const box = document.getElementById('ua-team-members');
     if (!box) return;
     if (App.demoMode) {
