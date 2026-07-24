@@ -2948,20 +2948,46 @@ const App = {
   // user_data blob never re-stores them. saveKey's `key` is already mutated on
   // this.data by the caller; we just write the stripped blob. Every event
   // write-site goes through putRecord/removeRecord instead.
+  // S195 — the pre-load gate refused a CONFIG-BLOB save. Which of two very different things that is
+  // depends on whether the initial load is still running:
+  //   • load STILL RUNNING  → a harmless race. The operator did not act (an autosave fired mid-boot)
+  //     and their next real edit saves normally, so stay SILENT — this is what `deferred` has always
+  //     meant and why the classifier ignores it.
+  //   • load FINISHED, still not ready → readData never CONFIRMED the account (a cold OFFLINE boot is
+  //     the common way in), so the gate stays shut for the WHOLE session: every settings save is
+  //     dropped — not even queued — while the screens flashed "Saved" over it. Say it out loud.
+  // Returns false either way: nothing was written, and no caller may report success.
+  // ⚠ `!this.data` is the second half of the silence test, and it is not optional: _loadInFlight is
+  // undefined (falsy) until loadAllData actually STARTS, so the window between page load and that
+  // call would otherwise raise a false alarm. No data loaded = nothing an operator could have edited.
+  // A cold offline boot DOES set this.data (readData falls back to the local copy), so the real case
+  // still speaks.
+  _configGateRefused() {
+    if (DB._loadInFlight || !this.data) return false;
+    this._reportWriteFail({ ok: false, configGate: true });
+    return false;
+  },
+
   async save() {
-    if (!DB._dataReady) return false;   // gated pre-load (see DB.writeData) — nothing loaded yet to persist
+    if (!DB._dataReady) return this._configGateRefused();   // gated pre-load (see DB.writeData) — nothing loaded yet to persist
     const r = await DB.writeData(this._configBlob('core', this.data));
-    if (!r.ok) console.error('Save failed:', r.error);
+    // S195: the ROW path (putRecord) has always surfaced its failures; this one only logged to the
+    // console, so a failed settings write was invisible. The classifier self-silences for offline /
+    // queued / deferred / blocked, so this cannot produce a false alarm.
+    if (!r.ok) { console.error('Save failed:', r.error); this._reportWriteFail(r); }
     return r.ok;
   },
 
   async saveKey(key) {
-    if (!DB._dataReady) return false;   // gated pre-load (see DB.writeData) — a premature save must not clobber the server blob
+    if (!DB._dataReady) return this._configGateRefused();   // gated pre-load (see DB.writeData) — a premature save must not clobber the server blob
     const r = await DB.writeData(this._configBlob('core', this.data));
     // An offline save is NOT a failure: the copy is kept on-device and queued, and
     // the global offline banner tells the operator it will sync. Report success so
     // form handlers render the record instead of a misleading "Save failed."
-    if (!r.ok && !r.offline) console.error('saveKey failed:', r.error);
+    if (!r.ok) {
+      if (!r.offline) console.error('saveKey failed:', r.error);
+      this._reportWriteFail(r);   // S195 — self-silencing for offline/queued; speaks for a real failure
+    }
     return r.ok || !!r.offline;
   },
 
@@ -6429,6 +6455,10 @@ const App = {
     if (!r) return generic;
     if (r.ok || r.deferred || r.blocked) return null;
     if ((r.offline || r.queued) && !r.storageFull) return null;
+    // S195: the config-blob pre-load gate, refused AFTER the load finished — distinct from `deferred`
+    // (the harmless mid-load race above). The gate stays shut for the session, so this settings change
+    // was dropped and reloading is the only route back to a saving app.
+    if (r.configGate) return { msg: 'Settings were not saved — Bar Cop has not loaded this account on this device yet. Reconnect, reload, and try again.', ownedBy: '' };
     if (r.storageFull) return { msg: 'Out of space on this device. Nothing was saved — free up some space and try again.', ownedBy: 'storage-full-banner' };
     const err = String((r.error && r.error.message) || r.error || '');
     if (/read-only|viewer/i.test(err)) return { msg: 'Your access is view-only, so nothing was saved.', ownedBy: 'viewer-banner' };
