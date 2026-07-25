@@ -353,6 +353,129 @@ S.HubUserAccounts = {
     } else {
       el.innerHTML = '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No active subscription on this account.</div>';
     }
+    // L18 — self-serve deletion sits UNDER billing on purpose: the order matters (cancel the
+    // subscription first), and putting the button here is what makes that obvious. Owner only.
+    if (isOwner) this._renderDeleteBar(el);
+  },
+
+  _renderDeleteBar(el) {
+    if (!el) return;
+    el.insertAdjacentHTML('beforeend',
+      '<div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--b2);">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;'
+      + 'color:var(--t3);margin-bottom:8px;">Close This Bar</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:10px;">'
+      + 'Deleting removes this bar and everything in it: your counts, shifts, labor, recipes, books, '
+      + 'and every backup. It cannot be undone. Cancel your subscription under Manage Billing first '
+      + 'so you are not billed again.</div>'
+      + '<button class="btn btn-danger" id="ua-delete-bar">Delete This Bar</button></div>');
+    document.getElementById('ua-delete-bar')?.addEventListener('click', () => this._deleteBarFlow());
+  },
+
+  // Asks the server FIRST (check mode) so the dialog can say the right thing, rather than making
+  // the operator commit and only then discover they have to go cancel a subscription.
+  async _deleteBarFlow() {
+    let accountId, headers;
+    try {
+      accountId = await DB._ensureAccountId();
+      if (!accountId) return;
+      headers = await this._teamAuthHeaders();
+      if (!headers) return;
+    } catch (e) { return; }
+
+    let verdict = null;
+    try {
+      const r = await fetch('/api/abandon-account', {
+        method: 'POST', headers, body: JSON.stringify({ accountId, check: true })
+      });
+      verdict = await r.json();
+      if (!r.ok || !verdict || !verdict.ok) {
+        // A live subscription is not an error, it is a STEP. Send them to Manage Billing instead
+        // of leaving them on a refusal they cannot act on.
+        if (verdict && verdict.code === 'subscription_active') {
+          this._teamModal({
+            title: 'Cancel your subscription first',
+            message: verdict.error,
+            buttons: [
+              { label: 'Not now', act: 'cancel', kind: 'ghost' },
+              { label: 'Manage Billing', act: 'ok', kind: 'primary' }
+            ],
+            onAction: (act) => {
+              if (act !== 'ok') return;
+              // The portal button only renders while the client thinks the sub is active. If the
+              // server says billing but the client does not, a silent no-op button is the worst
+              // possible answer — say what to do instead.
+              const portal = document.getElementById('ua-billing-portal');
+              if (portal) { portal.click(); return; }
+              this._teamModal({ message: 'Open Your Account and use Manage Billing to cancel, then come back and delete.', tone: 'error' });
+            }
+          });
+          return;
+        }
+        this._teamModal({ message: (verdict && verdict.error) || 'Could not check this bar right now. Nothing was deleted.', tone: 'error' });
+        return;
+      }
+    } catch (e) {
+      this._teamModal({ message: 'Connection error. Nothing was deleted.', tone: 'error' });
+      return;
+    }
+
+    // Already cancelled and running out the paid period: say so plainly, including that the
+    // remaining days are not refunded, BEFORE they commit.
+    var winding = '';
+    if (verdict.windingDown) {
+      var until = '';
+      if (verdict.periodEnd) {
+        var d = new Date(verdict.periodEnd * 1000);
+        if (!isNaN(d.getTime())) until = ' (paid through ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ')';
+      }
+      winding = ' Your subscription is already cancelled' + until + '. Deleting now ends your access '
+        + 'immediately, and the remaining days are not refunded.';
+    }
+
+    this._teamModal({
+      title: 'Delete this bar?',
+      message: 'This removes this bar and everything in it: counts, shifts, labor, recipes, books, '
+        + 'and every backup. It cannot be undone and there is no way to get it back.' + winding,
+      buttons: [
+        { label: 'Keep my bar', act: 'cancel', kind: 'ghost' },
+        { label: 'Continue', act: 'ok', kind: 'danger' }
+      ],
+      onAction: (act) => { if (act === 'ok') this._deleteBarConfirm(accountId); }
+    });
+  },
+
+  // Second and final step. Deliberately a separate confirm: one stray click must not be able to
+  // destroy an account, and this is the single most irreversible action in Bar Cop.
+  _deleteBarConfirm(accountId) {
+    this._teamModal({
+      title: 'Last chance',
+      message: 'Deleting is permanent and immediate. Are you certain?',
+      buttons: [
+        { label: 'Cancel', act: 'cancel', kind: 'ghost' },
+        { label: 'Delete Everything', act: 'ok', kind: 'danger' }
+      ],
+      onAction: async (act) => {
+        if (act !== 'ok') return;
+        try {
+          const headers = await this._teamAuthHeaders();
+          if (!headers) return;
+          const r = await fetch('/api/abandon-account', {
+            method: 'POST', headers, body: JSON.stringify({ accountId })
+          });
+          const data = await r.json();
+          if (!r.ok || !data.ok) {
+            this._teamModal({ message: (data && data.error) || 'Could not delete this bar. Nothing was deleted.', tone: 'error' });
+            return;
+          }
+          // The account is gone; there is nothing left to render. Reload out to the sign-in card.
+          try { await DB.signOut(); } catch (e) {}
+          window.location.href = '/';
+        } catch (e) {
+          this._teamModal({ message: 'Connection error. Nothing was deleted.', tone: 'error' });
+        }
+      }
+    });
   },
 
   // ── Password change — copied from settings.js ────────────────────────────
