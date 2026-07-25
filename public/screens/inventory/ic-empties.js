@@ -347,7 +347,7 @@ S.InventoryEmpties = {
         this.renderList();
         return;
       }
-      if (ev.target.closest('#em-export')) { App.exportPDF({ title: 'Empties Log', root: this.container }); return; }
+      if (ev.target.closest('#em-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Empties Log', root: this.container, lists: [['ic', 'empty']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#em-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#emb-add')) { this.addLine(); return; }
       if (ev.target.closest('#emb-save')) { this.saveBatch(); return; }

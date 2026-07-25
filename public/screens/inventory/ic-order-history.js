@@ -209,24 +209,16 @@ S.InventoryOrderHistory = {
 
   // Export the COMPLETE order list to PDF (every order, not just the on-screen
   // window, which paginates via Show older). Built from an off-screen node.
+  // Was an offscreen table built from EVERY record ever, so the PDF ignored the date
+  // chips entirely — the opposite of the other screens, which exported only the page on
+  // display. Both are gone: exportListPDF renders the real screen with the row limit
+  // lifted, so the PDF is exactly the chip selection, complete, and there is one code
+  // path instead of three behaviours.
   exportList() {
-    const all = this.sorted();
-    if (all.length === 0) return;
-    const statusPlain = s => s === 'Received' ? 'Received' : s === 'Submitted' ? 'Submitted' : 'Open';
-    const rows = all.map(o => '<tr><td>' + this.fmtDate(o.date) + '</td>'
-      + '<td>' + esc(o.vendor || '-') + '</td>'
-      + '<td>' + (o.item_count || (o.line_items ? o.line_items.length : 0)) + '</td>'
-      + '<td>' + App.fmtCurrency(o.total || 0) + '</td>'
-      + '<td>' + statusPlain(o.status) + '</td></tr>').join('');
-    const node = document.createElement('div');
-    node.className = 'screen';
-    node.style.cssText = 'position:absolute;left:-99999px;top:0;';
-    node.innerHTML = '<div class="card"><div class="card-title">Order History</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Vendor</th><th>Items</th><th>Total</th><th>Status</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-    document.body.appendChild(node);
-    Promise.resolve(App.exportPDF({ title: 'Order History', root: node })).finally(() => node.remove());
+    const r = this.effectiveRange();
+    App.exportListPDF({ title: 'Order History', root: this.container, lists: [['ic', 'order']],
+      reRender: () => this.renderList(),
+      range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) });
   },
 
   // Build a single-order PDF that reads as a purchase order, from the order

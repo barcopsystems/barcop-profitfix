@@ -370,7 +370,7 @@ S.InventoryTransfers = {
         this.renderList();
         return;
       }
-      if (ev.target.closest('#tr-export')) { App.exportPDF({ title: 'Transfer Log', root: this.container }); return; }
+      if (ev.target.closest('#tr-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Transfer Log', root: this.container, lists: [['ic', 'transfer']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#tr-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#trb-add')) { this.addLine(); return; }
       if (ev.target.closest('#trb-save')) { this.saveBatch(); return; }

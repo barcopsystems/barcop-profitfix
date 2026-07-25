@@ -508,7 +508,7 @@ S.InventorySpotCheck = {
         this.renderHistory();
         return;
       }
-      if (ev.target.closest('#sp-list-export')) { App.exportPDF({ title: 'Spot Check History', root: this.container }); return; }
+      if (ev.target.closest('#sp-list-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Spot Check History', root: this.container, lists: [['ic', 'spot_check']], reRender: () => this.renderHistory(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderHistory()); return; }
       const hdel = ev.target.closest('.sp-hdel');
       const hview = ev.target.closest('.sp-hview');

@@ -186,35 +186,16 @@ S.InventoryCountHistory = {
 
   // Export the COMPLETE count list to PDF (every count, not just the on-screen
   // window, which paginates via Show older). Built from an off-screen node.
+  // Was an offscreen table built from EVERY record ever, so the PDF ignored the date
+  // chips entirely — the opposite of the other screens, which exported only the page on
+  // display. Both are gone: exportListPDF renders the real screen with the row limit
+  // lifted, so the PDF is exactly the chip selection, complete, and there is one code
+  // path instead of three behaviours.
   exportList() {
-    const asc = this.sorted();
-    if (asc.length === 0) return;
-    const ordered = asc.map((c, i) => {
-      const prior = i > 0 ? asc[i - 1] : null;
-      const variance = prior ? (c.total_value || 0) - (prior.total_value || 0) : null;
-      const isLatest = i === asc.length - 1;
-      return { c, variance, isLatest };
-    }).reverse();
-    const rows = ordered.map(r => {
-      const c = r.c;
-      const varCell = r.variance == null ? '-' : (r.variance >= 0 ? '+' : '') + App.fmtBal(r.variance);
-      return '<tr><td>' + this.fmtDate(c.date) + '</td>'
-        + '<td>' + esc(c.type || '-') + '</td>'
-        + '<td>' + esc(c.counted_by || '-') + '</td>'
-        + '<td>' + this.splitItems(c).counted.length + '</td>'
-        + '<td>' + App.fmtCurrency(c.total_value || 0) + '</td>'
-        + '<td>' + varCell + '</td>'
-        + '<td>' + (r.isLatest ? 'Latest' : 'Past') + '</td></tr>';
-    }).join('');
-    const node = document.createElement('div');
-    node.className = 'screen';
-    node.style.cssText = 'position:absolute;left:-99999px;top:0;';
-    node.innerHTML = '<div class="card"><div class="card-title">Count History</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Type</th><th>Counted By</th><th>Counted</th><th>Total Value</th><th>Variance vs Prior</th><th>Status</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-    document.body.appendChild(node);
-    Promise.resolve(App.exportPDF({ title: 'Count History', root: node })).finally(() => node.remove());
+    const r = this.effectiveRange();
+    App.exportListPDF({ title: 'Count History', root: this.container, lists: [['ic', 'count']],
+      reRender: () => this.renderList(),
+      range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) });
   },
 
   // Guarded delete: a count is a finalized record, so removing one is behind

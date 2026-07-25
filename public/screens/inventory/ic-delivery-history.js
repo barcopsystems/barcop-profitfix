@@ -172,35 +172,16 @@ S.InventoryDeliveryHistory = {
 
   // Export the COMPLETE delivery list to PDF (every delivery, not just the
   // on-screen window, which paginates via Show older). Built from an off-screen node.
+  // Was an offscreen table built from EVERY record ever, so the PDF ignored the date
+  // chips entirely — the opposite of the other screens, which exported only the page on
+  // display. Both are gone: exportListPDF renders the real screen with the row limit
+  // lifted, so the PDF is exactly the chip selection, complete, and there is one code
+  // path instead of three behaviours.
   exportList() {
-    const all = this.sorted();
-    if (all.length === 0) return;
-    const rows = all.map(d => {
-      let disc;
-      if (d.has_discrepancy) {
-        const parts = [];
-        if (d.price_change_count) parts.push(d.price_change_count + ' Price Change' + (d.price_change_count === 1 ? '' : 's'));
-        if (d.short_count_count)  parts.push(d.short_count_count + ' Short Count' + (d.short_count_count === 1 ? '' : 's'));
-        disc = parts.join(', ') || 'Discrepancy';
-      } else {
-        disc = 'Clean';
-      }
-      return '<tr><td>' + this.fmtDate(d.date) + '</td>'
-        + '<td>' + esc(d.vendor || '-') + '</td>'
-        + '<td>' + esc(d.invoice_number || '-') + '</td>'
-        + '<td>' + (d.item_count || (d.line_items ? d.line_items.length : 0)) + '</td>'
-        + '<td>' + App.fmtCurrency(d.total || 0) + '</td>'
-        + '<td>' + esc(disc) + '</td></tr>';
-    }).join('');
-    const node = document.createElement('div');
-    node.className = 'screen';
-    node.style.cssText = 'position:absolute;left:-99999px;top:0;';
-    node.innerHTML = '<div class="card"><div class="card-title">Delivery History</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Vendor</th><th>Invoice #</th><th>Items</th><th>Total</th><th>Discrepancy</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-    document.body.appendChild(node);
-    Promise.resolve(App.exportPDF({ title: 'Delivery History', root: node })).finally(() => node.remove());
+    const r = this.effectiveRange();
+    App.exportListPDF({ title: 'Delivery History', root: this.container, lists: [['ic', 'delivery']],
+      reRender: () => this.renderList(),
+      range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) });
   },
 
   // Guarded delete: a delivery is a finalized record, so removing one is behind

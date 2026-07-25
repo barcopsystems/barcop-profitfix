@@ -398,7 +398,7 @@ S.InventoryAdjustments = {
         this.renderList();
         return;
       }
-      if (ev.target.closest('#adj-export')) { App.exportPDF({ title: 'Adjustment Log', root: this.container }); return; }
+      if (ev.target.closest('#adj-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Adjustment Log', root: this.container, lists: [['ic', 'adjustment']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#adj-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#ajb-add')) { this.addLine(); return; }
       if (ev.target.closest('#ajb-save')) { this.saveBatch(); return; }
