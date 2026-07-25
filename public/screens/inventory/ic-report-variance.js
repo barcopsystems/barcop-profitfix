@@ -1017,7 +1017,15 @@ S.InventoryVarianceReport = {
   // Over recipe (positive) is a leak, shown red; under stays neutral.
   dCell(dv) {
     if (dv == null || isNaN(dv)) return '<td>' + this.n(null) + '</td>';
-    return '<td class="' + (dv > 0.005 ? 'neg' : '') + '">' + (dv > 0 ? '+' : '') + App.fmtCurrency(dv) + '</td>';
+    // Normalise at the displayed precision BEFORE testing the sign: the same floating-point
+    // residue that produced "-0.0" in n() also decided this cell's "+", so one dead-even row
+    // printed "+$0.00" (residue positive) and the next printed "$0.00" (residue negative). Two
+    // balanced rows disagreeing about a sign is the tell that neither number is trustworthy.
+    const v = Number(Number(dv).toFixed(2)) === 0 ? 0 : Number(dv);
+    // fmtBal, not fmtCurrency: this column is signed BY DESIGN (under recipe is negative), and
+    // fmtCurrency renders a negative as "$-1.20". Its sibling cur() on line above already uses
+    // fmtBal for exactly this reason; dCell was the straggler. See the neg-currency harnesses.
+    return '<td class="' + (v > 0.005 ? 'neg' : '') + '">' + (v > 0 ? '+' : '') + App.fmtBal(v) + '</td>';
   },
 
   // ── Sales Variance ────────────────────────────────────────────────────────
@@ -1166,7 +1174,19 @@ S.InventoryVarianceReport = {
     return rows.sort((a, b) => a.name.localeCompare(b.name));
   },
 
-  n(v, d) { return (v == null || isNaN(v)) ? '<span style="color:var(--t4);">-</span>' : Number(v).toFixed(d == null ? 1 : d); },
+  // ⚠ NORMALISE -0 AT THE DISPLAYED PRECISION. A count that comes out exactly even still leaves
+  // floating-point residue (0.5 cases can be 0.4999999999999998), so the variance is -2e-16 and
+  // toFixed keeps the sign: Athletic NA showed "Case Var -0.0 / Btl Var -0" on a row that
+  // balanced perfectly, while every other even row showed 0.0 / 0. A minus in front of a
+  // variance reads as a real shortage. Same line pct() and App.fmtCurrency already carry — this
+  // was the one display helper in the file without it. A real shortage that rounds to a non-zero
+  // keeps its minus, so nothing is hidden.
+  n(v, d) {
+    if (v == null || isNaN(v)) return '<span style="color:var(--t4);">-</span>';
+    const dp = d == null ? 1 : d;
+    const x = Number(v);
+    return (Number(x.toFixed(dp)) === 0 ? 0 : x).toFixed(dp);
+  },
   recipeTag(r) { return r.fromMenu ? ' <span style="font-size:8px;color:var(--gold);font-weight:700;letter-spacing:1px;">FROM RECIPE</span>' : ''; },
   // Product column wide enough that "FROM RECIPE" stays on the name's row; Status
   // stays narrow; every data column in between shares the rest equally so the
