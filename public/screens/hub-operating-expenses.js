@@ -629,7 +629,13 @@ S.HubOperatingExpenses = {
        repaint went ahead, painting Operating Expenses over the History page the operator had just
        opened (sidebar still highlighting History). `_catchUpOnce` survives the identical race only
        because it branches on `_view`; this did not. */
-    if (!this._catchUpStillCurrent() || this._view !== 'current') return;
+    if (!this._catchUpStillCurrent()) return;
+    /* ⚠ EXPENSE HISTORY NEEDS THE NUMBERS REFRESHED, JUST NOT THE PAGE HIJACKED. It mounts through
+       this same object, so a bare `_view !== 'current'` return left it showing "Logged This Year"
+       and a log table built from rows that — on a FAILED write — had already been spliced back out
+       of memory a few lines above. Right answer for both: re-render whichever view is actually on
+       screen. `_rerender` is the function that already exists for this. */
+    if (this._view !== 'current') { this._rerender(); return; }
     // Say what happened, including what was NOT taken and why.
     if (!saved) {
       this._importMsg = 'Could not save the import. Nothing was changed — check your connection and try again.';

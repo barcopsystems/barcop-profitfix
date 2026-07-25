@@ -89,10 +89,22 @@ S.SalesIntegrity = {
           + scored + '. That is not an all-clear, it just means there is no floor to stand out from yet.'
       };
     }
+    /* ⚠ A METRIC BEING NON-NULL IS NOT THE SAME AS A SIGNAL BAR COP CAN ACT ON. `analyze` sets the
+       two CAPTURE signals from `hasCapture`, which is true the moment the file has a DATE column —
+       so with zero drawer shortages and zero walked tabs on record they both come out as a real 0,
+       not null. Counting those as live meant a Server + Date + Net Sales file (exactly what the
+       empty state invites) had "two signals", skipped this caveat, and printed the green all-clear
+       on both the screen and the PDF. They also cannot fire on their own: a capture signal needs
+       MIN_EVENTS behind it. A capture metric counts only once something was actually captured. */
+    const CAPTURE = { drawer_short: 1, walkouts: 1 };
     const live = new Set();
     ((review && review.servers) || []).forEach(s => {
       const m = (s && s.metrics) || {};
-      Object.keys(m).forEach(k => { if (m[k] != null) live.add(k); });
+      Object.keys(m).forEach(k => {
+        if (m[k] == null) return;
+        if (CAPTURE[k] && !(m[k] > 0)) return;
+        live.add(k);
+      });
     });
     if (live.size < 2) {
       return {
