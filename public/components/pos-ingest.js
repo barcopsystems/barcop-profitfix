@@ -417,19 +417,31 @@ const PosIngest = {
       // place, so a retry after a refused write re-upserts the same id instead of doubling the day.
       const mBar  = c.bar    ? agg.bar    : pv(prior.bar_revenue);
       const mFood = c.food   ? agg.food   : pv(prior.floor_revenue);
-      const mCov  = c.covers ? agg.covers : (prior.covers || 0);
+      /* ⚠ A NEGATIVE COVERS AGGREGATE MEANS THE FILE IS WRONG ABOUT COVERS FOR THIS DAY, so the
+         column is NOT CARRIED — the prior stands. mkRec clamps what it stores, and treating -12 as
+         "carried" therefore wrote a 0 over a day that had 220 covers, counted it as "1 replaced
+         earlier figures", and put nothing in skipped: a real count destroyed silently, which then
+         flows into Confirm the Week's prefill, weekly covers, check average and next week's goal.
+         Bar and food already work this way one branch down — a day that comes out non-positive is
+         reported, never written. Nothing is invented here and nothing is lost.
+         It also keeps the CONFLICT PROMPT honest: `theirs` below is built from the same test, so
+         it can no longer offer "-12 covers" as a choice that would actually write 0, and a day
+         whose only "difference" is an unusable covers cell stops raising a prompt where both
+         answers produce the identical record. */
+      const covUsable = !!c.covers && (agg.covers || 0) >= 0;
+      const mCov  = covUsable ? agg.covers : (prior.covers || 0);
       const useRec = mkRec(date, mBar, mFood, mCov, false, prior.id);   // what "Use the file" would write
       if (prior.source === 'manual') {
         // Only a DIFFERING carried column is a conflict — never prompt when the numbers MATCH; the
         // hand close simply stands, reported as kept.
         const diff = (c.bar    && pv(agg.bar)    !== pv(prior.bar_revenue))
                   || (c.food   && pv(agg.food)   !== pv(prior.floor_revenue))
-                  || (c.covers && (agg.covers || 0) !== (prior.covers || 0));
+                  || (covUsable && (agg.covers || 0) !== (prior.covers || 0));
         if (!diff) { if (!keptDates.has(date)) { keptDates.add(date); keptManual++; } return; }
         conflicts.push({
           key: date, date,
           mine:   { bar_revenue: pv(prior.bar_revenue), floor_revenue: pv(prior.floor_revenue), covers: prior.covers || 0 },
-          theirs: { bar_revenue: c.bar ? pv(agg.bar) : null, floor_revenue: c.food ? pv(agg.food) : null, covers: c.covers ? (agg.covers || 0) : null },
+          theirs: { bar_revenue: c.bar ? pv(agg.bar) : null, floor_revenue: c.food ? pv(agg.food) : null, covers: covUsable ? (agg.covers || 0) : null },
           useRec: useRec
         });
         return;
