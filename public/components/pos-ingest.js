@@ -356,7 +356,13 @@ const PosIngest = {
     // stray footer label) is non-blank but not a value — treating it as a carried 0 would raise a
     // FALSE conflict against a differing prior and, on "use the file", ZERO the column (S140 scan).
     // A real "0" DOES carry (the file says zero) and overwrites.
-    const numeric = v => { if (v == null) return false; const s = String(v).trim(); return s !== '' && !isNaN(parseFloat(s.replace(/[^0-9.\-]/g, ''))); };
+    // ⚠ MUST ASK THE SAME QUESTION AS _num/covOf BELOW, or this guard inverts into the bug it
+    // exists to stop. It kept its own parse through the coercion unification, so for a cell like
+    // "07/01-07/07" or "5-11" it said "this column carries a value" while _num returned 0 — and
+    // "use the file" then wrote that 0 over a real day's sales, reporting "1 replaced earlier
+    // figures", with nothing in skipped and no conflict raised. That is exactly the S140 failure
+    // this helper was added to prevent. One coercion, one answer: it carries iff parseNum can read it.
+    const numeric = v => App.parseNum(v) != null;
     const covOf = v => Math.round(App.parseNum(v) ?? 0);   // one coercion; keeps the decimal point so "12.00" is 12, not 1200
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
@@ -611,7 +617,10 @@ const PosIngest = {
     const toAdd = []; const skipped = []; const incomplete = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
-      const covers = Math.round(App.parseNum(r.covers) ?? 0);   // keep the decimal point: "12.00" is 12, not 1200; strip only commas/currency
+      // ⚠ Math.max(0, ...): the coercion now reads a sign, and a server cannot ring NEGATIVE
+      // covers. Left signed, "(12)" stored -12, which r-server-check prints and sums into the
+      // team total. The `!covers` guard below catches 0 and NaN but not a negative.
+      const covers = Math.max(0, Math.round(App.parseNum(r.covers) ?? 0));
       const sales = this._num(r.sales);
       // Two different problems, two different lists. An unmatched NAME is a roster fix.
       // A server who IS on the roster but rang no covers or no sales is just a row with
