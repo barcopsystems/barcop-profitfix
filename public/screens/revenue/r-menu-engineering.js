@@ -53,7 +53,11 @@ S.RevenueMenuEngineering = {
       .map(i => ({ ...i, cost: App.menuItemCost(i) || 0 }))
       .filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
     const byCat = {};
-    items.forEach(i => { const c = i.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(i); });
+    // Group by the COMPARISON BASIS, not the raw category: cocktails rank as one pool because
+    // Frozen / Specials / Happy Hour are menu layout, not economics, while dishes and No Prep
+    // still rank per category because an appetiser is not an entree. App.menuGroupKey is
+    // mirrored on the server so the audit names the same Dogs (verify-menu-grouping-tieout).
+    items.forEach(i => { const c = App.menuGroupKey(i); (byCat[c] = byCat[c] || []).push(i); });
     const map = {};
     Object.keys(byCat).forEach(cat => {
       const list = byCat[cat];
@@ -156,12 +160,20 @@ S.RevenueMenuEngineering = {
     // ranking" even when the category would STILL be short afterwards.
     const blocked = [], stuck = [];
     const byCatUncosted = {};
-    uncosted.forEach(i => { const c = i.category || 'Uncategorized'; byCatUncosted[c] = (byCatUncosted[c] || 0) + 1; });
+    // Key by the SAME comparison basis byCat uses. Keying this by the raw category while byCat
+    // keyed by group meant `byCat[cat]` never matched, every category read as zero costed items,
+    // and the shortfall printed one too many ("needs 3 more" when it needed 2).
+    uncosted.forEach(i => { const c = App.menuGroupKey(i); byCatUncosted[c] = (byCatUncosted[c] || 0) + 1; });
+    // These keys are GROUP KEYS ('plate|Entrees'). Everything pushed onto blocked/stuck is
+    // operator-facing copy, so convert to the display label or the sentence reads
+    // "plate|Desserts still needs 2 more costed dishes".
+    const _allKeys = Object.keys(byCat || {}).concat(Object.keys(byCatUncosted));
+    const _lbl = k => App.menuGroupLabel(k, _allKeys);
     Object.keys(byCatUncosted).forEach(cat => {
       const costedHere = ((byCat && byCat[cat]) || []).length;
       if (costedHere >= this.MIN_PER_CAT) return;   // already ranks; costing simply adds this dish
-      if (costedHere + byCatUncosted[cat] >= this.MIN_PER_CAT) blocked.push(cat);
-      else stuck.push({ cat, need: this.MIN_PER_CAT - costedHere - byCatUncosted[cat] });
+      if (costedHere + byCatUncosted[cat] >= this.MIN_PER_CAT) blocked.push(_lbl(cat));
+      else stuck.push({ cat: _lbl(cat), need: this.MIN_PER_CAT - costedHere - byCatUncosted[cat] });
     });
     let why = '';
     if (blocked.length) {
@@ -213,10 +225,19 @@ S.RevenueMenuEngineering = {
     const f = v => App.fmtCurrency(v);
 
     const byCat = {};
-    items.forEach(i => { const c = i.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(i); });
+    // Group by the COMPARISON BASIS, not the raw category: cocktails rank as one pool because
+    // Frozen / Specials / Happy Hour are menu layout, not economics, while dishes and No Prep
+    // still rank per category because an appetiser is not an entree. App.menuGroupKey is
+    // mirrored on the server so the audit names the same Dogs (verify-menu-grouping-tieout).
+    items.forEach(i => { const c = App.menuGroupKey(i); (byCat[c] = byCat[c] || []).push(i); });
+    // catSort now receives GROUP KEYS ('plate|Entrees'), not bare category names, so it orders by
+    // the DISPLAY label. CAT_ORDER is a list of category names and still works against that.
+    const _keys = Object.keys(byCat);
+    const _label = k => App.menuGroupLabel(k, _keys);
     const catSort = (a, b) => {
-      const ia = this.CAT_ORDER.indexOf(a), ib = this.CAT_ORDER.indexOf(b);
-      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+      const la = _label(a), lb = _label(b);
+      const ia = this.CAT_ORDER.indexOf(la), ib = this.CAT_ORDER.indexOf(lb);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || la.localeCompare(lb);
     };
 
     const cands = this.batchCandidates();
@@ -293,7 +314,7 @@ S.RevenueMenuEngineering = {
           + '<td>' + x.dwkCell + '</td>'
           + '<td>' + x.action + '</td></tr>';
       }).join('');
-      return heading(cat + ' (' + list.length + ')')
+      return heading(_label(cat) + ' (' + list.length + ')')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
         + colgroup
         + '<thead><tr><th>Item</th><th>Class</th><th>Sold/wk</th><th>Current</th><th>Suggested</th><th>&Delta;/wk</th><th></th></tr></thead>'
@@ -303,7 +324,7 @@ S.RevenueMenuEngineering = {
     // ── Categories too small to rank fairly (still get the pricing engine) ─────
     let unrankedCard = '';
     if (unranked.length) {
-      unranked.sort((a, b) => catSort(a.category || 'Uncategorized', b.category || 'Uncategorized') || b.weekly_covers - a.weekly_covers);
+      unranked.sort((a, b) => catSort(App.menuGroupKey(a), App.menuGroupKey(b)) || b.weekly_covers - a.weekly_covers);
       const urows = unranked.map(i => {
         const x = cellsFor(i, null);
         return '<tr><td><div class="val">' + esc(i.name) + '</div></td>'
