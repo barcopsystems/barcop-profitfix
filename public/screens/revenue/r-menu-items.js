@@ -1176,6 +1176,16 @@ S.RevenueMenuItems = {
     // whole category's average margin.
     const typedCost = parseFloat(document.getElementById('ri-cost')?.value);
     if (!isNaN(typedCost) && typedCost < 0) { fail('Cost cannot be negative.'); return; }
+    // ⚠ AND THE NEXT ONE ALONG. Target Cost % is read as `parseFloat(...) || DEFAULT`, and a
+    // NEGATIVE IS TRUTHY, so it sailed past that fallback. At -20 every positive cost percent is
+    // "over target" forever — the row cell renders red permanently and the item is counted in
+    // App.menuItemsOverTarget(), which drives the IC dashboard, Recipe Cost Analysis and two
+    // fix-gap counts. At 9999 it is the same hole reversed: a genuinely over-target dish reads
+    // green for good. The input carries no min/max and nothing calls checkValidity.
+    const typedTarget = parseFloat(document.getElementById('ri-target-pct')?.value);
+    if (!isNaN(typedTarget) && (typedTarget <= 0 || typedTarget >= 100)) {
+      fail('Target cost % must be between 1 and 99.'); return;
+    }
 
     let category = '';
     let recipe = null;
