@@ -3466,8 +3466,29 @@ S.HubSettings = {
       const cRev = (pw.catering && pw.catering.revenue) || 0, oRev = (pw.other && pw.other.revenue) || 0;
       const totSales = bRev + fRev + cRev + oRev;
       if (!(totSales > 0)) return;
+      // ⚠ THE PREMIUM GOES INTO THE LABOR MONEY, not just into the percentages.
+      // It used to be added only to the `labor` local below, so prime_cost_pct and
+      // labor_pct_blended carried a premium that pw.bar.labor / pw.food.labor did not.
+      // Two things broke, on all 13 seeded weeks: the Weekly P&L Brief printed a Prime
+      // Cost % that did not equal its own Total Prime Cost / Total Revenue (off ~0.2
+      // points), and weeks[] disagreed with revenue_weeks.total_labor_cost by ~$35 on
+      // the SAME week — a number an accountant foots by hand. A live confirm has no
+      // such split: this-week.laborCost hands ConfirmWeek a bar/food labor figure with
+      // the premium already in it, so bLab/fLab and primeCost cannot disagree. Match
+      // that shape — the premium lands on Bar/Food by their share of the week's labor,
+      // exactly as this-week.laborCost splits it (and as salary is split above).
+      // Round each side BEFORE summing, so what the sheet prints is what the total adds.
+      if (ot > 0 && pw.bar && pw.food) {
+        const bL = pw.bar.labor || 0, fL = pw.food.labor || 0, h = bL + fL;
+        if (h > 0) { pw.bar.labor = +(bL + ot * (bL / h)).toFixed(2); pw.food.labor = +(fL + ot * (fL / h)).toFixed(2); }
+        else { pw.food.labor = +(fL + ot).toFixed(2); }
+        // The department labor % is derived from that same money (confirm-week barLabPct
+        // / foodLabPct), so it has to follow or the record disagrees with itself.
+        if (bRev > 0) pw.bar.labor_pct  = pw.bar.labor  / bRev * 100;
+        if (fRev > 0) pw.food.labor_pct = pw.food.labor / fRev * 100;
+      }
       const labor = ((pw.bar && pw.bar.labor) || 0) + ((pw.food && pw.food.labor) || 0)
-                  + ((pw.catering && pw.catering.labor) || 0) + ot;
+                  + ((pw.catering && pw.catering.labor) || 0);
       const prime = ((pw.bar && pw.bar.cogs) || 0) + ((pw.food && pw.food.cogs) || 0)
                   + ((pw.catering && pw.catering.cogs) || 0) + ((pw.other && pw.other.cogs) || 0) + labor;
       pw.prime_cost_pct = +(prime / totSales * 100).toFixed(2);

@@ -886,13 +886,19 @@ S.HubYearEnd = {
       rows.push(this._lineRow('(no cash variances logged this year)', COL_COUNT));
       mergeFull(rows.length - 1);
     } else {
+      // A genuine $0.00 is DATA, not absence. `parseFloat(x) || null` collapsed both to
+      // the same blank cell, so a drawer that balanced to the penny printed EMPTY on a
+      // tax-facing sheet and read as "this shift was never counted" — the opposite of
+      // what it means. Null now only for a value that is missing or not a number.
+      // (Same class as the forecast-zero bug: `|| null` cannot tell zero from nothing.)
+      const numCell = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
       worst.forEach(v => rows.push([
         v.date || '',
         v.shift_type || v.shift || '',
         v.cashier || v.name || '',
-        parseFloat(v.expected_cash != null ? v.expected_cash : v.expected) || null,
-        parseFloat(v.counted_cash != null ? v.counted_cash : v.counted) || null,
-        parseFloat(v.variance) || null
+        numCell(v.expected_cash != null ? v.expected_cash : v.expected),
+        numCell(v.counted_cash != null ? v.counted_cash : v.counted),
+        numCell(v.variance)
       ]));
     }
 

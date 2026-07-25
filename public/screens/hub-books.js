@@ -1251,7 +1251,11 @@ S.HubBooks = {
     } else {
       sortedTips.forEach(t => {
         const total = parseFloat(t.total_tips) || ((parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0));
-        rows.push([t.date || '', t.name || '', t.shift_type || '', parseFloat(t.hours) || null, total]);
+        // Hours: a logged 0 is data, not absence. `parseFloat(x) || null` blanked both
+        // (twin of the Year-End Cash Control fix) — on an 8027-facing sheet a blank Hours
+        // cell reads as "not recorded" when the log actually says zero.
+        const hrs = parseFloat(t.hours);
+        rows.push([t.date || '', t.name || '', t.shift_type || '', isNaN(hrs) ? null : hrs, total]);
       });
     }
 
