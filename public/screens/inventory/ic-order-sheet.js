@@ -64,32 +64,48 @@ S.InventoryOrderSheet = {
   },
 
   // Units RECEIVED for each product since the count its on-hand came from.
-  // ⚠ This is deliberately NOT added into on-hand. On-hand moves only when you COUNT, and nothing
-  // subtracts what you POUR between counts — so folding receipts in alone would bias on-hand HIGH
-  // and start SUPPRESSING orders you actually need. Running dry mid-service is a worse failure than
-  // ordering a case twice. So the receipt is SURFACED on the line instead, and the operator decides.
+  // ⚠ THIS IS NOW FOLDED INTO THE SUGGESTION (Kyle's call 2026-07-24, superseding "surface it,
+  // never fold it in"). The old rule feared that receipts-without-pours bias on-hand HIGH and
+  // suppress orders you genuinely need. Kyle then hit the other side of it live: count Sunday,
+  // order 5, receive them Monday, and the SAME order comes back at full quantity. Following the
+  // sheet was actively creating trapped cash, which is the exact thing Bar Cop exists to free.
+  // The run-dry risk is handled instead by the just-received strip in belowParByVendor(), which
+  // keeps such an item VISIBLE and one click from being ordered.
   // Per PRODUCT, not per file: a count can skip products, so each product's on-hand can come from a
   // different (older) count, and what matters is everything received after THAT product's count.
   receivedSinceCount() {
-    const lastCounted = {};   // product_id -> newest date that product was actually counted
+    // A count and a delivery on the SAME DAY cannot be ordered by date alone, and getting it wrong
+    // now MOVES THE SUGGESTION rather than just a note. Prefer a real created_at on both sides.
+    // When one is missing, assume the COUNT came first (an operator counts before service and takes
+    // deliveries during it) so the delivery is credited. That is also the safer default here:
+    // over-crediting surfaces in the just-received strip, under-crediting silently re-orders stock
+    // already on the shelf. created_at is UTC and `date` is the local business day, so a same-day
+    // comparison is a heuristic either way — which is why the strip exists.
+    const ts = (rec, endOfDay) => {
+      const c = rec && rec.created_at ? String(rec.created_at) : '';
+      if (/^\d{4}-\d{2}-\d{2}T/.test(c)) return c;
+      const d = String((rec && rec.date) || '').slice(0, 10);
+      return d ? d + (endOfDay ? 'T23:59:59' : 'T00:00:00') : '';
+    };
+    const lastCounted = {};   // product_id -> newest stamp that product was actually counted
     ((App.inventoryData && App.inventoryData.ic_counts) || []).forEach(cnt => {
-      const d = String((cnt && cnt.date) || '').slice(0, 10);
-      if (!d) return;
+      const t = ts(cnt, false);
+      if (!t) return;
       (cnt.items || []).forEach(it => {
         // `counted === false` never sets on-hand, so it must not count as "you counted this" here.
         if (!it || it.counted === false || !it.product_id) return;
-        if (!lastCounted[it.product_id] || d > lastCounted[it.product_id]) lastCounted[it.product_id] = d;
+        if (!lastCounted[it.product_id] || t > lastCounted[it.product_id]) lastCounted[it.product_id] = t;
       });
     });
     const out = {};
     ((App.inventoryData && App.inventoryData.ic_deliveries) || []).forEach(dv => {
-      const d = String((dv && dv.date) || '').slice(0, 10);
-      if (!d) return;
+      const t = ts(dv, true);
+      if (!t) return;
       (dv.line_items || []).forEach(li => {
         const pid = li && li.product_id;
         if (!pid) return;
         const since = lastCounted[pid];
-        if (!since || d <= since) return;   // counted on/after the delivery: already reflected in on-hand
+        if (!since || t <= since) return;   // counted at/after the delivery: already reflected in on-hand
         // Delivery qty is stored in the same container unit as on-hand and par (cases for bottle beer).
         out[pid] = (out[pid] || 0) + (App.unitsFromDeliveryLine ? App.unitsFromDeliveryLine(li) : (parseFloat(li.qty) || 0));
       });
@@ -106,27 +122,45 @@ S.InventoryOrderSheet = {
     const received = this.receivedSinceCount();
 
     const groups = {};
+    // Items that are only OFF the list because of a receipt. Same shape as a `groups` line, so the
+    // strip can render and order them with the existing machinery. See the run-dry note below.
+    const justReceived = {};
     Object.keys(onHand).forEach(pid => {
       const p = this.productById(pid);
       if (!p || p.active === false) return;   // hidden/discontinued: out of orders, same as counts/par/receive (Hide promises this)
       if (p.par_level == null || p.par_level === '' || !(p.par_level > 0)) return;
       const isCaseBeer = (p.category === 'Bottle Beer') && p.case_size && p.case_size > 0;
       const oh = onHand[pid] || 0;
-      if (oh >= p.par_level) return;
-      const vendor = p.vendor || 'Unassigned';
-      if (!groups[vendor]) groups[vendor] = [];
-      groups[vendor].push({
+      const recvd = received[pid] || 0;
+      // ⭐ POSITION, not the last count. What you counted PLUS what has landed since. Ordering off
+      // the count alone re-ordered everything you had just received, at full quantity, until the
+      // next count — a sheet telling you to buy what is already on the shelf. Floored so a
+      // short receive still asks for the remainder and a full one asks for nothing.
+      const position = oh + recvd;
+      const line = {
         product: p,
-        on_hand: oh,
+        on_hand: oh,             // what was COUNTED — kept separate so the row can show both
         par: p.par_level,
-        suggested: Math.max(1, Math.ceil(p.par_level - oh)),
+        position: position,
+        suggested: Math.max(1, Math.ceil(p.par_level - position)),
         unit_cost: p.unit_cost != null ? p.unit_cost : 0,
         is_case_beer: isCaseBeer,
-        // Surfaced, never folded into on_hand or suggested — see receivedSinceCount().
-        received_since: received[pid] || 0
-      });
+        received_since: recvd
+      };
+      const vendor = p.vendor || 'Unassigned';
+      if (position >= p.par_level) {
+        // ⚠ THE RUN-DRY GUARD. Nothing subtracts what you POUR between counts, so a receipt the bar
+        // has already poured through would silently hide a genuine reorder. An item that is only
+        // off the list BECAUSE of a receipt therefore does not vanish: it moves to the
+        // just-received strip with its real breakdown, and stays one click from being ordered.
+        // (An item that was simply at par all along was never on the list and does not belong here.)
+        if (oh < p.par_level && recvd > 0) (justReceived[vendor] = justReceived[vendor] || []).push(line);
+        return;
+      }
+      if (!groups[vendor]) groups[vendor] = [];
+      groups[vendor].push(line);
     });
-    return { latest, groups };
+    return { latest, groups, justReceived };
   },
 
   // Most recent in-flight order (status != Received) for a vendor, or null.
@@ -182,10 +216,24 @@ S.InventoryOrderSheet = {
         + this.customToggleRow(data.latest) + '</div>';
     } else {
       statusHtml = this.statusCardHTML(visibleVendors, hiddenVendors, data);
+      // Just-received lines ride INSIDE their vendor's card when that vendor already has one, so a
+      // vendor never renders twice with two Create Order buttons. Only vendors with nothing below
+      // par get their own strip card below.
+      const jrAll = data.justReceived || {};
+      const linesFor = v => (data.groups[v] || [])
+        .concat((jrAll[v] || []).map(l => Object.assign({}, l, { just_received: true })));
       vendorHtml = editHtml + (visibleVendors.length
         ? '<div class="sh" style="margin:24px 0 10px;">Suggested Orders</div>'
-          + visibleVendors.map(v => this.vendorCard(v, data.groups[v])).join('')
+          + visibleVendors.map(v => this.vendorCard(v, linesFor(v))).join('')
         : '');
+      const jrOnly = Object.keys(jrAll).sort()
+        .filter(v => !(data.groups[v] || []).length && v !== this._editVendor && !this.openOrderForVendor(v));
+      if (jrOnly.length) {
+        vendorHtml += '<div class="sh" style="margin:24px 0 4px;">Just Received &middot; Confirm At Your Next Count</div>'
+          + '<div style="font-size:12px;color:var(--t3);margin:0 0 10px;">These were under par at your last count, but deliveries since have covered them, '
+          + 'so Bar Cop is not suggesting them. If you have already poured through what landed, order anyway.</div>'
+          + jrOnly.map(v => this.justReceivedCard(v, (jrAll[v] || []).map(l => Object.assign({}, l, { just_received: true })))).join('');
+      }
     }
 
     // Custom Order card sits right below Order Status, above the suggested vendor cards.
@@ -561,16 +609,25 @@ S.InventoryOrderSheet = {
   // ── Line row builder (ing-tbl row for a known product: suggested + added) ──
   // For bottle beer with case_size, qty/unit cost are in CASES (par is already
   // in cases). Quantities carry the abbreviated container unit (cs / btls).
-  lineRowHTML(product, qty, onHand, par, recvd) {
+  lineRowHTML(product, qty, onHand, par, recvd, line) {
     const unitCost = product.unit_cost != null ? product.unit_cost : 0;
     const unit = App.unitAbbr(App.productUnit(product));
-    // A delivery received AFTER this product's last count is NOT in on-hand — on-hand only moves
-    // when you count — so the line still reads below par and would be re-ordered. Say it on the row
-    // rather than folding it into the number (see receivedSinceCount() for why folding it in is
-    // unsafe). Formatted through onHandText so bottle beer still reads in cases.
+    const jr = !!(line && line.just_received);
+    // Deliveries since this product's last count are now IN the suggestion (see
+    // receivedSinceCount), so the row shows the working rather than a bare number: what you
+    // counted, what has landed since, and the position those add up to. On a just-received row
+    // that position is what took it off the order list, so it has to be legible or the operator
+    // cannot judge whether to override it. Formatted through onHandText so beer reads in cases.
     const recvNote = (recvd > 0)
-      ? '<div style="font-size:10px;color:var(--gold);margin-top:2px;">+' + esc(this.onHandText(product, recvd, unit)) + ' received since</div>'
+      ? '<div style="font-size:10px;color:var(--gold);margin-top:2px;">+' + esc(this.onHandText(product, recvd, unit)) + ' received since'
+        + (line && line.position != null
+            ? ' &middot; ' + esc(this.onHandText(product, line.position, unit)) + ' on hand now' : '')
+        + '</div>'
       : '';
+    // A just-received row defaults to ZERO. It is here so a genuine reorder is never hidden, not
+    // to be ordered by reflex — position already covers par, so any quantity is a deliberate
+    // override by someone who thinks the stock has been poured through.
+    if (jr) qty = 0;
     return '<tr class="os-line" data-product-id="' + esc(product.id || '') + '">'
       + '<td><div class="val">' + esc(product.name || '') + '</div>'
       + '<div style="font-size:10px;color:var(--t3);">' + esc(product.category || '') + '</div></td>'
@@ -642,7 +699,16 @@ S.InventoryOrderSheet = {
   },
 
   vendorCard(vendor, lines) {
-    const rows = lines.map(l => this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par, l.received_since)).join('');
+    const rows = lines.map(l => this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par, l.received_since, l)).join('');
+    return this.vendorCardShell(vendor, rows, lines.map(l => l.product), { mode: 'create' });
+  },
+
+  // Just-received lines for a vendor that has NOTHING below par — they would otherwise have no
+  // card at all. A vendor that DOES have below-par lines gets these appended to its existing card
+  // instead (see renderMain): two cards for one vendor means two Create Order buttons and two
+  // orders for the same delivery.
+  justReceivedCard(vendor, lines) {
+    const rows = lines.map(l => this.lineRowHTML(l.product, l.suggested, l.on_hand, l.par, l.received_since, l)).join('');
     return this.vendorCardShell(vendor, rows, lines.map(l => l.product), { mode: 'create' });
   },
 
