@@ -111,7 +111,22 @@ S.SalesIntegrity = {
       const key = name.toLowerCase();
       if (!agg[key]) agg[key] = { name, sales: 0, checks: 0, cash: 0, card: 0, voids: 0, void_count: 0, comps: 0, no_sales: 0, refunds: 0, hours: 0, days: new Set() };
       const a = agg[key];
-      const add = (field, raw, col) => { const n = this.num(raw); if (n != null) { a[field] += n; present[col] = true; } };
+      // ⚠ MAGNITUDE FOR THE LOSS COLUMNS. A void, comp or refund is an AMOUNT OF LOSS, and a POS
+      // export writes it either way round — "600" or "(600)", the latter being what any of these
+      // files becomes the moment it is opened and re-saved in Excel. Summing the signed value made
+      // void_pct NEGATIVE, and every floor here is a positive threshold, so the Void, Comps and
+      // Refund signals could never fire at all: a server voiding 12% of their sales raised nothing
+      // and the screen reported 0 flagged. Going dark on a loss-prevention screen is worse than
+      // misfiring, because it reads as "all clear".
+      // The four loss/count columns this file actually accumulates. Counts belong here too: a
+      // "(3)" void count is three voids, not minus three.
+      const LOSS = { voids: 1, comps: 1, refunds: 1, void_count: 1 };
+      const add = (field, raw, col) => {
+        let n = this.num(raw);
+        if (n == null) return;
+        if (LOSS[field]) n = Math.abs(n);
+        a[field] += n; present[col] = true;
+      };
       add('sales', r.net_sales, 'net_sales');
       add('checks', r.checks, 'checks');
       add('cash', r.cash_sales, 'cash_sales');

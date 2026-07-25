@@ -566,7 +566,7 @@ S.HubOperatingExpenses = {
   async _importRows(rows) {
     const arr = this.records();
     const _added = [];   // rows appended here, so a failed write can take them back out
-    let credits = 0, unreadable = 0, undated = 0;
+    let credits = 0, unreadable = 0, undated = 0, zeroed = 0;
     (rows || []).forEach((r, i) => {
       const date = this._normDate(r.date);
       // ⚠ App.parseNum, not a private parseFloat strip. This read a card export's refund row —
@@ -578,7 +578,10 @@ S.HubOperatingExpenses = {
       // thing that makes them stop trusting the total.
       const amount = App.parseNum(r.amount);
       if (amount == null) { unreadable++; return; }
-      if (amount <= 0)    { credits++;    return; }
+      // A $0.00 line (a voided bill, a zero-dollar subscription row) is not a credit and must not
+      // be reported as one — it is simply nothing to log.
+      if (amount < 0)     { credits++;    return; }
+      if (amount === 0)   { zeroed++;     return; }
       if (!date)          { undated++;    return; }
       const category = this.CATEGORIES.includes(r.category) ? r.category : (this._matchCat(r.category) || 'Other');
       const vendor = (r.vendor || '').trim();
@@ -600,11 +603,17 @@ S.HubOperatingExpenses = {
       if (credits)    bits.push(credits + ' credit' + (credits === 1 ? '' : 's') + ' or refund' + (credits === 1 ? '' : 's') + ' skipped (Bar Cop tracks expenses as positive amounts)');
       if (undated)    bits.push(undated + ' row' + (undated === 1 ? '' : 's') + ' skipped with no readable date');
       if (unreadable) bits.push(unreadable + ' row' + (unreadable === 1 ? '' : 's') + ' skipped with no readable amount');
-      const dupes = rows.length - _added.length - credits - undated - unreadable;
+      if (zeroed) bits.push(zeroed + ' zero-dollar row' + (zeroed === 1 ? '' : 's') + ' skipped');
+      const dupes = rows.length - _added.length - credits - undated - unreadable - zeroed;
       if (dupes > 0) bits.push(dupes + ' already logged');
       this._importMsg = bits.join(' · ') + '.';
     }
     this._entryMode = 'manual';
+    // ⚠ The operator can navigate away during the bulk write, and the Hub content host is
+    // PERMANENT — so isConnected cannot answer "is this page still on screen". Without the mount
+    // token this repainted Operating Expenses, banner and all, over Permits or Books. The
+    // catch-up pass in this same file already guards exactly this way.
+    if (!this._catchUpStillCurrent()) return;
     this.renderMain();
   },
 
