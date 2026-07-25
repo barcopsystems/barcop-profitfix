@@ -4186,6 +4186,59 @@ const App = {
   // their own (Happy Hour, Featured, Brunch...) which then show on every form and
   // as real sections on the menu pages. Item TYPE is stored separately on the item.
   MENU_ALL_CATEGORIES: ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials', 'Cocktails', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
+
+  /* ── THE MENU COMPARISON BASIS — mirrored in server/audit-compute.js ──────────────────────
+     Menu Engineering ranks Stars/Plowhorses/Puzzles/Dogs against a COMPARISON GROUP, and the
+     server audit must name the same Stars and the same Dogs or its "cut the Dogs" action item
+     points at different items than the screen it links to. That has already happened once (the
+     audit pooled the whole menu and compared a starter to a steak) and a separate client/server
+     menu filter drifted before that, so BOTH functions below are duplicated verbatim on the
+     server and held together by verify-menu-grouping-tieout.js. Change one, change both.
+
+     THE RULE (Kyle, 2026-07-25): the comparison group is whatever genuinely competes on the same
+     economics.
+       DISHES     - an appetiser and an entree are not comparable (different price band, covers
+                    and absolute margin), so they rank per CATEGORY.
+       NO PREP    - a $6 bottled beer and a $60 bottle of wine are not comparable either, so
+                    Beer / Wine / NA also rank per CATEGORY.
+       COCKTAILS  - a frozen margarita and a house old fashioned ARE comparable. Frozen, Specials
+                    and Happy Hour are how the MENU is laid out, not different economics, so every
+                    cocktail ranks in ONE pool whatever the operator calls their sections. */
+  menuTypeOf(item) {
+    if (!item) return 'plate';
+    // Explicit type is the source of truth (set on save). Everything below is the legacy
+    // inference for items saved before the type field existed — including the whole demo seed,
+    // which carries no type at all, so the fallbacks are load-bearing, not decoration.
+    if (item.type === 'plate' || item.type === 'cocktail' || item.type === 'inventory') return item.type;
+    if (item.linked_product_id) return 'inventory';
+    if (item.recipe && item.recipe.mode === 'single') return 'cocktail';
+    if (item.category === 'Cocktails') return 'cocktail';
+    return 'plate';
+  },
+
+  menuGroupKey(item) {
+    const t = this.menuTypeOf(item);
+    if (t === 'cocktail') return 'cocktail';          // one pool; categories are presentational
+    return t + '|' + ((item && item.category) || 'Uncategorized');
+  },
+
+  /* What a comparison group is CALLED on screen. Pass the other keys in play so it can qualify a
+     name only when it genuinely collides: a dish "Specials" and a No Prep "Specials" are different
+     sections on a real menu, and printing two identical headings reads as a bug. Unqualified in the
+     ordinary case, so nobody sees "Entrees (Dishes)" for no reason. Display only — the KEY is what
+     the math groups by, and it is never shown. */
+  menuGroupLabel(key, allKeys) {
+    const NOUN = { plate: 'Dishes', cocktail: 'Cocktails', inventory: 'No Prep' };
+    const k = String(key == null ? '' : key);
+    const bar = k.indexOf('|');
+    if (bar < 0) return NOUN[k] || k;
+    const type = k.slice(0, bar), cat = k.slice(bar + 1);
+    const clash = (allKeys || []).some(o => {
+      const s = String(o); const b = s.indexOf('|');
+      return s !== k && b > -1 && s.slice(b + 1) === cat;
+    });
+    return clash ? cat + ' (' + (NOUN[type] || type) + ')' : cat;
+  },
   // Inventory Control product categories shown as available recipe ingredients.
   // Cocktail recipes draw from spirits, wine, beer, and the catch-all Misc bin.
   MENU_COCKTAIL_ING_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Misc'],
