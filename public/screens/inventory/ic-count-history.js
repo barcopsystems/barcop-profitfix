@@ -278,10 +278,15 @@ S.InventoryCountHistory = {
       const cmpRowHtml = m => {
         const a = m.a || 0, b = m.b || 0, change = a - b;
         const u = m.unit ? ' ' + App.unitAbbr(m.unit) : '';
+        // App.fmtSigned, not a hand-rolled sign: two counts that came out identical still leave
+        // floating-point residue, so `a - b` is -2e-16 and this cell printed "-0.0" AND took the
+        // red 'neg' class on a product that did not move. Colour off the same decision that was
+        // printed (s.sign is measured at the displayed precision).
+        const s = App.fmtSigned(change, 1, u);
         return '<tr><td><div class="val">' + esc(m.name) + '</div></td>'
           + '<td>' + esc(b.toFixed(1) + u) + '</td>'
           + '<td>' + esc(a.toFixed(1) + u) + '</td>'
-          + '<td class="' + (change < 0 ? 'neg' : change > 0 ? 'pos' : '') + '">' + (change > 0 ? '+' : '') + esc(change.toFixed(1) + u) + '</td>'
+          + '<td class="' + (s.sign < 0 ? 'neg' : s.sign > 0 ? 'pos' : '') + '">' + esc(s.text) + '</td>'
           + '</tr>';
       };
       // Group the comparison by category too, matching the count view: one table

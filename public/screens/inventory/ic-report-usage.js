@@ -410,8 +410,12 @@ S.InventoryUsageReport = {
       return '<tr><td><div class="val">' + esc(r.name) + '</div></td>'
         + '<td>' + (r.prev != null ? esc(r.prev.toFixed(1) + u) : '<span style="color:var(--t4);">new</span>') + '</td>'
         + '<td>' + esc(r.cur.toFixed(1) + u) + '</td>'
-        + '<td>' + arrow + (r.change != null ? (r.change >= 0 ? '+' : '') + r.change.toFixed(1) : '-') + '</td>'
-        + '<td>' + (r.changePct != null ? (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(0) + '%' : '-') + '</td>'
+        // App.fmtSigned: a product used exactly the same amount two periods running still leaves
+        // floating-point residue, and `>= 0 ? '+'` printed "+0.0" or "-0.0" depending only on
+        // which way the dust fell. It normalises at the displayed precision, so an unchanged
+        // product reads a clean 0.0 / 0%.
+        + '<td>' + arrow + App.fmtSigned(r.change, 1).text + '</td>'
+        + '<td>' + App.fmtSigned(r.changePct, 0, '%').text + '</td>'
         + '</tr>';
     };
     const ORDER = ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];

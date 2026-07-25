@@ -684,8 +684,12 @@ S.InventorySpotCheck = {
     const flagged = Math.abs(r.variance) > 1 && pct >= thr;
     line.dataset.flag = flagged ? '1' : '0';
     const cls = flagged ? 'var(--red)' : 'var(--gold)';
-    const direction = r.variance > 0 ? 'Over' : (r.variance < 0 ? 'Under' : 'On target');
-    const byTxt = r.variance === 0 ? '' : ' by ' + Math.abs(r.variance).toFixed(1) + ' ' + sw;
+    // Decide the WORD and the "by" off the DISPLAYED precision. A spot check that came out dead
+    // on still leaves floating-point residue, and `r.variance === 0` is false for -2e-16, so it
+    // announced "Under by 0.0 units" on a count that was exactly right.
+    const vs = App.fmtSigned(r.variance, 1);
+    const direction = vs.sign > 0 ? 'Over' : (vs.sign < 0 ? 'Under' : 'On target');
+    const byTxt = vs.sign === 0 ? '' : ' by ' + Math.abs(r.variance).toFixed(1) + ' ' + sw;
     if (res) res.innerHTML = '<span style="color:var(--t2);">' + usedTxt + ' &middot; ' + r.sold.toFixed(0) + ' ' + sw + ' rung in.</span><br>'
       + '<span style="color:' + cls + ';font-weight:700;">' + direction + byTxt + ' &middot; '
       + (r.vd > 0 ? '+' : '') + App.fmtBal(r.vd, 2) + '</span>';
