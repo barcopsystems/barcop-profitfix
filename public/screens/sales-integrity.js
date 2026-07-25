@@ -61,6 +61,51 @@ S.SalesIntegrity = {
   // the floor. Relative, so it holds on a $400 night and a $40,000 one.
   MIN_SALES_SHARE: 0.25,
   MIN_TEAM: 3,     // no floor to stand out from below this many scored servers
+
+  /* ⚠ "NOTHING FLAGGED" AND "NOTHING COULD BE FLAGGED" ARE NOT THE SAME SENTENCE, and on a
+     loss-prevention screen printing the first when the second is true is the worst kind of wrong:
+     it reads as an all-clear. Returns why this review could not reach a verdict, or null if it
+     genuinely could have and the crew is clean.
+
+     ⚠ ONE ANSWER, SHARED BY THE SCREEN AND THE PDF. A first pass put the team-size caveat on the
+     screen only, and the exported document — the one that gets handed to an owner or a partner —
+     kept printing "Servers reviewed: 2 / Flagged: 0" with nothing beside it. Same lie, worse
+     artefact. Both callers ask this function now.
+
+     TWO WAYS TO REACH NO-VERDICT, and the first pass only covered one:
+       team    — every signal compares a server against the team, so under MIN_TEAM scored servers
+                 nothing can trip. A two-bartender bar was permanently green.
+       signals — severity needs TWO flags (see analyze), so with fewer than two live signal columns
+                 nobody can ever be flagged however bad their numbers are. A file of Server + Net
+                 Sales is exactly what the empty state invites, and it always read all-clear. */
+  _noVerdictReason(review) {
+    const scored = (review && review.summary && review.summary.reviewed) || 0;
+    if (scored < this.MIN_TEAM) {
+      return {
+        reason: 'team',
+        title: 'Not enough servers in this file to compare.',
+        detail: 'Every signal here works by comparing one server against the rest of the team, so Bar Cop needs at least '
+          + this.MIN_TEAM + ' servers with usable numbers in the same report before it can call anyone an outlier. This file scored '
+          + scored + '. That is not an all-clear, it just means there is no floor to stand out from yet.'
+      };
+    }
+    const live = new Set();
+    ((review && review.servers) || []).forEach(s => {
+      const m = (s && s.metrics) || {};
+      Object.keys(m).forEach(k => { if (m[k] != null) live.add(k); });
+    });
+    if (live.size < 2) {
+      return {
+        reason: 'signals',
+        title: 'Not enough columns in this file to reach a verdict.',
+        detail: 'Bar Cop only names a server when at least two separate signals line up, and this file carried '
+          + (live.size === 1 ? 'only one signal Bar Cop can read' : 'no signals Bar Cop can read')
+          + '. Map more columns — voids, comps, no-sale opens, refunds, cash and card split — and re-run it. '
+          + 'That is not an all-clear, it just means there was not enough here to judge anyone on.'
+      };
+    }
+    return null;
+  },
   MIN_EVENTS: 2,   // captured shorts/walkouts below this are the cost of doing business
 
   // Six-step investigation a Sales Integrity flag opens in Loss Prevention. Server
@@ -452,14 +497,10 @@ S.SalesIntegrity = {
        under MIN_TEAM scored servers NOTHING can ever trip — a two-bartender bar was permanently
        green no matter what the numbers said. Same when the file scored nobody at all. Say which
        one happened. */
-    // `summary.reviewed` is `scored.length` — the servers that actually qualified and were
-    // compared. That is the number the MIN_TEAM floor is applied to, so it is the one to test.
-    const scoredN = (review.summary && review.summary.reviewed) || 0;
-    if (!flagged.length && scoredN < this.MIN_TEAM) {
-      inner = '<div style="font-size:13px;color:var(--t1);font-weight:700;">Not enough servers in this file to compare.</div>'
-        + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">Every signal here works by comparing one server against the rest of the team, so Bar Cop needs at least '
-        + this.MIN_TEAM + ' servers with usable numbers in the same report before it can call anyone an outlier. This file scored '
-        + scoredN + '. That is not an all-clear, it just means there is no floor to stand out from yet.</div>';
+    const noVerdict = this._noVerdictReason(review);
+    if (!flagged.length && noVerdict) {
+      inner = '<div style="font-size:13px;color:var(--t1);font-weight:700;">' + esc(noVerdict.title) + '</div>'
+        + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">' + esc(noVerdict.detail) + '</div>';
     } else if (!flagged.length) {
       inner = '<div style="font-size:13px;color:var(--green);font-weight:700;">No servers flagged in this report.</div>'
         + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">Every server\'s numbers track the floor. Run this each shift or week and the outliers surface on their own.</div>';
@@ -580,6 +621,12 @@ S.SalesIntegrity = {
       ['High risk', String(review.summary.high)],
       ['Estimated exposure', review.summary.exposure > 0 ? '$' + Number(review.summary.exposure).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-']
     ], { columnStyles: { 1: { halign: 'right' } } });
+    // ⚠ THE SAME CAVEAT THE SCREEN SHOWS. Without it this document printed "Flagged: 0" beside a
+    // review that could never have flagged anyone, and it is the artefact that leaves the building.
+    {
+      const nv = this._noVerdictReason(review);
+      if (nv && !review.summary.flagged) b.paragraph(nv.title + ' ' + nv.detail);
+    }
     (review.servers || []).filter(x => x.severity !== 'clean').forEach(x => {
       b.sectionTitle(x.name + '  (' + (x.severity === 'high' ? 'High Risk' : 'Watch') + (x.exposure > 0 ? ', ' + App.fmtCurrency(x.exposure) + ' exposure' : '') + ')');
       b.table(['Pattern', 'Detail'], (x.flags || []).map(f => [f.label, f.detail]));
