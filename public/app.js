@@ -4205,6 +4205,42 @@ const App = {
     return (c.methods && c.methods[lc]) || 'count';
   },
 
+  /* ── THE ONE NUMERIC COERCION for operator-supplied text ──────────────────────────────────
+     Every import and every typed cell that has to become a number comes through here.
+
+     ⚠ WHY IT EXISTS: seven screens each rolled their own, and they disagreed on SIGN — which is
+     money. A card export's refund row reads "(125.00)" or "125.00-", and six of the seven returned
+     +125, so hub-operating-expenses booked a $125 CREDIT as a $125 EXPENSE. The same file's
+     "-125.00" rows parsed to -125 and were silently dropped by that same guard: one file, two
+     opposite wrong answers, $250 apart.
+
+     RETURNS A NUMBER, OR null WHEN THERE IS NO NUMBER TO READ. null is not 0 — that is the same
+     distinction as an uncosted item versus an item costing zero, and conflating them is what once
+     made an unpriced dish read as the best margin on the menu. The CALLER decides what "no number"
+     means for its own field (`?? 0`, or skip the row).
+
+     ⚠ WHAT IT DELIBERATELY DOES NOT DO. It does not read European decimal commas ("1 234,50" is
+     123450), does not parse scientific notation ("1e3" is 13), and does not unpick a cell holding
+     two numbers ("2 for $10" is 210). All eight previous implementations already behaved exactly
+     this way, so nothing that was right has moved; each needs a product decision and is tracked
+     separately. verify-parse-num.js PINS these so a later fix has to come here on purpose. */
+  parseNum(v) {
+    if (v == null) return null;
+    const s = String(v).trim();
+    if (!s) return null;
+    // Sign is read BEFORE stripping, from the three shapes accounting software actually emits:
+    // wrapped in parentheses, a leading minus, or a trailing minus.
+    const t = s.replace(/[^0-9.,()\-]/g, '');
+    // An INTERIOR minus is a range or a code ("4-6", "10-12"), not a value. The old implementations
+    // split 3-to-5 on it and fabricated either 46 or 4. Refusing is the honest answer; the caller's
+    // own default then applies.
+    if (/\d\s*-\s*\d/.test(t)) return null;
+    const neg = /^\(.*\)$/.test(t) || /^-/.test(t) || /-$/.test(t);
+    const n = parseFloat(s.replace(/[^0-9.]/g, ''));
+    if (isNaN(n)) return null;
+    return neg ? -n : n;
+  },
+
   // Canonical vendor discrepancy types. Used by vendor-discrepancy.js and
   // ic-receive-delivery.js flag-per-line flow so the type list stays unified.
   VENDOR_DISCREPANCY_TYPES: ['Price Overcharge', 'Short Count', 'Substitution', 'Damaged Goods', 'Other'],
