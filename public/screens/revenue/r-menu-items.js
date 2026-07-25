@@ -1403,20 +1403,22 @@ S.RevenueMenuItems = {
         // it. Only overwrite a field the file actually carries, so a partial export
         // (e.g. no cost column) never wipes a good cost/price already on file.
         if (price > 0) {
-          if (price !== cur.price) {
-            // First row wins the "from": that is the only price that was ever actually live.
-            if (!repriced.has(cur.id)) repriced.set(cur.id, { item: cur, from: cur.price });
-            // A price the file moves is a real reprice, same as a direct edit: the new
-            // live price supersedes any planned one. Left on the item, a stale plan
-            // makes Menu Engineering show a negative delta and its Mark Live button
-            // CUT the price, on a screen whose whole contract is raise-only.
-            cur.planned_price = null; cur.planned_vol_pct = null; cur.planned_at = null;
-          }
+          // First row wins the "from": that is the only price that was ever actually live.
+          if (price !== cur.price && !repriced.has(cur.id)) repriced.set(cur.id, { item: cur, from: cur.price });
           cur.price = price;
         }
         if (cost > 0)   cur.cost = cost;
         if (covers > 0) cur.weekly_covers = covers;
         if (cat)        cur.category = cat;
+        // ⚠ STAMP THE TYPE. The insert branch below sets it from the tile; this branch never did,
+        // and legacy and seeded items carry NO type at all — so menuTypeOf falls back to inferring
+        // from the category, and a cocktail list uploaded with its own sections ("Happy Hour",
+        // "Frozen", both shipped builtins that the help copy invites) turned every seeded cocktail
+        // into a DISH: it left the Cocktails tab, its comparison basis moved from the one cocktail
+        // pool to plate|Happy Hour, its cost target flipped 22% to 32%, and the next re-drop of
+        // the same file duplicated the whole drink menu. The match key already proved the types
+        // agree, so writing it is a no-op in meaning and a fix in effect.
+        cur.type = this.activeType;
         cur.updated_at = new Date().toISOString();
         updatedIds.add(cur.id);
       } else {
@@ -1443,6 +1445,17 @@ S.RevenueMenuItems = {
         addedIds.add(it.id);
       }
     });
+    /* ⚠ A PENDING MENU ENGINEERING PLAN IS CLEARED ON THE NET MOVE, NOT PER ROW.
+       A live price the file supersedes must drop its planned reprice — left on the item, a stale
+       plan makes Menu Engineering show a negative delta and its Mark Live button CUT the price, on
+       a screen whose whole contract is raise-only. But this used to run inside the row loop, so a
+       file naming one item on two rows at two prices (a daypart-split POS export) destroyed the
+       plan even when the price ended up exactly where it started. Nothing on screen said so. The
+       log already asked the net question; this now asks the same one, so the two cannot disagree. */
+    for (const rp of repriced.values()) {
+      if (rp.item.price === rp.from) continue;   // moved and moved back — the plan is still valid
+      rp.item.planned_price = null; rp.item.planned_vol_pct = null; rp.item.planned_at = null;
+    }
     // An item created by an earlier row and touched again by a later one was CREATED, not
     // refreshed — counting it in both is how one item became "1 new and 1 existing".
     const added = addedIds.size;
