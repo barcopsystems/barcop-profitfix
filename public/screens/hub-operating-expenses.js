@@ -549,18 +549,40 @@ S.HubOperatingExpenses = {
     });
   },
 
+  /* ⚠ AN UNREADABLE DATE MUST COME BACK EMPTY SO THE ROW IS SKIPPED AND COUNTED, never stored.
+     Two shapes got through and produced rows that "imported successfully" and then existed in a
+     month no view can open — invisible in This Month and Year to Date, but counted in History's
+     all-time total, so two figures on the same screen disagreed:
+       - a bare integer: `new Date("45845")` is year 45845, and an Excel date column whose format
+         was reset to General exports exactly that serial (raw:false hands the text straight over);
+       - an impossible ISO date: the fast path returned "2026-13-45" untouched. */
   _normDate(s) {
     if (!s) return '';
     const str = String(s).trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) {
+      const y = +iso[1], m = +iso[2], dd = +iso[3];
+      const probe = new Date(y, m - 1, dd);
+      const real = probe.getFullYear() === y && probe.getMonth() === m - 1 && probe.getDate() === dd;
+      return real ? str : '';
+    }
+    if (/^\d+$/.test(str)) return '';   // a bare number is a spreadsheet serial, not a date
     const d = new Date(str);
     return isNaN(d.getTime()) ? '' : App.ymdLocal(d);
   },
 
+  // ⚠ MATCHES THE OPERATOR'S OWN LIST TOO, not just the nine builtins. The manual Category field is
+  // built from App.listOptions('expense_category') and invites them to add their own — so a file
+  // whose column said "Waste Removal" was silently rewritten to "Other" on import while typing the
+  // same word by hand kept it. Worse, "Other" is a value listOptions deliberately strips, so they
+  // could not even select it back afterwards.
   _matchCat(s) {
     if (!s) return '';
     const t = String(s).toLowerCase().trim();
-    return this.CATEGORIES.find(c => c.toLowerCase() === t) || '';
+    const hit = this.CATEGORIES.find(c => c.toLowerCase() === t);
+    if (hit) return hit;
+    const own = (App.listOptions ? App.listOptions('expense_category') : []) || [];
+    return own.find(c => String(c).toLowerCase() === t) || '';
   },
 
   async _importRows(rows) {
@@ -595,6 +617,14 @@ S.HubOperatingExpenses = {
     // itself — take them back out rather than showing an import Books counts and the server lacks.
     const saved = await App.putRecordsBulk('core', 'operating_expense', this.records());
     if (!saved) App.dropRows(arr, _added);
+    this._entryMode = 'manual';
+    /* ⚠ THE GUARD COMES BEFORE THE MESSAGE, NOT AFTER IT. Placed after, it stopped the repaint but
+       left `_importMsg` banked — and nothing else consumes it, so the next time the operator opened
+       Operating Expenses, days later, it greeted them with "1 expense imported." about an import
+       they had already navigated away from. The failure text was worse: an unprompted "Could not
+       save the import. Nothing was changed" on a page they just opened. If nobody is on the screen
+       there is nobody to tell; a failed write already raises its own alert at the time. */
+    if (!this._catchUpStillCurrent()) return;
     // Say what happened, including what was NOT taken and why.
     if (!saved) {
       this._importMsg = 'Could not save the import. Nothing was changed — check your connection and try again.';
@@ -608,12 +638,6 @@ S.HubOperatingExpenses = {
       if (dupes > 0) bits.push(dupes + ' already logged');
       this._importMsg = bits.join(' · ') + '.';
     }
-    this._entryMode = 'manual';
-    // ⚠ The operator can navigate away during the bulk write, and the Hub content host is
-    // PERMANENT — so isConnected cannot answer "is this page still on screen". Without the mount
-    // token this repainted Operating Expenses, banner and all, over Permits or Books. The
-    // catch-up pass in this same file already guards exactly this way.
-    if (!this._catchUpStillCurrent()) return;
     this.renderMain();
   },
 

@@ -118,9 +118,16 @@ S.SalesIntegrity = {
       // Refund signals could never fire at all: a server voiding 12% of their sales raised nothing
       // and the screen reported 0 flagged. Going dark on a loss-prevention screen is worse than
       // misfiring, because it reads as "all clear".
-      // The four loss/count columns this file actually accumulates. Counts belong here too: a
-      // "(3)" void count is three voids, not minus three.
-      const LOSS = { voids: 1, comps: 1, refunds: 1, void_count: 1 };
+      // The loss columns. Counts belong here as much as dollars: a "(3)" is three events, not
+      // minus three.
+      // ⚠ `no_sales` WAS MISSING FROM THE FIRST VERSION OF THIS MAP, and it is the one that hurt
+      // most — weight 3, `strong: true`, and its materiality test reads the RAW COUNT
+      // (`s.raw.no_sales`), so a negative could never clear the floor. On the classic drawer-skim
+      // profile (no-sale opens plus an odd cash mix) losing it drops the server under the two-flag
+      // rule and the card reads "No servers flagged", on exactly the Excel-resaved file this whole
+      // change was written for. `void_count` is accumulated but no metric reads it yet; it stays
+      // here so it is already right the day one does.
+      const LOSS = { voids: 1, comps: 1, refunds: 1, no_sales: 1, void_count: 1 };
       const add = (field, raw, col) => {
         let n = this.num(raw);
         if (n == null) return;
@@ -439,7 +446,21 @@ S.SalesIntegrity = {
     const footer = footerInner ? '<div style="border-top:1px solid var(--b2);margin-top:4px;padding-top:14px;">' + footerInner + '</div>' : '';
 
     let inner;
-    if (!flagged.length) {
+    /* ⚠ "NOTHING FLAGGED" AND "NOTHING COULD BE FLAGGED" ARE NOT THE SAME SENTENCE, and on a
+       loss-prevention screen printing the first when the second is true is the worst kind of
+       wrong: it reads as an all-clear. Every signal here compares a server against the team, so
+       under MIN_TEAM scored servers NOTHING can ever trip — a two-bartender bar was permanently
+       green no matter what the numbers said. Same when the file scored nobody at all. Say which
+       one happened. */
+    // `summary.reviewed` is `scored.length` — the servers that actually qualified and were
+    // compared. That is the number the MIN_TEAM floor is applied to, so it is the one to test.
+    const scoredN = (review.summary && review.summary.reviewed) || 0;
+    if (!flagged.length && scoredN < this.MIN_TEAM) {
+      inner = '<div style="font-size:13px;color:var(--t1);font-weight:700;">Not enough servers in this file to compare.</div>'
+        + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">Every signal here works by comparing one server against the rest of the team, so Bar Cop needs at least '
+        + this.MIN_TEAM + ' servers with usable numbers in the same report before it can call anyone an outlier. This file scored '
+        + scoredN + '. That is not an all-clear, it just means there is no floor to stand out from yet.</div>';
+    } else if (!flagged.length) {
       inner = '<div style="font-size:13px;color:var(--green);font-weight:700;">No servers flagged in this report.</div>'
         + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">Every server\'s numbers track the floor. Run this each shift or week and the outliers surface on their own.</div>';
     } else {
