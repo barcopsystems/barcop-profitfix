@@ -381,7 +381,7 @@ S.ShiftWaste = {
         this.renderList();
         return;
       }
-      if (ev.target.closest('#wl-export')) { App.exportPDF({ title: 'Waste / Spill Log', root: this.container }); return; }
+      if (ev.target.closest('#wl-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Waste / Spill Log', root: this.container, lists: [['sc', 'waste']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#wl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#wlb-add')) { this.addLine(); return; }
       if (ev.target.closest('#wlb-save')) { this.saveBatch(); return; }

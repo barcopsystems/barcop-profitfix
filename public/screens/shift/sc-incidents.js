@@ -222,7 +222,7 @@ S.ShiftIncidents = {
         this.renderList();
         return;
       }
-      if (ev.target.closest('#in-export')) { App.exportPDF({ title: 'Incident Log', root: this.container, footer: 'A record-keeping aid, not legal advice. Verify details before relying on this document.' }); return; }
+      if (ev.target.closest('#in-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Incident Log', root: this.container, footer: 'A record-keeping aid, not legal advice. Verify details before relying on this document.', lists: [['sc', 'incident']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#in-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#in-save')) { this.saveNew(); return; }
       if (ev.target.closest('#in-startover')) { this.startOver(); return; }

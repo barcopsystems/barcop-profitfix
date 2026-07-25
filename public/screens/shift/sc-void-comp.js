@@ -299,7 +299,7 @@ S.ShiftVoidComp = {
         this.renderList();
         return;
       }
-      if (ev.target.closest('#vc-export')) { App.exportPDF({ title: 'Void and Comp Log', root: this.container }); return; }
+      if (ev.target.closest('#vc-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Void and Comp Log', root: this.container, lists: [['sc', 'void_comp']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#vc-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#vcb-add')) { this.addLine(); return; }
       if (ev.target.closest('#vcb-save')) { this.saveBatch(); return; }

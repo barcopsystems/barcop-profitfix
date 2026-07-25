@@ -188,7 +188,7 @@ S.ShiftWalkedTabs = {
         this.renderList();
         return;
       }
-      if (ev.target.closest('#wt-export')) { App.exportPDF({ title: 'Walked Tabs', root: this.container }); return; }
+      if (ev.target.closest('#wt-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Walked Tabs', root: this.container, lists: [['sc', 'walked_tab']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#wt-save')) { this.save(); return; }
       if (ev.target.closest('#wt-startover')) { this.startOver(); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }

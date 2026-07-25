@@ -92,7 +92,7 @@ S.ShiftCashHistory = {
         this.draw();
         return;
       }
-      if (ev.target.closest('#ch-export')) { App.exportPDF({ title: 'Cash History', root: this.container }); return; }
+      if (ev.target.closest('#ch-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Cash History', root: this.container, lists: [['sc', 'cash_drop'], ['sc', 'safe_log'], ['sc', 'variance']], reRender: () => this.draw(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#ch-go-board')) { App.navigate('sc-cash-control'); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.draw()); return; }
     };

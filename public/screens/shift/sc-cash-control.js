@@ -338,7 +338,7 @@ S.ShiftCashControl = {
       + App.showOlderBar('sc', 'cash_activity', stream, this.filterPreset !== 'all') + '</div>';
     App.applyCollapsed(this.container);
 
-    document.getElementById('cc-export')?.addEventListener('click', () => App.exportPDF({ title: 'Cash Control', root: this.container }));
+    document.getElementById('cc-export')?.addEventListener('click', () => { const r = this.effectiveRange(); App.exportListPDF({ title: 'Cash Control', root: this.container, lists: [['sc', 'cash_activity']], reRender: () => this.draw(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); });
     document.getElementById('cc-f-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.draw(); });
     document.getElementById('cc-f-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.draw(); });
     document.getElementById('cc-deposit')?.addEventListener('click', () => this.openSafeMove('Bank Deposit'));

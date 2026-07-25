@@ -216,7 +216,7 @@ S.ShiftMaintenance = {
         this.renderList();
         return;
       }
-      if (ev.target.closest('#mt-export')) { App.exportPDF({ title: 'Maintenance Log', root: this.container }); return; }
+      if (ev.target.closest('#mt-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Maintenance Log', root: this.container, lists: [['sc', 'maintenance']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#mt-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#mt-save')) { this.saveNew(); return; }
       if (ev.target.closest('#mt-startover')) { this.startOver(); return; }

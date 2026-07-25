@@ -248,7 +248,7 @@ S.ShiftChecklists = {
         this.renderMain();
         return;
       }
-      if (ev.target.closest('#cl-export')) { App.exportPDF({ title: this.TYPE + ' Checklists', root: this.container }); return; }
+      if (ev.target.closest('#cl-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: this.TYPE + ' Checklists', root: this.container, lists: [['sc', 'checklist']], reRender: () => this.renderMain(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
       const hrow = ev.target.closest('.cl-hrow');
       const hview = ev.target.closest('.cl-hview');
