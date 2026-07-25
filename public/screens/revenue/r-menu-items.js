@@ -49,19 +49,14 @@ S.RevenueMenuItems = {
   prepBatches() { return (App.prepBatches && App.prepBatches()) || []; },
   batchById(id) { return this.prepBatches().find(b => b.id === id) || null; },
 
-  // Classify an existing menu item into the right tab/form type.
-  // Used by edit routing and tab filtering.
-  classifyItem(item) {
-    if (!item) return 'plate';
-    // Explicit type is the source of truth (set on save). Category is now a free-
-    // form menu section and no longer implies the item's kind. Fall back to the
-    // legacy signals for older items saved before the type field existed.
-    if (item.type === 'plate' || item.type === 'cocktail' || item.type === 'inventory') return item.type;
-    if (item.linked_product_id) return 'inventory';
-    if (item.recipe && item.recipe.mode === 'single') return 'cocktail';
-    if (item.category === 'Cocktails') return 'cocktail';
-    return 'plate';
-  },
+  // Classify an existing menu item into the right tab/form type. Used by edit routing, tab
+  // filtering, and (through App.ensureMenuCatLists) which type's section list an item's category
+  // migrates into.
+  // ⚠ THIS WAS A VERBATIM SECOND COPY OF App.menuTypeOf and is now a delegate. They must agree:
+  // if they ever disagreed, an item would sit on the Cocktails tab while its section was written
+  // into the Dish list, and the operator would edit a cocktail whose own section was not offered.
+  // One implementation, mirrored on the server, held by verify-menu-grouping-tieout.js.
+  classifyItem(item) { return App.menuTypeOf(item); },
 
   // ── Ingredient picker helpers (shared by Plate + Cocktail forms) ─────
   ingredientOptions(selKey, mode) {
@@ -259,10 +254,11 @@ S.RevenueMenuItems = {
     App.showHelpModal('How Menu Builder Works', [
       { p: ['This is the one place you build and price your menu. Everything Bar Cop knows about an item, its price, cost, recipe and weekly units sold, lives here, and Menu Engineering, Dog Test, and Recipe Summary all read from it.'] },
       { h: 'Adding an Item', p: ['Start from the tile for the kind of item you are adding. Dishes and Cocktails get a recipe builder, so add ingredients and the cost computes itself, or skip the recipe and type a flat cost. No Prep items link straight to an Inventory Control product, and the cost and menu price both auto-fill from that product (the price stays yours to change). A poured product like draft beer or wine by the glass carries a Pour Size; a food or resale item carries a Portion; bottle beer sells whole. Enter units sold so Menu Engineering can weight the item by how often it sells.'] },
-      { h: 'Menu Categories Are Your Sections', p: ['The Category on each item is the section it sits in on your menu, and the list is yours to shape. Tap Edit next to Category to add your own sections (Happy Hour, Brunch, Featured), rename by adding and hiding, or reset to the defaults. Any item type can go in any section, so a Happy Hour section can hold a cocktail, a dish, and a beer together. Your sections show up as real grouped sections on this page and in the rest of the Menu tools. On a No Prep item, beer, wine, and NA beverages land in their obvious section on their own; anything else you pick.'] },
-      { h: 'Importing', p: ['Switch the form to Import File to drop a spreadsheet of your whole menu at once. You map the columns, then items come in without recipes; edit any item afterward to build its recipe or link a product.'] },
+      { h: 'Menu Categories Are Your Sections', p: ['The Category on each item is the section it sits in on your menu, and every tab keeps its own list. Dishes get Appetizers, Entrees, Sides, Desserts and Specials; Cocktails get Cocktails, Happy Hour, Frozen and Specials; No Prep gets Beer, Wine, NA Beverages and Snacks. Tap Edit next to Category to add your own sections to that tab, hide the ones you do not run, or reset to the defaults. Because the lists are separate, the Dish form never offers you Cocktails, and a Frozen section on your drink menu does not turn up on your food menu. On a No Prep item, beer, wine, and NA beverages land in their obvious section on their own; anything else you pick.'] },
+      { h: 'How Sections Affect Your Numbers', p: ['Sections are how your menu is laid out, not how Bar Cop judges an item. Dishes and No Prep items are compared inside their own section, because an appetizer is not an entree and a six dollar beer is not a sixty dollar bottle of wine. Cocktails are compared against every other cocktail no matter which section you file them under, because a frozen margarita and a house old fashioned earn their money the same way. So you can lay your drink menu out however you like without changing a single ranking.'] },
+      { h: 'Importing', p: ['Switch the form to Import File to drop a spreadsheet of your whole menu at once. You map the columns, then items come in without recipes; edit any item afterward to build its recipe or link a product. Any new section your file carries joins that tab\'s list, so your own sections are in the dropdown straight away. A section you have hidden stays hidden.'] },
       { h: 'Incomplete Items', p: ['An item missing a price or a cost shows as Incomplete and is left out of Menu Engineering until you finish it. The banner at the top counts how many are still open. Editing a price here also logs a pricing change so the Pricing Review Log in Menu Engineering picks it up.'] },
-      { h: 'Archived Items', p: ['An item you cut from the Dog Test lands in an Archived list at the bottom of the page, kept out of the menu and out of Menu Engineering but not deleted. Restore brings one back onto the live menu with everything intact; Delete Permanently removes it for good after a confirm. You can only get here by cutting an item, so nothing archives by accident.'] }
+      { h: 'Inactive Items', p: ['Pulling an item off the menu does not mean deleting it. Edit any item and use Make Inactive to retire a seasonal dish or a summer cocktail, and it moves to the Inactive tab, out of the live menu and out of Menu Engineering but with its recipe, price and history intact. Cutting an item from the Dog Test puts it in the same place. Make Active brings one straight back; Delete Permanently removes it for good after a confirm.'] }
     ]);
   },
 
@@ -271,10 +267,10 @@ S.RevenueMenuItems = {
     this.container = container;
     this.actions = actions;
     if (actions) actions.innerHTML = '';
-    // Register the menu-section builtins up front so the section-first list can
-    // order by App.listOptions('menu_category') before the editor form (which
-    // otherwise registers them on first render) has ever been opened.
-    App._listBuiltins.menu_category = App._listBuiltins.menu_category || App.MENU_ALL_CATEGORIES;
+    // Register the per-type section builtins and split the old single list, up front, so the
+    // grouped list can order by this tab's own sections before the editor form has ever opened.
+    // Idempotent and gated on the data being loaded — see App.ensureMenuCatLists.
+    App.ensureMenuCatLists();
     this.renderLanding();
     // External focus (e.g. from Recipe Cost Analysis): open the editor modal in
     // place over the landing — no full-screen swap, works the same from any door.
@@ -337,8 +333,15 @@ S.RevenueMenuItems = {
     // A first pass hand-rolled inline styles here and rendered CHIPS instead of tabs, which broke
     // [[color-system-locked]] and made two screens with the same job look unrelated. The count is
     // a dimmed span and is omitted at zero, matching Add Products exactly.
+    // ⚠ TWO CLASSES, DELIBERATELY. `ch-tab` is the shared component (styling); `mi-tab` is this
+    // screen's wiring hook. They shipped MISMATCHED — the markup said ch-tab and wireLanding
+    // queried .mi-tab, which matched no element in the document, so every tab was dead on click
+    // and activeTab was pinned to Dishes forever. Cocktails, No Prep and the entire Inactive tab
+    // (the only place Make Active / Delete Permanently render) were unreachable.
+    // The harness passed because it asserted the two spellings SEPARATELY and never that they
+    // agree — a node test cannot click, so nothing else could have caught it.
     const tabsBlock = '<div class="ch-tabs no-print">'
-      + tabDefs.map(t => '<button class="ch-tab' + (t.key === this.activeTab ? ' on' : '')
+      + tabDefs.map(t => '<button class="ch-tab mi-tab' + (t.key === this.activeTab ? ' on' : '')
         + '" data-tab="' + esc(t.key) + '">' + esc(t.label)
         + (t.n ? ' <span style="opacity:0.55;">' + t.n + '</span>' : '') + '</button>').join('')
       + '</div>';
@@ -346,7 +349,7 @@ S.RevenueMenuItems = {
     // The visible list is this tab's items only. Inactive gets its own view below.
     const tabItems = onInactive ? [] : all.filter(i => this.classifyItem(i) === this.activeTab);
     const lower = this._importOpen ? this.importPanelHTML()
-      : (onInactive ? '' : this.listHTML(tabItems));
+      : (onInactive ? '' : this.listHTML(tabItems, this.activeTab));
 
     // Inactive items (a seasonal item made inactive here, or cut from a Dog Test), across all
     // types. Shown ONLY on its own tab now — it used to sit at the bottom of every page.
@@ -376,19 +379,38 @@ S.RevenueMenuItems = {
     this.wireLanding();
   },
 
-  // Every live item, grouped into the operator's menu SECTIONS (categories), any
-  // item type mixing freely inside a section. Section order follows the custom
-  // menu_category list; leftover categories fall to the end, Uncategorized last.
-  listHTML(all) {
+  // This tab's items, grouped into the operator's menu SECTIONS. Section order follows THIS
+  // TYPE's own section list (B2 step 3) — the tab is one type, so ordering by the shared list
+  // would sort a dish page by cocktail sections. Leftovers fall to the end, Uncategorized last.
+  listHTML(all, type) {
     if (!all.length) {
       return '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No menu items yet. Use a <strong>+ Add</strong> tile above, or Upload to bring your menu in at once.</div></div>';
     }
     const incompleteN = all.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
-    const order = App.listOptions('menu_category');
-    const present = [...new Set(all.map(i => i.category || 'Uncategorized'))];
-    const ordered = order.filter(c => present.includes(c))
-      .concat(present.filter(c => !order.includes(c) && c !== 'Uncategorized').sort())
-      .concat(present.includes('Uncategorized') ? ['Uncategorized'] : []);
+    const order = App.menuCatOptions(type || this.activeTab);
+    // ⚠ CASE-INSENSITIVE, the way the list itself dedupes (listOptions and absorbMenuCats both
+    // compare lowercased). Matching exactly split ONE section into TWO headings whenever a POS
+    // export cased a category differently — "Appetizers" and "appetizers" rendered as separate
+    // tables while the dropdown, correctly, offered only one. The heading uses the spelling from
+    // the operator's own list so the page and the picker read the same.
+    const lc = c => String(c == null ? '' : c).toLowerCase();
+    // ⚠ Object.create(null), not {}. Membership is tested with `in`, so on a plain object a
+    // section named `constructor` / `toString` / `valueOf` / `__proto__` is inherited from the
+    // prototype, never registers, and its items VANISH from the page while still counting in the
+    // incomplete banner and still being caught by Select All. Same failure as the case-mismatch
+    // bug — a row you cannot see, deletable — and free to close.
+    const present = Object.create(null);       // lowercase -> the spelling to display
+    all.forEach(i => { const c = i.category || 'Uncategorized'; if (!(lc(c) in present)) present[lc(c)] = c; });
+    // ⚠ 'uncategorized' IS EXCLUDED FROM THE FIRST TERM TOO. It is pinned to the end by the third
+    // term, so if it ever reached the operator's section list it appeared in BOTH — two identical
+    // headings, and (the row filter being case-insensitive) the same items rendered under each.
+    // Three items came out as five rows, and the incomplete banner then disagreed with the page.
+    // A POS export whose Category column literally says "Uncategorized" is how it got in.
+    const ordered = order.filter(c => lc(c) !== 'uncategorized' && lc(c) in present)
+      .concat(Object.keys(present)
+        .filter(k => k !== 'uncategorized' && !order.some(c => lc(c) === k))
+        .sort().map(k => present[k]))
+      .concat('uncategorized' in present ? [present.uncategorized] : []);
     const warn = incompleteN > 0
       ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin:16px 0;font-size:12px;color:var(--t1);">'
         + incompleteN + ' item' + (incompleteN > 1 ? 's' : '') + ' missing price or cost. Incomplete items are left out of Menu Engineering until you finish them.</div>'
@@ -403,7 +425,12 @@ S.RevenueMenuItems = {
       + '</div>';
     let ci = 0;
     const sections = ordered.map(cat => {
-      const items = all.filter(i => (i.category || 'Uncategorized') === cat)
+      // ⚠ MUST MATCH `ordered` — both case-insensitive. Making the ORDER case-insensitive while
+      // leaving this exact meant a differently-cased item belonged to no section at all: its
+      // section returned zero rows, rendered '', and the item VANISHED from the page while still
+      // counting in the incomplete banner and still being picked up by Select All. A row you
+      // cannot see must never be deletable.
+      const items = all.filter(i => lc(i.category || 'Uncategorized') === lc(cat))
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (!items.length) return '';
       const rows = items.map(item => this._itemRowHTML(item)).join('');
@@ -492,9 +519,13 @@ S.RevenueMenuItems = {
       el.addEventListener('click', () => this.openEditor(null, { type: el.dataset.type })));
     this.container.querySelectorAll('.mi-card-imp').forEach(el =>
       el.addEventListener('click', () => this.openImport(el.dataset.type)));
-    // Select All / Clear + per-row checkboxes + bulk delete (every live item).
+    // Select All / Clear + per-row checkboxes + bulk delete.
+    // ⚠ SCOPED TO THE VISIBLE TAB. It used to take every live item of every type, which was right
+    // when the list showed the whole menu and became destructive the moment it did not: on the
+    // Dishes tab with 36 rows on screen the button read "Delete 64 Selected" and wiped every
+    // cocktail and beer too. Select All must never select a row the operator cannot see.
     this.container.querySelectorAll('.mi-sel-all').forEach(b => b.addEventListener('click', () => {
-      const rows = this.items().filter(i => !i.archived);
+      const rows = this.items().filter(i => !i.archived && this.classifyItem(i) === this.activeTab);
       this._selected = new Set(rows.map(i => i.id));
       this.renderLanding();
     }));
@@ -561,7 +592,13 @@ S.RevenueMenuItems = {
         this.renderLanding();
       }));
 
-    document.getElementById('mi-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu', root: document.getElementById('mi-list-export') }));
+    // The export root is the visible tab's list, so the title must name that tab. Titled plainly
+    // "Menu" it handed staff a document with no cocktails and no beer in it and nothing on the
+    // page said so.
+    document.getElementById('mi-export')?.addEventListener('click', () => {
+      const t = this.TYPES.find(x => x.key === this.activeTab);
+      App.exportPDF({ title: t ? 'Menu - ' + t.label : 'Menu', root: document.getElementById('mi-list-export') });
+    });
   },
 
   // ── Editor (ONE modal, form driven by the item TYPE) ─────────────────────
@@ -582,7 +619,16 @@ S.RevenueMenuItems = {
     // Type comes from the tile you clicked, NOT the category. Cocktails preset to
     // the Cocktails section; dishes and no-prep items let the operator pick a
     // section (no-prep also auto-fills one when a product is chosen).
-    this._presetCat = this._addType === 'cocktail' ? 'Cocktails' : '';
+    // ⚠ ONLY IF THE OPERATOR STILL HAS THAT SECTION. customSelect pushes the selected value in as
+    // an option, so presetting a "Cocktails" they deliberately removed silently resurrects it,
+    // preselects it on every new drink, and files the drink in a section its own tab cannot order.
+    // An operator who lays their drink menu out as Happy Hour / Frozen / Classics is entitled to
+    // have deleted it.
+    this._presetCat = '';
+    if (this._addType === 'cocktail'
+      && App.menuCatOptions('cocktail').some(c => c.toLowerCase() === 'cocktails')) {
+      this._presetCat = 'Cocktails';
+    }
     this._catAutoSet = '';   // the last section the No Prep picker auto-selected (never clobber a hand-picked one)
     this._pourAutoSet = '';  // the last pour size the No Prep picker auto-filled (same rule)
     this._priceAutoSet = ''; // the last menu price the No Prep picker auto-filled (same rule)
@@ -669,12 +715,16 @@ S.RevenueMenuItems = {
   // at once (openEditor removes the inline form first).
   formBodyHtml(item) {
     const selCat = item?.category || this._presetCat || '';
-    const scopeType = item ? this.classifyItem(item) : this._addType;
-    // Category is a free-form menu SECTION, shared across every item type and
-    // editable through the | Edit popup. It no longer implies the item's kind
-    // (that's the type, set by the tile), so it shows on all three forms.
-    const catCell = '<div class="f" style="flex:1.4 1 140px;"><label>Category' + App.manageListLink('menu_category') + '</label>'
-      + App.customSelect({ id: 'ri-cat', key: 'menu_category', builtin: App.MENU_ALL_CATEGORIES, selected: selCat, blank: true, blankLabel: 'Select category...' })
+    // The form is always opened for a known type (an item being edited, or the tile that was
+    // clicked). Fall back to the visible tab rather than to nothing, so the picker can never
+    // render off an undefined type and offer the wrong list.
+    const scopeType = (item ? this.classifyItem(item) : this._addType) || this.activeTab || 'plate';
+    // Category is the menu SECTION, and each TYPE now has its OWN list (B2 step 3): the Dish form
+    // no longer offers Cocktails, and a cocktail can sit in Happy Hour or Frozen. The section is
+    // still layout only — it does not imply the item's kind, and it does not move a ranking.
+    const catKey = App.menuCatListKey(scopeType);
+    const catCell = '<div class="f" style="flex:1.4 1 140px;"><label>Category' + App.manageListLink(catKey) + '</label>'
+      + App.customSelect({ id: 'ri-cat', key: catKey, builtin: App.menuCatBuiltins(scopeType), selected: selCat, blank: true, blankLabel: 'Select category...' })
       + '</div>';
     const nameSlot = '<div class="f" id="mi-name-slot" style="flex:1.5 1 140px;display:none;"></div>';
     const linkedSlot = '<div class="f" id="mi-linked-slot" style="width:185px;flex-shrink:0;display:none;"></div>';
@@ -900,8 +950,13 @@ S.RevenueMenuItems = {
       const catSel = document.getElementById('ri-cat');
       if (catSel && (catSel.value === '' || catSel.value === this._catAutoSet)) {
         const def = this._certainMenuSection(p);
-        catSel.value = def;
-        this._catAutoSet = def;
+        // ⚠ Only assign a section the select actually HOLDS. Setting .value to an option that is
+        // not there leaves the select at selectedIndex -1, which renders as an empty box rather
+        // than "Select category..." — and then Save refuses with no visible reason. Reached just
+        // by hiding Beer on the No Prep list, which the help copy invites you to do.
+        const has = !def || [...catSel.options].some(o => o.value === def);
+        catSel.value = has ? def : '';
+        this._catAutoSet = catSel.value;
       }
       recomputeCost();   // after the price is set, so the Cost % uses the current price
       this.refreshFieldMissing();
@@ -1103,7 +1158,12 @@ S.RevenueMenuItems = {
         computedCost = parseFloat(document.getElementById('ri-cost')?.value) || 0;
       }
     } else if (type === 'cocktail') {
-      category = document.getElementById('ri-cat')?.value || 'Cocktails';
+      // ⚠ NO SILENT DEFAULT. This used to fall back to 'Cocktails', so clearing the dropdown (or
+      // having it cleared for you — removing the selected section in the Edit popup deselects it
+      // on the open form) MOVED the drink to another section on Save with no message. Plate and
+      // No Prep both refuse; a cocktail must too.
+      category = document.getElementById('ri-cat')?.value || '';
+      if (!category) { fail('Category required.'); return; }
       const recipeIngs = (this.rows.length && this.mode)
         ? this.rows.filter(r => r.id && (parseFloat(r.quantity) || 0) > 0).map(r => ({ source: r.source, id: r.id, quantity: parseFloat(r.quantity) || 0 }))
         : [];
@@ -1164,8 +1224,25 @@ S.RevenueMenuItems = {
     // Setting the price directly here is a LIVE change, so a pending Menu
     // Engineering plan for this item is cleared (the new live price supersedes
     // it). A non-price edit carries the plan forward so it is not silently lost.
-    const priceChanged = existing && existing.price != null && existing.price !== price;
+    // The price MOVED (clears a pending plan) vs. this is a REAL REPRICE worth logging. They are
+    // not the same question, and conflating them wrote a price history for items that never had a
+    // price. ⚠ `!= null` never caught it: an item imported from a file with no price column is
+    // stored at 0, not null, and `0 != null` is true. Use the definition this screen already uses
+    // everywhere else for "has a price" — `> 0` — the same test missingFields and the incomplete
+    // banner run on. Otherwise typing an item's FIRST price logged "$0.00 to $16.00" into the
+    // Pricing Review Log, counted in Week Review's price-change stat, and ticked off Recovery's
+    // quarterly pricing step.
+    const priceMoved = !!existing && existing.price !== price;
+    const hadLivePrice = !!existing && parseFloat(existing.price) > 0;
+    const isReprice = hadLivePrice && priceMoved;
+    const priceChanged = priceMoved;
     const entry = {
+      // ⚠ SPREAD `existing` FIRST. This object used to be built purely from scratch, so any field
+      // written by another door and not listed below was silently ERASED on every save — and one
+      // was: `server_pitch`, the Pre-Shift talking point (12 of them ship in the seed). Changing a
+      // price on Menu Builder wiped the pitch out of the Brief and out of its PDF, with nothing on
+      // screen to say so. Listing the field would fix today; spreading fixes the next one too.
+      ...(existing || {}),
       id:                 existing?.id || App.uid(),
       type,
       name,
@@ -1207,7 +1284,10 @@ S.RevenueMenuItems = {
     // A direct price edit on an existing item is a real reprice: log it through
     // the one canonical pricing logger (no prediction — that is a Menu
     // Engineering reprice thing) so the Pricing Review Log and Recovery pick it up.
-    if (okSave && priceChanged) {
+    // isReprice, NOT priceChanged: setting an item's FIRST price is not a price change, and
+    // logging one put "$0.00 to $16.00" in front of the operator with the full menu price recorded
+    // as the margin impact.
+    if (okSave && isReprice) {
       await App.logPriceChange(entry, existing.price, price, { reason: 'Direct edit on Menu Builder', source: 'menu-items-edit' });
     }
     App.markSetupDone('gs_r_menu');
@@ -1255,9 +1335,53 @@ S.RevenueMenuItems = {
     const existing = this.items();
     const keyOf = (t, n) => String(t || '') + '|' + String(n || '').trim().toLowerCase();
     const byKey = {};
-    existing.forEach(it => { byKey[keyOf(it.type, it.name)] = it; });
-    let added = 0, updated = 0;
-    const repriced = [];
+    // ⚠ menuTypeOf, NOT the raw `type` field. Re-dropping an export is supposed to REFRESH the
+    // matching items, but legacy and seeded items carry no `type` at all, so their key was
+    // "|anchor burger" while the lookup below builds "plate|anchor burger". Nothing ever matched
+    // and a re-import duplicated the entire menu, which then double-counts in Menu Engineering.
+    existing.forEach(it => { byKey[keyOf(App.menuTypeOf(it), it.name)] = it; });
+    // ⚠ NORMALISE A CATEGORY'S CASE TO THE SPELLING THE OPERATOR'S LIST ALREADY USES. A POS export
+    // whose column reads "entrees" would otherwise be stored verbatim, and App.menuGroupKey matches
+    // exactly — so that item became its OWN comparison group of one and Menu Engineering called it
+    // both the best and the worst margin of its "bunch". Fixing it here rather than in menuGroupKey
+    // keeps the client/server comparison basis byte-identical, which is what holds the audit and
+    // the screen to the same Stars and the same Dogs.
+    // ⚠ knownCats GROWS AS THE FILE IS READ. Snapshotting it meant a file carrying both "brunch"
+    // and "Brunch" produced two categories and therefore two comparison groups, neither big enough
+    // to rank. The first spelling in the file wins for the rest of the file.
+    // ⚠ THE DICTIONARY IS WIDER THAN THE OFFERED LIST, ON PURPOSE. canonCat's job is to stop one
+    // section becoming two spellings, NOT to decide what is offered. Built from the live options
+    // PLUS the sections the operator has hidden PLUS the spellings already on this type's items —
+    // because removing a section pushes it into `hidden`, and without it here every later import
+    // minted a fresh casing variant that menuGroupKey (exact-match) then treated as its own
+    // comparison group of one, so Menu Engineering called each item best AND worst of its bunch.
+    const knownCats = App.menuCatOptions(this.activeType).slice();
+    const learn = v => {
+      v = String(v == null ? '' : v).trim();
+      if (v && !knownCats.some(k => k.toLowerCase() === v.toLowerCase())) knownCats.push(v);
+    };
+    (App.listConfig(App.menuCatListKey(this.activeType)).hidden || []).forEach(learn);
+    existing.forEach(it => { if (App.menuTypeOf(it) === this.activeType) learn(it.category); });
+    const canonCat = c => {
+      const v = String(c == null ? '' : c).trim();
+      if (!v) return '';
+      const hit = knownCats.find(k => k.toLowerCase() === v.toLowerCase());
+      if (hit) return hit;
+      knownCats.push(v);   // first spelling in the file wins for the rest of the file
+      return v;
+    };
+    // ⚠ COUNT ITEMS, NOT ROWS. A file can name the same item on several rows (a POS export split
+    // by daypart does it routinely), and counting rows made the summary lie in three ways: two
+    // rows for one new item read "Imported 1 new item and refreshed 1 existing", and three rows
+    // matching one retired item read "3 items are inactive".
+    const addedIds = new Set(), updatedIds = new Set(), skippedIds = new Set();
+    // ⚠ KEYED BY ITEM, HOLDING THE PRICE THE ITEM HAD BEFORE THIS FILE. It used to be an array
+    // pushed once per ROW, and the log loop read the item's FINAL price for every entry — so a
+    // file naming one item twice at two prices (a dinner sheet and a happy-hour sheet, which is
+    // ordinary) wrote two Pricing Review Log rows, the second recording a change FROM a price that
+    // was never live. Those rows also feed Week Review's price-change stat and the Recovery fix
+    // count, so the counts were wrong wherever they appeared.
+    const repriced = new Map();
     // Snapshot the whole menu before the import touches it, and track the rows it appends. The
     // bulk write below cannot revert itself, so without these a failed import left the new prices
     // and new items on screen while the server kept the old menu — and the repricing below would
@@ -1268,15 +1392,20 @@ S.RevenueMenuItems = {
       const name = (r.name || '').trim();
       if (!name) return;
       const price = num(r.price), cost = +(num(r.cost)).toFixed(2), covers = num(r.covers);
-      const cat = (r.category || '').trim();
+      const cat = canonCat(r.category);
       const cur = byKey[keyOf(this.activeType, name)];
+      // ⚠ AN INACTIVE ITEM IS MATCHED BUT NOT TOUCHED. Matching it is what stops the import
+      // creating a duplicate of something the operator retired; repricing it would put a price
+      // change into the Pricing Review Log and Recovery for an item that is off the live menu.
+      if (cur && cur.archived) { skippedIds.add(cur.id); return; }
       if (cur) {
         // Re-dropping an export REFRESHES the matching item instead of duplicating
         // it. Only overwrite a field the file actually carries, so a partial export
         // (e.g. no cost column) never wipes a good cost/price already on file.
         if (price > 0) {
           if (price !== cur.price) {
-            repriced.push({ item: cur, from: cur.price });
+            // First row wins the "from": that is the only price that was ever actually live.
+            if (!repriced.has(cur.id)) repriced.set(cur.id, { item: cur, from: cur.price });
             // A price the file moves is a real reprice, same as a direct edit: the new
             // live price supersedes any planned one. Left on the item, a stale plan
             // makes Menu Engineering show a negative delta and its Mark Live button
@@ -1289,7 +1418,7 @@ S.RevenueMenuItems = {
         if (covers > 0) cur.weekly_covers = covers;
         if (cat)        cur.category = cat;
         cur.updated_at = new Date().toISOString();
-        updated++;
+        updatedIds.add(cur.id);
       } else {
         const it = {
           id:                 App.uid(),
@@ -1311,13 +1440,28 @@ S.RevenueMenuItems = {
         };
         existing.push(it); addedRecs.push(it);
         byKey[keyOf(this.activeType, name)] = it;
-        added++;
+        addedIds.add(it.id);
       }
     });
+    // An item created by an earlier row and touched again by a later one was CREATED, not
+    // refreshed — counting it in both is how one item became "1 new and 1 existing".
+    const added = addedIds.size;
+    const updated = [...updatedIds].filter(id => !addedIds.has(id)).length;
+    const skippedInactive = skippedIds.size;
 
     const result = document.getElementById('mi-imp-result');
     if (!added && !updated) {
-      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No items imported. No item names were found in the file.</div>';
+      // ⚠ SAY WHICH NOTHING HAPPENED. Rows matching an INACTIVE item are skipped on purpose (so a
+      // file drop cannot reprice something you retired), but they increment neither counter — so
+      // this used to tell the operator "no item names were found in the file" when every name in
+      // it had been found and matched.
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + (skippedInactive
+          ? 'No items imported. ' + skippedInactive + ' item' + (skippedInactive > 1 ? 's are' : ' is')
+            + ' inactive, so nothing was changed. Make ' + (skippedInactive > 1 ? 'them' : 'it')
+            + ' active on the Inactive tab first.'
+          : 'No items imported. No item names were found in the file.')
+        + '</div>';
       return;
     }
 
@@ -1328,10 +1472,25 @@ S.RevenueMenuItems = {
       this.render(this.container, this.actions);
       return;
     }
+    // Sections the file brought in join THIS type's list, so the operator's own menu sections are
+    // in the dropdown the moment their menu is uploaded. Without it, importing a dish list with
+    // eight sections leaves the Dish picker offering none of them. Runs only after the write
+    // succeeded, so a failed import cannot leave sections behind for items that were rolled back.
+    App.absorbMenuCats(this.activeType);
     // Every reprice the file carried goes through the one canonical pricing logger,
     // same as a direct edit, so the Pricing Review Log and Recovery see it. Without
     // this the audit told the operator to reprice the day after they repriced.
-    for (const rp of repriced) {
+    for (const rp of repriced.values()) {
+      // An item this same file CREATED has no previous price, so a later row moving it is not a
+      // price change — logging one had Bar Cop report "Imported 1 new item" and a price history
+      // for that item on the same screen.
+      if (addedIds.has(rp.item.id)) continue;
+      // And a file that moves a price and moves it back has changed nothing.
+      if (rp.item.price === rp.from) continue;
+      // Nor is an item's FIRST price a price change. A menu file with no price column stores every
+      // item at 0 — and the import's own success line invites you to go add prices — so without
+      // this, doing exactly that logged "$0.00 to $16.00" for the whole menu at once.
+      if (!(parseFloat(rp.from) > 0)) continue;
       await App.logPriceChange(rp.item, rp.from, rp.item.price, { reason: 'Menu list import', source: 'menu-items-import' });
     }
     App.markSetupDone('gs_r_menu');
@@ -1343,6 +1502,9 @@ S.RevenueMenuItems = {
       const parts = [];
       if (added)   parts.push('imported ' + added + ' new item' + (added === 1 ? '' : 's'));
       if (updated) parts.push('refreshed ' + updated + ' existing');
+      // A skipped row is not a silent drop — the operator must be told their file mentioned items
+      // that are off the live menu, or the counts look wrong and they re-drop the file.
+      if (skippedInactive) parts.push('skipped ' + skippedInactive + ' inactive item' + (skippedInactive === 1 ? '' : 's'));
       res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
         + parts.join(' and ').replace(/^./, c => c.toUpperCase()) + '. Edit any item to set its price, cost, or recipe.'
         + '</div>';
