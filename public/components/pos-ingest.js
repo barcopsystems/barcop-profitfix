@@ -113,9 +113,11 @@ const PosIngest = {
   // DEFAULT Accounting format for a negative, i.e. what a POS export becomes the moment it is
   // opened and re-saved. A -$75 drawer stored as +$75 is a $150-wide error that also flips Short
   // to Over, so it reads green everywhere and Loss Prevention never sees it.
-  // ⚠ ONE COPY ON PURPOSE. _num and _count both parse signed POS cells and this test had already
-  // drifted once — the paren form was fixed for "($15)" and never for "$(15)". A third copy would
-  // drift again. _hours delegates to _num, so it is covered by the same door.
+  // ⚠ ITS ONLY CALLER IS NOW _hours. _num and _count used to parse signed POS cells through this
+  // test; both now delegate to App.parseNum, which does its own sign detection. So this is a
+  // SECOND sign implementation with nothing holding it to the first — it survives only because
+  // _hours parses "8:30" itself and cannot go through parseNum. Keep them in step by hand, or
+  // fold the colon case into parseNum and delete this. verify-pos-number-sign.js covers both.
   _isNeg(s) {
     const t = String(s == null ? '' : s).replace(/[^0-9.,()\-]/g, '');
     return /^\(.*\)$/.test(t) || /^-/.test(t) || /-$/.test(t);
@@ -377,8 +379,17 @@ const PosIngest = {
     });
     const toAdd = []; const conflicts = [];
     const pv = v => Math.round((+v || 0) * 100) / 100;
+    // ⚠ COVERS IS CLAMPED AT THE DAY, NOT AT THE ROW. Bar and food each get a day-level
+    // non-positive guard; covers had none anywhere, so an accounting-negative covers cell — and
+    // the column matches `checks`, `tickets`, `orders`, exactly where a refund-heavy day gets
+    // written as "(12)" — stored a NEGATIVE day. That reaches Confirm the Week's prefill, weekly
+    // covers, check average (a $-175.00 check average), and next week's cover goal. It also bricked
+    // the OTHER door: the manual grid prefills from the import, so the new negative-input refusal
+    // then blocked every Save of that week over a -12 the operator never typed.
+    // The clamp belongs HERE and not in covOf: a per-ROW negative is legitimate, the daypart rows
+    // above aggregate and a refund row should reduce the day the same way it does bar and food.
     const mkRec = (date, bar, food, covers, manual, reuseId) => ({
-      id: reuseId || App.uid(), date, bar_revenue: bar, floor_revenue: food, covers,
+      id: reuseId || App.uid(), date, bar_revenue: bar, floor_revenue: food, covers: Math.max(0, covers || 0),
       total_revenue: cents(bar + food), shift_type: 'Full Day', status: 'Closed',
       source: manual ? 'manual' : 'import', imported: !manual, created_at: new Date().toISOString()
     });
