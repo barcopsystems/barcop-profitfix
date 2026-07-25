@@ -48,6 +48,14 @@ S.LaborTipHistory = {
     const d = new Date(str + 'T00:00:00');
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
+  // Hours were printed RAW here (the only numbers in the app that were), so a stored sum of decimal
+  // hours surfaced its floating-point tail: 8.1 + 8.2 rendered as 16.299999999999999. Matches the
+  // tip-log convention: 2dp, with a whole number left clean.
+  fmtHours(n) {
+    const v = Number(n);
+    if (!isFinite(v)) return '-';
+    return v.toFixed(2).replace(/\.00$/, '');
+  },
 
   render(container, actions) {
     this.container = container;
@@ -274,7 +282,7 @@ S.LaborTipHistory = {
     if (!p) return;
     const rows = (p.participants || []).map(pt => '<tr>'
       + '<td><div class="val">' + esc(pt.name || '-') + '</div></td>'
-      + '<td>' + (pt.hours != null ? pt.hours : '-') + '</td>'
+      + '<td>' + (pt.hours != null ? this.fmtHours(pt.hours) : '-') + '</td>'
       + '<td class="val">' + App.fmtCurrency(pt.share || 0, 2) + '</td></tr>').join('');
     const html = '<div class="card form-card" id="th-pview-card" style="margin:0;">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
@@ -284,7 +292,7 @@ S.LaborTipHistory = {
       + '<div class="calc" style="margin-bottom:14px;">'
         + '<div class="calc-item"><div class="calc-label">Method</div><div class="calc-val">' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + (p.total_hours || 0) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Total Hours</div><div class="calc-val">' + this.fmtHours(p.total_hours || 0) + '</div></div>'
       + '</div>'
       + '<div style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Staff</th><th>Hours</th><th>Tip Share</th></tr></thead><tbody>' + rows + '</tbody></table></div>'

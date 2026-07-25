@@ -295,13 +295,26 @@ S.LaborPayrollExport = {
     const d = this._data(weekStart);
     if (!d.rows.length) { this._setStatus('No hours or salaried staff in this pay period.', 'var(--red)'); return; }
     const f2 = (v) => (v == null ? '' : Number(v).toFixed(2));
-    const dataRows = d.rows.map(r => [
+    // ⚠ THE COLUMN MUST FOOT. Every row prints rounded to cents, so the TOTAL has to be the sum of
+    // those ROUNDED values — not a rounding of the unrounded sum, which missed the printed rows by
+    // up to a cent per person and left a payroll worksheet that does not add up in front of whoever
+    // runs the payroll. What is printed per person is what actually gets paid, so the rounded rows
+    // are the truth and the total follows them.
+    // ⚠ The XLSX deliberately does the OPPOSITE (full precision + a display format, which Excel sums
+    // correctly and is proper spreadsheet practice). Do NOT align the two.
+    const r2 = (v) => (v == null ? null : Math.round(Number(v) * 100) / 100);
+    const rows = d.rows.map(r => Object.assign({}, r, {
+      regHours: r2(r.regHours), otHours: r2(r.otHours), totalHours: r2(r.totalHours),
+      regPay: r2(r.regPay), otPay: r2(r.otPay), tipShare: r2(r.tipShare), gross: r2(r.gross)
+    }));
+    const dataRows = rows.map(r => [
       r.name, r.position, r.payType,
       f2(r.regHours), f2(r.otHours), f2(r.totalHours),
       f2(r.rate), f2(r.regPay), f2(r.otPay), f2(r.tipShare), f2(r.gross), r.status
     ]);
-    const t = d.totals;
-    dataRows.push(['TOTAL', '', '', f2(t.regular_hours), f2(t.ot_hours), f2(t.hours), '', f2(t.regular_cost), f2(t.ot_cost), '', f2(t.gross), '']);
+    const sum = (k) => rows.reduce((t, r) => t + (Number(r[k]) || 0), 0);
+    dataRows.push(['TOTAL', '', '', f2(sum('regHours')), f2(sum('otHours')), f2(sum('totalHours')), '',
+      f2(sum('regPay')), f2(sum('otPay')), '', f2(sum('gross')), '']);
     const escapeCell = (v) => {
       const s = String(v == null ? '' : v);
       return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
