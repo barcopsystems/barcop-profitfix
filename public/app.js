@@ -4228,6 +4228,12 @@ const App = {
     if (v == null) return null;
     const s = String(v).trim();
     if (!s) return null;
+    // ⚠ A SPREADSHEET ERROR IS NOT A NUMBER. #REF! and #N/A already fell out as null (no digits),
+    // but #DIV/0! carries a literal 0 and parsed as a REAL ZERO — and a zero is not "unreadable",
+    // it is a value, so the sales import's carry test treated the column as present and wrote $0
+    // over a day's real takings, reporting "1 replaced earlier figures" with no conflict raised.
+    // Every Excel error starts with '#', which no legitimate money or count cell does.
+    if (s.charAt(0) === '#') return null;
     // Sign is read BEFORE stripping, from the three shapes accounting software actually emits:
     // wrapped in parentheses, a leading minus, or a trailing minus.
     const t = s.replace(/[^0-9.,()\-]/g, '');
