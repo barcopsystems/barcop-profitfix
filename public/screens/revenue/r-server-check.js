@@ -421,7 +421,7 @@ S.RevenueServerCheck = {
     c.querySelectorAll('.rsc-range-chip').forEach(b => b.addEventListener('click', () => { this.captureForm(); this._window = b.dataset.v; this.draw(); }));
     c.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     document.getElementById('rsc-worksheet')?.addEventListener('click', () => this.printBlank());
-    document.getElementById('rsc-export')?.addEventListener('click', () => App.exportPDF({ title: 'Server Performance', root: document.getElementById('rsc-sc-export') || c }));
+    document.getElementById('rsc-export')?.addEventListener('click', () => App.exportListPDF({ title: 'Server Performance', rootId: 'rsc-sc-export', root: c, lists: [['core', 'revenue_server_check']], reRender: () => this.draw() }));
 
     ['rsc-date', 'rsc-shift', 'rsc-server'].forEach(id => document.getElementById(id)?.addEventListener('change', () => this.captureForm()));
     document.getElementById('rsc-cov')?.addEventListener('input', () => { this.captureForm(); this.calc(); });

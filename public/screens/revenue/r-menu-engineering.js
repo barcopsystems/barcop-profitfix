@@ -112,7 +112,7 @@ S.RevenueMenuEngineering = {
     c.querySelectorAll('.me-dogtest').forEach(b => b.addEventListener('click', () => { App._dogTestPreselect = b.dataset.id; App.navigate('r-dog-test'); }));
     document.getElementById('me-batch')?.addEventListener('click', () => this.openBatch());
     document.getElementById('me-marklive-all')?.addEventListener('click', () => this.markAllLive());
-    document.getElementById('me-export')?.addEventListener('click', () => App.exportPDF({ title: 'Menu Engineering', root: document.getElementById('me-export-root') || this.container }));
+    document.getElementById('me-export')?.addEventListener('click', () => App.exportListPDF({ title: 'Menu Engineering', rootId: 'me-export-root', root: this.container, lists: [['core', 'revenue_price_log']], reRender: () => this.draw() }));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
     if (priced) this.mountCoversImport();
     // Deep-link from Menu Rundown: open the reprice modal for the passed item.
