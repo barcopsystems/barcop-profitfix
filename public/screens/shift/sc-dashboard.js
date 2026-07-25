@@ -493,7 +493,15 @@ S.ShiftDashboard = {
   async _doImportSales(rows, opts) {
     opts = opts || {};
     const built = PosIngest.build('sales', rows, opts);
-    const { toAdd, skipped, zeroSkipped, dupCount, merged, keptManual, conflicts } = built;
+    const { toAdd, skipped, zeroSkipped, dupCount, merged, keptManual, conflicts, covDropped } = built;
+    // A covers column the file carried but Bar Cop could not read (an accounting-negative cell, a
+    // date, a range). The sales are still imported — only covers is left alone — but the operator
+    // has to be told, or the day's covers look imported when they were never touched.
+    const covNote = (covDropped && covDropped.length)
+      ? ' (covers could not be read on ' + covDropped.length + ' day' + (covDropped.length === 1 ? '' : 's')
+        + ', so ' + (covDropped.length === 1 ? 'that day kept its' : 'those days kept their')
+        + ' existing count — sales still came in)'
+      : '';
     // S189: days that came in at $0. An import will NOT write $0 over FACT-tier sales (a blank/partial
     // export must not silently wipe a day), so a zero day is reported plainly and the operator is sent
     // to Enter Manually — the sanctioned zeroing path — rather than told "no usable sales figure".
@@ -539,17 +547,17 @@ S.ShiftDashboard = {
           + ' skipped, no usable date or sales figure)' : '';
       if (opts.cleared) {
         this._flash = opts.cleared + ' day' + (opts.cleared === 1 ? '' : 's') + ' cleared to zero'
-          + (kept ? ', ' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as entered' : '') + skipNote + zeroNote + '.';
+          + (kept ? ', ' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as entered' : '') + skipNote + zeroNote + covNote + '.';
         this._openStep = 'cash'; this.render(this.container, this.actions); return;
       }
       if (kept) note('No new figures written. ' + kept + ' day' + (kept === 1 ? ' was' : 's were')
-                     + ' kept as you entered ' + (kept === 1 ? 'it' : 'them') + ' by hand.' + skipNote + zeroNote);
+                     + ' kept as you entered ' + (kept === 1 ? 'it' : 'them') + ' by hand.' + skipNote + zeroNote + covNote);
       // S189: nothing imported and the ONLY reason is $0 days — say that plainly instead of "check the
       // Date column", and point to the sanctioned zeroing path (Enter Manually).
       else if (zeroSkipped.length && !skipped.length) fail((zeroSkipped.length === 1 ? 'That day' : 'Those days')
                      + ' came in at $0, so nothing was imported. Use Enter Manually to record a zero day.');
       else fail((opts.manual ? 'No days saved. Enter sales for at least one day.'
-                             : 'No days imported. Check that the file has a Date column and sales values.') + skipNote + zeroNote);
+                             : 'No days imported. Check that the file has a Date column and sales values.') + skipNote + zeroNote + covNote);
       return;
     }
     const ok = await PosIngest.commit('sales', allToAdd);
@@ -568,7 +576,7 @@ S.ShiftDashboard = {
       // a 5-day file and believe the week was in.
       + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
           + ' skipped, no usable date or sales figure)' : '')
-      + zeroNote
+      + zeroNote + covNote
       + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + '.';
     this._openStep = 'cash';
     this.render(this.container, this.actions);
