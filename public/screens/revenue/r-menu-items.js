@@ -614,8 +614,28 @@ S.RevenueMenuItems = {
       : this.formType === 'cocktail' ? 'Add Cocktail Item'
       : this.formType === 'inventory' ? 'Add No Prep Item' : 'Add Menu Item';
     const title = item ? ('Edit ' + editLbl) : addTitle;
+    // ── ACTIVE / INACTIVE, mirroring Add Products exactly ────────────────────────────────────
+    // Only on EDIT: a brand-new item is never born inactive, and a status pill on an Add form
+    // would just be noise. Same markup and same wording as ic-product-setup, because "just like
+    // Add Products" means the same component, not a lookalike.
+    const isActive = !(item && item.archived);
+    const statusRow = item
+      ? '<div style="display:flex;align-items:center;gap:10px;">'
+        + '<span class="mi-active-state" data-active="' + (isActive ? 'true' : 'false') + '" style="'
+          + 'display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:1px;'
+          + 'background:' + (isActive ? 'rgba(125,199,125,0.12)' : 'rgba(199,125,125,0.12)') + ';'
+          + 'color:' + (isActive ? 'var(--green)' : 'var(--red)') + ';">'
+          + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span>'
+          + (isActive ? 'ACTIVE' : 'INACTIVE')
+        + '</span>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="mi-toggle-active">'
+          + (isActive ? 'Make Inactive' : 'Make Active')
+        + '</button>'
+      + '</div>'
+      : '';
     const html = '<div class="card form-card' + (isInv ? ' narrow-form' : '') + '" id="mi-editor-card" style="margin:0;">'
-      + '<div class="card-title">' + title + '</div>'
+      + '<div class="card-title" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-right:30px;">'
+        + '<span>' + title + '</span>' + statusRow + '</div>'
       + this.formBodyHtml(item)
       + '<div class="card-actions">'
       + '<button class="btn btn-primary" id="ri-save">' + (item ? 'Update Item' : 'Save Item') + '</button>'
@@ -625,6 +645,18 @@ S.RevenueMenuItems = {
     App.openModal(html, { id: 'mi-editor', maxWidth: isInv ? 540 : 680, confirmDirty: true, onClose: () => this.cancelEditor() });
     App.wireCustomSelects(document.getElementById('mi-editor') || document);
     document.getElementById('ri-cat')?.addEventListener('change', e => this.onCategoryChange(e.target.value));
+    // Toggle flips the pill in place; nothing persists until Update Item, same as Add Products.
+    document.getElementById('mi-toggle-active')?.addEventListener('click', () => {
+      const el = document.querySelector('.mi-active-state');
+      if (!el) return;
+      const nowActive = !(el.dataset.active === 'true');
+      el.dataset.active = nowActive ? 'true' : 'false';
+      el.style.background = nowActive ? 'rgba(125,199,125,0.12)' : 'rgba(199,125,125,0.12)';
+      el.style.color = nowActive ? 'var(--green)' : 'var(--red)';
+      el.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;"></span>'
+        + (nowActive ? 'ACTIVE' : 'INACTIVE');
+      document.getElementById('mi-toggle-active').textContent = nowActive ? 'Make Inactive' : 'Make Active';
+    });
     document.getElementById('ri-save')?.addEventListener('click', () => this._save(this._editItem));
     document.getElementById('ri-name')?.addEventListener('input', () => this.refreshFieldMissing());
     this.renderAdaptive(item);
@@ -1153,6 +1185,16 @@ S.RevenueMenuItems = {
       planned_vol_pct:    priceChanged ? null : (existing && existing.planned_vol_pct != null ? existing.planned_vol_pct : null),
       planned_at:         priceChanged ? null : (existing && existing.planned_at ? existing.planned_at : null),
       created_at:         existing?.created_at || new Date().toISOString(),
+      // Carried from the header toggle. Before this, `archived` was set in exactly ONE place in
+      // the whole app — the Dog Test's "Cut" — so a seasonal cocktail could only be retired by
+      // running a Dog Test on it. Reads the toggle when it is on screen (editing), and falls back
+      // to whatever the item already had so a save from anywhere else cannot silently revive an
+      // inactive item. A NEW item is never born inactive.
+      archived:           existing
+        ? (document.querySelector('.mi-active-state')
+            ? document.querySelector('.mi-active-state').dataset.active !== 'true'
+            : !!existing.archived)
+        : false,
       updated_at:         new Date().toISOString()
     };
 
