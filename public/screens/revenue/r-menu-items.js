@@ -1455,9 +1455,14 @@ S.RevenueMenuItems = {
           type:               this.activeType,   // the tile the Upload was opened from sets the item type
           name,
           category:           cat,
-          price,
-          cost,
-          weekly_covers:      covers,
+          // ⚠ NEGATIVES DO NOT BECOME A MENU ITEM. The refresh branch above guards every one of
+          // these (`price > 0`, `cost > 0`, `covers > 0`); this branch assigned them raw, so an
+          // accounting-negative cell created an item at -$12.00 that renders "$-12.00" and, at
+          // -3 sold/wk, drags its whole category's classification. buildPmix refuses a negative
+          // count for exactly that reason — two doors for the same file must not disagree.
+          price:              price > 0 ? price : 0,
+          cost:               cost > 0 ? cost : 0,
+          weekly_covers:      covers > 0 ? covers : 0,
           prev_weekly_covers: null,
           weekly_covers_updated_at: null,
           notes:              '',
