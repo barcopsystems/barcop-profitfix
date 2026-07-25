@@ -81,7 +81,7 @@ S.EventsPricing = {
     document.getElementById('rp-add')?.addEventListener('click', () => this.addPackage());
     document.getElementById('rp-clear')?.addEventListener('click', () => { this._draft = null; this.draw(); });
     document.getElementById('rp-calc')?.addEventListener('click', () => this.cateringCalcModal());
-    document.getElementById('rp-export')?.addEventListener('click', () => { const el = document.getElementById('rp-list'); if (el) App.exportPDF({ title: 'Rate Card', root: el }); });
+    document.getElementById('rp-export')?.addEventListener('click', () => { if (document.getElementById('rp-list')) App.exportListPDF({ title: 'Rate Card', rootId: 'rp-list', lists: [['core', 'event_rate_card']], reRender: () => this.draw() }); });
     this.container.querySelectorAll('.rp-edit').forEach(b => b.addEventListener('click', () => this.editModal(b.dataset.id)));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     this.container.querySelectorAll('.rp-del').forEach(b => b.addEventListener('click', async () => {

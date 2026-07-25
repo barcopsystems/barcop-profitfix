@@ -131,7 +131,7 @@ S.EventsRegulars = {
   wire() {
     this.container.querySelector('.card-collapse-head')?.addEventListener('click', e => App.toggleCollapse(e.currentTarget));
     App.applyCollapsed(this.container);
-    document.getElementById('rg-export')?.addEventListener('click', () => { const el = document.getElementById('rg-list'); if (el) App.exportPDF({ title: 'Regulars', root: el }); });
+    document.getElementById('rg-export')?.addEventListener('click', () => { if (document.getElementById('rg-list')) App.exportListPDF({ title: 'Regulars', rootId: 'rg-list', lists: [['core', 'event_regular']], reRender: () => this.renderList() }); });
     this.container.querySelectorAll('.rg-mode').forEach(b => b.addEventListener('click', () => { this.entryMode = b.dataset.mode; this.renderList(); }));
     this.container.querySelectorAll('.rg-fchip').forEach(b => b.addEventListener('click', () => { this.filter = b.dataset.v; this.renderList(); }));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.renderList())));
