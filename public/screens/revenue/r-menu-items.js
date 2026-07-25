@@ -20,7 +20,14 @@ S.RevenueMenuItems = {
   linkedProductId:  '',          // for inventory items
   _saving:          false,
   entryMode:        'manual',    // inline add-form lane: 'manual' | 'import'
-  activeType:       'plate',     // active tile/tab: 'plate' | 'cocktail' | 'inventory'
+  activeType:       'plate',     // which TILE an add/upload was opened from: 'plate' | 'cocktail' | 'inventory'
+  // The visible LIST tab. Deliberately separate from activeType: that one records which tile the
+  // operator opened a form from (the importer stamps item.type off it), and reusing it for the
+  // list would make browsing a tab silently change what the next upload creates.
+  activeTab:        'plate',     // 'plate' | 'cocktail' | 'inventory' | 'Inactive'
+  // The one extra tab after the three types. "Inactive" matches Add Products, which is the
+  // pattern this mirrors — deliberately NOT "Archived", the word this screen used before.
+  INACTIVE_TAB:     'Inactive',
   _importOpen:      false,       // Upload panel open in place of the list
   _selected:        null,        // Set of item ids checked for bulk delete
   _recipeOpen:      false,       // recipe builder revealed (allow-but-nudge toggle)
@@ -314,14 +321,36 @@ S.RevenueMenuItems = {
     }).join('');
     const tilesBlock = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">' + tiles + '</div>';
 
-    // The menu is shown section-first: one list grouped into the operator's own
-    // categories, any item type mixing freely inside a section. The three tiles
-    // above stay as the add/upload doors, so no type tabs.
-    const lower = this._importOpen ? this.importPanelHTML() : this.listHTML(all);
+    // ── Type tabs (Kyle, 2026-07-25) ────────────────────────────────────────────────────────
+    // This REPLACES "section-first, all types in one long page, so no type tabs". At real menu
+    // size that page is a scroll, and the three types have genuinely different forms, different
+    // targets and (next step) their own category lists. Same shape as Add Products: the working
+    // tabs list ACTIVE items of that type, and INACTIVE items leave those tabs entirely for the
+    // Inactive tab, so a seasonal cocktail stops cluttering the live list without being deleted.
+    if (!this.TYPES.some(t => t.key === this.activeTab) && this.activeTab !== this.INACTIVE_TAB) {
+      this.activeTab = 'plate';
+    }
+    const onInactive = this.activeTab === this.INACTIVE_TAB;
+    const tabDefs = this.TYPES.map(t => ({ key: t.key, label: t.label, n: all.filter(i => this.classifyItem(i) === t.key).length }))
+      .concat([{ key: this.INACTIVE_TAB, label: this.INACTIVE_TAB, n: archivedItems.length }]);
+    const tabsBlock = '<div class="no-print" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px;">'
+      + tabDefs.map(t => '<button type="button" class="btn btn-sm mi-tab" data-tab="' + esc(t.key) + '" style="'
+        + (t.key === this.activeTab
+            ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+            : 'background:transparent;border:1px solid var(--b1);color:var(--t2);')
+        + '">' + esc(t.label) + ' (' + t.n + ')</button>').join('')
+      + '</div>';
 
-    // Archived items (cut from a Dog Test, or archived here), across all types.
-    const archivedSection = archivedItems.length
-      ? '<div class="sh" style="margin:24px 0 10px;">Archived</div>'
+    // The visible list is this tab's items only. Inactive gets its own view below.
+    const tabItems = onInactive ? [] : all.filter(i => this.classifyItem(i) === this.activeTab);
+    const lower = this._importOpen ? this.importPanelHTML()
+      : (onInactive ? '' : this.listHTML(tabItems));
+
+    // Inactive items (a seasonal item made inactive here, or cut from a Dog Test), across all
+    // types. Shown ONLY on its own tab now — it used to sit at the bottom of every page.
+    const archivedSection = (onInactive && archivedItems.length)
+      ? '<div class="sh" style="margin:8px 0 10px;">Inactive</div>'
+        + '<div style="font-size:12px;color:var(--t3);margin:0 0 10px;">These are off the live menu and out of Menu Engineering, but nothing is lost. Make active brings one straight back.</div>'
         + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Item</th><th>Category</th><th>Price</th><th></th>'
         + '</tr></thead><tbody>'
@@ -329,13 +358,19 @@ S.RevenueMenuItems = {
             + '<td><div class="val">' + esc(item.name) + '</div></td>'
             + '<td>' + esc(item.category || '') + '</td>'
             + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
-            + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm mi-restore" data-id="' + esc(item.id) + '">Restore</button>'
+            + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm mi-restore" data-id="' + esc(item.id) + '">Make Active</button>'
             + '<button class="btn btn-danger btn-sm mi-delperm" data-id="' + esc(item.id) + '">Delete Permanently</button></div></td>'
           + '</tr>').join('')
         + '</tbody></table></div>'
       : '';
 
-    this.container.innerHTML = '<div class="screen">' + tilesBlock + lower + archivedSection + '</div>';
+    // An empty Inactive tab still needs to say what the tab is FOR, or it reads as a dead end.
+    const inactiveEmpty = (onInactive && !archivedItems.length)
+      ? '<div class="card" style="margin-top:6px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">'
+        + 'Nothing is inactive. Edit any item and use Make Inactive to pull a seasonal dish or cocktail off the live menu without deleting it.'
+        + '</div></div>'
+      : '';
+    this.container.innerHTML = '<div class="screen">' + tilesBlock + tabsBlock + lower + archivedSection + inactiveEmpty + '</div>';
     this.wireLanding();
   },
 
@@ -449,6 +484,8 @@ S.RevenueMenuItems = {
   wireLanding() {
     // Tiles: + Add opens the popup editor scoped to the type; Upload opens the
     // in-place import panel for that type.
+    this.container.querySelectorAll('.mi-tab').forEach(b =>
+      b.addEventListener('click', () => { this.activeTab = b.dataset.tab; this._selected = new Set(); this.renderLanding(); }));
     this.container.querySelectorAll('.mi-card-add').forEach(el =>
       el.addEventListener('click', () => this.openEditor(null, { type: el.dataset.type })));
     this.container.querySelectorAll('.mi-card-imp').forEach(el =>
