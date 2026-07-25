@@ -7378,6 +7378,33 @@ const App = {
   // never prints "$-0.00", and testing the raw v would hand back "-$0.00" instead,
   // reintroducing the same malformed-currency bug one layer up. `decimals` is forwarded
   // untouched so fmtBal(v, 0) still gives whole dollars.
+  /* A SIGNED DIFFERENCE for display: a variance, a delta, a "vs scheduled", a change column.
+     Every hand-rolled version of this in the app got the same three things wrong, and Kyle
+     caught the result on the live variance report (Athletic NA, a row that balanced perfectly,
+     showing "Case Var -0.0 / Btl Var -0"):
+
+       1. NORMALISE -0 AT THE DISPLAYED PRECISION. A count that comes out exactly even still
+          leaves floating-point residue — 0.5 cases can be 0.4999999999999998 — so the
+          difference is -2e-16 and toFixed keeps the sign. A minus in front of a variance reads
+          as a real shortage.
+       2. DECIDE THE "+" ON THE DISPLAYED VALUE, not the raw one. Tested against the raw value,
+          whichever way the residue happened to fall decided the sign, so one balanced row
+          printed "+0.0" and the next "-0.0".
+       3. RETURN THE SIGN so the caller colours off the SAME decision it printed. Two sites
+          drive a red/green class off this, and a residue-negative was painting a balanced row
+          red (ic-count-history) or green (lc-reports).
+
+     Returns { text, sign }, sign being -1 / 0 / 1 AT THE DISPLAYED PRECISION. A real difference
+     that rounds to a non-zero keeps its sign, so nothing is ever hidden. */
+  fmtSigned(v, decimals, suffix) {
+    const d = decimals == null ? 1 : decimals;
+    if (v == null || isNaN(v)) return { text: '-', sign: 0 };
+    const x = Number(v);
+    const shown = Number(x.toFixed(d));
+    const sign = shown > 0 ? 1 : (shown < 0 ? -1 : 0);
+    return { text: (sign > 0 ? '+' : '') + (sign === 0 ? 0 : x).toFixed(d) + (suffix || ''), sign: sign };
+  },
+
   fmtBal(v, decimals) {
     const d = decimals !== undefined ? decimals : 2;
     return (Number(Number(v).toFixed(d)) < 0 ? '-' : '') + App.fmtCurrency(Math.abs(v), decimals);
@@ -8218,7 +8245,9 @@ const App = {
 
   fmtPct(n, d=1) {
     if (isNaN(n) || n == null) return ' ';
-    return Number(n).toFixed(d) + '%';
+    let v = Number(n);
+    if (Number(v.toFixed(d)) === 0) v = 0;   // normalize -0 / tiny negatives so it never prints "-0.0%"
+    return v.toFixed(d) + '%';
   },
 
   /* ── Dollarize a percentage gap (Section 10.2) ───────────────────────────
