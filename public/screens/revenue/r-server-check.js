@@ -369,16 +369,34 @@ S.RevenueServerCheck = {
     // zero-row outcome, so re-dropping a good report whose rows were already logged read
     // as "check that the file has server, covers, and sales columns".
     let head;
-    if (fl.failed)      head = 'Save failed. Try the import again.';
+    if (fl.failed)      head = fl.landed
+                               ? fl.landed + ' of ' + fl.total + ' server checks were saved before the save was refused. '
+                                 + 'Run the import again to finish it — the ones already saved will come back as "already logged".'
+                               : 'Save failed. Nothing was imported. Try the import again.';
     else if (fl.added)  head = fl.added + ' server check' + (fl.added === 1 ? '' : 's') + ' imported'
                                + (fl.dupCount ? ', ' + fl.dupCount + ' already logged' : '') + '.';
     else if (fl.dupCount) head = 'No new checks. All ' + fl.dupCount + ' row' + (fl.dupCount === 1 ? ' was' : 's were') + ' already logged.';
+    /* ⚠ DO NOT BLAME COLUMNS THAT WERE FINE, and do not contradict the note printed directly below.
+       This was the only zero-row sentence, so a file whose Date cells read "Jul 24" (no year) was
+       told to check the server, covers and sales columns — with "Skipped, no readable date: Maria
+       Lopez" sitting underneath it — and a file where every server rang zero sent the operator to
+       the Staff Roster to add people already on it. Same fix as the PMIX door one screen over.
+       Anything involving a genuinely unmatched name still falls through to the column message. */
+    else if ((fl.undated || []).length && !(fl.unmatched || []).length && !(fl.incomplete || []).length)
+      head = 'No rows imported. Bar Cop could not read a date on any row — check the date column in your export.';
+    else if ((fl.incomplete || []).length && !(fl.unmatched || []).length && !(fl.undated || []).length)
+      head = 'No rows imported. Every name matched your roster, but no row had both covers and sales.';
     else                head = 'No rows imported. Check that the file has server, covers, and sales columns.';
     const note = t => '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">' + t + '</div>';
     const list = a => a.slice(0, 8).map(esc).join(', ') + (a.length > 8 ? ', and ' + (a.length - 8) + ' more' : '');
     return '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + ((fl.added && !fl.failed) ? 'var(--gold)' : (fl.dupCount && !fl.failed) ? 'var(--t2)' : 'var(--red)') + ';">' + head + '</div>'
       + (fl.unmatched && fl.unmatched.length ? note('Not matched to your roster: ' + list(fl.unmatched) + '. Add them in the Staff Roster or rename to match.') : '')
-      + (fl.incomplete && fl.incomplete.length ? note('Skipped, no covers or sales rung: ' + list(fl.incomplete) + '. These are on your roster, nothing to fix.') : '');
+      + (fl.incomplete && fl.incomplete.length ? note('Skipped, no covers or sales rung: ' + list(fl.incomplete) + '. These are on your roster, nothing to fix.') : '')
+      // ⚠ THE THIRD LIST. buildServer stopped writing a record with a blank date and started
+      // reporting those rows in `undated` — the cockpit door says so, this one never destructured it,
+      // so at THIS door the row vanished with no word at all. It is the one skip an operator can
+      // actually fix in the file (a date cell like "Jul 24" with no year), so it has to be named.
+      + (fl.undated && fl.undated.length ? note('Skipped, no readable date: ' + list(fl.undated) + '. Check the date column in your export.') : '');
   },
   mountServerImport() {
     const el = document.getElementById('rsc-imp-csv');
@@ -393,19 +411,34 @@ S.RevenueServerCheck = {
     });
   },
   async applyServerImport(rows) {
-    const { toAdd, skipped, incomplete, dupCount } = PosIngest.build('server', rows);
-    let added = 0, failed = false;
+    const { toAdd, skipped, incomplete, undated, dupCount } = PosIngest.build('server', rows);
+    let added = 0, failed = false, landed = 0;
     if (toAdd.length) {
       // Honor the commit result. Discarding it reported "N server checks imported" in
       // gold after a save the server rejected and reverted (viewer role), while the
       // scorecard right below re-rendered with no new rows.
       const ok = await PosIngest.commit('server', toAdd);
-      if (ok) added = toAdd.length; else failed = true;
+      /* ⚠ A PARTIAL SAVE IS NOT A FAILED SAVE, and at THIS door the contradiction is on screen. The
+         generic commit path writes row by row, does not stop at the first refusal, and ANDs one
+         boolean — so eleven of twelve saved still returns false. draw() then re-renders the Server
+         Shift log straight from App.data.revenue_server_checks, so the operator gets a red
+         "Save failed. Try the import again." sitting directly above the eleven rows that saved.
+         The natural next move is to key them in by hand, and the roster ends up holding each twice.
+         App.putRecord reverts the array slot on a genuine refusal, so what is still in memory IS
+         what landed; re-running is safe because buildServer dedupes on staff + date + covers + sales.
+         (The cockpit door does the same probe — sc-dashboard.importServer.) */
+      if (ok) added = toAdd.length;
+      else {
+        const live = new Set(((App.data && App.data.revenue_server_checks) || []).map(x => x && x.id));
+        landed = toAdd.filter(r => live.has(r.id)).length;
+        failed = true;
+      }
     }
     this._impFlash = {
-      added, failed, dupCount: dupCount || 0,
+      added, failed, landed, total: toAdd.length, dupCount: dupCount || 0,
       unmatched: (skipped || []).filter(s => s && s !== '(blank)'),
-      incomplete: (incomplete || []).filter(s => s && s !== '(blank)')
+      incomplete: (incomplete || []).filter(s => s && s !== '(blank)'),
+      undated: (undated || []).filter(s => s && s !== '(blank)')
     };
     this.draw();
   },

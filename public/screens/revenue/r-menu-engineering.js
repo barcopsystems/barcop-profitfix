@@ -689,13 +689,39 @@ S.RevenueMenuEngineering = {
     const fl = this._coversFlash; this._coversFlash = null;
     let flash = '';
     if (fl) {
+      // Same two helpers r-server-check's flash uses, so the three outcome notes read identically
+      // at both PMIX doors.
+      const note = t => '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">' + t + '</div>';
+      const list = a => a.slice(0, 8).map(esc).join(', ') + (a.length > 8 ? ', and ' + (a.length - 8) + ' more' : '');
       flash = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.updated ? 'var(--gold)' : 'var(--red)') + ';">'
         + (fl.failed ? 'Save failed. Try the import again.'
            : fl.updated ? 'Updated units sold on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's')
              + (fl.merged ? ' (' + fl.merged + ' extra row' + (fl.merged === 1 ? '' : 's') + ' combined into item totals)' : '') + '.'
-           : 'No items matched. Check that the item names in your export match your menu.')
+           /* ⚠ DO NOT BLAME THE NAMES WHEN THE NAMES WERE FINE, and do not contradict the note
+              printed directly underneath. "No items matched" was the only zero-row headline, so a
+              file whose Units cells were unreadable — or whose items all netted negative after
+              returns — sent the operator off to rename menu items that were already correct, while
+              the note below said in plain words that those names HAD matched. Every combination
+              gets a headline that agrees with its notes; anything involving a genuinely unmatched
+              name, or an empty file, still falls through to the name message. */
+           : 'No items updated. ' + (
+               ((fl.incomplete || []).length && !(fl.unmatched || []).length && !(fl.netNegative || []).length)
+                 ? 'The item names matched, but Bar Cop could not read a units-sold figure for any of them.'
+             : ((fl.netNegative || []).length && !(fl.unmatched || []).length && !(fl.incomplete || []).length)
+                 ? 'Every item came out at negative units after returns, so the previous figures were left alone.'
+             : (((fl.incomplete || []).length || (fl.netNegative || []).length) && !(fl.unmatched || []).length)
+                 ? 'The item names matched — see below for what happened to each row.'
+             : 'Check that the item names in your export match your menu.'))
         + '</div>'
-        + (fl.unmatched.length ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Not matched: ' + fl.unmatched.slice(0, 8).map(esc).join(', ') + (fl.unmatched.length > 8 ? ', and ' + (fl.unmatched.length - 8) + ' more' : '') + '. Add them in Menu Builder or rename to match.</div>' : '');
+        // ⚠ GUARDED like its two neighbours. coversImportHtml() is ONE TERM inside draw()'s single
+        // innerHTML expression, so a throw here does not lose a note — it blanks the entire Menu
+        // Engineering screen, classification board and all. One writer sets this key today; the
+        // guard is for the next one.
+        + ((fl.unmatched || []).length ? note('Not matched: ' + list(fl.unmatched) + '. Add them in Menu Builder or rename to match.') : '')
+        + (fl.incomplete && fl.incomplete.length ? note('Skipped, no readable units-sold figure: ' + list(fl.incomplete) + '. These names matched your menu, so check the units column in your export.') : '')
+        // A dropped item is a MEASUREMENT THAT WENT MISSING. It keeps last week's units, and this
+        // screen presents those as this week's mix — so silence here is a wrong Star/Dog call.
+        + (fl.netNegative && fl.netNegative.length ? note('Left at the previous figure: ' + list(fl.netNegative) + '. Returns exceeded sales in this file, so the units came out negative and were not written.') : '');
     }
     return '<div class="card form-card no-print">'
       + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Re-import Units Sold</span>' + App.freqTag('As needed') + '</div>'
@@ -719,7 +745,7 @@ S.RevenueMenuEngineering = {
 
   async applyCoversImport(rows) {
     // One ingest path: PosIngest matches by name + upserts weekly_covers.
-    const { toAdd, skipped, merged } = PosIngest.build('pmix', rows);
+    const { toAdd, skipped, incomplete, netNegative, merged } = PosIngest.build('pmix', rows);
     let updated = 0, failed = false;
     if (toAdd.length) {
       // Honor the commit result: discarding it reported "Updated units sold on N items" after a
@@ -735,7 +761,17 @@ S.RevenueMenuEngineering = {
     // item several times and buildPmix sums them, so without this the operator sees a number bigger
     // than any single row in their file with no reason given — the same silent-merge the cockpit
     // import already explains. (sc-dashboard's importPmix surfaces this; this screen was the twin.)
-    this._coversFlash = { updated, failed, merged: merged || 0, unmatched: skipped.filter(s => s && s !== '(blank)') };
+    // ⚠ CARRY ALL THREE OUTCOMES, not just the unmatched names. buildPmix split its one `skipped`
+    // list into skipped (name not on your menu) / incomplete (Units cell unreadable) and started
+    // reporting netNegative (returns exceeded sales, so the item was LEFT at its previous figure).
+    // sc-dashboard's importPmix reads all three; this screen kept reading only the first, so an
+    // unreadable Units cell and a net-negative item both vanished here with nothing said — and a
+    // net-negative item silently keeps LAST week's units while this very screen presents them as
+    // this week's mix, driving its Star/Dog call, its suggested price and the weekly upside.
+    this._coversFlash = { updated, failed, merged: merged || 0,
+      unmatched: skipped.filter(s => s && s !== '(blank)'),
+      incomplete: (incomplete || []).filter(s => s && s !== '(blank)'),
+      netNegative: (netNegative || []).filter(Boolean) };
     this.draw();
   },
 
