@@ -642,7 +642,10 @@ S.ShiftDashboard = {
     // Refuse the whole save on a negative rather than part-saving around it — a day silently left
     // out is the thing that makes the week's total wrong without anything on screen saying so.
     if (badDays.length) {
-      fail('Sales and covers cannot be negative. Check ' + badDays.join(', ') + ' and save again.');
+      // Name the day the way the GRID does ("Thu, Jul 23"), not as a raw ISO date. This is the one
+      // thing standing between the operator and a save, so it must point at a row they can see.
+      const label = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
+      fail('Sales and covers cannot be negative. Check ' + badDays.map(label).join(', ') + ' and save again.');
       return;
     }
     if (!rows.length && !zeroDays.length) { fail('Enter at least one day\'s sales before saving.'); return; }
