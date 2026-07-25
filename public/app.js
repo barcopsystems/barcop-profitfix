@@ -3355,7 +3355,11 @@ const App = {
     subcat_food: 'Food Sub-Categories',
     size_spirits: 'Liquor Sizes', size_wine: 'Wine Sizes', size_beer: 'Beer Sizes',
     size_draft: 'Keg Sizes', size_liquid: 'Bottle Sizes', order_min_unit: 'Order Minimum Units',
+    // menu_category is the pre-B2 shared list. It is never deleted — ensureMenuCatLists re-derives
+    // the three per-type lists from it, which is what makes a failed migration write harmless.
     menu_category: 'Menu Categories',
+    menu_category_plate: 'Dish Categories', menu_category_cocktail: 'Cocktail Categories',
+    menu_category_inventory: 'No Prep Categories',
   },
   _listIsValued(key) { return !!(this._listMeta[key] && this._listMeta[key].valued); },
   // Category-appropriate example for the "Name" field on a valued (size) list.
@@ -3403,6 +3407,11 @@ const App = {
   listAddOption(key, val) {
     val = (val == null ? '' : String(val)).trim();
     if (!val) return;
+    // ⚠ listOptions drops 'other' unconditionally (it is the bucket "+ Add your own" replaced), so
+    // storing one produced an entry that was written to the server, never shown in the manager,
+    // and never offered in any dropdown — the Add button simply appeared broken. Refuse it here
+    // instead of accepting something that can never take effect.
+    if (val.toLowerCase() === 'other') return;
     const c = this.listConfig(key);
     const lc = val.toLowerCase();
     c.hidden = c.hidden.filter(h => String(h).toLowerCase() !== lc);
@@ -3414,18 +3423,56 @@ const App = {
   listRemoveOption(key, val) {
     const c = this.listConfig(key);
     const lc = String(val).toLowerCase();
+    // ⚠ A MENU SECTION LIST MAY NOT BE EMPTIED. Every item form requires a section, so taking the
+    // last one off a type dead-ends its Add form for good: the picker holds only the blank option
+    // and Save refuses "Category required." from a screen the operator cannot fix it on. Refusing
+    // here rather than papering over it at read time keeps the manager and the dropdown telling
+    // the same story — a read-time fallback made them disagree and resurrected deleted sections.
+    const isMenuKey = this.MENU_CAT_LIST_KEYS
+      && Object.keys(this.MENU_CAT_LIST_KEYS).some(t => this.MENU_CAT_LIST_KEYS[t] === key);
+    if (isMenuKey) {
+      const left = this.listOptions(key).filter(o => String(o).toLowerCase() !== lc);
+      if (!left.length) return false;
+    }
     const before = c.added.length;
     c.added = c.added.filter(a => a.toLowerCase() !== lc);
-    if (c.added.length === before && (this._listBuiltins[key] || []).some(b => String(b).toLowerCase() === lc)) {
+    const wasCustom = c.added.length !== before;
+    if (!wasCustom && (this._listBuiltins[key] || []).some(b => String(b).toLowerCase() === lc)) {
       if (!c.hidden.some(h => String(h).toLowerCase() === lc)) c.hidden.push(val);
     } else if (c.methods) {
       delete c.methods[lc];   // a deleted custom unit drops its stored method
     }
+    // ⚠ MENU SECTION LISTS ONLY: a removed CUSTOM section has to be remembered as hidden as well.
+    // Deleting it from `added` leaves no record it ever existed, and its items still carry the
+    // name — so absorbMenuCats put it straight back on the next import and the operator found a
+    // section they deleted kept returning. Re-adding it un-hides it again (listAddOption).
+    if (wasCustom && isMenuKey && !c.hidden.some(h => String(h).toLowerCase() === lc)) {
+      c.hidden.push(val);
+    }
     this.saveKey('list_config');
+    return true;
   },
   listResetDefaults(key) {
     this.data.list_config = this.data.list_config || {};
-    this.data.list_config[key] = { added: [], hidden: [] };
+    // A per-type MENU section list is not like the others: its `added` entries were DERIVED from
+    // the operator's own items by ensureMenuCatLists, not typed in by hand, while the confirm only
+    // promises to remove "the ones you added". A plain reset therefore deleted sections their menu
+    // is actively using, leaving items in a section their own picker no longer offers. Keep the
+    // _seeded marker (so the migration does not undo the reset by re-merging the pre-B2 list) and
+    // re-absorb what the menu actually uses.
+    // ⚠ IT DOES NOT RE-ABSORB. A first pass called absorbMenuCats here so a reset could not strip a
+    // section the menu was using — but every `added` entry on a migrated list came FROM an in-use
+    // item, so absorb put all of them straight back and Reset to Defaults became a visible no-op
+    // that still burned two server writes. Reset means reset, the same as it does for the other
+    // twenty lists. Items keep their category, customSelect still offers it on the item that has
+    // it, and the section still renders on the page; it just stops being offered to new items.
+    // The _seeded marker is kept so the migration cannot undo the reset by re-merging the pre-B2
+    // list on the next boot.
+    const menuType = Object.keys(this.MENU_CAT_LIST_KEYS || {})
+      .find(t => this.MENU_CAT_LIST_KEYS[t] === key);
+    this.data.list_config[key] = menuType
+      ? { added: [], hidden: [], methods: {}, _seeded: true }
+      : { added: [], hidden: [] };
     this.saveKey('list_config');
   },
   // ── Valued lists (bottle sizes: each option is {label, v} where v = ounces) ──
@@ -3535,11 +3582,19 @@ const App = {
       // the ounces in data-v and show the size label; methoded (unit) rows show the
       // tracking method next to the name.
       const rows = valued ? this.listValuedOptions(key) : this.listOptions(key).map(v => ({ label: v, v }));
+      // ⚠ A MENU SECTION LIST CANNOT GO TO ZERO — every item form requires a section, so an empty
+      // list dead-ends the Add form. listRemoveOption refuses it outright, but a Remove link that
+      // does nothing when clicked is its own bug, so the last one simply does not offer it.
+      const isMenuKey = this.MENU_CAT_LIST_KEYS
+        && Object.keys(this.MENU_CAT_LIST_KEYS).some(t => this.MENU_CAT_LIST_KEYS[t] === key);
+      const atFloor = isMenuKey && rows.length === 1;
       const rowsHtml = rows.length
         ? rows.map(o =>
             '<div style="' + rowStyle + '">'
             + '<span>' + esc(o.label) + (methoded ? methodTag(o.v) : '') + '</span>'
-            + '<span class="ll-del" data-v="' + esc(String(o.v)) + '" style="' + linkStyle + '">Remove</span>'
+            + (atFloor
+              ? '<span style="color:var(--t3);font-size:11px;">Your last section</span>'
+              : '<span class="ll-del" data-v="' + esc(String(o.v)) + '" style="' + linkStyle + '">Remove</span>')
             + '</div>').join('')
         : '<div style="color:var(--t3);font-size:12px;padding:6px 0 10px;">No options yet. Add one below.</div>';
       // Hidden built-ins available to restore (valued ones are looked up for a label).
@@ -4187,6 +4242,192 @@ const App = {
   // as real sections on the menu pages. Item TYPE is stored separately on the item.
   MENU_ALL_CATEGORIES: ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials', 'Cocktails', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
 
+  /* ── PER-TYPE MENU SECTION LISTS (B2 step 3, Kyle 2026-07-25) ─────────────────────────────
+     Each item TYPE now carries its own operator-customizable section list, so the Dish form
+     stops offering "Cocktails" and a cocktail can sit in Happy Hour or Frozen. MENU_ALL_CATEGORIES
+     above is kept as the union — it is what the ONE old shared list was seeded from, and the
+     migration below still reads accounts that were built on it.
+     ⚠ THESE ARE MENU LAYOUT. THEY ARE NOT ECONOMICS. menuGroupKey still pools every cocktail
+     whatever section it sits in, and still keys dishes / No Prep per category, so adding a
+     cocktail section can never move a ranking. Pinned by verify-menu-cat-lists.js case 7, and
+     the basis itself by verify-menu-grouping-tieout.js. */
+  MENU_CATEGORIES_BY_TYPE: {
+    plate:     ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials'],
+    // Frozen / Happy Hour / Specials are how a bar LAYS OUT its drinks. They all still rank in
+    // the one cocktail pool, which is the whole point of the comparison basis.
+    cocktail:  ['Cocktails', 'Happy Hour', 'Frozen', 'Specials'],
+    inventory: ['Beer', 'Wine', 'NA Beverages', 'Snacks']
+  },
+  MENU_CAT_LIST_KEYS: {
+    plate:     'menu_category_plate',
+    cocktail:  'menu_category_cocktail',
+    inventory: 'menu_category_inventory'
+  },
+  /* Names a section list must never adopt. SHARED BY BOTH SEEDERS — ensureMenuCatLists and
+     absorbMenuCats — because they do the same job at two different moments and a rule written into
+     only one of them is the twin miss that keeps costing rounds. It went into absorb and not into
+     the migration, so a degraded first load followed by a POS import left "Uncategorized" adopted
+     as a real, permanently-offered section on the next healthy boot.
+       'Other'         — listOptions drops it unconditionally; the "+ Add your own" flow replaced
+                         that bucket, so storing one yields an option nothing can ever show.
+       'Uncategorized' — the synthetic heading the menu list renders for items with NO section. It
+                         is a state, not a section anyone chose, and adopting it made the list
+                         builder draw it twice: once in place and once in its pinned slot. */
+  _menuCatReserved(v) {
+    const l = String(v == null ? '' : v).trim().toLowerCase();
+    return !l || l === 'other' || l === 'uncategorized';
+  },
+  menuCatListKey(type)  { return this.MENU_CAT_LIST_KEYS[type] || this.MENU_CAT_LIST_KEYS.plate; },
+  menuCatBuiltins(type) { return this.MENU_CATEGORIES_BY_TYPE[type] || this.MENU_CATEGORIES_BY_TYPE.plate; },
+  // The live options for a type.
+  // ⚠ IT MUST NOT CREATE THE KEY. listOptions → listConfig CREATES whatever key it is handed, so
+  // calling this while the migration is gated shut used to write an EMPTY
+  // menu_category_plate — and an empty key reads as "already migrated", which locked the operator
+  // out of their own sections permanently. Unmigrated now serves the builtins and touches nothing.
+  menuCatOptions(type) {
+    this.ensureMenuCatLists();
+    const key = this.menuCatListKey(type);
+    const lc = (this.data && this.data.list_config) || null;
+    if (!lc || !lc[key]) return (this._listBuiltins[key] || this.menuCatBuiltins(type)).slice();
+    // ⚠ NO "IF EMPTY, SHOW THE BUILTINS" FALLBACK HERE, DELIBERATELY. A first pass added one, and
+    // it was both dead and harmful: the form's picker is customSelect, which reads listOptions
+    // DIRECTLY and never comes through this door, so the form still dead-ended — while the preset
+    // guard in r-menu-items DID come through here, passed on phantom options, and re-injected a
+    // section the operator had deleted as the only selectable choice. The list cannot be emptied
+    // in the first place now; listRemoveOption holds the floor, where the manager and every
+    // dropdown see the same answer.
+    return this.listOptions(key);
+  },
+
+  /* Split the single `menu_category` list into three, once per account.
+
+     ⚠ IT IS RE-DERIVABLE ON PURPOSE, AND THAT IS THE WHOLE DESIGN. saveKey does not roll memory
+     back when it fails, so a migration that stamped a "done" flag would land the flag in memory,
+     lose the write, and never retry — the failure that has bitten this app four times. Instead
+     this reads the ORIGINAL menu_category config, never deletes it, and writes no flag. A failed
+     save costs nothing: the next boot refetches a server copy that never moved and derives the
+     identical three lists.
+
+     ⚠ listConfig() CREATES the key it is handed, so "already migrated?" must be read off
+     data.list_config directly. One listConfig call here would make every account look done.
+
+     ⚠ GATED ON BOTH _dataReady AND _loadDegraded, and it needs both.
+     `_dataReady` only covers the CONFIG BLOB (DB.readData). `menu_items` is row-per-record and
+     does not arrive until loadEventStores('core') runs AFTER that, and loadEvents returns an empty
+     or truncated array on any error while leaving the app fully booted — it raises _loadDegraded
+     instead. Gating on _dataReady alone therefore let one flaky login derive the split from an
+     EMPTY menu list: no in-use sections, so every hand-added section became an unattributable
+     "orphan" and landed on all three lists (the Dish form offering drink sections is the exact
+     thing this step exists to remove), and a builtin hidden while items sit in it stayed hidden.
+     Then it PERSISTED, and reloading restored the items but never the lists. _maybeAutoBackup and
+     backupNow already guard on _loadDegraded for this same "this login did not see the whole
+     account" reason.
+
+     ⚠ "ALREADY MIGRATED" IS `_seeded`, NOT MERE PRESENCE. listConfig() creates any key it is
+     handed, so a single stray read could mint an empty list that read as migrated forever. The
+     marker lives INSIDE the derived object, so it cannot desync from it: if the save fails, the
+     whole object is lost from the server and re-derived next boot. That is not the "done flag"
+     [[test-the-retry]] warns about — that one is written somewhere the retry cannot see. */
+  ensureMenuCatLists() {
+    const TYPES = ['plate', 'cocktail', 'inventory'];
+    // Register builtins whatever happens — listOptions returns [] without them.
+    TYPES.forEach(t => { this._listBuiltins[this.menuCatListKey(t)] = this.menuCatBuiltins(t); });
+    if (typeof DB !== 'undefined' && (!DB._dataReady || DB._loadDegraded)) return false;
+    if (!this.data) return false;
+    const lc = this.data.list_config || null;
+    const missing = TYPES.filter(t => { const c = lc && lc[this.menuCatListKey(t)]; return !c || !c._seeded; });
+    if (!missing.length) return false;
+
+    const old = (lc && lc.menu_category) || {};
+    const oldAdded  = (old.added  || []).map(String);
+    const oldHidden = (old.hidden || []).map(String);
+    // In-use sections, per type. ARCHIVED ITEMS COUNT: making a seasonal cocktail active again
+    // must not land it in a section that no longer exists.
+    const used = { plate: [], cocktail: [], inventory: [] };
+    (this.data.menu_items || []).forEach(i => {
+      const t = this.menuTypeOf(i);
+      const c = (i && i.category != null) ? String(i.category).trim() : '';
+      if (!c || !used[t]) return;
+      if (!used[t].some(x => x.toLowerCase() === c.toLowerCase())) used[t].push(c);
+    });
+    // An added section NO item uses cannot be attributed to a type, and there is no undo on a
+    // config blob. It goes on all three lists: an unused option costs nothing and can be hidden
+    // per type, whereas a deleted one is gone. Reversible beats clever.
+    const orphanAdded = oldAdded.filter(a =>
+      !TYPES.some(t => used[t].some(x => x.toLowerCase() === a.toLowerCase())));
+
+    this.data.list_config = this.data.list_config || {};
+    missing.forEach(t => {
+      const key = this.menuCatListKey(t);
+      const builtins = this.menuCatBuiltins(t).map(b => b.toLowerCase());
+      // A key can already exist WITHOUT _seeded if something read it before the migration ran.
+      // MERGE onto it rather than replacing, so an option the operator added in that window is
+      // not thrown away by the migration that follows.
+      const prior = this.data.list_config[key] || {};
+      const added = [];
+      const push = v => {
+        v = String(v == null ? '' : v).trim();
+        const l = v.toLowerCase();
+        if (this._menuCatReserved(v) || builtins.includes(l)) return;
+        if (!added.some(x => x.toLowerCase() === l)) added.push(v);
+      };
+      (prior.added || []).forEach(push);
+      used[t].forEach(push);
+      orphanAdded.forEach(push);
+      // Carry the OLD SHARED list's hides across, but only for this type's builtins, and never
+      // hide a section this type's items sit in — that is what the seeding rule promises.
+      // ⚠ `prior.hidden` is NOT subject to that in-use rule. Those are hides made on THIS type's
+      // own list, so they are current intent, not an inherited guess: filtering them by in-use
+      // silently un-hid a section the operator had just removed.
+      let hidden = oldHidden
+        .filter(h => builtins.includes(String(h).toLowerCase())
+          && !used[t].some(x => x.toLowerCase() === String(h).toLowerCase()))
+        .concat(prior.hidden || []);
+      hidden = hidden.filter((h, n) => hidden.findIndex(o => String(o).toLowerCase() === String(h).toLowerCase()) === n);
+      // ⚠ NEVER HAND BACK AN EMPTY LIST. A food-only bar that hid every drink section from the one
+      // pre-B2 list would otherwise migrate to a No Prep list with nothing in it, and the first
+      // No Prep item they ever add opens an empty dropdown — the exact outcome this step exists to
+      // prevent. Test the ACTUAL result rather than counting hides: `hidden` can now hold customs
+      // too, so a length comparison against the builtins is no longer the same question.
+      const visible = this.menuCatBuiltins(t).concat(added)
+        .filter(v => String(v).toLowerCase() !== 'other'
+          && !hidden.some(h => String(h).toLowerCase() === String(v).toLowerCase()));
+      if (!visible.length) hidden = [];
+      this.data.list_config[key] = { added, hidden, methods: {}, _seeded: true };
+    });
+    this.saveKey('list_config');
+    return true;
+  },
+
+  // The same seeding rule at a later moment: after an IMPORT brings in sections the list has never
+  // seen. Without it, uploading a dish list with eight of the operator's own sections leaves the
+  // Dish dropdown offering none of them. Idempotent, and silent when there is nothing new.
+  absorbMenuCats(type) {
+    this.ensureMenuCatLists();
+    if (typeof DB !== 'undefined' && (!DB._dataReady || DB._loadDegraded)) return false;
+    if (!this.data || !this.data.list_config || !this.data.list_config[this.menuCatListKey(type)]) return false;
+    const key = this.menuCatListKey(type);
+    const have = this.listOptions(key).map(o => o.toLowerCase());
+    const c = this.listConfig(key);
+    let changed = false;
+    (this.data.menu_items || []).forEach(i => {
+      if (this.menuTypeOf(i) !== type) return;
+      const v = (i && i.category != null) ? String(i.category).trim() : '';
+      const l = v.toLowerCase();
+      if (!v || have.includes(l)) return;
+      if (this._menuCatReserved(v)) return;
+      // ⚠ Dedup against `added` DIRECTLY, not only against `have`: a reserved name can never
+      // appear in `have` (listOptions drops it), so `have` alone re-added it on every single
+      // import — one server write each, for an option that was never selectable.
+      if (c.added.some(a => String(a).toLowerCase() === l)) return;
+      // A section the operator deliberately HID must not come back just because an item uses it.
+      if (c.hidden.some(h => String(h).toLowerCase() === l)) return;
+      c.added.push(v); have.push(l); changed = true;
+    });
+    if (changed) this.saveKey('list_config');
+    return changed;
+  },
+
   /* ── THE MENU COMPARISON BASIS — mirrored in server/audit-compute.js ──────────────────────
      Menu Engineering ranks Stars/Plowhorses/Puzzles/Dogs against a COMPARISON GROUP, and the
      server audit must name the same Stars and the same Dogs or its "cut the Dogs" action item
@@ -4233,9 +4474,15 @@ const App = {
     const bar = k.indexOf('|');
     if (bar < 0) return NOUN[k] || k;
     const type = k.slice(0, bar), cat = k.slice(bar + 1);
+    // ⚠ THE BARE POOL KEY COUNTS AS A CLASH TOO. This used to require `b > -1` on the other key,
+    // so the pooled 'cocktail' key was invisible to the test — and a No Prep section literally
+    // named "Cocktails" (canned/RTD drinks, which a No Prep CSV import creates readily) rendered
+    // a second heading also reading "Cocktails", sorted right next to the first. The pool keeps
+    // its plain name and the section gets qualified, which is enough to tell them apart.
     const clash = (allKeys || []).some(o => {
-      const s = String(o); const b = s.indexOf('|');
-      return s !== k && b > -1 && s.slice(b + 1) === cat;
+      const s = String(o); if (s === k) return false;
+      const b = s.indexOf('|');
+      return (b > -1 ? s.slice(b + 1) : (NOUN[s] || s)) === cat;
     });
     return clash ? cat + ' (' + (NOUN[type] || type) + ')' : cat;
   },
@@ -5598,11 +5845,13 @@ const App = {
     // unless the operator sets a per-item override — return null so they drop out of the
     // "over target" check (menuItemPct guards target != null) rather than being flagged
     // against the cocktail number. THE single target rule: Menu Engineering's targetPctFor
-    // and the Menu Items list both defer to this via classifyItem, so no two screens drift.
-    const type = (window.S && S.RevenueMenuItems && S.RevenueMenuItems.classifyItem)
-      ? S.RevenueMenuItems.classifyItem(item)
-      : ((item && item.type) || (item && item.recipe && item.recipe.mode === 'food' ? 'plate'
-        : (item && item.recipe && item.recipe.mode === 'single' ? 'cocktail' : null)));
+    // and the Menu Items list both defer to this, so no two screens drift.
+    // ⚠ THIS USED TO REACH FOR S.RevenueMenuItems.classifyItem WITH ITS OWN INFERENCE AS A
+    // FALLBACK — a THIRD copy of the type rule, and a divergent one: it read neither
+    // linked_product_id nor the legacy category signal, so with the screen not yet loaded a
+    // seeded cocktail (no type, no recipe) resolved to null and carried no target at all.
+    // classifyItem is now a delegate to menuTypeOf, so this calls the one rule directly.
+    const type = this.menuTypeOf(item);
     if (type === 'plate')    return this.MENU_TARGET_COST_PCT.plate;
     if (type === 'cocktail') return this.MENU_TARGET_COST_PCT.cocktail;
     return null;
