@@ -1300,6 +1300,18 @@ S.HubBooks = {
         const suggested = line7a * share;
         rows.push([name, e.hours, e.tips, share, suggested]);
       });
+      // NO HOURS ON FILE = NO BASIS TO SPLIT ON, and the sheet has to say so. Every share
+      // falls to 0, so this column prints $0.00 for everyone while Line 7a above still shows
+      // a real figure that has to be allocated — an accountant gets told to allocate $1,020
+      // and handed a column that adds to nothing, with nothing on the page explaining why.
+      // Reachable day one: hours auto-fill from logged or scheduled hours, so an operator who
+      // logs tips before setting up Labor has none.
+      // ⚠ DO NOT "fix" this by spreading Line 7a evenly. Inventing an allocation basis on an
+      // IRS worksheet is worse than an empty column that says why it is empty.
+      if (totalHours <= 0 && line7a > 0) {
+        rows.push(this._lineRow('No tippable hours are on file for this month, so Bar Cop cannot suggest a split. Line 7a above still has to be allocated. Add hours on the Tip Log and this column fills in, or your accountant can allocate it another way.', COL_COUNT));
+        mergeFull(rows.length - 1);
+      }
     }
 
     this._pushFooter(rows, merges,

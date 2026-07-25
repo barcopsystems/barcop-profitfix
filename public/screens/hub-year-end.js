@@ -801,6 +801,15 @@ S.HubYearEnd = {
         const suggested = line7a * share;
         rows.push([name, e.hours, e.tips, share, suggested]);
       });
+      // TWIN of the monthly builder in hub-books — see the full note there. No hours on file
+      // means no basis to split on, so every share is 0 and this column prints $0.00 for
+      // everyone while Line 7a above still shows a real figure to allocate. Say why.
+      // ⚠ DO NOT spread Line 7a evenly to make it foot: that invents an allocation basis on an
+      // IRS worksheet.
+      if (totalHours <= 0 && line7a > 0) {
+        rows.push(this._lineRow('No tippable hours are on file for this year, so Bar Cop cannot suggest a split. Line 7a above still has to be allocated. Add hours on the Tip Log and this column fills in, or your accountant can allocate it another way.', COL_COUNT));
+        mergeFull(rows.length - 1);
+      }
     } else {
       rows.push(this._lineRow('(no tip records on file for this year)', COL_COUNT));
       mergeFull(rows.length - 1);
