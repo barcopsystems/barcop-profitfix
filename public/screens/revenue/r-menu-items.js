@@ -1167,6 +1167,15 @@ S.RevenueMenuItems = {
     // that same filter and shows up in the Incomplete banner. `type="number"` does not stop it:
     // the input still hands back "-5" and nothing calls checkValidity.
     if (covers < 0) { fail('Units sold cannot be negative.'); return; }
+    // ⚠ AND THE FIELD RIGHT BESIDE IT. The covers guard above was added and cost was left exactly
+    // as it was, two lines away in the same function — the identical two-doors-disagree shape the
+    // comment above was written to close (the import door clamps cost; this one did not). A
+    // negative cost is worse than negative covers: menuItemPct guards it, but the ROW and the
+    // Menu Engineering board do not, so a -$5 cost on a $12 item rendered a GREEN "-41.7%" cost
+    // percent and a $17 margin, was not flagged Incomplete, and ranked on the board dragging its
+    // whole category's average margin.
+    const typedCost = parseFloat(document.getElementById('ri-cost')?.value);
+    if (!isNaN(typedCost) && typedCost < 0) { fail('Cost cannot be negative.'); return; }
 
     let category = '';
     let recipe = null;
