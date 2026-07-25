@@ -124,15 +124,11 @@ const PosIngest = {
   // Parse a POS number cleanly: strips $ and thousands commas AND handles a
   // NEGATIVE in any common export form — leading "-15", accounting "(15)", or
   // trailing "15-", with or without a currency symbol in front of the sign.
-  _num(v) {
-    if (v == null) return 0;
-    const s = String(v).trim();
-    if (!s) return 0;
-    const neg = this._isNeg(s);
-    const n = parseFloat(s.replace(/[^0-9.]/g, ''));
-    if (isNaN(n)) return 0;
-    return neg ? -n : n;
-  },
+  // Delegates to App.parseNum, the ONE coercion. This file's sign handling was the only correct
+  // one in the app and is now the shared behaviour; six other screens booked a "(125.00)" refund
+  // as a POSITIVE amount. Keeps this caller's own contract of 0 for a cell with no number, because
+  // its callers sum these.
+  _num(v) { const n = App.parseNum(v); return n == null ? 0 : n; },
 
   // Parse a POS COUNT cell (units sold) that may be NEGATIVE — a product return or void reports
   // "-3" / "(3)" / "3-". The old cleaner stripped [^0-9.], so a "-3" return read as +3 and INFLATED
@@ -140,12 +136,10 @@ const PosIngest = {
   // for a non-numeric cell, so a junk row is SKIPPED rather than silently counted as zero. Keeps the
   // decimal point so "12.00" is 12, not 1200.
   _count(v) {
-    const s = String(v == null ? '' : v).trim();
-    if (!s) return NaN;
-    const neg = this._isNeg(s);
-    const n = parseFloat(s.replace(/[^0-9.]/g, ''));
-    if (isNaN(n)) return NaN;
-    return Math.round(neg ? -n : n);
+    // Same shared coercion, but NaN (not 0) for a junk cell so the row is SKIPPED rather than
+    // silently counted as zero, and rounded because this is a unit count.
+    const n = App.parseNum(v);
+    return n == null ? NaN : Math.round(n);
   },
 
   // Parse a POS HOURS cell. Timeclock exports commonly give "8:30" (8 hours 30
@@ -363,7 +357,7 @@ const PosIngest = {
     // FALSE conflict against a differing prior and, on "use the file", ZERO the column (S140 scan).
     // A real "0" DOES carry (the file says zero) and overwrites.
     const numeric = v => { if (v == null) return false; const s = String(v).trim(); return s !== '' && !isNaN(parseFloat(s.replace(/[^0-9.\-]/g, ''))); };
-    const covOf = v => Math.round(parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, ''))) || 0;   // "12.00" is 12, not 1200
+    const covOf = v => Math.round(App.parseNum(v) ?? 0);   // one coercion; keeps the decimal point so "12.00" is 12, not 1200
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
       if (!date) { skipped.push('(no date)'); return; }
@@ -617,7 +611,7 @@ const PosIngest = {
     const toAdd = []; const skipped = []; const incomplete = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
-      const covers = Math.round(parseFloat(String(r.covers == null ? '' : r.covers).replace(/[^0-9.]/g, ''))) || 0;   // keep the decimal point: "12.00" is 12, not 1200; strip only commas/currency
+      const covers = Math.round(App.parseNum(r.covers) ?? 0);   // keep the decimal point: "12.00" is 12, not 1200; strip only commas/currency
       const sales = this._num(r.sales);
       // Two different problems, two different lists. An unmatched NAME is a roster fix.
       // A server who IS on the roster but rang no covers or no sales is just a row with
