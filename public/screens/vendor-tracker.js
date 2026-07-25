@@ -330,7 +330,7 @@ S.VendorTracker = {
     this.container.querySelectorAll('.vt-range-chip').forEach(b =>
       b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-w-export')?.addEventListener('click',
-      () => App.exportPDF({ title: 'Vendor Price Changes', root: this.container }));
+      () => App.exportListPDF({ title: 'Vendor Price Changes', root: this.container, lists: [['core', 'vendor_price_changes']], reRender: () => this.draw() }));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
   },
 
@@ -425,7 +425,7 @@ S.VendorTracker = {
     this.container.querySelectorAll('.vt-range-chip').forEach(b =>
       b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-disc-export')?.addEventListener('click',
-      () => App.exportPDF({ title: 'Vendor Discrepancies', root: this.container }));
+      () => App.exportListPDF({ title: 'Vendor Discrepancies', root: this.container, lists: [['core', 'vendor_discrepancy']], reRender: () => this.draw() }));
     // Work jumps to that order's Delivery History page and opens the discrepancy
     // modal, where discrepancies are worked (cohesive with Loss Prevention).
     this.container.querySelectorAll('.vt-disc-work').forEach(b => b.addEventListener('click', () => {
