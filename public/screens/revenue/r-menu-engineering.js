@@ -546,7 +546,15 @@ S.RevenueMenuEngineering = {
   // (Dogs go to the Dog Test, not a blind price bump).
   _dogIds() {
     const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
-    const byCat = {}; items.forEach(i => { const c = i.category || 'Uncategorized'; (byCat[c] = byCat[c] || []).push(i); });
+    // ⚠ THE SHARED COMPARISON BASIS, like every other grouping in this file (lines 66, 172, 238,
+    // 333) and the server audit. This was the THIRD grouping site and it was missed when the basis
+    // landed — it still keyed on the raw category, so it disagreed with the board rendered right
+    // beside it. It decides which items are Dogs, and that drives the "To Reprice" count, the
+    // Weekly Upside dollar figure and the batch reprice: with drinks split across Cocktails /
+    // Shots / Frozen, no drink section reached MIN_PER_CAT, so _dogIds found NO dogs while the
+    // board ranked the pool — Weekly Upside read 20x the truth and "Reprice to Target" offered to
+    // blind-bump four items the same page labelled Dogs, which the comment below forbids.
+    const byCat = {}; items.forEach(i => { const c = App.menuGroupKey(i); (byCat[c] = byCat[c] || []).push(i); });
     const dogs = new Set();
     Object.values(byCat).forEach(list => {
       if (list.length < this.MIN_PER_CAT) return;

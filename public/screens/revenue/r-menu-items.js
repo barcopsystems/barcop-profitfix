@@ -267,6 +267,14 @@ S.RevenueMenuItems = {
     this.container = container;
     this.actions = actions;
     if (actions) actions.innerHTML = '';
+    // ⚠ THIS SCREEN IS A SINGLETON, so anything not reset here SURVIVES leaving and coming back.
+    // renderLanding already clears nine transient fields, but these two live on the object across
+    // navigations: an operator who clicked Upload, went to Menu Engineering and came back found
+    // the upload card sitting where their entire menu used to be, with no way out but Cancel — and
+    // a stale selection could carry a bulk delete across a visit. Add Products clears both on
+    // entry; this did not.
+    this._importOpen = false;
+    this._selected = null;
     // Register the per-type section builtins and split the old single list, up front, so the
     // grouped list can order by this tab's own sections before the editor form has ever opened.
     // Idempotent and gated on the data being loaded — see App.ensureMenuCatLists.
@@ -1500,8 +1508,14 @@ S.RevenueMenuItems = {
     if (!(await App.putRecordsBulk('core', 'menu_item', this.items()))) {
       App.restoreRows(undoAll);
       App.dropRows(existing, addedRecs);
-      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the import. Nothing was changed — check your connection and try again.</div>';
-      this.render(this.container, this.actions);
+      // ⚠ RE-RENDER FIRST, THEN WRITE THE MESSAGE. This wrote the error into the slot and then
+      // re-rendered on the very next line, which destroyed it — so a failed import rolled
+      // everything back and the screen simply BLINKED. The operator's only reading was that
+      // nothing had happened, on the one path where they most need to be told. The success path
+      // below already re-fetches the slot after rendering; this now matches it.
+      this.renderLanding();
+      const res = document.getElementById('mi-imp-result');
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the import. Nothing was changed — check your connection and try again.</div>';
       return;
     }
     // Sections the file brought in join THIS type's list, so the operator's own menu sections are
