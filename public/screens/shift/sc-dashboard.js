@@ -612,7 +612,7 @@ S.ShiftDashboard = {
     const has = x => x != null && String(x).trim() !== '';
     // App.parseNum is the ONE coercion; 0 is this caller's own default for "no number".
     const n = x => App.parseNum(x) ?? 0;
-    const rows = [], zeroDays = [];
+    const rows = [], zeroDays = [], badDays = [];
     this._weekDays().forEach(d => {
       const bar = (document.getElementById('scm-bar-' + d) || {}).value;
       const food = (document.getElementById('scm-food-' + d) || {}).value;
@@ -627,11 +627,24 @@ S.ShiftDashboard = {
       // replacing, so a wrong $500 Monday on a day the bar was closed could never be taken
       // back down: the save reported success and the grid re-rendered the same $500, while
       // it kept feeding Where You Stand, the Hub and Revenue. Clear those days instead.
-      if (n(bar) + n(food) <= 0) { zeroDays.push(d); return; }
+      // ⚠ A NEGATIVE IS NOT AN OPERATOR ZEROING THE DAY. `<= 0` treated one as an explicit zero and
+      // DELETED that day's saved record, reporting "1 day cleared to zero" — and a negative bar
+      // against a larger food figure netted positive and got STORED as -4,500, rendering
+      // $-4,500.00. `min="0"` on the input does not stop it: a number input still hands back
+      // "-4500" and nothing calls checkValidity. Only a genuine, non-negative zero clears a day.
+      const b = n(bar), f = n(food);
+      if (b < 0 || f < 0 || n(cov) < 0) { badDays.push(d); return; }
+      if (b + f <= 0) { zeroDays.push(d); return; }
       rows.push({ date: d, bar: bar, food: food, covers: cov });
     });
     const res = document.getElementById('sc-ck-import-res');
     const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
+    // Refuse the whole save on a negative rather than part-saving around it — a day silently left
+    // out is the thing that makes the week's total wrong without anything on screen saying so.
+    if (badDays.length) {
+      fail('Sales and covers cannot be negative. Check ' + badDays.join(', ') + ' and save again.');
+      return;
+    }
     if (!rows.length && !zeroDays.length) { fail('Enter at least one day\'s sales before saving.'); return; }
 
     let cleared = 0, broke = false;
