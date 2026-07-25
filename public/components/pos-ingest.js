@@ -402,7 +402,38 @@ const PosIngest = {
       if (prior) { prior.bar = cents(prior.bar + bar); prior.food = cents(prior.food + food); prior.covers += covers; merged++; }
       else byDate.set(date, { bar, food, covers });
     });
-    const toAdd = []; const conflicts = []; const covDropped = [];
+    const toAdd = []; const conflicts = [];
+    /* ⚠ WHICH COLUMN, AND WHAT HAPPENED TO IT — one list was never enough. This was a flat
+       `covDropped` array of dates, born when the mechanism only fired for covers, and the cockpit
+       still renders it as "covers could not be read... sales still came in". The test underneath it
+       has since widened to bar and food, so on a bad BAR column all three of those claims are false
+       and the worst of them ("sales still came in") is the exact thing that did not happen.
+       There are also TWO different outcomes, and they need different words:
+         kept   — the day already had a record, so the column keeps the figure already saved;
+         zeroed — a BRAND-NEW day, so the column is written as 0 and presented as the day's takings.
+       The second one was reported NOWHERE AT ALL: not here (covDropped needed the column to be
+       carried-but-unreadable), not in `skipped`, not in `zeroSkipped`. A file whose Food cell is
+       empty on Tuesday wrote Tuesday's total_revenue as bar-only and called it the day's full
+       takings — which then feeds Confirm the Week, the cash-forecast baseline and the sales-tax
+       hold, all of them under-stated, with nothing on screen to say so. */
+    const colGaps = { kept: { bar: [], food: [], covers: [] }, zeroed: { bar: [], food: [], covers: [] } };
+    /* Does the FILE carry this column at all? A column that appears NOWHERE in the export is a
+       mapping decision the operator made and can see in the preview — a bar with no food service
+       would otherwise be told about its missing Food column on every single import, which is how a
+       result line stops being read. A column that is carried on SOME days and blank on this one is
+       the real gap, and that is what gets reported.
+       ⚠ KNOWN LIMIT, documented not fixed: a Food column present in the file but never MAPPED is
+       indistinguishable from one that does not exist, so it is not flagged either. */
+    // ⚠ OVER THE RAW ROWS, NOT OVER `carry`. `carry` is only populated for rows with a READABLE
+    // DATE, so one undated row was enough to make the whole file look like it had no Food column —
+    // and then a real gap on a dated day went unreported. Whether the export CARRIES a column is a
+    // fact about the file, and has nothing to do with whether a given row's date parsed.
+    const anywhere = { bar: false, food: false, covers: false };
+    (rows || []).forEach(r => {
+      if (numeric(r.bar)) anywhere.bar = true;
+      if (numeric(r.food)) anywhere.food = true;
+      if (numeric(r.covers)) anywhere.covers = true;
+    });
     const pv = v => Math.round((+v || 0) * 100) / 100;
     // ⚠ COVERS IS CLAMPED AT THE DAY, NOT AT THE ROW. Bar and food each get a day-level
     // non-positive guard; covers had none anywhere, so an accounting-negative covers cell — and
@@ -445,7 +476,24 @@ const PosIngest = {
       const barUsable  = colUsable(c.bar,    agg.bar);
       const foodUsable = colUsable(c.food,   agg.food);
       const covUsable  = colUsable(c.covers, agg.covers);
-      if ((c.bar && !barUsable) || (c.food && !foodUsable) || (c.covers && !covUsable)) covDropped.push(date);
+      // Record the gap only for a day that actually produces a record — a day about to be
+      // zero-skipped is already reported as its own outcome and must not be counted twice.
+      /* ⚠ BOTH BUCKETS ASK THE SAME QUESTION. `kept` used to test `carried` alone — which is the
+         very test the header comment above calls the flaw being fixed — so the half of this with
+         the STALE-NUMBER outcome stayed silent. A file whose Food cell is blank on Tuesday reported
+         the gap on a brand-new day and said nothing on a day that already had a record, where the
+         day is written with LAST import's food figure and counted as "1 replaced earlier figures".
+         Worse, a row whose every cell reads "N/A" against an existing day reported "1 day imported
+         (1 replaced earlier figures)" with nothing whatsoever from the file landing. Same file,
+         same blank cell, reported or not depending only on whether the day already existed. */
+      const noteGaps = isNew => {
+        [['bar', c.bar, barUsable], ['food', c.food, foodUsable], ['covers', c.covers, covUsable]]
+          .forEach(g => {
+            const col = g[0], carried = g[1], usable = g[2];
+            if (usable || !(carried || anywhere[col])) return;
+            (isNew ? colGaps.zeroed : colGaps.kept)[col].push(date);
+          });
+      };
       const barFor  = p => barUsable  ? agg.bar    : (p ? pv(p.bar_revenue)   : 0);
       const foodFor = p => foodUsable ? agg.food   : (p ? pv(p.floor_revenue) : 0);
       const covFor  = p => covUsable  ? agg.covers : (p ? (p.covers || 0)     : 0);
@@ -454,14 +502,40 @@ const PosIngest = {
       // in place — a retry after a refused write can never double the day.
       if (manualEntry) {
         if (cents(agg.bar + agg.food) <= 0) { skipped.push(date); return; }
+        noteGaps(!prior);
         toAdd.push(mkRec(date, barFor(prior), foodFor(prior), covFor(prior), true, prior && prior.id));
         return;
       }
       if (!prior) {   // a brand-new day: a column the file omits is genuinely 0 (nothing to preserve)
-        if (cents(agg.bar + agg.food) <= 0) { zeroSkipped.push(date); return; }   // S189: a $0 day is a deliberate zero, not an unreadable row
-        toAdd.push(mkRec(date, barFor(null), foodFor(null), covFor(null), false));
+        /* ⚠ ASK THE USABLE FIGURES, NOT THE RAW AGGREGATE. This summed `agg`, which still holds the
+           value the column guard above just refused — so a day reading bar 100 against food "(150)"
+           netted -50, was dropped, and the cockpit said "1 day came in at $0 and was skipped — use
+           Enter Manually to record a zero day". The file's Bar column said 100, the day's real
+           sales were thrown away, and the column that actually broke it was never named. Scales:
+           bar 4,200 against food "(4,500)" loses $4,200 the same way.
+           The day-with-history branch below already asks the CLAMPED figures (`useRec`), so the two
+           branches were drawing opposite conclusions from one bad column — the exact split the
+           covers hoist further up was written to stop, left standing on this guard. */
+        const newBar = barFor(null), newFood = foodFor(null);
+        if (cents(newBar + newFood) <= 0) {
+          // NOTHING READABLE IS NOT A ZERO DAY. S189's copy sends the operator to Enter Manually to
+          // record a zero; that is wrong advice for a row whose sales cells could not be read at
+          // all, and `skipped` ("no usable date or sales figure") is what that outcome already means.
+          if (!barUsable && !foodUsable) { skipped.push(date); return; }
+          zeroSkipped.push(date); return;   // S189: a $0 day is a deliberate zero, not an unreadable row
+        }
+        noteGaps(true);
+        toAdd.push(mkRec(date, newBar, newFood, covFor(null), false));
         return;
       }
+      /* ⚠ NOTHING USABLE MEANS NOTHING TO IMPORT FOR THIS DAY. Every column unreadable — an "N/A"
+         straight across the row, which is what a POS prints for a service that did not run —
+         rebuilt a record IDENTICAL to the prior (same id, same three figures), pushed it to toAdd
+         and counted it as a replace. The cockpit then said "1 day imported (1 replaced earlier
+         figures)" for a row that contributed nothing at all, and no gap was reported either,
+         because a column readable NOWHERE in the file is treated as a column the file does not
+         carry. `skipped` is what "no usable figure on this row" already means. */
+      if (!barUsable && !foodUsable && !covUsable) { skipped.push(date); return; }
       // A record already exists for this date. NEVER zero a column the file does not carry (S140):
       // "Use the file" overlays ONLY the columns the file actually has onto the prior figures.
       // ⚠ REUSE the prior record's id (S147): an import-replace / "use the file" is an UPSERT in
@@ -496,6 +570,12 @@ const PosIngest = {
                   || (foodUsable && pv(agg.food) !== pv(prior.floor_revenue))
                   || (covUsable && (agg.covers || 0) !== (prior.covers || 0));
         if (!diff) { if (!keptDates.has(date)) { keptDates.add(date); keptManual++; } return; }
+        // ⚠ noteGaps SITS BELOW EVERY "this day was not touched" RETURN. It used to run above the
+        // whole manual branch, so a hand-closed day the file simply MATCHED was reported twice —
+        // "1 day kept as you entered it" AND "Covers had no usable figure on 1 day, so that day
+        // kept the figures already saved" — for a day the import ignored end to end. Both true,
+        // and together they read like two separate things happened.
+        noteGaps(false);
         conflicts.push({
           key: date, date,
           mine:   { bar_revenue: pv(prior.bar_revenue), floor_revenue: pv(prior.floor_revenue), covers: prior.covers || 0 },
@@ -507,13 +587,14 @@ const PosIngest = {
       // Prior is an import / seed: replace it, carrying forward any column the file omits. Not a
       // user-vs-user conflict (replacing your own machine import), so no prompt.
       // (S189 is now checked ABOVE the manual branch so it covers a hand-closed prior too.)
+      noteGaps(false);
       dupCount++;
       toAdd.push(useRec);
     });
     // `merged`, NOT dupCount — the same reasoning spelled out in buildPmix. dupCount means "rows
     // already logged" everywhere else and the cockpit renders it as "N replaced earlier figures";
     // rows FOLDED INTO a total are the opposite of that.
-    return { toAdd, skipped, zeroSkipped, dupCount, merged, keptManual, conflicts, covDropped };
+    return { toAdd, skipped, zeroSkipped, dupCount, merged, keptManual, conflicts, colGaps };
   },
 
   // A row is one drawer's (or the day's) over/short. Resolves Register + Cashier
@@ -592,13 +673,43 @@ const PosIngest = {
        fixed for exactly this and never carried across to cash. */
     const has = v => App.parseNum(v) != null;
     const cents = n => Math.round(n * 100) / 100;
-    // Which dates have a NAMED-register row? Used to recognise a column-less TOTALS line (S142).
+    /* Which dates have a NAMED-register row? Used to recognise a column-less TOTALS line (S142).
+       ⚠ ONLY A ROW THAT WILL ACTUALLY IMPORT COUNTS. This asked "is there a named row on this
+       date", not "is there a named row that produces a FIGURE" — so a report whose per-register
+       rows all printed `--` for a drawer nobody closed made the date look covered, and the
+       column-less row carrying the day's ONLY readable over/short was thrown away as a duplicate
+       of two rows that imported nothing. The day ended with no cash record at all, which is the
+       precise opposite of what the totals-line skip exists to protect (a DOUBLE count). */
     const namedDates = new Set();
-    (rows || []).forEach(r => { if (String(r.drawer || '').trim()) { const d = this.normDate(r.date); if (d) namedDates.add(d); } });
-    const toAdd = []; const skipped = []; const conflicts = []; let dupCount = 0; let keptManual = 0; let extraDropped = 0; let totalsLines = 0; const used = new Set();
+    (rows || []).forEach(r => {
+      if (!String(r.drawer || '').trim()) return;
+      if (!(has(r.over_short) || (has(r.expected) && has(r.counted)))) return;
+      const d = this.normDate(r.date); if (d) namedDates.add(d);
+    });
+    const toAdd = []; const skipped = []; const undated = []; const conflicts = []; let dupCount = 0; let keptManual = 0; let extraDropped = 0; let totalsLines = 0; const used = new Set();
     (rows || []).forEach(r => {
       const date = this.normDate(r.date);
-      if (!date) { skipped.push('(no date)'); return; }
+      /* ⚠ AN UNREADABLE DATE IS ITS OWN OUTCOME, NOT "no over/short figure". Both skips went into
+         one `skipped` list and the cockpit renders that list as "N rows skipped, no over/short
+         figure" — so a file whose date cell reads "Jul 24" (no year, an ordinary export shape) sent
+         the operator to stare at an Over/Short column that was perfectly fine. The two sibling
+         doors already split this: buildServer has its own `undated`, buildSales says "no usable
+         date or sales figure". Cash was the only one that named the wrong column. */
+      if (!date) { undated.push((r.drawer || '').trim() || '(no date)'); return; }
+      const dName = (r.drawer || '').trim();
+      /* ⚠ SKIP A WHOLE-DAY TOTALS LINE (S142 + S190). A column-less row on a date that ALSO has
+         per-register rows is the day's TOTALS line; filing it beside the per-register rows
+         double-counts the day (consumers sum by date, not by register) in Drawer Net, the short
+         rate, Loss Prevention and the Books cash sheet. Skip + report it. This fires on BOTH a 2+
+         register bar (the blank stays day-level) AND a single-register bar (S190 — soleDrawer would
+         otherwise resolve the blank onto the one register and double it). A blank row on a date with
+         NO named rows is a legitimate whole-day count and is kept.
+         ⚠ THIS TEST RUNS BEFORE THE OVER/SHORT DERIVATION, NOT AFTER IT. Below the derivation, a
+         totals row whose own Over/Short read `N/A` fell out through `skipped` instead and the
+         cockpit printed "1 row skipped, no over/short figure" — sending the operator to a column
+         that was never going to be used, which is the same mis-naming the `undated` split directly
+         above was just written to stop. What the row IS does not depend on what its cells say. */
+      if (!dName && namedDates.has(date)) { totalsLines++; return; }
       const exp = this._num(r.expected), cnt = this._num(r.counted), os = this._num(r.over_short);
       let expected_cash = null, counted_cash = null, variance;
       // ⚠ THE POS'S OWN OVER/SHORT IS AUTHORITATIVE (S144). When the file carries it, use it —
@@ -614,18 +725,10 @@ const PosIngest = {
       } else if (has(r.expected) && has(r.counted)) {
         expected_cash = exp; counted_cash = cnt; variance = cents(cnt - exp);
       } else { skipped.push(date); return; }            // no over/short derivable
-      const dName = (r.drawer || '').trim();
       const dRec = dName ? drawerByName[dName.toLowerCase()] : soleDrawer;
       const drawer = dRec ? dRec.name : dName;
       const drawerId = dRec ? dRec.id : '';
-      // ⚠ SKIP A WHOLE-DAY TOTALS LINE (S142 + S190). A column-less row on a date that ALSO has
-      // per-register rows is the day's TOTALS line; filing it beside the per-register rows
-      // double-counts the day (consumers sum by date, not by register) in Drawer Net, the short
-      // rate, Loss Prevention and the Books cash sheet. Skip + report it. This fires on BOTH a 2+
-      // register bar (the blank stays day-level) AND a single-register bar (S190 — soleDrawer would
-      // otherwise resolve the blank onto the one register and double it). A blank row on a date with
-      // NO named rows is a legitimate whole-day count and is kept.
-      if (!dName && namedDates.has(date)) { totalsLines++; return; }
+      // (The whole-day totals-line skip now runs ABOVE the over/short derivation — see the note there.)
       const cName = (r.cashier || '').trim();
       const staff = cName ? staffByName[cName.toLowerCase()] : null;
       const cashier = staff ? staff.name : cName;
@@ -687,8 +790,10 @@ const PosIngest = {
     // `dupCount` means REPLACED (an earlier import), `keptManual` counts register-days the file
     // matched a hand count on, `conflicts` are register-days the operator must choose on,
     // `extraDropped` counts later file rows dropped because their register-day was already handled,
-    // and `totalsLines` counts column-less whole-day rows skipped as a totals line (S142).
-    return { toAdd, skipped, dupCount, keptManual, conflicts, extraDropped, totalsLines };
+    // `totalsLines` counts column-less whole-day rows skipped as a totals line (S142), `skipped`
+    // is rows with NO over/short derivable, and `undated` is rows whose DATE could not be read.
+    // The last two are different problems with different fixes and must never be reported as one.
+    return { toAdd, skipped, undated, dupCount, keptManual, conflicts, extraDropped, totalsLines };
   },
 
   // Two drawer figures are "the same" for conflict purposes when their over/short agrees to the
