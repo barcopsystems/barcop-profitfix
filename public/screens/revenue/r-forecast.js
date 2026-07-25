@@ -126,7 +126,9 @@ S.RevenueForecast = {
         + '<td>' + this.fmt(p.forecast) + '</td>'
         + '<td class="val">' + this.fmt(p.actual) + '</td>'
         + '<td class="' + cls + '">' + (p.gap >= 0 ? '+' : '') + this.fmt(p.gap) + '</td>'
-        + '<td class="' + cls + '">' + (p.gapPct != null ? (p.gapPct >= 0 ? '+' : '') + p.gapPct.toFixed(1) + '%' : '-') + '</td></tr>';
+        // App.fmtSigned: a week that hit its forecast exactly still leaves floating-point
+        // residue, and `>= 0 ? '+'` made the sign depend on which way it fell.
+        + '<td class="' + cls + '">' + App.fmtSigned(p.gapPct, 1, '%').text + '</td></tr>';
     }).join('');
     return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'
       + '<div class="sh" style="margin:0;">Forecast Accuracy</div>'
