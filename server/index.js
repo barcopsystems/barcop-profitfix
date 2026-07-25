@@ -2195,7 +2195,10 @@ app.post('/api/set-account-name', async (req, res) => {
 // so the email is free to sign up again.
 app.post('/api/abandon-account', async (req, res) => {
   try {
-    const { accountId } = req.body || {};
+    // `check:true` runs every guard below and reports the verdict WITHOUT deleting, so the confirm
+    // dialog can say the right thing up front instead of dead-ending the customer after they type
+    // DELETE. Same code path, so the check can never drift from what enforcement actually does.
+    const { accountId, check } = req.body || {};
     if (!accountId) return res.status(400).json({ error: 'Missing accountId' });
 
     const authHeader = req.headers.authorization || '';
@@ -2221,9 +2224,13 @@ app.post('/api/abandon-account', async (req, res) => {
     // CHECKOUT_BLOCK_STATES, not LIVE_SUB_STATES: an 'incomplete' sub never billed successfully,
     // so it must not trap the customer here either. Blocking both this AND checkout on
     // 'incomplete' is what left a failed-card customer with no way forward and no way back.
-    if (sub && CHECKOUT_BLOCK_STATES.includes(sub.subscription_status)) {
-      return res.status(400).json({ error: 'This account has an active subscription and cannot be discarded.' });
-    }
+    // ⚠ NO LONGER AN IMMEDIATE REFUSAL (L18 self-serve delete). Our table cannot see
+    // `cancel_at_period_end`, and Stripe keeps a CANCELLED subscription at status 'active' until the
+    // paid period ends (that is the no-refund policy working). Returning here therefore told a
+    // customer who had ALREADY cancelled to come back in three weeks, which is worse than having no
+    // button at all. Kept as EVIDENCE instead: Stripe decides below, and if Stripe cannot corroborate
+    // this row we still refuse, so the fail-closed posture is unchanged.
+    const dbSaysLive = !!(sub && CHECKOUT_BLOCK_STATES.includes(sub.subscription_status));
 
     // SOURCE OF TRUTH: ask STRIPE, not just our own table. The comment above says "never discard
     // an account that still has a LIVE subscription in Stripe" — until now nothing here asked
@@ -2257,6 +2264,9 @@ app.post('/api/abandon-account', async (req, res) => {
       return res.status(503).json({ error: 'Could not confirm your billing status just now. Nothing was deleted — please contact support.' });
     }
     const stripe = require('stripe')(stripeKey);
+    // sawMine  = Stripe confirmed a still-counting subscription for THIS bar (cancelled or not).
+    // windingDown/periodEnd = already cancelled, running out the paid period. The dialog says so.
+    let sawMine = false, windingDown = false, periodEnd = null;
     try {
       const custs = await stripe.customers.list({ email: ownerEmail, limit: 20 });
       for (const cust of (custs && custs.data) || []) {
@@ -2264,14 +2274,42 @@ app.post('/api/abandon-account', async (req, res) => {
         // Scope by the account_id stamped on the subscription, so a multi-bar owner
         // discarding one bar is not blocked by the subscription on another.
         const mine = ((subs && subs.data) || []).filter(s => s.metadata && s.metadata.account_id === accountId);
-        if (mine.some(s => CHECKOUT_BLOCK_STATES.includes(s.status))) {
-          return res.status(400).json({ error: 'This account has an active subscription and cannot be discarded.' });
+        for (const s of mine) {
+          if (!CHECKOUT_BLOCK_STATES.includes(s.status)) continue;
+          sawMine = true;
+          if (s.cancel_at_period_end) {
+            // Already cancelled: nothing further will be charged, so deleting is safe and is the
+            // customer's own call. They forfeit the rest of the period they paid for and the
+            // confirm dialog tells them that plainly before they commit.
+            windingDown = true;
+            if (s.current_period_end) periodEnd = s.current_period_end;
+          } else {
+            return res.status(400).json({
+              code: 'subscription_active',
+              error: 'This bar still has a live subscription. Open Manage Billing and cancel it first '
+                + 'so Stripe does not bill you again, then come back and delete.'
+            });
+          }
         }
       }
     } catch (e) {
       console.error('abandon-account: could not confirm billing with Stripe, refusing to delete:', e.message);
       return res.status(503).json({ error: 'Could not confirm your billing status just now. Nothing was deleted — please try again in a minute.' });
     }
+
+    // Our own table says this bar is billing and Stripe could not corroborate it (a changed billing
+    // email, a customer record we cannot see). Evidence of billing with no confirmation is exactly
+    // when to fail closed — this is what the old immediate DB refusal above used to cover.
+    if (dbSaysLive && !sawMine) {
+      return res.status(400).json({
+        code: 'subscription_active',
+        error: 'This bar still has a live subscription on record. Open Manage Billing and cancel it '
+          + 'first, then come back and delete.'
+      });
+    }
+
+    // Every guard passed. In check mode, report the verdict and touch nothing.
+    if (check) return res.json({ ok: true, deletable: true, windingDown: windingDown, periodEnd: periodEnd });
 
     // Delete the account (memberships + subscription cascade via FK ON DELETE CASCADE).
     const { error: delErr } = await supabaseAdmin.from('accounts').delete().eq('id', accountId);
@@ -2298,7 +2336,7 @@ app.post('/api/abandon-account', async (req, res) => {
       try { await supabaseAdmin.auth.admin.deleteUser(userId); } catch (e) { console.error('abandon deleteUser:', e); }
     }
 
-    res.json({ ok: true });
+    res.json({ ok: true, windingDown: windingDown, periodEnd: periodEnd });
   } catch (e) {
     console.error('abandon-account exception:', e);
     res.status(500).json({ error: e.message || 'Could not discard the account' });
