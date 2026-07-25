@@ -263,7 +263,11 @@ S.LaborReports = {
       + this.statItem('Actual Hours', actHours.toFixed(1))
       + this.statItem('Actual Cost', App.fmtCurrency(actCost))
       + this.statItem('Scheduled Hours', schedHours != null ? schedHours.toFixed(1) : '-', 'dim')
-      + this.statItem('Hours vs Scheduled', hoursVar != null ? ((hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1)) : '-', hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good')
+      // App.fmtSigned: a week that landed exactly on its scheduled hours still leaves
+      // floating-point residue, so this printed "-0.0" and took the green 'good' class off the
+      // raw sign rather than the one shown. Colour off s.sign, the displayed decision.
+      + this.statItem('Hours vs Scheduled', App.fmtSigned(hoursVar, 1).text,
+          hoursVar == null ? '' : (App.fmtSigned(hoursVar, 1).sign > 0 ? 'warn' : 'good'))
       + '</div></div>';
 
     let actualsCard;
@@ -389,7 +393,11 @@ S.LaborReports = {
       + this.statItem('Actual Hours', actHours.toFixed(1))
       + this.statItem('Actual Labor Cost', App.fmtCurrency(actCost))
       + this.statItem('Scheduled Hours', schedHours != null ? schedHours.toFixed(1) : '-', 'dim')
-      + this.statItem('Hours vs Scheduled', hoursVar != null ? ((hoursVar > 0 ? '+' : '') + hoursVar.toFixed(1)) : '-', hoursVar == null ? '' : hoursVar > 0 ? 'warn' : 'good')
+      // App.fmtSigned: a week that landed exactly on its scheduled hours still leaves
+      // floating-point residue, so this printed "-0.0" and took the green 'good' class off the
+      // raw sign rather than the one shown. Colour off s.sign, the displayed decision.
+      + this.statItem('Hours vs Scheduled', App.fmtSigned(hoursVar, 1).text,
+          hoursVar == null ? '' : (App.fmtSigned(hoursVar, 1).sign > 0 ? 'warn' : 'good'))
       + this.statItem('Labor % (vs Forecast)', laborPct != null ? App.fmtPct(laborPct) : '-', laborPct == null ? '' : laborPct > target ? 'warn' : 'good')
       + this.statItem('RPLH (vs Forecast)', rplh != null ? App.fmtCurrency(rplh) : '-')
       + '</div></div>';
