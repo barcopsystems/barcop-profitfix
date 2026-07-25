@@ -485,8 +485,12 @@ S.InventoryVarianceReport = {
         onComplete: rows => {
           this.posRows = rows.map(r => ({
             name: String(r.name || '').trim(),
-            qty: parseFloat(String(r.qty || '').replace(/[^0-9.]/g, '')) || 0,
-            sales: parseFloat(String(r.sales || '').replace(/[^0-9.-]/g, '')) || 0
+            // ⚠ THESE TWO DISAGREED WITH EACH OTHER ON ADJACENT LINES: qty stripped the minus and
+            // sales kept it, so a POS pmix line with a negative qty (a return or void) came in
+            // POSITIVE, inflating theoretical usage and sending the operator chasing shrinkage
+            // that never happened. Both now use the one coercion.
+            qty: App.parseNum(r.qty) ?? 0,
+            sales: App.parseNum(r.sales) ?? 0
           })).filter(r => r.name);
           this.manualMap = { ...this.savedPosMap() };
           this._unmatchedCollapsed = null;

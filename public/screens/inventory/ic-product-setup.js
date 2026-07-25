@@ -1558,7 +1558,7 @@ S.InventoryProducts = {
   // History is named but explicitly EXCLUDED: past counts, deliveries, waste and spot checks are a
   // record of what happened. Pulling a product out of last month's count would rewrite a closed
   // period's COGS, so a delete never touches them and the dialog says so.
-  _delRefsSummary(refs) {
+  _delRefsSummary(refs, count) {
     const names = (arr, key) => {
       const list = arr.map(x => (x && x[key]) || '').filter(Boolean);
       const shown = list.slice(0, 4).map(n => esc(n)).join(', ');
@@ -1575,7 +1575,7 @@ S.InventoryProducts = {
       + line((refs.investigations || []).length, 'open loss investigation', 'open loss investigations', names(refs.investigations || [], 'sku'))
       + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:10px;">'
       + 'Your count, delivery, waste and spot-check history also mentions '
-      + (refs.total === 1 ? 'it' : 'them') + '. That is a record of what happened and is never changed.'
+      + (count === 1 ? 'it' : 'them') + '. That is a record of what happened and is never changed.'
       + '</div>';
   },
   // Three-way, because "delete or cancel" is the wrong question when something still uses it.
@@ -1595,7 +1595,7 @@ S.InventoryProducts = {
     return new Promise(resolve => {
       const html = '<div class="card" style="margin:0;">'
         + '<div class="card-title">Something still uses ' + what + '</div>'
-        + this._delRefsSummary(refs)
+        + this._delRefsSummary(refs, ids.length)
         + (canInactivate
             ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:14px 0 4px;">'
               + '<strong>Make Inactive</strong> keeps every recipe costing correctly and every past number '
@@ -1961,7 +1961,9 @@ S.InventoryProducts = {
     const cat = this._formCategory || 'Liquor';
     const spec = this.FORM_SPEC[cat];
     const val = (row, k) => String(row[k] != null ? row[k] : '').trim();
-    const numOf = str => { if (str == null || str === '') return null; const n = parseFloat(String(str).replace(/[^0-9.]/g, '')); return isNaN(n) ? null : n; };
+    // App.parseNum is the ONE coercion; null for "no number" is already this caller's contract.
+    // ⚠ It also FIXES the sign here: this stripped the minus entirely, so a "-4.50" cell read +4.50.
+    const numOf = str => App.parseNum(str);
     // Snap an imported Misc Type to a known tag (case-insensitive); an unknown
     // value is kept as typed and simply behaves as a recipe ingredient.
     const normMiscType = v => { const s = (v || '').trim().toLowerCase(); return (App.MISC_TYPES || []).find(t => t.toLowerCase() === s) || (v || '').trim(); };
