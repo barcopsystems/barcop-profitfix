@@ -254,8 +254,8 @@ S.RevenueMenuItems = {
     App.showHelpModal('How Menu Builder Works', [
       { p: ['This is the one place you build and price your menu. Everything Bar Cop knows about an item, its price, cost, recipe and weekly units sold, lives here, and Menu Engineering, Dog Test, and Recipe Summary all read from it.'] },
       { h: 'Adding an Item', p: ['Start from the tile for the kind of item you are adding. Dishes and Cocktails get a recipe builder, so add ingredients and the cost computes itself, or skip the recipe and type a flat cost. No Prep items link straight to an Inventory Control product, and the cost and menu price both auto-fill from that product (the price stays yours to change). A poured product like draft beer or wine by the glass carries a Pour Size; a food or resale item carries a Portion; bottle beer sells whole. Enter units sold so Menu Engineering can weight the item by how often it sells.'] },
-      { h: 'Menu Categories Are Your Sections', p: ['The Category on each item is the section it sits in on your menu, and every tab keeps its own list. Dishes get Appetizers, Entrees, Sides, Desserts and Specials; Cocktails get Cocktails, Happy Hour, Frozen and Specials; No Prep gets Beer, Wine, NA Beverages and Snacks. Tap Edit next to Category to add your own sections to that tab, hide the ones you do not run, or reset to the defaults. Because the lists are separate, the Dish form never offers you Cocktails, and a Frozen section on your drink menu does not turn up on your food menu. On a No Prep item, beer, wine, and NA beverages land in their obvious section on their own; anything else you pick.'] },
-      { h: 'How Sections Affect Your Numbers', p: ['Sections are how your menu is laid out, not how Bar Cop judges an item. Dishes and No Prep items are compared inside their own section, because an appetizer is not an entree and a six dollar beer is not a sixty dollar bottle of wine. Cocktails are compared against every other cocktail no matter which section you file them under, because a frozen margarita and a house old fashioned earn their money the same way. So you can lay your drink menu out however you like without changing a single ranking.'] },
+      { h: 'Menu Categories Are Your Sections', p: ['Each tab is a kind of item, and the Category on each item is the section it sits in on your menu. Every tab keeps its own list: Dishes get Appetizers, Entrees, Sides and Desserts; Mixed Drinks get Cocktails, Shots and Frozen; No Prep gets Beer, Wine, NA Beverages and Snacks. Tap Edit next to Category to add your own sections to that tab, hide the ones you do not run, or reset to the defaults. Because the lists are separate, the Dish form never offers you a drink section, and a Frozen section on your bar menu does not turn up on your food menu. On a No Prep item, beer, wine, and NA beverages land in their obvious section on their own; anything else you pick.'] },
+      { h: 'How Sections Affect Your Numbers', p: ['Sections are how your menu is laid out, not how Bar Cop judges an item. Dishes and No Prep items are compared inside their own section, because an appetizer is not an entree and a six dollar beer is not a sixty dollar bottle of wine. Mixed Drinks are compared against every other mixed drink no matter which section you file them under, because a frozen margarita and a house old fashioned earn their money the same way. So you can lay your bar menu out however you like without changing a single ranking.'] },
       { h: 'Importing', p: ['Switch the form to Import File to drop a spreadsheet of your whole menu at once. You map the columns, then items come in without recipes; edit any item afterward to build its recipe or link a product. Any new section your file carries joins that tab\'s list, so your own sections are in the dropdown straight away. A section you have hidden stays hidden.'] },
       { h: 'Incomplete Items', p: ['An item missing a price or a cost shows as Incomplete and is left out of Menu Engineering until you finish it. The banner at the top counts how many are still open. Editing a price here also logs a pricing change so the Pricing Review Log in Menu Engineering picks it up.'] },
       { h: 'Inactive Items', p: ['Pulling an item off the menu does not mean deleting it. Edit any item and use Make Inactive to retire a seasonal dish or a summer cocktail, and it moves to the Inactive tab, out of the live menu and out of Menu Engineering but with its recipe, price and history intact. Cutting an item from the Dog Test puts it in the same place. Make Active brings one straight back; Delete Permanently removes it for good after a confirm.'] }
@@ -287,7 +287,10 @@ S.RevenueMenuItems = {
   // menu section (category) is chosen separately and is free-form.
   TYPES: [
     { key: 'plate',     label: 'Dishes',    add: 'Add Dish Menu Item',     imp: 'Dish List',     noun: 'dish' },
-    { key: 'cocktail',  label: 'Cocktails', add: 'Add Cocktail Menu Item', imp: 'Cocktail List', noun: 'cocktail' },
+    // ⚠ THE KEY IS DATA, THE LABEL IS DISPLAY. `key` is what lands in item.type and what the whole
+    // comparison basis groups on, so it stays 'cocktail' forever — renaming it would re-file every
+    // drink in the app. Only the operator-facing label moved to Mixed Drinks.
+    { key: 'cocktail',  label: 'Mixed Drinks', add: 'Add Mixed Drink', imp: 'Mixed Drink List', noun: 'mixed drink' },
     { key: 'inventory', label: 'No Prep',   add: 'Add Inventory Item',     imp: 'No Prep List',  noun: 'no prep' }
   ],
 
@@ -353,29 +356,42 @@ S.RevenueMenuItems = {
 
     // Inactive items (a seasonal item made inactive here, or cut from a Dog Test), across all
     // types. Shown ONLY on its own tab now — it used to sit at the bottom of every page.
-    const archivedSection = (onInactive && archivedItems.length)
+    // ⚠ ONE TABLE FOR BOTH STATES. The empty case used to be a bare line of text in a plain card
+    // while the populated case was a full table — two different-looking pages for the same tab.
+    // Add Products renders the SAME card with the SAME column headers either way and puts the
+    // empty message in the body, so the tab keeps its shape and you can see what will appear here.
+    const INACTIVE_EMPTY_MSG = 'No inactive menu items. Edit any item and use Make Inactive to pull a '
+      + 'seasonal dish or drink off the live menu without deleting it.';
+    const archivedSection = onInactive
       ? '<div class="sh" style="margin:8px 0 10px;">Inactive</div>'
-        + '<div style="font-size:12px;color:var(--t3);margin:0 0 10px;">These are off the live menu and out of Menu Engineering, but nothing is lost. Make active brings one straight back.</div>'
+        + (archivedItems.length
+          ? '<div style="font-size:12px;color:var(--t3);margin:0 0 10px;">These are off the live menu and out of Menu Engineering, but nothing is lost. Make active brings one straight back.</div>'
+          : '')
         + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Item</th><th>Category</th><th>Price</th><th></th>'
         + '</tr></thead><tbody>'
-        + archivedItems.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(item => '<tr>'
-            + '<td><div class="val">' + esc(item.name) + '</div></td>'
-            + '<td>' + esc(item.category || '') + '</td>'
-            + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
-            + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm mi-restore" data-id="' + esc(item.id) + '">Make Active</button>'
-            + '<button class="btn btn-danger btn-sm mi-delperm" data-id="' + esc(item.id) + '">Delete Permanently</button></div></td>'
-          + '</tr>').join('')
+        + (archivedItems.length
+          ? archivedItems.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(item => '<tr>'
+              + '<td><div class="val">' + esc(item.name) + '</div></td>'
+              + '<td>' + esc(item.category || '') + '</td>'
+              + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
+              // ⚠ EDIT BELONGS HERE. Without it, fixing a retired item's price meant Make Active →
+              // edit → Make Inactive: three steps, and the item sat on the LIVE MENU in between.
+              // Add Products has carried Make Active / Edit / Delete on its inactive rows all
+              // along; this tab was the one that was wrong.
+              + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm mi-restore" data-id="' + esc(item.id) + '">Make Active</button>'
+              + '<button class="btn btn-ghost btn-sm mi-inactive-edit" data-id="' + esc(item.id) + '">Edit</button>'
+              + '<button class="btn btn-danger btn-sm mi-delperm" data-id="' + esc(item.id) + '">Delete Permanently</button></div></td>'
+            + '</tr>').join('')
+          : '<tr><td colspan="4" style="color:var(--t3);font-size:12px;padding:14px 12px;line-height:1.6;">'
+            + esc(INACTIVE_EMPTY_MSG) + '</td></tr>')
         + '</tbody></table></div>'
       : '';
-
-    // An empty Inactive tab still needs to say what the tab is FOR, or it reads as a dead end.
-    const inactiveEmpty = (onInactive && !archivedItems.length)
-      ? '<div class="card" style="margin-top:6px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">'
-        + 'Nothing is inactive. Edit any item and use Make Inactive to pull a seasonal dish or cocktail off the live menu without deleting it.'
-        + '</div></div>'
-      : '';
-    this.container.innerHTML = '<div class="screen">' + tilesBlock + tabsBlock + lower + archivedSection + inactiveEmpty + '</div>';
+    // The upload panel REPLACES the list, so the tabs above it would be pointing at something that
+    // is not on screen — and clicking one silently swaps what you are looking at mid-upload. Add
+    // Products drops them for exactly this reason; the Cancel button is the way back.
+    this.container.innerHTML = '<div class="screen">' + tilesBlock
+      + (this._importOpen ? '' : tabsBlock) + lower + archivedSection + '</div>';
     this.wireLanding();
   },
 
@@ -554,8 +570,11 @@ S.RevenueMenuItems = {
       this.container.querySelector('.mi-imp-cancel')?.addEventListener('click', () => this.closeImport());
     }
 
-    // List: Edit opens the popup; Delete removes.
-    this.container.querySelectorAll('.mi-edit').forEach(b =>
+    // List: Edit opens the popup; Delete removes. The Inactive tab's Edit is a SEPARATE class so a
+    // Select All / bulk action on a working tab can never sweep up an inactive row, but it opens
+    // the identical editor — the status pill inside reads INACTIVE and the item stays inactive
+    // unless the operator flips it.
+    this.container.querySelectorAll('.mi-edit, .mi-inactive-edit').forEach(b =>
       b.addEventListener('click', () => this.openEditor(this.items().find(i => i.id === b.dataset.id) || null)));
     this.container.querySelectorAll('.mi-del').forEach(b =>
       b.addEventListener('click', async () => {

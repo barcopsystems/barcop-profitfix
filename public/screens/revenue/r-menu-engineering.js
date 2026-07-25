@@ -25,7 +25,13 @@ S.RevenueMenuEngineering = {
   MIN_PER_CAT: 4,
 
   // Menu order for the per-category sections (same order Menu Items uses).
-  CAT_ORDER: ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials', 'Cocktails', 'Beer', 'Wine', 'NA Beverages', 'Snacks'],
+  // ⚠ THIS SORTS DISPLAY LABELS, so it must contain the POOLED group's label too. The drink pool
+  // is labelled "Mixed Drinks" (App.menuGroupLabel's NOUN map) — without it here, indexOf returns
+  // -1 and every drink on this screen sorted to the bottom, below Snacks. Cocktails / Shots /
+  // Frozen are also listed because they are real section names a No Prep or dish list can use.
+  CAT_ORDER: ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials',
+              'Mixed Drinks', 'Cocktails', 'Shots', 'Frozen',
+              'Beer', 'Wine', 'NA Beverages', 'Snacks'],
 
   // The item's margin target: its own override, else the category default. Null
   // for beverages / inventory items with no set target, so no price is suggested.
