@@ -377,7 +377,7 @@ const PosIngest = {
       if (prior) { prior.bar = cents(prior.bar + bar); prior.food = cents(prior.food + food); prior.covers += covers; merged++; }
       else byDate.set(date, { bar, food, covers });
     });
-    const toAdd = []; const conflicts = [];
+    const toAdd = []; const conflicts = []; const covDropped = [];
     const pv = v => Math.round((+v || 0) * 100) / 100;
     // ⚠ COVERS IS CLAMPED AT THE DAY, NOT AT THE ROW. Bar and food each get a day-level
     // non-positive guard; covers had none anywhere, so an accounting-negative covers cell — and
@@ -398,17 +398,29 @@ const PosIngest = {
     byDate.forEach((agg, date) => {
       const c = carry.get(date) || {};
       const prior = priorByDate.get(date);
+      /* ⚠ HOISTED ABOVE EVERY BRANCH, and it has to be. A negative covers aggregate means the file
+         is wrong about covers for this day, so the column is NOT CARRIED — the prior stands, and a
+         brand-new day gets nothing rather than an invented 0. This test first went in on the
+         prior-exists path only, so the two branches drew opposite conclusions from the SAME bad
+         column: a day with history kept its 220 covers while a new day was hard-written to 0, both
+         silently, in one import.
+         And it is REPORTED. Bar and food already report a dropped day through zeroSkipped, which
+         is the precedent the first version cited and then did not follow — the operator was told
+         "7 days imported" with no way to know covers never came from the file at all. */
+      const covUsable = !!c.covers && (agg.covers || 0) >= 0;
+      if (c.covers && !covUsable) covDropped.push(date);
+      const covFor = p => covUsable ? agg.covers : (p ? (p.covers || 0) : 0);
       // The grid writes straight through: an edit is the operator's own choice, so there is no
       // conflict to raise. It REUSES any prior record's id for the date (S147) so a re-save upserts
       // in place — a retry after a refused write can never double the day.
       if (manualEntry) {
         if (cents(agg.bar + agg.food) <= 0) { skipped.push(date); return; }
-        toAdd.push(mkRec(date, agg.bar, agg.food, agg.covers, true, prior && prior.id));
+        toAdd.push(mkRec(date, agg.bar, agg.food, covFor(prior), true, prior && prior.id));
         return;
       }
       if (!prior) {   // a brand-new day: a column the file omits is genuinely 0 (nothing to preserve)
         if (cents(agg.bar + agg.food) <= 0) { zeroSkipped.push(date); return; }   // S189: a $0 day is a deliberate zero, not an unreadable row
-        toAdd.push(mkRec(date, agg.bar, agg.food, agg.covers, false));
+        toAdd.push(mkRec(date, agg.bar, agg.food, covFor(null), false));
         return;
       }
       // A record already exists for this date. NEVER zero a column the file does not carry (S140):
@@ -428,8 +440,7 @@ const PosIngest = {
          it can no longer offer "-12 covers" as a choice that would actually write 0, and a day
          whose only "difference" is an unusable covers cell stops raising a prompt where both
          answers produce the identical record. */
-      const covUsable = !!c.covers && (agg.covers || 0) >= 0;
-      const mCov  = covUsable ? agg.covers : (prior.covers || 0);
+      const mCov  = covFor(prior);
       const useRec = mkRec(date, mBar, mFood, mCov, false, prior.id);   // what "Use the file" would write
       if (prior.source === 'manual') {
         // Only a DIFFERING carried column is a conflict — never prompt when the numbers MATCH; the
@@ -455,7 +466,7 @@ const PosIngest = {
     // `merged`, NOT dupCount — the same reasoning spelled out in buildPmix. dupCount means "rows
     // already logged" everywhere else and the cockpit renders it as "N replaced earlier figures";
     // rows FOLDED INTO a total are the opposite of that.
-    return { toAdd, skipped, zeroSkipped, dupCount, merged, keptManual, conflicts };
+    return { toAdd, skipped, zeroSkipped, dupCount, merged, keptManual, conflicts, covDropped };
   },
 
   // A row is one drawer's (or the day's) over/short. Resolves Register + Cashier
