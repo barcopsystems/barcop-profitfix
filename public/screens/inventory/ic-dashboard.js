@@ -206,21 +206,36 @@ S.InventoryDashboard = {
     const prevRaw = {};
     if (sigPrev) sigPrev.comps.forEach(c => { prevRaw[c.key] = c.raw; });
 
-    // Reorder plan (same basis as Order Sheet: below par → fill to par).
-    const byVendor = {};
-    let reorderTotal = 0, reorderCount = 0, parChecked = 0;
+    // ── Reorder plan — ONE DOOR (fixed 2026-07-25, Kyle found it on the live app) ──────────────
+    // This USED to be its own copy of the Order Sheet's below-par loop, commented "same basis as
+    // Order Sheet" while being a separate implementation, and the two drifted in two ways:
+    //   1. it read the COUNT alone, so a vendor Kyle had already ordered AND received still showed
+    //      "2 items below par / CREATE ORDER" on Close The Week;
+    //   2. it had no `active === false` filter, so a hidden product still counted here while the
+    //      Order Sheet excluded it — two screens, two different item counts and two costs.
+    // Read the real plan instead, exactly as CashEngine.reorderToPar() already does, so the
+    // cockpit, the Order Sheet and the cash forecast cannot disagree about what to buy.
+    let parChecked = 0;
     Object.keys(onHand).forEach(pid => {
       const p = this.productById(pid); if (!p) return;
       const par = parseFloat(p.par_level); if (isNaN(par) || par <= 0) return;
-      parChecked++;
-      const oh = onHand[pid]; if (oh >= par) return;
-      const qty = Math.max(1, Math.ceil(par - oh));
-      const cost = qty * (App.unitCost(p) || 0);
-      const v = p.vendor || 'Unassigned';
-      if (!byVendor[v]) byVendor[v] = { vendor: v, items: 0, cost: 0 };
-      byVendor[v].items++; byVendor[v].cost += cost;
-      reorderTotal += cost; reorderCount++;
+      parChecked++;   // "are pars set up at all", which drives hasReorderBasis below
     });
+    const byVendor = {};
+    let reorderTotal = 0, reorderCount = 0, justReceivedCount = 0;
+    const _os = window.S && S.InventoryOrderSheet;
+    const _plan = (_os && _os.belowParByVendor) ? _os.belowParByVendor() : null;
+    if (_plan && _plan.groups) {
+      Object.keys(_plan.groups).forEach(v => (_plan.groups[v] || []).forEach(l => {
+        const cost = (l.suggested || 0) * (l.unit_cost || 0);
+        if (!byVendor[v]) byVendor[v] = { vendor: v, items: 0, cost: 0 };
+        byVendor[v].items++; byVendor[v].cost += cost;
+        reorderTotal += cost; reorderCount++;
+      }));
+      // Items that left the plan only because a delivery covered them. Surfaced as a note so the
+      // number dropping is explained rather than mysterious, and the operator knows where to look.
+      Object.keys(_plan.justReceived || {}).forEach(v => { justReceivedCount += (_plan.justReceived[v] || []).length; });
+    }
     const vendors = Object.values(byVendor).sort((a, b) => b.cost - a.cost);
     let parOff = 0;
     if (sigNow) { const pc = sigNow.comps.find(c => c.key === 'par'); if (pc) parOff = pc.off || 0; }
@@ -266,7 +281,7 @@ S.InventoryDashboard = {
     return {
       asc, latest, prev, onHand, inventoryValue, lastAge, hasCountThisWeek, weekCount,
       base, periodCost, weeksOnHand, sigNow, prevRaw,
-      vendors, reorderTotal, reorderCount, parOff, hasReorderBasis: parChecked > 0,
+      vendors, reorderTotal, reorderCount, justReceivedCount, parOff, hasReorderBasis: parChecked > 0,
       fast, slow, dead, deadAll, shrink, spotFlags, catRows, catMax, deliveriesThisWeek, menuOver
     };
   },
@@ -421,8 +436,16 @@ S.InventoryDashboard = {
           + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:var(--t1);white-space:nowrap;">' + App.fmtCurrency(v.cost) + '</div>'
           + '<div style="width:130px;flex-shrink:0;display:flex;justify-content:center;">' + action + '</div></div>';
       }).join('');
+      // Say WHY the number is lower than the last count implies. Without this the figure just
+      // quietly drops after a delivery and the operator cannot tell whether Bar Cop noticed the
+      // stock or lost it. The Order Sheet holds the detail and keeps those items orderable.
+      const jrNote = st.justReceivedCount
+        ? '<div style="font-size:11px;color:var(--t3);margin:8px 0 0;">' + st.justReceivedCount + ' item'
+          + (st.justReceivedCount === 1 ? ' is' : 's are') + ' not listed because deliveries since your count already cover them. '
+          + '<span data-go="ic-order-sheet" style="color:var(--gold);cursor:pointer;">See them on the Order Sheet</span></div>'
+        : '';
       return '<div style="font-size:12px;color:var(--t2);margin-bottom:6px;">Bring everything to par: <strong style="color:var(--gold);font-size:15px;">' + App.fmtCurrency(st.reorderTotal) + '</strong></div>'
-        + vRows + (st.parOff ? this.parNudge(st.parOff) : '')
+        + vRows + jrNote + (st.parOff ? this.parNudge(st.parOff) : '')
         + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet">Open Order Sheet</button>' + this.markBtn('orders', 'Mark Done'));
     }
     // review
