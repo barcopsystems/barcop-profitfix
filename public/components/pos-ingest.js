@@ -54,7 +54,7 @@ const PosIngest = {
       { key: 'date',   label: 'Date',       required: true,  match: ['date', 'business date', 'day', 'service date', 'business day', 'sales date', 'trans date', 'date of sale'] },
       { key: 'bar',    label: 'Bar Sales',  required: false, match: ['bar sales', 'bar revenue', 'bar', 'beverage', 'liquor sales', 'beverage sales', 'drink sales', 'drinks', 'drink', 'liquor', 'alcohol', 'wet sales', 'beverage revenue', 'drink revenue', 'bar total', 'beverage total', 'alcohol sales'] },
       { key: 'food',   label: 'Food Sales', required: false, match: ['food sales', 'food revenue', 'food', 'kitchen', 'floor', 'floor sales', 'kitchen sales', 'food total', 'dining', 'dining sales', 'meal sales', 'dry sales', 'kitchen revenue', 'entree sales'] },
-      { key: 'covers', label: 'Covers',     required: false, match: ['covers', 'guests', 'guest count', 'customers', 'checks', 'check count', 'transactions', 'tickets', 'headcount', 'heads', 'patrons', 'guest ct', 'orders', 'sales count', 'covers count'] }
+      { key: 'covers', label: 'Covers',     required: false, match: ['covers', 'covers count', 'guest count', 'guests', 'guest ct', 'headcount', 'heads', 'patrons', 'customers', 'checks', 'check count', 'tickets', 'transactions', 'orders', 'sales count'] }
     ],
     // A POS cash / drawer report: per-day, optionally per-register. The POS blind
     // close already computed over/short, so the cash-variance pattern recovery
@@ -65,13 +65,13 @@ const PosIngest = {
       // NOT a bare 'pos': it eats the "POS Cash" column, which is this file's Expected
       // Cash, and files a dollar amount as the register name.
       { key: 'drawer',     label: 'Register',      required: false, match: ['drawer', 'register', 'till', 'station', 'terminal', 'device', 'workstation', 'reg', 'register name', 'till id', 'drawer id', 'terminal id'] },
-      { key: 'cashier',    label: 'Cashier',       required: false, match: ['cashier', 'server', 'employee', 'name', 'staff', 'bartender', 'clerk', 'operator', 'user', 'server name', 'employee name'] },
+      { key: 'cashier',    label: 'Cashier',       required: false, match: ['cashier', 'server name', 'server', 'employee name', 'employee', 'team member', 'staff name', 'staff', 'bartender', 'clerk', 'operator', 'user', 'name'] },
       // Expected = cash sales + starting bank - paid-outs. NOT 'cash sales' / 'net cash':
       // those are a different quantity, and mapping them makes buildVoids prefer a bogus
       // counted-minus-sales subtraction over the POS's own authoritative Over/Short.
-      { key: 'expected',   label: 'Expected Cash', required: false, match: ['expected', 'expected cash', 'declared', 'system cash', 'pos cash', 'cash due', 'expected drawer', 'system total', 'expected total', 'sys cash', 'expected amount'] },
+      { key: 'expected',   label: 'Expected Cash', required: false, match: ['expected cash', 'expected drawer', 'expected total', 'expected amount', 'expected', 'system cash', 'system total', 'sys cash', 'pos cash', 'cash due'] },
       // NOT 'bank': on a drawer report "Bank" is the opening float, not the count.
-      { key: 'counted',    label: 'Counted Cash',  required: false, match: ['counted', 'counted cash', 'actual', 'actual cash', 'deposit', 'deposited', 'drawer count', 'actual drawer', 'counted total', 'cash counted', 'ending cash', 'deposit amount', 'cash in drawer', 'actual amount'] },
+      { key: 'counted',    label: 'Counted Cash',  required: false, match: ['counted cash', 'cash counted', 'counted total', 'drawer count', 'actual drawer', 'actual cash', 'actual amount', 'cash in drawer', 'ending cash', 'deposit amount', 'cash deposited', 'counted', 'actual', 'deposited'] },
       { key: 'over_short', label: 'Over / Short',  required: false, match: ['over/short', 'over short', 'variance', 'difference', 'discrepancy', '+/-', 'short/over', 'over', 'short', 'cash variance', 'diff', 'variance amount'] }
     ],
     // A POS per-server sales report: one row per server (per day). Covers + sales
@@ -79,20 +79,45 @@ const PosIngest = {
     // name; writes revenue_server_check records. Comps/tips already auto-join from
     // the Void/Comp log and Tip Tracking, so they are not needed here.
     server: [
-      { key: 'name',   label: 'Server',      required: true,  match: ['server', 'server name', 'employee', 'employee name', 'name', 'staff', 'bartender', 'staff name', 'waiter', 'sales rep', 'attendant'] },
+      { key: 'name',   label: 'Server',      required: true,  match: ['server name', 'server', 'employee name', 'employee', 'team member', 'team member name', 'staff name', 'staff', 'bartender', 'name', 'staff name', 'waiter', 'sales rep', 'attendant'] },
       { key: 'date',   label: 'Date',        required: true,  match: ['date', 'business date', 'shift date', 'service date', 'day', 'business day'] },
-      { key: 'covers', label: 'Covers',      required: true,  match: ['covers', 'guests', 'guest count', 'checks', 'customers', 'check count', 'tickets', 'tables', 'transactions', 'guest ct', 'orders', 'headcount'] },
-      { key: 'sales',  label: 'Total Sales', required: true,  match: ['sales', 'net sales', 'total sales', 'gross sales', 'revenue', 'amount', 'net', 'total', 'gross', 'sales total', 'server sales', 'rung sales', 'dollars', 'net total'] },
+      /* ⚠ GUEST COUNT FIRST. A check/order/ticket count is a DIFFERENT QUANTITY and every one of
+         Aloha, Revel, Clover and SpotOn prints it to the LEFT of the guest count — so under the
+         old column-order matching it won, and a real Revel row (52 orders / 118 guests / $3,800)
+         put every server on the scorecard at a $73.08 check average against a true $32.20. The
+         contract is spelled out in confirm-week.js: check average is per-GUEST, so the numerator
+         and the cover population have to match. They stay as last-resort candidates because some
+         exports carry nothing else. */
+      { key: 'covers', label: 'Covers',      required: true,  match: ['covers', 'guest count', 'guests', 'guest ct', 'headcount', 'customers', 'checks', 'check count', 'tickets', 'tables', 'transactions', 'orders'] },
+      /* ⚠ NET BEFORE GROSS, and bare 'gross' is gone. Aloha, Lightspeed, TouchBistro and Square
+         all print Gross Sales before Net Sales, so gross was winning — counting the comps and
+         promos the operator already gave away as that server's own sales, which then drives the
+         check average and the comp% signal. Bare 'amount'/'total' stay last: they are what an
+         order-detail export calls its money column when it calls it nothing better. */
+      { key: 'sales',  label: 'Total Sales', required: true,  match: ['net sales', 'net total', 'sales total', 'total sales', 'server sales', 'rung sales', 'sales', 'revenue', 'net', 'gross sales', 'total', 'amount', 'dollars'] },
       { key: 'shift',  label: 'Shift',       required: false, match: ['shift', 'shift type', 'daypart', 'meal period', 'shift name'] }
     ],
     // A POS product-mix (PMIX) report: one row per menu item with units sold for
     // the week. Matches the item to the menu by name and UPDATES weekly_covers in
     // place (no new records), so it has a custom commit (_commitPmix).
     pmix: [
-      { key: 'name',  label: 'Item Name',  required: true, match: ['item', 'item name', 'menu item', 'menu item name', 'name', 'product', 'description', 'product name', 'menu', 'plu', 'plu name', 'item description', 'sku', 'item no'] },
-      // NOT a bare 'each': it grabs an "Each Price" column, and $12.50 strips to 1250
-      // units sold, which moves the item's whole Menu Engineering quadrant.
-      { key: 'units', label: 'Units Sold', required: true, match: ['units', 'units sold', 'sold', 'qty', 'qty sold', 'quantity', 'covers', 'sales count', 'count', 'number sold', 'quantity sold', 'sold qty', 'orders', 'rung', 'total sold', 'units count'] }
+      /* ⚠ 'sku' AND 'plu' ARE GONE, and bare 'menu' with them. Toast's ItemSelectionDetails.csv
+         prints SKU and PLU columns BEFORE "Menu Item" and leaves them blank unless the operator
+         fills them in, so the importer bound the name to an empty column and read ZERO rows off a
+         file whose item names were right there. Bare 'menu' is the surviving half of the same
+         incident: on a product mix grouped by menu it bound "Menu Name", which holds Dinner /
+         Brunch / Bar, and reported those as unmatched item names. An identifier is not a name. */
+      { key: 'name',  label: 'Item Name',  required: true, match: ['menu item name', 'menu item', 'item name', 'product name', 'item description', 'description', 'item', 'product', 'name'] },
+      /* ⚠ EXPLICIT SOLD-TERMS FIRST. NOT a bare 'each': it grabs an "Each Price" column, and
+         $12.50 strips to 1250 units sold, which moves the item's whole Menu Engineering quadrant.
+         'count' is gone: it claimed a "Count Date" column on a stock-count export and stored the
+         date as units. Toast prints "Item Qty (incl voids)" to the LEFT of the net "Item Qty", so
+         the precise terms have to come first or voided plates count as sold.
+         ⚠ KNOWN LIMIT, not solvable by name: 'quantity' is the units-sold column on a Clover or
+         Lightspeed ITEM SALES report and the on-hand column on the same vendors' INVENTORY export.
+         Same word, two meanings, so an inventory file dropped on this door still needs the
+         operator to read the preview. It sits last so any real sold-column wins it. */
+      { key: 'units', label: 'Units Sold', required: true, match: ['units sold', 'quantity sold', 'qty sold', 'sold qty', 'total sold', 'number sold', 'item qty', 'units', 'sold', 'qty', 'units count', 'sales count', 'rung', 'quantity'] }
     ]
   },
 
@@ -551,7 +576,21 @@ const PosIngest = {
     existing.forEach(x => { if (x && x.source === 'manual') manualByKey.set(x.date + '|' + (x.drawer_id || ''), x); });
     const keptKeys = new Set();       // register-DAYS reported as kept (file matched), N counts days not rows
     const conflictKeys = new Set();   // register-days already raised as a conflict (first file row establishes it)
-    const has = v => v != null && String(v).trim() !== '';
+    /* ⚠ "IS THERE A FIGURE HERE" MUST ASK App.parseNum, NOT "IS THE CELL NON-BLANK". This was a
+       bare non-empty-string test, so a POS placeholder — `-`, `--`, `N/A`, `#DIV/0!`, `#REF!`, and
+       a drawer nobody closed prints exactly that — passed as a real value, `_num` turned it into
+       0, and the row stored as **$0.00, Within Tolerance**.
+       That is not a wrong number in one cell. It converts the honest "Not counted" state into a
+       CLEAN BILL OF HEALTH across the Hub shift card, Where You Stand, the loss-flag rows and the
+       Bar Cop Briefing ("The register is clean this week... Nothing walking this week"), on a week
+       where nobody counted a drawer. A loss-prevention screen reading all-clear because the file
+       had a dash in it is the worst failure this app can have.
+       It also stops a junk Expected or Counted cell from becoming 0 INSIDE the subtraction below
+       and fabricating a full-magnitude Short (`#REF!` against $1,000 expected read as a $1,000
+       Short) — with `has` honest, that row falls through to `skipped` and is reported.
+       This is the twin of the sales door's `numeric` test (`App.parseNum(v) != null`), which was
+       fixed for exactly this and never carried across to cash. */
+    const has = v => App.parseNum(v) != null;
     const cents = n => Math.round(n * 100) / 100;
     // Which dates have a NAMED-register row? Used to recognise a column-less TOTALS line (S142).
     const namedDates = new Set();
@@ -670,7 +709,7 @@ const PosIngest = {
   buildServer(rows) {
     const staffByName = this._staffByName();
     const existing = (App.data && App.data.revenue_server_checks) || [];
-    const toAdd = []; const skipped = []; const incomplete = []; let dupCount = 0; const used = new Set();
+    const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       // ⚠ Math.max(0, ...): the coercion now reads a sign, and a server cannot ring NEGATIVE
@@ -686,6 +725,16 @@ const PosIngest = {
       if (!staff) { skipped.push(r.name || '(blank)'); return; }
       if (!covers || !(sales > 0)) { incomplete.push(r.name || '(blank)'); return; }
       const recDate = this.normDate(r.date);
+      /* ⚠ A ROW WITH NO READABLE DATE IS NOT AN IMPORT, IT IS A SKIP. This wrote the record with
+         `date: ''` and counted it as imported. Every consumer of a server check filters by date
+         (r-server-check's scorecard is `(c.date || '') >= cutoff`), so the row was invisible
+         everywhere the operator would look for it — while the audit's readiness count, which does
+         NOT date-filter when there are no closed weeks, still counted it. "2 server checks
+         imported" for two rows that appear on no screen.
+         The two sibling doors already refuse this: buildSales says "No days imported. Check that
+         the file has a Date column", buildCash says "Each row needs a date". Only server accepted
+         it. A per-server export with a date cell like "Jul 24" or "7/24" (no year) hits this. */
+      if (!recDate) { undated.push(r.name || '(blank)'); return; }
       if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate
             && (x.covers || 0) === covers && Math.abs((x.sales || 0) - sales) < 0.001)) { dupCount++; return; }
       toAdd.push({
@@ -694,7 +743,7 @@ const PosIngest = {
         imported: true, saved_at: new Date().toISOString()
       });
     });
-    return { toAdd, skipped, incomplete, dupCount };
+    return { toAdd, skipped, incomplete, undated, dupCount };
   },
 
   // A POS product-mix report: one row per item with units sold. Matches the item
@@ -702,8 +751,17 @@ const PosIngest = {
   // applied in _commitPmix. Unmatched item names are skipped and surfaced.
   buildPmix(rows) {
     const items = (App.data && App.data.menu_items) || [];
+    /* ⚠ TWO PASSES, ARCHIVED FIRST, SO A LIVE ITEM ALWAYS WINS ITS NAME. This was one pass over
+       every item including archived ones, so which copy received the units was decided by ARRAY
+       POSITION. An item the operator rebuilt (old one archived, new one live) could take its
+       week's sales onto the archived row, which Menu Engineering filters out of every board — the
+       message said "1 menu item updated from sales mix" and the number appeared nowhere.
+       The cash door already does exactly this two-pass ordering for registers (S145); PMIX never
+       got it. Archived items are still indexed, so a POS still selling a retired item matches
+       rather than reporting a false "name not matched". */
     const byName = {};
-    items.forEach(it => { if (it && it.name) byName[it.name.trim().toLowerCase()] = it; });
+    items.forEach(it => { if (it && it.name && it.archived) byName[it.name.trim().toLowerCase()] = it; });
+    items.forEach(it => { if (it && it.name && !it.archived) byName[it.name.trim().toLowerCase()] = it; });
     // AGGREGATE BY ITEM — never one entry per CSV row. A PMIX split by daypart, revenue centre or
     // order type lists the same item several times, which is an ordinary export shape, and the
     // week's units sold is their SUM. One-entry-per-row meant the LAST row won (lunch silently
@@ -715,16 +773,22 @@ const PosIngest = {
     // Aggregating HERE rather than at commit means the PREVIEW shows the combined figure, so the
     // operator approves the number that will actually be saved.
     const byItem = new Map();
-    const skipped = []; const dupCount = 0; let merged = 0;
+    // ⚠ TWO LISTS, NOT ONE. `skipped` used to hold both "this name is not on your menu" and "this
+    // row's Units cell is unreadable", and the screen renders it as "N names not matched" — so an
+    // item that IS on the menu with a junk Units cell sent the operator off to rename a menu item
+    // that was already correct. buildServer split exactly this into skipped vs incomplete for
+    // exactly this reason; PMIX never got the split.
+    const skipped = []; const incomplete = []; const dupCount = 0; let merged = 0;
     (rows || []).forEach(r => {
       const nm = (r.name || '').trim().toLowerCase();
       const units = this._count(r.units);   // signed: a "-3" return REDUCES the week's units; NaN (junk) is skipped below
-      if (!nm || isNaN(units)) { skipped.push(r.name || '(blank)'); return; }
+      if (!nm) { skipped.push(r.name || '(blank)'); return; }
       const it = byName[nm];
       if (!it) { skipped.push(r.name); return; }
+      if (isNaN(units)) { incomplete.push(r.name); return; }
       const prior = byItem.get(it.id);
       if (prior) { prior.covers += units; merged++; }
-      else byItem.set(it.id, { item_id: it.id, covers: units });
+      else byItem.set(it.id, { item_id: it.id, name: it.name, covers: units });
     });
     // Drop an item whose NET units come out NEGATIVE (returns exceeded sales in this file, or a
     // returns-only export dropped by mistake). _commitPmix REPLACES weekly_covers, so writing a
@@ -734,13 +798,21 @@ const PosIngest = {
     // sold none this week, and that is a TRUE figure that must overwrite. Filtering it out left last
     // week's number on screen as if it were current — and a zero-seller is exactly what the Dog Test
     // exists to surface, so hiding it behind a stale figure is the worse lie. `> 0` was too greedy.
-    const toAdd = [...byItem.values()].filter(u => u.covers >= 0);
+    // ⚠ A DROPPED ITEM IS REPORTED. This filter is right — writing a negative would overwrite the
+    // real prior figure and show "-3 sold/wk" — but the item vanished in TOTAL SILENCE: not in
+    // toAdd, not in skipped, and the message still read "1 menu item updated from sales mix". The
+    // item then kept LAST week's units and presented them as this week's mix on Menu Engineering,
+    // driving its Star/Dog call, its suggested price and the weekly upside. Same reporting rule
+    // the sales door got for a column it could not read.
+    const toAdd = [];
+    const netNegative = [];
+    byItem.forEach(u => { if (u.covers >= 0) toAdd.push(u); else netNegative.push(u.name || u.item_id); });
     // `merged`, NOT dupCount. In every other builder in this file dupCount means rows SKIPPED
     // because they were already logged, and every screen renders it as "N already logged" — the
     // opposite of what happened here, where N rows were FOLDED INTO a total. Reusing the name
     // would have been a message waiting to lie the moment someone wired it up. dupCount stays 0
     // so the shared build() contract documented at the top of this file still holds.
-    return { toAdd, skipped, dupCount, merged };
+    return { toAdd, skipped, incomplete, netNegative, dupCount, merged };
   },
 
   // ── Persist ──────────────────────────────────────────────────────────────

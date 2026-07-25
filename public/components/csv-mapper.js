@@ -237,7 +237,13 @@ const CSVMapper = {
     const map = {};
     const used = Object.assign({}, takenIdx || {});   // keyed by INDEX, so duplicate NAMES don't block each other
     const esc = c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const candsFor = f => [f.key, f.label, ...(f.match || [])].map(s => String(s).toLowerCase());
+    /* ⚠ MATCH TERMS FIRST, KEY AND LABEL LAST. Now that candidate ORDER decides the winner, the
+       order of this list is the priority order — and the field's own key is the LEAST specific
+       thing about it. With `f.key` first, the pmix name field led with the bare word "name", which
+       word-matches "Menu Name" on a Toast product mix grouped by menu, so Dinner / Brunch / Bar
+       imported as item names ahead of the file's real "Menu Item" column. The curated `match`
+       list is the precise vocabulary; the key and label are the fallback. */
+    const candsFor = f => [...(f.match || []), f.key, f.label].map(s => String(s).toLowerCase());
     const norm = h => String(h).toLowerCase().trim();
     const claim = (f, i) => { if (i > -1) { map[f.key] = i; used[i] = true; } };
     // An UNNAMED column is never auto-claimed — there is nothing to match on, and guessing it is
@@ -250,20 +256,47 @@ const CSVMapper = {
       return -1;
     };
 
+    /* ⚠ CANDIDATE ORDER WINS, NOT COLUMN ORDER. This used to ask "which is the leftmost header
+       that matches ANY of my candidates", so a file decided the meaning: "Gross Sales" beat
+       "Net Sales" and "Checks" beat "Guests" purely by sitting one column to the left. A server's
+       comps then counted as their own sales, and a check count was used as a guest count, which
+       made every check average on the scorecard wrong by the party size (a real Revel file: $73.08
+       against a true $32.20). The `hours` field carries a ⚠ describing this same failure with
+       Regular vs Total Hours, worked around by DELETING the losing candidate — which is the only
+       tool this loop left available.
+       Now the FIRST CANDIDATE THAT MATCHES ANYTHING wins, so `match` arrays are PRIORITY LISTS:
+       put the precise term first and the loose synonym last, and a file can no longer outvote the
+       meaning. Pinned across every POS report in verify-pos-column-mapping.js. */
     fields.forEach(f => {
       const cands = candsFor(f);
-      claim(f, findIdx(h => cands.includes(norm(h))));
+      let hit = -1;
+      for (let ci = 0; ci < cands.length && hit < 0; ci++) {
+        const c = cands[ci];
+        hit = findIdx(h => norm(h) === c);
+      }
+      claim(f, hit);
     });
     // Whatever is still unmapped falls back to a WORD-BOUNDARY match, not a raw
     // substring, so "count" no longer matches inside "account" and a candidate only
     // hits a whole token.
+    /* ⚠ EXACT-ONLY TERMS. A few candidates are bare generics that are perfectly good as a WHOLE
+       header ("Name" is Clover's item column) and actively dangerous as a token INSIDE one:
+       'name' word-matches "Menu Name", which is how Dinner / Brunch / Bar imported as item names;
+       'item' word-matches "Item Qty", a number. They still win pass 1 on an exact header; they are
+       simply not allowed to go hunting inside a longer column name in pass 2. */
+    const EXACT_ONLY = { name: 1, item: 1, total: 1, amount: 1, type: 1, count: 1, value: 1, date: 1 };
+    // Same rule in the fuzzy pass: walk the candidates in PRIORITY order, not the headers.
     fields.forEach(f => {
       if (map[f.key] != null) return;   // `!= null`: column 0 is a real match, not "unmapped"
       const cands = candsFor(f);
-      claim(f, findIdx(h => {
-        const hl = norm(h);
-        return cands.some(c => c.length >= 3 && new RegExp('(^|[^a-z])' + esc(c) + '([^a-z]|$)').test(hl));
-      }));
+      let hit = -1;
+      for (let ci = 0; ci < cands.length && hit < 0; ci++) {
+        const c = cands[ci];
+        if (c.length < 3 || EXACT_ONLY[c]) continue;
+        const re = new RegExp('(^|[^a-z])' + esc(c) + '([^a-z]|$)');
+        hit = findIdx(h => re.test(norm(h)));
+      }
+      claim(f, hit);
     });
     return map;
   },
