@@ -813,7 +813,10 @@ S.HubYearEnd = {
     const pctFmt   = '0.0%';
     const hoursFmt = '#,##0.0';
     rows.forEach((r, i) => {
-      [1, 4].forEach(c => {
+      // Col 2 is the per-employee "Tips Reported" — MONEY, and it was the one money cell on this
+      // sheet no format pass touched, so it rendered as a raw float on an IRS worksheet. Non-numeric
+      // col-2 cells (the Line 2/3/4a/4b notes) are skipped by the typeof guard below.
+      [1, 2, 4].forEach(c => {
         const addr = XLSX.utils.encode_cell({ r: i, c });
         const cell = ws[addr];
         if (!cell || typeof cell.v !== 'number') return;

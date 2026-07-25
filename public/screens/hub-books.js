@@ -1316,6 +1316,11 @@ S.HubBooks = {
       if (ws[c1] && typeof ws[c1].v === 'number') ws[c1].z = isEmpRow ? hoursFmt : moneyFmt;
       // For per-employee allocation rows (col 3 = share <= 1, col 4 = money)
       if (isEmpRow) {
+        // Col 2 is "Tips Reported" — MONEY, and it was the one money cell on this sheet that no
+        // format pass touched, so it rendered as a raw float (1234.5600000000002) on an IRS
+        // worksheet. Same gap existed in the annual builder; both fixed together.
+        const c2 = XLSX.utils.encode_cell({ r: i, c: 2 });
+        if (ws[c2] && typeof ws[c2].v === 'number') ws[c2].z = moneyFmt;
         const c3 = XLSX.utils.encode_cell({ r: i, c: 3 });
         const c4 = XLSX.utils.encode_cell({ r: i, c: 4 });
         if (ws[c3]) ws[c3].z = pctFmt;
