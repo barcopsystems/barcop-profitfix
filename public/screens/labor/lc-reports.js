@@ -580,42 +580,55 @@ S.LaborReports = {
     return row + custom;
   },
 
-  // Weekly OT premium per non-salaried staff (0.5x on hours over 40/week),
-  // bucketed across the range and attributed to staff + dept so Labor Cost
-  // reconciles with gross. Returns { total, byStaff, byDept }.
-  // Weekly OT premium (0.5x on hours over 40/week) for the range [winFrom, winTo].
-  // OT is a WEEKLY threshold, so it must be computed over WHOLE Mon-Sun weeks off
-  // UNFILTERED rows and only THEN allocated to the window by each week's share of
-  // hours inside it (the same model App.otPremiumInWindow uses). Passing range-
-  // FILTERED rows under-counts: a week straddling the range edge falls under 40 on
-  // its sliced hours and draws no premium. Returns { total, byStaff, byDept }.
+  // Weekly OT premium (0.5x on hours over 40/week) for the range [winFrom, winTo],
+  // attributed to staff + department so Labor Cost reconciles with gross.
+  // Returns { total, byStaff, byDept }.
+  //
+  // THE MONEY COMES FROM App.otPremiumInWindow AND NOWHERE ELSE. This used to carry its
+  // own copy of the whole model — weekly buckets, blended rate, window allocation — and
+  // [[labor-cost-model]] is explicit that the reg/OT wage math must never be re-implemented
+  // locally: two copies drift, and hub-year-end's local copy was already a shipped bug.
+  // The local copy had also picked up a divergence of its own: an undated row keys to
+  // weekStartFor(undefined) = "NaN-NaN-NaN", so every dateless row for one person landed in
+  // ONE phantom week that then took the 40-hour test like a real one and could draw a
+  // premium no other screen showed. The shared helper drops undated rows outright.
+  //
+  // Pass ALL rows, never a pre-filtered set: OT is a WEEKLY threshold, so a week straddling
+  // the range edge falls under 40 on its sliced hours and draws nothing. The helper computes
+  // over whole Mon-Sun weeks and only then allocates by each week's share of hours inside
+  // the window.
+  //
+  // byDept is a PRESENTATION split of that one number, allocated by each staff member's
+  // hours per department inside the window. Identical to the old result for anyone who works
+  // one department (everybody, normally); for a cross-trained employee the premium now
+  // follows where they actually worked instead of landing wholly on whichever row was read
+  // first.
   otPremiums(allRows, winFrom, winTo) {
-    const wk = {};
-    (allRows || []).forEach(a => {
-      if (App.isSalaried(a.staff_id)) return;
-      const sk = a.staff_id || a.name || '?';
-      const ws = App.weekStartFor ? App.weekStartFor(a.date) : (a.date || '');
-      const key = sk + '|' + ws;
-      if (!wk[key]) {
-        const pos = this.positionById(a.position_id);
-        wk[key] = { sk, dept: pos ? (pos.department || 'Other') : 'Unassigned', hours: 0, cost: 0, inHours: 0 };
-      }
-      wk[key].hours += (a.hours || 0);
-      wk[key].cost += (a.cost || 0);
-      const d = String(a.date || '').slice(0, 10);
-      if ((!winFrom || d >= winFrom) && (!winTo || d <= winTo)) wk[key].inHours += (a.hours || 0);
+    const rows = allRows || [];
+    const ot = App.otPremiumInWindow(rows, winFrom, winTo);
+    const deptHrs = {};
+    rows.forEach(a => {
+      if (!a || !a.date || App.isSalaried(a.staff_id)) return;
+      const d = String(a.date).slice(0, 10);
+      if ((winFrom && d < winFrom) || (winTo && d > winTo)) return;
+      const k = App.otStaffKey(a);
+      const pos = this.positionById(a.position_id);
+      const dept = pos ? (pos.department || 'Other') : 'Unassigned';
+      if (!deptHrs[k]) deptHrs[k] = {};
+      deptHrs[k][dept] = (deptHrs[k][dept] || 0) + (a.hours || 0);
     });
-    const out = { total: 0, byStaff: {}, byDept: {} };
-    Object.values(wk).forEach(b => {
-      const otH = Math.max(0, b.hours - App.OT_THRESHOLD);
-      if (otH <= 0 || b.hours <= 0 || b.inHours <= 0) return;
-      const share = b.inHours / b.hours;
-      const prem = otH * (b.cost / b.hours) * 0.5 * share;
-      out.total += prem;
-      out.byStaff[b.sk] = (out.byStaff[b.sk] || 0) + prem;
-      out.byDept[b.dept] = (out.byDept[b.dept] || 0) + prem;
+    const byDept = {};
+    Object.keys(ot.byStaff).forEach(k => {
+      const prem = ot.byStaff[k];
+      const m = deptHrs[k] || {};
+      const tot = Object.keys(m).reduce((s, d) => s + m[d], 0);
+      // No in-window hours to split on (the premium came from a week whose in-window
+      // rows are all dateless or filtered out) — park it rather than drop it, so the
+      // department column still foots to `total`.
+      if (tot > 0) Object.keys(m).forEach(d => { byDept[d] = (byDept[d] || 0) + prem * (m[d] / tot); });
+      else byDept['Unassigned'] = (byDept['Unassigned'] || 0) + prem;
     });
-    return out;
+    return { total: ot.total, byStaff: ot.byStaff, byDept: byDept };
   },
 
   byStaff(rows, totCost, salWeeks, otByStaff) {
