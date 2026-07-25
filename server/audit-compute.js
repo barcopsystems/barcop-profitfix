@@ -55,6 +55,32 @@ function avg(arr) {
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 }
 
+/* ── THE MENU COMPARISON BASIS — mirrored VERBATIM from App.menuTypeOf / App.menuGroupKey ──────
+   This audit must name the same Stars and the same Dogs as the Menu Engineering screen, because
+   its "cut the Dogs" action item links straight to that screen. The two have drifted before (the
+   audit pooled the whole menu and compared a starter to a steak) and a separate client/server menu
+   filter drifted before that. The server cannot import client code, so this is a deliberate copy
+   held together by verify-menu-grouping-tieout.js. CHANGE ONE, CHANGE BOTH.
+
+   THE RULE: the comparison group is whatever genuinely competes on the same economics. Dishes and
+   No Prep rank per CATEGORY (an appetiser is not an entree; a $6 beer is not a $60 wine). Cocktails
+   rank as ONE pool, because Frozen / Specials / Happy Hour are menu layout, not economics. */
+function menuTypeOf(item) {
+  if (!item) return 'plate';
+  // The demo seed and every pre-type item carry no `type`, so these fallbacks are load-bearing.
+  if (item.type === 'plate' || item.type === 'cocktail' || item.type === 'inventory') return item.type;
+  if (item.linked_product_id) return 'inventory';
+  if (item.recipe && item.recipe.mode === 'single') return 'cocktail';
+  if (item.category === 'Cocktails') return 'cocktail';
+  return 'plate';
+}
+
+function menuGroupKey(item) {
+  const t = menuTypeOf(item);
+  if (t === 'cocktail') return 'cocktail';          // one pool; categories are presentational
+  return t + '|' + ((item && item.category) || 'Uncategorized');
+}
+
 // Score for a cost % vs target: at/under target is strong, degrading as it runs
 // over. diff = actual - target (positive = over target = worse).
 function scoreCostVsTarget(actualPct, targetPct, withinBands) {
@@ -493,7 +519,13 @@ function computeRevenueAudit(appData, controlData) {
     // the screen its "cut the Dogs" action item links to. A category with fewer than MENU_MIN_PER_CAT
     // priced items cannot be ranked, so its dishes are left unclassified — exactly as the screen does.
     const byCat = {};
-    menuItems.forEach(i => { const c = i.category || 'Other'; (byCat[c] = byCat[c] || []).push(i); });
+    // Group by the SHARED COMPARISON BASIS, not the raw category. Cocktails rank as one pool
+    // (Frozen / Specials / Happy Hour are menu layout, not economics) while dishes and No Prep
+    // still rank per category. menuGroupKey is mirrored VERBATIM from App.menuGroupKey and held
+    // there by verify-menu-grouping-tieout.js, so this audit names the same Dogs as the screen
+    // its action item links to. ⚠ It also carries the type INFERENCE, which is load-bearing:
+    // items saved before the `type` field (the entire demo seed) are recognised by their category.
+    menuItems.forEach(i => { const c = menuGroupKey(i); (byCat[c] = byCat[c] || []).push(i); });
     Object.keys(byCat).forEach(cat => {
       const list = byCat[cat];
       if (list.length < MENU_MIN_PER_CAT) return;
