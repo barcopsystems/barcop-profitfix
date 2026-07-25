@@ -1159,6 +1159,14 @@ S.RevenueMenuItems = {
 
     if (!this.formType) { fail('Pick a category first.'); return; }
     if (!(price > 0)) { fail('Menu price required.'); return; }
+    // ⚠ THE OTHER DOOR FOR THE SAME FIELD. The importer refuses a negative here; this form wrote it
+    // raw, and the two must not disagree — the comment on the import branch says so explicitly.
+    // A negative is worse than useless: it is TRUTHY, so it passes Menu Engineering's
+    // `i.weekly_covers &&` filter, drags the category's average covers down, and RECLASSIFIES
+    // other items (a Dog became a Plowhorse on -50). A clamped 0 is inert by comparison — it fails
+    // that same filter and shows up in the Incomplete banner. `type="number"` does not stop it:
+    // the input still hands back "-5" and nothing calls checkValidity.
+    if (covers < 0) { fail('Units sold cannot be negative.'); return; }
 
     let category = '';
     let recipe = null;
