@@ -407,28 +407,42 @@ const PosIngest = {
          And it is REPORTED. Bar and food already report a dropped day through zeroSkipped, which
          is the precedent the first version cited and then did not follow — the operator was told
          "7 days imported" with no way to know covers never came from the file at all. */
-      const covUsable = !!c.covers && (agg.covers || 0) >= 0;
-      if (c.covers && !covUsable) covDropped.push(date);
-      const covFor = p => covUsable ? agg.covers : (p ? (p.covers || 0) : 0);
+      /* ⚠ ALL THREE COLUMNS, not just covers. A negative AGGREGATE means the file is wrong about
+         that column for this day, whichever column it is — and the first version of this tested
+         covers alone. Bar and food kept writing raw, so a day whose bar came in as "($4,500.00)"
+         against $6,000 of food NETTED POSITIVE, passed the day-total guard, and stored
+         bar_revenue: -4500. Confirm the Week then reported the week's bar as $1,500 on a $6,000
+         bar, and — the part that hurts most — the manual grid prefills from the import, so the
+         operator's next Save of ANY day that week was refused for a negative they never typed.
+         That is the exact "it bricked the OTHER door" failure the covers fix was written to stop,
+         left standing on its two siblings. */
+      const colUsable = (has, v) => !!has && (v || 0) >= 0;
+      const barUsable  = colUsable(c.bar,    agg.bar);
+      const foodUsable = colUsable(c.food,   agg.food);
+      const covUsable  = colUsable(c.covers, agg.covers);
+      if ((c.bar && !barUsable) || (c.food && !foodUsable) || (c.covers && !covUsable)) covDropped.push(date);
+      const barFor  = p => barUsable  ? agg.bar    : (p ? pv(p.bar_revenue)   : 0);
+      const foodFor = p => foodUsable ? agg.food   : (p ? pv(p.floor_revenue) : 0);
+      const covFor  = p => covUsable  ? agg.covers : (p ? (p.covers || 0)     : 0);
       // The grid writes straight through: an edit is the operator's own choice, so there is no
       // conflict to raise. It REUSES any prior record's id for the date (S147) so a re-save upserts
       // in place — a retry after a refused write can never double the day.
       if (manualEntry) {
         if (cents(agg.bar + agg.food) <= 0) { skipped.push(date); return; }
-        toAdd.push(mkRec(date, agg.bar, agg.food, covFor(prior), true, prior && prior.id));
+        toAdd.push(mkRec(date, barFor(prior), foodFor(prior), covFor(prior), true, prior && prior.id));
         return;
       }
       if (!prior) {   // a brand-new day: a column the file omits is genuinely 0 (nothing to preserve)
         if (cents(agg.bar + agg.food) <= 0) { zeroSkipped.push(date); return; }   // S189: a $0 day is a deliberate zero, not an unreadable row
-        toAdd.push(mkRec(date, agg.bar, agg.food, covFor(null), false));
+        toAdd.push(mkRec(date, barFor(null), foodFor(null), covFor(null), false));
         return;
       }
       // A record already exists for this date. NEVER zero a column the file does not carry (S140):
       // "Use the file" overlays ONLY the columns the file actually has onto the prior figures.
       // ⚠ REUSE the prior record's id (S147): an import-replace / "use the file" is an UPSERT in
       // place, so a retry after a refused write re-upserts the same id instead of doubling the day.
-      const mBar  = c.bar    ? agg.bar    : pv(prior.bar_revenue);
-      const mFood = c.food   ? agg.food   : pv(prior.floor_revenue);
+      const mBar  = barFor(prior);
+      const mFood = foodFor(prior);
       /* ⚠ A NEGATIVE COVERS AGGREGATE MEANS THE FILE IS WRONG ABOUT COVERS FOR THIS DAY, so the
          column is NOT CARRIED — the prior stands. mkRec clamps what it stores, and treating -12 as
          "carried" therefore wrote a 0 over a day that had 220 covers, counted it as "1 replaced
@@ -442,24 +456,32 @@ const PosIngest = {
          answers produce the identical record. */
       const mCov  = covFor(prior);
       const useRec = mkRec(date, mBar, mFood, mCov, false, prior.id);   // what "Use the file" would write
+      /* ⚠ S189 RUNS BEFORE THE MANUAL BRANCH, NOT AFTER IT. This guard ("never write $0 over real
+         sales") sat below the conflict branch, so it protected a prior written by an earlier
+         IMPORT and left the operator's own HAND-CLOSED day exposed: the same file that was safely
+         zero-skipped over a machine figure instead raised a conflict whose "Use the file" wrote
+         $0/$0/$0 over a typed $4,300 day, reusing its id. And the conflict modal carries a
+         "Set all to → Use the file" control, so one click did it to every hand-closed day in the
+         export. The figure with a person behind it was the less protected of the two. */
+      if (useRec.total_revenue <= 0) { zeroSkipped.push(date); return; }
       if (prior.source === 'manual') {
         // Only a DIFFERING carried column is a conflict — never prompt when the numbers MATCH; the
         // hand close simply stands, reported as kept.
-        const diff = (c.bar    && pv(agg.bar)    !== pv(prior.bar_revenue))
-                  || (c.food   && pv(agg.food)   !== pv(prior.floor_revenue))
+        const diff = (barUsable && pv(agg.bar)  !== pv(prior.bar_revenue))
+                  || (foodUsable && pv(agg.food) !== pv(prior.floor_revenue))
                   || (covUsable && (agg.covers || 0) !== (prior.covers || 0));
         if (!diff) { if (!keptDates.has(date)) { keptDates.add(date); keptManual++; } return; }
         conflicts.push({
           key: date, date,
           mine:   { bar_revenue: pv(prior.bar_revenue), floor_revenue: pv(prior.floor_revenue), covers: prior.covers || 0 },
-          theirs: { bar_revenue: c.bar ? pv(agg.bar) : null, floor_revenue: c.food ? pv(agg.food) : null, covers: covUsable ? (agg.covers || 0) : null },
+          theirs: { bar_revenue: barUsable ? pv(agg.bar) : null, floor_revenue: foodUsable ? pv(agg.food) : null, covers: covUsable ? (agg.covers || 0) : null },
           useRec: useRec
         });
         return;
       }
       // Prior is an import / seed: replace it, carrying forward any column the file omits. Not a
       // user-vs-user conflict (replacing your own machine import), so no prompt.
-      if (useRec.total_revenue <= 0) { zeroSkipped.push(date); return; }   // S189: don't write $0 over FACT-tier sales; report it as a $0 day, not "no usable figure"
+      // (S189 is now checked ABOVE the manual branch so it covers a hand-closed prior too.)
       dupCount++;
       toAdd.push(useRec);
     });
