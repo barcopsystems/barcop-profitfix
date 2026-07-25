@@ -624,7 +624,12 @@ S.HubOperatingExpenses = {
        they had already navigated away from. The failure text was worse: an unprompted "Could not
        save the import. Nothing was changed" on a page they just opened. If nobody is on the screen
        there is nobody to tell; a failed write already raises its own alert at the time. */
-    if (!this._catchUpStillCurrent()) return;
+    /* ⚠ THE TOKEN ALONE IS NOT ENOUGH — CHECK `_view` TOO. Expense History mounts through this
+       same object and re-stamps the SAME `_mountedAt` slot, so the token still matches and the
+       repaint went ahead, painting Operating Expenses over the History page the operator had just
+       opened (sidebar still highlighting History). `_catchUpOnce` survives the identical race only
+       because it branches on `_view`; this did not. */
+    if (!this._catchUpStillCurrent() || this._view !== 'current') return;
     // Say what happened, including what was NOT taken and why.
     if (!saved) {
       this._importMsg = 'Could not save the import. Nothing was changed — check your connection and try again.';
