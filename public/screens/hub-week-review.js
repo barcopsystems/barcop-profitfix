@@ -124,8 +124,33 @@ S.WeekReview = {
     } else if (rw) {
       netSales = (rw.bar_revenue || 0) + (rw.floor_revenue || 0);
     }
+    // Labor % is ConfirmWeek's `labor_pct_blended`, measured against TOTAL SALES with
+    // catering labor in the numerator ([[labor-cost-model]] THE DENOMINATORS). When that
+    // number is missing, rebuild it THE SAME WAY — two things were wrong with the old
+    // fallback and both showed the operator a number that was not true:
+    //   1. `(b.labor || 0)` reads a BLANK as zero, so a week with revenue and no labor
+    //      entered printed a confident "Labor 0.0%" — the best labor number a bar can
+    //      have, on a week with no labor data at all. ConfirmWeek is deliberately
+    //      null-in/null-out here ("a percentage whose input was never entered is
+    //      unknown, and it stays unknown all the way into the store") and every other
+    //      consumer honours it: hub.js, r-dashboard.js and hub-group-dashboard.js all
+    //      print '-'. This was the only site that invented a value.
+    //   2. It divided bar+food labor by bar+food revenue, dropping catering from BOTH
+    //      sides, so the same "Labor" label switched basis depending on whether a
+    //      revenue_week happened to exist (measured 2.34 points high on a catering week).
+    // `laborIn` MIRRORS confirm-week's gate exactly — a department owes a labor figure
+    // only once it has rung sales, so a bar with no kitchen still resolves. Do not
+    // "simplify" it to a plain null check or a bar-only operation goes unknown forever.
     if (rw && rw.labor_pct_blended != null) laborPct = rw.labor_pct_blended;
-    else if (w) { const b = w.bar || {}, f = w.food || {}; const s = (b.revenue || 0) + (f.revenue || 0); if (s > 0) laborPct = ((b.labor || 0) + (f.labor || 0)) / s * 100; }
+    else if (w) {
+      const b = w.bar || {}, f = w.food || {}, c = w.catering || {}, o = w.other || {};
+      const bR = b.revenue || 0, fR = f.revenue || 0;
+      const laborIn = (!(bR > 0) || b.labor != null) && (!(fR > 0) || f.labor != null);
+      const totSales = bR + fR + (c.revenue || 0) + (o.revenue || 0);
+      if (laborIn && totSales > 0) {
+        laborPct = ((b.labor || 0) + (f.labor || 0) + (c.labor || 0)) / totSales * 100;
+      }
+    }
     return { netSales, prime, laborPct };
   },
   _topCard() {
