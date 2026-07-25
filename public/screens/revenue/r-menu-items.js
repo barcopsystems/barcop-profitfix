@@ -1358,7 +1358,8 @@ S.RevenueMenuItems = {
   },
 
   async importItems(rows) {
-    const num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
+    // App.parseNum is the ONE coercion (see app.js). 0 is this caller's own default for "no number".
+    const num = v => App.parseNum(v) ?? 0;
     const existing = this.items();
     const keyOf = (t, n) => String(t || '') + '|' + String(n || '').trim().toLowerCase();
     const byKey = {};
