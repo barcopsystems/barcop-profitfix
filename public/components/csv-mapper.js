@@ -68,13 +68,22 @@ const CSVMapper = {
   _readFile(file, container, opts) {
     this._msg(container, 'Reading file...');
     const ext = file.name.split('.').pop().toLowerCase();
+    // ⚠ EVERY reader needs an onerror. Without one, a file the browser cannot read — a OneDrive or
+    // network file that is not actually local, or one moved between the picker and the read —
+    // leaves "Reading file..." on screen forever, with no error, no telemetry and no way to tell
+    // that anything went wrong.
+    const failRead = () => this._msg(container,
+      'Could not read that file. If it lives in a cloud folder, make it available offline (or copy '
+      + 'it to this device) and try again.', 'var(--red)');
     if (ext === 'csv') {
       const r = new FileReader();
       r.onload = e => this._afterParse(this._parseCSV(e.target.result), container, opts);
+      r.onerror = failRead;
       r.readAsText(file);
     } else if (ext === 'xlsx' || ext === 'xls') {
       const r = new FileReader();
       r.onload = e => this._parseXLSX(e.target.result, container, opts);
+      r.onerror = failRead;
       r.readAsArrayBuffer(file);
     } else {
       this._msg(container, 'Unsupported file type. Use CSV or Excel.', 'var(--red)');
@@ -86,10 +95,32 @@ const CSVMapper = {
   // lost its trailing values and a phantom row appeared beside it. Any notes/reason cell with a
   // line break does this, and the voids/comps import maps exactly such a field
   // (note/notes/memo/comment). Quote state has to survive newlines, so it is tracked across them.
+  /* Which character separates the columns. Excel writes SEMICOLON CSVs wherever the system list
+     separator is ';' (most of Europe and Latin America), and a TSV renamed .csv is routine. Both
+     parsed as ONE column, and because a menu import's only REQUIRED field is the name, that single
+     column auto-mapped to it, Import was enabled, and records literally called "Wings;Food;12.00"
+     were written at price 0 with no warning anywhere.
+     ⚠ Counted on the HEADER LINE ONLY and OUTSIDE QUOTES, and comma wins ties — a semicolon inside
+     an ordinary comma file ("hot; very hot") is data and must not change the delimiter. */
+  _sniffDelim(src) {
+    const line = String(src == null ? '' : src).split(/\r?\n/)[0] || '';
+    const n = { ',': 0, ';': 0, '\t': 0 };
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; continue; }
+      if (!inQ && n[ch] != null) n[ch]++;
+    }
+    let best = ',';
+    [';', '\t'].forEach(d => { if (n[d] > n[best]) best = d; });
+    return best;
+  },
+
   _parseCSV(text) {
     // Strip a BOM and any leading blank lines before anything reads column 0. (Neither can sit
     // inside a quoted field at position 0, so this is safe to do up front.)
     const src = String(text == null ? '' : text).replace(/^﻿/, '').replace(/^[\r\n]+/, '');
+    const DELIM = (this && this._sniffDelim) ? this._sniffDelim(src) : ',';
     const rows = [];
     let row = [], cur = '', inQ = false;
     for (let i = 0; i < src.length; i++) {
@@ -101,8 +132,14 @@ const CSVMapper = {
         } else cur += ch;                               // a newline in here is DATA, not a row break
         continue;
       }
-      if (ch === '"') { inQ = true; continue; }
-      if (ch === ',') { row.push(cur.trim()); cur = ''; continue; }
+      // ⚠ A QUOTE ONLY OPENS A FIELD AT THE START OF ONE. Treating any quote as an opening quote
+      // meant an inch mark in an ordinary item name — `12" Pizza`, `Bar Towels 16"x19"` — put the
+      // parser into quoted mode, so it swallowed the next newline AS DATA: the row merged with the
+      // one below it, the first item's price was lost, and the second was imported under a mangled
+      // name at the wrong price. Column counts still matched, so the ragged-row banner never fired
+      // and the preview collapsed the newline — nothing on screen said a menu item had vanished.
+      if (ch === '"' && cur === '') { inQ = true; continue; }
+      if (ch === DELIM) { row.push(cur.trim()); cur = ''; continue; }
       if (ch === '\r') continue;                        // CRLF: ignore the CR, break on the LF
       if (ch === '\n') { row.push(cur.trim()); rows.push(row); row = []; cur = ''; continue; }
       cur += ch;
@@ -135,19 +172,17 @@ const CSVMapper = {
   },
 
   _parseXLSX(buffer, container, opts) {
+    // ⚠ WRAPPED. run() is called straight from the FileReader onload, so anything XLSX.read threw
+    // — a truncated download ("Unsupported ZIP file"), a password-protected workbook ("CFB file
+    // size ... < 512"), any non-workbook renamed .xlsx — escaped to window.onerror, which replaces
+    // the whole screen with the generic "this screen ran into a problem" card. A bad file is an
+    // ordinary thing an operator does; it must not look like the app broke.
     const run = () => {
-      const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      // raw:false so SheetJS returns each cell as its DISPLAYED text (dates as
-      // "7/13/2026", not the numeric serial 45845). Without it a real Excel
-      // date-typed column came through as serial numbers, normDate rejected every
-      // one, and the whole file imported zero rows with no explanation. Formatted
-      // text is exactly what the CSV path already feeds normDate/_num.
-      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-      if (data.length < 2) { this._msg(container, 'File appears empty.', 'var(--red)'); return; }
-      const headers = data[0].map(h => String(h).trim());
-      const rows = data.slice(1).filter(r => r.some(c => c !== '')).map(r => r.map(c => String(c).trim()));
-      this._afterParse({ headers, rows }, container, opts);
+      try { this._parseXLSXInner(buffer, container, opts); }
+      catch (e) {
+        this._msg(container, 'Could not read that Excel file. It may be password-protected or only '
+          + 'partly downloaded. Try opening it in Excel and saving as CSV.', 'var(--red)');
+      }
     };
     if (typeof XLSX === 'undefined') {
       const s = document.createElement('script');
@@ -156,6 +191,34 @@ const CSVMapper = {
       s.onerror = () => this._msg(container, 'Could not load the Excel reader. Try saving as CSV instead.', 'var(--red)');
       document.head.appendChild(s);
     } else run();
+  },
+
+  _parseXLSXInner(buffer, container, opts) {
+    {
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // raw:false so SheetJS returns each cell as its DISPLAYED text (dates as
+      // "7/13/2026", not the numeric serial 45845). Without it a real Excel
+      // date-typed column came through as serial numbers, normDate rejected every
+      // one, and the whole file imported zero rows with no explanation. Formatted
+      // text is exactly what the CSV path already feeds normDate/_num.
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+      // ⚠ Only the FIRST sheet is read. Saying "empty" when the data is sitting on sheet 2 sends
+      // the operator looking at the wrong thing — name the other sheets so they can move the tab.
+      const others = (wb.SheetNames || []).slice(1);
+      const emptyMsg = others.length
+        ? 'The first sheet ("' + wb.SheetNames[0] + '") has no rows. Bar Cop reads the first sheet only — '
+          + 'this file also has: ' + others.join(', ') + '. Move your data to the first sheet and try again.'
+        : 'File appears empty.';
+      if (data.length < 2) { this._msg(container, emptyMsg, 'var(--red)'); return; }
+      const headers = data[0].map(h => String(h).trim());
+      const rows = data.slice(1).filter(r => r.some(c => c !== '')).map(r => r.map(c => String(c).trim()));
+      // ⚠ The guard above runs on the UNFILTERED rows, so a sheet of blank data rows passed it and
+      // then filtered down to nothing — rendering a live "Import 0 Rows" button that fired
+      // onComplete with an empty array. Re-check after filtering.
+      if (!rows.length) { this._msg(container, 'That sheet has headers but no data rows.', 'var(--red)'); return; }
+      this._afterParse({ headers, rows }, container, opts);
+    }
   },
 
   _sig(headers) { return headers.map(h => String(h).toLowerCase().trim()).join('|'); },
@@ -298,7 +361,14 @@ const CSVMapper = {
       // voids, server checks, regulars, roster). One guard here closes them all. Validation runs
       // BEFORE the flag so a missing-field click never latches it; the flag + the button-disable are
       // held until onComplete settles (await covers a promise-returning handler and a sync one alike).
-      if (this._importing) return;
+      // ⚠ SAY SO. A bare `return` here is a button that does nothing when clicked, which the
+      // operator reads as "the app is broken" — reachable by cancelling a big import and dropping
+      // the file again while the first one is still writing.
+      if (this._importing) {
+        const busy = this._area(container).querySelector('.csvm-err');
+        if (busy) { busy.textContent = 'An import is still finishing. Give it a moment and try again.'; busy.style.display = 'block'; }
+        return;
+      }
       const sels = {};
       this._area(container).querySelectorAll('.csvm-sel').forEach(s => { sels[s.dataset.key] = s.value; });
       const missing = opts.fields.filter(f => f.required && !sels[f.key]);
@@ -314,6 +384,24 @@ const CSVMapper = {
         this._saveMap(sig, sels);
         // sels holds column INDEXES ('' = skip); _mapRows resolves them by position.
         await opts.onComplete(this._mapRows(rows, sels));
+      } catch (e) {
+        // ⚠ THIS COMPONENT OWNS AN ERROR SLOT AND WAS NOT USING IT FOR THE ONE FAILURE THAT
+        // MATTERS. Every consumer's onComplete is an async multi-write chain; a rejection anywhere
+        // in it (a network fault mid-request) used to become an unhandled rejection, which the app
+        // logs to the server but deliberately does NOT surface. The button re-enabled and the panel
+        // sat there unchanged, so the only reading available to the operator was "nothing
+        // happened" — and the natural next move is to click Import again.
+        const err = this._area(container).querySelector('.csvm-err');
+        if (err) {
+          err.textContent = 'The import could not be saved. Nothing was changed — check your connection and try again.';
+          err.style.display = 'block';
+        }
+        // DB.logClientError, not App — it lives on DB (db.js:1195). Guarded, never-throws, and
+        // deliberately non-blocking, so reporting can never make a failed import worse.
+        if (typeof DB !== 'undefined' && DB.logClientError) {
+          DB.logClientError('import_failed', (e && e.message) || 'onComplete rejected',
+            'fields=' + Object.keys(sels).join(','), 'csv-import');
+        }
       } finally {
         this._importing = false;
         goBtn.disabled = false;
