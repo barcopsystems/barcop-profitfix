@@ -697,7 +697,7 @@ S.ShiftDashboard = {
     // `incomplete` (on the roster, rang no covers/sales) is split out of `skipped` (name
     // not matched) by buildServer. Destructure BOTH or those rows vanish with no mention:
     // they used to be counted in the skipped total. Server Check's door reports both.
-    const { toAdd, skipped, incomplete, dupCount } = PosIngest.build('server', rows);
+    const { toAdd, skipped, incomplete, undated, dupCount } = PosIngest.build('server', rows);
     const res = document.getElementById('sc-ck-server-res');
     if (!toAdd.length) {
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
@@ -706,11 +706,14 @@ S.ShiftDashboard = {
     }
     const ok = await PosIngest.commit('server', toAdd);
     if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
-    const inc = (incomplete || []).length;
+    const inc = (incomplete || []).length, und = (undated || []).length;
     this._flash = toAdd.length + ' server check' + (toAdd.length === 1 ? '' : 's') + ' imported'
       + (dupCount ? ' (' + dupCount + ' already logged)' : '')
       + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped, names not matched)' : '')
-      + (inc ? ' (' + inc + ' row' + (inc === 1 ? '' : 's') + ' skipped, no covers or sales rung)' : '') + '.';
+      + (inc ? ' (' + inc + ' row' + (inc === 1 ? '' : 's') + ' skipped, no covers or sales rung)' : '')
+      // A row whose date Bar Cop cannot read is skipped now rather than written with a blank
+      // date, so it has to be named — it is the one skip an operator can actually fix in the file.
+      + (und ? ' (' + und + ' row' + (und === 1 ? '' : 's') + ' skipped, no readable date)' : '') + '.';
     if (this._optOpen) this._optOpen.server = false;   // collapse back to the link
     this._openStep = 'import';
     this.render(this.container, this.actions);
@@ -732,7 +735,7 @@ S.ShiftDashboard = {
     });
   },
   async importPmix(rows) {
-    const { toAdd, skipped, merged } = PosIngest.build('pmix', rows);
+    const { toAdd, skipped, incomplete, netNegative, merged } = PosIngest.build('pmix', rows);
     const res = document.getElementById('sc-ck-pmix-res');
     if (!toAdd.length) {
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No items updated. Each row needs an item name Bar Cop can match on your menu and a units-sold number.</div>';
@@ -742,9 +745,19 @@ S.ShiftDashboard = {
     if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
     // Say when rows were combined. A daypart-split export legitimately lists an item several
     // times and we sum them, so the operator should see why the total is bigger than any one row.
+    // ⚠ THREE DIFFERENT OUTCOMES, THREE DIFFERENT SENTENCES. This used to report one `skipped`
+    // list as "N names not matched", which sent the operator to rename a menu item that was
+    // already correct when the real problem was an unreadable Units cell — and an item whose
+    // units netted negative was dropped with NO mention at all, so it silently kept last week's
+    // figure and presented it as this week's mix.
+    const inc = incomplete || [], neg = netNegative || [];
     this._flash = toAdd.length + ' menu item' + (toAdd.length === 1 ? '' : 's') + ' updated from sales mix'
       + (merged ? ' (' + merged + ' extra row' + (merged === 1 ? '' : 's') + ' combined into item totals)' : '')
-      + (skipped.length ? ' (' + skipped.length + ' name' + (skipped.length === 1 ? '' : 's') + ' not matched)' : '') + '.';
+      + (skipped.length ? ' (' + skipped.length + ' name' + (skipped.length === 1 ? '' : 's') + ' not matched)' : '')
+      + (inc.length ? ' (' + inc.length + ' row' + (inc.length === 1 ? '' : 's') + ' had no readable units figure)' : '')
+      + (neg.length ? ' (' + neg.length + ' item' + (neg.length === 1 ? '' : 's')
+          + ' came out at negative units after returns and ' + (neg.length === 1 ? 'was' : 'were')
+          + ' left at the previous figure)' : '') + '.';
     if (this._optOpen) this._optOpen.pmix = false;   // collapse back to the link
     this._openStep = 'import';
     this.render(this.container, this.actions);
