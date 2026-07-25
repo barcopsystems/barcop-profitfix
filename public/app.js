@@ -4755,6 +4755,86 @@ const App = {
     return styles;
   },
 
+  /* "Last 4 Weeks · Jun 1, 2026 to Jun 28, 2026" — the range a list export covers, built
+     from the screen's OWN chip config so the PDF names the chip the operator actually
+     picked. `chips` is the screen's RANGE_CHIPS ([{v,label}]). An all-time selection has no
+     dates to print, so it is just the chip name. */
+  chipRangeLabel(chips, preset, from, to) {
+    const hit = (chips || []).find(c => (c.v || '') === (preset || ''));
+    const name = hit ? hit.label : '';
+    if (!from && !to) return name;
+    const fmt = d => {
+      if (!d) return '';
+      const dt = new Date(String(d).slice(0, 10) + 'T00:00:00');
+      return isNaN(dt.getTime()) ? String(d)
+        : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    const span = from && to ? fmt(from) + ' to ' + fmt(to) : (from ? 'from ' + fmt(from) : 'through ' + fmt(to));
+    return name ? name + ' · ' + span : span;
+  },
+
+  /* Export a LIST screen as the WHOLE CHIP SELECTION, not just the page on screen.
+
+     Every log renders `filtered.slice(0, App.listLimit(mod, kind))` — LIST_PAGE (50) rows at
+     a time behind a "Show older" button — so handing the rendered container to exportPDF
+     capped the PDF at the first page with nothing in the document saying so. Pick the "All"
+     chip on a 300-entry log and you handed your accountant 50 rows that looked complete.
+     That is the export equivalent of a number that is simply wrong. (The stray "Show older"
+     button printed into the PDF too: showOlderBar is not marked no-print.)
+
+     The opposite failure was live as well: four screens built their own offscreen table from
+     EVERY record ever and ignored the chips completely. One helper now, so they cannot drift
+     into three behaviours again.
+
+     ⚠ ONLY LIFTS WHEN THE PAGE IS ACTUALLY SHORT. The tell is the screen's own "Show older"
+     button (`data-older-mode="reveal"`, rendered only when filtered.length > limit). No
+     button means the page already holds the whole selection, so nothing re-renders and a
+     half-typed entry or an in-progress edit is never disturbed. The re-render is reserved
+     for exactly the case where NOT doing it produces a truncated document. (Screens with an
+     entry form also carry App.captureDraft/restoreDraft, which already survives the
+     re-render a filter click causes — this is the same re-render.)
+
+     lists:    [[mod, kind], ...] — the same pairs the screen passes to App.listLimit.
+     reRender: the screen's own re-render, the one already wired to "Show older".
+     rootId:   for a root looked up by id — it must be re-resolved AFTER the re-render,
+               because the old node is detached by then. Pass `root` for a stable element
+               (this.container survives, only its innerHTML is replaced).
+     range:    App.chipRangeLabel(...), printed in the PDF header. */
+  async exportListPDF(opts) {
+    opts = opts || {};
+    const baseRoot = opts.root || (opts.rootId ? document.getElementById(opts.rootId) : null);
+    const truncated = !!(baseRoot && baseRoot.querySelector('[data-show-older][data-older-mode="reveal"]'));
+    const saved = (truncated ? (opts.lists || []) : []).map(p => {
+      const key = this._listKey(p[0], p[1]);
+      const st = this._listState[key] || {};
+      const had = Object.prototype.hasOwnProperty.call(st, 'limit');
+      const prev = st.limit;
+      st.limit = Infinity;
+      this._listState[key] = st;
+      return { key: key, had: had, prev: prev };
+    });
+    // Restore must run even if the PDF engine fails to load or export throws, or the screen
+    // is left showing an unbounded list forever.
+    const restore = () => saved.forEach(s => {
+      const st = this._listState[s.key] || {};
+      if (s.had) st.limit = s.prev; else delete st.limit;
+      this._listState[s.key] = st;
+    });
+    const o = {};
+    Object.keys(opts).forEach(k => { if (k !== 'lists' && k !== 'reRender' && k !== 'rootId') o[k] = opts[k]; });
+    try {
+      if (saved.length && opts.reRender) opts.reRender();
+      if (opts.rootId) o.root = document.getElementById(opts.rootId) || o.root || null;
+      else if (opts.root) o.root = opts.root;
+      await this.exportPDF(o);
+    } finally {
+      if (saved.length) {
+        restore();
+        if (opts.reRender) opts.reRender();
+      }
+    }
+  },
+
   async exportPDF(opts) {
     opts = opts || {};
     const title = opts.title || 'Report';
@@ -4799,6 +4879,11 @@ const App = {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110, 110, 110);
     const dstr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     doc.text(this._pdfSafe(dstr), margin, y);
+    // The range the export actually covers, opposite the generated date. Without it an
+    // "Adjustment Log" could be one week or one year and the saved file cannot tell you
+    // which — the same document, twice, meaning different things. Printed on the existing
+    // date line rather than a new row, so no other export's layout moves.
+    if (opts.range) doc.text(this._pdfSafe(String(opts.range)), pageW - margin, y, { align: 'right' });
     y += 8;
     doc.setDrawColor(205, 205, 205); doc.line(margin, y, pageW - margin, y);
     y += 16;
