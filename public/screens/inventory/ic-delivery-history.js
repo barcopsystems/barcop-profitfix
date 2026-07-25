@@ -102,16 +102,21 @@ S.InventoryDeliveryHistory = {
     const filtered = all.filter(d =>
       (!from || (d.date || '') >= from) && (!to || (d.date || '') <= to));
 
-    const totalReceived = all.reduce((s, d) => s + (d.total || 0), 0);
-    const flagged = all.filter(d => d.has_discrepancy).length;
-    const last = all[0];
+    // The strip sits above the date chips and the list they filter, so it describes the
+    // SAME SET. Off `all` it showed all-time totals over a four-week list on the default
+    // chip. Every figure here is a period figure. `sorted()` is newest-first and .filter
+    // keeps that order, so filtered[0] is the newest in range; guard it, because a range
+    // with no deliveries has no newest row (fmtDate already renders '-' for a blank).
+    const totalReceived = filtered.reduce((s, d) => s + (d.total || 0), 0);
+    const flagged = filtered.filter(d => d.has_discrepancy).length;
+    const last = filtered[0] || null;
 
     const statsCard = '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
       + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + '<div class="calc-item"><div class="calc-label">Deliveries</div><div class="calc-val lg">' + all.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Deliveries</div><div class="calc-val lg">' + filtered.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Total Received</div><div class="calc-val lg">' + App.fmtCurrency(totalReceived) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg">' + flagged + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Last Delivery</div><div class="calc-val lg">' + this.fmtDate(last.date) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last Delivery</div><div class="calc-val lg">' + this.fmtDate(last && last.date) + '</div></div>'
       + '</div></div></div>';
 
     const rows = filtered.slice(0, App.listLimit('ic', 'delivery')).map(d => {

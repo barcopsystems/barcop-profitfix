@@ -131,12 +131,14 @@ S.InventoryTransfers = {
         return (!from || date >= from) && (!to || date <= to);
       }).sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
 
-      const lastDate = all.reduce((m, t) => {
+      // The strip describes the list under it, so both figures follow the date chips. Off
+      // `all` they showed an all-time count over a four-week list on the default chip.
+      const lastDate = filtered.reduce((m, t) => {
         const d = t.date_time || t.created_at || '';
         return (!m || new Date(d).getTime() > new Date(m).getTime()) ? d : m;
       }, '');
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-        + '<div class="calc-item"><div class="calc-label">Transfers</div><div class="calc-val lg">' + all.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Transfers</div><div class="calc-val lg">' + filtered.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Last Transfer</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
         + '</div></div>';
 

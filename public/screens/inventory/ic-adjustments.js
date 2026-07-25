@@ -154,8 +154,16 @@ S.InventoryAdjustments = {
         return (!from || date >= from) && (!to || date <= to);
       }).sort((a, b) => new Date(b.date_time || b.created_at || 0).getTime() - new Date(a.date_time || a.created_at || 0).getTime());
 
+      // THE STRIP MUST DESCRIBE THE SAME SET AS THE LIST. It renders directly above the
+      // date chips and the table they filter, so reading `all` here meant the default
+      // `last-4` chip showed a four-week list under all-time totals with no user action,
+      // and a narrow range could print "Total Loss $3,912" over a table reading "No
+      // adjustments in this range." Every figure on THIS strip is a period figure — counts
+      // and sums of what happened — so every one follows the filter. (Compare ic-empties
+      // and ic-order-history, where Deposit Owed / Open Value are STANDING BALANCES and
+      // deliberately stay all-time.)
       let totalLoss = 0, totalFound = 0, lastDate = '';
-      all.forEach(r => {
+      filtered.forEach(r => {
         const val = Math.abs(r.value || 0);
         if (r.direction === 'in') totalFound += val; else totalLoss += val;
         const d = r.date_time || r.created_at || '';
@@ -163,7 +171,7 @@ S.InventoryAdjustments = {
       });
 
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-        + '<div class="calc-item"><div class="calc-label">Adjustments</div><div class="calc-val lg">' + all.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Adjustments</div><div class="calc-val lg">' + filtered.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Loss</div><div class="calc-val lg" style="color:var(--red);">' + App.fmtCurrency(totalLoss) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Total Found</div><div class="calc-val lg" style="color:var(--green);">' + App.fmtCurrency(totalFound) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Last Entry</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'

@@ -121,14 +121,24 @@ S.InventoryEmpties = {
         return (!from || date >= from) && (!to || date <= to);
       }).sort((a, b) => new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
 
-      let depositOwed = 0, lastDate = '';
+      // ⚠ TWO DIFFERENT KINDS OF NUMBER ON ONE STRIP, and they read different sets ON PURPOSE.
+      // Deposit Owed is a STANDING BALANCE: what the distributor owes you right now for every
+      // empty flagged to return, whenever it was logged. Scoping it to the date chips would
+      // understate a real liability, so it reads `all` and always will. Do not "tidy" it onto
+      // the filter to match its neighbours.
+      let depositOwed = 0;
       all.forEach(e => {
         if (e.disposition === 'Return for Deposit') depositOwed += (parseFloat(e.deposit_amount) || 0) * (parseFloat(e.quantity) || 0);
+      });
+      // Entries and Last Entry describe the list underneath, so they follow the filter — off
+      // `all` they showed an all-time count over a four-week list on the default chip.
+      let lastDate = '';
+      filtered.forEach(e => {
         const d = e.date || e.created_at || '';
         if (!lastDate || new Date(d).getTime() > new Date(lastDate).getTime()) lastDate = d;
       });
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-        + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val lg">' + all.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Entries</div><div class="calc-val lg">' + filtered.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Deposit Owed</div><div class="calc-val lg">' + App.fmtCurrency(depositOwed) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Last Entry</div><div class="calc-val lg">' + this.fmtDate((lastDate || '').slice(0, 10)) + '</div></div>'
         + '</div></div>';

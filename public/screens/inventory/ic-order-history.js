@@ -148,16 +148,23 @@ S.InventoryOrderHistory = {
     const filtered = all.filter(o =>
       (!from || (o.date || '') >= from) && (!to || (o.date || '') <= to));
 
+    // ⚠ TWO DIFFERENT KINDS OF NUMBER ON ONE STRIP, and they read different sets ON PURPOSE.
+    // Open and Open Value are STANDING BALANCES: an order placed in January that has not been
+    // received is still open today and is still money committed. They read `all` deliberately
+    // and must not be scoped to the date chips. Orders and Last Order describe the list below,
+    // so they follow the filter — off `all` they showed an all-time count over a four-week
+    // list on the default chip. `sorted()` is newest-first and .filter keeps that order, so
+    // filtered[0] is the newest in range; guard it for a range with no orders.
     const openOrders = all.filter(o => o.status !== 'Received');
     const openValue = openOrders.reduce((s, o) => s + (o.total || 0), 0);
-    const last = all[0];
+    const last = filtered[0] || null;
 
     const statsCard = '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
       + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + '<div class="calc-item"><div class="calc-label">Orders</div><div class="calc-val lg">' + all.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Orders</div><div class="calc-val lg">' + filtered.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Open</div><div class="calc-val lg">' + openOrders.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Open Value</div><div class="calc-val lg">' + App.fmtCurrency(openValue) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Last Order</div><div class="calc-val lg">' + this.fmtDate(last.date) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last Order</div><div class="calc-val lg">' + this.fmtDate(last && last.date) + '</div></div>'
       + '</div></div></div>';
 
     const rows = filtered.slice(0, App.listLimit('ic', 'order')).map(o => '<tr class="oh-row" data-id="' + o.id + '" style="cursor:pointer;">'
