@@ -333,12 +333,14 @@ S.RevenueMenuItems = {
     const onInactive = this.activeTab === this.INACTIVE_TAB;
     const tabDefs = this.TYPES.map(t => ({ key: t.key, label: t.label, n: all.filter(i => this.classifyItem(i) === t.key).length }))
       .concat([{ key: this.INACTIVE_TAB, label: this.INACTIVE_TAB, n: archivedItems.length }]);
-    const tabsBlock = '<div class="no-print" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px;">'
-      + tabDefs.map(t => '<button type="button" class="btn btn-sm mi-tab" data-tab="' + esc(t.key) + '" style="'
-        + (t.key === this.activeTab
-            ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-            : 'background:transparent;border:1px solid var(--b1);color:var(--t2);')
-        + '">' + esc(t.label) + ' (' + t.n + ')</button>').join('')
+    // ⚠ USE THE SHARED TAB COMPONENT (ch-tabs / ch-tab / .on), the same one Add Products uses.
+    // A first pass hand-rolled inline styles here and rendered CHIPS instead of tabs, which broke
+    // [[color-system-locked]] and made two screens with the same job look unrelated. The count is
+    // a dimmed span and is omitted at zero, matching Add Products exactly.
+    const tabsBlock = '<div class="ch-tabs no-print">'
+      + tabDefs.map(t => '<button class="ch-tab' + (t.key === this.activeTab ? ' on' : '')
+        + '" data-tab="' + esc(t.key) + '">' + esc(t.label)
+        + (t.n ? ' <span style="opacity:0.55;">' + t.n + '</span>' : '') + '</button>').join('')
       + '</div>';
 
     // The visible list is this tab's items only. Inactive gets its own view below.
