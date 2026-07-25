@@ -535,6 +535,26 @@ const App = {
   async startDemo() {
     this.demoMode = true;
     DB._demo = true;
+    // ⚠ MARK THE SESSION LOADED. The readiness gates exist to stop a save from overwriting a
+    // real server row before the initial load confirmed what that row holds — and the demo has
+    // no server row. startDemo builds App.data from the seed and never calls readData, so
+    // _dataReady stayed false for the WHOLE demo session and every gate that reads it misfired:
+    //   App.save / App.saveKey    -> _configGateRefused painted a red "Settings were not saved —
+    //                                Bar Cop has not loaded this account on this device yet"
+    //                                banner over the demo, on every screen that saves anything
+    //   hub-operating-expenses    -> the recurring catch-up refused, so this month's rent,
+    //                                utilities, insurance and subscriptions never materialised
+    //                                and the card read "No recurring bills this month" with the
+    //                                bills sitting right there in the seed
+    //   ic-prep-batches, lc-pay-periods, profit-fix, r-fix -> silently declined to write
+    // Opening the gates changes nothing about persistence: writeData, _writeControl, putEvent,
+    // removeEvent and putEventsBulk all return a no-op success for _demo before touching the
+    // server, so demo edits still stay in memory for the session and reset on reload. Set BEFORE
+    // loadSample so the seed itself is not gated. Fixed at the source rather than at the eight
+    // call sites, because the ninth one added later would have the bug again.
+    DB._dataReady    = true;
+    DB._controlReady = { ic_data: true, lc_data: true, sc_data: true };
+    DB._loadDegraded = false;
     this.data          = DB._defaultData();
     this.inventoryData = {};
     this.laborData     = {};
