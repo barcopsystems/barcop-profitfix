@@ -496,7 +496,17 @@ S.HubOperatingExpenses = {
       + '<div class="collapse-body">' + bodyInner + '</div>'
       + '</div>' + addButtons;
 
-    return statsCard + warnBanner + addCard
+    // What the last import actually did. An expense import used to report NOTHING — not even a
+    // count — so rows it skipped (a credit, an unreadable amount, a missing date) simply were not
+    // there afterwards. A row the operator can see in their own file and cannot find in Bar Cop is
+    // what makes them stop trusting the total.
+    const imp = this._importMsg;
+    this._importMsg = null;   // one render only; it must not survive a navigation
+    const importBanner = imp
+      ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin:16px 0;font-size:12px;color:var(--t1);line-height:1.6;">'
+        + esc(imp) + '</div>'
+      : '';
+    return statsCard + warnBanner + importBanner + addCard
       + this._monthCardHtml(mk, { next: false, exportId: 'oex-export-this', wrapId: 'oex-thismonth' })
       + this._monthCardHtml(this._nextMonthKey(mk), { next: true });
   },
@@ -556,10 +566,20 @@ S.HubOperatingExpenses = {
   async _importRows(rows) {
     const arr = this.records();
     const _added = [];   // rows appended here, so a failed write can take them back out
+    let credits = 0, unreadable = 0, undated = 0;
     (rows || []).forEach((r, i) => {
       const date = this._normDate(r.date);
-      const amount = parseFloat(String(r.amount || '').replace(/[^0-9.\-]/g, ''));
-      if (!date || isNaN(amount) || amount <= 0) return;
+      // ⚠ App.parseNum, not a private parseFloat strip. This read a card export's refund row —
+      // "(125.00)" or "125.00-" — as +125 and BOOKED IT AS A $125 EXPENSE, while the same file's
+      // "-125.00" rows parsed to -125 and were dropped by the guard below. One file, two opposite
+      // wrong answers, $250 apart. Credits are still not imported (an operating-expense ledger of
+      // positive amounts is the existing model), but they are now COUNTED and reported rather than
+      // vanishing — a row the operator can see in their file and cannot find in Bar Cop is the
+      // thing that makes them stop trusting the total.
+      const amount = App.parseNum(r.amount);
+      if (amount == null) { unreadable++; return; }
+      if (amount <= 0)    { credits++;    return; }
+      if (!date)          { undated++;    return; }
       const category = this.CATEGORIES.includes(r.category) ? r.category : (this._matchCat(r.category) || 'Other');
       const vendor = (r.vendor || '').trim();
       const notes = (r.notes || '').trim();
@@ -570,7 +590,20 @@ S.HubOperatingExpenses = {
     });
     // Imported rows were pushed into the live list before the write, and a bulk write cannot revert
     // itself — take them back out rather than showing an import Books counts and the server lacks.
-    if (!(await App.putRecordsBulk('core', 'operating_expense', this.records()))) App.dropRows(arr, _added);
+    const saved = await App.putRecordsBulk('core', 'operating_expense', this.records());
+    if (!saved) App.dropRows(arr, _added);
+    // Say what happened, including what was NOT taken and why.
+    if (!saved) {
+      this._importMsg = 'Could not save the import. Nothing was changed — check your connection and try again.';
+    } else {
+      const bits = [_added.length + ' expense' + (_added.length === 1 ? '' : 's') + ' imported'];
+      if (credits)    bits.push(credits + ' credit' + (credits === 1 ? '' : 's') + ' or refund' + (credits === 1 ? '' : 's') + ' skipped (Bar Cop tracks expenses as positive amounts)');
+      if (undated)    bits.push(undated + ' row' + (undated === 1 ? '' : 's') + ' skipped with no readable date');
+      if (unreadable) bits.push(unreadable + ' row' + (unreadable === 1 ? '' : 's') + ' skipped with no readable amount');
+      const dupes = rows.length - _added.length - credits - undated - unreadable;
+      if (dupes > 0) bits.push(dupes + ' already logged');
+      this._importMsg = bits.join(' · ') + '.';
+    }
     this._entryMode = 'manual';
     this.renderMain();
   },

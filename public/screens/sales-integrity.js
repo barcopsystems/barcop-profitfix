@@ -89,7 +89,8 @@ S.SalesIntegrity = {
     return m;
   },
 
-  num(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? null : n; },
+  // App.parseNum is the ONE coercion; null for "no number" is already this caller's contract.
+  num(v) { return App.parseNum(v); },
   fmtDate(str) {
     if (!str) return '-';
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
