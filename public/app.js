@@ -3358,7 +3358,7 @@ const App = {
     // menu_category is the pre-B2 shared list. It is never deleted — ensureMenuCatLists re-derives
     // the three per-type lists from it, which is what makes a failed migration write harmless.
     menu_category: 'Menu Categories',
-    menu_category_plate: 'Dish Categories', menu_category_cocktail: 'Cocktail Categories',
+    menu_category_plate: 'Dish Categories', menu_category_cocktail: 'Mixed Drink Categories',
     menu_category_inventory: 'No Prep Categories',
   },
   _listIsValued(key) { return !!(this._listMeta[key] && this._listMeta[key].valued); },
@@ -4252,10 +4252,16 @@ const App = {
      cocktail section can never move a ranking. Pinned by verify-menu-cat-lists.js case 7, and
      the basis itself by verify-menu-grouping-tieout.js. */
   MENU_CATEGORIES_BY_TYPE: {
-    plate:     ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials'],
-    // Frozen / Happy Hour / Specials are how a bar LAYS OUT its drinks. They all still rank in
-    // the one cocktail pool, which is the whole point of the comparison basis.
-    cocktail:  ['Cocktails', 'Happy Hour', 'Frozen', 'Specials'],
+    plate:     ['Appetizers', 'Entrees', 'Sides', 'Desserts'],
+    /* ⚠ THE TAB IS "MIXED DRINKS"; "COCKTAILS" IS A SECTION INSIDE IT (Kyle, 2026-07-25).
+       It was both at once before, and a category cannot contain itself. The tab names the KIND of
+       thing the way Dishes does; these name what goes on a printed menu, the way Appetizers /
+       Entrees / Desserts do.
+       ⚠ "Cocktails" MUST STAY IN THIS LIST. All 14 seeded drinks are filed there, and menuTypeOf's
+       legacy fallback for every item saved before the `type` field is literally
+       `category === 'Cocktails'`. Dropping it would strand the seed and blind that inference.
+       Cocktails / Shots / Frozen are LAYOUT — all three still rank in the one pool. */
+    cocktail:  ['Cocktails', 'Shots', 'Frozen'],
     inventory: ['Beer', 'Wine', 'NA Beverages', 'Snacks']
   },
   MENU_CAT_LIST_KEYS: {
@@ -4469,7 +4475,11 @@ const App = {
      ordinary case, so nobody sees "Entrees (Dishes)" for no reason. Display only — the KEY is what
      the math groups by, and it is never shown. */
   menuGroupLabel(key, allKeys) {
-    const NOUN = { plate: 'Dishes', cocktail: 'Cocktails', inventory: 'No Prep' };
+    // ⚠ 'Mixed Drinks', not 'Cocktails'. This labels the POOLED group — every drink whatever
+    // section it sits in — so it has to be the TAB's name, not one of the sections inside it.
+    // Labelling it "Cocktails" while a section was also called Cocktails printed the same word at
+    // two levels, and read as though the group held only the drinks filed under that section.
+    const NOUN = { plate: 'Dishes', cocktail: 'Mixed Drinks', inventory: 'No Prep' };
     const k = String(key == null ? '' : key);
     const bar = k.indexOf('|');
     if (bar < 0) return NOUN[k] || k;
