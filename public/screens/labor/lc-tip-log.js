@@ -441,7 +441,7 @@ S.LaborTipLog = {
       if (ev.target.closest('.tl-b-wk-now')) { this._addWeekStart = this.mondayOf(App.todayLocal()); this.renderList(); return; }
       const dayChip = ev.target.closest('.tl-b-day');
       if (dayChip) { this._addDate = dayChip.dataset.ymd; this._addWeekStart = this.mondayOf(this._addDate); this.preloadFromDate(this._addDate, this._addShiftType); this.renderList(); return; }
-      if (ev.target.closest('#tl-export')) { App.exportPDF({ title: 'Tip Log', root: this.container }); return; }
+      if (ev.target.closest('#tl-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Tip Log', root: this.container, lists: [['lc', 'tip']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save-all')) { this.saveBatch(); return; }
       if (ev.target.closest('#tl-startover')) { this._addRows = []; this._savedNote = null; this.renderList(); return; }
@@ -1135,7 +1135,7 @@ S.LaborTipLog = {
       if (ev.target.closest('.tp-wk-now')) { this.collectPool(); this._addWeekStart = this.mondayOf(App.todayLocal()); this.renderPool(); return; }
       const dayChip = ev.target.closest('.tp-day');
       if (dayChip) { this.loadPoolDay(dayChip.dataset.ymd); return; }
-      if (ev.target.closest('#tl-export')) { App.exportPDF({ title: 'Tip Pool', root: this.container }); return; }
+      if (ev.target.closest('#tl-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Tip Pool', root: this.container, lists: [['lc', 'tip_pool']], reRender: () => this.renderPool(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlankPool(); return; }
       const tpRange = ev.target.closest('.tl-range-chip');
       if (tpRange) {

@@ -255,7 +255,7 @@ S.LaborPayPeriods = {
 
     this.container.innerHTML = '<div class="screen">' + topCard + openCard + closedCard + '</div>';
 
-    this.container.querySelector('#pp-open-export')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Periods', root: this.container }));
+    this.container.querySelector('#pp-open-export')?.addEventListener('click', () => App.exportListPDF({ title: 'Pay Periods', root: this.container, lists: [['lc', 'pay_period']], reRender: () => this.renderList() }));
     this.container.querySelectorAll('.pp-view').forEach(b => b.addEventListener('click', () => { const ws = b.dataset.ws; this.detailWeekStart = ws; App.pushView(() => this.renderDetail(ws)); }));
     this.container.querySelectorAll('.pp-close').forEach(b => b.addEventListener('click', () => this.closePeriod(b.dataset.ws, true)));
     this.container.querySelectorAll('.pp-reopen').forEach(b => b.addEventListener('click', () => this.reopenPeriod(b.dataset.ws)));

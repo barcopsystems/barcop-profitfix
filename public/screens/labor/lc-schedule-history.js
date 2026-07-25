@@ -158,7 +158,7 @@ S.LaborScheduleHistory = {
       + '</div></div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#lh-export')) { App.exportPDF({ title: 'Schedule History', root: this.container }); return; }
+      if (ev.target.closest('#lh-export')) { App.exportListPDF({ title: 'Schedule History', root: this.container, lists: [['lc', 'schedule']], reRender: () => this.renderList() }); return; }
       if (ev.target.closest('#lh-edit-detail')) this.editSchedule(id);
       else if (ev.target.closest('#lh-copy')) this.copyToNewWeek(s);
     };

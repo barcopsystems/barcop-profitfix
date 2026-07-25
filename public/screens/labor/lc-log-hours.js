@@ -739,31 +739,14 @@ S.LaborLogHours = {
   // Export the COMPLETE entry log to PDF. The on-screen list paginates (Show
   // older), so we build an off-screen node holding every entry and hand that to
   // exportPDF — otherwise the PDF would silently drop older rows.
+  // Was an offscreen table built from EVERY logged hour on file, so the PDF ignored the
+  // date chips entirely. exportListPDF renders the real screen with the row limit lifted,
+  // so the PDF is exactly the chip selection, complete.
   exportLogged() {
-    const all = [...this.actuals()].sort((a, b) =>
-      new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime());
-    const list = this.applyFilters(all);
-    if (list.length === 0) return;
-    const rows = list.map(a => {
-      const wageCell = App.isSalaried(a.staff_id) ? 'Salary' : (a.wage != null ? App.fmtCurrency(a.wage) + '/hr' : '-');
-      // "Salary" here too: the export carried the same per-entry seventh as the screen.
-      const costCell = App.isSalaried(a.staff_id) ? 'Salary' : App.fmtCurrency(a.cost || 0);
-      return '<tr><td>' + this.fmtDate(a.date) + (a.locked ? ' (locked)' : '') + '</td>'
-        + '<td>' + esc(a.name || '-') + '</td>'
-        + '<td>' + esc(a.shift_type || '-') + '</td>'
-        + '<td>' + (a.hours != null ? a.hours.toFixed(1) : '-') + '</td>'
-        + '<td>' + wageCell + '</td>'
-        + '<td>' + costCell + '</td></tr>';
-    }).join('');
-    const node = document.createElement('div');
-    node.className = 'screen';
-    node.style.cssText = 'position:absolute;left:-99999px;top:0;';
-    node.innerHTML = '<div class="card"><div class="card-title">Logged Hours</div>'
-      + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-      + '<th>Date</th><th>Staff</th><th>Shift</th><th>Hours</th><th>Wage</th><th>Cost</th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
-    document.body.appendChild(node);
-    Promise.resolve(App.exportPDF({ title: 'Logged Hours', root: node })).finally(() => node.remove());
+    const r = this.effectiveRange();
+    App.exportListPDF({ title: 'Logged Hours', root: this.container, lists: [['lc', 'actual']],
+      reRender: () => this.renderList(),
+      range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) });
   },
 
   async confirmDel(id) {
