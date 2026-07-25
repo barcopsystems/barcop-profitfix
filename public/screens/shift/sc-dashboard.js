@@ -610,7 +610,8 @@ S.ShiftDashboard = {
   },
   async saveManualSales() {
     const has = x => x != null && String(x).trim() !== '';
-    const n = x => { const v = parseFloat(String(x == null ? '' : x).replace(/[^0-9.\-]/g, '')); return isNaN(v) ? 0 : v; };
+    // App.parseNum is the ONE coercion; 0 is this caller's own default for "no number".
+    const n = x => App.parseNum(x) ?? 0;
     const rows = [], zeroDays = [];
     this._weekDays().forEach(d => {
       const bar = (document.getElementById('scm-bar-' + d) || {}).value;
