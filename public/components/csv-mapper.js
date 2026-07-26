@@ -289,7 +289,10 @@ const CSVMapper = {
     const normExact = h => {
       const t = norm(h);
       const m = t.match(/^(.*?)\s*\(([^)]*)\)$/);
-      return (m && UNIT_PAREN.has(m[2].trim())) ? m[1].trim() : t;
+      // ⚠ `m[1].trim() &&` — a column headed ONLY with a unit ("($)", "(oz)") would strip to the
+      // empty string and then exact-match any field carrying a blank candidate. No door has one
+      // today; this closes it before one is added.
+      return (m && m[1].trim() && UNIT_PAREN.has(m[2].trim())) ? m[1].trim() : t;
     };
     const claim = (f, i) => { if (i > -1) { map[f.key] = i; used[i] = true; } };
     // An UNNAMED column is never auto-claimed — there is nothing to match on, and guessing it is
