@@ -128,7 +128,11 @@ const PosIngest = {
          Lightspeed ITEM SALES report and the on-hand column on the same vendors' INVENTORY export.
          Same word, two meanings, so an inventory file dropped on this door still needs the
          operator to read the preview. It sits last so any real sold-column wins it. */
-      { key: 'units', label: 'Units Sold', required: true, match: ['units sold', 'quantity sold', 'qty sold', 'sold qty', 'total sold', 'number sold', 'item qty', 'units', 'sold', 'qty', 'units count', 'sales count', 'rung', 'quantity'] }
+      /* ⚠ `'rung'` REMOVED — it is a DOLLAR term, not a units one. It word-matches "Rung Sales", a
+         real Aloha/NCR header this file asks for by name in FIELDS.server, so on
+         `Item Name | Rung Sales | Net Sales` the units field took the money column and Menu
+         Engineering's `weekly_covers` was fed dollars. Same removal at the variance door. */
+      { key: 'units', label: 'Units Sold', required: true, match: ['units sold', 'quantity sold', 'qty sold', 'sold qty', 'total sold', 'number sold', 'item qty', 'units', 'sold', 'qty', 'units count', 'sales count', 'quantity'] }
     ]
   },
 

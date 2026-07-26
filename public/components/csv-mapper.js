@@ -266,12 +266,30 @@ const CSVMapper = {
        "($)" / "($/hr)" / "(USD)" say nothing about WHICH column this is; "(incl voids)" is the
        whole difference between two columns. So: strip a parenthetical only when it carries no
        letters at all, or only letters from a small unit vocabulary. */
-    const UNIT_PAREN = /^[^a-z]*$|^(?:usd|ea|each|hr|hrs|oz|lb|lbs|kg|g|ml|l|pct|qty)$/;
-    const norm = h => {
-      let t = String(h).toLowerCase().trim();
+    /* ⚠⚠ TWO NORMALISERS, AND THE SPLIT IS THE WHOLE POINT.
+       `norm` is the raw one (lowercase + trim) and pass 2 uses it, because pass 2 HUNTS INSIDE a
+       header and must see the whole text. A single stripping normaliser was used by both passes,
+       and the comment claiming "pass 2 is untouched" was simply false: `Total (hrs)` stopped
+       matching `hours` altogether (a REQUIRED field, so the import was blocked), `Labor (hrs)`
+       bound nothing silently, and `Number (qty)` left variance qty unmapped — which the row builder
+       turns into **0 for every row and a 100% variance report**. Bar Cop's own labels are shaped
+       exactly like that (`Wage ($/hr)`, `Pour Size (oz)`, `Par (bottles)`), so an operator writing a
+       sheet in the app's own style writes `Total (hrs)`.
+       `normExact` is pass 1 only. It drops a trailing UNIT ANNOTATION so `Pay ($/hr)` can win an
+       exact match on `pay` — the case EXACT_ONLY broke.
+       ⚠ THE VOCABULARY IS A LITERAL LIST, NOT A SHAPE. It was `^[^a-z]*$` ("any parenthetical with
+       no lowercase letters"), which swallowed `(%)`, `(2024)` and `(1/2)` — so `Total (%)` and
+       `Total ($)` collapsed onto one name and the required `amount` field silently auto-picked the
+       PERCENT column: **9.6 stored against a true 4,800.00**, where before the operator was at
+       least asked. A unit annotation says nothing about which column this is; a year or a percent
+       sign is the entire difference between two columns. */
+    const UNIT_PAREN = new Set(['$', '$/hr', 'usd', 'us$', 'oz', 'fl oz', 'hr', 'hrs', 'hour', 'hours',
+      'lb', 'lbs', 'kg', 'g', 'ml', 'l', 'ltr', 'ea', 'each']);
+    const norm = h => String(h).toLowerCase().trim();
+    const normExact = h => {
+      const t = norm(h);
       const m = t.match(/^(.*?)\s*\(([^)]*)\)$/);
-      if (m && UNIT_PAREN.test(m[2].replace(/[^a-z]/g, '') || m[2])) t = m[1].trim();
-      return t.trim();
+      return (m && UNIT_PAREN.has(m[2].trim())) ? m[1].trim() : t;
     };
     const claim = (f, i) => { if (i > -1) { map[f.key] = i; used[i] = true; } };
     // An UNNAMED column is never auto-claimed — there is nothing to match on, and guessing it is
@@ -300,7 +318,7 @@ const CSVMapper = {
       let hit = -1;
       for (let ci = 0; ci < cands.length && hit < 0; ci++) {
         const c = cands[ci];
-        hit = findIdx(h => norm(h) === c);
+        hit = findIdx(h => normExact(h) === c);   // pass 1 ONLY — pass 2 below uses the raw `norm`
       }
       claim(f, hit);
     });
