@@ -205,18 +205,17 @@ S.EventsRegulars = {
   },
 
   async importRows(rows) {
-    const parseDate = s => {
-      if (!s) return '';
-      const str = String(s).trim();
-      // A plain YYYY-MM-DD is kept verbatim: new Date('1985-06-01') parses as UTC
-      // midnight, and ymdLocal would then roll it back a day in any US timezone,
-      // bucketing a March 1 birthday into February so it never surfaces in the
-      // month's outreach list. Other formats (M/D/YYYY, "June 1 1985") parse local.
-      const iso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-      if (iso) return iso[1] + '-' + String(+iso[2]).padStart(2, '0') + '-' + String(+iso[3]).padStart(2, '0');
-      const d = new Date(str);
-      return isNaN(d.getTime()) ? '' : App.ymdLocal(d);
-    };
+    /* ⚠⚠ ONE DATE READER FOR THE WHOLE APP. This was a private copy ending in `new Date(str)` — the
+       exact line six scan rounds were spent removing from PosIngest.normDate — so every failure that
+       was eliminated there was still live here: a missing year invented as 2001, an impossible date
+       rolled into the next month, a UTC marker losing a day (which for a BIRTHDAY buckets 1 March
+       into February and drops the regular off that month's outreach list, the precise harm the old
+       comment here said it was avoiding), and a day-first cell transposed.
+       ⚠ minYear 1900, and this is the only caller that needs it: a birthday is legitimately decades
+       before any business date, while every other door imports something that happened this year.
+       Before adding a date format here, add it to PosIngest.normDate. */
+    const parseDate = s => (typeof PosIngest !== 'undefined' && PosIngest.normDate)
+      ? PosIngest.normDate(s, { minYear: 1900 }) : '';
     const added = [];
     (rows || []).forEach(r => {
       const name = (r.name || '').trim(); if (!name) return;
