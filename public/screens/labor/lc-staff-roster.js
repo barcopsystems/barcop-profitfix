@@ -444,17 +444,27 @@ S.LaborStaffRoster = {
          and RPLH all read low by that person's entire payroll, on every screen that shows them. */
       const payTypeCell = (r.pay_type || '').trim();
       const salNum = App.parseNum(r.annual_salary);
+      // ⚠ Declared HERE, above `salaried`, because `salaried` now consults it. It used to sit below
+      // and a fix that referenced it died in the temporal dead zone.
+      const wageNum = App.parseNum(r.wage);
       const saysSalary = /salar/i.test(payTypeCell)
         || (/\bexempt\b/i.test(payTypeCell) && !/non[\s-]*exempt/i.test(payTypeCell));
       /* ⚠ AND A SALARY FIGURE IS ITSELF THE CLASSIFICATION. The old code forced `annual_salary` to
          null unless a SEPARATE Pay Type column agreed — so a Name/Title/Salary manager list (which
          is how a three-person salaried list is actually written; nobody adds a Pay Type column to
          it) imported everyone Hourly with no wage, and the weekly salaried cost was $0.00. */
-      const salaried = saysSalary || (!payTypeCell && salNum != null);
+      /* ⚠⚠ A SALARY FIGURE ONLY CLASSIFIES WHEN IT IS A REAL FIGURE AND THERE IS NO WAGE.
+         `salNum != null` was true for **zero**, so a file writing `0` into an unused Annual Salary
+         column — which is most exports — made every hourly employee salaried and the salaried
+         branch then threw their wage away. That is the identical $0.00-a-shift failure the
+         Non-Exempt fix was written to kill, re-entered through a different door one round later.
+         It also fired when a wage AND an annualised-pay column were both populated. Now: a salary
+         classifies only if it is greater than zero and the row carries no usable wage. */
+      const salaried = saysSalary || (!payTypeCell && salNum != null && salNum > 0 && wageNum == null);
       // App.parseNum, not parseFloat: `parseFloat('52,000')` is 52 and `parseFloat('$19.50')` is
       // NaN. XLSX is read with raw:false, so a Currency- or #,##0-formatted money column — the
       // default for money — arrives as exactly those strings. A $52,000 salary imported as $52.
-      const wageNum = App.parseNum(r.wage);
+      // (wageNum is declared above `salaried`, which consults it.)
       // A negative wage is refused rather than stored: the manual form carries min="0", and a
       // negative rate makes labor cost FALL when that person works.
       const wageOk = wageNum != null && wageNum >= 0;
