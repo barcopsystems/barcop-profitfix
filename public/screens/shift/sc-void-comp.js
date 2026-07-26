@@ -121,7 +121,7 @@ S.ShiftVoidComp = {
       { h: 'Void vs Comp', p: ['A void reverses a sale that should not have been rung (wrong item, rung in error). A comp is a sale you gave away.'] },
       { h: 'The Reason carries the classification', p: ['On a comp, the reason tells Bar Cop whether it is a loss or a policy expense. Service Recovery, Customer Goodwill, Manager Comp, Regular / VIP, and Marketing / Promo are give-aways and feed Loss Prevention. Staff Meal and Shift Drink are policy expense, tracked as cost lines in Books and the Annual Review, not a loss. Pick honestly and the loss read stays real.'] },
       { h: 'Linking a tracked item (Units)', p: ['Most comps need no item. But if you give away a tracked inventory product, a bottle of wine off the shelf, a six-pack, pick it under Item and set how many Units you gave away. The Inventory Variance Report subtracts that known comp from usage so it does not read as shrinkage.'] },
-      { h: 'Import from a POS export', p: ['Switch to Import File and drop your POS voids/comps export, CSV or Excel. Map the columns once and Bar Cop remembers it. Amount is required; Void-or-Comp, Item, Server, Reason, and Date are matched if your export has them. Servers match your roster by name, a row whose type mentions "comp" lands as a Comp and everything else as a Void. Each row lands as its own record, so the list, edits, Variance, and Loss Prevention all keep working. Fill anything missing by editing the row after import.'] },
+      { h: 'Import from a POS export', p: ['Switch to Import File and drop your POS voids/comps export, CSV or Excel. Map the columns once and Bar Cop remembers it. Amount is required; Void-or-Comp, Item, Server, Reason, and Date are matched if your export has them. Servers match your roster by name. A row whose type says comp, discount, promo, coupon, courtesy or on the house lands as a Comp, because all of those are revenue given away; everything else lands as a Void, and so does a row that names a void explicitly. If your export has no type column at all, every row lands as a Void and you can change any of them by editing the row. If your export has a date column and Bar Cop cannot read a date in it, that row is skipped and counted in the result line rather than being dated today; a date with no year in it, like "20-Jul", cannot be read, because the year is not in the file to read. With no date column at all, every row is dated today. Each row lands as its own record, so the list, edits, Variance, and Loss Prevention all keep working. Fill anything missing by editing the row after import.'] },
       { h: 'Filter, Export, Worksheet', p: ['Filter by date range and the void and comp totals update. Export PDF saves the filtered list. Worksheet prints a blank sheet to tally voids and comps by hand during the rush.'] }
     ]);
   },
@@ -681,22 +681,65 @@ S.ShiftVoidComp = {
   async importRows(rows, resultId, after) {
     // Match / dedup / build / save live in the shared PosIngest (dedup added so a
     // re-dropped voids/comps export never double-counts). UI message stays here.
-    const { toAdd, skipped, dupCount } = PosIngest.build('voids', rows);
+    const { toAdd, skipped, undated, dupCount } = PosIngest.build('voids', rows);
     const setResult = html => { const r = resultId && document.getElementById(resultId); if (r) r.innerHTML = html; };
+    const nUnd = (undated || []).length;
+    /* Everything this import found besides the rows it wrote, built ONCE and appended to every
+       outcome — the zero-row message, the failure message and the success line. A refused write is
+       when the operator reads hardest, and `undated` is a problem they can actually fix in the file.
+       ⚠ TWO LISTS, TWO SENTENCES. `skipped` is "no usable amount"; `undated` is "the file gave a
+       date I could not read". Reporting them as one would send the operator at the Amount column
+       over a date problem — the same mis-naming already fixed at the cash and sales doors. */
+    const dim = t => ' <span style="color:var(--t3);font-weight:400;">' + t + '</span>';
+    const outcomes = (skipped.length ? dim(skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no amount).') : '')
+      + (nUnd ? dim(nUnd + ' row' + (nUnd === 1 ? '' : 's') + ' skipped (no readable date).') : '')
+      + (dupCount ? dim(dupCount + ' already logged, skipped.') : '');
     if (!toAdd.length) {
+      // ⚠ NAME THE REAL REASON. One sentence used to cover every zero-row outcome, so a file whose
+      // dates could not be read was told "Every row was missing a valid amount" — about amounts that
+      // were fine. An absolute claim only fires when the other buckets are empty.
+      // ⚠ AN ABSOLUTE HEADLINE MUST EXCLUDE **EVERY** OTHER BUCKET, dupCount included. These two
+      // excluded only each other, so a file with two already-logged rows beside one bad amount read
+      // "Every row was missing a valid amount. 1 row skipped (no amount). 2 already logged" —
+      // contradicted by its own clause, one line down. Same trap the sales door hit twice.
       setResult('<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (dupCount ? 'No new rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
-                    : 'No rows imported. Every row was missing a valid amount.') + '</div>');
+        + (dupCount && !skipped.length && !nUnd ? 'No new rows imported. All ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
+         : nUnd && !skipped.length && !dupCount ? 'No rows imported. Bar Cop could not read a date on ' + (nUnd === 1 ? 'the row' : 'any row') + ' — check the date column in your export.'
+         : skipped.length && !nUnd && !dupCount ? 'No rows imported. Every row was missing a valid amount.'
+         : 'No new rows imported.')
+        + outcomes + '</div>');
       return;
     }
     const ok = await PosIngest.commit('voids', toAdd);
-    if (!ok) { setResult('<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'); return; }
-    if (typeof after === 'function') { after(); return; }   // popup: close + re-render the shift
-    this.renderList();
-    const r2 = document.getElementById('vc-imp-result');
-    if (r2) r2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported ' + toAdd.length + ' record' + (toAdd.length === 1 ? '' : 's') + '.'
-      + (skipped.length ? ' <span style="color:var(--t3);font-weight:400;">' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no amount).</span>' : '')
-      + (dupCount ? ' <span style="color:var(--t3);font-weight:400;">' + dupCount + ' already logged, skipped.</span>' : '') + '</div>';
+    if (!ok) {
+      // A partial save is not a failed save — the same lie already closed at the sales, cash and
+      // per-server doors. App.landedOf/partialSaveNote carry the contract; do not re-word it here.
+      setResult('<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + App.partialSaveNote(App.landedOf(toAdd, App.shiftData && App.shiftData.sc_void_comps),
+                              toAdd.length, 'row', 'rows')
+        + outcomes + '</div>');
+      return;
+    }
+    /* ⚠⚠ WRITE THE REPORT AFTER THE REDRAW, NEVER BEFORE IT — AND NEVER INTO THE POPUP.
+       The success line is the one message on this door that has to survive a re-render, and both
+       exits destroy the element it goes in:
+         inline — `renderList()` reassigns `container.innerHTML`, so #vc-imp-result is REPLACED by a
+                  fresh empty one and anything written first is gone;
+         popup  — `after` is the modal's `done`, which calls App.closeModal → el.remove(), taking
+                  #vc-imp-result-m with it.
+       Writing it first (the obvious reading of "report before you close") put the report on screen
+       for a single tick and then wiped it, on EVERY partially-successful import — which is the
+       common case and exactly when the new `undated` count matters. Only the zero-row and failure
+       paths stayed visible, because those `return` without redrawing.
+       So: redraw first, then write into a FRESHLY QUERIED slot. The popup's own slot is gone by
+       then, so its report goes to the inline one — which is the screen the operator is looking at
+       the moment the modal closes. */
+    const msg = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported '
+      + toAdd.length + ' record' + (toAdd.length === 1 ? '' : 's') + '.' + outcomes + '</div>';
+    if (typeof after === 'function') after();   // popup: close + re-render the shift underneath
+    else this.renderList();
+    const slot = document.getElementById('vc-imp-result');
+    if (slot) slot.innerHTML = msg;
   },
   // Paper-at-bar workflow.
   printBlank() {

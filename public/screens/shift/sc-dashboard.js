@@ -490,59 +490,9 @@ S.ShiftDashboard = {
     try { return await this._doImportSales(rows, opts); }
     finally { this._importingSales = false; }
   },
-  /* How many of these records ACTUALLY LANDED when the commit came back false.
-     ⚠ EVERY per-row committer in PosIngest walks its rows one at a time and ANDs a single boolean
-     without stopping, so "false" means "at least one was refused", never "nothing was written".
-     Reported flat, that reads as "nothing happened" over days that are already feeding Where You
-     Stand, Confirm the Week, the cash-forecast baseline and the sales-tax hold — and the operator's
-     natural next move is to enter them again by hand.
-     ⚠ IDENTITY, NOT ID. Sales and cash REUSE the prior record's id when they replace a day (S147),
-     so the id is already in the array before the write and an id test would call every row landed.
-     App.putRecord assigns the exact object on success and puts the PREVIOUS object back (or splices
-     it out) on a genuine refusal, so "is this exact object in the list" is the honest question.
-     One helper, so the three cockpit doors cannot drift apart on it again. */
-  _landed(list, arr) {
-    const live = (arr || []);
-    return (list || []).filter(r => live.indexOf(r) !== -1).length;
-  },
-  /* ⚠ THE REASSURANCE HAS TO BE TRUE AT ALL THREE DOORS. The first draft said the saved rows "come
-     back as already logged" — true of the SERVER door (fresh ids, deduped on staff+date+covers+sales)
-     and false of sales and cash, which reuse the prior id and UPSERT IN PLACE, reporting "replaced
-     earlier figures". Three doors, three mechanisms, one guarantee they all genuinely make: nothing
-     that already saved will be counted twice. Say that, and nothing more specific than that. */
-  // ⚠ TAKES BOTH FORMS OF THE NOUN. A fixed plural read "None of the 1 days were saved" / "1 server
-  // checks" / "1 reconciles", and total === 1 is the COMMONEST failure shape at all three doors —
-  // one day, one drawer, one server row. The partial branch is safe either way (landed < total with
-  // landed >= 1 means total >= 2), but the other two are not.
-  _partialNote(landed, total, one, many) {
-    /* ⚠ THREE STATES, NOT TWO.
-       landed === total is REACHABLE and was reported as a partial save telling the operator to run
-       it again. _commitSales and _commitCashRows fold the STALE-ROW RETIREMENT into the same `ok`
-       they return, so when every insert lands and only a `removeRecord` is refused, the write
-       succeeded completely and the failure is that a SUPERSEDED row could not be deleted. Nothing
-       is left to finish — and the thing that is actually wrong (the date now holds two rows, and
-       every consumer sums by date, so Confirm the Week and the cash-forecast baseline count it
-       twice) went unmentioned. Re-running IS the fix, but for a different reason, so say which.
-       landed === 0 must not say "Nothing was saved" either: the caller may append "N days were
-       already cleared to zero and stayed cleared", and those deletes really did happen — they run
-       before the write is even attempted. Scope the sentence to the rows this call tried to WRITE
-       and let the caller speak for anything else. */
-    // ⚠ "That day" HAS NO ANTECEDENT UNDER A PLURAL HEADLINE — "All 3 days were saved... That day may
-    // be counted twice" points at nothing, and at the cash door the unit is a register-day, not a day
-    // at all. Say "one of them", which is true of both and of either noun.
-    if (landed && landed >= total) {
-      return (total === 1 ? 'The ' + one + ' was saved' : 'All ' + total + ' ' + many + ' were saved')
-        + ', but an older record could not be cleared out, so '
-        + (total === 1 ? 'it' : 'one of them') + ' may be counted twice until you run this again.';
-    }
-    // ⚠ THE VERB AGREES WITH `landed`, NOT `total` — "1 of 2 days were saved" was the commonest
-    // partial shape at every door. (The NOUN correctly follows `total`.)
-    return landed
-      ? landed + ' of ' + total + ' ' + many + (landed === 1 ? ' was' : ' were') + ' saved before the save was refused. '
-        + 'Run it again to finish — Bar Cop will not double anything that already saved.'
-      : 'Save failed. ' + (total === 1 ? 'The ' + one + ' was not saved.'
-                                       : 'None of the ' + total + ' ' + many + ' were saved.') + ' Try again.';
-  },
+  // ⚠ The partial-save helpers moved to App.landedOf / App.partialSaveNote — FIVE import doors
+  // need them (sales, cash, per-server, voids, and the two labour doors) and three had already
+  // drifted into three wordings of the same lie. Read the contract there before changing a caller.
   async _doImportSales(rows, opts) {
     opts = opts || {};
     const built = PosIngest.build('sales', rows, opts);
@@ -763,7 +713,7 @@ S.ShiftDashboard = {
       // ⚠ THE CLEAR ALREADY HAPPENED. saveManualSales deletes the zeroed days BEFORE calling here,
       // so a refused save leaves those days genuinely gone while this line said only "Save failed" —
       // which reads as "nothing happened" to someone whose Monday has just been removed.
-      fail(this._partialNote(this._landed(allToAdd, App.shiftData && App.shiftData.sc_shifts),
+      fail(App.partialSaveNote(App.landedOf(allToAdd, App.shiftData && App.shiftData.sc_shifts),
                              allToAdd.length, 'day', 'days')
         + (opts.cleared ? ' ' + opts.cleared + ' day' + (opts.cleared === 1 ? ' was' : 's were')
                           + ' already cleared to zero and stayed cleared.' : '')
@@ -1041,7 +991,7 @@ S.ShiftDashboard = {
          is safe either way: buildServer dedupes on staff + date + covers + sales, so the rows that
          did save come back as "already logged" rather than doubling. */
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + this._partialNote(this._landed(toAdd, App.data && App.data.revenue_server_checks),
+        + App.partialSaveNote(App.landedOf(toAdd, App.data && App.data.revenue_server_checks),
                             toAdd.length, 'server check', 'server checks')
         + serverOutcomes   // the failure does not cancel what else the import found
         + '</div>';
@@ -1377,7 +1327,7 @@ S.ShiftDashboard = {
     const ok = await PosIngest.commit('cash', allToAdd);
     // Same partial-save honesty as the sales and server doors — _commitCashRows writes per row too,
     // and the failure carries every other outcome the import found rather than replacing them.
-    if (!ok) { fail(this._partialNote(this._landed(allToAdd, App.shiftData && App.shiftData.sc_variances),
+    if (!ok) { fail(App.partialSaveNote(App.landedOf(allToAdd, App.shiftData && App.shiftData.sc_variances),
                                       allToAdd.length, 'reconcile', 'reconciles') + cashOutcomes); return; }
     this._pendingCashRows = null;
     this._flash = allToAdd.length + ' reconcile' + (allToAdd.length === 1 ? '' : 's') + ' imported'
