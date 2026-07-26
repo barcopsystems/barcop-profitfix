@@ -244,7 +244,35 @@ const CSVMapper = {
        imported as item names ahead of the file's real "Menu Item" column. The curated `match`
        list is the precise vocabulary; the key and label are the fallback. */
     const candsFor = f => [...(f.match || []), f.key, f.label].map(s => String(s).toLowerCase());
-    const norm = h => String(h).toLowerCase().trim();
+    /* ⚠⚠ THE EXACT PASS STRIPS A PARENTHESISED UNIT SUFFIX, AND THAT IS WHAT MAKES "EXACT-ONLY"
+       MEAN WHAT IT SAYS. `norm` was lowercase+trim only, so "exact" really meant "the bare word and
+       nothing else" — and the moment `pay`, `delivery` and `shipping` were added to EXACT_ONLY to
+       stop them hunting inside longer headers, three ordinary columns stopped binding at all:
+         · `Pay ($/hr)` — the app's OWN field-label shape — left `wage` unmapped, so an 8-hour shift
+           cost **$0.00**: the exact failure the EXACT_ONLY change was made to prevent, firing from
+           the other side one round later;
+         · `Shipping ($)` left the vendor delivery fee unmapped, so the Order Sheet's fee line
+           vanished (`_vendorInfo` gates on `fee > 0`);
+         · and any `Delivery (...)` variant lost the delivery days, which silently reverts every
+           product from that vendor to the Default Delivery Cycle for its par.
+       A trailing "($)", "($/hr)", "(USD)" is a UNIT ANNOTATION, not part of the column's meaning.
+       Stripping it in the exact pass keeps the bare-word protection while letting the real headers
+       win pass 1 — and pass 2 is untouched, so nothing gains a new way to hunt. */
+    /* ⚠⚠ ONLY A UNIT ANNOTATION IS STRIPPED, NEVER A MEANING QUALIFIER. Stripping every trailing
+       parenthetical was too blunt and broke Toast's AllItemsReport instantly: "Item Qty (incl
+       voids)" and "Item Qty" both collapsed to "item qty", so the exact pass took the LEFTMOST —
+       the voided-plates column — which is the precise defect `'item qty'` was ordered first to
+       prevent. Two harnesses caught it, including the app-wide POS mapping pin.
+       "($)" / "($/hr)" / "(USD)" say nothing about WHICH column this is; "(incl voids)" is the
+       whole difference between two columns. So: strip a parenthetical only when it carries no
+       letters at all, or only letters from a small unit vocabulary. */
+    const UNIT_PAREN = /^[^a-z]*$|^(?:usd|ea|each|hr|hrs|oz|lb|lbs|kg|g|ml|l|pct|qty)$/;
+    const norm = h => {
+      let t = String(h).toLowerCase().trim();
+      const m = t.match(/^(.*?)\s*\(([^)]*)\)$/);
+      if (m && UNIT_PAREN.test(m[2].replace(/[^a-z]/g, '') || m[2])) t = m[1].trim();
+      return t.trim();
+    };
     const claim = (f, i) => { if (i > -1) { map[f.key] = i; used[i] = true; } };
     // An UNNAMED column is never auto-claimed — there is nothing to match on, and guessing it is
     // how a row-number column ends up imported as covers.
