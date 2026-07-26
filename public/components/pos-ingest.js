@@ -35,7 +35,12 @@ const PosIngest = {
     tips: [
       { key: 'name',      label: 'Staff Name', required: true,  match: ['employee', 'employee name', 'name', 'staff', 'staff name', 'server', 'server name', 'bartender', 'team member', 'waiter', 'full name', 'first name', 'last name'] },
       { key: 'date',      label: 'Date',       required: true,  match: ['date', 'business date', 'work date', 'shift date', 'day', 'service date', 'pay date'] },
-      { key: 'card_tips', label: 'Card Tips',  required: false, match: ['card tips', 'credit tips', 'cc tips', 'card', 'credit card tips', 'charged tips', 'non-cash tips', 'non cash tips', 'noncash tips', 'charge tips', 'tips charged', 'electronic tips', 'card gratuity', 'auto gratuity', 'autograt'] },
+      { key: 'card_tips', label: 'Card Tips',  required: false, /* ⚠ `credit card` is explicit because `card` became EXACT_ONLY (see csv-mapper). Before that, bare
+         `card` word-matched INSIDE "Credit Card" and bound it by accident; the moment it stopped
+         hunting, a tips export headed just "Credit Card" silently stopped importing card tips.
+         Caught in the blast-radius run of that change, not after it — this is the one regression in
+         1,242 door × header bindings, and the other 15 were all wrong bindings going away. */
+        match: ['card tips', 'credit tips', 'cc tips', 'card', 'credit card tips', 'credit card', 'charged tips', 'non-cash tips', 'non cash tips', 'noncash tips', 'charge tips', 'tips charged', 'electronic tips', 'card gratuity', 'auto gratuity', 'autograt'] },
       { key: 'cash_tips', label: 'Cash Tips',  required: false, match: ['cash tips', 'cash', 'declared cash tips', 'declared tips', 'declared', 'cash gratuity', 'cash tip', 'tips cash'] },
       { key: 'shift',     label: 'Shift',      required: false, match: ['shift', 'shift type', 'daypart', 'shift name', 'meal period'] }
     ],
@@ -225,6 +230,34 @@ const PosIngest = {
       used.add(x.id); return x;
     }
     return null;
+  },
+
+  /* ⚠ IS THIS NAME A PERSON, OR THE EXPORT'S OWN SUMMARY LINE? Micros, Toast and Aloha all append a
+     totals row to a per-server report, and its name cell reads "Total" / "Grand Total" / "All
+     Servers". Scored as a person it does real damage in BOTH directions, measured at door 12:
+       · its no_sales / voids are the SUM of the floor's, so it drags every team average up and the
+         real outlier stops clearing `v > avg * 2` — a bartender at 9 no-sale opens against a floor
+         of 2 went from High Risk to CLEAN and the screen printed the green all-clear;
+       · it counts toward `reviewed`, so it lifted a two-bartender bar over MIN_TEAM and bought the
+         all-clear that the MIN_TEAM caveat exists to prevent;
+       · and it can itself be FLAGGED — "TOTAL (High Risk)" printed as a named employee into the PDF
+         handed to an owner.
+     ⚠ A WHITELIST OF WHOLE-CELL NAMES, NOT A SUBSTRING TEST. "Total" as a token would eat a real
+     person ("Total Wine rep", a server nicknamed "Subtotal"), and this project has been burned four
+     times by a stem test matching a word inside a longer one ("Monthly" read as Monday). The cell
+     must BE one of these, punctuation and case aside, or it is a person.
+     ⚠ Lives here, not privately at one door: the same summary line lands on every per-server sales
+     door (4, 11 and 12), and a private copy is a copy that has already drifted. */
+  SUMMARY_NAMES: ['total', 'totals', 'grand total', 'grand totals', 'sum', 'sums', 'subtotal',
+    'subtotals', 'all servers', 'all employees', 'all staff', 'report total', 'report totals',
+    'overall total', 'total all', 'totals all', 'summary', 'net total', 'gross total'],
+  isSummaryName(name) {
+    const n = String(name == null ? '' : name)
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')   // strip ':' '*' '-' '_' and any stray punctuation
+      .replace(/\s+/g, ' ')
+      .trim();
+    return !!n && this.SUMMARY_NAMES.indexOf(n) >= 0;
   },
 
   // Normalize a POS date cell to canonical local YYYY-MM-DD (App.ymdLocal's

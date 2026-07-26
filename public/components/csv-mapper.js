@@ -345,8 +345,27 @@ const CSVMapper = {
            delivery fee on every order.
        Exact-only is the right tool for all three: a header of exactly "Pay" / "Delivery" /
        "Shipping" still binds in pass 1, and none of them may go hunting inside a longer header. */
+    /* ⚠ `cash`, `card`, `credit`, `charge`, `sales` and `no sale` joined 2026-07-26, and the reason
+       is the same one `pay` joined for: each is a perfectly good WHOLE header and a menace as a
+       token inside a longer one. Measured over 1,150 door × real-header bindings, the change moved
+       exactly 14 — and every single one was a WRONG binding becoming unmapped. Nothing correct was
+       lost, because a bare `Cash` / `Card` / `Sales` / `Charge` header still wins pass 1 exactly.
+         · `cash` word-matched "Cash Tips", so on any cash-out report (TouchBistro, Toast, SpotOn,
+           Micros) the Cash SALES field took the TIP column — `cash_ratio` then measured a tip mix,
+           and a bartender declaring her cash tips honestly printed as High Risk / Cash Skimming.
+           It also took "Cash Owed" and, at the TIPS door, "Cash Sales" and "Expected Cash" —
+           a sales column and a drawer column, both read as cash tips.
+         · `sales` word-matched the leftmost header merely containing it: "Sales Tax" became a
+           server's net sales (every ratio ~10x) and "Cash Sales" became their whole sales figure
+           (understated by the entire card half, which manufactures a flag on a cash-heavy but
+           honest server).
+         · `no sale` word-matched "No Sale Amount", so a DOLLAR total was read as a count of drawer
+           opens and the card printed "640 per shift" for $1,920.
+       ⚠ The precise multi-word terms ("cash sales", "cash tips", "no sale count", "sales total")
+       are all still in their match arrays and still bind — this only stops the BARE word hunting. */
     const EXACT_ONLY = { name: 1, item: 1, total: 1, amount: 1, type: 1, count: 1, value: 1, date: 1,
-      pay: 1, delivery: 1, shipping: 1 };
+      pay: 1, delivery: 1, shipping: 1,
+      cash: 1, card: 1, credit: 1, charge: 1, sales: 1, 'no sale': 1, 'credit card': 1 };
     // Same rule in the fuzzy pass: walk the candidates in PRIORITY order, not the headers.
     fields.forEach(f => {
       if (map[f.key] != null) return;   // `!= null`: column 0 is a real match, not "unmapped"
