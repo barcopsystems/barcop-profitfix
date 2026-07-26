@@ -384,8 +384,14 @@ S.LaborStaffRoster = {
       fields: [
         { key: 'name',          label: 'Name',          required: true,  match: ['name', 'employee', 'employee name', 'staff', 'full name', 'first name', 'last name', 'team member', 'staff name', 'worker'] },
         { key: 'position',      label: 'Position',      required: false, match: ['position', 'role', 'title', 'job', 'job title', 'job role', 'position title', 'job position'] },
-        { key: 'pay_type',      label: 'Pay Type',      required: false, match: ['pay type', 'type', 'pay', 'employment type', 'wage type', 'pay category'] },
-        { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate', 'hourly wage', 'wage rate', 'hourly pay'] },
+        /* ⚠ `'pay'` WAS IN pay_type's LIST AND IT STOLE THE WAGE COLUMN. `match` arrays are walked
+           in declared order and pay_type is declared first, so a header of exactly "Pay" bound to
+           pay_type and `wage` was left unmapped — every shift then cost $0.00. "Base Pay Rate" and
+           "Hourly Pay Rate" broke the same way on the word match. The door's own drop copy invites
+           the header ("position, pay, status, phone, and email come in if your file has them").
+           A column headed "Pay" is an AMOUNT, so it belongs to `wage`, last in its list. */
+        { key: 'pay_type',      label: 'Pay Type',      required: false, match: ['pay type', 'type', 'employment type', 'wage type', 'pay category'] },
+        { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate', 'hourly wage', 'wage rate', 'hourly pay', 'pay'] },
         { key: 'annual_salary', label: 'Annual Salary', required: false, match: ['salary', 'annual salary', 'annual', 'yearly salary', 'annual pay', 'yearly pay'] },
         { key: 'status',        label: 'Status',        required: false, match: ['status', 'active', 'employment status', 'active status', 'staff status'] },
         { key: 'phone',         label: 'Phone',         required: false, match: ['phone', 'mobile', 'cell', 'phone number', 'telephone', 'cell phone', 'contact phone', 'mobile number'] },
@@ -414,21 +420,58 @@ S.LaborStaffRoster = {
     const posByName = {};
     this.positions().forEach(p => { posByName[(p.name || '').trim().toLowerCase()] = p; });
     const toAdd = [];
+    // Dedup by name against the roster AND within the file, so a re-drop after a mapping fix — or
+    // next month's payroll export — never mints a second Ana Ruiz. The vendor door beside this one
+    // has always done it; this one had NO duplicate handling at all, so two drops gave four people,
+    // every picker listed them twice, and the original's hours and tips stayed on the old id.
+    // ⚠ The set is built from the WHOLE roster including Inactive, or re-importing a terminated
+    // employee creates a second Active record and strands their history.
+    const taken = new Set(this.staff().map(s => (s.name || '').trim().toLowerCase()));
+    let blank = 0, dupes = 0, badPay = 0;
     (rows || []).forEach(r => {
       const name = (r.name || '').trim();
-      if (!name) return;
+      if (!name) { blank++; return; }
+      if (taken.has(name.toLowerCase())) { dupes++; return; }
+      taken.add(name.toLowerCase());
       const pos = posByName[(r.position || '').trim().toLowerCase()] || null;
-      const salaried = /salar|exempt/i.test((r.pay_type || '').trim());
-      const wageNum = parseFloat(r.wage);
-      const salNum = parseFloat(r.annual_salary);
+      /* ⚠⚠ "NON-EXEMPT" IS THE FLSA WORD FOR *HOURLY*, AND THE OLD TEST READ IT AS SALARIED.
+         `/salar|exempt/i` matches the "exempt" inside "Non-Exempt" — so an ADP/Paychex/Paylocity
+         roster, whose Employment Type column this door's own `match` list asks for by name, made
+         **every hourly employee salaried and then threw their wage away** (the salaried branch
+         stores `wage: null`). With no Annual Salary column either, they landed with no pay of any
+         kind: `wageForStaffPosition` returns 0, `salariedCost` skips them, and a $19.50/hr
+         bartender's 40-hour week cost **$0.00 instead of $780**. Labor cost, labor %, prime cost
+         and RPLH all read low by that person's entire payroll, on every screen that shows them. */
+      const payTypeCell = (r.pay_type || '').trim();
+      const salNum = App.parseNum(r.annual_salary);
+      const saysSalary = /salar/i.test(payTypeCell)
+        || (/\bexempt\b/i.test(payTypeCell) && !/non[\s-]*exempt/i.test(payTypeCell));
+      /* ⚠ AND A SALARY FIGURE IS ITSELF THE CLASSIFICATION. The old code forced `annual_salary` to
+         null unless a SEPARATE Pay Type column agreed — so a Name/Title/Salary manager list (which
+         is how a three-person salaried list is actually written; nobody adds a Pay Type column to
+         it) imported everyone Hourly with no wage, and the weekly salaried cost was $0.00. */
+      const salaried = saysSalary || (!payTypeCell && salNum != null);
+      // App.parseNum, not parseFloat: `parseFloat('52,000')` is 52 and `parseFloat('$19.50')` is
+      // NaN. XLSX is read with raw:false, so a Currency- or #,##0-formatted money column — the
+      // default for money — arrives as exactly those strings. A $52,000 salary imported as $52.
+      const wageNum = App.parseNum(r.wage);
+      // A negative wage is refused rather than stored: the manual form carries min="0", and a
+      // negative rate makes labor cost FALL when that person works.
+      const wageOk = wageNum != null && wageNum >= 0;
+      const salOk = salNum != null && salNum >= 0;
+      if ((wageNum != null && wageNum < 0) || (salNum != null && salNum < 0)) badPay++;
+      // Fall back to the position's default wage, exactly as the manual form does the moment a
+      // position is picked — otherwise the same file typed by hand and imported gives two answers,
+      // and the import's answer costs every shift at $0.
+      const posWage = (pos && pos.default_wage != null) ? pos.default_wage : null;
       const inactive = /inactive|term/i.test((r.status || '').trim());
       toAdd.push({
         id:            App.uid(),
         name,
         position_id:   pos ? pos.id : '',
         pay_type:      salaried ? 'Salary' : 'Hourly',
-        wage:          salaried ? null : (isNaN(wageNum) ? null : wageNum),
-        annual_salary: salaried ? (isNaN(salNum) ? null : salNum) : null,
+        wage:          salaried ? null : (wageOk ? wageNum : posWage),
+        annual_salary: salaried ? (salOk ? salNum : null) : null,
         wage_history:  [],
         status:        inactive ? 'Inactive' : 'Active',
         phone:         (r.phone || '').trim(),
@@ -439,8 +482,20 @@ S.LaborStaffRoster = {
     });
 
     const result = document.getElementById('sr-imp-result');
+    /* ⚠ THE ZERO-ROW HEADLINE MUST NAME THE REASON THAT ACTUALLY APPLIES. "Each row needs a Name"
+       was printed even when every name was fine and every row was already on the roster — sending
+       the operator to fix a column that was correct. An absolute claim may only fire when the other
+       buckets are empty; the mixed case asserts nothing and lets the counts speak. */
     if (toAdd.length === 0) {
-      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No rows imported. Each row needs a Name.</div>';
+      const why = dupes && !blank ? 'Everyone in this file is already on your roster.'
+        : blank && !dupes ? 'No rows imported. Each row needs a Name.'
+        : dupes || blank ? 'No new staff imported.'
+        : 'No rows imported. Each row needs a Name.';
+      const bits = [];
+      if (dupes) bits.push(dupes + ' already on your roster');
+      if (blank) bits.push(blank + ' row' + (blank === 1 ? '' : 's') + ' skipped with no name');
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + why + (bits.length ? ' (' + bits.join(' · ') + ')' : '') + '</div>';
       return;
     }
     this.staff().push(...toAdd);
@@ -450,8 +505,16 @@ S.LaborStaffRoster = {
       const noPos = toAdd.filter(s => !s.position_id).length;
       this.renderList();
       const res2 = document.getElementById('sr-imp-result');
+      /* Every way a row can be dropped now reaches the operator. The only counter this door had was
+         `noPos`, so a 50-row export with 20 subtotal/spacer rows reported "Imported 30 staff
+         members." and said nothing about the other 20 — which is what hid every defect above. */
+      const notes = [];
+      if (dupes) notes.push(dupes + ' already on your roster');
+      if (blank) notes.push(blank + ' row' + (blank === 1 ? '' : 's') + ' skipped with no name');
+      if (badPay) notes.push(badPay + ' negative pay figure' + (badPay === 1 ? '' : 's') + ' ignored');
+      if (noPos > 0) notes.push(noPos + ' need a position set; open them on the roster below');
       if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported ' + toAdd.length + ' staff member' + (toAdd.length === 1 ? '' : 's') + '.'
-        + (noPos > 0 ? ' <span style="color:var(--t3);font-weight:400;">' + noPos + ' need a position set; open them on the roster below.</span>' : '') + '</div>';
+        + (notes.length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes.join(' · ') + ')</span>' : '') + '</div>';
     } else {
       const ids = new Set(toAdd.map(s => s.id));
       App.laborData.lc_staff = this.staff().filter(s => !ids.has(s.id));
