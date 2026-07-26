@@ -7065,6 +7065,49 @@ const App = {
   // records in place — this only writes them. Used where a batch changes at once
   // (close / reopen a pay period locks or unlocks a whole week of logged hours);
   // turns a 5-10s per-row loop into one bulk upsert.
+  /* ── PARTIAL-SAVE HONESTY, shared by every per-row importer ───────────────────────────────────
+     PosIngest's committers walk their rows ONE AT A TIME, do not stop at the first refusal, and
+     AND a single boolean. So `false` means "at least one row was refused", never "nothing was
+     written" — and reported flat as "Save failed" it reads as "nothing happened" over records that
+     are already feeding Where You Stand, Confirm the Week, the cash-forecast baseline, the tax hold
+     and the loss screens. The operator's natural next move is to enter them all again by hand.
+     These live on App because FIVE import doors need them (sales, cash, per-server, voids, and the
+     two labour doors). Three of them had already drifted into three different wordings of the same
+     lie before this was extracted; that is what a copy-per-door buys.
+     ⚠ IDENTITY, NOT ID. Sales and cash REUSE the prior record's id when they replace a row, so the
+     id is already in the array before the write and an id test would call every row landed.
+     putRecord assigns the exact object on success and puts the PREVIOUS object back (or splices it
+     out) on a genuine refusal, so "is this exact object in the list" is the honest question. */
+  landedOf(list, arr) {
+    const live = (arr || []);
+    return (list || []).filter(r => live.indexOf(r) !== -1).length;
+  },
+  /* THREE STATES, NOT TWO.
+     `landed === total` is REACHABLE and must not read as a partial save: _commitSales and
+     _commitCashRows fold the STALE-ROW RETIREMENT into the same `ok` they return, so when every
+     insert lands and only a `removeRecord` is refused, the write succeeded completely and the real
+     problem is a superseded row that could not be deleted — the date now holds two rows, and every
+     consumer sums by date, so it is DOUBLE-COUNTED. Re-running is still the fix, for a different
+     reason, so say which.
+     `landed === 0` is scoped to the rows THIS call tried to write, never a blanket "nothing was
+     saved": a caller may append "N days were already cleared to zero and stayed cleared", and those
+     deletes really did happen — they run before the write is even attempted.
+     Both noun forms are required because `total === 1` is the commonest failure shape at every door
+     ("None of the 1 reconciles were saved"), and the VERB follows `landed` while the NOUN follows
+     `total` ("1 of 2 days was saved"). */
+  partialSaveNote(landed, total, one, many) {
+    if (landed && landed >= total) {
+      return (total === 1 ? 'The ' + one + ' was saved' : 'All ' + total + ' ' + many + ' were saved')
+        + ', but an older record could not be cleared out, so '
+        + (total === 1 ? 'it' : 'one of them') + ' may be counted twice until you run this again.';
+    }
+    return landed
+      ? landed + ' of ' + total + ' ' + many + (landed === 1 ? ' was' : ' were') + ' saved before the save was refused. '
+        + 'Run it again to finish — Bar Cop will not double anything that already saved.'
+      : 'Save failed. ' + (total === 1 ? 'The ' + one + ' was not saved.'
+                                       : 'None of the ' + total + ' ' + many + ' were saved.') + ' Try again.';
+  },
+
   async putRecordsBulk(mod, kind, recs, opts) {
     const store = this.EVENT_STORES[mod];
     if (!store) return false;
