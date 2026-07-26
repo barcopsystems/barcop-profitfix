@@ -556,19 +556,21 @@ S.HubOperatingExpenses = {
        - a bare integer: `new Date("45845")` is year 45845, and an Excel date column whose format
          was reset to General exports exactly that serial (raw:false hands the text straight over);
        - an impossible ISO date: the fast path returned "2026-13-45" untouched. */
+  /* ⚠⚠ ONE DATE READER FOR THE WHOLE APP. This door had its OWN copy, and it ended in the exact
+     line six scan rounds were spent removing from the shared one: `new Date(str)`, which hands free
+     text to V8's legacy parser. So every failure mode that was eliminated in PosIngest.normDate was
+     still live HERE — an Excel `d-mmm` cell ("20-Jul") booked to 2001, a UTC marker lost a day,
+     "06.07.2026" transposed, "Feb 29 2026" rolled into March, "Jul 2026" became the 1st, and a
+     1899 or 3000 date was accepted verbatim. On a three-row rent/utilities file that put $7,340 of
+     $8,540 into July 2001 — invisible in This Month and Year to Date (which filter on the date's
+     first seven characters) while still counting in History's all-time total. Books reads this log
+     for the Income Statement's operating-expense lines.
+     This is the second-consumer miss in its purest form: the shared reader was rewritten and nobody
+     grepped for OTHER readers. Delegating is the fix — a private copy is a copy that drifts.
+     ⚠ Before adding a date format here, add it to PosIngest.normDate; it is pinned by
+     verify-import-date-year.js and shared by every import door in the app. */
   _normDate(s) {
-    if (!s) return '';
-    const str = String(s).trim();
-    const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (iso) {
-      const y = +iso[1], m = +iso[2], dd = +iso[3];
-      const probe = new Date(y, m - 1, dd);
-      const real = probe.getFullYear() === y && probe.getMonth() === m - 1 && probe.getDate() === dd;
-      return real ? str : '';
-    }
-    if (/^\d+$/.test(str)) return '';   // a bare number is a spreadsheet serial, not a date
-    const d = new Date(str);
-    return isNaN(d.getTime()) ? '' : App.ymdLocal(d);
+    return (typeof PosIngest !== 'undefined' && PosIngest.normDate) ? PosIngest.normDate(s) : '';
   },
 
   // ⚠ MATCHES THE OPERATOR'S OWN LIST TOO, not just the nine builtins. The manual Category field is
@@ -588,6 +590,34 @@ S.HubOperatingExpenses = {
   async _importRows(rows) {
     const arr = this.records();
     const _added = [];   // rows appended here, so a failed write can take them back out
+    /* ⚠⚠ DEDUP AGAINST WHAT WAS ALREADY LOGGED — A SNAPSHOT — NOT AGAINST THE LIST THIS LOOP IS
+       APPENDING TO. The old test was `arr.some(...)` where `arr` is the LIVE log, and rows are
+       pushed into `arr` inside the same loop. So the second genuinely-separate expense that happened
+       to match the first COLLAPSED INTO IT: three $89 rows on one Saturday (two ice deliveries and a
+       linen drop — a card statement lists each) imported as ONE. **$89.00 banked against $267.00 in
+       the file**, and the result line said "2 already logged", which was false — they were in the
+       same file and had never been logged at all. Same-day repeats from one vendor for one amount
+       are ORDINARY in a bar: two ice runs, two kegs, the same delivery fee twice.
+       This log feeds the Books Income Statement's operating-expense lines, This Month, Year to Date,
+       By Category and breakeven, so the money went missing from all of them at once.
+       ⚠ THE CONSUME-ONCE SET IS THE HALF THAT KEEPS THE RE-DROP HONEST. Snapshot alone would let a
+       re-dropped file import everything twice; `_used` lets each already-logged row absorb exactly
+       ONE incoming row, so a genuine re-drop still dedupes in full while three-of-a-kind in one file
+       all land. Snapshotting WITHOUT consume-once, or consume-once against the LIVE array, each
+       still lose a row — both were tried and both are wrong.
+       `PosIngest._isDup` is the shared implementation every POS builder already uses for exactly
+       this; door 17 was the one place hand-rolling it. */
+    const _pre = arr.slice();
+    const _used = new Set();
+    const _dup = (date, amount, vendor, category) => {
+      const pred = x => x.date === date && Math.abs((parseFloat(x.amount) || 0) - amount) < 0.005
+        && (x.vendor || '') === vendor && (x.category || '') === category;
+      if (typeof PosIngest !== 'undefined' && PosIngest._isDup) return PosIngest._isDup(_pre, _used, pred);
+      // Backstop with the same consume-once semantics, never the old any-match test.
+      const hit = _pre.find(x => !_used.has(x.id) && pred(x));
+      if (hit) { _used.add(hit.id); return true; }
+      return false;
+    };
     let credits = 0, unreadable = 0, undated = 0, zeroed = 0;
     (rows || []).forEach((r, i) => {
       const date = this._normDate(r.date);
@@ -608,8 +638,8 @@ S.HubOperatingExpenses = {
       const category = this.CATEGORIES.includes(r.category) ? r.category : (this._matchCat(r.category) || 'Other');
       const vendor = (r.vendor || '').trim();
       const notes = (r.notes || '').trim();
-      // Skip a row already logged (same date, amount, vendor, category).
-      if (arr.some(x => x.date === date && Math.abs((parseFloat(x.amount) || 0) - amount) < 0.005 && (x.vendor || '') === vendor && (x.category || '') === category)) return;
+      // Skip a row ALREADY LOGGED (same date, amount, vendor, category) — see the snapshot note above.
+      if (_dup(date, amount, vendor, category)) return;
       const row = { id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date, category, vendor, amount, notes, created_at: new Date().toISOString() };
       arr.push(row); _added.push(row);
     });
