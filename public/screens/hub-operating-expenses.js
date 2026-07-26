@@ -569,8 +569,10 @@ S.HubOperatingExpenses = {
      grepped for OTHER readers. Delegating is the fix — a private copy is a copy that drifts.
      ⚠ Before adding a date format here, add it to PosIngest.normDate; it is pinned by
      verify-import-date-year.js and shared by every import door in the app. */
-  _normDate(s) {
-    return (typeof PosIngest !== 'undefined' && PosIngest.normDate) ? PosIngest.normDate(s) : '';
+  /* `opts` carries the FILE-LEVEL date verdict (S199). This door reads its own column rather than
+     going through PosIngest.build, so it has to ask for the verdict itself — see _importRows. */
+  _normDate(s, opts) {
+    return (typeof PosIngest !== 'undefined' && PosIngest.normDate) ? PosIngest.normDate(s, opts) : '';
   },
 
   // ⚠ MATCHES THE OPERATOR'S OWN LIST TOO, not just the nine builtins. The manual Category field is
@@ -607,6 +609,15 @@ S.HubOperatingExpenses = {
        still lose a row — both were tried and both are wrong.
        `PosIngest._isDup` is the shared implementation every POS builder already uses for exactly
        this; door 17 was the one place hand-rolling it. */
+    /* ⚠ READ THE DATE COLUMN ONCE, BEFORE ANY ROW (S199). A DD/MM/YYYY expense file used to land
+       its 1st-to-12th rows in the wrong MONTH while its 13th-to-31st rows read correctly, so a
+       month of rent and utilities scattered and the totals on this very screen disagreed with each
+       other. This door does not go through PosIngest.build, so it asks for the verdict itself. */
+    const _conv = (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
+      ? PosIngest.dateConvention(rows, 'date') : { dayFirst: false, contradictory: false };
+    // A self-contradicting file refuses its coin-toss rows rather than guessing; they land in the
+    // `undated` bucket this door already counts and names.
+    const _dopts = { dayFirst: _conv.dayFirst, dateAmbiguous: _conv.contradictory };
     const _pre = arr.slice();
     const _used = new Set();
     const _dup = (date, amount, vendor, category) => {
@@ -620,7 +631,7 @@ S.HubOperatingExpenses = {
     };
     let credits = 0, unreadable = 0, undated = 0, zeroed = 0;
     (rows || []).forEach((r, i) => {
-      const date = this._normDate(r.date);
+      const date = this._normDate(r.date, _dopts);
       // ⚠ App.parseNum, not a private parseFloat strip. This read a card export's refund row —
       // "(125.00)" or "125.00-" — as +125 and BOOKED IT AS A $125 EXPENSE, while the same file's
       // "-125.00" rows parsed to -125 and were dropped by the guard below. One file, two opposite
@@ -677,6 +688,13 @@ S.HubOperatingExpenses = {
       if (zeroed) bits.push(zeroed + ' zero-dollar row' + (zeroed === 1 ? '' : 's') + ' skipped');
       const dupes = rows.length - _added.length - credits - undated - unreadable - zeroed;
       if (dupes > 0) bits.push(dupes + ' already logged');
+      /* ⚠ ONLY THE CONTRADICTORY FILE IS WORTH SAYING OUT LOUD. A day-first file that Bar Cop read
+         correctly needs no announcement — it is simply right, and a US file can never trigger the
+         detection at all. What the operator DOES need is the case Bar Cop could not decide: some
+         rows in the file can only be day-first and others can only be month-first, so the rows where
+         both numbers are 12 or under are a coin toss. Those are read US-style and named here rather
+         than guessed at in silence. */
+      if (_conv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
       this._importMsg = bits.join(' · ') + '.';
     }
     this.renderMain();
