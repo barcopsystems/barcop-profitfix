@@ -42,11 +42,21 @@ S.LaborLogHours = {
     let hr = h % 12; if (hr === 0) hr = 12;
     return hr + (m ? ':' + String(m).padStart(2, '0') : '') + ap;
   },
-  normDate(raw) {
-    if (!raw) return '';
-    const d = new Date(String(raw).length <= 10 ? raw + 'T00:00:00' : raw);
-    return isNaN(d.getTime()) ? String(raw) : App.ymdLocal(d);
-  },
+  /* ⚠⚠ A DEAD PRIVATE `normDate` WAS DELETED HERE (and the identical one from lc-tip-log.js, and a
+     third from sc-void-comp.js). Zero callers in any of the three — nothing in `public/` referenced
+     them — so no operator number ever moved. They are removed because of what they were: the exact
+     shape six scan rounds were spent eliminating from the shared reader, carrying THREE bugs at once.
+       · `new Date(<free text>)` hands the string to V8's legacy parser — an Excel `d-mmm` cell books
+         to 2001, a UTC marker loses a day, "06.07.2026" transposes, "Feb 29 2026" rolls into March;
+       · `length <= 10` appends 'T00:00:00' one character too early, so "Jul 4 2026" (exactly 10)
+         died while "Jul 04 2026" (11) parsed — days 1-9 of every month;
+       · and it returned `String(raw)` — THE RAW CELL — when the parse failed, so an unreadable date
+         would have been STORED VERBATIM rather than refused. The shared reader's whole contract is
+         that an unreadable date comes back empty so the row is skipped and counted.
+     Dead code in a date-writing screen is a landmine, not a neutral: it is named the obvious thing,
+     so the next person wiring a date column reaches for it and reintroduces the class.
+     ⚠ PosIngest.normDate is the ONE date reader. Add formats there; verify-import-date-year.js case
+     C6 now sweeps ALL of public/ for a private one. */
 
   // ── Schedule-pull helpers (Fill from Schedule mode) ──────────────────────────
   schedules() { return ((App.laborData && App.laborData.lc_schedules) || []); },

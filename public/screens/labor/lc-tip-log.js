@@ -163,11 +163,16 @@ S.LaborTipLog = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
-  normDate(raw) {
-    if (!raw) return '';
-    const d = new Date(String(raw).length <= 10 ? raw + 'T00:00:00' : raw);
-    return isNaN(d.getTime()) ? String(raw) : App.ymdLocal(d);
-  },
+  /* ⚠⚠ A DEAD PRIVATE `normDate` WAS DELETED HERE — the twin of the one in lc-log-hours.js, byte for
+     byte, plus a third in sc-void-comp.js. Zero callers anywhere in `public/`, so no operator number
+     moved. Removed because it was the exact shape six rounds were spent eliminating: a free-text
+     `new Date()` (2001 invention, UTC day loss, day-first transposition, Feb-29 rollover), a
+     `length <= 10` test that ate days 1-9 of every month, and a failure path that returned the RAW
+     CELL instead of refusing — the one thing the shared reader promises never to do.
+     ⚠ `fmtDate` directly above is NOT the same thing and is correct: it reads an already-stored
+     `YYYY-MM-DD` and returns a display string. Parsing for STORAGE is what belongs to
+     PosIngest.normDate, and only there. verify-import-date-year.js case C6 now sweeps all of
+     public/ and tells the two apart. */
 
   render(container, actions) {
     this.container = container;
