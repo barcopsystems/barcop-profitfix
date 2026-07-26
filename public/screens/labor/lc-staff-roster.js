@@ -391,7 +391,7 @@ S.LaborStaffRoster = {
            the header ("position, pay, status, phone, and email come in if your file has them").
            A column headed "Pay" is an AMOUNT, so it belongs to `wage`, last in its list. */
         { key: 'pay_type',      label: 'Pay Type',      required: false, match: ['pay type', 'type', 'employment type', 'wage type', 'pay category'] },
-        { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate', 'hourly wage', 'wage rate', 'hourly pay', 'pay'] },
+        { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate', 'hourly wage', 'wage rate', 'hourly pay', 'pay per hour', 'pay/hr', 'base pay', 'pay'] },
         { key: 'annual_salary', label: 'Annual Salary', required: false, match: ['salary', 'annual salary', 'annual', 'yearly salary', 'annual pay', 'yearly pay'] },
         { key: 'status',        label: 'Status',        required: false, match: ['status', 'active', 'employment status', 'active status', 'staff status'] },
         { key: 'phone',         label: 'Phone',         required: false, match: ['phone', 'mobile', 'cell', 'phone number', 'telephone', 'cell phone', 'contact phone', 'mobile number'] },
