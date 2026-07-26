@@ -284,7 +284,20 @@ const CSVMapper = {
        'name' word-matches "Menu Name", which is how Dinner / Brunch / Bar imported as item names;
        'item' word-matches "Item Qty", a number. They still win pass 1 on an exact header; they are
        simply not allowed to go hunting inside a longer column name in pass 2. */
-    const EXACT_ONLY = { name: 1, item: 1, total: 1, amount: 1, type: 1, count: 1, value: 1, date: 1 };
+    /* ⚠ `pay`, `delivery` and `shipping` joined this list 2026-07-26, and the reason is worth
+       keeping because the FIRST attempt at the fix was to delete them from their match arrays —
+       which quietly threw away their pass-1 exact bind and broke one-word headers.
+         · `pay` word-matches "Gross Pay", "Total Pay", "Net Pay" and "Pay Period". A payroll
+           REGISTER is exactly the file dropped on the staff-roster import and often has no rate
+           column at all, so a $19.50/hr bartender's 4-week gross imported as a **$3,120.00/hr
+           wage** — every labor figure 160x.
+         · `delivery` word-matches "Delivery Fee ($)" and `shipping` matches "Free Shipping Over ($)",
+           so the Delivery Days field claimed the FEE column and the Order Sheet printed a $400
+           delivery fee on every order.
+       Exact-only is the right tool for all three: a header of exactly "Pay" / "Delivery" /
+       "Shipping" still binds in pass 1, and none of them may go hunting inside a longer header. */
+    const EXACT_ONLY = { name: 1, item: 1, total: 1, amount: 1, type: 1, count: 1, value: 1, date: 1,
+      pay: 1, delivery: 1, shipping: 1 };
     // Same rule in the fuzzy pass: walk the candidates in PRIORITY order, not the headers.
     fields.forEach(f => {
       if (map[f.key] != null) return;   // `!= null`: column 0 is a real match, not "unmapped"
