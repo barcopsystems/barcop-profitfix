@@ -246,14 +246,26 @@ S.InventoryProducts = {
        refusal below exists to prevent, arriving from the other side. A pack descriptor is not a
        size, so it stays unreadable and the row stays Incomplete. */
     const s0 = String(raw == null ? '' : raw).trim().toLowerCase();
-    const s = s0.replace(/(\d)\s*-\s*(?=([a-z]+))/g, (mm, d, word) =>
-      (App.ozPerUnit && App.ozPerUnit(word) != null) ? d + ' ' : mm);
+    /* ⚠ THE LOOKAHEAD TAKES UP TO TWO WORDS, because a unit can be two ("fl oz"). Capturing one
+       word made `16-FL OZ` read `fl`, which `ozPerUnit` does not know — so the hyphen survived,
+       `App.parseNum` saw a trailing minus, and the negative guard below refused the whole cell.
+       A 16 oz bottle imported with NO SIZE. */
+    const known = w => App.ozPerUnit && App.ozPerUnit(String(w).trim()) != null;
+    const s = s0.replace(/(\d)\s*-\s*(?=([a-z]+(?:\s+[a-z]+)?))/g, (mm, d, word) => {
+      const one = String(word).split(/\s+/)[0];
+      return (known(word) || known(one)) ? d + ' ' : mm;
+    });
     if (!s) return null;
     /* ⚠ KEG FRACTIONS FIRST, because they are two numbers and the guard below would refuse them.
        "1/2 keg", "1/6 bbl" and "1/4 barrel" are how a draft size is normally written, and every one
        was landing Incomplete. The ounce figures are the SIZES table's own (1/2 = 1984, 1/4 = 992,
        1/6 = 661), so the import and the dropdown cannot disagree. */
-    const keg = s.match(/^(\d)\s*\/\s*(\d)\s*(?:bbl|barrel|keg)\b/);
+    /* ⚠ `[-\s]*`, NOT `\s*`. `App.ozPerUnit` does not know "bbl" or "keg" (kegs live in the table
+       below, not in the shared unit map), so the hyphen rewrite above deliberately leaves them
+       alone — and a space-only keg pattern then could not match `1/2-BBL`, ordinary draft notation.
+       The cell fell through to the two-number refusal and every hyphenated keg landed Incomplete
+       with no pour cost and no theoretical usage. */
+    const keg = s.match(/^(\d)\s*\/\s*(\d)[-\s]*(?:bbl|barrel|keg)\b/);
     if (keg) { const KEG = { '1/2': 1984, '1/4': 992, '1/6': 661 }; const oz = KEG[keg[1] + '/' + keg[2]]; if (oz) return oz; }
     if ((s.match(/[\d][\d,]*(?:\.\d+)?/g) || []).length > 1) return null;   // pack x size — ambiguous
     const n = App.parseNum(s);
@@ -285,7 +297,10 @@ S.InventoryProducts = {
        `"#12/CS"`, where `#` is ordinary shorthand for "number of" on a hand-built case-size column —
        the product then landed Incomplete with no bottle cost at all. A can size is the hash followed
        by a small number AND a can/pail word; `"#10 can"` is refused, `"#24"` is twenty-four. */
-    if (/^\s*#\s*\d+\s*(?:can|pail|tin|jug)\b/.test(s)) return null;
+    // ⚠ CASE-INSENSITIVE AND PLURAL-TOLERANT. Without the `i` flag and the `s?`, only the exact
+    // lowercase singular was caught — and a distributor order guide prints "#10 CAN" and "#5 PAIL"
+    // in CAPS. `#10 CAN` came back as a count of ten, so a $28.80 can priced at $2.88 a unit.
+    if (/^\s*#\s*[\d.]+\s*(?:can|pail|tin|jug)s?\b/i.test(s)) return null;
     const m = s.match(/[\d][\d,]*(?:\.\d+)?/);
     return m ? App.parseNum(m[0]) : null;
   },

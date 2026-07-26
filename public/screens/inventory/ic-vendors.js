@@ -401,7 +401,7 @@ S.InventoryVendors = {
      A range is expanded, a list is split, "daily" is all seven, and anything unreadable comes back
      empty so the door can COUNT and report it rather than storing something no screen can use. */
   _normDeliveryDays(raw) {
-    const s = String(raw || '').trim();
+    let s = String(raw || '').trim();   // `let`: the exclusion pass below rewrites it
     if (!s) return '';
     if (/pick\s*-?\s*up|will\s*call/i.test(s)) return 'Pickup';
     const D = this.DAY_NAMES;                                   // Mon..Sun, index 0..6
@@ -424,7 +424,22 @@ S.InventoryVendors = {
       const s3 = { sun: 6, mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5 };
       return s3[stem] != null ? s3[stem] : -1;
     };
+    /* ⚠⚠ A NEGATED DAY WAS BEING READ AS A DELIVERY DAY. `idxOf('closed')` is -1, so the negating
+       word was simply dropped and the day beside it ADDED: "Mon-Fri, closed Sat" stored SIX days,
+       "Daily except Sunday" stored a vendor that delivers only on **Sunday**, and "Sat 10-2, Sun
+       closed" gave a par of 18 against a true 35. Both word orders occur ("closed Sunday" and
+       "Sun closed"), so both are matched, the phrase is removed before the day pass, and the named
+       days are subtracted at the end. */
+    const excluded = new Set();
+    let t = s.replace(/\b(?:closed|except|excluding|excl\.?|no)\s+([a-z]+)|\b([a-z]+)\s+closed\b/gi,
+      (mm, a, b) => { const i = idxOf(a || b); if (i > -1) { excluded.add(i); return ' '; } return mm; });
+    /* "Daily" only means all seven when it is the WHOLE cell — but once an exclusion has been lifted
+       out, "Daily except Sunday" leaves a bare "Daily" that must still mean all seven minus Sunday. */
+    if (/^\s*(daily|every\s*day|7\s*days?)\s*$/i.test(t) && excluded.size) {
+      return D.filter((_, i) => !excluded.has(i)).join(', ');
+    }
     if (/^\s*(daily|every\s*day|7\s*days?)\s*$/i.test(s)) return D.join(', ');
+    s = t;
     const on = new Set();
     let ambiguous = false;
     /* ⚠⚠ EVERY RANGE, THEN EVERYTHING LEFT OVER. The first version matched ONE range and gated the
@@ -451,7 +466,15 @@ S.InventoryVendors = {
       // ⚠ "…-close" is a time too. A bar writes its receiving window as "Mon-Fri 4-close", and the
       // digit-dash-DIGIT strip left that second dash behind: "Mon, Fri", 2 delivery days not 5,
       // which doubles the suggested par. Silent, because badDays only counts an EMPTY result.
-      const seg = rawSeg.replace(/\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*[-–—]\s*(?:close|closing|\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi, ' ');
+      /* ⚠ A CLOSING TIME DOES NOT ALWAYS START WITH A DIGIT. Requiring one left "Mon-Fri open-close",
+         "noon-close", "lunch-close" and "11a-close" with a second dash in the segment, so the range
+         collapsed to its endpoints: **2 delivery days instead of 5**, and at 35 units/week that is a
+         suggested par of 18 against a true 7. Silent, because badDays only counts an EMPTY result.
+         ⚠ The left token is checked against the day names first — "Mon-close" must keep its Monday
+         rather than have the whole phrase stripped. */
+      const seg = rawSeg
+        .replace(/([a-z0-9:]+)\s*[-–—]\s*clos(?:e|ing)\b/gi, (mm, lead) => (idxOf(lead) > -1 ? mm : ' '))
+        .replace(/\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*[-–—]\s*(?:close|closing|\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi, ' ');
       const dashes = (seg.match(/-|–|—/g) || []).length;
       const r = (dashes === 1 || /\b(to|thru|through)\b/i.test(seg))
         ? seg.match(/([a-z]+)[.\s]*(?:-|–|—|to|thru|through)[.\s]*([a-z]+)/i) : null;
@@ -469,6 +492,7 @@ S.InventoryVendors = {
     /* A cell mixing readable days with an ambiguous single letter is refused WHOLE. Keeping the
        readable half would store a schedule quietly missing a day, and the par count reads it. */
     if (ambiguous) return '';
+    excluded.forEach(i => on.delete(i));   // "Mon-Fri, closed Sat" is five days, not six
     if (!on.size) return '';
     return D.filter((_, i) => on.has(i)).join(', ');
   },
