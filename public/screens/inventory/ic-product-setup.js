@@ -567,7 +567,13 @@ S.InventoryProducts = {
     // sits in an .rpt-panel so the active category tab connects into it cleanly
     // (same connected look as the report tabs) and the header row gets padding.
     const lower = this._import ? this.importPanelHTML() : (tabs + body);
-    this.container.innerHTML = '<div class="screen">' + cardsBlock + lower + '</div>';
+    /* The import result (S206). It has to render HERE, not be written into the DOM by `note()`:
+       `note()` targets `#ip-csv-actions`, which is the importer's own action row, and a successful
+       import closes the importer and calls renderLanding — so anything written first is destroyed
+       on the spot. Cleared once shown, so it cannot greet the operator again on a later visit. */
+    const _im = this._importMsg; this._importMsg = null;
+    const _imHtml = _im ? '<div style="font-size:13px;color:var(--t2);margin:0 0 12px;">' + esc(_im) + '</div>' : '';
+    this.container.innerHTML = '<div class="screen">' + _imHtml + cardsBlock + lower + '</div>';
     this.wireLanding();
   },
 
@@ -2004,21 +2010,37 @@ S.InventoryProducts = {
     // and de-dupes repeats within the file itself), so a re-drop never creates
     // duplicate-named products the rest of the app treats as an error state.
     const taken = new Set(this.products().map(p => (p.name || '').trim().toLowerCase()));
-    let dup = 0;
+    /* ⚠ AN ARCHIVED PRODUCT OF THE SAME NAME IS A DEAD END, SO IT IS NAMED SEPARATELY. `products()`
+       includes `active:false` rows, and archive-then-reimport is the app's OWN documented recovery
+       path for a bad import — so following it was the one thing that could not work: 0 imported,
+       *"3 duplicate names skipped"*, and the category tab showing 0 products because the archived
+       copies are not visible anywhere. The block stays (a second product of the same name is an
+       error state the rest of the app cannot represent), but the message now says WHERE they are. */
+    const archived = new Set(this.products().filter(p => p.active === false)
+      .map(p => (p.name || '').trim().toLowerCase()));
+    let dup = 0, dupArchived = 0, nameless = 0;
     rows.forEach(row => {
       const name = val(row, 'name');
-      if (!name) return;
+      if (!name) { nameless++; return; }
       const nameKey = name.toLowerCase();
-      if (taken.has(nameKey)) { dup++; return; }
+      if (taken.has(nameKey)) { if (archived.has(nameKey)) dupArchived++; else dup++; return; }
       taken.add(nameKey);
       let oz     = this._sizeToOz(val(row, 'container_size_oz'));
       // Bottle beer has no oz field; store a fixed nominal size so the usage-variance
       // oz round-trip cancels (never shown or entered — matches the manual form).
       if (cat === 'Bottle Beer') oz = 12;
-      const pour = spec.showPour ? numOf(val(row, 'pour_size_oz')) : null;
-      const cost = numOf(val(row, 'unit_cost'));
+      /* ⚠ A NEGATIVE COST OR PRICE IS REFUSED, NOT STORED. `verify-negative-input-guards.js` states
+         the app's standard — negative values must not reach storage — and four guards were added
+         elsewhere while this door was missed. Only the import can produce one: a `type="number"`
+         field cannot accept `(25.00)`, but Excel's default accounting format for a vendor CREDIT
+         line emits exactly that, and App.parseNum correctly reads it as -25. It then stored as a
+         negative unit cost with `isComplete()` returning TRUE, giving negative COGS and negative
+         inventory value. Dropping it to null leaves the row Incomplete, which is the honest state. */
+      const nonNeg = n => (n == null || n < 0) ? null : n;
+      const pour = spec.showPour ? nonNeg(numOf(val(row, 'pour_size_oz'))) : null;
+      const cost = nonNeg(numOf(val(row, 'unit_cost')));
       // Menu price + servings come in for resale Food/Misc as well as pourables.
-      const price = (spec.showMenuPrice || spec.showUnitType) ? numOf(val(row, 'menu_price')) : null;
+      const price = (spec.showMenuPrice || spec.showUnitType) ? nonNeg(numOf(val(row, 'menu_price'))) : null;
       const soldOnMenu = spec.showUnitType && price != null && price > 0;
       const servingsPerUnit = soldOnMenu ? (numOf(val(row, 'servings_per_unit')) || 1) : null;
       const costPerServing = soldOnMenu ? this._resaleCps(cost, servingsPerUnit) : null;
@@ -2076,8 +2098,26 @@ S.InventoryProducts = {
       });
     });
 
-    const dupMsg = dup ? (' ' + dup + ' duplicate name' + (dup === 1 ? '' : 's') + ' skipped.') : '';
-    if (!imported.length) { note(dup ? ('No new products imported.' + dupMsg) : 'No rows with a product name were found.'); return; }
+    /* Every bucket reaches the operator, on BOTH exits. `note()` used to fire only when nothing
+       imported, so a 400-row file that silently landed 180 read as a clean success — and the
+       zero-row headline named only duplicates, so 1 duplicate plus 3 nameless rows reported the
+       duplicate and nothing else. An absolute claim may only fire when the other buckets are empty. */
+    const buckets = () => {
+      const b = [];
+      if (dup) b.push(dup + ' duplicate name' + (dup === 1 ? '' : 's') + ' skipped');
+      if (dupArchived) b.push(dupArchived + ' already exist' + (dupArchived === 1 ? 's' : '') + ' but ' + (dupArchived === 1 ? 'is' : 'are') + ' hidden — see the Inactive tab');
+      if (nameless) b.push(nameless + ' row' + (nameless === 1 ? '' : 's') + ' skipped with no product name');
+      return b;
+    };
+    if (!imported.length) {
+      const b = buckets();
+      const head = (dup || dupArchived) && !nameless ? 'No new products imported.'
+        : nameless && !dup && !dupArchived ? 'No rows with a product name were found.'
+        : b.length ? 'No new products imported.'
+        : 'No rows with a product name were found.';
+      note(head + (b.length ? ' ' + b.join('. ') + '.' : ''));
+      return;
+    }
 
     this.products().push(...imported);
     // Row-per-record: persist just the newly imported products (dups were skipped
@@ -2089,6 +2129,10 @@ S.InventoryProducts = {
       this.editId = null;
       this._formCategory = null;
       this._import = null;
+      // Say what landed AND what did not. Set before renderLanding, which is what renders it.
+      const b = buckets();
+      this._importMsg = 'Imported ' + imported.length + ' product' + (imported.length === 1 ? '' : 's') + '.'
+        + (b.length ? ' ' + b.join('. ') + '.' : '');
       this.renderLanding();
     } else {
       // ⚠ TAKE THEM BACK OUT. They were pushed into the live list above and

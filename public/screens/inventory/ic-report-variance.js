@@ -293,8 +293,15 @@ S.InventoryVarianceReport = {
 
   unmatchedPos() {
     if (!this.posRows) return [];
+    /* ⚠⚠ THE SAME `active !== false` FILTER `posByProduct` USES (:233). Without it an ARCHIVED
+       product's POS row matched here — so it was excluded from the report AND excluded from
+       Unmatched, landing in neither bucket. Measured: Tito's $90 and an archived Old Crow $360
+       imported as *"2 rows imported · 2 recognized"* with **Recipe Coverage 100%** while 80% of the
+       file's dollars were silently discarded. The comment at :230 already claims Unmatched surfaces
+       this; it was only half-done. Discontinued products get archived, not deleted, and last
+       month's POS file still lists them. */
     const productByName = {};
-    this.allProducts().forEach(p => { productByName[p.name.toLowerCase().trim()] = true; });
+    this.allProducts().forEach(p => { if (p.active !== false) productByName[p.name.toLowerCase().trim()] = true; });
     const menuItemByName = {};
     this.menuItems().forEach(m => { if (m && m.name) menuItemByName[m.name.toLowerCase().trim()] = true; });
     return this.posRows.filter(pr => {
@@ -478,9 +485,22 @@ S.InventoryVarianceReport = {
         dropTitle: 'Drop your ' + this.fmtLong(period.startC.date) + ' to ' + this.fmtLong(period.endC.date) + ' POS sales file here',
         dropSub: 'Needs columns for product name, quantity sold, and sales amount.',
         fields: [
-          { key: 'name',  label: 'Product Name',   required: true,  match: ['product', 'item', 'name', 'description', 'menu item', 'product name', 'item name'] },
-          { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['qty', 'quantity', 'sold', 'units', 'count', 'units sold', 'qty sold', 'quantity sold', 'number sold', 'pours'] },
-          { key: 'sales', label: 'Sales Amount',   required: false, match: ['sales', 'amount', 'revenue', 'net sales', 'total', 'gross sales', 'sales amount', 'sales total', 'net amount', 'total sales'] }
+          /* ⚠⚠ THESE THREE LISTS HAD DRIFTED FROM `PosIngest.FIELDS.pmix`, WHICH READS THE SAME
+             POS REPORTS CORRECTLY. Three separate mis-binds, all measured on real header rows:
+             · `sales` carried NO PRICE TERM AT ALL, so on Toast ItemSelectionDetails it word-matched
+               **"Sales Category"** — a TEXT column reading Food / Liquor / Beer. Every product then
+               read **$0 register sales, $900 theoretical, 100% variance, -$100 profit** on a file
+               that sold exactly what it poured. And with no Sales Category column present, `sales`
+               bound NOTHING, so a Toast file's Net Price could never come in at all.
+             · `qty` led with the bare `'qty'`, which takes Toast AllItemsReport's
+               **"Item Qty (incl voids)"** ahead of the net "Item Qty" — voided plates counted as
+               poured. `'item qty'` first is exactly how PosIngest gets it right.
+             · `'count'` binds a STOCK SHEET's "Count" column as units sold. PosIngest DELETED that
+               candidate on purpose and says so in its comment; this private list never got it.
+             Precise terms first, loose synonyms last — a `match` array is a priority list. */
+          { key: 'name',  label: 'Product Name',   required: true,  match: ['product name', 'item name', 'menu item', 'product', 'description', 'item', 'name'] },
+          { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['item qty', 'qty sold', 'quantity sold', 'units sold', 'number sold', 'qty', 'quantity', 'sold', 'units', 'pours'] },
+          { key: 'sales', label: 'Sales Amount',   required: false, match: ['net sales', 'net amount', 'net price', 'sales amount', 'sales total', 'total sales', 'item price', 'gross sales', 'sales', 'revenue', 'price', 'amount', 'total'] }
         ],
         onComplete: rows => {
           this.posRows = rows.map(r => ({

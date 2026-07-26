@@ -345,11 +345,19 @@ S.InventoryVendors = {
         { key: 'rep',            label: 'Rep Name',      required: false, match: ['rep', 'rep name', 'sales rep', 'salesperson', 'contact', 'contact name', 'representative', 'account rep', 'sales representative', 'contact person'] },
         { key: 'phone',          label: 'Phone',         required: false, match: ['phone', 'phone number', 'telephone', 'tel', 'contact phone', 'mobile', 'cell', 'rep phone', 'office phone'] },
         { key: 'email',          label: 'Email',         required: false, match: ['email', 'e-mail', 'email address', 'e mail', 'contact email', 'rep email'] },
-        { key: 'delivery_days',  label: 'Delivery Days', required: false, match: ['delivery days', 'delivery', 'days', 'delivery day', 'delivery schedule', 'ship days', 'order days'] },
+        /* ⚠ THE BARE `'delivery'` STOLE THE DELIVERY FEE COLUMN. Fields are claimed in DECLARED
+           order and this one sits four ahead of `delivery_fee`, so on a header row of
+           `Order Minimum ($) / Delivery Fee ($) / Free Shipping Over ($)` it word-matched
+           "Delivery Fee ($)" in pass 2 and took it — the real $25 fee landed in this TEXT field,
+           `delivery_fee` then fell through to `'shipping'` and grabbed "Free Shipping Over ($)", and
+           the Order Sheet printed a **$400 delivery fee** on every order. Exact headers already win
+           in pass 1, so removing the loose token costs nothing and closes both mis-binds. */
+        { key: 'delivery_days',  label: 'Delivery Days', required: false, match: ['delivery days', 'delivery day', 'delivery schedule', 'ship days', 'order days', 'days'] },
         { key: 'payment_terms',  label: 'Terms',         required: false, match: ['terms', 'payment terms', 'net terms', 'payment', 'credit terms', 'pay terms'] },
         { key: 'account_number', label: 'Account #',     required: false, match: ['account', 'account number', 'account #', 'acct', 'acct #', 'account no', 'customer number', 'customer #', 'acct number', 'account id'] },
         { key: 'order_minimum',  label: 'Order Minimum', required: false, match: ['order minimum', 'minimum', 'min order', 'order min', 'minimum order', 'min purchase', 'minimum purchase', 'minimum order amount'] },
-        { key: 'delivery_fee',   label: 'Delivery Fee',  required: false, match: ['delivery fee', 'freight', 'delivery charge', 'shipping', 'shipping fee', 'freight charge', 'delivery cost'] },
+        // `'shipping'` removed for the same reason: it word-matched "Free Shipping Over ($)".
+        { key: 'delivery_fee',   label: 'Delivery Fee',  required: false, match: ['delivery fee', 'freight', 'delivery charge', 'shipping fee', 'freight charge', 'delivery cost'] },
         { key: 'free_delivery_over', label: 'Free Delivery Over', required: false, match: ['free delivery over', 'free delivery', 'free shipping over', 'free freight over', 'free delivery threshold', 'free shipping', 'free delivery minimum'] }
       ],
       confirmLabel: 'Import',
@@ -360,51 +368,160 @@ S.InventoryVendors = {
   // Map a free-text terms cell onto one of the known terms, else leave it blank
   // (the edit form's Terms dropdown only offers the known set, so an unrecognized
   // value would be silently unselectable).
+  /* ⚠ MATCHES THE OPERATOR'S OWN TERMS LIST TOO, not just the builtins. The Terms field carries a
+     "| Edit" list manager that invites them to add their distributor's real terms — and then the
+     import threw those values away in silence: `Net 45`, `Due on Receipt` and `2/10 Net 30` all
+     landed BLANK even after being added. `hub-operating-expenses._matchCat` exists for exactly this
+     failure and already checks `App.listOptions`; this is the same fix.
+     ⚠ Punctuation is flattened as well as whitespace, so `Net-30` and `Net 30` are one term. */
   normTerms(raw) {
     const s = (raw || '').trim();
     if (!s) return '';
-    const flat = x => String(x).toLowerCase().replace(/\s+/g, '');
-    const hit = this.TERMS.find(t => t && flat(t) === flat(s));
+    const flat = x => String(x).toLowerCase().replace(/[\s\-_.]+/g, '');
+    const own = (App.listOptions ? App.listOptions('payment_term') : []) || [];
+    const hit = this.TERMS.concat(own).find(t => t && flat(t) === flat(s));
     return hit || '';
+  },
+
+  /* ⚠ DELIVERY DAYS MUST COME IN AS CHIP-COMPATIBLE DAY NAMES. The field is stored as a "Mon, Thu"
+     string and read back two ways that both broke on free text:
+       · `ic-par-suggestions.deliveryDaysPerWeek` COUNTS substring hits, so "Mon-Fri" scored **2**,
+         not 5 — and at 20 units/week usage that turned a Suggested Par of 5 into **12**, 2.4x the
+         stock the screen tells them to carry, plus every par-value dollar figure built on it;
+       · `collectDeliveryDays` reads the CHIPS, which cannot represent "M/W/F" or "Daily" — so the
+         first time the operator opened that vendor and pressed Update, the value was WIPED.
+     The import is the only door that can put an unrepresentable string here (the form is chips-only).
+     A range is expanded, a list is split, "daily" is all seven, and anything unreadable comes back
+     empty so the door can COUNT and report it rather than storing something no screen can use. */
+  _normDeliveryDays(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return '';
+    if (/pick\s*-?\s*up|will\s*call/i.test(s)) return 'Pickup';
+    const D = this.DAY_NAMES;                                   // Mon..Sun, index 0..6
+    /* Returns a day index, -1 for "not a day", or -2 for AMBIGUOUS. A single "T" is Tuesday or
+       Thursday and a single "S" is Saturday or Sunday, and there is nothing in the cell to settle
+       it — so an M/T/W sheet is refused and REPORTED rather than half-guessed. M, W and F have only
+       one reading, which is what makes the common "M/W/F" shorthand safe to accept. */
+    const idxOf = tok => {
+      const t = tok.toLowerCase().replace(/[^a-z]/g, '');
+      if (!t) return -1;
+      if (t.length === 1) {
+        const one = { m: 0, w: 2, f: 4 };
+        if (one[t] != null) return one[t];
+        return (t === 't' || t === 's') ? -2 : -1;
+      }
+      // 'thu' must beat 'tue' on "thur"/"thurs"; test the 3-letter stem after the long forms.
+      const map = { sunday: 6, monday: 0, tuesday: 1, wednesday: 2, thursday: 3, friday: 4, saturday: 5 };
+      if (map[t] != null) return map[t];
+      const stem = t.slice(0, 3);
+      const s3 = { sun: 6, mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5 };
+      return s3[stem] != null ? s3[stem] : -1;
+    };
+    if (/^\s*(daily|every\s*day|7\s*days?)\s*$/i.test(s)) return D.join(', ');
+    const on = new Set();
+    // A range: "Mon-Fri", "Monday to Friday", "Tue thru Sat".
+    const range = s.match(/([a-z]+)\s*(?:-|–|—|to|thru|through)\s*([a-z]+)/i);
+    if (range) {
+      const a = idxOf(range[1]), b = idxOf(range[2]);
+      if (a > -1 && b > -1) { for (let i = a; ; i = (i + 1) % 7) { on.add(i); if (i === b) break; } }
+    }
+    if (!on.size) {
+      let ambiguous = false;
+      s.split(/[,/&+;|\s]+/).forEach(tok => {
+        const i = idxOf(tok);
+        if (i === -2) ambiguous = true;
+        else if (i > -1) on.add(i);
+      });
+      // A cell mixing readable days with an ambiguous single letter is refused WHOLE. Keeping the
+      // readable half would store a delivery schedule that is quietly missing a day, and the par
+      // suggestion is computed from the count.
+      if (ambiguous) return '';
+    }
+    if (!on.size) return '';
+    return D.filter((_, i) => on.has(i)).join(', ');
+  },
+
+  /* An order minimum is not always money. The manual form and the seed both offer cases / kegs /
+     lbs, and the import hardcoded `'$'` — so "5 cases" stored as FIVE DOLLARS and the Order Sheet
+     measured a case minimum against a dollar total, always reading "Meets the $5.00 minimum". */
+  _minUnitOf(raw, fallback) {
+    const s = String(raw || '').toLowerCase();
+    const own = (App.listOptions ? App.listOptions('order_min_unit') : []) || [];
+    const hit = this.MIN_UNITS.concat(own).find(u => u && u !== '$'
+      && new RegExp('(^|[^a-z])' + String(u).toLowerCase().replace(/s$/, '') + 's?([^a-z]|$)').test(s));
+    return hit || fallback || '$';
   },
 
   async importVendors(rows) {
     const existing = this.vendors();
     const taken = new Set(existing.map(v => (v.name || '').trim().toLowerCase()));
     const toAdd = [];
-    let dup = 0, blank = 0;
+    let dup = 0, blank = 0, badDays = 0, badTerms = 0;
     rows.forEach(r => {
       const name = (r.name || '').trim();
       if (!name) { blank++; return; }
-      const key = name.toLowerCase();
+      // Flatten punctuation and runs of whitespace for the dedup key only — the STORED name keeps
+      // the operator's own spelling. `Sysco Foods.` and `Sysco  Foods` are one vendor, and products
+      // link to vendors BY NAME, so a near-duplicate record owns nothing and confuses the list.
+      const key = name.toLowerCase().replace(/[\s.,]+/g, ' ').trim();
       // Skip a name already on the list (or repeated in the file) so a re-drop
       // never creates duplicate vendors.
       if (taken.has(key)) { dup++; return; }
       taken.add(key);
+      const nonNeg = n => (n == null || n < 0) ? null : n;
+      // Report a delivery-day or terms cell the file HAD and Bar Cop could not use. An ABSENT cell
+      // is not a problem and must never be counted as one, or every name-and-phone list reads broken.
+      const days = this._normDeliveryDays(r.delivery_days);
+      if (String(r.delivery_days || '').trim() && !days) badDays++;
+      const terms = this.normTerms(r.payment_terms);
+      if (String(r.payment_terms || '').trim() && !terms) badTerms++;
       toAdd.push({
         id:             App.uid(),
         name,
         rep:            (r.rep || '').trim(),
         phone:          (r.phone || '').trim(),
         email:          (r.email || '').trim(),
-        delivery_days:  (r.delivery_days || '').trim(),
-        payment_terms:  this.normTerms(r.payment_terms),
+        delivery_days:  days,
+        payment_terms:  terms,
         account_number: (r.account_number || '').trim(),
-        order_minimum:      (() => { const n = parseFloat(r.order_minimum); return isNaN(n) ? null : n; })(),
-        order_minimum_unit: '$',
-        delivery_fee:       (() => { const n = parseFloat(r.delivery_fee); return isNaN(n) ? null : n; })(),
-        free_delivery_over: (() => { const n = parseFloat(r.free_delivery_over); return isNaN(n) ? null : n; })(),
+        /* ⚠ App.parseNum, NOT parseFloat. `parseFloat('$1,500')` is NaN — the minimum vanished
+           silently — and `parseFloat('2,500')` is **2**, so the Order Sheet printed "Meets the
+           $2.00 minimum" on a $60 order against a real $2,500 one, and a `2,500.00` free-delivery
+           threshold made every order over two dollars read "Free delivery". Excel's Currency and
+           Comma formats emit exactly those strings through `raw:false`. Negatives are refused: a
+           fee below zero is not a thing, and `_vendorInfo` gates on `> 0` so it would be lost
+           anyway — better to not store it than to store a number no screen will show. */
+        order_minimum:      nonNeg(App.parseNum(r.order_minimum)),
+        order_minimum_unit: this._minUnitOf(r.order_minimum, '$'),
+        delivery_fee:       nonNeg(App.parseNum(r.delivery_fee)),
+        free_delivery_over: nonNeg(App.parseNum(r.free_delivery_over)),
         notes:          '',
         imported:       true,
         created_at:     new Date().toISOString()
       });
     });
 
+    /* Every bucket reaches the operator now. `blank` was counted at the top of this function and
+       NEVER read again, and the zero-row headline named only duplicates — so a file of 2 known
+       vendors and 3 spacer rows said "2 names were already on your list" and accounted for nothing
+       else. An absolute claim may only fire when the other buckets are empty. */
+    const notes = () => {
+      const b = [];
+      if (dup) b.push(dup + ' already on your list');
+      if (blank) b.push(blank + ' row' + (blank === 1 ? '' : 's') + ' skipped with no vendor name');
+      if (badDays) b.push(badDays + ' delivery-day cell' + (badDays === 1 ? '' : 's') + ' could not be read');
+      if (badTerms) b.push(badTerms + ' terms value' + (badTerms === 1 ? '' : 's') + ' not on your Terms list');
+      return b;
+    };
     const result = document.getElementById('iv-imp-result');
     if (!toAdd.length) {
+      const n = notes();
+      const head = dup && !blank ? 'No new vendors imported. Every name in this file is already on your list.'
+        : blank && !dup ? 'No vendors imported. No vendor names were found in the file.'
+        : dup || blank ? 'No new vendors imported.'
+        : 'No vendors imported. No vendor names were found in the file.';
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (dup ? 'No new vendors imported. ' + dup + ' ' + (dup === 1 ? 'name was' : 'names were') + ' already on your list.'
-               : 'No vendors imported. No vendor names were found in the file.') + '</div>';
+        + head + (n.length ? ' (' + n.join(' · ') + ')' : '') + '</div>';
       return;
     }
 
@@ -421,7 +538,7 @@ S.InventoryVendors = {
     const res2 = document.getElementById('iv-imp-result');
     if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
       + 'Imported ' + toAdd.length + ' vendor' + (toAdd.length === 1 ? '' : 's') + '.'
-      + (dup ? ' Skipped ' + dup + ' already on your list.' : '')
+      + (notes().length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes().join(' · ') + ')</span>' : '')
       + '</div>';
   },
 

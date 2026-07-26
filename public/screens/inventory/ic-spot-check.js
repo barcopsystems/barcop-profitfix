@@ -585,7 +585,10 @@ S.InventorySpotCheck = {
       dropSub: 'Needs columns for product name and pours or bottles sold. That register only, not the whole venue.<br>The sold number fills in on each product you have added.',
       fields: [
         { key: 'product', label: 'Product', required: true, match: ['product', 'item', 'name', 'description', 'item name', 'menu item', 'product name'] },
-        { key: 'sold',    label: 'Sold',    required: true, match: ['sold', 'pours', 'qty', 'quantity', 'units', 'count', 'qty sold', 'quantity sold', 'units sold', 'sold qty', 'number sold'] }
+        /* Same drift as door 14's list, same fix (see the note there): `'item qty'` first so Toast's
+           net column beats "Item Qty (incl voids)", and `'count'` REMOVED — it binds a stock
+           sheet's Count column as units sold, which is why `PosIngest` deleted that candidate. */
+        { key: 'sold',    label: 'Sold',    required: true, match: ['item qty', 'qty sold', 'quantity sold', 'units sold', 'sold qty', 'number sold', 'sold', 'pours', 'qty', 'quantity', 'units'] }
       ],
       confirmLabel: 'Fill POS Sold',
       onComplete: rows => this.applyPosImport(rows)
