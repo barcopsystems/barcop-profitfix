@@ -41,7 +41,18 @@ const PosIngest = {
     ],
     voids: [
       { key: 'amount', label: 'Amount',       required: true,  match: ['amount', 'total', 'value', 'comp amount', 'void amount', '$', 'amt', 'dollars', 'discount', 'discount amount', 'total amount', 'comp total', 'void total'] },
-      { key: 'type',   label: 'Void or Comp', required: false, match: ['type', 'void/comp', 'void or comp', 'transaction', 'kind', 'adjustment type', 'category', 'action', 'reason type'] },
+      /* ⚠ THE TYPE COLUMN HAS TO BIND ON A DISCOUNT/COMP EXPORT, or the whole comp-vs-void split is
+         inert on the files it exists for. Real header rows:
+             Business Date | Discount Name | Discount Type | Discount Amount | Employee
+             Date | Employee Name | Comp/Promo Name | Amount | Reason | Approved By
+         `type` is EXACT-ONLY (it word-matches "Item Type", "Payment Type"), so it cannot reach
+         inside "Discount Type" — and none of the other candidates matched either, so the field came
+         through UNMAPPED, every row defaulted to Void, and a $840 discount export imported as $840
+         of Voids and $0 of Comps: Comp Total $0, Given Away $0, "% of Sales" a dash, and Server
+         Check's per-server comp% theft signal reading zero.
+         The precise terms go FIRST (a match array is a priority list). 'category' stays LAST — on a
+         void report it is usually the MENU category, not void-vs-comp. */
+      { key: 'type',   label: 'Void or Comp', required: false, match: ['void/comp', 'void or comp', 'discount type', 'comp type', 'void type', 'adjustment type', 'reason type', 'discount name', 'comp/promo name', 'promo name', 'comp name', 'type', 'transaction type', 'transaction', 'kind', 'action', 'category'] },
       { key: 'item',   label: 'Item',         required: false, match: ['item', 'item name', 'product', 'product name', 'menu item', 'description', 'sku', 'plu'] },
       { key: 'server', label: 'Server',       required: false, match: ['server', 'server name', 'employee', 'employee name', 'name', 'staff', 'bartender', 'cashier', 'authorized by', 'approved by', 'voided by', 'comped by', 'manager'] },
       { key: 'reason', label: 'Reason',       required: false, match: ['reason', 'comp reason', 'void reason', 'note', 'notes', 'memo', 'comment', 'explanation'] },
@@ -218,24 +229,121 @@ const PosIngest = {
   // Invalid Date and was stored raw — silently breaking dedup and week grouping.
   // Returns '' (not the raw string) when unparseable, so a bad row is skipped
   // rather than stored with a date that no comparison will ever match.
-  normDate(raw) {
-    if (!raw) return '';
-    const s = String(raw).trim();
-    if (!s) return '';
-    const datePart = s.split(/[ T]/)[0];   // drop any trailing time component
-    let m = datePart.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);   // ISO-ish YYYY-MM-DD
-    if (m) return this._ymd(+m[1], +m[2], +m[3]);
-    m = datePart.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/);     // US MM/DD/YYYY (or DD/MM when the first field can't be a month)
-    if (m) {
-      let a = +m[1], b = +m[2], y = +m[3]; if (y < 100) y += 2000;
-      const mo = (a > 12 && b <= 12) ? b : a;
-      const d  = (a > 12 && b <= 12) ? a : b;
-      return this._ymd(y, mo, d);
-    }
-    const dt = new Date(s.length <= 10 ? s + 'T00:00:00' : s);   // "Jul 13 2026", ISO with time, etc.
-    return isNaN(dt.getTime()) ? '' : App.ymdLocal(dt);
-  },
+  /* Normalize a POS date cell to canonical local YYYY-MM-DD (App.ymdLocal's format).
 
+     ⚠⚠ THIS PARSES EXPLICITLY. IT NEVER HANDS FREE TEXT TO `new Date()`. That is the whole point of
+     the rewrite, and it was earned the hard way: five consecutive scan rounds each found that the
+     PREVIOUS round's guard was itself writing wrong data, because every one of them was patching a
+     fallback that let V8's legacy parser guess. That parser is unspecified, month-first, silently
+     lenient, and it invents what it cannot read. What it did to real files:
+       · a MISSING YEAR became 2001, so Excel's built-in d-mmm format ("20-Jul") imported a week
+         25 years into the past and no undated guard could catch it, because the parse "succeeded";
+       · a DAY-FIRST numeric export ("06.07.2026") was read month-first with no swap, scattering one
+         week of hours across seven months, four of them in the future;
+       · an IMPOSSIBLE date ROLLED OVER instead of being refused — "Feb 29 2026" became 1 March and
+         "Apr 31 2026" became 1 May, so a 31-row sheet for a 30-day month banked two people's hours
+         onto one day and reported it as a clean import;
+       · a UTC marker moved the business date back a day (`ymdLocal` of a UTC-anchored instant);
+       · a month-labelled column ("Jul 2026") silently became the 1st.
+     Each of those was invisible: the row imported, so nothing was ever reported as skipped.
+
+     THE RULE NOW: a date is read only if it matches one of four explicit shapes AND the y/m/d it
+     yields is a date that actually exists. Anything else returns '' and the door reports the row.
+     Refusing a shape is cheap — the operator re-exports. Guessing it is not: every consumer windows
+     by date, so a wrong date is silently missing money in one week and invented money in another.
+
+     ⚠ DOT-SEPARATED ALL-NUMERIC DATES ARE DELIBERATELY REFUSED. "06.07.2026" is the European
+     day-first convention, and Bar Cop reads slash/dash numerics month-first (the US convention).
+     Reading dots month-first would be wrong more often than right, and there is nothing in the cell
+     to disambiguate — so it is refused and named, rather than guessed. Do not "fix" this by adding
+     '.' to the numeric branch without deciding the day-first question first.
+
+     Handles: ISO YYYY-MM-DD, US M/D/YYYY and M/D/YY (with a day-first swap when the first field
+     cannot be a month), and both word-month orders (20-Jul-2026, Jul 20 2026, "July 20, 2026"),
+     each with an optional trailing time or timezone, and an optional leading weekday. */
+  MONTHS: { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 },
+  /* `opts.minYear` exists for ONE caller: ev-regulars imports BIRTHDAYS, which are legitimately
+     decades before any business date. Everything else takes the default. */
+  normDate(raw, opts) {
+    if (raw == null) return '';
+    let s = String(raw).trim();
+    if (!s) return '';
+    const minYear = (opts && opts.minYear) || 1990;
+    // A leading weekday carries no date information and defeats every pattern below.
+    s = s.replace(/^(sun|mon|tue|wed|thu|fri|sat)[a-z]*\.?,?\s+/i, '').trim();
+
+    /* ⚠ A SHAPE THAT MATCHES THE PATTERN IS NOT A DATE THAT EXISTS. Both regex branches used to
+       hand their captures straight to _ymd, which only pads and joins — so `0000-00-00` (a database
+       null date) stored as "0-00-00" and `2026-13-01` stored verbatim, both counted as imported.
+       The round-trip is what refuses 31 April and a non-leap 29 February instead of rolling them
+       over into the next month. */
+    const ok = (y, mo, d) => {
+      if (!(y >= minYear && y <= 2100) || !(mo >= 1 && mo <= 12) || !(d >= 1 && d <= 31)) return '';
+      const t = new Date(y, mo - 1, d);
+      return (t.getFullYear() === y && t.getMonth() === mo - 1 && t.getDate() === d) ? this._ymd(y, mo, d) : '';
+    };
+    const yr4 = y => (y < 100 ? y + 2000 : y);
+    /* ⚠⚠ THE TAIL IS CAPTURED AND VALIDATED, NOT WAVED THROUGH. Two failures, opposite directions:
+       · TOO STRICT — it only allowed a tail starting with `T` or whitespace, so a COMMA refused the
+         whole file. A comma is what JavaScript itself emits: `toLocaleString('en-US')` produces
+         "7/20/2026, 6:00:00 PM". Every date-reading builder returned ZERO rows on such a file while
+         telling the operator to go check a date column that was perfectly correct.
+       · TOO LOOSE — `.*` swallowed anything, so a PERIOD/RANGE cell ("07/20/2026 - 07/26/2026", a
+         very common export header value) read as its FIRST date. buildSales aggregates by date, so
+         a week-total row landed ON TOP of Monday: $26,500 banked against a true $6,800 and the week
+         written as exactly DOUBLE — with nothing skipped, nothing undated, and the only trace a
+         "(1 extra row combined into day totals)" note that is the expected message for a legitimate
+         daypart-split export. Silent doubling reading as a clean import.
+       So a tail may only be a CLOCK or a ZONE. A tail carrying a second date makes the cell
+       ambiguous, and an ambiguous cell is refused and reported — never guessed. */
+    const TAIL = '([T\\s,].*)?$';
+    const tailOk = t => {
+      if (!t) return true;
+      // Strip the separators that introduce a tail — a comma, whitespace, or ISO's `T` when a clock
+      // follows it. What is LEFT has to look like a time or a zone and nothing else.
+      const x = t.trim().replace(/^[,\s]+/, '').replace(/^T(?=\d)/i, '');
+      if (!x) return true;
+      if (/^\d{1,2}:\d{2}/.test(x)) return true;                       // a clock
+      if (/^(z|utc|gmt|[+-]\d{2}:?\d{2})\b/i.test(x)) return true;     // a zone
+      return false;
+    };
+
+    // 1. ISO-ish YYYY-MM-DD (or with slashes), optionally followed by a time.
+    let m = s.match(new RegExp('^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})' + TAIL));
+    if (m) return tailOk(m[4]) ? ok(+m[1], +m[2], +m[3]) : '';
+
+    /* 2. All-numeric M/D/Y — US order, with the day-first swap when the first field cannot be a
+       month. Slash and dash ONLY; see the dot note above. */
+    m = s.match(new RegExp('^(\\d{1,2})[-/](\\d{1,2})[-/](\\d{2,4})' + TAIL));
+    if (m) {
+      if (!tailOk(m[4])) return '';
+      const a = +m[1], b = +m[2], y = yr4(+m[3]);
+      const dayFirst = a > 12 && b <= 12;
+      return ok(y, dayFirst ? b : a, dayFirst ? a : b);
+    }
+
+    /* 3. Word month, DAY first: 20-Jul-2026, 20 Jul 26, "20 July 2026", 20th Jul 2026, 20JUL2026.
+       The separators are optional here ONLY because letters and digits cannot run together
+       ambiguously — "20JUL2026" splits exactly one way. Ordinal suffixes are accepted; a
+       hand-maintained sheet writes them and a whole column of them used to refuse. */
+    m = s.match(new RegExp('^(\\d{1,2})(?:st|nd|rd|th)?[-\\s.]*([a-z]{3,})[-\\s.,]*(\\d{2,4})' + TAIL, 'i'));
+    if (m) {
+      const mo = this.MONTHS[m[2].slice(0, 3).toLowerCase()];
+      return (mo && tailOk(m[4])) ? ok(yr4(+m[3]), mo, +m[1]) : '';
+    }
+
+    /* 4. Word month, MONTH first: Jul 20 2026, "July 20, 2026", Jul-20-2026, "July 20th, 2026".
+       ⚠ The day/year separator stays REQUIRED here. Making it optional would let "JUL202026" split
+       two ways, and guessing between them is the whole habit this rewrite exists to end. */
+    m = s.match(new RegExp('^([a-z]{3,})[-\\s.]*(\\d{1,2})(?:st|nd|rd|th)?[-\\s.,]+(\\d{2,4})' + TAIL, 'i'));
+    if (m) {
+      const mo = this.MONTHS[m[1].slice(0, 3).toLowerCase()];
+      return (mo && tailOk(m[4])) ? ok(yr4(+m[3]), mo, +m[2]) : '';
+    }
+
+    // Anything else is not a date Bar Cop is willing to guess at. The door reports the row.
+    return '';
+  },
   _staffByName() {
     const m = {};
     ((App.laborData && App.laborData.lc_staff) || []).forEach(s => {
@@ -262,12 +370,29 @@ const PosIngest = {
   buildHours(rows) {
     const staffByName = this._staffByName();
     const existing = (App.laborData && App.laborData.lc_actuals) || [];
-    const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
+    const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const hours = this._hours(r.hours);
-      if (!staff || isNaN(hours) || hours <= 0) { skipped.push(r.name || '(blank)'); return; }
+      /* ⚠ TWO PROBLEMS, TWO LISTS — the same split buildServer and buildPmix already have, and for
+         the same reason. Lumping them meant the screen said "no roster match" about people who ARE
+         on the roster and simply had no usable hours that row (a `--` cell, a $0.00 line, a day
+         off), which sends the operator to add a staff member who already exists — "they added a
+         duplicate that fixed nothing and corrupted the roster". An unmatched NAME is a roster fix;
+         an unusable FIGURE is a file fix. */
+      if (!staff) { skipped.push(r.name || '(blank)'); return; }
+      if (isNaN(hours) || hours <= 0) { incomplete.push(r.name || '(blank)'); return; }
       const recDate = this.normDate(r.date);
+      /* ⚠⚠ A TIMECLOCK ROW WITH NO READABLE DATE IS A SKIP, NOT A BLANK-DATED RECORD. This wrote
+         `date: ''` and counted it as imported — and because the dedup key is staff + date + hours,
+         EVERY undated row of EVERY week collapses onto the same empty date. So week one imported,
+         and week two — same crew, same shift lengths — deduped away in full and reported "6 already
+         logged" about six rows that had never been logged. Half a month of payroll hours, gone,
+         under a message that says everything is fine.
+         The four dated builders (sales, cash, per-server, voids) all refuse an unreadable date;
+         these two were the last writing blanks. Pay is the worst place for it: gross pay, labour %,
+         RPLH, overtime and the payroll export all read these rows, and all of them window by date. */
+      if (!recDate) { undated.push(r.name || '(blank)'); return; }
       // Skip an exact re-import (same staff + date + hours) so re-dropping a
       // timeclock file never double-counts hours into gross pay.
       if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate && Math.abs((x.hours || 0) - hours) < 0.001)) {
@@ -282,19 +407,29 @@ const PosIngest = {
         notes: '', imported: true, created_at: new Date().toISOString()
       });
     });
-    return { toAdd, skipped, dupCount };
+    // `undated` = the file gave a date this row could not be read from; `skipped` = no staff
+    // match or no usable figure. Different problems, different fixes, never one list.
+    return { toAdd, skipped, incomplete, undated, dupCount };
   },
 
   buildTips(rows) {
     const staffByName = this._staffByName();
     const existing = (App.laborData && App.laborData.lc_tips) || [];
-    const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
+    const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const cash = this._num(r.cash_tips);
       const card = this._num(r.card_tips);
-      if (!staff || (cash + card) <= 0) { skipped.push(r.name || '(blank)'); return; }
+      // ⚠ The twin of buildHours' split. A $0.00 tips row is an ORDINARY line in a POS tips export
+      // (barbacks, kitchen, someone's day off) — telling the operator those people are not on the
+      // roster is both false and an instruction to corrupt the roster.
+      if (!staff) { skipped.push(r.name || '(blank)'); return; }
+      if ((cash + card) <= 0) { incomplete.push(r.name || '(blank)'); return; }
       const recDate = this.normDate(r.date);
+      // ⚠ The twin of buildHours' guard above, and it fails the same way: the dedup key is
+      // staff + date + amounts, so undated rows all share one key and a second week deduped away
+      // in full. Tips feed Form 8027, the tip-out basis and the payroll export, all date-windowed.
+      if (!recDate) { undated.push(r.name || '(blank)'); return; }
       // Skip an exact re-import (same staff + date + the same cash and card tips)
       // so re-dropping a tips export never double-counts tip income.
       if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate
@@ -310,14 +445,26 @@ const PosIngest = {
         hours: null, notes: '', imported: true, created_at: new Date().toISOString()
       });
     });
-    return { toAdd, skipped, dupCount };
+    // `undated` = the file gave a date this row could not be read from; `skipped` = no staff
+    // match or no usable figure. Different problems, different fixes, never one list.
+    return { toAdd, skipped, incomplete, undated, dupCount };
   },
 
+  /* What a POS calls a comp. Anything here in the Type cell means revenue GIVEN AWAY, which is a
+     Comp in Bar Cop's model; everything else is a Void (an item rung and taken back off).
+     Drawn from App.SC_COMP_REASONS — the app's single source for what a comp is, which already
+     lists 'Marketing / Promo', 'Customer Goodwill' and 'Staff Meal' — plus the words the exports
+     themselves use. Deliberately NOT here: 'manager' on its own (a Type column can hold a manager's
+     NAME) and 'free'/'house' as bare tokens; 'manager comp' and 'on the house' already hit. */
+  COMP_WORDS: ['comp', 'discount', 'promo', 'coupon', 'goodwill', 'courtesy', 'on the house',
+               'staff meal', 'shift drink', 'employee meal', 'giveaway', 'marketing'],
+
   buildVoids(rows) {
+    const COMP_WORDS = this.COMP_WORDS;
     const byName = this._staffByName();
     const existing = (App.shiftData && App.shiftData.sc_void_comps) || [];
     const today = App.todayLocal();
-    const toAdd = []; const skipped = []; let dupCount = 0; const used = new Set();
+    const toAdd = []; const skipped = []; const undated = []; let dupCount = 0; const used = new Set();
     (rows || []).forEach(r => {
       // A void/comp is a LOSS magnitude. POS exports show it as a negative ("-15")
       // or accounting parens ("(15)") to signal it reduces sales; both are a $15
@@ -325,12 +472,50 @@ const PosIngest = {
       const amount = Math.abs(this._num(r.amount));
       if (!(amount > 0)) { skipped.push('(no amount)'); return; }
       const t = (r.type || '').trim().toLowerCase();
-      const type = (t.indexOf('comp') >= 0 || t === 'c') ? 'Comp' : 'Void';
+      /* ⚠ A DISCOUNT IS NOT A VOID. This asked only whether the cell contained "comp", so anything
+         else — Discount, Promo, Coupon, Courtesy — became a Void. Bar Cop's own model disagrees:
+         App.SC_COMP_REASONS lists 'Marketing / Promo' as a COMP reason, while this screen's
+         REASONS.Void are all ring-in errors ('Rung in error', 'Wrong item', 'Sent back'). A void is
+         an item rung and taken off; a comp is revenue GIVEN AWAY. This door's own `amount` match
+         list invites discount exports ('discount', 'discount amount'), and they were all landing on
+         the wrong side — understating Comps, overstating Voids, and dropping out of the per-server
+         comp% signal on Server Check entirely, which filters `type === 'Comp'` and is a THEFT
+         signal. This can only ever turn a Void into a Comp; nothing the old test called a Comp
+         changes. A BLANK type still defaults to Void, which is what the help copy promises. */
+      /* ⚠ AN EXPLICIT "VOID" WINS. Where a POS names the transaction by what it REVERSED
+         ("Void Discount", "Promo Void", "Discount Removed"), a comp word is present but the row is
+         a genuine void — and calling it a Comp inflates Comp Total, Given Away and comp % of sales,
+         which is the exact inverse of the harm this classifier was widened to fix. The word the file
+         chose for the ACTION beats a word that only names what the action was performed on. */
+      // ⚠ STEMS, NOT EXACT FORMS. The first version matched `void` but not `voided`, and
+      // `removed` but not `removal` — so "Void Discount" was a Void while "Discount Voided", the
+      // same transaction written the other way round, was a $200 Comp. Word-START anchored, so
+      // "Unavoidable" is still not a void.
+      const type = /(^|[^a-z])(void|remov|revers|cancel)[a-z]*([^a-z]|$)/.test(t)
+        ? 'Void'
+        : (COMP_WORDS.some(w => t.indexOf(w) >= 0) || t === 'c') ? 'Comp' : 'Void';
       const serverName = (r.server || '').trim();
       const staff = serverName ? byName[serverName.toLowerCase()] : null;
       const server = staff ? staff.name : serverName;
       const item = (r.item || '').trim();
-      const recDate = this.normDate(r.date) || today;
+      /* ⚠⚠ A DATE THE FILE GAVE AND BAR COP COULD NOT READ IS NEVER RESTAMPED TO TODAY. This was
+         `this.normDate(r.date) || today`, so a voids export dated "Jul 24" (no year — an ordinary
+         export shape, and the exact case that produced buildServer's `undated` fix) landed EVERY
+         ROW on today. A whole week of losses collapsed onto one day in the WRONG week, silently.
+         That figure drives the Void/Comp log's date-filtered totals, void % and comp %, the
+         per-server comp total on Server Check (a theft signal, cut off by date), Theft Risk and the
+         Books comp split — so the week being closed reads clean and the current week reads like
+         someone is giving the place away. Every sibling builder refuses an unreadable date; this
+         one invented one.
+         ⚠ A SPLIT, NOT A REFUSAL: `date` is genuinely OPTIONAL at this door and the drop copy says
+         so, so a file with NO date column (or a blank cell) must still date its rows today — that
+         is the documented contract, and it is uniform across the file. The dishonest case is the
+         narrow one: a NON-EMPTY cell that will not parse. The file said something; we could not
+         read it; inventing today is the one answer that is certainly wrong. */
+      const rawDate = String(r.date == null ? '' : r.date).trim();
+      const parsed = this.normDate(rawDate);
+      if (rawDate && !parsed) { undated.push(rawDate); return; }
+      const recDate = parsed || today;
       // Skip an exact re-import (same date + amount + server + item) so re-dropping
       // a voids/comps export never double-counts loss.
       if (this._isDup(existing, used, x => x.date === recDate && Math.abs((x.amount || 0) - amount) < 0.001
@@ -347,7 +532,9 @@ const PosIngest = {
         created_at: new Date().toISOString()
       });
     });
-    return { toAdd, skipped, dupCount };
+    // `skipped` is rows with no usable AMOUNT; `undated` is rows whose date the file gave and Bar
+    // Cop could not read. Two different problems with two different fixes — never one list.
+    return { toAdd, skipped, undated, dupCount };
   },
 
   // rows -> one per-day sc_shifts record. `opts.manual` = the Enter-Manually grid (a hand entry,
