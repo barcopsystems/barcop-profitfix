@@ -521,7 +521,7 @@ S.InventoryVarianceReport = {
              Sales" — a real Aloha/NCR header this codebase asks for BY NAME — silently stopped
              binding here. Caught by `verify-reference-import-doors` case I9 before it shipped, which
              is precisely why that pin exists. */
-          { key: 'sales', label: 'Sales Amount',   required: false, match: ['net sales', 'net amount', 'net price', 'sales amount', 'sales total', 'total sales', 'rung sales', 'server sales', 'item sales', 'product sales', 'item price', 'gross sales', 'gross price', 'extended price', 'sale price', 'revenue', 'price', 'amount', 'total', 'sales'] }
+          { key: 'sales', label: 'Sales Amount',   required: false, match: ['net sales', 'net amount', 'net price', 'sales amount', 'sales value', 'sales $', 'sales total', 'total sales', 'rung sales', 'server sales', 'item sales', 'product sales', 'item price', 'gross sales', 'gross price', 'extended price', 'sale price', 'revenue', 'price', 'amount', 'total', 'sales'] }
         ],
         onComplete: rows => {
           this.posRows = rows.map(r => ({
