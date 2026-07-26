@@ -5562,8 +5562,14 @@ const App = {
       pt:16, pint:16, pints:16,
       qt:32, quart:32, quarts:32,
       l:33.814, liter:33.814, litre:33.814, liters:33.814, litres:33.814,
+      // ⚠ LTR / LT are what a distributor order guide actually prints (Southern Glazer's, RNDC,
+      // Breakthru, Johnson Brothers all use "1.75LTR"). Without them a 1.75L handle read as 1.75
+      // OUNCES — a 34x error that reached pours-per-container, cost-per-pour, theoretical usage,
+      // Variance, Menu Engineering and COGS, with the row still marked Complete.
+      ltr:33.814, ltrs:33.814, lt:33.814,
       gal:128, gallon:128, gallons:128,
-      ml:0.033814, milliliter:0.033814, millilitre:0.033814
+      cl:0.33814, centiliter:0.33814, centilitre:0.33814,
+      ml:0.033814, milliliter:0.033814, millilitre:0.033814, mls:0.033814
     };
     return MAP[u] != null ? MAP[u] : null;
   },
