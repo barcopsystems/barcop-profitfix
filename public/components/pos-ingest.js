@@ -262,6 +262,90 @@ const PosIngest = {
      cannot be a month), and both word-month orders (20-Jul-2026, Jul 20 2026, "July 20, 2026"),
      each with an optional trailing time or timezone, and an optional leading weekday. */
   MONTHS: { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 },
+
+  /* ⭐ S199 — DAY-FIRST IS A PROPERTY OF THE FILE, NOT OF THE CELL. Read the date column ONCE and
+     hand the verdict to normDate; normDate itself stays per-cell and pure.
+
+     THE DEFECT THIS EXISTS FOR: normDate's own `a > 12 && b <= 12` is a per-cell rescue, so in ONE
+     DD/MM/YYYY file the rows dated 13-31 flipped and read correctly while the rows dated 1-12 stayed
+     month-first and transposed. A real week, Mon 29 Jun to Sun 5 Jul 2026, landed as
+     Jun 29 · Jun 30 · JAN 7 · FEB 7 · MAR 7 · APR 7 · MAY 7 — five of seven rows in the wrong month,
+     nothing skipped, nothing reported, and buildSales aggregates by date so the money went with
+     them. Because two rows DID read correctly, the import looked like it worked.
+     ⚠ The tell that this was a bug rather than the documented US-month-first policy: Bar Cop already
+     REFUSES the dotted day-first form ("06.07.2026") and NAMES it, on the stated grounds that there
+     is nothing in the cell to disambiguate. There is nothing in the SLASH cell either.
+
+     THREE VERDICTS, and the third is the one that keeps this honest:
+       · 'day'   — some row's FIRST field is >12, so it cannot be a month. The file is day-first.
+       · 'month' — some row's SECOND field is >12. Month-first, which is also the default.
+       · 'none'  — no row disambiguates (a window of 12 days or fewer). Genuinely undecidable, so it
+                   stays month-first: unchanged from today, and the US reading is the right default.
+       · 'both'  — the file contradicts ITSELF. Not guessable, so nothing is forced: the per-cell
+                   reading is kept (every row that can only be read one way still is) and the door
+                   REPORTS it rather than picking a side.
+     ⚠ A US EXPORT MUST COME OUT BYTE-IDENTICAL. Detection that fired on a US file would be far worse
+     than the bug it fixes — see THE LOOP, "a guard is a change, not a safety net". Only the
+     all-numeric slash/dash shape is ambiguous at all, so ISO and word-month rows cast NO vote. */
+  dateConvention(rows, key, opts) {
+    const k = key || 'date';
+    let day = false, month = false;
+    /* ⚠⚠ ONLY A CELL THAT WILL ACTUALLY IMPORT MAY VOTE — AND THE ONLY HONEST WAY TO ASK THAT IS TO
+       ASK normDate ITSELF. The first version of this function matched a regex with a permissive
+       `(?:[T\s,].*)?$` tail, while normDate's `tailOk` accepts only a clock or a zone. Everything in
+       that gap voted and then imported as NOTHING: a period/range header row ("30/06/2026 -
+       06/07/2026" — named in normDate's own comment as a very common export header), "15/07/2026
+       EST", "15/07/2026 (adj)", even the impossible "99/1/2026".
+       ⛔ THAT WAS A NEW WAY TO CORRUPT A US FILE, which is the one thing this whole change exists to
+       be safe about. Measured: a clean US week 07/01-07/03 with ONE range header row on top imported
+       as 2026-01-07, 2026-02-07, 2026-03-07 — January, February and March — while the header row
+       itself imported as nothing at all. A row that contributes NO DATA must never decide how every
+       other row is read.
+       Probing with the real reader (rather than copying tailOk here) is also what stops the two from
+       drifting apart the next time either is touched. */
+    /* ⚠ ONE PROBE, NOT TWO. This asked `probe(s,false) || probe(s,true)`. Measured exhaustively over
+       all 1,089 `a/b/2026` shapes: there is NO cell that fails month-first and parses day-first,
+       because normDate's own per-cell `a > 12 && b <= 12` rescue already reads day-first whenever
+       month-first is impossible. The second call was dead code in a per-row loop. */
+    const probe = s => this.normDate(s, Object.assign({}, opts, { dayFirst: false }));
+    (rows || []).forEach(r => {
+      if (!r) return;
+      const s = String(r[k] == null ? '' : r[k]).trim();
+      if (!s) return;
+      /* Same weekday strip as normDate, or "Mon 20/07/2026" would cast no vote.
+         ⚠ THE YEAR IS OPTIONAL IN THIS PATTERN (S200). It used to require three fields, so a
+         year-less birthday column — the entire reason yearOptional exists — cast ZERO votes and the
+         numeric branch fell back to month-first. Measured: a day-first birthday column
+         ["25/12","01/07","03/11","06/09","30/06"] stored 3 of 5 in the WRONG MONTH and said nothing,
+         which is the S199 defect reproduced verbatim inside the S200 fix. */
+      const m = s.replace(/^(sun|mon|tue|wed|thu|fri|sat)[a-z]*\.?,?\s+/i, '')
+        .match(/^(\d{1,2})[-/](\d{1,2})(?:[-/]\d{2,4})?(?:[T\s,].*)?$/i);
+      if (!m) return;
+      if (!probe(s)) return;                 // it imports as nothing: no vote
+      const a = +m[1], b = +m[2];
+      if (a > 12 && b <= 12) day++;          // field 1 cannot be a month
+      if (b > 12 && a <= 12) month++;        // field 2 cannot be a month
+    });
+    /* ⚠⚠ VOTES ARE COUNTED AND THE MAJORITY WINS. THEY USED TO BE BOOLEANS, AND THAT WAS A GUARD
+       THAT REFUSED REAL DATA — the same failure that once destroyed a week of payroll.
+       ⛔ MEASURED: a clean 31-row US July file with ONE stray day-first row scored 19 month-first
+       votes against 1 day-first, was declared "contradictory", and **refused 07/01 through 07/12 —
+       12 days and $18,000 — of a file every one of whose rows had a single correct reading.** At the
+       expense door the same shape stopped $8,740 of a $9,139 statement from importing.
+       One dissenting row is a typo, not a convention. The majority IS the file's convention, and a
+       row that cannot be read that way then fails validation on its own and is reported — which is
+       the honest outcome for the odd row rather than a reason to punish the other thirty.
+       ⚠ `contradictory` is now reserved for a genuine TIE with evidence on both sides: the only case
+       where the file really does not say what convention it uses. Everything else has an answer. */
+    const contradictory = day > 0 && month > 0 && day === month;
+    return {
+      dayFirst: day > month,
+      contradictory,
+      dayVotes: day,
+      monthVotes: month,
+      evidence: contradictory ? 'both' : (day > month ? 'day' : (month > day ? 'month' : 'none'))
+    };
+  },
   /* `opts.minYear` exists for ONE caller: ev-regulars imports BIRTHDAYS, which are legitimately
      decades before any business date. Everything else takes the default. */
   normDate(raw, opts) {
@@ -343,7 +427,20 @@ const PosIngest = {
     if (m) {
       if (!tailOk(m[4])) return '';
       const a = +m[1], b = +m[2], y = yr4(+m[3]);
-      const dayFirst = a > 12 && b <= 12;
+      /* ⚠ THE FILE'S VERDICT WINS OVER THE PER-CELL GUESS (S199). `a > 12` is still honoured as a
+         fallback so a single pasted cell with no file around it reads sensibly, but when the caller
+         has read the whole column (PosIngest.dateConvention) that answer is the one that counts —
+         it is the only one that can be right for the rows where BOTH fields are 12 or under, which
+         is exactly the half of a day-first file that used to transpose in silence. */
+      /* ⚠⚠ A SELF-CONTRADICTING FILE REFUSES ITS AMBIGUOUS ROWS RATHER THAN GUESSING. When the
+         column holds BOTH a row that can only be day-first and a row that can only be month-first,
+         there is no verdict to apply, and a row where both numbers are 12 or under is a genuine coin
+         toss. Refusing sends it to the door's `undated` bucket, which EVERY door already reports —
+         so the operator is told, using reporting that already exists, instead of money landing in a
+         silently-guessed month. This is the same policy the dotted form has had all along: refuse
+         the ambiguity and name it, never guess. Rows that CAN only be read one way still import. */
+      if (opts && opts.dateAmbiguous && a <= 12 && b <= 12) return '';
+      const dayFirst = (opts && opts.dayFirst) || (a > 12 && b <= 12);
       return ok(y, dayFirst ? b : a, dayFirst ? a : b);
     }
 
@@ -366,6 +463,44 @@ const PosIngest = {
       return (mo && tailOk(m[4])) ? ok(yr4(+m[3]), mo, +m[2]) : '';
     }
 
+    /* ⭐ S200 — A DATE WITH NO YEAR, ACCEPTED ONLY WHERE THE YEAR IS NOT DATA.
+       `opts.yearOptional` is set by ONE caller: ev-regulars, importing BIRTHDAYS and ANNIVERSARIES.
+       Everywhere else a year-less cell stays refused, which is correct — a sales day with no year is
+       genuinely unusable, and inventing one is what six scan rounds were spent stamping out.
+
+       WHY THIS DOOR IS DIFFERENT: the birth YEAR is the one field a guest never gives, and Bar Cop
+       never displays it. The list column renders `fmtMD` (month and day), the stat tile and both
+       filter chips read `monthOf`. So refusing "1-Jul" did not protect anything — it emptied the
+       feature: `birthday` stored '', `monthOf('')` returns -1, and "Birthdays This Month" read 0 on
+       a file full of birthdays. The OLD private parser here stored 2001-07-01, a junk year with the
+       RIGHT month and day, which is why outreach worked before the delegation.
+
+       THE YEAR IS STAMPED 1900 AND THAT IS DELIBERATE. It is not a guess dressed as data: nobody in
+       a bar was born in 1900, it is this door's own `minYear` floor, and it reads as "no year given"
+       to anyone who opens the record. The alternative — inventing the current year — would make a
+       70-year-old's birthday look like a newborn's and would be a real number, silently wrong.
+       ⚠ ONLY UNAMBIGUOUS SHAPES ARE ACCEPTED WITHOUT A YEAR. A word month cannot be confused with a
+       day, so "1-Jul" / "Jul 8" / "July 27th" are safe in either order. A bare "7/19" is NOT safe on
+       its own, so it follows the file's day-first verdict exactly like every other numeric cell. */
+    if (opts && opts.yearOptional) {
+      const NOYEAR = 1900;
+      // Word month with the day first: 1-Jul, "20 July", 3rd Mar
+      m = s.match(/^(\d{1,2})(?:st|nd|rd|th)?[-\s.]*([a-z]{3,})$/i);
+      if (m) { const mo = this.MONTHS[m[2].slice(0, 3).toLowerCase()]; if (mo) return ok(NOYEAR, mo, +m[1]); }
+      // Word month first: Jul 8, "July 27th", Mar-3
+      m = s.match(/^([a-z]{3,})[-\s.]*(\d{1,2})(?:st|nd|rd|th)?$/i);
+      if (m) { const mo = this.MONTHS[m[1].slice(0, 3).toLowerCase()]; if (mo) return ok(NOYEAR, mo, +m[2]); }
+      // All-numeric month/day — ambiguous, so it obeys the file's verdict, never a private guess.
+      m = s.match(/^(\d{1,2})[-/](\d{1,2})$/);
+      if (m) {
+        const a = +m[1], b = +m[2];
+        // Same ambiguity rule as the dated branch: a contradicting file refuses its coin-toss rows.
+        if (opts.dateAmbiguous && a <= 12 && b <= 12) return '';
+        const df = (opts.dayFirst) || (a > 12 && b <= 12);
+        return ok(NOYEAR, df ? b : a, df ? a : b);
+      }
+    }
+
     // Anything else is not a date Bar Cop is willing to guess at. The door reports the row.
     return '';
   },
@@ -381,18 +516,41 @@ const PosIngest = {
   // `opts` is threaded to the two builders that need it: buildSales reads opts.manual to know the
   // Enter-Manually grid from a POS file (a hand entry is source:'manual' and never raises a
   // conflict against itself), and the signature is uniform so any builder can grow one.
+  /* ⚠ EVERY DATED BUILDER NOW TAKES `opts`, and it is not optional plumbing: `opts.dayFirst` is the
+     file-level date verdict (S199) and a builder that drops it reads a day-first week into six
+     different months. buildPmix is the one builder with no date column, so it is the one that does
+     not need it. If the caller passed no verdict, `build` reads the column itself — a door that
+     forgets to call dateConvention still gets the right answer rather than the old silent scatter. */
   build(type, rows, opts) {
-    if (type === 'hours') return this.buildHours(rows);
-    if (type === 'tips')  return this.buildTips(rows);
-    if (type === 'voids') return this.buildVoids(rows);
-    if (type === 'sales') return this.buildSales(rows, opts);
-    if (type === 'cash')  return this.buildCash(rows, opts);
-    if (type === 'server') return this.buildServer(rows);
+    const o = Object.assign({}, opts);
+    /* ⚠ BOTH HALVES OF THE VERDICT TRAVEL, not just `dayFirst`. Taking only `dayFirst` and dropping
+       `contradictory` made this function's own promise false at six of the eight doors: a
+       self-contradicting file quietly picked month-first and scattered money across eleven wrong
+       months with nothing skipped and no message. `dateAmbiguous` makes the coin-toss rows refuse,
+       so they land in `undated` — a bucket every door on this path already reports. */
+    let conv = null;
+    if (o.dayFirst === undefined && type !== 'pmix') {
+      conv = this.dateConvention(rows, 'date', o);
+      o.dayFirst = conv.dayFirst;
+      if (o.dateAmbiguous === undefined) o.dateAmbiguous = conv.contradictory;
+    }
+    /* The verdict rides OUT on the result too, so a door can name the cause. Without this the six
+       doors on this path could only say "no readable date" about dates that read perfectly well —
+       which is what turned a recoverable refusal into one the operator cannot act on. The refused
+       rows themselves already reach them through `undated`, which every door on this path reports. */
+    const tag = r => (conv && r && typeof r === 'object'
+      ? Object.assign(r, { dateAmbiguous: conv.contradictory, dayFirst: conv.dayFirst }) : r);
+    if (type === 'hours') return tag(this.buildHours(rows, o));
+    if (type === 'tips')  return tag(this.buildTips(rows, o));
+    if (type === 'voids') return tag(this.buildVoids(rows, o));
+    if (type === 'sales') return tag(this.buildSales(rows, o));
+    if (type === 'cash')  return tag(this.buildCash(rows, o));
+    if (type === 'server') return tag(this.buildServer(rows, o));
     if (type === 'pmix')  return this.buildPmix(rows);
     return { toAdd: [], skipped: [], dupCount: 0 };
   },
 
-  buildHours(rows) {
+  buildHours(rows, opts) {
     const staffByName = this._staffByName();
     const existing = (App.laborData && App.laborData.lc_actuals) || [];
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
@@ -407,7 +565,7 @@ const PosIngest = {
          an unusable FIGURE is a file fix. */
       if (!staff) { skipped.push(r.name || '(blank)'); return; }
       if (isNaN(hours) || hours <= 0) { incomplete.push(r.name || '(blank)'); return; }
-      const recDate = this.normDate(r.date);
+      const recDate = this.normDate(r.date, opts);
       /* ⚠⚠ A TIMECLOCK ROW WITH NO READABLE DATE IS A SKIP, NOT A BLANK-DATED RECORD. This wrote
          `date: ''` and counted it as imported — and because the dedup key is staff + date + hours,
          EVERY undated row of EVERY week collapses onto the same empty date. So week one imported,
@@ -437,7 +595,7 @@ const PosIngest = {
     return { toAdd, skipped, incomplete, undated, dupCount };
   },
 
-  buildTips(rows) {
+  buildTips(rows, opts) {
     const staffByName = this._staffByName();
     const existing = (App.laborData && App.laborData.lc_tips) || [];
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
@@ -450,7 +608,7 @@ const PosIngest = {
       // roster is both false and an instruction to corrupt the roster.
       if (!staff) { skipped.push(r.name || '(blank)'); return; }
       if ((cash + card) <= 0) { incomplete.push(r.name || '(blank)'); return; }
-      const recDate = this.normDate(r.date);
+      const recDate = this.normDate(r.date, opts);
       // ⚠ The twin of buildHours' guard above, and it fails the same way: the dedup key is
       // staff + date + amounts, so undated rows all share one key and a second week deduped away
       // in full. Tips feed Form 8027, the tip-out basis and the payroll export, all date-windowed.
@@ -484,7 +642,7 @@ const PosIngest = {
   COMP_WORDS: ['comp', 'discount', 'promo', 'coupon', 'goodwill', 'courtesy', 'on the house',
                'staff meal', 'shift drink', 'employee meal', 'giveaway', 'marketing'],
 
-  buildVoids(rows) {
+  buildVoids(rows, opts) {
     const COMP_WORDS = this.COMP_WORDS;
     const byName = this._staffByName();
     const existing = (App.shiftData && App.shiftData.sc_void_comps) || [];
@@ -524,7 +682,7 @@ const PosIngest = {
       const server = staff ? staff.name : serverName;
       const item = (r.item || '').trim();
       /* ⚠⚠ A DATE THE FILE GAVE AND BAR COP COULD NOT READ IS NEVER RESTAMPED TO TODAY. This was
-         `this.normDate(r.date) || today`, so a voids export dated "Jul 24" (no year — an ordinary
+         `this.normDate(r.date, opts) || today`, so a voids export dated "Jul 24" (no year — an ordinary
          export shape, and the exact case that produced buildServer's `undated` fix) landed EVERY
          ROW on today. A whole week of losses collapsed onto one day in the WRONG week, silently.
          That figure drives the Void/Comp log's date-filtered totals, void % and comp %, the
@@ -538,7 +696,7 @@ const PosIngest = {
          narrow one: a NON-EMPTY cell that will not parse. The file said something; we could not
          read it; inventing today is the one answer that is certainly wrong. */
       const rawDate = String(r.date == null ? '' : r.date).trim();
-      const parsed = this.normDate(rawDate);
+      const parsed = this.normDate(rawDate, opts);
       if (rawDate && !parsed) { undated.push(rawDate); return; }
       const recDate = parsed || today;
       // Skip an exact re-import (same date + amount + server + item) so re-dropping
@@ -604,7 +762,7 @@ const PosIngest = {
     const numeric = v => App.parseNum(v) != null;
     const covOf = v => Math.round(App.parseNum(v) ?? 0);   // one coercion; keeps the decimal point so "12.00" is 12, not 1200
     (rows || []).forEach(r => {
-      const date = this.normDate(r.date);
+      const date = this.normDate(r.date, opts);
       /* ⚠ AN UNREADABLE DATE IS ITS OWN OUTCOME — the same split buildCash got, arriving late here.
          `skipped` carried BOTH "this row's date is gibberish" and "this row had no usable figure",
          and the cockpit gates its red "Check that the file has a Date column and sales values" on
@@ -938,11 +1096,11 @@ const PosIngest = {
     (rows || []).forEach(r => {
       if (!String(r.drawer || '').trim()) return;
       if (!(has(r.over_short) || (has(r.expected) && has(r.counted)))) return;
-      const d = this.normDate(r.date); if (d) namedDates.add(d);
+      const d = this.normDate(r.date, opts); if (d) namedDates.add(d);
     });
     const toAdd = []; const skipped = []; const undated = []; const conflicts = []; let dupCount = 0; let keptManual = 0; let extraDropped = 0; let totalsLines = 0; const used = new Set();
     (rows || []).forEach(r => {
-      const date = this.normDate(r.date);
+      const date = this.normDate(r.date, opts);
       /* ⚠ AN UNREADABLE DATE IS ITS OWN OUTCOME, NOT "no over/short figure". Both skips went into
          one `skipped` list and the cockpit renders that list as "N rows skipped, no over/short
          figure" — so a file whose date cell reads "Jul 24" (no year, an ordinary export shape) sent
@@ -1065,7 +1223,7 @@ const PosIngest = {
   // sales. Matches the server to the roster by name; writes revenue_server_check
   // records so Server Check reads it the same as a hand-entered check. Dedup on
   // staff + date + covers + sales so re-dropping the report never double-logs.
-  buildServer(rows) {
+  buildServer(rows, opts) {
     const staffByName = this._staffByName();
     const existing = (App.data && App.data.revenue_server_checks) || [];
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
@@ -1083,7 +1241,7 @@ const PosIngest = {
       // corrupted the roster.
       if (!staff) { skipped.push(r.name || '(blank)'); return; }
       if (!covers || !(sales > 0)) { incomplete.push(r.name || '(blank)'); return; }
-      const recDate = this.normDate(r.date);
+      const recDate = this.normDate(r.date, opts);
       /* ⚠ A ROW WITH NO READABLE DATE IS NOT AN IMPORT, IT IS A SKIP. This wrote the record with
          `date: ''` and counted it as imported. Every consumer of a server check filters by date
          (r-server-check's scorecard is `(c.date || '') >= cutoff`), so the row was invisible
