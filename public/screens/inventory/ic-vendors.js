@@ -359,12 +359,12 @@ S.InventoryVendors = {
            the Default Delivery Cycle for its par. Both tokens are in `EXACT_ONLY` in csv-mapper.js
            now, which is the mechanism built for exactly this: good as a whole header, never allowed
            to hunt inside a longer one. */
-        { key: 'delivery_days',  label: 'Delivery Days', required: false, match: ['delivery days', 'delivery day', 'delivery schedule', 'ship days', 'order days', 'days', 'delivery'] },
+        { key: 'delivery_days',  label: 'Delivery Days', required: false, match: ['delivery days', 'delivery day', 'delivery schedule', 'delivery info', 'delivery window', 'ship days', 'order days', 'days', 'delivery'] },
         { key: 'payment_terms',  label: 'Terms',         required: false, match: ['terms', 'payment terms', 'net terms', 'payment', 'credit terms', 'pay terms'] },
         { key: 'account_number', label: 'Account #',     required: false, match: ['account', 'account number', 'account #', 'acct', 'acct #', 'account no', 'customer number', 'customer #', 'acct number', 'account id'] },
         { key: 'order_minimum',  label: 'Order Minimum', required: false, match: ['order minimum', 'minimum', 'min order', 'order min', 'minimum order', 'min purchase', 'minimum purchase', 'minimum order amount'] },
         // `'shipping'` last, and exact-only via EXACT_ONLY — see the note on delivery_days above.
-        { key: 'delivery_fee',   label: 'Delivery Fee',  required: false, match: ['delivery fee', 'freight', 'delivery charge', 'shipping fee', 'freight charge', 'delivery cost', 'shipping'] },
+        { key: 'delivery_fee',   label: 'Delivery Fee',  required: false, match: ['delivery fee', 'freight', 'delivery charge', 'shipping fee', 'shipping cost', 'shipping charge', 'shipping charges', 'shipping amount', 'freight charge', 'delivery cost', 'shipping'] },
         { key: 'free_delivery_over', label: 'Free Delivery Over', required: false, match: ['free delivery over', 'free delivery', 'free shipping over', 'free freight over', 'free delivery threshold', 'free shipping', 'free delivery minimum'] }
       ],
       confirmLabel: 'Import',
@@ -441,7 +441,14 @@ S.InventoryVendors = {
        both: a segment with exactly ONE dash between two day tokens is a range; anything else is a
        list of tokens. */
     const addRange = (a, b) => { for (let i = a; ; i = (i + 1) % 7) { on.add(i); if (i === b) break; } };
-    s.split(/[,;&|]+|\band\b|\/(?=\s*[a-z]{3,})/i).forEach(seg => {
+    s.split(/[,;&|]+|\band\b|\/(?=\s*[a-z]{3,})/i).forEach(rawSeg => {
+      /* ⚠ STRIP DELIVERY HOURS BEFORE COUNTING DASHES. A cell reading "Mon-Fri 8-5" carries a
+         SECOND dash that has nothing to do with days, and the per-segment dash count then treated
+         the whole thing as a token list — so only the two endpoints survived: **"Mon, Fri", 2
+         delivery days instead of 5**, which doubles the suggested par. And it was silent, because
+         `badDays` only fires on a cell that comes back empty. A delivery-days column carrying
+         hours is ordinary on a vendor sheet. */
+      const seg = rawSeg.replace(/\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?/gi, ' ');
       const dashes = (seg.match(/-|–|—/g) || []).length;
       const r = (dashes === 1 || /\b(to|thru|through)\b/i.test(seg))
         ? seg.match(/([a-z]+)[.\s]*(?:-|–|—|to|thru|through)[.\s]*([a-z]+)/i) : null;
@@ -475,7 +482,12 @@ S.InventoryVendors = {
        The Order Sheet then measured a DOLLAR minimum against a unit count. A currency marker
        settles it outright: if the cell says $, it is money. */
     if (!s || /[$€£]/.test(s)) return fallback || '$';
-    const m = s.match(/^[\d.,]+\s*([a-z]+)$/);
+    /* ⚠ THE UNIT MUST FOLLOW THE NUMBER; WHAT COMES AFTER IT DOES NOT MATTER. Anchoring the whole
+       cell (`...([a-z]+)$`) was one word too tight and reopened the very bug this function exists
+       to close: "5 cases min", "2 keg minimum", "10 cases per delivery" — the way a minimum is
+       actually written — all fell back to `$`, and the Order Sheet printed "Meets the $5.00
+       minimum" in green on every order. */
+    const m = s.match(/^[\d.,]+\s*([a-z]+)\b/);
     if (!m) return fallback || '$';
     const own = (App.listOptions ? App.listOptions('order_min_unit') : []) || [];
     const word = m[1].replace(/s$/, '');
@@ -510,6 +522,12 @@ S.InventoryVendors = {
       // never creates duplicate vendors.
       if (taken.has(key)) { dup++; return; }
       taken.add(key);
+      /* ⚠ A CELL HOLDING TWO NUMBERS IS REFUSED, not concatenated. `App.parseNum` joins digit runs
+         (its own doc says it will not unpick a two-number cell), so "$250 or 5 cases" stored a
+         **$2,505.00** minimum against a real $250 one, and "5 cases ($250)" stored $5,250.00.
+         Refusing leaves the field blank, which the Order Sheet shows as no minimum — visibly
+         missing rather than confidently wrong. Same rule `_sizeToOz` uses at the product door. */
+      const oneNum = v => ((String(v == null ? '' : v).match(/[\d][\d,]*(?:\.\d+)?/g) || []).length > 1 ? null : v);
       const nonNeg = n => (n == null || n < 0) ? null : n;
       // Report a delivery-day or terms cell the file HAD and Bar Cop could not use. An ABSENT cell
       // is not a problem and must never be counted as one, or every name-and-phone list reads broken.
@@ -533,10 +551,10 @@ S.InventoryVendors = {
            Comma formats emit exactly those strings through `raw:false`. Negatives are refused: a
            fee below zero is not a thing, and `_vendorInfo` gates on `> 0` so it would be lost
            anyway — better to not store it than to store a number no screen will show. */
-        order_minimum:      nonNeg(App.parseNum(r.order_minimum)),
+        order_minimum:      nonNeg(App.parseNum(oneNum(r.order_minimum))),
         order_minimum_unit: this._minUnitOf(r.order_minimum, '$'),
-        delivery_fee:       nonNeg(App.parseNum(r.delivery_fee)),
-        free_delivery_over: nonNeg(App.parseNum(r.free_delivery_over)),
+        delivery_fee:       nonNeg(App.parseNum(oneNum(r.delivery_fee))),
+        free_delivery_over: nonNeg(App.parseNum(oneNum(r.free_delivery_over))),
         notes:          '',
         imported:       true,
         created_at:     new Date().toISOString()

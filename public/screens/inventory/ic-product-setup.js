@@ -237,8 +237,16 @@ S.InventoryProducts = {
      Refusing leaves the row Incomplete, which is the honest state and the one the operator can act
      on. */
   _sizeToOz(raw) {
-    const s = String(raw == null ? '' : raw).trim().toLowerCase();
+    // A hyphen between the number and its unit is just punctuation ("750-ML", "12-OZ"), but it made
+    // the unit unreadable AND made App.parseNum see a trailing minus, so the size was lost entirely.
+    const s = String(raw == null ? '' : raw).trim().toLowerCase().replace(/(\d)\s*-\s*(?=[a-z])/g, '$1 ');
     if (!s) return null;
+    /* ⚠ KEG FRACTIONS FIRST, because they are two numbers and the guard below would refuse them.
+       "1/2 keg", "1/6 bbl" and "1/4 barrel" are how a draft size is normally written, and every one
+       was landing Incomplete. The ounce figures are the SIZES table's own (1/2 = 1984, 1/4 = 992,
+       1/6 = 661), so the import and the dropdown cannot disagree. */
+    const keg = s.match(/^(\d)\s*\/\s*(\d)\s*(?:bbl|barrel|keg)\b/);
+    if (keg) { const KEG = { '1/2': 1984, '1/4': 992, '1/6': 661 }; const oz = KEG[keg[1] + '/' + keg[2]]; if (oz) return oz; }
     if ((s.match(/[\d][\d,]*(?:\.\d+)?/g) || []).length > 1) return null;   // pack x size — ambiguous
     const n = App.parseNum(s);
     if (n == null) return null;
@@ -255,7 +263,13 @@ S.InventoryProducts = {
      made to win "1,000 count" (which parseInt read as 1); this reads the first NUMBER RUN, so it
      wins both — commas stay inside the run, a slash ends it. */
   _packCount(raw) {
-    const m = String(raw == null ? '' : raw).match(/[\d][\d,]*(?:\.\d+)?/);
+    const s = String(raw == null ? '' : raw);
+    /* ⚠ `#10` IS A CAN SIZE, NOT A COUNT. Reading the first number run accepted "#10 can" as ten,
+       so a $28.80 case priced at $2.88 a unit — and BOTH predecessors refused it (`parseInt` gave
+       NaN, `App.parseNum` has a `#` guard for exactly this family, which is also what keeps
+       `#REF!` / `#N/A` out). "6/#10 CAN" is still 6, because there the count comes first. */
+    if (/^\s*#/.test(s)) return null;
+    const m = s.match(/[\d][\d,]*(?:\.\d+)?/);
     return m ? App.parseNum(m[0]) : null;
   },
 

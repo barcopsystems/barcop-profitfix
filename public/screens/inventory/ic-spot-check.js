@@ -656,7 +656,11 @@ S.InventorySpotCheck = {
         : '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
           + (offCheck && !noMatch && !unreadable && !negative
               ? 'Nothing filled. Those products are not on this check yet — add them first.'
-             : (unreadable || negative) && !noMatch
+             /* ⚠ `&& !offCheck` — without it, three of the sixteen bucket combinations claimed
+                "The products matched" while off-check rows had matched NOTHING on the check, and
+                sent the operator to fix a sold column when the real fix was to add the products.
+                An absolute claim needs EVERY other bucket empty. */
+             : (unreadable || negative) && !noMatch && !offCheck
               ? 'Nothing filled. The products matched, but no row carried a sold figure Bar Cop could use.'
              : noMatch || offCheck
               ? 'Nothing filled.'

@@ -499,7 +499,13 @@ S.InventoryVarianceReport = {
                candidate on purpose and says so in its comment; this private list never got it.
              Precise terms first, loose synonyms last — a `match` array is a priority list. */
           { key: 'name',  label: 'Product Name',   required: true,  match: ['product name', 'item name', 'menu item', 'product', 'description', 'item', 'name'] },
-          { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['item qty', 'qty sold', 'quantity sold', 'units sold', 'number sold', 'qty', 'quantity', 'sold', 'units', 'pours'] },
+          /* ⚠ REALIGNED TO `PosIngest.FIELDS.pmix` FOR REAL THIS TIME. The last pass claimed these
+             lists were brought into line and they were not: `sales count`, `total sold`, `sold qty`,
+             `units count` and `rung` were all missing, so a Micros/Simphony export headed
+             `Menu Item | Sales Count | Sales Total` left qty UNMAPPED — and the row builder's
+             `App.parseNum(undefined) ?? 0` then stored **0 for every row** while `matchSummary`
+             still called them all recognized. The whole report reads 100% variance. */
+          { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['item qty', 'qty sold', 'quantity sold', 'units sold', 'number sold', 'sales count', 'total sold', 'sold qty', 'units count', 'qty', 'quantity', 'sold', 'units', 'pours', 'rung'] },
           /* ⚠ THE BARE `'sales'` SITS BEHIND EVERY PRICE TERM. Left ahead of them it still took a
              TEXT column: on `Menu Item / Sales Category / Qty / Gross Price` it word-matched
              "Sales Category" in pass 2 and every product read $0 register sales at 100% variance.
