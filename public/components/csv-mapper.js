@@ -347,9 +347,20 @@ const CSVMapper = {
        "Shipping" still binds in pass 1, and none of them may go hunting inside a longer header. */
     /* ⚠ `cash`, `card`, `credit`, `charge`, `sales` and `no sale` joined 2026-07-26, and the reason
        is the same one `pay` joined for: each is a perfectly good WHOLE header and a menace as a
-       token inside a longer one. Measured over 1,150 door × real-header bindings, the change moved
-       exactly 14 — and every single one was a WRONG binding becoming unmapped. Nothing correct was
-       lost, because a bare `Cash` / `Card` / `Sales` / `Charge` header still wins pass 1 exactly.
+       token inside a longer one.
+       ⚠⚠ AND THE FIRST VERSION OF THIS COMMENT WAS FALSE, WHICH IS WORTH MORE THAN THE FIX. It said
+       "measured over 1,150 bindings ... nothing correct was lost." That measurement was real but its
+       CORPUS WAS TOO NARROW — 25 header rows. Re-measured over **16,983 bindings across all 23 doors
+       and 111 real header rows**, the change moved 158, and **36 of them were correct bindings
+       LOST**: NCR Silver "Cash Tendered"/"Credit Tendered", Positouch "Cash Tender"/"Credit Tender",
+       Shift4 "Cash Amount"/"Credit Amount", Restaurant Manager "Cash Received"/"Credit Received"
+       and "Sales Amount", Focus POS "Credit Payments", "Sales $", "Sales Value", "No Sale Opens",
+       "Credit Card Tip", "Card Tip", "Tips - Credit Card", "Charge Amount", "Charge Total".
+       On a Positouch file a 90%-cash server went from FLAGGED to CLEAN, silently, because losing
+       either half of the tender split kills the cash-mix signal for the whole file.
+       **THE LESSON: a blast-radius measurement is only as good as its corpus, and a confident
+       "nothing was lost" in a comment is what stops the next person checking.** Every lost header is
+       now an explicit candidate in the field that wanted it; the bare word still wins pass 1 alone.
          · `cash` word-matched "Cash Tips", so on any cash-out report (TouchBistro, Toast, SpotOn,
            Micros) the Cash SALES field took the TIP column — `cash_ratio` then measured a tip mix,
            and a bartender declaring her cash tips honestly printed as High Risk / Cash Skimming.

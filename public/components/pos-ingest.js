@@ -40,8 +40,12 @@ const PosIngest = {
          hunting, a tips export headed just "Credit Card" silently stopped importing card tips.
          Caught in the blast-radius run of that change, not after it — this is the one regression in
          1,242 door × header bindings, and the other 15 were all wrong bindings going away. */
-        match: ['card tips', 'credit tips', 'cc tips', 'card', 'credit card tips', 'credit card', 'charged tips', 'non-cash tips', 'non cash tips', 'noncash tips', 'charge tips', 'tips charged', 'electronic tips', 'card gratuity', 'auto gratuity', 'autograt'] },
-      { key: 'cash_tips', label: 'Cash Tips',  required: false, match: ['cash tips', 'cash', 'declared cash tips', 'declared tips', 'declared', 'cash gratuity', 'cash tip', 'tips cash'] },
+/* ⚠ AND THE SINGULAR AND PREFIXED FORMS TOO. Adding bare `credit card` fixed only a header that IS
+         exactly "Credit Card" — because `credit card` is itself EXACT_ONLY. "Credit Card Tip"
+         (singular), "Card Tip", "Tips - Credit Card" and "Tips (Credit Card)" were all still lost,
+         and a lost tips column imports $0.00 in silence: measured, a $300 tip day became $40. */
+        match: ['card tips', 'card tip', 'credit tips', 'credit tip', 'cc tips', 'card', 'credit card tips', 'credit card tip', 'credit card', 'tips - credit card', 'tips (credit card)', 'tips - card', 'charged tips', 'non-cash tips', 'non cash tips', 'noncash tips', 'charge tips', 'charge tip', 'tips charged', 'electronic tips', 'card gratuity', 'credit card gratuity', 'card $', 'auto gratuity', 'autograt'] },
+      { key: 'cash_tips', label: 'Cash Tips',  required: false, match: ['cash tips', 'cash tip', 'cash', 'declared cash tips', 'declared tips', 'declared', 'cash gratuity', 'tips cash', 'tips - cash', 'tips (cash)', 'cash $'] },
       { key: 'shift',     label: 'Shift',      required: false, match: ['shift', 'shift type', 'daypart', 'shift name', 'meal period'] }
     ],
     voids: [
@@ -110,7 +114,11 @@ const PosIngest = {
          promos the operator already gave away as that server's own sales, which then drives the
          check average and the comp% signal. Bare 'amount'/'total' stay last: they are what an
          order-detail export calls its money column when it calls it nothing better. */
-      { key: 'sales',  label: 'Total Sales', required: true,  match: ['net sales', 'net total', 'sales total', 'total sales', 'server sales', 'rung sales', 'sales', 'revenue', 'net', 'gross sales', 'total', 'amount', 'dollars'] },
+      // ⚠ `sales amount`/`sales $`/`sales value` explicit: bare `sales` is EXACT_ONLY now (it was
+      // reading "Sales Tax" and "Cash Sales" as a server's whole sales figure), so these real
+      // headers bound nothing. REQUIRED here, so the import blocks rather than importing zeros —
+      // loud and recoverable, but still a file the operator could not import.
+      { key: 'sales',  label: 'Total Sales', required: true,  match: ['net sales', 'net total', 'sales total', 'total sales', 'sales amount', 'sales value', 'sales $', 'server sales', 'rung sales', 'sales', 'revenue', 'net', 'gross sales', 'total', 'amount', 'dollars'] },
       { key: 'shift',  label: 'Shift',       required: false, match: ['shift', 'shift type', 'daypart', 'meal period', 'shift name'] }
     ],
     // A POS product-mix (PMIX) report: one row per menu item with units sold for
@@ -250,14 +258,41 @@ const PosIngest = {
      door (4, 11 and 12), and a private copy is a copy that has already drifted. */
   SUMMARY_NAMES: ['total', 'totals', 'grand total', 'grand totals', 'sum', 'sums', 'subtotal',
     'subtotals', 'all servers', 'all employees', 'all staff', 'report total', 'report totals',
-    'overall total', 'total all', 'totals all', 'summary', 'net total', 'gross total'],
+    'overall total', 'total all', 'totals all', 'summary', 'net total', 'gross total',
+    'total sales', 'total revenue', 'totals sales'],
+  /* ⚠ A QUALIFIER IN FRONT OF "TOTAL" IS STILL A TOTALS LINE. The bare-forms-only whitelist let
+     "Bar Total", "Server Total", "Employee Total" and "Grand Total (All)" through as PEOPLE, and one
+     of them flipped a verdict: adding a single "Bar Total" row to a clean five-server file lifted
+     the team mean past the real outlier's `v > avg * 2` and the screen printed the GREEN ALL-CLEAR
+     over a named skimmer. On a two-bartender bar it also pushed `reviewed` from 2 to 3, clearing
+     MIN_TEAM and replacing the team caveat with the all-clear. Both are verbatim the damage this
+     function exists to prevent. The qualifier list is CLOSED — a fixed vocabulary of things a POS
+     groups a subtotal by — so it can never eat a person's name. */
+  SUMMARY_QUALIFIERS: ['bar', 'server', 'servers', 'employee', 'employees', 'staff', 'cashier',
+    'cashiers', 'section', 'department', 'dept', 'store', 'location', 'shift', 'day', 'daily',
+    'weekly', 'monthly', 'period', 'revenue centre', 'revenue center', 'terminal', 'register'],
+  /* ⚠ AND A ROW THAT IS NOT A NAME AT ALL IS NOT A PERSON EITHER. A separator ("-----", "===") or a
+     repeated mid-file HEADER ("Server") was scored as a server: the report then printed
+     "Not enough data to score: -----, Server, ===" to the operator, and three junk names were enough
+     to trip the not-enough-scored caveat over an otherwise clean file. */
+  SUMMARY_HEADERS: ['server', 'servers', 'employee', 'employee name', 'name', 'staff', 'cashier',
+    'bartender', 'team member', 'server name', 'staff name'],
   isSummaryName(name) {
-    const n = String(name == null ? '' : name)
+    const raw = String(name == null ? '' : name);
+    const n = raw
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, ' ')   // strip ':' '*' '-' '_' and any stray punctuation
       .replace(/\s+/g, ' ')
       .trim();
-    return !!n && this.SUMMARY_NAMES.indexOf(n) >= 0;
+    // A cell with no letters or digits at all is a separator rule, not a name.
+    if (!n) return /\S/.test(raw);
+    if (this.SUMMARY_NAMES.indexOf(n) >= 0) return true;
+    if (this.SUMMARY_HEADERS.indexOf(n) >= 0) return true;
+    // A leading qualifier and/or a trailing scope word ("Grand Total (All)" strips to
+    // "grand total all"). Both vocabularies are CLOSED, so a real name cannot match.
+    if (/^(grand|report|overall|final|net|gross)?\s*(total|totals)(\s+(all|combined|everyone|everything))?$/.test(n)) return true;
+    const m = n.match(/^(.*?)\s+(total|totals)$/);
+    return !!m && this.SUMMARY_QUALIFIERS.indexOf(m[1]) >= 0;
   },
 
   // Normalize a POS date cell to canonical local YYYY-MM-DD (App.ymdLocal's
