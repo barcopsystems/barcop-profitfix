@@ -567,6 +567,28 @@ S.InventoryVendors = {
       });
     });
 
+    /* ⭐⭐ STRICT MODE (Kyle, 2026-07-26: "strict mode or drop... this file drop may be used one time
+       if even that. just pick one, fix it and let's move on.")
+       ⚠ THE DECIDING FACT WAS REACH, NOT DIFFICULTY. This door is used once, if ever — so a parser
+       that keeps needing rounds is the wrong shape of solution regardless of how good it gets.
+       Measured: every other surface in the five-door batch converged and re-verified clean twice;
+       this function went 6 -> 5 -> 11 findings, because free text has no end of phrasings.
+       SO: THE CELL MUST BE ENTIRELY SCHEDULE VOCABULARY OR IT IS NOT READ. A single word this
+       function does not know means the whole cell is refused and COUNTED in `badDays`, and the
+       operator sets the day chips by hand — a ten-second job on the vendor page, and the manual form
+       is chips-only anyway. That trades a few more reported cells for ZERO silent wrong answers.
+       It matters because the day COUNT divides into the par cycle (`deliveryDaysPerWeek` ->
+       `computeSuggestion`), so a wrong count moved Suggested Par by 36% to 440% — and a
+       wrong-but-non-empty answer was never reported, because `badDays` only counts an EMPTY result.
+       ⚠ This makes the whole "a note invented a day" class UNREACHABLE rather than guarded, which is
+       the same move that finally settled `PosIngest.normDate`. Do not replace it with another guard. */
+    const KNOWN = w => w === '~' || LONG[w] != null || SHORT[w] != null || AMBIG[w] || SPAN[w]
+      || NEG[w] || FILLER[w] || ALLWORD.test(w) || /^\d+$/.test(w)
+      || w === 'every' || w === 'all' || w === 'daily' || w === 'to' || w === 'thru' || w === 'through';
+    const leftover = s.replace(/[-–—]|\b(?:to|thru|through)\b/g, ' ')
+      .split(/[^a-z0-9]+/).filter(Boolean).filter(w => !KNOWN(w));
+    if (leftover.length) return '';
+
     if (ambiguous) return '';
     const on = all ? new Set(D.map((_, i) => i)) : pos;
     neg.forEach(i => on.delete(i));
