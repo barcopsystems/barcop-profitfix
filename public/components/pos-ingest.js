@@ -289,7 +289,10 @@ const PosIngest = {
      all-numeric slash/dash shape is ambiguous at all, so ISO and word-month rows cast NO vote. */
   dateConvention(rows, key, opts) {
     const k = key || 'date';
-    let day = false, month = false;
+    // ⚠ NUMBERS, NOT BOOLEANS. These stayed `false` when the votes became counts, so a file with no
+    // day votes returned `dayVotes: false` — `=== 0` is false against it and it renders as "false"
+    // in any message. Nothing read them yet, which is the only reason it was harmless.
+    let day = 0, month = 0;
     /* ⚠⚠ ONLY A CELL THAT WILL ACTUALLY IMPORT MAY VOTE — AND THE ONLY HONEST WAY TO ASK THAT IS TO
        ASK normDate ITSELF. The first version of this function matched a regex with a permissive
        `(?:[T\s,].*)?$` tail, while normDate's `tailOk` accepts only a clock or a zone. Everything in
@@ -337,13 +340,39 @@ const PosIngest = {
        the honest outcome for the odd row rather than a reason to punish the other thirty.
        ⚠ `contradictory` is now reserved for a genuine TIE with evidence on both sides: the only case
        where the file really does not say what convention it uses. Everything else has an answer. */
-    const contradictory = day > 0 && month > 0 && day === month;
+    /* ⚠⚠ THE MAJORITY MUST BE A MAJORITY OVER A STRAY, NOT OVER A BLOC. Plain `day > month` was the
+       round-9 fix for a guard that refused too much, and it then failed the other way: a hand-kept
+       expense sheet with 14 day-first rows and 3 hand-typed US rows scored 2 votes to 3, declared
+       itself month-first, and put **11 rows / $5,500 into eleven wrong months with nothing refused
+       and no warning**. One row disagreeing is a typo; three rows agreeing with each other are a
+       second convention, and a file carrying two conventions genuinely does not say which it uses.
+       THE 3x RULE IS A JUDGEMENT CALL AND IS WRITTEN DOWN AS ONE: the winner must out-vote the loser
+       at least three to one. 19-vs-1 and 30-vs-2 are strays and the file imports whole; 3-vs-2 and
+       2-vs-3 are blocs and the coin-toss rows refuse and get named. Rows that can only be read one
+       way always import either way — the refusal only ever touches cells where BOTH numbers are 12
+       or under, which are the only genuinely undecidable ones.
+       ⚠ Unreachable from any single-convention POS export: a DD/MM cell cannot cast a month vote and
+       an MM/DD cell cannot cast a day vote, so a clean file of either convention has exactly one
+       kind of evidence. This rule only ever fires on a hand-assembled sheet — which is precisely
+       what the Operating Expenses door is for. */
+    /* TWO WAYS TO BE A STRAY, because one test alone fails at one end or the other:
+         · EXACTLY ONE dissenting row is always a typo, at any scale. A ratio test alone breaks here:
+           a 14-day window only contains 2 disambiguating rows, so one stray US row makes it 2-vs-1
+           and a pure 3x rule would refuse 12 of the 15 rows — the round-9 defect all over again.
+         · A ratio for everything else, so two or three typos in a long file are still strays
+           (14-vs-2 imports whole) while a genuine second convention is not (3-vs-2 refuses).
+       A TIE is never decisive, which is why `win > lose` is required. */
+    const DOMINANCE = 3;
+    const win = Math.max(day, month), lose = Math.min(day, month);
+    const decisive = lose === 0 || (win > lose && (lose === 1 || win >= lose * DOMINANCE));
+    const contradictory = lose > 0 && !decisive;
     return {
-      dayFirst: day > month,
+      dayFirst: day > month && !contradictory,
       contradictory,
       dayVotes: day,
       monthVotes: month,
       evidence: contradictory ? 'both' : (day > month ? 'day' : (month > day ? 'month' : 'none'))
+
     };
   },
   /* `opts.minYear` exists for ONE caller: ev-regulars imports BIRTHDAYS, which are legitimately
@@ -483,7 +512,16 @@ const PosIngest = {
        day, so "1-Jul" / "Jul 8" / "July 27th" are safe in either order. A bare "7/19" is NOT safe on
        its own, so it follows the file's day-first verdict exactly like every other numeric cell. */
     if (opts && opts.yearOptional) {
-      const NOYEAR = 1900;
+      /* ⚠ 1904, NOT 1900, AND THE REASON IS A REAL GUEST. The sentinel has to satisfy three things:
+         it must be a year no living person was born in (so it can never be mistaken for real data),
+         it must clear this door's own minYear floor of 1900, and — the one that was missed — IT MUST
+         BE A LEAP YEAR. 1900 is not (divisible by 100, not by 400), so `ok()`'s round-trip refused
+         **29 February outright**: a guest born on the leap day imported with a BLANK birthday and
+         vanished from February outreach forever. Roughly 1 guest in 1,461, permanently invisible.
+         1904 is the first leap year that keeps all three properties. The value is never displayed —
+         the list renders month/day and the tile reads the month — so this only ever shows in the
+         edit form, where 1904 reads exactly as "no year given" does. */
+      const NOYEAR = 1904;
       // Word month with the day first: 1-Jul, "20 July", 3rd Mar
       m = s.match(/^(\d{1,2})(?:st|nd|rd|th)?[-\s.]*([a-z]{3,})$/i);
       if (m) { const mo = this.MONTHS[m[2].slice(0, 3).toLowerCase()]; if (mo) return ok(NOYEAR, mo, +m[1]); }
@@ -534,10 +572,18 @@ const PosIngest = {
       o.dayFirst = conv.dayFirst;
       if (o.dateAmbiguous === undefined) o.dateAmbiguous = conv.contradictory;
     }
-    /* The verdict rides OUT on the result too, so a door can name the cause. Without this the six
-       doors on this path could only say "no readable date" about dates that read perfectly well —
-       which is what turned a recoverable refusal into one the operator cannot act on. The refused
-       rows themselves already reach them through `undated`, which every door on this path reports. */
+    /* The verdict rides OUT on the result so a door CAN name the cause. Be precise about what that
+       does and does not buy today, because the first version of this comment claimed more:
+         · the refused rows themselves DO reach the operator — they land in `undated`, and all six
+           doors on this path render that bucket;
+         · but no door reads `dateAmbiguous` yet, so those rows are still described as "no readable
+           date" when the real cause is that the file carries two date conventions. Wiring the six
+           messages is S203 on THE LIST, deliberately not done in the same session that rewrote this
+           logic three times.
+       ⚠ Reachability keeps that honest rather than urgent: a clean POS export cannot produce mixed
+       evidence at all (a DD/MM cell cannot cast a month vote, an MM/DD cell cannot cast a day vote),
+       so this only fires on a hand-assembled sheet — and the two doors that actually receive those,
+       Operating Expenses and Regulars, call dateConvention directly and already print the sentence. */
     const tag = r => (conv && r && typeof r === 'object'
       ? Object.assign(r, { dateAmbiguous: conv.contradictory, dayFirst: conv.dayFirst }) : r);
     if (type === 'hours') return tag(this.buildHours(rows, o));
