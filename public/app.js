@@ -5568,8 +5568,13 @@ const App = {
       // Variance, Menu Engineering and COGS, with the row still marked Complete.
       ltr:33.814, ltrs:33.814, lt:33.814,
       gal:128, gallon:128, gallons:128,
-      cl:0.33814, centiliter:0.33814, centilitre:0.33814,
-      ml:0.033814, milliliter:0.033814, millilitre:0.033814, mls:0.033814
+      cl:0.33814, centiliter:0.33814, centilitre:0.33814, centiliters:0.33814, centilitres:0.33814,
+      // ⚠ THE PLURALS ARE NOT OPTIONAL. `liter`/`liters` were both here but only the SINGULAR
+      // `milliliter` — so a spelled-out "750 milliliters" read as 750 OUNCES: 500 pours, a 0.6%
+      // pour cost against a true 18.4%, marked Complete and rendered green. That is the original
+      // 750ML defect surviving under one more spelling.
+      ml:0.033814, milliliter:0.033814, millilitre:0.033814, mls:0.033814,
+      milliliters:0.033814, millilitres:0.033814
     };
     return MAP[u] != null ? MAP[u] : null;
   },
