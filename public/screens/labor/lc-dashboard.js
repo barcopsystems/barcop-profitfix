@@ -487,22 +487,66 @@ S.LaborDashboard = {
   // Shared import path: match/dedup/build/save live in PosIngest so the cockpit
   // and the per-page lanes never drift. label = 'hours' | 'tips'.
   async importLane(type, rows, resultId, nextStep) {
-    const { toAdd, skipped, dupCount } = PosIngest.build(type, rows);
+    const { toAdd, skipped, incomplete, undated, dupCount } = PosIngest.build(type, rows);
     const noun = type === 'hours' ? 'hour' : 'tip';
     const setRes = html => { const r = document.getElementById(resultId); if (r) r.innerHTML = html; };
+    /* ⚠ ROWS WHOSE DATE COULD NOT BE READ ARE NOW REFUSED RATHER THAN WRITTEN BLANK, so they have to
+       be reported — this is the one skip an operator can actually fix in the file. Before the
+       builder guard they were written with `date: ''`, and since the dedup key is staff + date +
+       amount, every undated row of every week shared one key: week one imported and week two
+       deduped away IN FULL under "N already logged", about rows that had never been logged.
+       ⚠ AND A PARTIAL SAVE IS NOT A FAILED SAVE. This door writes row by row through the generic
+       commit, same as the four already closed — App.landedOf/partialSaveNote carry the contract. */
+    /* ⚠ "NO ROSTER MATCH" IS ONLY TRUE OF AN UNMATCHED NAME. The builder used to lump "this person
+       is not on your roster" together with "this person IS on your roster and had nothing to log"
+       — a `--` hours cell, a $0.00 tips line (an ordinary row for a barback, the kitchen, or
+       someone's day off) — and this sentence called all of them a roster problem. The implied fix
+       is to add the staff member, who already exists, which is how a roster gets duplicated. Split
+       at the builder now, exactly as buildServer and buildPmix already were. */
+    const nUnd = (undated || []).length, nInc = (incomplete || []).length;
+    const figure = type === 'hours' ? 'no hours rung' : 'no tips to log';
+    const outcomes = (skipped.length ? ' (' + skipped.length + ' skipped, name not on your roster)' : '')
+      + (nInc ? ' (' + nInc + ' row' + (nInc === 1 ? '' : 's') + ' skipped, ' + figure + ')' : '')
+      + (nUnd ? ' (' + nUnd + ' row' + (nUnd === 1 ? '' : 's') + ' skipped, no readable date)' : '')
+      + (dupCount ? ' (' + dupCount + ' already logged)' : '');
     if (!toAdd.length) {
+      const others = skipped.length + nInc + nUnd;
+      /* ⚠ THE HEADLINE MUST NOT POINT AT THE COLUMNS WHEN THE COLUMNS ARE THE ONE THING THAT CANNOT
+         BE WRONG. Staff, Date and Hours are all `required: true`, and CSVMapper blocks the Import
+         button until every required field is mapped — so by the time this fires, the columns are
+         mapped by definition. Once this branch was narrowed to "every row's NAME failed the roster
+         match", the old copy ("Check the file has Staff, Date, and Hours") was sending the operator
+         to the one place with nothing to find, while the clause right after it said the real thing.
+         ⚠ AND THE DUP-ONLY HEADLINE DOES NOT GET `outcomes` — it already states the count, so
+         appending the shared string printed it twice ("All 2 were already logged. (2 already
+         logged)"). It is the one headline that duplicates rather than adds. */
+      if (dupCount && !others) {
+        setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">No new rows imported. All '
+          + dupCount + ' were already logged.</div>');
+        return;
+      }
       setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (dupCount ? 'No new rows imported. ' + dupCount + ' already logged.'
-                    : 'No rows imported. Check the file has Staff, Date, and ' + (type === 'hours' ? 'Hours.' : 'tip amounts, and the names match your roster.')) + '</div>');
+        + (nUnd && !skipped.length && !nInc && !dupCount ? 'No rows imported. Bar Cop could not read a date on ' + (nUnd === 1 ? 'the row' : 'any row') + ' — check the date column in your export.'
+         : nInc && !skipped.length && !nUnd && !dupCount ? 'No rows imported. Every name matched your roster, but no row had ' + (type === 'hours' ? 'usable hours.' : 'a tip amount above zero.')
+         : skipped.length && !nInc && !nUnd && !dupCount ? 'No rows imported. Not one name in the file matched your staff roster — check the spellings, or add them in Staff Roster.'
+         : 'No new rows imported.') + outcomes + '</div>');
       return;
     }
     const ok = await PosIngest.commit(type, toAdd);
-    if (!ok) { setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'); return; }
+    if (!ok) {
+      setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + App.partialSaveNote(App.landedOf(toAdd, type === 'hours'
+              ? (App.laborData && App.laborData.lc_actuals) : (App.laborData && App.laborData.lc_tips)),
+            toAdd.length, noun + ' record', noun + ' records')
+        + outcomes + '</div>');
+      return;
+    }
     // The import updates the status (flash + step sub-text); the operator marks
     // the step done themselves when the week's hours/tips are fully in.
+    // Same `outcomes` string as the zero-row and failure messages, so all three describe one import
+    // in one set of words — and the undated count cannot be reported on two paths and dropped on the third.
     this._flash = toAdd.length + ' ' + noun + ' record' + (toAdd.length === 1 ? '' : 's') + ' imported'
-      + (skipped.length ? ' (' + skipped.length + ' skipped, no roster match)' : '')
-      + (dupCount ? ' (' + dupCount + ' already logged)' : '') + '.';
+      + outcomes + '.';
     this._openStep = nextStep;
     this.render(this.container, this.actions);
   },
