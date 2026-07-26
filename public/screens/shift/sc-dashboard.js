@@ -490,10 +490,74 @@ S.ShiftDashboard = {
     try { return await this._doImportSales(rows, opts); }
     finally { this._importingSales = false; }
   },
+  /* How many of these records ACTUALLY LANDED when the commit came back false.
+     ⚠ EVERY per-row committer in PosIngest walks its rows one at a time and ANDs a single boolean
+     without stopping, so "false" means "at least one was refused", never "nothing was written".
+     Reported flat, that reads as "nothing happened" over days that are already feeding Where You
+     Stand, Confirm the Week, the cash-forecast baseline and the sales-tax hold — and the operator's
+     natural next move is to enter them again by hand.
+     ⚠ IDENTITY, NOT ID. Sales and cash REUSE the prior record's id when they replace a day (S147),
+     so the id is already in the array before the write and an id test would call every row landed.
+     App.putRecord assigns the exact object on success and puts the PREVIOUS object back (or splices
+     it out) on a genuine refusal, so "is this exact object in the list" is the honest question.
+     One helper, so the three cockpit doors cannot drift apart on it again. */
+  _landed(list, arr) {
+    const live = (arr || []);
+    return (list || []).filter(r => live.indexOf(r) !== -1).length;
+  },
+  /* ⚠ THE REASSURANCE HAS TO BE TRUE AT ALL THREE DOORS. The first draft said the saved rows "come
+     back as already logged" — true of the SERVER door (fresh ids, deduped on staff+date+covers+sales)
+     and false of sales and cash, which reuse the prior id and UPSERT IN PLACE, reporting "replaced
+     earlier figures". Three doors, three mechanisms, one guarantee they all genuinely make: nothing
+     that already saved will be counted twice. Say that, and nothing more specific than that. */
+  // ⚠ TAKES BOTH FORMS OF THE NOUN. A fixed plural read "None of the 1 days were saved" / "1 server
+  // checks" / "1 reconciles", and total === 1 is the COMMONEST failure shape at all three doors —
+  // one day, one drawer, one server row. The partial branch is safe either way (landed < total with
+  // landed >= 1 means total >= 2), but the other two are not.
+  _partialNote(landed, total, one, many) {
+    /* ⚠ THREE STATES, NOT TWO.
+       landed === total is REACHABLE and was reported as a partial save telling the operator to run
+       it again. _commitSales and _commitCashRows fold the STALE-ROW RETIREMENT into the same `ok`
+       they return, so when every insert lands and only a `removeRecord` is refused, the write
+       succeeded completely and the failure is that a SUPERSEDED row could not be deleted. Nothing
+       is left to finish — and the thing that is actually wrong (the date now holds two rows, and
+       every consumer sums by date, so Confirm the Week and the cash-forecast baseline count it
+       twice) went unmentioned. Re-running IS the fix, but for a different reason, so say which.
+       landed === 0 must not say "Nothing was saved" either: the caller may append "N days were
+       already cleared to zero and stayed cleared", and those deletes really did happen — they run
+       before the write is even attempted. Scope the sentence to the rows this call tried to WRITE
+       and let the caller speak for anything else. */
+    // ⚠ "That day" HAS NO ANTECEDENT UNDER A PLURAL HEADLINE — "All 3 days were saved... That day may
+    // be counted twice" points at nothing, and at the cash door the unit is a register-day, not a day
+    // at all. Say "one of them", which is true of both and of either noun.
+    if (landed && landed >= total) {
+      return (total === 1 ? 'The ' + one + ' was saved' : 'All ' + total + ' ' + many + ' were saved')
+        + ', but an older record could not be cleared out, so '
+        + (total === 1 ? 'it' : 'one of them') + ' may be counted twice until you run this again.';
+    }
+    // ⚠ THE VERB AGREES WITH `landed`, NOT `total` — "1 of 2 days were saved" was the commonest
+    // partial shape at every door. (The NOUN correctly follows `total`.)
+    return landed
+      ? landed + ' of ' + total + ' ' + many + (landed === 1 ? ' was' : ' were') + ' saved before the save was refused. '
+        + 'Run it again to finish — Bar Cop will not double anything that already saved.'
+      : 'Save failed. ' + (total === 1 ? 'The ' + one + ' was not saved.'
+                                       : 'None of the ' + total + ' ' + many + ' were saved.') + ' Try again.';
+  },
   async _doImportSales(rows, opts) {
     opts = opts || {};
     const built = PosIngest.build('sales', rows, opts);
-    const { toAdd, skipped, zeroSkipped, dupCount, merged, keptManual, conflicts, colGaps } = built;
+    const { toAdd, skipped, zeroSkipped, unchanged, undated, dupCount, merged, keptManual, conflicts, colGaps } = built;
+    // ⚠ ROWS whose DATE could not be read, split out of `skipped` (which is keyed per DAY). Two
+    // different problems with two different fixes; the red headline below used to blame the Date
+    // column for both, so a file whose dates all parsed could still be told to go check them.
+    const nUnd = (undated || []).length;
+    const undNote = nUnd ? ' (' + nUnd + ' row' + (nUnd === 1 ? '' : 's') + ' skipped, no readable date)' : '';
+    // Days this file had nothing new for — every figure it carried already matches what is saved.
+    // Rebuilding those records and calling them "replaced earlier figures" claimed a change that
+    // never happened; re-dropping the same export is the ordinary way to land here.
+    const nSame = (unchanged || []).length;
+    const sameNote = nSame ? ' (' + nSame + ' day' + (nSame === 1 ? '' : 's')
+        + ' already matched what is saved)' : '';
     /* ⚠ NAME THE COLUMN, AND SAY WHAT ACTUALLY HAPPENED TO IT. The copy here read "(covers could
        not be read on N days, so those days kept their existing count — sales still came in)". It
        was written when this only ever fired for covers. The test underneath it has since widened to
@@ -512,18 +576,27 @@ S.ShiftDashboard = {
       return { text: names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1],
                n: days.size };
     };
-    const gaps = colGaps || {};
-    const gk = colList(gaps.kept), gz = colList(gaps.zeroed);
-    // ⚠ "NO USABLE FIGURE", not "could not be read" and not "had no figure". One bucket now covers
-    // BOTH a cell that is blank on this day and a cell holding something Bar Cop refused (a
-    // negative, a date, a range), and the two earlier phrasings were each false for the other case:
-    // a day whose Bar cell held "($4,500.00)" was told the file "had no figure for bar sales" with
-    // $4,500 sitting right there in the column. One phrase that is true of both.
-    const covNote = (gk ? ' (' + gk.text + ' had no usable figure on ' + gk.n + ' day' + (gk.n === 1 ? '' : 's')
-                          + ', so ' + (gk.n === 1 ? 'that day' : 'those days') + ' kept the figures already saved)' : '')
-                  + (gz ? ' (' + gz.n + ' new day' + (gz.n === 1 ? '' : 's') + ' had no usable figure for '
-                          + gz.text.toLowerCase() + ', so ' + (gz.n === 1 ? 'it was' : 'they were')
-                          + ' saved as zero)' : '');
+    /* ⚠ BUILT AFTER THE CONFLICT PROMPT, not here. Which days belong in the `kept` bucket is not
+       known until the operator has answered — a conflict day they KEEP is a day the import never
+       touched, and its gap note would read as a second, separate event alongside "1 day kept as you
+       entered it". The builder cannot know that; only the answer can. `keptConflictDates` is filled
+       in below and this string is assembled straight after.
+       ⚠ "NO USABLE FIGURE", not "could not be read" and not "had no figure". One bucket covers BOTH
+       a cell blank on this day and a cell holding something Bar Cop refused (a negative, a date, a
+       range), and the two earlier phrasings were each false for the other case: a day whose Bar cell
+       held "($4,500.00)" was told the file "had no figure for bar sales" with $4,500 sitting right
+       there in the column. One phrase that is true of both. */
+    const keptConflictDates = new Set();
+    let covNote = '';
+    const buildCovNote = () => {
+      const gaps = colGaps || {};
+      const gk = colList(gaps.kept), gz = colList(gaps.zeroed);
+      covNote = (gk ? ' (' + gk.text + ' had no usable figure on ' + gk.n + ' day' + (gk.n === 1 ? '' : 's')
+                      + ', so ' + (gk.n === 1 ? 'that day' : 'those days') + ' kept the figures already saved)' : '')
+              + (gz ? ' (' + gz.n + ' new day' + (gz.n === 1 ? '' : 's') + ' had no usable figure for '
+                      + gz.text.toLowerCase() + ', so ' + (gz.n === 1 ? 'it was' : 'they were')
+                      + ' saved as zero)' : '');
+    };
     // A day the operator typed covers into with both sales cells left empty. saveManualSales drops
     // it (a covers-only row is not a saveable day) and hands the labels over so it is not dropped
     // in silence while every other day saves.
@@ -564,63 +637,143 @@ S.ShiftDashboard = {
       });
       if (!r.confirmed) { note('Import cancelled. Nothing was changed.'); return; }
       conflicts.forEach(c => { if (r.useTheirs.has(c.key)) { extra.push(c.useRec); usedTheirs++; } });
+      /* ⚠ A CONFLICT DAY THE OPERATOR KEPT IS A DAY THE IMPORT DID NOT TOUCH, so its gap note reads
+         as a second, separate event: "1 day kept as you entered it" AND "Food sales had no usable
+         figure on 1 day, so that day kept the figures already saved" — both true, both about the
+         same day, and together they sound like two things happened. The builder cannot know this;
+         only the answer to the prompt decides it. A day resolved as USE THE FILE keeps its note,
+         because there the unusable column really does stay at the prior figure and that is exactly
+         what the operator needs to know about the choice they just made. */
+      conflicts.forEach(c => { if (!r.useTheirs.has(c.key)) keptConflictDates.add(c.date); });
     }
+    ['bar', 'food', 'covers'].forEach(k => {
+      const list = ((colGaps || {}).kept || {})[k];
+      if (list) colGaps.kept[k] = list.filter(d => !keptConflictDates.has(d));
+    });
+    buildCovNote();   // only now is the `kept` bucket final
     const keptMine = (conflicts ? conflicts.length : 0) - usedTheirs;   // hand days the operator kept at the prompt
     const kept = (keptManual || 0) + keptMine;                          // + hand days the file simply matched
     const allToAdd = toAdd.concat(extra);
+    // ⚠ DECLARED OUT HERE, not inside the no-rows branch. The commit-FAILURE path needs it too, and
+    // block-scoping it there is why a refused write reported the failure and silently dropped every
+    // skipped row the same import had already found.
+    // ⚠ "DAYS", not "rows" — `skipped` is keyed per DATE, after the file's rows have been
+    // aggregated, so a daypart-split day that produced 4 rows is ONE entry here. And the date is no
+    // longer part of this sentence; unreadable dates have their own list now.
+    const skipNote = skipped.length ? ' (' + skipped.length + ' day' + (skipped.length === 1 ? '' : 's')
+        + ' skipped, no usable sales figure)' : '';
     if (!allToAdd.length) {
       // ⚠ Say the TRUE reason (S105). Kept-by-hand and cleared days are real outcomes, not a broken
       // file — never blame the operator's own work. A dropped row is still surfaced. And if days
       // were CLEARED (deleted up in saveManualSales) but every typed day came through empty, report
       // the clear AND re-render — otherwise the delete is silent and the grid keeps showing them.
-      const skipNote = skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
-          + ' skipped, no usable date or sales figure)' : '';
       if (opts.cleared) {
         this._flash = opts.cleared + ' day' + (opts.cleared === 1 ? '' : 's') + ' cleared to zero'
-          + (kept ? ', ' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as entered' : '') + skipNote + zeroNote + covNote + coNote + '.';
+          + (kept ? ', ' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as entered' : '') + skipNote + undNote + zeroNote + covNote + coNote + sameNote + '.';
         this._openStep = 'cash'; this.render(this.container, this.actions); return;
       }
-      if (kept) note('No new figures written. ' + kept + ' day' + (kept === 1 ? ' was' : 's were')
-                     + ' kept as you entered ' + (kept === 1 ? 'it' : 'them') + ' by hand.' + skipNote + zeroNote + covNote + coNote);
-      // S189: nothing imported and the ONLY reason is $0 days — say that plainly instead of "check the
-      // Date column", and point to the sanctioned zeroing path (Enter Manually).
-      // ⚠ GUARDED, like its twin on line 533. A browser holding a CACHED older pos-ingest.js under a
-      // fresh sc-dashboard.js gets `undefined` here, and the TypeError fires BEFORE fail() runs — so
-      // the import dies in complete silence, which is the one outcome every message in this function
-      // exists to prevent. Cheap insurance on a project where a missed hard-refresh is a known event.
-      else if ((zeroSkipped || []).length && !skipped.length) fail((zeroSkipped.length === 1 ? 'That day' : 'Those days')
-                     + ' came in at $0, so nothing was imported. Use Enter Manually to record a zero day.');
-      else fail((opts.manual ? 'No days saved. Enter sales for at least one day.'
-                             : 'No days imported. Check that the file has a Date column and sales values.') + skipNote + zeroNote + covNote + coNote);
+      // ⚠ "ALREADY MATCHED" IS A SUCCESS, NOT A BROKEN FILE. Re-dropping the same export is the
+      // ordinary way to land here, and without this it fell through to the red "check that the file
+      // has a Date column" — blaming a file that was read perfectly and agreed with every figure.
+      if (kept || nSame) note('No new figures written.'
+                     + (kept ? ' ' + kept + ' day' + (kept === 1 ? ' was' : 's were')
+                               + ' kept as you entered ' + (kept === 1 ? 'it' : 'them') + ' by hand.' : '')
+                     + (nSame ? ' ' + nSame + ' day' + (nSame === 1 ? '' : 's') + ' already matched what is saved.' : '')
+                     + skipNote + undNote + zeroNote + covNote + coNote);
+      /* ⚠ AN ABSOLUTE HEADLINE MUST EXCLUDE EVERY OTHER BUCKET, INCLUDING THE $0 ONE. Each of these
+         branches used to check only the buckets it named, so a file carrying BOTH a readable $0 day
+         and unreadable ones printed an absolute claim and then contradicted it one clause later:
+         "No day in this file carried a sales figure Bar Cop could read. (3 days skipped) (1 day
+         came in at $0 and was skipped)" — the $0 day's figure was read; it read zero. Same shape
+         with dates: "could not read a date on any row" beside a $0 day that only exists because its
+         date parsed. A claim about ALL days needs every other bucket empty, and the mixed case gets
+         a plain headline that asserts nothing the notes then have to walk back.
+         ⚠ AND THE MANUAL GRID GOES FIRST. Two of these branches say "in this file"/"your export";
+         saveManualSales routes through here with no file at all (reachable: type 0.004 into Bar and
+         it rounds to zero cents), and only the old generic branch had the opts.manual guard.
+         ⚠ `zeroSkipped` GUARDED, like its twin above: a browser holding a CACHED older pos-ingest.js
+         under a fresh sc-dashboard.js gets `undefined`, and the TypeError fires BEFORE fail() runs —
+         so the import dies in complete silence, the one outcome every message here exists to prevent. */
+      else {
+        const nZero = (zeroSkipped || []).length;
+        const mergeNote = merged ? ' (' + merged + ' extra row' + (merged === 1 ? '' : 's') + ' combined into day totals)' : '';
+        const rest = skipNote + undNote + covNote + coNote + sameNote + mergeNote;
+        const tail = zeroNote + rest;
+        if (opts.manual) fail('No days saved. Enter sales for at least one day.' + tail);
+        /* S189: the ONLY reason is $0 days — say that plainly and point to the sanctioned zeroing path.
+           ⚠ THIS BRANCH GETS `rest`, NOT `tail`. Round 4 handed one shared tail to every headline, and
+           this is the one headline whose own note adds nothing: the operator read "That day came in at
+           $0, so nothing was imported. Use Enter Manually to record a zero day. (1 day came in at $0
+           and was skipped — use Enter Manually to record a zero day)". The instruction twice, the fact
+           twice, one line. The other headlines each GAIN a count from their note; this one already
+           carries it. */
+        else if (nZero && !skipped.length && !nUnd) fail((nZero === 1 ? 'That day' : 'Those ' + nZero + ' days')
+                     + ' came in at $0, so nothing was imported. Use Enter Manually to record a zero day.' + rest);
+        else if (nUnd && !skipped.length && !nZero) fail('No days imported. Bar Cop could not read a date on '
+                     + (nUnd === 1 ? 'a row' : 'any row') + ' — check the date column in your export.' + tail);
+        else if (skipped.length && !nUnd && !nZero) fail('No days imported. No day in this file carried a sales figure Bar Cop could read.' + tail);
+        else {
+          /* Mixed: assert nothing about ALL days, and name ONLY the columns that were actually a
+             problem. A flat "Check that the file has a Date column and sales values" sent the
+             operator at a sales column that read perfectly whenever the mix was undated rows plus a
+             genuine $0 day — `skipped` is empty there, so no day lacked a figure. */
+          // ⚠ EACH CLAUSE STANDS ALONE. "sales values it can read" borrowed its "it" from the Date
+          // clause, so the combination that prints ONLY the second one ($0 days plus unreadable
+          // figures, no undated rows) read "Check that the file has sales values it can read" with
+          // nothing for "it" to refer to. Same antecedent trap as "That day" in _partialNote.
+          const bits = [];
+          if (nUnd) bits.push('a readable Date column');
+          if (skipped.length) bits.push('readable sales values');
+          fail('No days imported.' + (bits.length ? ' Check that the file has ' + bits.join(' and ') + '.' : '')
+            // ⚠ BACKSTOP, NOT A LIVE PATH — and the earlier comment here wrongly called it reachable.
+            // CSVMapper cannot emit zero rows (the CSV parser pops trailing blank rows and then
+            // refuses anything under two rows; the XLSX path re-checks after filtering), and
+            // saveManualSales guards on rows.length. Kept as one clause of insurance so a future
+            // change upstream cannot produce a headline that is the entire message.
+            + (tail || ' Bar Cop found no rows to read in this file.'));
+        }
+      }
       return;
     }
+    /* ⚠ ONE OUTCOMES STRING, USED BY BOTH THE SUCCESS LINE AND THE FAILURE LINE. Say when rows were
+       combined, replaced, chosen over a hand entry, or kept — folding any of those into a money
+       figure silently is how the old drop-the-repeats bug stayed invisible (S105).
+       The failure line used to hand-list a SUBSET of these, so a refused write dropped `merged`,
+       `dupCount`, `usedTheirs` and `kept` — the operator staring at a red message was told nothing
+       about their hand-closed Monday, and nothing about whether the "use the file" choice they had
+       just made had taken effect (for the refused day it had not). The comment sitting above that
+       line already stated the invariant it was breaking: a refused write is when they read hardest,
+       so it must carry everything the success message would. The cash and server doors were already
+       built this way (`cashOutcomes`, `serverOutcomes`); sales was the last one hand-listing.
+       ⚠ KNOWN LIMIT, DOCUMENTED NOT FIXED. These clauses describe what the FILE held and what the
+       import set out to do; `_partialNote` in front of them says how much of it actually landed. So
+       on a refused write "(1 replaced earlier figures)" can name a day that did not make it. Making
+       each clause landed-aware means recomputing all four against the written set on every door, and
+       it buys nothing: the message LEADS with the landed count, the instruction ("run it again") is
+       correct and complete either way, and re-running reconciles everything. All three doors read
+       the same way on purpose — do not "fix" one of them alone. */
+    const salesOutcomes =
+        (merged ? ' (' + merged + ' extra row' + (merged === 1 ? '' : 's') + ' combined into day totals)' : '')
+      + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
+      + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand entry)' : '')
+      + (kept ? ' (' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as you entered ' + (kept === 1 ? 'it' : 'them') + ')' : '')
+      + skipNote + undNote + zeroNote + covNote + coNote + sameNote;
     const ok = await PosIngest.commit('sales', allToAdd);
     if (!ok) {
       // ⚠ THE CLEAR ALREADY HAPPENED. saveManualSales deletes the zeroed days BEFORE calling here,
       // so a refused save leaves those days genuinely gone while this line said only "Save failed" —
-      // which reads as "nothing happened" to someone whose Monday has just been removed. Same for a
-      // covers-only day that was dropped on the way in. Report both, then the failure.
-      fail('Save failed. Try the ' + (opts.manual ? 'save' : 'import') + ' again.'
+      // which reads as "nothing happened" to someone whose Monday has just been removed.
+      fail(this._partialNote(this._landed(allToAdd, App.shiftData && App.shiftData.sc_shifts),
+                             allToAdd.length, 'day', 'days')
         + (opts.cleared ? ' ' + opts.cleared + ' day' + (opts.cleared === 1 ? ' was' : 's were')
                           + ' already cleared to zero and stayed cleared.' : '')
-        + coNote);
+        + salesOutcomes);
       return;
     }
     if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
     this.setDone('import', true);   // a cockpit import is a deliberate "the week is in" action
-    // Say when rows were combined, replaced, chosen over a hand entry, or kept — folding any of
-    // those into a money figure silently is how the old drop-the-repeats bug stayed invisible.
     this._flash = allToAdd.length + ' day' + (allToAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
-      + (merged ? ' (' + merged + ' extra row' + (merged === 1 ? '' : 's') + ' combined into day totals)' : '')
-      + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
-      + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand entry)' : '')
-      + (kept ? ' (' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as you entered ' + (kept === 1 ? 'it' : 'them') + ')' : '')
-      // ⚠ A dropped row is a MEASUREMENT THAT WENT MISSING (S105): a junk date, or a day whose
-      // revenue came through zero or negative. Silence let the operator read "3 days imported" off
-      // a 5-day file and believe the week was in.
-      + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
-          + ' skipped, no usable date or sales figure)' : '')
-      + zeroNote + covNote + coNote
+      + salesOutcomes
       + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + '.';
     this._openStep = 'cash';
     this.render(this.container, this.actions);
@@ -760,23 +913,35 @@ S.ShiftDashboard = {
       return;
     }
 
-    let cleared = 0, broke = false;
+    /* ⚠ COUNT DAYS, NOT RECORDS. `cleared++` sat inside the per-RECORD loop, and a date can
+       legitimately hold more than one sc_shifts row — _commitSales deliberately leaves a superseded
+       row in place when its retirement delete is refused (S102). So clearing ONE such day reported
+       "2 days cleared to zero", and the failure message could say "2 of 2 were cleared" while
+       refusing. Every number the operator reads here is a DAY, so count days.
+       `attempted` counts only days that actually had something to remove — a zeroed day with no
+       saved record is not a failure, it is a no-op, and folding it into the denominator would
+       under-report success. */
+    let cleared = 0, attempted = 0, broke = false;
     for (const d of zeroDays) {
       // The operator is IN the grid explicitly zeroing this day, so clear whatever record held it,
       // WHATEVER its source (S140) — a hand entry is now source:'manual', imported:false, and the
       // old `imported === true` filter would leave their own prior figure standing and re-render it.
       // This IS the operator's own edit door, so clearing their prior figure for the day is the point.
       const stale = ((App.shiftData && App.shiftData.sc_shifts) || []).filter(s => s && s.date === d);
-      for (const s of stale) { if (await App.removeRecord('sc', 'shift', s.id)) cleared++; else broke = true; }
+      if (!stale.length) continue;
+      attempted++;
+      let dayOk = true;
+      for (const s of stale) { if (!(await App.removeRecord('sc', 'shift', s.id))) { dayOk = false; broke = true; } }
+      if (dayOk) cleared++;
     }
     // ⚠ SAY WHAT ALREADY LANDED. The days above are deleted one at a time, so a refusal partway
     // through leaves some ALREADY CLEARED — and "Could not clear a day. Try the save again." reads
     // as "nothing happened" over a week that has already lost a record.
     if (broke) {
       fail('Could not clear ' + (cleared
-            ? 'every day — ' + cleared + ' of ' + zeroDays.length + ' were cleared before the save was refused. Try the save again to finish.'
+            ? 'every day — ' + cleared + ' of ' + attempted + ' were cleared before the save was refused. Try the save again to finish.'
             // ...and say how many were being cleared, rather than "the day" over a batch of three.
-            : (zeroDays.length === 1 ? 'the day' : 'those ' + zeroDays.length + ' days') + '. Try the save again.') + coTail);
+            : (attempted === 1 ? 'the day' : 'those ' + attempted + ' days') + '. Try the save again.') + coTail);
       return;
     }
     if (rows.length) { await this.importSales(rows, { manual: true, cleared: cleared, coversOnly: coversOnlyLabels }); return; }
@@ -816,6 +981,21 @@ S.ShiftDashboard = {
     const { toAdd, skipped, incomplete, undated, dupCount } = PosIngest.build('server', rows);
     const res = document.getElementById('sc-ck-server-res');
     const inc = (incomplete || []).length, und = (undated || []).length;
+    /* Everything this import found besides the rows it wrote. Built ONCE and appended to every
+       outcome — the zero-row message, the failure message and the success flash — because a refused
+       write is exactly when the operator reads hardest, and the failure path used to replace all of
+       this with a bare "Save failed". The twin door renders its notes under a failed headline, so
+       the two were telling different stories about the same file.
+       ⚠ A ROW WITH NO NAME TO PRINT IS NOT "a name not matched". buildServer pushes '(blank)' for a
+       row whose Server cell is empty — a subtotal or section line, which CSVMapper keeps because not
+       every cell is empty — and calling that "1 name not matched" sends the operator hunting for a
+       roster spelling that does not exist. Counted separately, the way both revenue doors do it. */
+    const nameless = (skipped || []).filter(s => !s || s === '(blank)').length;
+    const named = skipped.length - nameless;
+    const serverOutcomes = (named ? ' (' + named + ' name' + (named === 1 ? '' : 's') + ' not matched)' : '')
+      + (nameless ? ' (' + nameless + ' row' + (nameless === 1 ? '' : 's') + ' had no server name)' : '')
+      + (inc ? ' (' + inc + ' row' + (inc === 1 ? '' : 's') + ' rang no covers or sales)' : '')
+      + (und ? ' (' + und + ' row' + (und === 1 ? '' : 's') + ' had no readable date)' : '');
     if (!toAdd.length) {
       /* ⚠ THE BREAKDOWN WAS ONLY REACHABLE WHEN SOMETHING IMPORTED. `undated` and `incomplete` were
          rendered on the success flash alone, so the case where they matter MOST — nothing came in at
@@ -824,14 +1004,27 @@ S.ShiftDashboard = {
          and never mentioned the date; a file where everyone rang zero sent them to the Staff Roster
          to add people already on it. _commitCash already reports its skips on this path, so this was
          an asymmetry rather than a decision. */
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (dupCount ? 'No new server rows imported. ' + dupCount + ' already logged.'
+      /* ⚠ A HEADLINE PER COMBINATION, not per single bucket. Each branch below used to demand that
+         the OTHER two lists be empty, so a file with some undated rows AND some that rang nothing
+         fell straight through to "Each row needs a server name Bar Cop can match" — with the notes
+         under it naming only dates and covers, and no unmatched-name note at all. And "All N rows
+         were already logged" was claimed whenever dupCount was non-zero, even with rows dropped for
+         other reasons alongside it. Only ever say "All" when nothing else was dropped. */
+      const otherDrops = skipped.length + inc + und;
+      // ⚠ RED IS FOR A PROBLEM. Re-dropping the same report is a NORMAL thing to do and nothing is
+      // wrong with the file, but this block was hard-coded red, so "All 12 rows were already logged"
+      // read as a failure. The twin door (r-server-check) renders the identical outcome neutral and
+      // _doImportSales treats its equivalent as a success. Only colour it red when something is
+      // actually wrong. (Round 2 rewrote this very expression and left the colour behind it.)
+      const benign = dupCount && !otherDrops;
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--' + (benign ? 't2' : 'red') + ');margin-top:12px;">'
+        + (benign ? 'No new server rows imported. All ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
+         : dupCount ? 'No new server rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged; the rest could not be used.'
          : (und && !skipped.length && !inc) ? 'No server rows imported. Bar Cop could not read a date on any row — check the date column in your export.'
          : (inc && !skipped.length && !und) ? 'No server rows imported. Every name matched your roster, but no row had both covers and sales.'
+         : (!skipped.length && (und || inc)) ? 'No server rows imported. Every name matched your roster — see below for what stopped each row.'
          : 'No server rows imported. Each row needs a server name Bar Cop can match, a date, covers, and sales.')
-        + (skipped.length ? ' (' + skipped.length + ' name' + (skipped.length === 1 ? '' : 's') + ' not matched)' : '')
-        + (inc ? ' (' + inc + ' row' + (inc === 1 ? '' : 's') + ' rang no covers or sales)' : '')
-        + (und ? ' (' + und + ' row' + (und === 1 ? '' : 's') + ' had no readable date)' : '')
+        + serverOutcomes
         + '</div>';
       return;
     }
@@ -847,22 +1040,16 @@ S.ShiftDashboard = {
          straight back out — so what is STILL IN MEMORY is exactly what landed. Re-running the import
          is safe either way: buildServer dedupes on staff + date + covers + sales, so the rows that
          did save come back as "already logged" rather than doubling. */
-      const live = new Set((((App.data && App.data.revenue_server_checks) || []).map(x => x && x.id)));
-      const landed = toAdd.filter(r => live.has(r.id)).length;
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (landed ? landed + ' of ' + toAdd.length + ' server checks were saved before the save was refused. '
-                    + 'Run the import again to finish it — the ones already saved will come back as "already logged".'
-                  : 'Save failed. Nothing was imported. Try the import again.')
+        + this._partialNote(this._landed(toAdd, App.data && App.data.revenue_server_checks),
+                            toAdd.length, 'server check', 'server checks')
+        + serverOutcomes   // the failure does not cancel what else the import found
         + '</div>';
       return;
     }
     this._flash = toAdd.length + ' server check' + (toAdd.length === 1 ? '' : 's') + ' imported'
       + (dupCount ? ' (' + dupCount + ' already logged)' : '')
-      + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped, names not matched)' : '')
-      + (inc ? ' (' + inc + ' row' + (inc === 1 ? '' : 's') + ' skipped, no covers or sales rung)' : '')
-      // A row whose date Bar Cop cannot read is skipped now rather than written with a blank
-      // date, so it has to be named — it is the one skip an operator can actually fix in the file.
-      + (und ? ' (' + und + ' row' + (und === 1 ? '' : 's') + ' skipped, no readable date)' : '') + '.';
+      + serverOutcomes + '.';
     if (this._optOpen) this._optOpen.server = false;   // collapse back to the link
     this._openStep = 'import';
     this.render(this.container, this.actions);
@@ -898,7 +1085,9 @@ S.ShiftDashboard = {
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No items updated.'
         + (!nSkip && nInc && !nNeg ? ' The item names matched, but Bar Cop could not read a units-sold figure for any of them.'
          : !nSkip && nNeg && !nInc ? ' Every item came out at negative units after returns, so the previous figures were left alone.'
-         : !nSkip && (nInc || nNeg) ? ' The item names matched, but no row carried a usable units figure.'
+         // ⚠ NOT "no row carried a usable units figure" — a net-negative item DID carry one; it went
+         // negative after returns. That sentence denied what the note printed under it stated.
+         : !nSkip && (nInc || nNeg) ? ' The item names matched — see below for what happened to each row.'
          : ' Each row needs an item name Bar Cop can match on your menu and a units-sold number.')
         + (nSkip ? ' (' + nSkip + ' name' + (nSkip === 1 ? '' : 's') + ' not matched)' : '')
         + (nInc ? ' (' + nInc + ' row' + (nInc === 1 ? '' : 's') + ' had no readable units figure)' : '')
@@ -1172,16 +1361,24 @@ S.ShiftDashboard = {
     // was never the problem. It is also the one skip they can actually fix in the file.
     const und = (undated || []).length;
     const undatedNote = und ? ' (' + und + ' row' + (und === 1 ? '' : 's') + ' skipped, no readable date)' : '';
+    // Declared out here so the commit-FAILURE path can carry it too — see the sales door's note.
+    const skipNote = skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
+        + ' skipped, no over/short figure)' : '';
+    // Everything this import found besides the write itself. A refused save must not swallow it.
+    const cashOutcomes = (kept ? ' (' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept)' : '')
+        + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand count)' : '')
+        + extraNote + totalsNote + skipNote + undatedNote;
     if (!allToAdd.length) {
-      const skipNote = skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
-          + ' skipped, no over/short figure)' : '';
       if (kept || extraDropped || totalsLines) note('No new figures written.'
           + (kept ? ' ' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept.' : '') + extraNote + totalsNote + skipNote + undatedNote);
       else fail('No rows imported. Each row needs a date plus an over/short, or expected and counted cash.' + skipNote + undatedNote);
       return;
     }
     const ok = await PosIngest.commit('cash', allToAdd);
-    if (!ok) { fail('Save failed. Try the import again.'); return; }
+    // Same partial-save honesty as the sales and server doors — _commitCashRows writes per row too,
+    // and the failure carries every other outcome the import found rather than replacing them.
+    if (!ok) { fail(this._partialNote(this._landed(allToAdd, App.shiftData && App.shiftData.sc_variances),
+                                      allToAdd.length, 'reconcile', 'reconciles') + cashOutcomes); return; }
     this._pendingCashRows = null;
     this._flash = allToAdd.length + ' reconcile' + (allToAdd.length === 1 ? '' : 's') + ' imported'
       + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
