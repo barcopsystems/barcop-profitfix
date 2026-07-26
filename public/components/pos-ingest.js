@@ -282,7 +282,20 @@ const PosIngest = {
       const t = new Date(y, mo - 1, d);
       return (t.getFullYear() === y && t.getMonth() === mo - 1 && t.getDate() === d) ? this._ymd(y, mo, d) : '';
     };
-    const yr4 = y => (y < 100 ? y + 2000 : y);
+    /* ⚠ A TWO-DIGIT YEAR PIVOTS AT 50. It used to be a flat `y + 2000`, which put every two-digit
+       year in the 2000s — so at the REGULARS door, where `{minYear:1900}` exists precisely because
+       birthdays predate the business, a guest born `06/15/65` was stored as **2065-06-15**: a
+       birthday 39 years in the FUTURE, rendered straight into the edit form's <input type="date">.
+       The option that door passes to say "my dates are old" could not do anything, because nothing
+       downstream of `yr4` ever consulted it.
+       50-99 -> 1900s, 00-49 -> 2000s is the universal convention (POSIX, Excel, Java) and it is a
+       strict improvement at the business doors too: `7/20/98` used to bank as **2098**, 72 years in
+       the future and inside the 2100 ceiling, so nothing caught it. It now reads 1998 — and a
+       genuinely absurd one like `7/20/50` resolves to 1950 and is then REFUSED by the default
+       minYear of 1990 and reported, instead of silently banking a 2050 expense.
+       ⚠ Verified against the suite: the only two-digit years anywhere in the harnesses are `26` and
+       `01`, both below the pivot, so every pinned shape is byte-identical. */
+    const yr4 = y => (y >= 100 ? y : (y <= 49 ? y + 2000 : y + 1900));
     /* ⚠⚠ THE TAIL IS CAPTURED AND VALIDATED, NOT WAVED THROUGH. Two failures, opposite directions:
        · TOO STRICT — it only allowed a tail starting with `T` or whitespace, so a COMMA refused the
          whole file. A comma is what JavaScript itself emits: `toLocaleString('en-US')` produces
@@ -308,13 +321,25 @@ const PosIngest = {
       return false;
     };
 
+    /* ⚠ THE `i` FLAG BELONGS ON ALL FOUR BRANCHES, and it was on only two. Branches 3 and 4 carried
+       it (they must — they match month WORDS), branches 1 and 2 did not, so `TAIL`'s `[T\s,]` was
+       uppercase-only here. Result: `2026-07-20t18:00:00` was refused while `20 Jul 2026t18:00`
+       parsed — the same date, the same lowercase `t`, two different answers, purely from an
+       inconsistent flag. RFC 3339 explicitly permits the lowercase `t` and some SQL/API exporters
+       emit it, and a refused date drops the row out of every total. The branches are all-digit
+       patterns, so the flag changes nothing else about what they match.
+       ⚠ A TRAILING PERIOD ("2026-07-20.") IS STILL REFUSED, DELIBERATELY. Allowing it means widening
+       the tail character class, and the tail is the one part of this function that has already
+       failed in BOTH directions — too strict refused a whole file over a comma, too loose read a
+       week-range cell as its first date and wrote the week DOUBLE. No POS has been named that emits
+       it. Not worth reopening a twice-burned surface for a shape nobody can point at. */
     // 1. ISO-ish YYYY-MM-DD (or with slashes), optionally followed by a time.
-    let m = s.match(new RegExp('^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})' + TAIL));
+    let m = s.match(new RegExp('^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})' + TAIL, 'i'));
     if (m) return tailOk(m[4]) ? ok(+m[1], +m[2], +m[3]) : '';
 
     /* 2. All-numeric M/D/Y — US order, with the day-first swap when the first field cannot be a
        month. Slash and dash ONLY; see the dot note above. */
-    m = s.match(new RegExp('^(\\d{1,2})[-/](\\d{1,2})[-/](\\d{2,4})' + TAIL));
+    m = s.match(new RegExp('^(\\d{1,2})[-/](\\d{1,2})[-/](\\d{2,4})' + TAIL, 'i'));
     if (m) {
       if (!tailOk(m[4])) return '';
       const a = +m[1], b = +m[2], y = yr4(+m[3]);
