@@ -50,18 +50,34 @@ S.SalesIntegrity = {
   FIELDS: [
     { key: 'server',       label: 'Server / Employee', required: true,  match: ['server name', 'server', 'employee name', 'employee', 'team member name', 'team member', 'staff name', 'staff', 'bartender', 'cashier', 'waiter', 'sales rep', 'attendant', 'name'] },
     { key: 'date',         label: 'Date',              required: false, match: ['business date', 'service date', 'transaction date', 'trans date', 'sales date', 'shift date', 'business day', 'date of business', 'date of sale', 'date', 'day'] },
-    { key: 'cash_sales',   label: 'Cash Sales',        required: false, match: ['cash sales', 'cash payments', 'cash tenders', 'cash collected', 'cash total', 'cash revenue', 'cash'] },
-    { key: 'card_sales',   label: 'Card Sales',        required: false, match: ['card sales', 'credit sales', 'card payments', 'credit card sales', 'charge sales', 'card total', 'non-cash sales', 'non cash sales', 'credit card', 'card', 'credit', 'charge'] },
+    /* ⚠⚠ EVERY TENDER SPELLING IS ENUMERATED, because the bare words cannot hunt. `cash`, `card`,
+       `credit`, `charge` and `credit card` are EXACT_ONLY in the shared mapper (they were reading
+       TIP columns as the sales split, which printed an honest bartender as Cash Skimming). That is
+       the right call, but it means every real header has to be named here or it binds NOTHING and
+       the cash-mix signal goes dark in silence — `bothSides` needs both halves, so losing either
+       one kills the whole signal. Measured losses that this list exists to prevent: NCR Silver
+       "Cash Tendered"/"Credit Tendered", Positouch "Cash Tender"/"Credit Tender", Shift4 "Cash
+       Amount"/"Credit Amount", Restaurant Manager "Cash Received"/"Credit Received", Focus POS
+       "Credit Payments". On a Positouch file a 90%-cash server went from flagged to CLEAN. */
+    { key: 'cash_sales',   label: 'Cash Sales',        required: false, match: ['cash sales', 'cash payments', 'cash payment', 'cash tendered', 'cash tenders', 'cash tender', 'cash received', 'cash amount', 'cash collected', 'cash total', 'cash revenue', 'cash $', 'cash'] },
+    { key: 'card_sales',   label: 'Card Sales',        required: false, match: ['card sales', 'credit sales', 'card payments', 'card payment', 'credit payments', 'credit payment', 'credit card sales', 'credit card amount', 'credit card tendered', 'credit card tender', 'credit tendered', 'credit tenders', 'credit tender', 'card tendered', 'card tender', 'credit received', 'card received', 'credit amount', 'card amount', 'charge sales', 'charge amount', 'charge total', 'card total', 'non-cash sales', 'non cash sales', 'credit/debit', 'credit card', 'card $', 'card', 'credit', 'charge'] },
     { key: 'void_count',   label: 'Void Count',        required: false, match: ['void count', 'voids count', '# voids', 'number of voids', 'voided checks', 'checks voided', 'void qty'] },
     { key: 'voids',        label: 'Void $',            required: false, match: ['void amount', 'void total', 'void $', 'voided amount', 'voided total', 'void sales', 'voids', 'void'] },
     { key: 'comp_count',   label: 'Comp Count',        required: false, match: ['comp count', 'comps count', '# comps', 'number of comps', 'discount count', 'discounts count', '# discounts', 'promo count'] },
     { key: 'comps',        label: 'Comp / Discount $', required: false, match: ['comp amount', 'comp total', 'comp $', 'discount amount', 'discount total', 'discounts & comps', 'discounts and comps', 'promo amount', 'comps', 'discounts', 'comp', 'discount', 'promo'] },
     { key: 'refund_count', label: 'Refund Count',      required: false, match: ['refund count', 'refunds count', '# refunds', 'number of refunds', 'return count', 'returns count'] },
     { key: 'refunds',      label: 'Refund $',          required: false, match: ['refund amount', 'refund total', 'refund $', 'return amount', 'return total', 'refunds', 'returns', 'refund'] },
-    { key: 'no_sales',     label: 'No-Sale Opens',     required: false, match: ['no sale count', 'no sales count', '# no sales', 'number of no sales', 'no-sale count', 'drawer opens', 'no sale', 'no-sale', 'no sales', 'nosale'] },
+    // ⚠ `no sale opens` unhyphenated is THIS DOOR'S OWN LABEL minus one character, and `no sale`
+    // is EXACT_ONLY, so without it the app's own export shape bound nothing and a weight-3 strong
+    // signal vanished silently. Same failure shape as the `Pay ($/hr)` case.
+    { key: 'no_sales',     label: 'No-Sale Opens',     required: false, match: ['no sale count', 'no sales count', '# no sales', 'number of no sales', 'no-sale count', 'no sale opens', 'no-sale opens', 'no sales opens', 'drawer opens', 'no sale', 'no-sale', 'no sales', 'nosale'] },
     { key: 'checks',       label: 'Checks',            required: false, match: ['check count', 'closed checks', 'guest checks', '# of checks', 'chks', 'checks', 'ticket count', 'tickets', 'order count', 'number of orders', 'orders', 'transaction count', 'transactions', 'tabs'] },
     { key: 'hours',        label: 'Labor Hours',       required: false, match: ['total hours', 'labor hours', 'hours worked', 'total hrs', 'hrs worked', 'paid hours', 'net hours', 'hours', 'hrs', 'worked'] },
-    { key: 'net_sales',    label: 'Net Sales',         required: false, match: ['net sales', 'net total', 'net revenue', 'sales total', 'total sales', 'server sales', 'rung sales', 'gross sales', 'revenue', 'net', 'sales', 'total', 'amount'] }
+    // ⚠ `sales amount` / `sales $` / `sales value` are explicit for the same reason: bare `sales` is
+    // EXACT_ONLY, so a Restaurant Manager cashout headed "Sales Amount" bound NOTHING — and with
+    // `a.sales` at 0, `realSales` is false and void %, comp %, average check, refund % and sales
+    // per hour ALL go null at once. One missing candidate takes out five signals.
+    { key: 'net_sales',    label: 'Net Sales',         required: false, match: ['net sales', 'net sales amount', 'net total', 'net revenue', 'sales total', 'total sales', 'sales amount', 'sales value', 'sales $', 'server sales', 'rung sales', 'gross sales', 'revenue', 'net', 'sales', 'total', 'amount'] }
   ],
 
   // Signal config. dir: how an outlier reads (high = more is worse, low = less is
@@ -75,7 +91,11 @@ S.SalesIntegrity = {
     { key: 'comp_pct',    label: 'Comps and discounts',      cat: 'pricing',  dir: 'high', weight: 2, dollar: 'comps' },
     { key: 'cash_ratio',  label: 'Cash mix',                 cat: 'cash',     dir: 'both', weight: 2 },
     { key: 'refund_pct',  label: 'Refunds',                  cat: 'cash',     dir: 'high', weight: 2, dollar: 'refunds' },
-    { key: 'sales_per_hr',label: 'Sales per labor hour',     cat: 'register', dir: 'low',  weight: 1, soft: true },
+    /* `twin` names the signal this one is a SECOND READING OF, not a weaker version of. Sales per
+       labour hour and average check are both sales over a divisor, so when BOTH fire they are one
+       fact counted twice and must not satisfy the two-signal rule between them. Against any OTHER
+       signal it is an independent reading and counts normally. */
+    { key: 'sales_per_hr',label: 'Sales per labor hour',     cat: 'register', dir: 'low',  weight: 1, soft: true, twin: 'avg_check' },
     { key: 'drawer_short',label: 'Drawer shorts',            cat: 'cash',     dir: 'high', weight: 3, strong: true, dollar: 'short', capture: true },
     { key: 'walkouts',    label: 'Walkouts',                 cat: 'cash',     dir: 'high', weight: 2, dollar: 'walkout', capture: true }
   ],
@@ -131,12 +151,23 @@ S.SalesIntegrity = {
        as two live signals and suppressed this caveat — on a Server + Date + Net Sales file where
        nobody could possibly have been flagged, the screen and the PDF printed the green all-clear.
        Count the EVENTS, which is why the review persists them. */
+    /* ⚠⚠ AND A SOFT SIGNAL IS NOT ONE OF THE TWO EITHER. `analyze` names a server only on two
+       NON-SOFT flags, so counting `sales_per_hr` here left this caveat one branch short of the rule
+       it exists to enforce — a Server + Net Sales + Checks + Hours file has two live metrics and
+       only ONE that can ever be half of a pattern. Measured: a blatant under-ringer at a $20 average
+       check against a $42.50 floor produced live.size === 2, no caveat, and the screen and the PDF
+       both printed the green all-clear. This is the SECOND CONSUMER of the severity change, missed
+       when that change was made — step 0.6, exactly. The soft list is read from SIGNALS so the two
+       can never drift apart again. */
+    const SOFT = {};
+    this.SIGNALS.forEach(sig => { if (sig.soft) SOFT[sig.key] = 1; });
     const CAPTURE = { drawer_short: 'shortCount', walkouts: 'walkCount' };
     const live = new Set();
     ((review && review.servers) || []).forEach(s => {
       const m = (s && s.metrics) || {};
       Object.keys(m).forEach(k => {
         if (m[k] == null) return;
+        if (SOFT[k]) return;
         if (CAPTURE[k] && !((s[CAPTURE[k]] || 0) >= this.MIN_EVENTS)) return;
         live.add(k);
       });
@@ -147,11 +178,13 @@ S.SalesIntegrity = {
         title: 'Not enough columns in this file to reach a verdict.',
         detail: 'Bar Cop only names a server when at least two separate signals line up, and this file carried '
           + (live.size === 1 ? 'only one signal Bar Cop can read' : 'no signals Bar Cop can read')
-          // ⚠ The remediation list must name EVERY column that unlocks a signal, or it sends the
-          // operator back for a second export that still cannot reach a verdict. It was missing
-          // checks (average check), hours (sales per labour hour) and date (both capture signals).
-          + '. Map more columns — voids, comps, no-sale opens, refunds, the cash and card split, checks, labour hours, '
-          + 'and the date — and re-run it. '
+          /* ⚠ THE REMEDIATION MAY ONLY NAME COLUMNS THIS FILE DOES NOT ALREADY HAVE. It listed the
+             full set, so a file that HAD mapped Checks was told to "map more columns — ... checks
+             ...", which reads as though Bar Cop did not see the column that is sitting right there.
+             ⚠ And the names are the mapper's OWN FIELD LABELS: it said "labour hours", which is a
+             spelling the mapping screen never shows (the label is "Labor Hours"), so the operator
+             hunts for a column that does not exist by that name. */
+          + '. ' + this._missingColumnsSentence(review)
           + 'That is not an all-clear, it just means there was not enough here to judge anyone on.'
       };
     }
@@ -164,17 +197,41 @@ S.SalesIntegrity = {
        takes at least two, and at least half as many as were actually scored. */
     const scoredN = (review && review.summary && review.summary.reviewed) || 0;
     const setAside = ((review && review.skipped) || []).length;
-    if (setAside >= 2 && setAside * 2 >= scoredN) {
+    /* ⚠ THE THRESHOLD FIRED ON THE CANONICAL SMALL-BAR FILE. `setAside * 2 >= scoredN` triggers at
+       one third, so four servers plus a barback and a host — everyone clean — got
+       "Too much of this file could not be scored to call it a verdict" instead of the all-clear.
+       That is verbatim the case the note above says must not trigger it. It now takes at least as
+       many set aside as were actually scored. */
+    if (setAside >= 2 && setAside >= scoredN) {
       return {
         reason: 'skipped',
         title: 'Too much of this file could not be scored to call it a verdict.',
         detail: setAside + ' of the ' + (setAside + scoredN) + ' people in this report did not have enough '
           + 'checks or volume to be benchmarked fairly, so only ' + scoredN + ' were actually compared. '
           + 'Anyone set aside was not cleared, just not measured. Pull a report that covers more of '
-          + 'their shifts, or map a Checks column, and run it again.'
+          + 'their shifts'
+          // ⚠ Only offer the Checks column when the file genuinely lacks it. This fixture HAD it
+          // mapped — the servers were set aside for having one check each, not a missing column.
+          + (((review && review.columns) || []).indexOf('checks') >= 0 ? '' : ', or map a Checks column')
+          + ', and run it again.'
       };
     }
     return null;
+  },
+
+  /* Names only the signal columns this file did not carry, using the mapper's own field labels so
+     the operator is looking for the same words the mapping screen shows them. */
+  _missingColumnsSentence(review) {
+    const have = {};
+    ((review && review.columns) || []).forEach(c => { have[c] = 1; });
+    const WANT = ['voids', 'comps', 'no_sales', 'refunds', 'cash_sales', 'card_sales', 'checks', 'hours', 'date'];
+    const byKey = {};
+    this.FIELDS.forEach(f => { byKey[f.key] = f.label; });
+    const missing = WANT.filter(k => !have[k]).map(k => byKey[k] || k);
+    if (!missing.length) return 'Every column Bar Cop can read is already mapped here, so this file simply does not carry enough separate signals to judge anyone on. ';
+    const list = missing.length === 1 ? missing[0]
+      : missing.slice(0, -1).join(', ') + ' and ' + missing[missing.length - 1];
+    return 'Map ' + (missing.length === 1 ? 'the ' + list + ' column' : 'more columns — ' + list) + ' — and re-run it. ';
   },
   MIN_EVENTS: 2,   // captured shorts/walkouts below this are the cost of doing business
 
@@ -218,8 +275,15 @@ S.SalesIntegrity = {
      than that: stripping initials or middle names would MERGE two real people, which on this
      screen means putting one server's numbers on another one's name. */
   _nameKey(s) {
+    /* \u26a0 TRIM BEFORE STRIPPING THE PUNCTUATION, not after. Stripping first meant the strip missed
+       whenever anything followed the period: "Brianna K." collapsed to "brianna k" while
+       "Brianna K. " (a roster name with a trailing space) stayed "brianna k." \u2014 and three of the
+       four consumers are handed RAW STORED strings, so the roster link and BOTH capture signals
+       went dark on the very pair this key builder exists to join. The zero-width characters go in
+       the collapse class for the same reason: `trim()` does not reach them. */
     return String(s == null ? '' : s).toLowerCase()
-      .replace(/[\s\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/g, ' ')
+      .replace(/[\s\u00a0\u1680\u200b\u2000-\u200a\u202f\u205f\u3000\ufeff]+/g, ' ')
+      .trim()
       .replace(/[.,;:]+$/, '')
       .trim();
   },
@@ -301,9 +365,25 @@ S.SalesIntegrity = {
       // file-wide and cannot answer that, and the difference is a real defect twice over — see
       // cash_ratio (a blank Card cell read as "100% cash") and qualifies (one blank Checks cell
       // dropped a server out of scoring entirely).
-      if (!agg[key]) agg[key] = { name, sales: 0, checks: 0, cash: 0, card: 0, voids: 0, void_count: 0, comp_count: 0, refund_count: 0, comps: 0, no_sales: 0, refunds: 0, hours: 0, rows: 0, has: {}, days: new Set() };
+      if (!agg[key]) agg[key] = { name, sales: 0, checks: 0, cash: 0, card: 0, voids: 0, void_count: 0, comp_count: 0, refund_count: 0, comps: 0, no_sales: 0, refunds: 0, hours: 0, rows: 0, noDate: 0, has: {}, days: new Set() };
       const a = agg[key];
       a.rows++;
+      /* ⚠ AN UNDATED ROW STILL COUNTS AS A SHIFT WORKED. Keeping the row (so a skimmer cannot vanish
+         from the report) put its opens in the NUMERATOR while `a.days` gave it no divisor — so a
+         server with three dated rows and one unreadable date had 40 opens over "3 shifts" and a rate
+         inflated by 33%, on the very flag that made them High Risk. That is precisely what the
+         comment above says this door refuses to do. The row's date is unknown; the fact that they
+         worked is not. */
+      /* ⚠ A BLANK CELL COUNTS TOO, AND THE FIRST VERSION OF THIS ONLY COUNTED AN UNREADABLE ONE.
+         A grouped Date column — written once per server block, which is what every spreadsheet
+         export produces — leaves the rest of the block BLANK, so those rows added their opens and
+         shorts to the numerator and nothing to the divisor. Measured: six servers with identical
+         facts, one of whom had 4 blank date cells, and she alone came out **High Risk, $49.00
+         exposure** at "10 no-sale opens in one shift" against the others' 2.00. Her inflated rate
+         then dragged the team mean up and raised the bar for a real skimmer.
+         ⚠ `undated` (the REPORTED counter) deliberately stays on `cell && !d` — a blank cell is not
+         something to tell the operator about, it is just a row with no date. */
+      if (!d) a.noDate++;
       // ⚠ MAGNITUDE FOR THE LOSS COLUMNS. A void, comp or refund is an AMOUNT OF LOSS, and a POS
       // export writes it either way round — "600" or "(600)", the latter being what any of these
       // files becomes the moment it is opened and re-saved in Excel. Summing the signed value made
@@ -385,7 +465,18 @@ S.SalesIntegrity = {
          honest fallback. ⚠ And it cannot disturb a file with no date column at all: there every
          server falls back the same way, and every signal here is a RATIO against the team average,
          so a uniform change of divisor cancels out of the comparison entirely. */
-      const shifts = a.days.size || a.rows || 1;
+      /* ⚠ AND THE ROW-COUNT FALLBACK ONLY APPLIES WHEN THE FILE HAS DATES AT ALL. `|| a.rows` made a
+         TICKET a shift on a per-transaction export with no Date column, and row counts differ per
+         server — so the divisor stopped being uniform and **the server with the FEWEST no-sale opens
+         was the one flagged**: 3 opens over 8 tickets read as 0.4 "per shift" and went High Risk,
+         while a colleague with 6 opens over 60 tickets read 0.10 and clean.
+         With no date column anywhere, nobody's shift count is knowable, so everyone divides by ONE
+         report period — uniform, which cancels out of every ratio, exactly as it did before. */
+      const shifts = a.days.size ? (a.days.size + a.noDate) : (dateList.length ? (a.rows || 1) : 1);
+      /* Whether this server's shift count came from REAL DATES or was inferred from row count.
+         `_flagDetail` needs it: with no date column a weekly rollup is one row per server, and
+         calling that "in one shift" printed a WEEK's 140 no-sale opens as one night's. */
+      const datedSpan = a.days.size > 0;
       const shortCount = capShorts[key] ? capShorts[key].count : 0;
       const walkCount  = capWalk[key] ? capWalk[key].count : 0;
       /* ⚠ THE CASH MIX IS REFUSED UNLESS THIS SERVER SUPPLIED BOTH SIDES OF IT. `present` is
@@ -399,7 +490,7 @@ S.SalesIntegrity = {
          rather than accuse someone with it. */
       const bothSides = a.has.cash_sales && a.has.card_sales;
       const cashTotal = bothSides ? (a.cash + a.card) : null;
-      const cashOnly  = (!bothSides && a.has.cash_sales && a.sales > 0 && a.cash <= a.sales) ? a.cash / a.sales : null;
+      const cashOnly  = (!bothSides && a.has.cash_sales && a.sales > 0 && a.cash >= 0 && a.cash <= a.sales) ? a.cash / a.sales : null;
       // ⚠ A NEGATIVE OR ZERO SALES TOTAL IS NOT A BENCHMARK. A "House"/comp pseudo-server carrying a
       // credit made `avg_check` print **"$-45.00 average check"** and dragged the team floor down
       // far enough that a genuine under-ringer stopped flagging at all.
@@ -409,7 +500,16 @@ S.SalesIntegrity = {
         void_pct:    (present.voids && realSales) ? a.voids / a.sales : null,
         avg_check:   (present.checks && a.checks > 0 && realSales) ? a.sales / a.checks : null,
         comp_pct:    (present.comps && realSales) ? a.comps / a.sales : null,
-        cash_ratio:  (cashTotal && cashTotal > 0) ? Math.min(1, a.cash / cashTotal) : cashOnly,
+        /* ⚠ THE GUARD WAS ONE-SIDED AND THE TWO BRANCHES DISAGREED. `Math.min(1, …)` capped the top
+           and nothing capped the bottom, so a Cash column net of paid-outs printed
+           **"Cash mix: -8.6% cash, runs low"** on a High Risk card and in the PDF. Worse, clamping
+           an impossible 120% to exactly 1.0 printed "100% cash, runs high" — the maximum possible
+           accusation value — while the cash-only branch REFUSED the identical impossibility. Two
+           opposite policies for one condition. A share outside 0-100% means the column is not what
+           Bar Cop thinks it is, so it is refused rather than accused with. */
+        cash_ratio:  (cashTotal && cashTotal > 0)
+          ? ((a.cash / cashTotal >= 0 && a.cash / cashTotal <= 1) ? a.cash / cashTotal : null)
+          : cashOnly,
         refund_pct:  (present.refunds && realSales) ? a.refunds / a.sales : null,
         // ⚠ `hours >= 1`: a 0.25-hour clock artefact (a manager ring, a rounding stub) gave a
         // $9,600/hr rate and pushed the printed TEAM AVERAGE to $2,587.50 an hour in a bar doing
@@ -422,7 +522,7 @@ S.SalesIntegrity = {
         walkouts:     hasCapture ? walkCount / shifts : null
       };
       const staff = byName[key];
-      return { name: a.name, staff_id: staff ? staff.id : '', raw: a, shifts, shortCount, walkCount,
+      return { name: a.name, staff_id: staff ? staff.id : '', raw: a, shifts, datedSpan, shortCount, walkCount,
         shortAmt: capShorts[key] ? capShorts[key].amount : 0, walkAmt: capWalk[key] ? capWalk[key].amount : 0,
         m, qualifies: false };
     });
@@ -501,7 +601,7 @@ S.SalesIntegrity = {
         }
         if (!tripped) return;
         s.flags.push({
-          key: sig.key, label: sig.label, cat: sig.cat, weight: sig.weight, strong: !!sig.strong, soft: !!sig.soft,
+          key: sig.key, label: sig.label, cat: sig.cat, weight: sig.weight, strong: !!sig.strong, soft: !!sig.soft, twin: sig.twin || '',
           value: v, team: avg, dir: sig.dir,
           detail: this._flagDetail(sig, v, avg, s),
           exposure: this._exposure(sig, v, avg, s)
@@ -526,7 +626,17 @@ S.SalesIntegrity = {
          `soft` already marks the weaker reading; it now means what it says. A soft signal still
          shows on the card and still adds weight once a real pattern exists, it just cannot be one
          of the two independent tells that CREATE one. */
-      const hardN = s.flags.filter(f => !f.soft).length;
+      /* ⚠⚠ AND THE FIRST VERSION OF THIS WAS TOO BROAD, WHICH BLINDED THE SCREEN. Excluding every
+         `soft` flag stopped `sales_per_hr` pairing with ANY signal, not just its twin — so the
+         classic void skim (12.9% of sales voided against a 3.7% floor, plus a low sales-per-hour)
+         came out CLEAN, composite 5, and the screen and the PDF printed "No servers flagged among
+         the 5 scored" while $192.74 of void exposure was computed and never shown.
+         Voids and sales-per-hour are NOT two readings of one quantity. The exclusion is pair-wise
+         now: a flag stops counting as independent only when the signal it is a second reading of
+         (`twin`) is ALSO flagged. Everything else counts. */
+      const keys = {};
+      s.flags.forEach(f => { keys[f.key] = 1; });
+      const hardN = s.flags.filter(f => !(f.twin && keys[f.twin])).length;
       s.severity = hardN < 2 ? 'clean'
         : ((comp >= 5 || strongN >= 2) ? 'high' : 'watch');
     });
@@ -597,7 +707,13 @@ S.SalesIntegrity = {
        "9 no-sale opens vs 3 per shift team average" — a raw count beside a rate, which a reader
        spreads across the whole window and reads as BELOW the floor when it is three times it. On a
        theft screen the softer misreading is the dangerous one. */
-    const span = s.shifts > 1 ? ' over ' + s.shifts + ' shifts (' + this._fmtVal(sig, v) + ')' : ' in one shift';
+    /* ⚠ AND "in one shift" IS A CLAIM ABOUT THE FILE, NOT JUST THE COUNT. A weekly per-server rollup
+       is ONE ROW per server with no Date column, so `shifts === 1` — and printing "140 no-sale opens
+       in one shift" turned a WEEK's total into a single night's on a High Risk card and in the PDF.
+       Both help texts invite exactly that file ("for a shift or a week"). Only say "one shift" when
+       real dates say so; otherwise name the window honestly. */
+    const span = s.shifts > 1 ? ' over ' + s.shifts + ' shifts (' + this._fmtVal(sig, v) + ')'
+      : (s.datedSpan ? ' in one shift' : ' over the report period');
     if (sig.key === 'no_sales')     return s.raw.no_sales + ' no-sale opens' + span + teamTxt;
     if (sig.key === 'void_pct')     return this.pct(v) + ' of sales voided' + teamTxt;
     if (sig.key === 'avg_check')    return App.fmtCurrency(v) + ' average check' + teamTxt;
@@ -717,7 +833,12 @@ S.SalesIntegrity = {
 
   // ── The report ────────────────────────────────────────────────────────────
   renderReport(review) {
-    const s = review.summary;
+    /* ⚠⚠ THE ROUND-1 COMMENT SAID THIS WAS GUARDED IN BOTH PLACES AND IT WAS GUARDED IN ONE. Only
+       `renderHistory` got it, so a summary-less LATEST review still threw out of `draw()` before
+       `container.innerHTML` was assigned — blanking the whole screen, the exact outcome the comment
+       claimed was closed. A false comment is worse than no comment: it stops the next reader
+       looking. `printReview` needs the same guard for the same reason. */
+    const s = review.summary || { reviewed: 0, flagged: 0, high: 0, exposure: 0 };
     const sev = n => n > 0 ? 'var(--red)' : 'var(--t1)';
     const stat = (label, val, color) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
       + '<div class="calc-val lg" style="' + (color ? 'color:' + color + ';' : '') + '">' + val + '</div></div>';
@@ -739,8 +860,14 @@ S.SalesIntegrity = {
     const flagged = (review.servers || []).filter(x => x.severity !== 'clean');
     const cleanN = (review.servers || []).filter(x => x.severity === 'clean').length;
     const cleanTxt = cleanN ? (cleanN + ' other server' + (cleanN === 1 ? '' : 's') + ' reviewed, no patterns flagged.') : '';
-    const skipTxt = (review.skipped && review.skipped.length)
-      ? ('Not enough data to score: ' + review.skipped.map(esc).join(', ') + '.') : '';
+    /* ⚠ The "not cleared" reassurance used to live ONLY in the all-clear branch, so on a review that
+       actually names someone — the case an operator reads hardest — the set-aside people got a bare
+       list and no statement that they were not cleared. It belongs on the list itself, which prints
+       in both branches. */
+    const nSkip = (review.skipped && review.skipped.length) || 0;
+    const skipTxt = nSkip
+      ? ('Not enough data to score: ' + review.skipped.map(esc).join(', ') + '. '
+         + (nSkip === 1 ? 'That server was' : 'Those servers were') + ' not cleared, just not measured.') : '';
 
     // The clean-and-skipped summary lives INSIDE the review card, divided from the
     // servers to investigate, never as loose text on the page background.
@@ -765,14 +892,14 @@ S.SalesIntegrity = {
          track the floor" four words above a line reading "Not enough data to score: Barback." — an
          absolute claim about a set that demonstrably excluded someone. Scope it to the scored count
          and, when anyone was set aside, say plainly that they were not cleared, just not measured. */
-      const nSet = (review.skipped || []).length;
+      /* ⚠ This branch only renders when `noVerdict` is null, which requires reviewed >= MIN_TEAM —
+         so the singular and zero wordings here were unreachable dead branches. The set-aside
+         sentence also moved out to `skipTxt`, which prints in BOTH branches (it used to appear only
+         when nobody was flagged, i.e. never on the review an operator reads hardest). */
       inner = '<div style="font-size:13px;color:var(--green);font-weight:700;">'
-        + 'No servers flagged' + (s.reviewed ? ' among the ' + s.reviewed + ' scored' : '') + '.</div>'
+        + 'No servers flagged among the ' + s.reviewed + ' scored.</div>'
         + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">'
-        + (s.reviewed === 1 ? 'That server\'s' : 'Their') + ' numbers track the floor. Run this each shift or week and the outliers surface on their own.'
-        + (nSet ? ' ' + (nSet === 1 ? 'The one server' : 'The ' + nSet + ' servers') + ' set aside below '
-            + (nSet === 1 ? 'was' : 'were') + ' not cleared, just not measured.' : '')
-        + '</div>';
+        + 'Their numbers track the floor. Run this each shift or week and the outliers surface on their own.</div>';
     } else {
       inner = flagged.map(x => this.serverCard(x, review.date)).join('');
     }
@@ -809,8 +936,12 @@ S.SalesIntegrity = {
     const revDate = String(reviewDate || '').slice(0, 10);
     const invList = (App.data.variance_investigations || []).filter(i => i.sku === x.name + ' (sales)');
     const invOpen = invList.some(i => i.status !== 'resolved');
-    const invResolved = !invOpen && invList.some(i => i.status === 'resolved'
-      && (!revDate || String(i.opened_date || i.date || '').slice(0, 10) >= revDate));
+    /* ⚠ AND IT FAILS CLOSED, NOT OPEN. `!revDate ||` meant a review with no date (a restored or
+       legacy record) treated ANY old resolved case as current — the exact stale-Resolved hole this
+       parameter was added to close, re-opened by its own guard. With no date to compare, Bar Cop
+       cannot know the case is current, so it does not claim it is. */
+    const invResolved = !invOpen && !!revDate && invList.some(i => i.status === 'resolved'
+      && String(i.opened_date || i.date || '').slice(0, 10) >= revDate);
     const invLabel = invOpen ? 'Reviewing' : invResolved ? 'Resolved' : 'Open Investigation';
     const invStyle = invResolved ? 'color:var(--green);' : (invOpen ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);' : '');
 
@@ -914,18 +1045,20 @@ S.SalesIntegrity = {
     const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const b = App._pdfBuilder('Sales Integrity Review');
     b.header({ right: 'Sales Integrity Review', meta: review.label + ', generated ' + today });
+    const sm = review.summary || { reviewed: 0, flagged: 0, high: 0, exposure: 0 };
+    let nvSaid = null;   // which no-verdict reason the document already stated, so nothing repeats it
     b.table(['Summary', ''], [
-      ['Servers reviewed', String(review.summary.reviewed)],
-      ['Flagged', String(review.summary.flagged)],
-      ['High risk', String(review.summary.high)],
+      ['Servers reviewed', String(sm.reviewed)],
+      ['Flagged', String(sm.flagged)],
+      ['High risk', String(sm.high)],
       // Same wording as the screen's stat strip — this table and that strip are the same four numbers.
-      ['Flagged exposure', review.summary.exposure > 0 ? '$' + Number(review.summary.exposure).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-']
+      ['Flagged exposure', sm.exposure > 0 ? '$' + Number(sm.exposure).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-']
     ], { columnStyles: { 1: { halign: 'right' } } });
     // ⚠ THE SAME CAVEAT THE SCREEN SHOWS. Without it this document printed "Flagged: 0" beside a
     // review that could never have flagged anyone, and it is the artefact that leaves the building.
     {
       const nv = this._noVerdictReason(review);
-      if (nv && !review.summary.flagged) b.paragraph(nv.title + ' ' + nv.detail);
+      if (nv && !sm.flagged) { b.paragraph(nv.title + ' ' + nv.detail); nvSaid = nv.reason; }
     }
     /* ⚠ THE DOCUMENT MUST CARRY WHAT THE SCREEN CARRIES. Four things were on screen and missing
        here, and this is the artefact handed to an owner, a partner, a lender or an accountant:
@@ -947,14 +1080,33 @@ S.SalesIntegrity = {
       });
     });
     if (review.skipped && review.skipped.length) {
-      b.paragraph('Not enough data to score: ' + review.skipped.join(', ') + '. These names were set aside '
-        + 'because the report did not carry enough checks or volume to benchmark them fairly. They were not '
-        + 'cleared, only left unmeasured.');
+      /* ⚠ TWO FIXES HERE, BOTH FOUND BY READING THE DOCUMENT RATHER THAN THE CODE.
+         (a) When the no-verdict paragraph above already ran with `reason: 'skipped'`, this printed
+             the SAME two claims again, back to back, in the document handed to an owner. Drop the
+             explanatory half when it has already been said; the NAMES are what this paragraph is
+             for and the screen prints only the names too.
+         (b) One name read "These names ... them ... They were not cleared" — the screen got the
+             singular right in the same fixture and the PDF did not. */
+      const one = review.skipped.length === 1;
+      const already = nvSaid === 'skipped';
+      b.paragraph('Not enough data to score: ' + review.skipped.join(', ') + '.'
+        + (already ? '' : (one
+            ? ' This name was set aside because the report did not carry enough checks or volume to'
+              + ' benchmark them fairly. They were not cleared, only left unmeasured.'
+            : ' These names were set aside because the report did not carry enough checks or volume to'
+              + ' benchmark them fairly. They were not cleared, only left unmeasured.')));
     }
     /* ⚠ THE DATE THE REPORT WAS UPLOADED IS NOT TODAY. Exporting a review from Past Reviews printed
        "a sales report you uploaded on <today>", misdating the evidence by however old the review is
        — eight weeks in the case that found it. `today` still belongs on "generated". */
-    const uploaded = this.fmtDate(String(review.created_at || review.date || '').slice(0, 10));
+    /* ⚠ PARSE IT, DO NOT SLICE IT — the same defect this file spent a whole block removing from the
+       date column, reintroduced by me in the fix directly above. `.slice(0, 10)` on a malformed
+       `created_at` of "Week of 7/6" cut mid-value and `fmtDate` handed back the fragment, so the
+       LEGAL DISCLAIMER of a document going to a lender read "uploaded on Week of 7/". Anything that
+       will not parse falls through to "earlier". */
+    const rawUp = String(review.created_at || review.date || '');
+    const upYmd = (typeof PosIngest !== 'undefined' && PosIngest.normDate) ? PosIngest.normDate(rawUp, {}) : '';
+    const uploaded = upYmd ? this.fmtDate(upYmd) : '-';
     b.disclaimer('Generated ' + today + ' from a sales report uploaded ' + (uploaded === '-' ? 'earlier' : 'on ' + uploaded)
       + '. These are statistical patterns worth investigating, not proof of theft. Product theft (overpouring, '
       + 'free pours, walking out bottles) does not show in a sales report at all, so this review does not cover it. '
@@ -970,7 +1122,7 @@ S.SalesIntegrity = {
       /* ⚠ THE DATE COLUMN WAS NAMED NOWHERE IN THE WHOLE SCREEN, and it is the one that switches on
          BOTH capture signals — drawer shorts (weight 3, strong) and walkouts. Measured: the same
          file with and without a Date column gave 1 flagged / $361 exposure versus 0 / $0. */
-      { h: 'Drop the report', p: ['Pull a per-server sales summary for a shift or a week from your POS and drop it in the box up top. Map the columns once and Bar Cop remembers it. The only column it must have is the server name; every other column unlocks one more signal, so the richer the export, the sharper the read. Include the Date column if your export has one: it is what lets Bar Cop line the report up with the drawer shortages and walked tabs you have already logged, which are two of the strongest tells it has. A server with too few checks to judge fairly is set aside, not flagged.', 'This is the deep theft read and wants a richer export than the weekly one, with the register and cash columns. Your basic per-server covers and sales already import at the Shift weekly close and show up in Server Check, so use that for check averages and this for the theft patterns.'] },
+      { h: 'Drop the report', p: ['Pull a per-server sales summary for a shift or a week from your POS and drop it in the box up top. Map the columns once and Bar Cop remembers it. The only column it must have is the server name; every other column unlocks one more signal, so the richer the export, the sharper the read. Include the Date column if your export has one: it is what lets Bar Cop line the report up with the drawer shortages and walked tabs you have already logged, and drawer shortages are one of the strongest tells it has. A server with too few checks to judge fairly is set aside, not flagged.', 'This is the deep theft read and wants a richer export than the weekly one, with the register and cash columns. Your basic per-server covers and sales already import at the Shift weekly close and show up in Server Check, so use that for check averages and this for the theft patterns.'] },
       /* ⚠ THE "or a strong tell is severe" CLAUSE WAS UNREACHABLE and said the opposite of the rule.
          `severity` is `clean` below TWO independent flags, full stop — measured, a server at 60
          no-sale opens against a floor of 1 raised that flag and still read clean, and the screen
