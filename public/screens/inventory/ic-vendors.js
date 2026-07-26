@@ -400,103 +400,144 @@ S.InventoryVendors = {
      The import is the only door that can put an unrepresentable string here (the form is chips-only).
      A range is expanded, a list is split, "daily" is all seven, and anything unreadable comes back
      empty so the door can COUNT and report it rather than storing something no screen can use. */
+  /* ⭐⭐ REWRITTEN 2026-07-26 AFTER FIVE ROUNDS OF GUARDS. Rounds 2-5 each added a patch here and
+     round 6 found six more — including two the round-5 patch made WORSE than round 4. That is the
+     documented signal to stop patching and replace the mechanism, exactly as `PosIngest.normDate`
+     needed after five failed date guards.
+
+     WHAT KEPT GOING WRONG: the old shape was regex-strip-then-hope. Each fix removed one more kind
+     of text (a time range, a "closed X" phrase) and left the residue to a token pass, so every new
+     phrasing produced a new way to lose or invent a day. Measured failures, all silent because
+     `badDays` only counts a cell that comes back EMPTY:
+       · "Daily except Sat & Sun" stored **Sunday only** — the exclusion regex took one word, so the
+         second excluded day fell through and was ADDED (a par of 46 against a true 10);
+       · "Mon-Fri, closed Sat & Sun" stored six days including Sunday;
+       · "Daily, closed Sunday" (a comma) threw the whole cell away;
+       · "Daily except holidays" stored nothing at all — a 7-day vendor with zero delivery days;
+       · "closed on Sat" stored Saturday as a DELIVERY day, because one preposition broke the phrase;
+       · and `idxOf` matched a 3-LETTER STEM, so **"Monthly" was Monday**, "Sunrise Produce" was
+         Sunday, "Satellite" was Saturday and "Frito lay direct" was Friday.
+
+     THE MECHANISM NOW: tokenise, then WALK the tokens with an explicit state. Negation is a MODE
+     that survives fillers and further days until a real non-day word ends it, so "closed Sat & Sun"
+     and "closed on Sat" both negate everything they name. Days are matched as EXACT TOKENS from a
+     vocabulary — never a stem — so a word that merely starts like a day is simply not a day. And a
+     cadence the weekly chips cannot express (monthly, bi-weekly, "1st & 3rd") is REFUSED and
+     reported rather than flattened into a weekly schedule that reads twice as often as the truth. */
   _normDeliveryDays(raw) {
-    let s = String(raw || '').trim();   // `let`: the exclusion pass below rewrites it
-    if (!s) return '';
-    if (/pick\s*-?\s*up|will\s*call/i.test(s)) return 'Pickup';
+    const src = String(raw == null ? '' : raw).trim();
+    if (!src) return '';
+    if (/pick\s*-?\s*up|will\s*call/i.test(src)) return 'Pickup';
     const D = this.DAY_NAMES;                                   // Mon..Sun, index 0..6
-    /* Returns a day index, -1 for "not a day", or -2 for AMBIGUOUS. A single "T" is Tuesday or
-       Thursday and a single "S" is Saturday or Sunday, and there is nothing in the cell to settle
-       it — so an M/T/W sheet is refused and REPORTED rather than half-guessed. M, W and F have only
-       one reading, which is what makes the common "M/W/F" shorthand safe to accept. */
-    const idxOf = tok => {
-      const t = tok.toLowerCase().replace(/[^a-z]/g, '');
-      if (!t) return -1;
-      if (t.length === 1) {
-        const one = { m: 0, w: 2, f: 4 };
-        if (one[t] != null) return one[t];
-        return (t === 't' || t === 's') ? -2 : -1;
-      }
-      // 'thu' must beat 'tue' on "thur"/"thurs"; test the 3-letter stem after the long forms.
-      const map = { sunday: 6, monday: 0, tuesday: 1, wednesday: 2, thursday: 3, friday: 4, saturday: 5 };
-      if (map[t] != null) return map[t];
-      const stem = t.slice(0, 3);
-      const s3 = { sun: 6, mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5 };
-      return s3[stem] != null ? s3[stem] : -1;
-    };
-    /* ⚠⚠ A NEGATED DAY WAS BEING READ AS A DELIVERY DAY. `idxOf('closed')` is -1, so the negating
-       word was simply dropped and the day beside it ADDED: "Mon-Fri, closed Sat" stored SIX days,
-       "Daily except Sunday" stored a vendor that delivers only on **Sunday**, and "Sat 10-2, Sun
-       closed" gave a par of 18 against a true 35. Both word orders occur ("closed Sunday" and
-       "Sun closed"), so both are matched, the phrase is removed before the day pass, and the named
-       days are subtracted at the end. */
-    const excluded = new Set();
-    let t = s.replace(/\b(?:closed|except|excluding|excl\.?|no)\s+([a-z]+)|\b([a-z]+)\s+closed\b/gi,
-      (mm, a, b) => { const i = idxOf(a || b); if (i > -1) { excluded.add(i); return ' '; } return mm; });
-    /* "Daily" only means all seven when it is the WHOLE cell — but once an exclusion has been lifted
-       out, "Daily except Sunday" leaves a bare "Daily" that must still mean all seven minus Sunday. */
-    if (/^\s*(daily|every\s*day|7\s*days?)\s*$/i.test(t) && excluded.size) {
-      return D.filter((_, i) => !excluded.has(i)).join(', ');
-    }
-    if (/^\s*(daily|every\s*day|7\s*days?)\s*$/i.test(s)) return D.join(', ');
-    s = t;
-    const on = new Set();
-    let ambiguous = false;
-    /* ⚠⚠ EVERY RANGE, THEN EVERYTHING LEFT OVER. The first version matched ONE range and gated the
-       token pass behind `if (!on.size)`, so the rest of the cell was silently discarded:
-       "Mon-Fri, Sat" lost Saturday, "Mon-Wed, Fri" lost Friday, "Mon-Wed & Fri-Sat" lost two days.
-       That is how a distributor actually writes a schedule with an add-on day, and it was INVISIBLE
-       — `badDays` only counts a cell that comes back completely empty, so a file with four mangled
-       cells printed "Imported 4 vendors." with no note. `deliveryDaysPerWeek` drives the par cycle,
-       so "Mon-Wed, Fri" suggested 9 units against a true 7 and "Mon.-Fri." suggested 26 against 6.
-       ⚠ `[.\s]*` around the separator, or "Mon.-Fri." never matches at all and collapses to "Mon". */
-    /* ⚠ SPLIT INTO SEGMENTS FIRST, THEN DECIDE RANGE-OR-LIST PER SEGMENT. Deciding globally on a
-       dash count got "Mon-Wed & Fri-Sat" wrong (two ranges, read as a two-item list → "Mon, Fri")
-       and "M-W-F" wrong the other way (a dash-delimited LIST, read as a range). Segmenting settles
-       both: a segment with exactly ONE dash between two day tokens is a range; anything else is a
-       list of tokens. */
-    const addRange = (a, b) => { for (let i = a; ; i = (i + 1) % 7) { on.add(i); if (i === b) break; } };
-    s.split(/[,;&|]+|\band\b|\/(?=\s*[a-z]{3,})/i).forEach(rawSeg => {
-      /* ⚠ STRIP DELIVERY HOURS BEFORE COUNTING DASHES. A cell reading "Mon-Fri 8-5" carries a
-         SECOND dash that has nothing to do with days, and the per-segment dash count then treated
-         the whole thing as a token list — so only the two endpoints survived: **"Mon, Fri", 2
-         delivery days instead of 5**, which doubles the suggested par. And it was silent, because
-         `badDays` only fires on a cell that comes back empty. A delivery-days column carrying
-         hours is ordinary on a vendor sheet. */
-      // ⚠ "…-close" is a time too. A bar writes its receiving window as "Mon-Fri 4-close", and the
-      // digit-dash-DIGIT strip left that second dash behind: "Mon, Fri", 2 delivery days not 5,
-      // which doubles the suggested par. Silent, because badDays only counts an EMPTY result.
-      /* ⚠ A CLOSING TIME DOES NOT ALWAYS START WITH A DIGIT. Requiring one left "Mon-Fri open-close",
-         "noon-close", "lunch-close" and "11a-close" with a second dash in the segment, so the range
-         collapsed to its endpoints: **2 delivery days instead of 5**, and at 35 units/week that is a
-         suggested par of 18 against a true 7. Silent, because badDays only counts an EMPTY result.
-         ⚠ The left token is checked against the day names first — "Mon-close" must keep its Monday
-         rather than have the whole phrase stripped. */
-      const seg = rawSeg
-        .replace(/([a-z0-9:]+)\s*[-–—]\s*clos(?:e|ing)\b/gi, (mm, lead) => (idxOf(lead) > -1 ? mm : ' '))
-        .replace(/\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*[-–—]\s*(?:close|closing|\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi, ' ');
-      const dashes = (seg.match(/-|–|—/g) || []).length;
-      const r = (dashes === 1 || /\b(to|thru|through)\b/i.test(seg))
-        ? seg.match(/([a-z]+)[.\s]*(?:-|–|—|to|thru|through)[.\s]*([a-z]+)/i) : null;
-      if (r) {
-        const a = idxOf(r[1]), b = idxOf(r[2]);
-        if (a === -2 || b === -2) { ambiguous = true; return; }
-        if (a > -1 && b > -1) { addRange(a, b); return; }
-      }
-      seg.split(/[/+.\s-]+/).forEach(tok => {
-        const i = idxOf(tok);
-        if (i === -2) ambiguous = true;
-        else if (i > -1) on.add(i);
-      });
+
+    /* EXACT tokens only. A single "T" is Tuesday or Thursday and a single "S" is Saturday or
+       Sunday, so those are AMBIGUOUS and refuse the whole cell rather than being half-guessed;
+       M, W and F have one reading each, which is what makes "M/W/F" safe. */
+    // ⚠ THE PLURALS ARE REAL SPELLINGS. "Mondays" and "Tuesdays & Thursdays" are how a schedule is
+    // ordinarily written, and an exact-token vocabulary without them refused the whole cell.
+    const DAY = { monday: 0, mondays: 0, mon: 0, mons: 0, mo: 0, m: 0,
+                  tuesday: 1, tuesdays: 1, tues: 1, tue: 1, tues_: 1, tu: 1,
+                  wednesday: 2, wednesdays: 2, weds: 2, wed: 2, we: 2, w: 2,
+                  thursday: 3, thursdays: 3, thurs: 3, thur: 3, thu: 3, th: 3,
+                  friday: 4, fridays: 4, fri: 4, fris: 4, fr: 4, f: 4,
+                  saturday: 5, saturdays: 5, sat: 5, sats: 5, sa: 5,
+                  sunday: 6, sundays: 6, sun: 6, suns: 6, su: 6 };
+    // "Weekdays" / "weekends" are ranges written as one word.
+    const SPAN = { weekday: [0, 4], weekdays: [0, 4], weekend: [5, 6], weekends: [5, 6] };
+    const AMBIG = { t: 1, s: 1 };
+    const NEG = { closed: 1, close: 1, closes: 1, except: 1, excepting: 1, excluding: 1, excl: 1,
+                  exc: 1, no: 1, not: 1, but: 1, minus: 1 };
+    // Words that carry no day information and must NOT end a negation phrase.
+    const FILLER = { on: 1, in: 1, at: 1, the: 1, a: 1, of: 1, for: 1, and: 1, or: 1, plus: 1,
+                     delivery: 1, deliveries: 1, deliver: 1, delivers: 1, delivered: 1,
+                     day: 1, days: 1, only: 1, am: 1, pm: 1, morning: 1, afternoon: 1, evening: 1 };
+
+    let s = src.toLowerCase();
+    /* A cadence the weekly chips cannot represent is refused OUTRIGHT. "Monthly", "every other
+       Tuesday" and "1st & 3rd Monday" used to read as a WEEKLY delivery on that day, which makes
+       the par cycle twice (or four times) as frequent as the truth. Refusing puts the cell in the
+       door's `badDays` count so the operator is told. */
+    /* ⚠ NARROW. The first version matched a bare `call`, bare ordinals and a bare `month`, and it
+       threw away perfectly good schedules: **"Mon-Fri, call ahead"**, "Mon-Fri, 3rd party carrier"
+       and "Mon-Fri, first come first served" all returned NOTHING. A note beside the days is not a
+       cadence. An ordinal only means a cadence when it MODIFIES A DAY ("1st & 3rd Monday"). */
+    const CADENCE = /\b(?:monthly|bi-?monthly|bi-?weekly|biweekly|fortnight\w*|quarterly|semi-?monthly|every\s+other|alternating)\b/;
+    const ORDINAL_DAY = /\b(?:1st|2nd|3rd|4th|first|second|third|fourth)\b(?:\s*(?:&|and|,|\/|\s)\s*(?:1st|2nd|3rd|4th|first|second|third|fourth)\b)*\s+(?:mon|tue|wed|thu|fri|sat|sun)/;
+    if (CADENCE.test(s) || ORDINAL_DAY.test(s)) return '';
+
+    // Remove TIME expressions before anything else — a delivery window's dash is not a day range.
+    // Both endpoints may be worded ("open-close", "noon-close", "11a-close"), not just numeric.
+    const TIMEWORD = '(?:\\d{1,2}(?::\\d{2})?\\s*(?:am|pm|a|p)?|open|opening|noon|midnight|lunch|dinner|clos(?:e|ing))';
+    s = s.replace(new RegExp('\\b' + TIMEWORD + '\\s*[-\u2013\u2014]\\s*' + TIMEWORD + '\\b', 'g'), ' ');
+
+    /* Segment on LIST separators, then decide range-or-list inside each segment. A segment holding
+       one range marker between two days is a range ("Mon-Fri"); anything else is a list, which is
+       what makes "M-W-F" three days rather than Monday through Wednesday. */
+    /* ⚠ TWO LEVELS, and the reason is word ORDER. A negator can come before its days
+       ("closed Sat & Sun") or after them ("Sat & Sun closed"), so polarity is decided per CLAUSE —
+       a negator anywhere in the clause makes the whole clause negative — while ranges and lists are
+       still resolved inside it. Deciding polarity token-by-token got "Sat & Sun closed" wrong,
+       because both days were already banked positive by the time `closed` was read.
+       Mode also PERSISTS across clauses, so "Mon-Thu, closed Fri, Sat, Sun" negates all three. */
+    const clauses = s.split(/[;,]+/);
+    let mode = 'pos', sawPositive = false;
+    const pos = new Set(), neg = new Set();
+    let all = false, ambiguous = false;
+    const segs = [];
+    /* ⚠ TWO CLASSES OF NEGATOR. `closed` / `except` / `excluding` always negate. But `no`, `not`
+       and `but` are ordinary words in a vendor note — "Mon-Fri no minimum", "Mon-Fri (no COD)",
+       "Mon-Fri not before 8am", "Mon-Fri but call first" — and treating them as negators threw
+       every one of those schedules away entirely. They only negate when a DAY actually follows. */
+    const STRONG = /\b(?:closed|closes|close|except|excepting|excluding|excl|exc|minus)\b/;
+    const WEAK = /\b(?:no|not|but)\b(?:\s+\w+){0,2}\s+(?:mon|tue|wed|thu|fri|sat|sun|weekend)/;
+    clauses.forEach(cl => {
+      const hasNeg = STRONG.test(cl) || WEAK.test(cl);
+      /* ⚠ NEGATION ONLY PERSISTS FORWARD ONCE A POSITIVE SET EXISTS. "Mon-Thu, closed Fri, Sat,
+         Sun" is one exclusion list continuing across clauses; "closed Sunday, Mon-Fri" is an
+         exclusion FOLLOWED BY the real schedule, and persisting there negated Mon-Fri and returned
+         nothing. Whether a positive clause came first is what tells them apart. */
+      if (hasNeg) mode = 'neg';
+      else if (!sawPositive) mode = 'pos';
+      const polarity = mode;
+      if (polarity === 'pos' && /\b(?:mon|tue|wed|thu|fri|sat|sun|m|w|f|daily|weekday|weekend)/.test(cl)) sawPositive = true;
+      cl.split(/[&|+]+|\band\b|\bor\b|\/(?=\s*[a-z]{2,})/).forEach(seg => segs.push({ seg, polarity }));
     });
-    /* A cell mixing readable days with an ambiguous single letter is refused WHOLE. Keeping the
-       readable half would store a schedule quietly missing a day, and the par count reads it. */
+
+    segs.forEach(({ seg, polarity }) => {
+      const words = seg.split(/[^a-z0-9]+/).filter(Boolean);
+      const dashes = (seg.match(/[-\u2013\u2014]/g) || []).length;
+      const rangey = dashes === 1 || /\b(?:to|thru|through)\b/.test(seg);
+      const found = [];
+      for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        if (NEG[w]) continue;                                   // polarity is decided per clause
+        if (w === 'daily' || w === 'everyday' || (w === 'every' && words[i + 1] === 'day')
+            || (w === 'all' && words[i + 1] === 'days') || (w === '7' && words[i + 1] === 'days')) {
+          all = true; continue;
+        }
+        if (SPAN[w]) { const r = SPAN[w]; for (let k = r[0]; ; k = (k + 1) % 7) { (polarity === 'neg' ? neg : pos).add(k); if (k === r[1]) break; } continue; }
+        if (FILLER[w]) continue;
+        if (w.length === 1 && AMBIG[w]) { ambiguous = true; continue; }
+        const d = DAY[w];
+        if (d == null) continue;                                // not a day: carries no information
+        found.push(d);
+      }
+      if (!found.length) return;
+      const set = polarity === 'neg' ? neg : pos;
+      if (rangey && found.length === 2) {
+        for (let i = found[0]; ; i = (i + 1) % 7) { set.add(i); if (i === found[1]) break; }
+      } else {
+        found.forEach(d => set.add(d));
+      }
+    });
+
     if (ambiguous) return '';
-    excluded.forEach(i => on.delete(i));   // "Mon-Fri, closed Sat" is five days, not six
+    // "Daily except Sunday" starts from the whole week; everything else from what was named.
+    const on = all ? new Set(D.map((_, i) => i)) : pos;
+    neg.forEach(i => on.delete(i));
     if (!on.size) return '';
     return D.filter((_, i) => on.has(i)).join(', ');
   },
-
   /* An order minimum is not always money. The manual form and the seed both offer cases / kegs /
      lbs, and the import hardcoded `'$'` — so "5 cases" stored as FIVE DOLLARS and the Order Sheet
      measured a case minimum against a dollar total, always reading "Meets the $5.00 minimum". */
