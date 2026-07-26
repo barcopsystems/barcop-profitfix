@@ -88,8 +88,14 @@ S.EventsRegulars = {
         + '<button class="btn btn-ghost" id="rg-clear">Start Over</button>'
         + '<span id="rg-err" style="color:var(--red);font-size:12px;display:none;"></span></div>';
     }
+    /* The import result (S201). Rendered as PART of the card, never written into the DOM after a
+       redraw — renderList reassigns innerHTML, so a message written first is destroyed on the spot.
+       It is cleared once shown, so it cannot greet the operator again days later on a screen they
+       just opened. */
+    const im = this.importMsg; this.importMsg = null;
+    const imHtml = im ? '<div style="margin-top:10px;font-size:12px;color:' + (im.bad ? 'var(--red)' : 'var(--t2)') + ';">' + esc(im.text) + '</div>' : '';
     const addCard = '<div class="card form-card">' + App.collapsibleCardTitle('rg-add', 'Add a Regular')
-      + '<div class="collapse-body">' + body + '</div></div>' + belowButtons;
+      + '<div class="collapse-body">' + body + imHtml + '</div></div>' + belowButtons;
 
     const chips = App.filterChips(this.filter, [
       { v: '', label: 'All' }, { v: 'bday', label: 'Birthdays' }, { v: 'anniv', label: 'Anniversaries' }, { v: 'quiet', label: 'Gone Quiet' }, { v: 'vip', label: 'VIP' }
@@ -214,25 +220,109 @@ S.EventsRegulars = {
        ⚠ minYear 1900, and this is the only caller that needs it: a birthday is legitimately decades
        before any business date, while every other door imports something that happened this year.
        Before adding a date format here, add it to PosIngest.normDate. */
-    const parseDate = s => (typeof PosIngest !== 'undefined' && PosIngest.normDate)
-      ? PosIngest.normDate(s, { minYear: 1900 }) : '';
+    /* ⚠ `yearOptional` (S200) IS THE WHOLE REASON THIS DOOR HAS ITS OWN OPTS. A birthday is the one
+       date in Bar Cop where the YEAR IS NOT DATA: the list column renders month and day, the stat
+       tile and both filter chips read the month, and nothing anywhere prints the year. So refusing
+       "1-Jul" did not protect anything, it emptied the feature — "Birthdays This Month" read 0 on a
+       file full of birthdays. Year-less cells now store with an explicit 1900, which reads as "no
+       year given" and can never be mistaken for a real birth year.
+       ⚠ And the date column is read ONCE for its day-first verdict (S199), separately for birthdays
+       and anniversaries, because a file can carry one column from a CRM and the other typed by hand. */
+    /* ⚠ THE PROBE OPTS MUST MATCH THE READ OPTS, or the column votes on a question it is not being
+       asked. dateConvention decides whether a cell may vote by asking normDate to parse it — so
+       without `yearOptional` here, every cell in a YEAR-LESS birthday column came back unreadable,
+       cast no vote, and the numeric branch silently fell back to month-first. Measured: a day-first
+       column ["25/12","01/07","03/11","06/09","30/06"] stored 3 of 5 in the WRONG MONTH under a
+       message saying "5 regulars imported." That is the S199 defect reproduced inside the S200 fix,
+       which is exactly what a scan round over one's own work is for. */
+    const RD = { minYear: 1900, yearOptional: true };
+    const conv = k => (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
+      ? PosIngest.dateConvention(rows, k, RD) : { dayFirst: false, contradictory: false };
+    const bConv = conv('birthday'), aConv = conv('anniversary');
+    const mk = c => Object.assign({}, RD, { dayFirst: c.dayFirst, dateAmbiguous: c.contradictory });
+    const parseDate = (s, c) => (typeof PosIngest !== 'undefined' && PosIngest.normDate)
+      ? PosIngest.normDate(s, mk(c)) : '';
     const added = [];
+    let noName = 0, dupes = 0, inFile = 0, badBday = 0, badAnniv = 0;
+    // Phone is compared on DIGITS ONLY: "555-0100" and "(555) 0100" are one person, and email is
+    // already lowercased, so formatting alone must not mint a second record.
+    const key = r => [(r.name || '').trim().toLowerCase(),
+      String(r.contact_phone || '').replace(/\D/g, ''),
+      (r.contact_email || '').trim().toLowerCase()].join('|');
+    const hasContact = r => !!(String(r.contact_phone || '').replace(/\D/g, '') || (r.contact_email || '').trim());
+    /* ⚠⚠ TWO DEDUP RULES, BECAUSE A NAME IS NOT AN IDENTITY. The first version used one seen-set on
+       name+phone+email, and for a NAME-ONLY list the key degrades to the name — the exact case its
+       own comment claimed to avoid. Measured: a six-row bartender's list
+       [Mike, Dave, Mike, Sarah, Dave, Mike] imported as THREE people, silently merging two different
+       Mikes and keeping only the first one's drink preference, under a message reading "3 already in
+       your book" about a book that was empty. First names are what a regulars list is made of, so
+       this is the ordinary case, not the edge one.
+         · WITH a phone or an email, the key identifies a PERSON: dedup against the book AND within
+           the file, because the same contact twice really is one duplicated row.
+         · WITHOUT either, the key is just a name and cannot tell two Mikes apart. So it dedups
+           CONSUME-ONCE against the book only: a re-drop of the same list matches one banked Mike per
+           incoming Mike and adds nobody, while three Mikes in a fresh file stay three people.
+       ⚠ That consume-once half is the same mechanism as the operating-expense door, for the same
+       reason — the question there is also "have I already got THIS ONE", not "have I got one like
+       it". Where the two doors differ is the contact case: an expense is an EVENT and can honestly
+       repeat, a fully-identified person cannot. */
+    const seen = new Set(this.regulars().filter(hasContact).map(key));
+    // Frozen snapshot of what was in the book BEFORE this file, so "already in your book" and
+    // "twice in this file" stay tellable apart once `seen` starts growing.
+    const BOOK_KEYS = new Set(seen);
+    const bare = [];
+    this.regulars().forEach(r => { if (!hasContact(r)) bare.push((r.name || '').trim().toLowerCase()); });
     (rows || []).forEach(r => {
-      const name = (r.name || '').trim(); if (!name) return;
+      const name = (r.name || '').trim();
+      if (!name) { noName++; return; }
       const rec = {
         id: App.uid(), name,
         contact_phone: (r.phone || '').trim(), contact_email: (r.email || '').trim(),
-        birthday: parseDate(r.birthday), anniversary: parseDate(r.anniversary),
+        birthday: parseDate(r.birthday, bConv), anniversary: parseDate(r.anniversary, aConv),
         drink_prefs: (r.drink_prefs || '').trim(), last_visit: '', vip: false, notes: '',
         created_at: new Date().toISOString()
       };
+      /* `dupes` = already in the book. `inFile` = the same row twice in THIS file. They are different
+         facts and saying "already in your book" about the second one was false: on an empty book,
+         two identical rows reported "1 already in your book" about someone who had never been there. */
+      if (hasContact(rec)) {
+        const k = key(rec);
+        if (seen.has(k)) { (BOOK_KEYS.has(k) ? dupes++ : inFile++); return; }
+        seen.add(k);
+      } else {
+        const n = name.toLowerCase();
+        const at = bare.indexOf(n);
+        if (at > -1) { bare.splice(at, 1); dupes++; return; }   // consume ONE banked namesake
+      }
+      // A cell the file HAD and Bar Cop could not read is reported. A cell the file simply lacks is
+      // not a problem and must never be counted as one, or every phone-only list reads as broken.
+      if (String(r.birthday || '').trim() && !rec.birthday) badBday++;
+      if (String(r.anniversary || '').trim() && !rec.anniversary) badAnniv++;
       this.regulars().push(rec);
       added.push(rec);
     });
     // Row-per-record: persist just the imported regulars in one bulk upsert. They were pushed into
     // the live list before the write, and a bulk write cannot revert itself — so on failure take
     // them back out rather than showing an import the server never received.
-    if (!(await App.putRecordsBulk('core', 'event_regular', added))) App.dropRows(this.regulars(), added);
+    const saved = added.length ? await App.putRecordsBulk('core', 'event_regular', added) : true;
+    if (!saved) App.dropRows(this.regulars(), added);
+    /* ⚠ THE DOOR USED TO REPORT NOTHING AT ALL — no counter of any kind, no message (S201). A
+       200-row list with 20 blank names and 50 unreadable birthdays imported 180 records and said
+       NOTHING, so the operator had no way to know half their outreach dates never arrived. The
+       message is built here and rendered BY renderList, not written into the DOM after it:
+       renderList reassigns innerHTML, so anything written first is destroyed on the spot. */
+    if (!saved) {
+      this.importMsg = { bad: true, text: 'Could not save the import. Nothing was changed — check your connection and try again.' };
+    } else {
+      const bits = [added.length + ' regular' + (added.length === 1 ? '' : 's') + ' imported'];
+      if (dupes)    bits.push(dupes + ' already in your book');
+      if (inFile)   bits.push(inFile + ' repeated row' + (inFile === 1 ? '' : 's') + ' in the file');
+      if (noName)   bits.push(noName + ' row' + (noName === 1 ? '' : 's') + ' skipped with no name');
+      if (badBday)  bits.push(badBday + ' birthday' + (badBday === 1 ? '' : 's') + ' could not be read and imported blank');
+      if (badAnniv) bits.push(badAnniv + ' anniversar' + (badAnniv === 1 ? 'y' : 'ies') + ' could not be read and imported blank');
+      if (bConv.contradictory || aConv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
+      this.importMsg = { bad: added.length === 0, text: bits.join(' · ') + '.' };
+    }
     this.entryMode = 'manual';
     this.renderList();
   },
