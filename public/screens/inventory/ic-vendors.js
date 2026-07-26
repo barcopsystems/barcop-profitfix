@@ -448,7 +448,10 @@ S.InventoryVendors = {
          delivery days instead of 5**, which doubles the suggested par. And it was silent, because
          `badDays` only fires on a cell that comes back empty. A delivery-days column carrying
          hours is ordinary on a vendor sheet. */
-      const seg = rawSeg.replace(/\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?/gi, ' ');
+      // ⚠ "…-close" is a time too. A bar writes its receiving window as "Mon-Fri 4-close", and the
+      // digit-dash-DIGIT strip left that second dash behind: "Mon, Fri", 2 delivery days not 5,
+      // which doubles the suggested par. Silent, because badDays only counts an EMPTY result.
+      const seg = rawSeg.replace(/\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*[-–—]\s*(?:close|closing|\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi, ' ');
       const dashes = (seg.match(/-|–|—/g) || []).length;
       const r = (dashes === 1 || /\b(to|thru|through)\b/i.test(seg))
         ? seg.match(/([a-z]+)[.\s]*(?:-|–|—|to|thru|through)[.\s]*([a-z]+)/i) : null;

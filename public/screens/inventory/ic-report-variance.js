@@ -505,7 +505,11 @@ S.InventoryVarianceReport = {
              `Menu Item | Sales Count | Sales Total` left qty UNMAPPED — and the row builder's
              `App.parseNum(undefined) ?? 0` then stored **0 for every row** while `matchSummary`
              still called them all recognized. The whole report reads 100% variance. */
-          { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['item qty', 'qty sold', 'quantity sold', 'units sold', 'number sold', 'sales count', 'total sold', 'sold qty', 'units count', 'qty', 'quantity', 'sold', 'units', 'pours', 'rung'] },
+          /* ⚠ `'rung'` IS NOT A UNITS TERM — it was copied across with the others and it binds a
+             DOLLAR column. "Rung Sales" is a real Aloha/NCR header (PosIngest.FIELDS.server asks
+             for it by name), and `qty` is declared ahead of `sales`, so the bare token took the
+             money column: **units sold 3,800 and register sales $0** on the Variance Report. */
+          { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['item qty', 'qty sold', 'quantity sold', 'units sold', 'number sold', 'sales count', 'total sold', 'sold qty', 'units count', 'qty', 'quantity', 'sold', 'units', 'pours'] },
           /* ⚠ THE BARE `'sales'` SITS BEHIND EVERY PRICE TERM. Left ahead of them it still took a
              TEXT column: on `Menu Item / Sales Category / Qty / Gross Price` it word-matched
              "Sales Category" in pass 2 and every product read $0 register sales at 100% variance.

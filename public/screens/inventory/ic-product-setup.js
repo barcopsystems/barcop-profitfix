@@ -237,9 +237,17 @@ S.InventoryProducts = {
      Refusing leaves the row Incomplete, which is the honest state and the one the operator can act
      on. */
   _sizeToOz(raw) {
-    // A hyphen between the number and its unit is just punctuation ("750-ML", "12-OZ"), but it made
-    // the unit unreadable AND made App.parseNum see a trailing minus, so the size was lost entirely.
-    const s = String(raw == null ? '' : raw).trim().toLowerCase().replace(/(\d)\s*-\s*(?=[a-z])/g, '$1 ');
+    /* A hyphen between the number and its unit is just punctuation ("750-ML", "12-OZ"), but it made
+       the unit unreadable AND made App.parseNum see a trailing minus, so the size was lost entirely.
+       ⚠ IT IS REWRITTEN ONLY WHEN THE LETTERS ARE A UNIT THIS APP RECOGNISES. Rewriting every
+       `<digits>-<letters>` turned **"12-PACK" into a 12-OUNCE container** — 8 pours from a case, a
+       38.9% pour cost that `isComplete()` called true and the list rendered GREEN. `6-PK` gave
+       77.8%, `4-PK` gave 116.7%. That is the same "plausible wrong answer" failure the two-number
+       refusal below exists to prevent, arriving from the other side. A pack descriptor is not a
+       size, so it stays unreadable and the row stays Incomplete. */
+    const s0 = String(raw == null ? '' : raw).trim().toLowerCase();
+    const s = s0.replace(/(\d)\s*-\s*(?=([a-z]+))/g, (mm, d, word) =>
+      (App.ozPerUnit && App.ozPerUnit(word) != null) ? d + ' ' : mm);
     if (!s) return null;
     /* ⚠ KEG FRACTIONS FIRST, because they are two numbers and the guard below would refuse them.
        "1/2 keg", "1/6 bbl" and "1/4 barrel" are how a draft size is normally written, and every one
@@ -250,6 +258,11 @@ S.InventoryProducts = {
     if ((s.match(/[\d][\d,]*(?:\.\d+)?/g) || []).length > 1) return null;   // pack x size — ambiguous
     const n = App.parseNum(s);
     if (n == null) return null;
+    /* ⚠ A NEGATIVE SIZE IS NEVER A SIZE, and this refuses it HERE rather than leaning on the
+       caller's `nonNeg`. "12-PACK" keeps its hyphen (a pack descriptor is not a unit), which makes
+       App.parseNum read a trailing minus and hand back -12 — so the function's own answer must be
+       null. Leaving that to the one call site meant any second caller would inherit the bug. */
+    if (n < 0) return null;
     const m = s.match(/[\d.]\s*([a-z]+)/);                   // the unit token attached to the number
     const per = (m && App.ozPerUnit) ? App.ozPerUnit(m[1]) : null;
     if (per == null) return n;                               // no unit, or one we do not convert: already ounces
@@ -268,7 +281,11 @@ S.InventoryProducts = {
        so a $28.80 case priced at $2.88 a unit — and BOTH predecessors refused it (`parseInt` gave
        NaN, `App.parseNum` has a `#` guard for exactly this family, which is also what keeps
        `#REF!` / `#N/A` out). "6/#10 CAN" is still 6, because there the count comes first. */
-    if (/^\s*#/.test(s)) return null;
+    /* ⚠ ONLY A CAN-SIZE `#`, not every `#`. Refusing any leading hash also threw away `"#24"` and
+       `"#12/CS"`, where `#` is ordinary shorthand for "number of" on a hand-built case-size column —
+       the product then landed Incomplete with no bottle cost at all. A can size is the hash followed
+       by a small number AND a can/pail word; `"#10 can"` is refused, `"#24"` is twenty-four. */
+    if (/^\s*#\s*\d+\s*(?:can|pail|tin|jug)\b/.test(s)) return null;
     const m = s.match(/[\d][\d,]*(?:\.\d+)?/);
     return m ? App.parseNum(m[0]) : null;
   },
