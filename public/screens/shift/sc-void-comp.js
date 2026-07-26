@@ -660,11 +660,20 @@ S.ShiftVoidComp = {
   },
 
   // ── CSV import (drag-drop + column mapping, same setup as Labor Log Hours) ────
-  normDate(raw) {
-    if (!raw) return '';
-    const d = new Date(String(raw).length <= 10 ? raw + 'T00:00:00' : raw);
-    return isNaN(d.getTime()) ? '' : App.ymdLocal(d);
-  },
+  /* ⚠⚠ A PRIVATE `normDate` USED TO SIT HERE, DIRECTLY ABOVE mountImporter, AND IT WAS DEAD.
+     Zero callers — the import path goes through PosIngest.build('voids'), which uses the shared
+     PosIngest.normDate — so it changed no number. It is deleted rather than left alone because of
+     what it was: a verbatim copy of the shape six scan rounds were spent removing, carrying BOTH
+     eliminated bugs at once. `new Date(<free text>)` hands the string to V8's legacy parser (an
+     Excel `d-mmm` cell books to 2001, a UTC marker loses a day, "06.07.2026" transposes, "Feb 29
+     2026" rolls into March); and `length <= 10` appends 'T00:00:00' one character too early, so
+     "Jul 4 2026" (exactly 10) died while "Jul 04 2026" (11) parsed — days 1-9 of every month.
+     Dead code in an import door is a landmine, not a neutral: it is named the obvious thing and
+     sits in the obvious place, so the next person wiring a date column here reaches for it and
+     reintroduces the whole class. The shared reader is the only one.
+     ⚠ Before adding a date format anywhere, add it to PosIngest.normDate. verify-import-date-year.js
+     case C6 now scans EVERY CSVMapper door file for a private date parser, not the two it already
+     knew about — which is the only reason this copy was found. */
   mountImporter(elId, after) {
     const el = document.getElementById(elId);
     if (!el || typeof CSVMapper === 'undefined') return;
