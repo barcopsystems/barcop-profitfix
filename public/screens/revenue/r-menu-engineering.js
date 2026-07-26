@@ -104,6 +104,17 @@ S.RevenueMenuEngineering = {
     const costed = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 }))
       .filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
     if (costed.length < 4) {
+      /* ⚠ DROP ANY PENDING IMPORT RESULT ON THE WAY OUT. coversImportHtml() is the only thing that
+         clears `_coversFlash`, and it is never reached down this branch — so a result stored here
+         sat on the screen object and fired LATER, out of context, presented as if it had just
+         happened. Reachable: a PMIX where an item sold 0 units writes weekly_covers: 0, the gate
+         above filters on a TRUTHY weekly_covers, and a small menu can drop under four and land here
+         on the very redraw that follows the import.
+         ⚠ THAT FILTER IS ITSELF A KNOWN GAP, NOT FIXED HERE: buildPmix deliberately keeps a real 0
+         ("a zero-seller is exactly what the Dog Test exists to surface") and four sites on this
+         screen then filter it out of the board, the Dog list and this gate. Fixing that changes what
+         the board RANKS — a 0-unit item drags its category's average — so it needs its own pass. */
+      this._coversFlash = null;
       App.setupCard(this.container, {
         title: 'Menu Engineering',
         lead: 'Menu Engineering sorts every priced item into Stars, Plowhorses, Puzzles, and Dogs, and names the move plus the number behind it. Price your menu items first.',
@@ -693,6 +704,7 @@ S.RevenueMenuEngineering = {
       // at both PMIX doors.
       const note = t => '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">' + t + '</div>';
       const list = a => a.slice(0, 8).map(esc).join(', ') + (a.length > 8 ? ', and ' + (a.length - 8) + ' more' : '');
+      const nSkip = fl.nSkipped || 0, nInc = fl.nIncomplete || 0, nNeg = fl.nNegative || 0;
       flash = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.updated ? 'var(--gold)' : 'var(--red)') + ';">'
         + (fl.failed ? 'Save failed. Try the import again.'
            : fl.updated ? 'Updated units sold on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's')
@@ -704,12 +716,16 @@ S.RevenueMenuEngineering = {
               the note below said in plain words that those names HAD matched. Every combination
               gets a headline that agrees with its notes; anything involving a genuinely unmatched
               name, or an empty file, still falls through to the name message. */
+           /* ⚠ BRANCH ON THE BUILDER'S COUNTS (nSkipped/nIncomplete/nNegative), NOT on the display
+              lists. The lists strip '(blank)' rows, so a PMIX carrying a nameless row made
+              `unmatched` come out EMPTY and the headline claimed "The item names matched" about a
+              file that had an unmatched row — one that was itself rendered nowhere. */
            : 'No items updated. ' + (
-               ((fl.incomplete || []).length && !(fl.unmatched || []).length && !(fl.netNegative || []).length)
+               (nInc && !nSkip && !nNeg)
                  ? 'The item names matched, but Bar Cop could not read a units-sold figure for any of them.'
-             : ((fl.netNegative || []).length && !(fl.unmatched || []).length && !(fl.incomplete || []).length)
+             : (nNeg && !nSkip && !nInc)
                  ? 'Every item came out at negative units after returns, so the previous figures were left alone.'
-             : (((fl.incomplete || []).length || (fl.netNegative || []).length) && !(fl.unmatched || []).length)
+             : ((nInc || nNeg) && !nSkip)
                  ? 'The item names matched — see below for what happened to each row.'
              : 'Check that the item names in your export match your menu.'))
         + '</div>'
@@ -721,7 +737,12 @@ S.RevenueMenuEngineering = {
         + (fl.incomplete && fl.incomplete.length ? note('Skipped, no readable units-sold figure: ' + list(fl.incomplete) + '. These names matched your menu, so check the units column in your export.') : '')
         // A dropped item is a MEASUREMENT THAT WENT MISSING. It keeps last week's units, and this
         // screen presents those as this week's mix — so silence here is a wrong Star/Dog call.
-        + (fl.netNegative && fl.netNegative.length ? note('Left at the previous figure: ' + list(fl.netNegative) + '. Returns exceeded sales in this file, so the units came out negative and were not written.') : '');
+        + (fl.netNegative && fl.netNegative.length ? note('Left at the previous figure: ' + list(fl.netNegative) + '. Returns exceeded sales in this file, so the units came out negative and were not written.') : '')
+        // The rows with no name to print — a nameless PMIX line is usually a subtotal or a section
+        // header. Reported as a count so the operator's totals reconcile.
+        + ((nSkip - (fl.unmatched || []).length) > 0
+            ? note((nSkip - fl.unmatched.length) + ' row' + ((nSkip - fl.unmatched.length) === 1 ? '' : 's')
+                   + ' skipped with no item name — usually a subtotal or section line in the export.') : '');
     }
     return '<div class="card form-card no-print">'
       + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Re-import Units Sold</span>' + App.freqTag('As needed') + '</div>'
@@ -771,7 +792,14 @@ S.RevenueMenuEngineering = {
     this._coversFlash = { updated, failed, merged: merged || 0,
       unmatched: skipped.filter(s => s && s !== '(blank)'),
       incomplete: (incomplete || []).filter(s => s && s !== '(blank)'),
-      netNegative: (netNegative || []).filter(Boolean) };
+      netNegative: (netNegative || []).filter(Boolean),
+      // ⚠ RAW COUNTS drive the headline; the lists above only supply names. A PMIX row with an empty
+      // Item Name cell lands in `skipped` as '(blank)', gets filtered out here, and then the headline
+      // said "The item names matched" about a file that had a nameless row — which was itself
+      // rendered nowhere. Same hole as the server door. Count what the builder counted.
+      nSkipped: (skipped || []).length,
+      nIncomplete: (incomplete || []).length,
+      nNegative: (netNegative || []).length };
     this.draw();
   },
 

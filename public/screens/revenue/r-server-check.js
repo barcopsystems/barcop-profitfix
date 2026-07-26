@@ -368,6 +368,10 @@ S.RevenueServerCheck = {
     // Say what actually happened. This used to print the file-is-wrong message for every
     // zero-row outcome, so re-dropping a good report whose rows were already logged read
     // as "check that the file has server, covers, and sales columns".
+    // Counts come from the BUILDER (see nSkipped/nIncomplete/nUndated on the flash); the name lists
+    // below are the display subset, so they can be shorter and must never drive a claim.
+    const nSkip = fl.nSkipped || 0, nInc = fl.nIncomplete || 0, nUnd = fl.nUndated || 0;
+    const nOther = nSkip + nInc + nUnd;
     let head;
     if (fl.failed)      head = fl.landed
                                ? fl.landed + ' of ' + fl.total + ' server checks were saved before the save was refused. '
@@ -375,17 +379,26 @@ S.RevenueServerCheck = {
                                : 'Save failed. Nothing was imported. Try the import again.';
     else if (fl.added)  head = fl.added + ' server check' + (fl.added === 1 ? '' : 's') + ' imported'
                                + (fl.dupCount ? ', ' + fl.dupCount + ' already logged' : '') + '.';
-    else if (fl.dupCount) head = 'No new checks. All ' + fl.dupCount + ' row' + (fl.dupCount === 1 ? ' was' : 's were') + ' already logged.';
+    // ⚠ "All" ONLY WHEN NOTHING ELSE WAS DROPPED. This branch fired on any non-zero dupCount, so a
+    // re-drop where 5 rows deduped and 3 more were undated printed "All 5 rows were already logged"
+    // above a "Skipped, no readable date" note — and made both branches below unreachable.
+    else if (fl.dupCount && !nOther) head = 'No new checks. All ' + fl.dupCount + ' row' + (fl.dupCount === 1 ? ' was' : 's were') + ' already logged.';
+    else if (fl.dupCount) head = 'No new checks. ' + fl.dupCount + ' row' + (fl.dupCount === 1 ? ' was' : 's were') + ' already logged; the rest could not be used.';
     /* ⚠ DO NOT BLAME COLUMNS THAT WERE FINE, and do not contradict the note printed directly below.
        This was the only zero-row sentence, so a file whose Date cells read "Jul 24" (no year) was
        told to check the server, covers and sales columns — with "Skipped, no readable date: Maria
        Lopez" sitting underneath it — and a file where every server rang zero sent the operator to
        the Staff Roster to add people already on it. Same fix as the PMIX door one screen over.
        Anything involving a genuinely unmatched name still falls through to the column message. */
-    else if ((fl.undated || []).length && !(fl.unmatched || []).length && !(fl.incomplete || []).length)
+    else if (nUnd && !nSkip && !nInc)
       head = 'No rows imported. Bar Cop could not read a date on any row — check the date column in your export.';
-    else if ((fl.incomplete || []).length && !(fl.unmatched || []).length && !(fl.undated || []).length)
+    else if (nInc && !nSkip && !nUnd)
       head = 'No rows imported. Every name matched your roster, but no row had both covers and sales.';
+    // ⚠ THE MIXED CASE. Each branch above demands the other two buckets be empty, so a file with
+    // some undated rows AND some that rang nothing fell through to the column message — with the
+    // notes underneath naming only dates and covers. Every combination needs a true headline.
+    else if (!nSkip && (nUnd || nInc))
+      head = 'No rows imported. Every name matched your roster — see below for what stopped each row.';
     else                head = 'No rows imported. Check that the file has server, covers, and sales columns.';
     const note = t => '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">' + t + '</div>';
     const list = a => a.slice(0, 8).map(esc).join(', ') + (a.length > 8 ? ', and ' + (a.length - 8) + ' more' : '');
@@ -396,7 +409,13 @@ S.RevenueServerCheck = {
       // reporting those rows in `undated` — the cockpit door says so, this one never destructured it,
       // so at THIS door the row vanished with no word at all. It is the one skip an operator can
       // actually fix in the file (a date cell like "Jul 24" with no year), so it has to be named.
-      + (fl.undated && fl.undated.length ? note('Skipped, no readable date: ' + list(fl.undated) + '. Check the date column in your export.') : '');
+      + (fl.undated && fl.undated.length ? note('Skipped, no readable date: ' + list(fl.undated) + '. Check the date column in your export.') : '')
+      // ⚠ THE ROWS WITH NO NAME TO PRINT. A subtotal or section line with an empty Server cell is a
+      // real dropped row, and it was rendered NOWHERE because every list above prints names and it
+      // has none. Report it as a count so the totals an operator adds up actually reconcile.
+      + ((nSkip - (fl.unmatched || []).length) > 0
+          ? note((nSkip - fl.unmatched.length) + ' row' + ((nSkip - fl.unmatched.length) === 1 ? '' : 's')
+                 + ' skipped with no server name — usually a subtotal or section line in the export.') : '');
   },
   mountServerImport() {
     const el = document.getElementById('rsc-imp-csv');
@@ -429,8 +448,10 @@ S.RevenueServerCheck = {
          (The cockpit door does the same probe — sc-dashboard.importServer.) */
       if (ok) added = toAdd.length;
       else {
-        const live = new Set(((App.data && App.data.revenue_server_checks) || []).map(x => x && x.id));
-        landed = toAdd.filter(r => live.has(r.id)).length;
+        // IDENTITY, not id: App.putRecord assigns the exact object on success and restores the
+        // previous one (or splices it out) on a genuine refusal.
+        const live = ((App.data && App.data.revenue_server_checks) || []);
+        landed = toAdd.filter(r => live.indexOf(r) !== -1).length;
         failed = true;
       }
     }
@@ -438,7 +459,17 @@ S.RevenueServerCheck = {
       added, failed, landed, total: toAdd.length, dupCount: dupCount || 0,
       unmatched: (skipped || []).filter(s => s && s !== '(blank)'),
       incomplete: (incomplete || []).filter(s => s && s !== '(blank)'),
-      undated: (undated || []).filter(s => s && s !== '(blank)')
+      undated: (undated || []).filter(s => s && s !== '(blank)'),
+      /* ⚠ RAW COUNTS FOR THE HEADLINE — the display lists above strip '(blank)' rows, and the
+         headline must never assert something those lists cannot see. A subtotal or section line
+         with an empty Server cell and a populated Covers cell survives CSVMapper's all-cells-empty
+         filter, lands in `skipped` as '(blank)', and is then filtered out here — so `unmatched`
+         came out EMPTY and the headline claimed "Every name matched your roster" about a file that
+         had an unmatched row, which was also rendered nowhere. Branch on what the BUILDER counted;
+         list only what can be named; report the difference as a count. */
+      nSkipped: (skipped || []).length,
+      nIncomplete: (incomplete || []).length,
+      nUndated: (undated || []).length
     };
     this.draw();
   },
