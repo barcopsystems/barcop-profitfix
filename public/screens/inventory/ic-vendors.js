@@ -352,12 +352,19 @@ S.InventoryVendors = {
            `delivery_fee` then fell through to `'shipping'` and grabbed "Free Shipping Over ($)", and
            the Order Sheet printed a **$400 delivery fee** on every order. Exact headers already win
            in pass 1, so removing the loose token costs nothing and closes both mis-binds. */
-        { key: 'delivery_days',  label: 'Delivery Days', required: false, match: ['delivery days', 'delivery day', 'delivery schedule', 'ship days', 'order days', 'days'] },
+        /* ⚠ `'delivery'` IS BACK, AND SO IS `'shipping'` BELOW. Deleting them stopped the mis-bind
+           (delivery_days was word-matching "Delivery Fee ($)") but ALSO killed their pass-1 EXACT
+           match, so a hand-kept sheet with a one-word "Delivery" column bound NOTHING — and no
+           delivery days means `perWeek` 0, which silently reverts every product from that vendor to
+           the Default Delivery Cycle for its par. Both tokens are in `EXACT_ONLY` in csv-mapper.js
+           now, which is the mechanism built for exactly this: good as a whole header, never allowed
+           to hunt inside a longer one. */
+        { key: 'delivery_days',  label: 'Delivery Days', required: false, match: ['delivery days', 'delivery day', 'delivery schedule', 'ship days', 'order days', 'days', 'delivery'] },
         { key: 'payment_terms',  label: 'Terms',         required: false, match: ['terms', 'payment terms', 'net terms', 'payment', 'credit terms', 'pay terms'] },
         { key: 'account_number', label: 'Account #',     required: false, match: ['account', 'account number', 'account #', 'acct', 'acct #', 'account no', 'customer number', 'customer #', 'acct number', 'account id'] },
         { key: 'order_minimum',  label: 'Order Minimum', required: false, match: ['order minimum', 'minimum', 'min order', 'order min', 'minimum order', 'min purchase', 'minimum purchase', 'minimum order amount'] },
-        // `'shipping'` removed for the same reason: it word-matched "Free Shipping Over ($)".
-        { key: 'delivery_fee',   label: 'Delivery Fee',  required: false, match: ['delivery fee', 'freight', 'delivery charge', 'shipping fee', 'freight charge', 'delivery cost'] },
+        // `'shipping'` last, and exact-only via EXACT_ONLY — see the note on delivery_days above.
+        { key: 'delivery_fee',   label: 'Delivery Fee',  required: false, match: ['delivery fee', 'freight', 'delivery charge', 'shipping fee', 'freight charge', 'delivery cost', 'shipping'] },
         { key: 'free_delivery_over', label: 'Free Delivery Over', required: false, match: ['free delivery over', 'free delivery', 'free shipping over', 'free freight over', 'free delivery threshold', 'free shipping', 'free delivery minimum'] }
       ],
       confirmLabel: 'Import',
@@ -419,24 +426,39 @@ S.InventoryVendors = {
     };
     if (/^\s*(daily|every\s*day|7\s*days?)\s*$/i.test(s)) return D.join(', ');
     const on = new Set();
-    // A range: "Mon-Fri", "Monday to Friday", "Tue thru Sat".
-    const range = s.match(/([a-z]+)\s*(?:-|–|—|to|thru|through)\s*([a-z]+)/i);
-    if (range) {
-      const a = idxOf(range[1]), b = idxOf(range[2]);
-      if (a > -1 && b > -1) { for (let i = a; ; i = (i + 1) % 7) { on.add(i); if (i === b) break; } }
-    }
-    if (!on.size) {
-      let ambiguous = false;
-      s.split(/[,/&+;|\s]+/).forEach(tok => {
+    let ambiguous = false;
+    /* ⚠⚠ EVERY RANGE, THEN EVERYTHING LEFT OVER. The first version matched ONE range and gated the
+       token pass behind `if (!on.size)`, so the rest of the cell was silently discarded:
+       "Mon-Fri, Sat" lost Saturday, "Mon-Wed, Fri" lost Friday, "Mon-Wed & Fri-Sat" lost two days.
+       That is how a distributor actually writes a schedule with an add-on day, and it was INVISIBLE
+       — `badDays` only counts a cell that comes back completely empty, so a file with four mangled
+       cells printed "Imported 4 vendors." with no note. `deliveryDaysPerWeek` drives the par cycle,
+       so "Mon-Wed, Fri" suggested 9 units against a true 7 and "Mon.-Fri." suggested 26 against 6.
+       ⚠ `[.\s]*` around the separator, or "Mon.-Fri." never matches at all and collapses to "Mon". */
+    /* ⚠ SPLIT INTO SEGMENTS FIRST, THEN DECIDE RANGE-OR-LIST PER SEGMENT. Deciding globally on a
+       dash count got "Mon-Wed & Fri-Sat" wrong (two ranges, read as a two-item list → "Mon, Fri")
+       and "M-W-F" wrong the other way (a dash-delimited LIST, read as a range). Segmenting settles
+       both: a segment with exactly ONE dash between two day tokens is a range; anything else is a
+       list of tokens. */
+    const addRange = (a, b) => { for (let i = a; ; i = (i + 1) % 7) { on.add(i); if (i === b) break; } };
+    s.split(/[,;&|]+|\band\b|\/(?=\s*[a-z]{3,})/i).forEach(seg => {
+      const dashes = (seg.match(/-|–|—/g) || []).length;
+      const r = (dashes === 1 || /\b(to|thru|through)\b/i.test(seg))
+        ? seg.match(/([a-z]+)[.\s]*(?:-|–|—|to|thru|through)[.\s]*([a-z]+)/i) : null;
+      if (r) {
+        const a = idxOf(r[1]), b = idxOf(r[2]);
+        if (a === -2 || b === -2) { ambiguous = true; return; }
+        if (a > -1 && b > -1) { addRange(a, b); return; }
+      }
+      seg.split(/[/+.\s-]+/).forEach(tok => {
         const i = idxOf(tok);
         if (i === -2) ambiguous = true;
         else if (i > -1) on.add(i);
       });
-      // A cell mixing readable days with an ambiguous single letter is refused WHOLE. Keeping the
-      // readable half would store a delivery schedule that is quietly missing a day, and the par
-      // suggestion is computed from the count.
-      if (ambiguous) return '';
-    }
+    });
+    /* A cell mixing readable days with an ambiguous single letter is refused WHOLE. Keeping the
+       readable half would store a schedule quietly missing a day, and the par count reads it. */
+    if (ambiguous) return '';
     if (!on.size) return '';
     return D.filter((_, i) => on.has(i)).join(', ');
   },
@@ -445,16 +467,36 @@ S.InventoryVendors = {
      lbs, and the import hardcoded `'$'` — so "5 cases" stored as FIVE DOLLARS and the Order Sheet
      measured a case minimum against a dollar total, always reading "Meets the $5.00 minimum". */
   _minUnitOf(raw, fallback) {
-    const s = String(raw || '').toLowerCase();
+    const s = String(raw || '').trim().toLowerCase();
+    /* ⚠ THE WHOLE CELL MUST BE "<number> <unit>" AND NOTHING ELSE. Hunting for a unit WORD anywhere
+       in the cell read one out of ordinary money text: "$35 case charge" stored the unit `cases`,
+       "$1,000 per unit" stored `units`, and "$250 or 5 cases" stored **2,505 cases** (App.parseNum
+       concatenates the digit runs, which is its own reason to distrust a cell shaped like that).
+       The Order Sheet then measured a DOLLAR minimum against a unit count. A currency marker
+       settles it outright: if the cell says $, it is money. */
+    if (!s || /[$€£]/.test(s)) return fallback || '$';
+    const m = s.match(/^[\d.,]+\s*([a-z]+)$/);
+    if (!m) return fallback || '$';
     const own = (App.listOptions ? App.listOptions('order_min_unit') : []) || [];
+    const word = m[1].replace(/s$/, '');
     const hit = this.MIN_UNITS.concat(own).find(u => u && u !== '$'
-      && new RegExp('(^|[^a-z])' + String(u).toLowerCase().replace(/s$/, '') + 's?([^a-z]|$)').test(s));
+      && String(u).toLowerCase().replace(/s$/, '') === word);
     return hit || fallback || '$';
   },
 
   async importVendors(rows) {
     const existing = this.vendors();
-    const taken = new Set(existing.map(v => (v.name || '').trim().toLowerCase()));
+    /* ⚠ THE SEED MUST BE FLATTENED THE SAME WAY THE INCOMING KEY IS, or the dedup only works for
+       punctuation-free names. It was seeded RAW while the incoming key stripped `[\s.,]`, so
+       "ben e. keith" never equalled "ben e keith" — and a re-drop, which is the exact case the
+       dedup was added for, minted a second "Ben E. Keith" and a second "Glazer's, Inc." Distributor
+       names carry periods and commas as a rule. Products link to vendors BY NAME and `_vendorInfo`
+       takes the FIRST match, so once the operator edits the second copy the Order Sheet keeps
+       quoting the stale first one. */
+    const vkey = n => String(n || '').trim().toLowerCase().replace(/[\s.,]+/g, ' ').trim();
+    // ⚠ `.map(v => vkey(v.name))`, not `.map(vkey)` — `existing` holds vendor OBJECTS, so passing
+    // them straight in stringifies every seed key to "[object Object]" and the dedup matches NOTHING.
+    const taken = new Set(existing.map(v => vkey(v.name)));
     const toAdd = [];
     let dup = 0, blank = 0, badDays = 0, badTerms = 0;
     rows.forEach(r => {
@@ -463,7 +505,7 @@ S.InventoryVendors = {
       // Flatten punctuation and runs of whitespace for the dedup key only — the STORED name keeps
       // the operator's own spelling. `Sysco Foods.` and `Sysco  Foods` are one vendor, and products
       // link to vendors BY NAME, so a near-duplicate record owns nothing and confuses the list.
-      const key = name.toLowerCase().replace(/[\s.,]+/g, ' ').trim();
+      const key = vkey(name);
       // Skip a name already on the list (or repeated in the file) so a re-drop
       // never creates duplicate vendors.
       if (taken.has(key)) { dup++; return; }
