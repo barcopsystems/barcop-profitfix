@@ -469,6 +469,12 @@ S.InventoryVendors = {
     // Both endpoints may be worded ("open-close", "noon-close", "11a-close"), not just numeric.
     const TIMEWORD = '(?:\\d{1,2}(?::\\d{2})?\\s*(?:am|pm|a|p)?|open|opening|noon|midnight|lunch|dinner|clos(?:e|ing))';
     s = s.replace(new RegExp('\\b' + TIMEWORD + '\\s*[-\u2013\u2014]\\s*' + TIMEWORD + '\\b', 'g'), ' ');
+    /* ⚠⚠ A DOTTED ABBREVIATION IS NOT A DAY. Tokenising splits "a.m." into ['a','m'] — and `m` is
+       Monday in the single-letter vocabulary that exists to make "M/W/F" work. So **"Tue & Thu a.m."
+       stored Mon, Tue, Thu**, "confirm w/ rep" added Wednesday and "F.O.B." added Friday, every one
+       of them silently. The whole-word `am`/`pm` were already fillers; only the punctuated
+       spellings broke. Remove any run of single-letter-plus-period, and the `w/` shorthand. */
+    s = s.replace(/\b(?:[a-z]\.){2,}/g, ' ').replace(/\b[a-z]\/(?=\s|$)/g, ' ');
 
     /* Segment on LIST separators, then decide range-or-list inside each segment. A segment holding
        one range marker between two days is a range ("Mon-Fri"); anything else is a list, which is
@@ -489,24 +495,71 @@ S.InventoryVendors = {
        "Mon-Fri not before 8am", "Mon-Fri but call first" — and treating them as negators threw
        every one of those schedules away entirely. They only negate when a DAY actually follows. */
     const STRONG = /\b(?:closed|closes|close|except|excepting|excluding|excl|exc|minus)\b/;
-    const WEAK = /\b(?:no|not|but)\b(?:\s+\w+){0,2}\s+(?:mon|tue|wed|thu|fri|sat|sun|weekend)/;
+    // ⚠ A LOOKAHEAD, so the match is the negator WORD only. Including the day in the match meant
+    // "Every day but Sunday" consumed "but sunday" whole — the day never reached a segment and was
+    // never excluded, so it returned all seven days.
+    const WEAK = /\b(?:no|not|but)\b(?=(?:\s+\w+){0,2}\s+(?:mon|tue|wed|thu|fri|sat|sun|weekend))/;
+    const DAYWORD = /\b(?:mon|tue|wed|thu|fri|sat|sun|weekday|weekend)/;
+    const pushSegs = (text, polarity) => {
+      if (!text || !text.trim()) return;
+      text.split(/[&|+]+|\band\b|\bor\b|\/(?=\s*[a-z]{2,})/).forEach(seg => segs.push({ seg, polarity }));
+    };
     clauses.forEach(cl => {
-      const hasNeg = STRONG.test(cl) || WEAK.test(cl);
+      const m = cl.match(STRONG) || cl.match(WEAK);
       /* ⚠ NEGATION ONLY PERSISTS FORWARD ONCE A POSITIVE SET EXISTS. "Mon-Thu, closed Fri, Sat,
          Sun" is one exclusion list continuing across clauses; "closed Sunday, Mon-Fri" is an
          exclusion FOLLOWED BY the real schedule, and persisting there negated Mon-Fri and returned
          nothing. Whether a positive clause came first is what tells them apart. */
-      if (hasNeg) mode = 'neg';
-      else if (!sawPositive) mode = 'pos';
-      const polarity = mode;
-      if (polarity === 'pos' && /\b(?:mon|tue|wed|thu|fri|sat|sun|m|w|f|daily|weekday|weekend)/.test(cl)) sawPositive = true;
-      cl.split(/[&|+]+|\band\b|\bor\b|\/(?=\s*[a-z]{2,})/).forEach(seg => segs.push({ seg, polarity }));
+      if (!m && !sawPositive) mode = 'pos';
+      if (!m) {
+        const polarity = mode;
+        if (polarity === 'pos' && DAYWORD.test(cl)) sawPositive = true;
+        pushSegs(cl, polarity);
+        return;
+      }
+      /* ⚠⚠ A NEGATOR APPLIES TO ONE SIDE OF ITSELF, NOT TO THE WHOLE CLAUSE. Making the clause
+         negative wholesale meant **"Mon-Fri except holidays"** (no comma) negated its OWN days and
+         imported nothing — par fell back to the 7-day default, 20 against a true 4. The natural
+         reading: a negator negates what FOLLOWS it, unless nothing follows, in which case it
+         negates what precedes ("Sat & Sun closed"). */
+      const at = cl.indexOf(m[0]);
+      const head = cl.slice(0, at), tail = cl.slice(at + m[0].length);
+      /* ⚠ THE HEAD IS ALWAYS PUSHED. Gating it on DAYWORD dropped **"Daily except holidays"** and
+         "Daily except Sat & Sun" entirely, because `daily` is not a day NAME — the head never
+         reached the walk, the all-week flag was never set, and both returned nothing. */
+      if (DAYWORD.test(tail)) {
+        pushSegs(head, mode);
+        if (mode === 'pos' && (DAYWORD.test(head) || /\bdaily|every|all\b/.test(head))) sawPositive = true;
+        pushSegs(tail, 'neg');
+        mode = 'neg';
+      } else {
+        // Nothing to exclude after the negator: a trailing negator applies BACKWARDS ("Sat & Sun
+        // closed"); a non-day after it ("except holidays") excludes nothing at all.
+        const backwards = !tail.trim() || !/[a-z]/.test(tail);
+        pushSegs(head, backwards ? 'neg' : mode);
+        if (backwards) mode = 'neg';
+        else if (mode === 'pos' && DAYWORD.test(head)) sawPositive = true;
+      }
     });
 
     segs.forEach(({ seg, polarity }) => {
-      const words = seg.split(/[^a-z0-9]+/).filter(Boolean);
-      const dashes = (seg.match(/[-\u2013\u2014]/g) || []).length;
-      const rangey = dashes === 1 || /\b(?:to|thru|through)\b/.test(seg);
+      /* \u26a0\u26a0 COUNT ONLY THE DASHES THAT SIT BETWEEN TWO DAYS. Counting every dash in the segment made
+         any hyphenated word collapse the range to its endpoints: **"Mon-Fri (drop-off)" stored
+         Mon and Fri**, 2 delivery days instead of 5, and the suggested par went from 4 to 10. Every
+         ordinary hyphenated note does it \u2014 drop-off, walk-in, pre-order, same-day, cut-off,
+         self-serve, e-mail, 24-hour \u2014 and it was silent, because a non-empty result is never
+         counted in `badDays`. The range marker is kept as its own `~` token so adjacency can be
+         read directly: `DAY ~ DAY` is a range, and two of those in one segment is a LIST, which is
+         what keeps "M-W-F" three days rather than Monday through Wednesday. */
+      const toks = seg.replace(/[-\u2013\u2014]|\b(?:to|thru|through)\b/g, ' ~ ')
+        .split(/[^a-z0-9~]+/).filter(Boolean);
+      const isDay = w => !NEG[w] && !FILLER[w] && !SPAN[w] && DAY[w] != null;
+      let adjacent = 0;
+      for (let i = 1; i < toks.length - 1; i++) {
+        if (toks[i] === '~' && isDay(toks[i - 1]) && isDay(toks[i + 1])) adjacent++;
+      }
+      const rangey = adjacent === 1;
+      const words = toks.filter(w => w !== '~');
       const found = [];
       for (let i = 0; i < words.length; i++) {
         const w = words[i];
