@@ -500,7 +500,12 @@ S.InventoryVarianceReport = {
              Precise terms first, loose synonyms last — a `match` array is a priority list. */
           { key: 'name',  label: 'Product Name',   required: true,  match: ['product name', 'item name', 'menu item', 'product', 'description', 'item', 'name'] },
           { key: 'qty',   label: 'Quantity Sold',  required: false, match: ['item qty', 'qty sold', 'quantity sold', 'units sold', 'number sold', 'qty', 'quantity', 'sold', 'units', 'pours'] },
-          { key: 'sales', label: 'Sales Amount',   required: false, match: ['net sales', 'net amount', 'net price', 'sales amount', 'sales total', 'total sales', 'item price', 'gross sales', 'sales', 'revenue', 'price', 'amount', 'total'] }
+          /* ⚠ THE BARE `'sales'` SITS BEHIND EVERY PRICE TERM. Left ahead of them it still took a
+             TEXT column: on `Menu Item / Sales Category / Qty / Gross Price` it word-matched
+             "Sales Category" in pass 2 and every product read $0 register sales at 100% variance.
+             Exact headers win in pass 1 regardless of order, so demoting it costs nothing and
+             closes the whole family (Gross Price, Extended Price, Sale Price, Net, Sales $). */
+          { key: 'sales', label: 'Sales Amount',   required: false, match: ['net sales', 'net amount', 'net price', 'sales amount', 'sales total', 'total sales', 'item price', 'gross sales', 'gross price', 'extended price', 'sale price', 'revenue', 'price', 'amount', 'total', 'sales'] }
         ],
         onComplete: rows => {
           this.posRows = rows.map(r => ({

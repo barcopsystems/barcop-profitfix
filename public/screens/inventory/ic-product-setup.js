@@ -223,16 +223,40 @@ S.InventoryProducts = {
      ⚠ The manual form never had this bug because it uses a size DROPDOWN (SIZES above, already in
      ounces). The import is the only door that can put a raw metric string in the field.
      Explicit units only — this converts what the file SAYS and never guesses at a bare number. */
+  /* ⚠⚠ IT DELEGATES TO `App.ozPerUnit`, WHICH ALREADY EXISTED. The first version hand-rolled ml/cl/L
+     here — a second unit table 5,300 lines from the real one — and immediately proved why that is a
+     mistake: it did not know **LTR**, which is what every distributor order guide actually prints,
+     so a "1.75LTR" handle still read as 1.75 OUNCES (the exact 34x bug this function was written to
+     kill, surviving under the commonest spelling). It also knew nothing of gal/qt/pt/cup, which
+     `App.ozPerUnit` has carried all along, so "5.16 gal" read as 5.16 oz at a 4,872% pour cost.
+     One table. Formats added there are gained here for free, and vice versa.
+     ⚠ A CELL WITH TWO NUMBERS IS REFUSED, NOT GUESSED. "12/750ML" is pack-times-size, and
+     `App.parseNum` concatenates digit runs — its own doc says it will not unpick a two-number cell —
+     so it produced 12750 and this function turned that into **431 oz: a plausible 13% pour cost that
+     renders GREEN**. That is worse than the raw 0.4% it replaced, which at least looked absurd.
+     Refusing leaves the row Incomplete, which is the honest state and the one the operator can act
+     on. */
   _sizeToOz(raw) {
-    const n = App.parseNum(raw);
+    const s = String(raw == null ? '' : raw).trim().toLowerCase();
+    if (!s) return null;
+    if ((s.match(/[\d][\d,]*(?:\.\d+)?/g) || []).length > 1) return null;   // pack x size — ambiguous
+    const n = App.parseNum(s);
     if (n == null) return null;
-    const s = String(raw).toLowerCase();
-    const OZ_ML = 29.5735;                                   // 1 US fl oz
-    const r1 = v => Math.round(v * 10) / 10;                 // matches the SIZES table's precision
-    if (/\d\s*ml\b|millilit/.test(s))            return r1(n / OZ_ML);
-    if (/\d\s*cl\b|centiliT/i.test(s))           return r1(n * 10 / OZ_ML);
-    if (/\d\s*l\b|\blitre|\bliter/.test(s))      return r1(n * 1000 / OZ_ML);
-    return n;                                                // already ounces, or the operator's own oz column
+    const m = s.match(/[\d.]\s*([a-z]+)/);                   // the unit token attached to the number
+    const per = (m && App.ozPerUnit) ? App.ozPerUnit(m[1]) : null;
+    if (per == null) return n;                               // no unit, or one we do not convert: already ounces
+    return Math.round(n * per * 10) / 10;                    // matches the SIZES table's precision
+  },
+
+  /* A PACK COLUMN'S LEADING NUMBER IS THE COUNT. `parseInt` used to read it and the switch to
+     `App.parseNum` REGRESSED every slash-pack cell: "24/12 OZ" became **2412**, so a $28.80 case of
+     beer priced at **$0.0119 a bottle** instead of $1.20 — a 100x understatement feeding
+     `App.bottleCost`, COGS, variance dollars, stock value and the books valuation. The switch was
+     made to win "1,000 count" (which parseInt read as 1); this reads the first NUMBER RUN, so it
+     wins both — commas stay inside the run, a slash ends it. */
+  _packCount(raw) {
+    const m = String(raw == null ? '' : raw).match(/[\d][\d,]*(?:\.\d+)?/);
+    return m ? App.parseNum(m[0]) : null;
   },
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -1993,6 +2017,15 @@ S.InventoryProducts = {
     // App.parseNum is the ONE coercion; null for "no number" is already this caller's contract.
     // ⚠ It also FIXES the sign here: this stripped the minus entirely, so a "-4.50" cell read +4.50.
     const numOf = str => App.parseNum(str);
+    /* ⚠ DECLARED HERE, above every use. It sat below the size read and died in the temporal dead
+       zone — the same trap that bit the staff door's `wageNum` in the same round.
+       Negative values must not reach storage (the standard `verify-negative-input-guards.js`
+       states): the typed form carries `min="0"` on size, pour, par and reorder and `min="1"` on the
+       pack fields, so the IMPORT is the only door that can produce one — and Excel's accounting
+       format on a vendor credit line emits exactly `(25.00)`, which App.parseNum correctly reads as
+       -25. Stored, it gave a negative pour cost that `isComplete()` called true and the row-colour
+       class rendered GREEN, indistinguishable from a healthy figure. */
+    const nonNeg = n => (n == null || n < 0) ? null : n;
     // Snap an imported Misc Type to a known tag (case-insensitive); an unknown
     // value is kept as typed and simply behaves as a recipe ingredient.
     const normMiscType = v => { const s = (v || '').trim().toLowerCase(); return (App.MISC_TYPES || []).find(t => t.toLowerCase() === s) || (v || '').trim(); };
@@ -2025,7 +2058,9 @@ S.InventoryProducts = {
       const nameKey = name.toLowerCase();
       if (taken.has(nameKey)) { if (archived.has(nameKey)) dupArchived++; else dup++; return; }
       taken.add(nameKey);
-      let oz     = this._sizeToOz(val(row, 'container_size_oz'));
+      // nonNeg here too: a `-750ml` credit line gave -25.4 oz, a NEGATIVE pour cost, and the row
+      // still read Complete and rendered GREEN (the row-colour class keys off the sign).
+      let oz     = nonNeg(this._sizeToOz(val(row, 'container_size_oz')));
       // Bottle beer has no oz field; store a fixed nominal size so the usage-variance
       // oz round-trip cancels (never shown or entered — matches the manual form).
       if (cat === 'Bottle Beer') oz = 12;
@@ -2036,20 +2071,19 @@ S.InventoryProducts = {
          line emits exactly that, and App.parseNum correctly reads it as -25. It then stored as a
          negative unit cost with `isComplete()` returning TRUE, giving negative COGS and negative
          inventory value. Dropping it to null leaves the row Incomplete, which is the honest state. */
-      const nonNeg = n => (n == null || n < 0) ? null : n;
       const pour = spec.showPour ? nonNeg(numOf(val(row, 'pour_size_oz'))) : null;
       const cost = nonNeg(numOf(val(row, 'unit_cost')));
       // Menu price + servings come in for resale Food/Misc as well as pourables.
       const price = (spec.showMenuPrice || spec.showUnitType) ? nonNeg(numOf(val(row, 'menu_price'))) : null;
       const soldOnMenu = spec.showUnitType && price != null && price > 0;
-      const servingsPerUnit = soldOnMenu ? (numOf(val(row, 'servings_per_unit')) || 1) : null;
+      const servingsPerUnit = soldOnMenu ? (this._packCount(val(row, 'servings_per_unit')) || 1) : null;
       const costPerServing = soldOnMenu ? this._resaleCps(cost, servingsPerUnit) : null;
-      const caseSize = spec.showCaseSize ? (numOf(val(row, 'case_size')) || null) : null;
+      const caseSize = spec.showCaseSize ? (this._packCount(val(row, 'case_size')) || null) : null;
       const unitType = spec.showUnitType ? (val(row, 'unit_type').toLowerCase() || spec.defaultUnitType) : null;
       const miscType = cat === 'Misc' ? normMiscType(val(row, 'misc_type')) : '';
       // Food / Misc: pieces-or-servings per unit, the recipe noun, and the count
       // method (defaulted from the product's role, exactly like the form).
-      const packSizeRaw = spec.showPackSize ? (numOf(val(row, 'pack_size')) || null) : null;
+      const packSizeRaw = spec.showPackSize ? (this._packCount(val(row, 'pack_size')) || null) : null;
       // A Food/Misc product is tracked ONE way: by ounces (container_size_oz) OR by
       // pieces (pack_size), never both — otherwise the edit form picks one Track By
       // and drops the other on save. Prefer ounces when a container size is given.
@@ -2085,8 +2119,8 @@ S.InventoryProducts = {
         sold_on_menu:        soldOnMenu,
         servings_per_unit:   servingsPerUnit,
         cost_per_serving:    costPerServing,
-        par_level:           numOf(val(row, 'par_level')),
-        reorder_point:       numOf(val(row, 'reorder_point')),
+        par_level:           nonNeg(numOf(val(row, 'par_level'))),
+        reorder_point:       nonNeg(numOf(val(row, 'reorder_point'))),
         primary_location:    '',
         active:              true,
         notes:               '',

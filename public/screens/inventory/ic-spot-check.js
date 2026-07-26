@@ -618,14 +618,19 @@ S.InventorySpotCheck = {
       // coercion; this door had a private copy that disagreed with it on four shapes.
       const sold = App.parseNum(r.sold);
       if (sold == null) { unreadable++; return; }
-      /* A negative sold is refused. The typed field is `<input type="number" min="0">`, so the
-         operator cannot enter one; only the import can. A net-negative POS line (refunds exceeding
-         sales) wrote straight through and produced 141.6 pours of phantom theft. */
-      if (sold < 0) { negative++; return; }
+      /* ⚠ A NEGATIVE ROW IS NETTED, NOT DROPPED. Refusing it per row fought the summing directly
+         above: a POS export that prints returns on their own line ("Tito's 60", "Tito's -4") had
+         the refund THROWN AWAY and filled 60 instead of 56 — 4 phantom pours of "sold", which is
+         the divisor of the whole spot check, so the variance understated by 4 pours per product.
+         The guard belongs on the TOTAL, below, where a genuinely net-negative product is refused. */
       totals[p.id] = (totals[p.id] || 0) + sold;
     });
     let filled = 0;
     Object.keys(totals).forEach(pid => {
+      /* Only a net-negative TOTAL is refused. The typed field is `<input type="number" min="0">`,
+         so the operator cannot enter one; a file whose refunds exceed its sales for a product is
+         not a quantity the check can use, and writing it produced phantom theft. */
+      if (totals[pid] < 0) { negative++; return; }
       const inp = onScreen[pid].querySelector('.sp-sold');
       if (inp) { inp.value = totals[pid]; this.recalcLine(onScreen[pid]); filled++; }
     });
@@ -644,9 +649,18 @@ S.InventorySpotCheck = {
       const tail = notes.length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes.join(' · ') + ')</span>' : '';
       res.innerHTML = filled > 0
         ? '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Filled POS sold for ' + filled + ' product' + (filled === 1 ? '' : 's') + '. Review the variance below, then save.' + tail + '</div>'
+        /* ⚠ THE ZERO-FILL HEADLINE MUST NAME THE CAUSE THAT ACTUALLY APPLIES. It said "No products
+           matched… make sure the names match" whenever nothing filled — including when the names
+           matched perfectly and the figures were unreadable or net-negative, and on an empty file.
+           An absolute claim may only fire when the other buckets are empty. */
         : '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-          + (offCheck && !noMatch ? 'Nothing filled. Those products are not on this check yet — add them first.'
-             : 'No products matched. Add the products to the check first, and make sure the names match.')
+          + (offCheck && !noMatch && !unreadable && !negative
+              ? 'Nothing filled. Those products are not on this check yet — add them first.'
+             : (unreadable || negative) && !noMatch
+              ? 'Nothing filled. The products matched, but no row carried a sold figure Bar Cop could use.'
+             : noMatch || offCheck
+              ? 'Nothing filled.'
+              : 'No products matched. Add the products to the check first, and make sure the names match.')
           + tail + '</div>';
     }
   },
