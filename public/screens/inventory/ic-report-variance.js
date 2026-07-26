@@ -514,8 +514,14 @@ S.InventoryVarianceReport = {
              TEXT column: on `Menu Item / Sales Category / Qty / Gross Price` it word-matched
              "Sales Category" in pass 2 and every product read $0 register sales at 100% variance.
              Exact headers win in pass 1 regardless of order, so demoting it costs nothing and
-             closes the whole family (Gross Price, Extended Price, Sale Price, Net, Sales $). */
-          { key: 'sales', label: 'Sales Amount',   required: false, match: ['net sales', 'net amount', 'net price', 'sales amount', 'sales total', 'total sales', 'item price', 'gross sales', 'gross price', 'extended price', 'sale price', 'revenue', 'price', 'amount', 'total', 'sales'] }
+             closes the whole family (Gross Price, Extended Price, Sale Price, Net, Sales $).
+             ⚠ AND `rung sales` / `server sales` ARE NOW EXPLICIT, because `sales` became EXACT_ONLY
+             in the shared mapper (bare `sales` was word-matching "Sales Tax" and "Cash Sales" and
+             reading them as a server's whole sales figure). The moment it stopped hunting, "Rung
+             Sales" — a real Aloha/NCR header this codebase asks for BY NAME — silently stopped
+             binding here. Caught by `verify-reference-import-doors` case I9 before it shipped, which
+             is precisely why that pin exists. */
+          { key: 'sales', label: 'Sales Amount',   required: false, match: ['net sales', 'net amount', 'net price', 'sales amount', 'sales total', 'total sales', 'rung sales', 'server sales', 'item sales', 'product sales', 'item price', 'gross sales', 'gross price', 'extended price', 'sale price', 'revenue', 'price', 'amount', 'total', 'sales'] }
         ],
         onComplete: rows => {
           this.posRows = rows.map(r => ({
