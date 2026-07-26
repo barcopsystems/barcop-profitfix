@@ -594,25 +594,57 @@ S.InventorySpotCheck = {
   applyPosImport(rows) {
     const byName = {};
     this.products().forEach(p => { byName[(p.name || '').trim().toLowerCase()] = p; });
-    let filled = 0;
     const onScreen = {};
     this.container.querySelectorAll('.sp-line').forEach(line => { onScreen[line.dataset.pid] = line; });
+    /* ⚠⚠ A PRODUCT LISTED TWICE MUST BE SUMMED, NOT OVERWRITTEN. This did `inp.value = sold`, so the
+       LAST row won. Plenty of real exports print one product on several rows: Square Item Sales
+       splits Single and Double under the same item name, a Toast item report repeats per Menu Group,
+       and a per-sale export has a row per ticket. Measured: Tito's sold 60 then 41 against 6 bottles
+       poured read as **41 sold, a 60.6-pour variance, $90.90** — and the line sets `dataset.flag`,
+       so the screen shows a **red theft flag against a bartender who poured exactly what they rang**.
+       A 43-row per-sale export ends at sold = 1. The sibling door in this same section
+       (`posByProduct.addProduct` in ic-report-variance) already sums; this one never did. */
+    const totals = {};      // product id -> summed sold
+    let noMatch = 0, offCheck = 0, unreadable = 0, negative = 0;
     rows.forEach(r => {
       const p = byName[(r.product || '').trim().toLowerCase()];
-      const sold = parseFloat(r.sold);
-      if (!p || isNaN(sold)) return;
-      const line = onScreen[p.id];
-      if (!line) return;
-      const inp = line.querySelector('.sp-sold');
-      if (inp) { inp.value = sold; this.recalcLine(line); filled++; }
+      if (!p) { noMatch++; return; }
+      if (!onScreen[p.id]) { offCheck++; return; }
+      // App.parseNum, not parseFloat: `parseFloat('1,200')` is 1 and `parseFloat('$45')` is NaN,
+      // which silently DROPPED the row. Every other numeric read in this section uses the one
+      // coercion; this door had a private copy that disagreed with it on four shapes.
+      const sold = App.parseNum(r.sold);
+      if (sold == null) { unreadable++; return; }
+      /* A negative sold is refused. The typed field is `<input type="number" min="0">`, so the
+         operator cannot enter one; only the import can. A net-negative POS line (refunds exceeding
+         sales) wrote straight through and produced 141.6 pours of phantom theft. */
+      if (sold < 0) { negative++; return; }
+      totals[p.id] = (totals[p.id] || 0) + sold;
+    });
+    let filled = 0;
+    Object.keys(totals).forEach(pid => {
+      const inp = onScreen[pid].querySelector('.sp-sold');
+      if (inp) { inp.value = totals[pid]; this.recalcLine(onScreen[pid]); filled++; }
     });
     this.recalcTotal();
     this.syncDraft();
     const res = document.getElementById('sp-pos-result');
     if (res) {
+      /* `filled` counts PRODUCTS now. It used to increment inside the row loop, so a two-row file
+         for one product reported "Filled POS sold for 2 products" — the reading that hid the
+         overwrite above. And every way a row could be dropped was silent. */
+      const notes = [];
+      if (offCheck)   notes.push(offCheck + ' row' + (offCheck === 1 ? '' : 's') + ' for products not on this check');
+      if (noMatch)    notes.push(noMatch + ' name' + (noMatch === 1 ? '' : 's') + ' not matched to a product');
+      if (unreadable) notes.push(unreadable + ' row' + (unreadable === 1 ? '' : 's') + ' with no readable sold figure');
+      if (negative)   notes.push(negative + ' negative sold figure' + (negative === 1 ? '' : 's') + ' ignored');
+      const tail = notes.length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes.join(' · ') + ')</span>' : '';
       res.innerHTML = filled > 0
-        ? '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Filled POS sold for ' + filled + ' product' + (filled === 1 ? '' : 's') + '. Review the variance below, then save.</div>'
-        : '<div style="font-size:13px;color:var(--red);margin-top:12px;">No products matched. Add the products to the check first, and make sure the names match.</div>';
+        ? '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Filled POS sold for ' + filled + ' product' + (filled === 1 ? '' : 's') + '. Review the variance below, then save.' + tail + '</div>'
+        : '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+          + (offCheck && !noMatch ? 'Nothing filled. Those products are not on this check yet — add them first.'
+             : 'No products matched. Add the products to the check first, and make sure the names match.')
+          + tail + '</div>';
     }
   },
 

@@ -212,6 +212,29 @@ S.InventoryProducts = {
     {g:'Draft Keg',l:'1/2 keg (1984 oz)',oz:1984},{g:'Other',l:'Custom (enter oz)',oz:null}
   ],
 
+  /* ⚠⚠ A DISTRIBUTOR'S SIZE COLUMN IS METRIC, AND IT WAS STORED AS OUNCES VERBATIM.
+     `container_size_oz` took `App.parseNum`, which strips the unit and keeps the number — so a
+     Southern Glazer / RNDC / Breakthru order guide reading "750ML" stored a **750-OUNCE BOTTLE**:
+     500 pours instead of 16.9, a $28 bottle costing $0.056 a pour instead of $1.656, and a
+     **0.6% pour cost against a true 18.4%** — rendered GREEN, with `isComplete()` returning true so
+     nothing flagged it. "1.75L" made the opposite error, 1.75 oz, at 428%.
+     It reaches theoretical usage, theoretical sales, the Variance Report, Menu Engineering and COGS,
+     so a bar that poured three bottles reads 1,500 pours made instead of 50.8.
+     ⚠ The manual form never had this bug because it uses a size DROPDOWN (SIZES above, already in
+     ounces). The import is the only door that can put a raw metric string in the field.
+     Explicit units only — this converts what the file SAYS and never guesses at a bare number. */
+  _sizeToOz(raw) {
+    const n = App.parseNum(raw);
+    if (n == null) return null;
+    const s = String(raw).toLowerCase();
+    const OZ_ML = 29.5735;                                   // 1 US fl oz
+    const r1 = v => Math.round(v * 10) / 10;                 // matches the SIZES table's precision
+    if (/\d\s*ml\b|millilit/.test(s))            return r1(n / OZ_ML);
+    if (/\d\s*cl\b|centiliT/i.test(s))           return r1(n * 10 / OZ_ML);
+    if (/\d\s*l\b|\blitre|\bliter/.test(s))      return r1(n * 1000 / OZ_ML);
+    return n;                                                // already ounces, or the operator's own oz column
+  },
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   isPourable(cat) { return cat !== 'Food' && cat !== 'Misc'; },
 
@@ -1988,7 +2011,7 @@ S.InventoryProducts = {
       const nameKey = name.toLowerCase();
       if (taken.has(nameKey)) { dup++; return; }
       taken.add(nameKey);
-      let oz     = numOf(val(row, 'container_size_oz'));
+      let oz     = this._sizeToOz(val(row, 'container_size_oz'));
       // Bottle beer has no oz field; store a fixed nominal size so the usage-variance
       // oz round-trip cancels (never shown or entered — matches the manual form).
       if (cat === 'Bottle Beer') oz = 12;
@@ -1997,14 +2020,14 @@ S.InventoryProducts = {
       // Menu price + servings come in for resale Food/Misc as well as pourables.
       const price = (spec.showMenuPrice || spec.showUnitType) ? numOf(val(row, 'menu_price')) : null;
       const soldOnMenu = spec.showUnitType && price != null && price > 0;
-      const servingsPerUnit = soldOnMenu ? (parseInt(val(row, 'servings_per_unit')) || 1) : null;
+      const servingsPerUnit = soldOnMenu ? (numOf(val(row, 'servings_per_unit')) || 1) : null;
       const costPerServing = soldOnMenu ? this._resaleCps(cost, servingsPerUnit) : null;
-      const caseSize = spec.showCaseSize ? (parseInt(val(row, 'case_size')) || null) : null;
+      const caseSize = spec.showCaseSize ? (numOf(val(row, 'case_size')) || null) : null;
       const unitType = spec.showUnitType ? (val(row, 'unit_type').toLowerCase() || spec.defaultUnitType) : null;
       const miscType = cat === 'Misc' ? normMiscType(val(row, 'misc_type')) : '';
       // Food / Misc: pieces-or-servings per unit, the recipe noun, and the count
       // method (defaulted from the product's role, exactly like the form).
-      const packSizeRaw = spec.showPackSize ? (parseInt(val(row, 'pack_size')) || null) : null;
+      const packSizeRaw = spec.showPackSize ? (numOf(val(row, 'pack_size')) || null) : null;
       // A Food/Misc product is tracked ONE way: by ounces (container_size_oz) OR by
       // pieces (pack_size), never both — otherwise the edit form picks one Track By
       // and drops the other on save. Prefer ounces when a container size is given.
