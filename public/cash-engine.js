@@ -629,12 +629,33 @@ window.CashEngine = {
     for (let i = 0; i < numWeeks; i++) {
       const ws = this._addDays(start, i * 7), we = this._addDays(ws, 6);
       let sales = this.revenueForWeek(ws) * (1 + salesAdj / 100);
+      /* ⚠⚠ THE PRORATION WAS APPLIED TO THE INFLOW AND NOT TO THE OUTFLOW, so the later in the week
+         an operator looked, the poorer Bar Cop told them they were. Opening cash is a "right now"
+         balance: on a Sunday it already reflects six days of sales AND six days of labor and
+         purchases. Week 0 correctly projected only the sales still to come and then charged a FULL
+         week of labor and recurring purchases against them.
+         Measured on a $4,000-a-week bar with $2,500 labor and $1,000 purchases:
+             Mon  wk0 sales $4,000  net   +$500      <- correct, the whole week is ahead
+             Wed  wk0 sales $2,857  net     -$643
+             Fri  wk0 sales $1,714  net   -$1,786
+             Sun  wk0 sales   $571  net   -$2,929    <- truth is about +$71
+         A ~$3,000 error in week one on a $4,000-a-week bar, feeding the RUNWAY line on Cash Audit,
+         the low-point week, and the lender PDF. It reads pessimistic, which is the safe direction,
+         but an operator checking on a Friday got a materially different answer than on a Monday for
+         no reason in the world.
+         ⚠ The comment on the outflow filter below already states this exact rule — "counting a bill
+         dated earlier this same week (already paid, already out of opening) would double it". It was
+         implemented for `bills` and `outflows`, which carry DATES and can be filtered, and could not
+         be implemented for labor and recurring purchases, which carry none. The share is the same
+         answer their date filter reaches. */
+      let wk0Share = 1;
       if (i === 0) {
         // Opening cash is a "right now" balance that already reflects sales banked
         // earlier this week, so week 0 only projects the days still to come — else
         // the elapsed days are double-counted and the near-term runway overshoots.
         const dow = (new Date().getDay() + 6) % 7;   // 0=Mon .. 6=Sun
-        sales = sales * ((7 - dow) / 7);
+        wk0Share = (7 - dow) / 7;
+        sales = sales * wk0Share;
       }
       // A SAVED forecast override already bundles this week's booked-event revenue
       // (Build Schedule adds it into the number you type), so adding the event
@@ -671,10 +692,18 @@ window.CashEngine = {
       const outflows = ofRecs.filter(_future0).reduce((s, o) => s + o.amount, 0);
       let extraOut = 0;
       extra.forEach(x => { if (x.recurring || x.week === i || (x.week == null && i === 0)) extraOut += (parseFloat(x.amount) || 0); });
-      const out = lab.cost + purch + bills + outflows + extraOut;
+      /* ⚠ PRORATED AND *DISPLAYED* PRORATED. The row is what the forecast table prints column by
+         column, and `verify-forecast-column-tieouts` asserts inflow - out = net on every row, so
+         charging a prorated figure while showing the full one would put a lie in the table and break
+         the tie-out. One number, used and shown. `extraOut` is deliberately NOT prorated: those are
+         explicit "what if I spend this" entries an operator typed for this week, not a recurring
+         cost that has been quietly draining since Monday. */
+      const labCost = lab.cost * wk0Share;
+      const purchWk = purch * wk0Share;
+      const out = labCost + purchWk + bills + outflows + extraOut;
       const net = inflow - out;
       bal += net;
-      rows.push({ ws, we, i, sales, events: evAdd, eventList: ev.list, inflow, labor: lab.cost, laborSource: lab.source, purchases: purch, bills, billRecs, outflows, ofRecs, extra: extraOut, out, net, balance: bal });
+      rows.push({ ws, we, i, sales, events: evAdd, eventList: ev.list, inflow, labor: labCost, laborSource: lab.source, purchases: purchWk, bills, billRecs, outflows, ofRecs, extra: extraOut, out, net, balance: bal });
     }
     let lowIdx = 0;
     rows.forEach((r, i) => { if (r.balance < rows[lowIdx].balance) lowIdx = i; });
