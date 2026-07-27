@@ -86,7 +86,20 @@ S.SalesIntegrity = {
     // ⚠ `no sale opens` unhyphenated is THIS DOOR'S OWN LABEL minus one character, and `no sale`
     // is EXACT_ONLY, so without it the app's own export shape bound nothing and a weight-3 strong
     // signal vanished silently. Same failure shape as the `Pay ($/hr)` case.
-    { key: 'no_sales',     label: 'No-Sale Opens',     required: false, notMoney: true, match: ['no sale count', 'no sales count', '# no sales', 'number of no sales', 'no-sale count', 'no sale opens', 'no-sale opens', 'no sales opens', 'drawer opens', 'no sale', 'no-sale', 'no sales', 'nosale'] },
+    /* ⚠⚠ SEALING `no-sale`/`no sales`/`nosale` IN EXACT_ONLY CLOSED TWO WRONG BINDINGS AND TOOK NINE
+       RIGHT ONES WITH IT — the guard-in-one-direction failure, one round after writing the rule down.
+       Measured: `NoSale Count`, `NoSale Opens`, `NoSale Qty`, `No-Sale Qty`, `No Sales Qty`,
+       `No-Sale #`, `# No-Sale`, `No Sales #` and `NoSale #` all bound NOTHING, because the bare
+       tokens can no longer hunt and none of those spellings was an explicit candidate. Cost, end to
+       end on the classic drawer-skim profile: the column goes unmapped, and a weight-3 `strong`
+       signal with a solo escalation simply is not there — **High Risk becomes clean and the card
+       prints "No servers flagged"**.
+       ⭐ The round-2 rule says it exactly: a candidate added to restore a lost EXACT header belongs
+       in EXACT_ONLY. Every spelling below is unambiguously a COUNT (`count`/`opens`/`qty`/`#`), so
+       each is named explicitly rather than left to a bare token's reach. `void_count` already had
+       both `# voids` and `void qty`; this list had `# no sales` alone, which is why the asymmetry
+       went unnoticed. */
+    { key: 'no_sales',     label: 'No-Sale Opens',     required: false, notMoney: true, match: ['no sale count', 'no sales count', 'no-sale count', 'nosale count', '# no sales', '# no-sale', '# nosale', 'no sales #', 'no-sale #', 'nosale #', 'number of no sales', 'no sale opens', 'no-sale opens', 'no sales opens', 'nosale opens', 'no sale qty', 'no-sale qty', 'no sales qty', 'nosale qty', 'drawer opens', 'no sale', 'no-sale', 'no sales', 'nosale'] },
     { key: 'checks',       label: 'Checks',            required: false, notMoney: true, match: ['check count', 'closed checks', 'guest checks', '# of checks', 'chks', 'checks', 'ticket count', 'tickets', 'order count', 'number of orders', 'orders', 'transaction count', 'transactions', 'tabs'] },
     { key: 'hours',        label: 'Labor Hours',       required: false, match: ['total hours', 'labor hours', 'hours worked', 'total hrs', 'hrs worked', 'paid hours', 'net hours', 'hours', 'hrs', 'worked'] },
     // ⚠ `sales amount` / `sales $` / `sales value` are explicit for the same reason: bare `sales` is
@@ -137,6 +150,44 @@ S.SalesIntegrity = {
     { key: 'cash',     label: 'Cash Skimming' },
     { key: 'pricing',  label: 'Under-Ringing and Pricing' }
   ],
+  /* ⭐⭐ THE BAR A SIGNAL HAS TO CLEAR, AS A MULTIPLE OF THE PEER AVERAGE (everyone ELSE's mean).
+     ⛔ WHY THESE ARE NOT 2 / 1.5 / 0.6, AND IT IS THE WHOLE POINT: the test used to compare against
+     the WHOLE-TEAM mean, which INCLUDES the accused. Solve that and the bar it really imposes is
+     `k(n-1)/(n-k)` times the peer average — a HIDDEN FUNCTION OF CREW SIZE that nobody chose:
+
+         n  |  dir:high   |  capture  |  dir:low        (n = servers who reported THAT column)
+        ----+-------------+-----------+----------
+         2  | IMPOSSIBLE  |   3.000   |   0.429
+         3  |    4.000    |   2.000   |   0.500
+         6  |    2.500    |   1.667   |   0.556
+        10  |    2.250    |   1.588   |   0.574
+        50  |    2.042    |   1.515   |   0.595
+
+     So a four-server bar was held to 3x while a twenty-server bar was held to 2.1x, and every
+     comment and help line in this file said "twice the team average" — true only in the limit. At
+     n=2 the high test is not merely strict, it is UNSATISFIABLE (`v > 2v` needs a negative peer),
+     which is why a 6%-void skim against a 0.5% floor printed the green all-clear the moment its
+     peers left the cell blank.
+     The multipliers below are the effective values at **n=6** — the seeded crew, and a typical
+     independent bar's shift report — so a six-server bar behaves exactly as it did, crews of 3-5
+     become testable instead of near-impossible, and crews of 8+ get slightly STRICTER, which is the
+     safe direction on a screen that prints a person's name. The bar is now a stated constant rather
+     than an artefact of how many colleagues happened to fill in a cell.
+
+     ⚠⚠ AND THIS APPLIES ONLY TO `dir:'high'` AND THE CAPTURE SIGNALS — A DELIBERATE ASYMMETRY,
+     MEASURED, NOT AN OVERSIGHT. My first version moved `dir:'low'` and `dir:'both'` across too, and
+     a pin caught it immediately: leave-one-out AMPLIFIES a deviation by `n/(n-1)`, so on a
+     four-person crew one bartender at 70% cash pulled the peer mean to 33% and handed **all three
+     honest servers at 15% a "Cash mix — runs low" flag** they did not have. That is verbatim the
+     harm the duplicate-name pin exists to catch, arriving from a new direction, and it matters even
+     though a lone cash-mix flag names nobody: it adds weight, and a phantom second signal is exactly
+     how the two-flag rule gets satisfied by accident.
+     For `low` and `both` the whole-team mean is CONSERVATIVE — including the accused pulls the mean
+     toward them, which shrinks the gap and makes the flag harder to earn. Conservative is fine.
+     For `high` it was conservative too, right up to the point where it became UNSATISFIABLE, and
+     "impossible" reads on screen as "clean". Fix what was broken; leave what was merely strict. */
+  RATIO_HIGH: 2.5,
+  RATIO_CAPTURE: 1.667,
   MIN_CHECKS: 8,   // a server below this is "not enough data", not scored
   // When the export carries no Checks column there is nothing to count, so fall back
   // to volume: a server under this share of the median server's sales worked a
@@ -643,7 +694,20 @@ S.SalesIntegrity = {
          a seven-day file is a rollup, and dividing a week's work by 1 is what printed "40 no-sale
          opens in one shift" on the cleanest server in the file. Only the second is unknowable, and
          only the second goes quiet. */
-      const shiftsKnown = !fileDated || datedSpan || (a.rows || 0) >= dateList.length;
+      /* ⚠⚠ AND MY SECOND VERSION DEMANDED PERFECT ATTENDANCE. `a.rows >= dateList.length` means an
+         undated server is only judged if they appear on as many rows as the file has distinct dates
+         — i.e. only if they worked EVERY night in the span. Measured on a seven-night file with the
+         probe byte-identical in every run: 4, 5 or 6 undated rows → rate `null`, **clean**; 7 rows →
+         8.00 a shift against peers at 2.00, **High Risk, $630**. Taking one night off in a week was
+         the entire difference, and worse, her verdict moved when her COLLEAGUES' rota changed.
+         The genuinely unknowable case is narrower than that, and it is the one actually measured: a
+         SINGLE row standing for a multi-day span, which is what a weekly rollup line is. Two or more
+         rows in a dated file read as a row per shift, which is round 4's finding and is the honest
+         reading of a per-server export. So only `rows === 1` in a multi-day file goes quiet.
+         ⚠ It costs the genuine one-night server their rate signals, and that is the deliberate
+         direction: dividing a week by 1 inflates the rate sevenfold and NAMES somebody, while
+         suppressing it leaves them scored on every share signal and reported by name in the note. */
+      const shiftsKnown = !fileDated || datedSpan || dateList.length <= 1 || (a.rows || 0) > 1;
       if (!shiftsKnown) noShiftCount.push(a.name);
       const _sh = onOwnDays(capShorts[key], a), _wk = onOwnDays(capWalk[key], a);
       const shortCount = _sh.count, walkCount = _wk.count;
@@ -774,9 +838,14 @@ S.SalesIntegrity = {
        sales against a floor of 1% is FIFTEEN times the floor, but including themselves in a
        six-person average made it 4.5x and they cleared nothing. Same distortion understated the
        dollar exposure by ~25% on a four-person crew.
-       `peerAvg` is the mean of everyone ELSE. It is used where the question is "how far off is this
-       person from the rest" — the solo bar and the exposure figure. The ordinary 2x flag test still
-       uses the whole-team mean it was tuned against; changing that is a separate decision. */
+       `peerAvg` is the mean of everyone ELSE, and as of round 6 it drives EVERY comparison in this
+       file: the trip test, the solo bar, the exposure figure and the number printed on the card.
+       ⭐ It used to drive all of those EXCEPT the ordinary trip test, which kept the whole-team mean
+       "because including the accused makes the bar harder to clear, which is the safe direction".
+       That reasoning was right about the direction and wrong about the size: the bar it produced was
+       `k(n-1)/(n-k)` times the peer average, i.e. a hidden function of how many colleagues filled in
+       that cell — 4x on a three-server crew, UNSATISFIABLE on a two-server one, 2.04x on a large
+       floor. See the RATIO_* block for the table and the calibration. */
     const peerAvg = (key, s) => {
       const v = s.m[key];
       if (v == null) return teamAvg[key];
@@ -798,6 +867,7 @@ S.SalesIntegrity = {
       s.flags = [];
       this.SIGNALS.forEach(sig => {
         const v = s.m[sig.key];
+        // ⚠ STILL READ, and only by `dir:'low'` and `dir:'both'` — see the asymmetry note above.
         const avg = teamAvg[sig.key];
         if (v == null) return;
         // Capture-based signals (drawer shorts / walkouts) are real logged events
@@ -827,6 +897,11 @@ S.SalesIntegrity = {
            ⚠ A signal dropped here is NOT a clean reading, so it is recorded and reported rather than
            left to look like one. */
         const reporters = teamN[sig.key] || 0;
+        /* ⭐ EVERY COMPARISON BELOW IS AGAINST THE PEER AVERAGE — the mean of everyone ELSE — and the
+           multipliers live in the RATIO_* block with the table that derives them. `avg` (the
+           whole-team mean) is deliberately no longer used for any test: it made the bar a function
+           of crew size, and it made the tested number differ from the reported one. */
+        const peer = peerAvg(sig.key, s);
         let tripped = false;
         if (sig.capture) {
           // Two tests, both required: enough events to be a pattern rather than the
@@ -834,20 +909,43 @@ S.SalesIntegrity = {
           // floor's. Rate for the comparison, raw count for the materiality, so the
           // closer who works five nights is not flagged for volume alone.
           const events = (sig.key === 'drawer_short') ? s.shortCount : s.walkCount;
-          tripped = reporters >= this.MIN_TEAM && avg != null
-                    && events >= this.MIN_EVENTS && v > avg * 1.5;
-          if (avg != null && reporters < this.MIN_TEAM) thin[sig.key] = 1;
-        } else if (avg == null || reporters < this.MIN_TEAM) {
+          /* ⚠⚠ A PEER AVERAGE OF EXACTLY ZERO MAKES `v > peer * RATIO` MEAN `v > 0`, so `MIN_EVENTS`
+             becomes the only bar — AND THAT IS THE DESIGN, NOT A DEFECT. A scan flagged it as one
+             (a bartender identical to her peers except for 2 shorts and 2 walked tabs reads High
+             Risk), and raising the bar to "more than four events with no peer activity" broke three
+             pins at once: block D, which exists to prove the capture path is not DEAD after it once
+             passed vacuously, and I2, which asserts that two shorts plus two walked tabs must still
+             be caught. Both were right and the scan was not.
+             ⭐ Zero peer events is the STRONGEST benchmark available, not missing data — the same
+             reasoning `_soloClears` already carries for a zero peer average. `MIN_EVENTS` is the
+             materiality bar and its own comment says so ("below this are the cost of doing
+             business"); the defect this file actually fixed was ONE short plus ONE walked tab, which
+             is under that bar. Two separate capture signals lining up is exactly what the two-signal
+             rule calls a pattern. Reverted, deliberately, and recorded so it is not "fixed" again. */
+          tripped = reporters >= this.MIN_TEAM && peer != null
+                    && events >= this.MIN_EVENTS && v > peer * this.RATIO_CAPTURE;
+          if (peer != null && reporters < this.MIN_TEAM) thin[sig.key] = 1;
+        } else if (peer == null || reporters < this.MIN_TEAM) {
           tripped = false;   // need a floor to compare against
-          if (avg != null) thin[sig.key] = 1;
+          /* ⚠⚠ `if (peer != null)` MADE THIS SILENT IN EXACTLY THE WORST CASE. `peer` is null
+             precisely when NOBODY ELSE supplied that column — the extreme of "too few reporters",
+             and the only case the note exists for. Measured, sweeping how many of five peers fill
+             the Voids cell: 0 peers → **(silent)**, 1 peer → "Void rate", 2+ → compared normally.
+             Non-monotonic: the less Bar Cop could tell, the less it said. And it is the same input
+             where `_exposure` withholds the dollars, so the card showed a share, no comparison, no
+             money and no explanation of any of it. If the accused HAS a figure and it could not be
+             compared, that is the whole condition — the peer value is irrelevant to whether it is
+             worth saying. */
+          thin[sig.key] = 1;
         } else if (sig.dir === 'high') {
           // Compare on the rate, but check materiality on the raw count for no_sales:
           // its floor has always meant "at least this many opens in the window", and
           // testing a per-shift rate against it would demand 3 opens EVERY shift and
           // miss the bartender popping the drawer twice a night all week.
           const material = (sig.key === 'no_sales') ? s.raw.no_sales : v;
-          tripped = v > avg * 2 && material >= this._floor(sig.key, avg);
+          tripped = v > peer * this.RATIO_HIGH && material >= this._floor(sig.key, peer);
         } else if (sig.dir === 'low') {
+          // ⚠ WHOLE-TEAM MEAN ON PURPOSE — see the asymmetry note in the RATIO_* block.
           tripped = avg > 0 && v < avg * 0.6;
         } else if (sig.dir === 'both') {
           tripped = avg > 0 && Math.abs(v - avg) > Math.max(0.15, avg * 0.4);
@@ -940,8 +1038,14 @@ S.SalesIntegrity = {
         : (soloHit ? 'watch' : 'clean');
     });
 
+    /* ⚠ SEVERITY FIRST, THEN COMPOSITE. Round 6 decoupled the two (`anyTripped` can cap a
+       high-composite card at Watch), so composite stopped being a proxy for "worst" — and both
+       consumers print the stored order under a help line promising "servers are listed worst first".
+       A Watch card above a High Risk card is the first name an owner reads in the document. */
+    const SEV_RANK = { high: 0, watch: 1 };
     const flagged = scored.filter(s => s.severity !== 'clean')
-      .sort((a, b) => b.composite - a.composite || b.exposure - a.exposure);
+      .sort((a, b) => (SEV_RANK[a.severity] - SEV_RANK[b.severity])
+        || b.composite - a.composite || b.exposure - a.exposure);
     const clean = scored.filter(s => s.severity === 'clean');
     const skipped = servers.filter(s => !s.qualifies);
 
@@ -1268,7 +1372,12 @@ S.SalesIntegrity = {
     const n = (c, one, many) => c + ' ' + (c === 1 ? one : (many || one + 's'));
     // ⚠ An undated row is KEPT (it just has no date), so it is not subtracted from "rows read" —
     // saying otherwise would contradict the report drawn right beside it.
-    const bits = [n(k.rows - k.noName - (k.summaryRows || 0), 'row') + ' read'];
+    /* ⚠⚠ MY PER-FIELD DEFAULTS STOPPED THE `NaN` AND PRODUCED A NEGATIVE INSTEAD. A partial record
+       carrying `{noName:3}` and no `rows` printed **"-3 rows read"** into the card and the PDF;
+       `{rows:5, summaryRows:9}` printed "-4 rows read". Clamped, because a count of rows read is
+       never below zero whatever the record is missing, and this line goes into an exported document. */
+    const readN = Math.max(0, (k.rows || 0) - (k.noName || 0) - (k.summaryRows || 0));
+    const bits = [n(readN, 'row') + ' read'];
     if (s.reviewed) bits.push(n(s.reviewed, 'server') + ' scored');
     // ⚠ The clause has to agree with the count in BOTH branches — "5 rows ... so it could not" was
     // a plural subject with a singular pronoun. Phrased so one wording is right for 1 and for many.
@@ -1281,9 +1390,13 @@ S.SalesIntegrity = {
     if (k.noShiftCount.length) bits.push('no dates for ' + k.noShiftCount.join(', ')
       + ', so no-sale, drawer-short and walkout rates could not be worked out for '
       + (k.noShiftCount.length === 1 ? 'them' : 'those servers'));
+    /* ⚠ "TOO FEW SERVERS REPORTED THEM" IS FALSE OF HALF THE SIGNALS IT NAMES. Drawer shorts and
+       walked tabs come from Bar Cop's OWN logs, not from any column in the file, and average check
+       is computed rather than reported — so the sentence sent an operator hunting for a column that
+       does not exist. Say what actually happened: there were not enough servers to compare against. */
     if (k.unjudged.length) bits.push(k.unjudged.join(', ').toLowerCase()
-      + ' could not be compared — too few servers in this file reported '
-      + (k.unjudged.length === 1 ? 'it' : 'them'));
+      + (k.unjudged.length === 1 ? ' was' : ' were')
+      + ' not scored — too few servers in this file to compare against');
     /* ⚠ ONLY THE CONTRADICTORY FILE IS WORTH SAYING OUT LOUD (S199). A day-first file Bar Cop read
        correctly needs no announcement — it is simply right — and a US file can never trigger the
        detection at all. What the operator does need is the case Bar Cop could not settle. */
