@@ -259,7 +259,17 @@ const PosIngest = {
   SUMMARY_NAMES: ['total', 'totals', 'grand total', 'grand totals', 'sum', 'sums', 'subtotal',
     'subtotals', 'all servers', 'all employees', 'all staff', 'report total', 'report totals',
     'overall total', 'total all', 'totals all', 'summary', 'net total', 'gross total',
-    'total sales', 'total revenue', 'totals sales'],
+    'total sales', 'total revenue', 'totals sales',
+    /* ⚠ THE SPACED AND HYPHENATED FORMS. `subtotal` was whitelisted and "Sub Total" / "Sub-Total"
+       were not, because the strip splits them into two words and the closed-up entry no longer
+       matches. Measured on the Anchor file plus one "Sub Total" row: "Servers reviewed 7" for a
+       six-person bar, the real skimmer's peer floor lifted 1.2 → 3.2 opens a shift, and a card and
+       a PDF section headed **"Sub Total (Watch)"**. On a two-bartender bar the same row cleared
+       MIN_TEAM and replaced the honest caveat with the green all-clear. */
+    'sub total', 'sub totals', 'combined total', 'combined totals', 'overall', 'grand sum',
+    'total all servers', 'totals all servers', 'all servers total', 'all servers totals',
+    'total for all servers', 'totals for all', 'total for all', 'total all employees',
+    'all employees total'],
   /* ⚠ A QUALIFIER IN FRONT OF "TOTAL" IS STILL A TOTALS LINE. The bare-forms-only whitelist let
      "Bar Total", "Server Total", "Employee Total" and "Grand Total (All)" through as PEOPLE, and one
      of them flipped a verdict: adding a single "Bar Total" row to a clean five-server file lifted
@@ -268,9 +278,17 @@ const PosIngest = {
      MIN_TEAM and replacing the team caveat with the all-clear. Both are verbatim the damage this
      function exists to prevent. The qualifier list is CLOSED — a fixed vocabulary of things a POS
      groups a subtotal by — so it can never eat a person's name. */
-  SUMMARY_QUALIFIERS: ['bar', 'server', 'servers', 'employee', 'employees', 'staff', 'cashier',
-    'cashiers', 'section', 'department', 'dept', 'store', 'location', 'shift', 'day', 'daily',
+  SUMMARY_QUALIFIERS: ['bar', 'house', 'kitchen', 'floor', 'patio', 'restaurant', 'venue',
+    'server', 'servers', 'employee', 'employees', 'staff', 'cashier',
+    'cashiers', 'bartender', 'bartenders', 'team', 'section', 'department', 'dept', 'store',
+    'location', 'shift', 'day', 'daily',
     'weekly', 'monthly', 'period', 'revenue centre', 'revenue center', 'terminal', 'register'],
+  /* The role words a POS groups an "All <role>" or "Total All <role>" line by. Kept as its own
+     closed vocabulary because three separate tests below need the same list, and when they were
+     spelled out inline they drifted: two of them accepted only servers/employees/staff, so
+     "All Cashiers" and "Total All Cashiers" were scored as people. */
+  SUMMARY_ROLES: ['servers', 'server', 'employees', 'employee', 'staff', 'cashiers', 'cashier',
+    'bartenders', 'bartender', 'team members', 'team member', 'personnel', 'crew'],
   /* ⚠ AND A ROW THAT IS NOT A NAME AT ALL IS NOT A PERSON EITHER. A separator ("-----", "===") or a
      repeated mid-file HEADER ("Server") was scored as a server: the report then printed
      "Not enough data to score: -----, Server, ===" to the operator, and three junk names were enough
@@ -306,7 +324,38 @@ const PosIngest = {
     if (new RegExp('^' + q + '\\s+(?:total|totals)$').test(n)) return true;             // "Bar Total"
     if (new RegExp('^(?:total|totals)(?:\\s+(?:for|by))?\\s+' + q + '$').test(n)) return true;  // "Total Bar", "Total for Bar", "Totals by Server"
     if (new RegExp('^' + q + '\\s+\\d+\\s+(?:total|totals)$').test(n)) return true;     // "Store 3 Total"
-    return /^(?:grand|all)$/.test(n);
+    /* ⚠ THE LEAD AND SCOPE WORDS HAVE TO COMBINE. "Grand Total" was caught and **"Grand Total (All
+       Servers)"** was not, because the leading-qualifier regex and the `all servers` phrases were
+       two separate tests that could not meet. Measured: that one row made a real outlier read CLEAN
+       and was itself listed as a scored server. Same for "Totals All Employees". */
+    const role = '(?:' + this.SUMMARY_ROLES.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')';
+    if (new RegExp('^' + lead + '?\\s*(?:total|totals)\\s+all\\s+' + role + '$').test(n)) return true;
+    if (new RegExp('^all\\s+' + role + '(?:\\s+(?:total|totals))?$').test(n)) return true;
+    // A bare plural role word is the export's own roll-up line, not somebody's name.
+    if (new RegExp('^' + role + '$').test(n)) return true;
+    /* ⚠⚠ THE AVERAGE ROW HAD NONE OF THE QUALIFIER MACHINERY THE TOTAL ROW HAD — a flat alternation
+       of five bare words, while "total" got five combining tests. Measured, every one of these was
+       scored as a PERSON: Bar Average · Server Average · Daily Average · Shift Average · Weekly
+       Average · Grand Average · Overall Average · Average by Server · Team Average · Average per
+       Server · Avg per Shift. And an average row is WORSE here than a totals row: its values sit at
+       the team mean by construction, so it does not merely lift `reviewed` past MIN_TEAM — it drags
+       the floor toward itself, which is the direction that makes a real outlier read clean. Verified
+       reaching door 12: appending one "Team Average" row took `reviewed` from 5 to 6 with
+       `summaryRows` still 0, and the row was listed on screen as a scored server. */
+    const stat = '(?:average|averages|avg|avgs|mean|means|median|summary|summaries|report summary|summary total)';
+    if (new RegExp('^' + lead + '?\\s*' + stat + '(?:\\s+' + scope + ')?$').test(n)) return true;
+    if (new RegExp('^' + q + '\\s+' + stat + '$').test(n)) return true;                            // "Bar Average"
+    if (new RegExp('^' + stat + '(?:\\s+(?:for|by|per))?\\s+' + q + '$').test(n)) return true;     // "Average by Server", "Avg per Shift"
+    if (new RegExp('^' + q + '\\s+\\d+\\s+' + stat + '$').test(n)) return true;                    // "Store 3 Average"
+    if (new RegExp('^' + lead + '?\\s*' + stat + '\\s+all\\s+' + role + '$').test(n)) return true;
+    /* ⚠⚠ "GRAND" IS A REAL SURNAME AND THIS DELETED THE PERSON WHO HAS IT. A bare `grand` was
+       whitelisted as a totals row, so a server named Grand was dropped before scoring — never
+       flagged, never listed as unscored — and the intake note told the operator their shifts were
+       "totals rows skipped". That is the same disappearance the non-Latin-script guard above was
+       written for, arriving through the vocabulary instead of the character class. No POS writes a
+       bare "Grand" as a subtotal; it writes "Grand Total", which every test above already catches.
+       ⚠ Measured across 90 person names, this was the ONLY false positive in the function. */
+    return /^all$/.test(n);
   },
 
   // Normalize a POS date cell to canonical local YYYY-MM-DD (App.ymdLocal's

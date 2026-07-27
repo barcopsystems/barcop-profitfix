@@ -283,8 +283,19 @@ const CSVMapper = {
        PERCENT column: **9.6 stored against a true 4,800.00**, where before the operator was at
        least asked. A unit annotation says nothing about which column this is; a year or a percent
        sign is the entire difference between two columns. */
-    const UNIT_PAREN = new Set(['$', '$/hr', 'usd', 'us$', 'oz', 'fl oz', 'hr', 'hrs', 'hour', 'hours',
-      'lb', 'lbs', 'kg', 'g', 'ml', 'l', 'ltr', 'ea', 'each']);
+    /* ⚠⚠ `hr` / `hrs` / `hour` / `hours` AND `ea` / `each` ARE NOT ANNOTATIONS HERE, and a comment
+       two screens down used to claim the brackets made them safe. They are the ENTIRE DIFFERENCE
+       between two columns, and stripping them in pass 1 handed the wrong one to a money field:
+         · `Total (hrs)` normalised to `total`, so on the per-server sales doors and the void/comp
+           and expense doors an HOURS column bound as the MONEY column — with a real "Amount"
+           column sitting right beside it, ignored;
+         · `Cost (each)` normalised to `cost` and beat `Case Cost` for unit cost on all six product
+           doors, so a $34.00 case of bottle beer landed at $1.42 a unit.
+       They still bind their own fields perfectly well through pass 2, which uses the RAW norm —
+       `hrs` word-matches inside "total (hrs)" because a bracket is not a letter.
+       ⚠ `$/hr` stays: it is a RATE annotation on a money column ("Pay ($/hr)"), not a column noun. */
+    const UNIT_PAREN = new Set(['$', '$/hr', 'usd', 'us$', 'oz', 'fl oz',
+      'lb', 'lbs', 'kg', 'g', 'ml', 'l', 'ltr']);
     const norm = h => String(h).toLowerCase().trim();
     const normExact = h => {
       const t = norm(h);
@@ -299,13 +310,31 @@ const CSVMapper = {
          candidates on every field that wanted them (which is how `cash $` came to outrank the real
          "Cash Tips $" column in pass 1), and a whole family of ordinary headers — "Sales Amount $",
          "Cash Amount USD" — reached no candidate at all.
-         ⚠ THE SUFFIX VOCABULARY IS THE SAME CLOSED SET as the parenthesised one, minus the single
-         letters: a bare trailing `l` or `g` is far more likely to be part of a word than a unit. */
-      const SUFFIX = /\s+(\$|usd|us\$|\$\/hr|oz|fl oz|hrs?|hours?|lbs?|kg|ml|ltr|ea|each)$/;
+         ⚠⚠ ONLY THE CURRENCY MARKS, THOUGH. The first version of this also stripped the MEASUREMENT
+         words (oz, ml, kg, lb, ea, each, hrs, hours), and that broke two doors at once — because a
+         PARENTHESIS marks an annotation and a bare word does not. Those are ordinary column NOUNS:
+         "Total Hours" normalised to "total", so at the TIMECLOCK it stopped beating "Regular Hours"
+         (undoing a fix that existed because sales-per-hour was overstated 45%), and on the
+         PER-SERVER SALES door `total` is a `sales` candidate — so the HOURS column bound as the
+         server's SALES. `$` / `usd` / `us$` / `$/hr` are never a column's noun on their own, which
+         is exactly what makes them safe to strip bare. The measurement words are still stripped in
+         the PARENTHESISED form, where the brackets say they are an annotation. */
+      const SUFFIX = /\s+(\$|usd|us\$|\$\/hr)$/;
       const t2 = t.replace(SUFFIX, '');
       return (t2 && t2 !== t) ? t2 : t;
     };
     const claim = (f, i) => { if (i > -1) { map[f.key] = i; used[i] = true; } };
+    /* ⚠⚠ A CURRENCY MARK IS SOMETIMES THE ONLY THING SEPARATING A COUNT COLUMN FROM ITS DOLLAR
+       TWIN — AND THE SUFFIX STRIP ABOVE DELETES IT. `normExact` takes a bare trailing `$` off so
+       that "Sales $" can bind a money field, which is right; the cost is that **"No Sales $"
+       normalises to exactly "no sales"** and then satisfies a COUNT candidate as an exact match, in
+       pass 1, outranking everything. Sealing the spelling in EXACT_ONLY does not help, because the
+       stripped form IS the exact candidate.
+       A field that counts things opts in with `notMoney` and will not accept a header the file
+       explicitly marked as money. Opt-in, so the blast radius is exactly the fields that declare it
+       — no header binding anywhere else can move. */
+    const hasMoneyMark = h => /\$/.test(String(h)) || /(^|[^a-z])usd([^a-z]|$)/i.test(String(h));
+    const allowed = (f, h) => !(f.notMoney && hasMoneyMark(h));
     // An UNNAMED column is never auto-claimed — there is nothing to match on, and guessing it is
     // how a row-number column ends up imported as covers.
     const findIdx = pred => {
@@ -332,7 +361,7 @@ const CSVMapper = {
       let hit = -1;
       for (let ci = 0; ci < cands.length && hit < 0; ci++) {
         const c = cands[ci];
-        hit = findIdx(h => normExact(h) === c);   // pass 1 ONLY — pass 2 below uses the raw `norm`
+        hit = findIdx(h => normExact(h) === c && allowed(f, h));   // pass 1 ONLY — pass 2 uses raw `norm`
       }
       claim(f, hit);
     });
@@ -388,6 +417,16 @@ const CSVMapper = {
     const EXACT_ONLY = { name: 1, item: 1, total: 1, amount: 1, type: 1, count: 1, value: 1, date: 1,
       pay: 1, delivery: 1, shipping: 1,
       cash: 1, card: 1, credit: 1, charge: 1, sales: 1, 'no sale': 1, 'credit card': 1,
+      /* ⚠⚠ ONE SPELLING OF "NO SALE" WAS SEALED AND THREE WERE LEFT HUNTING — so the defect four
+         lines above, the one this entry was created to close, was still live through the OTHER
+         spellings. Measured on the real matcher: "No-Sale Amount" and "No Sales Amount" both bound
+         door 12's `no_sales`, which is a COUNT signal at weight 3, `strong`, with a solo escalation
+         at ten raw opens. A $1,920 no-sale DOLLAR total therefore reads as 1,920 drawer opens,
+         clears every floor in the file and names an employee High Risk in the PDF. Control: the
+         unhyphenated "No Sale Amount" bound nothing, because `no sale` alone had been sealed.
+         ⚠ The hyphenated form is also Bar Cop's OWN column label ("No-Sale Opens") minus one word,
+         which is exactly why it was in the match array — it still binds, in pass 1, exactly. */
+      'no-sale': 1, 'no sales': 1, nosale: 1,
       /* ⚠ THE ROUND-2 RESTORATIONS ARE EXACT-ONLY TOO, and the reason is a rule worth stating:
          EVERY ONE OF THEM WAS JUSTIFIED BY AN EXACT HEADER that had stopped binding. None of them
          needs to hunt, and each one that did reached a neighbour's column:
@@ -418,7 +457,7 @@ const CSVMapper = {
         const c = cands[ci];
         if (c.length < 3 || EXACT_ONLY[c]) continue;
         const re = new RegExp('(^|[^a-z])' + esc(c) + '([^a-z]|$)');
-        hit = findIdx(h => re.test(norm(h)));
+        hit = findIdx(h => re.test(norm(h)) && allowed(f, h));
       }
       claim(f, hit);
     });
