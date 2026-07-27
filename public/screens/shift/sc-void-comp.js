@@ -690,7 +690,7 @@ S.ShiftVoidComp = {
   async importRows(rows, resultId, after) {
     // Match / dedup / build / save live in the shared PosIngest (dedup added so a
     // re-dropped voids/comps export never double-counts). UI message stays here.
-    const { toAdd, skipped, undated, dupCount } = PosIngest.build('voids', rows);
+    const { toAdd, skipped, undated, dupCount, fileRepeats } = PosIngest.build('voids', rows);
     const setResult = html => { const r = resultId && document.getElementById(resultId); if (r) r.innerHTML = html; };
     const nUnd = (undated || []).length;
     /* Everything this import found besides the rows it wrote, built ONCE and appended to every
@@ -702,7 +702,15 @@ S.ShiftVoidComp = {
     const dim = t => ' <span style="color:var(--t3);font-weight:400;">' + t + '</span>';
     const outcomes = (skipped.length ? dim(skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ' skipped (no amount).') : '')
       + (nUnd ? dim(nUnd + ' row' + (nUnd === 1 ? '' : 's') + ' skipped (no readable date).') : '')
-      + (dupCount ? dim(dupCount + ' already logged, skipped.') : '');
+      + (dupCount ? dim(dupCount + ' already logged, skipped.') : '')
+      /* ⚠ WORDED AS "LOOK AT THIS", NOT AS A COLLAPSE — this door imports BOTH rows on purpose
+         (S218). At the hours, tips and cash doors the hand form forbids a second record with the
+         same identity, so a repeat there is data the operator could not have entered and is safely
+         counted once. Nothing in the Void/Comp form says that: two $75 order errors on the same item
+         in one night is an ordinary evening, and dropping the second would delete real money. So
+         Bar Cop reports what it saw and leaves the decision where it belongs. */
+      + ((fileRepeats || 0) ? dim(fileRepeats + ' repeated line' + (fileRepeats === 1 ? '' : 's')
+          + ' in your file — both imported, delete one if it is a duplicate.') : '');
     if (!toAdd.length) {
       // ⚠ NAME THE REAL REASON. One sentence used to cover every zero-row outcome, so a file whose
       // dates could not be read was told "Every row was missing a valid amount" — about amounts that

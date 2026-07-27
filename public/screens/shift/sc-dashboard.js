@@ -1312,7 +1312,7 @@ S.ShiftDashboard = {
   },
   async _commitCash(rows) {
     const built = PosIngest.build('cash', rows);
-    const { toAdd, skipped, undated, dupCount, keptManual, conflicts, extraDropped, totalsLines } = built;
+    const { toAdd, skipped, undated, dupCount, keptManual, conflicts, extraDropped, totalsLines, fileRepeats } = built;
     // ⚠ THE MESSAGE GOES IN THE DEDICATED SLOT WHENEVER THE REGISTER-MAPPING PANEL IS UP — this is
     // the other half of S150 and it was left undone. _showCashMap renders its .sc-cm-sel selects and
     // its Match and Import button INTO #sc-ck-cash-res, and _applyCashMap calls straight through to
@@ -1370,13 +1370,19 @@ S.ShiftDashboard = {
     // Declared out here so the commit-FAILURE path can carry it too — see the sales door's note.
     const skipNote = skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
         + ' skipped, no over/short figure)' : '';
+    /* A register-day the FILE listed twice with identical figures (S218). Distinct from `extraNote`,
+       which is a second row for a register-day ALREADY COUNTED in this import with different
+       figures; this one is the same line over again. A drawer count is one per register per day —
+       the hand form keys on drawer_id and says so — so the repeat is counted once. */
+    const repeatNote = (fileRepeats || 0) ? ' (' + fileRepeats + ' repeated line' + (fileRepeats === 1 ? '' : 's')
+        + ' counted once)' : '';
     // Everything this import found besides the write itself. A refused save must not swallow it.
     const cashOutcomes = (kept ? ' (' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept)' : '')
         + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand count)' : '')
-        + extraNote + totalsNote + skipNote + undatedNote;
+        + extraNote + totalsNote + skipNote + undatedNote + repeatNote;
     if (!allToAdd.length) {
-      if (kept || extraDropped || totalsLines) note('No new figures written.'
-          + (kept ? ' ' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept.' : '') + extraNote + totalsNote + skipNote + undatedNote);
+      if (kept || extraDropped || totalsLines || fileRepeats) note('No new figures written.'
+          + (kept ? ' ' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept.' : '') + extraNote + totalsNote + skipNote + undatedNote + repeatNote);
       else fail('No rows imported. Each row needs a date plus an over/short, or expected and counted cash.' + skipNote + undatedNote);
       return;
     }
