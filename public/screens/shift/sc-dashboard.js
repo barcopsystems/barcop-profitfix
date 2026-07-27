@@ -1037,8 +1037,9 @@ S.ShiftDashboard = {
          twice. (_commitSales and _commitCashRows both track what landed; the generic path never did.)
          App.putRecord REVERTS the array slot on a genuine refusal — for a fresh id that is a splice
          straight back out — so what is STILL IN MEMORY is exactly what landed. Re-running the import
-         is safe either way: buildServer dedupes on staff + date + covers + sales, so the rows that
-         did save come back as "already logged" rather than doubling. */
+         is safe either way: buildServer dedupes on staff + date + SHIFT, so the rows that did save
+         come back as "already logged" rather than doubling. (The key stopped including the figures
+         on 2026-07-27 — with them in it, a hand-corrected row no longer matched its own file.) */
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
         + App.partialSaveNote(App.landedOf(toAdd, App.data && App.data.revenue_server_checks),
                             toAdd.length, 'server check', 'server checks')
@@ -1046,7 +1047,13 @@ S.ShiftDashboard = {
         + '</div>';
       return;
     }
-    this._flash = toAdd.length + ' server check' + (toAdd.length === 1 ? '' : 's') + ' imported'
+    // Step 0.5: same split as the twin. A row the operator handed to the file at the conflict
+    // prompt REPLACED an existing check — it is not a new import, and merging the two hides the
+    // decision they just made.
+    const freshCount = toAdd.length - serverExtra.length;
+    this._flash = (freshCount ? freshCount + ' server check' + (freshCount === 1 ? '' : 's') + ' imported' : '')
+      + (serverExtra.length ? (freshCount ? ', ' : '') + serverExtra.length + ' replaced with the file'
+                              + String.fromCharCode(8217) + 's figures' : '')
       + (dupCount ? ' (' + dupCount + ' already logged)' : '')
       + serverOutcomes + '.';
     if (this._optOpen) this._optOpen.server = false;   // collapse back to the link
