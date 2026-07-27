@@ -597,7 +597,14 @@ S.SalesIntegrity = {
       ((App.shiftData && App.shiftData.sc_walked_tabs) || []).forEach(w => {
         if (w.server && inDates(w.date)) {
           const k = this._nameKey(w.server);   // same key builder as the aggregate, or this misses
-          bump(capWalk, k, String(w.date).slice(0, 10), (this.num(w.amount) || 0));
+          /* ⚠ `Math.abs`, THE SAME GUARD THE SHORTS LINE ABOVE ALREADY HAD — its twin, missed.
+             A walked tab stored negative (a correction, a restored record, a hand-edited row) made
+             the exposure NEGATIVE: measured, one -$500 line printed **"$-370.00 exposure"** on the
+             card and drove `summary.exposure` to -$370.00 in the PDF. A dollar figure below zero on
+             a theft card is not a smaller accusation, it is a broken one. Both entry doors validate
+             `amount > 0`, so this is defensive — which is exactly why it had no test and why the
+             shorts line got the guard and this one did not. */
+          bump(capWalk, k, String(w.date).slice(0, 10), Math.abs(this.num(w.amount) || 0));
         }
       });
     }
@@ -657,6 +664,20 @@ S.SalesIntegrity = {
          shift, Watch**, against a truth of 2.00 where everyone is identical.
          With dates, the cap still does its job (a dated and an undated row for the SAME night
          cannot be two shifts); without them, the row count is the only honest signal there is. */
+      /* ⚠⚠ TWO SHAPES PRODUCE THE IDENTICAL DATA AND WANT OPPOSITE DIVISORS. Both are "some dated
+         rows, then blanks", and nothing in the file distinguishes them:
+           (a) THE GROUPED DATE COLUMN — the date written once at the top of a server's block, each
+               following row a DIFFERENT NIGHT. Round 2 measured this as the shape "every spreadsheet
+               export produces", and treating the blanks as continuation lines makes the divisor
+               collapse and prints **High Risk on identical facts** (pin J1);
+           (b) ONE NIGHT SPLIT ACROSS LINES — a revenue centre, a daypart, a second terminal. Round 3
+               measured this: counting each line as a night divides the rate away. On a 30-night
+               export the `dateList.length` cap never binds, so at 5 lines a night a **ten-times
+               skimmer reads 4.00 against a truth of 20.00 and comes out CLEAN.**
+         I changed this to "a server's own dates ARE their shifts", which fixes (b) and re-breaks (a).
+         **(a) is the common shape and (b) is the rare one, and naming an innocent is the error this
+         screen can least afford**, so the divisor stays as it was. (b) is recorded as a known
+         limitation with its measurement rather than traded for (a) — see S212 on THE LIST. */
       const shifts = a.days.size
         ? Math.min(a.days.size + a.noDate, dateList.length)
         : (dateList.length ? (a.rows || 1) : 1);
@@ -943,7 +964,7 @@ S.SalesIntegrity = {
           // testing a per-shift rate against it would demand 3 opens EVERY shift and
           // miss the bartender popping the drawer twice a night all week.
           const material = (sig.key === 'no_sales') ? s.raw.no_sales : v;
-          tripped = v > peer * this.RATIO_HIGH && material >= this._floor(sig.key, peer);
+          tripped = v > peer * this.RATIO_HIGH && material >= this._floor(sig.key, s);
         } else if (sig.dir === 'low') {
           // ⚠ WHOLE-TEAM MEAN ON PURPOSE — see the asymmetry note in the RATIO_* block.
           tripped = avg > 0 && v < avg * 0.6;
@@ -1059,8 +1080,13 @@ S.SalesIntegrity = {
       // What the file actually gave up, so the import can say so instead of drawing a
       // report over rows it quietly threw away. `ambiguous` is the S199 coin-toss case.
       intake: { rows: (rows || []).length, noName, undated, summaryRows, ambiguous: !!_conv.contradictory,
-        // Named, not counted: the operator has to know WHICH server's rates went unread.
-        noShiftCount: noShiftCount.slice(),
+        /* Named, not counted: the operator has to know WHICH server's rates went unread.
+           ⚠ SCORED SERVERS ONLY. It listed anybody with a lone undated row, including people who
+           were set aside for too little data — so a barback with one $40 line was reported as
+           "no dates for Barback Sam, so no-sale, drawer-short and walkout rates could not be worked
+           out for them", when the real reason is that he was never scored at all. Two different
+           facts, and the report already names the set-aside servers separately. */
+        noShiftCount: noShiftCount.filter(nm => scored.some(x => x.name === nm)),
         // Signals that carried a figure but had too few reporters to compare against.
         unjudged: Object.keys(thin).map(k => (this.SIGNALS.find(g => g.key === k) || {}).label || k) },
       summary: {
@@ -1164,14 +1190,23 @@ S.SalesIntegrity = {
     return false;
   },
 
-  _floor(key, avg) {
+  _floor(key, s) {
     // A minimum the value must clear so a 2x of a tiny team average never flags.
     // no_sales is a count of opens in the window (the caller passes the raw count);
     // the rest are ratios measured against themselves. This was Math.max(3, avg)
     // back when no_sales was a raw sum and avg was a raw count too. Now that avg is
     // a per-shift rate, maxing a count against a rate would compare two different
     // units, and the `v > avg * 2` test already covers "above the team's own rate".
-    if (key === 'no_sales')   return 3;
+    /* ⚠⚠ A FLAT 3 IS A MONTH'S NOISE AND A NIGHT'S PATTERN, AND IT WAS THE SAME NUMBER FOR BOTH.
+       The floor's own comment calls it "at least this many opens in the window" — but the window can
+       be one shift or thirty, and the constant never moved. Measured: a server who popped the drawer
+       **3 times in a 30-night export** against peers who never did earned a `no_sales` flag reading
+       "3 no-sale opens over 30 shifts (0.1 per shift) vs an average of 0 per shift". A flag that
+       weak names nobody on its own, but it carries weight 3 and `strong`, so it is one soft
+       coincidence away from creating the two-signal pattern the rule exists to require.
+       Scaled to the window: three opens still clears a three-night file, and a month needs a
+       materially larger number before "above a floor of zero" means anything. */
+    if (key === 'no_sales')   return Math.max(3, Math.ceil((s && s.shifts || 1) * 0.5));
     if (key === 'void_pct')   return 0.02;
     if (key === 'comp_pct')   return 0.02;
     if (key === 'refund_pct') return 0.01;
