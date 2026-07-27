@@ -131,25 +131,26 @@ S.SalesIntegrity = {
      tiny floor. ⚠ A solo escalation is capped at WATCH and can never reach High Risk — one signal is
      a lead worth a look, never a pattern Bar Cop asserts. */
   SIGNALS: [
-    { key: 'no_sales',    label: 'No-sale drawer opens',     cat: 'register', dir: 'high', weight: 3, strong: true, solo: { ratio: 5, minCount: 10 } },
-    { key: 'void_pct',    label: 'Void rate',                cat: 'register', dir: 'high', weight: 3, strong: true, dollar: 'voids',   solo: { ratio: 5, minShare: 0.10 } },
-    { key: 'avg_check',   label: 'Average check',            cat: 'pricing',  dir: 'low',  weight: 2 },
-    { key: 'comp_pct',    label: 'Comps and discounts',      cat: 'pricing',  dir: 'high', weight: 2, dollar: 'comps',   solo: { ratio: 5, minShare: 0.10 } },
-    { key: 'cash_ratio',  label: 'Cash mix',                 cat: 'cash',     dir: 'both', weight: 2 },
-    { key: 'refund_pct',  label: 'Refunds',                  cat: 'cash',     dir: 'high', weight: 2, dollar: 'refunds', solo: { ratio: 5, minShare: 0.10 } },
+    { key: 'no_sales',    label: 'No-sale drawer opens',     dir: 'high', weight: 3, strong: true, solo: { ratio: 5, minCount: 10 } },
+    { key: 'void_pct',    label: 'Void rate',                dir: 'high', weight: 3, strong: true, dollar: 'voids',   solo: { ratio: 5, minShare: 0.10 } },
+    { key: 'avg_check',   label: 'Average check',            dir: 'low',  weight: 2 },
+    { key: 'comp_pct',    label: 'Comps and discounts',      dir: 'high', weight: 2, dollar: 'comps',   solo: { ratio: 5, minShare: 0.10 } },
+    { key: 'cash_ratio',  label: 'Cash mix',                 dir: 'both', weight: 2 },
+    { key: 'refund_pct',  label: 'Refunds',                  dir: 'high', weight: 2, dollar: 'refunds', solo: { ratio: 5, minShare: 0.10 } },
     /* `twin` names the signal this one is a SECOND READING OF, not a weaker version of. Sales per
        labour hour and average check are both sales over a divisor, so when BOTH fire they are one
        fact counted twice and must not satisfy the two-signal rule between them. Against any OTHER
        signal it is an independent reading and counts normally. */
-    { key: 'sales_per_hr',label: 'Sales per labor hour',     cat: 'register', dir: 'low',  weight: 1, soft: true, twin: 'avg_check' },
-    { key: 'drawer_short',label: 'Drawer shorts',            cat: 'cash',     dir: 'high', weight: 3, strong: true, dollar: 'short', capture: true },
-    { key: 'walkouts',    label: 'Walkouts',                 cat: 'cash',     dir: 'high', weight: 2, dollar: 'walkout', capture: true }
+    { key: 'sales_per_hr',label: 'Sales per labor hour',     dir: 'low',  weight: 1, soft: true, twin: 'avg_check' },
+    { key: 'drawer_short',label: 'Drawer shorts',            dir: 'high', weight: 3, strong: true, dollar: 'short', capture: true },
+    { key: 'walkouts',    label: 'Walkouts',                 dir: 'high', weight: 2, dollar: 'walkout', capture: true }
   ],
-  CATS: [
-    { key: 'register', label: 'Register Manipulation' },
-    { key: 'cash',     label: 'Cash Skimming' },
-    { key: 'pricing',  label: 'Under-Ringing and Pricing' }
-  ],
+  /* ⭐⭐ THE THREE CATEGORY HEADINGS ARE GONE ON PURPOSE — "Register Manipulation", "Cash Skimming",
+     "Under-Ringing and Pricing" (Kyle, 2026-07-27). They were a static `cat` tag on each signal, so
+     they were asserted BEFORE any judgement about whether the pattern was real, and they named a
+     CRIME over numbers that only ever supported a comparison. Nothing in an operator's sales export
+     says "skimming". Do not reintroduce them: if a grouping is ever wanted, it has to be a grouping
+     of READINGS (rate signals vs cash-mix signals vs captured events), never of motives. */
   /* ⭐⭐ THE BAR A SIGNAL HAS TO CLEAR, AS A MULTIPLE OF THE PEER AVERAGE (everyone ELSE's mean).
      ⛔ WHY THESE ARE NOT 2 / 1.5 / 0.6, AND IT IS THE WHOLE POINT: the test used to compare against
      the WHOLE-TEAM mean, which INCLUDES the accused. Solve that and the bar it really imposes is
@@ -995,7 +996,7 @@ S.SalesIntegrity = {
         const soloOk = this._soloClears(sig, v, peerAvg(sig.key, s), s);
         if (!tripped && !soloOk) return;
         s.flags.push({
-          key: sig.key, label: sig.label, cat: sig.cat, weight: sig.weight, strong: !!sig.strong, soft: !!sig.soft, twin: sig.twin || '',
+          key: sig.key, label: sig.label, weight: sig.weight, strong: !!sig.strong, soft: !!sig.soft, twin: sig.twin || '',
           // Whether THIS flag, on its own, clears the solo-escalation bar. Computed here where the
           // team average and the raw counts are both in hand, so severity does not have to re-derive it.
           solo: soloOk,
@@ -1473,8 +1474,12 @@ S.SalesIntegrity = {
       + '<button class="btn btn-ghost btn-sm no-print" id="si-export">Export PDF</button></div>';
     const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
       + stat('Servers Reviewed', String(s.reviewed))
-      + stat('Flagged', String(s.flagged), sev(s.flagged))
-      + stat('High Risk', String(s.high), sev(s.high))
+      /* ⭐ "Flagged" and "High Risk" were verdicts in a stat tile. The honest count is how many
+         servers have readings the file cannot explain, and the risk GRADE is gone entirely — see the
+         note on `serverCard`. `summary.high` is still computed and stored (severity remains the
+         internal filter that decides who gets a card at all); it is simply no longer ASSERTED at
+         the operator, because Bar Cop cannot grade a person off a sales summary. */
+      + stat('With Readings Out of Line', String(s.flagged), sev(s.flagged))
       /* ⚠ "Estimated Exposure" read as the file's whole exposure and it is not: `summary.exposure`
          sums the FLAGGED servers only. A server who trips a single signal is deliberately not named
          (one outlier is noise), but their dollars are still computed — measured, $5,700 of void
@@ -1557,9 +1562,9 @@ S.SalesIntegrity = {
          sentence also moved out to `skipTxt`, which prints in BOTH branches (it used to appear only
          when nobody was flagged, i.e. never on the review an operator reads hardest). */
       inner = '<div style="font-size:13px;color:var(--green);font-weight:700;">'
-        + 'No servers flagged among the ' + s.reviewed + ' scored.</div>'
+        + 'Nothing out of line among the ' + s.reviewed + ' servers scored.</div>'
         + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">'
-        + 'Their numbers track the floor. Run this each shift or week and the outliers surface on their own.</div>';
+        + 'Their numbers track the rest of the floor. Run this each shift or week and the outliers surface on their own.</div>';
     } else {
       /* ⚠⚠ THE BADGE ASKS "WAS THIS CASE OPENED IN RESPONSE TO THIS REVIEW", SO IT NEEDS THE DATE
          THE REVIEW WAS MADE — NOT THE LAST SALES DATE IN THE FILE. `review.date` is the newest date
@@ -1587,23 +1592,35 @@ S.SalesIntegrity = {
 
     const note = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin:18px 0 6px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
-      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">These are patterns to investigate, not proof. A flag means a server\'s numbers are an outlier worth a closer look. Product theft (overpouring, free pours, bottle loss) does not show in a sales report; pour cost, inventory variance, and spot checks catch that. Bar Cop is a software tool, not an investigator; confirm before acting on anyone.</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">These are numbers that do not line up with the rest of the floor. They are not proof of anything, and Bar Cop does not say what causes them: a listed server may be working a different station, a different shift, or a different kind of guest. Product theft (overpouring, free pours, bottle loss) does not show in a sales report at all; pour cost, inventory variance and spot checks catch that. Bar Cop is a software tool, not an investigator. Look into it yourself before you act on anyone.</div>'
       + '</div>';
 
     return statStrip + head + reviewCard + note;
   },
 
+  /* ⭐⭐ THIS CARD REPORTS READINGS, IT DOES NOT RETURN A VERDICT (Kyle, 2026-07-27).
+     It used to print a person's name over the words HIGH RISK and group their numbers under
+     "CASH SKIMMING" / "REGISTER MANIPULATION" / "UNDER-RINGING". Those three things were never in
+     the operator's file. The file supports exactly one statement — *this server's cash share is 61%
+     where the rest of the floor runs 22%, and here is what the gap is worth* — and the screen was
+     turning that into a category of theft, a risk grade and a named suspect, asserted with the same
+     confidence as the arithmetic. Worse, the category was a STATIC TAG on the signal, so it was
+     asserted before any judgement about whether the pattern was real: a server flagged on cash mix
+     alone got "Cash Skimming" printed over them on the same screen whose help text says a cash-heavy
+     station explains a cash-heavy mix.
+     ⭐ THE LINE THAT MATTERS: **filtering is defensible, interpreting is not.** The thresholds and
+     the two-signal rule stay, because deciding who is worth a look is a filter and it is what stops
+     the patio server's naturally low check average landing on the board. The dollar figures stay,
+     because they are measured. The CATEGORY and the RISK GRADE go, because Bar Cop cannot know them.
+     What is left is a name, a count of readings that are out of line, what they are worth, and the
+     numbers behind each one — and the operator decides what it means. */
   serverCard(x, reviewDate) {
-    const sevColor = x.severity === 'high' ? 'var(--red)' : 'var(--amber)';
-    const sevLabel = x.severity === 'high' ? 'High Risk' : 'Watch';
-    const byCat = {};
-    (x.flags || []).forEach(f => { (byCat[f.cat] = byCat[f.cat] || []).push(f); });
-    const cats = this.CATS.filter(c => byCat[c.key] && byCat[c.key].length).map(c => {
-      const rows = byCat[c.key].map(f => '<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--b2);font-size:12px;">'
-        + '<span style="color:var(--t2);">' + esc(f.label) + (f.soft ? ' <span style="color:var(--t4);">(soft)</span>' : '') + '<span style="color:var(--t3);">: ' + esc(f.detail) + '</span></span>'
-        + '<span style="color:' + (f.exposure > 0 ? 'var(--red)' : 'var(--t4)') + ';white-space:nowrap;font-weight:600;">' + (f.exposure > 0 ? App.fmtCurrency(f.exposure) : '') + '</span></div>').join('');
-      return '<div style="margin-top:10px;"><div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">' + esc(c.label) + '</div>' + rows + '</div>';
-    }).join('');
+    const flags = x.flags || [];
+    const rows = flags.map(f => '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--b2);font-size:12px;">'
+      + '<span style="color:var(--t2);">' + esc(f.label) + '<span style="color:var(--t3);">: ' + esc(f.detail) + '</span></span>'
+      + '<span style="color:' + (f.exposure > 0 ? 'var(--red)' : 'var(--t4)') + ';white-space:nowrap;font-weight:600;">' + (f.exposure > 0 ? App.fmtCurrency(f.exposure) : '') + '</span></div>').join('');
+    // ⚠ Neutral, per the design rule that colour carries meaning and a plain count is not a verdict.
+    const countTxt = flags.length + ' reading' + (flags.length === 1 ? '' : 's') + ' out of line';
 
     /* ⚠ A CASE CLOSED MONTHS AGO IS NOT THIS WEEK'S ANSWER. `invList` matched on NAME alone, with no
        date and no review id — so a March investigation that was resolved and forgotten printed a
@@ -1629,11 +1646,11 @@ S.SalesIntegrity = {
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">'
       +   '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(x.name) + '</div>'
       +   '<div style="display:flex;align-items:center;gap:12px;">'
-      +     (x.exposure > 0 ? '<span style="font-size:12px;color:var(--red);font-weight:600;">' + App.fmtCurrency(x.exposure) + ' exposure</span>' : '')
-      +     '<span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:' + sevColor + ';">' + sevLabel + '</span>'
+      +     (x.exposure > 0 ? '<span style="font-size:12px;color:var(--red);font-weight:600;">' + App.fmtCurrency(x.exposure) + '</span>' : '')
+      +     '<span style="font-size:11px;color:var(--t3);">' + countTxt + '</span>'
       +   '</div>'
       + '</div>'
-      + cats
+      + '<div style="margin-top:8px;">' + rows + '</div>'
       + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm si-investigate" data-name="' + esc(x.name) + '" data-staff="' + esc(x.staff_id || '') + '" style="' + invStyle + '">' + invLabel + '</button></div>'
       + '</div>';
   },
@@ -1732,10 +1749,10 @@ S.SalesIntegrity = {
     let nvSaid = null;   // which no-verdict reason the document already stated, so nothing repeats it
     b.table(['Summary', ''], [
       ['Servers reviewed', String(sm.reviewed)],
-      ['Flagged', String(sm.flagged)],
-      ['High risk', String(sm.high)],
-      // Same wording as the screen's stat strip — this table and that strip are the same four numbers.
-      ['Flagged exposure', sm.exposure > 0 ? '$' + Number(sm.exposure).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-']
+      // Same wording as the screen's stat strip — this table and that strip are the same numbers.
+      // The risk GRADE is deliberately absent from both; see the note on `serverCard`.
+      ['With readings out of line', String(sm.flagged)],
+      ['Dollars behind those readings', sm.exposure > 0 ? '$' + Number(sm.exposure).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-']
     ], { columnStyles: { 1: { halign: 'right' } } });
     // ⚠ THE SAME CAVEAT THE SCREEN SHOWS. Without it this document printed "Flagged: 0" beside a
     // review that could never have flagged anyone, and it is the artefact that leaves the building.
@@ -1748,24 +1765,21 @@ S.SalesIntegrity = {
       const it = this._intakeNote(review);
       if (it) b.paragraph('What this file carried: ' + it);
     }
-    /* ⚠ THE DOCUMENT MUST CARRY WHAT THE SCREEN CARRIES. Four things were on screen and missing
-       here, and this is the artefact handed to an owner, a partner, a lender or an accountant:
-         · the SET-ASIDE servers. The screen names them; the PDF printed "Servers reviewed 4" with
-           no hint that anyone was excluded. Exactly the shape of the caveat bug this file's own
-           header block says was already closed once — fixed on screen, silent in the export;
-         · the CATEGORY grouping (Register Manipulation / Cash Skimming / Under-Ringing), which the
-           help text promises by name and the PDF printed as one flat list;
-         · the per-flag DOLLARS, so a $238 comp exposure and a $0 behavioural flag looked identical;
-         · the `(soft)` marker, so a weight-1 soft reading looked exactly like a strong tell. */
+    /* ⚠ THE DOCUMENT MUST CARRY WHAT THE SCREEN CARRIES. The SET-ASIDE servers were on screen and
+       missing here, and this is the artefact handed to an owner, a partner, a lender or an
+       accountant: the PDF printed "Servers reviewed 4" with no hint that anyone was excluded.
+       ⭐⭐ AND THE SECTION HEADING NO LONGER GRADES A PERSON. It read "Ana Lopez (High Risk,
+       $740.00 exposure)" over a table headed CASH SKIMMING — three assertions stacked on one
+       measurement, in the document most likely to be shown to somebody other than the operator.
+       It now states what was counted and what it is worth, and the readings are listed flat under
+       the name. See the note on `serverCard` for the whole reasoning. */
     (review.servers || []).filter(x => this._isFlagged(x)).forEach(x => {
-      b.sectionTitle(x.name + '  (' + (x.severity === 'high' ? 'High Risk' : 'Watch') + (x.exposure > 0 ? ', ' + App.fmtCurrency(x.exposure) + ' exposure' : '') + ')');
-      const byCat = {};
-      (x.flags || []).forEach(f => { (byCat[f.cat] = byCat[f.cat] || []).push(f); });
-      this.CATS.filter(c => byCat[c.key] && byCat[c.key].length).forEach(c => {
-        b.table([c.label, 'Detail', 'Exposure'], byCat[c.key].map(f =>
-          [f.label + (f.soft ? ' (soft)' : ''), f.detail, f.exposure > 0 ? App.fmtCurrency(f.exposure) : '']),
-          { columnStyles: { 2: { halign: 'right' } } });
-      });
+      const fl = x.flags || [];
+      b.sectionTitle(x.name + '  (' + fl.length + ' reading' + (fl.length === 1 ? '' : 's')
+        + ' out of line' + (x.exposure > 0 ? ', ' + App.fmtCurrency(x.exposure) : '') + ')');
+      b.table(['Reading', 'Detail', 'Dollars'], fl.map(f =>
+        [f.label, f.detail, f.exposure > 0 ? App.fmtCurrency(f.exposure) : '']),
+        { columnStyles: { 2: { halign: 'right' } } });
     });
     if (review.skipped && review.skipped.length) {
       /* ⚠ TWO FIXES HERE, BOTH FOUND BY READING THE DOCUMENT RATHER THAN THE CODE.
@@ -1835,7 +1849,11 @@ S.SalesIntegrity = {
          sales (it is a raw count of opens, and that signal carries no dollars at all), it said
          "five times the floor" while the card printed the whole-team average (~4x), and it said
          flags are sorted worst first when only SERVERS are sorted. */
-      { h: 'How a server gets flagged', p: ['One outlier is usually noise; a real pattern stacks. A server is named when at least two separate signals line up — so a naturally low check average on a slow station, on its own, is never treated as a pattern.', 'There is one exception, and it is deliberately narrow. A single signal can put someone on the board as Watch, never High Risk, when it runs five times the rest of the floor and the loss behind it is material: a real share of that server\'s own sales for voids, comps and discounts or refunds, or at least ten drawer opens for no-sales. One signal is a lead worth a look, not a pattern Bar Cop will assert. Cash mix, check averages, sales per labour hour, drawer shorts and walkouts are never enough on their own, however far off they look: a cash-heavy or a slow station explains the first three, and a bartender who runs short once or twice is a training problem, not a pattern.', 'Servers are listed worst first, and each one\'s flags are grouped into Register Manipulation, Cash Skimming, and Under-Ringing. Every figure you see, and every dollar exposure, is measured against the rest of the team with that server left out, so their own numbers never soften the comparison. A dollar exposure is shown on the signals where one can be computed honestly (voids, comps, refunds, drawer shorts and walkouts); the behavioural signals carry no dollar figure, so a flagged server can show none.'] },
+      /* ⭐⭐ THIS SECTION USED TO EXPLAIN A VERDICT. It now explains a FILTER, because that is all
+         Bar Cop actually does here: it decides which numbers are far enough from the floor to be
+         worth your time, and then it shows you the numbers. It does not grade the person and it does
+         not name a category of theft. Keep it that way. */
+      { h: 'Which readings get listed', p: ['One number out of line is usually noise, so Bar Cop does not list a server on one alone: it takes at least two separate readings before anyone appears. That is why a naturally low check average on a slow station, by itself, never puts somebody on the page.', 'There is one exception and it is deliberately narrow. A single reading can list somebody when it runs five times the rest of the floor and the money behind it is real: a meaningful share of that server\'s own sales for voids, comps and discounts or refunds, or at least ten drawer opens for no-sales. Cash mix, check averages, sales per labour hour, drawer shorts and walkouts are never enough on their own, however far off they look. A cash-heavy or a slow station explains the first three, and a bartender who runs short once or twice is a training problem.', 'Every figure you see, and every dollar figure beside it, is measured against the rest of the team with that server left out, so their own numbers never soften the comparison. Dollars are shown only where they can be worked out honestly (voids, comps, refunds, drawer shorts and walkouts), so a listed server can show none at all. Bar Cop does not tell you what any of it means. It tells you which numbers do not line up and what the gap is worth, and the next step is yours.'] },
       { h: 'Working a flag', p: ['A flag is a lead, not a verdict. Open Investigation starts a six-step case over in Loss Prevention so you work it the same way you work any variance: watch the drawer, pull the void timestamps, talk to the shift, document the finding. Export PDF saves the review for an owner or partner. Confirm before you act on anyone.'] }
     ]);
   }
