@@ -265,18 +265,29 @@ S.HubOperatingExpenses = {
       recs = recs.filter(r => r.category === this._filterCategory);
     }
     const today = new Date(); today.setHours(0,0,0,0);
+    const todayStr = App.todayLocal();
     if (this._filterRange === 'this-month') {
       const mk = this._currentMonthKey();
       recs = recs.filter(r => this._monthKey(r.date) === mk);
     } else if (this._filterRange === 'last-month') {
       const mk = this._priorMonthKey(this._currentMonthKey());
       recs = recs.filter(r => this._monthKey(r.date) === mk);
+    /* ⚠⚠ BOTH BACKWARD-LOOKING RANGES ARE BOUNDED AT THE TOP (S222). Neither was, so a future-dated
+       expense — a mistyped year on a bill, or one typed forward on purpose — appeared under a chip
+       that says "Year to DATE" or "Last 12 Months", and flowed from there into the By Category card
+       and that range's export PDF.
+       Demonstrated with BARCOP-TEST-E: a row dated 2027-03-01 showed under **Last 12 Months**.
+       ⚠ `this-month` and `next-month` are deliberately NOT bounded — this screen shows the month
+       ahead on purpose (that is what the Next Month card is for). Only the ranges whose LABEL says
+       "to date" or "last" are backward-looking claims.
+       ⚠ 12 months is not 365 days, so the month arithmetic stays and this cannot use App.inWindow;
+       the upper bound is added explicitly. */
     } else if (this._filterRange === 'ytd') {
       const year = String(today.getFullYear());
-      recs = recs.filter(r => (r.date || '').slice(0, 4) === year);
+      recs = recs.filter(r => (r.date || '').slice(0, 4) === year && r.date <= todayStr);
     } else if (this._filterRange === 'last-12') {
       const cutoff = new Date(today); cutoff.setMonth(cutoff.getMonth() - 12);
-      recs = recs.filter(r => r.date && new Date(r.date + 'T00:00:00') >= cutoff);
+      recs = recs.filter(r => r.date && r.date <= todayStr && new Date(r.date + 'T00:00:00') >= cutoff);
     }
     // Newest first.
     recs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -318,7 +329,12 @@ S.HubOperatingExpenses = {
     const recs = this.records();
     const yr = String(new Date().getFullYear());
     const total = recs.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
-    const ytd = recs.filter(r => String(r.date || '').slice(0, 4) === yr).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    // ⚠ "Logged This Year" is a to-DATE claim, so it stops at today (S222) — the same bound the YTD
+    // chip carries. A bill typed with a future date is logged, but it is not logged *this year yet*.
+    // "Logged All Time" deliberately keeps everything, which is what makes the row findable.
+    const _today = App.todayLocal();
+    const ytd = recs.filter(r => String(r.date || '').slice(0, 4) === yr && String(r.date || '') <= _today)
+      .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
     const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
     return '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + stat('Logged This Year', fmt$(ytd)) + stat('Logged All Time', fmt$(total)) + stat('Entries', String(recs.length))
