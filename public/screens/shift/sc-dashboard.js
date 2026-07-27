@@ -999,16 +999,26 @@ S.ShiftDashboard = {
          under it naming only dates and covers, and no unmatched-name note at all. And "All N rows
          were already logged" was claimed whenever dupCount was non-zero, even with rows dropped for
          other reasons alongside it. Only ever say "All" when nothing else was dropped. */
+      /* ⚠ Step 0.5, and the twin needed BOTH halves of the same fix (2026-07-27). `otherDrops` knew
+         nothing about a repeated line counted once or a conflict kept by hand, so this door would
+         have printed "All N rows were already logged" over a file where a 9th row was collapsed —
+         the very "All" claim the comment above exists to prevent. And "the rest could not be used"
+         is false of a repeat, which WAS used. Rows that could not be USED and rows handled some
+         other way are separate counts now, exactly as at the twin. */
       const otherDrops = skipped.length + inc + und;
+      const otherHandled = (fileRepeats || 0) + (keptByHand || 0);
       // ⚠ RED IS FOR A PROBLEM. Re-dropping the same report is a NORMAL thing to do and nothing is
       // wrong with the file, but this block was hard-coded red, so "All 12 rows were already logged"
       // read as a failure. The twin door (r-server-check) renders the identical outcome neutral and
       // _doImportSales treats its equivalent as a success. Only colour it red when something is
       // actually wrong. (Round 2 rewrote this very expression and left the colour behind it.)
+      // Benign (neutral, not red) whenever nothing was actually WRONG with the file — a repeat
+      // collapsed or a hand entry kept is not a problem, but it does stop the word "All".
       const benign = dupCount && !otherDrops;
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--' + (benign ? 't2' : 'red') + ');margin-top:12px;">'
-        + (benign ? 'No new server rows imported. All ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
-         : dupCount ? 'No new server rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged; the rest could not be used.'
+        + (benign && !otherHandled ? 'No new server rows imported. All ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
+         : (dupCount && !otherDrops) ? 'No new server rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
+         : dupCount ? 'No new server rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged, ' + otherDrops + ' could not be used.'
          : (und && !skipped.length && !inc) ? 'No server rows imported. Bar Cop could not read a date on any row — check the date column in your export.'
          : (inc && !skipped.length && !und) ? 'No server rows imported. Every name matched your roster, but no row had both covers and sales.'
          : (!skipped.length && (und || inc)) ? 'No server rows imported. Every name matched your roster — see below for what stopped each row.'
