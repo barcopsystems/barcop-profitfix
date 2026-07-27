@@ -343,7 +343,14 @@ const CSVMapper = {
        with 11 void TRANSACTIONS on $290 of sales printed **High Risk, "3.8% of sales voided", $18.10
        exposure** into the PDF. Bound correctly as counts the same file is CLEAN.
        A count marker is as explicit as a currency marker and deserves the same symmetric guard. */
-    const hasCountMark = h => /(^|[^a-z])(?:#|qty|cnt|count|counts|quantity|no\.|num|number)([^a-z]|$)/i.test(String(h));
+    /* ⚠ `trans`/`transactions`/`items`/`rung`/`ct` joined after measurement: a POS counts voids in
+       TRANSACTIONS as often as it counts them in "#", and every spelling the detector did not know
+       still reached the dollar twin through the bare `void`/`comp`/`refund` candidates. Measured
+       before the fix: `Void Transactions`, `Void Trans`, `Void Ct`, `Void Items` and `Voids Rung`
+       all bound the DOLLAR field, so 11 void transactions on $290 of sales printed "3.8% of sales
+       voided" and a $10.67 figure, both fabricated from a count. `ct` is word-bounded, so "Direct"
+       and "Account" do not trip it. */
+    const hasCountMark = h => /(^|[^a-z])(?:#|qty|cnt|ct|count|counts|quantity|no\.|num|number|trans|transaction|transactions|items|rung)([^a-z]|$)/i.test(String(h));
     const allowed = (f, h) => !(f.notMoney && hasMoneyMark(h)) && !(f.notCount && hasCountMark(h));
     // An UNNAMED column is never auto-claimed — there is nothing to match on, and guessing it is
     // how a row-number column ends up imported as covers.
@@ -437,6 +444,13 @@ const CSVMapper = {
          ⚠ The hyphenated form is also Bar Cop's OWN column label ("No-Sale Opens") minus one word,
          which is exactly why it was in the match array — it still binds, in pass 1, exactly. */
       'no-sale': 1, 'no sales': 1, nosale: 1,
+      /* ⚠ A VOID COUNT WAS BINDING THE CHECK COUNT. `checks` carries bare `transactions` and
+         `orders`, and a hyphen or a space is a word boundary, so **"Voided Transactions" bound
+         `checks`**: measured, five of six servers then fell under MIN_CHECKS and were set aside,
+         and the one who survived printed a **$166.67 average check against a true $50.00**. Sealed,
+         so a plain "Transactions" or "Orders" column still binds exactly and a qualified one does
+         not reach. The precise spellings ("transaction count", "order count") are unaffected. */
+      transactions: 1, orders: 1, tickets: 1, tabs: 1,
       /* ⚠ THE ROUND-2 RESTORATIONS ARE EXACT-ONLY TOO, and the reason is a rule worth stating:
          EVERY ONE OF THEM WAS JUSTIFIED BY AN EXACT HEADER that had stopped binding. None of them
          needs to hunt, and each one that did reached a neighbour's column:
