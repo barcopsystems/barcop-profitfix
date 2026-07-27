@@ -58,9 +58,10 @@ S.EventsDashboard = {
     const depositsDue = depDueList.reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
 
     // The briefing sentence below says "your win rate is X over the last 90 days", so the window is
-    // 90 days, not 91. App.windowCutoff is the one implementation of that.
-    const cutoff = App.windowCutoff(90);
-    const closed = all.filter(b => (b.stage === 'Booked' || b.stage === 'Completed' || b.stage === 'Lost') && (b.date_received || '') >= cutoff);
+    // 90 days, not 91 — and it is bounded at the top too (S217), or an enquiry typed with a future
+    // received-date counts toward the win rate from whenever it was entered.
+    const inWin = App.inWindow(90);
+    const closed = all.filter(b => (b.stage === 'Booked' || b.stage === 'Completed' || b.stage === 'Lost') && inWin(b.date_received));
     const wins = closed.filter(b => b.stage === 'Booked' || b.stage === 'Completed').length;
     const conv = closed.length >= 5 ? Math.round(100 * wins / closed.length) + '%' : (closed.length ? wins + ' of ' + closed.length : '-');
 
