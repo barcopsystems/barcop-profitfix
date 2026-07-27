@@ -1450,7 +1450,7 @@ const PosIngest = {
     const staffByName = this._staffByName();
     const existing = (App.data && App.data.revenue_server_checks) || [];
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
-    const summaryRows = []; const notService = [];
+    const summaryRows = []; const notService = []; const conflicts = []; let replaced = 0;
     (rows || []).forEach(r => {
       /* ⚠⚠ A POS TOTALS LINE IS NOT A PERSON, AND TELLING THE OPERATOR TO ADD IT TO THE ROSTER IS
          THE WORST ADVICE THIS DOOR COULD GIVE. `isSummaryName` was never called here, so
@@ -1495,15 +1495,51 @@ const PosIngest = {
          the file has a Date column", buildCash says "Each row needs a date". Only server accepted
          it. A per-server export with a date cell like "Jul 24" or "7/24" (no year) hits this. */
       if (!recDate) { undated.push(r.name || '(blank)'); return; }
-      if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate
-            && (x.covers || 0) === covers && Math.abs((x.sales || 0) - sales) < 0.001)) { dupCount++; return; }
-      toAdd.push({
-        id: App.uid(), date: recDate, shift: (r.shift || '').trim(), shift_id: '',
+      /* ⚠⚠ THE DEDUP KEY INCLUDED THE FIGURES, SO CORRECTING A ROW DESTROYED ITS OWN IDENTITY.
+         The key was staff + date + covers + sales — so a row the operator FIXED BY HAND no longer
+         matched the file it came from, and re-dropping the same export wrote it a second time.
+         Measured: Maria at 66 covers / $3,368 against a truth of 24 / $1,684.
+         A server check's identity is WHO, WHEN and WHICH SERVICE PERIOD. The figures are the
+         PAYLOAD, and a payload that disagrees is a CONFLICT, not a different record. buildSales has
+         worked this way since S140 ([[user-chooses-conflicts]]) and buildCash since S99; this door
+         was the last one still keying on its own values.
+         ⚠ `shift` is IN the identity because a server legitimately works Lunch and Dinner on one
+         date — keying on staff + date alone would refuse the second service as a duplicate. A file
+         with no shift column leaves it '' on both sides, collapsing to staff + date, which is right
+         for the one-row-per-server-per-day export that shape comes from. */
+      const shiftName = (r.shift || '').trim();
+      const rec = {
+        id: App.uid(), date: recDate, shift: shiftName, shift_id: '',
         staff_id: staff.id, server_name: staff.name, covers, sales,
-        imported: true, saved_at: new Date().toISOString()
-      });
+        imported: true, source: 'import', saved_at: new Date().toISOString()
+      };
+      const prior = this._findDup(existing, used, x => x.staff_id === staff.id && x.date === recDate
+            && (x.shift || '').trim() === shiftName);
+      if (prior) {
+        // Identical row: already logged, exactly as before.
+        if ((prior.covers || 0) === covers && Math.abs((prior.sales || 0) - sales) < 0.001) { dupCount++; return; }
+        /* ⚠ PROVENANCE DECIDES, AND `imported` ALONE IS NOT IT — S140's exact trap. `saveEdit`
+           spreads the prior record, so a HAND CORRECTION to an imported row keeps `imported:true`;
+           testing that flag would silently overwrite the very correction this fix exists to
+           protect. `source` is the field ([[user-chooses-conflicts]]), and the edit doors stamp
+           'manual'. Legacy rows carry neither, so fall back to `imported` and treat everything else
+           — including the seed, which stamps no provenance — as the operator's own. */
+        const mine = prior.source === 'manual'
+          || (prior.source == null && prior.imported !== true);
+        if (!mine) { rec.id = prior.id; replaced++; toAdd.push(rec); return; }   // replacing our own earlier import
+        conflicts.push({
+          key: prior.id, date: recDate, shift: shiftName, name: staff.name,
+          mine:   { covers: prior.covers || 0, sales: prior.sales || 0 },
+          theirs: { covers, sales },
+          useRec: Object.assign({}, rec, { id: prior.id })
+        });
+        return;
+      }
+      toAdd.push(rec);
     });
-    return { toAdd, skipped, incomplete, undated, dupCount, summaryRows, notService };
+    // `replaced` is NOT `dupCount`: this door renders dupCount as "already logged", which is false
+    // of a row whose figures we just overwrote. Different events, different words.
+    return { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, summaryRows, notService };
   },
 
   // A POS product-mix report: one row per item with units sold. Matches the item
