@@ -111,16 +111,45 @@ S.RevenueServerCheck = {
       rec.sales  += parseFloat(c.sales)  || 0;
     });
 
-    voids.forEach(v => { if (v.staff_id && byId[v.staff_id]) byId[v.staff_id].comp_total += parseFloat(v.amount) || 0; });
+    /* ⚠⚠ TIPS % AND COMPS % DIVIDED TWO DIFFERENT LOGS BY EACH OTHER. Tips come from Tip Tracking,
+       comps from Shift Control's Void/Comp log, and SALES from this door — each windowed by date and
+       nothing else. Those doors fill up independently, so being out of step is the ORDINARY state,
+       not an edge case, and the rate then puts a numerator and a denominator from different shifts
+       either side of a division sign.
+       Seen live at 45.6% on the 7-day chip. Measured on a fixture — identical work, identical tip
+       log — the rate read 19.0% with five nights of checks logged and 95.0% with one, and a single
+       large tip on a day with no check produced 288.0%. A tip rate cannot exceed about 25%; the
+       excess was always the denominator missing shifts the numerator had counted.
+       ⭐ THE RULE: a rate is only honest across the shifts BOTH sides can see. Tips and comps count
+       only on the days that server has a check in this window, so the percentage lines up with the
+       Sales column beside it. Same reasoning as door 12's `onOwnDays`.
+       ⚠ Nothing that was on screen disappears — a server with tips and no checks at all was never on
+       the scorecard. And it is FLAT in how much the operator has logged: the same server on the same
+       nights reads the same rate whether one night or five are entered, which is the property that
+       makes the number trustworthy at all. */
+    const ownDays = new Set();
+    checks.forEach(c => { if (c.staff_id) ownDays.add(c.staff_id + '|' + (c.date || '')); });
+    const onOwnDay = (sid, date) => !!sid && ownDays.has(sid + '|' + (date || ''));
+    const offDays = new Set();   // staff|date pairs carrying tips or comps with no check to measure against
+
+    voids.forEach(v => {
+      if (!v.staff_id || !byId[v.staff_id]) return;
+      if (!onOwnDay(v.staff_id, v.date)) { offDays.add(v.staff_id + '|' + (v.date || '')); return; }
+      byId[v.staff_id].comp_total += parseFloat(v.amount) || 0;
+    });
 
     // Tips: pools first (preferred), then lc_tips for staff whose tips didn't go
     // through a pool. Same priority as Form 8027.
     const poolStaffIds = new Set();
     pools.forEach(p => (p.participants || []).forEach(pt => {
-      if (pt.staff_id && byId[pt.staff_id]) { byId[pt.staff_id].tip_total += parseFloat(pt.share) || 0; poolStaffIds.add(pt.staff_id + '|' + p.date); }
+      if (!pt.staff_id || !byId[pt.staff_id]) return;
+      if (!onOwnDay(pt.staff_id, p.date)) { offDays.add(pt.staff_id + '|' + (p.date || '')); return; }
+      byId[pt.staff_id].tip_total += parseFloat(pt.share) || 0;
+      poolStaffIds.add(pt.staff_id + '|' + p.date);
     }));
     tips.forEach(t => {
       if (!t.staff_id || !byId[t.staff_id]) return;
+      if (!onOwnDay(t.staff_id, t.date)) { offDays.add(t.staff_id + '|' + (t.date || '')); return; }
       if (poolStaffIds.has(t.staff_id + '|' + t.date)) return;
       byId[t.staff_id].tip_total += parseFloat(t.total_tips) || ((parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0));
     });
@@ -165,7 +194,8 @@ S.RevenueServerCheck = {
     // `future` and `unattributed` are rows this scorecard deliberately did not count. Both are
     // RENDERED (draw + scorecardSection) — a field computed and read nowhere is a fix that never
     // shipped, so grep either name for its second occurrence before changing this line.
-    return { rows: all, teamAvg, teamCovers, teamSales, windowDays: windowDays || 30, future, unattributed };
+    return { rows: all, teamAvg, teamCovers, teamSales, windowDays: windowDays || 30, future, unattributed,
+      offDays: offDays.size };
   },
 
   freshForm() {
@@ -371,7 +401,16 @@ S.RevenueServerCheck = {
       + this.COLGROUP
       + '<thead><tr>'
       + '<th>Server</th><th>Check Avg</th><th>vs Target</th><th>vs Team</th><th>Covers</th><th>Sales</th><th>Comps %</th><th>Tips %</th><th class="no-print"></th>'
-      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      + '</tr></thead><tbody>' + rows + '</tbody></table>'
+      /* States the BASIS of the two rate columns, and only when it actually bit. Deliberately
+         INSIDE #rsc-sc-export so it rides along on the exported PDF — a rate leaving the building
+         on an owner's copy needs to say what it was measured over. */
+      + (sc.offDays
+          ? '<div style="font-size:11px;color:var(--t3);margin-top:10px;">Tips % and Comps % cover only'
+            + ' the days each server has a logged check, so they line up with the Sales column. '
+            + sc.offDays + ' day' + (sc.offDays === 1 ? '' : 's') + ' of tips or comps fell outside those days.</div>'
+          : '')
+      + '</div></div>';
   },
 
   // ── Shift log (data-card) ────────────────────────────────────────────────────

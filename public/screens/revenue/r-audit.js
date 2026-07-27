@@ -538,8 +538,20 @@ S.RevenueAudit = {
     const checks = (App.data.revenue_server_checks || []).filter(c => inWin(c.date));
     if (checks.length) {
       const serverSales = checks.reduce((s, c) => s + (parseFloat(c.sales) || 0), 0);
+      /* ⚠⚠ S220's SECOND CONSUMER, AND THIS ONE FEEDS A SCORE (step 0.6). The scorecard's Comps %
+         one screen over had the identical shape: comps from the WHOLE window divided by sales from
+         only the days that actually have a server check. The Void/Comp log and the Server Check log
+         are filled in by different people at different times, so being out of step is the ordinary
+         state. Measured on this rate — same comping, same nights worked, only the number of nights
+         ENTERED changing: 5.0% with five nights logged, 8.3% with three, 25.0% with one. The audit
+         then grades "server comp discipline" on how much bookkeeping got done, which is not what it
+         claims to measure.
+         This is a TEAM rate, so the honest restriction is by DATE (the scorecard's is per server).
+         Comps on a day with no server sales have no denominator and cannot be expressed as a rate. */
+      const checkDays = new Set(checks.map(c => String(c.date || '').slice(0, 10)));
       const comps = ((App.shiftData && App.shiftData.sc_void_comps) || [])
-        .filter(r => r.type === 'Comp' && App.compReasonIsLoss(r.reason || r.category) && inWin(r.date));   // give-aways only; excludes Staff Meal/Shift Drink so S4 doesn't fire a false "tighten comp discipline" flag; same bounded window as the sales side, or the rate is a ratio of two different periods
+        .filter(r => r.type === 'Comp' && App.compReasonIsLoss(r.reason || r.category) && inWin(r.date)
+                  && checkDays.has(String(r.date || '').slice(0, 10)));   // give-aways only; excludes Staff Meal/Shift Drink so S4 doesn't fire a false "tighten comp discipline" flag; same bounded window as the sales side, or the rate is a ratio of two different periods
       const compTotal = comps.reduce((s, v) => s + (parseFloat(v.amount) || 0), 0);
       if (serverSales > 0) {
         cd.server_comp_total = Math.round(compTotal);
