@@ -77,11 +77,11 @@ S.SalesIntegrity = {
        CLEAN" failure, still live for the tender and payment nouns after the sales/amount/total ones
        were fixed. The two lists have to enumerate the SAME nouns or the split silently loses a side. */
     { key: 'card_sales',   label: 'Card Sales',        required: false, match: ['card sales', 'credit sales', 'card payments', 'card payment', 'credit payments', 'credit payment', 'credit card sales', 'credit card total', 'credit card amount', 'credit card tendered', 'credit card tender', 'credit tendered', 'credit tenders', 'credit tender', 'card tendered', 'card tender', 'credit received', 'card received', 'credit amount', 'card amount', 'card total', 'credit total', 'total credit', 'net credit amount', 'net credit', 'net card amount', 'net card', 'charge sales', 'charge amount', 'charge total', 'non-cash sales', 'non cash sales', 'non-cash amount', 'non cash amount', 'non-cash total', 'non cash total', 'non-cash tenders', 'non cash tenders', 'non-cash tender', 'non cash tender', 'non-cash tendered', 'non cash tendered', 'non-cash payments', 'non cash payments', 'non-cash payment', 'non cash payment', 'non-cash received', 'non cash received', 'non-cash collected', 'non cash collected', 'non-cash revenue', 'non cash revenue', 'non-cash', 'non cash', 'credit/debit', 'credit card', 'card', 'credit', 'charge'] },
-    { key: 'void_count',   label: 'Void Count',        required: false, notMoney: true, match: ['void count', 'voids count', 'void cnt', 'voids cnt', 'void quantity', 'voids quantity', '# voids', '# void', 'voids #', 'void #', 'qty voids', 'qty void', 'number of voids', 'voided checks', 'checks voided', 'void qty', 'voids qty'] },
+    { key: 'void_count',   label: 'Void Count',        required: false, notMoney: true, match: ['void count', 'voids count', 'void cnt', 'voids cnt', 'void quantity', 'voids quantity', 'void ct', 'voids ct', 'void trans', 'void transactions', 'voided transactions', 'void items', 'voids rung', 'no. of voids', 'num voids', '# voids', '# void', 'voids #', 'void #', 'qty voids', 'qty void', 'number of voids', 'voided checks', 'checks voided', 'void qty', 'voids qty'] },
     { key: 'voids',        label: 'Void $',            required: false, notCount: true, match: ['void amount', 'void total', 'void $', 'voided amount', 'voided total', 'void sales', 'voids', 'void'] },
-    { key: 'comp_count',   label: 'Comp Count',        required: false, notMoney: true, match: ['comp count', 'comps count', 'comp cnt', 'comps cnt', 'comp quantity', '# comps', '# comp', 'comps #', 'comp #', 'qty comps', 'comp qty', 'comps qty', 'number of comps', 'discount count', 'discounts count', 'discount qty', '# discounts', 'discounts #', 'promo count'] },
+    { key: 'comp_count',   label: 'Comp Count',        required: false, notMoney: true, match: ['comp count', 'comps count', 'comp cnt', 'comps cnt', 'comp quantity', 'comp ct', 'comps ct', 'comp trans', 'comp transactions', 'comp items', 'no. of comps', 'num comps', '# comps', '# comp', 'comps #', 'comp #', 'qty comps', 'comp qty', 'comps qty', 'number of comps', 'discount count', 'discounts count', 'discount qty', '# discounts', 'discounts #', 'promo count'] },
     { key: 'comps',        label: 'Comp / Discount $', required: false, notCount: true, match: ['comp amount', 'comp total', 'comp $', 'discount amount', 'discount total', 'discounts & comps', 'discounts and comps', 'promo amount', 'comps', 'discounts', 'comp', 'discount', 'promo'] },
-    { key: 'refund_count', label: 'Refund Count',      required: false, notMoney: true, match: ['refund count', 'refunds count', 'refund cnt', 'refunds cnt', 'refund quantity', '# refunds', '# refund', 'refunds #', 'refund #', 'qty refunds', 'refund qty', 'refunds qty', 'number of refunds', 'return count', 'returns count', 'return qty'] },
+    { key: 'refund_count', label: 'Refund Count',      required: false, notMoney: true, match: ['refund count', 'refunds count', 'refund cnt', 'refunds cnt', 'refund quantity', 'refund ct', 'refunds ct', 'refund trans', 'refund transactions', 'no. of refunds', 'num refunds', '# refunds', '# refund', 'refunds #', 'refund #', 'qty refunds', 'refund qty', 'refunds qty', 'number of refunds', 'return count', 'returns count', 'return qty'] },
     { key: 'refunds',      label: 'Refund $',          required: false, notCount: true, match: ['refund amount', 'refund total', 'refund $', 'return amount', 'return total', 'refunds', 'returns', 'refund'] },
     // ⚠ `no sale opens` unhyphenated is THIS DOOR'S OWN LABEL minus one character, and `no sale`
     // is EXACT_ONLY, so without it the app's own export shape bound nothing and a weight-3 strong
@@ -99,7 +99,7 @@ S.SalesIntegrity = {
        each is named explicitly rather than left to a bare token's reach. `void_count` already had
        both `# voids` and `void qty`; this list had `# no sales` alone, which is why the asymmetry
        went unnoticed. */
-    { key: 'no_sales',     label: 'No-Sale Opens',     required: false, notMoney: true, match: ['no sale count', 'no sales count', 'no-sale count', 'nosale count', '# no sales', '# no sale', '# no-sale', '# nosale', 'no sale #', 'no sales #', 'no-sale #', 'nosale #', 'number of no sales', 'no sale opens', 'no-sale opens', 'no sales opens', 'nosale opens', 'no sale qty', 'no-sale qty', 'no sales qty', 'nosale qty', 'drawer opens', 'no sale', 'no-sale', 'no sales', 'nosale'] },
+    { key: 'no_sales',     label: 'No-Sale Opens',     required: false, notMoney: true, match: ['no sale count', 'no sales count', 'no-sale count', 'nosale count', '# no sales', '# no sale', '# no-sale', '# nosale', 'no sale #', 'no sales #', 'no-sale #', 'nosale #', 'number of no sales', 'no sale opens', 'no-sale opens', 'no sales opens', 'nosale opens', 'no sale qty', 'no-sale qty', 'no sales qty', 'nosale qty', 'no sale cnt', 'no-sale cnt', 'no sales cnt', 'nosale cnt', 'no sale ct', 'number of no-sales', 'no. of no sales', 'no. of no-sales', 'drawer open count', 'drawer opens count', 'drawer opens', 'no sale', 'no-sale', 'no sales', 'nosale'] },
     { key: 'checks',       label: 'Checks',            required: false, notMoney: true, match: ['check count', 'closed checks', 'guest checks', '# of checks', 'chks', 'checks', 'ticket count', 'tickets', 'order count', 'number of orders', 'orders', 'transaction count', 'transactions', 'tabs'] },
     { key: 'hours',        label: 'Labor Hours',       required: false, match: ['total hours', 'labor hours', 'hours worked', 'total hrs', 'hrs worked', 'paid hours', 'net hours', 'hours', 'hrs', 'worked'] },
     // ⚠ `sales amount` / `sales $` / `sales value` are explicit for the same reason: bare `sales` is
@@ -740,6 +740,26 @@ S.SalesIntegrity = {
          ⚠ It costs the genuine one-night server their rate signals, and that is the deliberate
          direction: dividing a week by 1 inflates the rate sevenfold and NAMES somebody, while
          suppressing it leaves them scored on every share signal and reported by name in the note. */
+      /* ⛔⛔ THE SALES-MAGNITUDE TEST WAS BUILT HERE AND REVERTED WITHIN THE HOUR — IT WAS NET
+         NEGATIVE, MEASURED. The idea was sound in isolation: take a second estimate of an undated
+         server's shift count (their sales against a dated colleague's per-shift turnover) and trust
+         `rows` only when the two agree within 2x. It closed the rollup false positive and opened
+         three worse things, all measured on the shipped code:
+           ⛔ **A REAL 15-OPENS-AGAINST-2 OUTLIER READ CLEAN** whenever their station's sales per row
+              sat outside the window — $450 a row (a lunch station) and $2,100 (bottle service) both
+              went dark, while the identical server at $1,000 was listed. Going dark is the worst
+              outcome this screen has, and the window turned it on and off by SALES VOLUME;
+           ⛔ **IT DISCARDED REAL LOGGED DRAWER SHORTS AND WALKED TABS**, which do not come from the
+              sales column at all — they come from Bar Cop's own Shift Control log. José with four
+              logged shorts and four walked tabs read **CLEAN, $0.00** at $350 a row and **$420.00**
+              at $1,200 a row, on identical logged events;
+           ⛔ **AND IT NAMED AN INNOCENT.** Suppressing the undated servers emptied the peer pool, so
+              the one dated colleague became the sole reporter, `peerAvg` went null and the solo rule
+              fired on raw count alone: everybody on exactly 2 opens a shift, and Nina was listed.
+         ⭐ THE LESSON, and it is the same one S212 recorded: **a heuristic that infers a fact the
+         file does not contain will be wrong in both directions, and its blast radius is every server
+         whose station is simply different.** The row count is a worse estimate on one shape and an
+         honest one everywhere else. S213 stays a documented limitation, not a guess. */
       const shiftsKnown = !fileDated || datedSpan || dateList.length <= 1 || (a.rows || 0) > 1;
       if (!shiftsKnown) noShiftCount.push(a.name);
       const _sh = onOwnDays(capShorts[key], a), _wk = onOwnDays(capWalk[key], a);
@@ -1106,8 +1126,17 @@ S.SalesIntegrity = {
            out for them", when the real reason is that he was never scored at all. Two different
            facts, and the report already names the set-aside servers separately. */
         noShiftCount: noShiftCount.filter(nm => scored.some(x => x.name === nm)),
-        // Signals that carried a figure but had too few reporters to compare against.
-        unjudged: Object.keys(thin).map(k => (this.SIGNALS.find(g => g.key === k) || {}).label || k) },
+        /* Signals that carried a figure but had too few reporters to compare against.
+           ⚠⚠ A SIGNAL THAT PRODUCED A PRINTED FLAG IS NOT AN UNSCORED ONE. The solo rule can list
+           somebody on materiality alone with no peer benchmark, which is exactly the condition that
+           also records the signal as unjudged — so one card asserted a finding and its own
+           non-existence: **"Void rate: 30% of sales voided"** with, three lines below it, *"void rate
+           was not scored — too few servers in this file to compare against."* Both sentences were
+           true of different halves of the same rule and the document read as self-contradicting.
+           A signal anybody was actually listed on is dropped from the note. */
+        unjudged: Object.keys(thin)
+          .filter(k => !scored.some(x => (x.flags || []).some(f => f.key === k)))
+          .map(k => (this.SIGNALS.find(g => g.key === k) || {}).label || k) },
       summary: {
         reviewed: scored.length, flagged: flagged.length, skipped: skipped.length,
         high: flagged.filter(s => s.severity === 'high').length,
@@ -1853,7 +1882,14 @@ S.SalesIntegrity = {
          Bar Cop actually does here: it decides which numbers are far enough from the floor to be
          worth your time, and then it shows you the numbers. It does not grade the person and it does
          not name a category of theft. Keep it that way. */
-      { h: 'Which readings get listed', p: ['One number out of line is usually noise, so Bar Cop does not list a server on one alone: it takes at least two separate readings before anyone appears. That is why a naturally low check average on a slow station, by itself, never puts somebody on the page.', 'There is one exception and it is deliberately narrow. A single reading can list somebody when it runs five times the rest of the floor and the money behind it is real: a meaningful share of that server\'s own sales for voids, comps and discounts or refunds, or at least ten drawer opens for no-sales. Cash mix, check averages, sales per labour hour, drawer shorts and walkouts are never enough on their own, however far off they look. A cash-heavy or a slow station explains the first three, and a bartender who runs short once or twice is a training problem.', 'Every figure you see, and every dollar figure beside it, is measured against the rest of the team with that server left out, so their own numbers never soften the comparison. Dollars are shown only where they can be worked out honestly (voids, comps, refunds, drawer shorts and walkouts), so a listed server can show none at all. Bar Cop does not tell you what any of it means. It tells you which numbers do not line up and what the gap is worth, and the next step is yours.'] },
+      { h: 'Which readings get listed', p: ['One number out of line is usually noise, so Bar Cop does not list a server on one alone: it takes at least two separate readings before anyone appears. That is why a naturally low check average on a slow station, by itself, never puts somebody on the page.', /* ⚠ THIS PARAGRAPH PROMISED A COMPARISON THE CODE DOES NOT ALWAYS MAKE. It said a single reading
+   lists somebody only when it "runs five times the rest of the floor AND the money is real" —
+   but `_soloClears` skips the ratio test entirely when no colleague supplied that column, and
+   materiality alone decides. Measured: a server listed on "30% of sales voided" with no peer
+   figure at all, so there was nothing for it to be five times. The copy now states both paths.
+   Also "labour" → "labor", matching the signal's own label (the spelling class this file has
+   already recorded once). */
+'There is one exception and it is deliberately narrow. A single reading can list somebody when it runs five times the rest of the floor and the money behind it is real: a meaningful share of that server\'s own sales for voids, comps and discounts or refunds, or at least ten drawer opens for no-sales. When no colleague reported that column at all there is nothing to compare against, and the size of the number alone decides. Cash mix, check averages, sales per labor hour, drawer shorts and walkouts are never enough on their own, however far off they look. A cash-heavy or a slow station explains the first three, and a bartender who runs short once or twice is a training problem.', 'Every figure you see, and every dollar figure beside it, is measured against the rest of the team with that server left out, so their own numbers never soften the comparison. Dollars are shown only where they can be worked out honestly (voids, comps, refunds, drawer shorts and walkouts), so a listed server can show none at all. Bar Cop does not tell you what any of it means. It tells you which numbers do not line up and what the gap is worth, and the next step is yours.'] },
       { h: 'Working a flag', p: ['A flag is a lead, not a verdict. Open Investigation starts a six-step case over in Loss Prevention so you work it the same way you work any variance: watch the drawer, pull the void timestamps, talk to the shift, document the finding. Export PDF saves the review for an owner or partner. Confirm before you act on anyone.'] }
     ]);
   }
