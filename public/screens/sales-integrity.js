@@ -1442,9 +1442,15 @@ S.SalesIntegrity = {
     }
   },
 
-  draw() {
+  /* ⚠⚠ AFTER AN IMPORT, SHOW THAT IMPORT — never "whichever review wins a sort". The screen used to
+     re-derive what to display, so an operator could drop a file and be shown a DIFFERENT review with
+     somebody else's numbers under a header they did not import, with no signal that it had happened.
+     `latestReview()` is now sorted by when a review was MADE, which is the right answer to "what is
+     newest" — but re-deriving at all is the fragile part, and the import already knows the id it
+     just wrote. `showId` removes the question. */
+  draw(showId) {
     this._viewing = null;
-    const latest = this.latestReview();
+    const latest = (showId && this.reviews().find(r => r && r.id === showId)) || this.latestReview();
     const importCard = '<div class="card form-card">'
       + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Sales Integrity Review</span>' + App.freqTag('As needed') + '</div>'
       + '<div id="si-csv"></div><div id="si-imp-result"></div>'
@@ -1499,7 +1505,8 @@ S.SalesIntegrity = {
     // ⚠ The intake note now renders INSIDE the review card (see `renderReport`), so it survives a
     // reload and a re-view and reaches the PDF. Writing a second copy here would only let the two
     // drift apart, which is how the "fixed on screen, silent in the export" family of bugs starts.
-    this.draw();
+    // ⚠⚠ AND THE ID IS PASSED: the operator sees the review they just imported, full stop. See `draw`.
+    this.draw(review.id);
   },
 
   /* What the file gave up. Reads the counters `analyze` banked rather than re-deriving them, so the
