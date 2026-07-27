@@ -85,13 +85,34 @@ S.RevenueAudit = {
   // Shared trailing-4-week window end, mirroring the server (audit-compute.js
   // computeRevenueAudit): winEnd = the last confirmed revenue week's period_end, or ''
   // when no weeks are confirmed yet (each caller applies its own no-weeks fallback).
-  _auditWinEndFromWeeks() {
+  /* ⚠⚠ THE AUDIT'S WINDOW, AND IT MIRRORS `server/audit-compute.js` FIELD FOR FIELD (S216).
+     The server is the authority and it is unambiguous:
+         weeks       = confirmed weeks, oldest -> newest, .slice(-PERIOD_WEEKS)
+         _winWeeks   = weeks.length || PERIOD_WEEKS        <- the REAL count, never a constant
+         _scWinEnd   = weeks[last].period_end
+         _scWinStart = _scWinEnd - (_winWeeks * 7 - 1)     <- inclusive
+         AUDIT_PERIOD = "<weeks.length> weeks ending <_scWinEnd>"
+     Its own comment records why the count must be real: "A hardcoded PERIOD_WEEKS made these windows
+     28 days under an 'N weeks ending ...' heading, so a bar with 2 confirmed weeks had 4 weeks of
+     events and server checks summed into figures labelled 2 weeks."
+     ⛔ TWO CLIENT WINDOWS WERE STILL MISSING IT, EACH IN ITS OWN WAY: `_windowedServerCount` had the
+     right anchor and a hardcoded `-(4*7-1)`, and buildControlData's S4 comp window was anchored to
+     TODAY over a fixed 28 days — so `server_comp_pct` was measured over a period that need not
+     overlap the heading at all. Measured on a bar with 2 confirmed weeks ending 15 days ago: the
+     comp rate read 10.0% against a truth of 5.0% for the period it was reported under.
+     ⭐ ONE helper, both readers, so they cannot drift apart again. A figure measured over a
+     different window is not a worse figure — it is a figure about something else. */
+  _auditWindow() {
     const weeks = (App.data.revenue_weeks || [])
       .filter(w => w && (((+w.bar_revenue || 0) + (+w.floor_revenue || 0)) > 0 || (+w.total_revenue || 0) > 0))
       .sort((a, b) => String(a.period_end || a.week_end || '').localeCompare(String(b.period_end || b.week_end || '')))
-      .slice(-4);
-    return weeks.length ? String(weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end || '').slice(0, 10) : '';
+      .slice(-4);   // PERIOD_WEEKS on the server
+    if (!weeks.length) return { start: '', end: '', weeks: 0 };
+    const end = String(weeks[weeks.length - 1].period_end || weeks[weeks.length - 1].week_end || '').slice(0, 10);
+    if (!end) return { start: '', end: '', weeks: 0 };
+    return { start: this._shiftYmdUTC(end, -(weeks.length * 7 - 1)), end, weeks: weeks.length };
   },
+  _auditWinEndFromWeeks() { return this._auditWindow().end; },
   _shiftYmdUTC(ymd, days) { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); },
 
   // Mirror the server's S5 window: the audit only scores events that are COMPLETED and
@@ -102,8 +123,14 @@ S.RevenueAudit = {
     const completed = (App.data.bookings || []).filter(e => e && e.stage === 'Completed');
     if (!completed.length) return [];
     const evDate = e => String(e.event_date || '').slice(0, 10);
-    const winEnd = this._auditWinEndFromWeeks() || (completed.map(evDate).filter(Boolean).sort().slice(-1)[0] || '');   // no weeks yet: anchor on the latest event, same as the server
-    const winStart = winEnd ? this._shiftYmdUTC(winEnd, -(4 * 7 - 1)) : '';
+    /* ⚠ THE THIRD WINDOW WITH THE HARDCODED FOUR (S216) — found by the detector, not by reading.
+       The server's S5 spans `_winWeeks * 7 - 1` where `_winWeeks = weeks.length || PERIOD_WEEKS`,
+       so with 2 confirmed weeks this counted completed events over 28 days while the run scored 14.
+       Same shape as `_windowedServerCount`, one function away, and I only looked at the two I had
+       already named. `win.weeks || 4` mirrors the server's fallback exactly. */
+    const win = this._auditWindow();
+    const winEnd = win.end || (completed.map(evDate).filter(Boolean).sort().slice(-1)[0] || '');   // no weeks yet: anchor on the latest event, same as the server
+    const winStart = winEnd ? this._shiftYmdUTC(winEnd, -((win.weeks || 4) * 7 - 1)) : '';
     return (winStart && winEnd)
       ? completed.filter(e => { const d = evDate(e); return d && d >= winStart && d <= winEnd; })
       : completed;
@@ -117,8 +144,11 @@ S.RevenueAudit = {
   _windowedServerCount() {
     const checks = (App.data.revenue_server_checks || []).filter(c => c && (+(c.covers) || 0) > 0 && c.sales != null && !isNaN(+c.sales));
     if (!checks.length) return 0;
-    const winEnd = this._auditWinEndFromWeeks();
-    const winStart = winEnd ? this._shiftYmdUTC(winEnd, -(4 * 7 - 1)) : '';
+    // ⚠ THE REAL WEEK COUNT, not a hardcoded four (S216). Readiness exists to predict whether S4
+    // will score, so counting servers over 28 days when the run scores 14 makes the badge promise
+    // something the run then refuses — the exact mismatch the comment above says it fixed.
+    const win = this._auditWindow();
+    const winEnd = win.end, winStart = win.start;
     const windowed = (winStart && winEnd)
       ? checks.filter(c => { const d = String(c.date || '').slice(0, 10); return d && d >= winStart && d <= winEnd; })
       : checks;   // no closed weeks yet: use every check, same as the server
@@ -519,22 +549,25 @@ S.RevenueAudit = {
       cd.sources.push('Labor Control actuals');
     }
 
-    // Server comp discipline (Revenue S4): comps as a % of server sales over the
-    // trailing four weeks. Server sales come from the Server Check log, comps from
-    // Shift Control's void/comp log. Fed as one team rate the server audit grades.
-    // "Trailing four weeks" is 28 days, and `today - 28` is 29 of them. `_windowedServerCount`
-    // above already had this right (`-(4*7-1)`); the window that feeds the SCORE did not.
-    const cutoffStr = App.windowCutoff(4 * 7);
-    /* ⚠⚠ THE SECOND CONSUMER OF AN UNBOUNDED WINDOW (S215b, step 0.6). Door 11's scorecard was not
-       the only reader of a future-dated server check: this window was `>= cutoff` with no upper
-       bound too, so one mistyped year inflated `serverSales` here as well. That is the DENOMINATOR
-       of the S4 comp rate, so a future-dated row pushes `server_comp_pct` DOWN and the audit scores
-       comp discipline as healthier than it is — the safe-looking direction, which is why nothing
-       would ever have reported it.
-       ⚠ `_windowedServerCount` above already bounds BOTH sides, and its comment says it mirrors
-       this window. It did not: it is bounded and inclusive (`-(4*7-1)`), this one was neither. */
-    const upToStr = App.todayLocal ? App.todayLocal() : cutoffStr;
-    const inWin = d => { const s = d || ''; return s >= cutoffStr && s <= upToStr; };
+    /* Server comp discipline (Revenue S4): comps as a % of server sales. Server sales come from the
+       Server Check log, comps from Shift Control's void/comp log. Fed as one team rate the audit grades.
+       ⚠⚠ IT IS MEASURED OVER THE AUDIT'S OWN WINDOW, NOT A TRAILING 28 DAYS FROM TODAY (S216).
+       This used to anchor on today over a fixed four weeks, while every other S4 figure — and the
+       AUDIT_PERIOD heading printed above them — anchors on the last CONFIRMED week and spans as many
+       weeks as are actually confirmed. Those need not overlap at all: measured on a bar with 2
+       confirmed weeks ending 15 days ago, the rate read **10.0% against a truth of 5.0%** for the
+       period it was reported under, because it was counting the in-progress week's comps.
+       `_auditWindow` is the one implementation and mirrors server/audit-compute.js field for field.
+       ⚠⚠ AND IT KEEPS S215b's UPPER BOUND. With confirmed weeks the window ends at the last one, so
+       a future-dated row is already out. With NONE, the server's own fallback is "score every check
+       on file" — matched here, except still bounded at today, because one mistyped year in the
+       DENOMINATOR pushes this rate DOWN and makes comp discipline look healthier than it is. This
+       figure is produced solely by the client, so bounding it cannot put the two out of step. */
+    const auditWin = this._auditWindow();
+    const todayStr = App.todayLocal ? App.todayLocal() : '9999-12-31';
+    const inWin = auditWin.end
+      ? (d => { const s = String(d || '').slice(0, 10); return s >= auditWin.start && s <= auditWin.end; })
+      : (d => { const s = String(d || '').slice(0, 10); return !!s && s <= todayStr; });
     const checks = (App.data.revenue_server_checks || []).filter(c => inWin(c.date));
     if (checks.length) {
       const serverSales = checks.reduce((s, c) => s + (parseFloat(c.sales) || 0), 0);
