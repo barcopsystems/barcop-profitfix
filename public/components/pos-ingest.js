@@ -777,6 +777,7 @@ const PosIngest = {
     const staffByName = this._staffByName();
     const existing = (App.laborData && App.laborData.lc_actuals) || [];
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
+    const fileSeen = new Set(); let fileRepeats = 0;   // exact repeats WITHIN this one file (S218)
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const hours = this._hours(r.hours);
@@ -799,6 +800,23 @@ const PosIngest = {
          these two were the last writing blanks. Pay is the worst place for it: gross pay, labour %,
          RPLH, overtime and the payroll export all read these rows, and all of them window by date. */
       if (!recDate) { undated.push(r.name || '(blank)'); return; }
+      const shiftType = (r.shift || '').trim();
+      /* ⚠⚠ A LINE REPEATED INSIDE ONE FILE (S218). `_isDup` only searches what is ALREADY SAVED, so
+         on a FIRST import there is nothing to dedup against and a byte-identical repeat was written
+         TWICE — straight into gross pay, labor %, RPLH, overtime and the payroll export. This is the
+         worst of the four doors that had it.
+         ⭐ THE DISCRIMINATOR IS NOT A GUESS, IT IS THIS DOOR'S OWN FORM: Log Hours refuses to create
+         a second record with the same staff + date + shift_type (lc-log-hours.js), and `hoursFor`'s
+         comment states the model — "a SPLIT SHIFT is two records ... lunch and dinner are separate
+         rows by design". So two rows matching on all three PLUS the hours describe a record the
+         operator could not have made by hand, which is the "two doors, one record, two rules"
+         defect. Two rows differing in shift_type are a real split shift and BOTH still import —
+         getting that wrong once reported 4 hours for a 9-hour day and, because it is the tip-pool
+         denominator, short-paid that person and over-paid everyone else.
+         ⚠ Reported, never silent, so an operator whose export really does repeat a line can see it. */
+      const fileKey = staff.id + '|' + recDate + '|' + shiftType + '|' + hours.toFixed(3);
+      if (fileSeen.has(fileKey)) { fileRepeats++; return; }
+      fileSeen.add(fileKey);
       // Skip an exact re-import (same staff + date + hours) so re-dropping a
       // timeclock file never double-counts hours into gross pay.
       if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate && Math.abs((x.hours || 0) - hours) < 0.001)) {
@@ -808,20 +826,22 @@ const PosIngest = {
       const wage = sal ? null : (App.wageForStaffOn ? App.wageForStaffOn(staff.id, recDate) : (staff.wage || 0));
       toAdd.push({
         id: App.uid(), date: recDate, staff_id: staff.id, name: staff.name,
-        position_id: staff.position_id || '', shift_type: (r.shift || '').trim(),
+        position_id: staff.position_id || '', shift_type: shiftType,
         hours, wage, cost: sal ? 0 : hours * (wage || 0),
         notes: '', imported: true, created_at: new Date().toISOString()
       });
     });
     // `undated` = the file gave a date this row could not be read from; `skipped` = no staff
     // match or no usable figure. Different problems, different fixes, never one list.
-    return { toAdd, skipped, incomplete, undated, dupCount };
+    // `fileRepeats` = lines this file repeated verbatim; counted once, and REPORTED by the door.
+    return { toAdd, skipped, incomplete, undated, dupCount, fileRepeats };
   },
 
   buildTips(rows, opts) {
     const staffByName = this._staffByName();
     const existing = (App.laborData && App.laborData.lc_tips) || [];
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
+    const fileSeen = new Set(); let fileRepeats = 0;   // exact repeats WITHIN this one file (S218)
     (rows || []).forEach(r => {
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const cash = this._num(r.cash_tips);
@@ -836,6 +856,17 @@ const PosIngest = {
       // staff + date + amounts, so undated rows all share one key and a second week deduped away
       // in full. Tips feed Form 8027, the tip-out basis and the payroll export, all date-windowed.
       if (!recDate) { undated.push(r.name || '(blank)'); return; }
+      const tipShift = (r.shift || '').trim();
+      /* ⚠⚠ THE TWIN OF buildHours' FILE-REPEAT GUARD (S218), and the same reasoning applies without
+         change: nothing compared a file row against the rows beside it, so a byte-identical repeat
+         was written twice on a first import — into declared tips, the tip-out basis, Form 8027 and
+         the payroll export. Log Tips refuses a second entry for the same staff + date + service
+         period (`lc-tip-log.js` tests `App.tipShiftKey(t.date, t.shift_type)`), so two rows matching
+         on those PLUS both tip figures describe a record the operator could not enter by hand.
+         Two service periods on one day still both import — tips are logged per period. */
+      const fileKey = staff.id + '|' + recDate + '|' + tipShift + '|' + cash.toFixed(2) + '|' + card.toFixed(2);
+      if (fileSeen.has(fileKey)) { fileRepeats++; return; }
+      fileSeen.add(fileKey);
       // Skip an exact re-import (same staff + date + the same cash and card tips)
       // so re-dropping a tips export never double-counts tip income.
       if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate
@@ -846,14 +877,15 @@ const PosIngest = {
       toAdd.push({
         id: App.uid(), shift_id: '', manager_id: '', date: recDate,
         staff_id: staff.id, name: staff.name, position_id: staff.position_id || '',
-        shift_type: (r.shift || '').trim(),
+        shift_type: tipShift,
         cash_tips: cash, card_tips: card, total_tips: cash + card,
         hours: null, notes: '', imported: true, created_at: new Date().toISOString()
       });
     });
     // `undated` = the file gave a date this row could not be read from; `skipped` = no staff
     // match or no usable figure. Different problems, different fixes, never one list.
-    return { toAdd, skipped, incomplete, undated, dupCount };
+    // `fileRepeats` = lines this file repeated verbatim; counted once, and REPORTED by the door.
+    return { toAdd, skipped, incomplete, undated, dupCount, fileRepeats };
   },
 
   /* What a POS calls a comp. Anything here in the Type cell means revenue GIVEN AWAY, which is a
@@ -871,6 +903,8 @@ const PosIngest = {
     const existing = (App.shiftData && App.shiftData.sc_void_comps) || [];
     const today = App.todayLocal();
     const toAdd = []; const skipped = []; const undated = []; let dupCount = 0; const used = new Set();
+    // S218: repeats here are COUNTED, not dropped — see the guard below for why this door differs.
+    const fileSeen = new Set(); let fileRepeats = 0;
     (rows || []).forEach(r => {
       // A void/comp is a LOSS magnitude. POS exports show it as a negative ("-15")
       // or accounting parens ("(15)") to signal it reduces sales; both are a $15
@@ -924,6 +958,16 @@ const PosIngest = {
       const recDate = parsed || today;
       // Skip an exact re-import (same date + amount + server + item) so re-dropping
       // a voids/comps export never double-counts loss.
+      /* ⚠⚠ THIS DOOR REPORTS A REPEATED LINE AND IMPORTS IT ANYWAY, AND THE DIFFERENCE IS THE WHOLE
+         POINT OF S218 (2026-07-27). At the hours, tips and cash doors the hand FORM refuses to
+         create a second record with the same identity, so a repeat in the file is data the operator
+         could never have entered and collapsing it is safe. **Nothing in the Void/Comp form says
+         that here.** Two $75 order errors on the same item in one night is an ordinary evening, and
+         dropping the second would silently delete real money — the payroll mistake wearing a
+         different hat ([[the-loop]] #30: do not infer a fact the file does not carry).
+         So Bar Cop says what it saw and the operator decides. Counted, never returned early. */
+      const fileKey = recDate + '|' + server + '|' + item + '|' + type + '|' + amount.toFixed(2);
+      if (fileSeen.has(fileKey)) fileRepeats++; else fileSeen.add(fileKey);
       if (this._isDup(existing, used, x => x.date === recDate && Math.abs((x.amount || 0) - amount) < 0.001
             && (x.server || '') === server && (x.item || '') === item)) {
         dupCount++; return;
@@ -940,7 +984,9 @@ const PosIngest = {
     });
     // `skipped` is rows with no usable AMOUNT; `undated` is rows whose date the file gave and Bar
     // Cop could not read. Two different problems with two different fixes — never one list.
-    return { toAdd, skipped, undated, dupCount };
+    // `fileRepeats` here means "the file repeated a line" — NOT that anything was dropped. Both rows
+    // are in `toAdd`. The door words it as something to look at, never as a collapse.
+    return { toAdd, skipped, undated, dupCount, fileRepeats };
   },
 
   // rows -> one per-day sc_shifts record. `opts.manual` = the Enter-Manually grid (a hand entry,
@@ -1322,6 +1368,7 @@ const PosIngest = {
       const d = this.normDate(r.date, opts); if (d) namedDates.add(d);
     });
     const toAdd = []; const skipped = []; const undated = []; const conflicts = []; let dupCount = 0; let keptManual = 0; let extraDropped = 0; let totalsLines = 0; const used = new Set();
+    const fileSeen = new Set(); let fileRepeats = 0;   // exact repeats WITHIN this one file (S218)
     (rows || []).forEach(r => {
       const date = this.normDate(r.date, opts);
       /* ⚠ AN UNREADABLE DATE IS ITS OWN OUTCOME, NOT "no over/short figure". Both skips went into
@@ -1384,6 +1431,33 @@ const PosIngest = {
         imported: true, created_at: new Date().toISOString()
       };
       const dayKey = date + '|' + drawerId;
+      /* ⚠⚠ A LINE REPEATED INSIDE ONE FILE (S218). Nothing compared a file row against the rows
+         beside it, so a byte-identical repeat was written twice on a first import — two counts for
+         one register-day, doubling the over/short. This door's own comment 30 lines up states the
+         identity: "KEYED ON drawer_id, NOT the register NAME. The hand form dedupes on drawer_id" —
+         one count per register per day, which is what a drawer count IS. So a second row with the
+         same register, day AND the same two figures is a repeated line, not a second count.
+         ⚠ Two DIFFERENT registers with identical figures still both import (the key carries
+         drawer_id), and so does a genuine recount with a different figure — that falls through to
+         the conflict/replace logic below, where the operator is asked. */
+      /* ⚠⚠ AND IT KEYS ON THE NAME WHEN THERE IS NO ID — my first version used `dayKey` and a
+         CONTROL caught it inside a minute. A register the operator has not set up in Bar Cop
+         resolves to `drawer_id: ''` (see `dRec` above), so EVERY unrecognized register shares one
+         key: "Bar 1" and "Bar 2" with the same figures collapsed into one and a real count was
+         silently dropped. That is the guard-refuses-real-data failure this whole item exists to
+         avoid, introduced by the fix for it. Recognized registers key on their id (canonical, so a
+         rename cannot split them); unrecognized ones key on the name the file used. */
+      /* ⚠⚠ AND THE VARIANCE IS IN THE KEY, NOT JUST expected/counted — an existing pin caught this
+         and it would have destroyed real counts. A cash row may carry ONLY an over/short figure
+         (`r.over_short`), in which case expected_cash and counted_cash are both null and every row
+         for that register-day looked identical to a key built on them: two genuine sittings at
+         -$20.00 and -$27.00 collapsed into one. The variance is the figure those rows actually
+         carry, so it decides. Second time in this one guard that a key was too narrow; the controls
+         found both. */
+      const fileKey = date + '|' + (drawerId || 'name:' + drawer.toLowerCase())
+        + '|' + (expected_cash == null ? '' : expected_cash) + '|' + counted_cash + '|' + variance;
+      if (fileSeen.has(fileKey)) { fileRepeats++; return; }
+      fileSeen.add(fileKey);
       const manual = manualByKey.get(dayKey);
       if (manual) {
         // The operator counted this register-day by hand. Only a DIFFERING figure is a conflict; an
@@ -1428,7 +1502,8 @@ const PosIngest = {
     // `totalsLines` counts column-less whole-day rows skipped as a totals line (S142), `skipped`
     // is rows with NO over/short derivable, and `undated` is rows whose DATE could not be read.
     // The last two are different problems with different fixes and must never be reported as one.
-    return { toAdd, skipped, undated, dupCount, keptManual, conflicts, extraDropped, totalsLines };
+    // `fileRepeats` = register-days this file listed twice with identical figures; counted once.
+    return { toAdd, skipped, undated, dupCount, keptManual, conflicts, extraDropped, totalsLines, fileRepeats };
   },
 
   // Two drawer figures are "the same" for conflict purposes when their over/short agrees to the
