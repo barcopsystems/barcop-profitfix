@@ -323,12 +323,17 @@ S.RevenueServerCheck = {
        corrected — so without this line the tiles and the log simply disagree and nothing explains
        why. A future-dated row is a typo the operator can fix; an unattributed row cannot be
        attributed by Bar Cop, only re-entered. */
+    /* ⚠ Seen on screen: this printed "1 dated in the future. Fix them…" — the noun was missing and
+       the pronoun was plural for a single row. A count needs the thing it counts. */
     const excl = [];
-    if (sc.future) excl.push(sc.future + ' dated in the future');
-    if (sc.unattributed) excl.push(sc.unattributed + ' with no server on the record');
+    const nChecks = n => n + ' check' + (n === 1 ? '' : 's');
+    if (sc.future) excl.push(nChecks(sc.future) + ' dated in the future');
+    if (sc.unattributed) excl.push(nChecks(sc.unattributed) + ' with no server on the record');
+    const exclTotal = (sc.future || 0) + (sc.unattributed || 0);
     const exclNote = excl.length
       ? '<div class="no-print" style="font-size:11px;color:var(--amber);margin:-2px 0 10px;">'
-        + 'Not counted in the scorecard: ' + excl.join(', ') + '. Fix them in the Server Shift log below.'
+        + 'Not counted in the scorecard: ' + excl.join(', ') + '. Fix '
+        + (exclTotal === 1 ? 'it' : 'them') + ' in the Server Shift log below.'
         + '</div>'
       : '';
     if (!sc.rows.length) {
