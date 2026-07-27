@@ -57,7 +57,9 @@ S.EventsDashboard = {
     const depDueList = booked.filter(b => !b.deposit_paid_date && (parseFloat(b.deposit_amount) || 0) > 0);
     const depositsDue = depDueList.reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
 
-    const cutoff = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() - 90); return App.ymdLocal(d); })();
+    // The briefing sentence below says "your win rate is X over the last 90 days", so the window is
+    // 90 days, not 91. App.windowCutoff is the one implementation of that.
+    const cutoff = App.windowCutoff(90);
     const closed = all.filter(b => (b.stage === 'Booked' || b.stage === 'Completed' || b.stage === 'Lost') && (b.date_received || '') >= cutoff);
     const wins = closed.filter(b => b.stage === 'Booked' || b.stage === 'Completed').length;
     const conv = closed.length >= 5 ? Math.round(100 * wins / closed.length) + '%' : (closed.length ? wins + ' of ' + closed.length : '-');
