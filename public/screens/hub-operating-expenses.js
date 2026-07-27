@@ -283,8 +283,17 @@ S.HubOperatingExpenses = {
        ⚠ 12 months is not 365 days, so the month arithmetic stays and this cannot use App.inWindow;
        the upper bound is added explicitly. */
     } else if (this._filterRange === 'ytd') {
+      /* ⚠⚠ YEAR-ONLY, NOT DAY-BOUNDED — I ADDED A DAY BOUND HERE AND IT WAS WRONG (S222 → S224).
+         Operating expenses are carried on a MONTH basis everywhere else: `_sumYTD` and
+         `hub-books._opExSums` both use `mk <= monthKey`, so a bill dated later THIS month is already
+         part of this month's YTD. Day-bounding this chip made it disagree with the By Category card
+         sitting directly above it on the same screen — $1,200 under $2,180 — which is the exact
+         "two numbers for one claim" defect it was meant to prevent.
+         A future-dated row is still excluded from the wrong YEAR, which is what TEST-E's 2027 row
+         needed. `last-12` below keeps its ceiling: nothing else computes "last 12 months", and a
+         row eight months ahead is not in it by any reading. */
       const year = String(today.getFullYear());
-      recs = recs.filter(r => (r.date || '').slice(0, 4) === year && r.date <= todayStr);
+      recs = recs.filter(r => (r.date || '').slice(0, 4) === year);
     } else if (this._filterRange === 'last-12') {
       const cutoff = new Date(today); cutoff.setMonth(cutoff.getMonth() - 12);
       recs = recs.filter(r => r.date && r.date <= todayStr && new Date(r.date + 'T00:00:00') >= cutoff);
@@ -329,11 +338,11 @@ S.HubOperatingExpenses = {
     const recs = this.records();
     const yr = String(new Date().getFullYear());
     const total = recs.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
-    // ⚠ "Logged This Year" is a to-DATE claim, so it stops at today (S222) — the same bound the YTD
-    // chip carries. A bill typed with a future date is logged, but it is not logged *this year yet*.
-    // "Logged All Time" deliberately keeps everything, which is what makes the row findable.
-    const _today = App.todayLocal();
-    const ytd = recs.filter(r => String(r.date || '').slice(0, 4) === yr && String(r.date || '') <= _today)
+    // ⚠ YEAR-ONLY, matching `_sumYTD` and `hub-books._opExSums` (S224). I briefly day-bounded this
+    // and it put $1,200 directly under a By Category card reading $2,180 for the same period — a
+    // recurring bill due on the 28th is "future" for most of every month, so it fired monthly.
+    // Operating expenses are carried on a MONTH basis app-wide; this figure follows that.
+    const ytd = recs.filter(r => String(r.date || '').slice(0, 4) === yr)
       .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
     const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
     return '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
@@ -662,7 +671,7 @@ S.HubOperatingExpenses = {
       if (hit) { _used.add(hit.id); return true; }
       return false;
     };
-    let credits = 0, unreadable = 0, undated = 0, zeroed = 0;
+    let credits = 0, unreadable = 0, undated = 0, zeroed = 0, totalsLines = 0;
     (rows || []).forEach((r, i) => {
       const date = this._normDate(r.date, _dopts);
       // ⚠ App.parseNum, not a private parseFloat strip. This read a card export's refund row —
@@ -681,6 +690,24 @@ S.HubOperatingExpenses = {
       if (!date)          { undated++;    return; }
       const category = this.CATEGORIES.includes(r.category) ? r.category : (this._matchCat(r.category) || 'Other');
       const vendor = (r.vendor || '').trim();
+      /* ⚠⚠ A DATED "TOTAL" ROW IS NOT AN EXPENSE — IT IS THE FILE'S OWN SUBTOTAL, AND IMPORTING IT
+         MAKES THE MONTH READ EXACTLY DOUBLE (S223). Measured: Utilities $812.40 + Insurance
+         $1,450.00 + a TOTAL row dated 07/31 for $2,262.40 imported as three rows and **$4,524.80**,
+         with the banner reading "3 expenses imported" and flagging nothing. It feeds Books'
+         operating-expense lines, This Month, YTD, By Category and breakeven, so the whole set
+         doubles at once.
+         ⭐ THIS IS THE THIRD DOOR TO NEED THE SHARED GATE. `isSummaryName` lives in PosIngest and its
+         own comment says it belongs there "because the same summary line lands on doors 4, 11 and
+         12" — door 12 called it, door 11 was fixed to call it, door 17 never did.
+         ⚠ AN UNDATED total row was already caught (it lands in `undated`), so this only closes the
+         case where the export dates its total line — which QuickBooks and most bank exports do.
+         ⚠ VERIFIED AGAINST REAL VENDOR NAMES BEFORE SHIPPING ([[the-loop]] #26 — this vocabulary has
+         eaten a real name three times): "Total Wine & More", "Total Wine", "Total Beverage
+         Solutions", "Totally Bread Co", "Grand Rapids Linen" and "Summit Beverage" all come back
+         FALSE, while TOTAL / Total / Grand Total / Sub Total / Subtotal / TOTALS / Month Total /
+         Report Total all come back true. The qualifier machinery is what makes that safe. */
+      if (vendor && typeof PosIngest !== 'undefined' && PosIngest.isSummaryName
+          && PosIngest.isSummaryName(vendor)) { totalsLines++; return; }
       const notes = (r.notes || '').trim();
       // Skip a row ALREADY LOGGED (same date, amount, vendor, category) — see the snapshot note above.
       if (_dup(date, amount, vendor, category)) return;
@@ -719,7 +746,14 @@ S.HubOperatingExpenses = {
       if (undated)    bits.push(undated + ' row' + (undated === 1 ? '' : 's') + ' skipped with no readable date');
       if (unreadable) bits.push(unreadable + ' row' + (unreadable === 1 ? '' : 's') + ' skipped with no readable amount');
       if (zeroed) bits.push(zeroed + ' zero-dollar row' + (zeroed === 1 ? '' : 's') + ' skipped');
-      const dupes = rows.length - _added.length - credits - undated - unreadable - zeroed;
+      // The file's own subtotal line, named rather than silently dropped (S223).
+      if (totalsLines) bits.push(totalsLines + ' totals row' + (totalsLines === 1 ? '' : 's')
+        + ' skipped (your file' + String.fromCharCode(8217) + 's own subtotal, not an expense)');
+      /* ⚠ EVERY BUCKET MUST BE SUBTRACTED HERE OR `dupes` ABSORBS IT. This residual is how "already
+         logged" is derived — it is not counted directly — so a new early-return that is not
+         subtracted silently inflates it and the operator is told rows were already logged when they
+         were skipped for another reason entirely. */
+      const dupes = rows.length - _added.length - credits - undated - unreadable - zeroed - totalsLines;
       if (dupes > 0) bits.push(dupes + ' already logged');
       /* ⚠ ONLY THE CONTRADICTORY FILE IS WORTH SAYING OUT LOUD. A day-first file that Bar Cop read
          correctly needs no announcement — it is simply right, and a US file can never trigger the
