@@ -522,8 +522,9 @@ S.RevenueAudit = {
     // Server comp discipline (Revenue S4): comps as a % of server sales over the
     // trailing four weeks. Server sales come from the Server Check log, comps from
     // Shift Control's void/comp log. Fed as one team rate the server audit grades.
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 28);
-    const cutoffStr = App.ymdLocal ? App.ymdLocal(cutoff) : cutoff.toISOString().slice(0, 10);
+    // "Trailing four weeks" is 28 days, and `today - 28` is 29 of them. `_windowedServerCount`
+    // above already had this right (`-(4*7-1)`); the window that feeds the SCORE did not.
+    const cutoffStr = App.windowCutoff(4 * 7);
     /* ⚠⚠ THE SECOND CONSUMER OF AN UNBOUNDED WINDOW (S215b, step 0.6). Door 11's scorecard was not
        the only reader of a future-dated server check: this window was `>= cutoff` with no upper
        bound too, so one mistyped year inflated `serverSales` here as well. That is the DENOMINATOR

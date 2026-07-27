@@ -69,8 +69,12 @@ S.RevenueServerCheck = {
 
   // ── Scorecard computation (per-server metrics over the last N days) ──────────
   computeScorecard(windowDays) {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (windowDays || 30));
-    const cutoffStr = App.ymdLocal(cutoff);
+    /* ⚠ "LAST 7 DAYS" HELD EIGHT. `today - N` with an inclusive `>=` is N+1 days, so every chip
+       overstated its own label — measured 8 / 31 / 91 days on the 7 / 30 / 90 chips, inflating
+       Covers, Sales, both team totals, the stat strip, the log and the PDF by a full day.
+       App.windowCutoff is the one implementation of this and is the convention datePresetRange
+       already used (`-27` for four weeks); this door was one of eight that had drifted. */
+    const cutoffStr = App.windowCutoff(windowDays || 30);
     /* ⚠⚠ EVERY WINDOW NEEDS AN UPPER BOUND. The filter was `date >= cutoff` and nothing else, so a
        row dated in the FUTURE sat inside every window at once — the 7-day chip, the 90-day chip and
        All Time all counted it. Measured on this fixture: one mistyped year (2027) at 40 covers /
@@ -405,9 +409,15 @@ S.RevenueServerCheck = {
     const t = App.data.revenue_settings?.targets || {};
     const targetCA = t.check_avg || 35;
     const win = this.windowDays();
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - win);
-    const cutoffStr = App.ymdLocal(cutoff);
+    // Same window as the scorecard above it, from the same helper — two spellings of one window is
+    // how a log and the tiles over it come to disagree.
+    const cutoffStr = App.windowCutoff(win);
     const scorecard = this.computeScorecard(win);
+    /* ⚠ NO UPPER BOUND HERE, DELIBERATELY, and it is the opposite of the scorecard's rule. A
+       future-dated row is excluded from every NUMBER (computeScorecard) but must stay VISIBLE in
+       the log, because Edit and Delete only exist in the log — bounding it here would put the row
+       permanently out of reach of the operator who has to fix it. The amber note above the table
+       names the count so the two are never silently inconsistent. */
     const log = (App.data.revenue_server_checks || [])
       .filter(c => (c.date || '') >= cutoffStr)
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -456,8 +466,16 @@ S.RevenueServerCheck = {
     // as "check that the file has server, covers, and sales columns".
     // Counts come from the BUILDER (see nSkipped/nIncomplete/nUndated on the flash); the name lists
     // below are the display subset, so they can be shorter and must never drive a claim.
+    // The operator backed out of the conflict prompt. Nothing was written, and saying so is the
+    // whole point — silence here reads as "it worked".
+    if (fl.cancelled) return '<div style="font-size:13px;margin-top:12px;font-weight:700;color:var(--t2);">Import cancelled. Nothing was changed.</div>';
     const nSkip = fl.nSkipped || 0, nInc = fl.nIncomplete || 0, nUnd = fl.nUndated || 0;
-    const nOther = nSkip + nInc + nUnd;
+    /* ⚠ `keptByHand` COUNTS AS "SOMETHING ELSE HAPPENED". Without it, a file of 5 already-logged
+       rows plus 2 conflicts the operator chose to keep printed "All 5 rows were already logged" —
+       true of the 5, false of the file, and it buried the two rows they had just made a decision
+       about. Every branch below that claims "All" has to see every other outcome. */
+    const nKept = fl.keptByHand || 0;
+    const nOther = nSkip + nInc + nUnd + nKept;
     let head;
     /* ⚠ THE SENTENCE WAS HAND-ROLLED AND FIXED-PLURAL, so landed=1 printed "1 of 2 server checks
        WERE saved". Five import doors already share App.partialSaveNote for exactly this, and it
@@ -465,6 +483,7 @@ S.RevenueServerCheck = {
        was not saved"). This door was the one still writing its own. */
     if (fl.failed)      head = App.partialSaveNote(fl.landed, fl.total, 'server check', 'server checks');
     else if (fl.added)  head = fl.added + ' server check' + (fl.added === 1 ? '' : 's') + ' imported'
+                               + (fl.replaced ? ', ' + fl.replaced + ' earlier import' + (fl.replaced === 1 ? '' : 's') + ' updated' : '')
                                + (fl.dupCount ? ', ' + fl.dupCount + ' already logged' : '') + '.';
     // ⚠ "All" ONLY WHEN NOTHING ELSE WAS DROPPED. This branch fired on any non-zero dupCount, so a
     // re-drop where 5 rows deduped and 3 more were undated printed "All 5 rows were already logged"
@@ -508,6 +527,10 @@ S.RevenueServerCheck = {
       // so at THIS door the row vanished with no word at all. It is the one skip an operator can
       // actually fix in the file (a date cell like "Jul 24" with no year), so it has to be named.
       + (fl.undated && fl.undated.length ? note('Skipped, no readable date: ' + list(fl.undated) + '. Check the date column in your export.') : '')
+      // The choice the operator just made at the conflict prompt, echoed back. A decision with no
+      // confirmation reads as if it did not take.
+      + (nKept ? note(nKept + ' check' + (nKept === 1 ? ' was' : 's were') + ' kept as you entered '
+                      + (nKept === 1 ? 'it' : 'them') + ', not replaced by the file.') : '')
       // ⚠ THE ROWS WITH NO NAME TO PRINT. A subtotal or section line with an empty Server cell is a
       // real dropped row, and it was rendered NOWHERE because every list above prints names and it
       // has none. Report it as a count so the totals an operator adds up actually reconcile.
@@ -528,7 +551,31 @@ S.RevenueServerCheck = {
     });
   },
   async applyServerImport(rows) {
-    const { toAdd, skipped, incomplete, undated, dupCount, summaryRows, notService } = PosIngest.build('server', rows);
+    const { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, summaryRows, notService } = PosIngest.build('server', rows);
+    /* The file disagrees with checks entered or corrected BY HAND. Ask which wins before writing
+       anything ([[user-chooses-conflicts]]) — the same prompt the Shift close uses for sales, cash
+       and now server rows, so all three lanes behave the same way.
+       ⚠ It runs BEFORE the write and before any flash: a file whose every row conflicts has an
+       empty `toAdd`, and the zero-row branch would otherwise blame the file for rows Bar Cop read
+       perfectly well. */
+    const extra = [];
+    if (conflicts && conflicts.length) {
+      const figs = v => v.covers + (v.covers === 1 ? ' cover' : ' covers') + ' · ' + App.fmtCurrency(v.sales || 0);
+      const label = c => { const dt = new Date(c.date + 'T00:00:00');
+        return c.name + ' · ' + (isNaN(dt.getTime()) ? c.date : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
+          + (c.shift ? ' · ' + c.shift : ''); };
+      const r = await App.promptImportConflicts({
+        title: 'Some checks were entered by hand',
+        intro: 'This file has different figures for ' + conflicts.length + ' check'
+             + (conflicts.length === 1 ? '' : 's') + ' you already entered or corrected by hand. Pick which to keep. Your own are kept unless you choose the file.',
+        rowLabel: 'Check', colMine: 'You entered', colTheirs: 'This file',
+        rows: conflicts.map(c => ({ key: c.key, label: label(c), mineText: figs(c.mine), theirsText: figs(c.theirs) }))
+      });
+      if (!r.confirmed) { this._impFlash = { cancelled: true }; this.draw(); return; }
+      conflicts.forEach(c => { if (r.useTheirs.has(c.key)) extra.push(c.useRec); });
+    }
+    const keptByHand = (conflicts ? conflicts.length : 0) - extra.length;
+    extra.forEach(rec => toAdd.push(rec));
     let added = 0, failed = false, landed = 0;
     if (toAdd.length) {
       // Honor the commit result. Discarding it reported "N server checks imported" in
@@ -555,6 +602,7 @@ S.RevenueServerCheck = {
     }
     this._impFlash = {
       added, failed, landed, total: toAdd.length, dupCount: dupCount || 0,
+      replaced: replaced || 0, keptByHand,
       unmatched: (skipped || []).filter(s => s && s !== '(blank)'),
       incomplete: (incomplete || []).filter(s => s && s !== '(blank)'),
       undated: (undated || []).filter(s => s && s !== '(blank)'),
@@ -690,6 +738,9 @@ S.RevenueServerCheck = {
       server_name: byId.name,
       covers:      Math.round(cov),
       sales,
+      // Provenance, so a later import knows this figure has a person behind it and asks before
+      // replacing it ([[user-chooses-conflicts]]). `imported` is NOT this field — see buildServer.
+      source:      'manual',
       saved_at:    new Date().toISOString()
     };
     /* ⚠ THE WRITE RESULT WAS DISCARDED. A refused write (viewer role, or localStorage full after
@@ -739,6 +790,11 @@ S.RevenueServerCheck = {
       server_name: staff.name,
       covers:      Math.round(cov),
       sales,
+      /* ⚠⚠ AFTER THE SPREAD, DELIBERATELY, AND THIS LINE IS THE WHOLE POINT OF S215f. `...c` carries
+         the prior record's provenance, so a hand correction to an IMPORTED row would still read as
+         'import' and the next re-drop would silently overwrite it — the exact figure the operator
+         went in to fix. Editing a row makes it theirs. */
+      source:      'manual',
       saved_at:    new Date().toISOString()
     };
     // Step 0.5: the twin needs the same result check. Closing the modal on a refused write threw
