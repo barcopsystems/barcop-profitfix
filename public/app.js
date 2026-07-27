@@ -8260,6 +8260,25 @@ const App = {
     return this.ymdLocal(d);
   },
 
+  /* ── THE SAME WINDOW, BOUNDED AT BOTH ENDS. Use THIS unless you specifically want a bare lower
+     bound (S217). `windowCutoff` returns only the floor, and six read surfaces used it with
+     `>= cutoff` and nothing above — so one mistyped year sat inside every one of them at once.
+     Measured at door 11 before it was bounded: a single 2027 row moved a Last-7-Days team average
+     from $35.00 to $56.67, and diluted the Revenue audit's comp rate to 5% against a truth of 10%
+     (wrong in the reassuring direction, which is why nothing ever reported it).
+     ⭐ THE POINT OF THE HELPER: the upper bound becomes the DEFAULT rather than something every
+     caller has to remember. Returns a predicate, so a row's date is tested in one place.
+     ⚠ Excluding a future row from an AGGREGATE is safe because the record still lives in its own
+     editable list. Where the aggregate and the record share a screen — door 11's scorecard and its
+     log — the row must stay VISIBLE and be excluded from the math instead, or it can never be
+     corrected. That door bounds by hand and reports the count; it is one of the two documented
+     `windowCutoff` callers left. */
+  inWindow(days) {
+    const from = this.windowCutoff(days);
+    const to = this.todayLocal();
+    return d => { const s = String(d == null ? '' : d).slice(0, 10); return !!s && s >= from && s <= to; };
+  },
+
   // Resolve the Monday of the week containing a given date string. Forecast
   // records are keyed by week_start (Monday) so every screen converts a
   // period_end (Sunday) or any in-week date to the canonical Monday key.

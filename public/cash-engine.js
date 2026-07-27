@@ -175,12 +175,16 @@ window.CashEngine = {
   //    recent deliveries and any sitting on this week's order-to-par list. ───────
   vendorPurchasing(days) {
     days = days || 90;
-    // A `days`-day window is `days` days, today included. `today - days` is one more than that.
-    const cut = App.windowCutoff(days);
+    /* A `days`-day window is `days` days, today included — and it is bounded at the TOP as well
+       (S217). This used to test `dt < cut` and nothing above, so one delivery typed with a future
+       date counted in every window at once and inflated a vendor's spend, order count and the
+       annualized figure built from them. The delivery itself is still in Delivery History where it
+       can be corrected; only the total leaves it out. */
+    const inWin = App.inWindow(days);
     const map = {};
     this.deliveries().forEach(d => {
       const v = d.vendor; if (!v) return;
-      const dt = String(d.date || '').slice(0, 10); if (!dt || dt < cut) return;
+      const dt = String(d.date || '').slice(0, 10); if (!inWin(dt)) return;
       const m = map[v] = map[v] || { vendor: v, orders: 0, spend: 0, lastOrder: null };
       m.orders++; m.spend += (parseFloat(d.total) || 0);
       if (!m.lastOrder || dt > m.lastOrder) m.lastOrder = dt;
