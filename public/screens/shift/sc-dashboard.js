@@ -934,7 +934,7 @@ S.ShiftDashboard = {
        drops that row on the floor: not in `toAdd`, not in any count, no message — which is worse
        than the double-count it replaced. This is the same lesson the comment above records about
        `incomplete`, one field later. */
-    const { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts } = PosIngest.build('server', rows);
+    const { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, fileRepeats } = PosIngest.build('server', rows);
     const res = document.getElementById('sc-ck-server-res');
     const inc = (incomplete || []).length, und = (undated || []).length;
     /* Everything this import found besides the rows it wrote. Built ONCE and appended to every
@@ -951,7 +951,10 @@ S.ShiftDashboard = {
     let serverOutcomes = (named ? ' (' + named + ' name' + (named === 1 ? '' : 's') + ' not matched)' : '')
       + (nameless ? ' (' + nameless + ' row' + (nameless === 1 ? '' : 's') + ' had no server name)' : '')
       + (inc ? ' (' + inc + ' row' + (inc === 1 ? '' : 's') + ' rang no covers or sales)' : '')
-      + (und ? ' (' + und + ' row' + (und === 1 ? '' : 's') + ' had no readable date)' : '');
+      + (und ? ' (' + und + ' row' + (und === 1 ? '' : 's') + ' had no readable date)' : '')
+      // Same collapse as the twin door, reported the same way. Silence here would leave the
+      // operator's row count and Bar Cop's disagreeing with no explanation.
+      + ((fileRepeats || 0) ? ' (' + fileRepeats + ' repeated line' + (fileRepeats === 1 ? '' : 's') + ' counted once)' : '');
     /* The file disagrees with checks the operator entered BY HAND. Ask before writing anything
        ([[user-chooses-conflicts]]) — the same prompt this screen already uses for sales and cash,
        so the three import lanes behave identically. ⚠ This runs ABOVE the zero-row branch: a file
