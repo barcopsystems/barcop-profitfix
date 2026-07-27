@@ -100,7 +100,7 @@ S.SalesIntegrity = {
        both `# voids` and `void qty`; this list had `# no sales` alone, which is why the asymmetry
        went unnoticed. */
     { key: 'no_sales',     label: 'No-Sale Opens',     required: false, notMoney: true, match: ['no sale count', 'no sales count', 'no-sale count', 'nosale count', '# no sales', '# no sale', '# no-sale', '# nosale', 'no sale #', 'no sales #', 'no-sale #', 'nosale #', 'number of no sales', 'no sale opens', 'no-sale opens', 'no sales opens', 'nosale opens', 'no sale qty', 'no-sale qty', 'no sales qty', 'nosale qty', 'no sale cnt', 'no-sale cnt', 'no sales cnt', 'nosale cnt', 'no sale ct', 'number of no-sales', 'no. of no sales', 'no. of no-sales', 'drawer open count', 'drawer opens count', 'drawer opens', 'no sale', 'no-sale', 'no sales', 'nosale'] },
-    { key: 'checks',       label: 'Checks',            required: false, notMoney: true, match: ['check count', 'closed checks', 'guest checks', '# of checks', 'chks', 'checks', 'ticket count', 'tickets', 'order count', 'number of orders', 'orders', 'transaction count', 'transactions', 'tabs'] },
+    { key: 'checks',       label: 'Checks',            required: false, notMoney: true, notLoss: true, match: ['check count', 'closed checks', 'guest checks', '# of checks', 'chks', 'checks', 'ticket count', 'tickets', 'order count', 'number of orders', 'orders', 'transaction count', 'transactions', 'tabs'] },
     { key: 'hours',        label: 'Labor Hours',       required: false, match: ['total hours', 'labor hours', 'hours worked', 'total hrs', 'hrs worked', 'paid hours', 'net hours', 'hours', 'hrs', 'worked'] },
     // ⚠ `sales amount` / `sales $` / `sales value` are explicit for the same reason: bare `sales` is
     // EXACT_ONLY, so a Restaurant Manager cashout headed "Sales Amount" bound NOTHING — and with
@@ -339,7 +339,7 @@ S.SalesIntegrity = {
        map a column it had already mapped — directly under an intake note saying those very rows
        could not be matched to a shift. The operator needs the FORMAT named, not the column. */
     const k = (review && review.intake) || {};
-    if (k.undated > 0) have.date = 1;
+    if (k.undated > 0) have.date = 1;   // the column IS mapped either way — blank or unreadable
     /* ⚠⚠ THE ONE COLUMN THAT DOES MOST OF THE WORK WAS MISSING FROM THE ADVICE. `net_sales` is the
        denominator of the void, comp and refund shares, of the average check and of sales per hour —
        five of the nine signals — and this sentence never named it. The empty state, the drop-zone
@@ -356,7 +356,7 @@ S.SalesIntegrity = {
       : missing.slice(0, -1).join(', ') + ' and ' + missing[missing.length - 1];
     // ⚠ The dashes are a MATCHED PAIR in the multi-column branch; the singular branch used to
     // inherit only the closing one ("Map the Checks column — and re-run it.").
-    const dateNote = (k.undated > 0)
+    const dateNote = (k.unreadableDates > 0)
       ? 'Bar Cop could not read the dates in this file, so it could not match the report to the drawer shortages and walked tabs already on file — check the date format. ' : '';
     if (!missing.length) return dateNote || 'Every column Bar Cop can read is already mapped here, so this file simply does not carry enough separate signals to judge anyone on. ';
     return dateNote + (missing.length === 1
@@ -381,8 +381,21 @@ S.SalesIntegrity = {
     if (!Array.isArray(App.data.sales_reviews)) App.data.sales_reviews = [];
     return App.data.sales_reviews;
   },
+  /* ⚠⚠ "LATEST" MEANS THE ONE MOST RECENTLY IMPORTED, NOT THE ONE COVERING THE NEWEST SALES.
+     `App.cmpNewest` sorts on `_recDate`, which for a review is `review.date` — the newest date the
+     IMPORT COULD PARSE. Those are different facts, and a grouped date column drives them apart: a
+     file covering Jul 20-26 whose date cell is filled only on the first row of each server's block
+     parses ONE date, so `review.date` is **Jul 20** — and it then sorts BEHIND an older review dated
+     Jul 25. Measured on the real test file: the operator drops a report and the screen shows a
+     DIFFERENT review, with somebody else's numbers under a header they did not import.
+     `created_at` is when the review was made and is the only honest answer to "what did I just do".
+     `review.date` stays the sales period, which is what the label is for.
+     ⚠ `App.cmpNewest` is shared app-wide and is NOT changed — a history table sorted by the period
+     it covers is right. Only this "show me the one I just imported" question is different. */
   latestReview() {
-    const list = this.reviews().slice().sort(App.cmpNewest);
+    const list = this.reviews().slice().sort((a, b) =>
+      String((b && b.created_at) || '').localeCompare(String((a && a.created_at) || ''))
+      || App.cmpNewest(a, b));
     return list[0] || null;
   },
   /* ⚠ EVERY NAME KEY IN THIS FILE MUST BE BUILT BY `_nameKey`, OR THE CROSS-REFERENCES SILENTLY
@@ -492,7 +505,7 @@ S.SalesIntegrity = {
        contributing no day to divide them by, which INFLATES their per-shift rate. On the one screen
        in Bar Cop that prints a person's name next to the word theft, the false-accusation direction
        is the one to close hardest. Every refusal is counted and reported by runImport. */
-    let noName = 0, undated = 0, summaryRows = 0;
+    let noName = 0, undated = 0, summaryRows = 0, blankDate = 0;
     (rows || []).forEach(r => {
       const name = (r.server || '').trim();
       if (!name) { noName++; return; }
@@ -507,7 +520,18 @@ S.SalesIntegrity = {
          whose date column read "Week of 7/6" hid a 20-opens-a-shift skimmer completely, and the
          artefact that leaves the building said all-clear. Losing a row's DATE is not a reason to
          lose its VOIDS. It is kept as a dateless row and counted for the report. */
+      /* ⚠⚠ A BLANK DATE CELL IS A ROW BAR COP COULD NOT MATCH TO A SHIFT, EXACTLY LIKE AN UNREADABLE
+         ONE — and only the unreadable one was counted, so the commonest shape of all reported
+         NOTHING. Measured on a 7-night file whose date column carries a value on row 1 only (the
+         Excel merged / report-header cell): four byte-identical servers, the one dated server
+         printed "14 no-sale opens IN ONE SHIFT" and was listed, and `intake` came back
+         `{undated: 0, noShiftCount: [], unjudged: []}` — the note read "28 rows read · 4 servers
+         scored" and not one word about a date column that was 96% empty.
+         ⚠ Counted separately and folded in only when the file HAS readable dates: with no date
+         column at all every cell is blank by definition, everyone divides by one report period
+         uniformly, and saying "28 rows could not be matched to a shift" would be noise. */
       if (cell && !d) undated++;
+      else if (_hasReader && !cell) blankDate++;
       /* ⚠ TWO SPELLINGS OF ONE PERSON ARE ONE PERSON. A bare `.toLowerCase()` made "Brianna K." and
          "Brianna K" two servers, and it did three separate wrongs at once: it halved her counts so
          her STRONGEST flag (no-sale opens, weight 3) stopped clearing its floor and disappeared; it
@@ -584,6 +608,16 @@ S.SalesIntegrity = {
     // Optional cross-reference to captured Shift data, restricted to the report's
     // dates so we never pull in unrelated shifts. Adds drawer shorts + walkouts.
     const dateList = [...dates];
+    /* A blank date cell only means "could not be matched to a shift" when the file HAS readable
+       dates to match against. With no date column at all everyone divides by one report period
+       uniformly and there is nothing to report. */
+    /* ⚠ KEPT APART ON PURPOSE.  is "rows Bar Cop could not match to a shift" and covers
+       BOTH causes;  is the narrower "there is a value here and it does not parse",
+       which is the only one the FORMAT advice may be given for. Folding them made the remediation
+       tell an operator to "check the date format" on a file whose dates were read correctly and are
+       printed in the header of the same card — the column was simply blank on the grouped rows. */
+    const unreadableDates = undated;
+    if (dateList.length) undated += blankDate;
     const inDates = ds => dateList.length === 0 ? false : dateList.indexOf(String(ds).slice(0, 10)) >= 0;
     /* ⚠⚠ THE NUMERATOR AND THE DIVISOR HAVE TO COVER THE SAME DAYS. These counted every short in
        the FILE'S window while `shifts` counts only the days that server has a row for, so the card
@@ -815,7 +849,7 @@ S.SalesIntegrity = {
         walkouts:     (hasCapture && shiftsKnown) ? walkCount / shifts : null
       };
       const staff = byName[key];
-      return { name: a.name, staff_id: staff ? staff.id : '', raw: a, shifts, datedSpan, fileDated, shortCount, walkCount,
+      return { name: a.name, staff_id: staff ? staff.id : '', raw: a, shifts, datedSpan, fileDated, undatedRows: a.noDate, shortCount, walkCount,
         shortAmt: _sh.amount, walkAmt: _wk.amount,
         m, qualifies: false };
     });
@@ -952,7 +986,9 @@ S.SalesIntegrity = {
         const reporters = teamN[sig.key] || 0;
         /* ⭐ EVERY COMPARISON BELOW IS AGAINST THE PEER AVERAGE — the mean of everyone ELSE — and the
            multipliers live in the RATIO_* block with the table that derives them. `avg` (the
-           whole-team mean) is deliberately no longer used for any test: it made the bar a function
+           whole-team mean) is no longer used by the `dir:'high'` or CAPTURE tests — `dir:'low'` and
+           `dir:'both'` still read it on purpose, see the asymmetry note in the RATIO_* block. For the
+           seven signals that moved it made the bar a function
            of crew size, and it made the tested number differ from the reported one. */
         const peer = peerAvg(sig.key, s);
         let tripped = false;
@@ -1030,7 +1066,11 @@ S.SalesIntegrity = {
              (3.2% implies $176). The peer figure is also the HONESTER one: the whole-team mean
              includes the accused, so their own 12% drags the printed "team average" up and makes
              the case against them look milder than it is.
-             ⚠ The TRIP TEST above deliberately still uses the whole-team mean it was tuned against —
+             ⚠ (STALE AS WRITTEN, CORRECTED: the trip test uses the PEER average for `dir:'high'` and
+             both capture signals — 7 of the 9 — since the RATIO_* work. Only `dir:'low'` and
+             `dir:'both'` still read the whole-team mean, and the asymmetry note in the RATIO_* block
+             is the authority. The original sentence follows because its REASONING is still why those
+             two keep it.) The whole-team mean was kept because —
              including the accused makes the bar HARDER to clear, which is the safe direction on a
              screen that names people. Test conservatively, report honestly. */
           value: v, team: peerAvg(sig.key, s), dir: sig.dir,
@@ -1111,14 +1151,14 @@ S.SalesIntegrity = {
 
     return {
       id: opts.id || App.uid(),
-      label: opts.label || this._autoLabel(dateList),
+      label: opts.label || this._autoLabel(dateList, undated),
       date: opts.date || (dateList.sort()[dateList.length - 1]) || App.todayLocal(),
       created_at: opts.created_at || new Date().toISOString(),
       source: opts.source || 'import',
       columns: Object.keys(present),
       // What the file actually gave up, so the import can say so instead of drawing a
       // report over rows it quietly threw away. `ambiguous` is the S199 coin-toss case.
-      intake: { rows: (rows || []).length, noName, undated, summaryRows, ambiguous: !!_conv.contradictory,
+      intake: { rows: (rows || []).length, noName, undated, unreadableDates, summaryRows, ambiguous: !!_conv.contradictory,
         /* Named, not counted: the operator has to know WHICH server's rates went unread.
            ⚠ SCORED SERVERS ONLY. It listed anybody with a lone undated row, including people who
            were set aside for too little data — so a barback with one $40 line was reported as
@@ -1134,8 +1174,16 @@ S.SalesIntegrity = {
            was not scored — too few servers in this file to compare against."* Both sentences were
            true of different halves of the same rule and the document read as self-contradicting.
            A signal anybody was actually listed on is dropped from the note. */
+        /* ⚠⚠ AND THE FILTER MUST BE PER SERVER, NOT FILE-WIDE. Dropping the signal the moment ANYONE
+           was listed on it silenced the caveat for everybody ELSE it could not judge: measured, five
+           servers where only Ana (30% voids) and Bree (5.9%) supplied a Voids figure — Ana solo-
+           clears and is listed, so `unjudged` came back EMPTY and **Bree's 5.9% void rate was never
+           compared to anything and neither the screen nor the PDF said so.** Non-monotonic in the
+           direction round 8 already forbade: the file where Bar Cop actually named somebody said
+           LESS about what it could not judge. A signal is dropped only when EVERY server carrying a
+           reading for it was listed on it. */
         unjudged: Object.keys(thin)
-          .filter(k => !scored.some(x => (x.flags || []).some(f => f.key === k)))
+          .filter(k => scored.some(x => x.m[k] != null && !(x.flags || []).some(f => f.key === k)))
           .map(k => (this.SIGNALS.find(g => g.key === k) || {}).label || k) },
       summary: {
         reviewed: scored.length, flagged: flagged.length, skipped: skipped.length,
@@ -1317,8 +1365,15 @@ S.SalesIntegrity = {
        is the field that answers this question, it has existed since round 4 for exactly this, and
        it was computed, persisted and read NOWHERE — the comment in `_fmtVal` below discusses it
        while the code beneath that comment reads `fileDated` too. */
+    /* ⚠⚠ AND "in one shift" NEEDS THIS SERVER TO HAVE NO UNDATED ROWS EITHER. `datedSpan` only says
+       she has AT LEAST ONE readable date. On a file whose date column carries a value on row 1 only,
+       she had one date and six blank ones, the cap collapsed her divisor to 1, and the card and the
+       PDF asserted **"14 no-sale opens in one shift"** for a week's work — an outright claim about
+       her attendance, made from a column that was 96% empty. The divisor itself is S214 and cannot be
+       settled from this data; the SENTENCE can, and it now says "over the report period", which is
+       true whatever the divisor turns out to be. */
     const span = s.shifts > 1 ? ' over ' + s.shifts + ' shifts (' + this._fmtVal(sig, v, s) + ')'
-      : (s.datedSpan ? ' in one shift' : ' over the report period');
+      : ((s.datedSpan && !s.undatedRows) ? ' in one shift' : ' over the report period');
     if (sig.key === 'no_sales')     return s.raw.no_sales + ' no-sale opens' + span + teamTxt;
     if (sig.key === 'void_pct')     return this.pct(v) + ' of sales voided' + teamTxt;
     // ⚠ The row is already LABELLED "Average check", so repeating it read "Average check: $23.87
@@ -1354,17 +1409,25 @@ S.SalesIntegrity = {
          that is now `shifts === 1 && !datedSpan` — the same predicate, read off the same field, so
          the two can never disagree again. It was keyed on `fileDated`, which is a fact about the
          FILE and not about this server. */
-      const bare = !!s && s.shifts === 1 && !s.datedSpan;
+      const bare = !!s && s.shifts === 1 && !(s.datedSpan && !s.undatedRows);
       return this._smallNum(v) + (bare ? '' : ' per shift');
     }
     if (sig.key === 'avg_check' || sig.key === 'sales_per_hr') return App.fmtCurrency(v);
     return this.pct(v);
   },
-  _autoLabel(dateList) {
+  /* ⚠⚠ "<date> shift" IS A CLAIM ABOUT THE WHOLE FILE, AND ONE READABLE DATE IS NOT EVIDENCE FOR IT.
+     A 7-night export whose date column carries a value on row 1 only was labelled **"Jul 10, 2026
+     shift"** — on the card, in the PDF header, and as `review.date`, which then drives which review
+     `App.cmpNewest` opens on. Say it only when the single date is the whole story; otherwise name
+     the one date Bar Cop could read and admit there are rows it could not place. */
+  _autoLabel(dateList, undatedRows) {
     if (!dateList.length) return 'Sales review ' + this.fmtDate(App.todayLocal());
     const sorted = dateList.slice().sort();
-    return sorted.length === 1 ? this.fmtDate(sorted[0]) + ' shift'
-      : this.fmtDate(sorted[0]) + ' to ' + this.fmtDate(sorted[sorted.length - 1]);
+    if (sorted.length === 1) {
+      return undatedRows > 0 ? this.fmtDate(sorted[0]) + ' (plus undated rows)'
+        : this.fmtDate(sorted[0]) + ' shift';
+    }
+    return this.fmtDate(sorted[0]) + ' to ' + this.fmtDate(sorted[sorted.length - 1]);
   },
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -1391,7 +1454,7 @@ S.SalesIntegrity = {
     let body;
     if (!latest) {
       body = '<div class="card" style="padding:22px;"><div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;">No reviews yet</div>'
-        + '<div style="font-size:13px;color:var(--t3);line-height:1.6;max-width:640px;">Pull a server sales report for a shift or a week from your POS and drop it above. The only column it must have is the server name, and Net Sales is the one that unlocks the most: void, comp and refund rates, the check average and sales per hour are all measured against it, and so is every dollar figure. The more it carries after that (date, no-sales, voids, cash and card split, comps, checks, refunds, hours) the more Bar Cop can read.</div></div>';
+        + '<div style="font-size:13px;color:var(--t3);line-height:1.6;max-width:640px;">Pull a server sales report for a shift or a week from your POS and drop it above. The only column it must have is the server name, and Net Sales is the one that unlocks the most: void, comp and refund rates, the check average and sales per hour are all measured against it, and so are the void, comp and refund dollar figures. The more it carries after that (date, no-sales, voids, cash and card split, comps, checks, refunds, hours) the more Bar Cop can read.</div></div>';
     } else {
       body = this.renderReport(latest) + this.renderHistory(latest.id);
     }
@@ -1449,7 +1512,7 @@ S.SalesIntegrity = {
        a field existed — reached the arithmetic below and printed "NaN rows read." */
     const k0 = (review && review.intake) || {};
     const k = { rows: k0.rows || 0, noName: k0.noName || 0, undated: k0.undated || 0,
-      summaryRows: k0.summaryRows || 0, ambiguous: !!k0.ambiguous,
+      summaryRows: k0.summaryRows || 0, unreadableDates: k0.unreadableDates || 0, ambiguous: !!k0.ambiguous,
       noShiftCount: k0.noShiftCount || [], unjudged: k0.unjudged || [] };
     const s = (review && review.summary) || { reviewed: 0 };
     const n = (c, one, many) => c + ' ' + (c === 1 ? one : (many || one + 's'));
@@ -1477,9 +1540,22 @@ S.SalesIntegrity = {
        walked tabs come from Bar Cop's OWN logs, not from any column in the file, and average check
        is computed rather than reported — so the sentence sent an operator hunting for a column that
        does not exist. Say what actually happened: there were not enough servers to compare against. */
+    /* ⚠⚠ AND THE SENTENCE HAS TO BE TRUE WHEN SOMEBODY *WAS* LISTED ON THAT SIGNAL. The filter is
+       per-server, so a signal appears here when it could not be compared for SOME server — and on a
+       file where one server clears the solo bar on it, the same card printed
+       **"Void rate: 30% of sales voided vs an average of 5.9% ... $963.90"** and then, two lines
+       below, "void rate was not scored". A comparison made, printed and priced, then disowned.
+       Measured over 3,000 sparse-column files: 33.8% produced that contradiction. "Not scored" was
+       the wrong claim; the true one is that it could not be compared ACROSS THE WHOLE FLOOR, which
+       holds whether nobody, somebody or everybody carrying it ended up listed. */
+    /* ⚠ AND IT STILL MUST NOT SAY SERVERS "REPORTED" IT — a pin caught my first rewrite doing exactly
+       that. Drawer shorts and walked tabs come from Bar Cop's OWN Shift Control log, not from any
+       column a server reports, so that phrasing sends an operator hunting for a column that does not
+       exist. Two constraints at once: true when somebody WAS listed on the signal, and silent about
+       where the figure came from. */
     if (k.unjudged.length) bits.push(k.unjudged.join(', ').toLowerCase()
-      + (k.unjudged.length === 1 ? ' was' : ' were')
-      + ' not scored — too few servers in this file to compare against');
+      + ' could not be compared across the whole floor — too few servers to measure '
+      + (k.unjudged.length === 1 ? 'it' : 'them') + ' against');
     /* ⚠ ONLY THE CONTRADICTORY FILE IS WORTH SAYING OUT LOUD (S199). A day-first file Bar Cop read
        correctly needs no announcement — it is simply right — and a US file can never trigger the
        detection at all. What the operator does need is the case Bar Cop could not settle. */
@@ -1514,14 +1590,22 @@ S.SalesIntegrity = {
          (one outlier is noise), but their dollars are still computed — measured, $5,700 of void
          exposure on a 20%-void server was calculated and then printed as "-". The number is right
          for what it counts, so the LABEL is what was lying. */
-      + stat('Flagged Exposure', s.exposure > 0 ? App.fmtCurrency(s.exposure) : '-', s.exposure > 0 ? 'var(--red)' : '')
+      /* ⚠ THE SCREEN AND THE PDF DISAGREED ON THIS TILE'S NAME. The PDF was renamed with the rest
+         of P-SIMPLIFY and this one was not, so the same figure was "Flagged Exposure" on screen and
+         "Dollars behind those readings" in the export — and "flagged" is the verdict word the whole
+         change removed. */
+      + stat('Dollars Behind These Readings', s.exposure > 0 ? App.fmtCurrency(s.exposure) : '-', s.exposure > 0 ? 'var(--red)' : '')
       + '</div></div>';
 
     // Same predicate the summary uses — see `_isFlagged`. `cleanN` is the complement, so every
     // stored server lands in exactly one of the two counts and none can silently vanish.
     const flagged = (review.servers || []).filter(x => this._isFlagged(x));
     const cleanN = (review.servers || []).filter(x => !this._isFlagged(x)).length;
-    const cleanTxt = cleanN ? (cleanN + ' other server' + (cleanN === 1 ? '' : 's') + ' reviewed, no patterns flagged.') : '';
+    /* ⚠ P-SIMPLIFY MISSED THIS LINE AND A SCREENSHOT FOUND IT. My source sweep hunted the three
+       category names and "High Risk", so "no PATTERNS FLAGGED" walked straight through it — the
+       same verdict vocabulary in different words, printed under every report. A banned-word list is
+       only as good as the words somebody thought of. */
+    const cleanTxt = cleanN ? (cleanN + ' other server' + (cleanN === 1 ? '' : 's') + ' reviewed, nothing out of line.') : '';
     /* ⚠ The "not cleared" reassurance used to live ONLY in the all-clear branch, so on a review that
        actually names someone — the case an operator reads hardest — the set-aside people got a bare
        list and no statement that they were not cleared. It belongs on the list itself, which prints
@@ -1537,7 +1621,13 @@ S.SalesIntegrity = {
        explanation, and the two artefacts disagreeing in the same fixture. */
     const nSkip = (review.skipped && review.skipped.length) || 0;
     const nvEarly = this._noVerdictReason(review);
-    const saidAlready = !!nvEarly && nvEarly.reason === 'skipped' && !flagged.length;
+    /* ⚠ THE `&& !flagged.length` CLAUSE OUTLIVED ITS REASON. It was right when the no-verdict
+       paragraph only rendered in the nothing-flagged branch; a later fix made that paragraph print
+       in the FLAGGED branch too, and this clause was not moved with it. Measured: on a review that
+       names somebody AND sets servers aside, the screen printed "not cleared, just not measured"
+       TWICE while the PDF printed it once — the screen/PDF divergence class again, from the side
+       that was fixed. The PDF guard never had the clause, which is why they disagreed. */
+    const saidAlready = !!nvEarly && nvEarly.reason === 'skipped';
     /* ⚠ And no doubled period: Bar Cop's own roster convention is "Brianna K.", so a set-aside list
        ending in an initial produced "Not enough data to score: Barback B..". That is the NORMAL
        case here, not an edge one. */
@@ -1773,7 +1863,9 @@ S.SalesIntegrity = {
     catch (e) { alert('Could not load the PDF engine. Check your connection and try again.'); return; }
     const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const b = App._pdfBuilder('Sales Integrity Review');
-    b.header({ right: 'Sales Integrity Review', meta: review.label + ', generated ' + today });
+    // ⚠ Coerced: every other reader of a stored review defends this shape, and the PDF header was
+    //   the one place a record with no label printed "undefined, generated July 27, 2026".
+    b.header({ right: 'Sales Integrity Review', meta: (review.label || 'Sales review') + ', generated ' + today });
     const sm = review.summary || this._summaryFrom(review);
     let nvSaid = null;   // which no-verdict reason the document already stated, so nothing repeats it
     b.table(['Summary', ''], [
@@ -1781,7 +1873,7 @@ S.SalesIntegrity = {
       // Same wording as the screen's stat strip — this table and that strip are the same numbers.
       // The risk GRADE is deliberately absent from both; see the note on `serverCard`.
       ['With readings out of line', String(sm.flagged)],
-      ['Dollars behind those readings', sm.exposure > 0 ? '$' + Number(sm.exposure).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-']
+      ['Dollars behind these readings', sm.exposure > 0 ? '$' + Number(sm.exposure).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-']
     ], { columnStyles: { 1: { halign: 'right' } } });
     // ⚠ THE SAME CAVEAT THE SCREEN SHOWS. Without it this document printed "Flagged: 0" beside a
     // review that could never have flagged anyone, and it is the artefact that leaves the building.
@@ -1862,7 +1954,7 @@ S.SalesIntegrity = {
 
   showHowTo() {
     App.showHelpModal('How Sales Integrity Works', [
-      { p: ['Sales Integrity is the deep theft read. You drop a per-server sales report from your POS and Bar Cop benchmarks every server against the rest of the floor, then flags the ones whose numbers do not add up, with a dollar exposure on each. It is the feature an owner runs every shift or every week.'] },
+      { p: ['Sales Integrity is the deep theft read. You drop a per-server sales report from your POS and Bar Cop benchmarks every server against the rest of the floor, then lists the ones whose numbers do not add up, with a dollar figure wherever one can be worked out. It is the feature an owner runs every shift or every week.'] },
       { h: 'What it catches, what it does not', p: ['It catches the register and cash games that leave a fingerprint in the sales data: no-sale drawer opens, void abuse, abnormal cash mix, low average checks, heavy comps, refunds, plus drawer shorts and walkouts Bar Cop already has on file. It does not catch product theft (overpouring, free pours, watering or walking out bottles), because an unrung free drink never reaches a sales report. Pour cost, inventory variance, and spot checks catch that half.'] },
       /* ⚠ THE DATE COLUMN WAS NAMED NOWHERE IN THE WHOLE SCREEN, and it is the one that switches on
          BOTH capture signals — drawer shorts (weight 3, strong) and walkouts. Measured: the same
@@ -1889,7 +1981,7 @@ S.SalesIntegrity = {
    figure at all, so there was nothing for it to be five times. The copy now states both paths.
    Also "labour" → "labor", matching the signal's own label (the spelling class this file has
    already recorded once). */
-'There is one exception and it is deliberately narrow. A single reading can list somebody when it runs five times the rest of the floor and the money behind it is real: a meaningful share of that server\'s own sales for voids, comps and discounts or refunds, or at least ten drawer opens for no-sales. When no colleague reported that column at all there is nothing to compare against, and the size of the number alone decides. Cash mix, check averages, sales per labor hour, drawer shorts and walkouts are never enough on their own, however far off they look. A cash-heavy or a slow station explains the first three, and a bartender who runs short once or twice is a training problem.', 'Every figure you see, and every dollar figure beside it, is measured against the rest of the team with that server left out, so their own numbers never soften the comparison. Dollars are shown only where they can be worked out honestly (voids, comps, refunds, drawer shorts and walkouts), so a listed server can show none at all. Bar Cop does not tell you what any of it means. It tells you which numbers do not line up and what the gap is worth, and the next step is yours.'] },
+'There is one exception and it is deliberately narrow. A single reading can list somebody when it runs five times the rest of the floor and the money behind it is real: a meaningful share of that server\'s own sales for voids, comps and discounts or refunds, or at least ten drawer opens for no-sales. When no colleague reported that column at all there is nothing to compare against, and the size of the number alone decides. Cash mix, check averages, sales per labor hour, drawer shorts and walkouts are never enough on their own, however far off they look. A cash-heavy or a slow station explains the first three, and a bartender who runs short once or twice is a training problem.', 'Every rate you see is measured against the rest of the team with that server left out, so their own numbers never soften the comparison, and so are the dollar figures on voids, comps and refunds: those are what the server ran ABOVE what the rest of the floor would predict. Drawer shorts and walked tabs are different — those dollars come straight from your own Shift Control records rather than from a comparison, so nothing is subtracted from them. They cover only the days that server appears on in this file, so if your report misses a night, the shortages logged that night are not counted here either. Dollars are shown only where they can be worked out honestly, so a listed server can show none at all. Bar Cop does not tell you what any of it means. It tells you which numbers do not line up and what the gap is worth, and the next step is yours.'] },
       { h: 'Working a flag', p: ['A flag is a lead, not a verdict. Open Investigation starts a six-step case over in Loss Prevention so you work it the same way you work any variance: watch the drawer, pull the void timestamps, talk to the shift, document the finding. Export PDF saves the review for an owner or partner. Confirm before you act on anyone.'] }
     ]);
   }
