@@ -538,12 +538,27 @@ S.HubOperatingExpenses = {
       dropSub: 'Needs columns for date and amount; category, vendor, and notes come in if your file has them. Categories that do not match yours import as Other.',
       actionsEl: '#oexa-imp-actions',
       fields: [
-        { key: 'date',     label: 'Date',     required: true,  match: ['date', 'paid', 'posted', 'transaction date', 'business date', 'day', 'due date', 'bill date', 'invoice date', 'date paid', 'trans date', 'entry date'] },
+        /* ⚠ REQUIRED, so a missing candidate REFUSES THE WHOLE IMPORT. Chase business checking — the
+           most common bank CSV in America — heads its column "Posting Date", which `posted` does not
+           reach. Same for "Post Date", "Statement Date", "Settlement Date" and Xero's "InvoiceDate".
+           ⚠ AND `bill date`/`invoice date` NOW OUTRANK `due date`: a QuickBooks bill export and a
+           Sysco invoice both carry both, and dating the expense to when it is DUE books a 28 Jan
+           bill on Net 30 into February. */
+        { key: 'date',     label: 'Date',     required: true,  match: ['date', 'bill date', 'invoice date', 'invoicedate', 'transaction date', 'business date', 'posting date', 'post date', 'posted date', 'date posted', 'statement date', 'settlement date', 'expense date', 'purchase date', 'charge date', 'payment date', 'batch date', 'due date', 'date paid', 'trans date', 'entry date', 'paid', 'posted', 'day'] },
         { key: 'category', label: 'Category', required: false, match: ['category', 'type', 'account', 'expense type', 'expense category', 'gl account', 'account name', 'class', 'gl code'] },
         { key: 'vendor',   label: 'Vendor',   required: false, match: ['vendor', 'payee', 'merchant', 'description', 'name', 'paid to', 'supplier', 'company', 'vendor name', 'payee name', 'biller'] },
-        // ⚠ `charge amount`/`charge total` explicit: bare `charge` is EXACT_ONLY now, so a card
-        // statement headed "Charge Amount" stopped binding a REQUIRED field and refused the import.
-        { key: 'amount',   label: 'Amount',   required: true,  match: ['amount', 'total', 'cost', 'debit', 'amt', 'value', 'expense', 'payment', 'charge amount', 'charge total', 'charge', 'dollars', 'total amount', 'amount paid'] },
+        /* ⚠ COMMENTS GO ABOVE THE ARRAY, NEVER INSIDE A FIELD LITERAL — a comment placed mid-entry
+           broke `verify-reference-import-doors`' field slicer twice in one session.
+           `charge amount`/`charge total` are explicit because bare `charge` is EXACT_ONLY now, and
+           `amount due` / `invoice total` / `charges` were never candidates at all — so a supplier
+           bill or a card statement headed any of those left this REQUIRED field unmapped and
+           refused the whole import. */
+        /* ⚠ `invoice total` BEFORE `amount due`: on a partly-paid bill those are different numbers,
+           and the expense is what the bill COST, not what is still owed on it. A US Foods invoice
+           prints both columns side by side.
+           ⚠⚠ AND THE COMMENT LIVES HERE, NOT INSIDE THE ARRAY — a mid-line `//` truncated the field
+           for `verify-reference-import-doors`' line-based slicer. Third time this session. */
+        { key: 'amount',   label: 'Amount',   required: true,  match: ['amount', 'total', 'cost', 'debit', 'amt', 'value', 'expense', 'payment', 'charge amount', 'charge total', 'invoice total', 'invoice amount', 'amount due', 'charges', 'charge', 'dollars', 'total amount', 'amount paid'] },
         { key: 'notes',    label: 'Notes',    required: false, match: ['notes', 'memo', 'note', 'comment', 'details', 'remark'] }
       ],
       confirmLabel: 'Import Expenses',
