@@ -1518,7 +1518,11 @@ S.HubSettings = {
     [7, 9, 12, 14, 16, 19, 21].forEach((d, i) => {
       rServers.forEach((nm, j) => {
         const cv = 18 + Math.round(rnd() * 14);
-        rSC.push({ id:uid(), date:dateStr(d), shift:['Dinner','Lunch','Bar'][i % 3],
+        // ⚠ SEED HONESTY (S219): these must be periods from `service_periods` above, because every
+        // form that writes a shift builds its picker from App.SHIFT_TYPES — so 'Bar' was a value no
+        // operator could ever have entered. Rotating through Happy Hour also puts the profile's one
+        // CUSTOM daypart on screen, which is the thing it exists to demonstrate.
+        rSC.push({ id:uid(), date:dateStr(d), shift:['Dinner','Lunch','Happy Hour'][i % 3],
           server_name:nm, covers:cv,
           sales:+(cv * (31 + j * 1.5 + rnd() * 7)).toFixed(2),
           saved_at:daysAgoISO(d) });
@@ -2393,7 +2397,8 @@ S.HubSettings = {
         variance_pours:varP, variance_dollar:+(varP * cpp).toFixed(2), flagged:flagged };
     };
     const mkSpot = (daysAgo, items) => ({
-      id:uid(), date:dateStr(daysAgo), shift:'PM', checked_by:'Maria G.',
+      // 'PM' was not a service period (S219) — ic-spot-check's own picker is App.SHIFT_TYPES.
+      id:uid(), date:dateStr(daysAgo), shift:'Dinner', checked_by:'Maria G.',
       items:items, flag_pct:SPOT_FLAG_PCT, product_count:items.length,
       flagged_count:items.filter(i => i.flagged).length,
       total_variance_dollar:+items.reduce((t, i) => t + (i.variance_dollar || 0), 0).toFixed(2),
@@ -2719,7 +2724,9 @@ S.HubSettings = {
     const vcServers = ['Jessica M.', 'Marcus T.', 'Brianna K.', 'Devin R.', 'Carlos P.'];
     const findProdId = (name) => (icProducts.find(p => p.name === name) || {}).id || '';
     const findMenuId = (name) => (((App.data && App.data.menu_items) || []).find(m => m.name === name) || {}).id || '';
-    const vcShifts = ['Dinner', 'Late Night', 'Dinner', 'Lunch', 'Brunch', 'Dinner'];
+    // Service periods only (S219) — 'Brunch' is not one this profile runs. sc-void-comp's picker is
+    // App.SHIFT_TYPES, so a seeded void on a period the operator does not have could not be re-entered.
+    const vcShifts = ['Dinner', 'Late Night', 'Dinner', 'Lunch', 'Happy Hour', 'Dinner'];
     // Voids = a sale reversed (error). Comps = a sale given away, carrying a
     // category that splits loss (Customer Comp / Service Recovery) from policy
     // expense (Staff Meal / Shift Drink). Some comps link to a tracked product so
@@ -3246,7 +3253,7 @@ S.HubSettings = {
       { cat:'Draft Beer',  reason:'Spill',                            units:32, who:'Jake T.',   shift:'Late Night', day:4 },
       { cat:'Food',        reason:'Dumped / Tasted Bad',              units:1,  who:'Renee K.',  shift:'Dinner',     day:6 },
       { cat:'Wine',        reason:'Bad Pour / Customer Dissatisfied', units:1,  who:'Devin R.',  shift:'Dinner',     day:2 },
-      { cat:'Food',        reason:'Expired / Past Date',              units:3,  who:'Luis V.',   shift:'Brunch',     day:1 },
+      { cat:'Food',        reason:'Expired / Past Date',              units:3,  who:'Luis V.',   shift:'Lunch',      day:1 },
       { cat:'Liquor',      reason:'Bad Pour / Customer Dissatisfied', units:1,  who:'Brianna K.',shift:'Late Night', day:5 },
       { cat:'Draft Beer',  reason:'Training',                         units:16, who:'Marcus T.', shift:'Lunch',      day:3 },
       { cat:'Bottle Beer', reason:'Broken',                           units:1,  who:'Maria G.',  shift:'Dinner',     day:4 },
@@ -3390,8 +3397,13 @@ S.HubSettings = {
     // The GM logs coverage hours at 0 hourly cost (salary added by salariedCost); the
     // hourly AM logs real hours/cost, carved out of the food labor budget below.
     const seedLeaders = (baseAgo) => {
-      gmStaff.forEach(st => { for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name, position_id:st.position_id, shift_type:'Full Day', hours:9, wage:0, cost:0, notes:'' }); });
-      if (amStaff) for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:amStaff.id, name:amStaff.name, position_id:amStaff.position_id, shift_type:'Full Day', hours:amHrs, wage:amStaff.wage, cost:+(amHrs * amStaff.wage).toFixed(2), notes:'' });
+      /* ⚠ BLANK, NOT 'Full Day' (S219). These are LOGGED HOURS, and Log Hours' picker is
+         `['', ...App.SHIFT_TYPES]` — it offers blank but never 'Full Day', so the operator could not
+         reproduce these rows. Blank is also the honest answer for a salaried manager working
+         open-to-close: no single service period. (`sc_shifts` above keeps 'Full Day' on purpose —
+         that is what the shipped `buildSales` writes and what hub-books' join expects.) */
+      gmStaff.forEach(st => { for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name, position_id:st.position_id, shift_type:'', hours:9, wage:0, cost:0, notes:'' }); });
+      if (amStaff) for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:amStaff.id, name:amStaff.name, position_id:amStaff.position_id, shift_type:'', hours:amHrs, wage:amStaff.wage, cost:+(amHrs * amStaff.wage).toFixed(2), notes:'' });
     };
     // Hours actually seeded into lc_actuals, per week. This is the ONLY honest source
     // for revenue_weeks.total_hours: a live re-confirm reads laborFeed(), which sums
