@@ -382,7 +382,11 @@ S.LaborStaffRoster = {
       dropSub: 'Only Name is required; position, pay, status, phone, and email come in if your file has them.',
       actionsEl: '#sr-imp-actions',
       fields: [
-        { key: 'name',          label: 'Name',          required: true,  match: ['name', 'employee', 'employee name', 'staff', 'full name', 'first name', 'last name', 'team member', 'staff name', 'worker'] },
+        /* ⚠ REQUIRED, and an ADP roster imported a JOB CLASSIFICATION as everyone's name: on
+           `Associate ID | Legal Name | Job Title | Worker Category`, `name` is EXACT_ONLY so "Legal
+           Name" was unreachable, while bare `worker` hunted into "Worker Category". The payroll
+           spellings are explicit now and lead; `worker` moved to last so it can never outrank one. */
+        { key: 'name',          label: 'Name',          required: true,  match: ['employee name', 'legal name', 'display name', 'preferred name', 'full name', 'staff name', 'team member name', 'associate name', 'worker name', 'name', 'employee', 'staff', 'first name', 'last name', 'team member', 'associate', 'worker'] },
         { key: 'position',      label: 'Position',      required: false, match: ['position', 'role', 'title', 'job', 'job title', 'job role', 'position title', 'job position'] },
         /* ⚠ `'pay'` WAS IN pay_type's LIST AND IT STOLE THE WAGE COLUMN. `match` arrays are walked
            in declared order and pay_type is declared first, so a header of exactly "Pay" bound to
