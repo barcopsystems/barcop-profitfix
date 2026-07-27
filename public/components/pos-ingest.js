@@ -719,6 +719,19 @@ const PosIngest = {
     // Anything else is not a date Bar Cop is willing to guess at. The door reports the row.
     return '';
   },
+  /* ⚠⚠ THIS MAP RELIES ON AN INVARIANT ENFORCED ELSEWHERE: STAFF NAMES ARE UNIQUE (S215k).
+     It is `m[name] = s`, so two staff sharing a name collapse into whichever sits later in the
+     array — and this is the shared matcher for FIVE builders (hours, tips, voids, server, cash), so
+     the loser can never receive a single imported row. Measured: two "Chris M." records, and every
+     imported shift lands on the second one at the wrong wage.
+     ⭐ THE INVARIANT IS HELD AT THE SOURCE, NOT HERE, and deliberately: `lc-staff-roster`'s import
+     has always refused a duplicate name (whole roster, Inactive included) and `saveProfile` now
+     refuses one too, on both ADD and RENAME. That makes the ambiguous state unreachable through the
+     app instead of asking five builders to resolve an ambiguity the file cannot settle
+     ([[the-loop]] #20: when the fix moves the bug out of reach, assert the unreachability —
+     `verify-roster-name-unique.js`).
+     ⛔ SO: ANY NEW WRITER OF lc_staff MUST ENFORCE IT. Adding a second door that can mint a
+     duplicate name silently re-opens all five builders at once. */
   _staffByName() {
     const m = {};
     ((App.laborData && App.laborData.lc_staff) || []).forEach(s => {
