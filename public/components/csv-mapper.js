@@ -334,7 +334,17 @@ const CSVMapper = {
        explicitly marked as money. Opt-in, so the blast radius is exactly the fields that declare it
        — no header binding anywhere else can move. */
     const hasMoneyMark = h => /\$/.test(String(h)) || /(^|[^a-z])usd([^a-z]|$)/i.test(String(h));
-    const allowed = (f, h) => !(f.notMoney && hasMoneyMark(h));
+    /* ⚠⚠ AND ITS TWIN, WHICH I DID NOT WRITE THE FIRST TIME — `notMoney` stopped a dollar column
+       reaching a COUNT field and left the opposite door wide open. The dollar fields end in bare
+       `voids`/`comps`/`refunds`, none sealed, so in pass 2 they take whatever the count field did
+       not recognise. Measured over 80 real count spellings: **47 bound a DOLLAR field**, including
+       `Voids #`, `Void #`, `Voids Qty`, `Void Cnt`, `Qty Voids`, `Void Quantity`, `Comps #`,
+       `Comp Qty`, `Refunds #`, `Refund Qty`. End to end on a counts-only per-server export, Bree K.
+       with 11 void TRANSACTIONS on $290 of sales printed **High Risk, "3.8% of sales voided", $18.10
+       exposure** into the PDF. Bound correctly as counts the same file is CLEAN.
+       A count marker is as explicit as a currency marker and deserves the same symmetric guard. */
+    const hasCountMark = h => /(^|[^a-z])(?:#|qty|cnt|count|counts|quantity|no\.|num|number)([^a-z]|$)/i.test(String(h));
+    const allowed = (f, h) => !(f.notMoney && hasMoneyMark(h)) && !(f.notCount && hasCountMark(h));
     // An UNNAMED column is never auto-claimed — there is nothing to match on, and guessing it is
     // how a row-number column ends up imported as covers.
     const findIdx = pred => {

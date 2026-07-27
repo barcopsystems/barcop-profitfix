@@ -282,7 +282,14 @@ const PosIngest = {
     'server', 'servers', 'employee', 'employees', 'staff', 'cashier',
     'cashiers', 'bartender', 'bartenders', 'team', 'section', 'department', 'dept', 'store',
     'location', 'shift', 'day', 'daily',
-    'weekly', 'monthly', 'period', 'revenue centre', 'revenue center', 'terminal', 'register'],
+    'weekly', 'monthly', 'period', 'revenue centre', 'revenue center', 'terminal', 'register',
+    /* ⚠ `daily`/`weekly`/`monthly` were here and their BARE NOUNS were not, so "Weekly Total" was
+       caught and **"Week Total" / "Month Total" / "Year Total" were scored as people**. Adding the
+       nouns also fixes "Total for the Week", which a comment one round ago claimed was handled and
+       measurement showed was not. `page` joins for the paginated "Page 1 Total" shape. None of these
+       is a surname on its own, and a qualifier only ever matches BESIDE a total word, so a person
+       called Page or Day is untouched. */
+    'week', 'month', 'year', 'quarter', 'page', 'job', 'category', 'group', 'sales', 'revenue'],
   /* The role words a POS groups an "All <role>" or "Total All <role>" line by. Kept as its own
      closed vocabulary because three separate tests below need the same list, and when they were
      spelled out inline they drifted: two of them accepted only servers/employees/staff, so
@@ -343,8 +350,18 @@ const PosIngest = {
     const role = '(?:' + this.SUMMARY_ROLES.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')';
     if (new RegExp('^' + lead + '?\\s*(?:total|totals)\\s+(?:for\\s+)?all\\s+' + role + '$').test(n)) return true;
     if (new RegExp('^all\\s+' + role + '(?:\\s+(?:total|totals))?$').test(n)) return true;
-    // "Totals for the Day" / "Total for the Week" — the article is what stopped the qualifier test.
-    if (new RegExp('^(?:total|totals)\\s+(?:for|by|per)\\s+the\\s+' + q + '$').test(n)) return true;
+    /* "Totals for the Day", "Total for the Week" — the article is what stopped the qualifier test.
+       ⚠ THE PREVIOUS VERSION OF THIS COMMENT NAMED "Total for the Week" AND THE CODE DID NOT CATCH
+       IT, because `week` was not a qualifier. A comment asserting coverage the code lacks is worse
+       than no comment: it is an instruction to the next reader not to check. Both are measured now. */
+    if (new RegExp('^(?:total|totals|subtotal|subtotals)\\s+(?:for|by|per)\\s+the\\s+' + q + '$').test(n)) return true;
+    /* The remaining real spellings a paginated or grouped export prints, all measured as scored
+       PEOPLE before this line existed: "Page 1 Total", "Page Subtotal", "Total of All",
+       "End of Report", "Report Total". */
+    if (new RegExp('^' + q + '\\s+\\d+\\s+(?:sub)?(?:total|totals)$').test(n)) return true;
+    if (new RegExp('^' + q + '\\s+(?:sub)?(?:total|totals)$').test(n)) return true;
+    if (new RegExp('^' + lead + '?\\s*(?:sub)?(?:total|totals)\\s+of\\s+' + scope + '$').test(n)) return true;
+    if (/^end of (?:report|file|data|list)$/.test(n)) return true;
     // A bare plural role word is the export's own roll-up line, not somebody's name.
     if (new RegExp('^' + role + '$').test(n)) return true;
     /* ⚠⚠ THE AVERAGE ROW HAD NONE OF THE QUALIFIER MACHINERY THE TOTAL ROW HAD — a flat alternation
