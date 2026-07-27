@@ -474,8 +474,8 @@ S.RevenueServerCheck = {
        rows plus 2 conflicts the operator chose to keep printed "All 5 rows were already logged" —
        true of the 5, false of the file, and it buried the two rows they had just made a decision
        about. Every branch below that claims "All" has to see every other outcome. */
-    const nKept = fl.keptByHand || 0;
-    const nOther = nSkip + nInc + nUnd + nKept;
+    const nKept = fl.keptByHand || 0, nRep = fl.fileRepeats || 0;
+    const nOther = nSkip + nInc + nUnd + nKept + nRep;
     let head;
     /* ⚠ THE SENTENCE WAS HAND-ROLLED AND FIXED-PLURAL, so landed=1 printed "1 of 2 server checks
        WERE saved". Five import doors already share App.partialSaveNote for exactly this, and it
@@ -531,6 +531,10 @@ S.RevenueServerCheck = {
       // confirmation reads as if it did not take.
       + (nKept ? note(nKept + ' check' + (nKept === 1 ? ' was' : 's were') + ' kept as you entered '
                       + (nKept === 1 ? 'it' : 'them') + ', not replaced by the file.') : '')
+      // A repeated line is counted once, and SAID so — an operator whose export really does list a
+      // server twice needs to know Bar Cop collapsed it, not discover it in the totals later.
+      + (nRep ? note(nRep + ' repeated line' + (nRep === 1 ? '' : 's') + ' in your file counted once'
+                     + ' (same server, date, service period, covers and sales).') : '')
       // ⚠ THE ROWS WITH NO NAME TO PRINT. A subtotal or section line with an empty Server cell is a
       // real dropped row, and it was rendered NOWHERE because every list above prints names and it
       // has none. Report it as a count so the totals an operator adds up actually reconcile.
@@ -551,7 +555,7 @@ S.RevenueServerCheck = {
     });
   },
   async applyServerImport(rows) {
-    const { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, summaryRows, notService } = PosIngest.build('server', rows);
+    const { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, fileRepeats, summaryRows, notService } = PosIngest.build('server', rows);
     /* The file disagrees with checks entered or corrected BY HAND. Ask which wins before writing
        anything ([[user-chooses-conflicts]]) — the same prompt the Shift close uses for sales, cash
        and now server rows, so all three lanes behave the same way.
@@ -602,7 +606,7 @@ S.RevenueServerCheck = {
     }
     this._impFlash = {
       added, failed, landed, total: toAdd.length, dupCount: dupCount || 0,
-      replaced: replaced || 0, keptByHand,
+      replaced: replaced || 0, keptByHand, fileRepeats: fileRepeats || 0,
       unmatched: (skipped || []).filter(s => s && s !== '(blank)'),
       incomplete: (incomplete || []).filter(s => s && s !== '(blank)'),
       undated: (undated || []).filter(s => s && s !== '(blank)'),
