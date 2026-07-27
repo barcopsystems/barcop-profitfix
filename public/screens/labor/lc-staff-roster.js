@@ -911,6 +911,32 @@ S.LaborStaffRoster = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const name = document.getElementById('sr-name')?.value.trim();
     if (!name) { fail('Name is required.'); return; }
+    /* ⚠⚠ A UNIQUE NAME IS NOT A NICETY — IT IS WHAT THE WHOLE IMPORT LAYER STANDS ON (S215k).
+       `PosIngest._staffByName` is `m[name.toLowerCase()] = s`, the SHARED matcher behind five
+       builders (hours, tips, voids, server checks, cash). Two staff with one name collapse into
+       whichever record happens to sit later in the array: every imported row for that name lands on
+       one of them and the other can never receive a single hour, with nothing anywhere saying so.
+       At the timeclock door that is gross pay; at Server Check it is somebody else's covers.
+       ⚠ THE ROSTER IMPORT HAS ALWAYS REFUSED A DUPLICATE NAME — across the whole roster, Inactive
+       included ("or re-importing a terminated employee creates a second Active record and strands
+       their history"). This form checked only that the name was non-empty. Two doors writing one
+       record on two different rules; making them agree closes all five builders at once and makes
+       the ambiguous state unreachable, rather than teaching each builder to handle an ambiguity it
+       has no way to resolve ([[the-loop]] #20, #30).
+       ⚠ `s.id !== staffId` so editing someone does not collide with themselves; on an ADD staffId is
+       null and every row is compared. */
+    const nameKey = name.toLowerCase();
+    const clash = this.staff().find(s => s && s.id !== staffId && (s.name || '').trim().toLowerCase() === nameKey);
+    if (clash) {
+      /* ⚠ THE NAME IS QUOTED, NOT RUN INTO THE SENTENCE. Nearly every name in this app ends in an
+         initial ("Chris M."), so "You already have someone called " + name + "." printed
+         "Chris M.." — seen in the harness output the moment this shipped. Quoting closes the clause
+         without a second full stop and reads better besides. */
+      fail('"' + name + '" is already on your roster' + (clash.status === 'Inactive' ? ' (inactive)' : '')
+        + '. Bar Cop matches each row of your POS exports to staff by name, so two people cannot share one — '
+        + 'add a last initial or surname to tell them apart.');
+      return;
+    }
     const posId = document.getElementById('sr-pos')?.value;
     if (!posId) { fail('Choose a position.'); return; }
     const payType = document.getElementById('sr-paytype')?.value === 'Salary' ? 'Salary' : 'Hourly';
