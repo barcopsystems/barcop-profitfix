@@ -494,8 +494,9 @@ S.TheftRisk = {
 
   // ── 90-Day Theft & Loss Brief (PDF) — the periodic owner/insurance review ──
   async printBrief() {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
-    const cutoffStr = App.ymdLocal(cutoff);
+    // The document says "90-day review" in its header, its section titles and its help text, so the
+    // window has to be 90 days. `today - 90` is 91. (App.windowCutoff — one implementation.)
+    const cutoffStr = App.windowCutoff(90);
     const d = this._signalData(cutoffStr);
     const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

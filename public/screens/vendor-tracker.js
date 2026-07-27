@@ -111,12 +111,14 @@ S.VendorTracker = {
   // ════════════════════════════════════════════════════════════════════
   //  SCORECARD TAB
   // ════════════════════════════════════════════════════════════════════
+  /* ⚠⚠ THIS ONE WAS NOT JUST A LABEL — THE NUMERATOR AND THE DENOMINATOR DISAGREED. `today - days`
+     with an inclusive `>=` admits days+1 of deliveries, while `_rangeDays` below returns the CHIP'S
+     number (30) for annualizing them. So "Last 30 Days" summed 31 days of spend and divided by 30,
+     overstating the annualized figure by ~3.3% on the 30 chip and ~1.1% on the 90. Routing through
+     App.windowCutoff makes the two agree by construction rather than by coincidence. */
   startDate() {
     if (this.range === 'all') return '';
-    const days = parseInt(this.range, 10) || 90;
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return App.ymdLocal(d);
+    return App.windowCutoff(parseInt(this.range, 10) || 90);
   },
 
   metricsFor(vendorName) {

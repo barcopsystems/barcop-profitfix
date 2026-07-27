@@ -74,17 +74,20 @@ S.HubBarCopAudit = {
 
   // ── Utilities ───────────────────────────────────────────────────────────
   _now() { return new Date(); },
-  _daysAgo(n) {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  },
+  // (_daysAgo removed 2026-07-27: its only caller was _withinWindow, which now uses
+  //  App.windowCutoff. A private day-offset helper sitting unused is how the next window
+  //  quietly gets built on the old convention again.)
+  /* ⚠ A `days`-day window held days+1. The screen says "over the last 30 days" in its help and its
+     component notes, so the window has to be 30. Lower cost than the other nine sites because the
+     ratios here are internally consistent — `runDays` is a Set built from the SAME window, so both
+     sides of every ratio moved together — but the stated day count was still wrong.
+     Compares DATE STRINGS now: `_daysAgo` returned a midnight Date while some records carry a full
+     timestamp, so a same-day record's time of day decided whether it was inside the boundary. */
   _withinWindow(dateStr, days) {
     if (!dateStr) return false;
-    const d = new Date(String(dateStr).length <= 10 ? dateStr + 'T00:00:00' : dateStr);
-    if (isNaN(d.getTime())) return false;
-    return d >= this._daysAgo(days);
+    const ymd = String(dateStr).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+    return ymd >= App.windowCutoff(days);
   },
   _daysSince(dateStr) {
     if (!dateStr) return null;

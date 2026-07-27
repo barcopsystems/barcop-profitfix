@@ -1645,7 +1645,9 @@ S.Hub = {
 
     // 5. Vendor price re-drift — fresh price increases in recent deliveries
     const dels = (App.inventoryData || {}).ic_deliveries || [];
-    const cutoff = (() => { const d = new Date(); d.setDate(d.getDate() - 45); return iso(d); })();
+    // 45 days means 45. (This one names no day count on screen, so it was the only one of the eight
+    // not printing a false figure — routed anyway so the convention has a single implementation.)
+    const cutoff = App.windowCutoff(45);
     let incCount = 0;
     dels.filter(d => d.date && d.date >= cutoff).forEach(d => {
       (d.line_items || []).forEach(li => {
