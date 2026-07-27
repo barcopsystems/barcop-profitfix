@@ -77,12 +77,12 @@ S.SalesIntegrity = {
        CLEAN" failure, still live for the tender and payment nouns after the sales/amount/total ones
        were fixed. The two lists have to enumerate the SAME nouns or the split silently loses a side. */
     { key: 'card_sales',   label: 'Card Sales',        required: false, match: ['card sales', 'credit sales', 'card payments', 'card payment', 'credit payments', 'credit payment', 'credit card sales', 'credit card total', 'credit card amount', 'credit card tendered', 'credit card tender', 'credit tendered', 'credit tenders', 'credit tender', 'card tendered', 'card tender', 'credit received', 'card received', 'credit amount', 'card amount', 'card total', 'credit total', 'total credit', 'net credit amount', 'net credit', 'net card amount', 'net card', 'charge sales', 'charge amount', 'charge total', 'non-cash sales', 'non cash sales', 'non-cash amount', 'non cash amount', 'non-cash total', 'non cash total', 'non-cash tenders', 'non cash tenders', 'non-cash tender', 'non cash tender', 'non-cash tendered', 'non cash tendered', 'non-cash payments', 'non cash payments', 'non-cash payment', 'non cash payment', 'non-cash received', 'non cash received', 'non-cash collected', 'non cash collected', 'non-cash revenue', 'non cash revenue', 'non-cash', 'non cash', 'credit/debit', 'credit card', 'card', 'credit', 'charge'] },
-    { key: 'void_count',   label: 'Void Count',        required: false, notMoney: true, match: ['void count', 'voids count', '# voids', 'number of voids', 'voided checks', 'checks voided', 'void qty'] },
-    { key: 'voids',        label: 'Void $',            required: false, match: ['void amount', 'void total', 'void $', 'voided amount', 'voided total', 'void sales', 'voids', 'void'] },
-    { key: 'comp_count',   label: 'Comp Count',        required: false, notMoney: true, match: ['comp count', 'comps count', '# comps', 'number of comps', 'discount count', 'discounts count', '# discounts', 'promo count'] },
-    { key: 'comps',        label: 'Comp / Discount $', required: false, match: ['comp amount', 'comp total', 'comp $', 'discount amount', 'discount total', 'discounts & comps', 'discounts and comps', 'promo amount', 'comps', 'discounts', 'comp', 'discount', 'promo'] },
-    { key: 'refund_count', label: 'Refund Count',      required: false, notMoney: true, match: ['refund count', 'refunds count', '# refunds', 'number of refunds', 'return count', 'returns count'] },
-    { key: 'refunds',      label: 'Refund $',          required: false, match: ['refund amount', 'refund total', 'refund $', 'return amount', 'return total', 'refunds', 'returns', 'refund'] },
+    { key: 'void_count',   label: 'Void Count',        required: false, notMoney: true, match: ['void count', 'voids count', 'void cnt', 'voids cnt', 'void quantity', 'voids quantity', '# voids', '# void', 'voids #', 'void #', 'qty voids', 'qty void', 'number of voids', 'voided checks', 'checks voided', 'void qty', 'voids qty'] },
+    { key: 'voids',        label: 'Void $',            required: false, notCount: true, match: ['void amount', 'void total', 'void $', 'voided amount', 'voided total', 'void sales', 'voids', 'void'] },
+    { key: 'comp_count',   label: 'Comp Count',        required: false, notMoney: true, match: ['comp count', 'comps count', 'comp cnt', 'comps cnt', 'comp quantity', '# comps', '# comp', 'comps #', 'comp #', 'qty comps', 'comp qty', 'comps qty', 'number of comps', 'discount count', 'discounts count', 'discount qty', '# discounts', 'discounts #', 'promo count'] },
+    { key: 'comps',        label: 'Comp / Discount $', required: false, notCount: true, match: ['comp amount', 'comp total', 'comp $', 'discount amount', 'discount total', 'discounts & comps', 'discounts and comps', 'promo amount', 'comps', 'discounts', 'comp', 'discount', 'promo'] },
+    { key: 'refund_count', label: 'Refund Count',      required: false, notMoney: true, match: ['refund count', 'refunds count', 'refund cnt', 'refunds cnt', 'refund quantity', '# refunds', '# refund', 'refunds #', 'refund #', 'qty refunds', 'refund qty', 'refunds qty', 'number of refunds', 'return count', 'returns count', 'return qty'] },
+    { key: 'refunds',      label: 'Refund $',          required: false, notCount: true, match: ['refund amount', 'refund total', 'refund $', 'return amount', 'return total', 'refunds', 'returns', 'refund'] },
     // ⚠ `no sale opens` unhyphenated is THIS DOOR'S OWN LABEL minus one character, and `no sale`
     // is EXACT_ONLY, so without it the app's own export shape bound nothing and a weight-3 strong
     // signal vanished silently. Same failure shape as the `Pay ($/hr)` case.
@@ -99,7 +99,7 @@ S.SalesIntegrity = {
        each is named explicitly rather than left to a bare token's reach. `void_count` already had
        both `# voids` and `void qty`; this list had `# no sales` alone, which is why the asymmetry
        went unnoticed. */
-    { key: 'no_sales',     label: 'No-Sale Opens',     required: false, notMoney: true, match: ['no sale count', 'no sales count', 'no-sale count', 'nosale count', '# no sales', '# no-sale', '# nosale', 'no sales #', 'no-sale #', 'nosale #', 'number of no sales', 'no sale opens', 'no-sale opens', 'no sales opens', 'nosale opens', 'no sale qty', 'no-sale qty', 'no sales qty', 'nosale qty', 'drawer opens', 'no sale', 'no-sale', 'no sales', 'nosale'] },
+    { key: 'no_sales',     label: 'No-Sale Opens',     required: false, notMoney: true, match: ['no sale count', 'no sales count', 'no-sale count', 'nosale count', '# no sales', '# no sale', '# no-sale', '# nosale', 'no sale #', 'no sales #', 'no-sale #', 'nosale #', 'number of no sales', 'no sale opens', 'no-sale opens', 'no sales opens', 'nosale opens', 'no sale qty', 'no-sale qty', 'no sales qty', 'nosale qty', 'drawer opens', 'no sale', 'no-sale', 'no sales', 'nosale'] },
     { key: 'checks',       label: 'Checks',            required: false, notMoney: true, match: ['check count', 'closed checks', 'guest checks', '# of checks', 'chks', 'checks', 'ticket count', 'tickets', 'order count', 'number of orders', 'orders', 'transaction count', 'transactions', 'tabs'] },
     { key: 'hours',        label: 'Labor Hours',       required: false, match: ['total hours', 'labor hours', 'hours worked', 'total hrs', 'hrs worked', 'paid hours', 'net hours', 'hours', 'hrs', 'worked'] },
     // ⚠ `sales amount` / `sales $` / `sales value` are explicit for the same reason: bare `sales` is
@@ -410,7 +410,18 @@ S.SalesIntegrity = {
        four consumers are handed RAW STORED strings, so the roster link and BOTH capture signals
        went dark on the very pair this key builder exists to join. The zero-width characters go in
        the collapse class for the same reason: `trim()` does not reach them. */
-    return String(s == null ? '' : s).toLowerCase()
+    /* \u26a0\u26a0 NORMALISE THE UNICODE, OR TWO IDENTICAL-LOOKING NAMES ARE TWO PEOPLE. "Jos\u00e9 M." can be
+       stored precomposed (U+00E9) or decomposed (`e` + U+0301). They render as the same glyphs
+       everywhere \u2014 screen, PDF, this file, the roster \u2014 and compare as different strings. A POS
+       export and a hand-typed roster routinely disagree about which one they use.
+       Measured, 4 logged drawer shorts and 4 walked tabs against Jos\u00e9 M. on his own nights:
+         file NFC + log NFC -> shorts 4, walks 4, **High Risk, $420.00**
+         file NFD + log NFC -> shorts 0, walks 0, **CLEAN, $0.00**
+       and with both spellings inside ONE file he becomes **two cards both displaying "Jos\u00e9 M."**,
+       each carrying half his counts, neither of them the truth. That is the same failure the
+       trailing-punctuation note above describes and the same class as the non-Latin-script guard in
+       `isSummaryName`: an accented name is not an edge case, it is a bar's normal staff list. */
+    return String(s == null ? '' : s).normalize('NFC').toLowerCase()
       .replace(/[\s\u00a0\u1680\u200b\u2000-\u200a\u202f\u205f\u3000\ufeff]+/g, ' ')
       .trim()
       .replace(/[.,;:]+$/, '')
@@ -945,7 +956,14 @@ S.SalesIntegrity = {
              rule calls a pattern. Reverted, deliberately, and recorded so it is not "fixed" again. */
           tripped = reporters >= this.MIN_TEAM && peer != null
                     && events >= this.MIN_EVENTS && v > peer * this.RATIO_CAPTURE;
-          if (peer != null && reporters < this.MIN_TEAM) thin[sig.key] = 1;
+          /* ⚠⚠ THE SAME `peer != null` GUARD I REMOVED FROM THE BRANCH BELOW, LEFT STANDING HERE —
+             step 0.6, the twin, one line apart. `peer == null` means nobody else reported the
+             signal, which is the extreme of "too few reporters" and the only case this note exists
+             for. Measured: Ana with 3 real logged drawer shorts against colleagues whose capture
+             metrics are null had `drawer_short` computed at 1.00 a shift and then discarded, while
+             `intake.unjudged` listed only "Void rate" — so the report named the one signal it could
+             not compare and stayed silent about the two it also could not. */
+          if (reporters < this.MIN_TEAM || peer == null) thin[sig.key] = 1;
         } else if (peer == null || reporters < this.MIN_TEAM) {
           tripped = false;   // need a floor to compare against
           /* ⚠⚠ `if (peer != null)` MADE THIS SILENT IN EXACTLY THE WORST CASE. `peer` is null
