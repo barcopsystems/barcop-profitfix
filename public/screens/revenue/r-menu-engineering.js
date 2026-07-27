@@ -55,9 +55,7 @@ S.RevenueMenuEngineering = {
   // Returns { [id]: 'STAR'|'PLOWHORSE'|'PUZZLE'|'DOG'|null }; null = the item's
   // category has fewer than MIN_PER_CAT priced items, so it cannot be ranked yet.
   classify() {
-    const items = (App.data.menu_items || [])
-      .map(i => ({ ...i, cost: App.menuItemCost(i) || 0 }))
-      .filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
+    const items = this._rankable().filter(i => i.cost);
     const byCat = {};
     // Group by the COMPARISON BASIS, not the raw category: cocktails rank as one pool because
     // Frozen / Specials / Happy Hour are menu layout, not economics, while dishes and No Prep
@@ -97,12 +95,38 @@ S.RevenueMenuEngineering = {
     this.draw();
   },
 
+  /* ⚠⚠ THE ONE DEFINITION OF "AN ITEM THIS BOARD CAN RANK" (S221). Four sites wrote this predicate
+     out by hand — the setup gate, the ranking, the classification and `_dogIds` — and this file's own
+     comments already record one of them being missed when the comparison basis landed ("the THIRD
+     grouping site and it was missed"). One helper, four callers.
+     ⭐⭐ AND THE SEMANTIC FIX IT CARRIES: the hand-written filters tested `i.weekly_covers` as a
+     TRUTHY value, which cannot tell **measured at zero** from **never measured**. The PMIX import
+     writes a real 0 on purpose — buildPmix keeps it because "a zero-seller is exactly what the Dog
+     Test exists to surface" — and then every one of these filters threw it away. Measured on a
+     four-item category with Wings imported at 0 units: the board showed three items and **no sign
+     that Wings had died**; with the zero included it ranks as a Puzzle, the single most actionable
+     row on the page.
+     `!= null` is the discriminator: an item the operator has never entered units for has no data and
+     stays off; an item MEASURED at zero is data, and belongs on. Verified both ways.
+     ⚠ THE COST, STATED HONESTLY: a zero pulls the category's average covers down (30.0 -> 22.5 in
+     the measured fixture), and that CAN flip another item between high and low volume. Nothing else
+     flipped in that fixture, but it can — Kyle approved the trade knowing it. */
+  /* ⚠ BOTH HALVES ARE LOAD-BEARING AND NEITHER WORKS ALONE. `!= null` alone would admit a legacy
+     NEGATIVE, which this file's own notes record as the worst case — it is truthy, drags the
+     category average down and reclassifies other items (a Dog became a Plowhorse on -50). And
+     `>= 0` alone would admit a never-measured item, because `null >= 0` is TRUE in JS. Both write
+     doors now refuse a negative; this is the defensive read for anything already on file. */
+  _measured(i) { return !!(i && i.price && !i.archived && i.weekly_covers != null && i.weekly_covers >= 0); },
+  _rankable() {
+    return (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 }))
+      .filter(i => this._measured(i));
+  },
+
   draw() {
     // New-user setup: Menu Engineering needs at least four fully-priced items
     // (price, cost, weekly covers) to rank. Until then, guide the operator to
     // Menu Items with the standard setup card instead of a bare empty state.
-    const costed = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 }))
-      .filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
+    const costed = this._rankable().filter(i => i.cost);
     if (costed.length < 4) {
       /* ⚠ DROP ANY PENDING IMPORT RESULT ON THE WAY OUT. coversImportHtml() is the only thing that
          clears `_coversFlash`, and it is never reached down this branch — so a result stored here
@@ -220,8 +244,7 @@ S.RevenueMenuEngineering = {
     // the manually-entered cost) so the math always sees a current number.
     // draw() gates on < 4 costed items with the setup card, so this only runs
     // with a rankable menu.
-    const priced = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 }))
-      .filter(i => i.price && i.weekly_covers && !i.archived);
+    const priced = this._rankable();
     const items = priced.filter(i => i.cost);
     // ⚠ The dishes we just dropped for having no cost. Excluding them from the ranking is
     // CORRECT — a Star/Dog class is relative to the category average and you cannot place
@@ -556,7 +579,7 @@ S.RevenueMenuEngineering = {
   },
   // (Dogs go to the Dog Test, not a blind price bump).
   _dogIds() {
-    const items = (App.data.menu_items || []).map(i => ({ ...i, cost: App.menuItemCost(i) || 0 })).filter(i => i.price && i.cost && i.weekly_covers && !i.archived);
+    const items = this._rankable().filter(i => i.cost);
     // ⚠ THE SHARED COMPARISON BASIS, like every other grouping in this file (lines 66, 172, 238,
     // 333) and the server audit. This was the THIRD grouping site and it was missed when the basis
     // landed — it still keyed on the raw category, so it disagreed with the board rendered right
