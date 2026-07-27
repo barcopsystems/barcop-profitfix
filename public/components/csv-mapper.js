@@ -333,7 +333,16 @@ const CSVMapper = {
        A field that counts things opts in with `notMoney` and will not accept a header the file
        explicitly marked as money. Opt-in, so the blast radius is exactly the fields that declare it
        — no header binding anywhere else can move. */
-    const hasMoneyMark = h => /\$/.test(String(h)) || /(^|[^a-z])usd([^a-z]|$)/i.test(String(h));
+    /* ⚠ `amount`/`amt`/`dollars` joined the money marks so the two guards are the SAME WIDTH. They
+       were not, and the asymmetry had a cost: `hasCountMark` knows 15 tokens and this knew 2, so a
+       money column headed "Void Trans Amount" carried a count mark and no money mark. `notCount`
+       refused the DOLLAR field, `notMoney` could not see anything to refuse, and the column landed
+       in `void_count` — which this door declares a DELIBERATELY UNREAD decoy. Measured: $510 of
+       voids on $3,550 of sales silently discarded, `void_pct` (weight 3, `strong`, the only signal
+       carrying void dollars) went dark, and the screen printed "No servers flagged".
+       ⚠ `total` is deliberately NOT a money mark: "Total Transactions" is a COUNT. */
+    const hasMoneyMark = h => /\$/.test(String(h))
+      || /(^|[^a-z])(?:usd|amount|amounts|amt|dollars)([^a-z]|$)/i.test(String(h));
     /* ⚠⚠ AND ITS TWIN, WHICH I DID NOT WRITE THE FIRST TIME — `notMoney` stopped a dollar column
        reaching a COUNT field and left the opposite door wide open. The dollar fields end in bare
        `voids`/`comps`/`refunds`, none sealed, so in pass 2 they take whatever the count field did
@@ -351,7 +360,33 @@ const CSVMapper = {
        voided" and a $10.67 figure, both fabricated from a count. `ct` is word-bounded, so "Direct"
        and "Account" do not trip it. */
     const hasCountMark = h => /(^|[^a-z])(?:#|qty|cnt|ct|count|counts|quantity|no\.|num|number|trans|transaction|transactions|items|rung)([^a-z]|$)/i.test(String(h));
-    const allowed = (f, h) => !(f.notMoney && hasMoneyMark(h)) && !(f.notCount && hasCountMark(h));
+    /* ⚠ A MONEY NOUN SETTLES A HEADER THAT CARRIES BOTH MARKS. "Void Trans Amount" says count AND
+       money; refusing it on both sides leaves it unmapped and the dollars still lost. The head noun
+       of a POS header is what it measures, and `Amount` is unambiguous where `Trans` is a qualifier,
+       so money wins the tie and the DOLLAR field takes the column. A header with a count mark and no
+       money mark still keeps count columns out of dollar fields, which is what `notCount` is for. */
+    /* ⚠⚠ A COUNT OF LOSS EVENTS IS NOT A COUNT OF SALES. Two rounds tried to stop "Voided Tickets"
+       reaching the CHECK count by sealing the tokens `transactions`/`orders`/`tickets`/`tabs`, and
+       the seal took 448 ordinary spellings with it (`Total Orders`, `Closed Tabs`) before being
+       reverted — at which point twelve loss spellings came back: `Cancelled Orders`,
+       `Canceled Tickets`, `Voided Orders|Tickets|Tabs`, `Comped Orders|Tickets`,
+       `Refunded Orders|Tickets`, `No-Sale Tickets`, `Tickets Voided`, `Orders Comped`.
+       ⭐ SEALING THE NOUN WAS THE WRONG TOOL BOTH TIMES: the noun is fine, the QUALIFIER is what
+       makes it a loss count. One semantic guard closes the whole family and cannot cost a
+       legitimate spelling, because no real check-count header names a void.
+       Measured cost of leaving it open, both directions: `Cancelled Orders` as the only ticket-ish
+       column gave every server 1-3 "checks", all five failed MIN_CHECKS, and a 38-open / 15.2%-void
+       server produced **"reviewed 0, flagged 0"** where the truth was High Risk with $569.21; and
+       `Voided Tickets` fabricated an average check for a cash-only patio server that paired with her
+       real cash mix and **printed her name**. */
+    const hasLossMark = h => /(^|[^a-z])(?:void|voids|voided|comp|comps|comped|refund|refunds|refunded|cancel|cancels|cancelled|canceled|no.?sale|no.?sales|discount|discounts|discounted|promo|return|returns|returned)([^a-z]|$)/i.test(String(h));
+    const allowed = (f, h) => {
+      const money = hasMoneyMark(h);
+      if (f.notMoney && money) return false;
+      if (f.notCount && hasCountMark(h) && !money) return false;
+      if (f.notLoss && hasLossMark(h)) return false;
+      return true;
+    };
     // An UNNAMED column is never auto-claimed — there is nothing to match on, and guessing it is
     // how a row-number column ends up imported as covers.
     const findIdx = pred => {
@@ -444,13 +479,22 @@ const CSVMapper = {
          ⚠ The hyphenated form is also Bar Cop's OWN column label ("No-Sale Opens") minus one word,
          which is exactly why it was in the match array — it still binds, in pass 1, exactly. */
       'no-sale': 1, 'no sales': 1, nosale: 1,
-      /* ⚠ A VOID COUNT WAS BINDING THE CHECK COUNT. `checks` carries bare `transactions` and
-         `orders`, and a hyphen or a space is a word boundary, so **"Voided Transactions" bound
-         `checks`**: measured, five of six servers then fell under MIN_CHECKS and were set aside,
-         and the one who survived printed a **$166.67 average check against a true $50.00**. Sealed,
-         so a plain "Transactions" or "Orders" column still binds exactly and a qualified one does
-         not reach. The precise spellings ("transaction count", "order count") are unaffected. */
-      transactions: 1, orders: 1, tickets: 1, tabs: 1,
+      /* ⛔⛔ `transactions`/`orders`/`tickets`/`tabs` WERE SEALED HERE FOR ONE ROUND AND IT COST FAR
+         MORE THAN IT FIXED — REVERTED. The seal stopped "Voided Transactions" reaching `checks`, and
+         took every ORDINARY qualified spelling with it. Measured: `Total Transactions`,
+         `Total Orders`, `Total Tickets`, `Closed Tabs`, `Open Tabs`, `# Transactions`,
+         `Number of Transactions`, `Orders Count` and `Tickets Count` all bound NOTHING at `checks`,
+         and six more died at BOTH `covers` doors — including `Ticket Count` / `Order Count` /
+         `Transaction Count`, which those lists never carried explicitly and the plural was covering.
+         `Closed Tabs` is the spelling bar POSs actually print, and `tabs` was added for them.
+         Cost measured end to end: with the check column unmapped a server ringing 3x the tickets for
+         the same money loses her check average, drops under the two-signal rule, and the screen
+         prints the green all-clear.
+         ⭐ AND THE SEAL WAS ALREADY REDUNDANT WHERE IT MATTERED: `voided transactions` is an explicit
+         `void_count` candidate declared BEFORE `checks`, so pass 1 claims that column first anyway.
+         ⚠ MY BLAST-RADIUS CORPUS FOR THAT EDIT WAS 32 HEADER ROWS AND CONTAINED NONE OF THESE. Third
+         time the corpus has been the thing that was too small — size it to the SHARED file's whole
+         reach, not to the door being worked. */
       /* ⚠ THE ROUND-2 RESTORATIONS ARE EXACT-ONLY TOO, and the reason is a rule worth stating:
          EVERY ONE OF THEM WAS JUSTIFIED BY AN EXACT HEADER that had stopped binding. None of them
          needs to hunt, and each one that did reached a neighbour's column:

@@ -74,7 +74,7 @@ const PosIngest = {
       { key: 'date',   label: 'Date',       required: true,  match: ['date', 'business date', 'day', 'service date', 'business day', 'sales date', 'trans date', 'date of sale'] },
       { key: 'bar',    label: 'Bar Sales',  required: false, match: ['bar sales', 'bar revenue', 'bar', 'beverage', 'liquor sales', 'beverage sales', 'drink sales', 'drinks', 'drink', 'liquor', 'alcohol', 'wet sales', 'beverage revenue', 'drink revenue', 'bar total', 'beverage total', 'alcohol sales'] },
       { key: 'food',   label: 'Food Sales', required: false, match: ['food sales', 'food revenue', 'food', 'kitchen', 'floor', 'floor sales', 'kitchen sales', 'food total', 'dining', 'dining sales', 'meal sales', 'dry sales', 'kitchen revenue', 'entree sales'] },
-      { key: 'covers', label: 'Covers',     required: false, match: ['covers', 'covers count', 'guest count', 'guests', 'guest ct', 'headcount', 'heads', 'patrons', 'customers', 'checks', 'check count', 'tickets', 'transactions', 'orders', 'sales count'] }
+      { key: 'covers', label: 'Covers',     required: false, notLoss: true, match: ['covers', 'covers count', 'guest count', 'guests', 'guest ct', 'headcount', 'heads', 'patrons', 'customers', 'checks', 'check count', 'tickets', 'transactions', 'orders', 'sales count'] }
     ],
     // A POS cash / drawer report: per-day, optionally per-register. The POS blind
     // close already computed over/short, so the cash-variance pattern recovery
@@ -108,7 +108,7 @@ const PosIngest = {
          contract is spelled out in confirm-week.js: check average is per-GUEST, so the numerator
          and the cover population have to match. They stay as last-resort candidates because some
          exports carry nothing else. */
-      { key: 'covers', label: 'Covers',      required: true,  match: ['covers', 'guest count', 'guests', 'guest ct', 'headcount', 'customers', 'checks', 'check count', 'tickets', 'tables', 'transactions', 'orders'] },
+      { key: 'covers', label: 'Covers',      required: true,  notLoss: true, match: ['covers', 'guest count', 'guests', 'guest ct', 'headcount', 'customers', 'checks', 'check count', 'tickets', 'tables', 'transactions', 'orders'] },
       /* ⚠ NET BEFORE GROSS, and bare 'gross' is gone. Aloha, Lightspeed, TouchBistro and Square
          all print Gross Sales before Net Sales, so gross was winning — counting the comps and
          promos the operator already gave away as that server's own sales, which then drives the
