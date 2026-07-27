@@ -26,6 +26,15 @@ S.RevenueServerCheck = {
     { v: 'all', label: 'All Time' }
   ],
   windowDays() { return this._window === 'all' ? 36500 : (parseInt(this._window) || 30); },
+  // Covers a server needs before they can win/lose the Top Performer and Spread TILES. Not a
+  // scoring rule — every server is listed in the scorecard table regardless. See statStrip.
+  MIN_TILE_COVERS: 10,
+  // The chip label, so the PDF can say which window it covers. One source, so the export can
+  // never name a different period than the chips do.
+  windowLabel() {
+    const chip = (this.WINDOW_CHIPS || []).find(w => w.v === this._window);
+    return chip ? chip.label : 'Last 30 Days';
+  },
 
   // Shared 9-column layout so the scorecard and the Server Shift log line up
   // column-for-column: 8 even data columns plus a wider trailing action column.
@@ -62,23 +71,40 @@ S.RevenueServerCheck = {
   computeScorecard(windowDays) {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (windowDays || 30));
     const cutoffStr = App.ymdLocal(cutoff);
-    const checks = (App.data.revenue_server_checks || []).filter(c => (c.date || '') >= cutoffStr);
-    const voids  = ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => r.type === 'Comp' && App.compReasonIsLoss(r.reason || r.category) && (r.date || '') >= cutoffStr);   // give-away comps only, not Staff Meal/Shift Drink (policy expense) — matches the Void/Comp Log's % and Theft Risk
-    const pools  = ((App.laborData && App.laborData.lc_tip_pools)  || []).filter(p => (p.date || '') >= cutoffStr);
-    const tips   = ((App.laborData && App.laborData.lc_tips)       || []).filter(t => (t.date || '') >= cutoffStr);
+    /* ⚠⚠ EVERY WINDOW NEEDS AN UPPER BOUND. The filter was `date >= cutoff` and nothing else, so a
+       row dated in the FUTURE sat inside every window at once — the 7-day chip, the 90-day chip and
+       All Time all counted it. Measured on this fixture: one mistyped year (2027) at 40 covers /
+       $4,000 moved the Last 7 Days team average from a true $35.00 to $56.67 and team sales from
+       $2,800 to $6,800. A single wrong character in one cell should not be able to move the whole
+       scorecard, and the operator has no way to tell from the tiles that it did.
+       ⚠ The row is EXCLUDED FROM THE MATH BUT STAYS IN THE LOG (see draw()), because a row that
+       cannot be seen cannot be corrected — the same reasoning the dateless-save guard carries. */
+    const todayStr = App.todayLocal();
+    const inWin = d => { const s = d || ''; return s >= cutoffStr && s <= todayStr; };
+    const allChecks = (App.data.revenue_server_checks || []);
+    const checks = allChecks.filter(c => inWin(c.date));
+    const future = allChecks.filter(c => (c.date || '') > todayStr).length;
+    const voids  = ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => r.type === 'Comp' && App.compReasonIsLoss(r.reason || r.category) && inWin(r.date));   // give-away comps only, not Staff Meal/Shift Drink (policy expense) — matches the Void/Comp Log's % and Theft Risk
+    const pools  = ((App.laborData && App.laborData.lc_tip_pools)  || []).filter(p => inWin(p.date));
+    const tips   = ((App.laborData && App.laborData.lc_tips)       || []).filter(t => inWin(t.date));
 
     const byId = {};
     const pushTo = (map, key, fn) => { if (!map[key]) map[key] = fn(); return map[key]; };
 
+    /* ⚠ A CHECK WITH NO staff_id IS DROPPED HERE AND KEPT BY THE LOG, so the two halves of one
+       screen disagreed and nothing said so: a legacy or restored row printed its covers and sales
+       in the Server Shift list while being in NONE of the tiles above it. It stays out of the math
+       (there is no server to attribute it to), but the count now travels so the screen can say so
+       instead of leaving the operator to reconcile two numbers that cannot be reconciled. */
+    let unattributed = 0;
     checks.forEach(c => {
       const id = c.staff_id;
-      if (!id) return;  // pre-Rule 20 entries without staff_id are dropped
+      if (!id) { unattributed++; return; }  // pre-Rule 20 entries without staff_id are not scored
       const name = (this.staffById(id)?.name) || c.server_name || '(unknown)';
       const rec  = pushTo(byId, id, () => ({ staff_id: id, name, entries: 0, covers: 0, sales: 0, comp_total: 0, tip_total: 0, checks: [] }));
       rec.entries++;
       rec.covers += parseFloat(c.covers) || 0;
       rec.sales  += parseFloat(c.sales)  || 0;
-      rec.checks.push({ date: c.date, covers: parseFloat(c.covers) || 0, sales: parseFloat(c.sales) || 0 });
     });
 
     voids.forEach(v => { if (v.staff_id && byId[v.staff_id]) byId[v.staff_id].comp_total += parseFloat(v.amount) || 0; });
@@ -95,10 +121,27 @@ S.RevenueServerCheck = {
       byId[t.staff_id].tip_total += parseFloat(t.total_tips) || ((parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0));
     });
 
-    // Derived stats + trend (last-7 vs prior-7 check avg).
+    /* ⚠⚠ THE TREND MUST NOT BE READ OUT OF THE CHOSEN WINDOW. `rec.checks` was filled from the
+       WINDOWED rows, and the prior-7 bucket (today-14 .. today-7) falls ENTIRELY OUTSIDE a 7-day
+       window — so on the 7 chip `priorAvg` was always 0, `lastAvg > 0 && priorAvg > 0` never passed,
+       and the arrow was pinned flat. Measured: three servers each halving their check average week
+       over week produced 0 "Trending Down" on the 7 chip and 3 on every other chip, under a help
+       line that promises "a trend arrow comparing the last 7 days to the prior 7" and a tile that
+       reads "off pace last 7 days". The chip the operator is most likely to be on was the one chip
+       that could not report a decline.
+       The trend IS that fixed comparison at every chip, so it is built from its own 14-day slice.
+       Who gets LISTED is still decided by the window; this only decides their arrow. */
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const lastWeekCutoff = new Date(today); lastWeekCutoff.setDate(lastWeekCutoff.getDate() - 7);
     const priorWeekCutoff = new Date(today); priorWeekCutoff.setDate(priorWeekCutoff.getDate() - 14);
+    const trendFrom = App.ymdLocal(priorWeekCutoff);
+    allChecks.forEach(c => {
+      const rec = c.staff_id && byId[c.staff_id];
+      if (!rec) return;
+      const d = c.date || '';
+      if (d < trendFrom || d > todayStr) return;   // same upper bound: a future row trends nothing
+      rec.checks.push({ date: d, covers: parseFloat(c.covers) || 0, sales: parseFloat(c.sales) || 0 });
+    });
     const all = Object.values(byId).map(rec => {
       const checkAvg = rec.covers > 0 ? rec.sales / rec.covers : 0;
       const compsPct = rec.sales > 0 ? (rec.comp_total / rec.sales) * 100 : 0;
@@ -115,7 +158,10 @@ S.RevenueServerCheck = {
     const teamCovers = all.reduce((s, r) => s + r.covers, 0);
     const teamSales  = all.reduce((s, r) => s + r.sales,  0);
     const teamAvg    = teamCovers > 0 ? teamSales / teamCovers : 0;
-    return { rows: all, teamAvg, teamCovers, teamSales, windowDays: windowDays || 30 };
+    // `future` and `unattributed` are rows this scorecard deliberately did not count. Both are
+    // RENDERED (draw + scorecardSection) — a field computed and read nowhere is a fix that never
+    // shipped, so grep either name for its second occurrence before changing this line.
+    return { rows: all, teamAvg, teamCovers, teamSales, windowDays: windowDays || 30, future, unattributed };
   },
 
   freshForm() {
@@ -148,9 +194,20 @@ S.RevenueServerCheck = {
   // ── Stat strip ──────────────────────────────────────────────────────────────
   statStrip(sc, targetCA) {
     const has = sc.rows.length;
-    const top = has ? sc.rows[0] : null;
+    /* ⚠ TOP PERFORMER AND SPREAD RANKED ON CHECK AVERAGE WITH NO MATERIALITY FLOOR, so one thin row
+       won both tiles. Measured: a single 1-cover / $240 walk-in tab printed Top Performer $240.00
+       and a Spread of $211.99 against a real leader of $40.10. A tile is a COMPARISON, and a
+       comparison needs a shift rather than one table. Everyone still appears in the scorecard TABLE
+       below; only these two tiles apply the floor, and the Spread sub-label says so.
+       ⚠ AND THE FLOOR HAS A FLOOR: if fewer than two servers clear it the tiles fall back to every
+       row, so a quiet night or a two-person bar still gets numbers instead of dashes. A guard that
+       refuses real data is a defect with a support call attached; this one degrades instead. */
+    const ranked = sc.rows.filter(r => r.covers >= this.MIN_TILE_COVERS);
+    const use = ranked.length > 1 ? ranked : sc.rows;
+    const floored = use.length !== sc.rows.length;
+    const top = use.length ? use[0] : null;
     const downCount = sc.rows.filter(r => r.trend === 'down').length;
-    const spread = sc.rows.length > 1 ? (sc.rows[0].checkAvg - sc.rows[sc.rows.length - 1].checkAvg) : 0;
+    const spread = use.length > 1 ? (use[0].checkAvg - use[use.length - 1].checkAvg) : 0;
     const item = (label, val, sub, color) =>
       '<div class="calc-item"><div class="calc-label">' + label + '</div>'
       + '<div class="calc-val lg"' + (color ? ' style="color:' + color + ';"' : '') + '>' + val + '</div>'
@@ -159,7 +216,7 @@ S.RevenueServerCheck = {
       + item('Team Average', has ? App.fmtCurrency(sc.teamAvg) : '-', 'target ' + App.fmtCurrency(targetCA), has ? (sc.teamAvg >= targetCA ? null : 'var(--red)') : null)
       + item('Top Performer', top ? App.fmtCurrency(top.checkAvg) : '-', top ? esc(top.name) : 'no data yet', null)
       + item('Trending Down', has ? String(downCount) : '-', downCount > 0 ? 'off pace last 7 days' : 'none off pace', downCount > 0 ? 'var(--red)' : null)
-      + item('Spread', has ? App.fmtCurrency(spread) : '-', 'top vs bottom', spread > 10 ? 'var(--red)' : null)
+      + item('Spread', has ? App.fmtCurrency(spread) : '-', 'top vs bottom' + (floored ? ', ' + this.MIN_TILE_COVERS + '+ covers' : ''), spread > 10 ? 'var(--red)' : null)
       + '</div></div>';
   },
 
@@ -168,8 +225,20 @@ S.RevenueServerCheck = {
   formBody(f, targetCA, p, narrow) {
     const hasServers = this.staff().some(s => s.status !== 'Inactive' && App.isService && App.isService(s));
     const serverOpts = App.staffOptions(f.server || '', { audience: 'service', placeholder: hasServers ? 'Select server...' : 'Add Bar or Front of House staff in Labor Control' });
-    const shiftOpts = (App.SHIFT_TYPES || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day'])
-      .map(tp => '<option' + (f.shift === tp ? ' selected' : '') + '>' + esc(tp) + '</option>').join('');
+    /* ⚠⚠ EDITING AN IMPORTED CHECK SILENTLY REWROTE ITS SHIFT. `selected` was set only on an EXACT
+       match and nothing preserved an off-list value — so a check imported carrying whatever the POS
+       calls the daypart ("Happy Hour") rendered with NO option selected, the browser fell back to
+       the FIRST one, and saving the edit wrote "Brunch". The operator corrects a cover count and
+       Bar Cop changes the service period underneath them, with no message either way. It fires
+       app-wide the day a service period is RENAMED, for every historical record on the old name.
+       The sibling Server picker in this very form already handles this (App.staffOptions keeps an
+       off-roster value rather than dropping the link, app.js) — the shift picker was the one door
+       that did not. Step 0.5: same job, same hole, one line apart. */
+    const periods = (App.SHIFT_TYPES || ['Brunch', 'Lunch', 'Dinner', 'Late Night', 'Full Day']);
+    const curShift = f.shift || '';
+    const shiftOpts = periods.map(tp => '<option' + (curShift === tp ? ' selected' : '') + '>' + esc(tp) + '</option>').join('')
+      + (curShift && periods.indexOf(curShift) === -1
+          ? '<option value="' + esc(curShift) + '" selected>' + esc(curShift) + ' (not on your shift list)</option>' : '');
     // narrow = the two-column modal layout (widths come from .narrow-form CSS);
     // otherwise the always-on page form flows as one fixed-width horizontal row.
     const w = px => narrow ? '' : (' style="width:' + px + ';flex-shrink:0;"');
@@ -245,8 +314,21 @@ S.RevenueServerCheck = {
         + '<button class="btn btn-ghost btn-sm" id="rsc-export">Export PDF</button>'
         + '<button class="btn btn-ghost btn-sm" id="rsc-worksheet">Worksheet</button>'
       + '</div></div>';
+    /* The rows this scorecard deliberately did NOT count, said out loud. Both kinds are still
+       listed in the Server Shift log directly below — which is the only place they can be
+       corrected — so without this line the tiles and the log simply disagree and nothing explains
+       why. A future-dated row is a typo the operator can fix; an unattributed row cannot be
+       attributed by Bar Cop, only re-entered. */
+    const excl = [];
+    if (sc.future) excl.push(sc.future + ' dated in the future');
+    if (sc.unattributed) excl.push(sc.unattributed + ' with no server on the record');
+    const exclNote = excl.length
+      ? '<div class="no-print" style="font-size:11px;color:var(--amber);margin:-2px 0 10px;">'
+        + 'Not counted in the scorecard: ' + excl.join(', ') + '. Fix them in the Server Shift log below.'
+        + '</div>'
+      : '';
     if (!sc.rows.length) {
-      return headingRow + '<div class="card"><div style="text-align:center;padding:22px;color:var(--t4);">No server data in this range. Log a shift check above, or drop a per-server sales report here or at your Shift weekly close, to build the scorecard.</div></div>';
+      return headingRow + exclNote + '<div class="card"><div style="text-align:center;padding:22px;color:var(--t4);">No server data in this range. Log a shift check above, or drop a per-server sales report here or at your Shift weekly close, to build the scorecard.</div></div>';
     }
     const rows = sc.rows.map((r, i) => {
       const vsT = r.checkAvg - targetCA;
@@ -275,7 +357,7 @@ S.RevenueServerCheck = {
         + '<td class="no-print"><div class="row-actions">' + coachBtn + '</div></td>'
         + '</tr>';
     }).join('');
-    return headingRow
+    return headingRow + exclNote
       + '<div id="rsc-sc-export"><div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
       + this.COLGROUP
       + '<thead><tr>'
@@ -377,10 +459,11 @@ S.RevenueServerCheck = {
     const nSkip = fl.nSkipped || 0, nInc = fl.nIncomplete || 0, nUnd = fl.nUndated || 0;
     const nOther = nSkip + nInc + nUnd;
     let head;
-    if (fl.failed)      head = fl.landed
-                               ? fl.landed + ' of ' + fl.total + ' server checks were saved before the save was refused. '
-                                 + 'Run the import again to finish it — the ones already saved will come back as "already logged".'
-                               : 'Save failed. Nothing was imported. Try the import again.';
+    /* ⚠ THE SENTENCE WAS HAND-ROLLED AND FIXED-PLURAL, so landed=1 printed "1 of 2 server checks
+       WERE saved". Five import doors already share App.partialSaveNote for exactly this, and it
+       carries both noun forms because total===1 is the commonest failure shape ("The server check
+       was not saved"). This door was the one still writing its own. */
+    if (fl.failed)      head = App.partialSaveNote(fl.landed, fl.total, 'server check', 'server checks');
     else if (fl.added)  head = fl.added + ' server check' + (fl.added === 1 ? '' : 's') + ' imported'
                                + (fl.dupCount ? ', ' + fl.dupCount + ' already logged' : '') + '.';
     // ⚠ "All" ONLY WHEN NOTHING ELSE WAS DROPPED. This branch fired on any non-zero dupCount, so a
@@ -403,7 +486,13 @@ S.RevenueServerCheck = {
     // notes underneath naming only dates and covers. Every combination needs a true headline.
     else if (!nSkip && (nUnd || nInc))
       head = 'No rows imported. Every name matched your roster — see below for what stopped each row.';
-    else                head = 'No rows imported. Check that the file has server, covers, and sales columns.';
+    /* ⚠ AND THE FALLBACK BLAMED COLUMNS THAT WERE FINE. Every branch above demands `nSkip` be zero,
+       so ANY unmatched or blank name sent a mixed file here — printing "check that the file has
+       server, covers, and sales columns" directly above "Not matched to your roster: …" and
+       "Skipped, no readable date: Sam P.", which name the real causes. The twin door
+       (sc-dashboard) already words this as the ROW requirement rather than a column fault, which is
+       true in every combination; this door kept the older wording. Same sentence now. */
+    else                head = 'No rows imported. Each row needs a server name Bar Cop can match, a date, covers, and sales.';
     const note = t => '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">' + t + '</div>';
     const list = a => a.slice(0, 8).map(esc).join(', ') + (a.length > 8 ? ', and ' + (a.length - 8) + ' more' : '');
     return '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + ((fl.added && !fl.failed) ? 'var(--gold)' : (fl.dupCount && !fl.failed) ? 'var(--t2)' : 'var(--red)') + ';">' + head + '</div>'
@@ -496,7 +585,19 @@ S.RevenueServerCheck = {
     c.querySelectorAll('.rsc-range-chip').forEach(b => b.addEventListener('click', () => { this.captureForm(); this._window = b.dataset.v; this.draw(); }));
     c.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     document.getElementById('rsc-worksheet')?.addEventListener('click', () => this.printBlank());
-    document.getElementById('rsc-export')?.addEventListener('click', () => App.exportListPDF({ title: 'Server Performance', rootId: 'rsc-sc-export', root: c, lists: [['core', 'revenue_server_check']], reRender: () => this.draw() }));
+    /* ⚠ THE EXPORT NAMED NEITHER THE WINDOW NOR THE TARGET. A "Last 7 Days" PDF and an "All Time"
+       PDF were byte-indistinguishable once printed, and the "vs Target" column graded every server
+       against a number that appeared nowhere on the page — an owner reading it later cannot tell
+       what period it covers or what bar it was measured against. Both now ride in the subtitle.
+       ⚠ AND `lists`/`reRender` WERE INERT, not merely redundant: exportListPDF expands a truncated
+       list only when it finds a [data-show-older] INSIDE the export root, and the root here is the
+       scorecard table — the Server Shift log lives outside it. `saved` was therefore always empty
+       and `reRender` was never called. Dropped rather than left looking like it does something. */
+    document.getElementById('rsc-export')?.addEventListener('click', () => App.exportPDF({
+      title: 'Server Performance',
+      subtitle: this.windowLabel() + ' · check average target ' + App.fmtCurrency(App.data.revenue_settings?.targets?.check_avg || 35),
+      root: document.getElementById('rsc-sc-export') || c
+    }));
 
     ['rsc-date', 'rsc-shift', 'rsc-server'].forEach(id => document.getElementById(id)?.addEventListener('change', () => this.captureForm()));
     document.getElementById('rsc-cov')?.addEventListener('input', () => { this.captureForm(); this.calc(); });
@@ -591,7 +692,15 @@ S.RevenueServerCheck = {
       sales,
       saved_at:    new Date().toISOString()
     };
-    App.putRecord('core', 'revenue_server_check', entry).then(() => {
+    /* ⚠ THE WRITE RESULT WAS DISCARDED. A refused write (viewer role, or localStorage full after
+       eviction — putRecord reverts the array slot and returns false for both) still cleared the
+       form, reset the entry id and redrew, so the operator's typed check was GONE and the
+       scorecard simply did not contain it. App._reportWriteFail still toasts, so it is not silent
+       app-wide, but losing the typed entry is the part that costs them the shift.
+       The import lane on this same screen honours its commit result carefully; the hand-entry lane
+       threw it away. Keep the form populated on a refusal so the entry is retryable. */
+    App.putRecord('core', 'revenue_server_check', entry).then(saved => {
+      if (!saved) { fail('That did not save. Your entry is still here — try again.'); return; }
       this._form = this.freshForm();
       this._entryId = App.uid();
       this._calc = null;
@@ -632,6 +741,11 @@ S.RevenueServerCheck = {
       sales,
       saved_at:    new Date().toISOString()
     };
-    App.putRecord('core', 'revenue_server_check', entry).then(() => { App.closeModal('rsc-edit-modal'); this.draw(); });
+    // Step 0.5: the twin needs the same result check. Closing the modal on a refused write threw
+    // the operator's corrections away and left the old figures on screen looking accepted.
+    App.putRecord('core', 'revenue_server_check', entry).then(saved => {
+      if (!saved) return fail('That did not save. Your changes are still here — try again.');
+      App.closeModal('rsc-edit-modal'); this.draw();
+    });
   }
 };

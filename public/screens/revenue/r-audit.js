@@ -524,11 +524,21 @@ S.RevenueAudit = {
     // Shift Control's void/comp log. Fed as one team rate the server audit grades.
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 28);
     const cutoffStr = App.ymdLocal ? App.ymdLocal(cutoff) : cutoff.toISOString().slice(0, 10);
-    const checks = (App.data.revenue_server_checks || []).filter(c => (c.date || '') >= cutoffStr);
+    /* ⚠⚠ THE SECOND CONSUMER OF AN UNBOUNDED WINDOW (S215b, step 0.6). Door 11's scorecard was not
+       the only reader of a future-dated server check: this window was `>= cutoff` with no upper
+       bound too, so one mistyped year inflated `serverSales` here as well. That is the DENOMINATOR
+       of the S4 comp rate, so a future-dated row pushes `server_comp_pct` DOWN and the audit scores
+       comp discipline as healthier than it is — the safe-looking direction, which is why nothing
+       would ever have reported it.
+       ⚠ `_windowedServerCount` above already bounds BOTH sides, and its comment says it mirrors
+       this window. It did not: it is bounded and inclusive (`-(4*7-1)`), this one was neither. */
+    const upToStr = App.todayLocal ? App.todayLocal() : cutoffStr;
+    const inWin = d => { const s = d || ''; return s >= cutoffStr && s <= upToStr; };
+    const checks = (App.data.revenue_server_checks || []).filter(c => inWin(c.date));
     if (checks.length) {
       const serverSales = checks.reduce((s, c) => s + (parseFloat(c.sales) || 0), 0);
       const comps = ((App.shiftData && App.shiftData.sc_void_comps) || [])
-        .filter(r => r.type === 'Comp' && App.compReasonIsLoss(r.reason || r.category) && (r.date || '') >= cutoffStr);   // give-aways only; excludes Staff Meal/Shift Drink so S4 doesn't fire a false "tighten comp discipline" flag
+        .filter(r => r.type === 'Comp' && App.compReasonIsLoss(r.reason || r.category) && inWin(r.date));   // give-aways only; excludes Staff Meal/Shift Drink so S4 doesn't fire a false "tighten comp discipline" flag; same bounded window as the sales side, or the rate is a ratio of two different periods
       const compTotal = comps.reduce((s, v) => s + (parseFloat(v.amount) || 0), 0);
       if (serverSales > 0) {
         cd.server_comp_total = Math.round(compTotal);
