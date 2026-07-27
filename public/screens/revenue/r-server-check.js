@@ -475,7 +475,15 @@ S.RevenueServerCheck = {
        true of the 5, false of the file, and it buried the two rows they had just made a decision
        about. Every branch below that claims "All" has to see every other outcome. */
     const nKept = fl.keptByHand || 0, nRep = fl.fileRepeats || 0;
-    const nOther = nSkip + nInc + nUnd + nKept + nRep;
+    /* ⚠⚠ TWO DIFFERENT CLAIMS, AND MERGING THEM PUT A CONTRADICTION ON SCREEN. Rows Bar Cop COULD
+       NOT USE (no roster match, no figures, no date) are not the same as rows it DID use but not as
+       new checks (a repeat counted once, a conflict kept by hand). I folded all five into one
+       counter to stop a false "All N were already logged" — and that made the OTHER branch print
+       "the rest could not be used" directly above "1 repeated line in your file counted once".
+       Seen on screen on a real drop. `nOther` still gates the "All" claim, because "all" means
+       nothing else happened at all; only `nUnusable` may be described as unusable. */
+    const nUnusable = nSkip + nInc + nUnd;
+    const nOther = nUnusable + nKept + nRep;
     let head;
     /* ⚠ THE SENTENCE WAS HAND-ROLLED AND FIXED-PLURAL, so landed=1 printed "1 of 2 server checks
        WERE saved". Five import doors already share App.partialSaveNote for exactly this, and it
@@ -489,7 +497,11 @@ S.RevenueServerCheck = {
     // re-drop where 5 rows deduped and 3 more were undated printed "All 5 rows were already logged"
     // above a "Skipped, no readable date" note — and made both branches below unreachable.
     else if (fl.dupCount && !nOther) head = 'No new checks. All ' + fl.dupCount + ' row' + (fl.dupCount === 1 ? ' was' : 's were') + ' already logged.';
-    else if (fl.dupCount) head = 'No new checks. ' + fl.dupCount + ' row' + (fl.dupCount === 1 ? ' was' : 's were') + ' already logged; the rest could not be used.';
+    // Name the number rather than saying "the rest": "the rest" silently included rows that WERE
+    // used, and a count cannot contradict the notes underneath it.
+    else if (fl.dupCount && nUnusable) head = 'No new checks. ' + fl.dupCount + ' row' + (fl.dupCount === 1 ? ' was' : 's were')
+                               + ' already logged, ' + nUnusable + ' could not be used.';
+    else if (fl.dupCount) head = 'No new checks. ' + fl.dupCount + ' row' + (fl.dupCount === 1 ? ' was' : 's were') + ' already logged.';
     /* ⚠ DO NOT BLAME COLUMNS THAT WERE FINE, and do not contradict the note printed directly below.
        This was the only zero-row sentence, so a file whose Date cells read "Jul 24" (no year) was
        told to check the server, covers and sales columns — with "Skipped, no readable date: Maria
