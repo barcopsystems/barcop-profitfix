@@ -175,7 +175,8 @@ window.CashEngine = {
   //    recent deliveries and any sitting on this week's order-to-par list. ───────
   vendorPurchasing(days) {
     days = days || 90;
-    const cut = (() => { const d = new Date(); d.setDate(d.getDate() - days); return App.ymdLocal(d); })();
+    // A `days`-day window is `days` days, today included. `today - days` is one more than that.
+    const cut = App.windowCutoff(days);
     const map = {};
     this.deliveries().forEach(d => {
       const v = d.vendor; if (!v) return;

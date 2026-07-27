@@ -8233,6 +8233,33 @@ const App = {
   // stamp in Bar Cop.
   todayLocal() { return this.ymdLocal(new Date()); },
 
+  /* ── THE "LAST N DAYS" WINDOW. One implementation, because eight of them had drifted. ─────────
+     A window labelled "Last 7 Days" must contain SEVEN days, today included — so it starts at
+     today-(N-1), not today-N. Eight sites had written `today - N` with an inclusive `>=`, which is
+     N+1 days, and every one of them PRINTED the day count to the operator: the Server Check
+     7/30/90 chips, the "90-day review" Theft & Loss Brief, vendor purchasing, the Revenue audit's
+     "trailing four weeks", the Events win rate, and the vendor price re-drift sweep.
+     ⚠ THIS IS NOT A NEW CONVENTION — it is the one `datePresetRange` already uses (`-27` for four
+     weeks, `-83` for twelve) and the one `r-audit._windowedServerCount` uses (`-(4*7-1)`). The
+     eight were the outliers, inside an app that had already decided.
+     Returns the INCLUSIVE LOWER BOUND only, as 'YYYY-MM-DD'. It does not bound the top, and the
+     caller must decide that separately: a window left open at the top lets one mistyped year into
+     every window at once (measured: a single 2027 row moved a Last-7-Days team average from $35.00
+     to $56.67, and diluted the Revenue audit's comp rate to 5% against a truth of 10%).
+     ⚠ AS OF 2026-07-27 ONLY TWO CALLERS BOUND THE TOP — r-server-check's scorecard and r-audit's S4
+     window, the two that were measured. theft-risk's brief, cash-engine's vendor scorecard,
+     ev-dashboard's win rate and hub's price re-drift are still open at the top (S217 on THE LIST).
+     Stated as a measurement with its scope, not as an all-clear.
+     ⚠ Compare DATE STRINGS, not Date objects. Building the cutoff from `new Date()` keeps the
+     current time of day, so a row stamped earlier in the day on the boundary date falls out and
+     the same window returns different answers at 9am and 5pm. */
+  windowCutoff(days) {
+    const n = Math.max(1, Math.floor(Number(days) || 1));
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - (n - 1));
+    return this.ymdLocal(d);
+  },
+
   // Resolve the Monday of the week containing a given date string. Forecast
   // records are keyed by week_start (Monday) so every screen converts a
   // period_end (Sunday) or any in-week date to the canonical Monday key.
