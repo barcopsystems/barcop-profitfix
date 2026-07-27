@@ -1451,6 +1451,7 @@ const PosIngest = {
     const existing = (App.data && App.data.revenue_server_checks) || [];
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
     const summaryRows = []; const notService = []; const conflicts = []; let replaced = 0;
+    const fileSeen = new Set(); let fileRepeats = 0;   // exact repeats WITHIN this one file
     (rows || []).forEach(r => {
       /* ⚠⚠ A POS TOTALS LINE IS NOT A PERSON, AND TELLING THE OPERATOR TO ADD IT TO THE ROSTER IS
          THE WORST ADVICE THIS DOOR COULD GIVE. `isSummaryName` was never called here, so
@@ -1508,6 +1509,26 @@ const PosIngest = {
          with no shift column leaves it '' on both sides, collapsing to staff + date, which is right
          for the one-row-per-server-per-day export that shape comes from. */
       const shiftName = (r.shift || '').trim();
+      /* ⚠⚠ A LINE REPEATED INSIDE ONE FILE — FOUND BY A REAL DROP, NOT BY A SCAN (2026-07-27).
+         `_findDup` searches only what is ALREADY SAVED, and its `used` set exists to stop one saved
+         record absorbing two file rows. NOTHING compared a file row against the rows beside it, so
+         a byte-identical repeat was written twice on the FIRST import, before there was anything to
+         dedup against. Measured on Kyle's own test file, whose last line repeats its second:
+         "9 server checks imported" for 8 real checks, Jessica M. listed twice for Jul 25 Dinner, and
+         her scorecard overstated by 42 covers and $2,145.50 — which also lifted her check average
+         and put her on top of the board.
+         ⚠ ONLY AN EXACT REPEAT IS DROPPED — same server, same date, same service period AND the
+         same covers and sales to the cent. Two rows that share an identity but differ (a shift split
+         across revenue centres) still both import, which is right: they sum to the same covers,
+         sales and check average on the scorecard. Matching to the cent is not a coincidence.
+         ⚠ AND IT IS REPORTED, never silent, so an operator who really did have two identical rows
+         can see that one was collapsed.
+         ⛔ DO NOT COPY THIS TO buildHours WITHOUT DECIDING IT THERE. Measured 2026-07-27: hours,
+         tips, voids and cash double the same way, but a repeated 4-hour line is just as likely a
+         genuine split shift, and dropping it is the payroll version of this bug. See S218. */
+      const fileKey = staff.id + '|' + recDate + '|' + shiftName + '|' + covers + '|' + sales.toFixed(2);
+      if (fileSeen.has(fileKey)) { fileRepeats++; return; }
+      fileSeen.add(fileKey);
       const rec = {
         id: App.uid(), date: recDate, shift: shiftName, shift_id: '',
         staff_id: staff.id, server_name: staff.name, covers, sales,
@@ -1539,7 +1560,7 @@ const PosIngest = {
     });
     // `replaced` is NOT `dupCount`: this door renders dupCount as "already logged", which is false
     // of a row whose figures we just overwrote. Different events, different words.
-    return { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, summaryRows, notService };
+    return { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, fileRepeats, summaryRows, notService };
   },
 
   // A POS product-mix report: one row per item with units sold. Matches the item
