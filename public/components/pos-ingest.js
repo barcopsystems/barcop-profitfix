@@ -1450,7 +1450,19 @@ const PosIngest = {
     const staffByName = this._staffByName();
     const existing = (App.data && App.data.revenue_server_checks) || [];
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
+    const summaryRows = []; const notService = [];
     (rows || []).forEach(r => {
+      /* ⚠⚠ A POS TOTALS LINE IS NOT A PERSON, AND TELLING THE OPERATOR TO ADD IT TO THE ROSTER IS
+         THE WORST ADVICE THIS DOOR COULD GIVE. `isSummaryName` was never called here, so
+         "Grand Total" fell through to `skipped` — which this door renders as *"Not matched to your
+         roster: Grand Total. Add them in the Staff Roster or rename to match."* Measured on what
+         happens if an operator follows that instruction: the totals line becomes the #2 server on
+         the scorecard and the Revenue audit reads **$9,219.00 of server sales against a truth of
+         $4,609.50** — exactly double, because the file's own subtotal is counted alongside the rows
+         it totals. `isSummaryName` lives in this file and its own comment says it belongs here
+         rather than privately at one door, "because the same summary line lands on doors 4, 11 and
+         12". Door 12 calls it; this one did not. */
+      if (this.isSummaryName(r.name)) { summaryRows.push(String(r.name || '').trim()); return; }
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       // ⚠ Math.max(0, ...): the coercion now reads a sign, and a server cannot ring NEGATIVE
       // covers. Left signed, "(12)" stored -12, which r-server-check prints and sums into the
@@ -1463,6 +1475,14 @@ const PosIngest = {
       // for someone already on it, so they added a duplicate that fixed nothing and
       // corrupted the roster.
       if (!staff) { skipped.push(r.name || '(blank)'); return; }
+      /* ⚠⚠ AND THE IMPORT WROTE SERVER CHECKS FOR PEOPLE THE MANUAL FORM WILL NOT EVEN OFFER. The
+         form builds its picker from `App.staffOptions(..., {audience:'service'})` — active staff in
+         Bar or Front of House. This matched the WHOLE roster, with no status and no department test.
+         Measured: a Line Cook, the salaried Manager and an INACTIVE bartender all had server checks
+         written for them, and one kitchen row at 5 covers / $40 dragged the Team Average tile from
+         $40.00 to $36.44. Two doors writing one record on two different rules is the defect, and the
+         form's rule is the right one, so this reads the same predicate. */
+      if (staff.status === 'Inactive' || (App.isService && !App.isService(staff))) { notService.push(staff.name); return; }
       if (!covers || !(sales > 0)) { incomplete.push(r.name || '(blank)'); return; }
       const recDate = this.normDate(r.date, opts);
       /* ⚠ A ROW WITH NO READABLE DATE IS NOT AN IMPORT, IT IS A SKIP. This wrote the record with
@@ -1483,7 +1503,7 @@ const PosIngest = {
         imported: true, saved_at: new Date().toISOString()
       });
     });
-    return { toAdd, skipped, incomplete, undated, dupCount };
+    return { toAdd, skipped, incomplete, undated, dupCount, summaryRows, notService };
   },
 
   // A POS product-mix report: one row per item with units sold. Matches the item
