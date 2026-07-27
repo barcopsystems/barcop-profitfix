@@ -287,8 +287,12 @@ const PosIngest = {
      closed vocabulary because three separate tests below need the same list, and when they were
      spelled out inline they drifted: two of them accepted only servers/employees/staff, so
      "All Cashiers" and "Total All Cashiers" were scored as people. */
+  /* ⚠⚠ `crew` WAS IN THIS LIST FOR ONE ROUND AND IT IS A REAL SURNAME (Crew, Crewe). Removed.
+     A role word only belongs here when NO ONE IS NAMED IT — which is why the PLURALS are safe and
+     the singulars mostly are not. The singular forms that remain are the ones already proven safe as
+     repeated mid-file HEADERS in `SUMMARY_HEADERS`; they are not new exposure. */
   SUMMARY_ROLES: ['servers', 'server', 'employees', 'employee', 'staff', 'cashiers', 'cashier',
-    'bartenders', 'bartender', 'team members', 'team member', 'personnel', 'crew'],
+    'bartenders', 'bartender', 'team members', 'team member', 'personnel'],
   /* ⚠ AND A ROW THAT IS NOT A NAME AT ALL IS NOT A PERSON EITHER. A separator ("-----", "===") or a
      repeated mid-file HEADER ("Server") was scored as a server: the report then printed
      "Not enough data to score: -----, Server, ===" to the operator, and three junk names were enough
@@ -318,19 +322,29 @@ const PosIngest = {
        skimmer from High Risk to Watch; on a two-bartender bar it cleared MIN_TEAM and replaced the
        honest caveat with a green all-clear listing "Total Bar" as a scored server. */
     const q = '(?:' + this.SUMMARY_QUALIFIERS.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')';
-    const lead = '(?:grand|report|overall|final|net|gross|sum)';
+    // `running`/`page`/`cumulative` join the lead words: "Running Total" and "Page Total" are what a
+    // paginated Micros or Aloha export prints at every page break, and both were scored as people.
+    const lead = '(?:grand|report|overall|final|net|gross|sum|running|page|cumulative|closing|ending)';
     const scope = '(?:all|combined|everyone|everything)';
     if (new RegExp('^' + lead + '?\\s*(?:total|totals)(?:\\s+' + scope + ')?$').test(n)) return true;
     if (new RegExp('^' + q + '\\s+(?:total|totals)$').test(n)) return true;             // "Bar Total"
-    if (new RegExp('^(?:total|totals)(?:\\s+(?:for|by))?\\s+' + q + '$').test(n)) return true;  // "Total Bar", "Total for Bar", "Totals by Server"
+    /* ⚠ `per` WAS GIVEN TO THE STATISTICS TEST AND NOT TO THIS ONE, three lines apart in the same
+       edit — so "Average per Server" was caught and **"Total per Server" was scored as a PERSON**.
+       Measured: adding one "Total per Server" row to a two-bartender file took `reviewed` from 2 to
+       3, which clears MIN_TEAM, engaged scoring, replaced the team-too-small caveat, and listed the
+       row itself as a scored server. That is verbatim the failure the qualifier block above exists
+       to prevent, still open through one preposition. The two tests take the same prepositions now. */
+    if (new RegExp('^(?:total|totals)(?:\\s+(?:for|by|per))?\\s+' + q + '$').test(n)) return true;  // "Total Bar", "Total for Bar", "Totals per Server"
     if (new RegExp('^' + q + '\\s+\\d+\\s+(?:total|totals)$').test(n)) return true;     // "Store 3 Total"
     /* ⚠ THE LEAD AND SCOPE WORDS HAVE TO COMBINE. "Grand Total" was caught and **"Grand Total (All
        Servers)"** was not, because the leading-qualifier regex and the `all servers` phrases were
        two separate tests that could not meet. Measured: that one row made a real outlier read CLEAN
        and was itself listed as a scored server. Same for "Totals All Employees". */
     const role = '(?:' + this.SUMMARY_ROLES.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')';
-    if (new RegExp('^' + lead + '?\\s*(?:total|totals)\\s+all\\s+' + role + '$').test(n)) return true;
+    if (new RegExp('^' + lead + '?\\s*(?:total|totals)\\s+(?:for\\s+)?all\\s+' + role + '$').test(n)) return true;
     if (new RegExp('^all\\s+' + role + '(?:\\s+(?:total|totals))?$').test(n)) return true;
+    // "Totals for the Day" / "Total for the Week" — the article is what stopped the qualifier test.
+    if (new RegExp('^(?:total|totals)\\s+(?:for|by|per)\\s+the\\s+' + q + '$').test(n)) return true;
     // A bare plural role word is the export's own roll-up line, not somebody's name.
     if (new RegExp('^' + role + '$').test(n)) return true;
     /* ⚠⚠ THE AVERAGE ROW HAD NONE OF THE QUALIFIER MACHINERY THE TOTAL ROW HAD — a flat alternation
@@ -342,7 +356,18 @@ const PosIngest = {
        the floor toward itself, which is the direction that makes a real outlier read clean. Verified
        reaching door 12: appending one "Team Average" row took `reviewed` from 5 to 6 with
        `summaryRows` still 0, and the row was listed on screen as a scored server. */
-    const stat = '(?:average|averages|avg|avgs|mean|means|median|summary|summaries|report summary|summary total)';
+    /* ⚠⚠ `means` WAS HERE FOR EXACTLY ONE ROUND AND IT DELETED A REAL PERSON. **Means is a US
+       surname** (Russell Means, Gardiner Means; ~12,000 US bearers), so a server named Means was
+       classified as a statistics row: never scored, never flagged, never listed as unscored, and the
+       intake note told the operator "1 totals row skipped". Measured on the identical file with only
+       the name changed — "Brianna K." flagged High Risk on four signals, "Means" produced
+       **flagged 0, reviewed 5, summaryRows 1** and a green all-clear over 9 drawer opens, $90 of
+       voids and a 47% cash mix.
+       This is the THIRD time this function has eaten a person: the ASCII separator guard took every
+       non-Latin name, bare `grand` took a surname, and now `means`. **Every word added here is a
+       policy about whose name counts.** No POS writes a bare "Means" as a statistics label; it
+       writes "Mean" or "Average". `avgs` and `summaries` stay — nobody is named those. */
+    const stat = '(?:average|averages|avg|avgs|mean|median|summary|summaries|report summary|summary total)';
     if (new RegExp('^' + lead + '?\\s*' + stat + '(?:\\s+' + scope + ')?$').test(n)) return true;
     if (new RegExp('^' + q + '\\s+' + stat + '$').test(n)) return true;                            // "Bar Average"
     if (new RegExp('^' + stat + '(?:\\s+(?:for|by|per))?\\s+' + q + '$').test(n)) return true;     // "Average by Server", "Avg per Shift"
