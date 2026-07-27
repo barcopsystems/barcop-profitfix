@@ -487,7 +487,11 @@ S.LaborDashboard = {
   // Shared import path: match/dedup/build/save live in PosIngest so the cockpit
   // and the per-page lanes never drift. label = 'hours' | 'tips'.
   async importLane(type, rows, resultId, nextStep) {
-    const { toAdd, skipped, incomplete, undated, dupCount } = PosIngest.build(type, rows);
+    /* ⚠ `fileRepeats` JOINS THE DESTRUCTURE FOR THE SAME REASON AS `incomplete` DID (S218). A line
+       the file repeated verbatim is now counted ONCE — at this door that is hours into gross pay and
+       tips into Form 8027, so it was the most expensive place the bug lived. A bucket no door reads
+       is worse than the bug: the operator's row count stops matching Bar Cop's and nothing says why. */
+    const { toAdd, skipped, incomplete, undated, dupCount, fileRepeats } = PosIngest.build(type, rows);
     const noun = type === 'hours' ? 'hour' : 'tip';
     const setRes = html => { const r = document.getElementById(resultId); if (r) r.innerHTML = html; };
     /* ⚠ ROWS WHOSE DATE COULD NOT BE READ ARE NOW REFUSED RATHER THAN WRITTEN BLANK, so they have to
@@ -508,7 +512,9 @@ S.LaborDashboard = {
     const outcomes = (skipped.length ? ' (' + skipped.length + ' skipped, name not on your roster)' : '')
       + (nInc ? ' (' + nInc + ' row' + (nInc === 1 ? '' : 's') + ' skipped, ' + figure + ')' : '')
       + (nUnd ? ' (' + nUnd + ' row' + (nUnd === 1 ? '' : 's') + ' skipped, no readable date)' : '')
-      + (dupCount ? ' (' + dupCount + ' already logged)' : '');
+      + (dupCount ? ' (' + dupCount + ' already logged)' : '')
+      // Counted once, and said so — never folded into "already logged", which would be false.
+      + ((fileRepeats || 0) ? ' (' + fileRepeats + ' repeated line' + (fileRepeats === 1 ? '' : 's') + ' counted once)' : '');
     if (!toAdd.length) {
       const others = skipped.length + nInc + nUnd;
       /* ⚠ THE HEADLINE MUST NOT POINT AT THE COLUMNS WHEN THE COLUMNS ARE THE ONE THING THAT CANNOT
