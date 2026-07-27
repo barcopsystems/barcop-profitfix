@@ -44,8 +44,8 @@ const PosIngest = {
          exactly "Credit Card" — because `credit card` is itself EXACT_ONLY. "Credit Card Tip"
          (singular), "Card Tip", "Tips - Credit Card" and "Tips (Credit Card)" were all still lost,
          and a lost tips column imports $0.00 in silence: measured, a $300 tip day became $40. */
-        match: ['card tips', 'card tip', 'credit tips', 'credit tip', 'cc tips', 'card', 'credit card tips', 'credit card tip', 'credit card', 'tips - credit card', 'tips (credit card)', 'tips - card', 'charged tips', 'non-cash tips', 'non cash tips', 'noncash tips', 'charge tips', 'charge tip', 'tips charged', 'electronic tips', 'card gratuity', 'credit card gratuity', 'card $', 'auto gratuity', 'autograt'] },
-      { key: 'cash_tips', label: 'Cash Tips',  required: false, match: ['cash tips', 'cash tip', 'cash', 'declared cash tips', 'declared tips', 'declared', 'cash gratuity', 'tips cash', 'tips - cash', 'tips (cash)', 'cash $'] },
+        match: ['card tips', 'card tip', 'credit tips', 'credit tip', 'cc tips', 'card', 'credit card tips', 'credit card tip', 'credit card', 'tips - credit card', 'tips (credit card)', 'tips - card', 'charged tips', 'non-cash tips', 'non cash tips', 'noncash tips', 'charge tips', 'charge tip', 'tips charged', 'electronic tips', 'card gratuity', 'credit card gratuity', 'auto gratuity', 'autograt'] },
+      { key: 'cash_tips', label: 'Cash Tips',  required: false, match: ['cash tips', 'cash tip', 'cash', 'declared cash tips', 'declared tips', 'declared', 'cash gratuity', 'tips cash', 'tips - cash', 'tips (cash)'] },
       { key: 'shift',     label: 'Shift',      required: false, match: ['shift', 'shift type', 'daypart', 'shift name', 'meal period'] }
     ],
     voids: [
@@ -279,20 +279,34 @@ const PosIngest = {
     'bartender', 'team member', 'server name', 'staff name'],
   isSummaryName(name) {
     const raw = String(name == null ? '' : name);
-    const n = raw
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')   // strip ':' '*' '-' '_' and any stray punctuation
-      .replace(/\s+/g, ' ')
-      .trim();
-    // A cell with no letters or digits at all is a separator rule, not a name.
-    if (!n) return /\S/.test(raw);
+    /* ⚠⚠ THE SEPARATOR TEST MUST ASK ABOUT LETTERS IN ANY SCRIPT, NOT ASCII ONES. Stripping to
+       `[^a-z0-9\s]` reduced 王伟, Дмитрий, محمد, Ελένη, あきら and 김민 to EMPTY, and the separator
+       branch then classified each of them as a totals line — so a server with a non-Latin name was
+       deleted from a theft report outright: never scored, never flagged, never listed as unscored,
+       and the intake note told the operator their shifts were "totals rows skipped". Measured: the
+       same file with the name spelled "Dmitri" flagged him High Risk with $678 of exposure.
+       This is the worst thing in the door and it was mine, from a guard added an hour earlier. */
+    const hasWordChar = /[\p{L}\p{N}]/u.test(raw);
+    if (!hasWordChar) return /\S/.test(raw);   // a rule of dashes or equals signs is not a person
+    // Only ASCII-normalisable cells can be summary vocabulary; anything else is a name.
+    const n = raw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!n) return false;
     if (this.SUMMARY_NAMES.indexOf(n) >= 0) return true;
     if (this.SUMMARY_HEADERS.indexOf(n) >= 0) return true;
-    // A leading qualifier and/or a trailing scope word ("Grand Total (All)" strips to
-    // "grand total all"). Both vocabularies are CLOSED, so a real name cannot match.
-    if (/^(grand|report|overall|final|net|gross)?\s*(total|totals)(\s+(all|combined|everyone|everything))?$/.test(n)) return true;
-    const m = n.match(/^(.*?)\s+(total|totals)$/);
-    return !!m && this.SUMMARY_QUALIFIERS.indexOf(m[1]) >= 0;
+    /* ⚠ BOTH WORD ORDERS. The qualifier vocabulary was consulted only for "<qualifier> Total", so
+       "Bar Total" was caught and **"Total Bar" was not** — and "Total Bar" / "Total (Bar)" is the
+       spelling Aloha, Micros and Toast use for a revenue-centre subtotal. One such row added to a
+       five-server file printed "Servers reviewed 6" for a five-person bar and dropped the real
+       skimmer from High Risk to Watch; on a two-bartender bar it cleared MIN_TEAM and replaced the
+       honest caveat with a green all-clear listing "Total Bar" as a scored server. */
+    const q = '(?:' + this.SUMMARY_QUALIFIERS.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')';
+    const lead = '(?:grand|report|overall|final|net|gross|sum)';
+    const scope = '(?:all|combined|everyone|everything)';
+    if (new RegExp('^' + lead + '?\\s*(?:total|totals)(?:\\s+' + scope + ')?$').test(n)) return true;
+    if (new RegExp('^' + q + '\\s+(?:total|totals)$').test(n)) return true;             // "Bar Total"
+    if (new RegExp('^(?:total|totals)(?:\\s+(?:for|by))?\\s+' + q + '$').test(n)) return true;  // "Total Bar", "Total for Bar", "Totals by Server"
+    if (new RegExp('^' + q + '\\s+\\d+\\s+(?:total|totals)$').test(n)) return true;     // "Store 3 Total"
+    return /^(?:grand|all)$/.test(n);
   },
 
   // Normalize a POS date cell to canonical local YYYY-MM-DD (App.ymdLocal's

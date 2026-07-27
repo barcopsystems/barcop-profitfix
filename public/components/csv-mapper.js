@@ -292,7 +292,18 @@ const CSVMapper = {
       // ⚠ `m[1].trim() &&` — a column headed ONLY with a unit ("($)", "(oz)") would strip to the
       // empty string and then exact-match any field carrying a blank candidate. No door has one
       // today; this closes it before one is added.
-      return (m && m[1].trim() && UNIT_PAREN.has(m[2].trim())) ? m[1].trim() : t;
+      if (m && m[1].trim() && UNIT_PAREN.has(m[2].trim())) return m[1].trim();
+      /* ⚠ AN UNBRACKETED UNIT IS STILL A UNIT. Only the PARENTHESISED form was stripped, so
+         "Cash Total ($)" normalised and "Cash Total $" did not — and a vendor writes it either way
+         in the same export. That split had two costs: `Cash $` and `Card $` needed their own
+         candidates on every field that wanted them (which is how `cash $` came to outrank the real
+         "Cash Tips $" column in pass 1), and a whole family of ordinary headers — "Sales Amount $",
+         "Cash Amount USD" — reached no candidate at all.
+         ⚠ THE SUFFIX VOCABULARY IS THE SAME CLOSED SET as the parenthesised one, minus the single
+         letters: a bare trailing `l` or `g` is far more likely to be part of a word than a unit. */
+      const SUFFIX = /\s+(\$|usd|us\$|\$\/hr|oz|fl oz|hrs?|hours?|lbs?|kg|ml|ltr|ea|each)$/;
+      const t2 = t.replace(SUFFIX, '');
+      return (t2 && t2 !== t) ? t2 : t;
     };
     const claim = (f, i) => { if (i > -1) { map[f.key] = i; used[i] = true; } };
     // An UNNAMED column is never auto-claimed — there is nothing to match on, and guessing it is
@@ -376,7 +387,28 @@ const CSVMapper = {
        are all still in their match arrays and still bind — this only stops the BARE word hunting. */
     const EXACT_ONLY = { name: 1, item: 1, total: 1, amount: 1, type: 1, count: 1, value: 1, date: 1,
       pay: 1, delivery: 1, shipping: 1,
-      cash: 1, card: 1, credit: 1, charge: 1, sales: 1, 'no sale': 1, 'credit card': 1 };
+      cash: 1, card: 1, credit: 1, charge: 1, sales: 1, 'no sale': 1, 'credit card': 1,
+      /* ⚠ THE ROUND-2 RESTORATIONS ARE EXACT-ONLY TOO, and the reason is a rule worth stating:
+         EVERY ONE OF THEM WAS JUSTIFIED BY AN EXACT HEADER that had stopped binding. None of them
+         needs to hunt, and each one that did reached a neighbour's column:
+           · `charge amount` / `charge total` took "Delivery Charge Amount", "Fuel Charge Amount" and
+             "Service Charge Amount" — a surcharge booked as the whole bill, on a REQUIRED field;
+           · `sales amount` / `sales value` took "Cash Sales Amount", so a server's whole sales
+             figure became the cash half and every check average dropped by the card share;
+           · `cash amount` / `cash total` reached inside "Non-Cash Amount" (a hyphen is a word
+             boundary), inverting the tender split.
+         **RULE: a candidate added to restore a lost EXACT header belongs in EXACT_ONLY.** Adding it
+         to the match array alone hands it a pass-2 licence it never needed. */
+      'charge amount': 1, 'charge total': 1, 'sales amount': 1, 'sales value': 1, 'sales $': 1,
+      'cash amount': 1, 'cash total': 1, 'card amount': 1, 'card total': 1, 'credit amount': 1,
+      'credit total': 1, 'total cash': 1, 'total credit': 1,
+      /* ⚠ AND `non-cash` / `non cash` — added to a match array one round ago and NOT added here,
+         which broke the rule written directly above it. Bare `non cash` word-matched Toast's
+         "Non Cash Tips", so the CARD half of the tender split bound a TIP column: measured, $612.40
+         of cash sales against $84.25 of non-cash TIPS printed **87.9% cash against a true 30.2%**.
+         That is the tips-read-as-sales defect this whole EXACT_ONLY block exists to kill, coming
+         back from the opposite side one round later. */
+      'non-cash': 1, 'non cash': 1 };
     // Same rule in the fuzzy pass: walk the candidates in PRIORITY order, not the headers.
     fields.forEach(f => {
       if (map[f.key] != null) return;   // `!= null`: column 0 is a real match, not "unmapped"
