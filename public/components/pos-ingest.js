@@ -1445,7 +1445,9 @@ const PosIngest = {
   // A POS per-server sales report: one row per server (per day) with covers +
   // sales. Matches the server to the roster by name; writes revenue_server_check
   // records so Server Check reads it the same as a hand-entered check. Dedup on
-  // staff + date + covers + sales so re-dropping the report never double-logs.
+  // staff + date + SHIFT so re-dropping the report never double-logs. The figures are deliberately
+  // NOT in the key — see the comment on the dedup itself; a hand-corrected row must still be the
+  // same check. (Was staff + date + covers + sales until 2026-07-27, which broke exactly that.)
   buildServer(rows, opts) {
     const staffByName = this._staffByName();
     const existing = (App.data && App.data.revenue_server_checks) || [];
