@@ -341,7 +341,9 @@ S.InventoryVendors = {
       dropSub: 'Needs a column for vendor name. Rep, phone, email, delivery days, terms, account number, order minimum, delivery fee, and free-delivery-over come in too if your file has them.',
       actionsEl: '#iv-imp-actions',
       fields: [
-        { key: 'name',           label: 'Vendor Name',   required: true,  match: ['vendor', 'vendor name', 'name', 'supplier', 'distributor', 'company', 'company name', 'supplier name', 'distributor name', 'purveyor', 'business name'] },
+        // ⚠ REQUIRED. `Vendor ID | Legal Name | Contact` bound the ID as the vendor's name, because
+        // `name` is EXACT_ONLY and "Legal Name" had no candidate. Precise spellings lead.
+        { key: 'name',           label: 'Vendor Name',   required: true,  match: ['vendor name', 'supplier name', 'distributor name', 'company name', 'business name', 'legal name', 'display name', 'vendor', 'name', 'supplier', 'distributor', 'company', 'purveyor'] },
         { key: 'rep',            label: 'Rep Name',      required: false, match: ['rep', 'rep name', 'sales rep', 'salesperson', 'contact', 'contact name', 'representative', 'account rep', 'sales representative', 'contact person'] },
         { key: 'phone',          label: 'Phone',         required: false, match: ['phone', 'phone number', 'telephone', 'tel', 'contact phone', 'mobile', 'cell', 'rep phone', 'office phone'] },
         { key: 'email',          label: 'Email',         required: false, match: ['email', 'e-mail', 'email address', 'e mail', 'contact email', 'rep email'] },
