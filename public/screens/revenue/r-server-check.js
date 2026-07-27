@@ -495,9 +495,21 @@ S.RevenueServerCheck = {
        carries both noun forms because total===1 is the commonest failure shape ("The server check
        was not saved"). This door was the one still writing its own. */
     if (fl.failed)      head = App.partialSaveNote(fl.landed, fl.total, 'server check', 'server checks');
-    else if (fl.added)  head = fl.added + ' server check' + (fl.added === 1 ? '' : 's') + ' imported'
-                               + (fl.replaced ? ', ' + fl.replaced + ' earlier import' + (fl.replaced === 1 ? '' : 's') + ' updated' : '')
-                               + (fl.dupCount ? ', ' + fl.dupCount + ' already logged' : '') + '.';
+    /* ⚠ A ROW THE OPERATOR CHOSE FROM THE CONFLICT PROMPT IS NOT AN "IMPORT". Seen on screen: they
+       picked "Use the file" for one check and got "1 server check imported" — but nothing new was
+       added, an existing check's figures were REPLACED at their instruction, and the log still held
+       one row for that shift. Worse at scale: 10 new rows plus one resolved conflict read
+       "11 server checks imported" and the decision they had just made disappeared into the count.
+       Both halves of that decision are now echoed back — the kept one already had its own note. */
+    else if (fl.added) {
+      const fresh = Math.max(0, fl.added - (fl.usedFile || 0));
+      const bits = [];
+      if (fresh)         bits.push(fresh + ' server check' + (fresh === 1 ? '' : 's') + ' imported');
+      if (fl.usedFile)   bits.push(fl.usedFile + ' replaced with the file' + String.fromCharCode(8217) + 's figures');
+      if (fl.replaced)   bits.push(fl.replaced + ' earlier import' + (fl.replaced === 1 ? '' : 's') + ' updated');
+      if (fl.dupCount)   bits.push(fl.dupCount + ' already logged');
+      head = bits.join(', ') + '.';
+    }
     // ⚠ "All" ONLY WHEN NOTHING ELSE WAS DROPPED. This branch fired on any non-zero dupCount, so a
     // re-drop where 5 rows deduped and 3 more were undated printed "All 5 rows were already logged"
     // above a "Skipped, no readable date" note — and made both branches below unreachable.
@@ -610,7 +622,8 @@ S.RevenueServerCheck = {
          "Save failed. Try the import again." sitting directly above the eleven rows that saved.
          The natural next move is to key them in by hand, and the roster ends up holding each twice.
          App.putRecord reverts the array slot on a genuine refusal, so what is still in memory IS
-         what landed; re-running is safe because buildServer dedupes on staff + date + covers + sales.
+         what landed; re-running is safe because buildServer dedupes on staff + date + shift (an
+         identical row comes back as "already logged"; a differing one asks or replaces).
          (The cockpit door does the same probe — sc-dashboard.importServer.) */
       if (ok) added = toAdd.length;
       else {
@@ -623,7 +636,9 @@ S.RevenueServerCheck = {
     }
     this._impFlash = {
       added, failed, landed, total: toAdd.length, dupCount: dupCount || 0,
-      replaced: replaced || 0, keptByHand, fileRepeats: fileRepeats || 0,
+      // Both halves of the conflict decision travel: how many the operator handed to the file, and
+      // how many they kept. Neither may be folded into the plain "imported" count.
+      replaced: replaced || 0, keptByHand, usedFile: extra.length, fileRepeats: fileRepeats || 0,
       unmatched: (skipped || []).filter(s => s && s !== '(blank)'),
       incomplete: (incomplete || []).filter(s => s && s !== '(blank)'),
       undated: (undated || []).filter(s => s && s !== '(blank)'),
