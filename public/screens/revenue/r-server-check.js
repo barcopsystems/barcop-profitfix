@@ -185,7 +185,7 @@ S.RevenueServerCheck = {
         + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
           + '<div style="display:flex;align-items:center;gap:36px;flex-wrap:wrap;">'
             + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val lg" id="' + p + '-ca">-</div></div>'
-            + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val lg" style="color:var(--t3);">$' + targetCA + '</div></div>'
+            + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val lg" style="color:var(--t3);">' + App.fmtCurrency(targetCA) + '</div></div>'
             + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val lg" id="' + p + '-var">-</div></div>'
             + '<div style="margin-left:auto;"><div id="' + p + '-badge" style="font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;"></div></div>'
           + '</div>'
@@ -262,8 +262,12 @@ S.RevenueServerCheck = {
       return '<tr>'
         + '<td style="font-weight:700;color:var(--t1);">' + esc(r.name) + tag + '</td>'
         + '<td class="val" style="color:' + (r.checkAvg >= targetCA ? 'var(--t1)' : 'var(--red)') + ';">' + App.fmtCurrency(r.checkAvg) + '</td>'
-        + '<td style="color:' + (vsT >= 0 ? 'var(--t2)' : 'var(--red)') + ';">' + (vsT >= 0 ? '+' : '') + App.fmtCurrency(vsT) + '</td>'
-        + '<td style="color:var(--t2);">' + (vsTeam >= 0 ? '+' : '') + App.fmtCurrency(vsTeam) + '</td>'
+        /* ⚠ `App.fmtCurrency` PREFIXES THE DOLLAR SIGN, so a raw negative renders "$-2.55" — the
+           sign on the WRONG SIDE of it, in the same column that prints "+$11.33" for a positive.
+           Seen live on a real import, in this exact column. `App.fmtBal` exists for precisely this
+           and is what the audit screens already use. */
+        + '<td style="color:' + (vsT >= 0 ? 'var(--t2)' : 'var(--red)') + ';">' + (vsT >= 0 ? '+' : '') + App.fmtBal(vsT) + '</td>'
+        + '<td style="color:var(--t2);">' + (vsTeam >= 0 ? '+' : '') + App.fmtBal(vsTeam) + '</td>'
         + '<td>' + Math.round(r.covers) + '</td>'
         + '<td class="val">' + App.fmtCurrency(r.sales) + '</td>'
         + '<td>' + (r.compsPct > 0 ? r.compsPct.toFixed(1) + '%' : '-') + '</td>'
@@ -305,7 +309,7 @@ S.RevenueServerCheck = {
         + '<td>' + Math.round(c.covers || 0) + '</td>'
         + '<td class="val">' + App.fmtCurrency(c.sales || 0) + '</td>'
         + '<td class="val">' + App.fmtCurrency(ca) + '</td>'
-        + '<td style="color:' + color + ';">' + (diff >= 0 ? '+' : '') + App.fmtCurrency(diff) + '</td>'
+        + '<td style="color:' + color + ';">' + (diff >= 0 ? '+' : '') + App.fmtBal(diff) + '</td>'
         + '<td style="color:' + color + ';font-weight:600;">' + status + '</td>'
         + '<td class="no-print"><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm rsc-edit" data-id="' + c.id + '">Edit</button>'
@@ -405,6 +409,11 @@ S.RevenueServerCheck = {
     return '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + ((fl.added && !fl.failed) ? 'var(--gold)' : (fl.dupCount && !fl.failed) ? 'var(--t2)' : 'var(--red)') + ';">' + head + '</div>'
       + (fl.unmatched && fl.unmatched.length ? note('Not matched to your roster: ' + list(fl.unmatched) + '. Add them in the Staff Roster or rename to match.') : '')
       + (fl.incomplete && fl.incomplete.length ? note('Skipped, no covers or sales rung: ' + list(fl.incomplete) + '. These are on your roster, nothing to fix.') : '')
+      /* Two buckets the builder now separates, and both used to land in 'Not matched to your
+         roster' — which told the operator to ADD A POS TOTALS LINE as a staff member, and to add
+         a line cook who is already on the roster. Neither is a roster fix, so neither says so. */
+      + (fl.summaryRows && fl.summaryRows.length ? note('Skipped, this is your export' + String.fromCharCode(8217) + 's own totals line: ' + list(fl.summaryRows) + '. Nothing to fix.') : '')
+      + (fl.notService && fl.notService.length ? note('Skipped, not on the service floor: ' + list(fl.notService) + '. Server checks only cover active Bar and Front of House staff.') : '')
       // ⚠ THE THIRD LIST. buildServer stopped writing a record with a blank date and started
       // reporting those rows in `undated` — the cockpit door says so, this one never destructured it,
       // so at THIS door the row vanished with no word at all. It is the one skip an operator can
@@ -430,7 +439,7 @@ S.RevenueServerCheck = {
     });
   },
   async applyServerImport(rows) {
-    const { toAdd, skipped, incomplete, undated, dupCount } = PosIngest.build('server', rows);
+    const { toAdd, skipped, incomplete, undated, dupCount, summaryRows, notService } = PosIngest.build('server', rows);
     let added = 0, failed = false, landed = 0;
     if (toAdd.length) {
       // Honor the commit result. Discarding it reported "N server checks imported" in
@@ -467,6 +476,8 @@ S.RevenueServerCheck = {
          came out EMPTY and the headline claimed "Every name matched your roster" about a file that
          had an unmatched row, which was also rendered nowhere. Branch on what the BUILDER counted;
          list only what can be named; report the difference as a count. */
+      summaryRows: (summaryRows || []).filter(Boolean),
+      notService: (notService || []).filter(Boolean),
       nSkipped: (skipped || []).length,
       nIncomplete: (incomplete || []).length,
       nUndated: (undated || []).length
@@ -537,7 +548,7 @@ S.RevenueServerCheck = {
     else if (diff >= -5) { status = 'Watch';          color = 'var(--amber)'; }
     else                 { status = 'Below Standard'; color = 'var(--red)'; }
     caEl.textContent = App.fmtCurrency(ca); caEl.style.color = color;
-    if (vEl) { vEl.textContent = (diff >= 0 ? '+' : '') + App.fmtCurrency(diff); vEl.style.color = color; }
+    if (vEl) { vEl.textContent = (diff >= 0 ? '+' : '') + App.fmtBal(diff); vEl.style.color = color; }
     if (bEl) { bEl.textContent = status; bEl.style.color = color; }
     this._calc = { ca, diff, status };
   },
@@ -552,6 +563,18 @@ S.RevenueServerCheck = {
     // A check saved without a date sorts below every window cutoff, so it never shows
     // in the log or the scorecard again. Guard it like every other save in Shift does.
     if (!f.date) { fail('Pick the date before saving.'); return; }
+    /* ⚠⚠ THE FORM ACCEPTED WHAT THE IMPORT REFUSES — two doors writing the same record on two
+       different rules. `!cov` is false for a NEGATIVE, so -35 covers and -$700 both saved.
+       Measured: one -35-cover row dragged the Team Average tile to $420.00 against a truth of
+       $40.00, and a live entry of -5 covers / -$700 printed a $140.00 check average under an
+       "On Target" badge. The same rows feed the Revenue audit's server-sales figure.
+       Also guarded here: INFINITY (a number input accepts 1e400 and `!Infinity` is false, so it
+       saved and printed **$∞** on the scorecard), and FRACTIONAL covers — the import rounds them
+       and the form did not, so a 12.5-cover entry printed "13 covers" beside a check average
+       computed on 12.5, and the row did not tie out. `PosIngest.buildServer` is the reference
+       for all three. */
+    if (!isFinite(cov) || !isFinite(sales)) { fail('Those numbers are too large to record.'); return; }
+    if (cov < 0 || sales < 0) { fail('Covers and total sales cannot be negative.'); return; }
     if (!cov || !sales) { fail('Enter covers and total sales before saving.'); return; }
     const byId = this.staffById(f.server);
     if (!byId) { fail('Pick a server.'); return; }
@@ -564,7 +587,7 @@ S.RevenueServerCheck = {
       shift_id:    matchShift ? matchShift.id : '',
       staff_id:    byId.id,
       server_name: byId.name,
-      covers:      cov,
+      covers:      Math.round(cov),
       sales,
       saved_at:    new Date().toISOString()
     };
@@ -584,12 +607,20 @@ S.RevenueServerCheck = {
     if (err) err.style.display = 'none';
     const cov = parseFloat(v('rscm-cov')) || 0;
     const sales = parseFloat(v('rscm-sales')) || 0;
+    /* ⚠⚠ AND THE EDIT DOOR HAD NEITHER GUARD NOR A DATE CHECK. `save()` refuses a dateless entry,
+       with a comment explaining that it "sorts below every window cutoff, so it never shows in the
+       log or the scorecard again" — and Edit let you CLEAR the date. Measured: the record then
+       renders in no window and on no chip, and since Edit and Delete only exist IN the log, it is
+       unreachable forever. Step 0.5: the twin needed the same four tests. */
+    const date = v('rscm-date'), shift = v('rscm-shift');
+    if (!date) return fail('Pick the date before saving.');
+    if (!isFinite(cov) || !isFinite(sales)) return fail('Those numbers are too large to record.');
+    if (cov < 0 || sales < 0) return fail('Covers and total sales cannot be negative.');
     if (!cov || !sales) return fail('Enter covers and total sales before saving.');
     const staff = this.staffById(v('rscm-server'));
     if (!staff) return fail('Pick a server.');
     const c = (App.data.revenue_server_checks || []).find(x => x.id === id);
     if (!c) return;
-    const date = v('rscm-date'), shift = v('rscm-shift');
     const matchShift = this.activeShiftFor(date, shift);
     const entry = {
       ...c,
@@ -597,7 +628,7 @@ S.RevenueServerCheck = {
       shift_id:    matchShift ? matchShift.id : (c.shift_id || ''),
       staff_id:    staff.id,
       server_name: staff.name,
-      covers:      cov,
+      covers:      Math.round(cov),
       sales,
       saved_at:    new Date().toISOString()
     };
