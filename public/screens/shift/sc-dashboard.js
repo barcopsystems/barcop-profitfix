@@ -928,7 +928,13 @@ S.ShiftDashboard = {
     // `incomplete` (on the roster, rang no covers/sales) is split out of `skipped` (name
     // not matched) by buildServer. Destructure BOTH or those rows vanish with no mention:
     // they used to be counted in the skipped total. Server Check's door reports both.
-    const { toAdd, skipped, incomplete, undated, dupCount } = PosIngest.build('server', rows);
+    /* ⚠⚠ AND `conflicts` / `replaced` JOIN THE LIST FOR THE SAME REASON (S215f, 2026-07-27). When
+       buildServer stopped keying on the figures, a row that DISAGREES with a hand-entered check
+       became a conflict instead of a silent second record. A door that does not destructure it
+       drops that row on the floor: not in `toAdd`, not in any count, no message — which is worse
+       than the double-count it replaced. This is the same lesson the comment above records about
+       `incomplete`, one field later. */
+    const { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts } = PosIngest.build('server', rows);
     const res = document.getElementById('sc-ck-server-res');
     const inc = (incomplete || []).length, und = (undated || []).length;
     /* Everything this import found besides the rows it wrote. Built ONCE and appended to every
@@ -942,10 +948,40 @@ S.ShiftDashboard = {
        roster spelling that does not exist. Counted separately, the way both revenue doors do it. */
     const nameless = (skipped || []).filter(s => !s || s === '(blank)').length;
     const named = skipped.length - nameless;
-    const serverOutcomes = (named ? ' (' + named + ' name' + (named === 1 ? '' : 's') + ' not matched)' : '')
+    let serverOutcomes = (named ? ' (' + named + ' name' + (named === 1 ? '' : 's') + ' not matched)' : '')
       + (nameless ? ' (' + nameless + ' row' + (nameless === 1 ? '' : 's') + ' had no server name)' : '')
       + (inc ? ' (' + inc + ' row' + (inc === 1 ? '' : 's') + ' rang no covers or sales)' : '')
       + (und ? ' (' + und + ' row' + (und === 1 ? '' : 's') + ' had no readable date)' : '');
+    /* The file disagrees with checks the operator entered BY HAND. Ask before writing anything
+       ([[user-chooses-conflicts]]) — the same prompt this screen already uses for sales and cash,
+       so the three import lanes behave identically. ⚠ This runs ABOVE the zero-row branch: a file
+       whose every row is a conflict has an EMPTY toAdd, and falling into "no server rows imported.
+       Each row needs a server name…" would blame the file for rows Bar Cop understood perfectly. */
+    const serverExtra = [];
+    if (conflicts && conflicts.length) {
+      const figs = v => v.covers + (v.covers === 1 ? ' cover' : ' covers') + ' · $'
+        + (Math.round((v.sales || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const rowLabel = c => { const dt = new Date(c.date + 'T00:00:00');
+        return c.name + ' · ' + (isNaN(dt.getTime()) ? c.date : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
+          + (c.shift ? ' · ' + c.shift : ''); };
+      const r = await App.promptImportConflicts({
+        title: 'Some checks were entered by hand',
+        intro: 'This file has different figures for ' + conflicts.length + ' check'
+             + (conflicts.length === 1 ? '' : 's') + ' you already entered or corrected by hand. Pick which to keep. Your own are kept unless you choose the file.',
+        rowLabel: 'Check', colMine: 'You entered', colTheirs: 'This file',
+        rows: conflicts.map(c => ({ key: c.key, label: rowLabel(c), mineText: figs(c.mine), theirsText: figs(c.theirs) }))
+      });
+      if (!r.confirmed) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">Import cancelled. Nothing was changed.</div>'; return; }
+      conflicts.forEach(c => { if (r.useTheirs.has(c.key)) serverExtra.push(c.useRec); });
+    }
+    const keptByHand = (conflicts ? conflicts.length : 0) - serverExtra.length;
+    // Both outcomes are REPORTED, on every branch below, because `serverOutcomes` is appended to
+    // the zero-row message, the failure message and the success flash alike. A row we overwrote and
+    // a row the operator chose to keep are things that happened to their data; neither is "already
+    // logged", and neither may be silent.
+    serverOutcomes += ((replaced || 0) ? ' (' + replaced + ' earlier import' + (replaced === 1 ? '' : 's') + ' updated)' : '')
+      + (keptByHand ? ' (' + keptByHand + ' kept as you entered ' + (keptByHand === 1 ? 'it' : 'them') + ')' : '');
+    serverExtra.forEach(rec => toAdd.push(rec));
     if (!toAdd.length) {
       /* ⚠ THE BREAKDOWN WAS ONLY REACHABLE WHEN SOMETHING IMPORTED. `undated` and `incomplete` were
          rendered on the success flash alone, so the case where they matter MOST — nothing came in at
