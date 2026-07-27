@@ -1647,9 +1647,11 @@ S.Hub = {
     const dels = (App.inventoryData || {}).ic_deliveries || [];
     // 45 days means 45. (This one names no day count on screen, so it was the only one of the eight
     // not printing a false figure — routed anyway so the convention has a single implementation.)
-    const cutoff = App.windowCutoff(45);
+    // Bounded at the top as well (S217) — a future-dated delivery would otherwise raise a
+    // price-drift alert from whenever it was typed until the date arrived.
+    const inWin = App.inWindow(45);
     let incCount = 0;
-    dels.filter(d => d.date && d.date >= cutoff).forEach(d => {
+    dels.filter(d => inWin(d.date)).forEach(d => {
       (d.line_items || []).forEach(li => {
         if (li.price_changed && li.prev_price != null && li.price_per_unit != null
             && li.price_per_unit > li.prev_price) incCount++;

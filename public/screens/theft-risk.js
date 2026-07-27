@@ -29,8 +29,11 @@ S.TheftRisk = {
   // Returns event count + dollar amount per signal. Used for both the Today
   // column (fromStr = today) and the Last-7-Days column (fromStr = a week ago),
   // and at 90 days for the Brief.
-  _signalData(fromStr) {
-    const inRange = d => { const ds = d ? String(d).slice(0, 10) : ''; return ds && ds >= fromStr; };
+  /* ⚠⚠ TAKES A BOUNDED PREDICATE, NOT A BARE "FROM" DATE (S217). This built `ds >= fromStr` with
+     nothing above, and ALL THREE callers inherited it — including "Flags Today", where a variance
+     or spot check dated next month counted as today's. On a loss-prevention screen that is a signal
+     appearing before the shift it describes. `App.inWindow(n)` bounds both ends in one place. */
+  _signalData(inRange) {
     const shorts = this.variances().filter(v => v.status === 'Short' && inRange(v.date));
     // Count CHECKS carrying at least one flag, not flagged product LINES. The row is
     // labelled "Flagged spot checks", so one check that flagged five products counted as
@@ -83,10 +86,9 @@ S.TheftRisk = {
 
   renderMain() {
     const today = App.todayLocal();
-    const wk = new Date(); wk.setDate(wk.getDate() - 6);
-    const weekStart = App.ymdLocal(wk);
-    const td = this._signalData(today);
-    const wkd = this._signalData(weekStart);
+    // Today alone, and the last seven days — both bounded at the top now (S217).
+    const td = this._signalData(App.inWindow(1));
+    const wkd = this._signalData(App.inWindow(7));
     const open = (App.data.variance_investigations || []).filter(i => i.status !== 'resolved');
     const flagsWeek = this._totalFlags(wkd);
     const flagsToday = this._totalFlags(td);
@@ -495,13 +497,14 @@ S.TheftRisk = {
   // ── 90-Day Theft & Loss Brief (PDF) — the periodic owner/insurance review ──
   async printBrief() {
     // The document says "90-day review" in its header, its section titles and its help text, so the
-    // window has to be 90 days. `today - 90` is 91. (App.windowCutoff — one implementation.)
-    const cutoffStr = App.windowCutoff(90);
-    const d = this._signalData(cutoffStr);
+    // window has to be 90 days — bounded at BOTH ends (S217), because this one leaves the building
+    // on an owner's or insurer's desk and a future-dated variance would be counted as history.
+    const inWin = App.inWindow(90);
+    const d = this._signalData(inWin);
     const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const fmt$ = (v) => (v == null || isNaN(v)) ? '-' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const inWindow = (dt) => dt && String(dt).slice(0, 10) >= cutoffStr;
+    const inWindow = inWin;   // one predicate for the whole document (S217)
     const recentSpots = this.spotChecks().filter(c => inWindow(c.date));
     const recentVCs = this.voidComps().filter(r => inWindow(r.date));
     const recentVars = this.variances().filter(v => inWindow(v.date));

@@ -98,7 +98,7 @@ S.VendorTracker = {
   },
 
   // Shared day-based range chips (the Scorecard's set) + an Export button, used
-  // on all three tabs. Filters by startDate(); 'all' = no cutoff. this.range is
+  // on all three tabs. Filters by inRange(); 'all' = no cutoff. this.range is
   // shared, so the window carries across tabs.
   RANGES: [['30', 'Last 30 Days'], ['90', 'Last 90 Days'], ['180', 'Last 6 Months'], ['365', 'Last 12 Months'], ['all', 'All Time']],
   rangeFilterRow(exportId) {
@@ -114,17 +114,24 @@ S.VendorTracker = {
   /* ⚠⚠ THIS ONE WAS NOT JUST A LABEL — THE NUMERATOR AND THE DENOMINATOR DISAGREED. `today - days`
      with an inclusive `>=` admits days+1 of deliveries, while `_rangeDays` below returns the CHIP'S
      number (30) for annualizing them. So "Last 30 Days" summed 31 days of spend and divided by 30,
-     overstating the annualized figure by ~3.3% on the 30 chip and ~1.1% on the 90. Routing through
-     App.windowCutoff makes the two agree by construction rather than by coincidence. */
-  startDate() {
-    if (this.range === 'all') return '';
-    return App.windowCutoff(parseInt(this.range, 10) || 90);
+     overstating the annualized figure by ~3.3% on the 30 chip and ~1.1% on the 90. The window helper
+     makes the two agree by construction rather than by coincidence.
+     (`startDate()` removed 2026-07-27 with S217 — its three consumers now call `inRange` below. A
+     bare lower bound left lying around is how the next window quietly gets built on it again.) */
+  /* ⚠⚠ THE MEMBERSHIP TEST, BOUNDED AT BOTH ENDS (S217). Every consumer used to write
+     `!start || d.date >= start` — a bare floor — so a delivery, price change or discrepancy typed
+     with a future date counted in every range at once. It matters more here than almost anywhere
+     else: `_rangeDays` above turns these totals into an ANNUALIZED figure, so one bad row is
+     multiplied. 'All Time' still means all time, which is why the empty-range case returns true.
+     The record itself stays in Delivery History where it can be corrected; only the total drops it. */
+  inRange(date) {
+    if (this.range === 'all') return true;
+    return App.inWindow(parseInt(this.range, 10) || 90)(date);
   },
 
   metricsFor(vendorName) {
-    const start = this.startDate();
-    const dels  = this.deliveries().filter(d => d.vendor === vendorName && (!start || d.date >= start));
-    const disc  = this.discRecords().filter(d => d.vendor === vendorName && (!start || d.date >= start));
+    const dels  = this.deliveries().filter(d => d.vendor === vendorName && this.inRange(d.date));
+    const disc  = this.discRecords().filter(d => d.vendor === vendorName && this.inRange(d.date));
 
     const totalSpend    = dels.reduce((s, d) => s + (d.total || 0), 0);
     const deliveryCount = dels.length;
@@ -144,7 +151,10 @@ S.VendorTracker = {
       let au;
       (p.cost_history || []).forEach(h => {
         if (h.vendor !== vendorName) return;
-        if (start && h.date < start) return;
+        // ⚠ THE FOURTH CONSUMER OF THE OLD `start` FLOOR, and I removed its declaration without it.
+        // Cost-history entries are dated like everything else, so a future-dated delivery would
+        // otherwise drift a vendor's annualized price movement from the day it was typed.
+        if (!this.inRange(h.date)) return;
         if (h.source !== 'delivery') return;
         if (au === undefined) au = this.annualUsage(p.id);
         if (au == null) return;   // no count pair: the drift is unknown, not zero
@@ -300,8 +310,7 @@ S.VendorTracker = {
         + '</div></div>';
     }
 
-    const start = this.startDate();
-    const changes = all.filter(c => !start || (c.date || '') >= start);
+    const changes = all.filter(c => this.inRange(c.date));
     const totalAnnual = changes.reduce((s, c) => s + (c.annual || 0), 0);
     const increases = changes.filter(c => c.delta > 0).length;
 
@@ -370,8 +379,7 @@ S.VendorTracker = {
 
   discrepanciesBody() {
     const allRows = this.discRecords().slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    const start = this.startDate();
-    const rows = allRows.filter(r => !start || (r.date || '') >= start);
+    const rows = allRows.filter(r => this.inRange(r.date));
     const open = rows.filter(r => r.status !== 'Resolved');
     const openTotal = open.reduce((s, r) => s + (r.overcharge || 0), 0);
     const recovered = rows.filter(r => r.status === 'Resolved').reduce((s, r) => s + ((r.recovered_amount != null ? r.recovered_amount : r.overcharge) || 0), 0);

@@ -87,7 +87,10 @@ S.HubBarCopAudit = {
     if (!dateStr) return false;
     const ymd = String(dateStr).slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
-    return ymd >= App.windowCutoff(days);
+    // Bounded at BOTH ends (S217). This tested only the floor, so a checklist, count, spot check or
+    // drop typed with a future date counted toward the Bar Cop Audit score straight away — and
+    // every component here is a completion RATIO, so a phantom row raises the grade.
+    return App.inWindow(days)(ymd);
   },
   _daysSince(dateStr) {
     if (!dateStr) return null;
