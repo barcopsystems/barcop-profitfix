@@ -631,6 +631,35 @@ S.HubOperatingExpenses = {
     return own.find(c => String(c).toLowerCase() === t) || '';
   },
 
+  /* ⚠⚠ THE FILE-LEVEL SIGN VERDICT (S225). Deliberately mirrors `PosIngest.dateConvention` — the
+     same vote/dominance shape, for the same reason: a whole-file ambiguity settled once from the
+     file's own evidence beats a per-row guess.
+     WHY A MAJORITY IS THE RIGHT EVIDENCE HERE (and this differs from dates): a single date cell can
+     be undecidable on its own, but a single AMOUNT never is — a negative is equally consistent with
+     "a refund in a positive-charge file" and "a charge in a negative-debit file". Only the balance
+     of the column distinguishes them. A bar's statement is overwhelmingly money OUT either way, so
+     the majority is a strong signal.
+     THE 3x DOMINANCE AND THE lose===1 ESCAPE ARE COPIED VERBATIM from dateConvention, including its
+     reasoning: ONE dissenting row is always a stray at any scale (a single refund on a card
+     statement), while three rows agreeing with each other are a second convention.
+     ⚠ WHEN IT CANNOT TELL, IT DOES NOT FLIP. `contradictory` keeps today's positive-charge rule and
+     the door SAYS SO — a silent flip on weak evidence is how you turn a working import into a wrong
+     one. Kept local to this door on purpose: it is the only importer that treats a negative as a
+     credit to skip (buildVoidComp takes the magnitude, buildPmix needs the sign for returns). */
+  _amountConvention(rows) {
+    let neg = 0, pos = 0;
+    (rows || []).forEach(r => {
+      const v = App.parseNum(r && r.amount);
+      if (v == null || v === 0) return;   // a zero row is not evidence of either convention
+      if (v < 0) neg++; else pos++;
+    });
+    const DOMINANCE = 3;
+    const win = Math.max(neg, pos), lose = Math.min(neg, pos);
+    const decisive = lose === 0 || (win > lose && (lose === 1 || win >= lose * DOMINANCE));
+    const contradictory = lose > 0 && !decisive;
+    return { negativeIsCharge: decisive && neg > pos, contradictory, negVotes: neg, posVotes: pos };
+  },
+
   async _importRows(rows) {
     const arr = this.records();
     const _added = [];   // rows appended here, so a failed write can take them back out
@@ -671,6 +700,21 @@ S.HubOperatingExpenses = {
       if (hit) { _used.add(hit.id); return true; }
       return false;
     };
+    /* ⚠⚠⚠ WHICH SIGN MEANS "MONEY OUT"? THE FILE DECIDES, NOT US (S225). Chase business checking —
+       named in this door's own date-field comment as an intended input — writes DEBITS NEGATIVE and
+       deposits positive, as do BofA, Wells Fargo and Chase credit cards. The old rule was a flat
+       `amount < 0 -> credit, skip`, so on those files it imported the DEPOSITS as expenses and threw
+       every real bill away.
+       MEASURED end to end, and reachability is total: the real CSVMapper._autoMap binds every
+       required field from Chase's real header row with NO operator input, and then 4 bills
+       ($17,340.55 of Sysco, Austin Energy, the lease, Texas Mutual) were discarded while 2 merchant
+       deposits ($16,364.85) were booked as operating expenses — under a banner reading "2 expenses
+       imported · 4 credits or refunds skipped", which is exactly inverted. Books took revenue as
+       expense while every real opex line read $0.
+       ⭐ SAME SHAPE AS `dateConvention`, which this door already calls three lines down for exactly
+       this reason: settle a FILE-LEVEL ambiguity once, from the file's own evidence, instead of
+       guessing per row. One flip below and every downstream guard is untouched. */
+    const _sign = this._amountConvention(rows);
     let credits = 0, unreadable = 0, undated = 0, zeroed = 0, totalsLines = 0;
     (rows || []).forEach((r, i) => {
       const date = this._normDate(r.date, _dopts);
@@ -681,8 +725,12 @@ S.HubOperatingExpenses = {
       // positive amounts is the existing model), but they are now COUNTED and reported rather than
       // vanishing — a row the operator can see in their file and cannot find in Bar Cop is the
       // thing that makes them stop trusting the total.
-      const amount = App.parseNum(r.amount);
-      if (amount == null) { unreadable++; return; }
+      const _raw = App.parseNum(r.amount);
+      if (_raw == null) { unreadable++; return; }
+      /* ONE FLIP, DECIDED ONCE FOR THE WHOLE FILE. Under the negative-debit convention a charge is
+         -1240.55 and becomes +1240.55 (imports); a deposit is +8420.11 and becomes -8420.11, which
+         the existing credit guard below then skips. Every downstream test is unchanged. */
+      const amount = _sign.negativeIsCharge ? -_raw : _raw;
       // A $0.00 line (a voided bill, a zero-dollar subscription row) is not a credit and must not
       // be reported as one — it is simply nothing to log.
       if (amount < 0)     { credits++;    return; }
@@ -742,7 +790,15 @@ S.HubOperatingExpenses = {
       this._importMsg = 'Could not save the import. Nothing was changed — check your connection and try again.';
     } else {
       const bits = [_added.length + ' expense' + (_added.length === 1 ? '' : 's') + ' imported'];
-      if (credits)    bits.push(credits + ' credit' + (credits === 1 ? '' : 's') + ' or refund' + (credits === 1 ? '' : 's') + ' skipped (Bar Cop tracks expenses as positive amounts)');
+      /* ⚠ THE SENTENCE FOLLOWS THE VERDICT. Under the negative-debit convention the skipped rows are
+         DEPOSITS, not refunds — saying "credits or refunds skipped (Bar Cop tracks expenses as
+         positive amounts)" about a Chase file was not merely unhelpful, it described the opposite of
+         what happened and would have sent the operator hunting for refunds that do not exist. */
+      if (credits)    bits.push(credits + (_sign.negativeIsCharge
+        ? ' deposit' + (credits === 1 ? '' : 's') + ' or credit' + (credits === 1 ? '' : 's')
+          + ' skipped (this file marks charges as negative, so Bar Cop imported the charges)'
+        : ' credit' + (credits === 1 ? '' : 's') + ' or refund' + (credits === 1 ? '' : 's')
+          + ' skipped (Bar Cop tracks expenses as positive amounts)'));
       if (undated)    bits.push(undated + ' row' + (undated === 1 ? '' : 's') + ' skipped with no readable date');
       if (unreadable) bits.push(unreadable + ' row' + (unreadable === 1 ? '' : 's') + ' skipped with no readable amount');
       if (zeroed) bits.push(zeroed + ' zero-dollar row' + (zeroed === 1 ? '' : 's') + ' skipped');
@@ -762,6 +818,11 @@ S.HubOperatingExpenses = {
          both numbers are 12 or under are a coin toss. Those are read US-style and named here rather
          than guessed at in silence. */
       if (_conv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
+      /* ⚠ NAMED, NOT GUESSED (S225). A file too evenly split to call keeps the positive-charge rule
+         — the safe, unchanged behaviour — and says so with the counts, so the operator can settle in
+         one glance what Bar Cop could not. Same posture as the date verdict directly above. */
+      if (_sign.contradictory) bits.push(_sign.negVotes + ' amounts are negative and ' + _sign.posVotes
+        + ' positive, so Bar Cop could not tell which sign means money out — it read the positive rows as expenses; check the amount column');
       this._importMsg = bits.join(' · ') + '.';
     }
     this.renderMain();
