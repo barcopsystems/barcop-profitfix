@@ -105,7 +105,7 @@ S.EventsDashboard = {
     const hero = '<div style="padding:2px 0;">'
       + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
       +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--w);">' + this._money(st.bookedRev) + '</span>'
-      +   '<span style="font-size:13px;color:var(--t2);">booked, on the calendar</span>'
+      +   '<span style="font-size:13px;color:var(--t2);">booked, on the calendar (incl. service and tax)</span>'
       + '</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-top:12px;">' + nextLine + '</div></div>';
 
@@ -254,7 +254,7 @@ S.EventsDashboard = {
     const paras = [];
 
     // 1 — what is booked and in the pipeline
-    let p1 = 'You have ' + m(st.bookedRev) + ' booked on the calendar across ' + st.futureBooked.length + ' event' + (st.futureBooked.length === 1 ? '' : 's') + (st.next ? ', next up ' + EB.fmtDate(st.next.event_date) : '') + '.';
+    let p1 = 'You have ' + m(st.bookedRev) + ' booked on the calendar, service and tax included, across ' + st.futureBooked.length + ' event' + (st.futureBooked.length === 1 ? '' : 's') + (st.next ? ', next up ' + EB.fmtDate(st.next.event_date) : '') + '.';
     if (st.pipeline > 0) p1 += ' Another ' + m(st.pipeline) + ' sits in the open pipeline.';
     paras.push(p1);
 

@@ -191,6 +191,17 @@ S.EventsBookings = {
     return Math.max(0, this.quoteTotal(b) - dep);
   },
 
+  /* What the bar owes BACK, when a deposit is larger than the whole quote. balanceDue clamps at
+     zero, which is right for a balance and wrong as the last word on the money: the overpayment
+     simply disappeared, the tile read "paid in full", and the event dropped out of the forecast's
+     event table (it only lists rows with a balance above zero). Measured: an $8,000 deposit on a
+     $7,695 event hid $305 the bar owes the client on every screen in Bar Cop. */
+  refundOwed(b) {
+    if (!b) return 0;
+    const dep = parseFloat(b.deposit_amount) || 0;
+    return Math.max(0, dep - this.quoteTotal(b));
+  },
+
   /* ⚠⚠ FREEZE THE RATES THE MOMENT A QUOTE BECOMES A COMMITMENT. quoteParts reads `tax_pct` off the
      booking and falls back to the LIVE setting, and `collectQuote` was the only writer that ever
      stored it — so a booking that reached Quote Sent or Booked by any other door (a rate-card pill,
@@ -375,7 +386,7 @@ S.EventsBookings = {
     const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">'
       + stat('Open Leads', String(open.length), open.length ? '' : 'var(--t3)')
       + stat('Stale (3+ Days)', String(stale.length), stale.length ? 'var(--amber)' : '')
-      + stat('Pipeline Value', App.fmtCurrency(pipelineVal))
+      + stat('Pipeline Value (incl. tax)', App.fmtCurrency(pipelineVal))
       + stat('Booked, Next 30d', String(bookedSoon.length))
       + stat('Deposits Due', App.fmtCurrency(depositsDue), depositsDue ? 'var(--amber)' : '')
       + '</div></div>';
@@ -538,12 +549,20 @@ S.EventsBookings = {
       t.push(this.statTile('Countdown', cd, cdSub, dU != null && dU >= 0 && dU <= 7 ? 'warn' : ''));
       t.push(this.statTile('Quoted Total', App.fmtCurrency(this.quoteTotal(b)), 'all in, service and tax'));
       t.push(this.statTile('Deposit', b.deposit_paid_date ? 'Paid' : (b.deposit_amount ? App.fmtCurrency(b.deposit_amount) : '-'), b.deposit_paid_date ? 'in hand' : (b.deposit_amount ? 'still due' : 'none set'), b.deposit_paid_date ? 'good' : (b.deposit_amount ? 'warn' : '')));
-      // payment_method is READ here, not just written — a settled balance says which way it landed,
-      // because that is the difference between money already in your sales and money that was not.
-      t.push(this.statTile('Balance Due', App.fmtCurrency(bal),
-        b.balance_paid_date
-          ? ('paid in full' + (b.payment_method === 'register' ? ', through the register' : b.payment_method === 'direct' ? ', paid direct' : ''))
-          : 'on event day', bal > 0 ? '' : 'good'));
+      /* payment_method is READ here, not just written — a settled balance says which way it landed,
+         because that is the difference between money already in your sales and money that was not.
+         ⚠⚠ AND AN OVERPAYMENT IS NAMED. balanceDue clamps with Math.max(0, …), so a deposit larger
+         than the quote read "$0.00 · paid in full" and the event dropped out of the forecast table
+         entirely (that list only takes rows where the balance is above zero). The refund the bar
+         OWES THE CLIENT — real money, a real liability — appeared on no screen at all. It is also
+         the only tell that a figure was typed into the wrong box. */
+      const over = this.refundOwed(b);
+      t.push(over > 0
+        ? this.statTile('Refund Owed', App.fmtCurrency(over), 'deposit is over the quote', 'warn')
+        : this.statTile('Balance Due', App.fmtCurrency(bal),
+          b.balance_paid_date
+            ? ('paid in full' + (b.payment_method === 'register' ? ', through the register' : b.payment_method === 'direct' ? ', paid direct' : ''))
+            : 'on event day', bal > 0 ? '' : 'good'));
     } else if (stage === 'Completed') {
       const rev = this.bookingRevenue(b);
       const labor = this.bookingLabor(b);
