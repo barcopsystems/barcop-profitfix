@@ -372,8 +372,35 @@ S.HubCashOutflows = {
        `stopped_ym` alone is the right marker here and every engine reader already honours it: the
        projection stops at that month and keeps everything before it. The round-4 defect was the two
        TABLES hiding the row, and those filters are fixed; the record shape did not need changing. */
-    await App.putRecord('core', 'cash_outflow', Object.assign({}, rec,
-      { stopped_ym: App.todayLocal().slice(0, 7) }));
+    /* ⚠⚠ STOP FROM THE NEXT PAYMENT, NOT FROM THE START OF THIS MONTH (found on screen by Kyle,
+       2026-07-28 — the last surviving piece of the round-4 error). The engine drops every occurrence
+       in or after `stopped_ym`, so stamping the CURRENT month erased a payment that had already
+       fallen due: measured on the Anchor Bar, a $2,200 loan due the 12th, stopped on the 28th, took
+       Year to Date $39,000 → $36,800 and removed the "Loan payments" line from the Cash Bridge for
+       this month while last month kept its own. Money that has left the bank is not undone by
+       cancelling the schedule, and the confirm dialog above promises exactly that.
+       ⚠ NEITHER FLAT RULE IS RIGHT. Stamping NEXT month (the pre-round-4 behaviour) keeps a payment
+       that has NOT fallen due yet — press Stop on the 5th for a bill due the 12th and it still gets
+       charged. The rule the dialog already states is the correct one: occurrences that have not
+       happened yet stop, ones that have stay. So the stamp is next month only when this month's
+       occurrence is already behind us. */
+    const _today = App.todayLocal(), _cur = _today.slice(0, 7);
+    const _y = parseInt(_cur.slice(0, 4), 10), _m0 = parseInt(_cur.slice(5, 7), 10) - 1;
+    const _base = new Date(String(rec.date || '').length <= 10 ? rec.date + 'T00:00:00' : rec.date);
+    const _step = rec.frequency === 'quarterly' ? 3 : rec.frequency === 'annual' ? 12 : 1;
+    let _dueAlready = false;
+    if (!isNaN(_base.getTime())) {
+      const _startIdx = _base.getFullYear() * 12 + _base.getMonth(), _curIdx = _y * 12 + _m0;
+      // Only a month this series actually recurs in can have an occurrence to protect.
+      if (_curIdx >= _startIdx && (_curIdx - _startIdx) % _step === 0) {
+        const _dim = new Date(_y, _m0 + 1, 0).getDate();
+        const _day = Math.min(parseInt(rec.recur_day, 10) || _base.getDate() || 1, _dim);
+        _dueAlready = (_cur + '-' + String(_day).padStart(2, '0')) <= _today;
+      }
+    }
+    const _nextD = new Date(_y, _m0 + 1, 1);
+    const _stopYm = _dueAlready ? App.ymdLocal(_nextD).slice(0, 7) : _cur;
+    await App.putRecord('core', 'cash_outflow', Object.assign({}, rec, { stopped_ym: _stopYm }));
     this.draw();
   },
   async del(id) {
