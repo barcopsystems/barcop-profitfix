@@ -68,10 +68,13 @@ S.EventsPricing = {
       + (rc.length ? '<button class="btn btn-ghost btn-sm" id="rp-export">Export PDF</button>' : '')
       + '</div>';
 
-    const listCard = '<div id="rp-list" class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+    // ⚠ The "Show older" marker has to live INSIDE the export root, or exportListPDF cannot tell the
+    // list was truncated and the PDF is silently capped — see the note in ev-regulars.renderList().
+    const listCard = '<div id="rp-export-root">'
+      + '<div id="rp-list" class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Package</th><th>Type</th><th>Covers</th><th>F&amp;B Min</th><th>Room Fee</th><th>Per Head</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-      + App.showOlderBar('core', 'event_rate_card', rc, false);
+      + App.showOlderBar('core', 'event_rate_card', rc, false) + '</div>';
 
     this.container.innerHTML = '<div class="screen">' + rateForm + headingRow + listCard + '</div>';
     this.wire();
@@ -81,7 +84,9 @@ S.EventsPricing = {
     document.getElementById('rp-add')?.addEventListener('click', () => this.addPackage());
     document.getElementById('rp-clear')?.addEventListener('click', () => { this._draft = null; this.draw(); });
     document.getElementById('rp-calc')?.addEventListener('click', () => this.cateringCalcModal());
-    document.getElementById('rp-export')?.addEventListener('click', () => { if (document.getElementById('rp-list')) App.exportListPDF({ title: 'Rate Card', rootId: 'rp-list', lists: [['core', 'event_rate_card']], reRender: () => this.draw() }); });
+    // ⚠ SAME DEFECT AS ev-regulars: the "Show older" marker sits OUTSIDE #rp-list, so exportListPDF
+    // could never detect truncation and the PDF was silently capped at the row limit.
+    document.getElementById('rp-export')?.addEventListener('click', () => { if (document.getElementById('rp-export-root')) App.exportListPDF({ title: 'Rate Card', rootId: 'rp-export-root', lists: [['core', 'event_rate_card']], reRender: () => this.draw() }); });
     this.container.querySelectorAll('.rp-edit').forEach(b => b.addEventListener('click', () => this.editModal(b.dataset.id)));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
     this.container.querySelectorAll('.rp-del').forEach(b => b.addEventListener('click', async () => {
@@ -137,8 +142,9 @@ S.EventsPricing = {
       room_fee:   parseFloat(g('rp-room')?.value) || 0,
       per_head:   parseFloat(g('rp-ph')?.value) || 0
     };
+    // ⚠ The draft survives a refused write — see the note in ev-regulars.add().
+    if (!(await App.putRecord('core', 'event_rate_card', rec))) return;   // row-per-record
     this._draft = null;
-    await App.putRecord('core', 'event_rate_card', rec);   // row-per-record
     this.draw();
   },
 

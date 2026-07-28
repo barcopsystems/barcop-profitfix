@@ -18,7 +18,16 @@ S.EventsRegulars = {
   fmtDate(str){ if (!str) return ''; const d = new Date(String(str).slice(0, 10) + 'T00:00:00'); return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); },
   monthOf(str){ if (!str) return -1; const d = new Date(String(str).slice(0, 10) + 'T00:00:00'); return isNaN(d.getTime()) ? -1 : d.getMonth(); },
   daysSince(str){ if (!str) return null; const d = new Date(String(str).slice(0, 10) + 'T00:00:00'); if (isNaN(d.getTime())) return null; return Math.round((new Date(App.todayLocal() + 'T00:00:00') - d) / 86400000); },
-  isQuiet(r){ const d = this.daysSince(r.last_visit); return d == null || d >= this.QUIET_DAYS; },
+  /* ⚠⚠ "NEVER LOGGED" IS NOT "GONE QUIET FOR 60+ DAYS". isQuiet returned true for a MISSING
+     last_visit, and the importer writes '' on every row — so the moment an operator imported their
+     book, the amber tile told them 100% of their regulars had not been in for 60+ days, including
+     the six who were at the bar last night, and the Gone Quiet chip handed them their entire list
+     as a win-back sheet. The row text already knew better: it prints "never logged", not "(quiet)".
+     The tile was the thing making a claim about elapsed time it could not support.
+     Two states, two counts, two chips: one is a win-back list, the other is "log a visit for these".
+     Different work, so they cannot share a number. */
+  isQuiet(r){ const d = this.daysSince(r && r.last_visit); return d != null && d >= this.QUIET_DAYS; },
+  isUnlogged(r){ return this.daysSince(r && r.last_visit) == null; },
 
   render(container, actions) {
     this.container = container;
@@ -66,6 +75,7 @@ S.EventsRegulars = {
     const bdays  = all.filter(r => this.monthOf(r.birthday) === thisMonth);
     const annivs = all.filter(r => this.monthOf(r.anniversary) === thisMonth);
     const quiet  = all.filter(r => this.isQuiet(r));
+    const unlogged = all.filter(r => this.isUnlogged(r));
 
     const stat = (l, v, color) => '<div class="calc-item"><div class="calc-label">' + l + '</div><div class="calc-val lg"' + (color ? ' style="color:' + color + '"' : '') + '>' + v + '</div></div>';
     const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">'
@@ -73,6 +83,7 @@ S.EventsRegulars = {
       + stat('Birthdays This Month', String(bdays.length), bdays.length ? 'var(--green)' : '')
       + stat('Anniversaries This Month', String(annivs.length), annivs.length ? 'var(--green)' : '')
       + stat('Gone Quiet (' + this.QUIET_DAYS + '+ Days)', String(quiet.length), quiet.length ? 'var(--amber)' : '')
+      + stat('No Visit Logged', String(unlogged.length), unlogged.length ? 'var(--t3)' : '')
       + '</div></div>';
 
     const segBtn = (mode, label) => '<button type="button" class="btn btn-sm rg-mode" data-mode="' + mode + '" style="'
@@ -98,7 +109,8 @@ S.EventsRegulars = {
       + '<div class="collapse-body">' + body + imHtml + '</div></div>' + belowButtons;
 
     const chips = App.filterChips(this.filter, [
-      { v: '', label: 'All' }, { v: 'bday', label: 'Birthdays' }, { v: 'anniv', label: 'Anniversaries' }, { v: 'quiet', label: 'Gone Quiet' }, { v: 'vip', label: 'VIP' }
+      { v: '', label: 'All' }, { v: 'bday', label: 'Birthdays' }, { v: 'anniv', label: 'Anniversaries' },
+      { v: 'quiet', label: 'Gone Quiet' }, { v: 'unlogged', label: 'No Visit Logged' }, { v: 'vip', label: 'VIP' }
     ], 'rg-fchip');
     const headRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px;">'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
@@ -108,8 +120,12 @@ S.EventsRegulars = {
     if (this.filter === 'bday') list = bdays;
     else if (this.filter === 'anniv') list = annivs;
     else if (this.filter === 'quiet') list = quiet;
+    else if (this.filter === 'unlogged') list = unlogged;
     else if (this.filter === 'vip') list = all.filter(r => r.vip);
-    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    // ⚠ String(): (a.name || '') passes any truthy NON-string straight to localeCompare, and one
+    // corrupt or legacy row then throws the whole screen into the error card — the entire book gone
+    // over one bad field. A single bad row never showed it, because sort does not run at length 1.
+    list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
     const rows = list.slice(0, App.listLimit('core', 'event_regular')).map(r => {
       const q = this.isQuiet(r);
@@ -126,18 +142,49 @@ S.EventsRegulars = {
 
     const listSection = all.length === 0
       ? '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">Add your first regular above, or import a list. Birthdays, anniversaries, and quiet regulars surface here as you build the book.</div></div>'
-      : headRow + '<div id="rg-list" class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr><th>Name</th><th>Birthday</th><th>Anniversary</th><th>Drinks</th><th>Last Visit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + App.showOlderBar('core', 'event_regular', list, !!this.filter);
+      /* ⚠⚠ THE EXPORT ROOT HAS TO CONTAIN THE "SHOW OLDER" MARKER OR THE PDF IS SILENTLY CAPPED AT
+         50. exportListPDF decides whether to lift the row limit by looking for that marker INSIDE
+         the root it is handed — and this rendered the bar as a SIBLING of #rg-list while passing
+         #rg-list as the root, so truncated was always false and the limit was never raised.
+         Measured: a 140-regular book exported 50 names with nothing saying the rest were missing.
+         That is the exact failure exportListPDF's own header comment exists to prevent ("you handed
+         your accountant 50 rows that looked complete"). A wrapper is the fix: the bar is a BUTTON,
+         which the PDF engine strips, so nothing unwanted prints. */
+      : headRow + '<div id="rg-export-root">'
+        + '<div id="rg-list" class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr><th>Name</th><th>Birthday</th><th>Anniversary</th><th>Drinks</th><th>Last Visit</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + App.showOlderBar('core', 'event_regular', list, !!this.filter)
+        + '</div>';
 
     this.container.innerHTML = '<div class="screen">' + statStrip + addCard + listSection + '</div>';
     this.wire();
     if (this.entryMode === 'import') this.mountImporter();
   },
 
+  // The active chip, in words, for the PDF header. '' when nothing is narrowing the list.
+  filterLabel() {
+    return this.filter === 'bday'     ? 'Birthdays this month'
+         : this.filter === 'anniv'    ? 'Anniversaries this month'
+         : this.filter === 'quiet'    ? 'Gone quiet (' + this.QUIET_DAYS + '+ days)'
+         : this.filter === 'unlogged' ? 'No visit logged'
+         : this.filter === 'vip'      ? 'VIPs only' : '';
+  },
+
   wire() {
     this.container.querySelector('.card-collapse-head')?.addEventListener('click', e => App.toggleCollapse(e.currentTarget));
     App.applyCollapsed(this.container);
-    document.getElementById('rg-export')?.addEventListener('click', () => { if (document.getElementById('rg-list')) App.exportListPDF({ title: 'Regulars', rootId: 'rg-list', lists: [['core', 'event_regular']], reRender: () => this.renderList() }); });
+    /* ⚠ AND IT NAMES THE ACTIVE FILTER (D3) — the chips are no-print and sit outside the root, so
+       a Gone Quiet export printed under a bare "Regulars" header and read as the whole book a
+       fortnight later. Twelve other screens pass range: for exactly this.
+       ⚠ AND A FOOTER, because of WHAT this document is: a printed sheet of guest names, phone
+       numbers, birthdays and drink habits. It is the most sensitive artefact Bar Cop produces and
+       it carried no handling note; sc-incidents already sets the precedent. */
+    document.getElementById('rg-export')?.addEventListener('click', () => {
+      if (!document.getElementById('rg-export-root')) return;
+      App.exportListPDF({ title: 'Regulars', rootId: 'rg-export-root',
+        range: this.filterLabel(),
+        footer: 'Contains guest contact details. Store and share it accordingly.',
+        lists: [['core', 'event_regular']], reRender: () => this.renderList() });
+    });
     this.container.querySelectorAll('.rg-mode').forEach(b => b.addEventListener('click', () => { this.entryMode = b.dataset.mode; this.renderList(); }));
     this.container.querySelectorAll('.rg-fchip').forEach(b => b.addEventListener('click', () => { this.filter = b.dataset.v; this.renderList(); }));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.renderList())));
@@ -167,22 +214,37 @@ S.EventsRegulars = {
     const rec = this.collect('rg');
     if (!rec.name) { const e = document.getElementById('rg-err'); if (e) { e.textContent = 'Name is required.'; e.style.display = 'inline'; } return; }
     rec.id = App.uid(); rec.created_at = new Date().toISOString();
+    /* ⚠⚠ THE DRAFT SURVIVES A REFUSED WRITE. This cleared it BEFORE the await and then discarded
+       putRecord's verdict — so on a rejection the record was reverted out of the array, the draft
+       was already gone, and renderList painted an empty form: the operator retypes the regular from
+       memory, having been told only that the save failed. The Labor family already does this
+       correctly (lc-time-off, lc-callout-log, lc-log-hours all keep the draft and check the
+       boolean); the Events family did not. */
+    if (!(await App.putRecord('core', 'event_regular', rec))) return;   // row-per-record
     this._draft = null;
-    await App.putRecord('core', 'event_regular', rec);   // row-per-record
     this.renderList();
   },
 
+  // ⚠ The Edit modal used to refuse a blank name in SILENCE — same door, same rule, two behaviours.
+  // The add form has always said "Name is required."; this now does too (see rge-err below).
   showEdit(id) {
     const r = this.regulars().find(x => x.id === id); if (!r) return;
     const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Regular</div>' + this.formCells(r, 'rge')
-      + '<div class="card-actions"><button class="btn btn-primary" id="rge-save">Save</button></div></div>';
+      + '<div class="card-actions"><button class="btn btn-primary" id="rge-save">Save</button>'
+      + '<span id="rge-err" style="display:none;font-size:11px;color:var(--red);align-self:center;margin-left:10px;"></span></div></div>';
     App.openModal(html, { id: 'rg-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('rge-save')?.addEventListener('click', async () => {
-      const rec = this.collect('rge'); if (!rec.name) return;
+      const err = document.getElementById('rge-err');
+      const say = (m) => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+      const rec = this.collect('rge');
+      // ⚠ SAY IT. A blank name here used to return in SILENCE while the Add form said "Name is
+      // required." — one door, one rule, two behaviours, and the operator just sees Save do nothing.
+      if (!rec.name) { say('Name is required.'); return; }
       const list = this.regulars(); const i = list.findIndex(x => x.id === id);
-      if (i < 0) return;
+      if (i < 0) { say('That regular is no longer in your book.'); return; }
       const out = Object.assign({}, list[i], rec, { updated_at: new Date().toISOString() });
-      await App.putRecord('core', 'event_regular', out);   // row-per-record
+      // ⚠ And the verdict is checked, so a refused save does not close the modal as though it landed.
+      if (!(await App.putRecord('core', 'event_regular', out))) { say('Could not save. Nothing was changed.'); return; }
       App.closeModal('rg-edit-modal'); this.renderList();
     });
   },
@@ -203,7 +265,13 @@ S.EventsRegulars = {
         { key: 'email',       label: 'Email',       required: false, match: ['email', 'e-mail', 'email address', 'e mail', 'contact email', 'primary email'] },
         { key: 'birthday',    label: 'Birthday',    required: false, match: ['birthday', 'birth date', 'dob', 'bday', 'birthdate', 'date of birth'] },
         { key: 'anniversary', label: 'Anniversary', required: false, match: ['anniversary', 'anniversary date', 'wedding anniversary'] },
-        { key: 'drink_prefs', label: 'Drink Preferences', required: false, match: ['drink', 'prefs', 'preferences', 'favorite', 'usual', 'drink preference', 'drink preferences', 'drinks', 'favorite drink', 'usual order', 'go-to drink', 'preferred drink'] }
+        { key: 'drink_prefs', label: 'Drink Preferences', required: false, match: ['drink', 'prefs', 'preferences', 'favorite', 'usual', 'drink preference', 'drink preferences', 'drinks', 'favorite drink', 'usual order', 'go-to drink', 'preferred drink'] },
+        /* ⚠ THE ONE COLUMN THE QUIET TILE RUNS ON, AND IT COULD NOT BE IMPORTED. Every row landed
+           with last_visit blank, so an imported book started 100% "no visit logged" and the only way
+           out was opening every regular in turn. A POS or CRM guest export almost always carries a
+           last-visit or last-order date; this reads it when it is there and changes nothing when it
+           is not. Same shared date reader as the birthday fields above. */
+        { key: 'last_visit', label: 'Last Visit', required: false, match: ['last visit', 'last visited', 'last seen', 'last order', 'last order date', 'last purchase', 'most recent visit', 'last transaction', 'visit date'] }
       ],
       confirmLabel: 'Import Regulars',
       onComplete: rows => this.importRows(rows)
@@ -238,7 +306,7 @@ S.EventsRegulars = {
     const RD = { minYear: 1900, yearOptional: true };
     const conv = k => (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
       ? PosIngest.dateConvention(rows, k, RD) : { dayFirst: false, contradictory: false };
-    const bConv = conv('birthday'), aConv = conv('anniversary');
+    const bConv = conv('birthday'), aConv = conv('anniversary'), lvConv = conv('last_visit');
     const mk = c => Object.assign({}, RD, { dayFirst: c.dayFirst, dateAmbiguous: c.contradictory });
     const parseDate = (s, c) => (typeof PosIngest !== 'undefined' && PosIngest.normDate)
       ? PosIngest.normDate(s, mk(c)) : '';
@@ -279,7 +347,11 @@ S.EventsRegulars = {
         id: App.uid(), name,
         contact_phone: (r.phone || '').trim(), contact_email: (r.email || '').trim(),
         birthday: parseDate(r.birthday, bConv), anniversary: parseDate(r.anniversary, aConv),
-        drink_prefs: (r.drink_prefs || '').trim(), last_visit: '', vip: false, notes: '',
+        drink_prefs: (r.drink_prefs || '').trim(),
+        // ⚠ Through the SAME shared date reader as birthday/anniversary above, so a last-visit
+        // column gets the day-first / two-digit-year handling every other import door has. An
+        // unreadable or absent value still lands blank, which reads as "no visit logged".
+        last_visit: parseDate(r.last_visit, lvConv), vip: false, notes: '',
         created_at: new Date().toISOString()
       };
       /* `dupes` = already in the book. `inFile` = the same row twice in THIS file. They are different
