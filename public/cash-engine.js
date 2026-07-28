@@ -590,6 +590,7 @@ window.CashEngine = {
        ⚠ Same question, same answer, same key as the Operating Expenses catch-up — App.billIdentityKey
        is the one definition of it, precisely so these two cannot drift apart again. */
     const ownCovered = new Map();   // identity@month -> how many logged rows are still unclaimed
+    const ownDate = new Map();      // identity@month -> the LATEST date logged for it (see below)
     bills.forEach(b => {
       const d = String(b.date || '').slice(0, 10);
       if (!d) return;
@@ -608,9 +609,23 @@ window.CashEngine = {
          gone from the forecast. The importer solved this exact problem three files over with a
          consume-once `_used` set, under a comment about same-vendor same-amount repeats being ordinary
          in a bar. That lesson had not travelled. Each logged row now absorbs exactly ONE projection. */
-      if (!b.recurring && !b.recurring_parent) {
+      /* ⚠ A STOPPED SERIES PARENT IS NOT A HAND-LOGGED BILL (round 3, F6). Stopping a bill writes
+         recurring:false, so the parent row sailed through this gate and spent a token — a bill the
+         operator CANCELLED then quietly cancelled a month of one they did not. stopped_ym is the
+         tell, and only a stopped series carries it. */
+      if (!b.recurring && !b.recurring_parent && !b.stopped_ym) {
         const _k = App.billIdentityKey(b) + '@' + d.slice(0, 7);
         ownCovered.set(_k, (ownCovered.get(_k) || 0) + 1);
+        /* ⚠⚠ AND A PAYMENT CANNOT SETTLE A BILL THAT IS NOT DUE YET (round 3, F2). The key was
+           month-granular with no day test, so a $500 payment logged on the 3rd consumed the
+           series occurrence due on the 25th — 22 days later — and entering a bill they really paid
+           moved the forecast by exactly $0 while a month's rent silently left it. Worse on an ACH
+           lag: rent due the 28th clearing on the 2nd of the NEXT month suppressed the FOLLOWING
+           month's rent, which it had nothing to do with.
+           This is a fact about time, not a threshold fitted to a fixture ([[the-loop]] #30): a
+           logged row may only stand for an occurrence dated on or BEFORE it. Anything it cannot
+           settle is simply projected, which errs toward showing more money leaving. */
+        if (!ownDate.has(_k) || d > ownDate.get(_k)) ownDate.set(_k, d);
       }
       if (d >= startYmd && d <= endYmd) out.push({ date: d, amount: parseFloat(b.amount) || 0, vendor: b.vendor || b.category || 'Bill', category: b.category || '', recurring: !!b.recurring });
     });
@@ -645,11 +660,15 @@ window.CashEngine = {
         // the same skip list the catch-up honours (S226a). Without this the forecast kept projecting
         // a month the operator had explicitly removed from the books.
         if (Array.isArray(p.skip_months) && p.skip_months.some(m => String(m) === ym)) continue;
-        const _ok = App.billIdentityKey(p) + '@' + ym;
-        const _on = ownCovered.get(_ok) || 0;
-        if (_on > 0) { ownCovered.set(_ok, _on - 1); continue; }
+        /* ⚠ THE ORDER MATCHES THE CATCH-UP'S (round 3, F5). This asked "did the operator log it?"
+           BEFORE "is there already a generated row for it?", while hub-operating-expenses asks them
+           the other way round — so a month already covered by a child still spent the logged row's
+           token and left a second series unsuppressed. Two screens, same data, $500 apart. */
         const key = p.id + '@' + ym;
         if (covered.has(key)) continue;
+        const _ok = App.billIdentityKey(p) + '@' + ym;
+        const _on = ownCovered.get(_ok) || 0;
+        if (_on > 0 && ownDate.get(_ok) && ownDate.get(_ok) >= ymd) { ownCovered.set(_ok, _on - 1); continue; }
         covered.add(key);
         out.push({ date: ymd, amount: amt, vendor: p.vendor || p.category || 'Bill', category: p.category || '', recurring: true, projected: true });
       }
@@ -833,6 +852,34 @@ window.CashEngine = {
       const perYear = b.frequency === 'quarterly' ? 4 : b.frequency === 'annual' ? 1 : 12;
       annual += amt * perYear;
     });
+    /* ⚠⚠ DEBT SERVICE IS A FIXED COST AND THIS FUNCTION COULD NOT SEE IT (round 3, F3). It read only
+       bills() — the operating-expense log — while loan and equipment payments live in the SEPARATE
+       cash_outflows store, and the operating-expense category list has no debt-service line at all,
+       so there was no way to enter one where this would find it. Its own doc comment already
+       promised "rent, utilities, insurance, LOAN". Measured: an $1,850/mo loan left the weekly nut
+       at $1,057.69 instead of $1,484.62, the 8-week reserve target $8,461 instead of $11,877, and
+       Safe to Spend — the number the whole Cash Position page exists to produce — reading $3,415
+       HIGH, permanently. The dangerous direction, and outflowsBetween was charging that very series
+       into the 13-week forecast the whole time, so the two figures on the same screen disagreed
+       about what a fixed cost is.
+       ⚠ WHAT IS DELIBERATELY EXCLUDED, and why, so this is not re-opened as an omission:
+         · type 'tax' — a sales-tax remittance is collected money passing through, not a cost of
+           opening the doors, and setAside() already reserves it. Counting it here would hold it back
+           twice.
+         · type 'draw' — an owner draw is not a cost the bar must cover to survive a week with no
+           sales; it is the first thing an owner suspends. The reserve answers "can I keep the doors
+           open", and a draw is not part of that question.
+       Stopped and fully-paid series are dropped on the same terms as the bills above. */
+    this.cashOutflows().forEach(o => {
+      if (!o || !o.recurring) return;
+      if (o.type !== 'loan' && o.type !== 'capital') return;
+      if (o.stopped_ym && o.stopped_ym <= cur) return;
+      const endYm = this.recurringEndYm(o);
+      if (endYm && endYm < cur) return;
+      const amt = parseFloat(o.amount) || 0;
+      const perYear = o.frequency === 'quarterly' ? 4 : o.frequency === 'annual' ? 1 : 12;
+      annual += amt * perYear;
+    });
     return annual / 52;
   },
 
@@ -950,12 +997,14 @@ window.CashEngine = {
        never have been reported, but one file answering one question two ways is the drift that
        produced every defect in this family. */
     const ownCovered = new Map();
+    const ownDate = new Map();
     recs.forEach(o => {
       const d = String(o.date || '').slice(0, 10); if (!d) return;
       covered.add((o.recurring_parent || o.id) + '@' + String(o.recurring_month || d.slice(0, 7)));
-      if (!o.recurring && !o.recurring_parent) {
+      if (!o.recurring && !o.recurring_parent && !o.stopped_ym) {
         const _k = App.billIdentityKey(o) + '@' + d.slice(0, 7);
         ownCovered.set(_k, (ownCovered.get(_k) || 0) + 1);
+        if (!ownDate.has(_k) || d > ownDate.get(_k)) ownDate.set(_k, d);   // see projectedBills
       }
       if (d >= startYmd && d <= endYmd) out.push({ date: d, amount: parseFloat(o.amount) || 0, type: o.type || 'capital', label: o.notes || this._outflowLabel(o.type) });
     });
@@ -980,10 +1029,11 @@ window.CashEngine = {
         if (ymd < startYmd || ymd > endYmd) continue;
         const _ym = ymd.slice(0, 7);
         if (Array.isArray(p.skip_months) && p.skip_months.some(m => String(m) === _ym)) continue;
+        const key = p.id + '@' + _ym; if (covered.has(key)) continue;
         const _ok = App.billIdentityKey(p) + '@' + _ym;
         const _on = ownCovered.get(_ok) || 0;
-        if (_on > 0) { ownCovered.set(_ok, _on - 1); continue; }
-        const key = p.id + '@' + _ym; if (covered.has(key)) continue; covered.add(key);
+        if (_on > 0 && ownDate.get(_ok) && ownDate.get(_ok) >= ymd) { ownCovered.set(_ok, _on - 1); continue; }
+        covered.add(key);
         out.push({ date: ymd, amount: amt, type: p.type || 'capital', label: p.notes || this._outflowLabel(p.type), projected: true, recurring_parent: p.id });
       }
     });
@@ -1036,7 +1086,17 @@ window.CashEngine = {
     if (!(rate > 0)) return [];
     const quarterly = this.taxFrequency() === 'quarterly';
     const manualMonths = new Set();
-    this.cashOutflows().forEach(o => { if (o.type === 'tax' && o.date) manualMonths.add(String(o.date).slice(0, 7)); });
+    /* ⚠⚠ A RECURRING TAX OUTFLOW WAS COUNTED TWICE (round 3, F4). This built its "the operator has
+       already entered a remittance for this month" set from RAW rows only, so it could see a tax
+       outflow physically dated in a month but never the ones outflowsBetween PROJECTS from a
+       recurring tax series — and survivalForecast concatenates both lists. Setting sales tax up as
+       a recurring outflow is the obvious move (the type is in the dropdown and Recurring is on the
+       same form), and it charged sales tax roughly twice every month, forever. Pessimistic, which is
+       why nobody would ever report it; it just makes the runway and the low point wrong.
+       Asking outflowsBetween over the same window means the projection and the suppression can never
+       disagree about which months a tax series covers. */
+    this.cashOutflows().forEach(o => { if (o && o.type === 'tax' && o.date) manualMonths.add(String(o.date).slice(0, 7)); });
+    this.outflowsBetween(startYmd, endYmd).forEach(o => { if (o && o.type === 'tax' && o.date) manualMonths.add(String(o.date).slice(0, 7)); });
     const out = [];
     const startD = new Date(startYmd + 'T00:00:00');
     let d = new Date(startD.getFullYear(), startD.getMonth(), 20);

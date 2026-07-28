@@ -7140,8 +7140,22 @@ const App = {
   // get the same answer from the same place rather than a second copy that drifts (S228a).
   billIdentityKey(r) {
     if (!r) return '';
-    return String(r.category || r.type || '') + '|' + String(r.vendor || '').trim().toLowerCase()
-      + '|' + Math.round((parseFloat(r.amount) || 0) * 100);
+    /* ⚠⚠ AN OUTFLOW'S NAME LIVES IN ITS NOTE (round 3, F1). Expenses discriminate on vendor; cash
+       outflows have none, and there are only five type values, so type|amount collapsed the whole
+       keyspace: two financed pieces of equipment at the same monthly payment, or a regular draw plus
+       an extra draw of the same size, cancelled each other and HALF the outflow vanished from the
+       13-week forecast and the Cash Bridge — a report of money that has already left the bank.
+       Measured $1,850 against a truth of $3,700. The note is what the operator types to tell them
+       apart ("Equipment loan" vs "SBA loan"), so it is the discriminator.
+       ⚠ App.parseNum, not parseFloat: this key decides whether money is suppressed, and parseFloat
+       reads "4,200.00" as 4. Nothing writes a formatted string today; the key should not be the
+       place that assumption is load-bearing. */
+    const who = String(r.vendor || r.notes || '').trim().toLowerCase();
+    return String(r.category || r.type || '') + '|' + who
+      // ⚠ `this.parseNum`, NOT `App.parseNum` — same reason windowCutoff uses `this.ymdLocal`.
+      // A helper lifted out of this file for a harness has no `App` in scope, so an absolute
+      // reference throws the moment the lift is exercised. It broke 38 harnesses in one run.
+      + '|' + Math.round((this.parseNum(r.amount) || 0) * 100);
   },
 
   // `opts.quiet` suppresses the failure toast for an UNATTENDED write — one fired by a render or a
