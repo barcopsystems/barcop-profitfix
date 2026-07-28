@@ -97,13 +97,16 @@ S.EventsCalendar = {
     Object.keys(map).forEach(k => {
       const bk = map[k].filter(it => it.kind === 'booking');
       if (bk.length < 2) return;
-      const bySpace = {};
+      /* ⚠⚠ ONE CONFLICT RULE, NOT TWO. This was a private copy that used a different stage set from
+         S.EventsBookings.conflicts — the calendar counted Completed events as holders and ignored
+         Quote Sent ones, so it flagged pairs the booking page then refused to name: click the red
+         chip and the banner described a DIFFERENT event. It also dropped any booking with a blank
+         space, exactly like the copy on the other screen, so a single-room bar got nothing.
+         Delegating means the two screens can never disagree again. */
       bk.forEach(it => {
         const rec = this.bookings().find(x => x.id === it.id);
-        const sp = rec && rec.space ? String(rec.space).trim().toLowerCase() : '';
-        if (sp) (bySpace[sp] = bySpace[sp] || []).push(it.id);
+        if (rec && typeof S !== 'undefined' && S.EventsBookings && S.EventsBookings.conflicts(rec).length) conflictIds.add(it.id);
       });
-      Object.keys(bySpace).forEach(sp => { if (bySpace[sp].length >= 2) bySpace[sp].forEach(id => conflictIds.add(id)); });
     });
     this._conflictIds = conflictIds;
 

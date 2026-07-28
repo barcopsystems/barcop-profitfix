@@ -210,12 +210,24 @@ S.EventsBookings = {
   },
 
   // Other active bookings holding the same space on the same day: a double-book risk.
+  /* One definition of "this booking still holds its date". Lost is dead and Completed is history,
+     so neither can clash with anything. ⚠ ev-calendar carried a SECOND copy of the conflict rule
+     with a DIFFERENT stage set, so the calendar flagged a pair the booking page then refused to
+     name — click through and the banner described a different event ([[the-loop]]: find the second
+     IMPLEMENTATION, not the second caller). The calendar now calls this. */
+  holdsDate(o) { return !!o && o.stage !== 'Lost' && o.stage !== 'Completed'; },
+
   conflicts(b) {
-    if (!b || !b.event_date || !b.space || !String(b.space).trim()) return [];
+    if (!b || !b.event_date || !this.holdsDate(b)) return [];
     const date = String(b.event_date).slice(0, 10);
-    const space = String(b.space).trim().toLowerCase();
+    /* ⚠⚠ A BLANK SPACE USED TO SWITCH THE WHOLE CHECK OFF. Space is optional at every entry door
+       and has no validation anywhere, so a single-room bar that never types one got NO protection:
+       two Booked events on the same night read completely clean on both screens. Two bookings with
+       no space named are still two events on one day, which is the thing worth seeing — the banner
+       words that case differently rather than claiming a room clash it cannot know about. */
+    const space = String(b.space || '').trim().toLowerCase();
     return this.bookings().filter(o => o.id !== b.id
-      && o.stage !== 'Lost' && o.stage !== 'Completed'
+      && this.holdsDate(o)
       && String(o.event_date || '').slice(0, 10) === date
       && String(o.space || '').trim().toLowerCase() === space);
   },
@@ -224,9 +236,21 @@ S.EventsBookings = {
     if (!conf.length) return '';
     const hard = b.stage === 'Booked' && conf.some(o => o.stage === 'Booked');
     const col = hard ? 'var(--red)' : 'var(--amber)';
-    const names = conf.map(o => esc(this.title(o)) + ' (' + esc(o.stage) + ')').join(', ');
+    /* ⚠ NAME THE TIMES. The check is date + space with no time, because a booking carries a start
+       and no duration — so a legitimate lunch and dinner turn in one room reads as a clash. Bar Cop
+       cannot know whether they overlap, so it does not pretend to: it prints both times and lets
+       the operator see at a glance that it is a turn ([[the-loop]] #30 — do not infer a fact the
+       data does not carry). Without this every twice-a-day room shows a red banner, which is how a
+       real warning stops being read. */
+    const names = conf.map(o => esc(this.title(o)) + ' (' + esc(o.stage) + ')'
+      + (o.event_time ? ', ' + esc(o.event_time) : '')).join(', ');
+    const named = !!String(b.space || '').trim();
+    const mine = b.event_time ? ' at ' + esc(b.event_time) : '';
+    const body = named
+      ? esc(b.space) + ' is also held on ' + this.fmtDate(b.event_date) + mine + ' by ' + names + '. Move one, or confirm the room turns in time.'
+      : this.fmtDate(b.event_date) + mine + ' also has ' + names + '. Neither has a space named, so Bar Cop cannot tell whether they share a room. Add the space to each to be sure.';
     return '<div style="border:1px solid ' + col + ';background:var(--input);border-radius:6px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--t2);line-height:1.6;">'
-      + '<span style="color:' + col + ';font-weight:800;">Double-booking</span> &middot; ' + esc(b.space) + ' is also held on ' + this.fmtDate(b.event_date) + ' by ' + names + '. Move one or confirm the room fits both.</div>';
+      + '<span style="color:' + col + ';font-weight:800;">' + (named ? 'Double-booking' : 'Two events, one day') + '</span> &middot; ' + body + '</div>';
   },
 
   // The event-staff roster table (who is charged to this event, and their hours).
