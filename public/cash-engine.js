@@ -528,7 +528,7 @@ window.CashEngine = {
   // The all-in event total (F&B subtotal + service charge + tax), from the Events
   // section so it matches what the booking shows; falls back to the stored field.
   _eventTotal(b) { try { return S.EventsBookings.quoteTotal(b); } catch (e) { return parseFloat(b.quoted_total) || 0; } },
-  eventInflow(startYmd, endYmd) {
+  eventInflow(startYmd, endYmd, anchorYmd) {
     const bookings = (App.data && Array.isArray(App.data.bookings)) ? App.data.bookings : [];
     let total = 0; const list = [];
     bookings.forEach(b => {
@@ -550,10 +550,22 @@ window.CashEngine = {
       if (b.balance_paid_date) return;                               // collected: in the bank, not the forecast
       const raw = String(b.event_date || '').slice(0, 10);
       if (!raw) return;
-      // An overdue balance is collectible NOW, so it lands at the window start rather than in a week
-      // that has already gone. Without this an invoice from last Friday sat in no week at all.
-      const d = raw < startYmd ? startYmd : raw;
-      if (d > endYmd) return;
+      /* ⛔⛔ THE ANCHOR IS THE FORECAST'S START, NOT THE CALLER'S WINDOW — [[the-loop]] #47/#52, and
+         I broke it again in the very fix this comment sits in. An overdue balance is collectible
+         NOW, so it lands at the START rather than in a week that has already gone. But
+         survivalForecast asks this function THIRTEEN TIMES, one WEEK each, so clamping to the
+         handed-in `startYmd` re-anchored the same invoice to every week's Monday and counted it
+         every time. MEASURED: one $6,195 receivable became $80,535 across 13 weeks, and the Anchor
+         Bar seed's own two Booked events became $98,652.00 against a truth of $9,503.50 — $89,148.50
+         of phantom cash, in the OPTIMISTIC direction, feeding the ending balance, the low point,
+         the runway and Safe to Spend.
+         So the caller passes the anchor it means, the clamp is measured against THAT, and the
+         window test is restored — which makes it impossible to count the row twice however the
+         caller slices time. committedEventCash asks once over the whole window and passes nothing,
+         so the anchor defaults to its own start and behaves exactly as before. */
+      const anchor = anchorYmd || startYmd;
+      const d = raw < anchor ? anchor : raw;
+      if (d < startYmd || d > endYmd) return;
       const evTotal = this._eventTotal(b);
       // Only a COLLECTED deposit comes off the balance still to come. Netting an
       // uncollected one out made that money vanish from the forecast entirely: it was
@@ -564,7 +576,7 @@ window.CashEngine = {
       // deposit that is not held.
       const dep = b.deposit_paid_date ? (parseFloat(b.deposit_amount) || 0) : 0;
       const bal = Math.max(0, evTotal - dep);
-      if (bal > 0) { total += bal; list.push({ name: b.event_name || 'Event', amount: bal, date: d, total: evTotal, deposit: dep }); }
+      if (bal > 0) { total += bal; list.push({ name: b.event_name || 'Event', amount: bal, date: raw, total: evTotal, deposit: dep }); }
     });
     return { total, list };
   },
@@ -777,7 +789,7 @@ window.CashEngine = {
       // are UNCOLLECTED balances dated Mon..yesterday, which are still owed to you and
       // are in no other week either (every later week starts on a future Monday), so
       // gating here silently deleted them from the whole 13-week forecast.
-      const ev = this.eventInflow(ws, we);
+      const ev = this.eventInflow(ws, we, start);
       const evAdd = onOverride ? 0 : ev.total;
       const inflow = sales + evAdd;
       const lab = this.laborForWeek(ws);
