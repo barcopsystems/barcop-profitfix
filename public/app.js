@@ -7150,7 +7150,14 @@ const App = {
        ⚠ App.parseNum, not parseFloat: this key decides whether money is suppressed, and parseFloat
        reads "4,200.00" as 4. Nothing writes a formatted string today; the key should not be the
        place that assumption is load-bearing. */
-    const who = String(r.vendor || r.notes || '').trim().toLowerCase();
+    /* ⚠⚠ THE NOTES FALLBACK IS FOR OUTFLOWS ONLY, AND IT LEAKED (round 4). An expense carries a
+       VENDOR; a cash outflow has none and carries a note instead. Written as a bare
+       vendor-or-notes fallback it also changed EXPENSES: Vendor is optional on the add form, and
+       the importer writes the file's Memo column into notes — so a QuickBooks Desktop import
+       (vendor unmapped, notes populated) stopped matching the operator's own logged payment of the
+       same bill and the month booked TWICE. Measured $8,400 against a truth of $4,200.
+       An expense always has a category; an outflow always has a type and never a category. */
+    const who = ((!r.category && r.type) ? String(r.notes || '') : String(r.vendor || '')).trim().toLowerCase();
     return String(r.category || r.type || '') + '|' + who
       // ⚠ `this.parseNum`, NOT `App.parseNum` — same reason windowCutoff uses `this.ymdLocal`.
       // A helper lifted out of this file for a harness has no `App` in scope, so an absolute

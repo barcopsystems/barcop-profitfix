@@ -840,6 +840,10 @@ window.CashEngine = {
       if (b.stopped_ym && b.stopped_ym <= cur) return;
       const endYm = this.recurringEndYm(b);
       if (endYm && endYm < cur) return;
+      // ⚠ NOT STARTED YET IS NOT A FIXED COST (round 4). A bill entered with its first payment
+      // months out was charged into the nut at full rate today, while the forecast correctly
+      // projected $0 of it — the reserve target held money back for something not yet owed.
+      if (String(b.date || '').slice(0, 7) > cur) return;
       /* ⚠ skip_months IS DELIBERATELY NOT READ HERE, AND THIS IS THE REASONING SO THE NEXT ROUND
          DOES NOT RE-OPEN IT (S228b, [[the-loop]] #29). A scan flagged that the reserve target keeps
          charging a month the operator deleted while projectedBills has dropped it. That is correct:
@@ -876,6 +880,7 @@ window.CashEngine = {
       if (o.stopped_ym && o.stopped_ym <= cur) return;
       const endYm = this.recurringEndYm(o);
       if (endYm && endYm < cur) return;
+      if (String(o.date || '').slice(0, 7) > cur) return;   // not started yet — see the bills half
       const amt = parseFloat(o.amount) || 0;
       const perYear = o.frequency === 'quarterly' ? 4 : o.frequency === 'annual' ? 1 : 12;
       annual += amt * perYear;
@@ -1096,7 +1101,18 @@ window.CashEngine = {
        Asking outflowsBetween over the same window means the projection and the suppression can never
        disagree about which months a tax series covers. */
     this.cashOutflows().forEach(o => { if (o && o.type === 'tax' && o.date) manualMonths.add(String(o.date).slice(0, 7)); });
-    this.outflowsBetween(startYmd, endYmd).forEach(o => { if (o && o.type === 'tax' && o.date) manualMonths.add(String(o.date).slice(0, 7)); });
+    /* ⚠⚠ ASK OVER THE WHOLE MONTH, NOT THE WINDOW WE WERE HANDED (round 4). The round-3 fix was
+       right and almost entirely INERT, because the only caller — survivalForecast — asks this one
+       WEEK at a time. A month was therefore suppressed only when the tax series' occurrence happened
+       to fall in the same Mon-Sun week as the 20th: measured, `recur_day` 20 worked and 1, 15 and 25
+       all still double-charged, putting ~$17,500 of phantom tax into a 13-week forecast and taking
+       the ending balance from $226,600 to $209,143.
+       A month is covered or it is not — that question has nothing to do with the slice of time the
+       caller happens to be rendering. Widen to the enclosing months before asking. */
+    const _mStart = String(startYmd).slice(0, 7) + '-01';
+    const _mEndD = new Date(parseInt(String(endYmd).slice(0, 4), 10), parseInt(String(endYmd).slice(5, 7), 10), 0);
+    const _mEnd = App.ymdLocal(_mEndD);
+    this.outflowsBetween(_mStart, _mEnd).forEach(o => { if (o && o.type === 'tax' && o.date) manualMonths.add(String(o.date).slice(0, 7)); });
     const out = [];
     const startD = new Date(startYmd + 'T00:00:00');
     let d = new Date(startD.getFullYear(), startD.getMonth(), 20);
