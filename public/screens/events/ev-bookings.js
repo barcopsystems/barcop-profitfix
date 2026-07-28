@@ -120,7 +120,19 @@ S.EventsBookings = {
   quoteParts(b) {
     b = b || {};
     const ph = parseFloat(b.per_head) || 0;
-    const party = parseInt(b.party_size) || 0;
+    /* ⚠⚠ BILL THE GUARANTEED COUNT — THE SIGNED AGREEMENT ALREADY PROMISES IT AND THE APP NEVER DID.
+       agreementTerms reads "A final guaranteed count is due several days before the event. You are
+       billed for the guaranteed count or the actual count, whichever is higher." `guaranteed_count`
+       is collected on the Run Sheet and was then used ONLY for display — never by the quote math,
+       which read the ESTIMATE (`party_size`) forever. Measured: an estimate of 60 with a final
+       guarantee of 75 at $85/head left the quoted total, the Balance Due tile, the re-printed
+       agreement and the cash forecast at $7,028 while the terms entitled the bar to $8,660 —
+       $1,632 under-collected, with no screen in Bar Cop disagreeing with the operator.
+       ⚠ Bar Cop has no ACTUAL-count field, so the honest reading of the clause it can support is
+       "the guarantee supersedes the estimate once it is given". The breakdown names which count it
+       billed, so the number never moves for a reason the operator cannot point at. */
+    const guaranteed = parseInt(b.guaranteed_count) || 0;
+    const party = guaranteed || parseInt(b.party_size) || 0;
     const fbMin = parseFloat(b.fb_minimum) || 0;
     const roomFee = parseFloat(b.room_fee) || 0;
     const svcPct = (b.service_charge_pct != null && b.service_charge_pct !== '') ? (parseFloat(b.service_charge_pct) || 0) : this.DEFAULT_SVC_PCT;
@@ -133,7 +145,7 @@ S.EventsBookings = {
     // auto-serviced or auto-taxed — it flows straight to the total (and the balance
     // due). Before this it was collected on the rate card but silently dropped from
     // every quote, PDF, agreement, and balance.
-    return { ph, party, fbMin, roomFee, svcPct, taxPct, subtotal, service, tax, total: subtotal + service + tax + roomFee };
+    return { ph, party, guaranteed, fbMin, roomFee, svcPct, taxPct, subtotal, service, tax, total: subtotal + service + tax + roomFee };
   },
   quoteTotal(b) { return this.quoteParts(b).total; },
   quoteBreakdownHtml(p) {
@@ -141,7 +153,9 @@ S.EventsBookings = {
       + '<span style="color:' + (strong ? 'var(--t1)' : 'var(--t3)') + ';font-weight:' + (strong ? '700' : '400') + ';">' + lbl + '</span>'
       + '<span style="color:' + (strong ? 'var(--gold)' : 'var(--t2)') + ';font-weight:' + (strong ? '800' : '600') + ';">' + App.fmtCurrency(val) + '</span></div>';
     return '<div style="max-width:320px;">'
-      + line('F&amp;B Subtotal', p.subtotal)
+      // Name the count the subtotal was billed on, so a total that moves when the final guarantee
+      // comes in is a change the operator can point at rather than one that just happens.
+      + line('F&amp;B Subtotal' + (p.ph && p.party ? ' (' + p.party + (p.guaranteed ? ' guaranteed' : ' est.') + ')' : ''), p.subtotal)
       + line('Service Charge (' + (p.svcPct || 0) + '%)', p.service)
       + line('Tax (' + (p.taxPct || 0) + '%)', p.tax)
       + (p.roomFee ? line('Room Fee', p.roomFee) : '')
@@ -714,8 +728,28 @@ S.EventsBookings = {
     }));
     document.getElementById('eb-viewback')?.addEventListener('click', () => { this._viewStep = null; this.renderDetail(id); });
     document.getElementById('eb-edit')?.addEventListener('click', () => this.showForm(id));
-    document.getElementById('eb-q-pdf')?.addEventListener('click', () => this.quotePDF(this.bookings().find(x => x.id === id)));
-    document.getElementById('eb-agreement')?.addEventListener('click', () => this.agreementModal(id));
+    /* ⚠⚠ THE TWO DOORS THAT PRODUCE A DOCUMENT FOR THE CLIENT WERE THE TWO THAT DID NOT SAVE FIRST.
+       Typing in the quote cells only calls renderQuoteBreakdown, so the screen showed the
+       renegotiated number while both of these read the STORED record. Measured: per-head talked
+       down from $95 to $85 and not yet saved — the breakdown on screen read $7,796 while the Quote
+       PDF and the signed Event Agreement both printed $7,028. The client signs the wrong figure on
+       the document that governs the deal.
+       openEdits() is the helper that already exists for exactly this, and its own comment describes
+       this bug being fixed for the STAGE buttons — these two were never added ([[the-loop]] #53: a
+       comment naming a defect reads as handled to every later reader). Email Quote already saved
+       first, which is what makes this an omission rather than a decision. */
+    const saveOpenFirst = async () => {
+      const f = this.openEdits();
+      if (Object.keys(f).length) await this.patch(id, f);
+    };
+    document.getElementById('eb-q-pdf')?.addEventListener('click', async () => {
+      await saveOpenFirst();
+      this.quotePDF(this.bookings().find(x => x.id === id));
+    });
+    document.getElementById('eb-agreement')?.addEventListener('click', async () => {
+      await saveOpenFirst();
+      this.agreementModal(id);
+    });
     // Quote
     this.container.querySelectorAll('.eb-rc-pill').forEach(p => p.addEventListener('click', () => this.applyRateCard(id, p.dataset.rc)));
     document.getElementById('eb-q-rc')?.addEventListener('change', e => this.applyRateCard(id, e.target.value));
