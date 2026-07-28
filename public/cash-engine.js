@@ -566,7 +566,14 @@ window.CashEngine = {
     bookings.forEach(b => {
       if (b.stage !== 'Booked' || !b.deposit_paid_date) return;
       const d = String(b.event_date || '').slice(0, 10);
-      if (!d || d < start) return;   // future booked events only
+      /* ⚠ THE TWO HALVES OF THIS STRUCT MUST BE WINDOWED THE SAME WAY. eventInflow bounds both ends
+         (`d < startYmd || d > endYmd`); this loop had a start bound and no end, so a deposit banked
+         against an event beyond the window was counted as "in hand" for a window that does not
+         contain the event. Measured: a $1,500 deposit for an event six months out produced an empty
+         event list and deposits of $1,500, and c-forecast then printed "$1,500 in deposits is
+         already in hand against booked events. No balances left to collect THIS QUARTER." — a
+         this-quarter sentence carrying an out-of-quarter figure. */
+      if (!d || d < start || d > end) return;   // booked events inside the forecast window only
       deposits += parseFloat(b.deposit_amount) || 0;
     });
     return { balanceTotal: ev.total, list: ev.list, deposits };
