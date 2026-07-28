@@ -54,8 +54,10 @@ S.EventsDashboard = {
     const bookedRev = futureBooked.reduce((s, b) => s + EB.quoteTotal(b), 0);
     const next = futureBooked.slice().sort((a, b) => (a.event_date || '').localeCompare(b.event_date || ''))[0] || null;
     const pipeline = open.reduce((s, b) => s + EB.quoteTotal(b), 0);
-    const depDueList = booked.filter(b => !b.deposit_paid_date && (parseFloat(b.deposit_amount) || 0) > 0);
-    const depositsDue = depDueList.reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
+    // ⚠ ONE DEFINITION, shared with the Bookings strip — they were two computations and disagreed by
+    // $2,000.00 on the same set, and neither dropped a booking whose balance was already settled.
+    const depDueList = EB.depositsDueList();
+    const depositsDue = EB.depositsDueTotal();
 
     // The briefing sentence below says "your win rate is X over the last 90 days", so the window is
     // 90 days, not 91 — and it is bounded at the top too (S217), or an enquiry typed with a future
@@ -173,7 +175,8 @@ S.EventsDashboard = {
     const n = info.newPend.length;
     if (k === 'leads')    return n ? n + ' lead' + (n === 1 ? '' : 's') + ' to follow up' : 'No open leads right now';
     if (k === 'deposits') {
-      const amt = st.depDueList.filter(b => info.newPend.indexOf(b.id) !== -1).reduce((s, b) => s + (parseFloat(b.deposit_amount) || 0), 0);
+      const amt = st.depDueList.filter(b => info.newPend.indexOf(b.id) !== -1)
+        .reduce((s, b) => s + this.EB()._depositHeld(b), 0);   // same floor as the list it slices
       return n ? this._money(amt) + ' due across ' + n + ' event' + (n === 1 ? '' : 's') : 'No deposits due right now';
     }
     if (k === 'prep')     return n ? n + ' event' + (n === 1 ? '' : 's') + ' need a run sheet' : 'Nothing to prep right now';
