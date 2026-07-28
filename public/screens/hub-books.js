@@ -48,7 +48,9 @@ S.HubBooks = {
       return;
     }
     const months = this._availableMonths();
-    const defaultMonth = months[0] || this._currentMonthKey();
+    // The newest month that is not the one we are standing in — see _availableMonths (S228d).
+    // Every month stays selectable; only the default steps back.
+    const defaultMonth = months.find(m => m !== this._currentMonthKey()) || months[0] || this._currentMonthKey();
     const monthOpts = months.map(m =>
       '<option value="' + m + '"' + (m === defaultMonth ? ' selected' : '') + '>' + this._monthLabel(m) + '</option>'
     ).join('');
@@ -388,9 +390,13 @@ S.HubBooks = {
   },
 
   // ── Month list — months with at least one saved week of data ───────────────
-  // Default selection is the most recent fully-completed month (today's
-  // month is excluded unless the operator has data in it and the month has
-  // ended). Listed newest first.
+  /* ⚠⚠ THIS COMMENT USED TO DESCRIBE A FILTER THAT DOES NOT EXIST, AND IT MISLED A LATER CHANGE
+     INTO CITING IT AS THE APP'S CONVENTION (S228d). It claimed "today's month is excluded unless
+     the month has ended"; the code below returns EVERY month that has a week, so months[0] — the
+     default selection — was today's PARTIAL month whenever a week had landed in it, and an operator
+     generating a monthly close got a part-month income statement by default.
+     The LIST still offers every month (closing a partial month on purpose is legitimate); only the
+     DEFAULT now steps back past the current one, which is what this comment always claimed. */
   _availableMonths() {
     const weeks = (App.data?.weeks || []).filter(w => w && w.period_end);
     if (!weeks.length) {

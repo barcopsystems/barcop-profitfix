@@ -825,7 +825,14 @@ S.HubOperatingExpenses = {
            ⚠ AND `bill date`/`invoice date` NOW OUTRANK `due date`: a QuickBooks bill export and a
            Sysco invoice both carry both, and dating the expense to when it is DUE books a 28 Jan
            bill on Net 30 into February. */
-        { key: 'date',     label: 'Date',     required: true,  match: ['date', 'bill date', 'invoice date', 'invoicedate', 'transaction date', 'business date', 'posting date', 'post date', 'posted date', 'date posted', 'statement date', 'settlement date', 'expense date', 'purchase date', 'charge date', 'payment date', 'batch date', 'due date', 'date paid', 'trans date', 'entry date', 'paid', 'posted', 'day'] },
+        /* ⚠ THIS FIELD IS REQUIRED, SO AN UNMATCHED HEADER REFUSES THE WHOLE IMPORT — and two real
+           exports were being refused: Mercury heads its column "Date (UTC)" and Expensify heads its
+           "Timestamp" (S228e). Both are named EXPLICITLY here rather than by widening the shared
+           normExact vocabulary, whose own comment records what that cost last time: it once stripped
+           any parenthetical with no lowercase letters, which collapsed "Total (%)" onto "Total ($)"
+           and put a PERCENT into a required money field. A door-local candidate has no blast radius;
+           a change to normExact reaches all 23 doors. */
+        { key: 'date',     label: 'Date',     required: true,  match: ['date', 'bill date', 'invoice date', 'invoicedate', 'transaction date', 'business date', 'posting date', 'post date', 'posted date', 'date posted', 'statement date', 'settlement date', 'expense date', 'purchase date', 'charge date', 'payment date', 'batch date', 'due date', 'date paid', 'trans date', 'entry date', 'date (utc)', 'timestamp', 'order date', 'delivery date', 'service date', 'paid', 'posted', 'day'] },
         /* ⚠⚠ THE FILE OFTEN SAYS WHICH WAY THE MONEY WENT — READ IT (S225). Kyle's bank export heads
            this "Transaction Type" and fills it with Debit / Credit, and it was reaching this door
            NOWHERE: measured against the real _autoMap, his header row bound date←Posting Date,
@@ -868,7 +875,12 @@ S.HubOperatingExpenses = {
            prints both columns side by side.
            ⚠⚠ AND THE COMMENT LIVES HERE, NOT INSIDE THE ARRAY — a mid-line `//` truncated the field
            for `verify-reference-import-doors`' line-based slicer. Third time this session. */
-        { key: 'amount',   label: 'Amount',   required: true,  match: ['amount', 'total', 'cost', 'debit', 'amt', 'value', 'expense', 'payment', 'charge amount', 'charge total', 'invoice total', 'invoice amount', 'amount due', 'charges', 'charge', 'dollars', 'total amount', 'amount paid'] },
+        /* ⚠ ALSO REQUIRED, ALSO REFUSING REAL FILES (S228e): PNC splits its register into
+           "Withdrawals" and "Deposits" with no single amount column, and Sysco, GFS and PFG all head
+           the line total "Extended Price". Named explicitly for the same reason as the date field
+           above — 'price' as a bare word is NOT added, because it would reach a unit price on a
+           distributor guide and book one bottle as the whole invoice. */
+        { key: 'amount',   label: 'Amount',   required: true,  match: ['amount', 'total', 'cost', 'debit', 'amt', 'value', 'expense', 'payment', 'charge amount', 'charge total', 'invoice total', 'invoice amount', 'amount due', 'charges', 'charge', 'dollars', 'total amount', 'amount paid', 'extended price', 'withdrawals', 'withdrawal'] },
         { key: 'notes',    label: 'Notes',    required: false, match: ['notes', 'memo', 'note', 'comment', 'details', 'remark'] }
       ],
       confirmLabel: 'Import Expenses',
