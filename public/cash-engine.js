@@ -580,10 +580,38 @@ window.CashEngine = {
     const bills = this.bills();
     const out = [];
     const covered = new Set();
+    /* ⚠⚠ A BILL THE OPERATOR LOGGED THEMSELVES COVERS THAT MONTH TOO (S226c). The comment above
+       claims "nothing double counts", and for a generated CHILD that was true — the key is the
+       parent's id. But a bill entered by hand, or imported off a bank register, carries no
+       recurring_parent, so it keyed on its own id and suppressed nothing: measured, an operator with
+       a $4,200 recurring rent who also logged next month's rent saw $8,400 of rent in the forecast
+       window against a truth of $4,200, feeding the survival forecast, the low-point week, the
+       reserve target and Safe to Spend.
+       ⚠ Same question, same answer, same key as the Operating Expenses catch-up — App.billIdentityKey
+       is the one definition of it, precisely so these two cannot drift apart again. */
+    const ownCovered = new Map();   // identity@month -> how many logged rows are still unclaimed
     bills.forEach(b => {
       const d = String(b.date || '').slice(0, 10);
       if (!d) return;
-      covered.add((b.recurring_parent || b.id) + '@' + d.slice(0, 7));
+      /* ⚠⚠ THE MONTH A CHILD SATISFIES, NOT THE DATE TYPED IN IT — the same fact the catch-up was
+         taught (S226b) and this was NOT, which made a half-migration worse than either whole.
+         A generated row re-dated across a month boundary ("I paid July's rent on Aug 2") kept
+         claiming AUGUST here, so August's own rent was never projected and no re-mint arrived to
+         cover it: measured $12,600 of bills in a 13-week window against a truth of $16,800, an
+         ending balance $4,200 HIGH, and the low-point week moved with it. Understating what leaves
+         the bank is the dangerous direction — it feeds Safe to Spend, the runway and the lender PDF,
+         and nothing on screen says a month is missing. */
+      covered.add((b.recurring_parent || b.id) + '@' + String(b.recurring_month || d.slice(0, 7)));
+      /* ⚠ CONSUME-ONCE, NOT "DOES ONE EXIST" (S226 round 2). A Set answered "is there an identical
+         row this month?", so ONE logged payment cancelled EVERY series it matched: two identical
+         equipment leases at $249 and a single $249 payment suppressed both, $498 of real outflow
+         gone from the forecast. The importer solved this exact problem three files over with a
+         consume-once `_used` set, under a comment about same-vendor same-amount repeats being ordinary
+         in a bar. That lesson had not travelled. Each logged row now absorbs exactly ONE projection. */
+      if (!b.recurring && !b.recurring_parent) {
+        const _k = App.billIdentityKey(b) + '@' + d.slice(0, 7);
+        ownCovered.set(_k, (ownCovered.get(_k) || 0) + 1);
+      }
       if (d >= startYmd && d <= endYmd) out.push({ date: d, amount: parseFloat(b.amount) || 0, vendor: b.vendor || b.category || 'Bill', category: b.category || '', recurring: !!b.recurring });
     });
     bills.filter(b => b.recurring).forEach(p => {
@@ -612,7 +640,15 @@ window.CashEngine = {
         const ymd = App.ymdLocal(occ);
         if (stop && ymd.slice(0, 7) >= stop) break;
         if (ymd < startYmd || ymd > endYmd) continue;
-        const key = p.id + '@' + ymd.slice(0, 7);
+        const ym = ymd.slice(0, 7);
+        // A month the operator deleted off the Operating Expenses card is a decision, not a gap —
+        // the same skip list the catch-up honours (S226a). Without this the forecast kept projecting
+        // a month the operator had explicitly removed from the books.
+        if (Array.isArray(p.skip_months) && p.skip_months.some(m => String(m) === ym)) continue;
+        const _ok = App.billIdentityKey(p) + '@' + ym;
+        const _on = ownCovered.get(_ok) || 0;
+        if (_on > 0) { ownCovered.set(_ok, _on - 1); continue; }
+        const key = p.id + '@' + ym;
         if (covered.has(key)) continue;
         covered.add(key);
         out.push({ date: ymd, amount: amt, vendor: p.vendor || p.category || 'Bill', category: p.category || '', recurring: true, projected: true });

@@ -7109,6 +7109,36 @@ const App = {
     for (let i = list.length - 1; i >= 0; i--) if (list[i] && ids.has(list[i].id)) list.splice(i, 1);
   },
 
+  // ── "Is this the same bill?" — ONE definition, because two systems have to agree ──────────────
+  // A recurring bill exists in two shapes at once: the rows Bar Cop GENERATES for each elapsed
+  // month, and whatever the operator logs themselves (by hand, or off a bank register through the
+  // expense importer). Both the Operating Expenses catch-up and CashEngine's forecast have to answer
+  // "has this month already been paid for?", and they were answering it differently: each recognised
+  // only its own generated children, so a bill the operator logged themselves counted TWICE — the
+  // month read double on the books AND a second copy was projected into the cash forecast.
+  // Identity is category + vendor + amount, deliberately WITHOUT the day: a bill entered off a bank
+  // statement lands on the day it cleared, not the day the series says it is due.
+  // ⚠⚠ WHAT THIS DOES **NOT** REACH, MEASURED, because an earlier version of this comment claimed
+  // it did: a row that arrives through the EXPENSE IMPORTER off a bank register does not match. The
+  // importer stores the raw bank description as the vendor ("LANDLORD LLC RENT") and falls back to
+  // the category "Other" when the file's own column does not match one of ours — so on a real Chase
+  // header row NEITHER half of the identity agrees with the recurring bill it is paying, and the
+  // month still books twice. Suppression is deliberately strict because it changes a number; the
+  // importer case is caught by the WARNING instead (hub-operating-expenses._doubleBookedThisMonth,
+  // which also matches on amount alone), and that is a sentence, not a silent adjustment.
+  // Also asymmetric on purpose-of-note: vendor is case- and space-normalised, category is not,
+  // because category is chosen from a fixed list at every hand-entry door.
+  // ⚠ The amount is part of it on purpose. Two payments to one vendor in one month are ordinary in a
+  // bar (two ice runs, two kegs); two payments of the IDENTICAL amount, in the same category, in the
+  // month a recurring bill of exactly that amount falls due, is the same bill entered twice. Where
+  // the amount differs, nothing is suppressed and both are counted — see the pins in
+  // verify-opex-recurring.js, which assert BOTH directions.
+  billIdentityKey(r) {
+    if (!r) return '';
+    return String(r.category || '') + '|' + String(r.vendor || '').trim().toLowerCase()
+      + '|' + Math.round((parseFloat(r.amount) || 0) * 100);
+  },
+
   // `opts.quiet` suppresses the failure toast for an UNATTENDED write — one fired by a render or a
   // background resync rather than by something the operator just did. Reporting those pops a red
   // message over a page they merely opened, having done nothing. It never changes the return value,
