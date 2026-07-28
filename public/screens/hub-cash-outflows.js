@@ -166,9 +166,24 @@ S.HubCashOutflows = {
     // ⚠ A STOPPED SERIES BELONGS HERE TOO, or it is in no table at all (round 4, F4). Covers both
     // the new shape (recurring:false) and any legacy row still carrying recurring:true with a
     // stopped_ym that has already arrived.
+    /* ⚠⚠ A SERIES IS NOT A DATED PAYMENT, SO THE PERIOD CHIP MUST NOT HIDE IT (round 6 — the
+       round-4 unreachable-record defect coming back through a different gate). A series' date is
+       its FIRST due date, and the widest chip is Last Quarter, so any loan older than about three
+       months fell out of every chip once it was stopped: measured, series started 4, 8 and 14 months
+       ago all reachable from NOWHERE — no Edit, no Delete, no resume — while the engine still held
+       the record. A series whose term simply RAN OUT did the same without anyone pressing Stop.
+       ⚠ The pin that claimed this was fixed (S5c) is a source-text tripwire on the recurring clause
+       and never exercised the date filter, so it passed on a false claim. Rewritten to run the real
+       filters. */
     const _cur = App.todayLocal().slice(0, 7);
-    const recs = this.records().filter(o => o && o.id && (!o.recurring || (o.stopped_ym && o.stopped_ym <= _cur))
-        && (o.date || '') >= b.s && (o.date || '') <= b.e)
+    const _ended = (o) => {
+      const e = (window.CashEngine && CashEngine.recurringEndYm) ? CashEngine.recurringEndYm(o) : null;
+      return !!(e && e < _cur);
+    };
+    const _dormantSeries = (o) => !!((o.stopped_ym && o.stopped_ym <= _cur) || (o.recurring && _ended(o)));
+    const recs = this.records().filter(o => o && o.id
+        && (!o.recurring || _dormantSeries(o))
+        && (_dormantSeries(o) || ((o.date || '') >= b.s && (o.date || '') <= b.e)))
       .sort((a, c) => (String(a.date) < String(c.date) ? 1 : -1));
     const rows = recs.length
       ? recs.map(o => '<tr>'
@@ -271,7 +286,12 @@ S.HubCashOutflows = {
            ⚠ AND A RESUME THAT CAN GENERATE NOTHING MUST SAY SO, not close the modal on a record
            that then falls out of both tables — the round-4 unreachable-record defect coming back in
            through the Resume door. */
-        const _termNow = (termV && termV > 0) ? termV : (parseInt(base.term_months, 10) || 0);
+        /* ⚠ THE FIELD IS THE ANSWER, NOT THE STORED VALUE (round 6). Falling back to the stored term
+           when the box is blank meant that CLEARING "Ends after" — which this refusal's own message
+           tells the operator to do — re-derived the finished term and refused again. A dead end whose
+           only escape was guessing that the other half of the sentence worked. Line 283 already
+           treats a blank box as Ongoing; this now agrees with it, and with the expense twin. */
+        const _termNow = (termV && termV > 0) ? termV : 0;
         const _endYm = _termNow > 0 ? CashEngine.recurringEndYm(Object.assign({}, base, { date: date, term_months: _termNow })) : null;
         if (_endYm && _endYm < App.todayLocal().slice(0, 7)) {
           showErr('That fixed term has already finished. Change the date to when it next starts, or clear "Ends after" to keep it going.');
@@ -281,10 +301,14 @@ S.HubCashOutflows = {
         out.frequency = document.getElementById('cb-f-frequency')?.value || 'monthly';
         out.recur_day = parseInt(String(date).slice(8, 10), 10) || 1;
         if (termV && termV > 0) out.term_months = termV; else delete out.term_months;
-        if (base.stopped_ym) {
+        // ⚠ SHAPE-CHECKED AND BOUNDED (round 6). A corrupt stamp of '0001-01' generated 24,306
+        // skip entries — with unpadded year keys — and WROTE them to the record. A pause nobody
+        // could have taken is not a pause; refuse the stamp rather than trusting it.
+        if (/^\d{4}-(0[1-9]|1[0-2])$/.test(String(base.stopped_ym || ''))) {
           const idx = (mk) => parseInt(mk.slice(0, 4), 10) * 12 + (parseInt(mk.slice(5, 7), 10) - 1);
           const skips = Array.isArray(base.skip_months) ? base.skip_months.slice() : [];
-          for (let i = idx(String(base.stopped_ym)); i < idx(App.todayLocal().slice(0, 7)); i++) {
+          const from = idx(String(base.stopped_ym)), to = idx(App.todayLocal().slice(0, 7));
+          for (let i = Math.max(from, to - 240); i < to; i++) {
             const m = Math.floor(i / 12) + '-' + String((i % 12) + 1).padStart(2, '0');
             if (skips.indexOf(m) < 0) skips.push(m);
           }
@@ -300,8 +324,19 @@ S.HubCashOutflows = {
          $44,308, Safe to Spend moved by $40,615, three months of forecast went $0 -> $72,000, and the
          status flipped from "Ends Apr 2029" to "Ongoing". The Anchor Bar seed ships exactly one
          record this bites: the 24-month equipment loan. */
-      else { delete out.recurring; delete out.recur_day;
-        out.stopped_ym = base.stopped_ym || App.todayLocal().slice(0, 7); }
+      /* ⚠⚠ ONLY A ROW THAT WAS RECURRING GETS A STOP STAMP (round 6). This branch runs for EVERY
+         non-recurring save — a plain logged payment, and the Repeat button — so an ordinary edit
+         stamped stopped_ym on a one-off payment. CashEngine gates the "the operator already logged
+         this" token on !o.stopped_ym, so the stamped row stopped counting as a payment and the
+         matching series occurrence was projected on top of it: measured, a no-op Edit taking this
+         month from $1,850 to $3,700. The expense twin already carries this exact guard, with the
+         comment "a plain expense never had a series"; the outflow door was written without it. */
+      else {
+        const _wasRec = !!base.recurring;
+        delete out.recurring; delete out.recur_day;
+        if (_wasRec) out.stopped_ym = base.stopped_ym || App.todayLocal().slice(0, 7);
+        else delete out.stopped_ym;
+      }
       await App.putRecord('core', 'cash_outflow', out);
       if (!recChecked) this._setPeriodFor(date);
       App.closeModal(id);

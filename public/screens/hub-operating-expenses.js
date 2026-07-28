@@ -330,7 +330,16 @@ S.HubOperatingExpenses = {
          was left deciding by hand — so a rent paid LATE on the 3rd, for the previous month, made
          this print "looks logged twice" over a month the day rule certifies as CORRECT. Harmless as
          a sentence and dangerous the moment the operator acts on it: deleting the generated row
-         drops the month $4,200 into Books, the P&L, By Category and Break-Even. */
+         drops the month $4,200 into Books, the P&L, By Category and Break-Even.
+         ⚠⚠ WHAT THIS DELIBERATELY GIVES UP, so it is not re-opened as an omission ([[the-loop]] #29
+         and #30). A payment logged BEFORE the due day now neither suppresses nor warns — so if it
+         really was this month's bill paid early, the month reads double and nothing says so. That is
+         ACCEPTED, because the two cases are INDISTINGUISHABLE: "last month's bill paid late" and
+         "this month's bill paid early" are the same row, and nothing in the data separates them.
+         Treating it as the late payment is right far more often (a bill is paid after it is issued),
+         it is what the catch-up already assumes, and the alternative — warning on every early
+         payment — puts a "check which is real" prompt over months that are correct. Guessing would
+         need a threshold fitted to a fixture, which is the one thing this file has learned not to do. */
       const _rawDay = parseInt(p.recur_day, 10) || (() => {
         const s0 = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
         return isNaN(s0.getTime()) ? 1 : s0.getDate();

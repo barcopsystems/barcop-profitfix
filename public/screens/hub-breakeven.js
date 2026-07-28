@@ -280,11 +280,23 @@ S.HubBreakEven = {
     const debtRow = c.debtMonthly > 0
       ? '<tr><td><div class="val">Debt Service</div></td><td>' + f2(c.debtMonthly) + '</td><td class="val">' + f2(c.debtMonthly * 12 / 52) + '</td><td></td></tr>'
       : '';
-    const nutRows = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(k =>
-      '<tr><td><div class="val">' + esc(k) + '</div></td><td>' + f2(byCat[k]) + '</td><td class="val">' + f2(byCat[k] * 12 / 52) + '</td><td></td></tr>').join('')
-      + debtRow
-      + salRow
-      + '<tr><td><div class="val" style="font-weight:700;">Total</div></td><td style="font-weight:700;">' + f2(c.monthlyFixed) + '</td><td class="val" style="font-weight:700;">' + f2(c.weeklyNut) + '</td><td></td></tr>';
+    /* ⚠ THE PER-WEEK COLUMN HAS TO ADD UP TOO (round 6). Every row was rounded to cents and the
+       Total was not, so eleven rows summed to $2,352.22 under a printed $2,352.21 — a table whose
+       whole job is showing what the nut is made of, off by a cent, in the Break-Even PDF. Summing
+       the ROUNDED row values is what makes the column true; weeklyNut keeps its full precision
+       everywhere it is used as a number (Break-Even itself is computed from it, not from this). */
+    let _wkShown = 0;
+    const _wkCell = (v) => { const r = Math.round(v * 100) / 100; _wkShown += r; return f2(r); };
+    const catRows = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(k =>
+      '<tr><td><div class="val">' + esc(k) + '</div></td><td>' + f2(byCat[k]) + '</td><td class="val">' + _wkCell(byCat[k] * 12 / 52) + '</td><td></td></tr>').join('');
+    const debtRow2 = c.debtMonthly > 0
+      ? '<tr><td><div class="val">Debt Service</div></td><td>' + f2(c.debtMonthly) + '</td><td class="val">' + _wkCell(c.debtMonthly * 12 / 52) + '</td><td></td></tr>'
+      : '';
+    const salRow2 = c.weeklySalaried > 0
+      ? '<tr><td><div class="val">Salaried Labor</div></td><td>' + f2(c.salariedMonthly) + '</td><td class="val">' + _wkCell(c.weeklySalaried) + '</td><td></td></tr>'
+      : '';
+    const nutRows = catRows + debtRow2 + salRow2
+      + '<tr><td><div class="val" style="font-weight:700;">Total</div></td><td style="font-weight:700;">' + f2(c.monthlyFixed) + '</td><td class="val" style="font-weight:700;">' + f2(_wkShown) + '</td><td></td></tr>';
     const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="be-export">Export PDF</button>';
     const nutCard = this._sh('The Nut', exportBtn)
       + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">' + this.COLS
