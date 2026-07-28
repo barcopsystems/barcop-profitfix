@@ -121,7 +121,11 @@ S.HubCashOutflows = {
   activeRecurring() {
     const cur = App.todayLocal().slice(0, 7);
     return CashEngine.recurringOutflows().filter(o => {
-      if (o.stopped_ym) return false;
+      // ⚠ COMPARED TO THE CURRENT MONTH, like every other reader of this field (round 4, F4). Bare
+      // truthiness hid a series the whole app still considered live, and hid it somewhere with no
+      // way back. Legacy records stamped by the old Stop (a FUTURE month, recurring still true) are
+      // recovered by this: they show until the month they actually stop.
+      if (o.stopped_ym && o.stopped_ym <= cur) return false;
       const end = CashEngine.recurringEndYm(o);
       return !(end && end < cur);
     });
@@ -159,7 +163,12 @@ S.HubCashOutflows = {
 
   // ── Logged Outflows: one-time outflows in the selected period ─────────────────
   loggedSection(b) {
-    const recs = this.records().filter(o => o && o.id && !o.recurring && (o.date || '') >= b.s && (o.date || '') <= b.e)
+    // ⚠ A STOPPED SERIES BELONGS HERE TOO, or it is in no table at all (round 4, F4). Covers both
+    // the new shape (recurring:false) and any legacy row still carrying recurring:true with a
+    // stopped_ym that has already arrived.
+    const _cur = App.todayLocal().slice(0, 7);
+    const recs = this.records().filter(o => o && o.id && (!o.recurring || (o.stopped_ym && o.stopped_ym <= _cur))
+        && (o.date || '') >= b.s && (o.date || '') <= b.e)
       .sort((a, c) => (String(a.date) < String(c.date) ? 1 : -1));
     const rows = recs.length
       ? recs.map(o => '<tr>'
@@ -252,7 +261,16 @@ S.HubCashOutflows = {
       const base = isEdit ? (this.records().find(o => o.id === rec.id) || {}) : {};
       const out = Object.assign({}, base, { id: isEdit ? rec.id : App.uid(), date, type, amount, notes: note, created_at: base.created_at || new Date().toISOString() });
       if (recChecked) { out.recurring = true; out.frequency = document.getElementById('cb-f-frequency')?.value || 'monthly'; out.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; if (termV && termV > 0) out.term_months = termV; else delete out.term_months; delete out.stopped_ym; }
-      else { delete out.recurring; delete out.frequency; delete out.recur_day; delete out.term_months; delete out.stopped_ym; }
+      /* ⚠⚠ A PAUSE MUST NOT DESTROY WHAT THE SERIES IS (round 4, F2 — the same defect round 3 fixed
+         on the Operating Expenses twin, still live here). Deleting frequency and term_months was
+         harmless while turning a series off was terminal; the moment it can be turned back on, the
+         re-opened form falls back to "Monthly" and blank. Measured on a $24,000 ANNUAL loan with a
+         36-month term: the weekly nut went $461.54 -> $5,538.46 (12x), the reserve target $3,692 ->
+         $44,308, Safe to Spend moved by $40,615, three months of forecast went $0 -> $72,000, and the
+         status flipped from "Ends Apr 2029" to "Ongoing". The Anchor Bar seed ships exactly one
+         record this bites: the 24-month equipment loan. */
+      else { delete out.recurring; delete out.recur_day;
+        out.stopped_ym = base.stopped_ym || App.todayLocal().slice(0, 7); }
       await App.putRecord('core', 'cash_outflow', out);
       if (!recChecked) this._setPeriodFor(date);
       App.closeModal(id);
@@ -268,8 +286,17 @@ S.HubCashOutflows = {
     const rec = this.records().find(o => o.id === id); if (!rec) return;
     const ok = await App.confirm({ title: 'Stop this recurring outflow?', message: CashEngine._outflowLabel(rec.type) + ' will stop recurring. The months already logged stay in your bridge and forecast, it drops off going forward.', confirmText: 'Stop It', cancelText: 'Keep It' });
     if (!ok) return;
-    const now = new Date(); const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    await App.putRecord('core', 'cash_outflow', Object.assign({}, rec, { stopped_ym: App.ymdLocal(next).slice(0, 7) }));
+    /* ⚠⚠ STOP LEFT THE RECORD UNREACHABLE (round 4, F4). It wrote stopped_ym while KEEPING
+       recurring: true — and activeRecurring drops anything with a stopped_ym at all while the
+       logged table shows only !o.recurring, so the row fell out of BOTH tables: no Edit, no
+       Delete, no way to resume, "Recurring / mo" reading $0.00 — while CashEngine still held
+       $507.69/wk of reserve against it and still charged this month's payment, because the engine
+       correctly compares stopped_ym to the CURRENT month.
+       Now identical to the Operating Expenses twin: recurring:false plus the current month. The
+       row lands in the logged table, stays editable, and every engine reader already tests
+       recurring first. */
+    await App.putRecord('core', 'cash_outflow', Object.assign({}, rec,
+      { recurring: false, stopped_ym: App.todayLocal().slice(0, 7) }));
     this.draw();
   },
   async del(id) {

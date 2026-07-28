@@ -109,6 +109,7 @@ S.HubOperatingExpenses = {
   _sumYTD(monthKey) {
     const year = monthKey.slice(0, 4);
     return this.records().filter(r => {
+      if (!r) return false;
       const mk = this._monthKey(r.date);
       return mk && mk.slice(0, 4) === year && mk <= monthKey;
     }).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
@@ -116,7 +117,7 @@ S.HubOperatingExpenses = {
   _sumMonthByCategory(monthKey) {
     const out = {};
     this.CATEGORIES.forEach(c => { out[c] = 0; });
-    this.records().filter(r => this._monthKey(r.date) === monthKey).forEach(r => {
+    this.records().filter(r => r && this._monthKey(r.date) === monthKey).forEach(r => {
       const c = this.CATEGORIES.includes(r.category) ? r.category : 'Other';
       out[c] = (out[c] || 0) + (parseFloat(r.amount) || 0);
     });
@@ -127,6 +128,7 @@ S.HubOperatingExpenses = {
     const out = {};
     this.CATEGORIES.forEach(c => { out[c] = 0; });
     this.records().filter(r => {
+      if (!r) return false;
       const mk = this._monthKey(r.date);
       return mk && mk.slice(0, 4) === year && mk <= monthKey;
     }).forEach(r => {
@@ -247,11 +249,25 @@ S.HubOperatingExpenses = {
      makes them stop trusting the total, so _renderCurrent NAMES every month this covered.
      ⚠ SAME KEY AS THE CASH FORECAST. App.billIdentityKey is the one definition; CashEngine
      .projectedBills had the identical blind spot and now asks the same question the same way. */
+  /* ⚠⚠ AND A PAYMENT CANNOT SETTLE A BILL THAT IS NOT DUE YET (round 4, F1). CashEngine learned this
+     in round 3 and this door did not — while the comment on the shared key claimed the two now "ask
+     the same question the same way". Measured: a rent series due on the 25th, with last month's rent
+     logged late on the 3rd, made the LOG read $4,200 for the month while the FORECAST correctly read
+     $8,400 — the 25th had not been paid. The log is what Books, the P&L, YTD, By Category and the
+     1099 worksheet all read, so the understatement is the one that reaches the accountant.
+     A fact about time, not a threshold: a logged row may only stand for an occurrence dated on or
+     BEFORE it. dueDay is the series' own recurrence day, clamped to the month like the catch-up. */
   _ownCover(p, monthKey, used) {
     if (!p || !monthKey) return null;
     const key = App.billIdentityKey(p);
+    const y = parseInt(monthKey.slice(0, 4), 10), m0 = parseInt(monthKey.slice(5, 7), 10) - 1;
+    const start = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
+    const rawDay = parseInt(p.recur_day, 10) || (isNaN(start.getTime()) ? 1 : start.getDate());
+    const dueDay = Math.min(rawDay, this._daysInMonth(y, m0));
+    const due = monthKey + '-' + String(dueDay).padStart(2, '0');
     const hit = this.records().find(r => r && r.date && !r.recurring && !r.recurring_parent
-      && String(r.date).slice(0, 7) === monthKey && App.billIdentityKey(r) === key
+      && String(r.date).slice(0, 7) === monthKey && String(r.date).slice(0, 10) >= due
+      && App.billIdentityKey(r) === key
       && !(used && used.has(r.id))) || null;
     if (hit && used) used.add(hit.id);   // one logged bill stands down one series, not all of them
     return hit;
@@ -288,6 +304,7 @@ S.HubOperatingExpenses = {
     const used = new Set();
     const series = arr.filter(p => p && p.recurring && !p.recurring_parent);
     const nameOf = (p) => (p.vendor || p.category || 'A recurring bill');
+    const withAmt = (p) => nameOf(p) + ' (' + App.fmtCurrency(parseFloat(p.amount) || 0) + ')';
     const covered = [], doubled = [];
     // PASS 1 — mirrors the catch-up: a series that owes this month and has no generated row.
     series.forEach(p => {
@@ -308,9 +325,16 @@ S.HubOperatingExpenses = {
         && String(r.vendor || '').trim().toLowerCase() === String(p.vendor || '').trim().toLowerCase();
       const hit = pool.find(r => !used.has(r.id) && cents(r) === cents(p) && cents(p) !== 0
         && (same(r) || String(r.category || '') === 'Other'));
-      if (hit) { used.add(hit.id); doubled.push({ name: nameOf(p), other: (hit.vendor || hit.category || 'a bill you logged') }); }
+      if (hit) { used.add(hit.id); doubled.push({ name: nameOf(p), label: withAmt(p),
+        other: (hit.vendor || hit.category || 'a bill you logged') }); }
     });
-    return { covered: covered, doubled: doubled };
+    /* ⚠ ONE NAME, ONE CLAIM (round 4). Two DIFFERENT bills that share a vendor — a utility's
+       electric and gas — could land in opposite lists, printing "did not add it again" and "logged
+       twice" about the same string, with `other` naming that same string so there was nothing to go
+       and find. Both sentences were individually true and the pair was useless. The actionable one
+       wins, and it carries the AMOUNT so the operator can tell the two bills apart. */
+    const loud = new Set(doubled.map(d => d.name));
+    return { covered: covered.filter(n => !loud.has(n)), doubled: doubled };
   },
 
   _ownCoveredThisMonth() { return this._monthNotes().covered; },
@@ -663,6 +687,7 @@ S.HubOperatingExpenses = {
   // Expected (not-yet-booked) recurring rows for a future month: a forecast only.
   _expectedRecurring(monthKey) {
     const arr = this.records();
+    const _usedNext = new Set();   // one logged bill stands down one series — see _ownCover
     const idx = parseInt(monthKey.slice(0, 4), 10) * 12 + (parseInt(monthKey.slice(5, 7), 10) - 1);
     const out = [];
     arr.filter(p => p && p.recurring && !p.recurring_parent && p.date).forEach(p => {
@@ -679,7 +704,10 @@ S.HubOperatingExpenses = {
             : (r.recurring_parent === p.id && String(r.recurring_month || String(r.date || '').slice(0, 7)) === monthKey)))) return;
       // And a bill they already logged themselves — without this the card printed an Expected rent
       // directly underneath the rent they had entered (S226c).
-      if (this._ownCover(p, monthKey)) return;
+      // ⚠ THE used SET, which this call was missing (round 4, F5) — so two identical series both
+      // stood down against ONE logged payment and the Next Month card showed no Expected row for a
+      // bill that is genuinely still owed. The catch-up already threads it; this did not.
+      if (this._ownCover(p, monthKey, _usedNext)) return;
       out.push(p);
     });
     return out;
@@ -776,7 +804,7 @@ S.HubOperatingExpenses = {
       + (doubled.length
       ? noteBox(esc(this._monthLabel(mk)) + ' has ' + (doubled.length === 1 ? 'a bill that looks' : 'bills that look')
         + ' logged twice: '
-        + esc(doubled.map(d => d.name + (d.other && d.other !== d.name ? ' (also logged as "' + d.other + '")' : '')).join(', '))
+        + esc(doubled.map(d => (d.label || d.name) + (d.other && d.other !== d.name ? ' (also logged as "' + d.other + '")' : '')).join(', '))
         + '. One came from your recurring bill and one you entered. Check which is real before it counts twice.')
       : '');
 
@@ -1481,6 +1509,23 @@ S.HubOperatingExpenses = {
             if (wasStopped) {
               this._monthsBetween(String(wasStopped), this._currentMonthKey())
                 .forEach(m => { if (skips.indexOf(m) < 0) skips.push(m); });
+            }
+            /* ⚠⚠ A RESUME THAT CANNOT GENERATE ANYTHING MUST SAY SO (round 4). Round 3 made the
+               term survive a pause — right — but the term is measured from the series' ORIGINAL
+               start, so a term that ran out DURING the pause makes Resume a silent no-op: the row
+               keeps its "recurring" tag and its Stop button, generates nothing, and contributes $0
+               to Books, Break-Even and the forecast. The one message that would explain it is the
+               Terms Ending banner, and its +/-2 month floor (S226e) means it is silent too.
+               Refusing with a sentence is the honest answer: the operator can extend the term or
+               move the Due Date, and either is a decision only they can make. */
+            const _startIdx = (() => {
+              const s0 = new Date(String(arr[pIdx].date).length <= 10 ? arr[pIdx].date + 'T00:00:00' : arr[pIdx].date);
+              return isNaN(s0.getTime()) ? null : s0.getFullYear() * 12 + s0.getMonth();
+            })();
+            const _nowIdx = (new Date()).getFullYear() * 12 + (new Date()).getMonth();
+            if (termV && termV > 0 && _startIdx != null && _startIdx + termV - 1 < _nowIdx) {
+              showErr('That fixed term has already finished. Change the Due Date to when it next starts, or clear "Ends after" to keep it going.');
+              return;
             }
             arr[pIdx] = Object.assign({}, arr[pIdx], { recurring: true, frequency: freqV,
               term_months: (termV && termV > 0) ? termV : null,

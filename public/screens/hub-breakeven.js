@@ -93,15 +93,41 @@ S.HubBreakEven = {
       if (r.stopped_ym && r.stopped_ym <= curYm) return false;
       const endYm = (window.CashEngine && CashEngine.recurringEndYm) ? CashEngine.recurringEndYm(r) : null;
       if (endYm && endYm < curYm) return false;
+      if (String(r.date || '').slice(0, 7) > curYm) return false;   // not started yet — same as the engine
       return true;
     });
     // Normalize each recurring bill by its frequency (monthly/quarterly/annual) so
     // the weekly nut isn't over-weighted by a quarterly or annual bill.
-    const annualOpex = recurring.reduce((s, r) => {
+    let annualOpex = recurring.reduce((s, r) => {
       const amt = parseFloat(r.amount) || 0;
       const perYear = r.frequency === 'quarterly' ? 4 : r.frequency === 'annual' ? 1 : 12;
       return s + amt * perYear;
     }, 0);
+    /* ⚠⚠ DEBT SERVICE BELONGS IN THE NUT, AND THIS FILE COULD NOT SEE IT (round 4, F3). It built its
+       whole fixed-cost figure from the operating-expense log, while loan and equipment payments live
+       in the SEPARATE cash_outflows store — and the comment directly above claims this nut "agrees
+       with Cash Position's reserve target", which round 3 taught to include them. Measured on the
+       Anchor Bar's own data: Cash Position sized its reserve off $4,301.08/wk while this screen's
+       Nut read $3,793.38 — the gap is the equipment loan exactly — and BREAK-EVEN SALES, the
+       headline number of the page, printed $10,838/wk against a true $12,289/wk. Understated by
+       $1,450/wk, which is $75,428 a year, on the one number the page exists to give.
+       ⚠ THE JUDGMENT, STATED: loan PRINCIPAL is not a P&L expense, so a pure accounting break-even
+       would exclude it. Bar Cop is an operator's tool answering "what do I have to ring to keep the
+       doors open", and a bar that misses its equipment payment loses the equipment. It counts.
+       ⚠ SAME RULE AND SAME EXCLUSIONS AS CashEngine.weeklyFixedCosts, deliberately: tax is
+       collected money passing through (the cash tax hold already reserves it) and a draw is not a
+       cost of opening the doors. Two screens, one definition. */
+    const debtAnnual = ((App.data && App.data.cash_outflows) || []).reduce((s, o) => {
+      if (!o || !o.recurring) return s;
+      if (o.type !== 'loan' && o.type !== 'capital') return s;
+      if (o.stopped_ym && o.stopped_ym <= curYm) return s;
+      const endYm = (window.CashEngine && CashEngine.recurringEndYm) ? CashEngine.recurringEndYm(o) : null;
+      if (endYm && endYm < curYm) return s;
+      if (String(o.date || '').slice(0, 7) > curYm) return s;   // not started yet — same as the engine
+      const perYear = o.frequency === 'quarterly' ? 4 : o.frequency === 'annual' ? 1 : 12;
+      return s + (parseFloat(o.amount) || 0) * perYear;
+    }, 0);
+    annualOpex += debtAnnual;
     const monthlyOpex = annualOpex / 12;
     const weeklyOpex = annualOpex / 52;
     // The nut also carries salaried (exempt) pay: fixed every week like rent. One
