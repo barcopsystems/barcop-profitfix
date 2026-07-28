@@ -614,6 +614,7 @@ S.EventsBookings = {
           + '<div class="f" style="width:110px;flex-shrink:0;"><label>Tax</label><div class="fw"><input class="form-input suf eb-q-in" type="number" id="eb-q-tax" value="' + (b.tax_pct != null && b.tax_pct !== '' ? b.tax_pct : this.defaultTaxPct()) + '" step="0.01"/><span class="suf">%</span></div></div>'
         + '</div>'
         + '<div id="eb-q-breakdown" style="margin-top:16px;">' + this.quoteBreakdownHtml(this.quoteParts(b)) + '</div>'
+        + '<div id="eb-q-err" style="display:none;margin-top:10px;font-size:12px;color:var(--red);"></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
           + '<button class="btn btn-ghost btn-sm" id="eb-q-calc">Catering Calculator</button>'
         + '</div></div>';
@@ -701,6 +702,25 @@ S.EventsBookings = {
     return f;
   },
 
+  /* ⚠⚠ ONE GUARD, BOTH QUOTE DOORS — a quote is a document a client signs. quoteParts applies no
+     floor to any input, so a mistyped negative went straight onto it. Measured through the shipped
+     function: room_fee -9000 against a $6,000 minimum produced a Quoted Total of **-$1,305.00** on
+     the quote PDF and the agreement, and a service charge of -20 printed as a discount wearing the
+     service charge's name.
+     ⚠ REFUSED, NOT SILENTLY CLAMPED, for the same reason as the rate card: rewriting the operator's
+     number without saying so is the other way to put something untrue on a client's paperwork.
+     Both Save Quote and Update Quote route through here so they cannot drift apart. */
+  async saveQuote(id) {
+    const f = this.collectQuote();
+    const err = document.getElementById('eb-q-err');
+    const say = m => { if (err) { err.textContent = m; err.style.display = m ? 'block' : 'none'; } };
+    say('');
+    const neg = ['per_head', 'fb_minimum', 'room_fee', 'service_charge_pct', 'tax_pct', 'party_size']
+      .some(k => f[k] != null && f[k] < 0);
+    if (neg) { say('Prices, percentages and guest counts cannot be negative.'); return false; }
+    return this.patch(id, f);
+  },
+
   // Live recompute of the breakdown as the operator types in the quote fields.
   renderQuoteBreakdown() {
     const el = document.getElementById('eb-q-breakdown');
@@ -758,8 +778,8 @@ S.EventsBookings = {
     // Quote
     this.container.querySelectorAll('.eb-rc-pill').forEach(p => p.addEventListener('click', () => this.applyRateCard(id, p.dataset.rc)));
     document.getElementById('eb-q-rc')?.addEventListener('change', e => this.applyRateCard(id, e.target.value));
-    document.getElementById('eb-q-save')?.addEventListener('click', () => this.patch(id, this.collectQuote()));
-    document.getElementById('eb-q-update')?.addEventListener('click', () => this.patch(id, this.collectQuote()));
+    document.getElementById('eb-q-save')?.addEventListener('click', () => this.saveQuote(id));
+    document.getElementById('eb-q-update')?.addEventListener('click', () => this.saveQuote(id));
     document.getElementById('eb-q-calc')?.addEventListener('click', () => this.quoteCalc(id));
     this.container.querySelectorAll('.eb-q-in').forEach(el => el.addEventListener('input', () => this.renderQuoteBreakdown()));
     // Money
@@ -820,6 +840,20 @@ S.EventsBookings = {
   async changeStage(id, to) {
     const fields = Object.assign(this.openEdits(), { stage: to });
     const b = this.bookings().find(x => x.id === id);
+    /* ⚠⚠ A BOOKED EVENT WITH NO DATE IS OWED MONEY NOTHING CAN SEE. changeStage validated nothing,
+       and every other surface keys on event_date: the calendar map is empty, the countdown reads
+       "-", eventInflow skips it, and the dashboard's future-booked revenue is $0 — while
+       "Deposits Due" still bills its deposit on BOTH the Bookings strip and the Events dashboard.
+       So the one number it does produce is the one with no event behind it.
+       Same shape as sendQuote's missing-email guard: name the problem and open the door that fixes
+       it, rather than refusing in silence. */
+    if (to === 'Booked' && b && !String(b.event_date || '').trim()) {
+      const go = await App.confirm({ title: 'Set the event date first',
+        message: 'A booked event needs a date. Without one it will not reach your calendar, the countdown, or your cash forecast, but its deposit will still show as money you are owed.',
+        confirmText: 'Edit Details', cancelText: 'Cancel' });
+      if (go) this.showForm(id);
+      return false;
+    }
     if (to === 'Booked' && b && !b.date_received) fields.date_received = App.todayLocal();
     // Once a quote is out or committed it is a number someone else has seen, so the rates behind it
     // stop floating. Not on Lead (nothing has been sent) and not on Lost (a dead booking's total
