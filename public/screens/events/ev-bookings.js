@@ -373,20 +373,39 @@ S.EventsBookings = {
        ⚠ And the HEADLINE has its own test. "Double-booking" is only true when BOTH are booked, which
        is exactly what `hard` already computes for the colour; a Quote Sent booking beside a Booked
        one printed "Double-booking" when nothing of the operator's was booked at all. */
+    /* ⚠ AND "QUOTED" MEANS A QUOTE ACTUALLY WENT OUT. Round 4's bucket was `stage !== 'Booked'`,
+       which swept LEADS in and then asserted a quote about them: measured, *"Rotary (Lead) also has
+       a quote out for it"* and the headline "Same date, another quote out" on a booking nobody had
+       priced. That is the split-a-flag shape ([[the-loop]] #24) — the new bucket inherited the old
+       one's members. Three states, three words: held, quoted, enquired about. */
     const holders = conf.filter(o => o.stage === 'Booked');
-    const quoted = conf.filter(o => o.stage !== 'Booked');
+    const quoted = conf.filter(o => o.stage === 'Quote Sent');
+    const leads = conf.filter(o => o.stage !== 'Booked' && o.stage !== 'Quote Sent');
+    const verb = arr => arr.length === 1 ? ' also has ' : ' also have ';   // "has/have a quote out"
+    const asked = ' also asked about ';                                     // past tense takes neither
     const othersHold = holders.length > 0;
     const count = n === 1 ? 'Two events' : (n + 1) + ' events';
     const nEls = n === 1 ? 'Neither' : 'None';
+    // ⚠ `mine` is THIS booking's time and belongs to the date, never inside the clause naming the
+    // other event — "held on Sep 12 at 6:00 PM by Tech Mixer (Booked), 11:00 AM" read as though the
+    // operator's own 6:00 PM were part of the other party's hold.
+    const alsoQuoted = (quoted.length ? ' ' + nameList(quoted) + verb(quoted) + 'a quote out for it.' : '')
+      + (leads.length ? ' ' + nameList(leads) + asked + 'it.' : '');
     const body = named
       ? (othersHold
           ? esc(b.space) + ' is also held on ' + this.fmtDate(b.event_date) + mine + ' by ' + nameList(holders) + '.'
-            + (quoted.length ? ' ' + nameList(quoted) + ' also has a quote out for it.' : '')
-            + ' Move one, or confirm the room turns in time.'
-          : esc(b.space) + ' is also quoted for ' + this.fmtDate(b.event_date) + mine + ' on ' + names + '. Nothing else is booked yet, so this is a heads-up, not a clash.')
+            + alsoQuoted + ' Move one, or confirm the room turns in time.'
+          : quoted.length
+            ? esc(b.space) + ' is also quoted for ' + this.fmtDate(b.event_date) + mine + ' on ' + nameList(quoted) + '.'
+              + (leads.length ? ' ' + nameList(leads) + asked + 'it.' : '')
+              + ' Nothing else is booked yet, so this is a heads-up, not a clash.'
+            : nameList(leads) + asked + esc(b.space) + ' on ' + this.fmtDate(b.event_date)
+              + '. Nothing has been quoted or booked yet.')
       : this.fmtDate(b.event_date) + mine + ' also has ' + names + '. ' + nEls + ' has a space named, so Bar Cop cannot tell whether they share a room. Add the space to each to be sure.';
-    const headline = named ? (hard ? 'Double-booking' : othersHold ? 'Room already held' : 'Same date, another quote out')
-                           : count + ', one day';
+    const headline = named
+      ? (hard ? 'Double-booking' : othersHold ? 'Room already held'
+         : quoted.length ? 'Same date, another quote out' : 'Same date, another enquiry')
+      : count + ', one day';
     return '<div style="border:1px solid ' + col + ';background:var(--input);border-radius:6px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--t2);line-height:1.6;">'
       + '<span style="color:' + col + ';font-weight:800;">' + headline + '</span> &middot; ' + body + '</div>';
   },
@@ -876,11 +895,24 @@ S.EventsBookings = {
       + '<button class="btn btn-danger btn-sm" id="eb-detail-del" style="margin-left:auto;">Delete</button></div>';
   },
 
-  /* `onlyTyped` means "return the cells the operator has actually filled in", not "every cell that
-     happens to be rendered". Save Quote calls this WITHOUT it (an explicit save on a visible form
-     means what it shows, blanks included); `openEdits` calls it WITH it — see the note there. */
-  collectQuote(onlyTyped) {
-    const g = id => { const el = document.getElementById(id); return (el && (!onlyTyped || String(el.value).trim() !== '')) ? el : null; };
+  /* ⭐⭐ ONE RULE, EVERY DOOR AND THE LIVE BREAKDOWN: **a blank cell means UNCHANGED. Type 0 to zero
+     it.** Round 4 gave this an `onlyTyped` flag so only the incidental doors skipped blanks, and
+     kept "an explicit Save means what the form shows" for Save Quote. That split immediately paid
+     out three ways, all measured:
+       · **Email Quote** never got the flag, so clearing Per Head to retype it mailed the client
+         "Quoted total: $0.00" against a truth of $7,310.25, banked the booking at $0 and marked it
+         Quote Sent — on the one door whose output the client keeps.
+       · the **live breakdown** read blank as 0 while the nav doors read it as unchanged, so the
+         screen said **$0.00** and the click saved **$7,310.25**. The number they are looking at was
+         not the number the click banks, in either direction.
+       · a partly-typed number (`8.`, `-`) reports as `''` to `type="number"`, so mid-typing landed
+         in that same split.
+     Two rules for one cell is what produced all three. There is now one, it is the safe direction,
+     and the escape hatch is real: a typed `0` is collected as a genuine 0, and a stored 0 renders as
+     an empty box, so blank round-trips ([[the-loop]] #58 — the fix for a widened mechanism is fewer
+     special cases, not more). */
+  collectQuote() {
+    const g = id => { const el = document.getElementById(id); return (el && String(el.value).trim() !== '') ? el : null; };
     const f = {};
     if (g('eb-q-ph'))    f.per_head = parseFloat(g('eb-q-ph').value) || 0;
     if (g('eb-q-party')) f.party_size = parseInt(g('eb-q-party').value) || null;
@@ -973,16 +1005,16 @@ S.EventsBookings = {
        ⚠ The two CLIENT DOCUMENT doors below are the exception, and deliberately so. */
     this.container.querySelectorAll('.eb-step').forEach(el => el.addEventListener('click', async () => {
       const step = el.dataset.step;
-      await this._saveOpen(id);
+      if ((await this._saveOpen(id)) === 'invalid') return;   // fixable: keep the message on screen
       this._viewStep = (step === b.stage) ? null : step;
       this.renderDetail(id);
     }));
     document.getElementById('eb-viewback')?.addEventListener('click', async () => {
-      await this._saveOpen(id);
+      if ((await this._saveOpen(id)) === 'invalid') return;
       this._viewStep = null; this.renderDetail(id);
     });
     document.getElementById('eb-edit')?.addEventListener('click', async () => {
-      await this._saveOpen(id);
+      if ((await this._saveOpen(id)) === 'invalid') return;
       this.showForm(id);
     });
     /* ⚠⚠ THE TWO DOORS THAT PRODUCE A DOCUMENT FOR THE CLIENT WERE THE TWO THAT DID NOT SAVE FIRST.
@@ -999,11 +1031,11 @@ S.EventsBookings = {
     // code discarded it and printed the STORED (pre-negotiation) figures — measured $10,965.38 on a
     // document the operator had just re-priced to $9,811.13.
     document.getElementById('eb-q-pdf')?.addEventListener('click', async () => {
-      if (!(await this._saveOpen(id))) return;
+      if ((await this._saveOpen(id)) !== true) return;
       this.quotePDF(this.bookings().find(x => x.id === id));
     });
     document.getElementById('eb-agreement')?.addEventListener('click', async () => {
-      if (!(await this._saveOpen(id))) return;
+      if ((await this._saveOpen(id)) !== true) return;
       this.agreementModal(id);
     });
     // Quote
@@ -1037,7 +1069,7 @@ S.EventsBookings = {
     // ⚠ The deposit box sits in the SAME flex row as this button, so a correction typed into it and
     // then settled with Mark Balance Paid was thrown away by the re-render (measured 2500 -> 1500).
     document.getElementById('eb-bal-paid')?.addEventListener('click', async () => {
-      await this._saveOpen(id);
+      if ((await this._saveOpen(id)) === 'invalid') return;   // never settle a balance over an unread refusal
       this.markPaid(id);
     });
     // Staffing
@@ -1063,7 +1095,7 @@ S.EventsBookings = {
     document.getElementById('eb-send')?.addEventListener('click', () => this.sendQuote(id));
     document.getElementById('eb-resend')?.addEventListener('click', () => this.sendQuote(id, true));
     document.getElementById('eb-lost')?.addEventListener('click', async () => {
-      await this._saveOpen(id);
+      if ((await this._saveOpen(id)) === 'invalid') return;
       this.markLost(id);
     });
     this.container.querySelectorAll('.eb-stage').forEach(btn => btn.addEventListener('click', () => this.changeStage(id, btn.dataset.to)));
@@ -1106,7 +1138,11 @@ S.EventsBookings = {
     const g = id => document.getElementById(id);
     const typed = id => { const el = g(id); return !!el && String(el.value).trim() !== ''; };
     const f = {};
-    if (typed('eb-q-ph') || typed('eb-q-party') || typed('eb-q-fb')) Object.assign(f, this.collectQuote(true));
+    /* ⚠ ALL FOUR TRIGGER CELLS, NOT THREE. Round 4 gated on per head / guests / F&B minimum, so a
+       ROOM-FEE-ONLY edit — an ordinary room-rental enquiry with no headcount yet — collected nothing
+       and every navigation door dropped it: measured, $500.00 on screen, 0 writes, and the quote PDF
+       printed $0.00. Round 3's shape had returned it. */
+    if (typed('eb-q-ph') || typed('eb-q-party') || typed('eb-q-fb') || typed('eb-q-room')) Object.assign(f, this.collectQuote());
     if (typed('eb-dep')) f.deposit_amount = parseFloat(g('eb-dep').value) || 0;
     if (typed('eb-pl-food') || typed('eb-pl-bar') || typed('eb-pl-other') || typed('eb-pl-actual')) {
       if (typed('eb-pl-food'))   f.event_food_cost  = parseFloat(g('eb-pl-food').value) || 0;
@@ -1161,8 +1197,29 @@ S.EventsBookings = {
        ⚠ `changeStage` deliberately does NOT come through here — a stage button is an explicit
        commitment, and the rates the operator can see are the ones it should freeze. */
     const b = this.bookings().find(x => x.id === id);
-    if (!b || (b.stage || 'Lead') === 'Lead') { delete f.service_charge_pct; delete f.tax_pct; }
-    if (!this._stepErr(this._rejectReason(f))) return false;
+    if (!b) return false;                       // nothing can be saved onto a record that is gone
+    if ((b.stage || 'Lead') === 'Lead') {
+      /* ⚠ ...BUT ONLY WHEN THE CELL IS JUST THE RENDERED DEFAULT. Round 4 deleted both rates
+         unconditionally, which threw away a service charge the operator had TYPED — measured: 22%
+         and 9% entered on a Lead, Quote PDF clicked, both silently gone, and `quoted_total` banked
+         at **7467 while the PDF printed $7,310.25**, a persisted figure $156.75 from anything on
+         screen. A value that differs from the default is an override and is theirs; a value equal to
+         it is just what the box was painted with, and keeping that is what freezes a Lead. */
+      if ((parseFloat(f.service_charge_pct) || 0) === this.DEFAULT_SVC_PCT) delete f.service_charge_pct;
+      if ((parseFloat(f.tax_pct) || 0) === this.defaultTaxPct()) delete f.tax_pct;
+      if (f.quoted_total != null) f.quoted_total = Math.round(this.quoteParts(Object.assign({}, b, f)).total);
+    }
+    /* ⛔⛔ A VALIDATION REFUSAL AND A WRITE REFUSAL ARE DIFFERENT ANSWERS AND ROUND 4 RETURNED BOTH
+       AS `false`. The navigation doors were then told to ignore the verdict — which is right for a
+       write the operator cannot do anything about, and WRONG for a value they could fix in two
+       seconds: the door re-rendered, deleted the very span holding "Deposit Amount cannot be
+       negative", and took their typing with it. MEASURED: a Completed event with Food Cost 1450
+       (correct) beside Other Cost -20 (a fat finger) — one rail click and **the $1,450 was gone,
+       0 writes, and the explanation destroyed in the same tick**, so they never learn the minus sign
+       was the problem. Mark Balance Paid and Mark Lost went further and stamped a terminal fact over
+       the unread refusal. Three answers now: 'invalid' (stop, they can fix it), false (the write
+       failed, let them move — blocking is the trap round 4 already had to undo), true. */
+    if (!this._stepErr(this._rejectReason(f))) return 'invalid';
     if (!Object.keys(f).length) return true;
     return !!(await this.patch(id, f));
   },
@@ -1288,7 +1345,7 @@ S.EventsBookings = {
          card was thrown away by the Edit Details re-render — measured $10,965.38 stored against
          $9,811.13 on screen, a $1,154.25 gap, and the next Email Quote sends the client the old
          price. Only the SEND is refused; the numbers they typed are theirs. */
-      await this._saveOpen(id);   // best effort; the prompt must still open even on a refused write
+      if ((await this._saveOpen(id)) === 'invalid') return;   // a failed WRITE still opens the prompt
       const go = await App.confirm({ title: 'Add an email first', message: 'A quote goes out by email. Add the customer email on the booking, then send it.', confirmText: 'Edit Details', cancelText: 'Cancel' });
       if (go) this.showForm(id);
       return;
