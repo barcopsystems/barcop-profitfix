@@ -326,7 +326,19 @@ S.HubOperatingExpenses = {
       const cents = (r) => Math.round((parseFloat(r.amount) || 0) * 100);
       const same = (r) => String(r.category || '') === String(p.category || '')
         && String(r.vendor || '').trim().toLowerCase() === String(p.vendor || '').trim().toLowerCase();
-      const hit = pool.find(r => !used.has(r.id) && cents(r) === cents(p) && cents(p) !== 0
+      /* ⚠⚠ THE DUE-DAY RULE REACHES HERE TOO (round 5). PASS 1 was taught it via _ownCover and this
+         was left deciding by hand — so a rent paid LATE on the 3rd, for the previous month, made
+         this print "looks logged twice" over a month the day rule certifies as CORRECT. Harmless as
+         a sentence and dangerous the moment the operator acts on it: deleting the generated row
+         drops the month $4,200 into Books, the P&L, By Category and Break-Even. */
+      const _rawDay = parseInt(p.recur_day, 10) || (() => {
+        const s0 = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
+        return isNaN(s0.getTime()) ? 1 : s0.getDate();
+      })();
+      const _due = mk + '-' + String(Math.min(_rawDay, this._daysInMonth(
+        parseInt(mk.slice(0, 4), 10), parseInt(mk.slice(5, 7), 10) - 1))).padStart(2, '0');
+      const hit = pool.find(r => !used.has(r.id) && String(r.date).slice(0, 10) >= _due
+        && cents(r) === cents(p) && cents(p) !== 0
         && (same(r) || String(r.category || '') === 'Other'));
       if (hit) { used.add(hit.id); doubled.push({ name: nameOf(p), label: withAmt(p),
         key: App.billIdentityKey(p),

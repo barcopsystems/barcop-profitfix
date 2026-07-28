@@ -136,6 +136,12 @@ S.HubBreakEven = {
     const weeklySalaried = (App.salariedCost ? App.salariedCost(App.weekStartFor(beEnd), beEnd).total : 0) || 0;
     const salariedMonthly = weeklySalaried * 52 / 12;
     const monthlyFixed = monthlyOpex + salariedMonthly;
+    // ⚠ THE ROWS HAVE TO ADD UP TO THE TOTAL (round 5). The by-category rows are built from the
+    // operating-expense list while the Total carries debtAnnual too, so the table printed rows
+    // summing to $5,700 under a Total of $7,550 with nothing naming the missing $1,850 — and it
+    // ships that way in the Break-Even PDF. The comment a few lines up records that this same
+    // rows-do-not-add-up defect was already fixed once here, for frequency normalization.
+    const debtMonthly = debtAnnual / 12;
     const weeklyNut = weeklyOpex + weeklySalaried;
 
     const breakEven = (varRate != null && varRate < 1 && weeklyNut > 0) ? weeklyNut / (1 - varRate) : null;
@@ -152,7 +158,7 @@ S.HubBreakEven = {
     const lastSales = lastWk ? salesOf(lastWk) : null;
 
     return {
-      curKey, netRev, cogs, labor, hourlyLabor, varRate, recurring,
+      curKey, netRev, cogs, labor, hourlyLabor, varRate, recurring, debtMonthly,
       monthlyOpex, weeklyOpex, weeklySalaried, salariedMonthly, monthlyFixed, weeklyNut, breakEven,
       weeks, salesOf, lastWk, lastSales,
       hasOpex: monthlyOpex > 0, hasRev: netRev > 0
@@ -265,8 +271,18 @@ S.HubBreakEven = {
     const salRow = c.weeklySalaried > 0
       ? '<tr><td><div class="val">Salaried Labor</div></td><td>' + f2(c.salariedMonthly) + '</td><td class="val">' + f2(c.weeklySalaried) + '</td><td></td></tr>'
       : '';
+    /* ⚠ THE ROWS MUST ADD UP TO THE TOTAL, and debt service was missing from them (round 5). The
+       rows are built from `c.recurring`, the operating-expense list, while the Total carries the
+       recurring loan and equipment payments too — so the table printed rows summing to $5,700 under
+       a Total of $7,550 with nothing on screen naming the missing $1,850, and shipped that way in
+       the Break-Even PDF. The comment directly above records this same rows-do-not-add-up defect
+       being fixed once already, for frequency normalization. */
+    const debtRow = c.debtMonthly > 0
+      ? '<tr><td><div class="val">Debt Service</div></td><td>' + f2(c.debtMonthly) + '</td><td class="val">' + f2(c.debtMonthly * 12 / 52) + '</td><td></td></tr>'
+      : '';
     const nutRows = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(k =>
       '<tr><td><div class="val">' + esc(k) + '</div></td><td>' + f2(byCat[k]) + '</td><td class="val">' + f2(byCat[k] * 12 / 52) + '</td><td></td></tr>').join('')
+      + debtRow
       + salRow
       + '<tr><td><div class="val" style="font-weight:700;">Total</div></td><td style="font-weight:700;">' + f2(c.monthlyFixed) + '</td><td class="val" style="font-weight:700;">' + f2(c.weeklyNut) + '</td><td></td></tr>';
     const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="be-export">Export PDF</button>';

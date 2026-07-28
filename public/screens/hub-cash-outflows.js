@@ -260,7 +260,38 @@ S.HubCashOutflows = {
       if (recChecked && document.getElementById('cb-f-term')?.value && (isNaN(termV) || termV < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank.'); return; }
       const base = isEdit ? (this.records().find(o => o.id === rec.id) || {}) : {};
       const out = Object.assign({}, base, { id: isEdit ? rec.id : App.uid(), date, type, amount, notes: note, created_at: base.created_at || new Date().toISOString() });
-      if (recChecked) { out.recurring = true; out.frequency = document.getElementById('cb-f-frequency')?.value || 'monthly'; out.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; if (termV && termV > 0) out.term_months = termV; else delete out.term_months; delete out.stopped_ym; }
+      if (recChecked) {
+        /* ⚠⚠ TURNING A PAUSED OUTFLOW BACK ON MUST NOT RE-INVENT THE PAUSE (round 5, and the
+           expense twin learned this three rounds ago). This store PROJECTS its past, so simply
+           clearing stopped_ym re-created every month the series was suspended: measured, three
+           paused months worth $5,550 reappearing in Year to Date and in the Cash Bridge, which then
+           attributes profit to payments that were never made. `skip_months` is the mechanism the
+           expense door already uses AND that CashEngine.outflowsBetween has been READING on this
+           store the whole time with nothing to write it.
+           ⚠ AND A RESUME THAT CAN GENERATE NOTHING MUST SAY SO, not close the modal on a record
+           that then falls out of both tables — the round-4 unreachable-record defect coming back in
+           through the Resume door. */
+        const _termNow = (termV && termV > 0) ? termV : (parseInt(base.term_months, 10) || 0);
+        const _endYm = _termNow > 0 ? CashEngine.recurringEndYm(Object.assign({}, base, { date: date, term_months: _termNow })) : null;
+        if (_endYm && _endYm < App.todayLocal().slice(0, 7)) {
+          showErr('That fixed term has already finished. Change the date to when it next starts, or clear "Ends after" to keep it going.');
+          return;
+        }
+        out.recurring = true;
+        out.frequency = document.getElementById('cb-f-frequency')?.value || 'monthly';
+        out.recur_day = parseInt(String(date).slice(8, 10), 10) || 1;
+        if (termV && termV > 0) out.term_months = termV; else delete out.term_months;
+        if (base.stopped_ym) {
+          const idx = (mk) => parseInt(mk.slice(0, 4), 10) * 12 + (parseInt(mk.slice(5, 7), 10) - 1);
+          const skips = Array.isArray(base.skip_months) ? base.skip_months.slice() : [];
+          for (let i = idx(String(base.stopped_ym)); i < idx(App.todayLocal().slice(0, 7)); i++) {
+            const m = Math.floor(i / 12) + '-' + String((i % 12) + 1).padStart(2, '0');
+            if (skips.indexOf(m) < 0) skips.push(m);
+          }
+          out.skip_months = skips;
+        }
+        delete out.stopped_ym;
+      }
       /* ⚠⚠ A PAUSE MUST NOT DESTROY WHAT THE SERIES IS (round 4, F2 — the same defect round 3 fixed
          on the Operating Expenses twin, still live here). Deleting frequency and term_months was
          harmless while turning a series off was terminal; the moment it can be turned back on, the
@@ -295,8 +326,19 @@ S.HubCashOutflows = {
        Now identical to the Operating Expenses twin: recurring:false plus the current month. The
        row lands in the logged table, stays editable, and every engine reader already tests
        recurring first. */
+    /* ⚠⚠⚠ recurring:false ERASES THE HISTORY ON THIS STORE, AND ROUND 4 COPIED IT ACROSS A BOUNDARY
+       WHERE IT IS NOT SAFE. The two doors keep the past DIFFERENTLY: Operating Expenses writes a
+       real child row for every elapsed month, so clearing the flag costs nothing — cash outflows
+       write NOTHING and PROJECT the past from the parent, so clearing it deletes every payment the
+       series ever made. Measured on an 8-month-old $1,850 loan: Year to Date $12,950 -> $0.00 and
+       the Cash Bridge's "Cash You Kept" jumping $16,150 -> $18,000, on a screen whose whole job is
+       showing where the profit went — under a confirm dialog that had just promised "the months
+       already logged stay in your bridge and forecast".
+       `stopped_ym` alone is the right marker here and every engine reader already honours it: the
+       projection stops at that month and keeps everything before it. The round-4 defect was the two
+       TABLES hiding the row, and those filters are fixed; the record shape did not need changing. */
     await App.putRecord('core', 'cash_outflow', Object.assign({}, rec,
-      { recurring: false, stopped_ym: App.todayLocal().slice(0, 7) }));
+      { stopped_ym: App.todayLocal().slice(0, 7) }));
     this.draw();
   },
   async del(id) {
