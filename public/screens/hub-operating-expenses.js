@@ -309,9 +309,12 @@ S.HubOperatingExpenses = {
     // PASS 1 — mirrors the catch-up: a series that owes this month and has no generated row.
     series.forEach(p => {
       if (this._generatedFor(p, mk) || !this._owesMonth(p, mk)) return;
-      const key = App.billIdentityKey(p);
-      const hit = pool.find(r => !used.has(r.id) && App.billIdentityKey(r) === key);
-      if (hit) { used.add(hit.id); covered.push(nameOf(p)); }
+      /* ⚠⚠ THROUGH _ownCover, NOT BY HAND (round 5, F5). This was a raw identity match with no
+         due-day test, so it disagreed with the catch-up that actually made the decision — the exact
+         divergence S1 fixed one function away. It claimed "Bar Cop did not add it again" about a
+         payment made for the PREVIOUS month, on a bill still unpaid. One question, one implementation. */
+      const hit = this._ownCover(p, mk, used);
+      if (hit) covered.push({ name: nameOf(p), key: App.billIdentityKey(p) });
     });
     // PASS 2 — a Bar Cop row already stands for this month AND an unclaimed logged row looks like
     // the same bill. ⚠ The series' own START month counts as generated: the parent IS that month's
@@ -326,6 +329,7 @@ S.HubOperatingExpenses = {
       const hit = pool.find(r => !used.has(r.id) && cents(r) === cents(p) && cents(p) !== 0
         && (same(r) || String(r.category || '') === 'Other'));
       if (hit) { used.add(hit.id); doubled.push({ name: nameOf(p), label: withAmt(p),
+        key: App.billIdentityKey(p),
         other: (hit.vendor || hit.category || 'a bill you logged') }); }
     });
     /* ⚠ ONE NAME, ONE CLAIM (round 4). Two DIFFERENT bills that share a vendor — a utility's
@@ -333,8 +337,13 @@ S.HubOperatingExpenses = {
        twice" about the same string, with `other` naming that same string so there was nothing to go
        and find. Both sentences were individually true and the pair was useless. The actionable one
        wins, and it carries the AMOUNT so the operator can tell the two bills apart. */
-    const loud = new Set(doubled.map(d => d.name));
-    return { covered: covered.filter(n => !loud.has(n)), doubled: doubled };
+    /* ⚠ DEDUPE ON THE SERIES IDENTITY, NOT ON THE DISPLAY NAME (round 5, F4). Keyed on the vendor
+       string, one utility's electric bill being double-booked SILENCED the true "already logged"
+       note about that utility's separate GAS bill — the only difference between firing and not was
+       that the two bills share a vendor. The operator was left with no explanation for why the gas
+       series produced no row, and the obvious response is to enter it again. */
+    const loud = new Set(doubled.map(d => d.key));
+    return { covered: covered.filter(c => !loud.has(c.key)).map(c => c.name), doubled: doubled };
   },
 
   _ownCoveredThisMonth() { return this._monthNotes().covered; },
@@ -1518,12 +1527,28 @@ S.HubOperatingExpenses = {
                Terms Ending banner, and its +/-2 month floor (S226e) means it is silent too.
                Refusing with a sentence is the honest answer: the operator can extend the term or
                move the Due Date, and either is a decision only they can make. */
+            /* ⚠⚠⚠ A REFUSAL MUST PUT MEMORY BACK. This returned without restoring undoArr, and the
+               slots above had ALREADY been overwritten — so a refused save left the operator's edit
+               live in memory, and catchUpRecurring then read the amount off that dirty parent and
+               WROTE the generated months at it. Measured: a refused save persisted $300 of a raise
+               the app had just declined, and on a series with months still to generate it scaled —
+               $58,500 booked against a truth of $54,600. The two OTHER exits from this handler both
+               restore; this one was added later and did not.
+               ⚠⚠ AND IT ONLY FIRES ON A RESUME (round 5, F2). Sitting inside if (recChecked) it
+               fired on EVERY edit to EVERY row of a finished-term series — measured, 10 of 10 rows
+               refused a plain vendor-typo fix — and the advice it gave ("change the Due Date") is
+               inert from a child row, because the term lives on the parent. The only case that
+               genuinely needs refusing is the one it was written for: turning a PAUSED series back
+               on when its term has already run out, where the save would otherwise do nothing at
+               all, silently. A series that is already recurring is not being restarted. */
+            const _wasPaused = !arr[pIdx].recurring;
             const _startIdx = (() => {
               const s0 = new Date(String(arr[pIdx].date).length <= 10 ? arr[pIdx].date + 'T00:00:00' : arr[pIdx].date);
               return isNaN(s0.getTime()) ? null : s0.getFullYear() * 12 + s0.getMonth();
             })();
             const _nowIdx = (new Date()).getFullYear() * 12 + (new Date()).getMonth();
-            if (termV && termV > 0 && _startIdx != null && _startIdx + termV - 1 < _nowIdx) {
+            if (_wasPaused && termV && termV > 0 && _startIdx != null && _startIdx + termV - 1 < _nowIdx) {
+              arr.length = 0; arr.push(...undoArr);
               showErr('That fixed term has already finished. Change the Due Date to when it next starts, or clear "Ends after" to keep it going.');
               return;
             }
