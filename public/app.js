@@ -7414,6 +7414,16 @@ const App = {
   // already pulled an older page. Keeps the DB fetch off young accounts and the
   // sample data, whose full history is already in memory.
   hasServerOlder(mod, kind) {
+    /* ⚠⚠ A NONWINDOWED KIND HAS NOTHING OLDER TO LOAD — IT IS ALL ALREADY HERE. These rows are
+       stored with a null date on purpose, but oldestLoadedDate falls back to created_at, so once
+       an account's oldest record drifted within 35 days of the window edge every one of these lists
+       started offering "Load records older than 24 months" under a footnote reading "Showing the
+       last 24 months". Both statements are false — nothing is windowed — and the button is a dead
+       end, because the pager filters on date.lt.<cursor> and a NULL date can never match, so it
+       round-trips to the server and flips to "All records loaded".
+       Measured on the Regulars book: an account whose oldest regular was created 23 months ago. It
+       affects every NONWINDOWED kind that carries a created_at, which is all of them. */
+    if (DB.NONWINDOWED_KINDS && DB.NONWINDOWED_KINDS.indexOf(kind) >= 0) return false;
     const st = this._listState[this._listKey(mod, kind)];
     if (st && st.exhausted) return false;
     if (st && st.paged) return true;
