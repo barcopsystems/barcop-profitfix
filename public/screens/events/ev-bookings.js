@@ -202,9 +202,12 @@ S.EventsBookings = {
      is out by $1,275 in the bar's favour, which is exactly the direction a client disputes.
      The annotation had gone to the ONE surface the client never sees ([[the-loop]] step 0.6 — list
      every consumer of a value, and the artefact that leaves the building is the one that counts). */
-  _countLabel(p) {
+  // `long` is the client-document phrasing ("75 guests (guaranteed)"); the on-screen breakdown wants
+  // the short form for its parenthetical. ONE definition of the fact, two renderings of it.
+  _countLabel(p, long) {
     if (!p || !p.party) return '';
-    return p.party + (p.guaranteed ? ' guaranteed' : ' estimated');
+    const which = p.guaranteed ? 'guaranteed' : 'estimated';
+    return long ? (p.party + ' guests (' + which + ')') : (p.party + ' ' + which);
   },
 
   quoteBreakdownHtml(p) {
@@ -231,7 +234,11 @@ S.EventsBookings = {
      a negative OVER-BILLS the client: a deposit does not clamp a balance, it INFLATES it. Measured
      on a $6,540.75 quote with `deposit_amount: -2000` — Balance Due **$8,540.75 on the signed
      agreement**, $2,000 above the total it asks them to pay, and the same figure into the 13-week
-     forecast. One reader, all three balance doors. */
+     forecast.
+     ⚠ FIVE readers, not three: `cash-engine.eventInflow` and `committedEventCash` read the deposit
+     too, and the first version of this comment claimed they were covered when they were not — a
+     confidence claim in a comment is an instruction to the next reader not to check. They call this
+     helper now. If a sixth appears, it calls this, not `parseFloat`. */
   _depositHeld(b) { return Math.max(0, parseFloat(b && b.deposit_amount) || 0); },
 
   /* ⚠⚠ ONE DEFINITION OF "A DEPOSIT IS STILL DUE", BECAUSE THERE WERE TWO AND THEY DISAGREED.
@@ -338,8 +345,9 @@ S.EventsBookings = {
        the operator see at a glance that it is a turn ([[the-loop]] #30 — do not infer a fact the
        data does not carry). Without this every twice-a-day room shows a red banner, which is how a
        real warning stops being read. */
-    const names = conf.map(o => esc(this.title(o)) + ' (' + esc(o.stage) + ')'
+    const nameList = arr => arr.map(o => esc(this.title(o)) + ' (' + esc(o.stage) + ')'
       + (o.event_time ? ', ' + esc(o.event_time) : '')).join(', ');
+    const names = nameList(conf);
     const named = !!String(b.space || '').trim();
     const mine = b.event_time ? ' at ' + esc(b.event_time) : '';
     /* ⚠ THE BANNER MAY NOT STATE A COUNT OR A CLAIM THE DATA DOES NOT SUPPORT. It was written for a
@@ -357,16 +365,30 @@ S.EventsBookings = {
        beside an open quote read "the room is also held by Downtown Tech Mixer (Quote Sent)" — a quote
        holds nothing. Four combinations, all true now: others booked -> held, move one; others only
        quoted -> a heads-up with nothing else confirmed. */
-    const othersHold = conf.some(o => o.stage === 'Booked');
+    /* ⚠ ONLY A BOOKED EVENT HOLDS THE ROOM, so only Booked events may be NAMED as holding it. The
+       first version of this fix got the TEST right and left the LIST alone, so as soon as one other
+       booking was Booked the sentence swept every lead and quote in with it: measured, three events
+       in one room printed "Private Room is also held by Tech Mixer (Booked), Rotary (Quote Sent)" —
+       a quote holds nothing. It needed three events to show, which is why the two-event case passed.
+       ⚠ And the HEADLINE has its own test. "Double-booking" is only true when BOTH are booked, which
+       is exactly what `hard` already computes for the colour; a Quote Sent booking beside a Booked
+       one printed "Double-booking" when nothing of the operator's was booked at all. */
+    const holders = conf.filter(o => o.stage === 'Booked');
+    const quoted = conf.filter(o => o.stage !== 'Booked');
+    const othersHold = holders.length > 0;
     const count = n === 1 ? 'Two events' : (n + 1) + ' events';
     const nEls = n === 1 ? 'Neither' : 'None';
     const body = named
       ? (othersHold
-          ? esc(b.space) + ' is also held on ' + this.fmtDate(b.event_date) + mine + ' by ' + names + '. Move one, or confirm the room turns in time.'
+          ? esc(b.space) + ' is also held on ' + this.fmtDate(b.event_date) + mine + ' by ' + nameList(holders) + '.'
+            + (quoted.length ? ' ' + nameList(quoted) + ' also has a quote out for it.' : '')
+            + ' Move one, or confirm the room turns in time.'
           : esc(b.space) + ' is also quoted for ' + this.fmtDate(b.event_date) + mine + ' on ' + names + '. Nothing else is booked yet, so this is a heads-up, not a clash.')
       : this.fmtDate(b.event_date) + mine + ' also has ' + names + '. ' + nEls + ' has a space named, so Bar Cop cannot tell whether they share a room. Add the space to each to be sure.';
+    const headline = named ? (hard ? 'Double-booking' : othersHold ? 'Room already held' : 'Same date, another quote out')
+                           : count + ', one day';
     return '<div style="border:1px solid ' + col + ';background:var(--input);border-radius:6px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--t2);line-height:1.6;">'
-      + '<span style="color:' + col + ';font-weight:800;">' + (named ? (othersHold ? 'Double-booking' : 'Same date, another quote out') : count + ', one day') + '</span> &middot; ' + body + '</div>';
+      + '<span style="color:' + col + ';font-weight:800;">' + headline + '</span> &middot; ' + body + '</div>';
   },
 
   // The event-staff roster table (who is charged to this event, and their hours).
@@ -854,8 +876,11 @@ S.EventsBookings = {
       + '<button class="btn btn-danger btn-sm" id="eb-detail-del" style="margin-left:auto;">Delete</button></div>';
   },
 
-  collectQuote() {
-    const g = id => document.getElementById(id);
+  /* `onlyTyped` means "return the cells the operator has actually filled in", not "every cell that
+     happens to be rendered". Save Quote calls this WITHOUT it (an explicit save on a visible form
+     means what it shows, blanks included); `openEdits` calls it WITH it — see the note there. */
+  collectQuote(onlyTyped) {
+    const g = id => { const el = document.getElementById(id); return (el && (!onlyTyped || String(el.value).trim() !== '')) ? el : null; };
     const f = {};
     if (g('eb-q-ph'))    f.per_head = parseFloat(g('eb-q-ph').value) || 0;
     if (g('eb-q-party')) f.party_size = parseInt(g('eb-q-party').value) || null;
@@ -926,7 +951,8 @@ S.EventsBookings = {
        operator never typed in. Guarding the exits while leaving the entrance open is worse than not
        guarding at all: it strands the booking. */
     const bad = this._rejectReason(fields);
-    if (bad) { this._stepErr(bad + ' Fix the package on Pricing, or set the price here.'); return; }
+    // sticky: the bad value is on the CARD, not in any cell, so typing cannot clear this.
+    if (bad) { this._stepErr(bad + ' Fix the package on Pricing, or set the price here.', true); return; }
     this._stepErr('');
     fields.quoted_total = Math.round(this.quoteParts(Object.assign({}, b, fields)).total);
     await this.patch(id, fields);
@@ -935,20 +961,28 @@ S.EventsBookings = {
   wireDetail(b) {
     const id = b.id;
     // Clickable lifecycle rail: jump back to a reached step to edit it.
-    // Every one of these leaves the current step's card, and each rebuilds the page from the STORED
-    // record — so whatever is typed and unsaved goes with it. Save it on the way out.
+    /* Every one of these leaves the current step's card, and each rebuilds the page from the STORED
+       record — so whatever is typed and unsaved goes with it. Save it on the way out.
+       ⚠⚠ BUT NAVIGATION IS NEVER BLOCKED BY THE WRITE VERDICT. Gating these on the save TRAPPED a
+       read-only operator (and anyone with the storage-full banner up): Edit Details, the rail, Back
+       to <stage> and Mark Lost all became buttons that did nothing, with NO message — `_stepErr`
+       clears the span just before the failing write, and `_reportWriteFail` stays quiet while the
+       viewer banner owns the message. Worse, having opened a past step, both ways back were gated on
+       the same failing write, so the only escape was the global back arrow. A failed save reverts
+       and the operator can see that; refusing to let them move is a second, worse failure.
+       ⚠ The two CLIENT DOCUMENT doors below are the exception, and deliberately so. */
     this.container.querySelectorAll('.eb-step').forEach(el => el.addEventListener('click', async () => {
       const step = el.dataset.step;
-      if (!(await this._saveOpen(id))) return;
+      await this._saveOpen(id);
       this._viewStep = (step === b.stage) ? null : step;
       this.renderDetail(id);
     }));
     document.getElementById('eb-viewback')?.addEventListener('click', async () => {
-      if (!(await this._saveOpen(id))) return;
+      await this._saveOpen(id);
       this._viewStep = null; this.renderDetail(id);
     });
     document.getElementById('eb-edit')?.addEventListener('click', async () => {
-      if (!(await this._saveOpen(id))) return;
+      await this._saveOpen(id);
       this.showForm(id);
     });
     /* ⚠⚠ THE TWO DOORS THAT PRODUCE A DOCUMENT FOR THE CLIENT WERE THE TWO THAT DID NOT SAVE FIRST.
@@ -1003,7 +1037,7 @@ S.EventsBookings = {
     // ⚠ The deposit box sits in the SAME flex row as this button, so a correction typed into it and
     // then settled with Mark Balance Paid was thrown away by the re-render (measured 2500 -> 1500).
     document.getElementById('eb-bal-paid')?.addEventListener('click', async () => {
-      if (!(await this._saveOpen(id))) return;
+      await this._saveOpen(id);
       this.markPaid(id);
     });
     // Staffing
@@ -1029,7 +1063,7 @@ S.EventsBookings = {
     document.getElementById('eb-send')?.addEventListener('click', () => this.sendQuote(id));
     document.getElementById('eb-resend')?.addEventListener('click', () => this.sendQuote(id, true));
     document.getElementById('eb-lost')?.addEventListener('click', async () => {
-      if (!(await this._saveOpen(id))) return;
+      await this._saveOpen(id);
       this.markLost(id);
     });
     this.container.querySelectorAll('.eb-stage').forEach(btn => btn.addEventListener('click', () => this.changeStage(id, btn.dataset.to)));
@@ -1051,16 +1085,34 @@ S.EventsBookings = {
   // ⚠ EVERY read is gated on the input existing. These cards render one step at a time, and
   // `parseFloat(missing?.value) || 0` is 0 — an ungated collect would zero a banked deposit on
   // Mark Completed, which is worse than the bug it fixes.
+  /* ⛔⛔⛔ A BLANK BOX IS NOT A TYPED ZERO, AND THE COMMENT ABOVE ALREADY SAID SO WHILE THE CODE DID
+     THE OPPOSITE. The gate tested whether the ELEMENT exists, never whether the operator had put
+     anything in it — and `parseFloat('') || 0` is 0 either way. For the three stage buttons that was
+     survivable; round 3 wired SEVEN more doors onto the same collect, including two print buttons
+     and every node of the navigation rail.
+     ⛔ MEASURED: a Booked event with $1,500 banked. The operator clears the Deposit box to retype
+     it and clicks **Quote PDF**. `deposit_amount` **$1,500 -> $0.00**, what is still owed
+     **$4,912.50 -> $6,412.50**, and `balanceDue` — the figure on the SIGNED AGREEMENT — with it.
+     `eventInflow` then puts $1,500 more into the 13-week forecast as still owed and prints $0 in the
+     Deposit Held column on cash already in the bank. The card re-renders with the box blank again
+     (a stored 0 renders as ''), so it looks exactly as they left it, and the tile row reads
+     "Deposit / Paid / in hand" beside "Balance Due $6,412.50" — contradicting itself on one line.
+     Same door zeroes Per Head (quote -> $0.00, and that is what the PDF prints), Guests (collapses
+     to the F&B minimum) and Actual Revenue.
+     **The rule: a blank cell means UNCHANGED, not zero.** An explicit Save on a visible form still
+     means what the form shows — that is why only this collect passes `onlyTyped`. ([[the-loop]]
+     #53: the comment naming this exact failure had been sitting here since round 1.) */
   openEdits() {
     const g = id => document.getElementById(id);
+    const typed = id => { const el = g(id); return !!el && String(el.value).trim() !== ''; };
     const f = {};
-    if (g('eb-q-ph') || g('eb-q-party') || g('eb-q-fb')) Object.assign(f, this.collectQuote());
-    if (g('eb-dep')) f.deposit_amount = parseFloat(g('eb-dep').value) || 0;
-    if (g('eb-pl-food') || g('eb-pl-bar') || g('eb-pl-other')) {
-      if (g('eb-pl-food'))  f.event_food_cost  = parseFloat(g('eb-pl-food').value) || 0;
-      if (g('eb-pl-bar'))   f.event_bar_cost   = parseFloat(g('eb-pl-bar').value) || 0;
-      if (g('eb-pl-other')) f.event_other_cost = parseFloat(g('eb-pl-other').value) || 0;
-      if (g('eb-pl-actual')) f.actual_revenue  = parseFloat(g('eb-pl-actual').value) || 0;
+    if (typed('eb-q-ph') || typed('eb-q-party') || typed('eb-q-fb')) Object.assign(f, this.collectQuote(true));
+    if (typed('eb-dep')) f.deposit_amount = parseFloat(g('eb-dep').value) || 0;
+    if (typed('eb-pl-food') || typed('eb-pl-bar') || typed('eb-pl-other') || typed('eb-pl-actual')) {
+      if (typed('eb-pl-food'))   f.event_food_cost  = parseFloat(g('eb-pl-food').value) || 0;
+      if (typed('eb-pl-bar'))    f.event_bar_cost   = parseFloat(g('eb-pl-bar').value) || 0;
+      if (typed('eb-pl-other'))  f.event_other_cost = parseFloat(g('eb-pl-other').value) || 0;
+      if (typed('eb-pl-actual')) f.actual_revenue   = parseFloat(g('eb-pl-actual').value) || 0;
     }
     return f;
   },
@@ -1069,10 +1121,19 @@ S.EventsBookings = {
      typed in the open card (`openEdits`). That means they are a money door too: they must refuse a
      negative like every other one, and they must not THROW AWAY a legitimate edit when the stage
      move itself is refused. */
-  _stepErr(msg) {
+  /* `sticky` marks a message whose cause is NOT in any input, so nothing the operator types can
+     clear it. ⛔ Without it the rate-card refusal died on the next keystroke: `renderQuoteBreakdown`
+     re-checks the typed cells on every input event, found nothing wrong with them, and wiped the one
+     line explaining why tapping the package had done nothing — leaving an un-applied package, no
+     price set, and no explanation on screen. */
+  _stepErr(msg, sticky) {
     // Whichever step's card is on screen owns the message; there is no error span on the action bar.
     const el = ['eb-q-err', 'eb-pl-err', 'eb-dep-err'].map(i => document.getElementById(i)).find(Boolean);
-    if (el) { el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none'; }
+    if (el && !(!msg && el.dataset && el.dataset.sticky === '1')) {
+      el.textContent = msg || '';
+      el.style.display = msg ? 'block' : 'none';
+      if (el.dataset) { if (sticky && msg) el.dataset.sticky = '1'; else delete el.dataset.sticky; }
+    }
     return !msg;
   },
 
@@ -1090,6 +1151,17 @@ S.EventsBookings = {
      proves the rest were omissions. */
   async _saveOpen(id) {
     const f = this.openEdits();
+    /* ⚠ AND THESE DOORS MUST NOT FREEZE A LEAD'S RATES. They are incidental — printing, navigating,
+       opening a popup — while `_freezeRates`' own rule is "nothing is frozen while the booking is
+       still a Lead", because before a quote goes out the live rate is the correct one. The Service
+       Charge and Tax cells always RENDER with a value, so collecting them stamped a snapshot on a
+       Lead that had never been quoted: measured, a Quote PDF click pinned tax at 8.25%, and when the
+       operator later corrected their rate to 10% that Lead sat at $6,412.50 against a live $6,500.00
+       and stopped following the setting, with nothing on screen saying why.
+       ⚠ `changeStage` deliberately does NOT come through here — a stage button is an explicit
+       commitment, and the rates the operator can see are the ones it should freeze. */
+    const b = this.bookings().find(x => x.id === id);
+    if (!b || (b.stage || 'Lead') === 'Lead') { delete f.service_charge_pct; delete f.tax_pct; }
     if (!this._stepErr(this._rejectReason(f))) return false;
     if (!Object.keys(f).length) return true;
     return !!(await this.patch(id, f));
@@ -1190,7 +1262,7 @@ S.EventsBookings = {
     const p = this.quoteParts(b);
     // The BILLED count, not the estimate — see _countLabel. This line and the subtotal below have
     // to multiply out, or the client's own arithmetic contradicts the document.
-    if (p.party)       L.push('Party size: ' + this._countLabel(p) + ' guests');
+    if (p.party)       L.push('Party size: ' + this._countLabel(p, true));
     if (b.space)       L.push('Space: ' + b.space);
     if (p.ph)          L.push('Per head: ' + App.fmtCurrency(p.ph) + (p.party ? ' x ' + p.party + ' guests' : ''));
     if (b.fb_minimum)  L.push('Food and beverage minimum: ' + App.fmtCurrency(b.fb_minimum));
@@ -1216,7 +1288,7 @@ S.EventsBookings = {
          card was thrown away by the Edit Details re-render — measured $10,965.38 stored against
          $9,811.13 on screen, a $1,154.25 gap, and the next Email Quote sends the client the old
          price. Only the SEND is refused; the numbers they typed are theirs. */
-      if (!(await this._saveOpen(id))) return;
+      await this._saveOpen(id);   // best effort; the prompt must still open even on a refused write
       const go = await App.confirm({ title: 'Add an email first', message: 'A quote goes out by email. Add the customer email on the booking, then send it.', confirmText: 'Edit Details', cancelText: 'Cancel' });
       if (go) this.showForm(id);
       return;
@@ -1357,7 +1429,7 @@ S.EventsBookings = {
     if (b.event_date)  lines.push(['Date', this.fmtDate(b.event_date) + (b.event_time ? ' ' + b.event_time : '')]);
     const qp = this.quoteParts(b);
     // The BILLED count, not the estimate (see _countLabel) — Per Head x this must equal the subtotal.
-    if (qp.party)      lines.push(['Party Size', this._countLabel(qp) + ' guests']);
+    if (qp.party)      lines.push(['Party Size', this._countLabel(qp, true)]);
     if (b.space)       lines.push(['Space', b.space]);
     if (qp.ph)         lines.push(['Per Head', money(qp.ph) + (qp.party ? ' x ' + qp.party + ' guests' : '')]);
     if (b.fb_minimum)  lines.push(['Food & Beverage Minimum', money(b.fb_minimum)]);
@@ -1545,7 +1617,7 @@ S.EventsBookings = {
     // The count the F&B subtotal was BILLED on. The agreement's own terms promise "billed for the
     // guaranteed count or the actual count, whichever is higher" — printing the superseded estimate
     // next to a guarantee-billed subtotal contradicted the paragraph below it on the same page.
-    if (p.party) lines.push(['Guest Count', this._countLabel(p)]);
+    if (p.party) lines.push(['Guest Count', this._countLabel(p, true)]);
     lines.push(['F&B Subtotal', money(p.subtotal)]);
     if (p.svcPct) lines.push(['Service Charge (' + p.svcPct + '%)', money(p.service)]);
     if (p.taxPct) lines.push(['Tax (' + p.taxPct + '%)', money(p.tax)]);
