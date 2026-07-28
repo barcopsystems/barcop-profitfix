@@ -125,7 +125,15 @@ S.HubCashOutflows = {
       // truthiness hid a series the whole app still considered live, and hid it somewhere with no
       // way back. Legacy records stamped by the old Stop (a FUTURE month, recurring still true) are
       // recovered by this: they show until the month they actually stop.
-      if (o.stopped_ym && o.stopped_ym <= cur) return false;
+      /* ⚠⚠ ANY STOP MEANS NOT ACTIVE — "has the stop month ARRIVED" is the wrong question here.
+         stopped_ym does two jobs, and they only diverge when a stop takes effect NEXT month, which
+         is exactly what happens when this month's payment has already gone out. Asking <= cur then
+         left a series the operator had just stopped sitting in the Recurring Outflows table with
+         "Recurring / mo" still counting it: press Stop, and NOTHING on the page changes. That reads
+         as a broken button, and the rate claim is wrong too — there are no payments left.
+         The MONEY still asks the month question, correctly and separately (outflowsBetween keeps
+         every occurrence before the stop). This is a question about whether a series is live. */
+      if (o.stopped_ym) return false;
       const end = CashEngine.recurringEndYm(o);
       return !(end && end < cur);
     });
@@ -180,7 +188,9 @@ S.HubCashOutflows = {
       const e = (window.CashEngine && CashEngine.recurringEndYm) ? CashEngine.recurringEndYm(o) : null;
       return !!(e && e < _cur);
     };
-    const _dormantSeries = (o) => !!((o.stopped_ym && o.stopped_ym <= _cur) || (o.recurring && _ended(o)));
+    // ⚠ AND THE MIRROR: anything that left the active list above has to land here, or it is in no
+    // table at all. Same predicate, same reason — a stop stamp of any month means dormant.
+    const _dormantSeries = (o) => !!(o.stopped_ym || (o.recurring && _ended(o)));
     const recs = this.records().filter(o => o && o.id
         && (!o.recurring || _dormantSeries(o))
         && (_dormantSeries(o) || ((o.date || '') >= b.s && (o.date || '') <= b.e)))
@@ -234,7 +244,15 @@ S.HubCashOutflows = {
     const isEdit = !!record;
     const rec = record || prefill || { id: '', date: App.todayLocal(), type: 'draw', amount: '', notes: '', recurring: false };
     const id = 'cb-modal';
-    const seriesOn = !!rec.recurring;
+    /* ⚠⚠ A STOPPED SERIES MUST NOT OPEN WITH "RECURRING" STILL TICKED. Round 5 made Stop keep
+       `recurring: true` and mark the month instead — right, because this store PROJECTS its history
+       from the parent and clearing the flag deleted every payment ever made. But `seriesOn` still
+       read the raw flag, so a series the operator had just stopped opened its edit form claiming to
+       be live, while the page around it said the opposite: the row sits in Logged Outflows, the
+       status column reads stopped, and Recurring / mo excludes it. `stopped_ym` is what "stopped"
+       means on this door now, so the form has to read it too — and ticking the box then means what
+       it says: resume. */
+    const seriesOn = !!rec.recurring && !rec.stopped_ym;
     const freqOpt = (v, lbl) => '<option value="' + v + '"' + (rec.frequency === v || (!rec.frequency && v === 'monthly') ? ' selected' : '') + '>' + lbl + '</option>';
     const recurHtml = '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="cb-f-recur"' + (seriesOn ? ' checked' : '') + '/> Recurring (same amount each time)</label></div>'
       + '<div id="cb-f-term-wrap" style="margin-top:12px;' + (seriesOn ? '' : 'display:none;') + '">'
@@ -291,9 +309,15 @@ S.HubCashOutflows = {
            tells the operator to do — re-derived the finished term and refused again. A dead end whose
            only escape was guessing that the other half of the sentence worked. Line 283 already
            treats a blank box as Ongoing; this now agrees with it, and with the expense twin. */
+        /* ⚠⚠ ONLY ON A GENUINE RESUME — the same gate the expense twin got, and this door was
+           written without it. The checkbox is PRE-TICKED for a live series, so an unguarded refusal
+           fired on every ordinary edit to a series whose term had run out: change the note or the
+           amount and the save is refused, with advice about a schedule the operator never touched.
+           On this store "paused" means a stop stamp, not a cleared flag (see seriesOn above). */
+        const _wasPaused = !base.recurring || !!base.stopped_ym;
         const _termNow = (termV && termV > 0) ? termV : 0;
         const _endYm = _termNow > 0 ? CashEngine.recurringEndYm(Object.assign({}, base, { date: date, term_months: _termNow })) : null;
-        if (_endYm && _endYm < App.todayLocal().slice(0, 7)) {
+        if (_wasPaused && _endYm && _endYm < App.todayLocal().slice(0, 7)) {
           showErr('That fixed term has already finished. Change the date to when it next starts, or clear "Ends after" to keep it going.');
           return;
         }
