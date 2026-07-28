@@ -51,6 +51,12 @@ S.EventsPricing = {
         + '<button class="btn btn-primary" id="rp-add">Add Package</button>'
         + '<button class="btn btn-ghost" id="rp-clear">Start Over</button>'
         + '<button class="btn btn-ghost" id="rp-calc">Catering Calculator</button>'
+        /* ⚠ THIS DOOR REFUSED A BLANK PACKAGE NAME IN SILENCE — the operator fills in six cells,
+           forgets the name, clicks Add Package, and nothing whatever happens. The twin
+           (ev-regulars) says "Name is required." and got that fix in the same round this file took
+           its draft fix from; the silence half was left behind on BOTH of this file's doors.
+           Same span, same wording shape, so the two cannot drift again. */
+        + '<span id="rp-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
 
     const rows = rc.slice(0, App.listLimit('core', 'event_rate_card')).map(r =>
@@ -129,12 +135,41 @@ S.EventsPricing = {
     this.calc();
   },
 
+  /* ONE VALIDATOR, BOTH DOORS — the exact divergence this round exists to stop.
+     A rate card is not a note to self: ev-bookings.applyRateCard copies per_head, fb_minimum and
+     room_fee onto a booking, computes quoted_total, persists it, and it prints in the quote PDF and
+     the client agreement. Measured with a negative typed into the three money cells: a Quoted Total
+     of -$8,195.00 on the agreement with Balance Due clamped to $0.00 — a document telling a client
+     they owe nothing. And a reversed cover range printed as "60 - 20" in Saved Packages.
+     ⚠ REFUSED, NOT SILENTLY CLAMPED. Rewriting the operator's number without saying so is the other
+     way to put something untrue on the screen. */
+  _rejectReason(rec) {
+    if (['per_head', 'fb_minimum', 'room_fee', 'min_covers', 'max_covers'].some(f => rec[f] < 0)) {
+      return 'Prices and cover counts cannot be negative.';
+    }
+    if (rec.min_covers && rec.max_covers && rec.min_covers > rec.max_covers) {
+      return 'Min covers cannot be more than max covers.';
+    }
+    return '';
+  },
+
   async addPackage() {
     const g = x => document.getElementById(x);
+    const err = g('rp-err');
+    const say = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    // ⚠ AND CLEAR IT FIRST. Round 2 added the message and left it on screen: the operator fixed the
+    // very thing it named, pressed Add again, the write was then refused, and this door returns
+    // without a redraw — so a stale "Package name is required." sat beside a write-failure toast,
+    // telling them to do a thing they had just done. A message that outlives its cause is a lie.
+    const clear = () => { if (err) { err.textContent = ''; err.style.display = 'none'; } };
+    clear();
     const name = g('rp-name')?.value.trim();
-    if (!name) return;
+    if (!name) { say('Package name is required.'); return; }
     const rec = {
       id: App.uid(), package_name: name,
+      // ⚠ draw() sorts with App.byCreation, which keys on created_at || id. The twin stamps one and
+      // the seed comment for this very array says why; only the door a live operator uses did not.
+      created_at: new Date().toISOString(),
       event_type: g('rp-type')?.value || '',
       min_covers: parseFloat(g('rp-minc')?.value) || 0,
       max_covers: parseFloat(g('rp-maxc')?.value) || 0,
@@ -142,6 +177,8 @@ S.EventsPricing = {
       room_fee:   parseFloat(g('rp-room')?.value) || 0,
       per_head:   parseFloat(g('rp-ph')?.value) || 0
     };
+    const bad = this._rejectReason(rec);
+    if (bad) { say(bad); return; }
     // ⚠ The draft survives a refused write — see the note in ev-regulars.add().
     if (!(await App.putRecord('core', 'event_rate_card', rec))) return;   // row-per-record
     this._draft = null;
@@ -163,18 +200,24 @@ S.EventsPricing = {
         + '<div class="f" style="flex:1 1 110px;"><label>Room Fee</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rpe-room" value="' + v(r.room_fee) + '"/></div></div>'
         + '<div class="f" style="flex:1 1 110px;"><label>Per Head</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="rpe-ph" step="0.01" value="' + v(r.per_head) + '"/></div></div>'
       + '</div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="rpe-save">Save Changes</button></div></div>';
+      + '<div class="card-actions"><button class="btn btn-primary" id="rpe-save">Save Changes</button>'
+      + '<span id="rpe-err" style="display:none;font-size:11px;color:var(--red);align-self:center;margin-left:10px;"></span></div></div>';
     App.openModal(html, { id: 'rp-edit-modal', maxWidth: 540, noClose: true });
     document.getElementById('rpe-save')?.addEventListener('click', () => this.saveEdit(id));
   },
 
   async saveEdit(id) {
     const g = x => document.getElementById(x);
+    const err = g('rpe-err');
+    const say = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    if (err) { err.textContent = ''; err.style.display = 'none'; }   // never outlive its cause
     const name = g('rpe-name')?.value.trim();
-    if (!name) return;
+    // ⚠ SAY IT — same rule, same door family. Clearing the name and pressing Save Changes used to
+    // do literally nothing, with the modal sitting there giving no reason.
+    if (!name) { say('Package name is required.'); return; }
     const list = this.rateCards();
     const i = list.findIndex(x => x.id === id);
-    if (i < 0) return;
+    if (i < 0) { say('That package is no longer in your rate card.'); return; }
     const out = Object.assign({}, list[i], {
       package_name: name,
       event_type: g('rpe-type')?.value || '',
@@ -184,7 +227,15 @@ S.EventsPricing = {
       room_fee:   parseFloat(g('rpe-room')?.value) || 0,
       per_head:   parseFloat(g('rpe-ph')?.value) || 0
     });
-    await App.putRecord('core', 'event_rate_card', out);   // row-per-record
+    const bad = this._rejectReason(out);
+    if (bad) { say(bad); return; }
+    /* ⚠⚠ AND THE VERDICT IS CHECKED. This discarded putRecord's answer and closed the modal either
+       way — and putRecord DOES revert the row here (a fresh object is passed), so a refused save
+       showed the operator a modal closing like a success and the old figures back in the table.
+       That matters more on this screen than on its twin: ev-bookings.applyRateCard copies per_head,
+       fb_minimum and room_fee off a rate card, computes quoted_total, and that number leaves the
+       building in the quote PDF. A rate card is not a note to self. */
+    if (!(await App.putRecord('core', 'event_rate_card', out))) { say('Could not save. Nothing was changed.'); return; }   // row-per-record
     App.closeModal('rp-edit-modal');
     this.draw();
   },

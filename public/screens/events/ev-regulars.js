@@ -212,7 +212,12 @@ S.EventsRegulars = {
 
   async add() {
     const rec = this.collect('rg');
-    if (!rec.name) { const e = document.getElementById('rg-err'); if (e) { e.textContent = 'Name is required.'; e.style.display = 'inline'; } return; }
+    const e = document.getElementById('rg-err');
+    // ⚠ CLEARED FIRST, same as the Pricing twin. A refused write returns below WITHOUT a redraw, so
+    // a "Name is required." from the previous attempt stayed on screen after the operator had typed
+    // the name — sitting beside a write-failure toast and naming the wrong problem.
+    if (e) { e.textContent = ''; e.style.display = 'none'; }
+    if (!rec.name) { if (e) { e.textContent = 'Name is required.'; e.style.display = 'inline'; } return; }
     rec.id = App.uid(); rec.created_at = new Date().toISOString();
     /* ⚠⚠ THE DRAFT SURVIVES A REFUSED WRITE. This cleared it BEFORE the await and then discarded
        putRecord's verdict — so on a rejection the record was reverted out of the array, the draft
@@ -254,7 +259,11 @@ S.EventsRegulars = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your regulars list here',
-      dropSub: 'Only Name is required; phone, email, birthday, anniversary, and drink preferences come in if your file has them.',
+      /* ⚠ THIS SENTENCE IS READ AT THE MOMENT THE OPERATOR DECIDES WHICH COLUMNS TO MAP, and it
+         listed everything EXCEPT the column round 1 added. Anyone whose header is not in the
+         auto-match vocabulary read this, concluded last visit was not supported, left it unmapped —
+         and landed in the 100%-"no visit logged" state that column exists to end ([[copy-matches-app]]). */
+      dropSub: 'Only Name is required; phone, email, birthday, anniversary, drink preferences, and last visit come in if your file has them.',
       actionsEl: '#rg-imp-actions',
       fields: [
         // Whole phrases only. A bare 'customer' / 'guest' / 'patron' matched the
@@ -303,21 +312,42 @@ S.EventsRegulars = {
        column ["25/12","01/07","03/11","06/09","30/06"] stored 3 of 5 in the WRONG MONTH under a
        message saying "5 regulars imported." That is the S199 defect reproduced inside the S200 fix,
        which is exactly what a scan round over one's own work is for. */
-    const RD = { minYear: 1900, yearOptional: true };
-    const conv = k => (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
-      ? PosIngest.dateConvention(rows, k, RD) : { dayFirst: false, contradictory: false };
-    const bConv = conv('birthday'), aConv = conv('anniversary'), lvConv = conv('last_visit');
-    const mk = c => Object.assign({}, RD, { dayFirst: c.dayFirst, dateAmbiguous: c.contradictory });
-    const parseDate = (s, c) => (typeof PosIngest !== 'undefined' && PosIngest.normDate)
-      ? PosIngest.normDate(s, mk(c)) : '';
+    /* ⚠⚠ `yearOptional` IS A BIRTHDAY RULE AND IT MUST NOT REACH LAST VISIT. One shared opts object
+       served all three date columns, so the S200 sentinel — an explicit 1900 meaning "no year was
+       given", which is honest for a birthday because nothing ever prints a birth year — became a
+       REAL CLAIM about when a guest was last in. Measured on the shipped reader: a year-less cell
+       "3/15" (or "15-Mar", or "Mar 15") stored as 1904-03-15, the Last Visit column printed
+       "Mar 15, 1904" as fact, daysSince returned 44,695, and the regular moved OFF the "log a visit
+       for these" list onto the win-back list under a date that never happened.
+       A last visit is the one date on this screen where the year IS the data, so it takes the app's
+       ordinary rules: no yearOptional, and the DEFAULT minYear (1990) rather than 1900, which also
+       refuses a fat-fingered "1915" instead of banking it as a real visit.
+       ⚠ AND THE PROBE OPTS FOLLOW THE READ OPTS, per the note below — conv() is now passed the same
+       object the column is read with, or the column would vote on a question it is not being asked. */
+    const RD = { minYear: 1900, yearOptional: true };   // birthday + anniversary
+    const VD = {};                                      // last visit: an ordinary business date
+    const conv = (k, o) => (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
+      ? PosIngest.dateConvention(rows, k, o) : { dayFirst: false, contradictory: false };
+    const bConv = conv('birthday', RD), aConv = conv('anniversary', RD), lvConv = conv('last_visit', VD);
+    const mk = (o, c) => Object.assign({}, o, { dayFirst: c.dayFirst, dateAmbiguous: c.contradictory });
+    const parseDate = (s, c, o) => (typeof PosIngest !== 'undefined' && PosIngest.normDate)
+      ? PosIngest.normDate(s, mk(o, c)) : '';
     const added = [];
-    let noName = 0, dupes = 0, inFile = 0, badBday = 0, badAnniv = 0;
-    // Phone is compared on DIGITS ONLY: "555-0100" and "(555) 0100" are one person, and email is
-    // already lowercased, so formatting alone must not mint a second record.
+    let noName = 0, dupes = 0, inFile = 0, badBday = 0, badAnniv = 0, badVisit = 0;
+    /* Phone is compared on DIGITS ONLY: "555-0100" and "(555) 0100" are one person, and email is
+       already lowercased, so formatting alone must not mint a second record.
+       ⚠ AND THE COUNTRY CODE COUNTS AS FORMATTING. Digits alone left "+1 555-0100" as 15550100
+       beside "555-0100" as 5550100, so the same guest in one file minted two records — the exact
+       thing the digits-only rule exists to stop, one character short. A POS export writes E.164
+       (+1...) while a hand-typed list does not, which is the common mixed case.
+       Only an 11-digit number LEADING with 1 is trimmed: that is the US country code and nothing
+       else is 11 digits starting with 1. A 10-digit number and any genuine international number
+       are left exactly as they are. */
+    const phoneKey = v => { const d = String(v || '').replace(/\D/g, ''); return (d.length === 11 && d[0] === '1') ? d.slice(1) : d; };
     const key = r => [(r.name || '').trim().toLowerCase(),
-      String(r.contact_phone || '').replace(/\D/g, ''),
+      phoneKey(r.contact_phone),
       (r.contact_email || '').trim().toLowerCase()].join('|');
-    const hasContact = r => !!(String(r.contact_phone || '').replace(/\D/g, '') || (r.contact_email || '').trim());
+    const hasContact = r => !!(phoneKey(r.contact_phone) || (r.contact_email || '').trim());
     /* ⚠⚠ TWO DEDUP RULES, BECAUSE A NAME IS NOT AN IDENTITY. The first version used one seen-set on
        name+phone+email, and for a NAME-ONLY list the key degrades to the name — the exact case its
        own comment claimed to avoid. Measured: a six-row bartender's list
@@ -346,12 +376,12 @@ S.EventsRegulars = {
       const rec = {
         id: App.uid(), name,
         contact_phone: (r.phone || '').trim(), contact_email: (r.email || '').trim(),
-        birthday: parseDate(r.birthday, bConv), anniversary: parseDate(r.anniversary, aConv),
+        birthday: parseDate(r.birthday, bConv, RD), anniversary: parseDate(r.anniversary, aConv, RD),
         drink_prefs: (r.drink_prefs || '').trim(),
         // ⚠ Through the SAME shared date reader as birthday/anniversary above, so a last-visit
         // column gets the day-first / two-digit-year handling every other import door has. An
         // unreadable or absent value still lands blank, which reads as "no visit logged".
-        last_visit: parseDate(r.last_visit, lvConv), vip: false, notes: '',
+        last_visit: parseDate(r.last_visit, lvConv, VD), vip: false, notes: '',
         created_at: new Date().toISOString()
       };
       /* `dupes` = already in the book. `inFile` = the same row twice in THIS file. They are different
@@ -370,6 +400,12 @@ S.EventsRegulars = {
       // not a problem and must never be counted as one, or every phone-only list reads as broken.
       if (String(r.birthday || '').trim() && !rec.birthday) badBday++;
       if (String(r.anniversary || '').trim() && !rec.anniversary) badAnniv++;
+      // ⚠ AND THE THIRD COLUMN, which the sentence above claimed all along and did not do. The
+      // Last Visit column was added without a counter, so an unreadable one imported blank in
+      // silence — reading on screen as "never logged", which is a DIFFERENT fact and the one the
+      // quiet tile was split apart to stop the app confusing. That is S201's own defect, live
+      // again inside the field S201's fix introduced.
+      if (String(r.last_visit || '').trim() && !rec.last_visit) badVisit++;
       this.regulars().push(rec);
       added.push(rec);
     });
@@ -392,10 +428,21 @@ S.EventsRegulars = {
       if (noName)   bits.push(noName + ' row' + (noName === 1 ? '' : 's') + ' skipped with no name');
       if (badBday)  bits.push(badBday + ' birthday' + (badBday === 1 ? '' : 's') + ' could not be read and imported blank');
       if (badAnniv) bits.push(badAnniv + ' anniversar' + (badAnniv === 1 ? 'y' : 'ies') + ' could not be read and imported blank');
-      if (bConv.contradictory || aConv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
+      // An unreadable last visit lands blank, and blank renders as "never logged" — so without this
+      // line the operator is told a guest has never been in when their file said otherwise.
+      if (badVisit)  bits.push(badVisit + ' last visit' + (badVisit === 1 ? '' : 's') + ' could not be read and imported blank');
+      // ⚠ lvConv WAS COMPUTED AND ITS VERDICT THROWN AWAY. The last-visit column is probed for
+      // day-first exactly like the other two, and its "cannot settle the order" answer was simply
+      // not in this test — so an ambiguous visit column imported silently mis-monthed (S199's
+      // defect, live in the new column).
+      if (bConv.contradictory || aConv.contradictory || lvConv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
       this.importMsg = { bad: added.length === 0, text: bits.join(' · ') + '.' };
     }
-    this.entryMode = 'manual';
+    /* ⚠ ONLY LEAVE IMPORT MODE ON SUCCESS. This switched unconditionally, so the FAILURE path told
+       the operator to "check your connection and try again" and then destroyed the thing they would
+       retry: renderList drops the mapper, taking the parsed file and the column mapping with it, so
+       "try again" meant re-drop and re-map from scratch. On a failure the importer stays put. */
+    if (saved) this.entryMode = 'manual';
     this.renderList();
   },
 
@@ -403,8 +450,14 @@ S.EventsRegulars = {
     App.showHelpModal('How Tracking Regulars Works', [
       { p: ['Your regulars book: your guests by name, by drink, by date. Add one at a time, or switch to Import File and drop a list. The chips filter the list (birthdays, anniversaries, gone quiet, VIP), open any regular in the list to edit them, check VIP to mark your best, and Export PDF prints the book.'] },
       { h: 'Outreach', p: ['Birthdays and anniversaries this month are counted up top, and the chips filter the list to them. Work this as your monthly reach-out list.'] },
-      { h: 'Gone Quiet', p: ['A regular with no visit logged in the last ' + this.QUIET_DAYS + ' days flags as quiet. Work that as your win-back list, and log a last visit when they come in to keep it honest.'] },
-      { h: 'Importing', p: ['Drop a CSV or Excel file and map the columns once. Only Name is required; phone, email, birthday, anniversary, and drink preferences come in if your file has them, and anything missing imports blank to fill later.'] }
+      // ⚠ THE HELP STILL DESCRIBED THE PRE-SPLIT SCREEN. Round 1 split one count into two — a
+      // regular with NO visit ever logged is no longer counted as quiet — and neither the new tile
+      // nor the new chip was mentioned anywhere here, so the operator had nothing telling them
+      // which of the two counts is the win-back sheet.
+      { h: 'Gone Quiet', p: ['A regular whose last visit was more than ' + this.QUIET_DAYS + ' days ago flags as quiet. Work that chip as your win-back list, and log a last visit when they come in to keep it honest.',
+        'No Visit Logged is a separate count, and it is different work: those are regulars you have never logged a visit for, so Bar Cop cannot say whether they have gone quiet or were in last night. Open them and set a last visit, and they start counting properly.'] },
+      { h: 'Importing', p: ['Drop a CSV or Excel file and map the columns once. Only Name is required; phone, email, birthday, anniversary, drink preferences, and last visit come in if your file has them, and anything missing imports blank to fill later.',
+        'Bar Cop tells you what it could not read: rows with no name, dates it could not make sense of, and anyone already in your book.'] }
     ]);
   }
 };
