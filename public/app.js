@@ -4936,6 +4936,20 @@ const App = {
       if (!el) return;
       if (el.type === 'checkbox' || el.type === 'radio') el.checked = !!draft[id];
       else el.value = draft[id];
+      /* ⚠⚠ A RESTORED NOTE WAS PUT BACK INVISIBLY, UNDER A LABEL SAYING THERE WAS NONE. noteField
+         bakes `display:none` + "+ Add Note" into its markup when the value is empty AT RENDER TIME,
+         which is always true for a fresh add form — and this only ever set el.value, so the text
+         came back into a collapsed box with the toggle still reading "+ Add Note". Reached by any
+         re-render that restores a draft: a filter chip, a delete, an import, leaving and returning.
+         The operator sees their note gone, retypes it or gives up, and it is submitted anyway from
+         the hidden textarea. Fixed here rather than at one screen: 14 screens use noteField and
+         restoreDraft together. */
+      const nf = el.closest && el.closest('.note-field');
+      if (nf && String(el.value || '').trim()) {
+        const box = nf.querySelector('.note-box'); if (box) box.style.display = 'block';
+        const tg = nf.querySelector('.note-toggle');
+        if (tg) { tg.textContent = 'Note'; tg.style.color = 'var(--t1)'; }
+      }
     });
   },
 
