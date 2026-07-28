@@ -6450,6 +6450,86 @@ const App = {
     });
   },
 
+  /* ── PICK WHICH ROWS TO IMPORT ────────────────────────────────────────────────────────────────
+     Sibling of promptImportConflicts above, and deliberately shaped like it. That one asks "whose
+     figure wins"; this one asks "which of these rows do you actually want".
+     ⚠ WHY IT EXISTS (Kyle, 2026-07-27): a bank CHECKING export is not an expenses file. Every debit
+     on it is money out, but only some are OPERATING expenses — the rest are food and liquor
+     purchases, payroll runs, card-processor settlements, transfers and owner draws, several of which
+     Bar Cop already tracks elsewhere (COGS through Inventory, wages through Labor). Importing the
+     lot double-counts them in Books. The file cannot say which is which and neither can we, so the
+     operator ticks. Same principle as [[user-chooses-conflicts]]: where two readings of the
+     operator's own data are both defensible, ask once rather than guess.
+     ⚠ EVERYTHING STARTS TICKED. A clean card or bill export is then one click, which keeps
+     [[automate-obvious-step]] intact for the ordinary case; only a register needs real work, and
+     "Untick all" makes that direction cheap too.
+     Returns { confirmed, keep:Set(key) }. Cancel and the X both resolve confirmed:false with an
+     EMPTY set, so a caller that forgets to check `confirmed` writes nothing rather than everything. */
+  promptImportReview(opts) {
+    opts = opts || {};
+    const rows = (opts.rows || []).filter(Boolean);
+    return new Promise(resolve => {
+      // Nothing to review is not a question — resolve as "import them all" so a caller can hand us
+      // any list without special-casing the empty one.
+      if (!rows.length) { resolve({ confirmed: true, keep: new Set() }); return; }
+      const cell = (t, extra) => '<td style="padding:8px 10px;' + (extra || '') + '">' + esc(t == null ? '' : t) + '</td>';
+      const body = rows.map(r =>
+        '<tr data-key="' + esc(r.key) + '" style="border-bottom:1px solid var(--b2);">'
+        + '<td style="padding:8px 10px;"><input type="checkbox" class="ipr-pick bc-check" checked/></td>'
+        + cell(r.date, 'white-space:nowrap;color:var(--t2);')
+        + cell(r.label)
+        + cell(r.category, 'color:var(--t2);')
+        + cell(r.amount, 'white-space:nowrap;text-align:right;') + '</tr>').join('');
+      const html = '<div class="card form-card">'
+        + '<div class="card-title">' + esc(opts.title || 'Pick what to import') + '</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
+        + esc(opts.intro || 'Untick anything that is not an operating expense.') + '</div>'
+        + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ipr-all">Tick all</button>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="ipr-none">Untick all</button>'
+        + '<span id="ipr-count" style="font-size:12px;color:var(--t3);"></span></div>'
+        + '<div style="overflow:auto;max-height:52vh;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+        + '<thead><tr style="text-align:left;color:var(--t3);border-bottom:1px solid var(--b2);">'
+        + '<th style="padding:8px 10px;width:34px;"></th><th style="padding:8px 10px;">Date</th>'
+        + '<th style="padding:8px 10px;">' + esc(opts.rowLabel || 'Description') + '</th>'
+        + '<th style="padding:8px 10px;">Category</th>'
+        + '<th style="padding:8px 10px;text-align:right;">Amount</th></tr></thead>'
+        + '<tbody>' + body + '</tbody></table></div>'
+        + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">'
+        + '<button type="button" class="btn btn-ghost" id="ipr-cancel">Cancel import</button>'
+        + '<button type="button" class="btn btn-primary" id="ipr-confirm">Import ticked</button></div>'
+        + '</div>';
+      let done = false;
+      const finish = (val) => { if (done) return; done = true; this.closeModal('import-review'); resolve(val); };
+      const overlay = this.openModal(html, { id: 'import-review', maxWidth: 760,
+        onClose: () => finish({ confirmed: false, keep: new Set() }) });
+      const boxes = () => Array.from(overlay.querySelectorAll('tr[data-key]'));
+      const tally = () => {
+        const n = boxes().filter(tr => tr.querySelector('.ipr-pick').checked).length;
+        const el = overlay.querySelector('#ipr-count');
+        if (el) el.textContent = n + ' of ' + rows.length + ' ticked';
+        const btn = overlay.querySelector('#ipr-confirm');
+        // Nothing ticked is a legitimate answer ("none of this belongs"), but it is not an import —
+        // the button says so rather than writing zero rows under a label that promises otherwise.
+        if (btn) btn.textContent = n ? 'Import ' + n : 'Import nothing';
+      };
+      overlay.querySelectorAll('.ipr-pick').forEach(b => b.addEventListener('change', tally));
+      overlay.querySelector('#ipr-all').addEventListener('click', () => {
+        boxes().forEach(tr => { tr.querySelector('.ipr-pick').checked = true; }); tally();
+      });
+      overlay.querySelector('#ipr-none').addEventListener('click', () => {
+        boxes().forEach(tr => { tr.querySelector('.ipr-pick').checked = false; }); tally();
+      });
+      overlay.querySelector('#ipr-cancel').addEventListener('click', () => finish({ confirmed: false, keep: new Set() }));
+      overlay.querySelector('#ipr-confirm').addEventListener('click', () => {
+        const keep = new Set();
+        boxes().forEach(tr => { if (tr.querySelector('.ipr-pick').checked) keep.add(tr.getAttribute('data-key')); });
+        finish({ confirmed: true, keep: keep });
+      });
+      tally();
+    });
+  },
+
   // ── Inventory value AS OF a date — the ONE door for the tax sheets ──────────
   // Schedule C COGS is `beginning + purchases - ending`, so a deflated ending figure
   // OVERSTATES COGS and understates taxable profit. Every tax sheet used to read a
