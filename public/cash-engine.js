@@ -535,9 +535,25 @@ window.CashEngine = {
       // Only Booked events are future committed money. A Completed event's revenue
       // is already realized through sales and This Week catering, so counting its
       // balance here too would double it. A collected balance is in hand, not inflow.
-      if (b.stage !== 'Booked' || b.balance_paid_date) return;
-      const d = String(b.event_date || '').slice(0, 10);
-      if (!d || d < startYmd || d > endYmd) return;
+      /* ⚠⚠ THE TEST IS "IS IT STILL OWED", NOT "HAS THE EVENT HAPPENED YET".
+         This required stage === 'Booked' and an event date inside the window, on the theory that a
+         Completed event's revenue is already realized through sales. That theory is only true when
+         the client settled at the bar. A catering invoice on net-30 never touched the POS, and the
+         old rule DELETED it from every week of the forecast the moment the date passed or the
+         operator pressed Mark Completed. Measured: $6,195 of real receivable showing $0.00, and a
+         Booked event five days old showing $0.00 against $7,695 owed.
+         Bar Cop cannot work out which case it is, so it no longer guesses: the balance counts until
+         the operator marks it paid and says HOW it was settled (see ev-bookings.markPaid). A
+         register settlement is already in sales and carries a balance_paid_date, so it drops out
+         here exactly as it should; anything still owed stays visible. */
+      if (b.stage !== 'Booked' && b.stage !== 'Completed') return;   // Lead/Quote Sent/Lost are not committed money
+      if (b.balance_paid_date) return;                               // collected: in the bank, not the forecast
+      const raw = String(b.event_date || '').slice(0, 10);
+      if (!raw) return;
+      // An overdue balance is collectible NOW, so it lands at the window start rather than in a week
+      // that has already gone. Without this an invoice from last Friday sat in no week at all.
+      const d = raw < startYmd ? startYmd : raw;
+      if (d > endYmd) return;
       const evTotal = this._eventTotal(b);
       // Only a COLLECTED deposit comes off the balance still to come. Netting an
       // uncollected one out made that money vanish from the forecast entirely: it was
