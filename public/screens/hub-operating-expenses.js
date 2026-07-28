@@ -570,6 +570,18 @@ S.HubOperatingExpenses = {
            Sysco invoice both carry both, and dating the expense to when it is DUE books a 28 Jan
            bill on Net 30 into February. */
         { key: 'date',     label: 'Date',     required: true,  match: ['date', 'bill date', 'invoice date', 'invoicedate', 'transaction date', 'business date', 'posting date', 'post date', 'posted date', 'date posted', 'statement date', 'settlement date', 'expense date', 'purchase date', 'charge date', 'payment date', 'batch date', 'due date', 'date paid', 'trans date', 'entry date', 'paid', 'posted', 'day'] },
+        /* ⚠⚠ THE FILE OFTEN SAYS WHICH WAY THE MONEY WENT — READ IT (S225). Kyle's bank export heads
+           this "Transaction Type" and fills it with Debit / Credit, and it was reaching this door
+           NOWHERE: measured against the real _autoMap, his header row bound date←Posting Date,
+           amount←Amount, vendor←Description, notes←Memo, category←Type, and the actual direction
+           marker went unmapped. So the importer was left inferring from the amount sign a fact the
+           file states outright.
+           ⚠ ORDER-SAFE, CHECKED: `type` is EXACT_ONLY so it cannot reach "Transaction Type" and
+           steal it from `category`, and `transaction date` is not a substring of it either.
+           ⚠ `details` is deliberately NOT a candidate. Chase heads its DEBIT/CREDIT column that way,
+           but `details` is already how a genuine memo column reaches `notes`, and stealing a memo
+           to gain a direction is the wrong trade. A Chase operator maps it in one dropdown. */
+        { key: 'direction', label: 'Debit / Credit', required: false, match: ['transaction type', 'debit/credit', 'credit/debit', 'debit or credit', 'dr/cr', 'debit credit', 'trans type', 'entry type', 'direction'] },
         { key: 'category', label: 'Category', required: false, match: ['category', 'type', 'account', 'expense type', 'expense category', 'gl account', 'account name', 'class', 'gl code'] },
         { key: 'vendor',   label: 'Vendor',   required: false, match: ['vendor', 'payee', 'merchant', 'description', 'name', 'paid to', 'supplier', 'company', 'vendor name', 'payee name', 'biller'] },
         /* ⚠ COMMENTS GO ABOVE THE ARRAY, NEVER INSIDE A FIELD LITERAL — a comment placed mid-entry
@@ -646,6 +658,15 @@ S.HubOperatingExpenses = {
      the door SAYS SO — a silent flip on weak evidence is how you turn a working import into a wrong
      one. Kept local to this door on purpose: it is the only importer that treats a negative as a
      credit to skip (buildVoidComp takes the magnitude, buildPmix needs the sign for returns). */
+  /* One row's stated direction, or '' when the file does not say. Strict on purpose: this decides
+     whether money is skipped, so it reads only the markers a bank actually writes. */
+  _directionOf(v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    if (!s) return '';
+    if (/^cr(edit)?\b/.test(s) || s === 'c') return 'credit';
+    if (/^de?b(it)?\b/.test(s) || s === 'd') return 'debit';
+    return '';
+  },
   _amountConvention(rows) {
     let neg = 0, pos = 0;
     (rows || []).forEach(r => {
@@ -689,6 +710,7 @@ S.HubOperatingExpenses = {
     // A self-contradicting file refuses its coin-toss rows rather than guessing; they land in the
     // `undated` bucket this door already counts and names.
     const _dopts = { dayFirst: _conv.dayFirst, dateAmbiguous: _conv.contradictory };
+    const _candidates = [];   // rows that pass every guard; the operator ticks which of these land
     const _pre = arr.slice();
     const _used = new Set();
     const _dup = (date, amount, vendor, category) => {
@@ -715,6 +737,12 @@ S.HubOperatingExpenses = {
        this reason: settle a FILE-LEVEL ambiguity once, from the file's own evidence, instead of
        guessing per row. One flip below and every downstream guard is untouched. */
     const _sign = this._amountConvention(rows);
+    /* ⚠⚠ AND IF THE FILE STATES THE DIRECTION, THAT BEATS EVERY INFERENCE ABOVE (S225). A stated
+       fact is not a heuristic: where a Debit/Credit column is present and populated, `_sign` is not
+       consulted at all — credits are money IN and skipped, everything else is money OUT and imported
+       at its magnitude, whatever sign the file wrote it with. Kyle's `-123.62` debit becomes
+       $123.62. This is the whole reason the middle case stopped needing a guess. */
+    const _hasDir = (rows || []).some(r => this._directionOf(r && r.direction));
     let credits = 0, unreadable = 0, undated = 0, zeroed = 0, totalsLines = 0;
     (rows || []).forEach((r, i) => {
       const date = this._normDate(r.date, _dopts);
@@ -730,7 +758,9 @@ S.HubOperatingExpenses = {
       /* ONE FLIP, DECIDED ONCE FOR THE WHOLE FILE. Under the negative-debit convention a charge is
          -1240.55 and becomes +1240.55 (imports); a deposit is +8420.11 and becomes -8420.11, which
          the existing credit guard below then skips. Every downstream test is unchanged. */
-      const amount = _sign.negativeIsCharge ? -_raw : _raw;
+      const amount = _hasDir
+        ? (this._directionOf(r.direction) === 'credit' ? -Math.abs(_raw) : Math.abs(_raw))
+        : (_sign.negativeIsCharge ? -_raw : _raw);
       // A $0.00 line (a voided bill, a zero-dollar subscription row) is not a credit and must not
       // be reported as one — it is simply nothing to log.
       if (amount < 0)     { credits++;    return; }
@@ -760,8 +790,40 @@ S.HubOperatingExpenses = {
       // Skip a row ALREADY LOGGED (same date, amount, vendor, category) — see the snapshot note above.
       if (_dup(date, amount, vendor, category)) return;
       const row = { id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date, category, vendor, amount, notes, created_at: new Date().toISOString() };
-      arr.push(row); _added.push(row);
+      _candidates.push(row);
     });
+
+    /* ⚠⚠ THE OPERATOR PICKS, BECAUSE THE FILE CANNOT SAY (Kyle's call, 2026-07-27). Every debit on a
+       bank register is money out, but only some are OPERATING expenses — the rest are food and
+       liquor purchases, payroll runs, card-processor settlements, transfers and owner draws. Several
+       of those Bar Cop ALREADY tracks elsewhere (COGS through Inventory, wages through Labor), so
+       importing the lot double-counts them straight into the Books Income Statement. Nothing in the
+       file distinguishes them and no rule could.
+       ⚠ It runs AFTER every other guard, so the list shown is exactly what would have been written —
+       unreadable, zero, undated, totals and already-logged rows never reach it. Everything starts
+       ticked, so a clean card or bill export stays one click. */
+    let unticked = 0;
+    if (_candidates.length) {
+      const pick = await App.promptImportReview({
+        title: 'Pick what to import',
+        intro: 'These are the rows Bar Cop can log. Untick anything that is not an operating expense'
+             + ' — food and liquor purchases, payroll and card-processor fees are tracked elsewhere in'
+             + ' Bar Cop, so importing them here would count them twice.',
+        rowLabel: 'Description',
+        rows: _candidates.map(c => ({ key: c.id, date: c.date, label: c.vendor || '(no description)',
+          category: c.category, amount: App.fmtCurrency(c.amount) }))
+      });
+      if (!pick.confirmed) {
+        this._importMsg = 'Import cancelled. Nothing was changed.';
+        this._entryMode = 'manual';
+        if (this._catchUpStillCurrent()) { if (this._view !== 'current') this._rerender(); else this.renderMain(); }
+        return;
+      }
+      const chosen = _candidates.filter(c => pick.keep.has(c.id));
+      unticked = _candidates.length - chosen.length;
+      chosen.forEach(row => { arr.push(row); _added.push(row); });
+    }
+
     // Imported rows were pushed into the live list before the write, and a bulk write cannot revert
     // itself — take them back out rather than showing an import Books counts and the server lacks.
     const saved = await App.putRecordsBulk('core', 'operating_expense', this.records());
@@ -794,11 +856,14 @@ S.HubOperatingExpenses = {
          DEPOSITS, not refunds — saying "credits or refunds skipped (Bar Cop tracks expenses as
          positive amounts)" about a Chase file was not merely unhelpful, it described the opposite of
          what happened and would have sent the operator hunting for refunds that do not exist. */
-      if (credits)    bits.push(credits + (_sign.negativeIsCharge
-        ? ' deposit' + (credits === 1 ? '' : 's') + ' or credit' + (credits === 1 ? '' : 's')
-          + ' skipped (this file marks charges as negative, so Bar Cop imported the charges)'
-        : ' credit' + (credits === 1 ? '' : 's') + ' or refund' + (credits === 1 ? '' : 's')
-          + ' skipped (Bar Cop tracks expenses as positive amounts)'));
+      if (credits)    bits.push(credits + (_hasDir
+        // The file SAID they were credits, so say that — no inference to explain.
+        ? ' row' + (credits === 1 ? '' : 's') + ' skipped, marked as credits in your file (money in, not an expense)'
+        : _sign.negativeIsCharge
+          ? ' deposit' + (credits === 1 ? '' : 's') + ' or credit' + (credits === 1 ? '' : 's')
+            + ' skipped (this file marks charges as negative, so Bar Cop imported the charges)'
+          : ' credit' + (credits === 1 ? '' : 's') + ' or refund' + (credits === 1 ? '' : 's')
+            + ' skipped (Bar Cop tracks expenses as positive amounts)'));
       if (undated)    bits.push(undated + ' row' + (undated === 1 ? '' : 's') + ' skipped with no readable date');
       if (unreadable) bits.push(unreadable + ' row' + (unreadable === 1 ? '' : 's') + ' skipped with no readable amount');
       if (zeroed) bits.push(zeroed + ' zero-dollar row' + (zeroed === 1 ? '' : 's') + ' skipped');
@@ -809,7 +874,11 @@ S.HubOperatingExpenses = {
          logged" is derived — it is not counted directly — so a new early-return that is not
          subtracted silently inflates it and the operator is told rows were already logged when they
          were skipped for another reason entirely. */
-      const dupes = rows.length - _added.length - credits - undated - unreadable - zeroed - totalsLines;
+      // The rows the operator chose to leave out — their own decision, echoed back.
+      if (unticked) bits.push(unticked + ' row' + (unticked === 1 ? '' : 's') + ' left out');
+      // ⚠ `unticked` joins the subtraction for the same reason every other bucket does: this figure
+      // is DERIVED, so anything not subtracted is silently reported as "already logged".
+      const dupes = rows.length - _added.length - credits - undated - unreadable - zeroed - totalsLines - unticked;
       if (dupes > 0) bits.push(dupes + ' already logged');
       /* ⚠ ONLY THE CONTRADICTORY FILE IS WORTH SAYING OUT LOUD. A day-first file that Bar Cop read
          correctly needs no announcement — it is simply right, and a US file can never trigger the
@@ -821,7 +890,10 @@ S.HubOperatingExpenses = {
       /* ⚠ NAMED, NOT GUESSED (S225). A file too evenly split to call keeps the positive-charge rule
          — the safe, unchanged behaviour — and says so with the counts, so the operator can settle in
          one glance what Bar Cop could not. Same posture as the date verdict directly above. */
-      if (_sign.contradictory) bits.push(_sign.negVotes + ' amounts are negative and ' + _sign.posVotes
+      // ⚠ ONLY WHEN THE SIGN WAS ACTUALLY CONSULTED. With a Debit/Credit column present nothing was
+      // inferred, so warning that Bar Cop "could not tell" would be describing a decision it never
+      // had to make — a false caveat is as misleading as a false figure.
+      if (_sign.contradictory && !_hasDir) bits.push(_sign.negVotes + ' amounts are negative and ' + _sign.posVotes
         + ' positive, so Bar Cop could not tell which sign means money out — it read the positive rows as expenses; check the amount column');
       this._importMsg = bits.join(' · ') + '.';
     }
