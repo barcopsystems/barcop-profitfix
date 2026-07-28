@@ -830,6 +830,9 @@ window.CashEngine = {
   // quarterly or annual bill is not weighted as if it hit every month.
   weeklyFixedCosts() {
     const cur = App.todayLocal().slice(0, 7);   // current YYYY-MM
+    // The last month this reserve actually reaches — see the note on the start test below.
+    const _hz = new Date(); _hz.setHours(0, 0, 0, 0); _hz.setDate(_hz.getDate() + (this.reserveWeeks() || 8) * 7);
+    const horizonYm = App.ymdLocal(_hz).slice(0, 7);
     let annual = 0;
     this.bills().forEach(b => {
       if (!b.recurring) return;   // recurring parents only (children carry recurring_parent, not recurring)
@@ -840,10 +843,18 @@ window.CashEngine = {
       if (b.stopped_ym && b.stopped_ym <= cur) return;
       const endYm = this.recurringEndYm(b);
       if (endYm && endYm < cur) return;
-      // ⚠ NOT STARTED YET IS NOT A FIXED COST (round 4). A bill entered with its first payment
-      // months out was charged into the nut at full rate today, while the forecast correctly
-      // projected $0 of it — the reserve target held money back for something not yet owed.
-      if (String(b.date || '').slice(0, 7) > cur) return;
+      /* ⚠⚠ "NOT STARTED YET" IS MEASURED AGAINST THE RESERVE'S OWN HORIZON, NOT AGAINST TODAY
+         (round 4 introduced this test; round 5 corrected its boundary). A bill entered with its
+         first payment months out should not be in the nut — but this reserve is a FORWARD claim
+         ("N weeks of fixed costs with no sales"), so a bill starting INSIDE that horizon is
+         precisely what it exists to cover. Cutting at the current month made it a one-day cliff:
+         measured, a loan dated the 31st gave a reserve of $11,169.23 and the SAME loan dated the
+         1st gave $7,753.85 — Safe to Spend moving $3,415 for one day, while the 13-week forecast
+         charged $3,700 of that loan inside the very weeks the reserve covers.
+         ⚠ hub-breakeven deliberately keeps the strict "has started" test and does NOT copy this:
+         break-even answers "what must I ring THIS week", which is not a forward horizon. Two
+         questions, two boundaries, both stated ([[the-loop]] #29). */
+      if (String(b.date || '').slice(0, 7) > horizonYm) return;
       /* ⚠ skip_months IS DELIBERATELY NOT READ HERE, AND THIS IS THE REASONING SO THE NEXT ROUND
          DOES NOT RE-OPEN IT (S228b, [[the-loop]] #29). A scan flagged that the reserve target keeps
          charging a month the operator deleted while projectedBills has dropped it. That is correct:
@@ -880,7 +891,7 @@ window.CashEngine = {
       if (o.stopped_ym && o.stopped_ym <= cur) return;
       const endYm = this.recurringEndYm(o);
       if (endYm && endYm < cur) return;
-      if (String(o.date || '').slice(0, 7) > cur) return;   // not started yet — see the bills half
+      if (String(o.date || '').slice(0, 7) > horizonYm) return;   // see the bills half
       const amt = parseFloat(o.amount) || 0;
       const perYear = o.frequency === 'quarterly' ? 4 : o.frequency === 'annual' ? 1 : 12;
       annual += amt * perYear;

@@ -7157,7 +7157,16 @@ const App = {
        (vendor unmapped, notes populated) stopped matching the operator's own logged payment of the
        same bill and the month booked TWICE. Measured $8,400 against a truth of $4,200.
        An expense always has a category; an outflow always has a type and never a category. */
-    const who = ((!r.category && r.type) ? String(r.notes || '') : String(r.vendor || '')).trim().toLowerCase();
+    /* ⚠⚠ AN EMPTY DISCRIMINATOR MUST NOT MATCH ANOTHER EMPTY ONE (round 5). The note is OPTIONAL on
+       the cash-outflow form, so two separate equipment loans at the same payment both keyed
+       type|""|amount and cancelled each other: measured, a forecast charging $1,850 against a truth
+       of $3,700, and $3,700 against $5,550 with three of them. That is round 3's collapsed-keyspace
+       defect coming back through the empty-string door.
+       Falling back to the record's own id makes a nameless row match ONLY itself — so nothing is
+       suppressed, which over-projects rather than under-projects. Money that might not leave the
+       bank is the safe way to be wrong here. */
+    const raw = (!r.category && r.type) ? String(r.notes || '') : String(r.vendor || '');
+    const who = raw.trim() ? raw.trim().toLowerCase() : ('#' + String(r.id || ''));
     return String(r.category || r.type || '') + '|' + who
       // ⚠ `this.parseNum`, NOT `App.parseNum` — same reason windowCutoff uses `this.ymdLocal`.
       // A helper lifted out of this file for a harness has no `App` in scope, so an absolute
