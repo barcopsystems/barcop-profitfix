@@ -785,10 +785,12 @@ S.EventsBookings = {
       + '<div class="form-row" style="gap:18px;flex-wrap:wrap;">' + dispRow('Phone', b.contact_phone) + dispRow('Email', b.contact_email) + dispRow('Source', b.source) + dispRow('Time', b.event_time) + dispRow('Space', b.space) + '</div>'
       + (b.requests ? '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-top:10px;">' + esc(b.requests) + '</div>' : '');
 
+    // Remembered so the live quote redraw can refresh the tiles for the SAME step it is typing in.
+    this._curView = viewStep;
     const statsRow = this.statsRow(b, viewStep);
     let card1 = '<div class="card">' + header
       + this.divider() + this.subLabel('Progress') + this.progressRail(b, viewStep)
-      + (statsRow ? this.divider() + this.subLabel('This Booking') + statsRow : '')
+      + (statsRow ? this.divider() + this.subLabel('This Booking') + '<div id="eb-stats">' + statsRow + '</div>' : '')
       + this.divider() + contact;
     if (stage === 'Lost' && b.lost_reason) card1 += this.divider() + this.subLabel('Why It Closed') + '<div style="font-size:13px;color:var(--t2);line-height:1.6;">' + esc(b.lost_reason) + '</div>';
     card1 += '</div>';
@@ -955,7 +957,23 @@ S.EventsBookings = {
        -$5,700.00, visibly wrong; the floor made it invisibly wrong, which is worse.) The operator
        had no signal at all until Save Quote finally refused. */
     this._stepErr(this._rejectReason(f));
-    el.innerHTML = this.quoteBreakdownHtml(this.quoteParts(Object.assign({}, cur, f)));
+    const merged = Object.assign({}, cur, f);
+    el.innerHTML = this.quoteBreakdownHtml(this.quoteParts(merged));
+    /* ⛔⛔ AND THE TILES ABOVE, BECAUSE THEY NAME THE SAME QUANTITY. Found by Kyle in the real app in
+       two minutes, on ground five adversarial rounds had just been over — a node harness cannot see
+       that an element was not re-rendered.
+       Typing in the quote cells only redrew `#eb-q-breakdown`; `statsRow` is built by renderDetail
+       off the STORED record and sat there stale. MEASURED on screen: the **Quoted Total tile read
+       "–" while the Quoted Total line directly beneath it read $3,828.18**, and Per Head read "–"
+       against a 62 in its own box. One screen, one quantity, two answers — the exact class
+       [[the-loop]] #54 exists for, and it reads as "the app has not worked out the price yet", so
+       the operator presses Save just to find out what they are looking at.
+       ⚠ Only the Lead / Quote Sent branch is ever redrawn here (the quote cells exist nowhere else),
+       so this does not widen `statsRow`'s reach into its Booked or Completed branches ([[the-loop]]
+       #58 — re-derive the assumptions at the new reach, and keep the new reach narrow). */
+    const tiles = document.getElementById('eb-stats');
+    const view = this._curView || merged.stage;
+    if (tiles && (view === 'Lead' || view === 'Quote Sent')) tiles.innerHTML = this.statsRow(merged, view);
   },
 
   async applyRateCard(id, rcId) {
