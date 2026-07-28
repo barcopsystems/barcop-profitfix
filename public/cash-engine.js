@@ -919,7 +919,25 @@ window.CashEngine = {
       const perYear = o.frequency === 'quarterly' ? 4 : o.frequency === 'annual' ? 1 : 12;
       annual += amt * perYear;
     });
-    return annual / 52;
+    /* ⚠⚠⚠ SALARIED PAY IS A FIXED COST AND THIS RESERVE COULD NOT SEE IT (found on screen by Kyle,
+       2026-07-28, by putting Break-Even and Cash Position side by side). This function is the whole
+       basis of "N weeks of fixed costs with no sales" — and if a bar rings nothing for eight weeks it
+       still owes its salaried managers. That is what SALARIED means; hourly is the part that flexes.
+       hub-breakeven has always known it ("Salaried pay does not flex with sales, so it sits in the
+       nut"), so the two screens printed two different weekly fixed costs from the same data: the Nut
+       $5,608.76/wk against this function's $4,301.08/wk, the gap being salaried pay exactly.
+       Measured on the Anchor Bar: an 8-week reserve target of $34,408.62 against a true $44,870.08,
+       so **Safe to Spend read -$2,186.87 when the truth was -$12,648.33** — the operator told they
+       were $2,187 short of their reserve when they were $12,648 short. The DANGEROUS direction, on
+       the number the entire Cash Position page exists to produce.
+       ⚠ NOT A DOUBLE COUNT WITH THE FORECAST: survivalForecast charges labour week by week as money
+       LEAVING; this is a target for how much cushion to HOLD. Different questions, different numbers.
+       ⚠ One full week through the canonical App.salariedCost, exactly as hub-breakeven does it, so
+       the two screens cannot drift apart again. */
+    const _wkEnd = App.nextSunday ? App.nextSunday() : App.todayLocal();
+    const _wkStart = App.weekStartFor ? App.weekStartFor(_wkEnd) : _wkEnd;
+    const _salaried = App.salariedCost ? ((App.salariedCost(_wkStart, _wkEnd) || {}).total || 0) : 0;
+    return annual / 52 + _salaried;
   },
 
   _taxPeriodBounds() {
