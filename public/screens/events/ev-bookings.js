@@ -514,7 +514,12 @@ S.EventsBookings = {
       t.push(this.statTile('Countdown', cd, cdSub, dU != null && dU >= 0 && dU <= 7 ? 'warn' : ''));
       t.push(this.statTile('Quoted Total', App.fmtCurrency(this.quoteTotal(b)), 'all in, service and tax'));
       t.push(this.statTile('Deposit', b.deposit_paid_date ? 'Paid' : (b.deposit_amount ? App.fmtCurrency(b.deposit_amount) : '-'), b.deposit_paid_date ? 'in hand' : (b.deposit_amount ? 'still due' : 'none set'), b.deposit_paid_date ? 'good' : (b.deposit_amount ? 'warn' : '')));
-      t.push(this.statTile('Balance Due', App.fmtCurrency(bal), b.balance_paid_date ? 'paid in full' : 'on event day', bal > 0 ? '' : 'good'));
+      // payment_method is READ here, not just written — a settled balance says which way it landed,
+      // because that is the difference between money already in your sales and money that was not.
+      t.push(this.statTile('Balance Due', App.fmtCurrency(bal),
+        b.balance_paid_date
+          ? ('paid in full' + (b.payment_method === 'register' ? ', through the register' : b.payment_method === 'direct' ? ', paid direct' : ''))
+          : 'on event day', bal > 0 ? '' : 'good'));
     } else if (stage === 'Completed') {
       const rev = this.bookingRevenue(b);
       const labor = this.bookingLabor(b);
@@ -760,7 +765,7 @@ S.EventsBookings = {
     // Money
     document.getElementById('eb-dep-save')?.addEventListener('click', () => this.patch(id, { deposit_amount: parseFloat(document.getElementById('eb-dep')?.value) || 0 }));
     document.getElementById('eb-dep-paid')?.addEventListener('click', () => this.patch(id, { deposit_amount: parseFloat(document.getElementById('eb-dep')?.value) || (parseFloat(b.deposit_amount) || 0), deposit_paid_date: App.todayLocal() }));
-    document.getElementById('eb-bal-paid')?.addEventListener('click', () => this.patch(id, { balance_paid_date: App.todayLocal() }));
+    document.getElementById('eb-bal-paid')?.addEventListener('click', () => this.markPaid(id));
     // Staffing
     document.getElementById('eb-staff')?.addEventListener('click', () => { App._eventStaffTag = b.event_name || this.title(b); App._eventStaffDate = b.event_date || ''; App.openScreen('lc-build-schedule'); });
     this.container.querySelectorAll('.eb-runsheet-open').forEach(el => el.addEventListener('click', () => this.runSheet(id)));
@@ -824,6 +829,32 @@ S.EventsBookings = {
     // No per-booking scoreboard credit by design: event revenue flows into This
     // Week (catering) and the Revenue Audit, where the engine measures real
     // weekly improvement.
+  },
+
+  /* ⚠⚠ ASK HOW IT WAS SETTLED. Bar Cop cannot work this out and guessing costs money both ways: a
+     buyout the guests settle at the bar rings through the POS and is already in your sales, while a
+     catering invoice paid by check never touched them. The forecast used to guess by deleting every
+     Completed or past-dated event, which erased real receivables ($6,195 measured). One question,
+     two buttons, asked at the only moment the operator actually knows — and until it is answered
+     the balance simply stays owed, which is both true and the reason they will answer it. */
+  markPaid(id) {
+    const b = this.bookings().find(x => x.id === id); if (!b) return;
+    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">How was the balance paid?</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">'
+      + App.fmtCurrency(this.balanceOutstanding(b)) + ' on ' + esc(this.title(b)) + '.</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      + '<button class="btn btn-primary" id="eb-paid-reg">Rang through the register</button>'
+      + '<button class="btn btn-ghost" id="eb-paid-dir">Paid direct</button></div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:14px;">'
+      + 'Rang through the register means the guests settled at the bar, so it is already counted in your sales. '
+      + 'Paid direct means a check, transfer, or card off the POS, so Bar Cop counts it as event money coming in.</div></div>';
+    App.openModal(html, { id: 'eb-paid-modal', maxWidth: 520 });
+    const done = async (how) => {
+      App.closeModal('eb-paid-modal');
+      await this.patch(id, { balance_paid_date: App.todayLocal(), payment_method: how });
+    };
+    document.getElementById('eb-paid-reg')?.addEventListener('click', () => done('register'));
+    document.getElementById('eb-paid-dir')?.addEventListener('click', () => done('direct'));
   },
 
   // Mark Lost with a captured reason (App.confirm only returns a boolean).
