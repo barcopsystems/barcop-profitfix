@@ -527,7 +527,33 @@ window.CashEngine = {
   // Event balance payments collected around the event date. Booked only.
   // The all-in event total (F&B subtotal + service charge + tax), from the Events
   // section so it matches what the booking shows; falls back to the stored field.
-  _eventTotal(b) { try { return S.EventsBookings.quoteTotal(b); } catch (e) { return parseFloat(b.quoted_total) || 0; } },
+  /* ⛔⛔ THIS DELIBERATELY USES THE QUOTE, NEVER `actual_revenue`, AND THE REASONING IS HERE SO THE
+     NEXT ROUND DOES NOT RE-OPEN IT ([[the-loop]] #29).
+     Round 3 changed it to return `actual_revenue` for a Completed booking, on a finder's framing
+     that "the pipeline prints the actual and the forecast prints the quote, so one event has two
+     numbers". **That framing was wrong and I bought it without testing it.** The pipeline's column
+     is headed "Quote / Revenue" — WHAT THE EVENT WAS WORTH. This function answers WHAT IS STILL
+     OWED. Two different quantities are allowed to differ; only the same quantity computed twice
+     must agree. Round 1 of this door had already recorded that exact trap: *reconciling a pair of
+     tiles is not the same as a tile being right.*
+     ⛔ The change was reverted because it produced SIX new divergences, every one measured:
+       · `balanceOutstanding` still answered off the quote  → Events $7,618.75 vs forecast $7,400.00
+       · an invoice raised outside Bar Cop (no quote typed) → a real $6,195.00 receivable read $0.00,
+         which is the precise defect this door was built to fix
+       · a GROSS deposit netted off a possibly-NET actual   → $1,619.94 owed vs $1,175.00 forecast
+       · deposit ≥ quote but < actual → the forecast charged $1,500.00 with **no button anywhere**
+         to settle it (the clearing door's gate reads the quote)
+       · an overpaid event billed $3,618.75 it had already been overpaid $1,000.00 on
+       · and the forecast's "Event Total" column silently mixed the two bases row by row.
+     ⭐ The root cause of all six is one undecided fact: **`actual_revenue` has no stated basis.**
+     It is posted to This Week's Events REVENUE line (net of tax, since the engine computes tax
+     remittance AS a percentage OF revenue) and it drives Margin %, while a receivable must be
+     gross. The seed enters it BOTH ways ($1,575 net-ish on Westlake, $2,840 all-in on Reyes) and no
+     single entry can satisfy both readers. That is a product decision (Bar Cop has no final-invoice
+     field), not something to infer here — see S235 on THE LIST.
+     Until it is decided, the forecast collects **what was AGREED**, which is unambiguous and is what
+     the signed agreement holds the client to. */
+  _eventTotal(b) { try { return S.EventsBookings.quoteTotal(b); } catch (e) { return parseFloat(b && b.quoted_total) || 0; } },
   eventInflow(startYmd, endYmd, anchorYmd) {
     const bookings = (App.data && Array.isArray(App.data.bookings)) ? App.data.bookings : [];
     let total = 0; const list = [];
@@ -588,10 +614,37 @@ window.CashEngine = {
     numWeeks = numWeeks || 13;
     const start = this._mondayOf(new Date());
     const end = this._addDays(start, numWeeks * 7 - 1);
-    const ev = this.eventInflow(start, end);
+    /* ⚠⚠ ASKED WEEK BY WEEK, EXACTLY AS `survivalForecast` ASKS IT, BECAUSE THE CARD CLAIMS THEY
+       AGREE. c-forecast prints this card under "the balance still to collect, already counted in the
+       cash-in above" — a testable claim about another number ([[the-loop]] #54). survivalForecast
+       drops event money on any week carrying a SAVED forecast override (the override already bundles
+       it, so adding it again would double it); this asked once over the whole window and had no such
+       test. ⛔ MEASURED with an override saved on the Hargrove week: card $9,503.50 against
+       $7,695.00 actually counted — **$1,808.50 the sentence says is above when it is not**, and both
+       go into the lender PDF.
+       ⚠ Asking week by week is safe here precisely because the anchor property holds: thirteen
+       weekly calls total the same as one call over the window (pinned). */
+    const ev = { total: 0, list: [] };
+    for (let i = 0; i < numWeeks; i++) {
+      const ws = this._addDays(start, i * 7), we = this._addDays(ws, 6);
+      const savedFc = App.forecastForWeek ? App.forecastForWeek(ws) : null;
+      if (savedFc && savedFc.total != null) continue;   // `!= null`, not truthiness — a saved $0 is a real answer
+      const wk = this.eventInflow(ws, we, start);
+      ev.total += wk.total;
+      wk.list.forEach(r => ev.list.push(r));
+    }
     const bookings = (App.data && Array.isArray(App.data.bookings)) ? App.data.bookings : [];
     let deposits = 0;
     bookings.forEach(b => {
+      /* ⛔ THIS STAYS `Booked` ONLY, AND THE REASONING IS HERE SO THE NEXT ROUND DOES NOT "FIX" IT
+         ([[the-loop]] #29). A scan flagged it as inconsistent with `eventInflow`, which counts
+         Completed too and clamps an overdue date up to the anchor — and I very nearly matched them.
+         **They answer different questions.** `eventInflow` asks "what is still OWED", which does not
+         care whether the party has happened. This half is the struct's other line: deposits held
+         against service NOT YET DELIVERED — the operator is holding someone else's money. Once the
+         event is Completed the service is delivered and the deposit is simply the bar's, so widening
+         this would report money owed against nothing. The clamp is wrong here for the same reason.
+         ⚠ The comment below is about the WINDOW BOUNDS (both ends), not the stage set. */
       if (b.stage !== 'Booked' || !b.deposit_paid_date) return;
       const d = String(b.event_date || '').slice(0, 10);
       /* ⚠ THE TWO HALVES OF THIS STRUCT MUST BE WINDOWED THE SAME WAY. eventInflow bounds both ends
