@@ -576,7 +576,24 @@ window.CashEngine = {
   // occurrences not yet generated (recurring children only run to this month). A
   // parent or child already covering a month suppresses the projection for it, so
   // nothing double counts.
-  projectedBills(startYmd, endYmd) {
+  /* ⚠⚠ EVERY MONTH-GRAINED DECISION IS MADE OVER WHOLE MONTHS, THEN THE RESULT IS SLICED. Both
+     projection loops hand out a consume-once token per logged row per MONTH — and survivalForecast
+     asks them thirteen times, one Mon-Sun week each, rebuilding that pool on every call. So one
+     logged payment handed out a fresh token in EVERY week of the quarter: measured, two identical
+     series with due days in different weeks gave $1,245 asked once and $498 asked week by week —
+     60% of the projected bills gone, and $5,550 of debt service on the outflow twin. Understating
+     what leaves the bank feeds the low point, the runway, Safe to Spend and the lender PDF.
+     This is the third time the same shape has bitten (the tax remittance widening was the second).
+     Widening here makes it structural: the answer no longer depends on the window. */
+  _monthSpan(startYmd, endYmd) {
+    const s = String(startYmd).slice(0, 7) + '-01';
+    const eD = new Date(parseInt(String(endYmd).slice(0, 4), 10), parseInt(String(endYmd).slice(5, 7), 10), 0);
+    return { s: s, e: App.ymdLocal(eD) };
+  },
+
+  projectedBills(reqStart, reqEnd) {
+    const _span = this._monthSpan(reqStart, reqEnd);
+    const startYmd = _span.s, endYmd = _span.e;
     const bills = this.bills();
     const out = [];
     const covered = new Set();
@@ -673,7 +690,8 @@ window.CashEngine = {
         out.push({ date: ymd, amount: amt, vendor: p.vendor || p.category || 'Bill', category: p.category || '', recurring: true, projected: true });
       }
     });
-    return out;
+    // ...and only now cut to what the caller actually asked for.
+    return out.filter(b => b.date >= reqStart && b.date <= reqEnd);
   },
 
   survivalForecast(numWeeks, opts) {
@@ -1002,7 +1020,9 @@ window.CashEngine = {
   //    projection as bills. ──────────────────────────────────────────────────
   cashOutflows() { return (App.data && Array.isArray(App.data.cash_outflows)) ? App.data.cash_outflows : []; },
   _outflowLabel(t) { return t === 'draw' ? 'Owner draw' : t === 'loan' ? 'Loan payment' : t === 'tax' ? 'Tax remittance' : t === 'capital' ? 'Capital / equipment' : 'Other'; },
-  outflowsBetween(startYmd, endYmd) {
+  outflowsBetween(reqStart, reqEnd) {
+    const _span = this._monthSpan(reqStart, reqEnd);   // see projectedBills — same reason
+    const startYmd = _span.s, endYmd = _span.e;
     const recs = this.cashOutflows();
     const out = []; const covered = new Set();
     /* ⚠⚠ THE SAME QUESTION projectedBills ASKS, ANSWERED THE SAME WAY (S228a). This is a
@@ -1053,7 +1073,7 @@ window.CashEngine = {
         out.push({ date: ymd, amount: amt, type: p.type || 'capital', label: p.notes || this._outflowLabel(p.type), projected: true, recurring_parent: p.id });
       }
     });
-    return out;
+    return out.filter(o => o.date >= reqStart && o.date <= reqEnd);
   },
   // Active recurring outflow series (the parents you can stop or edit).
   recurringOutflows() { return this.cashOutflows().filter(o => o.recurring && o.id); },
