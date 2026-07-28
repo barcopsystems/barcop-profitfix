@@ -906,7 +906,12 @@ window.CashEngine = {
     this.cashOutflows().forEach(o => {
       if (!o || !o.recurring) return;
       if (o.type !== 'loan' && o.type !== 'capital') return;
-      if (o.stopped_ym && o.stopped_ym <= cur) return;
+      /* ⚠ AGAINST THE RESERVE'S OWN HORIZON, not against today. A series stopped from NEXT month has
+         no payments left at all — stopping records "no occurrence in or after this month" — so
+         holding weeks of reserve against it withholds money for a bill that will never arrive.
+         Comparing to the horizon rather than dropping every stopped series also stays correct for a
+         stop set FURTHER out than the reserve reaches, where the payments in between are real. */
+      if (o.stopped_ym && o.stopped_ym <= horizonYm) return;
       const endYm = this.recurringEndYm(o);
       if (endYm && endYm < cur) return;
       if (String(o.date || '').slice(0, 7) > horizonYm) return;   // see the bills half
