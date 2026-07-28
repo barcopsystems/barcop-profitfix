@@ -681,10 +681,24 @@ S.HubOperatingExpenses = {
     return (p && p.recurring) ? p : null;
   },
 
-  _recurTag(rec) {
+  /* The series a row came from, whether or not it is still running. _seriesOf answers the narrower
+     question ("is there a LIVE series here"), because that is what decides the row's buttons — this
+     one answers "did this row come from a recurring bill at all", which is what its LABEL has to say.
+     A row with neither flag nor parent was never part of a series. */
+  _seriesAny(r) {
+    if (!r) return null;
+    if (r.recurring_parent) return this.records().find(x => x && x.id === r.recurring_parent) || null;
+    return (r.recurring || r.stopped_ym || r.frequency) ? r : null;
+  },
+
+  /* ⚠ A STOPPED SERIES' MONTHS SAY SO (S229). After Stop, a generated month kept sitting under the
+     "Recurring" header with no tag at all and a Repeat button — the section and the row telling the
+     operator two different things about the same bill. The buttons are right (there is no live
+     series to stop), so it is the LABEL that was missing. */
+  _recurTag(rec, stopped) {
     const p = rec && rec.recurring_parent ? this.records().find(x => x.id === rec.recurring_parent) : rec;
     const f = p && p.frequency && p.frequency !== 'monthly' ? ' · ' + p.frequency : '';
-    return ' <span style="color:var(--t4);font-size:10px;white-space:nowrap;">recurring' + f + '</span>';
+    return ' <span style="color:var(--t4);font-size:10px;white-space:nowrap;">recurring' + f + (stopped ? ' · stopped' : '') + '</span>';
   },
 
   // One real-record row: Date, Category (+Recurring tag), Vendor, Amount, actions.
@@ -694,6 +708,8 @@ S.HubOperatingExpenses = {
     opts = opts || {};
     const fmt$ = (v) => App.fmtCurrency(v || 0);
     const isRec = !!this._seriesOf(r);   // an orphan is not a series — see _seriesOf (S226h)
+    // Came from a series that has since been stopped: keep the tag, mark it, keep the plain buttons.
+    const wasRec = !isRec && !!this._seriesAny(r);
     const edit = '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button>';
     const del  = '<button class="btn btn-danger btn-sm oex-del" data-id="' + esc(r.id) + '">Delete</button>';
     let actions = '';
@@ -707,7 +723,8 @@ S.HubOperatingExpenses = {
     }
     return '<tr>'
       + '<td data-label="Date" style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
-      + '<td style="color:var(--t2);">' + esc(r.category || '') + (isRec ? this._recurTag(r) : '') + '</td>'
+      + '<td style="color:var(--t2);">' + esc(r.category || '')
+      + (isRec ? this._recurTag(r) : wasRec ? this._recurTag(r, true) : '') + '</td>'
       + '<td style="color:var(--t2);">' + esc(r.vendor || '') + '</td>'
       + '<td style="font-weight:700;color:var(--t1);">' + fmt$(r.amount) + '</td>'
       + '<td class="no-print" style="text-align:right;white-space:nowrap;">' + actions + '</td>'
@@ -751,7 +768,13 @@ S.HubOperatingExpenses = {
     opts = opts || {};
     const fmt$ = (v) => App.fmtCurrency(v || 0);
     const recs = this.records().filter(r => r && String(r.date || '').slice(0, 7) === monthKey);
-    const byDate = (a, b) => String(a.date || '').localeCompare(String(b.date || ''));
+    /* ⚠ A TIEBREAK, because recurring bills all fall on the same day and the order was then whatever
+       order the records happened to sit in — it visibly reshuffled after a re-seed. Biggest first
+       within a day is what an operator scans for; category settles a true tie so the list is stable
+       between renders. */
+    const byDate = (a, b) => String(a.date || '').localeCompare(String(b.date || ''))
+      || ((parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0))
+      || String(a.category || '').localeCompare(String(b.category || ''));
     const recurring = recs.filter(r => r.recurring || r.recurring_parent).sort(byDate);
     const variable  = recs.filter(r => !(r.recurring || r.recurring_parent)).sort(byDate);
     const expected  = opts.next ? this._expectedRecurring(monthKey) : [];
