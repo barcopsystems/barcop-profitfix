@@ -600,7 +600,14 @@ window.CashEngine = {
       // Events dashboard were both showing it as "Deposits Due", money the bar is owed
       // and will bank. It also made the forecast's "Deposit Held" column print a
       // deposit that is not held.
-      const dep = b.deposit_paid_date ? (parseFloat(b.deposit_amount) || 0) : 0;
+      /* ⚠ THE FOURTH READER OF THE DEPOSIT, AND IT DID NOT GET THE FLOOR THE OTHER THREE GOT — under
+         a comment in ev-bookings claiming it had ("one reader, all three balance doors… and the same
+         figure into the 13-week forecast"). A confidence claim in a comment is an instruction to the
+         next reader not to check, and this one was wrong. MEASURED with a legacy `deposit_amount:
+         -2000`: the booking screen read $6,412.50 (floored) while the forecast read **$8,412.50** —
+         $2,000 of phantom receivable — and `deposits` came out at **-$2,000.00**, rendering
+         "$-2,000.00 in deposits is already in hand". One definition, five readers. */
+      const dep = b.deposit_paid_date ? S.EventsBookings._depositHeld(b) : 0;
       const bal = Math.max(0, evTotal - dep);
       if (bal > 0) { total += bal; list.push({ name: b.event_name || 'Event', amount: bal, date: raw, total: evTotal, deposit: dep }); }
     });
@@ -614,25 +621,27 @@ window.CashEngine = {
     numWeeks = numWeeks || 13;
     const start = this._mondayOf(new Date());
     const end = this._addDays(start, numWeeks * 7 - 1);
-    /* ⚠⚠ ASKED WEEK BY WEEK, EXACTLY AS `survivalForecast` ASKS IT, BECAUSE THE CARD CLAIMS THEY
-       AGREE. c-forecast prints this card under "the balance still to collect, already counted in the
-       cash-in above" — a testable claim about another number ([[the-loop]] #54). survivalForecast
-       drops event money on any week carrying a SAVED forecast override (the override already bundles
-       it, so adding it again would double it); this asked once over the whole window and had no such
-       test. ⛔ MEASURED with an override saved on the Hargrove week: card $9,503.50 against
-       $7,695.00 actually counted — **$1,808.50 the sentence says is above when it is not**, and both
-       go into the lender PDF.
-       ⚠ Asking week by week is safe here precisely because the anchor property holds: thirteen
-       weekly calls total the same as one call over the window (pinned). */
-    const ev = { total: 0, list: [] };
-    for (let i = 0; i < numWeeks; i++) {
-      const ws = this._addDays(start, i * 7), we = this._addDays(ws, 6);
-      const savedFc = App.forecastForWeek ? App.forecastForWeek(ws) : null;
-      if (savedFc && savedFc.total != null) continue;   // `!= null`, not truthiness — a saved $0 is a real answer
-      const wk = this.eventInflow(ws, we, start);
-      ev.total += wk.total;
-      wk.list.forEach(r => ev.list.push(r));
-    }
+    /* ⛔⛔ THIS ASKS ONCE OVER THE WHOLE WINDOW, AND A ROUND-3 CHANGE THAT MADE IT ASK WEEK BY WEEK
+       — SKIPPING ANY WEEK CARRYING A SAVED FORECAST OVERRIDE — WAS REVERTED. The reasoning is here
+       so the next round does not rebuild it ([[the-loop]] #29).
+       The intent was sound: c-forecast prints this card under *"the balance still to collect,
+       already counted in the cash-in above"*, and `survivalForecast` drops event money on an
+       override week, so that sentence was false by a measured $1,808.50. **But the fix was wrong on
+       its own premise and worse than the bug.**
+       · **The premise is false.** The claim was "the override already bundles that money". It does
+         not: `App.bookedEventRevenueForWeek` pre-fills `subtotal + service` — gross of a collected
+         deposit, with NO tax and NO room fee — and it bounds on the RAW event date, so it can never
+         contain an overdue row the anchor clamped into this week. MEASURED on one week: the override
+         bundles **$7,200.00** while the skip dropped **$13,107.50**.
+       · **It deleted real receivables from the one card whose job is listing them.** MEASURED with
+         overrides on two weeks: card total **$18,237.50 → $0.00**, and c-forecast's empty branch then
+         printed *"No balances left to collect this quarter"* against $18,237.50 genuinely owed — the
+         card vanishing from the screen AND from the lender PDF. That is the exact defect
+         `eventInflow` was rewritten to end.
+       A receivable is owed whether or not the operator saved a sales override, so this card must not
+       depend on one. **The real defect was the SENTENCE, and it is fixed where it is written** —
+       `c-forecast.eventsCard` now says so when a week in the window carries an override. */
+    const ev = this.eventInflow(start, end);
     const bookings = (App.data && Array.isArray(App.data.bookings)) ? App.data.bookings : [];
     let deposits = 0;
     bookings.forEach(b => {
@@ -655,7 +664,7 @@ window.CashEngine = {
          already in hand against booked events. No balances left to collect THIS QUARTER." — a
          this-quarter sentence carrying an out-of-quarter figure. */
       if (!d || d < start || d > end) return;   // booked events inside the forecast window only
-      deposits += parseFloat(b.deposit_amount) || 0;
+      deposits += S.EventsBookings._depositHeld(b);   // the fifth reader — same floor as the other four
     });
     return { balanceTotal: ev.total, list: ev.list, deposits };
   },
