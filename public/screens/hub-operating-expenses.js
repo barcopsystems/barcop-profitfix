@@ -100,8 +100,10 @@ S.HubOperatingExpenses = {
   },
 
   // ── Aggregation ────────────────────────────────────────────────────────
+  // ⚠ r && to match _catchUpOnce and the note builders, which already carry it. Nothing writes a
+  // null into this array today; three functions guarding and three not is how that stops being true.
   _sumMonth(monthKey) {
-    return this.records().filter(r => this._monthKey(r.date) === monthKey)
+    return this.records().filter(r => r && this._monthKey(r.date) === monthKey)
       .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
   },
   _sumYTD(monthKey) {
@@ -177,11 +179,15 @@ S.HubOperatingExpenses = {
     return keys.length ? keys.sort().pop() : '';
   },
 
-  /* ⚠ ONE BASIS FOR BOTH "% OF REVENUE" FIGURES ON THIS SCREEN, so they cannot disagree about
-     whether a usable period even exists. They did: with a confirmed ZERO-revenue week in the named
-     month, the stat printed "—" with no month named while the By Category card headed its column
-     "% of Revenue, YTD thru June 2026" and printed live percentages. One screen, two answers to
-     "do we have June?". Both now ask this. */
+  /* ⚠ ONE BASIS MONTH FOR BOTH "% OF REVENUE" FIGURES ON THIS SCREEN. They used to pick it
+     separately, so with a confirmed ZERO-revenue week in the named month the stat printed "—" with
+     no month named while the By Category card headed its column "% of Revenue, YTD thru June 2026"
+     and printed live percentages. One screen, two answers to "do we have June?".
+     ⚠ WHAT THIS DOES *NOT* GUARANTEE, so nobody reads more into it than it says: the By Category
+     column additionally requires the basis month to be in the CURRENT year (a year-to-date ratio
+     cannot be last year's), so every January the stat correctly names December while that column
+     correctly falls back to a plain header and prints nothing. Both readings are honest and both are
+     labelled; they are answering two different questions, not disagreeing about one. */
   _pctBasis() {
     const mk = this._lastCompleteMonthKey();
     if (!mk) return null;
@@ -257,17 +263,57 @@ S.HubOperatingExpenses = {
       && String(r.recurring_month || String(r.date || '').slice(0, 7)) === monthKey) || null;
   },
 
-  /* Series where a bill the operator logged themselves STOPPED Bar Cop generating one this month.
-     ⚠ Only where it genuinely would have: the same _owesMonth schedule test the catch-up uses, and
-     only where nothing has been generated for that month already. Without the second clause this
-     claimed credit for a suppression that never happened — see _doubleBookedThisMonth, which is the
-     case that was hiding behind it. */
-  _ownCoveredThisMonth() {
+  /* ⚠⚠ BOTH NOTES COME OUT OF ONE PASS, IN THE ORDER THE CATCH-UP ITSELF USES, because they are two
+     answers to the same question and they were contradicting each other on screen: two series with
+     the same vendor produced "already logged" and "booked twice" side by side over a month whose
+     money was CORRECT. A standalone row is claimed by at most ONE series here, exactly as the
+     catch-up claims it at most once — and the suppression pass runs FIRST so the notes follow what
+     the catch-up actually did rather than re-deriving it and disagreeing.
+     ⚠ THE WARNING'S MATCH IS STRICT PLUS ONE NARROW EXCEPTION, and the exception is the whole reason
+     it exists. A bill that arrives through the IMPORTER cannot match strictly: the importer stores
+     the raw bank description as the vendor and falls back to the category "Other". So an amount-only
+     match is allowed ONLY against an "Other" row. An earlier version allowed amount-only against
+     anything and it named the wrong bill: two unrelated $500 expenses (a CPA fee and an ad spend)
+     produced "Marsh CPA is booked twice", and matching on category+vendor alone flagged an electric
+     bill and a gas bill from one utility as a duplicate. Round numbers are everywhere in a bar.
+     ⚠ KNOWN AND ACCEPTED LIMITATION: if the operator logs the bill and then CORRECTS its amount, the
+     suppression lapses and the resulting double is NOT flagged — no rule can separate "the same bill,
+     corrected" from "a second, different bill" without a threshold fitted to a fixture
+     ([[the-loop]] #30). Stated here rather than guessed at. */
+  _monthNotes() {
     const mk = this._currentMonthKey();
-    return this.records()
-      .filter(p => p && this._owesMonth(p, mk) && !this._generatedFor(p, mk) && this._ownCover(p, mk))
-      .map(p => (p.vendor || p.category || 'A recurring bill'));
+    const arr = this.records();
+    const pool = arr.filter(r => r && r.date && !r.recurring && !r.recurring_parent
+      && String(r.date).slice(0, 7) === mk);
+    const used = new Set();
+    const series = arr.filter(p => p && p.recurring && !p.recurring_parent);
+    const nameOf = (p) => (p.vendor || p.category || 'A recurring bill');
+    const covered = [], doubled = [];
+    // PASS 1 — mirrors the catch-up: a series that owes this month and has no generated row.
+    series.forEach(p => {
+      if (this._generatedFor(p, mk) || !this._owesMonth(p, mk)) return;
+      const key = App.billIdentityKey(p);
+      const hit = pool.find(r => !used.has(r.id) && App.billIdentityKey(r) === key);
+      if (hit) { used.add(hit.id); covered.push(nameOf(p)); }
+    });
+    // PASS 2 — a Bar Cop row already stands for this month AND an unclaimed logged row looks like
+    // the same bill. ⚠ The series' own START month counts as generated: the parent IS that month's
+    // row, so it is the one month _owesMonth deliberately skips — and it is the likeliest month of
+    // all to be imported as well, because setting the bill up is what puts the operator there.
+    series.forEach(p => {
+      const gen = this._generatedFor(p, mk) || (String(p.date || '').slice(0, 7) === mk ? p : null);
+      if (!gen) return;
+      const cents = (r) => Math.round((parseFloat(r.amount) || 0) * 100);
+      const same = (r) => String(r.category || '') === String(p.category || '')
+        && String(r.vendor || '').trim().toLowerCase() === String(p.vendor || '').trim().toLowerCase();
+      const hit = pool.find(r => !used.has(r.id) && cents(r) === cents(p) && cents(p) !== 0
+        && (same(r) || String(r.category || '') === 'Other'));
+      if (hit) { used.add(hit.id); doubled.push({ name: nameOf(p), other: (hit.vendor || hit.category || 'a bill you logged') }); }
+    });
+    return { covered: covered, doubled: doubled };
   },
+
+  _ownCoveredThisMonth() { return this._monthNotes().covered; },
 
   /* ⚠⚠ THE MONTH REALLY IS BOOKED TWICE, AND THE OLD NOTE SAT ON TOP OF IT SAYING THE OPPOSITE.
      Order matters: if the operator logs the bill BEFORE the month is generated, _ownCover stops the
@@ -284,19 +330,7 @@ S.HubOperatingExpenses = {
      bill you logged from $4,200 to $4,250 used to re-open the slot silently and book a second
      $4,200 on top, and a strict test could not see that at all because the amounts no longer agree.
      A false positive here costs a sentence; a false negative costs a doubled month. */
-  _doubleBookedThisMonth() {
-    const mk = this._currentMonthKey();
-    const arr = this.records();
-    const loose = (r) => String(r.category || '') + '|' + String(r.vendor || '').trim().toLowerCase();
-    const cents = (r) => Math.round((parseFloat(r.amount) || 0) * 100);
-    return arr
-      .filter(p => p && p.recurring && !p.recurring_parent && this._generatedFor(p, mk)
-        && arr.some(r => r && r.date && !r.recurring && !r.recurring_parent
-          && String(r.date).slice(0, 7) === mk
-          // Either half is enough, and they cover different doors — see the note above.
-          && (loose(r) === loose(p) || (cents(r) === cents(p) && cents(p) !== 0))))
-      .map(p => (p.vendor || p.category || 'A recurring bill'));
-  },
+  _doubleBookedThisMonth() { return this._monthNotes().doubled; },
 
   // ── Recurring bills ──────────────────────────────────────────────────────
   // A recurring bill is the parent record (recurring:true). It is ongoing by
@@ -631,7 +665,7 @@ S.HubOperatingExpenses = {
     const arr = this.records();
     const idx = parseInt(monthKey.slice(0, 4), 10) * 12 + (parseInt(monthKey.slice(5, 7), 10) - 1);
     const out = [];
-    arr.filter(p => p.recurring && !p.recurring_parent && p.date).forEach(p => {
+    arr.filter(p => p && p.recurring && !p.recurring_parent && p.date).forEach(p => {
       const s = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
       if (isNaN(s.getTime())) return;
       // Start / step / term / skipped months: the SAME test the catch-up uses, so the Next Month
@@ -658,7 +692,7 @@ S.HubOperatingExpenses = {
   _monthCardHtml(monthKey, opts) {
     opts = opts || {};
     const fmt$ = (v) => App.fmtCurrency(v || 0);
-    const recs = this.records().filter(r => String(r.date || '').slice(0, 7) === monthKey);
+    const recs = this.records().filter(r => r && String(r.date || '').slice(0, 7) === monthKey);
     const byDate = (a, b) => String(a.date || '').localeCompare(String(b.date || ''));
     const recurring = recs.filter(r => r.recurring || r.recurring_parent).sort(byDate);
     const variable  = recs.filter(r => !(r.recurring || r.recurring_parent)).sort(byDate);
@@ -727,18 +761,23 @@ S.HubOperatingExpenses = {
        must be said out loud rather than left as a row they expected to see and cannot find. */
     const noteBox = (body) => '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin:16px 0;font-size:12px;color:var(--t1);line-height:1.6;">'
       + body + '</div>';
-    const covered = this._ownCoveredThisMonth();
-    const doubled = this._doubleBookedThisMonth();
+    const _notes = this._monthNotes();
+    const covered = _notes.covered, doubled = _notes.doubled;
     const coveredNote = (covered.length
       ? noteBox(esc(covered.join(', ')) + (covered.length === 1 ? ' is already logged for ' : ' are already logged for ')
         + esc(this._monthLabel(mk)) + ', so Bar Cop did not add ' + (covered.length === 1 ? 'it' : 'them')
         + ' again from your recurring bills.')
       : '')
       // The action note comes SECOND and reads as an action, because it is one.
+      /* ⚠ IT ASKS, IT DOES NOT INSTRUCT. This used to end "Delete whichever is not real" — an
+         instruction to destroy a real expense, printed on the strength of a match Bar Cop cannot be
+         certain about. It also names BOTH rows now, because naming only the recurring one sent the
+         operator looking for a row under the wrong description. */
       + (doubled.length
-      ? noteBox(esc(doubled.join(', ')) + (doubled.length === 1 ? ' is booked twice for ' : ' are booked twice for ')
-        + esc(this._monthLabel(mk)) + ' &mdash; once from your recurring bill and once from a bill you logged. '
-        + 'Delete whichever is not real.')
+      ? noteBox(esc(this._monthLabel(mk)) + ' has ' + (doubled.length === 1 ? 'a bill that looks' : 'bills that look')
+        + ' logged twice: '
+        + esc(doubled.map(d => d.name + (d.other && d.other !== d.name ? ' (also logged as "' + d.other + '")' : '')).join(', '))
+        + '. One came from your recurring bill and one you entered. Check which is real before it counts twice.')
       : '');
 
     const catOpts = this.CATEGORIES.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
@@ -1456,8 +1495,20 @@ S.HubOperatingExpenses = {
                                        : (arr[pIdx].recur_day || (parseInt(String(arr[pIdx].date).slice(8, 10), 10) || 1))),
               skip_months: skips, stopped_ym: null });
           } else {
-            arr[pIdx] = Object.assign({}, arr[pIdx], { recurring: false, frequency: undefined, term_months: null,
-              stopped_ym: arr[pIdx].stopped_ym || this._currentMonthKey() });
+            /* ⚠⚠ A PAUSE MUST NOT DESTROY WHAT THE SERIES IS (round 3, F1/F2). This used to clear
+               frequency and term_months, which was harmless while turning a bill off was TERMINAL —
+               and round 2 made it reversible, so the same two lines became a money defect. The
+               re-opened form falls back to "Monthly" and blank when those fields are missing, so
+               resuming a QUARTERLY bill re-billed it every month retroactively from the series
+               start: measured 5 rows / $12,000 becoming 12 / $28,800, and an ANNUAL one 3 / $3,300
+               becoming 24 / $26,400. Both also reach hub-breakeven and the cash forecast, which read
+               frequency directly, so the fixed-cost nut carried a quarterly bill at 4x.
+               And a cleared term made the bill recur FOREVER, with both things built to catch that —
+               the Terms Ending banner and the Renew button — going silent because there was no term
+               left to read. Frequency and term describe the SERIES; pausing it changes neither. */
+            arr[pIdx] = Object.assign({}, arr[pIdx], { recurring: false },
+              // Only a row that WAS recurring gets a stop stamp; a plain expense never had a series.
+              arr[pIdx].recurring ? { stopped_ym: arr[pIdx].stopped_ym || this._currentMonthKey() } : {});
           }
         }
         if (idx >= 0) touched.push(arr[idx]);
@@ -1508,7 +1559,10 @@ S.HubOperatingExpenses = {
        result — _delete and the edit form both roll back. A failed stop left the row showing Repeat
        instead of Stop, dropped the Expected line and the forecast entry, and then came back
        generating on the next login, because the server still had recurring:true. */
-    arr[pIdx] = Object.assign({}, p, { recurring: false, term_months: null, stopped_ym: this._currentMonthKey() });
+    // ⚠ term_months SURVIVES THE STOP (round 3, F2). Clearing it made a paused fixed-term contract
+    // recur forever once resumed, and silenced the banner and the Renew button that exist to catch
+    // exactly that. It is inert while paused — every reader tests recurring first.
+    arr[pIdx] = Object.assign({}, p, { recurring: false, stopped_ym: this._currentMonthKey() });
     if (!(await App.putRecord('core', 'operating_expense', arr[pIdx]))) { arr[pIdx] = p; return; }
     this._rerender();
   },
