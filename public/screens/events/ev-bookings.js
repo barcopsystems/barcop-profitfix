@@ -846,8 +846,7 @@ S.EventsBookings = {
       + '<button class="btn btn-primary" id="eb-paid-reg">Rang through the register</button>'
       + '<button class="btn btn-ghost" id="eb-paid-dir">Paid direct</button></div>'
       + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:14px;">'
-      + 'Rang through the register means the guests settled at the bar, so it is already counted in your sales. '
-      + 'Paid direct means a check, transfer, or card off the POS, so Bar Cop counts it as event money coming in.</div></div>';
+      + 'Rang through the register is already counted in your sales. Paid direct never touched the POS.</div></div>';
     App.openModal(html, { id: 'eb-paid-modal', maxWidth: 520 });
     const done = async (how) => {
       App.closeModal('eb-paid-modal');
