@@ -7133,9 +7133,14 @@ const App = {
   // month a recurring bill of exactly that amount falls due, is the same bill entered twice. Where
   // the amount differs, nothing is suppressed and both are counted — see the pins in
   // verify-opex-recurring.js, which assert BOTH directions.
+  // ⚠ TWO RECORD SHAPES, ONE KEY. An operating expense carries category + vendor; a CASH OUTFLOW
+  // (owner draw, loan payment, tax remittance) carries neither — it has a `type`. Falling back to
+  // `type` keeps a $4,000 draw and a $4,000 loan payment distinct, which a bare category|vendor key
+  // would have collapsed into one. Both stores ask the same question of the same forecast, so they
+  // get the same answer from the same place rather than a second copy that drifts (S228a).
   billIdentityKey(r) {
     if (!r) return '';
-    return String(r.category || '') + '|' + String(r.vendor || '').trim().toLowerCase()
+    return String(r.category || r.type || '') + '|' + String(r.vendor || '').trim().toLowerCase()
       + '|' + Math.round((parseFloat(r.amount) || 0) * 100);
   },
 

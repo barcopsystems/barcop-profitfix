@@ -821,6 +821,14 @@ window.CashEngine = {
       if (b.stopped_ym && b.stopped_ym <= cur) return;
       const endYm = this.recurringEndYm(b);
       if (endYm && endYm < cur) return;
+      /* ⚠ skip_months IS DELIBERATELY NOT READ HERE, AND THIS IS THE REASONING SO THE NEXT ROUND
+         DOES NOT RE-OPEN IT (S228b, [[the-loop]] #29). A scan flagged that the reserve target keeps
+         charging a month the operator deleted while projectedBills has dropped it. That is correct:
+         this function is a RATE, not a schedule — the annual nut over 52 weeks, "what a typical week
+         of fixed costs takes". A one-off skipped month (a bill not paid in March) does not change
+         what a typical week costs, and letting it lower the reserve permanently would be wrong in
+         the dangerous direction. Stopped and fully-paid series ARE dropped, two lines above,
+         because those change the ongoing rate. */
       const amt = parseFloat(b.amount) || 0;
       const perYear = b.frequency === 'quarterly' ? 4 : b.frequency === 'annual' ? 1 : 12;
       annual += amt * perYear;
@@ -934,9 +942,21 @@ window.CashEngine = {
   outflowsBetween(startYmd, endYmd) {
     const recs = this.cashOutflows();
     const out = []; const covered = new Set();
+    /* ⚠⚠ THE SAME QUESTION projectedBills ASKS, ANSWERED THE SAME WAY (S228a). This is a
+       line-for-line twin of that projection loop and it had neither the consume-once cover test nor
+       the skip list — so a loan payment the operator logged by hand beside a recurring loan series
+       counted TWICE: measured 3 rows / $5,550 through the expense door against 4 rows / $7,400
+       through this one, on the same money. The direction was pessimistic, which is why it would
+       never have been reported, but one file answering one question two ways is the drift that
+       produced every defect in this family. */
+    const ownCovered = new Map();
     recs.forEach(o => {
       const d = String(o.date || '').slice(0, 10); if (!d) return;
-      covered.add((o.recurring_parent || o.id) + '@' + d.slice(0, 7));
+      covered.add((o.recurring_parent || o.id) + '@' + String(o.recurring_month || d.slice(0, 7)));
+      if (!o.recurring && !o.recurring_parent) {
+        const _k = App.billIdentityKey(o) + '@' + d.slice(0, 7);
+        ownCovered.set(_k, (ownCovered.get(_k) || 0) + 1);
+      }
       if (d >= startYmd && d <= endYmd) out.push({ date: d, amount: parseFloat(o.amount) || 0, type: o.type || 'capital', label: o.notes || this._outflowLabel(o.type) });
     });
     recs.filter(o => o.recurring).forEach(p => {
@@ -958,7 +978,12 @@ window.CashEngine = {
         const ymd = App.ymdLocal(occ);
         if (stop && ymd.slice(0, 7) >= stop) break;
         if (ymd < startYmd || ymd > endYmd) continue;
-        const key = p.id + '@' + ymd.slice(0, 7); if (covered.has(key)) continue; covered.add(key);
+        const _ym = ymd.slice(0, 7);
+        if (Array.isArray(p.skip_months) && p.skip_months.some(m => String(m) === _ym)) continue;
+        const _ok = App.billIdentityKey(p) + '@' + _ym;
+        const _on = ownCovered.get(_ok) || 0;
+        if (_on > 0) { ownCovered.set(_ok, _on - 1); continue; }
+        const key = p.id + '@' + _ym; if (covered.has(key)) continue; covered.add(key);
         out.push({ date: ymd, amount: amt, type: p.type || 'capital', label: p.notes || this._outflowLabel(p.type), projected: true, recurring_parent: p.id });
       }
     });
