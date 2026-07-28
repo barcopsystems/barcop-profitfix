@@ -197,7 +197,12 @@ S.EventsBookings = {
      event table (it only lists rows with a balance above zero). Measured: an $8,000 deposit on a
      $7,695 event hid $305 the bar owes the client on every screen in Bar Cop. */
   refundOwed(b) {
-    if (!b) return 0;
+    /* ⚠⚠ ONLY MONEY ACTUALLY BANKED CAN BE OVER-COLLECTED — the same distinction balanceOutstanding
+       was fixed to make, and I did not carry it here in the same breath. Without it: a deposit taken
+       to hold a date BEFORE the quote is built (quote still $0) printed "Refund Owed $1,500.00", so
+       Bar Cop told the operator to pay back money they had just banked. And a PROMISED $8,000 on a
+       $7,695 event hid the $7,695 that was genuinely still owed. */
+    if (!b || !b.deposit_paid_date) return 0;
     const dep = parseFloat(b.deposit_amount) || 0;
     return Math.max(0, dep - this.quoteTotal(b));
   },
@@ -556,13 +561,16 @@ S.EventsBookings = {
          entirely (that list only takes rows where the balance is above zero). The refund the bar
          OWES THE CLIENT — real money, a real liability — appeared on no screen at all. It is also
          the only tell that a figure was typed into the wrong box. */
+      /* ⚠ REFUND OWED IS AN EXTRA TILE, NOT A REPLACEMENT. Swapping it in HID what was still owed,
+         and the Mark Balance Paid button is gated separately — so in that state the balance could
+         never be marked paid at all, and (before the anchor fix) it flooded the forecast forever.
+         They are two different facts and an overpaid deposit does not stop a balance existing. */
+      t.push(this.statTile('Balance Due', App.fmtCurrency(bal),
+        b.balance_paid_date
+          ? ('paid in full' + (b.payment_method === 'register' ? ', through the register' : b.payment_method === 'direct' ? ', paid direct' : ''))
+          : 'on event day', bal > 0 ? '' : 'good'));
       const over = this.refundOwed(b);
-      t.push(over > 0
-        ? this.statTile('Refund Owed', App.fmtCurrency(over), 'deposit is over the quote', 'warn')
-        : this.statTile('Balance Due', App.fmtCurrency(bal),
-          b.balance_paid_date
-            ? ('paid in full' + (b.payment_method === 'register' ? ', through the register' : b.payment_method === 'direct' ? ', paid direct' : ''))
-            : 'on event day', bal > 0 ? '' : 'good'));
+      if (over > 0) t.push(this.statTile('Refund Owed', App.fmtCurrency(over), 'deposit is over the quote', 'warn'));
     } else if (stage === 'Completed') {
       const rev = this.bookingRevenue(b);
       const labor = this.bookingLabor(b);
@@ -670,7 +678,7 @@ S.EventsBookings = {
             + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
               + '<button class="btn btn-primary btn-sm" id="eb-dep-save">Save Deposit</button>'
               + (b.deposit_amount && !b.deposit_paid_date ? '<button class="btn btn-ghost btn-sm" id="eb-dep-paid">Mark Deposit Paid</button>' : '')
-              + (!b.balance_paid_date && bal > 0 ? '<button class="btn btn-ghost btn-sm" id="eb-bal-paid">Mark Balance Paid</button>' : '')
+              + (this.balanceOutstanding(b) > 0 ? '<button class="btn btn-ghost btn-sm" id="eb-bal-paid">Mark Balance Paid</button>' : '')
             + '</div>'
           + '</div>'
         + '</div>'
@@ -989,7 +997,15 @@ S.EventsBookings = {
     // else left the booking floating on the live tax setting.
     this._freezeRates(b, fields);
     if (!resend) fields.stage = 'Quote Sent';
-    await this.patch(id, fields);
+    /* ⚠⚠ DO NOT EMAIL A CLIENT A NUMBER THAT DID NOT SAVE. The verdict was discarded here, and my
+       own patch fix made that WORSE rather than better: the old patch mutated the array before
+       awaiting, so a refused write still left the new figures in memory and the email at least
+       matched the screen. The fixed patch reverts properly — so this read returned the OLD record
+       and the client was emailed the OLD price. Measured: re-priced to $9,811.13 on screen, refused
+       write, and the email said "Quoted total: $7,695.00" — $2,116.13 under-quoted, on the document
+       the client holds you to. ([[the-loop]] step 0.6: when a fix changes a RETURN VALUE, read every
+       caller that consumed the old behaviour.) */
+    if (!(await this.patch(id, fields))) return;
     const updated = this.bookings().find(x => x.id === id) || b;
     window.location.href = this.buildQuoteMailto(updated);
   },
@@ -1071,6 +1087,19 @@ S.EventsBookings = {
     const err = document.getElementById('ebf-err');
     if (!fields.event_name && !fields.contact_name) { if (err) { err.textContent = 'Enter an event name or a contact name.'; err.style.display = 'inline'; } return; }
     const existing = id ? this.bookings().find(x => x.id === id) : null;
+    /* ⚠⚠ EDIT DETAILS IS A STAGE DOOR TOO, AND IT BYPASSED BOTH NEW GUARDS. `_freezeRates`' own
+       comment names this popup's Stage dropdown as a door that carried no rate snapshot — and then
+       the fix went to changeStage and sendQuote only, so a Lead driven straight to Booked here was
+       saved with no snapshot and no date check: it re-priced by $144.00 when the operator later
+       corrected their tax setting, and it could reach Booked with a blank date, the state where
+       "Deposits Due" bills an event nothing else can see. ([[the-loop]] #53 — a comment naming a
+       defect reads as handled to every later reader, including me.) */
+    const st = fields.stage || (existing && existing.stage);
+    if (st === 'Booked' && !String(fields.event_date || (existing && existing.event_date) || '').trim()) {
+      if (err) { err.textContent = 'A booked event needs a date, or it will not reach your calendar or your cash forecast.'; err.style.display = 'inline'; }
+      return;
+    }
+    if (st === 'Quote Sent' || st === 'Booked' || st === 'Completed') this._freezeRates(existing, fields);
     const rec = Object.assign({}, existing || {}, fields, { id: id || App.uid(), updated_at: new Date().toISOString() });
     if (!id) rec.created_at = new Date().toISOString();
     const ok = await App.putRecord('core', 'booking', rec);
