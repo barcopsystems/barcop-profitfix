@@ -278,9 +278,33 @@ S.CashForecast = {
     const ce = CashEngine.committedEventCash(this.WEEKS);
     if (!ce.list.length && !ce.deposits) return '';
     const heading = '<div class="sh" style="margin:24px 0 10px;">Event Money Coming In</div>';
+    /* ⚠⚠ THE CARD'S OWN CLAIM HAS TO BE TRUE. Its help text says these balances are "already counted
+       in the cash-in above" — and `survivalForecast` deliberately drops event money on any week
+       carrying a SAVED forecast override, because the operator's typed number stands on its own.
+       So on those weeks the sentence was simply false, by a measured $1,808.50, on a card that also
+       goes into the lender PDF.
+       ⛔ The first attempt at this fixed the ARITHMETIC — it made `committedEventCash` skip those
+       weeks too — and that was worse: a receivable is owed whether or not a sales override was
+       saved, so it deleted real money from the one card whose job is listing it ($18,237.50 -> $0.00
+       measured, under the words "No balances left to collect this quarter"). The card keeps the
+       truth; the SENTENCE is what gets qualified, here, where it is written. */
+    const overridden = [];
+    for (let i = 0; i < this.WEEKS; i++) {
+      const ws = CashEngine._addDays(CashEngine._mondayOf(new Date()), i * 7);
+      const sf = App.forecastForWeek ? App.forecastForWeek(ws) : null;
+      if (sf && sf.total != null && CashEngine.eventInflow(ws, CashEngine._addDays(ws, 6),
+          CashEngine._mondayOf(new Date())).total > 0) overridden.push(ws);
+    }
+    const note = overridden.length
+      ? '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin:8px 0 0;">'
+        + (overridden.length === 1 ? 'One week below carries' : overridden.length + ' weeks below carry')
+        + ' a sales forecast you saved, so the forecast uses your number for '
+        + (overridden.length === 1 ? 'that week' : 'those weeks')
+        + ' and does not add these balances on top. They are still owed to you.</div>'
+      : '';
     if (!ce.list.length) {
       return heading + '<div class="card"><div style="font-size:12px;color:var(--t2);">'
-        + App.fmtCurrency(ce.deposits) + ' in deposits is already in hand against booked events. No balances left to collect this quarter.</div></div>';
+        + App.fmtCurrency(ce.deposits) + ' in deposits is already in hand against booked events. No balances left to collect this quarter.</div>' + note + '</div>';
     }
     const rows = ce.list.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(e =>
       '<tr><td data-label="Event Date" style="color:var(--t1);">' + this.fmtWk(e.date) + '</td>'
@@ -288,7 +312,7 @@ S.CashForecast = {
       + '<td data-label="Event Total" class="val">' + App.fmtCurrency(e.total != null ? e.total : e.amount) + '</td>'
       + '<td data-label="Deposit Held" class="val">' + (e.deposit ? App.fmtCurrency(e.deposit) : '-') + '</td>'
       + '<td data-label="Balance Due" class="val" style="font-weight:600;">' + App.fmtCurrency(e.amount) + '</td></tr>').join('');
-    return heading + this.fixed5('<th>Event Date</th><th>Event</th><th>Event Total</th><th>Deposit Held</th><th>Balance Due</th>', rows);
+    return heading + this.fixed5('<th>Event Date</th><th>Event</th><th>Event Total</th><th>Deposit Held</th><th>Balance Due</th>', rows) + note;
   },
 
   // ── Bills due, next two weeks: who to pay and when ────────────────────────────
