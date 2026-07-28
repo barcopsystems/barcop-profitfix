@@ -3389,14 +3389,28 @@ const App = {
     this.saveKey('list_config');
   },
   // The live option list for a key: built-ins + added, minus hidden, minus Other.
+  /* ⚠⚠ 'OTHER' IS DROPPED AS A LEGACY BUCKET — BUT NOT WHEN THE LIST GENUINELY DECLARES IT (found
+     by Kyle in the real app, 2026-07-28). This stripped 'other' unconditionally, and the comment on
+     listAddOption already recorded the consequence — "the Add button simply appeared broken" — but
+     the fix went to the Add path only, so the underlying hole stayed open. THREE lists declare
+     'Other' as one of their own options: Expense Categories, Departments and Permit Types. On
+     Operating Expenses it is the ninth category, it is what the IMPORTER falls back to for any
+     column it cannot match, it is the bucket _sumMonthByCategory puts unknowns in, and it renders
+     as a row on the By Category card — so the operator could SEE 'Other' rows they had no way to
+     create, correct a row to, or re-add. Two doors, one record, two rules, again.
+     The bare bucket is still dropped for every list that never declared it. */
   listOptions(key) {
     const c = this.listConfig(key);
     const hid = c.hidden.map(h => String(h).toLowerCase());
+    const declaresOther = (this._listBuiltins[key] || []).some(b => String(b == null ? '' : b).trim().toLowerCase() === 'other');
     const out = [];
     const push = v => {
       v = (v == null ? '' : String(v)).trim();
       const lc = v.toLowerCase();
-      if (v && lc !== 'other' && !hid.includes(lc) && !out.some(x => x.toLowerCase() === lc)) out.push(v);
+      if (!v) return;
+      if (lc === 'other' && !declaresOther) return;
+      if (hid.includes(lc) || out.some(x => x.toLowerCase() === lc)) return;
+      out.push(v);
     };
     (this._listBuiltins[key] || []).forEach(push);
     c.added.forEach(push);
@@ -3406,18 +3420,21 @@ const App = {
   // A brand-new value goes into added; a hidden built-in just gets un-hidden.
   listAddOption(key, val) {
     val = (val == null ? '' : String(val)).trim();
-    if (!val) return;
-    // ⚠ listOptions drops 'other' unconditionally (it is the bucket "+ Add your own" replaced), so
-    // storing one produced an entry that was written to the server, never shown in the manager,
-    // and never offered in any dropdown — the Add button simply appeared broken. Refuse it here
-    // instead of accepting something that can never take effect.
-    if (val.toLowerCase() === 'other') return;
-    const c = this.listConfig(key);
+    if (!val) return false;
     const lc = val.toLowerCase();
+    /* ⚠ REFUSE ONLY WHERE IT CANNOT TAKE EFFECT, AND RETURN THE VERDICT SO THE CALLER CAN SAY SO.
+       listOptions drops a bare 'other' for lists that never declared it — storing one there produced
+       an entry written to the server, never shown, never offered, and the Add button simply appeared
+       broken. It still refuses those. But a list that DOES declare 'Other' (Expense Categories,
+       Departments, Permit Types) must accept it: re-adding un-hides the built-in, which is exactly
+       what every other built-in does. Silently returning was the part that read as a bug. */
+    if (lc === 'other' && !(this._listBuiltins[key] || []).some(b => String(b == null ? '' : b).trim().toLowerCase() === 'other')) return false;
+    const c = this.listConfig(key);
     c.hidden = c.hidden.filter(h => String(h).toLowerCase() !== lc);
     const isBuiltin = (this._listBuiltins[key] || []).some(b => String(b).toLowerCase() === lc);
     if (!isBuiltin && !c.added.some(a => a.toLowerCase() === lc)) c.added.push(val);
     this.saveKey('list_config');
+    return true;
   },
   // Remove an option: a built-in gets hidden, a custom-added one gets deleted.
   listRemoveOption(key, val) {
@@ -3615,16 +3632,19 @@ const App = {
           +   '<input type="text" id="ll-add" class="form-input" placeholder="Name (' + esc(this._listNameHints[key] || 'e.g. Gallon') + ')" style="flex:1;"/>'
           +   '<input type="number" id="ll-add-oz" class="form-input" placeholder="oz" step="0.1" min="0" style="width:90px;"/>'
           +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
+          +   '<span id="ll-add-err" style="display:none;font-size:11px;color:var(--red);align-self:center;"></span>'
           + '</div>'
         : methoded
         ? '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;">'
           +   '<input type="text" id="ll-add" class="form-input" placeholder="Add a unit" style="flex:1;"/>'
           +   '<select id="ll-add-method" class="form-input" style="width:130px;"><option value="count">By count</option><option value="oz">By ounces</option></select>'
           +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
+          +   '<span id="ll-add-err" style="display:none;font-size:11px;color:var(--red);align-self:center;"></span>'
           + '</div>'
         : '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;">'
           +   '<input type="text" id="ll-add" class="form-input" placeholder="Add an option" style="flex:1;"/>'
           +   '<button class="btn btn-primary" id="ll-add-btn">Add</button>'
+          +   '<span id="ll-add-err" style="display:none;font-size:11px;color:var(--red);align-self:center;"></span>'
           + '</div>';
       const html = '<div class="card form-card" style="margin:0;">'
         + '<div class="card-title">Edit ' + esc(label) + '</div>'
@@ -3659,7 +3679,14 @@ const App = {
           this.listAddUnit(v, (root.querySelector('#ll-add-method') || {}).value);
         } else {
           const v = (addInp.value || '').trim(); if (!v) return;
-          this.listAddOption(key, v);
+          /* ⚠ A FORM THAT TAKES INPUT AND DOES NOTHING IS THE THING BEING REPORTED. listAddOption
+             returns false when a value can never take effect; without this the row was accepted,
+             the editor re-rendered unchanged, and the operator was left typing it again. */
+          if (this.listAddOption(key, v) === false) {
+            const err = root.querySelector('#ll-add-err');
+            if (err) { err.textContent = '"' + v + '" cannot be added to this list.'; err.style.display = 'inline'; }
+            return;
+          }
         }
         render();
       };
