@@ -292,8 +292,13 @@ S.HubOperatingExpenses = {
          A future-dated row is still excluded from the wrong YEAR, which is what TEST-E's 2027 row
          needed. `last-12` below keeps its ceiling: nothing else computes "last 12 months", and a
          row eight months ahead is not in it by any reading. */
-      const year = String(today.getFullYear());
-      recs = recs.filter(r => (r.date || '').slice(0, 4) === year);
+      /* ⚠ CAPPED AT THE CURRENT MONTH, exactly like `_sumYTD` and `hub-books._opExSums` (`mk <=
+         monthKey`). Year-only was the ORIGINAL rule and it already disagreed with those two for a
+         row dated a LATER MONTH of this year — a bill pre-entered for September while it is July
+         counted here and not in Books. Surfaced by a control that went red when the clock rolled
+         past its fixture. The three YTD figures on this screen are now one number by construction. */
+      const mkNow = this._currentMonthKey();
+      recs = recs.filter(r => { const mk = this._monthKey(r.date); return mk && mk.slice(0, 4) === String(today.getFullYear()) && mk <= mkNow; });
     } else if (this._filterRange === 'last-12') {
       const cutoff = new Date(today); cutoff.setMonth(cutoff.getMonth() - 12);
       recs = recs.filter(r => r.date && r.date <= todayStr && new Date(r.date + 'T00:00:00') >= cutoff);
@@ -342,7 +347,8 @@ S.HubOperatingExpenses = {
     // and it put $1,200 directly under a By Category card reading $2,180 for the same period — a
     // recurring bill due on the 28th is "future" for most of every month, so it fired monthly.
     // Operating expenses are carried on a MONTH basis app-wide; this figure follows that.
-    const ytd = recs.filter(r => String(r.date || '').slice(0, 4) === yr)
+    const mkNow = this._currentMonthKey();
+    const ytd = recs.filter(r => { const mk = this._monthKey(r.date); return mk && mk.slice(0, 4) === yr && mk <= mkNow; })
       .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
     const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
     return '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
