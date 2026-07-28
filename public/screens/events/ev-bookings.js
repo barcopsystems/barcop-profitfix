@@ -163,7 +163,36 @@ S.EventsBookings = {
   // precisely because that cash is in hand, but the Balance Due tile kept printing the
   // full figure with "paid in full" written underneath it.
   balanceOutstanding(b) {
-    return b.balance_paid_date ? 0 : this.balanceDue(b);
+    if (b.balance_paid_date) return 0;
+    /* ⚠⚠ ONLY A COLLECTED DEPOSIT REDUCES WHAT IS STILL OWED. This deferred to balanceDue, which
+       nets the deposit whether or not the client has actually paid it — so a booking with a
+       promised-but-unpaid $1,500 deposit printed "Balance Due $6,195.00" against a truth of
+       $7,695.00, crediting the client for money the bar has not received, under a tile whose own
+       comment says it reports what is still owed RIGHT NOW.
+       cash-engine.eventInflow has always drawn this distinction (`b.deposit_paid_date ? ... : 0`),
+       which is why the same event read $6,195 here and $7,695 on the Cash Forecast.
+       ⚠ balanceDue is deliberately NOT changed: it is the AGREEMENT TERM — quoted minus the deposit
+       the contract asks for — and it must stay put on a signed document after the client pays. */
+    const dep = b.deposit_paid_date ? (parseFloat(b.deposit_amount) || 0) : 0;
+    return Math.max(0, this.quoteTotal(b) - dep);
+  },
+
+  /* ⚠⚠ FREEZE THE RATES THE MOMENT A QUOTE BECOMES A COMMITMENT. quoteParts reads `tax_pct` off the
+     booking and falls back to the LIVE setting, and `collectQuote` was the only writer that ever
+     stored it — so a booking that reached Quote Sent or Booked by any other door (a rate-card pill,
+     the Catering Calculator, Edit Details' own Stage dropdown) carried no snapshot at all.
+     ⛔ MEASURED: a $7,200.00 quote already sent to a client became $7,695.00 the moment the operator
+     set their sales tax rate in Cash settings. **$495 appeared with zero edits to the booking**, on
+     the quote PDF, the signed agreement, the Balance Due tile and the pipeline. A booking WITH the
+     snapshot is immune, which is the control.
+     This is the rule the cash engine already paid for once: a number that moves invisibly destroys
+     trust in every number beside it. Before a quote goes out the live rate is correct, so nothing is
+     frozen while the booking is still a Lead. */
+  _freezeRates(b, fields) {
+    const cur = Object.assign({}, b || {}, fields);
+    if (cur.tax_pct == null || cur.tax_pct === '') fields.tax_pct = this.defaultTaxPct();
+    if (cur.service_charge_pct == null || cur.service_charge_pct === '') fields.service_charge_pct = this.DEFAULT_SVC_PCT;
+    return fields;
   },
 
   // Other active bookings holding the same space on the same day: a double-book risk.
@@ -199,11 +228,24 @@ S.EventsBookings = {
   async patch(id, fields) {
     const list = this.bookings();
     const i = list.findIndex(x => x.id === id);
-    if (i < 0) return;
-    list[i] = Object.assign({}, list[i], fields, { updated_at: new Date().toISOString() });
-    await App.putRecord('core', 'booking', list[i]);
+    if (i < 0) return false;
+    /* ⚠⚠ HAND putRecord A DIFFERENT OBJECT THAN THE ONE IN THE LIST, OR ITS REVERT IS A NO-OP.
+       This assigned the new record into the array and THEN passed that same object to putRecord —
+       the exact shape putRecord's own comment warns about: `prev` and `rec` become one object, so
+       the rollback assigns it to itself and the old values are already gone.
+       ⛔ MEASURED on a refused write: the booking read "Booked" with a deposit date on screen and in
+       memory while the server still held "Lead". cash-engine.eventInflow counts `stage === 'Booked'`,
+       so that event's balance entered the 13-week forecast and Safe to Spend on a booking that was
+       never saved, and vanished on the next reload. A copy handed in reverts correctly (the control).
+       This is the central write door for the whole lifecycle — stage changes, rate-card application,
+       deposit and balance dates, quote edits — so it is the one place the fix belongs. */
+    const next = Object.assign({}, list[i], fields, { updated_at: new Date().toISOString() });
+    const ok = await App.putRecord('core', 'booking', next);   // places `next`, restores the old row if refused
+    // Re-render either way: on a refusal the row is back to its saved values and the screen must
+    // show that, rather than the change the operator thinks landed.
     if (this._detailId === id) this.renderDetail(id);
     else this.renderList();
+    return ok;
   },
 
   render(container, actions) {
@@ -740,6 +782,10 @@ S.EventsBookings = {
     const fields = Object.assign(this.openEdits(), { stage: to });
     const b = this.bookings().find(x => x.id === id);
     if (to === 'Booked' && b && !b.date_received) fields.date_received = App.todayLocal();
+    // Once a quote is out or committed it is a number someone else has seen, so the rates behind it
+    // stop floating. Not on Lead (nothing has been sent) and not on Lost (a dead booking's total
+    // never prints again, and writing to it would break "with no editable card, only the stage moves").
+    if (to === 'Quote Sent' || to === 'Booked' || to === 'Completed') this._freezeRates(b, fields);
     await this.patch(id, fields);
     // No per-booking scoreboard credit by design: event revenue flows into This
     // Week (catering) and the Revenue Audit, where the engine measures real
@@ -797,6 +843,10 @@ S.EventsBookings = {
       return;
     }
     const fields = this.collectQuote();
+    // The quote is about to be in a client's inbox. collectQuote only stamps the rates when the
+    // quote panel is on screen (every field is guarded by `if (g(...))`), so sending from anywhere
+    // else left the booking floating on the live tax setting.
+    this._freezeRates(b, fields);
     if (!resend) fields.stage = 'Quote Sent';
     await this.patch(id, fields);
     const updated = this.bookings().find(x => x.id === id) || b;
