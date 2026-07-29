@@ -14,12 +14,10 @@
    overtime, classification, and tax compliance. */
 
 S.LaborPayrollExport = {
-  _ackGiven: false,    // worksheet-disclaimer acknowledged this visit (covers both files)
   PP() { return S.LaborPayPeriods; },
 
   render(container, actions) {
     this.container = container;
-    this._ackGiven = false;
     if (actions) actions.innerHTML = '';
     const pp = this.PP();
     if (pp.actuals().length === 0) {
@@ -78,41 +76,32 @@ S.LaborPayrollExport = {
       + this._whatsInsideCard()
       + '</div>';
 
-    document.getElementById('px-xlsx')?.addEventListener('click', () => this._ackThenDownload('xlsx', document.getElementById('px-week')?.value));
-    document.getElementById('px-csv')?.addEventListener('click', () => this._ackThenDownload('csv', document.getElementById('px-week')?.value));
+    document.getElementById('px-xlsx')?.addEventListener('click', () => this._startDownload('xlsx', document.getElementById('px-week')?.value));
+    document.getElementById('px-csv')?.addEventListener('click', () => this._startDownload('csv', document.getElementById('px-week')?.value));
   },
 
-  // Gate the export behind an acknowledgment of the worksheet disclaimer, so the
-  // protection language is seen even when the operator only grabs the import CSV
-  // and never opens the formatted workbook. Once per visit: the first download
-  // prompts and the acknowledgment covers both files, so grabbing the workbook
-  // and the CSV seconds apart is one click, not two. A fresh visit (next week)
-  // prompts again.
-  _ackThenDownload(fmt, weekStart) {
+  // The payroll worksheet download. NO acknowledgement popup (2026-07-30): this screen already
+  // prints the full payroll disclaimer in its Heads Up box, and _downloadWorkbook writes it into
+  // the sheet as three merged rows PLUS App.deliverableFooter()'s lines PLUS the workbook
+  // Subject. The popup was a fifth copy of a paragraph visible on the page behind it, and
+  // ToS §7 already says Bar Cop does not run payroll or cut paychecks.
+  // ⚠⚠ THE "PERIOD NOT CLOSED" CONFIRM BELOW IS NOT A LEGAL ACK AND MUST STAY. It warns that
+  //   hours can still change after the handoff, which is an operational fact about THIS week,
+  //   not boilerplate. It was nested inside the old ack gate, which is exactly how removing a
+  //   gate silently removes the warning with it — pinned by verify-export-notice-carried.js,
+  //   which RUNS this handler across both period states.
+  _startDownload(fmt, weekStart) {
     if (!weekStart) return;
     const pp = S.LaborPayPeriods;
     const saved = pp.periods().find(p => p.week_start === weekStart);
     const isClosed = saved && saved.status === 'Closed';
     const run = () => { if (fmt === 'xlsx') this._downloadWorkbook(weekStart); else this._downloadCSV(weekStart); };
-    // An unlocked (not-yet-closed) period can still change after the handoff, so
-    // warn before exporting one — even if the worksheet disclaimer was already ack'd.
-    const proceed = () => {
-      if (isClosed) { run(); return; }
-      App.confirm({
-        title: 'This period is not closed yet',
-        message: 'This week has not been closed and locked in Pay Periods, so its hours and pay can still change after you export. Close it first for a clean payroll handoff, or export anyway.',
-        confirmText: 'Export Anyway', cancelText: 'Cancel', danger: false
-      }).then(ok => { if (ok) run(); });
-    };
-    if (this._ackGiven) { proceed(); return; }
-    App.confirmExport({
-      title: 'Before You Export Payroll',
-      message: 'This file is a worksheet Bar Cop builds from what you log, not your official payroll, tax, or timekeeping record. Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. Verify every figure before running&nbsp;payroll.'
-    }).then(ok => {
-      if (!ok) return;
-      this._ackGiven = true;
-      proceed();
-    });
+    if (isClosed) { run(); return; }
+    App.confirm({
+      title: 'This period is not closed yet',
+      message: 'This week has not been closed and locked in Pay Periods, so its hours and pay can still change after you export. Close it first for a clean payroll handoff, or export anyway.',
+      confirmText: 'Export Anyway', cancelText: 'Cancel', danger: false
+    }).then(ok => { if (ok) run(); });
   },
 
   showHowTo() {
