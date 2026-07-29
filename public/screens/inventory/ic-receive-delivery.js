@@ -159,12 +159,19 @@ S.InventoryReceiveDelivery = {
         + '</div>'
       + '</div>'
       + '<div class="pill-wrap" style="margin:6px 0 12px;">'
+      /* ⚠ PERCENTAGES, NOT PIXELS, AND THE LAST COLUMN GETS A SHARE. The four columns used to be
+         fixed at 280+130+140+110 = 660px with the actions column left unwidthed, so between the
+         680px stack point and about 870px there was a dead zone: the fixed widths could not
+         compress, the actions cell was squeezed to nothing, and the Short QTY badge printed on top
+         of the Extended figure. That is the "cramped middle zone" this table's own CSS comment
+         says the container query exists to avoid — pixels were what stopped it working.
+         Percentages let it compress the whole way down to the stack. */
       + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
-      + '<th style="width:280px;">Product</th>'
-      + '<th style="width:130px;">Qty Received</th>'
-      + '<th style="width:140px;">Unit Price</th>'
-      + '<th style="width:110px;">Extended</th>'
-      + '<th></th>'
+      + '<th style="width:32%;">Product</th>'
+      + '<th style="width:14%;">Qty Received</th>'
+      + '<th style="width:16%;">Unit Price</th>'
+      + '<th style="width:14%;">Extended</th>'
+      + '<th style="width:24%;"></th>'
       + '</tr></thead><tbody id="rd-lines">' + this.lineHTML(++this._seq) + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="rd-add" type="button" style="margin-bottom:14px;">+ Add Line Item</button>'
       + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
