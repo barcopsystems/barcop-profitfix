@@ -5,9 +5,17 @@
    with a week-stepper and progress bar, then the week's inventory steps top to
    bottom (take the count, receive deliveries, place orders, review flags). The
    current step opens inline; deeper work (Take Inventory, Order Sheet, the
-   reports) launches out. A status strip carries the KPIs, and once the week is
-   current the rich readout (cash by category, movement, since-last-count, leaks)
-   drops in as the payoff. Every number is computed from real data — no scores. */
+   reports) launches out. A status strip carries the KPIs. Every number is computed
+   from real data — no scores.
+   ⚠ THE OLD FOUR-PANEL READOUT IS GONE (2026-07-29). "Where Your Cash Sits / Movement /
+   Since Last Count / Leaks & Watch" was the RETIRED Inventory dashboard, and it was still
+   rendering here under `allDone ? this.readout(st)` — so it reappeared the moment an
+   operator ticked all four steps, which is exactly when nobody expects a second dashboard.
+   Gated on a state most sessions never reach, which is why it survived every scan.
+   Its five methods went with it, and so did this screen's PRIVATE `shPanel`/`row` — which
+   existed only to build those panels. dash-ui.js has its own pair of the same names, still
+   used by the other dashboards; the duplicate names here are what made the local copies look
+   shared. Counted the call sites in THIS file rather than trusting the name. */
 
 S.InventoryDashboard = {
   _weekStart: null,   // Monday of the selected week
@@ -17,11 +25,11 @@ S.InventoryDashboard = {
 
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
-      { p: ['This is your weekly close-out for Inventory. You land on the week, see how far along you are, and work the steps top to bottom. Open a step to do it; when the week is done it reads "You\'re current this week" and the full readout drops in below.'] },
+      { p: ['This is your weekly close-out for Inventory. You land on the week, see how far along you are, and work the steps top to bottom. Open a step to do it; when the week is done it reads "You\'re current this week."'] },
       { h: 'Where You Stand', p: ['The card up top reads your inventory value on hand and how many weeks of business that covers, then breaks down where your shelf cash sits: what is on the reorder, what you used this period, and shrinkage over the last 30 days. Hit Bar Cop Briefing for a written read of your week in plain language.'] },
       { h: 'The Steps', p: ['1. Take this week\'s count: count your inventory in Take Inventory. 2. Receive deliveries: log anything that came in since your last count, or mark it none. 3. Place your orders: everything below par, grouped by vendor, with the cost to refill, and create the orders in the Order Sheet. 4. Review the flags: shrinkage written off, spot-check flags, and dead stock worth chasing.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Take Inventory, Receive Delivery, and the Order Sheet open the full screen and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] },
-      { h: 'The Readout', p: ['Once the week is current, the readout below breaks your cash down by category, shows what is moving fast, slow, and not at all, the honest direction since your last count, and any leaks worth chasing. The As-needed row keeps Spot Check and Par Suggestions one tap away.'] }
+      { h: 'As-Needed Work', p: ['The row under the steps keeps Spot Check and Par Suggestions one tap away. Neither is part of the weekly close, but both are worth a look when a number stops making sense.'] }
     ]);
   },
 
@@ -175,7 +183,7 @@ S.InventoryDashboard = {
     return r;
   },
 
-  // ── Heavy compute, once per render, shared by steps + strip + readout ────────
+  // ── Heavy compute, once per render, shared by the steps and the status strip ──
   computeState() {
     const asc = this.countsAsc();
     const latest = asc.length ? asc[asc.length - 1] : null;
@@ -295,7 +303,6 @@ S.InventoryDashboard = {
     const done = this.stepDone(st);
     const doneCount = this.ORDER.filter(k => done[k]).length;
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
-    const allDone = doneCount === this.ORDER.length;
     const flash = this._flash; this._flash = null;
 
     container.innerHTML = '<div class="screen">'
@@ -305,7 +312,6 @@ S.InventoryDashboard = {
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
       +   this.ORDER.map(k => this.stepRow(k, done)).join('')
       + '</div>'
-      + (allDone ? this.readout(st) : '')
       + this.outlierStrip()
       + '</div>';
     this.wire();
@@ -492,81 +498,7 @@ S.InventoryDashboard = {
       + hero + secondary + '</div>';
   },
 
-  // ── Rich readout (the done-state payoff) ─────────────────────────────────────
-  shPanel(title, bodyHtml) {
-    return '<div class="sh" style="margin:0 0 10px;">' + title + '</div>'
-      + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
-  },
-  row(a, b) {
-    return '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch;">'
-      + '<div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;">' + a + '</div>'
-      + '<div style="flex:1 1 280px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
-  },
-  catBody(st) {
-    return st.catRows.length
-      ? st.catRows.map(([cat, valv]) => {
-          const pct = Math.max(2, Math.round(valv / st.catMax * 100));
-          return '<div style="margin-bottom:11px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'
-            + '<span style="color:var(--t2);">' + esc(cat) + '</span><span style="color:var(--t1);font-weight:600;">' + App.fmtCurrency(valv) + '</span></div>'
-            + '<div style="height:7px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);"></div></div></div>';
-        }).join('')
-      : '<div style="font-size:12px;color:var(--t3);">No counted value yet.</div>';
-  },
-  moveBody(st) {
-    const moveLine = (m, right) =>
-      '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;">'
-      + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(m.name) + '</div>'
-      + '<div style="font-size:12px;font-weight:600;color:var(--t1);white-space:nowrap;">' + right + '</div></div>';
-    const moveBlock = (title, rows, emptyMsg, dotColor) =>
-      '<div style="margin-bottom:10px;">'
-      + '<div style="display:flex;align-items:center;gap:6px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">'
-      + '<span style="width:6px;height:6px;border-radius:50%;background:' + dotColor + ';"></span>' + title + '</div>'
-      + (rows.length ? rows : '<div style="font-size:11px;color:var(--t4);padding:2px 0;">' + emptyMsg + '</div>') + '</div>';
-    return !st.base
-      ? '<div style="font-size:12px;color:var(--t3);">Take a second count to see what is moving fast, slow, and not at all.</div>'
-      : moveBlock('Fast Movers', st.fast.map(m => moveLine(m, App.fmtCurrency(m.cost) + ' used')).join(''), 'No usage recorded.', 'var(--gold)')
-        + moveBlock('Slow Movers', st.slow.map(m => moveLine(m, App.fmtCurrency(m.cost) + ' used')).join(''), 'Nothing crawling.', 'var(--steel)')
-        + moveBlock('Dead Stock', st.dead.map(m => moveLine(m, App.fmtCurrency(m.tied) + ' tied')).join(''), 'Nothing stale. Every product moved.', 'var(--red)');
-  },
-  sinceBody(st) {
-    return st.sigNow && st.sigNow.comps.length
-      ? st.sigNow.comps.map((c, i) => {
-          const pv = st.prevRaw[c.key];
-          let icon = '&#8226;', word = '', col = 'var(--t4)';
-          if (pv != null) {
-            const eps = 1e-6;
-            const improved = c.lowerBetter ? c.raw < pv - eps : c.raw > pv + eps;
-            const worsened = c.lowerBetter ? c.raw > pv + eps : c.raw < pv - eps;
-            if (improved) { icon = '&#9650;'; word = 'Improving'; col = 'var(--gold)'; }
-            else if (worsened) { icon = '&#9660;'; word = 'Slipping'; col = 'var(--red)'; }
-            else { icon = '&#8211;'; word = 'Flat'; col = 'var(--t4)'; }
-          }
-          const detail = pv != null ? esc(c.fmt(pv)) + ' &rarr; ' + esc(c.fmt(c.raw)) : esc(c.fmt(c.raw));
-          return '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;' + (i < st.sigNow.comps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
-            + '<span style="width:14px;text-align:center;color:' + col + ';font-size:12px;flex-shrink:0;">' + icon + '</span>'
-            + '<div style="flex:1;min-width:0;"><div style="font-size:12px;color:var(--t1);">' + c.label + '</div>'
-            + '<div style="font-size:11px;color:var(--t3);">' + detail + '</div></div>'
-            + '<span style="font-size:11px;font-weight:700;color:' + col + ';white-space:nowrap;">' + word + '</span></div>';
-        }).join('')
-      : '<div style="font-size:12px;color:var(--t3);">Trends appear once you have two counts.</div>';
-  },
-  leakBody(st) {
-    const leakRow = (label, val, screen, warn) =>
-      '<div data-go="' + screen + '" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--b2);cursor:pointer;">'
-      + '<span style="font-size:12px;color:var(--t2);">' + label + '</span>'
-      + '<span style="font-size:13px;font-weight:600;color:' + (warn ? 'var(--red)' : 'var(--t1)') + ';">' + val + ' &rsaquo;</span></div>';
-    const anyLeak = st.shrink > 0 || st.spotFlags > 0;
-    return leakRow('Shrinkage written off (30d)', App.fmtCurrency(st.shrink), 'ic-adjustments', st.shrink > 0)
-      + leakRow('Spot-check flags (30d)', String(st.spotFlags), 'ic-spot-check', st.spotFlags > 0)
-      + (anyLeak ? '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Tap any line to dig in.</div>'
-                 : '<div style="font-size:11px;color:var(--gold);margin-top:8px;">No leaks flagged in the last 30 days. Clean.</div>');
-  },
-  readout(st) {
-    return '<div style="margin-top:22px;">'
-      + this.row(this.shPanel('Where Your Cash Sits', this.catBody(st)), this.shPanel('Movement', this.moveBody(st)))
-      + this.row(this.shPanel('Since Last Count', this.sinceBody(st)), this.shPanel('Leaks &amp; Watch', this.leakBody(st)))
-      + '</div>';
-  },
+
 
   parNudge(n) {
     return '<div data-go="ic-par-suggestions" style="margin-top:12px;padding:11px 13px;background:var(--input);border:1px solid var(--b2);border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
