@@ -164,9 +164,9 @@ S.ShiftWaste = {
       + '<div class="f" style="width:220px;flex-shrink:0;"><label>Recorded By</label><select id="wlb-by">' + App.staffOptions('', { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="pill-wrap" style="margin-bottom:12px;">'
-      + '<table class="ing-tbl pill"><thead><tr>'
-      + '<th style="min-width:200px;">Product</th><th style="width:90px;">Units</th><th style="width:70px;">Unit</th>'
-      + '<th style="width:90px;">Cost</th><th style="min-width:180px;">Reason</th><th style="width:90px;"></th>'
+      + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
+      + '<th style="width:28%;">Product</th><th style="width:13%;">Units</th><th style="width:10%;">Unit</th>'
+      + '<th style="width:13%;">Cost</th><th style="width:25%;">Reason</th><th style="width:11%;"></th>'
       + '</tr></thead><tbody id="wlb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="wlb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
       + App.noteField({ id: 'wlb-notes' });
