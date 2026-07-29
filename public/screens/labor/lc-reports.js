@@ -179,21 +179,40 @@ S.LaborReports = {
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.renderReport(); return; }
       // Day lens
-      if (ev.target.closest('#dv-export')) { App.exportPDF({ title: 'Labor Report - Day', root: this.container }); return; }
+      /* ⚠ EVERY LENS PRINTS ITS PERIOD. The day picker, the week pill and the Range chips all
+         sit inside `class="no-print"` wrappers, and `_collectPDFBlocks` skips anything inside
+         one — a date `<input>` has no textContent to collect either. So without `range` the
+         three Labor Report PDFs were identical apart from the data in them, and two weeks'
+         reports side by side could not be told apart. `exportPDF`'s own source states the rule:
+         the same document, twice, must not mean different things. */
+      if (ev.target.closest('#dv-export')) {
+        App.exportPDF({ title: 'Labor Report - Day', root: this.container,
+          range: App.dateRangeLabel(this.date, this.date) });
+        return;
+      }
       if (ev.target.closest('#dv-prev')) { this.date = this.addDays(this.date, -1); this.renderReport(); return; }
       if (ev.target.closest('#dv-next')) { this.date = this.addDays(this.date, 1); this.renderReport(); return; }
       if (ev.target.closest('#dv-today')) { this.date = App.todayLocal(); this.renderReport(); return; }
       if (ev.target.closest('#dv-log-missing')) { this.logMissing(this.date, false); return; }
       const dvEdit = ev.target.closest('.dv-edit'); if (dvEdit) { this.openDayEdit(dvEdit.dataset.id); return; }
       // Week lens
-      if (ev.target.closest('#ws-export')) { App.exportPDF({ title: 'Labor Report - Week', root: this.container }); return; }
+      if (ev.target.closest('#ws-export')) {
+        App.exportPDF({ title: 'Labor Report - Week', root: this.container,
+          range: App.dateRangeLabel(this.weekStart, App.periodEndFor(this.weekStart)) });
+        return;
+      }
       if (ev.target.closest('#ws-prev')) { this.weekStart = this.addDays(this.weekStart, -7); this.renderReport(); return; }
       if (ev.target.closest('#ws-next')) { const nw = this.addDays(this.weekStart, 7); if (nw > this.mondayOf(new Date())) return; this.weekStart = nw; this.renderReport(); return; }
       if (ev.target.closest('#ws-now')) { this.weekStart = this.mondayOf(new Date()); this.renderReport(); return; }
       if (ev.target.closest('#ws-log-missing')) { this.logMissing(this.weekStart, true); return; }
       const wsEdit = ev.target.closest('.ws-edit'); if (wsEdit) { this.openWeekEdit(wsEdit.dataset.key); return; }
       // Range lens
-      if (ev.target.closest('#lr-export')) { App.exportPDF({ title: 'Labor Report - Range', root: this.container }); return; }
+      if (ev.target.closest('#lr-export')) {
+        const lrw = this.rangeWindow();   // the same window inRange() filters the rows by
+        App.exportPDF({ title: 'Labor Report - Range', root: this.container,
+          range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, lrw.from, lrw.to) });
+        return;
+      }
       const lrChip = ev.target.closest('.lr-range-chip');
       if (lrChip) {
         const v = lrChip.dataset.v;

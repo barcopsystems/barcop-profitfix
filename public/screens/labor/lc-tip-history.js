@@ -135,7 +135,15 @@ S.LaborTipHistory = {
       + '</div>';
 
     this.container.onclick = ev => {
-      if (ev.target.closest('#th-export')) { App.exportPDF({ title: 'Tip History', root: this.container }); return; }
+      if (ev.target.closest('#th-export')) {
+        // Range chips + custom From/To are all inside `no-print` rows, so a tip history handed
+        // to a bookkeeper could not say which weeks it covered. (The Tip Pool export below is a
+        // single pool's detail: the record is its identity, so it needs no range.)
+        const r = this.effectiveRange();
+        App.exportPDF({ title: 'Tip History', root: this.container,
+          range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) });
+        return;
+      }
       const pview = ev.target.closest('.th-pview');
       if (pview) { this.openPoolView(pview.dataset.id); return; }
       const tab = ev.target.closest('.ch-tab');
