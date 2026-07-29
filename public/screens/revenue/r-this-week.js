@@ -318,7 +318,7 @@ S.RevenueThisWeek = {
     }));
     document.getElementById('rw-from')?.addEventListener('change', e => { this.filterFrom = e.target.value; this.draw(); });
     document.getElementById('rw-to')?.addEventListener('change', e => { this.filterTo = e.target.value; this.draw(); });
-    document.getElementById('rw-export')?.addEventListener('click', () => { const r = this.effectiveRange ? this.effectiveRange() : {}; App.exportListPDF({ title: 'Weekly History', fileTag: 'WeeklyHistory_Revenue', rootId: 'rw-hist-export', root: this.container, lists: [['core', 'revenue_weeks_hist']], reRender: () => this.draw(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); });
+    document.getElementById('rw-export')?.addEventListener('click', () => { const r = this.effectiveRange ? this.effectiveRange() : {}; App.exportListPDF({ title: 'Weekly History', fileTag: 'Weekly History - Revenue', rootId: 'rw-hist-export', root: this.container, lists: [['core', 'revenue_weeks_hist']], reRender: () => this.draw(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); });
     this.container.querySelectorAll('.rw-edit').forEach(b => b.addEventListener('click', () => this.editWeek(b.dataset.id)));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
   },

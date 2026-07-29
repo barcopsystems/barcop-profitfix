@@ -376,7 +376,7 @@ S.RevenueAudit = {
     b.disclaimer(App.deliverableFooter().disclaimerLines.join(' '));
 
     const stamp = /^\d{4}-\d{2}-\d{2}/.test(audit.date || '') ? audit.date.slice(0, 10).replace(/-/g, '') : App._pdfDateStamp();
-    await b.save('BarCop_RevenueAudit_' + stamp + '.pdf');
+    await b.save(App.pdfFileName('Revenue Audit', stamp));
   },
 
 
