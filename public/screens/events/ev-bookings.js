@@ -161,8 +161,14 @@ S.EventsBookings = {
     const nn = v => Math.max(0, parseFloat(v) || 0);
     const ph = nn(b.per_head);
     /* ⚠⚠ BILL THE GUARANTEED COUNT — THE SIGNED AGREEMENT ALREADY PROMISES IT AND THE APP NEVER DID.
-       agreementTerms reads "A final guaranteed count is due several days before the event. You are
-       billed for the guaranteed count or the actual count, whichever is higher." `guaranteed_count`
+       the DEFAULT agreement template reads "A final guaranteed count is due several days before the
+       event. You are billed for the guaranteed count or the actual count, whichever is higher."
+       ⚠ That is the TEMPLATE, not necessarily this operator's terms — `agreementTerms()` returns
+       whatever they have saved, and they are invited to rewrite it. Billing on the guarantee is
+       still right whatever their terms say, because the operator TYPED that count themselves and
+       both the on-screen breakdown and the signed agreement NAME the count they were billed on, so
+       nothing is asserted behind anyone's back. The template is why the behaviour exists; it is not
+       a claim about any particular bar's contract. `guaranteed_count`
        is collected on the Run Sheet and was then used ONLY for display — never by the quote math,
        which read the ESTIMATE (`party_size`) forever. Measured: an estimate of 60 with a final
        guarantee of 75 at $85/head left the quoted total, the Balance Due tile, the re-printed
@@ -1421,9 +1427,20 @@ S.EventsBookings = {
     const money = held > 0
       ? this.divider() + this.subLabel('The Deposit You Are Holding')
         + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
+        /* ⛔ DO NOT TELL THE OPERATOR WHAT THEIR OWN CONTRACT SAYS. The first version of this read
+           "Your agreement says the deposit is non-refundable" — true of the DEFAULT template and
+           nothing else. `agreementTerms()` returns the operator's saved text whenever they have
+           edited it (`App.acctGet('event_agreement_terms')`), and the agreement modal exists
+           precisely so they can rewrite it to their own policy. Strike that clause and Bar Cop was
+           asserting the content of their contract, wrongly, at the moment they decide whether to
+           hand back real money — a legal-adjacent claim on a money decision ([[legal-protection]]).
+           ⚠ And it cannot be fixed by READING the terms: they are free text, so "refundable up to
+           30 days out" and "non-refundable" both contain the word, and a substring test would be
+           wrong in both directions ([[the-loop]] #30 — do not infer a fact the data does not carry).
+           Bar Cop states its own limit instead, which is true whatever their terms say. */
         + 'You have <b style="color:var(--t1);">' + App.fmtCurrency(held) + '</b> of theirs. '
-        + 'Your agreement says the deposit is non-refundable, but the call is yours. '
-        + 'Bar Cop only counts money leaving if you say it is.</div>'
+        + 'Check your own event agreement for what you owe back — Bar Cop does not read your terms. '
+        + 'It only counts money leaving if you say it does.</div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary btn-sm" id="eb-lost-kept">Keeping it</button>'
         + '<button class="btn btn-ghost btn-sm" id="eb-lost-refunded">Already refunded</button>'
