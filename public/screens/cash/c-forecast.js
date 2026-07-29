@@ -337,8 +337,13 @@ S.CashForecast = {
       + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Since</th><th>Event</th><th>Deposit to Refund</th></tr></thead><tbody>' + rows + '</tbody></table>'
       + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:10px;">'
-      + 'Bookings you marked Lost where you said the deposit still goes back. This is counted as money '
-      + 'leaving in the Out column above. Mark the refund paid on the booking once it has gone.</div></div>';
+      /* ⚠ THE COPY HAS TO COVER BOTH KINDS. This card was written for cancelled bookings only, and
+         S246 added live bookings whose banked deposit is bigger than the quote — so a footnote
+         saying "bookings you marked Lost" would have been describing a row it was sitting under. */
+      + 'Money you owe back: bookings you marked Lost where you said the deposit still goes back, and '
+      + 'live bookings where the deposit you banked is more than the quote. Counted as money leaving '
+      + 'in the Out column above. It clears when you mark the refund paid, or when you correct the '
+      + 'deposit or the price.</div></div>';
   },
 
   // ── Bills due, next two weeks: who to pay and when ────────────────────────────
