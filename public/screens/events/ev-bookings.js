@@ -807,7 +807,13 @@ S.EventsBookings = {
         + '<span style="width:9px;height:9px;border-radius:50%;background:' + accent + ';' + (live ? 'box-shadow:0 0 8px ' + accent + ';' : '') + '"></span>'
         + '<span style="font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:' + accent + ';">' + esc(stage) + '</span></div>'
         + '<div style="font-size:22px;font-weight:800;color:var(--t1);">' + esc(this.title(b)) + '</div>'
-        + '<div style="font-size:12px;color:var(--t3);margin-top:4px;">' + esc(b.event_type || '') + (b.event_date ? ' &middot; ' + this.fmtDate(b.event_date) : '') + (b.party_size ? ' &middot; ' + b.party_size + ' guests' : '') + (b.contact_name ? ' &middot; ' + esc(b.contact_name) : '') + '</div>'
+        // ⚠ JOINED, NOT CONCATENATED WITH LEADING SEPARATORS. Event Type is optional, so a booking
+        // without one printed "· Sep 2, 2026 · 30 guests" — a separator with nothing before it.
+        // Same for a missing date or party size anywhere in the chain.
+        + '<div style="font-size:12px;color:var(--t3);margin-top:4px;">'
+        + [esc(b.event_type || ''), b.event_date ? this.fmtDate(b.event_date) : '',
+           b.party_size ? b.party_size + ' guests' : '', b.contact_name ? esc(b.contact_name) : '']
+          .filter(Boolean).join(' &middot; ') + '</div>'
         + (readout ? '<div style="font-size:13px;color:' + accent + ';font-weight:600;margin-top:8px;">' + esc(readout) + '</div>' : '')
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
