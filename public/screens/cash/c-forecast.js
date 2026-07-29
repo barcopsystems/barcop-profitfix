@@ -70,6 +70,17 @@ S.CashForecast = {
       + this.scenarioCard(fc, base)
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Your Cash Across the Quarter</div>'
       + '<button class="btn btn-ghost btn-sm no-print" id="cf-export">Export for Lender</button></div>'
+      /* ⚠ DELIBERATELY NOT `no-print`, and the inner line carries `pdf-fine` so it lands in the
+         LENDER PDF as fine print, not only on screen. `_collectPDFBlocks` walks an EXPLICIT
+         selector list (.card-title, .sh, .pdf-para, .pdf-fine, tables, …) and SKIPS anything
+         inside `.no-print` — so a plain styled div contributes NOTHING to the document. My first
+         version of this box was `no-print` with no marker class, which would have put the
+         disclaimer nowhere at all in the file it exists to protect. Same render-vs-query trap as
+         [[the-loop]] integrity #11: the class you render has to be one the collector collects. */
+      + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin:0 0 16px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+        + '<div class="pdf-fine" style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop builds this forecast from what you log and from assumptions about your own averages. It is a software tool, not a CPA, accountant, or lender. This is a worksheet, not an audited financial statement, and a projection rather than a guarantee, so your actual results will vary. Review and verify every figure before you hand it to a bank.</div>'
+      + '</div>'
       + this.forecastCard(fc, opening)
       + this.billsCard()
       + this.eventsCard()
@@ -382,20 +393,14 @@ S.CashForecast = {
     };
   },
 
-  // Export-acknowledgment gate (once per visit) before the lender forecast
-  // download. A 13-week pro-forma handed to a bank is high-stakes, so it routes
-  // through the same gate as Payroll and Books. See [[legal-protection]].
+  // Export the 13-week forecast for a bank. NO acknowledgement popup (2026-07-30) — the Heads
+  // Up box on this screen carries the notice and the PDF footer carries
+  // App.deliverableFooter()'s disclaimer alongside the forecast caveat.
+  // ⚠⚠ THIS WAS THE ONE REAL EXPOSURE when the five popups came out. The lender forecast had
+  //   NO on-screen notice at all and only a thin "results will vary" footer, so the popup was
+  //   its ONLY carrier — on the single document that gets handed to a bank. Both carriers were
+  //   added in the same edit; do not remove either.
   async _exportLender() {
-    if (!this._cfAckGiven) {
-      const ok = await App.confirmExport({
-        title: 'Before You Export for a Lender',
-        message: 'This is a thirteen-week cash flow projection built from the numbers you have logged in Bar Cop. It is a forecast, not a guarantee or an audited financial statement, and your actual results will vary. Look it over before you hand it to a lender.',
-        confirmText: 'I Understand, Continue',
-        cancelText: 'Cancel'
-      });
-      if (!ok) return;
-      this._cfAckGiven = true;
-    }
     // A lender PDF must show the BASE forecast, never an active what-if (the slow-season
     // slider or a "Can I afford it" outflow). Those are exploratory and no-print on screen,
     // so exporting the live container as-is would hand the bank stressed numbers dressed as
@@ -403,7 +408,15 @@ S.CashForecast = {
     const sv = { adj: this._salesAdj, amt: this._scAmt, rec: this._scRecurring };
     const stressed = this._salesAdj || this._scAmt;
     if (stressed) { this._salesAdj = 0; this._scAmt = 0; this._scRecurring = false; this.draw(); }
-    await App.exportPDF({ title: '13-Week Cash Flow Forecast', root: this.container, brand: (App.data && App.data.settings && App.data.settings.bar_name) || '', footer: 'Projected figures based on historical sales and known commitments. Actual results will vary.' });
+    /* ⚠⚠ THE FOOTER MUST STAY ON ONE LINE. App.exportPDF draws it with a SINGLE unwrapped
+       doc.text at a fixed baseline, and the "Page N of M" label is right-aligned on that SAME
+       baseline — so a long footer runs off the page edge AND collides with the page number.
+       Measured budget at 7pt helvetica: ~134 characters. My first version appended
+       deliverableFooter().workbookSubject here and came to 427 (3.2x), which would have printed
+       the disclaimer mostly off the page — worse than the thin line it replaced. The full
+       disclaimer belongs in the BODY, where it wraps: that is the `pdf-fine` box in draw().
+       Pinned by verify-export-notice-carried.js, both the length and the body carrier. */
+    await App.exportPDF({ title: '13-Week Cash Flow Forecast', root: this.container, brand: (App.data && App.data.settings && App.data.settings.bar_name) || '', footer: 'A forecast, not a guarantee or an audited financial statement. Actual results will vary.' });
     if (stressed) { this._salesAdj = sv.adj; this._scAmt = sv.amt; this._scRecurring = sv.rec; this.draw(); }
   }
 };
