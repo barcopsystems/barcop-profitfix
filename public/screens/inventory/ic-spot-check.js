@@ -101,10 +101,20 @@ S.InventorySpotCheck = {
       const lid = line.dataset.lid;
       const added = parseFloat(line.querySelector('.sp-added')?.value);
       const soldRaw = line.querySelector('.sp-sold')?.value;
+      /* ⚠ `pre_entered` / `post_entered` EXIST BECAUSE A COUNT OF ZERO IS A REAL MEASUREMENT.
+         `spReadRaw` runs `parseFloat(...) || 0`, and BottleSlider reports an untouched slider as
+         {fulls:0,value:0}, so a bottle that genuinely came back EMPTY is indistinguishable from
+         one nobody counted. Inferring "did they do the post-shift count" from the numbers would
+         therefore refuse to finish a check on an emptied bottle -- the exact shape of bug this
+         screen already fights elsewhere. So the fact is RECORDED when the operator touches the
+         control (onLineChange), never guessed from the value. */
+      const t = (this._touched && this._touched[lid]) || {};
       return {
         product_id: p.id,
         pre:  this.spReadRaw('sp-pre-'  + lid, p),
         post: this.spReadRaw('sp-post-' + lid, p),
+        pre_entered:  !!t.pre,
+        post_entered: !!t.post,
         added: isNaN(added) ? 0 : added,
         sold:  (soldRaw == null || soldRaw === '') ? null : (parseFloat(soldRaw) || 0)
       };
@@ -117,6 +127,9 @@ S.InventorySpotCheck = {
       lines
     };
   },
+  // Clear the per-render touched map. renderMain repopulates it as it mints each line's _lid.
+  _restoreTouched() { this._touched = {}; },
+
   syncDraft() {
     const state = this.collectState();
     if (!state.lines.length && !state.location) { this.clearDraft(); return; }
@@ -196,6 +209,7 @@ S.InventorySpotCheck = {
     this.actions = actions;
     actions.innerHTML = '';
     this.draft = this.loadDraft();
+    this._restoreTouched();
     this.posMode = 'manual';
     this.renderMain();
     const pend = App._pendingInvestigation;
@@ -290,6 +304,21 @@ S.InventorySpotCheck = {
     const shiftOpts = (App.SHIFT_TYPES || ['Brunch','Lunch','Dinner','Late Night','Full Day'])
       .map(t => '<option' + (t === defaultShift ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
 
+    /* Checks saved for later, from ANY device. This is the half Kyle could not get to: the
+       localStorage draft below only ever existed on the tablet it was started on, so a pre-shift
+       count taken at the bar was invisible from the office. These are server records. */
+    const inProg = this.checks().filter(c => c && c.status === 'in_progress' && c.id !== this._openId)
+      .sort(App.cmpNewest);
+    const inProgBar = inProg.length
+      ? '<div class="alert-bar" style="margin-bottom:16px;display:block;">'
+        + inProg.map(c => '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:4px 0;">'
+          + '<div class="alert-text">' + esc(c.location || 'Spot check') + (c.shift ? ' &middot; ' + esc(c.shift) : '')
+            + ' &middot; started ' + this.ago(c.created_at) + '. Add the post-shift counts and POS sold to finish it.</div>'
+          + '<button class="btn btn-ghost btn-sm sp-open" data-id="' + esc(c.id) + '">Finish This Check</button>'
+        + '</div>').join('')
+        + '</div>'
+      : '';
+
     const resumeBar = resuming
       ? '<div class="alert-bar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
         + '<div class="alert-text">A spot check started ' + this.ago(this.draft.started_at) + ' is in progress. Add the post-shift counts and POS sold to finish it.</div>'
@@ -326,6 +355,12 @@ S.InventorySpotCheck = {
       if (!p) return '';
       const lid = ++this._seq;
       ld._lid = lid;
+      /* ⚠ RESTORE THE TOUCHED FLAGS HERE, where `_lid` is minted. `_lid` is a fresh per-render
+         sequence, so restoring them earlier (in render(), off the stored draft) keyed them to
+         numbers this pass never uses, and a resumed check would forget its pre counts and could
+         never be finished -- Kyle's original complaint arriving by a different road. */
+      if (!this._touched) this._touched = {};
+      this._touched[lid] = { pre: !!ld.pre_entered, post: !!ld.post_entered };
       return this.lineHTML(lid, p, ld);
     }).join('');
 
@@ -348,11 +383,17 @@ S.InventorySpotCheck = {
     const historyRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Take Spot Check</div>'
       + '<button class="btn btn-ghost btn-sm" id="sp-history">View History</button></div>';
-    this.container.innerHTML = '<div class="screen">' + resumeBar + statsCard + historyRow + setup + posCard
+    this.container.innerHTML = '<div class="screen">' + inProgBar + resumeBar + statsCard + historyRow + setup + posCard
       + '<div class="sh" id="sp-products-title" style="margin:24px 0 10px;display:none;">Products to spot check</div>'
       + '<div id="sp-lines">' + lineHtmls + '</div>'
-      + '<div style="margin-top:18px;">'
-        + '<button class="btn btn-primary" id="sp-save">Save Spot Check</button>'
+      /* TWO STAGES, TWO BUTTONS. "Save for Later" is the one an operator wants after the
+         pre-shift count, and it is offered rather than hidden behind a localStorage draft they
+         had no way to know about. "Finish Spot Check" says what it does: it is the door into
+         history, and it refuses to open on a half-counted check. */
+      + '<div style="margin-top:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary" id="sp-save">Finish Spot Check</button>'
+        + '<button class="btn btn-ghost" id="sp-save-later">Save for Later</button>'
+        + '<span id="sp-save-msg" style="display:none;color:var(--red);font-size:12px;margin-left:4px;"></span>'
       + '</div></div>';
     App.applyCollapsed(this.container);
     this.updateProductsTitle();
@@ -363,8 +404,8 @@ S.InventorySpotCheck = {
     (dft.lines || []).forEach(ld => {
       const p = this.productById(ld.product_id);
       if (!p || ld._lid == null) return;
-      this.spMount('sp-pre-'  + ld._lid, p, () => this.onLineChange(ld._lid));
-      this.spMount('sp-post-' + ld._lid, p, () => this.onLineChange(ld._lid));
+      this.spMount('sp-pre-'  + ld._lid, p, () => this.onLineChange(ld._lid, 'pre'));
+      this.spMount('sp-post-' + ld._lid, p, () => this.onLineChange(ld._lid, 'post'));
     });
     this.container.querySelectorAll('.sp-line').forEach(line => this.recalcLine(line));
     this.recalcTotal();
@@ -407,7 +448,10 @@ S.InventorySpotCheck = {
       this.recalcTotal();
     });
     document.getElementById('sp-flagpct')?.addEventListener('change', () => this.saveFlagPct());
-    document.getElementById('sp-save')?.addEventListener('click', () => this.save());
+    document.getElementById('sp-save')?.addEventListener('click', () => this.save(true));
+    document.getElementById('sp-save-later')?.addEventListener('click', () => this.save(false));
+    this.container.querySelectorAll('.sp-open').forEach(b =>
+      b.addEventListener('click', () => this.openInProgress(b.dataset.id)));
 
     this.container.onclick = ev => {
       const collHead = ev.target.closest('.card-collapse-head');
@@ -445,7 +489,9 @@ S.InventorySpotCheck = {
   renderHistory() {
     this.actions.innerHTML = '';
     this._onHistory = true;
-    const all = [...this.checks()].sort(App.cmpNewest);
+    // History is FINISHED checks only. An in-progress one has measured nothing yet and belongs on
+    // the entry screen where it can be picked back up, not in the record (S249).
+    const all = [...App.completedSpotChecks()].sort(App.cmpNewest);
     const flagged = all.reduce((s, c) => s + (c.flagged_count || 0), 0);
     const totalVar = all.reduce((s, c) => s + (c.total_variance_dollar || 0), 0);
     const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
@@ -525,8 +571,8 @@ S.InventorySpotCheck = {
     const lid = ++this._seq;
     lines.insertAdjacentHTML('beforeend', this.lineHTML(lid, p));
     const newLine = lines.querySelector('.sp-line[data-lid="' + lid + '"]');
-    this.spMount('sp-pre-'  + lid, p, () => this.onLineChange(lid));
-    this.spMount('sp-post-' + lid, p, () => this.onLineChange(lid));
+    this.spMount('sp-pre-'  + lid, p, () => this.onLineChange(lid, 'pre'));
+    this.spMount('sp-post-' + lid, p, () => this.onLineChange(lid, 'post'));
     this.recalcLine(newLine);
     this.recalcTotal();
     this.syncDraft();
@@ -568,11 +614,44 @@ S.InventorySpotCheck = {
       try { localStorage.removeItem('barcop_collapse_sp-setup'); } catch (e) {}
     }
   },
-  onLineChange(lid) {
+  /* `stage` is 'pre' | 'post' | undefined (the added/sold boxes). Recording WHICH stage the
+     operator touched is what lets the check know it has actually been counted at both ends --
+     see the note in collectState on why the numbers cannot answer that. */
+  onLineChange(lid, stage) {
+    if (stage) {
+      if (!this._touched) this._touched = {};
+      if (!this._touched[lid]) this._touched[lid] = {};
+      this._touched[lid][stage] = true;
+    }
     const line = this.container.querySelector('.sp-line[data-lid="' + lid + '"]');
     if (line) this.recalcLine(line);
     this.recalcTotal();
     this.syncDraft();
+  },
+
+  /* ── S249: WHAT MAKES A LINE, AND A CHECK, FINISHABLE ──────────────────────────────────
+     Kyle's rule, verbatim: "it shouldn't even be able to go into view history without a pre and
+     post count and without a pos number entered or imported."
+     A line is COMPLETE when both counts were entered and the register number is in. A line with
+     NOTHING on it is not half-done -- it is a product that was on the check and never counted,
+     which the screen already records honestly as not_counted. Only a line the operator STARTED
+     and did not finish blocks finalising. */
+  _lineComplete(ld) {
+    if (!ld) return false;
+    return !!ld.pre_entered && !!ld.post_entered && ld.sold != null;
+  },
+  _lineStarted(ld) {
+    if (!ld) return false;
+    return !!ld.pre_entered || !!ld.post_entered || ld.sold != null || !!ld.added;
+  },
+  // A check can be finished when at least one line is complete and no started line is half-done.
+  _checkComplete(lines) {
+    const started = (lines || []).filter(l => this._lineStarted(l));
+    if (!started.length) return false;
+    return started.every(l => this._lineComplete(l));
+  },
+  _incompleteLines(lines) {
+    return (lines || []).filter(l => this._lineStarted(l) && !this._lineComplete(l));
   },
 
   // ── POS import (fills the per-line POS sold from this register's report) ────
@@ -765,7 +844,13 @@ S.InventorySpotCheck = {
     }
   },
 
-  async save() {
+  /* ── S249: ONE SAVE PATH, TWO STAGES ───────────────────────────────────────────────────
+     A spot check is a two-sitting job: pre-shift counts before service, post-shift counts and the
+     POS numbers after. `finalize` false stores it as in_progress on the SERVER (so the second
+     sitting can happen on any device, not just the tablet that holds the localStorage draft);
+     `finalize` true is refused unless the check is actually finished. Deliberately one function,
+     because two copies of the record-building would drift the moment a field is added. */
+  async save(finalize) {
     if (!App.canEdit('ic-spot-check')) return;
     // A missing required field turns its cell border red, like the Add Product form.
     this.clearMissing();
@@ -818,8 +903,24 @@ S.InventorySpotCheck = {
     });
     if (!valid) { lines.forEach(l => l.classList.add('sp-missing')); return; }
 
+    /* ⛔ THE GATE. Finalising is refused while any STARTED line is half-done, which is the whole
+       of S249: a pre-only check used to save straight into history, unfixable, and land in the
+       audits either as a false all-clear ($0 variance because POS was null) or as a false
+       overpour (the entire pre-shift stock booked as poured against post 0). The operator is
+       pointed at Save for Later instead, which is the thing they actually wanted. */
+    const state = this.collectState();
+    if (finalize && !this._checkComplete(state.lines)) {
+      const short = this._incompleteLines(state.lines).length;
+      this._saveMsg(short
+        ? short + (short === 1 ? ' product still needs' : ' products still need')
+          + ' its post-shift count and POS sold. Use Save for Later and finish it after the shift.'
+        : 'Enter a pre count, a post count and the POS sold on at least one product before you finish this check.');
+      lines.forEach(l => { if (l.dataset.started === '1' && l.dataset.done !== '1') l.classList.add('sp-missing'); });
+      return;
+    }
+
     const rec = {
-      id:           App.uid(),
+      id:           this._openId || App.uid(),
       date,
       location,
       shift:        document.getElementById('sp-shift')?.value || '',
@@ -830,18 +931,45 @@ S.InventorySpotCheck = {
       product_count:  items.length,
       flagged_count:  items.filter(i => i.flagged).length,
       total_variance_dollar: items.reduce((t, i) => t + (i.variance_dollar || 0), 0),
-      created_at:   new Date().toISOString()
+      status:       finalize ? 'complete' : 'in_progress',
+      /* An in-progress record carries the RAW entry state as well as the computed items, because
+         reopening has to redraw the sliders exactly as they were left. Dropped on finalise so a
+         finished check stays the clean record every consumer reads. */
+      draft_state:  finalize ? null : state,
+      created_at:   (this._openCreatedAt || new Date().toISOString())
     };
 
-    const btn = document.getElementById('sp-save');
+    const btn = document.getElementById(finalize ? 'sp-save' : 'sp-save-later');
+    const label = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('ic', 'spot_check', rec);
     if (ok) {
       this.clearDraft();
+      this._openId = null; this._openCreatedAt = null; this._touched = {};
       this.renderMain();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Try Again'; }
+      if (btn) { btn.disabled = false; btn.textContent = label || 'Try Again'; }
     }
+  },
+
+  // A save refusal needs somewhere to speak. Never an alert: the operator is mid-count.
+  _saveMsg(msg) {
+    const el = document.getElementById('sp-save-msg');
+    if (el) { el.textContent = msg; el.style.display = msg ? 'inline' : 'none'; }
+  },
+
+  /* Reopen an in-progress check: load its stored entry state back into the draft and redraw.
+     `_openId` makes the next save UPDATE that record rather than mint a second one, and
+     `_openCreatedAt` keeps the original start time so the list still sorts by when it began. */
+  openInProgress(id) {
+    const c = this.checks().find(x => x.id === id);
+    if (!c || !c.draft_state) return;
+    this._openId = c.id;
+    this._openCreatedAt = c.created_at;
+    this.draft = { ...c.draft_state, started_at: c.created_at };
+    this.saveDraft();
+    this._touched = {};
+    this.renderMain();
   },
 
   renderDetail(id) {

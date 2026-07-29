@@ -33,7 +33,7 @@ S.InventoryDashboard = {
   deliveries()   { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
   products()     { return ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false); },
   adjustments()  { return ((App.inventoryData && App.inventoryData.ic_adjustments) || []); },
-  spotChecks()   { return ((App.inventoryData && App.inventoryData.ic_spot_checks) || []); },
+  spotChecks()   { return App.completedSpotChecks(); },
   locations()    { return ((App.inventoryData && App.inventoryData.ic_locations) || []); },
   vendors()      { return ((App.inventoryData && App.inventoryData.ic_vendors) || []); },
   productById(id){ return ((App.inventoryData && App.inventoryData.ic_products) || []).find(p => p.id === id); },
