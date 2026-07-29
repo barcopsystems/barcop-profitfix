@@ -5047,7 +5047,36 @@ const App = {
   // (e.g. the "->" arrow, the trend triangles) corrupts the WHOLE string into
   // garbage ("&M&a&y&..."), so map the glyphs the app actually uses to ASCII and
   // drop anything else still outside Latin-1.
+  /* Every string in every one of the 40 PDF exports passes through here, because exportPDF
+     walks the rendered DOM and sanitises each node's text. jsPDF's built-in helvetica can only
+     draw Latin-1, so anything outside it has to be dealt with somehow.
+
+     THE LAST STEP USED TO BE A BLANKET DELETE of everything outside Latin-1. Measured on real
+     staff names: "Lukasz Nowak" (L-with-stroke) printed as "ukasz Nowak", "Dorde" as "ore",
+     "Sahin Yilmaz" as "ahin Ylmaz", "Nguyen Van An" as "Nguyn Vn An", and a name written in
+     Chinese or Cyrillic came out EMPTY. Pay Period, Labor Reports and the Server Check
+     scorecard all render staff names and all three export through here, so the worst case was
+     a payroll-adjacent worksheet handed to a bookkeeper with hours and dollars on a row that
+     carried no name at all. A rule about which characters count is a rule about whose name
+     counts, and deleting silently is the one option that looks complete and is not.
+
+     KEEP THE LETTER WHEREVER A LETTER CAN BE KEPT. A Latin letter carrying a diacritic that
+     Latin-1 lacks decomposes (NFD) to a base letter Latin-1 has; the handful of Latin letters
+     that do NOT decompose get the explicit map below. Latin-1 itself is deliberately left
+     alone: Jose keeps its accent, because that already renders.
+
+     The map stays INSIDE this function. As a sibling property it would be invisible to every
+     method slicer in the harness suite, and verify-pdf-table-layout.js lifts this function by
+     name ([[the-loop]] #16).
+     KNOWN LIMIT: a name in a NON-LATIN script (Chinese, Cyrillic, Arabic, Hebrew, Greek, Thai)
+     has no Latin letters to fall back to, so it is still dropped. Transliterating it would be
+     inventing a name; embedding a Unicode font is the real answer and that is a bundle-size
+     call. Pinned as a STATED limitation in verify-pdf-name-safe.js, not an oversight. */
   _pdfSafe(s) {
+    const XLIT = { 'Ł': 'L', 'ł': 'l', 'Đ': 'D', 'đ': 'd', 'Ð': 'D',
+      'ı': 'i', 'ẞ': 'SS', 'Ħ': 'H', 'ħ': 'h', 'Ŋ': 'N', 'ŋ': 'n',
+      'Ŧ': 'T', 'ŧ': 't', 'Ə': 'E', 'ə': 'e', 'Œ': 'OE', 'œ': 'oe',
+      'ƒ': 'f', 'Ɖ': 'D', 'Ǥ': 'G', 'ǥ': 'g', 'Ɨ': 'I', 'ɨ': 'i' };
     return String(s == null ? '' : s)
       .replace(/→/g, '->').replace(/←/g, '<-')
       .replace(/↑/g, 'up').replace(/↓/g, 'down')
@@ -5056,7 +5085,11 @@ const App = {
       .replace(/[‘’′]/g, "'").replace(/[“”]/g, '"')
       .replace(/•/g, '-').replace(/ /g, ' ').replace(/…/g, '...')
       .replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/×/g, 'x')
-      .replace(/[^\x00-\xFF]/g, '');
+      .replace(/[^\x00-\xFF]/gu, ch => {
+        if (XLIT[ch]) return XLIT[ch];
+        const base = ch.normalize('NFD').replace(/[\u0300-\u036F]/g, '');   // drop the combining marks, keep the base letter
+        return /^[\x00-\xFF]*$/.test(base) ? base : '';
+      });
   },
 
   // Clean text of a node for the PDF: strip buttons, tooltips, and no-print chrome.
