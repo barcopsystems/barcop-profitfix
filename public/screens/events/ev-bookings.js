@@ -770,9 +770,16 @@ S.EventsBookings = {
       if (held > 0) {
         const o = b.deposit_outcome;
         const lbl = o === 'kept' ? 'Kept' : o === 'refunded' ? 'Refunded' : o === 'to_refund' ? 'To refund' : 'Undecided';
+        /* ⚠ THE SUBTITLE HAS TO SURVIVE A PARTIAL REFUND. "money still to leave" was written when the
+           whole deposit always went back; with S247 the tile read "Deposit Held $4,000.00 · money
+           still to leave" directly above a card saying only $1,500.00 goes back and $2,500.00 is
+           kept. The HELD figure is right — that is what the tile is for — but the sentence under it
+           was describing a different number ([[the-loop]] #54, one screen this time). */
+        const back = this._refundOwedOnLost(b);
         const sub = o === 'kept' ? 'stayed in your account'
           : o === 'refunded' ? (b.deposit_refund_date ? 'paid back ' + this.fmtDate(b.deposit_refund_date) : 'paid back')
-          : o === 'to_refund' ? 'money still to leave' : 'say what happened to it';
+          : o === 'to_refund' ? (back < held ? App.fmtCurrency(back) + ' of it goes back' : 'money still to leave')
+          : 'say what happened to it';
         t.push(this.statTile('Deposit Held', App.fmtCurrency(held), sub, o === 'kept' ? 'good' : o ? 'warn' : 'bad'));
         t.push(this.statTile('Outcome', lbl, o ? '&nbsp;' : 'nothing recorded', o ? '' : 'bad'));
       }
