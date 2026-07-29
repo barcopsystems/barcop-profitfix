@@ -3704,6 +3704,29 @@ const App = {
     render();
   },
 
+  /* ⭐ AN IN-PROGRESS SPOT CHECK IS NOT A SPOT CHECK YET. Every consumer reads through here.
+
+     A spot check is a TWO-SITTING job: pre-shift counts before service, post-shift counts and the
+     POS numbers after. Until the second sitting happens the check has measured nothing, and a
+     half-finished one must not reach a score. Two ways it used to land, both wrong and in opposite
+     directions: with no POS the variance is null, so it read as a COMPLETED check at $0 -- a clean
+     bill of health from a check that measured nothing, which also inflated the spot-check
+     discipline count; with POS but no post count it booked the entire pre-shift stock as poured,
+     a huge false overpour into the audit's shrink figure.
+
+     ⚠ THIS IS A HELPER BECAUSE SIX FILES ASKED THE SAME QUESTION SEPARATELY -- audit-tracker,
+     hub-bar-cop-audit (twice), hub-week-review, ic-dashboard and profit-fix all read
+     `ic_spot_checks` raw. Filtering inside the spot-check SCREEN would have fixed none of them
+     ([[the-loop]] step 0.6: the second consumer is in another file; where there are six of one
+     decision there is one helper).
+     ⚠ ABSENT STATUS MEANS COMPLETE, and that is load-bearing: every check already saved and every
+     seeded one predates the field. Testing `=== 'complete'` would erase real history on upgrade.
+     ⚠ `this.`, not `App.`, so it stays liftable into the harness suite ([[the-loop]] #46). */
+  completedSpotChecks() {
+    const all = (this.inventoryData && this.inventoryData.ic_spot_checks) || [];
+    return all.filter(c => c && c.status !== 'in_progress');
+  },
+
   // Display unit for a product's Par / Order Qty / On-Hand columns. Bottle beer
   // pars/orders in cases, draft in kegs, liquor/wine in bottles; Food/Misc use
   // the product's unit_type (lb, each, case, qt…). Keeps every category's
