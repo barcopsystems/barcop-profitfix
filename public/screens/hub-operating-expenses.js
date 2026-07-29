@@ -928,7 +928,7 @@ S.HubOperatingExpenses = {
       // This card and the filtered History below both saved as BarCop_OperatingExpenses_<today>.pdf.
       // This one is a single month, so say which month; History keeps the plain name.
       if (el) App.exportPDF({ title: 'Operating Expenses', root: el,
-        fileTag: 'OperatingExpenses_' + this._currentMonthKey() });
+        fileTag: 'Operating Expenses ' + this._currentMonthKey() });
     });
     this._wireRows(this.container);
     if (this._entryMode === 'import') this._mountImporter();

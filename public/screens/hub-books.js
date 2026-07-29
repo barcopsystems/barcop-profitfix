@@ -343,7 +343,7 @@ S.HubBooks = {
     b.disclaimer(App.deliverableFooter().workbookSubject);
 
     const period = String(monthKey).replace('-', '') || App._pdfDateStamp();
-    await b.save('BarCop_MonthEndBooks_Worksheet_' + period + '.pdf');
+    await b.save(App.pdfFileName('Month-End Books Worksheet', period));
   },
 
   // Helper for the PDF summary: format a "(% vs prior month)" label.

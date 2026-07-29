@@ -529,7 +529,7 @@ S.ThisWeek = {
          `BarCop_<fileTag || subtitle || title>_<date>.pdf` — so two documents from two different
          sections, with different numbers, saved under one name. Both now carry a fileTag. */
       App.exportListPDF({
-        title: 'Weekly History', fileTag: 'WeeklyHistory_Profit',
+        title: 'Weekly History', fileTag: 'Weekly History - Profit',
         root: this.container, lists: [['core', 'week']],
         reRender: () => this.draw(),
         range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to)

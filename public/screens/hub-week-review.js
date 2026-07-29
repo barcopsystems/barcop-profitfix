@@ -827,7 +827,7 @@ S.WeekReview = {
       b.paragraph('What it turned up: ' + s.results, { gray: 70 });
       b.paragraph('Carrying over: ' + s.open, { gray: 70 });
     });
-    await b.save('Week in Review');
+    await b.save(App.pdfFileName('Week in Review'));
   },
 
   showHowTo() {

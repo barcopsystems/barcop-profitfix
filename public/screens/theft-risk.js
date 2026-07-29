@@ -546,7 +546,7 @@ S.TheftRisk = {
       + 'Bar Cop is a software tool, not a forensic auditor, attorney, or insurance adjuster. '
       + 'Use this brief as a reference point for your own review; consult the relevant professional before acting on any conclusion.');
 
-    await b.save('BarCop_TheftLossBrief_' + App._pdfDateStamp() + '.pdf');
+    await b.save(App.pdfFileName('Theft and Loss Brief'));
   },
 
   showHowTo() {

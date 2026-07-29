@@ -1242,6 +1242,6 @@ S.HubBarCopAudit = {
         ds = '' + dt.getFullYear() + p(dt.getMonth() + 1) + p(dt.getDate());
       }
     }
-    await b.save('BarCop_BarCopAudit_' + ds + '.pdf');
+    await b.save(App.pdfFileName('Bar Cop Audit', ds));
   }
 };

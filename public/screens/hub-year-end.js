@@ -1252,6 +1252,6 @@ S.HubYearEnd = {
 
     b.disclaimer(App.deliverableFooter().workbookSubject);
 
-    await b.save('BarCop_YearEnd_Worksheet_' + year + '.pdf');
+    await b.save(App.pdfFileName('Annual Review Worksheet', year));
   }
 };

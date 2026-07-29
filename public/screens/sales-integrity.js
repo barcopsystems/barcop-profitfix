@@ -1956,7 +1956,7 @@ S.SalesIntegrity = {
       + 'free pours, walking out bottles) does not show in a sales report at all, so this review does not cover it. '
       + 'Bar Cop is a software tool, not an investigator, auditor, or attorney. Confirm with your own review before '
       + 'acting on any employee.');
-    await b.save('BarCop_SalesIntegrity_' + App._pdfDateStamp() + '.pdf');
+    await b.save(App.pdfFileName('Sales Integrity Review'));
   },
 
   showHowTo() {

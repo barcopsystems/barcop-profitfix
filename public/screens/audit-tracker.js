@@ -345,7 +345,7 @@ S.AuditTracker = {
         ds = '' + dt.getFullYear() + p(dt.getMonth() + 1) + p(dt.getDate());
       }
     }
-    await b.save('BarCop_ProfitAudit_' + ds + '.pdf');
+    await b.save(App.pdfFileName('Profit Audit', ds));
   },
 
   // renderNarrative() removed 2026-05-28 with the single-page audit refactor.
