@@ -50,7 +50,6 @@ S.CashFix = {
   gaps() { return (window.FIX && Array.isArray(FIX.cash)) ? FIX.cash : []; },
   gap(id) { return this.gaps().find(g => g.id === id) || null; },
   steps(g) { return (g && g.process && g.process.steps) || []; },
-  docPath(file) { return 'assets/resources/' + encodeURIComponent(file); },
 
   // ── Verification ────────────────────────────────────────────────────────────
   lastActivity(signal) {
