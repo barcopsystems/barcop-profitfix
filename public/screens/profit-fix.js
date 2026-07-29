@@ -43,7 +43,6 @@ S.ProfitFix = {
   steps(g) { return (g && g.process && g.process.steps) || []; },
   fixLog() { return (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : []; },
   loggedDate(id) { const e = this.fixLog().filter(x => x.gap_id === id).sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]; return e ? e : null; },
-  docPath(file) { return 'assets/resources/' + encodeURIComponent(file); },
 
   // ── Verification ────────────────────────────────────────────────────────────
   SIGNALS: {
@@ -411,10 +410,13 @@ S.ProfitFix = {
     if (docId) {
       return '<div class="pf-step pf-stepcard pf-doc" data-doc="' + esc(docId) + '" style="cursor:pointer;">' + inner + '</div>';
     }
-    if (s.target && kind === 'reference') {
-      return '<a class="pf-step pf-stepcard" href="' + this.docPath(s.target) + '" download style="text-decoration:none;">' + inner + '</a>';
-    }
-    if (s.target) {
+    /* ⚠ NO STORED-FILE FALLBACK, and `kind !== 'reference'` below is load-bearing. This used to
+       drop through to `<a href="assets/resources/<file>" download>`; that folder has since been
+       deleted, so the branch could only ever hand over a broken download. Deleting it alone was
+       not enough: a reference step would then have fallen into the pf-go branch and tried to
+       NAVIGATE to a filename, which is worse than nothing. A reference step with no `doc` id now
+       renders inert. ([[the-loop]] #44 — safe code becomes a defect when the world changes.) */
+    if (s.target && kind !== 'reference') {
       return '<div class="pf-step pf-stepcard pf-go" data-target="' + esc(s.target) + '">' + inner + '</div>';
     }
     return '<div class="pf-step">' + inner + '</div>';

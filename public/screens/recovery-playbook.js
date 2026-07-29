@@ -28,7 +28,6 @@ S.RecoveryPlaybook = {
 
   doc() { return this.CONTENT[this._module] || this.CONTENT.profit; },
   // Slash-safe so per-module resource subfolders resolve (e.g. revenue/Foo.pdf).
-  docPath(file) { return 'assets/resources/' + String(file).split('/').map(encodeURIComponent).join('/'); },
 
   // ── Module screen: standard .screen width + a sticky right-hand section rail ──
   render(content, actions) {
@@ -152,13 +151,15 @@ S.RecoveryPlaybook = {
       case 'docs':
         return '<div class="pb-docs">' + b.items.map(it => {
           // Kept docs are generated in Bar Cop style (headed with the operator's
-          // establishment name) via FixDocs; anything else falls back to a stored file.
+          // establishment name) via FixDocs.
           const base = String(it.file || '').split('/').pop();
           const docId = it.doc || (window.FixPanel && FixPanel.DOC_IDS[base]);
           if (docId) return '<button class="btn btn-ghost btn-sm pb-doc" data-doc="' + esc(docId) + '" style="justify-content:flex-start;">'
             + this._icon('reference') + 'Download: ' + esc(it.label) + '</button>';
-          return '<a class="btn btn-ghost btn-sm" href="' + this.docPath(it.file) + '" download style="text-decoration:none;">'
-            + this._icon('reference') + 'Download: ' + esc(it.label) + '</a>';
+          /* ⚠ NO STORED-FILE FALLBACK. This used to return `<a href="assets/resources/<file>"
+             download>`, and that folder has since been deleted, so the link could only 404. An
+             entry with no `doc` id now renders nothing rather than a button that fails. */
+          return '';
         }).join('') + '</div>';
       default:
         return '';
