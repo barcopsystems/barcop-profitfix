@@ -256,7 +256,7 @@ S.HubBooksHome = {
     return DashUI.dayOneStrip(
       'Your books build themselves from what you log. Four steps and this card fills in with your operating income, month to date and year to date.',
       [
-        { done: d.hasWeeks,   num: 1, label: 'Confirm your first week',          go: 'dashboard' },
+        { done: d.hasWeeks,   num: 1, label: 'Confirm your first week',          go: 'this-week' },
         { done: d.hasOpex,    num: 2, label: 'Add your operating expenses',     go: 'operating-expenses' },
         { done: d.hasInv,     num: 3, label: 'Set up Inventory Control',        go: 'ic-dashboard' },
         { done: d.hasPermits, num: 4, label: 'Enter your permits and licenses', go: 'permits' }
@@ -271,7 +271,12 @@ S.HubBooksHome = {
       else if (act === 'year-end')           S.HubYearEnd?.open?.();
       else if (act === 'operating-expenses') S.HubOperatingExpenses?.open?.();
       else if (act === 'permits')            S.HubPermits?.open?.();
-      else if (act === 'this-week')          App.openScreen('dashboard');
+      // 'this-week' is the CANONICAL id for "confirm the week": App.openScreen special-cases
+      // it (app.js) to land the Profit dashboard AND pop the Confirm the Week modal, which is
+      // the single weekly-close writer. Sending 'dashboard' here landed the dashboard with no
+      // modal, so the step's own label went unanswered. Keep this key in step with the
+      // day-one strip above — verify-action-key-wired.js pins that they agree (S260).
+      else if (act === 'this-week')          App.openScreen('this-week');
       else if (act === 'ic-dashboard')       App.openScreen('ic-dashboard');
     };
     this.container.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', () => go(el.dataset.act)));

@@ -97,29 +97,20 @@ const DashUI = {
 
   // Shared briefing modal for the Control + Recovery cockpits, routed through the
   // standard App.openModal (navy backdrop, corner X, inset header, 18px padding).
-  insightsModal(label, bodyHtml, generated_at) {
-    const dateStr = generated_at ? this._insDate(generated_at) : '';
+  // ⚠ THE DISCLAIMER IS UNCONDITIONAL, AND IT MUST STAY THAT WAY (S261, 2026-07-30).
+  // It used to render only when a THIRD `generated_at` argument was passed — a leftover of the
+  // API-backed briefing and its once-a-week cache. That cache is gone (the briefing is
+  // deterministic code now), and all 17 call sites across 9 screens pass TWO arguments, so the
+  // disclaimer sat behind a gate nothing in the app could open. This modal prints runway,
+  // safe-to-spend and survival reads; the disclaimer is not optional. Pinned by
+  // verify-briefing-disclaimer.js AT THE TWO-ARG ARITY PRODUCTION USES — a three-arg pin
+  // would have passed while every real briefing printed nothing ([[the-loop]] #47).
+  insightsModal(label, bodyHtml) {
     const html = '<div class="card form-card" style="margin:0;">'
-      + '<div class="card-title">' + (label || 'Bar Cop Briefing') + (dateStr ? ' &middot; as of ' + esc(dateStr) : '') + '</div>'
+      + '<div class="card-title">' + (label || 'Bar Cop Briefing') + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>'
-      + (generated_at ? '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Generated from your logged data. Refresh it anytime. Not financial or business advice.</div>' : '')
+      + '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Bar Cop builds this from your own logged data each time you open it. Not financial or business advice.</div>'
       + '</div>';
     App.openModal(html, { id: 'db-insights-modal', maxWidth: 620 });
-  },
-
-  // ── Weekly Insights cache (once a week per recovery section) ──────────────
-  // The written read is stored on App.data.recovery_insights[module] with a
-  // generated_at stamp. Re-opening within 7 days reuses it (no API spend); a
-  // new analysis only fires once the stored one is a week old. No manual
-  // mid-week refresh, so cost cannot run up on repeat clicks.
-  _insDate(iso) { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { return ''; } },
-  _insRec(moduleKey) { const s = App.data && App.data.recovery_insights; return (s && s[moduleKey] && s[moduleKey].html) ? s[moduleKey] : null; },
-  _insFresh(rec) { return !!(rec && rec.generated_at && (Date.now() - new Date(rec.generated_at).getTime()) / 86400000 < 7); },
-  _insSave(moduleKey, html) {
-    App.data.recovery_insights = App.data.recovery_insights || {};
-    const generated_at = new Date().toISOString();
-    App.data.recovery_insights[moduleKey] = { html: html, generated_at: generated_at };
-    App.save();   // persist in the background; the in-memory copy is live now
-    return generated_at;
   }
 };
