@@ -525,8 +525,12 @@ S.ThisWeek = {
        half-typed week survives exactly as it does on a filter-chip click. */
     document.getElementById('tw-export')?.addEventListener('click', () => {
       const r = this.effectiveRange();
+      /* ⚠ Revenue's `r-this-week.js` also titles its export "Weekly History", and the filename is
+         `BarCop_<fileTag || subtitle || title>_<date>.pdf` — so two documents from two different
+         sections, with different numbers, saved under one name. Both now carry a fileTag. */
       App.exportListPDF({
-        title: 'Weekly History', root: this.container, lists: [['core', 'week']],
+        title: 'Weekly History', fileTag: 'WeeklyHistory_Profit',
+        root: this.container, lists: [['core', 'week']],
         reRender: () => this.draw(),
         range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to)
       });
