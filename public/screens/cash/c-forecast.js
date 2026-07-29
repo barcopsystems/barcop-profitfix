@@ -73,6 +73,7 @@ S.CashForecast = {
       + this.forecastCard(fc, opening)
       + this.billsCard()
       + this.eventsCard()
+      + this.refundsCard()
       + '</div>';
     this.wire();
     this.wireChart();
@@ -313,6 +314,31 @@ S.CashForecast = {
       + '<td data-label="Deposit Held" class="val">' + (e.deposit ? App.fmtCurrency(e.deposit) : '-') + '</td>'
       + '<td data-label="Balance Due" class="val" style="font-weight:600;">' + App.fmtCurrency(e.amount) + '</td></tr>').join('');
     return heading + this.fixed5('<th>Event Date</th><th>Event</th><th>Event Total</th><th>Deposit Held</th><th>Balance Due</th>', rows) + note;
+  },
+
+  /* ── Deposits going back out on a cancelled booking ───────────────────────────
+     ⚠ WITHOUT THIS THE MONEY IS IN THE TOTAL AND NOWHERE ELSE. A deposit the operator has agreed to
+     refund raises the Out column of the week it falls in, and until now nothing on the page said
+     why — the mirror of the invisibility on the booking side, where a Lost booking rendered no card
+     at all and $1,500 of banked cash appeared on no screen.
+     ⚠ This asks the engine DIRECTLY rather than reading the forecast rows, because it is a
+     page-level list and not a per-week one. A `refundList` field was briefly put on those rows and
+     read nowhere — and the first version of this very comment claimed it was read, which is
+     [[the-loop]] #25 and a false confidence claim in one line. The field is gone. */
+  refundsCard() {
+    const start = CashEngine._mondayOf(new Date());
+    const r = CashEngine.eventRefundsOwed(start, CashEngine._addDays(start, this.WEEKS * 7 - 1), start);
+    if (!r.list.length) return '';
+    const rows = r.list.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(x =>
+      '<tr><td data-label="Since" style="color:var(--t1);">' + this.fmtWk(x.date) + '</td>'
+      + '<td data-label="Event"><span style="color:var(--t1);">' + esc(x.name) + '</span></td>'
+      + '<td data-label="Deposit to Refund" class="val" style="font-weight:600;">' + App.fmtCurrency(x.amount) + '</td></tr>').join('');
+    return '<div class="sh" style="margin:24px 0 10px;">Deposits to Refund</div>'
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      + '<th>Since</th><th>Event</th><th>Deposit to Refund</th></tr></thead><tbody>' + rows + '</tbody></table>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:10px;">'
+      + 'Bookings you marked Lost where you said the deposit still goes back. This is counted as money '
+      + 'leaving in the Out column above. Mark the refund paid on the booking once it has gone.</div></div>';
   },
 
   // ── Bills due, next two weeks: who to pay and when ────────────────────────────
