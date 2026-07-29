@@ -514,7 +514,23 @@ S.ThisWeek = {
     }));
     document.getElementById('tw-from')?.addEventListener('change', e => { this.filterFrom = e.target.value; this.draw(); });
     document.getElementById('tw-to')?.addEventListener('change', e => { this.filterTo = e.target.value; this.draw(); });
-    document.getElementById('tw-export')?.addEventListener('click', () => App.exportPDF({ title: 'Weekly History', root: this.container }));
+    /* Weekly History exports the WHOLE chip selection, not the page on screen. historyBlock()
+       renders `all.slice(0, App.listLimit('core','week'))` behind a Show older button, and
+       exportPDF builds the document by walking the rendered DOM — so this used to stop at
+       LIST_PAGE (50) rows with nothing in the PDF saying so. Fifty weeks is about a year of
+       confirmed weeks, after which the saved file quietly stopped being the whole history.
+       `range` matters just as much: without it the document could be one month or five years
+       and the file itself could not tell you which. Safe to re-render: every money input calls
+       onInput() -> collect() -> saveDraft(), and draw() rebuilds the form from this.draft, so a
+       half-typed week survives exactly as it does on a filter-chip click. */
+    document.getElementById('tw-export')?.addEventListener('click', () => {
+      const r = this.effectiveRange();
+      App.exportListPDF({
+        title: 'Weekly History', root: this.container, lists: [['core', 'week']],
+        reRender: () => this.draw(),
+        range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to)
+      });
+    });
     this.container.querySelectorAll('.tw-edit').forEach(b => b.addEventListener('click', () => this.editWeek(b.dataset.id)));
     this.container.querySelectorAll('.tw-del').forEach(b => b.addEventListener('click', () => this.deleteWeek(b.dataset.id)));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
