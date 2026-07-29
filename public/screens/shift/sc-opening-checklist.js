@@ -263,7 +263,7 @@ S.ShiftOpeningChecklist = {
     b.table(['Status', 'Item'], (r.items || []).map(it => [it.done ? 'DONE' : '-', it.text]), { columnStyles: { 0: { cellWidth: 60 } } });
     if (r.notes) { b.sectionTitle('Notes'); b.paragraph(r.notes); }
     const ds = /^\d{4}-\d{2}-\d{2}$/.test(r.date || '') ? r.date.replace(/-/g, '') : App._pdfDateStamp();
-    await b.save('BarCop_OpeningChecklist_' + ds + '.pdf');
+    await b.save(App.pdfFileName('Opening Checklist', ds));
   },
 
   async confirmDel(id) {

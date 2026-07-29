@@ -350,7 +350,7 @@ S.ShiftChecklists = {
     b.table(['Status', 'Item'], (r.items || []).map(it => [it.done ? 'DONE' : '-', it.text]), { columnStyles: { 0: { cellWidth: 60 } } });
     if (r.notes) { b.sectionTitle('Notes'); b.paragraph(r.notes); }
     const ds = /^\d{4}-\d{2}-\d{2}$/.test(r.date || '') ? r.date.replace(/-/g, '') : App._pdfDateStamp();
-    await b.save('BarCop_' + type + 'Checklist_' + ds + '.pdf');
+    await b.save(App.pdfFileName(type + ' Checklist', ds));
   },
 
   // Blank printable checklist for the clipboard: the current list with empty
@@ -370,7 +370,7 @@ S.ShiftChecklists = {
     b.spacer(8);
     b.sectionTitle('Notes');
     b.paragraph(' ');
-    await b.save('BarCop_' + type + 'ChecklistWorksheet.pdf');
+    await b.save(App.pdfFileName(type + ' Checklist Worksheet'));
   },
 
   async confirmDel(id) {

@@ -342,7 +342,7 @@ S.ShiftChecklistTemplates = {
     b.spacer(8);
     b.sectionTitle('Notes');
     b.paragraph(' ');
-    await b.save('BarCop_' + App.fileSafe(t.name) + '_Checklist.pdf');
+    await b.save(App.pdfFileName(t.name + ' Checklist'));
   },
 
   async confirmDel(id) {
