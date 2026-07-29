@@ -619,7 +619,7 @@ window.CashEngine = {
      out of the cash position with no prompt and no record — measured, $1,500 of real cash vanishing
      from every screen while the record still held it.
      `ev-bookings.markLost` now asks the one question the data cannot answer: was the deposit KEPT
-     (the agreement says non-refundable, so nothing moves), REFUNDED (it has already left the bank),
+     (whatever their own terms say — nothing moves), REFUNDED (it has already left the bank),
      or STILL TO REFUND (a payable). Only the last one is future money out, and that is what this
      returns.
      ⚠ DELIBERATELY THE MIRROR OF `eventInflow`, line for line, because the anchor rule has bitten
