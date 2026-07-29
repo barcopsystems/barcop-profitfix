@@ -739,6 +739,12 @@ S.EventsBookings = {
       t.push(this.statTile('Margin', App.fmtBal(margin), 'after all costs', margin >= 0 ? 'good' : 'bad'));
       t.push(this.statTile('Margin %', mp != null ? mp.toFixed(0) + '%' : '-', '30% is a solid event', mp != null && mp >= 30 ? 'good' : mp != null ? 'warn' : ''));
       t.push(this.statTile('Labor', App.fmtCurrency(labor), this.eventStaffShifts(b).length ? 'checked event staff' : 'check staff in schedule'));
+      /* ⚠ AND SAY IF IT IS STILL UNPAID (S238). A button with no figure beside it is a button nobody
+         presses: the P&L tiles are all about what the event EARNED, and none of them says whether
+         the money actually arrived. This is the tile that sends them to the Collect the Balance
+         row below, and it is the only thing on a Completed booking that reports it. */
+      const owed = this.balanceOutstanding(b);
+      if (owed > 0) t.push(this.statTile('Balance Due', App.fmtCurrency(owed), 'still to collect', 'warn'));
     }
     return t.length ? '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + t.join('') + '</div>' : '';
   },
@@ -855,6 +861,22 @@ S.EventsBookings = {
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Other Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-other" value="' + (b.event_other_cost != null && b.event_other_cost !== 0 ? b.event_other_cost : '') + '"/></div></div>'
         + '</div>'
         + '<div id="eb-pl-err" style="display:none;margin-top:10px;font-size:12px;color:var(--red);"></div>'
+        /* ⚠⚠ SETTLE THE BALANCE FROM THE CARD YOU LAND ON (S238, Kyle: "shouldn't have to go back to
+           previous step"). Mark Balance Paid lived ONLY on the Booked card, so the ordinary path —
+           event happens, Mark Completed, close out the P&L — never passes it. The operator had to
+           know to click backwards on the progress rail, which means **the default state of every
+           completed event is "still owed"**, and its balance sits in the 13-week forecast until
+           somebody thinks to go looking. Measured on a seed-shaped in-house buyout: **$7,400 of
+           phantom cash landing in week 0, which is the low point** — feeding the runway and Safe to
+           Spend. The one question Bar Cop cannot answer for itself is how it was settled, so the
+           door to asking has to be where the operator already is. */
+        + (this.balanceOutstanding(b) > 0
+            ? this.divider() + this.subLabel('Collect the Balance')
+              + '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;">'
+              + '<div style="font-size:13px;color:var(--t2);">' + App.fmtCurrency(this.balanceOutstanding(b))
+              + ' is still owed on this event.</div>'
+              + '<button class="btn btn-primary btn-sm" id="eb-bal-paid">Mark Balance Paid</button></div>'
+            : '')
         + this.divider() + this.staffingHtml(b)
         + '</div>';
     }
@@ -1704,6 +1726,13 @@ S.EventsBookings = {
     // guaranteed count or the actual count, whichever is higher" — printing the superseded estimate
     // next to a guarantee-billed subtotal contradicted the paragraph below it on the same page.
     if (p.party) lines.push(['Guest Count', this._countLabel(p, true)]);
+    /* ⚠ S244 — THE SIGNED DOCUMENT HAS TO SHOW ITS OWN WORKING. Kyle, reading a real agreement:
+       the page printed "52 guests (guaranteed)" and "F&B Subtotal $3,224.00" with nothing between
+       them, while the terms two paragraphs down say the client is billed on that count. So they
+       cannot check the figure, and cannot work out what a change in the count costs them — on the
+       one document that governs the deal. The quote PDF had this line the whole time; the agreement
+       did not ([[the-loop]] step 0.6 — the artefact that leaves the building is the one that counts). */
+    if (p.ph) lines.push(['Per Head', money(p.ph) + (p.party ? ' x ' + p.party + ' guests' : '')]);
     lines.push(['F&B Subtotal', money(p.subtotal)]);
     if (p.svcPct) lines.push(['Service Charge (' + p.svcPct + '%)', money(p.service)]);
     if (p.taxPct) lines.push(['Tax (' + p.taxPct + '%)', money(p.tax)]);
