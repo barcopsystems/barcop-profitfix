@@ -23,7 +23,6 @@
    zero API. */
 
 window.FixPanel = {
-  RESOURCE_ROOT: 'assets/resources/',
 
   // Reference docs are generated in Bar Cop's own PDF style now (headed with the
   // operator's establishment name) instead of served as stored files. A reference
@@ -41,9 +40,6 @@ window.FixPanel = {
 
   gapAreas(moduleKey) {
     return (window.FIX && Array.isArray(FIX[moduleKey])) ? FIX[moduleKey] : [];
-  },
-  docPath(module, file) {
-    return this.RESOURCE_ROOT + (module === 'profit' ? '' : module + '/') + encodeURIComponent(file);
   },
 
   // The per-module Fix screen id a gap-area deep-links into.
@@ -455,11 +451,13 @@ window.FixPanel = {
         link = '<button class="btn btn-ghost btn-sm fp-doc" data-doc="' + esc(docId) + '" '
           + 'style="display:inline-flex;align-items:center;gap:6px;">' + dlIcon
           + 'Download' + (label ? ': ' + label : '') + '</button>';
-      } else if (s.target) {
-        link = '<a class="btn btn-ghost btn-sm" href="' + this.docPath(module, s.target) + '" download '
-          + 'style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">' + dlIcon
-          + 'Download' + (label ? ': ' + label : '') + '</a>';
       }
+      /* ⚠ THERE IS NO STORED-FILE FALLBACK ANY MORE, ON PURPOSE. This used to drop through to
+         `<a href="assets/resources/<file>" download>`, and that folder has since been deleted --
+         so the branch could only ever hand the operator a broken download. A step with no `doc`
+         id now renders with no button at all, which is honest: nothing to download beats a
+         button that 404s. Every reference step carries a `doc` id today ([[the-loop]] #44 -- a
+         thing that was safe becomes a defect the moment the world around it changes). */
     } else if (s.target) {
       const verb = kind === 'result' ? 'View' : 'Open';
       link = '<button class="btn btn-ghost btn-sm fp-go" data-target="' + esc(s.target) + '">'
