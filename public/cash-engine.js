@@ -635,14 +635,36 @@ window.CashEngine = {
     const bookings = (App.data && Array.isArray(App.data.bookings)) ? App.data.bookings : [];
     let total = 0; const list = [];
     bookings.forEach(b => {
-      if (b.stage !== 'Lost' || b.deposit_outcome !== 'to_refund') return;
-      if (b.deposit_refund_date) return;                 // already paid back: it has left the bank
       if (!b.deposit_paid_date) return;                  // only money actually banked can be refunded
-      const amt = S.EventsBookings._depositHeld(b);
+      const held = S.EventsBookings._depositHeld(b);
+      let amt = 0;
+      if (b.stage === 'Lost') {
+        if (b.deposit_outcome !== 'to_refund') return;
+        if (b.deposit_refund_date) return;               // already paid back: it has left the bank
+        /* ⚠ S247 — PARTIAL REFUNDS. The operator may keep some and give some back (a cancellation
+           fee out of the deposit is ordinary), and charging the whole thing made that unrepresentable.
+           `refund_amount` is what they said goes back; absent, it is the whole deposit, which is what
+           every existing record means. ⚠ CAPPED AT WHAT WAS ACTUALLY BANKED — you cannot give back
+           more than you took, and an uncapped figure would be a typo the forecast believes. */
+        amt = Math.min(held, Math.max(0, parseFloat(b.refund_amount != null && b.refund_amount !== '' ? b.refund_amount : held) || 0));
+      } else {
+        /* ⚠⚠ S246 — AN OVERPAID DEPOSIT ON A LIVE BOOKING IS ALSO MONEY GOING BACK, and the Booked
+           card has said so on a tile ("Refund Owed $1,459.25") since round 1 while the forecast
+           charged $0.00. Same money, same direction, named on one screen and missing from the other.
+           It exists exactly while the banked deposit exceeds the quote, so it clears itself the
+           moment the operator corrects the deposit or the price — no second field to get stuck on,
+           which is what made the Lost payable dangerous until it got its own door. */
+        if (b.stage === 'Lost') return;
+        amt = Math.max(0, held - this._eventTotal(b));
+      }
       if (!(amt > 0)) return;
       // Owed since the booking died, so date it by when it was marked Lost, falling back to the
       // event date and then to the window start — a payable with no date is still a payable.
-      const raw = String(b.lost_date || b.event_date || '').slice(0, 10);
+      /* ⚠ AN OVERPAYMENT IS DATED BY WHEN THE MONEY LANDED, NOT BY THE EVENT. Falling through to
+         `event_date` would date it months out and drop it off the far end of the quarter entirely —
+         the AA1 defect, where a $3,000 payable read $0.00 because it was dated by an event five
+         months away. It is owed from the moment the overpayment exists. */
+      const raw = String((b.stage === 'Lost' ? b.lost_date : b.deposit_paid_date) || b.event_date || '').slice(0, 10);
       const anchor = anchorYmd || startYmd;
       const d = (!raw || raw < anchor) ? anchor : raw;
       if (d < startYmd || d > endYmd) return;
