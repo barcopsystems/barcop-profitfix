@@ -525,8 +525,8 @@ S.InventoryDashboard = {
   },
 
   // ── Bar Cop Briefing: a written read of the inventory week, the same button
-  //    the recovery dashboards carry. Cached a week per section (DashUI helpers)
-  //    so repeat opens do not spend on the API. ──────────────────────────────
+  //    the recovery dashboards carry. Built fresh from your logged data on every open —
+  //    there is no cache and no API call.
   // Code-generated (no API): where inventory stands, where cash is stuck, the move.
   showInsights() {
     const st = this._st || this.computeState();
