@@ -319,7 +319,20 @@ S.InventorySpotCheck = {
         + '</div>'
       : '';
 
-    const resumeBar = resuming
+    /* ⚠ CORRECTING A FINISHED CHECK IS NOT AN UNFINISHED ONE, AND THE BANNER MUST NOT SAY IT IS.
+       Kyle, on clicking Edit from history: "it opens with the banner saying to add the post count
+       and pos sold [which] is a little confusing" -- it already HAS both, that is why it finished.
+       Worse, the alert-bar is red, so a routine correction opened looking like a problem. An edit
+       gets its own neutral line and no Start Over, because discarding here would mean throwing
+       away a saved check rather than an in-progress draft. */
+    const resumeBar = (resuming && this._openWasComplete)
+      ? '<div class="card" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+        + '<div style="font-size:13px;color:var(--t1);">Editing the ' + this.fmtDate(this.draft.date)
+          + ' check at ' + esc(this.draft.location || 'this bar')
+          + '. Change what you need and hit Save Changes.</div>'
+        + '<button class="btn btn-ghost btn-sm" id="sp-cancel-edit">Cancel</button>'
+        + '</div>'
+      : resuming
       ? '<div class="alert-bar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
         + '<div class="alert-text">A spot check started ' + this.ago(this.draft.started_at) + ' is in progress. Add the post-shift counts and POS sold to finish it.</div>'
         + '<div style="display:flex;gap:8px;">'
@@ -452,6 +465,16 @@ S.InventorySpotCheck = {
       this.recalcTotal();
     });
     document.getElementById('sp-flagpct')?.addEventListener('change', () => this.saveFlagPct());
+    /* Cancel an edit: drop the reopened copy and go back to history WITHOUT writing. The saved
+       check is untouched -- clearDraft only clears the local working copy. */
+    document.getElementById('sp-cancel-edit')?.addEventListener('click', () => {
+      this.clearDraft();
+      this.draft = null;
+      this._openId = null; this._openCreatedAt = null;
+      this._openWasComplete = false; this._openEditCount = 0;
+      this._touched = {};
+      this.renderHistory();
+    });
     document.getElementById('sp-save')?.addEventListener('click', () => this.save(true));
     document.getElementById('sp-save-later')?.addEventListener('click', () => this.save(false));
     this.container.querySelectorAll('.sp-open').forEach(b =>

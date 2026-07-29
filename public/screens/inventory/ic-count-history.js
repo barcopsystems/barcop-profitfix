@@ -83,6 +83,10 @@ S.InventoryCountHistory = {
         'Inside a count, pick another count from the compare dropdown at the top and the table switches to show what changed product by product. A drop is product you used between the two counts. A rise is product you received.',
         'Say you compare last Sunday to this Sunday and a 750ml of your house bourbon shows a drop of four bottles. At 1.5 oz a pour that is roughly 67 pours that should match what the register rang. If the bottles moved but the sales did not, that gap is the conversation you need to have.'
       ] },
+      { h: 'Fixing A Count You Got Wrong', p: [
+        'Counted a location, submitted it, then realized you missed a couple of bottles? Hit Edit on that row. It reopens the count exactly as you left it, you add what you missed, and it saves back over the same count instead of creating a second one.',
+        'Edit only shows on counts that have not been booked yet. Once you confirm a week, the counts that week priced out are tagged Booked and Edit comes off them, because your cost of goods, prime cost, and variance for that week are already set from those numbers. Changing one after the fact would move a week you already signed off. If a Booked count is wrong, log the correction as an adjustment or delete the count and recount.'
+      ] },
       { h: 'Deleting A Count', p: ['Deleting a count is behind the edit permission for a reason. A finalized count feeds your cost of goods, usage, and variance, so pulling one out moves all of those numbers. Only delete a count that was entered wrong and cannot be trusted. If a single product was off, it is cleaner to recount than to throw out the whole record.'] },
       { h: 'Export', p: ['Use Export PDF to save a clean PDF of any count for your accountant at month end, your insurance file, or a new manager who needs to see where the stock stands.'] }
     ]);
@@ -133,9 +137,17 @@ S.InventoryCountHistory = {
         const varCell = r.variance == null
           ? '<span style="color:var(--t4);">-</span>'
           : (r.variance > 0 ? '+' : '') + App.fmtBal(r.variance);
+        /* ⚠ SAY WHY THE EDIT BUTTON IS NOT THERE. Kyle, seeing only the newest row offer Edit:
+           "why does only the latest take inventory have the edit button?" The lock was working
+           exactly as designed -- a confirmed week has already booked those counts into COGS -- but
+           the button simply VANISHED, so there was no way to tell a rule from a bug. A status the
+           operator can read beats a control that quietly disappears. */
+        const booked = App.countLockedByWeek(c);
         const status = r.isLatest
           ? '<span style="color:var(--gold);font-weight:700;">Latest</span>'
-          : '<span style="color:var(--t3);font-weight:600;">Past</span>';
+          : (booked
+              ? '<span style="color:var(--t3);font-weight:600;">Booked</span>'
+              : '<span style="color:var(--t3);font-weight:600;">Past</span>');
         return '<tr class="ch-row" data-id="' + c.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
           + '<td>' + esc(c.type || '-') + '</td>'
