@@ -187,7 +187,7 @@ S.WeekReview = {
     try { st = ID.computeState(); done = ID.stepDone(st); } finally { ID._weekStart = sv; }
 
     const wkCounts   = (inv.ic_counts || []).filter(c => this._inWeek(c.date)).length;
-    const wkSpot     = (inv.ic_spot_checks || []).filter(s => this._inWeek(s.date)).length;
+    const wkSpot     = App.completedSpotChecks().filter(s => this._inWeek(s.date)).length;
     const wkDeliv    = st.deliveriesThisWeek || 0;
     const wkOrders   = (inv.ic_orders || []).filter(o => this._inWeek(o.date)).length;
     const wkAdj      = (inv.ic_adjustments || []).filter(a => this._inWeek(a.date_time || a.created_at)).length;

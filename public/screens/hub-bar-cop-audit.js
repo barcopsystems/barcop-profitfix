@@ -162,7 +162,7 @@ S.HubBarCopAudit = {
     const checklists = (App.shiftData?.sc_checklists) || [];
     const shifts     = (App.shiftData?.sc_shifts) || [];
     const counts     = (App.inventoryData?.ic_counts) || [];
-    const spotChecks = (App.inventoryData?.ic_spot_checks) || [];
+    const spotChecks = App.completedSpotChecks();
 
     // Checklist screens write type 'Opening'/'Closing'; match case-insensitively
     // (also tolerates legacy 'open'/'closing').
@@ -285,7 +285,7 @@ S.HubBarCopAudit = {
   // 3. Inventory Execution. Count cadence + discrepancy resolution + variance.
   _scoreInventoryExecution() {
     const counts     = (App.inventoryData?.ic_counts)        || [];
-    const spotChecks = (App.inventoryData?.ic_spot_checks)   || [];
+    const spotChecks = App.completedSpotChecks();
     const discrep    = (App.data?.vendor_discrepancies)      || [];
 
     const wkCounts = counts.filter(c => this._withinWindow(c.date, this.WINDOW_DAYS));

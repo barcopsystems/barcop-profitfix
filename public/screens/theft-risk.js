@@ -13,7 +13,9 @@
    warning for the next manager, so this never becomes a page nobody opens.) */
 
 S.TheftRisk = {
-  spotChecks() { return ((App.inventoryData && App.inventoryData.ic_spot_checks) || []); },
+  // Finished checks only — an in-progress one has measured nothing yet, and Theft Risk is the
+  // screen where a phantom variance would name a person (S249).
+  spotChecks() { return App.completedSpotChecks(); },
   voidComps() {
     return ((App.shiftData && App.shiftData.sc_void_comps) || []).filter(r => {
       if (r.type === 'Void') return true;

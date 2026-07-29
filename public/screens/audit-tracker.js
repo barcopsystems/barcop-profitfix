@@ -545,7 +545,7 @@ S.AuditTracker = {
     }
 
     // Inventory Control — spot checks (theft pour-variance signal)
-    const spots = (inv.ic_spot_checks || []).filter(inWindow);
+    const spots = App.completedSpotChecks().filter(inWindow);   // in-progress checks measured nothing yet
     if (spots.length) {
       cd.spot_checks = spots.length;
       cd.spot_check_flagged = spots.reduce((s,c) => s + (c.flagged_count || 0), 0);
