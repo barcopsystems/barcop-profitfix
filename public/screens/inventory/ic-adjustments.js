@@ -242,9 +242,9 @@ S.InventoryAdjustments = {
           + '<select id="ajb-witness">' + App.staffOptions('', { placeholder: 'Optional' }) + '</select></div>'
       + '</div>'
       + '<div class="pill-wrap" style="margin-bottom:12px;">'
-      + '<table class="ing-tbl pill"><thead><tr>'
-      + '<th style="min-width:170px;">Product</th><th style="width:80px;">Qty</th><th style="width:100px;">Unit</th>'
-      + '<th style="min-width:130px;">Reason</th><th style="width:110px;">Direction</th><th style="width:90px;">Value</th><th style="width:80px;"></th>'
+      + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
+      + '<th style="width:22%;">Product</th><th style="width:11%;">Qty</th><th style="width:13%;">Unit</th>'
+      + '<th style="width:17%;">Reason</th><th style="width:14%;">Direction</th><th style="width:12%;">Value</th><th style="width:11%;"></th>'
       + '</tr></thead><tbody id="ajb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="ajb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
       + App.noteField({ id: 'ajb-notes' });

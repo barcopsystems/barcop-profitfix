@@ -205,9 +205,9 @@ S.InventoryEmpties = {
           + '<select id="emb-by">' + App.staffOptions(defaultBy, { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       + '<div class="pill-wrap" style="margin-bottom:12px;">'
-      + '<table class="ing-tbl pill"><thead><tr>'
-      + '<th style="min-width:170px;">Product</th><th style="width:80px;">Qty</th><th style="width:60px;">Unit</th>'
-      + '<th style="width:90px;">Deposit</th><th style="min-width:150px;">Disposition</th><th style="width:90px;">Value</th><th style="width:80px;"></th>'
+      + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
+      + '<th style="width:24%;">Product</th><th style="width:11%;">Qty</th><th style="width:8%;">Unit</th>'
+      + '<th style="width:13%;">Deposit</th><th style="width:21%;">Disposition</th><th style="width:13%;">Value</th><th style="width:10%;"></th>'
       + '</tr></thead><tbody id="emb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="emb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
       + App.noteField({ id: 'emb-notes' });

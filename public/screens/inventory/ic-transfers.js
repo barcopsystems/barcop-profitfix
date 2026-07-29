@@ -207,9 +207,9 @@ S.InventoryTransfers = {
           + '<select id="trb-witness">' + App.staffOptions('', { placeholder: 'Optional' }) + '</select></div>'
       + '</div>'
       + '<div class="pill-wrap" style="margin-bottom:12px;">'
-      + '<table class="ing-tbl pill"><thead><tr>'
-      + '<th style="min-width:180px;">Product</th><th style="width:90px;">Qty</th><th style="width:120px;">Unit</th>'
-      + '<th style="min-width:150px;">From</th><th style="min-width:150px;">To</th><th style="width:90px;"></th>'
+      + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
+      + '<th style="width:23%;">Product</th><th style="width:12%;">Qty</th><th style="width:15%;">Unit</th>'
+      + '<th style="width:19%;">From</th><th style="width:19%;">To</th><th style="width:12%;"></th>'
       + '</tr></thead><tbody id="trb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="trb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
       + App.noteField({ id: 'trb-notes' });
