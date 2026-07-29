@@ -892,7 +892,7 @@ S.EventsBookings = {
            service charge and the room fee ARE revenue (they are income to the bar); only the tax is
            not. And the operator is handed the figure rather than asked to compute it — derived from
            the QUOTE, which Bar Cop knows exactly, not inferred about the actual. */
-        + (qpNet ? '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:8px;">'
+        + (qpNet && qpNet.tax > 0 ? '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:8px;">'
             + 'You quoted ' + App.fmtCurrency(qpNet.total) + ' all in. Before sales tax that is '
             + '<b style="color:var(--t2);">' + App.fmtCurrency(qpNet.total - qpNet.tax) + '</b>. '
             + 'Enter what the event actually earned, not counting the tax you collected for the state.</div>' : '')
@@ -933,7 +933,7 @@ S.EventsBookings = {
           + '</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'
           + (o !== 'kept' ? '<button class="btn btn-ghost btn-sm eb-dep-out" data-out="kept">Keeping it</button>' : '')
           + (o !== 'refunded' ? '<button class="btn btn-primary btn-sm eb-dep-out" data-out="refunded">' + (o === 'to_refund' ? 'Mark refund paid' : 'Already refunded') + '</button>' : '')
-          + (o !== 'to_refund' && o !== 'refunded' ? '<button class="btn btn-ghost btn-sm eb-dep-out" data-out="to_refund">Still to refund</button>' : '')
+          + (o !== 'to_refund' ? '<button class="btn btn-ghost btn-sm eb-dep-out" data-out="to_refund">Still to refund</button>' : '')
           + '</div></div>';
       }
     }
@@ -1184,8 +1184,9 @@ S.EventsBookings = {
     document.getElementById('eb-staff')?.addEventListener('click', () => { App._eventStaffTag = b.event_name || this.title(b); App._eventStaffDate = b.event_date || ''; App.openScreen('lc-build-schedule'); });
     this.container.querySelectorAll('.eb-runsheet-open').forEach(el => el.addEventListener('click', () => this.runSheet(id)));
     this.container.querySelectorAll('.eb-runsheet-print').forEach(el => el.addEventListener('click', () => this.printRunSheet(this.bookings().find(x => x.id === id))));
-    // Event P&L. actual_revenue is now the figure the CASH FORECAST collects on a Completed event
-    // (cash-engine._eventTotal), so a mistyped negative here is money, not just a margin.
+    // Event P&L. � actual_revenue does NOT reach the cash forecast  _eventTotal collects the
+    // AGREED figure (quoteTotal); that change was tried and reverted. It IS posted to This Week's
+    // Events revenue line, net of tax (S235), so a mistyped negative here is still money.
     document.getElementById('eb-pl-save')?.addEventListener('click', () => {
       const f = {
         event_food_cost:  parseFloat(document.getElementById('eb-pl-food')?.value) || 0,
@@ -1209,6 +1210,16 @@ S.EventsBookings = {
       // Refunded means it has already left the bank, so it stops being projected out. Moving BACK
       // to kept or still-to-refund has to clear that date, or the money would read as gone twice.
       f.deposit_refund_date = (out === 'refunded') ? App.todayLocal() : null;
+      /* ⛔⛔ AND IT HAS TO BE DATED, OR THE PAYABLE CAN VANISH ENTIRELY. `eventRefundsOwed` dates the
+         obligation by `lost_date`, falling back to the EVENT date — and this card is the only door
+         for a booking that reached Lost through Edit Details' Stage dropdown or the New Booking
+         form, neither of which stamps one. MEASURED on a bar with $700 in the bank: a $3,000 refund
+         recorded here on a booking whose event was five months out was charged **$0.00** — byte
+         identical to owing nothing — and the Deposits to Refund card listed zero rows, while the
+         card two inches above said "your Cash Forecast counts it as money leaving". With the event
+         inside the quarter it charged in the WRONG WEEK, leaving the tightest week $3,000 rich and
+         the Runway reading 13+ weeks against a truth of THIS WEEK. */
+      if (!b.lost_date) f.lost_date = App.todayLocal();
       this.patch(id, f);
     }));
     document.getElementById('eb-lost')?.addEventListener('click', async () => {
@@ -1350,6 +1361,25 @@ S.EventsBookings = {
     // by the pre-existing G6 pin the same minute it was written ([[the-loop]] #49's family).
     const fields = Object.assign({}, edits, { stage: to });
     const b = this.bookings().find(x => x.id === id);
+    /* ⛔⛔ REOPENING A DEAD BOOKING MUST DROP WHAT DIED WITH IT. `deposit_outcome`,
+       `deposit_refund_date` and — when the money actually went back — `deposit_paid_date` all
+       describe a cancellation. Reopen wrote only the stage, so they survived onto the live booking.
+       ⛔ MEASURED: a $1,500 deposit banked, refunded on cancellation, then reopened and re-Booked —
+       `eventInflow` read **$5,040.75 against a truth of $6,540.75**, `committedEventCash` reported
+       **$1,500 of deposits "already in hand"** that had left the bank, and **the signed agreement
+       billed the client $5,040.75 instead of $6,540.75, under-collecting $1,500** for money they no
+       longer had. It also left a stale outcome that a later re-Lost resurrected, with a four-month-
+       old date, without asking anyone.
+       ⚠ Clearing `deposit_paid_date` ONLY on `refunded` is the factual half: the bar demonstrably
+       does not hold that money any more. "Kept" is deliberately left alone — whether a kept
+       cancellation fee becomes a deposit again is not something Bar Cop can know, and the outcome
+       being cleared means it will ask again if the booking dies twice ([[the-loop]] #30). */
+    if (b && b.stage === 'Lost' && to !== 'Lost') {
+      if (b.deposit_outcome) fields.deposit_outcome = null;
+      if (b.deposit_outcome === 'refunded') fields.deposit_paid_date = null;
+      if (b.deposit_refund_date) fields.deposit_refund_date = null;
+      if (b.lost_date) fields.lost_date = null;
+    }
     /* ⚠⚠ A BOOKED EVENT WITH NO DATE IS OWED MONEY NOTHING CAN SEE. changeStage validated nothing,
        and every other surface keys on event_date: the calendar map is empty, the countdown reads
        "-", eventInflow skips it, and the dashboard's future-booked revenue is $0 — while
@@ -1843,6 +1873,13 @@ S.EventsBookings = {
        one document that governs the deal. The quote PDF had this line the whole time; the agreement
        did not ([[the-loop]] step 0.6 — the artefact that leaves the building is the one that counts). */
     if (p.ph) lines.push(['Per Head', money(p.ph) + (p.party ? ' x ' + p.party + ' guests' : '')]);
+    /* ⛔ AND THE MINIMUM, OR THE PER HEAD ROW I JUST ADDED MAKES THE PAGE FAIL ITS OWN ARITHMETIC.
+       The subtotal is the GREATER of per-head x count and the F&B minimum. Print the per-head line
+       without the minimum beside it and a client checking the page sees 85 x 40 = $3,400 above an
+       F&B Subtotal of $5,000.00 — **$1,600 unexplained on a signature page**, which is the identical
+       shape to the room-fee omission documented below. Both siblings that print Per Head (the quote
+       PDF and the emailed quote) print the minimum too; only this document did not. */
+    if (p.fbMin) lines.push(['Food & Beverage Minimum', money(p.fbMin)]);
     lines.push(['F&B Subtotal', money(p.subtotal)]);
     if (p.svcPct) lines.push(['Service Charge (' + p.svcPct + '%)', money(p.service)]);
     if (p.taxPct) lines.push(['Tax (' + p.taxPct + '%)', money(p.tax)]);
