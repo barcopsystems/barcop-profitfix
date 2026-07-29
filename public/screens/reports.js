@@ -27,7 +27,6 @@ S.Reports = {
   },
 
   _renderQboPicker(panel, weeks){
-    this._pnlAckGiven = false;   // gate once per visit
 
     const lastDate=weeks[weeks.length-1]?.period_end||'';
     const firstCustomDate=weeks[Math.max(0,weeks.length-13)]?.period_end||'';
@@ -84,18 +83,6 @@ S.Reports = {
           cancelText: ''
         });
         return;
-      }
-      // Export-acknowledgment gate (once per visit) — active notice before the
-      // financial worksheet downloads. See [[legal-protection]].
-      if(!this._pnlAckGiven){
-        const ok = await App.confirmExport({
-          title: 'Before You Export Your P&L',
-          message: 'This Weekly P&L Brief is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed financial statement. Your accountant should review and verify it before you file anything or close your books.',
-          confirmText: 'I Understand, Continue',
-          cancelText: 'Cancel'
-        });
-        if(!ok) return;
-        this._pnlAckGiven = true;
       }
       this._buildAndDownloadXlsx(filtered, App.todayLocal());
     });

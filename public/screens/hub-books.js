@@ -228,7 +228,6 @@ S.HubBooks = {
   async _openPdfSummary() {
     const monthKey = document.getElementById('hb-month')?.value;
     if (!monthKey) return;
-    if (!(await this._ackExport())) return;
     const monthLabel = this._monthLabel(monthKey);
     const M   = this._aggregateMonth(monthKey);
     const YTD = this._aggregateYTD(monthKey);
@@ -430,25 +429,11 @@ S.HubBooks = {
     return (monthNames[m] || '') + ' ' + y;
   },
 
-  // Export-acknowledgment gate (once per visit) before a high-stakes Books
-  // download. See [[legal-protection]].
-  async _ackExport() {
-    if (this._booksAckGiven) return true;
-    const ok = await App.confirmExport({
-      title: 'Before You Export Your Books',
-      message: 'Month-End Books is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed financial statement. Your accountant should review and verify it before you file anything or close your books.',
-      confirmText: 'I Understand, Continue',
-      cancelText: 'Cancel'
-    });
-    if (ok) this._booksAckGiven = true;
-    return ok;
-  },
 
   // ── Generate the workbook ──────────────────────────────────────────────────
   async _generate() {
     const monthKey = document.getElementById('hb-month')?.value;
     if (!monthKey) return;
-    if (!(await this._ackExport())) return;
     const btn = document.getElementById('hb-generate');
     const status = document.getElementById('hb-status');
 

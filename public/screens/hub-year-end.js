@@ -137,25 +137,10 @@ S.HubYearEnd = {
     el.style.display = 'block';
   },
 
-  // ── Generate the workbook ──────────────────────────────────────────────────
-  // Export-acknowledgment gate (once per visit) before the year-end download.
-  // See [[legal-protection]].
-  async _ackExport() {
-    if (this._yeAckGiven) return true;
-    const ok = await App.confirmExport({
-      title: 'Before You Export Your Annual Review',
-      message: 'This Annual Review is built from the numbers you have logged in Bar Cop. It is a worksheet, not a filed tax return or audited financial statement. Your accountant should review and verify it before you file anything.',
-      confirmText: 'I Understand, Continue',
-      cancelText: 'Cancel'
-    });
-    if (ok) this._yeAckGiven = true;
-    return ok;
-  },
 
   async _generate() {
     const year = document.getElementById('hy-year')?.value;
     if (!year) return;
-    if (!(await this._ackExport())) return;
     const btn = document.getElementById('hy-generate');
 
     if (typeof XLSX === 'undefined') {
@@ -1094,7 +1079,6 @@ S.HubYearEnd = {
   async _openPdfSummary() {
     const year = document.getElementById('hy-year')?.value;
     if (!year) return;
-    if (!(await this._ackExport())) return;
     const Y = this._aggregateYear(year);
     const priorYear = String(parseInt(year, 10) - 1);
     const P = this._aggregateYear(priorYear);
