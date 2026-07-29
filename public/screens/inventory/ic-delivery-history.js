@@ -273,7 +273,12 @@ S.InventoryDeliveryHistory = {
         });
       }
     };
-    document.getElementById('dh-export')?.addEventListener('click', () => App.exportPDF({ title: 'Delivery History', root: this.container }));
+    // One delivery's detail and the whole Delivery History list both saved as
+    // BarCop_DeliveryHistory_<today>.pdf. Name this one after the delivery it is.
+    document.getElementById('dh-export')?.addEventListener('click', () => App.exportPDF({
+      title: 'Delivery History', root: this.container,
+      fileTag: 'Delivery_' + (String(d.date || '').slice(0, 10) || 'Detail') + '_' + (d.vendor || '')
+    }));
   },
 
   // Find the vendor discrepancy filed against a delivery line (via the stamped id,

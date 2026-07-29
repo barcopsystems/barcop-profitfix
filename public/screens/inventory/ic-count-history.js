@@ -358,7 +358,15 @@ S.InventoryCountHistory = {
       + '</div>';
 
     this.container.onclick = null;
-    document.getElementById('ch-export')?.addEventListener('click', () => App.exportPDF({ title: 'Count History', root: this.container }));
+    /* The filename is `BarCop_<fileTag || subtitle || title>_<date>.pdf`, so this ONE count's
+       detail and the whole Count History list both saved as BarCop_CountHistory_<today>.pdf —
+       two genuinely different documents under one name, and the second export just lands as
+       "(1)". Tag it with the count's own date so it names itself, and so two different counts
+       exported on the same day do not collide with each other either. */
+    document.getElementById('ch-export')?.addEventListener('click', () => App.exportPDF({
+      title: 'Count History', root: this.container,
+      fileTag: 'CountHistory_' + (String(count.date || '').slice(0, 10) || 'Detail')
+    }));
     document.getElementById('ch-compare')?.addEventListener('change', e => {
       this.compareId = e.target.value || null;
       this.renderDetail(id);
