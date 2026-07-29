@@ -480,8 +480,8 @@ S.CashDashboard = {
   },
 
   // ── Bar Cop Briefing: a written read of the cash picture, same button Profit
-  //    and Revenue carry. Cached once a week per section (DashUI helpers) so
-  //    repeat opens do not spend on the API. ──────────────────────────────────
+  //    and Revenue carry. Built fresh from your logged data on every open — there is no
+  //    cache and no API call ([[the-loop]] #53: the old comment here claimed both).
   // Code-generated (no API): survival read, where cash is stuck, the one move.
   showInsights() {
     const st = this._st || this.computeState();
