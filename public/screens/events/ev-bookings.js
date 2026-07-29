@@ -1497,7 +1497,12 @@ S.EventsBookings = {
     const done = async (outcome) => {
       const reason = document.getElementById('eb-lost-reason')?.value.trim() || '';
       App.closeModal('eb-lost-modal');
-      const f = { stage: 'Lost', lost_reason: reason, lost_date: App.todayLocal() };
+      // ⚠ THROUGH THE SHARED HELPER, not its own copy of the rule. This stamped `lost_date` inline,
+      // which made it the SECOND implementation of "a booking reaching Lost must be dated" — the
+      // exact drift the helper exists to end, found by sweeping every door against every rule
+      // rather than one defect at a time.
+      const f = this._applyStageFacts(this.bookings().find(x => x.id === id), 'Lost',
+        { stage: 'Lost', lost_reason: reason });
       if (outcome) {
         f.deposit_outcome = outcome;
         // Already refunded means the money has left the bank, so it is in the opening balance
@@ -1631,6 +1636,11 @@ S.EventsBookings = {
       const r = recompute();
       App.closeModal('eb-calc-modal');
       if (!r || !r.perHeadPrice) return;
+      /* ⚠ NO `_rejectReason` HERE ON PURPOSE, and the reasoning lives in the source so the next
+         sweep does not re-raise it ([[the-loop]] #29). This is the one money door without the floor,
+         because it CANNOT emit a negative: `perHeadPrice` is gated on `foodPH > 0 && t > 0` above,
+         so it is 0 or positive, and `if (!r || !r.perHeadPrice) return;` drops the 0. Verified by
+         running the arithmetic with a negative food cost and a negative target; both give 0. */
       const ph = Math.round(r.perHeadPrice * 100) / 100;
       const cur = this.bookings().find(x => x.id === id) || {};
       this.patch(id, { per_head: ph, quoted_total: Math.round(this.quoteParts(Object.assign({}, cur, { per_head: ph })).total) });
