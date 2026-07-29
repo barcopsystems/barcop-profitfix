@@ -158,7 +158,14 @@ S.ProfitForecast = {
     this.container.innerHTML = '<div class="screen">' + statStrip + chipRow + breakdown + headsUp + '</div>';
 
     this.container.querySelectorAll('.pf-horizon-chip').forEach(b => b.addEventListener('click', () => { this.horizon = b.dataset.v; this.renderMain(); }));
-    document.getElementById('pf-export')?.addEventListener('click', () => App.exportPDF({ title: 'Profit Forecast', root: this.container }));
+    /* ⚠ THE HORIZON DRIVES EVERY NUMBER IN THIS DOCUMENT and it lived only in the `no-print`
+       chip row, which the PDF collector skips. Nothing in the body carries a date either (no
+       dated weeks are rendered), so a Next Month forecast and a Next Year forecast saved as two
+       identical-looking files. Name it in the header. */
+    document.getElementById('pf-export')?.addEventListener('click', () => App.exportPDF({
+      title: 'Profit Forecast', root: this.container,
+      range: App.chipRangeLabel(this.HORIZONS.map(h => ({ v: h.v, label: h.label })), this.horizon)
+    }));
   },
 
   showHowTo() {

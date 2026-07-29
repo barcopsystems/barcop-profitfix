@@ -95,6 +95,19 @@ S.HubPermits = {
   },
 
   // ── Filtered list ──────────────────────────────────────────────────────
+  /* The active status filter in words, for the PDF header. A method, not a property, so the
+     harness slicers that lift members by name can still see its siblings ([[the-loop]] #16).
+     The on-screen chips carry live counts ("Expired (3)"); the printed label deliberately does
+     not, because a count baked into a saved document goes stale the moment anything changes. */
+  _filterLabel() {
+    return App.chipRangeLabel([
+      { v: 'all',     label: 'All permits' },
+      { v: 'due',     label: 'Due in 30 days' },
+      { v: 'expired', label: 'Expired only' },
+      { v: 'active',  label: 'On track only' }
+    ], this._filter);
+  },
+
   _filtered() {
     const all = this.records().slice();
     let recs = all;
@@ -283,7 +296,9 @@ S.HubPermits = {
 
     region.querySelector('#hp-export')?.addEventListener('click', () => {
       const el = document.getElementById('hp-list');
-      if (el) App.exportPDF({ title: 'Licensing', root: el });
+      /* Not a date range, but the same lie: the chips are `no-print`, so a list filtered to
+         "Expired" saved as a document that looks like the whole licence book. Name the filter. */
+      if (el) App.exportPDF({ title: 'Licensing', root: el, range: this._filterLabel() });
     });
     region.querySelectorAll('.fc-chip').forEach(chip => {
       chip.addEventListener('click', () => { this._filter = chip.dataset.v; this._renderListRegion(); });

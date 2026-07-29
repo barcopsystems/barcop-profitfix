@@ -171,7 +171,13 @@ S.CashRecon = {
     }));
     document.getElementById('cr-from')?.addEventListener('change', e => { this.filterFrom = e.target.value || ''; this.renderMain(); });
     document.getElementById('cr-to')?.addEventListener('change', e => { this.filterTo = e.target.value || ''; this.renderMain(); });
-    document.getElementById('cr-export')?.addEventListener('click', () => App.exportPDF({ title: 'Over and Short', root: this.container }));
+    // The range chips and the custom From/To are both inside `no-print` rows, so without this
+    // the saved Over and Short sheet could be one week or all time and never say which.
+    document.getElementById('cr-export')?.addEventListener('click', () => {
+      const r = this.effectiveRange();
+      App.exportPDF({ title: 'Over and Short', root: this.container,
+        range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) });
+    });
   },
 
   showHowTo() {

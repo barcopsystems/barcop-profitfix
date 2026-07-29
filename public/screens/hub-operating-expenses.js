@@ -1377,14 +1377,7 @@ S.HubOperatingExpenses = {
   _renderHistory() {
     const PAGE = App.LIST_PAGE || 50;
     if (!this._histShown) this._histShown = PAGE;
-    const rangeChipOpts = [
-      { v: 'this-month', label: 'This Month' },
-      { v: 'last-month', label: 'Last Month' },
-      { v: 'ytd',        label: 'Year to Date' },
-      { v: 'last-12',    label: 'Last 12 Months' },
-      { v: 'all',        label: 'All Time' }
-    ];
-    const rangeChips = App.filterChips(this._filterRange, rangeChipOpts);
+    const rangeChips = App.filterChips(this._filterRange, this._rangeChipOpts());
     const recs = this._filteredRecords();
     const shown = recs.slice(0, this._histShown);
 
@@ -1403,6 +1396,19 @@ S.HubOperatingExpenses = {
       + '</div>' + olderBar;
   },
 
+  /* The History range chips, as a METHOD so the render and the PDF header read one list.
+     Deliberately not a data property: 21 harnesses lift methods out of this file by name and a
+     sibling constant is invisible to every one of those slicers ([[the-loop]] #16). */
+  _rangeChipOpts() {
+    return [
+      { v: 'this-month', label: 'This Month' },
+      { v: 'last-month', label: 'Last Month' },
+      { v: 'ytd',        label: 'Year to Date' },
+      { v: 'last-12',    label: 'Last 12 Months' },
+      { v: 'all',        label: 'All Time' }
+    ];
+  },
+
   _wireHistory() {
     const PAGE = App.LIST_PAGE || 50;
     document.getElementById('oex-export')?.addEventListener('click', () => {
@@ -1411,7 +1417,13 @@ S.HubOperatingExpenses = {
       node.style.cssText = 'position:absolute;left:-99999px;top:0;width:900px;';
       node.innerHTML = this._byCatCardHtml() + this._logTableHtml(this._filteredRecords());
       document.body.appendChild(node);
-      Promise.resolve(App.exportPDF({ title: 'Operating Expenses', root: node })).finally(() => node.remove());
+      /* ⚠ The range chips are in a `no-print` row AND this exports an OFF-SCREEN node that never
+         contained them, so the accountant-facing expense history had no way to say whether it
+         was one month or all time. The "This Month" card export above needs none: its own
+         heading prints "This Month - July 2026" inside the exported root. */
+      Promise.resolve(App.exportPDF({ title: 'Operating Expenses', root: node,
+        range: App.chipRangeLabel(this._rangeChipOpts(), this._filterRange) }))
+        .finally(() => node.remove());
     });
     this.container.querySelectorAll('.fc-chip').forEach(chip => {
       chip.addEventListener('click', () => { this._filterRange = chip.dataset.v; this._histShown = PAGE; this._rerender(); });

@@ -129,6 +129,16 @@ S.VendorTracker = {
     return App.inWindow(parseInt(this.range, 10) || 90)(date);
   },
 
+  /* The window, in words, for the PDF header. All THREE tabs export and all three read the same
+     `this.range`, so this is one method rather than three copies — three copies of the same
+     decision is exactly how they drift. It matters most on the Scorecard, where Total Spend,
+     Net Price Drift and Recovered are all range-filtered dollars: without it the document
+     states money figures and cannot say what window produced them. The chips live in a
+     `no-print` row, so nothing else in the PDF carries the answer. */
+  rangeLabel() {
+    return App.chipRangeLabel(this.RANGES.map(([v, label]) => ({ v, label })), this.range);
+  },
+
   metricsFor(vendorName) {
     const dels  = this.deliveries().filter(d => d.vendor === vendorName && this.inRange(d.date));
     const disc  = this.discRecords().filter(d => d.vendor === vendorName && this.inRange(d.date));
@@ -254,7 +264,7 @@ S.VendorTracker = {
     this.container.querySelectorAll('.vt-range-chip').forEach(b =>
       b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-sc-export')?.addEventListener('click',
-      () => App.exportPDF({ title: 'Vendor Scorecard', root: this.container }));
+      () => App.exportPDF({ title: 'Vendor Scorecard', root: this.container, range: this.rangeLabel() }));
   },
 
   // ════════════════════════════════════════════════════════════════════
@@ -341,7 +351,7 @@ S.VendorTracker = {
     this.container.querySelectorAll('.vt-range-chip').forEach(b =>
       b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-w-export')?.addEventListener('click',
-      () => App.exportListPDF({ title: 'Vendor Price Changes', root: this.container, lists: [['core', 'vendor_price_changes']], reRender: () => this.draw() }));
+      () => App.exportListPDF({ title: 'Vendor Price Changes', root: this.container, lists: [['core', 'vendor_price_changes']], reRender: () => this.draw(), range: this.rangeLabel() }));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.draw())));
   },
 
@@ -435,7 +445,7 @@ S.VendorTracker = {
     this.container.querySelectorAll('.vt-range-chip').forEach(b =>
       b.addEventListener('click', () => { this.range = b.dataset.v; this.draw(); }));
     document.getElementById('vt-disc-export')?.addEventListener('click',
-      () => App.exportListPDF({ title: 'Vendor Discrepancies', root: this.container, lists: [['core', 'vendor_discrepancy']], reRender: () => this.draw() }));
+      () => App.exportListPDF({ title: 'Vendor Discrepancies', root: this.container, lists: [['core', 'vendor_discrepancy']], reRender: () => this.draw(), range: this.rangeLabel() }));
     // Work jumps to that order's Delivery History page and opens the discrepancy
     // modal, where discrepancies are worked (cohesive with Loss Prevention).
     this.container.querySelectorAll('.vt-disc-work').forEach(b => b.addEventListener('click', () => {
