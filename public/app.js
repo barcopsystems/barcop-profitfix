@@ -8908,30 +8908,19 @@ const App = {
     });
   },
 
-  // ── Standard EXPORT-acknowledgment gate — the ONE popup shown before any
-  //    high-stakes financial/payroll download (Payroll, Books, Year-End, Weekly
-  //    P&L). Form-card look, primary "I Understand, Continue" first, ghost
-  //    "Cancel"; no click-off or X so the notice is acted on. message may carry
-  //    inline HTML. Resolves true/false. Route every export gate through this so
-  //    they never drift apart. See [[legal-protection]].
-  confirmExport(opts) {
-    opts = opts || {};
-    const id = 'export-ack-modal';
-    return new Promise(resolve => {
-      const html = '<div class="card form-card" style="margin:0;">'
-        + '<div class="card-title">' + esc(opts.title || 'Before You Export') + '</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">' + (opts.message || '') + '</div>'
-        + '<div class="card-actions">'
-        +   '<button class="btn btn-primary" id="export-ack-go">' + esc(opts.confirmText || 'I Understand, Continue') + '</button>'
-        +   '<button class="btn btn-ghost" id="export-ack-cancel">' + esc(opts.cancelText || 'Cancel') + '</button>'
-        + '</div></div>';
-      this.openModal(html, { id, maxWidth: 540, noX: true });
-      let done = false;
-      const finish = (val) => { if (done) return; done = true; this.closeModal(id); resolve(val); };
-      document.getElementById('export-ack-go')?.addEventListener('click', () => finish(true));
-      document.getElementById('export-ack-cancel')?.addEventListener('click', () => finish(false));
-    });
-  },
+  // ⚠ THE EXPORT-ACK POPUP IS GONE (2026-07-30, Kyle's call). There used to be a
+  //    confirmExport() gate before Books / Year-End / Weekly P&L / Payroll / the lender
+  //    forecast. Five popups, five in-memory flags, so every one reset on every page load,
+  //    and three of them printed nearly the same sentence — a month-end package for the
+  //    accountant meant that paragraph three times in one sitting. On four of the five it
+  //    was the THIRD or FIFTH copy of a notice already on screen and already written into
+  //    the file, and ToS §7/§8 carry it behind a required signup checkbox.
+  //    THE PROTECTION NOW LIVES IN THE TWO CARRIERS THAT MATTER: the on-screen Heads Up
+  //    box and App.deliverableFooter() inside the artifact. The file is the one that
+  //    counts — it travels to the accountant or the bank, which is where a dispute starts;
+  //    a popup only ever protected us against the person who already agreed to the terms.
+  //    Do NOT reintroduce a pre-download gate: verify-export-notice-carried.js fails on it,
+  //    and enforces the screen + file notice instead. See [[legal-protection]].
 
   // ── Standard delete confirmation — ONE wording, identical on every delete box
   //    across Bar Cop. Pass a subject for multi-select deletes (e.g. 'these 5
@@ -8974,7 +8963,7 @@ const App = {
 
     const disclaimerLines = [
       'Generated from data you entered in Bar Cop on ' + dateStr + '.',
-      'Bar Cop is a software tool, not a CPA, accountant, marketing consultant, or other professional advisor.',
+      'Bar Cop is a software tool, not a CPA, accountant, tax preparer, payroll provider, attorney, or other professional advisor.',
       'Review and verify before filing, presenting, or making material decisions.'
     ];
     const workbookSubject = disclaimerLines.join(' ');
