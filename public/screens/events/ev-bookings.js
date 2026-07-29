@@ -247,6 +247,16 @@ S.EventsBookings = {
      helper now. If a sixth appears, it calls this, not `parseFloat`. */
   _depositHeld(b) { return Math.max(0, parseFloat(b && b.deposit_amount) || 0); },
 
+  /* How much of a banked deposit goes back on a cancelled booking (S247). Absent, it is the whole
+     deposit — what every record written before this field existed already means. ⚠ Capped at what
+     was actually banked: you cannot give back more than you took, and an uncapped figure would be a
+     typo the cash forecast believes. ONE definition, shared with `CashEngine.eventRefundsOwed`. */
+  _refundOwedOnLost(b) {
+    const held = this._depositHeld(b);
+    const set = (b && b.refund_amount != null && b.refund_amount !== '') ? (parseFloat(b.refund_amount) || 0) : held;
+    return Math.min(held, Math.max(0, set));
+  },
+
   /* ⚠⚠ ONE DEFINITION OF "A DEPOSIT IS STILL DUE", BECAUSE THERE WERE TWO AND THEY DISAGREED.
      The Bookings strip summed every unpaid deposit; the Events dashboard filtered `> 0` first.
      ⛔ MEASURED on the identical set (1500, -2000, 500): **strip $0.00, dashboard $2,000.00**.
@@ -930,9 +940,23 @@ S.EventsBookings = {
           + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
           + (o === 'kept' ? 'You kept ' + App.fmtCurrency(held) + '. It stayed in your account and no cash moves.'
              : o === 'refunded' ? 'You refunded ' + App.fmtCurrency(held) + (b.deposit_refund_date ? ' on ' + this.fmtDate(b.deposit_refund_date) : '') + '. That money has left your bank.'
-             : o === 'to_refund' ? App.fmtCurrency(held) + ' is still to go back to them. Your Cash Forecast counts it as money leaving until you mark it paid.'
+             : o === 'to_refund' ? App.fmtCurrency(this._refundOwedOnLost(b)) + ' is still to go back to them. Your Cash Forecast counts it as money leaving until you mark it paid.'
+               + (this._refundOwedOnLost(b) < held ? ' You are keeping ' + App.fmtCurrency(held - this._refundOwedOnLost(b)) + '.' : '')
              : 'You are holding ' + App.fmtCurrency(held) + ' of theirs and Bar Cop has no record of what happened to it, so it is in no number anywhere. Say which.')
-          + '</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'
+          + '</div>'
+          /* ⚠ S247 — HOW MUCH GOES BACK. Keeping a cancellation fee out of the deposit and returning
+             the rest is ordinary, and charging the whole thing made that unrepresentable. Only shown
+             while there IS something still to refund; the box defaults to the whole deposit, which
+             is what every record written before this field existed already means. */
+          + (o === 'to_refund'
+              ? '<div class="form-row" style="gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">'
+                + '<div class="f" style="width:170px;flex-shrink:0;"><label>Amount Going Back</label>'
+                + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-refund-amt" value="'
+                + this._refundOwedOnLost(b) + '"/></div></div>'
+                + '<button class="btn btn-ghost btn-sm" id="eb-refund-amt-save">Save Amount</button>'
+                + '<span id="eb-refund-err" style="color:var(--red);font-size:12px;display:none;"></span></div>'
+              : '')
+          + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
           + (o !== 'kept' ? '<button class="btn btn-ghost btn-sm eb-dep-out" data-out="kept">Keeping it</button>' : '')
           + (o !== 'refunded' ? '<button class="btn btn-primary btn-sm eb-dep-out" data-out="refunded">' + (o === 'to_refund' ? 'Mark refund paid' : 'Already refunded') + '</button>' : '')
           + (o !== 'to_refund' ? '<button class="btn btn-ghost btn-sm eb-dep-out" data-out="to_refund">Still to refund</button>' : '')
@@ -1237,6 +1261,21 @@ S.EventsBookings = {
       if (!b.lost_date) f.lost_date = App.todayLocal();
       this.patch(id, f);
     }));
+    // S247 — how much of the deposit goes back. Refused, not clamped, so a typo is never rewritten
+    // silently onto a figure the cash forecast then charges.
+    document.getElementById('eb-refund-amt-save')?.addEventListener('click', () => {
+      const el = document.getElementById('eb-refund-amt');
+      const err = document.getElementById('eb-refund-err');
+      const say = m => { if (err) { err.textContent = m; err.style.display = m ? 'inline' : 'none'; } };
+      const raw = el ? String(el.value).trim() : '';
+      const v = parseFloat(raw);
+      const held = this._depositHeld(b);
+      if (raw === '' || isNaN(v)) { say('Enter how much goes back.'); return; }
+      if (v < 0) { say('A refund cannot be negative.'); return; }
+      if (v > held) { say('You only took ' + App.fmtCurrency(held) + '.'); return; }
+      say('');
+      this.patch(id, { refund_amount: v });
+    });
     document.getElementById('eb-lost')?.addEventListener('click', async () => {
       if ((await this._saveOpen(id)) === 'invalid') return;
       this.markLost(id);
