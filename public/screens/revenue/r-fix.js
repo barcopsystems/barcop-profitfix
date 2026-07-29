@@ -40,7 +40,6 @@ S.RevenueFix = {
   steps(g) { return (g && g.process && g.process.steps) || []; },
   fixLog() { return (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : []; },
   loggedDate(id) { const e = this.fixLog().filter(x => x.gap_id === id).sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]; return e ? e : null; },
-  docPath(file) { return 'assets/resources/revenue/' + encodeURIComponent(file); },
 
   // ── Verification ────────────────────────────────────────────────────────────
   SIGNALS: {
@@ -373,10 +372,11 @@ S.RevenueFix = {
     if (docId) {
       return '<div class="pf-step pf-stepcard pf-doc" data-doc="' + esc(docId) + '" style="cursor:pointer;">' + inner + '</div>';
     }
-    if (s.target && kind === 'reference') {
-      return '<a class="pf-step pf-stepcard" href="' + this.docPath(s.target) + '" download style="text-decoration:none;">' + inner + '</a>';
-    }
-    if (s.target) {
+    /* ⚠ NO STORED-FILE FALLBACK, and `kind !== 'reference'` below is load-bearing — the twin of
+       profit-fix's stepRow. The old `<a href="assets/resources/<file>">` branch pointed at a
+       folder that has since been deleted, and simply removing it would have dropped a reference
+       step into pf-go, navigating to a filename. A reference step with no `doc` id renders inert. */
+    if (s.target && kind !== 'reference') {
       return '<div class="pf-step pf-stepcard pf-go" data-target="' + esc(s.target) + '">' + inner + '</div>';
     }
     return '<div class="pf-step">' + inner + '</div>';
