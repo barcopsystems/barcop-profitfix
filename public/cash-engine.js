@@ -550,7 +550,10 @@ window.CashEngine = {
      remittance AS a percentage OF revenue) and it drives Margin %, while a receivable must be
      gross. The seed enters it BOTH ways ($1,575 net-ish on Westlake, $2,840 all-in on Reyes) and no
      single entry can satisfy both readers. That is a product decision (Bar Cop has no final-invoice
-     field), not something to infer here — see S235 on THE LIST.
+     field), not something to infer here. ⚠ S235 IS NOW DECIDED: `actual_revenue` is NET OF SALES
+     TAX, stated on the P&L form and in the help. That does not reopen this — a receivable is GROSS,
+     so the agreed figure is still the right one to collect; it only ends the ambiguity about what
+     the field means.
      Until it is decided, the forecast collects **what was AGREED**, which is unambiguous and is what
      the signed agreement holds the client to. */
   _eventTotal(b) { try { return S.EventsBookings.quoteTotal(b); } catch (e) { return parseFloat(b && b.quoted_total) || 0; } },
@@ -924,8 +927,10 @@ window.CashEngine = {
       const net = inflow - out;
       bal += net;
       // ⚠ `refunds` rides in the OUTFLOWS column so the table's inflow - out = net tie-out holds
-      // (verify-forecast-column-tieouts asserts it on every row); `refundList` names them.
-      rows.push({ ws, we, i, sales, events: evAdd, eventList: ev.list, inflow, labor: labCost, laborSource: lab.source, purchases: purchWk, bills, billRecs, outflows: outflows + refunds.total, ofRecs, refundList: refunds.list, extra: extraOut, out, net, balance: bal });
+      // (verify-forecast-column-tieouts asserts it on every row). It carries NO list: a `refundList`
+      // field was added here and read nowhere, under a comment claiming it WAS read — [[the-loop]]
+      // #25 and a confidence claim in a comment, in one line. c-forecast asks the engine directly.
+      rows.push({ ws, we, i, sales, events: evAdd, eventList: ev.list, inflow, labor: labCost, laborSource: lab.source, purchases: purchWk, bills, billRecs, outflows: outflows + refunds.total, ofRecs, extra: extraOut, out, net, balance: bal });
     }
     let lowIdx = 0;
     rows.forEach((r, i) => { if (r.balance < rows[lowIdx].balance) lowIdx = i; });
