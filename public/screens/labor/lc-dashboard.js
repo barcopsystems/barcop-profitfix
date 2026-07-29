@@ -401,7 +401,7 @@ S.LaborDashboard = {
   },
 
   // ── Bar Cop Briefing: a written read of the labor week, cached a week per
-  //    section via DashUI so repeat opens do not spend on the API. ─────────────
+  //    section. Built fresh from your logged data on every open: no cache, no API call. ─────────────
   // Code-generated (no API): where labor stands, where it leaks, the one move.
   showInsights() {
     const st = this._wys();
