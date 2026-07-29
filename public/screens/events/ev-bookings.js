@@ -956,8 +956,19 @@ S.EventsBookings = {
        reads as "no price entered yet" rather than as a mistake. (Before the floor it read
        -$5,700.00, visibly wrong; the floor made it invisibly wrong, which is worse.) The operator
        had no signal at all until Save Quote finally refused. */
-    this._stepErr(this._rejectReason(f));
-    const merged = Object.assign({}, cur, f);
+    /* ⛔⛔ A REFUSED VALUE IS NOT PRICED AT ALL — found by Kyle on the very next screen after the
+       tile fix below, and it IS that fix's own [[the-loop]] #58: the tiles used to render only from
+       the STORED record, which no door lets hold a negative, so nothing had to ask what they do with
+       one. Making them follow the typing handed them a value the app had just refused.
+       MEASURED on screen: a red line reading "Per Head cannot be negative." with **Per Head
+       $-62.00** and **Quoted Total $250.00** printed confidently above it — negative money on a tile,
+       and a "quoted total" that is just the room fee left standing after the floor ate the rest.
+       Neither figure is true of this booking, and [[output-honesty]] is that every displayed number
+       must be. So while the input is invalid, BOTH surfaces show the booking as it actually stands
+       and the message says what to fix. One rule, no disagreement, nothing untrue on screen. */
+    const bad = this._rejectReason(f);
+    this._stepErr(bad);
+    const merged = bad ? Object.assign({}, cur) : Object.assign({}, cur, f);
     el.innerHTML = this.quoteBreakdownHtml(this.quoteParts(merged));
     /* ⛔⛔ AND THE TILES ABOVE, BECAUSE THEY NAME THE SAME QUANTITY. Found by Kyle in the real app in
        two minutes, on ground five adversarial rounds had just been over — a node harness cannot see
