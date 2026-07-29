@@ -315,8 +315,20 @@ S.LaborPayrollExport = {
     const sum = (k) => rows.reduce((t, r) => t + (Number(r[k]) || 0), 0);
     dataRows.push(['TOTAL', '', '', f2(sum('regHours')), f2(sum('otHours')), f2(sum('totalHours')), '',
       f2(sum('regPay')), f2(sum('otPay')), '', f2(sum('gross')), '']);
+    /* Excel and Google Sheets EVALUATE a cell that begins with `=`, `+`, `-` or `@` as a formula
+       when the file opens, instead of showing it as text. This file carries the staff name,
+       position, pay type and status exactly as the operator typed them, and it is the one export
+       that goes to a payroll provider, so a name entered as "=cmd|..." would run rather than
+       print. A leading apostrophe is the standard way to tell a spreadsheet "this is text".
+
+       ⛔⛔ `-` IS ON THAT LIST AND THIS FILE IS FULL OF NEGATIVE NUMBERS. Prefixing every cell
+       that starts with `-` would turn "-125.00" into text and the payroll provider's import would
+       stop reading it as money, which is far worse than the exposure being closed. So the guard
+       fires ONLY when the value is not a plain number. Pinned in verify-payroll-export-foots.js
+       from both directions: the hostile cells get the apostrophe, and -125.00 must NOT. */
     const escapeCell = (v) => {
-      const s = String(v == null ? '' : v);
+      let s = String(v == null ? '' : v);
+      if (/^\s*[=+\-@]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s.trim())) s = "'" + s;
       return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
     const lines = [this._columns, ...dataRows].map(r => r.map(escapeCell).join(','));
