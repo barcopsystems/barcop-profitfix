@@ -5410,8 +5410,31 @@ const App = {
       doc.text('Page ' + i + ' of ' + pages, pageW - margin, pageH - 22, { align: 'right' });
     }
 
-    const tag = (opts.fileTag || subtitle || title).replace(/[^A-Za-z0-9]+/g, '');
-    await this._savePDF(doc, 'BarCop_' + tag + '_' + this._pdfDateStamp() + '.pdf');
+    /* The period the document COVERS beats the day it was printed, which is why `range` wins
+       here. Two exports of the same view then produce the same file, exactly as the workbooks
+       already behave (`Month-End Books Worksheet - July 2026.xlsx` is that name every time). */
+    await this._savePDF(doc, this.pdfFileName(
+      opts.fileTag || (subtitle ? title + ' - ' + subtitle : title), opts.range));
+  },
+
+  /* ONE FILENAME CONVENTION FOR EVERY DOCUMENT BAR COP PRODUCES: `<Bar> - <What> - <Period>.pdf`.
+
+     The workbooks always did this right -- "Anchor Bar - Annual Review Worksheet - 2026.xlsx"
+     names the bar, the document and the period in plain language. The PDFs did not: they saved
+     as "BarCop_WeeklyHistory_20260729.pdf" with NO BAR NAME AT ALL, so an accountant or a lender
+     holding files for several bars could not tell whose was whose. Sixteen call sites had drifted
+     onto the BarCop_ shape while four had already found the venue shape on their own, which is
+     the usual tell that a convention was never written down anywhere ([[the-loop]] step 0.6:
+     where there are three of the same decision, extract ONE helper). Kyle, 2026-07-29, asked for
+     the workbook convention app-wide.
+
+     `_savePDF` runs fileSafe and guarantees the .pdf extension, so neither is repeated here.
+     A missing period falls back to today, never to an empty segment. */
+  pdfFileName(docName, period) {
+    const venue = ((this.data && this.data.settings && this.data.settings.bar_name) || 'Bar Cop');
+    const what = String(docName == null ? '' : docName).trim() || 'Report';
+    const when = String(period == null ? '' : period).trim() || this.todayLocal();
+    return venue.trim() + ' - ' + what + ' - ' + when + '.pdf';
   },
 
   async _savePDF(doc, filename) {
@@ -8797,8 +8820,7 @@ const App = {
 
     // Filename: strip the trailing noun from the title and append "Worksheet".
     const base = String(title).replace(/\s*(Log|Sheet|Pad|Book|Calendar|Worksheet|List)\s*$/i, '').trim() || String(title);
-    const tag = base.replace(/[^A-Za-z0-9]+/g, '');
-    await this._savePDF(doc, 'BarCop_' + tag + '_Worksheet_' + this._pdfDateStamp() + '.pdf');
+    await this._savePDF(doc, this.pdfFileName(base + ' Worksheet'));
   },
 
   // In-app confirmation modal — replaces window.confirm() so dialogs match
