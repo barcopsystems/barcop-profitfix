@@ -745,6 +745,19 @@ S.EventsBookings = {
          row below, and it is the only thing on a Completed booking that reports it. */
       const owed = this.balanceOutstanding(b);
       if (owed > 0) t.push(this.statTile('Balance Due', App.fmtCurrency(owed), 'still to collect', 'warn'));
+    } else if (stage === 'Lost') {
+      /* ⚠ A LOST BOOKING HAD NO TILES AT ALL, which is why a banked deposit could disappear from
+         every screen in Bar Cop while the record still held it. The deal is dead; the money is not. */
+      const held = b.deposit_paid_date ? this._depositHeld(b) : 0;
+      if (held > 0) {
+        const o = b.deposit_outcome;
+        const lbl = o === 'kept' ? 'Kept' : o === 'refunded' ? 'Refunded' : o === 'to_refund' ? 'To refund' : 'Undecided';
+        const sub = o === 'kept' ? 'stayed in your account'
+          : o === 'refunded' ? (b.deposit_refund_date ? 'paid back ' + this.fmtDate(b.deposit_refund_date) : 'paid back')
+          : o === 'to_refund' ? 'money still to leave' : 'say what happened to it';
+        t.push(this.statTile('Deposit Held', App.fmtCurrency(held), sub, o === 'kept' ? 'good' : o ? 'warn' : 'bad'));
+        t.push(this.statTile('Outcome', lbl, o ? '&nbsp;' : 'nothing recorded', o ? '' : 'bad'));
+      }
     }
     return t.length ? '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + t.join('') + '</div>' : '';
   },
@@ -853,13 +866,30 @@ S.EventsBookings = {
         + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm eb-runsheet-open">Open Run Sheet</button><button class="btn btn-ghost btn-sm eb-runsheet-print">Export Run Sheet</button></div>'
         + '</div>';
     } else if (viewStep === 'Completed') {
+      // Only when there is a quote to derive it from; a house event that was never quoted has no
+      // tax figure Bar Cop can hand them, and inventing one is exactly what it must not do.
+      const qpNet = this.quoteTotal(b) > 0 ? this.quoteParts(b) : null;
       card2 = '<div class="card form-card">' + this.subLabel('Close Out the P&amp;L')
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;align-items:flex-end;">'
-          + '<div class="f" style="width:170px;flex-shrink:0;"><label>Actual Revenue</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-actual" value="' + (b.actual_revenue != null && b.actual_revenue !== 0 ? b.actual_revenue : '') + '"/></div></div>'
+          + '<div class="f" style="width:190px;flex-shrink:0;"><label>Actual Revenue (before tax)</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-actual" value="' + (b.actual_revenue != null && b.actual_revenue !== 0 ? b.actual_revenue : '') + '"/></div></div>'
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Food Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-food" value="' + (b.event_food_cost != null && b.event_food_cost !== 0 ? b.event_food_cost : '') + '"/></div></div>'
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Bar Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-bar" value="' + (b.event_bar_cost != null && b.event_bar_cost !== 0 ? b.event_bar_cost : '') + '"/></div></div>'
           + '<div class="f" style="width:150px;flex-shrink:0;"><label>Other Cost</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="eb-pl-other" value="' + (b.event_other_cost != null && b.event_other_cost !== 0 ? b.event_other_cost : '') + '"/></div></div>'
         + '</div>'
+        /* ⚠⚠ SAY WHICH NUMBER YOU WANT, AND HAND THEM IT (S235). `actual_revenue` had no stated
+           basis and its two readers need opposite ones: `this-week.cateringFromBookings` posts it to
+           the week's Events REVENUE line, beside Bar and Food, which are NET — and the engine
+           computes the tax remittance AS A PERCENTAGE OF that total, so an all-in figure overstates
+           both the revenue and the tax owed. The seed entered it BOTH ways ($1,575 net-ish on one
+           booking, $2,840 all-in on another) and no single entry could satisfy both readers.
+           ⚠ THE DECISION: net of sales tax, because every other revenue number in Bar Cop is. The
+           service charge and the room fee ARE revenue (they are income to the bar); only the tax is
+           not. And the operator is handed the figure rather than asked to compute it — derived from
+           the QUOTE, which Bar Cop knows exactly, not inferred about the actual. */
+        + (qpNet ? '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:8px;">'
+            + 'You quoted ' + App.fmtCurrency(qpNet.total) + ' all in. Before sales tax that is '
+            + '<b style="color:var(--t2);">' + App.fmtCurrency(qpNet.total - qpNet.tax) + '</b>. '
+            + 'Enter what the event actually earned, not counting the tax you collected for the state.</div>' : '')
         + '<div id="eb-pl-err" style="display:none;margin-top:10px;font-size:12px;color:var(--red);"></div>'
         /* ⚠⚠ SETTLE THE BALANCE FROM THE CARD YOU LAND ON (S238, Kyle: "shouldn't have to go back to
            previous step"). Mark Balance Paid lived ONLY on the Booked card, so the ordinary path —
@@ -879,6 +909,27 @@ S.EventsBookings = {
             : '')
         + this.divider() + this.staffingHtml(b)
         + '</div>';
+    } else if (viewStep === 'Lost' || b.stage === 'Lost') {
+      /* ⚠ THE PAYABLE HAS TO STAY WORKABLE, or "still to refund" is just a label. A Lost booking
+         rendered no card at all, so a deposit the bar had agreed to give back could be recorded and
+         then never settled — it would sit in the 13-week forecast as money leaving, for ever.
+         This is also the only door for a booking that was marked Lost before the question existed,
+         or by the Stage dropdown in Edit Details, which does not ask. */
+      const held = b.deposit_paid_date ? this._depositHeld(b) : 0;
+      if (held > 0) {
+        const o = b.deposit_outcome;
+        card2 = '<div class="card form-card">' + this.subLabel('The Deposit You Were Holding')
+          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
+          + (o === 'kept' ? 'You kept ' + App.fmtCurrency(held) + '. It stayed in your account and no cash moves.'
+             : o === 'refunded' ? 'You refunded ' + App.fmtCurrency(held) + (b.deposit_refund_date ? ' on ' + this.fmtDate(b.deposit_refund_date) : '') + '. That money has left your bank.'
+             : o === 'to_refund' ? App.fmtCurrency(held) + ' is still to go back to them. Your Cash Forecast counts it as money leaving until you mark it paid.'
+             : 'You are holding ' + App.fmtCurrency(held) + ' of theirs and Bar Cop has no record of what happened to it, so it is in no number anywhere. Say which.')
+          + '</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'
+          + (o !== 'kept' ? '<button class="btn btn-ghost btn-sm eb-dep-out" data-out="kept">Keeping it</button>' : '')
+          + (o !== 'refunded' ? '<button class="btn btn-primary btn-sm eb-dep-out" data-out="refunded">' + (o === 'to_refund' ? 'Mark refund paid' : 'Already refunded') + '</button>' : '')
+          + (o !== 'to_refund' && o !== 'refunded' ? '<button class="btn btn-ghost btn-sm eb-dep-out" data-out="to_refund">Still to refund</button>' : '')
+          + '</div></div>';
+      }
     }
 
     const viewBanner = viewingPast
@@ -1145,6 +1196,15 @@ S.EventsBookings = {
     // Forward actions
     document.getElementById('eb-send')?.addEventListener('click', () => this.sendQuote(id));
     document.getElementById('eb-resend')?.addEventListener('click', () => this.sendQuote(id, true));
+    // Recording (or correcting) what happened to a dead booking's deposit.
+    this.container.querySelectorAll('.eb-dep-out').forEach(el => el.addEventListener('click', () => {
+      const out = el.dataset.out;
+      const f = { deposit_outcome: out };
+      // Refunded means it has already left the bank, so it stops being projected out. Moving BACK
+      // to kept or still-to-refund has to clear that date, or the money would read as gone twice.
+      f.deposit_refund_date = (out === 'refunded') ? App.todayLocal() : null;
+      this.patch(id, f);
+    }));
     document.getElementById('eb-lost')?.addEventListener('click', async () => {
       if ((await this._saveOpen(id)) === 'invalid') return;
       this.markLost(id);
@@ -1344,16 +1404,49 @@ S.EventsBookings = {
   },
 
   // Mark Lost with a captured reason (App.confirm only returns a boolean).
+  /* ⚠⚠ WHEN A BOOKING DIES, ASK WHAT HAPPENED TO THE MONEY YOU ARE HOLDING. Marking Lost used to
+     drop a banked deposit out of the cash position with no prompt and no record: measured, a $1,500
+     deposit went {balanceTotal 8311.13, deposits 1500} -> {0, [], 0} and appeared on NO screen in
+     Bar Cop, while the record still held it. `statsRow` returns '' for Lost, card 2 is empty and the
+     rail has no clickable nodes, so there was nowhere for it to show even if it had been counted.
+     Bar Cop cannot work out which of three things happened, and guessing costs money in both
+     directions — so it asks once, at the only moment the operator knows, exactly as Mark Balance
+     Paid asks how it was settled ([[the-loop]] #30: a single question beats a smarter inference).
+     ⚠ Only asked when a deposit was actually COLLECTED. A promised-but-unpaid deposit is nothing to
+     decide about, and a question with no stakes is how a real one stops being read. */
   markLost(id) {
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Mark This Booking Lost</div>'
-      + '<div class="f" style="width:100%;"><label>Reason (optional)</label><input type="text" id="eb-lost-reason" placeholder="Booked elsewhere, date conflict, over budget"/></div>'
-      + '<div class="card-actions"><button class="btn btn-primary" id="eb-lost-save">Mark Lost</button></div></div>';
-    App.openModal(html, { id: 'eb-lost-modal', maxWidth: 520, confirmDirty: true });
-    document.getElementById('eb-lost-save')?.addEventListener('click', async () => {
+    const b = this.bookings().find(x => x.id === id) || {};
+    const held = b.deposit_paid_date ? this._depositHeld(b) : 0;
+    const reasonField = '<div class="f" style="width:100%;"><label>Reason (optional)</label><input type="text" id="eb-lost-reason" placeholder="Booked elsewhere, date conflict, over budget"/></div>';
+    const money = held > 0
+      ? this.divider() + this.subLabel('The Deposit You Are Holding')
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
+        + 'You have <b style="color:var(--t1);">' + App.fmtCurrency(held) + '</b> of theirs. '
+        + 'Your agreement says the deposit is non-refundable, but the call is yours. '
+        + 'Bar Cop only counts money leaving if you say it is.</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary btn-sm" id="eb-lost-kept">Keeping it</button>'
+        + '<button class="btn btn-ghost btn-sm" id="eb-lost-refunded">Already refunded</button>'
+        + '<button class="btn btn-ghost btn-sm" id="eb-lost-torefund">Still to refund</button></div>'
+      : '<div class="card-actions"><button class="btn btn-primary" id="eb-lost-save">Mark Lost</button></div>';
+    App.openModal('<div class="card form-card" style="margin:0;"><div class="card-title">Mark This Booking Lost</div>'
+      + reasonField + money + '</div>', { id: 'eb-lost-modal', maxWidth: 540, confirmDirty: true });
+    const done = async (outcome) => {
       const reason = document.getElementById('eb-lost-reason')?.value.trim() || '';
       App.closeModal('eb-lost-modal');
-      await this.patch(id, { stage: 'Lost', lost_reason: reason });
-    });
+      const f = { stage: 'Lost', lost_reason: reason, lost_date: App.todayLocal() };
+      if (outcome) {
+        f.deposit_outcome = outcome;
+        // Already refunded means the money has left the bank, so it is in the opening balance
+        // already and must NOT also be projected out — the mirror of balance_paid_date on the way in.
+        if (outcome === 'refunded') f.deposit_refund_date = App.todayLocal();
+      }
+      await this.patch(id, f);
+    };
+    document.getElementById('eb-lost-save')?.addEventListener('click', () => done(''));
+    document.getElementById('eb-lost-kept')?.addEventListener('click', () => done('kept'));
+    document.getElementById('eb-lost-refunded')?.addEventListener('click', () => done('refunded'));
+    document.getElementById('eb-lost-torefund')?.addEventListener('click', () => done('to_refund'));
   },
 
   // ── Send Quote by email (the vendor-order mailto pattern) ────────────────
@@ -1789,7 +1882,7 @@ S.EventsBookings = {
       { h: 'Agreement', p: ['Agreement, on the booking header, builds an event agreement from the booking: the event details, the money, your terms, and signature lines for you and the client. The terms start from a sensible template you edit once to your own policy, and Bar Cop remembers them for the next event. Save and Print gives you a clean copy to send for signature. It is a worksheet, not a contract; have your attorney review it.'] },
       { h: 'Staffing', p: ['Schedule Staff for this Event jumps to Build Schedule on the event date, which is marked with an EVENT tag. Open each person working the event and check "Working [event name]" so only their hours land on the Event P&L, not the whole day\'s crew.'] },
       { h: 'Run Sheet', p: ['Run Sheet is what the kitchen and floor work the event off: the timeline, the food and bar, allergies and dietary, the room setup, AV and rentals, the guaranteed headcount and when the final count is due, and who runs point on site. Open it from the booking header or the Booked stage, fill it in, and Print Run Sheet to hand the team a clean copy.'] },
-      { h: 'Event P&L', p: ['On a Completed booking, enter the actual revenue (the event\'s bill) and the food, bar, and other cost. Labor pulls automatically from the staff you checked for the event in Build Schedule, using their logged hours on the event date. The margin is the event\'s bottom line.'] },
+      { h: 'Event P&L', p: ['On a Completed booking, enter the actual revenue and the food, bar, and other cost. Actual revenue is what the event earned BEFORE sales tax, the same basis as your bar and food sales, because the tax you collect is the state\'s money and not yours. The service charge and any room fee are yours, so they count. Bar Cop shows you the figure off your own quote so you do not have to work it out. Labor pulls automatically from the staff you checked for the event in Build Schedule, using their logged hours on the event date. The margin is the event\'s bottom line.'] },
       { h: 'Getting Back', p: ['The back arrow at the bottom right returns you to the pipeline from any booking.'] }
     ]);
   }
