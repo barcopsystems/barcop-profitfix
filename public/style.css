@@ -1235,6 +1235,12 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    gold flag note (e.g. "$0.40 Over", "Short QTY 2") + Flag + Delete fit without
    wrapping the row. */
 .ing-tbl.pill tbody .btn{padding:4px 9px;font-size:9px;}
+/* ...but "without wrapping the row" was only ever true at full width. .row-actions is
+   flex with no wrap, so once the builder narrows, the flag note and the buttons run past
+   their cell and print over the Extended figure instead of dropping to a second line.
+   Scoped to the pill builder deliberately: every other .row-actions in the app sits in a
+   roomier data-card row and is left exactly as it was. */
+.ing-tbl.pill tbody .row-actions{flex-wrap:wrap;}
 /* Stack to clean label/value cards as soon as the BUILDER itself gets too narrow,
    not at a viewport breakpoint — the sidebar makes viewport width a poor proxy.
    Mirrors the .row-list container-query approach so it compresses then stacks,
