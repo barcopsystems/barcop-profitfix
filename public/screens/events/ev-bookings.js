@@ -646,6 +646,8 @@ S.EventsBookings = {
       return;
     }
     if (rec.stage === 'Quote Sent' || rec.stage === 'Booked' || rec.stage === 'Completed') this._freezeRates(null, rec);
+    // A booking can be created straight at Lost from this form; it still needs dating.
+    this._applyStageFacts(null, rec.stage, rec);
     rec.id = App.uid();
     rec.created_at = new Date().toISOString();
     rec.updated_at = rec.created_at;
@@ -1184,7 +1186,7 @@ S.EventsBookings = {
     document.getElementById('eb-staff')?.addEventListener('click', () => { App._eventStaffTag = b.event_name || this.title(b); App._eventStaffDate = b.event_date || ''; App.openScreen('lc-build-schedule'); });
     this.container.querySelectorAll('.eb-runsheet-open').forEach(el => el.addEventListener('click', () => this.runSheet(id)));
     this.container.querySelectorAll('.eb-runsheet-print').forEach(el => el.addEventListener('click', () => this.printRunSheet(this.bookings().find(x => x.id === id))));
-    // Event P&L. � actual_revenue does NOT reach the cash forecast  _eventTotal collects the
+    // Event P&L. � actual_revenue does NOT reach the cash forecast  _eventTotal collects the
     // AGREED figure (quoteTotal); that change was tried and reverted. It IS posted to This Week's
     // Events revenue line, net of tax (S235), so a mistyped negative here is still money.
     document.getElementById('eb-pl-save')?.addEventListener('click', () => {
@@ -1352,6 +1354,38 @@ S.EventsBookings = {
     return !!(await this.patch(id, f));
   },
 
+  /* ⚠⚠ ONE DEFINITION OF WHAT A STAGE MOVE DOES TO THE CANCELLATION FACTS — because there are THREE
+     doors that move a booking's stage and round 6 taught only one of them.
+     ⛔ REOPENING A DEAD BOOKING MUST DROP WHAT DIED WITH IT. `deposit_outcome`,
+     `deposit_refund_date` and — when the money actually went back — `deposit_paid_date` all describe
+     a cancellation. Reopen wrote only the stage, so they survived onto the live booking. MEASURED:
+     $1,500 banked, refunded on cancellation, reopened and re-Booked — `eventInflow` read **$5,040.75
+     against a truth of $6,540.75** and `committedEventCash` reported **$1,500 "already in hand"**
+     that had left the bank. It also left a stale outcome a later re-Lost resurrected, four months
+     out of date, without asking anyone.
+     ⛔ AND A BOOKING THAT REACHES LOST MUST BE DATED, because `eventRefundsOwed` dates the payable by
+     `lost_date` and falls back to the EVENT date — five months out, that charged $0.00.
+     ⚠ THE TWIN, which is why this is a helper and not a block: `changeStage` got both rules in round
+     6 and **`saveForm`'s Stage dropdown had neither**, though it moves a booking out of Lost and into
+     it just as freely; `addBooking` can create one at Lost outright. Copying the block would have
+     been a second implementation of the thing under test ([[the-loop]] step 0.5, and #58 — a rule
+     stops the class it names only if the NEXT door is derived against it).
+     ⚠ Clearing `deposit_paid_date` ONLY on `refunded` is the factual half: the bar demonstrably does
+     not hold that money any more. "Kept" is left alone — whether a kept cancellation fee becomes a
+     deposit again is not knowable, and the cleared outcome means it asks again if the booking dies
+     twice ([[the-loop]] #30). */
+  _applyStageFacts(b, to, fields) {
+    const from = (b && b.stage) || 'Lead';
+    if (from === 'Lost' && to !== 'Lost') {
+      if (b.deposit_outcome) fields.deposit_outcome = null;
+      if (b.deposit_outcome === 'refunded') fields.deposit_paid_date = null;
+      if (b.deposit_refund_date) fields.deposit_refund_date = null;
+      if (b.lost_date) fields.lost_date = null;
+    }
+    if (to === 'Lost' && !(b && b.lost_date)) fields.lost_date = App.todayLocal();
+    return fields;
+  },
+
   async changeStage(id, to) {
     const edits = this.openEdits();
     if (!this._stepErr(this._rejectReason(edits))) return false;
@@ -1361,25 +1395,7 @@ S.EventsBookings = {
     // by the pre-existing G6 pin the same minute it was written ([[the-loop]] #49's family).
     const fields = Object.assign({}, edits, { stage: to });
     const b = this.bookings().find(x => x.id === id);
-    /* ⛔⛔ REOPENING A DEAD BOOKING MUST DROP WHAT DIED WITH IT. `deposit_outcome`,
-       `deposit_refund_date` and — when the money actually went back — `deposit_paid_date` all
-       describe a cancellation. Reopen wrote only the stage, so they survived onto the live booking.
-       ⛔ MEASURED: a $1,500 deposit banked, refunded on cancellation, then reopened and re-Booked —
-       `eventInflow` read **$5,040.75 against a truth of $6,540.75**, `committedEventCash` reported
-       **$1,500 of deposits "already in hand"** that had left the bank, and **the signed agreement
-       billed the client $5,040.75 instead of $6,540.75, under-collecting $1,500** for money they no
-       longer had. It also left a stale outcome that a later re-Lost resurrected, with a four-month-
-       old date, without asking anyone.
-       ⚠ Clearing `deposit_paid_date` ONLY on `refunded` is the factual half: the bar demonstrably
-       does not hold that money any more. "Kept" is deliberately left alone — whether a kept
-       cancellation fee becomes a deposit again is not something Bar Cop can know, and the outcome
-       being cleared means it will ask again if the booking dies twice ([[the-loop]] #30). */
-    if (b && b.stage === 'Lost' && to !== 'Lost') {
-      if (b.deposit_outcome) fields.deposit_outcome = null;
-      if (b.deposit_outcome === 'refunded') fields.deposit_paid_date = null;
-      if (b.deposit_refund_date) fields.deposit_refund_date = null;
-      if (b.lost_date) fields.lost_date = null;
-    }
+    this._applyStageFacts(b, to, fields);
     /* ⚠⚠ A BOOKED EVENT WITH NO DATE IS OWED MONEY NOTHING CAN SEE. changeStage validated nothing,
        and every other surface keys on event_date: the calendar map is empty, the countdown reads
        "-", eventInflow skips it, and the dashboard's future-booked revenue is $0 — while
@@ -1657,6 +1673,9 @@ S.EventsBookings = {
       return;
     }
     if (st === 'Quote Sent' || st === 'Booked' || st === 'Completed') this._freezeRates(existing, fields);
+    // The Stage dropdown is a stage door too — same cancellation rules as the buttons (see the
+    // helper). It moves a booking out of Lost and into it just as freely and had neither.
+    if (st) this._applyStageFacts(existing, st, fields);
     const rec = Object.assign({}, existing || {}, fields, { id: id || App.uid(), updated_at: new Date().toISOString() });
     if (!id) rec.created_at = new Date().toISOString();
     const ok = await App.putRecord('core', 'booking', rec);
