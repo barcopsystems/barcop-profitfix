@@ -67,6 +67,14 @@ S.InventoryTakeInventory = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '';
+    /* One-shot handoff from Count History's Edit button (S250). Consumed immediately, like every
+       other cross-screen jump in the app, so a later visit does not silently reopen the count. */
+    const pendEdit = App._pendingCountEdit;
+    if (pendEdit) {
+      App._pendingCountEdit = null;
+      this.editCount(pendEdit);
+      return;
+    }
     if (this.draft && this.draft._view) this.route();
     else this.renderSetup();
   },
@@ -269,6 +277,59 @@ S.InventoryTakeInventory = {
   },
 
   // ── Counting ──────────────────────────────────────────────────────────────
+  /* ── S250: RE-OPEN A SUBMITTED COUNT FOR CORRECTION ────────────────────────────────────
+     Kyle: "I inventory a location and submit it, then realize I missed a couple of bottles. How
+     do I add those?" Until now: you could not. There was no edit, only Delete, on a record that
+     feeds cost of goods -- and an ADJUSTMENT is not a substitute, because computeUsagePair reads
+     only the two counts and the deliveries, so one would record a note and correct nothing.
+
+     ⚠ THE ZERO-VS-ABSENT RULE IS PRESERVED EXACTLY, and it is the whole reason this is careful.
+     `_hasCount` tests `!= null`, NOT truthiness, so a genuine zero is a COUNT while a missing
+     field is a skip. Rebuilding a skipped product as `{fulls:0}` would silently promote every
+     shelf the operator deliberately passed over into a counted zero -- which is exactly what
+     `computeUsagePair`'s `counted === false` filter exists to prevent, and it would bill the whole
+     shelf as used. So a skipped item is rebuilt with NO numeric fields at all. */
+  editCount(id) {
+    const rec = this.counts().find(c => c.id === id);
+    if (!rec) return;
+    if (App.countLockedByWeek(rec)) return;    // the list hides Edit in this case; belt and braces
+
+    const counts = {};
+    (rec.items || []).forEach(it => {
+      if (!it || !it.product_id) return;
+      const key = it.product_id + '@@' + (it.location || 'Unassigned');
+      const e = { notes: it.notes || '' };
+      if (it.counted !== false) {              // a counted line keeps every number, zeros included
+        if (it.cases != null || it.loose != null) { e.cases = it.cases || 0; e.loose = it.loose || 0; }
+        if (it.fulls != null)   e.fulls = it.fulls;
+        if (it.partial != null) e.value = it.partial;
+        if (e.fulls == null && e.value == null && e.cases == null) e.value = it.total || 0;
+      }
+      counts[key] = e;
+    });
+
+    this.draft = {
+      type:            rec.type,
+      custom_locations: (rec.locations || []).slice(),
+      counted_by_id:   rec.counted_by_id || '',
+      counted_by:      rec.counted_by || '',
+      counts,
+      started_at:      rec.created_at,
+      _view:           'counting',
+      _locStep:        0,
+      /* Correcting a count must UPDATE it, never mint a second one dated today -- two counts on
+         one day would become a usage pair spanning zero days and poison the very COGS this is
+         protecting. Same id, same business date, same created_at. */
+      _edit_id:        rec.id,
+      _edit_date:      rec.date,
+      _edit_created_at: rec.created_at,
+      _edit_count:     (rec.edit_count || 0) + 1
+    };
+    this.locStep = 0;
+    this.saveDraft();
+    this.renderCounting();
+  },
+
   // Products to count = active products whose primary_location is one of
   // the picked locations on the draft. Backward compat: old draft types
   // ('Full' / 'Bar Only' / 'Kitchen Only' without custom_locations) still
@@ -770,9 +831,13 @@ S.InventoryTakeInventory = {
         counted:    r.counted
       };
     });
+    /* An EDIT updates the record in place (S250): same id, same business date, same created_at,
+       so it stays the same point in the usage timeline. `edited_at` / `edit_count` keep the
+       history honest -- Count History prints "Edited" rather than pretending nothing happened. */
+    const editing = !!this.draft._edit_id;
     const record = {
-      id:          App.uid(),
-      date:        App.todayLocal(),
+      id:          editing ? this.draft._edit_id : App.uid(),
+      date:        editing ? this.draft._edit_date : App.todayLocal(),
       type:        this.draft.type,
       counted_by_id: this.draft.counted_by_id || '',
       counted_by:  this.draft.counted_by || (App.staffById(this.draft.counted_by_id) || {}).name || '',
@@ -780,8 +845,12 @@ S.InventoryTakeInventory = {
       items,
       item_count:  items.length,
       total_value: items.reduce((s, i) => s + (i.value || 0), 0),
-      created_at:  new Date().toISOString()
+      created_at:  editing ? this.draft._edit_created_at : new Date().toISOString()
     };
+    if (editing) {
+      record.edited_at  = new Date().toISOString();
+      record.edit_count = this.draft._edit_count || 1;
+    }
 
     const btn = document.getElementById('ti-submit');
     if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }

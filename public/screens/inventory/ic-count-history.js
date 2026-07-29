@@ -144,7 +144,12 @@ S.InventoryCountHistory = {
           + '<td class="val">' + App.fmtCurrency(c.total_value || 0) + '</td>'
           + '<td>' + varCell + '</td>'
           + '<td>' + status + '</td>'
+          /* S250: Edit re-opens the count so a missed bottle can be added. Hidden once a
+             confirmed week has booked this count -- editing then would rewrite COGS that has
+             already been signed off. Delete stays where it was, behind the same permission. */
           + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm ch-view" data-id="' + c.id + '">View</button>'
+          + ((App.canEdit('ic-count-history') && !App.countLockedByWeek(c))
+              ? '<button class="btn btn-ghost btn-sm ch-edit" data-id="' + c.id + '">Edit</button>' : '')
           + (App.canEdit('ic-count-history') ? '<button class="btn btn-danger btn-sm ch-del" data-id="' + c.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
@@ -172,10 +177,20 @@ S.InventoryCountHistory = {
       }
       if (ev.target.closest('#ch-list-export')) { this.exportList(); return; }
       const del = ev.target.closest('.ch-del');
+      const edit = ev.target.closest('.ch-edit');
       const view = ev.target.closest('.ch-view');
       const row = ev.target.closest('.ch-row');
       const take = ev.target.closest('#ch-take');
       if (del)  { ev.stopPropagation(); this.confirmDelete(del.dataset.id); return; }
+      /* Hand the count to Take Inventory, which owns the counting form. The id rides on
+         App._pendingCountEdit because navigate() re-renders the target screen from scratch --
+         the same one-shot handoff pattern the other cross-screen jumps use. */
+      if (edit) {
+        ev.stopPropagation();
+        App._pendingCountEdit = edit.dataset.id;
+        App.navigate('ic-take-inventory');
+        return;
+      }
       if (view) { const id = view.dataset.id; App.pushView(() => this.renderDetail(id)); return; }
       if (row)  { const id = row.dataset.id;  App.pushView(() => this.renderDetail(id)); return; }
       if (take) App.navigate('ic-take-inventory');

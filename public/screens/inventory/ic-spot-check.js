@@ -391,8 +391,12 @@ S.InventorySpotCheck = {
          had no way to know about. "Finish Spot Check" says what it does: it is the door into
          history, and it refuses to open on a half-counted check. */
       + '<div style="margin-top:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-        + '<button class="btn btn-primary" id="sp-save">Finish Spot Check</button>'
-        + '<button class="btn btn-ghost" id="sp-save-later">Save for Later</button>'
+        + '<button class="btn btn-primary" id="sp-save">' + (this._openWasComplete ? 'Save Changes' : 'Finish Spot Check') + '</button>'
+        /* ⚠ NO "Save for Later" WHILE CORRECTING A FINISHED CHECK. It would set the record back to
+           in_progress, which silently pulls a real check out of history AND out of the audit's
+           shrink figure -- an abandoned two-second edit would quietly delete evidence. The
+           localStorage draft still holds the work if they walk away mid-correction. */
+        + (this._openWasComplete ? '' : '<button class="btn btn-ghost" id="sp-save-later">Save for Later</button>')
         + '<span id="sp-save-msg" style="display:none;color:var(--red);font-size:12px;margin-left:4px;"></span>'
       + '</div></div>';
     App.applyCollapsed(this.container);
@@ -527,6 +531,12 @@ S.InventorySpotCheck = {
         + '<td class="' + (vd > 0 ? 'neg' : '') + '">' + (vd > 0 ? '+' : '') + App.fmtCurrency(vd, 2) + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm sp-hview" data-id="' + c.id + '">View</button>'
+        /* S252: Edit re-opens a FINISHED check in the entry form. Delete already existed; edit did
+           not, so a fat-fingered post count or POS number was permanent on a record that feeds the
+           audit's shrink figure, theft-risk and the discipline count. Only offered when the check
+           carries its entry state -- a record saved before this shipped has none to reopen. */
+        + ((App.canEdit('ic-spot-check') && c.draft_state)
+            ? '<button class="btn btn-ghost btn-sm sp-hedit" data-id="' + c.id + '">Edit</button>' : '')
         + (App.canEdit('ic-spot-check') ? '<button class="btn btn-danger btn-sm sp-hdel" data-id="' + c.id + '">Delete</button>' : '')
         + '</div></td></tr>';
     }).join('');
@@ -557,9 +567,13 @@ S.InventorySpotCheck = {
       if (ev.target.closest('#sp-list-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Spot Check History', root: this.container, lists: [['ic', 'spot_check']], reRender: () => this.renderHistory(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderHistory()); return; }
       const hdel = ev.target.closest('.sp-hdel');
+      const hedit = ev.target.closest('.sp-hedit');
       const hview = ev.target.closest('.sp-hview');
       const hrow = ev.target.closest('.sp-hrow');
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
+      // Editing reuses the reopen path; openInProgress reads the record's status, so a finished
+      // check stays finished and gets an edited_at stamp instead of dropping back to in-progress.
+      else if (hedit) { ev.stopPropagation(); this.openInProgress(hedit.dataset.id); }
       else if (hview) { ev.stopPropagation(); const id = hview.dataset.id; App.pushView(() => this.renderDetail(id)); }
       else if (hrow) { const id = hrow.dataset.id; App.pushView(() => this.renderDetail(id)); }
     };
@@ -932,11 +946,15 @@ S.InventorySpotCheck = {
       flagged_count:  items.filter(i => i.flagged).length,
       total_variance_dollar: items.reduce((t, i) => t + (i.variance_dollar || 0), 0),
       status:       finalize ? 'complete' : 'in_progress',
-      /* An in-progress record carries the RAW entry state as well as the computed items, because
-         reopening has to redraw the sliders exactly as they were left. Dropped on finalise so a
-         finished check stays the clean record every consumer reads. */
-      draft_state:  finalize ? null : state,
-      created_at:   (this._openCreatedAt || new Date().toISOString())
+      /* The RAW entry state rides along on EVERY check, finished or not (S252). In-progress needs
+         it to resume; a FINISHED one needs it to be editable, and a fat-fingered post count or POS
+         number is otherwise permanent on a record that feeds the audit's shrink figure, theft-risk
+         and the discipline count. Rebuilding it from `items` instead would be a second
+         implementation of the entry shape, which is what drifts. */
+      draft_state:  state,
+      created_at:   (this._openCreatedAt || new Date().toISOString()),
+      edited_at:    this._openWasComplete ? new Date().toISOString() : null,
+      edit_count:   this._openWasComplete ? (this._openEditCount || 0) + 1 : 0
     };
 
     const btn = document.getElementById(finalize ? 'sp-save' : 'sp-save-later');
@@ -946,6 +964,7 @@ S.InventorySpotCheck = {
     if (ok) {
       this.clearDraft();
       this._openId = null; this._openCreatedAt = null; this._touched = {};
+      this._openWasComplete = false; this._openEditCount = 0;
       this.renderMain();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = label || 'Try Again'; }
@@ -966,11 +985,17 @@ S.InventorySpotCheck = {
     if (!c || !c.draft_state) return;
     this._openId = c.id;
     this._openCreatedAt = c.created_at;
+    // Editing a FINISHED check must keep it finished and stamp it (S252); reopening an
+    // in-progress one must not pretend it was ever edited.
+    this._openWasComplete = c.status !== 'in_progress';
+    this._openEditCount = c.edit_count || 0;
     this.draft = { ...c.draft_state, started_at: c.created_at };
     this.saveDraft();
     this._touched = {};
+    this._onHistory = false;
     this.renderMain();
   },
+
 
   renderDetail(id) {
     const c = this.checks().find(x => x.id === id);
