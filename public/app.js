@@ -3704,6 +3704,28 @@ const App = {
     render();
   },
 
+  /* ⛔ A COUNT THAT A CONFIRMED WEEK HAS ALREADY BOOKED IS LOCKED.
+
+     Kyle, 2026-07-29: "if i inventory a location and submit it.. but then i realize i missed a
+     couple of bottles.. how do i add those to the inventory count?" Today: you cannot. There is
+     no edit, only Delete, on a record the screen's own help says feeds cost of goods -- and an
+     ADJUSTMENT cannot stand in for it, because `computeUsagePair(start, end, deliveries)` never
+     reads adjustments, so one would record a note without correcting a penny of COGS.
+
+     So counts become editable. But not ALL of them: a count is one end of a usage pair, and once a
+     week has been confirmed off that pair the COGS, prime cost and variance are booked. Editing
+     then rewrites history somebody already signed off. The rule is deliberately conservative and
+     easy to say out loud: ONCE A WEEK ENDING ON OR AFTER THIS COUNT IS CONFIRMED, THE COUNT IS
+     LOCKED. It leaves exactly the window Kyle described open -- you counted, you noticed, you fix
+     it -- and closes the moment the number has been used.
+     ⚠ `this.`, not `App.`, so it stays liftable ([[the-loop]] #46). */
+  countLockedByWeek(c) {
+    const d = String((c && (c.date || c.created_at)) || '').slice(0, 10);
+    if (!d) return false;
+    return ((this.data && this.data.weeks) || [])
+      .some(w => w && String(w.period_end || '').slice(0, 10) >= d);
+  },
+
   /* ⭐ AN IN-PROGRESS SPOT CHECK IS NOT A SPOT CHECK YET. Every consumer reads through here.
 
      A spot check is a TWO-SITTING job: pre-shift counts before service, post-shift counts and the
