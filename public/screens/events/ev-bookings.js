@@ -961,6 +961,19 @@ S.EventsBookings = {
     if (stage === 'Lead') {
       act.push('<button class="btn btn-primary" id="eb-q-save">Save Quote</button>');
       act.push('<button class="btn btn-ghost" id="eb-send">Email Quote</button>');
+      /* ⛔⛔ A QUOTE DOES NOT HAVE TO GO BY EMAIL, AND WITHOUT THIS A PHONE BOOKING COULD NOT MOVE AT
+         ALL. Kyle, walking the real app: *"you cannot get to the quote sent screen without emailing
+         a quote.. this is wrong.. if no email is used."* He is right, and the reach is the common
+         case: `sendQuote` REFUSES without a `contact_email`, and Email Quote was the ONLY forward
+         action on a Lead — so a party booked over the phone or at the bar could never reach Quote
+         Sent, therefore never Booked, therefore never take a deposit, reach the calendar, or enter
+         the cash forecast. Bar Cop's own Source list leads with Phone and Walk-in.
+         The only escape was the Stage dropdown inside Edit Details, which is a hidden door and not
+         the "one big forward action" this workspace is built around. Quotes get read down the phone
+         and handed over on paper — Quote PDF is right there in the header — so the stage has to be
+         markable on its own. ⚠ Found by a real-app pass, not by six scan rounds: a harness cannot
+         see that the button you need is not on the screen ([[the-loop]] #32). */
+      act.push('<button class="btn btn-ghost eb-stage" data-to="Quote Sent">Mark Quote Sent</button>');
     }
     if (stage === 'Quote Sent') {
       act.push('<button class="btn btn-primary eb-stage" data-to="Booked">Mark Booked</button>');
