@@ -306,6 +306,11 @@ S.LaborTipHistory = {
       + '<th>Staff</th><th>Hours</th><th>Tip Share</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
     App.openModal(html, { id: 'th-pview-modal', maxWidth: 520, noClose: true });
-    document.getElementById('th-pview-export')?.addEventListener('click', () => App.exportPDF({ title: 'Tip Pool', root: document.getElementById('th-pview-card') }));
+    // This one pool's split and lc-tip-log's whole Tip Pool LOG both saved as
+    // BarCop_TipPool_<today>.pdf, from two different screens. Name it after the pool.
+    document.getElementById('th-pview-export')?.addEventListener('click', () => App.exportPDF({
+      title: 'Tip Pool', root: document.getElementById('th-pview-card'),
+      fileTag: 'TipPool_' + (String(p.date || '').slice(0, 10) || 'Detail')
+    }));
   }
 };
