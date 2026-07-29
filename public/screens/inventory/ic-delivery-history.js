@@ -277,7 +277,7 @@ S.InventoryDeliveryHistory = {
     // BarCop_DeliveryHistory_<today>.pdf. Name this one after the delivery it is.
     document.getElementById('dh-export')?.addEventListener('click', () => App.exportPDF({
       title: 'Delivery History', root: this.container,
-      fileTag: 'Delivery_' + (String(d.date || '').slice(0, 10) || 'Detail') + '_' + (d.vendor || '')
+      fileTag: 'Delivery ' + (String(d.date || '').slice(0, 10) || 'Detail') + ' ' + (d.vendor || '')
     }));
   },
 

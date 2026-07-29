@@ -365,7 +365,7 @@ S.InventoryCountHistory = {
        exported on the same day do not collide with each other either. */
     document.getElementById('ch-export')?.addEventListener('click', () => App.exportPDF({
       title: 'Count History', root: this.container,
-      fileTag: 'CountHistory_' + (String(count.date || '').slice(0, 10) || 'Detail')
+      fileTag: 'Count ' + (String(count.date || '').slice(0, 10) || 'Detail')
     }));
     document.getElementById('ch-compare')?.addEventListener('change', e => {
       this.compareId = e.target.value || null;
