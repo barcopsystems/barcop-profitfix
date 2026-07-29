@@ -310,7 +310,7 @@ S.LaborTipHistory = {
     // BarCop_TipPool_<today>.pdf, from two different screens. Name it after the pool.
     document.getElementById('th-pview-export')?.addEventListener('click', () => App.exportPDF({
       title: 'Tip Pool', root: document.getElementById('th-pview-card'),
-      fileTag: 'TipPool_' + (String(p.date || '').slice(0, 10) || 'Detail')
+      fileTag: 'Tip Pool ' + (String(p.date || '').slice(0, 10) || 'Detail')
     }));
   }
 };

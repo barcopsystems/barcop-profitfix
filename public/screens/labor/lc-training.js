@@ -403,7 +403,7 @@ S.LaborTraining = {
     b.spacer(6);
     b.sectionTitle('Notes');
     b.paragraph(' ');
-    await b.save('BarCop_' + App.fileSafe(t.name) + '_TrainingWorksheet.pdf');
+    await b.save(App.pdfFileName(t.name + ' Training Worksheet'));
   },
 
   // ════════════════════════════════════════════════════════════════════════
