@@ -614,6 +614,41 @@ window.CashEngine = {
     return { total, list };
   },
 
+  /* ⚠⚠ EVENT MONEY GOING OUT: A DEPOSIT THE BAR HAS AGREED TO GIVE BACK. Until now Bar Cop had no
+     path for event money LEAVING at all, so marking a booking Lost simply dropped a banked deposit
+     out of the cash position with no prompt and no record — measured, $1,500 of real cash vanishing
+     from every screen while the record still held it.
+     `ev-bookings.markLost` now asks the one question the data cannot answer: was the deposit KEPT
+     (the agreement says non-refundable, so nothing moves), REFUNDED (it has already left the bank),
+     or STILL TO REFUND (a payable). Only the last one is future money out, and that is what this
+     returns.
+     ⚠ DELIBERATELY THE MIRROR OF `eventInflow`, line for line, because the anchor rule has bitten
+     four times ([[the-loop]] #52): the caller passes the anchor it means, an overdue obligation is
+     clamped up to it rather than into a week that has gone, and the window test is then applied — so
+     asking week by week totals exactly the same as asking once, however the caller slices time.
+     A refund already paid drops out on `deposit_refund_date`, exactly as a collected balance drops
+     out of the inflow on `balance_paid_date`: the money has moved and is in the opening balance. */
+  eventRefundsOwed(startYmd, endYmd, anchorYmd) {
+    const bookings = (App.data && Array.isArray(App.data.bookings)) ? App.data.bookings : [];
+    let total = 0; const list = [];
+    bookings.forEach(b => {
+      if (b.stage !== 'Lost' || b.deposit_outcome !== 'to_refund') return;
+      if (b.deposit_refund_date) return;                 // already paid back: it has left the bank
+      if (!b.deposit_paid_date) return;                  // only money actually banked can be refunded
+      const amt = S.EventsBookings._depositHeld(b);
+      if (!(amt > 0)) return;
+      // Owed since the booking died, so date it by when it was marked Lost, falling back to the
+      // event date and then to the window start — a payable with no date is still a payable.
+      const raw = String(b.lost_date || b.event_date || '').slice(0, 10);
+      const anchor = anchorYmd || startYmd;
+      const d = (!raw || raw < anchor) ? anchor : raw;
+      if (d < startYmd || d > endYmd) return;
+      total += amt;
+      list.push({ name: b.event_name || 'Event', amount: amt, date: raw || anchor });
+    });
+    return { total, list };
+  },
+
   // Booked event money for the forecast window: the balances still coming in, plus
   // the deposits already in hand against future events (cash you hold but owe
   // service for, so it is shown as context, never as safe to spend).
@@ -873,12 +908,24 @@ window.CashEngine = {
          the tie-out. One number, used and shown. `extraOut` is deliberately NOT prorated: those are
          explicit "what if I spend this" entries an operator typed for this week, not a recurring
          cost that has been quietly draining since Monday. */
+      /* ⚠⚠ REFUNDS ARE OUTFLOW, AND THEY ARE DELIBERATELY NOT PUT THROUGH `_future0`. A deposit the
+         bar has agreed to give back and has not yet paid is money still to leave, exactly as an
+         uncollected balance is money still to arrive — and `eventRefundsOwed` already drops one that
+         HAS been paid (`deposit_refund_date`), so nothing here can double against opening cash. Put
+         through the today-or-later gate it would be deleted from the whole quarter: the anchor clamps
+         an overdue obligation into week 0, and every later week starts on a future Monday. That is
+         the identical asymmetry the inflow comment above explains, and for the identical reason.
+         ⚠ Not suppressed on a saved override either: an override is the operator's SALES number for
+         the week, and a refund is not sales. */
+      const refunds = this.eventRefundsOwed(ws, we, start);
       const labCost = lab.cost * wk0Share;
       const purchWk = purch * wk0Share;
-      const out = labCost + purchWk + bills + outflows + extraOut;
+      const out = labCost + purchWk + bills + outflows + extraOut + refunds.total;
       const net = inflow - out;
       bal += net;
-      rows.push({ ws, we, i, sales, events: evAdd, eventList: ev.list, inflow, labor: labCost, laborSource: lab.source, purchases: purchWk, bills, billRecs, outflows, ofRecs, extra: extraOut, out, net, balance: bal });
+      // ⚠ `refunds` rides in the OUTFLOWS column so the table's inflow - out = net tie-out holds
+      // (verify-forecast-column-tieouts asserts it on every row); `refundList` names them.
+      rows.push({ ws, we, i, sales, events: evAdd, eventList: ev.list, inflow, labor: labCost, laborSource: lab.source, purchases: purchWk, bills, billRecs, outflows: outflows + refunds.total, ofRecs, refundList: refunds.list, extra: extraOut, out, net, balance: bal });
     }
     let lowIdx = 0;
     rows.forEach((r, i) => { if (r.balance < rows[lowIdx].balance) lowIdx = i; });
