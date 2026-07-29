@@ -136,7 +136,13 @@ S.InventoryDeliveryHistory = {
         + '<td>' + (d.item_count || (d.line_items ? d.line_items.length : 0)) + '</td>'
         + '<td class="val">' + App.fmtCurrency(d.total || 0) + '</td>'
         + '<td>' + disc + '</td>'
+        /* S255: Edit reopens the delivery in the Receive form so a mistyped qty or price can be
+           corrected. Hidden once a confirmed week has booked the period -- a delivery is the
+           PURCHASES term in usage (starting + purchases - ending), so editing it after the fact
+           moves a COGS figure already signed off, exactly as editing a count would. */
         + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm dh-view" data-id="' + d.id + '">View</button>'
+        + ((App.canEdit('ic-delivery-history') && !App.countLockedByWeek(d))
+            ? '<button class="btn btn-ghost btn-sm dh-edit" data-id="' + d.id + '">Edit</button>' : '')
         + (App.canEdit('ic-delivery-history') ? '<button class="btn btn-danger btn-sm dh-del" data-id="' + d.id + '">Delete</button>' : '')
         + '</div></td></tr>';
     }).join('');
@@ -160,7 +166,14 @@ S.InventoryDeliveryHistory = {
       }
       if (ev.target.closest('#dh-list-export')) { this.exportList(); return; }
       const del = ev.target.closest('.dh-del');
+      const edit = ev.target.closest('.dh-edit');
       const view = ev.target.closest('.dh-view');
+      if (edit) {
+        ev.stopPropagation();
+        App._pendingDeliveryEdit = edit.dataset.id;
+        App.navigate('ic-receive-delivery');
+        return;
+      }
       const row = ev.target.closest('.dh-row');
       if (del)  { ev.stopPropagation(); this.confirmDelete(del.dataset.id); return; }
       if (view) { const id = view.dataset.id; App.pushView(() => this.renderDetail(id)); return; }

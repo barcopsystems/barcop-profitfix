@@ -57,6 +57,15 @@ S.InventoryReceiveDelivery = {
     this.container = container;
     this.actions = actions;
     actions.innerHTML = '';
+    /* One-shot handoff from Delivery History's Edit button (S255), consumed immediately like every
+       other cross-screen jump, so a later visit does not silently reopen the delivery. */
+    const pend = App._pendingDeliveryEdit;
+    if (pend) {
+      App._pendingDeliveryEdit = null;
+      this.editDelivery(pend);
+      return;
+    }
+    this._editId = null; this._editCreatedAt = null; this._editCount = 0; this._editPriceNote = 0;
     this.renderForm();
   },
 
@@ -307,6 +316,19 @@ S.InventoryReceiveDelivery = {
   // Remove a line: drop its data row; keep at least one.
   removeLine(line) {
     if (!line) return;
+    /* ⛔ A LINE CARRYING A FILED CREDIT CLAIM CANNOT BE DELETED (S255). The claim ties back by
+       delivery id + product name, so removing the line orphans a live vendor dispute -- the money
+       you are chasing loses the record it is chasing against. Editing the qty or the price is
+       fine and leaves the claim intact; only removal breaks it. Resolve or withdraw the claim in
+       Vendor Tracker first. */
+    if (line.dataset.discrepancyId) {
+      const msg = document.getElementById('rd-err');
+      if (msg) {
+        msg.textContent = 'That line has a credit claim filed against it. Resolve or withdraw the claim in Vendor Tracker before removing the line.';
+        msg.style.display = 'inline';
+      }
+      return;
+    }
     line.remove();
     const lines = document.getElementById('rd-lines');
     if (lines && this.container.querySelectorAll('.rd-line').length === 0) {
@@ -534,6 +556,82 @@ S.InventoryReceiveDelivery = {
     this.recalcTotal();
   },
 
+  /* ── S255: RE-OPEN A FILED DELIVERY FOR CORRECTION ─────────────────────────────────────
+     Kyle: "once you submit a received delivery and it goes into delivery history.. there is only
+     view and delete.. no way to edit." Same gap as the count and the spot check, and the same
+     answer -- except a delivery has two side effects a count does not, both handled elsewhere in
+     this file: the price is NOT re-applied to the product master (see the guard in the save), and
+     a line carrying a filed credit claim cannot be deleted out from under it (see removeLine).
+
+     Prefills exactly the way onOrderPick does, so there is one way to populate these rows rather
+     than two that can drift. Price comes off the DELIVERY line, not the product master -- the
+     whole point is to correct what was recorded, and the current cost may have moved since. */
+  editDelivery(id) {
+    const d = this.deliveries().find(x => x.id === id);
+    if (!d) return;
+    if (App.countLockedByWeek(d)) return;   // history hides Edit here; belt and braces
+
+    this._editId = d.id;
+    this._editCreatedAt = d.created_at;
+    this._editCount = d.edit_count || 0;
+    this._pendingDeliveryId = d.id;
+    this.renderForm();
+
+    const set = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = v == null ? '' : v; };
+    set('rd-vendor', d.vendor); this.onVendorChange(d.vendor);
+    set('rd-vendor', d.vendor);
+    set('rd-date', d.date); set('rd-invoice', d.invoice_number);
+    set('rd-driver', d.driver); set('rd-by', d.received_by_id); set('rd-notes', d.notes);
+
+    const linesEl = document.getElementById('rd-lines');
+    if (linesEl) {
+      linesEl.innerHTML = '';
+      (d.line_items || []).forEach(li => {
+        const prod = this.resolveProduct(li.product_id, li.name);
+        const lid = ++this._seq;
+        linesEl.insertAdjacentHTML('beforeend', this.lineHTML(lid));
+        const line = linesEl.querySelector('.rd-line[data-lid="' + lid + '"]');
+        if (!line) return;
+        if (prod) line.querySelector('.rd-prod').value = prod.id;
+        line.querySelector('.rd-qty').value   = li.qty != null ? li.qty : '';
+        // `price_per_unit` is the field the saved line uses (per CASE for case-tracked beer,
+        // which is what the form takes too), NOT `unit_cost` -- that is the product master's.
+        line.querySelector('.rd-price').value = li.price_per_unit != null ? li.price_per_unit : '';
+        if (li.ordered_qty != null) line.dataset.orderedQty = li.ordered_qty;
+        // Carry the claim link so removeLine can refuse to orphan it, and the row still
+        // renders its Filed / Resolved state.
+        if (li.discrepancy_id) line.dataset.discrepancyId = li.discrepancy_id;
+        this.recalcLine(line);
+      });
+    }
+    this.recalcTotal();
+    this._markEditing();
+  },
+
+  /* A correction must not look like a new delivery. Names the record being edited, and swaps the
+     primary button's wording so "Save Delivery" cannot read as "file a second one". */
+  _markEditing() {
+    if (!this._editId) return;
+    const d = this.deliveries().find(x => x.id === this._editId);
+    const host = document.getElementById('rd-lines')?.closest('.screen') || this.container;
+    const bar = document.createElement('div');
+    bar.className = 'card';
+    bar.style.cssText = 'margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;';
+    bar.innerHTML = '<div style="font-size:13px;color:var(--t1);">Editing the '
+      + (d ? esc(d.vendor || 'vendor') : 'vendor') + ' delivery from '
+      + (d && d.date ? esc(d.date) : 'this date')
+      + '. Correcting a price here does not change the cost on your product master.</div>'
+      + '<button class="btn btn-ghost btn-sm" id="rd-cancel-edit">Cancel</button>';
+    if (host && host.firstChild) host.insertBefore(bar, host.firstChild);
+    document.getElementById('rd-cancel-edit')?.addEventListener('click', () => {
+      this._editId = null; this._editCreatedAt = null; this._editCount = 0;
+      this._pendingDeliveryId = null; this._editPriceNote = 0;
+      App.navigate('ic-delivery-history');
+    });
+    const save = document.getElementById('rd-save');
+    if (save) save.textContent = 'Save Changes';
+  },
+
   // ── Discrepancy: open the shared Vendor Tracker modal from a flagged line ──
   // File the claim and chase it to credit/resolution in place (no page leave),
   // against the same vendor_discrepancies record Vendor Tracker reads. The line
@@ -672,7 +770,17 @@ S.InventoryReceiveDelivery = {
     // on the delivery record only.
     let appliedUpdates = productUpdates;
     let disputedUpdates = [];
-    if (productUpdates.length > 0) {
+    /* ⛔ AN EDIT NEVER RE-APPLIES A PRICE TO THE PRODUCT MASTER (S255). Receiving sets
+       `product.unit_cost` from the accepted price, which is right the first time. Correcting a
+       delivery from three weeks ago is NOT: later deliveries have almost certainly moved that cost
+       since, and re-applying an old one would silently roll your costing backwards, then cascade
+       into cost_per_pour, pour_cost_pct, every recipe cost, variance dollars and Menu Engineering.
+       The corrected price stays on the DELIVERY record, where it belongs, and the current cost is
+       left alone. Kyle's call, 2026-07-29. */
+    if (this._editId) {
+      appliedUpdates = [];
+      if (productUpdates.length) this._editPriceNote = productUpdates.length;
+    } else if (productUpdates.length > 0) {
       const choice = await this._confirmPriceChanges(productUpdates);
       if (choice === null) return;  // operator cancelled the save
       appliedUpdates  = productUpdates.filter((_, i) => choice.apply.has(i));
@@ -696,7 +804,9 @@ S.InventoryReceiveDelivery = {
     // 6 arrived, and that flows into COGS, usage variance and shrink. Held on the screen
     // for this draft and cleared once the delivery is filed, so the retry upserts the same
     // row instead of minting another.
-    this._pendingDeliveryId = this._pendingDeliveryId || App.uid();
+    // An edit UPDATES the delivery it reopened: same id, so it stays the same purchase in the
+    // usage math rather than becoming a second one (S255).
+    this._pendingDeliveryId = this._editId || this._pendingDeliveryId || App.uid();
     const record = {
       id:             this._pendingDeliveryId,
       vendor,
@@ -714,8 +824,12 @@ S.InventoryReceiveDelivery = {
       short_count_count:  shortCounts,
       matched_order_id:   matchedOrderId || null,
       has_discrepancy: priceChanges > 0 || shortCounts > 0,
-      created_at:     new Date().toISOString()
+      created_at:     this._editCreatedAt || new Date().toISOString()
     };
+    if (this._editId) {
+      record.edited_at  = new Date().toISOString();
+      record.edit_count = (this._editCount || 0) + 1;
+    }
 
     // Cost creep: before the new costs land, snapshot the cost% of every menu
     // item that uses a product whose price ROSE in this delivery, so afterward we
