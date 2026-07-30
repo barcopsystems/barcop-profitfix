@@ -195,7 +195,12 @@ S.LaborPayrollExport = {
   // ── Workbook (.xlsx) — formatted like Month-End Books ─────────────────────
   _downloadWorkbook(weekStart) {
     if (!weekStart) return;
-    if (typeof XLSX === 'undefined') { this._setStatus('Spreadsheet engine did not load. Refresh and try again.', 'var(--red)'); return; }
+    /* ⚠ THE HARD REFRESH, AND THE WAY OUT THAT IS ALREADY ON SCREEN. This read "Refresh and try
+       again", and a plain reload keeps serving the cached script ([[hard-refresh]]) — which is the
+       exact failure being reported, so it was advice that can quietly not work. It was also the only
+       one of the five XLSX doors not saying Ctrl+Shift+R, and the only one with a working alternative
+       sitting beside it (`px-csv` Download CSV, which needs no parser) that it never mentioned. */
+    if (typeof XLSX === 'undefined') { this._setStatus('The Excel builder did not load. Hard refresh the page (Ctrl+Shift+R) and try again, or use Download CSV instead.', 'var(--red)'); return; }
     const d = this._data(weekStart);
     if (!d.rows.length) { this._setStatus('No hours or salaried staff in this pay period.', 'var(--red)'); return; }
     try {
