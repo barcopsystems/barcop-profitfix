@@ -79,47 +79,11 @@ S.LaborTipLog = {
   },
 
   // ── Day + Service-Period anchor (replaces the old sc_shifts picker) ──────────
-  // A week stepper + day-of-week chips + service-period chips, shared by the Tip
-  // Log batch builder, the edit pop-up, and the Tip Pool. The real date printed on
-  // each chip kills the misclick a bare date field invited. prefix scopes the
-  // class names so two hosts never collide.
-  defaultPeriod() {
-    const p = App.servicePeriodByTime && App.servicePeriodByTime();
-    return (p && p.name) || (App.SHIFT_TYPES || [])[0] || '';
-  },
   addDaysYmd(ymd, n) {
     const d = new Date((ymd || App.todayLocal()) + 'T00:00:00');
     if (isNaN(d.getTime())) return ymd;
     d.setDate(d.getDate() + n);
     return App.ymdLocal(d);
-  },
-  anchorHtml(prefix, weekStart, selDate, selPeriod) {
-    const ws = weekStart || this.mondayOf(App.todayLocal());
-    const start = new Date(ws + 'T00:00:00');
-    const days = [];
-    for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(App.ymdLocal(d)); }
-    const mLabel = ymd => new Date(ymd + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const chip = (cls, on, attr, label) => '<button type="button" class="btn btn-sm ' + cls + '" ' + attr + ' style="'
-      + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-            : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    const dayChips = days.map(ymd => {
-      const d = new Date(ymd + 'T00:00:00');
-      const wd = this.DAYS[(d.getDay() + 6) % 7];
-      return chip(prefix + '-day', ymd === selDate, 'data-ymd="' + ymd + '"', wd + ' ' + d.getDate());
-    }).join('');
-    const perChips = (App.SHIFT_TYPES || []).map(per =>
-      chip(prefix + '-period', per === selPeriod, 'data-period="' + esc(per) + '"', esc(per))).join('');
-    return '<div style="margin-bottom:14px;">'
-      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
-      +   '<button type="button" class="btn btn-ghost btn-sm ' + prefix + '-wk-prev" aria-label="Previous week" style="margin:0;">&lsaquo;</button>'
-      +   '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);">Week of ' + mLabel(days[0]) + ' &ndash; ' + mLabel(days[6]) + '</div>'
-      +   '<button type="button" class="btn btn-ghost btn-sm ' + prefix + '-wk-next" aria-label="Next week" style="margin:0;">&rsaquo;</button>'
-      + '</div>'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">' + dayChips + '</div>'
-      + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-      +   '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:2px;">Service Period</span>' + perChips
-      + '</div>'
-    + '</div>';
   },
 
   // Day-only anchor for the Tip Log (tips log per day now, no service-period split):

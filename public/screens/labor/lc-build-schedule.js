@@ -109,14 +109,6 @@ S.LaborBuildSchedule = {
     const dt = new Date((ws || '') + 'T00:00:00');
     return isNaN(dt.getTime()) ? esc(ws || '') : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
-  // Step a Monday week_start by n weeks, returning the resulting Monday.
-  addWeeks(ws, n) {
-    const base = ws || this.mondayOf(App.todayLocal());
-    const d = new Date(base + 'T00:00:00');
-    if (isNaN(d.getTime())) return base;
-    d.setDate(d.getDate() + n * 7);
-    return this.mondayOf(App.ymdLocal(d));
-  },
   // The Monday-based week selector that replaces the calendar: ONE week range pill
   // (the active-selector style, gold NOW on the current week) flanked by step
   // arrows, plus a snap back to This Week once you step away. Forward IS allowed
