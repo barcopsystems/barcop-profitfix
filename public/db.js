@@ -1604,8 +1604,8 @@ const DB = {
     if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
     // Every row must land, not just some: a partially-stored batch is a silent partial save.
     const queueAll = () => {
-      let ok = true;
-      list.forEach(rec => { if (!this._queueEvent(table, kind, 'put', rec)) ok = false; });
+      // ONE merged write (S287) — all-or-nothing, so `storageFull` below is truthful.
+      const ok = this._queueEventsBulk(table, kind, 'put', list);
       if (ok) this._patchEventCache(table, kind, list, []);
       return ok;
     };
@@ -1735,6 +1735,31 @@ const DB = {
     filtered.push({ table, kind, op, id, payload: op === 'put' ? rec : null,
                     attempts: 0, lastError: '', queuedAt: new Date().toISOString() });
     const stored = this._setEventQueue(filtered);
+    if (stored) this._markPending('events');
+    return stored;
+  },
+  /* ⚠⚠ ONE WRITE FOR THE WHOLE BATCH, AND THAT IS A CORRECTNESS FIX, NOT A SPEED ONE (S287).
+     `_queueEvent` rewrites the ENTIRE queue on every call, so queueing a 400-row batch row by row
+     wrote the queue 400 times — and if localStorage filled at row 200, rows 1-199 were ON DISK
+     while the batch reported failure. `putEventsBulk` then returns `storageFull: true`, and
+     app.js says of that case "nothing reached disk, so reporting success would lose the batch on
+     reload" — false in the partial case. The caller rolled back in memory and told the operator
+     "Nothing was changed" while up to 199 rows sat queued for replay, so the screen and the
+     server disagreed in the one direction where the operator had been actively reassured.
+     Merging once makes the batch all-or-nothing and `storageFull` truthful.
+     ⚠ Same collapse-to-latest semantics as _queueEvent, including WITHIN the batch (a file
+     naming one row twice must leave one entry, last write winning), which a plain push would
+     have broken. Pinned by verify-bulk-queue-atomic.js. */
+  _queueEventsBulk(table, kind, op, recs) {
+    const list = (recs || []).filter(r => r && r.id != null);
+    if (!list.length) return true;
+    const byId = new Map();
+    list.forEach(rec => byId.set(String(rec.id), rec));   // last write wins, as _queueEvent did
+    const kept = this._eventQueue().filter(e => !(e.table === table && e.kind === kind && byId.has(e.id)));
+    const queuedAt = new Date().toISOString();
+    byId.forEach((rec, id) => kept.push({ table, kind, op, id,
+      payload: op === 'put' ? rec : null, attempts: 0, lastError: '', queuedAt }));
+    const stored = this._setEventQueue(kept);
     if (stored) this._markPending('events');
     return stored;
   },
