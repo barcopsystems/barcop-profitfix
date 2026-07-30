@@ -7435,6 +7435,23 @@ const App = {
   _listState: {},
   _listKey(mod, kind) { return mod + '.' + kind; },
 
+  /* ⚠⚠ DERIVED LIST VIEWS (S328). A list built by MERGING or COMPUTING from other kinds rather than
+     stored under a kind of its own: Cash Activity merges drops, safe logs, variances and safe
+     counts; Vendor Price Changes are computed off deliveries. They still need a paging key — the
+     "Show older" reveal and its per-list state are keyed by `mod.kind` — but there is nothing on the
+     server to page, because no row is stored under that name. You cannot ask for "older
+     cash_activity".
+     ⭐ THE POINT OF DECLARING THEM IS THAT THE ABSENCE WAS INDISTINGUISHABLE FROM A TYPO. Before
+     this, these two names were simply missing from EVENT_STORES, and a genuinely MISSPELLED kind
+     fails in exactly the same way and just as silently — `store.kinds[kind]` is undefined, so `all`
+     is `[]`, `hasServerOlder` is permanently false, and the button that offers the multi-year
+     lookback can never appear. Nothing errors, so nothing surfaces it. Declared here, the intent is
+     stated, and `verify-list-kind-names.js` can sweep the whole tree and fail on a real typo.
+     ⚠ `resetListState` reads this too — it iterates a module's kinds, so an undeclared view key's
+     reveal state was never cleared on a fresh window load. */
+  VIEW_KINDS: ['sc|cash_activity', 'core|vendor_price_changes'],
+  isViewKind(mod, kind) { return this.VIEW_KINDS.indexOf(mod + '|' + kind) >= 0; },
+
   // How many rows a list should currently display.
   listLimit(mod, kind) {
     const st = this._listState[this._listKey(mod, kind)];
@@ -7446,6 +7463,14 @@ const App = {
     const store = this.EVENT_STORES[mod];
     if (!store) return;
     Object.keys(store.kinds).forEach(k => { delete this._listState[this._listKey(mod, k)]; });
+    /* ⚠ AND THE DERIVED VIEWS (S328). This iterated the module's stored kinds only, so a view key
+       like `sc|cash_activity` was invisible to it: once the operator pressed "Show older" on Cash
+       Activity, that raised limit survived every fresh window load and account switch, because
+       nothing could ever clear it. */
+    this.VIEW_KINDS.forEach(vk => {
+      const [m, k] = vk.split('|');
+      if (m === mod) delete this._listState[this._listKey(m, k)];
+    });
   },
 
   // Oldest business date currently loaded for a kind (YYYY-MM-DD), or null.
@@ -7495,6 +7520,9 @@ const App = {
        round-trips to the server and flips to "All records loaded".
        Measured on the Regulars book: an account whose oldest regular was created 23 months ago. It
        affects every NONWINDOWED kind that carries a created_at, which is all of them. */
+    /* A DERIVED VIEW has no rows of its own on the server, so there is nothing older to fetch —
+       stated rather than left to fall out of `store.kinds[kind]` being undefined (S328). */
+    if (this.isViewKind(mod, kind)) return false;
     if (DB.NONWINDOWED_KINDS && DB.NONWINDOWED_KINDS.indexOf(kind) >= 0) return false;
     const st = this._listState[this._listKey(mod, kind)];
     if (st && st.exhausted) return false;
