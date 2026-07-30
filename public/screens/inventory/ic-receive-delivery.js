@@ -62,8 +62,10 @@ S.InventoryReceiveDelivery = {
     const pend = App._pendingDeliveryEdit;
     if (pend) {
       App._pendingDeliveryEdit = null;
-      this.editDelivery(pend);
-      return;
+      // ⚠ ONLY RETURN IF THE EDIT ACTUALLY OPENED (S312). This returned unconditionally, so a
+      // refusal (record gone, or a confirmed week now covering it) left a BLANK screen. Falling
+      // through renders the ordinary form, which is the honest outcome when the edit cannot open.
+      if (this.editDelivery(pend)) return;
     }
     this._editId = null; this._editCreatedAt = null; this._editCount = 0; this._editPriceNote = 0;
     this.renderForm();
@@ -120,6 +122,16 @@ S.InventoryReceiveDelivery = {
 
   renderForm() {
     if (this.vendors().length === 0 || this.products().length === 0) {
+      /* ⚠⚠ DROP THE DEEP-LINK FLAG ON THE WAY OUT (S311), and here it is not cosmetic: the consume
+         at the bottom of this function CLEARS THE SAVED DRAFT (`this._draft = null`) because a deep
+         link is meant to be a fresh start. Strand the flag and that clear fires on a LATER visit.
+         Real path: an operator with one vendor places an order, then deletes that vendor while
+         swapping distributors. Order History still offers "Log the Delivery" — click it, land on
+         this setup card, flag survives. They add the new vendor, key a real delivery by hand, leave
+         (the draft is saved), come back — and the stranded flag throws that work away and loads the
+         old order instead. Same shape as S288b, and a new exit in a function with a consume
+         convention is a leak until proven otherwise ([[the-loop]] #49). */
+      this._pendingOrderId = null;
       App.setupCard(this.container, {
         title: 'Set Up Receiving',
         lead: 'Receiving logs what showed up against what you ordered and flags price changes before they cost you. Two quick steps and you can record a delivery.',
@@ -573,10 +585,15 @@ S.InventoryReceiveDelivery = {
      Prefills exactly the way onOrderPick does, so there is one way to populate these rows rather
      than two that can drift. Price comes off the DELIVERY line, not the product master -- the
      whole point is to correct what was recorded, and the current cost may have moved since. */
+  /* ⚠ RETURNS FALSE INSTEAD OF JUST RETURNING (S312). Both refusals below are reachable from a
+     STALE Edit button: Delivery History decides whether to draw it at render time, and the record
+     can be deleted, or a week covering it confirmed, while that list is still on screen. `render()`
+     called this and then returned unconditionally, so a refusal left `content-area` EMPTY — no form,
+     no error, nothing. The caller now falls through to the normal form when the edit cannot open. */
   editDelivery(id) {
     const d = this.deliveries().find(x => x.id === id);
-    if (!d) return;
-    if (App.countLockedByWeek(d)) return;   // history hides Edit here; belt and braces
+    if (!d) return false;
+    if (App.countLockedByWeek(d)) return false;   // history hides Edit here; belt and braces
 
     this._editId = d.id;
     this._editCreatedAt = d.created_at;
@@ -613,6 +630,7 @@ S.InventoryReceiveDelivery = {
     }
     this.recalcTotal();
     this._markEditing();
+    return true;
   },
 
   /* A correction must not look like a new delivery. Names the record being edited, and swaps the

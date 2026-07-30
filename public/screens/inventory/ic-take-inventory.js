@@ -72,8 +72,10 @@ S.InventoryTakeInventory = {
     const pendEdit = App._pendingCountEdit;
     if (pendEdit) {
       App._pendingCountEdit = null;
-      this.editCount(pendEdit);
-      return;
+      // ⚠ ONLY RETURN IF THE EDIT ACTUALLY OPENED (S312). This returned unconditionally, so a
+      // refusal (record gone, or a confirmed week now covering it) left a BLANK screen. Falling
+      // through renders the ordinary view, which is the honest outcome when the edit cannot open.
+      if (this.editCount(pendEdit)) return;
     }
     if (this.draft && this.draft._view) this.route();
     else this.renderSetup();
@@ -289,10 +291,15 @@ S.InventoryTakeInventory = {
      shelf the operator deliberately passed over into a counted zero -- which is exactly what
      `computeUsagePair`'s `counted === false` filter exists to prevent, and it would bill the whole
      shelf as used. So a skipped item is rebuilt with NO numeric fields at all. */
+  /* ⚠ RETURNS FALSE INSTEAD OF JUST RETURNING (S312). Both refusals below are reachable from a
+     STALE Edit button: Count History decides whether to draw it at render time, and the record can
+     be deleted, or a week covering it confirmed, while that list is still on screen. `render()`
+     called this and then returned unconditionally, so a refusal left `content-area` EMPTY — no
+     form, no error, nothing at all. The caller now falls through to the normal view instead. */
   editCount(id) {
     const rec = this.counts().find(c => c.id === id);
-    if (!rec) return;
-    if (App.countLockedByWeek(rec)) return;    // the list hides Edit in this case; belt and braces
+    if (!rec) return false;
+    if (App.countLockedByWeek(rec)) return false;    // the list hides Edit in this case; belt and braces
 
     const counts = {};
     (rec.items || []).forEach(it => {
@@ -328,6 +335,7 @@ S.InventoryTakeInventory = {
     this.locStep = 0;
     this.saveDraft();
     this.renderCounting();
+    return true;
   },
 
   // Products to count = active products whose primary_location is one of
