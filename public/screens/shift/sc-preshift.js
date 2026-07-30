@@ -175,16 +175,6 @@ S.ShiftPreShift = {
     return it.price - m.cost;
   },
 
-  // Why we feature this item: a tight one-liner from the Menu Rundown (class +
-  // the sharpest fact), unique per item. Falls back to a margin line.
-  _featureReason(it) {
-    if (window.S && S.RevenueMenuPlanning && typeof S.RevenueMenuPlanning.shortReadFor === 'function') {
-      const line = S.RevenueMenuPlanning.shortReadFor(it);
-      if (line) return line;
-    }
-    const myM = this._itemMargin(it);
-    return myM != null ? 'Strong ' + App.fmtCurrency(myM) + ' margin.' : 'Feature it.';
-  },
 
   checkTarget() {
     const t = (App.data && App.data.revenue_settings && App.data.revenue_settings.targets) || {};
