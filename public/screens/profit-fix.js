@@ -173,9 +173,21 @@ S.ProfitFix = {
       // account a vacuous zero must not go green, so it reads Not started instead.
       if (!this.gapHasData(gapId)) return { kind: 'state', good: false, state: 'never', label: 'Not started', color: 'var(--t3)', sub: 'No data yet' };
       const n = t.key === 'reprice' ? this.repriceOver() : t.key === 'chase' ? this.chaseOpen() : 0;
-      const good = n === 0;
+      let good = n === 0;   // reassigned by the reprice branch below (I7)
       let label, sub;
-      if (t.key === 'reprice') { label = good ? 'All at target' : n + (n === 1 ? ' item over target' : ' items over target'); sub = good ? '' : 'Reprice or re-cost them'; }
+      if (t.key === 'reprice') {
+        /* ⚠⚠ SAME AS r-fix (I7): repriceOver cannot count an item it cannot grade, so a partial
+           menu printed "All at target" in green over 38 uncosted items. One door on App. */
+        const ungraded = App.menuItemsUngradeable ? App.menuItemsUngradeable().length : 0;
+        good = n === 0 && ungraded === 0;
+        label = n > 0
+          ? n + (n === 1 ? ' item over target' : ' items over target')
+          : (ungraded > 0
+              ? ungraded + (ungraded === 1 ? ' item not costed yet' : ' items not costed yet')
+              : 'All at target');
+        sub = n > 0 ? 'Reprice or re-cost them'
+          : (ungraded > 0 ? 'Bar Cop cannot grade them until they have a cost and a price' : '');
+      }
       else { label = good ? 'No open claims' : n + (n === 1 ? ' open claim' : ' open claims'); sub = good ? '' : 'Chase the credit'; }
       return { kind: 'state', good, state: good ? 'clear' : 'open', label, color: good ? 'var(--green)' : 'var(--amber)', sub };
     }
