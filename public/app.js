@@ -4927,6 +4927,31 @@ const App = {
     return this._pdfLibPromise;
   },
 
+  /* ⚠ Ctrl vs Cmd (S310). Every one of the five spreadsheet doors offers a hard refresh as its only
+     recovery, and "Ctrl+Shift+R" is literally unachievable on a Mac — so for a Mac operator the
+     single piece of advice on screen could not be followed. `userAgentData.platform` first because
+     `navigator.platform` is deprecated; both are absent under node, which falls to the Windows form. */
+  hardRefreshKeys() {
+    const p = (typeof navigator !== 'undefined'
+      && ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform)) || '';
+    return /mac|iphone|ipad|ipod/i.test(p) ? 'Cmd+Shift+R' : 'Ctrl+Shift+R';
+  },
+  /* THE ONE SENTENCE FOR "THE SPREADSHEET LIBRARY IS NOT HERE" (S292). Five doors told five
+     different stories about one fault — "The Excel reader", "The Excel builder", "The file builder",
+     "Spreadsheet engine" — so an operator who hit it on Books and then on an import had no way to
+     know it was the same problem, and a support email saying "the file builder is broken" could not
+     be matched to a screen. One name, one recovery, and each door passes its own alternative.
+     ⚠ IT ALSO LOGS, because this is BAR COP'S fault and not the operator's: a pulled tag, a dead
+     CDN, a corporate proxy. Before this, `cdn.sheetjs.com` being blocked for one chain took out
+     every Excel import plus Books, Year-End, QBO and payroll for that whole account, and the error
+     log showed NOTHING — it surfaced only if someone wrote in. The same file already logs a failed
+     import; this is the same class of fact. */
+  excelMissing(where, alt) {
+    try { if (typeof DB !== 'undefined' && DB.logClientError) DB.logClientError('xlsx_missing', 'SheetJS did not load', 'where=' + String(where || '')); } catch (e) { /* reporting must never break the refusal */ }
+    return 'The spreadsheet engine did not load. Hard refresh the page (' + this.hardRefreshKeys()
+      + ') and try again' + (alt ? ', or ' + alt : '') + '.';
+  },
+
   _pdfDateStamp() {
     const d = new Date(), p = n => String(n).padStart(2, '0');
     return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
