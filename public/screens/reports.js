@@ -18,8 +18,13 @@ S.Reports = {
           + '<div class="card form-card">'
             + '<div class="card-title">Weekly P&amp;L Brief</div>'
             + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm a week from the Profit dashboard first, and it shows here to export.</div>'
+            // S271: it named the Profit dashboard and gave no way to get there. 'this-week' is
+            // the canonical id — openScreen lands the dashboard AND opens Confirm the Week (S260).
+            + '<div style="margin-top:14px;"><button class="btn btn-primary btn-sm" id="pnl-go-confirm">Confirm a Week</button></div>'
           + '</div>'
         + '</div>';
+        document.getElementById('pnl-go-confirm')?.addEventListener('click',
+          () => App.openScreen('this-week'));
         return;
       }
       this._renderQboPicker(mount, weeks);

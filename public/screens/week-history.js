@@ -61,7 +61,12 @@ S.WeekHistory = {
 
     if (!rows.length) {
       this.container.innerHTML = '<div class="screen"><div class="card form-card"><div class="card-title">Week History</div>'
-        + '<div style="font-size:13px;color:var(--t2);padding:2px 0;">No weeks yet. Confirm your week over in Close The Week and it shows up here.</div></div></div>';
+        + '<div style="font-size:13px;color:var(--t2);padding:2px 0;">No weeks yet. Confirm your week over in Close The Week and it shows up here.</div>'
+        // S271: the copy named a destination and did not offer it. 'this-week' is the canonical
+        // confirm-the-week id — App.openScreen special-cases it to land the Profit dashboard AND
+        // open the Confirm the Week modal (S260). Sibling empty states already ship this button.
+        + '<div style="margin-top:14px;"><button class="btn btn-primary btn-sm" data-go="this-week">Confirm a Week</button></div>'
+        + '</div></div>';
       this.wire();
       return;
     }
@@ -122,6 +127,8 @@ S.WeekHistory = {
 
   wire() {
     this.container.onclick = ev => {
+      const go = ev.target.closest('[data-go]');
+      if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
       const ed = ev.target.closest('[data-edit]');
       if (ed) { ConfirmWeek.open(ed.dataset.edit, { onDone: () => this.draw() }); return; }
       const cf = ev.target.closest('[data-confirm]');

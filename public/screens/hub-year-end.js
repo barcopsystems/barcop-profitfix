@@ -52,8 +52,12 @@ S.HubYearEnd = {
       mount.innerHTML = '<div class="screen"><div class="card form-card">'
         + '<div class="card-title">Annual Review</div>'
         + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm your weeks from the Profit dashboard through the year, and your Annual Review builds here, ready to generate.</div>'
+        // S271: it named the Profit dashboard and gave no way to get there.
+        + '<div style="margin-top:14px;"><button class="btn btn-primary btn-sm" id="ye-go-confirm">Confirm a Week</button></div>'
         + '</div></div>';
       if (App.setHubTopbarActions) App.setHubTopbarActions('');
+      document.getElementById('ye-go-confirm')?.addEventListener('click',
+        () => App.openScreen('this-week'));
       return;
     }
     const years = this._availableYears();
