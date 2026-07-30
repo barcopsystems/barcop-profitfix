@@ -1591,6 +1591,15 @@ const App = {
     // Only list PAID bars (plus whichever one they're currently in), so a bar
     // that is mid-signup (created but not yet paid) never pops the switcher.
     const accounts = (allAccounts || []).filter(a => a.active || a.id === activeId);
+    /* ⚠⚠ AN EMPTY LIST AFTER A FAILED LOOKUP IS NOT AN ANSWER, SO DO NOT REPAINT ON IT (S313, and
+       this is the half my first fix got wrong). Not caching the failure made a retry possible, and
+       `navigate` fires one on the next click — but if the very first attempt at boot failed there is
+       no last-known list to fall back on, so `accounts` is empty and the block below would hide the
+       slot again on EVERY click. That takes the bar name off a SINGLE-location operator too, who has
+       no switcher to lose. Leaving the slots untouched keeps whatever is already correct on screen
+       and lets a later attempt fill them in. The retry itself stays user-paced: one click, one query,
+       no timer, so there is nothing here that can spin. */
+    if (!accounts.length && window.DB && DB._acctListErr) return;
     const isMulti  = !!(accounts && accounts.length > 1);
     // Cache for the mobile drawer's location chip (built synchronously).
     this._acctList = accounts || [];
@@ -4921,8 +4930,17 @@ const App = {
     // Only fetch what is actually missing: after a partial load the retry needs the plugin alone,
     // not another 300KB of a library already sitting in the page.
     const havejsPDF = !!(window.jspdf && window.jspdf.jsPDF);
+    /* ⚠⚠ AND THE OUTCOME IS CHECKED, NOT JUST THE INPUT. `onload` means "the browser fetched
+       something and ran it", NOT "the library registered". A captive portal or a corporate proxy that
+       answers the CDN with a 200 HTML interstitial fires onload for BOTH scripts, so the chain
+       resolves, the memo becomes a permanently RESOLVED promise, every caller's `try/catch` passes,
+       and `const { jsPDF } = window.jspdf;` then throws OUTSIDE all of them — the same silently dead
+       Export button the strict probe was added to prevent, arriving through the other door. The
+       probe only ever gated the SKIP; it has to gate the result too. Rejecting here reuses the catch
+       below, so the memo is dropped and the operator gets the real message. */
     this._pdfLibPromise = (havejsPDF ? Promise.resolve() : load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'))
       .then(() => load('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'))
+      .then(() => { if (!this._pdfLibReady()) throw new Error('PDF library loaded but did not register'); })
       .catch(err => { this._pdfLibPromise = null; throw err; });
     return this._pdfLibPromise;
   },
@@ -4947,7 +4965,17 @@ const App = {
      log showed NOTHING — it surfaced only if someone wrote in. The same file already logs a failed
      import; this is the same class of fact. */
   excelMissing(where, alt) {
-    try { if (typeof DB !== 'undefined' && DB.logClientError) DB.logClientError('xlsx_missing', 'SheetJS did not load', 'where=' + String(where || '')); } catch (e) { /* reporting must never break the refusal */ }
+    /* ⚠ THE DOOR GOES IN THE MESSAGE, NOT ONLY THE DETAIL. `logClientError` dedupes on
+       `kind + '|' + message`, so a constant message meant only the FIRST of the five doors ever
+       reached `client_errors` — and telling them apart is the entire reason this logs at all. A
+       support ticket reading "Books is broken" would never have shown that the importers died too,
+       which is the blind spot this was added to close. `screen` is its own column, so it gets the
+       door too rather than being left empty. */
+    try {
+      if (typeof DB !== 'undefined' && DB.logClientError) {
+        DB.logClientError('xlsx_missing', 'SheetJS did not load at ' + String(where || 'unknown'), '', String(where || ''));
+      }
+    } catch (e) { /* reporting must never break the refusal */ }
     return 'The spreadsheet engine did not load. Hard refresh the page (' + this.hardRefreshKeys()
       + ') and try again' + (alt ? ', or ' + alt : '') + '.';
   },
