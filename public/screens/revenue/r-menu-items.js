@@ -1145,7 +1145,17 @@ S.RevenueMenuItems = {
     // (set in the inventory branch below), so the name check waits until after.
     let name = document.getElementById('ri-name')?.value.trim() || '';
     const price = parseFloat(document.getElementById('ri-price')?.value) || 0;
-    const covers = parseFloat(document.getElementById('ri-cov')?.value) || 0;
+    /* ⚠⚠ ROUNDED AT THE WRITE DOOR, because units sold is a COUNT and this door was the odd one out.
+       Three doors write this field and they disagreed: the PMIX drop rounds (`PosIngest._count` →
+       `Math.round`, and its comment says "rounded because this is a unit count"), while this form and
+       the CSV import both stored whatever `parseFloat` returned. So a typed 12.004 was persisted as
+       12.004. FOUR readers then defend themselves with their own `Math.round` at display
+       (r-dog-test, two Menu Engineering columns, Menu Rundown) and a FIFTH does not — the Menu
+       Builder list at :507 prints the raw value, so it showed 12.004 in the table.
+       That is the second-consumer shape: every reader guarding a value the writer should have
+       normalised. Fixing it here means no reader has to. The negative refusal below still runs on the
+       rounded value, so -5.6 is still refused by name. */
+    const covers = Math.round(parseFloat(document.getElementById('ri-cov')?.value) || 0);
     const notes = document.getElementById('ri-notes')?.value || '';
 
     if (!this.formType) { fail('Pick a category first.'); return; }
@@ -1453,7 +1463,10 @@ S.RevenueMenuItems = {
     rows.forEach(r => {
       const name = (r.name || '').trim();
       if (!name) return;
-      const price = num(r.price), cost = +(num(r.cost)).toFixed(2), covers = num(r.covers);
+      // ⚠ `covers` ROUNDED here for the same reason as the form above: it is a unit COUNT, and this
+      // was the third door writing the field under a third rule. Both use sites below (the refresh
+      // branch and the insert) read this one local, so rounding once covers both.
+      const price = num(r.price), cost = +(num(r.cost)).toFixed(2), covers = Math.round(num(r.covers));
       const cat = canonCat(r.category);
       const cur = byKey[keyOf(this.activeType, name)];
       // ⚠ AN INACTIVE ITEM IS MATCHED BUT NOT TOUCHED. Matching it is what stops the import
