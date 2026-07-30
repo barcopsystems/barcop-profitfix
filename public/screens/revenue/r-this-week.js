@@ -251,7 +251,7 @@ S.RevenueThisWeek = {
       : '';
 
     const rows = all.length
-      ? all.slice(0, App.listLimit('core', 'revenue_weeks_hist')).map(w => {
+      ? all.slice(0, App.listLimit('core', 'revenue_week')).map(w => {
           const total = (w.bar_revenue || 0) + (w.floor_revenue || 0);
           const caCls = w.check_avg ? (w.check_avg >= targetCA ? 'pos' : 'neg') : '';
           const lpCls = w.labor_pct_blended ? (w.labor_pct_blended <= tgtLP ? 'pos' : 'neg') : '';
@@ -280,7 +280,7 @@ S.RevenueThisWeek = {
       + '<div id="rw-hist-export"><div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Week Ending</th><th>Week</th><th>Bar Rev</th><th>Floor Rev</th><th>Total</th><th>Covers</th><th>Check Avg</th><th>Labor %</th><th>Labor Hours</th><th>RPLH</th><th></th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>'
-      + App.showOlderBar('core', 'revenue_weeks_hist', all, this.filterPreset !== 'all');
+      + App.showOlderBar('core', 'revenue_week', all, this.filterPreset !== 'all');
   },
 
   draw() {
@@ -318,7 +318,7 @@ S.RevenueThisWeek = {
     }));
     document.getElementById('rw-from')?.addEventListener('change', e => { this.filterFrom = e.target.value; this.draw(); });
     document.getElementById('rw-to')?.addEventListener('change', e => { this.filterTo = e.target.value; this.draw(); });
-    document.getElementById('rw-export')?.addEventListener('click', () => { const r = this.effectiveRange ? this.effectiveRange() : {}; App.exportListPDF({ title: 'Weekly History', fileTag: 'Weekly History - Revenue', rootId: 'rw-hist-export', root: this.container, lists: [['core', 'revenue_weeks_hist']], reRender: () => this.draw(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); });
+    document.getElementById('rw-export')?.addEventListener('click', () => { const r = this.effectiveRange ? this.effectiveRange() : {}; App.exportListPDF({ title: 'Weekly History', fileTag: 'Weekly History - Revenue', rootId: 'rw-hist-export', root: this.container, lists: [['core', 'revenue_week']], reRender: () => this.draw(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); });
     this.container.querySelectorAll('.rw-edit').forEach(b => b.addEventListener('click', () => this.editWeek(b.dataset.id)));
     this.container.querySelector('[data-show-older]')?.addEventListener('click', e => App.handleShowOlder(e.target, () => this.draw()));
   },
