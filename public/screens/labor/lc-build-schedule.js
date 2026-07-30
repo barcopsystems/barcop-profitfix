@@ -187,10 +187,19 @@ S.LaborBuildSchedule = {
     if (actions) actions.innerHTML = '';
     // Events "Schedule Staff for this Event" jump: land on the event's week and
     // show a context banner. Reuses the one-shot _gotoWeek handoff below.
+    /* ⚠ THE DERIVED VALUE HAS TO BE UNDONE TOO (S311). The two App flags are one-shot and are
+       cleared correctly right here — but `_eventContext`, which is built FROM them, lived on the
+       screen object with only one clear anywhere: the operator pressing Dismiss. So arriving from
+       Events set the gold "Scheduling for <event> on <date>" banner, and opening Build Schedule from
+       the NAV a week later still rendered it, pointing at shifts that are no longer on screen (the
+       landing logic below correctly puts them on the current week). Clearing a one-shot flag is not
+       the same as clearing what you computed from it ([[the-loop]] #25). */
     if (App._eventStaffDate) {
       this._gotoWeek = this.mondayOf(App._eventStaffDate);
       this._eventContext = { name: App._eventStaffTag || '', date: App._eventStaffDate };
       App._eventStaffDate = null; App._eventStaffTag = null;
+    } else {
+      this._eventContext = null;
     }
     // Landing behavior. Every week change re-resolves editId to that week's
     // posted schedule (or null), so editId always matches the displayed week and
