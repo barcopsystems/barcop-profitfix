@@ -6017,8 +6017,19 @@ const App = {
     });
   },
   // Every menu item currently over its cost target (drives the cockpit count).
+  /* ⚠⚠ ARCHIVED ITEMS ARE EXCLUDED, AND THIS WAS THE ODD ONE OUT (I6, fixed 2026-07-30).
+     `menuItems()` returns the RAW array — archived included — and `menuItemPct` has no notion of
+     archived, so a Cut item counted here. Menu Engineering, the Bar Cop Audit and Menu Rundown all
+     filter `!archived` already (r-menu-engineering:119/151, and its own comment at :566 says "A Cut
+     item is archived and never reaches this list").
+     THE COST: this is the ONE door for the count (profit-fix:140 and r-fix:128 both say "One door
+     now") and FOUR consumers read it — the IC dashboard tile, profit-fix, r-fix and Recipe Cost
+     Analysis. So an item the operator DELIBERATELY CUT kept Revenue Fix's "N items over target"
+     step amber with no live row behind it, which the operator could not clear by working the list
+     because the row is not on the list. Pinned by verify-archived-not-over-target.js. */
   menuItemsOverTarget() {
-    return this.menuItems().map(it => this.menuItemPct(it)).filter(m => m.over);
+    return this.menuItems().filter(it => it && !it.archived)
+      .map(it => this.menuItemPct(it)).filter(m => m.over);
   },
 
   // ── Perpetual on-hand (the CURRENT picture, not just the latest count) ───────
