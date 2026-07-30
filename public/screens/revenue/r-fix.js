@@ -153,9 +153,19 @@ S.RevenueFix = {
       // account (no menu) a vacuous zero must not go green, so it reads Not started.
       if (!this.gapHasData(gapId)) return { kind: 'state', good: false, state: 'never', label: 'Not started', color: 'var(--t3)', sub: 'No data yet' };
       const n = t.key === 'reprice' ? this.repriceOver() : 0;
-      const good = n === 0;
-      const label = good ? 'All at target' : n + (n === 1 ? ' item over target' : ' items over target');
-      const sub = good ? '' : 'Reprice or re-cost them';
+      /* ⚠⚠ A ZERO IS ONLY ALL-CLEAR IF THERE WAS SOMETHING TO MEASURE (I7). repriceOver counts
+         items OVER target, and an item with no cost or no price can never BE over — so 2 costed
+         items of 40, both at target, printed "All at target" in green while 38 were ungradeable.
+         The comment above already demanded this: a vacuous zero must not go green. */
+      const ungraded = App.menuItemsUngradeable ? App.menuItemsUngradeable().length : 0;
+      const good = n === 0 && ungraded === 0;
+      const label = n > 0
+        ? n + (n === 1 ? ' item over target' : ' items over target')
+        : (ungraded > 0
+            ? ungraded + (ungraded === 1 ? ' item not costed yet' : ' items not costed yet')
+            : 'All at target');
+      const sub = n > 0 ? 'Reprice or re-cost them'
+        : (ungraded > 0 ? 'Bar Cop cannot grade them until they have a cost and a price' : '');
       return { kind: 'state', good, state: good ? 'clear' : 'open', label, color: good ? 'var(--green)' : 'var(--amber)', sub };
     }
     const last = this.lastActivity(t.signal);
