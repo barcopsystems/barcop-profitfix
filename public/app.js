@@ -6032,6 +6032,22 @@ const App = {
       .map(it => this.menuItemPct(it)).filter(m => m.over);
   },
 
+  /* ⚠⚠ THE ITEMS BAR COP CANNOT GRADE — the other half of "N items over target" (I7, 2026-07-30).
+     `menuItemsOverTarget` can only ever count items it can MEASURE: with no cost or no price,
+     `menuItemPct.pct` is null and the item can never be "over". So a menu with 40 items and 2
+     costed, both at target, produced a count of ZERO — and both Fix screens printed
+     **"All at target" in green** while 38 items were ungradeable and the operator was told there
+     was no pricing work to do. Exactly what a partial import produces.
+     A zero is only all-clear when there was something to measure; this is what makes that
+     testable. Archived items are excluded for the same reason they are above (I6): a Cut item is
+     not work. Deliberately NO threshold — the honest question is "is anything ungradeable", not
+     "how much of the menu is costed", so there is no number to fit to a fixture. */
+  menuItemsUngradeable() {
+    return this.menuItems().filter(it => it && !it.archived)
+      .map(it => ({ item: it, m: this.menuItemPct(it) }))
+      .filter(x => x.m.pct == null || x.m.target == null);
+  },
+
   // ── Perpetual on-hand (the CURRENT picture, not just the latest count) ───────
   // The reorder math + inventory value read current on-hand, which is NOT the
   // single latest count: a count can cover one location and skip products, so
