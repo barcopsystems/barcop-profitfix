@@ -679,6 +679,44 @@ S.PrepBatches = {
     // by `if (this._saving) return` while the stale "Batch name required" still showed.
     if (!name) { if (err) { err.textContent = 'Batch name required.'; err.style.display = 'inline'; } unlock(); return; }
 
+    const by = parseFloat(this._el('pb-yield')?.value) || 0;
+    const bu = this._el('pb-yield-unit')?.value || 'oz';
+    const ss = parseFloat(this._el('pb-serv')?.value) || 0;
+    const su = this._el('pb-serv-unit')?.value || 'oz';
+    /* ⚠⚠ A NEGATIVE QUANTITY BANKS THE BATCH AT A COST ITS OWN SAVED RECIPE DOES NOT PRODUCE.
+       Two things below read these rows and they disagree about what an ingredient is:
+       `computeRows(this.rows, …)` totals EVERY row, sign and all, while `ings` keeps only
+       `quantity > 0`. So a row typed at -10 oz is SUBTRACTED from the cost and then DROPPED from
+       the recipe. Measured on +10 oz and -10 oz of a $0.50/oz product: stored total_cost $0.00 and
+       cost_per_serving $0.00, while the ingredient list that was actually saved recomputes to
+       $5.00 and $0.39. `App.menuItemCost` reads `cost_per_serving` straight off the batch, so every
+       menu item built on it under-costs — the flattering direction — and on screen the operator
+       sees one ingredient and a $0 cost, with the row that caused it gone.
+       ⚠ THE FILE ALREADY GUARDS THIS FROM THE OTHER SIDE: `held`, twenty lines down, exists purely
+       to stop a DELETED ingredient re-costing a batch cheaper. One way in was closed, its twin was
+       not ([[the-loop]] step 0.5).
+       ⚠ YIELD AND SERVING SIZE ARE THE LESSER HARM and are here for completeness: `computeRows`
+       already refuses to invent a per-serving cost from them (`by > 0 && ss > 0`, S26), so a
+       negative yield stores a nonsense figure ON SCREEN but no false cost.
+       ⚠ ABOVE the `.pb-ing-qty` loop, which WRITES the typed values into `this.rows` — refusing
+       after it would leave the negative in the form's working state ([[the-loop]] #49) — and
+       `unlock()` on the way out, or the next click is swallowed by `if (this._saving) return`,
+       which is precisely the defect S155 fixed on the blank-name bail. */
+    const badNums = [];
+    this._els('.pb-ing-qty').forEach(el => {
+      const q = parseFloat(el.value);
+      if (isNaN(q) || q >= 0) return;
+      const row = this.rows[parseInt(el.dataset.i)];
+      const p = row ? this.prodById(row.product_id) : null;
+      badNums.push((p && p.name) || 'An ingredient');
+    });
+    if (by < 0) badNums.push('Batch yield');
+    if (ss < 0) badNums.push('Serving size');
+    if (badNums.length) {
+      if (err) { err.textContent = badNums.join(' and ') + ' cannot be negative.'; err.style.display = 'inline'; }
+      unlock(); return;
+    }
+
     this._els('.pb-ing-qty').forEach(el => {
       const idx = parseInt(el.dataset.i);
       if (this.rows[idx]) {
@@ -686,11 +724,6 @@ S.PrepBatches = {
         this.rows[idx].total_cost = this.rows[idx].quantity * (this.rows[idx].cost_per_unit || 0);
       }
     });
-
-    const by = parseFloat(this._el('pb-yield')?.value) || 0;
-    const bu = this._el('pb-yield-unit')?.value || 'oz';
-    const ss = parseFloat(this._el('pb-serv')?.value) || 0;
-    const su = this._el('pb-serv-unit')?.value || 'oz';
     const out = this.computeRows(this.rows, by, bu, ss, su);
 
     const ings = this.rows.filter(r => r.product_id && r.quantity > 0).map(r => ({ product_id: r.product_id, quantity: r.quantity }));
