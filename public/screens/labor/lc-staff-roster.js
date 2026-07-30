@@ -942,6 +942,36 @@ S.LaborStaffRoster = {
     const payType = document.getElementById('sr-paytype')?.value === 'Salary' ? 'Salary' : 'Hourly';
     const payRaw = parseFloat(document.getElementById('sr-pay')?.value);
     const payVal = isNaN(payRaw) ? null : payRaw;
+    /* Hoisted out of the record literal so it can be checked beside its sibling below — a rate
+       validated in one place and read in another is how these two drift apart. */
+    const sec2Pos = document.getElementById('sr-pos2')?.value || '';
+    const wage2Raw = parseFloat(document.getElementById('sr-wage2')?.value);
+    const sec2Wage = sec2Pos ? (isNaN(wage2Raw) ? null : wage2Raw) : null;
+    /* ⚠⚠ PAY CANNOT BE NEGATIVE, AND NOTHING DOWNSTREAM WAS GOING TO CATCH IT (class D round 2).
+       This handler refused a missing name, a duplicate name and a missing position — all by name —
+       and then took `parseFloat` on the pay cell raw. `min="0"` on the input stops nothing: a
+       number input still hands back "-20" and nothing calls checkValidity.
+       ⚠ AND NO READER FLOORS IT, which is what separates this from most of its class.
+       `App.updateActual` is the single owner of the hours → wage → cost math and it guards HOURS
+       (`!isNaN && >= 0`, added for the `hours` field of the same class) — then computes
+       `rec.cost = rec.hours * wage` with the wage untouched, while `wageForStaffOn` returns
+       `staff.wage || 0` and passes a negative through unchanged. So 40 hours at -$20 books
+       **-$800 of labor**, which LOWERS labor %, LOWERS prime %, and reaches Books, the schedule
+       budget and the payroll export. The direction is the dangerous one: it makes the week look
+       better, which is the kind of wrong number nobody reports ([[output-honesty]]).
+       ⚠ ZERO AND BLANK ARE BOTH LEGITIMATE and are deliberately still accepted — blank is "not set
+       yet", which is not the same number as zero, and zero is a real answer (an owner drawing
+       nothing, an unpaid trial shift). Only a negative is impossible.
+       ⚠ The message follows the LABEL the form is showing: that one cell is "Wage" or "Annual
+       Salary" depending on Pay Type, and naming the wrong one sends the operator to the wrong box. */
+    const negPay = [
+      [payType === 'Salary' ? 'Annual salary' : 'Wage', payVal],
+      ['Secondary rate', sec2Wage]
+    ].filter(p => p[1] != null && p[1] < 0).map(p => p[0]);
+    if (negPay.length) {
+      fail(negPay.join(' and ') + ' cannot be negative.');
+      return;
+    }
     const newWage = payType === 'Salary' ? null : payVal;
     const annualSalary = payType === 'Salary' ? payVal : null;
 
@@ -967,8 +997,8 @@ S.LaborStaffRoster = {
       email:         document.getElementById('sr-email')?.value.trim() || '',
       notes:         document.getElementById('sr-notes')?.value.trim() || '',
       // Secondary role + rate (cleared together when no secondary role is set).
-      secondary_position_id: document.getElementById('sr-pos2')?.value || '',
-      secondary_wage:        (function () { const sp = document.getElementById('sr-pos2')?.value || ''; const w = parseFloat(document.getElementById('sr-wage2')?.value); return sp ? (isNaN(w) ? null : w) : null; })()
+      secondary_position_id: sec2Pos,
+      secondary_wage:        sec2Wage
     };
     if (!staffId) rec.created_at = new Date().toISOString();
 
