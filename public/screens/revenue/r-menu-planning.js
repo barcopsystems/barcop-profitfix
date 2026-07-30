@@ -99,15 +99,24 @@ S.RevenueMenuPlanning = {
       worst: ['the thinnest margin', 'the weakest margin of the bunch', 'the skinniest margin here'],
       best2: ['the second-fattest margin', 'the second-best margin'],
       worst2: ['the second-thinnest margin', 'the second-weakest margin'],
-      up: ['one of the fatter margins', 'an upper-tier margin', 'a healthy margin'],
-      low: ['one of the thinner margins', 'a bottom-tier margin', 'a soft margin']
+      /* ⚠⚠ THE BANDS NAME THEIR BASIS INSTEAD OF IMPLYING A POSITION, and that is what makes them
+         honest across two pools. `hi` is the verdict's side, measured over `classify()`'s pool; the
+         RANK beside it is measured over the wider set the operator can SEE. Those differ (an uncosted
+         item shows a Menu Mix but is not ranked; an item with no units-sold figure shows a margin but
+         is not in the verdict's pool), so a vague position claim built from `hi` could invert against
+         the column: "one of the busier sellers at 40 a week" printed on a tile reading Menu Mix 6%
+         beside tiles reading 46% and 31%. "An above-average seller" is TRUE BY CONSTRUCTION — it says
+         exactly what `hi` means — and nothing on screen can contradict it. The superlatives below keep
+         their position claims because they are separately gated on being the real extreme. */
+      up: ['an above-average margin', 'a margin above the group average', 'a better-than-average margin'],
+      low: ['a below-average margin', 'a margin below the group average', 'a thinner-than-average margin']
     } : {
       best: ['the top seller', 'your busiest of them', 'the volume leader'],
       worst: ['the slowest mover', 'the least-ordered of them', 'the volume laggard'],
       best2: ['the second-best seller', 'the second-busiest of them'],
       worst2: ['the second-slowest mover', 'the second-least-ordered'],
-      up: ['one of the busier sellers', 'an upper-tier seller', 'a strong mover'],
-      low: ['one of the slower movers', 'a bottom-tier seller', 'a soft mover']
+      up: ['an above-average seller', 'a better-than-average mover', 'a seller above the group average'],
+      low: ['a below-average seller', 'a slower-than-average mover', 'a seller below the group average']
     };
     // The SIDE is a fact for every ranked item, so it is the floor. A PLACE has to be earned:
     // unique value, and only where that place cannot disagree with the side.
@@ -136,31 +145,24 @@ S.RevenueMenuPlanning = {
     Object.keys(byCat).forEach(cat => {
       const list = byCat[cat].map(i => ({ i, cost: App.menuItemCost(i) || 0 }));
       const priced = list.filter(x => x.i.price > 0 && x.cost > 0);
-      const rankable = priced.filter(x => x.i.weekly_covers > 0);
-      /* ⚠⚠ MARGIN RANKS OVER `priced`, COVERS RANKS OVER `rankable`, and the split is the fix rather
-         than an inconsistency. A rank is only honest if it is measured over the set the operator can
-         SEE, and the page renders a tile with Cost and Menu Price for every priced item. Ranking
-         margins over `rankable` printed "the weakest margin of the bunch at $2.00 a plate" with a
-         visible tile beside it reading "It earns $1.00 a plate" — the never-sold item held no rank,
-         so it could not be the bottom, while its margin sat on screen being thinner. Covers stay on
-         `rankable` because an unranked item shows NO cover count to be compared with (it gets the
-         "no covers yet" read). Equality was already handled by the tie maps; this closes the strict
-         inequality the tie test could never see. */
-      /* ⚠ AND THE COVERS POOL INCLUDES A REAL ZERO. `rankable` drops `covers === 0`, but a PMIX zero is
-         DELIBERATE data — r-menu-engineering's own comment says a zero-seller is exactly what the Dog
-         Test exists to surface — and such an item is priced, carries a verdict, and renders a tile with
-         a Menu Mix. Ranking covers over `rankable` therefore let a 20-a-week item claim "the
-         least-ordered of them" and "Nothing here earns and moves less" while a sibling on screen sold
-         NOTHING. `counted` is every priced item whose covers are known, zeros included. */
+      /* ⚠⚠⚠ THREE POOLS, AND WHICH ONE A CLAIM IS MEASURED OVER IS THE DEFECT THAT KEEPS COMING BACK
+         HERE. Rewritten wholesale after round 3, because the notes that used to sit in this spot
+         described the pools as they were two fixes ago and had gone BACKWARDS — and a comment that
+         states the wrong model is worse than none, since the next reader trusts it ([[the-loop]] #53).
+         The rule, once, plainly: A CLAIM IS MEASURED OVER THE SET THE OPERATOR CAN SEE IT AGAINST.
+           `priced`     price and cost both known. Every one renders a tile showing Cost and Menu
+                        Price, so this is the set a MARGIN claim is checked against.
+           `coversPool` covers known, costed or not. Every one renders a MENU MIX, so this is the set
+                        a VOLUME claim is checked against — an uncosted item still shows its share.
+           `counted`    priced AND covers known. This is exactly `classify()`'s pool, so it is what
+                        decides whether the section can be RANKED at all, and nothing else.
+         The two earlier attempts both failed by mixing them: ranking margins over the covers set let
+         "the weakest margin of the bunch at $2.00" print beside a visible tile reading $1.00, and
+         ranking covers over the costed set let a 90-a-week tile claim "the volume leader" under an
+         11% Menu Mix beside a 63% one. ⚠ A real PMIX zero belongs in `coversPool`: r-menu-engineering
+         says a zero-seller is exactly what the Dog Test exists to surface, and excluding it let a
+         20-a-week item call itself the least-ordered beside a sibling that sold nothing. */
       const counted = priced.filter(x => x.i.weekly_covers != null && x.i.weekly_covers >= 0);
-      /* ⚠⚠ AND THE COVERS POOL IS WIDER STILL (S308). Every item in the section renders a tile with a
-         MENU MIX, priced or not — the mix denominator is the whole section's units sold — so an
-         UNCOSTED item's volume is on screen in the one column an operator would check a volume claim
-         against. Ranking covers over the costed set alone let a ranked tile claim "the volume leader
-         at 90 a week" under an 11% Menu Mix while the tile beside it read 63%. Reachable from two
-         live doors together: a menu CSV with no cost column, then a PMIX drop.
-         So: `counted` (= classify's pool) still gates RANKING, and `coversPool` measures every
-         COVERS claim, because that is the set the operator can see. */
       const coversPool = list.filter(x => x.i.weekly_covers != null && x.i.weekly_covers >= 0);
       const mRank = {}, cRank = {};
       priced.slice().sort((a, b) => (b.i.price - b.cost) - (a.i.price - a.cost)).forEach((x, idx) => { mRank[x.i.id] = idx + 1; });
@@ -178,14 +180,8 @@ S.RevenueMenuPlanning = {
         pool.forEach(x => { const k = cents(val(x)); tied[x.i.id] = seen[k] > 1; atMin[x.i.id] = (k === min); });
         return { tied, atMin };
       };
-      /* ⚠ MARGIN TIES ARE MEASURED OVER EVERY PRICED ITEM, NOT JUST THE RANKED ONES, and the reason
-         is what the operator can SEE. The page renders a tile for every priced item with its Cost and
-         Menu Price, so a never-sold item's margin is on screen even though it holds no rank — and a
-         ranked tile claiming "the fattest margin at $11.00" directly under a visible tile also
-         reading $11.00 is a contradiction the operator reads off the screen. COVERS ties stay on
-         `rankable`, because an item with no covers has no cover count on screen to be compared with
-         (it gets the "no covers yet" line instead). Same family as the `n` vs `rankedN` note below,
-         one level in. `atMin` is what lets the Dog tail claim a bottom only when it really is one. */
+      // Each axis ties over the pool its claim is checked against, per the rule above. `atMin` is what
+      // lets the Dog tail claim a bottom only when the item really is one.
       const mMap = tieMap(priced, x => x.i.price - x.cost);
       const cMap = tieMap(coversPool, x => x.i.weekly_covers || 0);
       const mTied = mMap.tied, cTied = cMap.tied, mAtMin = mMap.atMin, cAtMin = cMap.atMin;
@@ -197,7 +193,7 @@ S.RevenueMenuPlanning = {
            sentence would have got a number the verdict was never measured against, which is exactly
            the two-means drift that caused M1. If a mean is ever needed here, take it from the
            verdict's own pool or read the side off the quad ([[the-loop]] #54). */
-        totalCovers: byCat[cat].reduce((s, i) => s + (i.weekly_covers || 0), 0),
+        totalCovers: byCat[cat].reduce((s, i) => s + Math.max(0, i.weekly_covers || 0), 0),
         /* ⚠⚠ THE SAME GATE THE VERDICT USES (S297/S309). This was `rankable.length >= 4` — items
            with covers ABOVE zero — while `classify()` ranks over every MEASURED item (priced, costed,
            covers known, zeros included) at `MIN_PER_CAT`. A stricter gate here meant a section could
@@ -271,8 +267,13 @@ S.RevenueMenuPlanning = {
        identical lie on Pre-Shift, so it gets the same answer: say what the numbers are and refuse to
        grade them. `!(margin > 0)` covers price === cost too, where there is equally nothing to read. */
     if (!(price - cost > 0)) return { lines: ['At ' + f(price) + ' with ' + f(cost)
-      + ' of cost in it, this one is not making anything. Check the price and the cost in Menu Builder '
-      + 'before reading anything else into it.'], move: '' };
+      + ' of cost in it, this one is not making anything. Every read below needs a margin to work '
+      + 'from, so the rest of the tile stays blank until the price or the cost moves.'],
+      // ⚠ AND IT KEEPS ITS BUTTON. `moveBand` renders only when `move` is non-empty, so returning ''
+      // here left a tile that says "check it in Menu Builder" with no way to get to Menu Builder —
+      // the exact dead end I10 was fixed for, reintroduced by a guard I added the same day.
+      move: 'open it in Menu Builder and fix whichever of the two is wrong. A cost above the price is '
+        + 'almost always a unit slip on one ingredient or a price that never got entered.' };
 
     const margin = price - cost;
     const costPct = cost / price * 100;
@@ -319,8 +320,16 @@ S.RevenueMenuPlanning = {
       ? ['It is the one dragging the section hardest.', 'It is the anchor on this section, plain and simple.', 'Nothing here earns and moves less.']
       : (mBottom || cBottom)
         ? ['On one measure it is the very bottom of your ' + catLc + '.', 'It hits rock bottom on one of the two here.', 'One of its two numbers is dead last in the group.']
+        /* ⚠ ONLY THE CLAIM THAT SURVIVES A SPLIT TIE. `tiedLow` means at the minimum on both axes with
+           a tie somewhere — but the item it ties with on MARGIN can be a different item from the one
+           it ties with on COVERS, and then "level with the weakest, nothing to separate them" is false
+           twice over: the margin twin outsells it, the covers twin out-earns it, and both are doing
+           better than it on the other measure. Measured: a Dog printed "It ties with the others at the
+           bottom here, and none of them are earning the spot" while its two partners were a Plowhorse
+           and a Puzzle. Only "nobody behind it" is true of a both-axis minimum however the ties pair
+           up, so that is the one left standing. */
         : tiedLow
-          ? ['It is level with the weakest of your ' + catLc + ', with nothing to separate them.', 'It ties with the others at the bottom here, and none of them are earning the spot.', 'It sits level with the weakest in the group, so there is nobody behind it.']
+          ? ['It sits level with the weakest in the group, so there is nobody behind it.', 'Nothing in this section is behind it on either measure, and it is level with the bottom on one.', 'It is down at the bottom on both counts, level rather than alone.']
           : ['Others trail it, but it still is not paying for its spot.', 'Not the worst of the bunch, but it is not earning its place.', 'A few trail it, yet it is still not carrying its spot on the menu.'];
 
     const V = {
@@ -394,6 +403,17 @@ S.RevenueMenuPlanning = {
               'A Dog. Low on both: {mword} at {margin} a {noun} and {cword} at {covers} a week. {tail}']
       };
       lines.push(pick(READ[quad] || READ.DOG, 0));
+    /* ⚠ THE DROP TO ZERO IS SAID FIRST, WHATEVER THE SECTION'S STATE (S304, second half). `!cs.ranked`
+       used to be tested ahead of the covers branch, so in a section too small to rank, an item that
+       sold 20 last read and NOTHING this one rendered "Only 3 items in entrees have a price, a cost
+       and units sold..." and stopped — the trend block is gated on `covers > 0` too, so nothing
+       anywhere on the tile mentioned that it had died. Whether the section can be ranked is a fact
+       about the SECTION; this item stopping is a fact about the ITEM, and it is the more important
+       of the two. */
+    } else if (prev > 0 && covers === 0) {
+      lines.push(pick(['It clears {margin} a {noun} when it sells, and it sold nothing this read against {prevc} the read before. That is the whole signal.',
+                       'Margin is {margin} a {noun}, but it moved zero this read, down from {prevc}. Worth finding out why before it settles in.',
+                       'It earns {margin} a {noun} on paper. Nothing sold this read against {prevc} last time, and that is a menu decision waiting to happen.'], 0));
     } else if (!cs.ranked) {
       /* ⚠ GATED ON THE SAME FACT THE RANKING IS (S309). This asked `cs.n < 4` — the PRICED count —
          while ranking needs a price, a cost AND a units-sold figure. So one item missing its units
@@ -421,7 +441,11 @@ S.RevenueMenuPlanning = {
          100% since your last read." Covers did come in. They went to zero, which is exactly what the
          Dog Test exists to surface, so it is worth saying out loud rather than describing as absent.
          The trend line is suppressed for this case below, because this sentence already carries it. */
-      lines.push(prev > 0
+      /* ⚠ `covers === 0`, NOT merely "not positive". A NEGATIVE count is corrupt legacy data, and
+         saying "it moved zero this read" about it asserts a figure the record does not carry — the
+         old code printed "-5 covers a week", and replacing that with a false zero is not an
+         improvement. A negative falls to the never-sold copy, which claims nothing. */
+      lines.push(prev > 0 && covers === 0
         ? pick(['It clears {margin} a {noun} when it sells, and it sold nothing this read against {prevc} the read before. That is the whole signal.',
                 'Margin is {margin} a {noun}, but it moved zero this read, down from {prevc}. Worth finding out why before it settles in.',
                 'It earns {margin} a {noun} on paper. Nothing sold this read against {prevc} last time, and that is a menu decision waiting to happen.'], 0)
@@ -466,7 +490,15 @@ S.RevenueMenuPlanning = {
        cost line names the target explicitly. If Kyle ever wants the tile to lead with the target
        instead, that is a voice decision, not a correctness one. */
     if (target) {
-      lines.push(costPct > target + 0.5
+      /* ⚠⚠ ONE THRESHOLD, NOT TWO. This asked `costPct > target + 0.5` while the MOVE below asks
+         `suggested()`, which fires at `cost / (target/100) > price + 0.01` — a different test on the
+         same question. Measured on a $10.00 plate at a 32% target, costs $3.21 through $3.25 land
+         between them, and the tile then printed "Cost is a tidy 33% against your 32% target" (which
+         contradicts itself in six words) directly above "walk it to $10.25". `sugg` IS the answer to
+         "is this over target enough to act on", and inside this branch a null `sugg` can only mean
+         at-or-under, so reading it makes the two agree by construction rather than by keeping two
+         tolerances in step by hand ([[the-loop]] #54). */
+      lines.push(sugg
         ? pick(['Cost is running {pct}% against your {target}% target, so the margin is the lever here, not the covers.',
                 'At {pct}% cost against a {target}% target, the leak is on the {noun}, not the volume.',
                 'Cost is {pct}% versus your {target}% target. Fix the {noun} before you chase covers.',
@@ -539,10 +571,21 @@ S.RevenueMenuPlanning = {
        the volume half is not, so the move says what would make the rest of the page true.
        ⚠ Placed AFTER the `sugg` branch on purpose: a reprice does not need volume to be right, and
        its weekly-dollar figure is already suppressed without covers. */
-    else if (!(covers > 0)) move = pick(['drop a product mix at the weekly close so the volume side fills in. Until it does, the only honest read here is the margin, and that clears {margin} a {noun}.',
-                                         'get units sold in before you act on this one. The margin reads {margin} a {noun}; what it actually does on the floor is still blank.',
-                                         'there is nothing to act on until it sells. Log a product mix at the weekly close and Bar Cop can tell you whether it is earning its spot.',
-                                         'let it run a week and drop your product mix. The {noun} clears {margin}, but a verdict without units sold behind it is not worth acting on.'], 4);
+    /* ⚠ THE SAME SPLIT THE READ LINE GOT, because the move was still telling an item that sold
+       nothing to go and drop the product mix it had already dropped. All four templates below assert
+       ABSENCE ("so the volume side fills in", "what it does on the floor is still blank"), which is
+       true of an item that has never sold and false of one that went 20 to 0 — for which the mix came
+       back and the answer was zero. A fix that splits one branch and not its sibling is the
+       half-migration shape ([[the-loop]] #42). */
+    else if (!(covers > 0)) move = (prev > 0 && covers === 0)
+      ? pick(['it sold nothing this read. Pull it for a week and watch, or put it on a 90-day Dog Test and make the call on data rather than on hope.',
+              'a {noun} that stops selling has told you something. Give it one honest change or one Dog Test, and if it stays at zero, take the spot back.',
+              'zero units is a decision, not a gap. Dog Test it, rework it once, or cut it and hand the space to something that moves.',
+              'find out why it stopped before you touch the price. A {noun} at zero is either off the menu, out of stock, or off the floor\'s tongue.'], 4)
+      : pick(['drop a product mix at the weekly close so the volume side fills in. Until it does, the only honest read here is the margin, and that clears {margin} a {noun}.',
+              'get units sold in before you act on this one. The margin reads {margin} a {noun}; what it actually does on the floor is still blank.',
+              'there is nothing to act on until it sells. Log a product mix at the weekly close and Bar Cop can tell you whether it is earning its spot.',
+              'let it run a week and drop your product mix. The {noun} clears {margin}, but a verdict without units sold behind it is not worth acting on.'], 4);
     else if (quad === 'DOG') move = pick(['rework or cut, but run a 90-day Dog Test first so the call is the data and not a hunch. Make one honest change, and if it still lags, pull it clean.',
                                           'fix it or retire it. Give it 90 days on a Dog Test with a single real change, and if margin or covers do not move, drop it and hand the spot to something that earns.',
                                           'this is a rework-or-cut. Dog Test it 90 days, try one thing that might move it, and if the numbers sit still, cut it and free the slot.',
@@ -579,6 +622,15 @@ S.RevenueMenuPlanning = {
               'work the buy price. There is no cost target on a resale item like this, so the margin comes from what it costs you, and at this count a small drop per unit adds up fast.',
               'the price is doing its job; the room is on the cost side. Get a quote from another distributor on this one, since volume like this makes a small unit saving worth chasing.',
               'shop this one. It moves well and earns thin, and with no recipe to tighten the only real lever is the case price you are paying.'], 4);
+    /* ⚠ NOBODY FALLS OFF THE END OF THIS CHAIN. Every branch above needs either a suggested price or
+       a quad, so an item that is selling, on target, and sitting in a section too small to rank got
+       NO move and therefore no button at all — `moveBand` renders only when `move` is non-empty. The
+       page's own help promises "a button that takes you straight to it" on every tile, which is what
+       I10 was fixed for; this was the last hole left in that promise. What such an item actually
+       needs is the thing that would let it be ranked. */
+    else move = pick(['nothing to chase on this one yet. Its cost is where you want it, and once {cat} has four items with a price, a cost and units sold, Bar Cop can rank it against the rest.',
+                      'it is doing its job quietly. Round out {cat} with a few more complete items and this tile starts telling you where it really sits.',
+                      'no move needed right now. Fill in the rest of {cat} and the comparison that makes this read useful comes with it.'], 4);
 
     return { lines, move };
   },
