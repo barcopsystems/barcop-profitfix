@@ -200,7 +200,7 @@ S.LaborPayrollExport = {
        exact failure being reported, so it was advice that can quietly not work. It was also the only
        one of the five XLSX doors not saying Ctrl+Shift+R, and the only one with a working alternative
        sitting beside it (`px-csv` Download CSV, which needs no parser) that it never mentioned. */
-    if (typeof XLSX === 'undefined') { this._setStatus('The Excel builder did not load. Hard refresh the page (Ctrl+Shift+R) and try again, or use Download CSV instead.', 'var(--red)'); return; }
+    if (typeof XLSX === 'undefined') { this._setStatus(App.excelMissing('lc-payroll-export', 'use Download CSV instead'), 'var(--red)'); return; }
     const d = this._data(weekStart);
     if (!d.rows.length) { this._setStatus('No hours or salaried staff in this pay period.', 'var(--red)'); return; }
     try {
