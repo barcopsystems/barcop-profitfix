@@ -74,7 +74,10 @@ S.RecipeCostAnalysis = {
   },
 
   draw() {
-    const items = App.menuItems();
+    // I6's second half: the Recipe Summary ranks "every plate and drink by recipe cost percentage
+    // and flags what is running over target", so a CUT item must not appear here either — it is the
+    // same question App.menuItemsOverTarget answers, and the same answer.
+    const items = App.menuItems().filter(it => it && !it.archived);
 
     // ── Day-one / prerequisite empty state ──────────────────────────────
     if (!items.length) {
