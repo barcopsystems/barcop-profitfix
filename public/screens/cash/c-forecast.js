@@ -70,16 +70,16 @@ S.CashForecast = {
       + this.scenarioCard(fc, base)
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Your Cash Across the Quarter</div>'
       + '<button class="btn btn-ghost btn-sm no-print" id="cf-export">Export for Lender</button></div>'
-      /* ⚠ DELIBERATELY NOT `no-print`, and the inner line carries `pdf-fine` so it lands in the
-         LENDER PDF as fine print, not only on screen. `_collectPDFBlocks` walks an EXPLICIT
-         selector list (.card-title, .sh, .pdf-para, .pdf-fine, tables, …) and SKIPS anything
-         inside `.no-print` — so a plain styled div contributes NOTHING to the document. My first
-         version of this box was `no-print` with no marker class, which would have put the
-         disclaimer nowhere at all in the file it exists to protect. Same render-vs-query trap as
-         [[the-loop]] integrity #11: the class you render has to be one the collector collects. */
-      + '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin:0 0 16px;">'
+      /* ⚠ `no-print` ON PURPOSE — THIS BOX IS THE SCREEN CARRIER ONLY. It briefly rendered into
+         the lender PDF (via `pdf-fine`) and Kyle killed it on sight: it landed between the
+         section heading and the operator's own numbers, and *"they couldn't give that to a
+         lender like that."* He is right — a disclaimer wedged into the middle of a bank document
+         reads as amateur. The PDF carries the same substance in its FOOTER, which now wraps and
+         reserves its own space (see App.exportPDF). Screen box + wrapped footer = both carriers,
+         neither one interrupting the document. */
+      + '<div class="no-print" style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin:0 0 16px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
-        + '<div class="pdf-fine" style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop builds this forecast from what you log and from assumptions about your own averages. It is a software tool, not a CPA, accountant, or lender. This is a worksheet, not an audited financial statement, and a projection rather than a guarantee, so your actual results will vary. Review and verify every figure before you hand it to a bank.</div>'
+        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop builds this forecast from what you log and from assumptions about your own averages. It is a software tool, not a CPA, accountant, or lender. This is a worksheet, not an audited financial statement, and a projection rather than a guarantee, so your actual results will vary. Review and verify every figure before you hand it to a bank.</div>'
       + '</div>'
       + this.forecastCard(fc, opening)
       + this.billsCard()
@@ -408,15 +408,16 @@ S.CashForecast = {
     const sv = { adj: this._salesAdj, amt: this._scAmt, rec: this._scRecurring };
     const stressed = this._salesAdj || this._scAmt;
     if (stressed) { this._salesAdj = 0; this._scAmt = 0; this._scRecurring = false; this.draw(); }
-    /* ⚠⚠ THE FOOTER MUST STAY ON ONE LINE. App.exportPDF draws it with a SINGLE unwrapped
-       doc.text at a fixed baseline, and the "Page N of M" label is right-aligned on that SAME
-       baseline — so a long footer runs off the page edge AND collides with the page number.
-       Measured budget at 7pt helvetica: ~134 characters. My first version appended
-       deliverableFooter().workbookSubject here and came to 427 (3.2x), which would have printed
-       the disclaimer mostly off the page — worse than the thin line it replaced. The full
-       disclaimer belongs in the BODY, where it wraps: that is the `pdf-fine` box in draw().
-       Pinned by verify-export-notice-carried.js, both the length and the body carrier. */
-    await App.exportPDF({ title: '13-Week Cash Flow Forecast', root: this.container, brand: (App.data && App.data.settings && App.data.settings.bar_name) || '', footer: 'A forecast, not a guarantee or an audited financial statement. Actual results will vary.' });
+    /* ⚠⚠ THE FOOTER IS THE PDF's DISCLAIMER CARRIER, and it is deliberately longer than one
+       line. App.exportPDF now WRAPS the footer and reserves the space it needs before laying
+       out content, so this text stacks above the page-number baseline instead of running off
+       the edge. Kyle's call, after seeing the earlier body-block version land in the middle of
+       his numbers: *"the bottom already has that.. so if you want to expand the bottom some
+       that is ok.. but remove it from the users info."*
+       ⚠ KEEP IT A LITERAL AND KEEP IT INSIDE THREE LINES (~400 chars at 7pt). A footer built by
+       concatenation has an unknown runtime length, and this is the one document that goes to a
+       bank. verify-export-notice-carried.js pins the length, the wrap and the substance. */
+    await App.exportPDF({ title: '13-Week Cash Flow Forecast', root: this.container, brand: (App.data && App.data.settings && App.data.settings.bar_name) || '', footer: 'Bar Cop builds this forecast from what you log and from assumptions about your own averages. It is a software tool, not a CPA, accountant, or lender. This is a worksheet, not an audited financial statement, and a projection rather than a guarantee, so actual results will vary. Review and verify every figure before relying on it.' });
     if (stressed) { this._salesAdj = sv.adj; this._scAmt = sv.amt; this._scRecurring = sv.rec; this.draw(); }
   }
 };
