@@ -262,11 +262,54 @@ S.InventoryTakeInventory = {
     this.renderSetup();
   },
 
-  startCount() {
+  async startCount() {
     const err = document.getElementById('ti-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const picked = [...this.container.querySelectorAll('.ti-loc-tile.selected')].map(t => t.dataset.loc);
     if (picked.length === 0) { fail('Pick at least one location to count.'); return; }
+    /* ⚠⚠ TELL THEM BEFORE THEY COUNT, NOT AFTER (S330b — Kyle, and he was right).
+       The duplicate guard shipped on the SUBMIT handler, which is the last possible moment: the
+       operator picked Kitchen Line, counted every product on it, pressed Submit, and only THEN
+       learned the day was already covered by a Full count. Worse, the way out was Count History →
+       Edit, which raises the in-progress-draft prompt (S321) and DISCARDS everything they just
+       typed. On a forty-product section that is a genuinely infuriating loop, and every step of it
+       was mine. **A check that can run before the work must run before the work.**
+       Here nothing has been entered yet, so "open that count instead" costs the operator nothing —
+       it is the sanctioned path (S250) arriving at the only moment it is free.
+       ⚠ A LOCKED prior count gets a plain notice and no offer: `editCount` would refuse it anyway,
+       and dangling a button that cannot work is worse than not offering one.
+       ⚠ The submit-time guard STAYS as the backstop — a count begun before the other one existed,
+       or on a second device, still has to be caught — but it now MERGES BY LOCATION instead of
+       refusing, so it can never again cost anyone their work. */
+    const sameDay = App.todayLocal();
+    const pickedSet = new Set(picked);
+    const prior = this.counts().find(c => c
+      && String(c.date || '').slice(0, 10) === sameDay
+      && (Array.isArray(c.locations) ? c.locations : []).some(l => pickedSet.has(l)));
+    if (prior) {
+      const overlap = (prior.locations || []).filter(l => pickedSet.has(l));
+      const nameList = a => a.length === 1 ? a[0] : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+      if (App.countLockedByWeek(prior)) {
+        await App.confirm({
+          title: 'Already counted today, and the week is confirmed',
+          message: nameList(overlap) + ' was counted earlier today, and the week it falls in has since been confirmed. '
+            + 'Confirmed weeks lock the counts inside them, so that count cannot be changed. Pick a different location, '
+            + 'or count this one tomorrow.',
+          confirmText: 'OK', cancelText: ''
+        });
+        return;
+      }
+      const openIt = await App.confirm({
+        title: 'You already counted ' + nameList(overlap) + ' today',
+        message: 'Bar Cop keeps one count per location per day, because two counts of the same shelf on one day cannot '
+          + 'be used as a usage pair. Open that count and correct it instead of starting a new one?',
+        confirmText: 'Open That Count', cancelText: 'Cancel'
+      });
+      if (!openIt) return;
+      // no draft exists yet, so nothing can be lost — go straight in
+      if (this.editCount(prior.id) !== 'opened') this._countGoneNotice();
+      return;
+    }
 
     // "type" is now derived: a single location uses the location name; more
     // than one is labeled "Multi-Location". The full set of picked locations
@@ -972,28 +1015,41 @@ S.InventoryTakeInventory = {
           });
           return;
         }
-        if (missing.length) {
-          await App.confirm({
-            title: 'You already counted ' + nameList(overlap) + ' today',
-            message: 'That earlier count also covered ' + nameList(missing) + ', so Bar Cop cannot fold this one into '
-              + 'it without losing those numbers. Open that count from Count History and edit it, or count '
-              + nameList(missing) + ' here as well. Nothing has been saved.',
-            confirmText: 'OK', cancelText: ''
-          });
-          return;
-        }
+        /* ⚠⚠ MERGE BY LOCATION — the earlier refusal was MY BAD REASONING (S330b). I wrote that a
+           partial overlap "cannot be folded in without losing those numbers" and sent the operator
+           to Count History, which then discarded everything they had typed. **Which items to
+           replace is not ambiguous at all**: they re-counted exactly the locations they picked, so
+           those locations' items are replaced and every other location on that record keeps its
+           own, untouched. Nothing is guessed and nothing is lost. That removes the refusal
+           entirely, and with it the loop ([[the-loop]] #65 — when a limitation pushes you somewhere
+           obviously worse, the limitation is the bug). */
         const merge = await App.confirm({
           title: 'You already counted ' + nameList(overlap) + ' today',
           message: 'Two counts of the same shelf on one day cannot be used as a usage pair, so Bar Cop keeps one count '
-            + 'per location per day. Update that count with what you just entered?',
+            + 'per location per day. Update that count with what you just entered?'
+            + (missing.length ? ' ' + nameList(missing) + ' stays exactly as counted earlier.' : ''),
           confirmText: 'Update That Count', cancelText: 'Cancel'
         });
         if (!merge) return;
-        record.id         = clash.id;
-        record.date       = clash.date;
-        record.created_at = clash.created_at;
-        record.edited_at  = new Date().toISOString();
-        record.edit_count = (clash.edit_count || 0) + 1;
+        const keep = (Array.isArray(clash.items) ? clash.items : [])
+          .filter(it => it && !mine.has(it.location || 'Unassigned'));
+        const mergedItems = keep.concat(record.items);
+        const mergedLocs = [...new Set((clash.locations || []).concat(record.locations))];
+        const liveLocs = ((App.inventoryData && App.inventoryData.ic_locations) || [])
+          .filter(l => !l.archived).map(l => l.name);
+        record.id          = clash.id;
+        record.date        = clash.date;
+        record.created_at  = clash.created_at;
+        record.edited_at   = new Date().toISOString();
+        record.edit_count  = (clash.edit_count || 0) + 1;
+        record.items       = mergedItems;
+        record.locations   = mergedLocs;
+        // the record's own label has to follow the merged set, or a Full count re-counted one
+        // shelf at a time would go on calling itself by that one shelf's name.
+        record.type        = (liveLocs.length && mergedLocs.length === liveLocs.length) ? 'Full'
+                           : (mergedLocs.length === 1 ? mergedLocs[0] : 'Multi-Location');
+        record.item_count  = mergedItems.length;
+        record.total_value = mergedItems.reduce((s, i) => s + (i.value || 0), 0);
       }
     }
 
