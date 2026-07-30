@@ -1529,7 +1529,19 @@ S.RevenueMenuItems = {
       return;
     }
 
-    if (!(await App.putRecordsBulk('core', 'menu_item', this.items()))) {
+    /* ⚠⚠ ONLY THE ROWS THIS IMPORT TOUCHED (I17a, 2026-07-30). This passed `this.items()` — THE
+       WHOLE MENU — so a 12-row import upserted all 400, and the product door had it right all along
+       (app.js:6290 passes `touched`). Every mutation in this function lands in one of these two
+       sets: the row loop adds to `updatedIds` (it stamps `type` and `updated_at` unconditionally, so
+       even an identical re-drop is a real change) or to `addedIds`, and the reprice-plan clear above
+       only touches items whose price moved, which are already in `updatedIds`.
+       ⛔ THAT COMPLETENESS IS THE WHOLE RISK, not the saving: a touched set missing a mutated row
+       loses that change silently on the next reload, which is worse than writing 400.
+       So it is PROVEN, not argued — verify-menu-import-writes-touched.js deep-snapshots every item,
+       runs this function for real, and asserts the written set EQUALS the changed set in BOTH
+       directions, including the reprice-plan case a hand-written filter would have missed. */
+    const touched = existing.filter(it => it && (addedIds.has(it.id) || updatedIds.has(it.id)));
+    if (!(await App.putRecordsBulk('core', 'menu_item', touched))) {
       App.restoreRows(undoAll);
       App.dropRows(existing, addedRecs);
       // ⚠ RE-RENDER FIRST, THEN WRITE THE MESSAGE. This wrote the error into the slot and then
