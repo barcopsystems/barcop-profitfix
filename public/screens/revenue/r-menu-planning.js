@@ -189,8 +189,18 @@ S.RevenueMenuPlanning = {
            the two-means drift that caused M1. If a mean is ever needed here, take it from the
            verdict's own pool or read the side off the quad ([[the-loop]] #54). */
         totalCovers: byCat[cat].reduce((s, i) => s + (i.weekly_covers || 0), 0),
-        ranked: rankable.length >= 4,
-        rankedN: rankable.length,
+        /* ⚠⚠ THE SAME GATE THE VERDICT USES (S297/S309). This was `rankable.length >= 4` — items
+           with covers ABOVE zero — while `classify()` ranks over every MEASURED item (priced, costed,
+           covers known, zeros included) at `MIN_PER_CAT`. A stricter gate here meant a section could
+           carry real verdicts that this page refused to say out loud: the tile still printed the
+           verdict's MOVE and its button, so a Dog got a Dog Test button and was never called a Dog,
+           and a Star got "feature it. Give it a power spot" with no Star named. `counted` is exactly
+           classify's pool, so the two cannot disagree, and the threshold is READ from the classifier
+           rather than the literal 4 that used to sit here and drift silently. */
+        ranked: counted.length >= (S.RevenueMenuEngineering.MIN_PER_CAT || 4),
+        // The count that actually gates ranking. `n` below is the PRICED count and means something
+        // else; quoting it in the "cannot rank yet" copy is what S309 was.
+        rankN: counted.length,
         // The pool size PER AXIS, because the two ranks are measured over different sets. One shared
         // `n` is what let a margin rank be tested against the covers pool's size.
         mN: priced.length, cN: counted.length,
@@ -301,11 +311,13 @@ S.RevenueMenuPlanning = {
           : ['Others trail it, but it still is not paying for its spot.', 'Not the worst of the bunch, but it is not earning its place.', 'A few trail it, yet it is still not carrying its spot on the menu.'];
 
     const V = {
-      // ⚠ `n` is the PRICED count and it must only ever be used by the "not enough to rank yet"
-      // branch, which is the one place it is true. The ranked READ lines used to print it next to
-      // a superlative measured over `rankedN` (priced AND with covers) — "the strongest margin of
-      // your 12 cocktails" on a page where seven other cocktail tiles showed a fatter margin,
-      // because only 5 of the 12 had covers. Cocktail pooling widened the gap.
+      /* ⚠ `n` IS THE COUNT THAT GATES RANKING, and it must only ever be used by the "not enough to
+         rank yet" branch, which is the one place it is true. It used to be the PRICED count while
+         the gate ran on a different set — so a section held back by one item with no units-sold
+         figure printed "Only 4 priced items" and then refused to rank the 4 (S309). It also used to
+         appear in the ranked READ lines next to a superlative measured over a smaller pool: "the
+         strongest margin of your 12 cocktails" on a page where seven other cocktail tiles showed a
+         fatter margin, because only 5 of the 12 had covers. */
       /* ⚠ ROUNDED FOR DISPLAY, BUT NEVER DOWN TO ZERO. Units sold is a COUNT, and two doors write it
          unrounded (Menu Builder's Units Sold field via `parseFloat`, and its CSV import), so a stray
          decimal printed "an average mover at 12.004 a week". ⚠⚠ My first version was a bare
@@ -315,7 +327,7 @@ S.RevenueMenuPlanning = {
          shown as it is; rounding only applies where there is a whole count to round. The real cure is
          refusing a fractional count at both write doors (S295). */
       margin: f(margin), covers: covers >= 1 ? Math.round(covers) : covers,
-      noun: noun, cat: catLc, n: cs.n, s: cs.n === 1 ? '' : 's',
+      noun: noun, cat: catLc, n: cs.rankN, s: cs.rankN === 1 ? '' : 's',
       pct: costPct.toFixed(0), target: target, sugg: f(sugg || 0),
       name: drv ? drv.name : '', dcost: drv ? f(drv.cost) : '',
       // Bare reads of mTied/cTied on purpose: they are required for correctness, and guarding them
@@ -366,13 +378,20 @@ S.RevenueMenuPlanning = {
               'A Dog. Low on both: {mword} at {margin} a {noun} and {cword} at {covers} a week. {tail}']
       };
       lines.push(pick(READ[quad] || READ.DOG, 0));
-    } else if (cs.n < 4) {
-      // "item{s} in {cat}" rather than "{n} {cat}": the count and the section name were glued
-      // together, so a section with one item in it read "Only 1 priced desserts" — and an import
-      // with no category column read "Only 3 priced uncategorized".
-      lines.push(pick(['Only {n} priced item{s} in {cat} so far, so there is no pack to rank it against yet. It clears {margin} a {noun}. A few more items and this read sharpens.',
-                       'Just {n} priced item{s} in {cat} on the menu, not enough to rank it fairly. For now it clears {margin} a {noun}.',
-                       'With only {n} priced item{s} in {cat}, Bar Cop cannot stack it against the group yet. It clears {margin} a {noun} in the meantime.'], 0));
+    } else if (!cs.ranked) {
+      /* ⚠ GATED ON THE SAME FACT THE RANKING IS (S309). This asked `cs.n < 4` — the PRICED count —
+         while ranking needs a price, a cost AND a units-sold figure. So one item missing its units
+         sold dropped the whole section out of the ranking while `cs.n` stayed at 4, this branch was
+         skipped, and three healthy items silently lost every verdict with no sentence anywhere
+         saying why. Asking `!cs.ranked` cannot drift from the gate because it IS the gate.
+         ⚠ The copy says what is actually needed, not "priced": an item counts here only once it has
+         all three numbers, which is the thing the operator has to go and fix.
+         "item{s} in {cat}" rather than "{n} {cat}": the count and the section name were glued
+         together, so a section with one item in it read "Only 1 priced desserts" — and an import
+         with no category column read "Only 3 priced uncategorized". */
+      lines.push(pick(['Only {n} item{s} in {cat} have a price, a cost and units sold, so there is no pack to rank it against yet. It clears {margin} a {noun}. A few more and this read sharpens.',
+                       'Just {n} item{s} in {cat} carry all three numbers, not enough to rank it fairly. For now it clears {margin} a {noun}.',
+                       'With only {n} complete item{s} in {cat}, Bar Cop cannot stack it against the group yet. It clears {margin} a {noun} in the meantime.'], 0));
     } else if (!(covers > 0)) {
       /* ⚠ `> 0`, NOT FALSY. A count that cannot legitimately be zero takes the strict test
          ([[the-loop]] #73). `!covers` let a legacy NEGATIVE through to the bare template below,
