@@ -137,9 +137,25 @@ S.RevenueMenuPlanning = {
       const list = byCat[cat].map(i => ({ i, cost: App.menuItemCost(i) || 0 }));
       const priced = list.filter(x => x.i.price > 0 && x.cost > 0);
       const rankable = priced.filter(x => x.i.weekly_covers > 0);
+      /* ⚠⚠ MARGIN RANKS OVER `priced`, COVERS RANKS OVER `rankable`, and the split is the fix rather
+         than an inconsistency. A rank is only honest if it is measured over the set the operator can
+         SEE, and the page renders a tile with Cost and Menu Price for every priced item. Ranking
+         margins over `rankable` printed "the weakest margin of the bunch at $2.00 a plate" with a
+         visible tile beside it reading "It earns $1.00 a plate" — the never-sold item held no rank,
+         so it could not be the bottom, while its margin sat on screen being thinner. Covers stay on
+         `rankable` because an unranked item shows NO cover count to be compared with (it gets the
+         "no covers yet" read). Equality was already handled by the tie maps; this closes the strict
+         inequality the tie test could never see. */
+      /* ⚠ AND THE COVERS POOL INCLUDES A REAL ZERO. `rankable` drops `covers === 0`, but a PMIX zero is
+         DELIBERATE data — r-menu-engineering's own comment says a zero-seller is exactly what the Dog
+         Test exists to surface — and such an item is priced, carries a verdict, and renders a tile with
+         a Menu Mix. Ranking covers over `rankable` therefore let a 20-a-week item claim "the
+         least-ordered of them" and "Nothing here earns and moves less" while a sibling on screen sold
+         NOTHING. `counted` is every priced item whose covers are known, zeros included. */
+      const counted = priced.filter(x => x.i.weekly_covers != null && x.i.weekly_covers >= 0);
       const mRank = {}, cRank = {};
-      rankable.slice().sort((a, b) => (b.i.price - b.cost) - (a.i.price - a.cost)).forEach((x, idx) => { mRank[x.i.id] = idx + 1; });
-      rankable.slice().sort((a, b) => (b.i.weekly_covers || 0) - (a.i.weekly_covers || 0)).forEach((x, idx) => { cRank[x.i.id] = idx + 1; });
+      priced.slice().sort((a, b) => (b.i.price - b.cost) - (a.i.price - a.cost)).forEach((x, idx) => { mRank[x.i.id] = idx + 1; });
+      counted.slice().sort((a, b) => (b.i.weekly_covers || 0) - (a.i.weekly_covers || 0)).forEach((x, idx) => { cRank[x.i.id] = idx + 1; });
       /* ⚠ WHICH VALUES TIE, so _rankWord can refuse to claim a position that nobody holds. A rank
          is a place in a sort, and a sort breaks a tie by array order — so two items on the same
          margin were told one had the fattest and the other the second-fattest. Compared in CENTS:
@@ -162,15 +178,22 @@ S.RevenueMenuPlanning = {
          (it gets the "no covers yet" line instead). Same family as the `n` vs `rankedN` note below,
          one level in. `atMin` is what lets the Dog tail claim a bottom only when it really is one. */
       const mMap = tieMap(priced, x => x.i.price - x.cost);
-      const cMap = tieMap(rankable, x => x.i.weekly_covers || 0);
+      const cMap = tieMap(counted, x => x.i.weekly_covers || 0);
       const mTied = mMap.tied, cTied = cMap.tied, mAtMin = mMap.atMin, cAtMin = cMap.atMin;
       stats[cat] = {
         n: priced.length,
-        avgMargin: priced.length ? priced.reduce((s, x) => s + (x.i.price - x.cost), 0) / priced.length : 0,
-        avgCovers: rankable.length ? rankable.reduce((s, x) => s + x.i.weekly_covers, 0) / rankable.length : 0,
+        /* ⚠ NO `avgMargin` / `avgCovers` HERE, DELIBERATELY (S289). Both were computed and read
+           nowhere, and they were not merely dead — they were the WRONG means: taken over these
+           pools, not over classify()'s. The next person reaching for "the group average" to write a
+           sentence would have got a number the verdict was never measured against, which is exactly
+           the two-means drift that caused M1. If a mean is ever needed here, take it from the
+           verdict's own pool or read the side off the quad ([[the-loop]] #54). */
         totalCovers: byCat[cat].reduce((s, i) => s + (i.weekly_covers || 0), 0),
         ranked: rankable.length >= 4,
         rankedN: rankable.length,
+        // The pool size PER AXIS, because the two ranks are measured over different sets. One shared
+        // `n` is what let a margin rank be tested against the covers pool's size.
+        mN: priced.length, cN: counted.length,
         mRank, cRank, mTied, cTied, mAtMin, cAtMin
       };
     });
@@ -217,6 +240,16 @@ S.RevenueMenuPlanning = {
 
     if (!(price > 0)) return { lines: ['No price on this one yet. Price it in Menu Builder and Bar Cop can start reading it.'], move: '' };
     if (!(cost > 0)) return { lines: ['No cost yet, so there is no margin to read. Attach a recipe or enter a cost in Menu Builder and this fills in.'], move: '' };
+    /* ⚠⚠ A LOSS IS NOT A MARGIN, AND EVERY READ BELOW ASSUMES IT IS. Nothing guarded `cost >= price`,
+       and a group whose mean margin is negative makes an above-mean LOSS a Puzzle — so the page
+       printed "Good money at $-10.00 a plate", "The best margin of the bunch at $-3.00" and
+       "It clears $-1.00 a plate", in gold. Reachable from a mis-entered recipe (a unit slip on one
+       ingredient) or a cost sheet imported without a price column. Same class as I9, which was the
+       identical lie on Pre-Shift, so it gets the same answer: say what the numbers are and refuse to
+       grade them. `!(margin > 0)` covers price === cost too, where there is equally nothing to read. */
+    if (!(price - cost > 0)) return { lines: ['At ' + f(price) + ' with ' + f(cost)
+      + ' of cost in it, this one is not making anything. Check the price and the cost in Menu Builder '
+      + 'before reading anything else into it.'], move: '' };
 
     const margin = price - cost;
     const costPct = cost / price * 100;
@@ -224,14 +257,19 @@ S.RevenueMenuPlanning = {
     const sugg = S.RevenueMenuEngineering.suggested(item, cost);
     const drv = this.topCostIngredient(item);
     const seed = this._seed(item.id);
-    const m = cs.mRank[item.id], c = cs.cRank[item.id], rn = cs.rankedN;
+    // ⚠ ONE n PER AXIS. `rn` used to serve both, so a margin rank taken over the priced pool was
+    // tested against the ranked pool's size and `rank === n` stopped meaning "the bottom".
+    const m = cs.mRank[item.id], c = cs.cRank[item.id], mN = cs.mN, cN = cs.cN;
     /* ⚠ THE VERDICT'S OWN SIDE, read straight off the quad rather than recomputed from a mean here.
        This is the definition classify() ranks by (hiM && hiV = Star, !hiM && hiV = Plowhorse,
        hiM && !hiV = Puzzle, neither = Dog), so the rank word beside the verdict cannot disagree
        with it. `null` when nothing was ranked: with no verdict there is no side to take. */
     const hiM = quad ? (quad === 'STAR' || quad === 'PUZZLE') : null;
     const hiV = quad ? (quad === 'STAR' || quad === 'PLOWHORSE') : null;
-    const dwk = (sugg && covers) ? (sugg - price) * covers : 0;
+    // ⚠ `covers > 0`, not truthy. A legacy negative cover count flipped the sign and the move read
+    // "take it up to $18.75, about $-43.75 more a week if covers hold" — a loss offered as upside.
+    // The read line already refuses a negative count; the move has to refuse it too.
+    const dwk = (sugg && covers > 0) ? (sugg - price) * covers : 0;
 
     /* ⚠ TIE-AWARE FOR THE SAME REASON _rankWord IS (M1, second half). `m === rn` is a place in a
        sort, and a sort breaks a tie by array order — so with margins 20/5/5/5 and covers 100/10/10/10
@@ -243,9 +281,17 @@ S.RevenueMenuPlanning = {
        which made "It is level with the weakest of your sides, with nothing to separate them" print on
        an item with two thinner AND two slower siblings, because a tie ANYWHERE satisfied it. A bottom
        claim is a claim about the MINIMUM, so it has to be measured against the minimum. */
-    const mBottom = !!(cs.mAtMin[item.id] && !cs.mTied[item.id]);
-    const cBottom = !!(cs.cAtMin[item.id] && !cs.cTied[item.id]);
-    const tiedLow = !!((cs.mAtMin[item.id] && cs.mTied[item.id]) || (cs.cAtMin[item.id] && cs.cTied[item.id]));
+    /* ⚠⚠ AND THE TIE READ NEEDS BOTH AXES AT THE BOTTOM, not a tie on either one. My first version
+       fired it on `(mAtMin && mTied) || (cAtMin && cTied)`, so a COVERS tie printed a MARGIN claim:
+       "paired with a bottom-tier seller at 5 a week. It sits level with the weakest in the group, so
+       there is nobody behind it" — on an item with two thinner margins in the same section. "Nobody
+       behind it" is a claim about the whole group, so it takes the whole group's bottom. */
+    const mMin = !!cs.mAtMin[item.id], cMin = !!cs.cAtMin[item.id];
+    const mTie = !!cs.mTied[item.id], cTie = !!cs.cTied[item.id];
+    const bothMin = mMin && cMin;
+    const mBottom = mMin && !mTie;
+    const cBottom = cMin && !cTie;
+    const tiedLow = bothMin && (mTie || cTie);
     const dogBucket = (mBottom && cBottom)
       ? ['It is the one dragging the section hardest.', 'It is the anchor on this section, plain and simple.', 'Nothing here earns and moves less.']
       : (mBottom || cBottom)
@@ -260,16 +306,22 @@ S.RevenueMenuPlanning = {
       // a superlative measured over `rankedN` (priced AND with covers) — "the strongest margin of
       // your 12 cocktails" on a page where seven other cocktail tiles showed a fatter margin,
       // because only 5 of the 12 had covers. Cocktail pooling widened the gap.
-      // ⚠ ROUNDED FOR DISPLAY. Units sold is a COUNT, and two doors write it without rounding —
-      // Menu Builder's Units Sold field (`parseFloat`) and its CSV import — so a stray decimal
-      // printed "an average mover at 12.004 a week" in the operator's read. PMIX already rounds.
-      margin: f(margin), covers: Math.round(covers), noun: noun, cat: catLc, n: cs.n, s: cs.n === 1 ? '' : 's',
+      /* ⚠ ROUNDED FOR DISPLAY, BUT NEVER DOWN TO ZERO. Units sold is a COUNT, and two doors write it
+         unrounded (Menu Builder's Units Sold field via `parseFloat`, and its CSV import), so a stray
+         decimal printed "an average mover at 12.004 a week". ⚠⚠ My first version was a bare
+         `Math.round`, which traded that for something worse: `weekly_covers: 0.4` passes the
+         `covers > 0` gate, so the volume read RUNS and then displayed "the slowest mover at 0 a week"
+         — a zero printed inside the branch that exists because covers are non-zero. A sub-1 value is
+         shown as it is; rounding only applies where there is a whole count to round. The real cure is
+         refusing a fractional count at both write doors (S295). */
+      margin: f(margin), covers: covers >= 1 ? Math.round(covers) : covers,
+      noun: noun, cat: catLc, n: cs.n, s: cs.n === 1 ? '' : 's',
       pct: costPct.toFixed(0), target: target, sugg: f(sugg || 0),
       name: drv ? drv.name : '', dcost: drv ? f(drv.cost) : '',
       // Bare reads of mTied/cTied on purpose: they are required for correctness, and guarding them
       // would silently go back to spending a superlative on a tie ([[the-loop]] #40).
-      mword: this._rankWord(m, rn, 'margin', seed, hiM, !cs.mTied[item.id]),
-      cword: this._rankWord(c, rn, 'covers', seed, hiV, !cs.cTied[item.id]),
+      mword: this._rankWord(m, mN, 'margin', seed, hiM, !cs.mTied[item.id]),
+      cword: this._rankWord(c, cN, 'covers', seed, hiV, !cs.cTied[item.id]),
       tail: dogBucket[seed % dogBucket.length],
       dwkc: dwk ? ', about ' + f(dwk) + ' more a week if covers hold' : ''
     };
@@ -282,10 +334,14 @@ S.RevenueMenuPlanning = {
     // ── Read line ─────────────────────────────────────────────────────────
     /* ⚠ `m && c` IS NOT BELT-AND-BRACES (S288). A priced item with NO covers is still in the
        verdict's pool, so it has a quad, and `cs.ranked` is a fact about the SECTION — so a
-       never-sold item took this branch, where every template quotes a rank it does not have.
+       never-sold item took this branch, where every template quotes a volume it does not have.
        Real output: "A Puzzle. Its margin at $180.00 a drink, but its volume at 0 a week." The
-       correct sentence for it was already written two branches down and was unreachable. */
-    if (quad && cs.ranked && m && c) {
+       correct sentence for it was already written two branches down and was unreachable.
+       ⚠ The test was `m && c` — "does it hold a rank" — which worked only while a zero-cover item
+       was excluded from the covers RANKING. Now that a real zero IS ranked (so nobody can claim to
+       be the least-ordered while it sits there selling nothing), the gate has to say what it always
+       meant: does this item have a volume worth reading. Two jobs that happened to coincide. */
+    if (quad && cs.ranked && covers > 0) {
       const READ = {
         // ⚠ NO SECOND LOCATOR IN THESE TEMPLATES. Four of the six _rankWord pools already end in
         // one ("the best margin of the bunch", "your busiest of them"), so "{mword} in the group"
@@ -295,7 +351,9 @@ S.RevenueMenuPlanning = {
                'This one is a Star. {Mword} at {margin} a {noun} and {cword} at {covers} a week. It is doing everything you want.',
                'A Star. Strong on both counts: {mword} at {margin} a {noun} and {cword} at {covers} a week.'],
         PLOWHORSE: ['A Plowhorse. {Cword} at {covers} a week, but it runs {mword} at {margin} a {noun}. The volume is propping up a thin {noun}.',
-                    'A Plowhorse. It moves, {cword} at {covers} a week, but it runs {mword} at {margin}.',
+                    // ⚠ `a {noun}` — this was the one margin mention in the file that ended bare, so it
+                    // printed "it runs a bottom-tier margin at $16.00." with no unit on the money.
+                    'A Plowhorse. It moves, {cword} at {covers} a week, but it runs {mword} at {margin} a {noun}.',
                     'This one is a Plowhorse. People order it, {cword} at {covers} a week, they just are not paying you much for it at {margin} a {noun}.',
                     'A Plowhorse. {Cword} at {covers} a week on {mword} at {margin} a {noun}. Busy, but thin.'],
         PUZZLE: ['A Puzzle. The margin is there, {mword} at {margin} a {noun}, but it is {cword} at {covers} a week. It pays when it sells, it just is not selling.',
@@ -368,7 +426,14 @@ S.RevenueMenuPlanning = {
     // ── An occasional dry aside, woven onto the end of the read line (~1 in 4),
     // and never the same one twice across the page (page-wide `used` set keyed on
     // the raw template so the same joke can't repeat as a plate and a drink). ──
-    if (quad && cs.ranked && (seed % 4 === 0) && lines.length) {
+    /* ⚠ THE SAME GATE AS THE READ LINE, AND LEAVING IT OFF WAS A DELIBERATE MISTAKE OF MINE. When
+       S288 added `covers > 0` above I judged this aside "apt anyway" for a never-sold item and moved
+       on. It is not: the joke is keyed to the QUAD, and it is stapled onto `lines[0]` — which for a
+       zero-cover item is the "no covers logged yet" sentence. Real output: "Margin is $6.00 a drink.
+       No covers logged yet, so Bar Cop can read the plate but not the pull. The only thing it moves
+       is the needle the wrong way." The aside contradicts the sentence it is glued to, and the word
+       Dog appears nowhere on the tile. A verdict-keyed line belongs only where the verdict is read. */
+    if (quad && cs.ranked && covers > 0 && (seed % 4 === 0) && lines.length) {
       const HUMOR = {
         STAR: ['The kind of {noun} you quietly thank at close.', 'If everything pulled like this, you would sleep at night.', 'It earns its spot, which is rarer than it should be.', 'This is the one carrying the quiet load.'],
         PLOWHORSE: ['Everybody\'s favorite, nobody\'s down payment.', 'It keeps the lights on and the margin humble.', 'The crowd loves it, the P&L just tolerates it.', 'A workhorse that forgot to ask for a raise.'],

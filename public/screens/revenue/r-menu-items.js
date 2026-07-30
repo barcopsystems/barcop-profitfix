@@ -1353,11 +1353,18 @@ S.RevenueMenuItems = {
     const el = document.getElementById('mi-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     const t = this.TYPES.find(x => x.key === this.activeType) || { noun: 'menu' };
+    /* ⚠ THE COPY STATES THE REQUIREMENT, because M5 made Category required and all three of these
+       strings then contradicted the app ([[copy-matches-app]]). Two of them said Category "comes in
+       if your file has it", which is now the opposite of true, and the MIXED DRINKS one never
+       mentioned Category at all — so a drink list would have been refused for a column the copy
+       never named. The section names are the real builtins (App.MENU_CATEGORIES_BY_TYPE), not
+       examples someone invented. "Mixed drink" also matches the tab and the drop title directly
+       above it; the subtitle still said "cocktail". */
     const dropSub = this.activeType === 'plate'
-      ? 'Needs a column for dish name. Category (Appetizers, Entrees, Sides...), price, and cost come in if your file has them. Dishes import without recipes; edit one afterward to build its recipe.'
+      ? 'Needs columns for dish name and Category (Appetizers, Entrees, Sides, Desserts). Price and cost come in if your file has them. Dishes import without recipes; edit one afterward to build its recipe.'
       : this.activeType === 'cocktail'
-      ? 'Needs a column for cocktail name. Price and cost come in if your file has them. Cocktails import without recipes; edit one afterward to build its recipe.'
-      : 'Needs a column for item name. Category (NA Beverages, Snacks), price, and cost come in if your file has them. Edit an item afterward to link its inventory product.';
+      ? 'Needs columns for mixed drink name and Category (Cocktails, Shots, Frozen). Price and cost come in if your file has them. Mixed drinks import without recipes; edit one afterward to build its recipe.'
+      : 'Needs columns for item name and Category (Beer, Wine, NA Beverages, Snacks). Price and cost come in if your file has them. Edit an item afterward to link its inventory product.';
     CSVMapper.mount(el, {
       dropTitle: 'Drop your ' + t.noun + ' items file here',
       dropSub: dropSub,
@@ -1365,7 +1372,13 @@ S.RevenueMenuItems = {
       actionsEl: '#mi-imp-actions',
       fields: [
         { key: 'name',     label: 'Menu Name',    required: true,  match: ['name', 'item', 'item name', 'menu name', 'product', 'description', 'menu item', 'product name', 'dish', 'dish name', 'title'] },
-        { key: 'category', label: 'Category',     required: false, match: ['category', 'type', 'group', 'section', 'menu category', 'menu section', 'course', 'class', 'department'] },
+        /* ⚠ REQUIRED (M5). A file with no Category column created items with `category: ''`, and
+           every save path then refuses "Category required." — so the operator could not fix a typo
+           or a price on an imported item without first filing it, on a screen that never told them
+           a section was missing. One rule everywhere beats a blank section the forms reject. The
+           blank-CELL half is handled in the row loop below: a required mapping still lets an
+           individual cell be empty. */
+        { key: 'category', label: 'Category',     required: true,  match: ['category', 'type', 'group', 'section', 'menu category', 'menu section', 'course', 'class', 'department'] },
         { key: 'price',    label: 'Menu Price',   required: false, match: ['price', 'menu price', 'sell price', 'sell', 'retail', 'selling price', 'list price', 'price each'] },
         { key: 'cost',     label: 'Cost',         required: false, match: ['cost', 'item cost', 'cogs', 'food cost', 'plate cost', 'recipe cost', 'cost each', 'ingredient cost', 'unit cost'] },
         { key: 'covers',   label: 'Weekly Units Sold',required: false, match: ['covers', 'cover', 'weekly covers', 'units', 'units sold', 'volume', 'qty', 'quantity', 'count', 'sold', 'weekly units', 'qty sold', 'quantity sold', 'units per week', 'sales count'] }
@@ -1421,6 +1434,9 @@ S.RevenueMenuItems = {
     // rows for one new item read "Imported 1 new item and refreshed 1 existing", and three rows
     // matching one retired item read "3 items are inactive".
     const addedIds = new Set(), updatedIds = new Set(), skippedIds = new Set();
+    // Rows the file could not file into a section. Counted so they can be REPORTED (M5) — a dropped
+    // row nothing mentions is the defect this codebase keeps rediscovering.
+    let noCat = 0;
     // ⚠ KEYED BY ITEM, HOLDING THE PRICE THE ITEM HAD BEFORE THIS FILE. It used to be an array
     // pushed once per ROW, and the log loop read the item's FINAL price for every entry — so a
     // file naming one item twice at two prices (a dinner sheet and a happy-hour sheet, which is
@@ -1468,6 +1484,15 @@ S.RevenueMenuItems = {
         cur.updated_at = new Date().toISOString();
         updatedIds.add(cur.id);
       } else {
+        /* ⚠ NO SECTION, NO NEW ITEM (M5). Category is a required MAPPING now, but a mapped column can
+           still hold a blank cell, and an item created with `category: ''` is a TRAP rather than a
+           partial record: `saveItem` refuses "Category required." on all three types, so the operator
+           cannot correct the price or the name without filing it first, and nothing on screen said
+           the section was what was missing. Skipped and REPORTED below.
+           ⚠ The REFRESH branch above is deliberately untouched — an existing item whose cell is blank
+           keeps the section it already has (`if (cat)`), which is the same only-overwrite-what-the-
+           file-carries rule the price and cost fields follow. */
+        if (!cat) { noCat++; return; }
         const it = {
           id:                 App.uid(),
           type:               this.activeType,   // the tile the Upload was opened from sets the item type
@@ -1519,12 +1544,19 @@ S.RevenueMenuItems = {
       // file drop cannot reprice something you retired), but they increment neither counter — so
       // this used to tell the operator "no item names were found in the file" when every name in
       // it had been found and matched.
+      // ⚠ AND SAY IT WHEN THE REASON IS A BLANK SECTION (M5). This is the whole-file case — every row
+      // named a new item and none of them said which section — where "no item names were found" would
+      // be the third wrong explanation for the same drop.
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (skippedInactive
-          ? 'No items imported. ' + skippedInactive + ' item' + (skippedInactive > 1 ? 's are' : ' is')
-            + ' inactive, so nothing was changed. Make ' + (skippedInactive > 1 ? 'them' : 'it')
-            + ' active on the Inactive tab first.'
-          : 'No items imported. No item names were found in the file.')
+        + (noCat
+          ? 'No items imported. ' + noCat + ' row' + (noCat === 1 ? '' : 's')
+            + ' had no section in the Category column, and Bar Cop files every item under a section. '
+            + 'Fill the Category cells in and drop the file again.'
+          : skippedInactive
+            ? 'No items imported. ' + skippedInactive + ' item' + (skippedInactive > 1 ? 's are' : ' is')
+              + ' inactive, so nothing was changed. Make ' + (skippedInactive > 1 ? 'them' : 'it')
+              + ' active on the Inactive tab first.'
+            : 'No items imported. No item names were found in the file.')
         + '</div>';
       return;
     }
@@ -1587,8 +1619,14 @@ S.RevenueMenuItems = {
       // A skipped row is not a silent drop — the operator must be told their file mentioned items
       // that are off the live menu, or the counts look wrong and they re-drop the file.
       if (skippedInactive) parts.push('skipped ' + skippedInactive + ' inactive item' + (skippedInactive === 1 ? '' : 's'));
+      // ⚠ THE PARTIAL CASE (M5), and it is the one that matters: some rows imported and some did not.
+      // A count that omits the dropped rows makes the file look fully imported, and the operator has
+      // no reason to look at their spreadsheet again.
+      if (noCat) parts.push('skipped ' + noCat + ' row' + (noCat === 1 ? '' : 's') + ' with no section');
       res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
         + parts.join(' and ').replace(/^./, c => c.toUpperCase()) + '. Edit any item to set its price, cost, or recipe.'
+        + (noCat ? ' Bar Cop files every item under a section, so fill the Category cells in and drop the file again to add '
+          + (noCat === 1 ? 'that row' : 'those rows') + '.' : '')
         + '</div>';
     }
   }
