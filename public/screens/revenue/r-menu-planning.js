@@ -647,11 +647,17 @@ S.RevenueMenuPlanning = {
   },
 
   // The one button a tile carries, matched to its move.
+  /* ⚠⚠ DELEGATES, IT DOES NOT RE-DECIDE (S322). This rolled its own test order — suggestion
+     FIRST, then Dog — while Menu Engineering asks planned → Dog → suggestion. So this tile offered
+     "+ Reprice" on a DOG and on an item whose reprice was already planned, and both deep links
+     landed on a screen with no Reprice button on that row: the click did nothing whatsoever.
+     One rule, one place. `rowAction` returns 'marklive' | 'dogtest' | 'reprice' | 'none', and
+     every one of those has a branch in `fire()` below. */
   actionFor(item, quad) {
-    const cost = App.menuItemCost(item) || 0;
-    const sugg = (item.price > 0 && cost > 0) ? S.RevenueMenuEngineering.suggested(item, cost) : null;
-    if (sugg) return { act: 'reprice', label: 'Reprice' };
-    if (quad === 'DOG') return { act: 'dogtest', label: 'Dog Test' };
+    const act = S.RevenueMenuEngineering.rowAction(item, quad);
+    if (act === 'reprice')  return { act: 'reprice',  label: 'Reprice' };
+    if (act === 'marklive') return { act: 'marklive', label: 'Mark Live' };
+    if (act === 'dogtest')  return { act: 'dogtest',  label: 'Dog Test' };
     return { act: 'edit', label: 'Edit Item' };
   },
 
@@ -766,6 +772,9 @@ S.RevenueMenuPlanning = {
     const fire = (btn) => {
       const id = btn.dataset.id, a = btn.dataset.act;
       if (a === 'reprice') { App._menuRepricePreselect = id; App.navigate('r-menu-engineering'); }
+      // A pending plan is taken live or cancelled on the board itself, so this lands the operator
+      // there rather than opening a second reprice over the first (S322).
+      else if (a === 'marklive') { App.navigate('r-menu-engineering'); }
       else if (a === 'dogtest') { App._dogTestPreselect = id; App.navigate('r-dog-test'); }
       else { App._menuItemFocus = id; App.navigate('r-menu-items'); }
     };

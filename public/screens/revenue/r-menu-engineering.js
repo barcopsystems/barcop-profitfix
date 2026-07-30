@@ -42,6 +42,25 @@ S.RevenueMenuEngineering = {
 
   // Suggested price = the price that hits the target cost %. Only ever a RAISE
   // (Bar Cop never tells you to cut a price); null when at/under target or no target.
+  /* ⚠⚠ THE ONE ROW-ACTION RULE (S322). 'marklive' | 'dogtest' | 'reprice' | 'none'.
+     Menu Rundown offers one action per tile and deep-links to this screen. It used to decide with
+     its own test order — SUGGESTION FIRST, then Dog — while this screen asks planned → Dog →
+     suggestion. Both of the rules encoded here were therefore invisible over there:
+       · a PLANNED price means a reprice is already pending, and it has to be taken live or
+         cancelled before another is started, so the row shows Mark Live / Cancel;
+       · a DOG is not a pricing problem, so it is routed to the Dog Test.
+     Rundown offered "+ Reprice" on both shapes, the deep link found no `.me-reprice` button, and
+     the click did NOTHING AT ALL — the page just loaded. Neither screen was wrong about its own
+     row; they were answering one question with two rules, which is what a shared decider exists to
+     prevent ([[the-loop]] step 0.6). Cost comes through `App.menuItemCost` so the answer is the
+     LIVE cost on both screens (`_rankable` already maps the same thing, S111). */
+  rowAction(item, quad) {
+    if (!item) return 'none';
+    if (item.planned_price > 0) return 'marklive';
+    if (quad === 'DOG') return 'dogtest';
+    return this.suggested(item, App.menuItemCost(item) || 0) ? 'reprice' : 'none';
+  },
+
   suggested(item, cost) {
     const tgt = this.targetPctFor(item);
     if (!tgt || !(cost > 0) || !(item.price > 0)) return null;
@@ -174,7 +193,24 @@ S.RevenueMenuEngineering = {
     if (App._menuRepricePreselect) {
       const rid = App._menuRepricePreselect;
       App._menuRepricePreselect = null;
-      if (c.querySelector('.me-reprice[data-id="' + rid + '"]')) this.openReprice(rid);
+      /* ⚠⚠ KEY ON THE ITEM, NOT ON A RENDERED BUTTON (S322). This tested `.me-reprice[data-id]`,
+         which is a PROXY for the wrong fact twice over: `openReprice` needs only that the item
+         exists (`if (!item) return;`), so an item that is genuinely repriceable but not on the
+         visible board — a category under MIN_PER_CAT ranks as null and is not drawn — was dropped
+         even though the modal would have worked perfectly ([[the-loop]] #62). And when the answer
+         really is "no", the click used to do NOTHING, which is indistinguishable from the app
+         being broken. Ask the shared rule, and say so when the answer changed. */
+      const it = (App.data.menu_items || []).find(x => x.id === rid);
+      const act = this.rowAction(it, this.classify()[rid] || null);
+      if (act === 'reprice') this.openReprice(rid);
+      else App.confirm({
+        title: 'That item is not ready to reprice',
+        message: !it ? 'The item has since been removed from your menu.'
+          : act === 'marklive' ? 'This item already has a planned price waiting. Take it live or cancel it from the row below, then you can price it again.'
+          : act === 'dogtest' ? 'This item ranks as a Dog, so Bar Cop routes it to a Dog Test rather than a price rise. Run the test from the row below.'
+          : 'This item is already at or under its cost target, so there is no raise to suggest.',
+        confirmText: 'OK', cancelText: ''
+      });
     }
   },
 
@@ -315,10 +351,13 @@ S.RevenueMenuEngineering = {
         ? '<span style="color:' + (dwk >= 0 ? 'var(--gold)' : 'var(--t2)') + ';">' + (dwk >= 0 ? '+' : '') + f(dwk) + '</span>'
         : '<span style="color:var(--t3);">-</span>';
 
+      /* ⚠ THROUGH THE SHARED RULE (S322), not three inline tests — Menu Rundown asks the same
+         function, so the button it offers and the button that renders here cannot drift apart. */
+      const act = this.rowAction(i, quad);
       let action;
-      if (planned) action = '<div class="row-actions"><button class="btn btn-primary btn-sm me-marklive" data-id="' + esc(i.id) + '">Mark Live</button><button class="btn btn-ghost btn-sm me-cancelplan" data-id="' + esc(i.id) + '">Cancel</button></div>';
-      else if (isDog) action = this.dogAction(i.id);
-      else if (sugg) action = '<div class="row-actions"><button class="btn btn-ghost btn-sm me-reprice" data-id="' + esc(i.id) + '">Reprice</button></div>';
+      if (act === 'marklive') action = '<div class="row-actions"><button class="btn btn-primary btn-sm me-marklive" data-id="' + esc(i.id) + '">Mark Live</button><button class="btn btn-ghost btn-sm me-cancelplan" data-id="' + esc(i.id) + '">Cancel</button></div>';
+      else if (act === 'dogtest') action = this.dogAction(i.id);
+      else if (act === 'reprice') action = '<div class="row-actions"><button class="btn btn-ghost btn-sm me-reprice" data-id="' + esc(i.id) + '">Reprice</button></div>';
       else action = '';
 
       return { suggCell, dwkCell, action };
