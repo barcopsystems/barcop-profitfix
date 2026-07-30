@@ -139,6 +139,16 @@ S.RevenueMenuEngineering = {
          screen then filter it out of the board, the Dog list and this gate. Fixing that changes what
          the board RANKS — a 0-unit item drags its category's average — so it needs its own pass. */
       this._coversFlash = null;
+      /* ⚠ AND DROP THE DEEP-LINK FLAG ON THE WAY OUT TOO — the identical mechanism as the line above,
+         one exit that had it and one that did not. Menu Rundown renders "+ Reprice" whenever
+         `suggested()` fires, which needs only price, cost and a target, so a THREE-item costed menu
+         shows the button while this screen cannot rank yet and returns here. Proven by running both
+         screens: the click sets `_menuRepricePreselect`, this branch never reaches the consume at the
+         bottom of draw(), and the flag survives — so when the operator later prices a fourth item and
+         opens Menu Engineering from the nav, the reprice modal pops UNBIDDEN for an item they clicked
+         on another screen minutes earlier. A new exit in a function with a consume convention is a
+         leak until proven otherwise ([[the-loop]] #49). */
+      App._menuRepricePreselect = null;
       App.setupCard(this.container, {
         title: 'Menu Engineering',
         lead: 'Menu Engineering sorts every priced item into Stars, Plowhorses, Puzzles, and Dogs, and names the move plus the number behind it. Price your menu items first.',

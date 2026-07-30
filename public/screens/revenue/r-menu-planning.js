@@ -67,31 +67,57 @@ S.RevenueMenuPlanning = {
     return 'var(--green)';
   },
 
-  _rankWord(rank, n, kind, seed) {
-    if (!(n > 1) || !rank) return kind === 'margin' ? 'its margin' : 'its volume';
+  /* ⚠⚠ THE WORD MAY NOT ARGUE WITH THE VERDICT (M1). `rank` is ORDINAL — a position in a sort of
+     the items that have covers. The verdict beside it (Star/Plowhorse/Puzzle/Dog) is MEAN-RELATIVE,
+     `>= the group average` over every PRICED item. Two scales in one sentence, so the sentence
+     contradicted itself. Measured before the fix: four bottle-beer cases at one case price are all
+     at the mean and all Stars, and the sort still handed out 1/2/3/4 — "A Star. It carries the
+     second-thinnest margin at $12.00 a drink ... Both sides working." And it was never only ties:
+     in ANY four-item section rank 2 is best2 and rank 3 is worst2, so an ordinary spread group
+     printed "A Puzzle ... yet only the second-best seller at 70 a week" — Puzzle MEANS low volume.
+     `hi` IS THE VERDICT'S OWN SIDE, handed in by the caller straight off the quad. It is never a
+     second mean computed here: two computations of one quantity is exactly how these drifted apart
+     ([[the-loop]] #54), and the pools differ anyway (the verdict's mean counts priced items with no
+     covers; the ranks do not, which is how the fattest RANKED margin could sit below the mean).
+     A superlative is spent only when it AGREES with that side and the value is UNIQUE in the pool —
+     a tied value holds no position however the sort happens to break it. `hi == null` means no
+     verdict was reached, and with no verdict there is no honest comparison to make.
+     ⚠⚠ A TIE FALLS TO THE SIDE WORD, NOT TO "middling" — and my first version of this fix got that
+     wrong in both directions, which is the part worth keeping. I sent a tie to `mid` because the
+     fixture in front of me was four IDENTICAL beers, where the tie sits exactly on the mean and
+     "an average margin" is true. It is only true there. A tie at a section's EXTREME is just as
+     ordinary, and `mid` then claimed a position the item does not hold — the same false-claim class
+     `unique` was added to kill (margins $4/$4/$32/$33 printed "a middling margin at $4.00" beside
+     two tiles reading $32 and $33). Worse, the READ templates below assert the side IN PROSE right
+     next to the slot — "Strong on both counts", "Both sides working", "Low on both" — so a mid word
+     contradicted its own sentence and merely MOVED the defect from verdict-vs-word to
+     word-vs-template. The side is a fact for every ranked item; a PLACE is not. So `mid` is gone. */
+  _rankWord(rank, n, kind, seed, hi, unique) {
+    if (!(n > 1) || !rank || hi == null) return kind === 'margin' ? 'its margin' : 'its volume';
     const P = kind === 'margin' ? {
       best: ['the fattest margin', 'the best margin of the bunch', 'the strongest margin here'],
       worst: ['the thinnest margin', 'the weakest margin of the bunch', 'the skinniest margin here'],
       best2: ['the second-fattest margin', 'the second-best margin'],
       worst2: ['the second-thinnest margin', 'the second-weakest margin'],
       up: ['one of the fatter margins', 'an upper-tier margin', 'a healthy margin'],
-      low: ['one of the thinner margins', 'a bottom-tier margin', 'a soft margin'],
-      mid: ['a middling margin', 'a middle-of-the-pack margin', 'an average margin']
+      low: ['one of the thinner margins', 'a bottom-tier margin', 'a soft margin']
     } : {
       best: ['the top seller', 'your busiest of them', 'the volume leader'],
       worst: ['the slowest mover', 'the least-ordered of them', 'the volume laggard'],
       best2: ['the second-best seller', 'the second-busiest of them'],
       worst2: ['the second-slowest mover', 'the second-least-ordered'],
       up: ['one of the busier sellers', 'an upper-tier seller', 'a strong mover'],
-      low: ['one of the slower movers', 'a bottom-tier seller', 'a soft mover'],
-      mid: ['a middling seller', 'a middle-of-the-pack seller', 'an average mover']
+      low: ['one of the slower movers', 'a bottom-tier seller', 'a soft mover']
     };
-    let bucket;
-    if (rank === 1) bucket = P.best;
-    else if (rank === n) bucket = P.worst;
-    else if (rank === 2 && n >= 4) bucket = P.best2;
-    else if (rank === n - 1 && n >= 4) bucket = P.worst2;
-    else { const frac = rank / n; bucket = frac <= 0.34 ? P.up : frac >= 0.67 ? P.low : P.mid; }
+    // The SIDE is a fact for every ranked item, so it is the floor. A PLACE has to be earned:
+    // unique value, and only where that place cannot disagree with the side.
+    let bucket = hi ? P.up : P.low;
+    if (unique) {
+      if (rank === 1 && hi) bucket = P.best;
+      else if (rank === n && !hi) bucket = P.worst;
+      else if (rank === 2 && n >= 4 && hi) bucket = P.best2;
+      else if (rank === n - 1 && n >= 4 && !hi) bucket = P.worst2;
+    }
     return bucket[(seed + (kind === 'margin' ? 0 : 5)) % bucket.length];
   },
 
@@ -114,6 +140,30 @@ S.RevenueMenuPlanning = {
       const mRank = {}, cRank = {};
       rankable.slice().sort((a, b) => (b.i.price - b.cost) - (a.i.price - a.cost)).forEach((x, idx) => { mRank[x.i.id] = idx + 1; });
       rankable.slice().sort((a, b) => (b.i.weekly_covers || 0) - (a.i.weekly_covers || 0)).forEach((x, idx) => { cRank[x.i.id] = idx + 1; });
+      /* ⚠ WHICH VALUES TIE, so _rankWord can refuse to claim a position that nobody holds. A rank
+         is a place in a sort, and a sort breaks a tie by array order — so two items on the same
+         margin were told one had the fattest and the other the second-fattest. Compared in CENTS:
+         float noise on `price - cost` reads two genuinely equal margins as distinct, which hands
+         the superlative straight back out. */
+      const cents = v => Math.round((Number(v) || 0) * 100);
+      const tieMap = (pool, val) => {
+        const seen = {}, tied = {}, atMin = {};
+        let min = null;
+        pool.forEach(x => { const k = cents(val(x)); seen[k] = (seen[k] || 0) + 1; if (min == null || k < min) min = k; });
+        pool.forEach(x => { const k = cents(val(x)); tied[x.i.id] = seen[k] > 1; atMin[x.i.id] = (k === min); });
+        return { tied, atMin };
+      };
+      /* ⚠ MARGIN TIES ARE MEASURED OVER EVERY PRICED ITEM, NOT JUST THE RANKED ONES, and the reason
+         is what the operator can SEE. The page renders a tile for every priced item with its Cost and
+         Menu Price, so a never-sold item's margin is on screen even though it holds no rank — and a
+         ranked tile claiming "the fattest margin at $11.00" directly under a visible tile also
+         reading $11.00 is a contradiction the operator reads off the screen. COVERS ties stay on
+         `rankable`, because an item with no covers has no cover count on screen to be compared with
+         (it gets the "no covers yet" line instead). Same family as the `n` vs `rankedN` note below,
+         one level in. `atMin` is what lets the Dog tail claim a bottom only when it really is one. */
+      const mMap = tieMap(priced, x => x.i.price - x.cost);
+      const cMap = tieMap(rankable, x => x.i.weekly_covers || 0);
+      const mTied = mMap.tied, cTied = cMap.tied, mAtMin = mMap.atMin, cAtMin = cMap.atMin;
       stats[cat] = {
         n: priced.length,
         avgMargin: priced.length ? priced.reduce((s, x) => s + (x.i.price - x.cost), 0) / priced.length : 0,
@@ -121,7 +171,7 @@ S.RevenueMenuPlanning = {
         totalCovers: byCat[cat].reduce((s, i) => s + (i.weekly_covers || 0), 0),
         ranked: rankable.length >= 4,
         rankedN: rankable.length,
-        mRank, cRank
+        mRank, cRank, mTied, cTied, mAtMin, cAtMin
       };
     });
     return stats;
@@ -175,14 +225,34 @@ S.RevenueMenuPlanning = {
     const drv = this.topCostIngredient(item);
     const seed = this._seed(item.id);
     const m = cs.mRank[item.id], c = cs.cRank[item.id], rn = cs.rankedN;
+    /* ⚠ THE VERDICT'S OWN SIDE, read straight off the quad rather than recomputed from a mean here.
+       This is the definition classify() ranks by (hiM && hiV = Star, !hiM && hiV = Plowhorse,
+       hiM && !hiV = Puzzle, neither = Dog), so the rank word beside the verdict cannot disagree
+       with it. `null` when nothing was ranked: with no verdict there is no side to take. */
+    const hiM = quad ? (quad === 'STAR' || quad === 'PUZZLE') : null;
+    const hiV = quad ? (quad === 'STAR' || quad === 'PLOWHORSE') : null;
     const dwk = (sugg && covers) ? (sugg - price) * covers : 0;
 
-    const bothBottom = (m === rn && c === rn);
-    const dogBucket = bothBottom
+    /* ⚠ TIE-AWARE FOR THE SAME REASON _rankWord IS (M1, second half). `m === rn` is a place in a
+       sort, and a sort breaks a tie by array order — so with margins 20/5/5/5 and covers 100/10/10/10
+       one of three IDENTICAL items was told "Nothing here earns and moves less" while its two twins
+       were told "Others trail it", which is false when nothing is behind any of them. A bottom claim
+       is only honest if this item is ALONE down there, and a "someone trails it" claim is only honest
+       if someone does. Ties get their own read, because level is a real answer.
+       ⚠⚠ MEASURED FROM `atMin`, NOT FROM `rank === rn`, and my first version of this used the rank —
+       which made "It is level with the weakest of your sides, with nothing to separate them" print on
+       an item with two thinner AND two slower siblings, because a tie ANYWHERE satisfied it. A bottom
+       claim is a claim about the MINIMUM, so it has to be measured against the minimum. */
+    const mBottom = !!(cs.mAtMin[item.id] && !cs.mTied[item.id]);
+    const cBottom = !!(cs.cAtMin[item.id] && !cs.cTied[item.id]);
+    const tiedLow = !!((cs.mAtMin[item.id] && cs.mTied[item.id]) || (cs.cAtMin[item.id] && cs.cTied[item.id]));
+    const dogBucket = (mBottom && cBottom)
       ? ['It is the one dragging the section hardest.', 'It is the anchor on this section, plain and simple.', 'Nothing here earns and moves less.']
-      : (m === rn || c === rn)
+      : (mBottom || cBottom)
         ? ['On one measure it is the very bottom of your ' + catLc + '.', 'It hits rock bottom on one of the two here.', 'One of its two numbers is dead last in the group.']
-        : ['Others trail it, but it still is not paying for its spot.', 'Not the worst of the bunch, but it is not earning its place.', 'A few trail it, yet it is still not carrying its spot on the menu.'];
+        : tiedLow
+          ? ['It is level with the weakest of your ' + catLc + ', with nothing to separate them.', 'It ties with the others at the bottom here, and none of them are earning the spot.', 'It sits level with the weakest in the group, so there is nobody behind it.']
+          : ['Others trail it, but it still is not paying for its spot.', 'Not the worst of the bunch, but it is not earning its place.', 'A few trail it, yet it is still not carrying its spot on the menu.'];
 
     const V = {
       // ⚠ `n` is the PRICED count and it must only ever be used by the "not enough to rank yet"
@@ -190,10 +260,16 @@ S.RevenueMenuPlanning = {
       // a superlative measured over `rankedN` (priced AND with covers) — "the strongest margin of
       // your 12 cocktails" on a page where seven other cocktail tiles showed a fatter margin,
       // because only 5 of the 12 had covers. Cocktail pooling widened the gap.
-      margin: f(margin), covers: covers, noun: noun, cat: catLc, n: cs.n, s: cs.n === 1 ? '' : 's',
+      // ⚠ ROUNDED FOR DISPLAY. Units sold is a COUNT, and two doors write it without rounding —
+      // Menu Builder's Units Sold field (`parseFloat`) and its CSV import — so a stray decimal
+      // printed "an average mover at 12.004 a week" in the operator's read. PMIX already rounds.
+      margin: f(margin), covers: Math.round(covers), noun: noun, cat: catLc, n: cs.n, s: cs.n === 1 ? '' : 's',
       pct: costPct.toFixed(0), target: target, sugg: f(sugg || 0),
       name: drv ? drv.name : '', dcost: drv ? f(drv.cost) : '',
-      mword: this._rankWord(m, rn, 'margin', seed), cword: this._rankWord(c, rn, 'covers', seed),
+      // Bare reads of mTied/cTied on purpose: they are required for correctness, and guarding them
+      // would silently go back to spending a superlative on a tie ([[the-loop]] #40).
+      mword: this._rankWord(m, rn, 'margin', seed, hiM, !cs.mTied[item.id]),
+      cword: this._rankWord(c, rn, 'covers', seed, hiV, !cs.cTied[item.id]),
       tail: dogBucket[seed % dogBucket.length],
       dwkc: dwk ? ', about ' + f(dwk) + ' more a week if covers hold' : ''
     };
@@ -204,7 +280,12 @@ S.RevenueMenuPlanning = {
     const lines = [];
 
     // ── Read line ─────────────────────────────────────────────────────────
-    if (quad && cs.ranked) {
+    /* ⚠ `m && c` IS NOT BELT-AND-BRACES (S288). A priced item with NO covers is still in the
+       verdict's pool, so it has a quad, and `cs.ranked` is a fact about the SECTION — so a
+       never-sold item took this branch, where every template quotes a rank it does not have.
+       Real output: "A Puzzle. Its margin at $180.00 a drink, but its volume at 0 a week." The
+       correct sentence for it was already written two branches down and was unreachable. */
+    if (quad && cs.ranked && m && c) {
       const READ = {
         // ⚠ NO SECOND LOCATOR IN THESE TEMPLATES. Four of the six _rankWord pools already end in
         // one ("the best margin of the bunch", "your busiest of them"), so "{mword} in the group"
@@ -234,7 +315,12 @@ S.RevenueMenuPlanning = {
       lines.push(pick(['Only {n} priced item{s} in {cat} so far, so there is no pack to rank it against yet. It clears {margin} a {noun}. A few more items and this read sharpens.',
                        'Just {n} priced item{s} in {cat} on the menu, not enough to rank it fairly. For now it clears {margin} a {noun}.',
                        'With only {n} priced item{s} in {cat}, Bar Cop cannot stack it against the group yet. It clears {margin} a {noun} in the meantime.'], 0));
-    } else if (!covers) {
+    } else if (!(covers > 0)) {
+      /* ⚠ `> 0`, NOT FALSY. A count that cannot legitimately be zero takes the strict test
+         ([[the-loop]] #73). `!covers` let a legacy NEGATIVE through to the bare template below,
+         which printed it raw: "It clears $9.00 a plate on -5 covers a week." The form and the
+         importer both refuse a negative now, so only data already on file can be shaped that way —
+         and this branch is what it lands in, which is also the honest read for it. */
       lines.push(pick(['It clears {margin} a {noun}, but no covers on it yet, so the volume read stays blank until you drop a product mix at the weekly close.',
                        'Margin is {margin} a {noun}. No covers logged yet, so Bar Cop can read the plate but not the pull.',
                        'It earns {margin} a {noun}. Once covers come in at the weekly close, the volume side fills in.'], 0));
@@ -452,12 +538,26 @@ S.RevenueMenuPlanning = {
 
     this.container.innerHTML = '<div class="screen">' + statStrip + sections + '</div>';
 
-    this.container.querySelectorAll('.mp-act').forEach(btn => btn.addEventListener('click', () => {
-      const id = btn.dataset.id, act = btn.dataset.act;
-      if (act === 'reprice') { App._menuRepricePreselect = id; App.navigate('r-menu-engineering'); }
-      else if (act === 'dogtest') { App._dogTestPreselect = id; App.navigate('r-dog-test'); }
+    /* ⚠ ONE ACTION, TWO EVENTS (M3). `.mp-act` is the ONLY `role="button"` in the app — nearly every
+       other control is a real <button>, which the browser activates on Enter and Space for free (the
+       one other custom control, `bottle-slider`'s `<div tabindex="0">`, wires its own keys). A span
+       does not, so a control that announces itself as a button and takes Tab focus did nothing on
+       either key. It is also the ONLY interactive control on this page, which is what made it a
+       dead end rather than an inconvenience. Space is preventDefault'd or the page scrolls under it.
+       ⚠ Kyle's call still open: a real <button> with the link styling reset is the stronger answer
+       and it is a style.css change, so it is not folded in here. */
+    const fire = (btn) => {
+      const id = btn.dataset.id, a = btn.dataset.act;
+      if (a === 'reprice') { App._menuRepricePreselect = id; App.navigate('r-menu-engineering'); }
+      else if (a === 'dogtest') { App._dogTestPreselect = id; App.navigate('r-dog-test'); }
       else { App._menuItemFocus = id; App.navigate('r-menu-items'); }
-    }));
+    };
+    this.container.querySelectorAll('.mp-act').forEach(btn => {
+      btn.addEventListener('click', () => fire(btn));
+      btn.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(btn); }
+      });
+    });
   },
 
   showHowTo() {
