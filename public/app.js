@@ -3602,6 +3602,35 @@ const App = {
      LOCKED. It leaves exactly the window Kyle described open -- you counted, you noticed, you fix
      it -- and closes the moment the number has been used.
      ⚠ `this.`, not `App.`, so it stays liftable ([[the-loop]] #46). */
+  /* ⚠⚠ WHICH CONFIRMED WEEKS DO THESE DATED ROWS FALL INSIDE? (S281.)
+     An import writes per-day `sc_shifts` records with no idea whether the operator has already
+     confirmed the week those days sit in — `pos-ingest` carries no lock guard at all, while the app
+     enforces one on counts and deliveries (`countLockedByWeek`). **This is NOT data loss and must
+     not be reported as one**: Confirm the Week STORES its own figures on the `week` /
+     `revenue_week` records, so a confirmed week keeps exactly what was signed off. What it is, is a
+     SILENT DIVERGENCE — the day-level sales behind a confirmed week now say something different
+     from the week itself, and nothing on screen says so. Kyle's call: WARN, do not block.
+     ⚠ Bounded by the week's real Monday, not just `<= period_end`. `countLockedByWeek` deliberately
+     locks everything on or before the newest confirmed week-end (a count is a running snapshot, so
+     anything earlier is behind a sign-off). A sales DAY is not like that — it belongs to exactly
+     one week, and warning about a day three months before the only confirmed week would be noise.
+     Returns the week-ending dates, sorted, so the caller can name them. */
+  confirmedWeeksTouched(dates) {
+    const weeks = (this.data && this.data.weeks) || [];
+    const ends = weeks.map(w => String((w && w.period_end) || '').slice(0, 10)).filter(Boolean);
+    if (!ends.length) return [];
+    const hit = new Set();
+    (dates || []).forEach(raw => {
+      const day = String(raw || '').slice(0, 10);
+      if (!day) return;
+      ends.forEach(end => {
+        const start = this.weekStartFor(end);
+        if (start && day >= start && day <= end) hit.add(end);
+      });
+    });
+    return [...hit].sort();
+  },
+
   countLockedByWeek(c) {
     const d = String((c && (c.date || c.created_at)) || '').slice(0, 10);
     if (!d) return false;
@@ -4217,10 +4246,13 @@ const App = {
   // Menu category groupings used across Revenue Recovery (r-menu-items,
   // r-menu-engineering, r-price-calc, r-dog-test, recipe-cost-analysis).
   // Promoted from per-file local arrays so the lists never drift.
-  // Plate-side menu categories — the starter food sections. Kept for the recipe
-  // ingredient/target-cost logic; the operator's live menu sections now come from
-  // the customizable menu_category list (MENU_ALL_CATEGORIES builtins below).
-  MENU_PLATE_CATEGORIES: ['Appetizers', 'Entrees', 'Sides', 'Desserts', 'Specials'],
+  /* ⚠ `MENU_PLATE_CATEGORIES` WAS DELETED HERE (M6, 2026-07-30). It had ZERO references in the
+     whole tree — one occurrence, its own definition — while its comment claimed it was "kept for
+     the recipe ingredient/target-cost logic". Nothing read it, and it still listed **Specials**,
+     which was removed from the dish list on 2026-07-25, so the next person to trust it would have
+     got the pre-rename set. A stale duplicate is worse than no constant: it looks authoritative.
+     ⚠ Do not confuse it with `MENU_PLATE_ING_CATS` (below), which IS live — r-menu-items reads it
+     through a getter. Near-identical names, opposite verdicts ([[the-loop]] #9). */
   // The shared, operator-customizable menu SECTION list (the | Edit popup key
   // 'menu_category'). Any menu item — dish, cocktail, or no-prep — can sit in any
   // of these. Builtins are the classic sections in menu order; the operator adds
