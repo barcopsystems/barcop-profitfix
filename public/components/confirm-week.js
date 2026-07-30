@@ -308,6 +308,37 @@ const ConfirmWeek = {
     const f = this._figures();
     const notes = (document.getElementById('cw-notes')?.value || '').trim();
 
+    /* ⚠⚠ NEGATIVE REVENUE IS REFUSED HERE THE WAY BOTH DAY DOORS ALREADY REFUSE IT (H-class field 6).
+       Four sites write bar/floor revenue, at two grains, and they split by grain: the POS import
+       (`PosIngest.buildSales`) treats a negative day aggregate as an unusable column, keeps the
+       prior figure and REPORTS it; the manual sales grid refuses and NAMES THE DAY. This door, the
+       weekly close, had exactly one guard — `totRev === 0` — so a bar of -4,500 against 6,000 of
+       food netted positive and sailed straight through. Measured on the live build: totRev $3,390
+       on a $6,000 food week, prime cost 336.4%, check average $3.00, and it saves. That one record
+       is the week: it writes BOTH the profit `week` and the `revenue_week`, which feed Books,
+       Recovery's leak dollars, the cash engine's revenue baseline, the Hub, both audits and the
+       forecast. `pos-ingest.js` already carries a comment describing this exact failure at the day
+       grain; the fix went to the day and the week grain never learned it ([[the-loop]] #45).
+       `<input type="number">` stops nothing: no cell here carries `min` and nothing calls
+       checkValidity, so the field hands back "-4500" quite happily.
+       ⚠ BEFORE the zero check, not after: -100 bar against +100 food sums to exactly 0, and the
+       operator would have been told to "enter a revenue figure" about figures they had entered.
+       ⚠ EVERY offending cell is named in ONE message. Refusing them one save at a time is the
+       drip-feed the bulk-hours door was fixed for.
+       ⚠ COGS AND LABOR ARE DELIBERATELY NOT HERE. A weekly COGS can legitimately come out negative
+       (usage = opening + purchases - closing, and a big delivery landing on the last day can push
+       closing above the rest), so a blanket refusal would refuse real data — a defect with a
+       support call attached. Every cell guarded below has a day-level twin that already refuses,
+       so this is grains agreeing, not a new rule. */
+    const negLabels = [['Bar revenue', f.bRev], ['Food revenue', f.fRev],
+                       ['Ancillary revenue', f.oRev], ['Total covers', f.covers]]
+      .filter(c => c[1] != null && c[1] < 0).map(c => c[0]);
+    if (negLabels.length) {
+      const names = negLabels.length === 1 ? negLabels[0]
+        : negLabels.slice(0, -1).join(', ') + ' and ' + negLabels[negLabels.length - 1];
+      fail(names + ' cannot be negative.');
+      return;
+    }
     if (f.totRev === 0) { fail('Enter at least one revenue figure before confirming.'); return; }
 
     const t = (App.data.settings && App.data.settings.targets) || {};
