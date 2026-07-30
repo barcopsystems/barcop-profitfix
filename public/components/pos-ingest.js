@@ -1432,7 +1432,15 @@ const PosIngest = {
       // halves of one check compared DIFFERENT FIELDS and a blank never lined up with a named
       // register — the collision went undetected in both directions.
       // Tolerance is the matched register's own (App.drawerTolerance); $10 when unrecognized.
-      const tol = (window.App && App.drawerTolerance) ? App.drawerTolerance(dRec || null) : 10;
+      /* ⚠⚠ BARE `App`, NOT `window.App` (S320). `App` is a top-level `const` in app.js and is NEVER
+         assigned to `window`, so `window.App` is undefined and this whole condition was ALWAYS FALSE.
+         Every drawer in every bar was judged against the hardcoded 10 on the right, and an operator
+         who set their own cash tolerance had it silently ignored — a $20-tolerance bar getting drawers
+         called Short and Over that are inside its own policy. `recovery.js:42` carries a comment
+         warning about this exact mistake. The `: 10` was redundant besides: `App.drawerTolerance`
+         already returns 10 when the drawer has no tolerance of its own, so the guard was duplicating
+         the default while suppressing the real answer ([[the-loop]] #40). */
+      const tol = App.drawerTolerance(dRec || null);
       const status = (expected_cash != null && VL) ? VL.statusOf(variance, expected_cash, counted_cash, dRec ? dRec.id : null)
                    : (Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over');
       const rec = {
