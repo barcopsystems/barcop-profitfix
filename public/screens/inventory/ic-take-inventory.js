@@ -928,6 +928,75 @@ S.InventoryTakeInventory = {
       record.edit_count = this.draft._edit_count || 1;
     }
 
+    /* ⚠⚠ SAME LOCATION, SAME DAY, SECOND RECORD (S330). Kyle: "what do you mean by a double
+       submitted count? how could that happen?" — and the answer is that nothing stopped it. This
+       handler always minted `App.uid()` and dated the record `todayLocal()` with NO duplicate check
+       of any kind. Not a double-click (the button is disabled synchronously below); the path is
+       simply COUNTING AGAIN: count the Back Bar, submit, spot a miscount, and run the count again
+       instead of going Count History → Edit.
+       THE COST IS A COGS NUMBER. `CashEngine.usageBase()` takes the last two counts ascending —
+       now two records on ONE date — so the usage pair spans ZERO DAYS, and `computeUsagePair`
+       filters deliveries `> start.date && <= end.date`, which an identical date empties. Two counts
+       of one shelf an hour apart differ by almost nothing, so usage reads ~0 and the whole shelf
+       reads as DEAD STOCK at zero velocity. `editCount` already warned about exactly this: "two
+       counts on one day would become a usage pair spanning zero days and poison the very COGS this
+       is protecting" — the edit path avoided it and the submit path did not.
+       ⭐ IT UPDATES RATHER THAN REFUSES, because the operator counted again precisely BECAUSE the
+       first count was wrong: their new numbers ARE the correction. Same id, same business date,
+       same created_at, edit_count bumped — identical to Count History → Edit, so nothing they just
+       typed is lost and no zero-day pair is created.
+       ⚠ ONLY ON AN EXACT LOCATION MATCH. A PARTIAL overlap (earlier: Back Bar + Store Room; now:
+       Back Bar alone) must NOT be merged — writing these items over that record would drop Store
+       Room's from it. The data cannot say which the operator meant, so it names the difference and
+       stops rather than guessing ([[the-loop]] #30).
+       ⚠ AND NEVER OVER A BOOKED COUNT: rewriting a count a confirmed week has signed off on is the
+       exact thing S250 and S282 forbid. */
+    if (!editing) {
+      const mine = new Set(record.locations);
+      const clash = this.counts().find(c => c
+        && String(c.date || '').slice(0, 10) === record.date
+        && (Array.isArray(c.locations) ? c.locations : []).some(l => mine.has(l)));
+      if (clash) {
+        const theirs = Array.isArray(clash.locations) ? clash.locations : [];
+        const missing = theirs.filter(l => !mine.has(l));
+        const overlap = theirs.filter(l => mine.has(l));
+        const nameList = a => a.length === 1 ? a[0]
+          : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+        if (App.countLockedByWeek(clash)) {
+          await App.confirm({
+            title: 'That day is already confirmed',
+            message: 'You counted ' + nameList(overlap) + ' earlier today, and the week it falls in has since been '
+              + 'confirmed. Confirmed weeks lock the counts inside them so the numbers behind a closed week cannot '
+              + 'move. Nothing has been saved.',
+            confirmText: 'OK', cancelText: ''
+          });
+          return;
+        }
+        if (missing.length) {
+          await App.confirm({
+            title: 'You already counted ' + nameList(overlap) + ' today',
+            message: 'That earlier count also covered ' + nameList(missing) + ', so Bar Cop cannot fold this one into '
+              + 'it without losing those numbers. Open that count from Count History and edit it, or count '
+              + nameList(missing) + ' here as well. Nothing has been saved.',
+            confirmText: 'OK', cancelText: ''
+          });
+          return;
+        }
+        const merge = await App.confirm({
+          title: 'You already counted ' + nameList(overlap) + ' today',
+          message: 'Two counts of the same shelf on one day cannot be used as a usage pair, so Bar Cop keeps one count '
+            + 'per location per day. Update that count with what you just entered?',
+          confirmText: 'Update That Count', cancelText: 'Cancel'
+        });
+        if (!merge) return;
+        record.id         = clash.id;
+        record.date       = clash.date;
+        record.created_at = clash.created_at;
+        record.edited_at  = new Date().toISOString();
+        record.edit_count = (clash.edit_count || 0) + 1;
+      }
+    }
+
     const btn = document.getElementById('ti-submit');
     if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
 
