@@ -185,6 +185,26 @@ S.LaborBuildSchedule = {
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';
+    /* ⚠⚠ THE EMPTY-ROSTER GUARD RUNS FIRST, ABOVE EVERY ONE-SHOT READ (S323a). It used to sit
+       sixty lines lower, so a render that shows the setup card and draws NOTHING ELSE still spent
+       the Events handoff on the way down: a new operator who booked an event and pressed "Schedule
+       Staff for this Event" before adding any staff had `_eventStaffDate` and `_eventStaffTag`
+       nulled, the banner never rendered, and after building the roster they had to walk back
+       through Events to find the event again — with nothing on the setup card to say anything had
+       been dropped. A render that cannot honour a handoff has no business consuming it.
+       This is S311a's shape one screen over, never re-asked here ([[the-loop]] #55: the shape is a
+       property of a SCREEN, not of a family). The flags are in-memory only, so an unhonoured
+       handoff dies with the page rather than lurking to fire unbidden later (S288b). */
+    if (this.activeStaff().length === 0) {
+      App.setupCard(this.container, {
+        title: 'Build Your First Schedule',
+        lead: 'A schedule is built from your roster. Add your staff and you can lay out the week on a grid with a live labor budget.',
+        steps: [
+          { title: 'Add your staff', desc: 'A schedule is built from your roster, so build it first.', btn: 'Go to Staff Roster', screen: 'lc-staff-roster', done: false }
+        ]
+      });
+      return;
+    }
     // Events "Schedule Staff for this Event" jump: land on the event's week and
     // show a context banner. Reuses the one-shot _gotoWeek handoff below.
     /* ⚠ THE DERIVED VALUE HAS TO BE UNDONE TOO (S311). The two App flags are one-shot and are
@@ -232,16 +252,6 @@ S.LaborBuildSchedule = {
         this.activeStaff().some(st => st.id === sh.staff_id));
       if (resumable) this.draft = saved;
       else { this.clearDraft(); this.loadWeek(this.mondayOf(App.todayLocal())); }
-    }
-    if (this.activeStaff().length === 0) {
-      App.setupCard(this.container, {
-        title: 'Build Your First Schedule',
-        lead: 'A schedule is built from your roster. Add your staff and you can lay out the week on a grid with a live labor budget.',
-        steps: [
-          { title: 'Add your staff', desc: 'A schedule is built from your roster, so build it first.', btn: 'Go to Staff Roster', screen: 'lc-staff-roster', done: false }
-        ]
-      });
-      return;
     }
     this.draw();
   },
@@ -528,6 +538,18 @@ S.LaborBuildSchedule = {
   _eventBanner() {
     const c = this._eventContext;
     if (!c) return '';
+    /* ⚠⚠ ONLY OVER THE WEEK IT DESCRIBES (S323b). Nothing reconciled this banner against the grid:
+       the week picker moves `draft.week_start` and never touched the context, so stepping back
+       three weeks left "Scheduling for Smith Wedding on Sat, Aug 15" sitting over a week that does
+       not contain Aug 15, telling the operator to open "each person working that day" and tick a
+       checkbox that is on none of the cells in front of them. Every clause of it was false on that
+       screen ([[output-honesty]]).
+       ⚠ HIDDEN, NOT CLEARED — and that is the whole point. Nulling the context on a week change
+       would mean stepping away and back loses it for good, which is the same destroy-what-you-can-
+       restore mistake S321 and S323a were both about. Dismiss still clears it outright.
+       ⚠ A context with no date, or a screen with no week loaded yet, renders as before: there is no
+       week for it to contradict, so suppressing it would hide a true banner. */
+    if (c.date && this.draft && this.draft.week_start && this.mondayOf(c.date) !== this.draft.week_start) return '';
     const dt = new Date((c.date || '') + 'T00:00:00');
     const dStr = isNaN(dt.getTime()) ? esc(c.date || '') : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     return '<div class="no-print" style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:11px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
