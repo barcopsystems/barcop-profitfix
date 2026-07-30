@@ -14,15 +14,6 @@ const DashUI = {
       + '<div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;">' + b + '</div></div>';
   },
 
-  // Heading-outside panel: a .sh title above a flex card. The heading is a
-  // fixed-height single-line row so titles line up across the row and the cards
-  // start at the same Y; flex:1 + the row's align-items:stretch make both cards
-  // equal height.
-  shPanel(title, bodyHtml, titleRight) {
-    const sh = '<div class="sh" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + title + '</div>';
-    const head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:22px;margin:0 0 10px;">' + sh + (titleRight || '') + '</div>';
-    return head + '<div class="card" style="flex:1;">' + bodyHtml + '</div>';
-  },
 
   ph(msg) { return '<div style="font-size:13px;color:var(--t3);line-height:1.6;">' + msg + '</div>'; },
 
@@ -65,14 +56,6 @@ const DashUI = {
       + '<button class="btn btn-ghost btn-sm db-qa" data-go="' + screen + '">View Audit</button>';
   },
 
-  // Bare Quick Actions block. buttons = [{go, label}].
-  quickActions(buttons) {
-    const btn = b => '<button class="btn btn-primary db-qa" data-go="' + b.go + '" style="flex:1;min-width:150px;">' + b.label + '</button>';
-    return '<div style="margin-top:20px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Quick Actions</div>'
-      + '<div style="border-top:1px solid var(--b2);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;">'
-      + buttons.map(btn).join('') + '</div></div>';
-  },
 
   // Day-one Get Started strip. steps = [{done, num, label, go, cross}]; cross
   // marks a step that lives in another module (openScreen vs navigate).
@@ -87,13 +70,6 @@ const DashUI = {
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + steps.map(step).join('') + '</div></div>';
   },
 
-  // Wire .db-qa (navigate within module) + .db-go (cross = openScreen, else navigate).
-  wireQuick(container) {
-    container.querySelectorAll('.db-qa').forEach(b => b.addEventListener('click', () => App.navigate(b.dataset.go)));
-    container.querySelectorAll('.db-go').forEach(b => b.addEventListener('click', () => {
-      if (b.dataset.cross) App.openScreen(b.dataset.go); else App.navigate(b.dataset.go);
-    }));
-  },
 
   // Shared briefing modal for the Control + Recovery cockpits, routed through the
   // standard App.openModal (navy backdrop, corner X, inset header, 18px padding).

@@ -103,22 +103,6 @@ S.HubBarCopAudit = {
     const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
     return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
-  _earliestDataDate() {
-    // Find the earliest dated record across the Control stores to decide
-    // whether ~60 days of history exists. If nothing logged, returns null.
-    const candidates = [];
-    const pushFrom = (arr, key) => {
-      (arr || []).forEach(r => { if (r && r[key]) candidates.push(r[key]); });
-    };
-    pushFrom(App.shiftData?.sc_shifts,        'date');
-    pushFrom(App.shiftData?.sc_variances,     'date');
-    pushFrom(App.inventoryData?.ic_counts,    'date');
-    pushFrom(App.laborData?.lc_actuals,       'date');
-    pushFrom(App.data?.weeks,                 'period_end');
-    if (!candidates.length) return null;
-    const earliest = candidates.sort()[0];
-    return earliest;
-  },
   _hasEnoughData() {
     // No hard time lock. The audit can be generated as soon as there is ANYTHING
     // real to show — a scored sub-score, or at least one scorable component (even

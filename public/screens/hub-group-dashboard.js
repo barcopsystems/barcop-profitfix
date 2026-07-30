@@ -151,7 +151,6 @@ S.HubGroupDashboard = {
 
   _fmtPct(v) { return v == null ? '--' : v.toFixed(1) + '%'; },
   _fmtCur(v) { return v == null ? '--' : App.fmtCurrency(v); },
-  _fmtRating(v) { return v == null ? '--' : v.toFixed(1) + ' ★'; },
   _fmtScore(v) { return v == null ? '--' : String(Math.round(v)); },
 
   // Builds the body inside the form-card: the comparison table as a standard

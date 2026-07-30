@@ -191,15 +191,8 @@ S.ThisWeek = {
   // ── Dates ───────────────────────────────────────────────────────────────
   currentWeekEnd() { return App.nextSunday ? App.nextSunday() : App.todayLocal(); },
   addDays(ymd, n) { const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
-  fmtChip(ymd) { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
   fmtDate(ymd) { if (!ymd) return '-'; const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? esc(ymd) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); },
   savedWeek(periodEnd) { return (App.data.weeks || []).find(w => w.period_end === periodEnd) || null; },
-  // The period_end of the most recent saved week (This Week opens here, so it
-  // lands on real numbers instead of the in-progress, partial current week).
-  mostRecentSavedEnd() {
-    const ends = (App.data.weeks || []).map(w => w.period_end).filter(Boolean).sort();
-    return ends.length ? ends[ends.length - 1] : null;
-  },
   // "Jun 15 - Jun 21" for the 7-day week ending on `end` (Sunday). Uses the
   // shared App.dateRangeLabel so the format matches every other week selector.
   weekRangeLabel(end) { return App.dateRangeLabel(App.weekStartFor(end), end); },

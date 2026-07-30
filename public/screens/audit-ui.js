@@ -227,9 +227,6 @@ const AuditUI = {
       + App.showOlderBar('core', listKey, audits, false);
   },
 
-  emptyState() {
-    return '<div class="card form-card"><div style="text-align:center;padding:22px;"><div style="font-size:15px;font-weight:700;color:var(--t1);">No audits yet</div></div></div>';
-  },
 
   // ── Full view: findings text under a section (the divider above provides the
   //    spacing). Shared block so the recovery audits and the Bar Cop audit read
@@ -414,39 +411,7 @@ const AuditUI = {
       + '<div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + id + '" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"/></div></div>';
   },
 
-  // "What Bar Cop already has" pills — ALWAYS shown; gold-tint + green check when
-  // the data exists, greyed otherwise. checks = [{label, ok}].
-  intakePills(checks) {
-    return checks.map(c => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:4px 11px;border-radius:20px;margin:0 6px 7px 0;'
-      + (c.ok ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t3);') + '">'
-      + (c.ok ? '<span style="color:var(--green);font-weight:800;">&#10003;</span>' : '')
-      + esc(c.label) + '</span>').join('');
-  },
 
-  // Sub-heading + note + pills block (the "what Bar Cop already has" section).
-  intakeHasBlock(heading, note, checks) {
-    return '<div class="sh" style="margin:18px 0 8px;">' + esc(heading) + '</div>'
-      + '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;">' + note + '</div>'
-      + '<div>' + AuditUI.intakePills(checks) + '</div>';
-  },
 
-  // One intake question row (label left, grey-chevron select right).
-  // options = [[value,label],...]; current = the saved value (or '').
-  intakeQRow(pfx, label, id, options, current) {
-    const all = [['', 'Select Answer']].concat(options);
-    const opts = all.map(o => '<option value="' + esc(o[0]) + '"' + (String(current == null ? '' : current) === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('');
-    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 2px;border-bottom:1px solid var(--row-div);">'
-      + '<span style="font-size:13px;color:var(--t1);">' + esc(label) + '</span>'
-      + '<select class="at-qsel" id="' + pfx + '-q-' + id + '" style="min-width:175px;flex-shrink:0;">' + opts + '</select>'
-      + '</div>';
-  },
 
-  // Generate row below the intake cards. The intake is reachable only when the
-  // audit can run (the landing button gates access), so this is always active.
-  intakeSubmit(pfx) {
-    return '<div style="margin:18px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + '<button class="btn btn-primary" id="' + pfx + '-iz-submit">Generate Audit</button>'
-      + '<span id="' + pfx + '-iz-status" style="font-size:12px;color:var(--red);display:none;margin-left:8px;"></span></div>';
-  }
 };

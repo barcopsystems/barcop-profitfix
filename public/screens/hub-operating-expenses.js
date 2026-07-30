@@ -367,7 +367,6 @@ S.HubOperatingExpenses = {
     return { covered: covered.filter(c => !loud.has(c.key)).map(c => c.name), doubled: doubled };
   },
 
-  _ownCoveredThisMonth() { return this._monthNotes().covered; },
 
   /* ⚠⚠ THE MONTH REALLY IS BOOKED TWICE, AND THE OLD NOTE SAT ON TOP OF IT SAYING THE OPPOSITE.
      Order matters: if the operator logs the bill BEFORE the month is generated, _ownCover stops the
@@ -384,7 +383,6 @@ S.HubOperatingExpenses = {
      bill you logged from $4,200 to $4,250 used to re-open the slot silently and book a second
      $4,200 on top, and a strict test could not see that at all because the amounts no longer agree.
      A false positive here costs a sentence; a false negative costs a doubled month. */
-  _doubleBookedThisMonth() { return this._monthNotes().doubled; },
 
   // ── Recurring bills ──────────────────────────────────────────────────────
   // A recurring bill is the parent record (recurring:true). It is ongoing by
