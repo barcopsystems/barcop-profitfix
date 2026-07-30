@@ -884,6 +884,28 @@ S.InventoryVendors = {
       free_delivery_over: numOrNull('iv-free'),
       notes:          document.getElementById('iv-notes')?.value.trim() || ''
     };
+    /* ⚠⚠ THE TWO DOORS DISAGREED ON THE SAME THREE FIELDS (class D round 2). The vendor CSV
+       importer in this same file wraps all three in `nonNeg = n => (n == null || n < 0) ? null : n`
+       and this form stored whatever was typed. `min="0"` on the inputs stops nothing.
+       ⚠ HONEST SIZE: this is NOT a money defect and should not be reported as one. Every reader on
+       the order sheet already floors it — `(v.order_minimum != null && v.order_minimum > 0)`,
+       `(v.delivery_fee > 0)`, `(v.free_delivery_over > 0)` — so a negative changes no number
+       anywhere. What it does is get stored and then RENDERED BACK INTO THIS FORM on reopen, so the
+       operator sees "-150" sitting in Order Minimum as though it were their setting while the order
+       sheet quietly ignores it: a setting that reads as set and does nothing.
+       ⚠ THE FORM REFUSES, THE IMPORT STILL CLAMPS, and that split is deliberate — the same one made
+       for `weekly_covers` and `price`. An operator typing a value can be TOLD, and being told beats
+       being silently corrected; a file of two hundred rows cannot stop on each one, so it clamps and
+       reports in aggregate ([[the-loop]] #57).
+       ⚠ ABOVE the `Object.assign(v, fields)` below, which overwrites EVERY field on the live vendor
+       row — a refusal after it would leave the whole form's rejected values on screen, which is
+       precisely the defect S164 fixed for the failed-write path (#49). */
+    const negVendor = [
+      ['Order Minimum', fields.order_minimum],
+      ['Delivery Fee', fields.delivery_fee],
+      ['Free Delivery Over', fields.free_delivery_over]
+    ].filter(f => f[1] != null && f[1] < 0).map(f => f[0]);
+    if (negVendor.length) { fail(negVendor.join(' and ') + ' cannot be negative.'); return; }
 
     let savedId = vendorId;
     const touched = [];   // products whose vendor name changed on a rename (row-per-record)
