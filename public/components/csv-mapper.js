@@ -184,13 +184,20 @@ const CSVMapper = {
           + 'partly downloaded. Try opening it in Excel and saving as CSV.', 'var(--red)');
       }
     };
+    /* ⚠ NO SECOND PARSER (M8). index.html loads SheetJS 0.20.3 as a blocking tag, so this branch has
+       never once fired — but it lazy-loaded xlsx 0.18.5 off a different CDN, so the day it DID fire
+       (tag removed, `cdn.sheetjs.com` blocked by a proxy or an ad blocker) every Excel import would
+       silently run through a parser it was never built or tested against, on the one code path whose
+       output becomes the operator's numbers. The app's four other Excel doors — hub-books,
+       hub-year-end, reports, lc-payroll-export — all REFUSE with a hard-refresh message; this was
+       the outlier, and when siblings disagree the odd one out is the bug ([[the-loop]] #27).
+       Refusing is also the honest repair: a hard refresh re-runs the real tag. */
     if (typeof XLSX === 'undefined') {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload = run;
-      s.onerror = () => this._msg(container, 'Could not load the Excel reader. Try saving as CSV instead.', 'var(--red)');
-      document.head.appendChild(s);
-    } else run();
+      this._msg(container, 'The Excel reader did not load. Hard refresh the page (Ctrl+Shift+R) and try '
+        + 'again, or save the file as CSV and drop that instead.', 'var(--red)');
+      return;
+    }
+    run();
   },
 
   _parseXLSXInner(buffer, container, opts) {
