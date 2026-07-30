@@ -7550,6 +7550,18 @@ const App = {
     // browser back on the sign-in page, or a queued callback after sign-out) painting
     // a broken app shell over the auth screen.
     if (!this.data) return;
+    /* ⚠ SELF-HEAL THE BAR SWITCHER (S313, second half). `renderAccountSwitcher` runs at boot and
+       after a bar-name save, never on navigation — so when the memberships query failed once, a
+       multi-location owner's switcher stayed gone for the entire session with nothing on screen
+       saying why. Not caching the failure (db.js) makes a retry POSSIBLE; this is what makes one
+       actually happen, on the operator's next click. Gated on the error flag, so it is a no-op on
+       every normal navigation and cannot loop: a success clears the flag, and a further failure
+       simply leaves it set for the click after that. */
+    // Bare call, no `&& this.renderAccountSwitcher` existence guard: it is a method on this very
+    // object, and guarding a helper that correctness depends on just turns a loud failure into a
+    // silent one ([[the-loop]] #40). The cross-file callers guard it for load-order reasons; this
+    // one cannot have that problem.
+    if (window.DB && DB._acctListErr) this.renderAccountSwitcher();
     // Role-based block: a member can't navigate to a screen they don't have
     // access to. Show the no-access notice and stay put (no bounce).
     if (!this.canAccess(id)) { this.showNoAccess(); return; }

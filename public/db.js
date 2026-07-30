@@ -8,6 +8,10 @@ const DB = {
   _ownerUserId: null, // accounts.owner_user_id for the active account (the Owner tier)
   _permissions: null, // { groupKey: 'view' | 'add' | 'edit' } — staff granular permissions
   _accountsCache: null,  // last-known accounts list for the current user (Phase 2)
+  /* TRUE when the last listMyAccounts() attempt FAILED, as opposed to genuinely returning no bars.
+     The twin of `_acctResolveErr` and it exists for the same reason: an empty list is an ANSWER
+     ("you belong to no bars") and a failed query is not, but they used to be stored identically. */
+  _acctListErr: false,
   _demo: false,   // demo mode — all writes are no-ops so the demo never persists
 
   // ── Init ─────────────────────────────────────────────────────────────────
@@ -332,13 +336,23 @@ const DB = {
   // can read the list without awaiting a network round-trip. Cache clears on
   // signIn / signOut / user change.
   async listMyAccounts() {
-    if (!this._sb || !this._user) { this._accountsCache = []; return []; }
+    // Not signed in is a real answer, not a failure: there genuinely are no bars to list.
+    if (!this._sb || !this._user) { this._accountsCache = []; this._acctListErr = false; return []; }
+    this._acctListErr = false;
     try {
       const { data, error } = await this._sb
         .from('memberships')
         .select('account_id, role, accounts(id, name, subscriptions(subscription_status))')
         .eq('user_id', this._user.id);
-      if (error || !data) { this._accountsCache = []; return []; }
+      /* ⚠⚠ A FAILED QUERY IS NOT "YOU HAVE NO BARS" (S313). This wrote `_accountsCache = []`, and
+         that empty list is what `renderAccountSwitcher` reads — an empty list hides BOTH switcher
+         slots and the bar name outright, and that function only runs at boot and after a bar-name
+         save, never on navigation. So one dropped request on bar wifi took a multi-location owner's
+         switcher away for the WHOLE SESSION, silently, recoverable only by a full reload. A failure
+         cached as an answer, which is exactly the shape S290 was fixed for.
+         The last-known list is kept instead, and the flag lets a caller retry. `_ensureAccountId`
+         twenty lines up has done it this way all along (`_acctResolveErr`); this one never learned. */
+      if (error || !data) { this._acctListErr = true; return this._accountsCache || []; }
       const list = data
         .filter(m => m.accounts)
         .map(m => {
@@ -354,8 +368,9 @@ const DB = {
       this._accountsCache = list;
       return list;
     } catch (e) {
-      this._accountsCache = [];
-      return [];
+      // Same rule as the error branch above: keep what we knew, flag it, let the next call resolve.
+      this._acctListErr = true;
+      return this._accountsCache || [];
     }
   },
 
