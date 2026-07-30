@@ -4883,8 +4883,19 @@ const App = {
   // Excel-style export: click -> native Save dialog (filename pre-filled) -> Save,
   // no browser print preview. Generates the PDF client-side from the on-screen
   // report DOM (card titles + .tbl tables + .calc tiles, skipping .no-print
-  // chrome) so one helper serves every Export button. jsPDF + autoTable are
-  // lazy-loaded from CDN the same way the XLSX import lib is.
+  // chrome) so one helper serves every Export button.
+  // ⚠ jsPDF + autoTable are the app's ONLY runtime-loaded library. The XLSX lib is NOT loaded this
+  // way — it is a single blocking tag in index.html, and the lazy-load that used to sit in
+  // csv-mapper was removed (M8) precisely because it fetched a different version. This comment used
+  // to cite that importer as the precedent for loading a library at runtime; M8 made that false, and
+  // left as-is it would have read to the next person as house permission to reintroduce it.
+  /* ⚠⚠ AND THE CACHE IS CLEARED ON FAILURE, OR THE ADVICE IS UNACHIEVABLE. `_pdfLibPromise` is the
+     memo, and a REJECTED promise memoises just as well as a resolved one — so one dropped connection
+     poisoned it for the rest of the session. Every one of the ~20 export doors then said "Could not
+     load the PDF engine. Check your connection and try again", and trying again failed instantly with
+     no network request even after the wifi came back, until a full page reload. Same class M8 was
+     closed for: advice that cannot work. The rejection is re-thrown so the caller's own message still
+     fires; only the memo is dropped. */
   _ensurePDFLib() {
     if (this._pdfLibPromise) return this._pdfLibPromise;
     if (window.jspdf && window.jspdf.jsPDF) { this._pdfLibPromise = Promise.resolve(); return this._pdfLibPromise; }
@@ -4894,7 +4905,8 @@ const App = {
       document.head.appendChild(s);
     });
     this._pdfLibPromise = load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-      .then(() => load('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'));
+      .then(() => load('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'))
+      .catch(err => { this._pdfLibPromise = null; throw err; });
     return this._pdfLibPromise;
   },
 
