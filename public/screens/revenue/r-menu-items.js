@@ -1201,6 +1201,24 @@ S.RevenueMenuItems = {
     let linkedProductId = '';
     let computedCost = 0;
     let targetPct = existing?.target_cost_pct;
+    /* ⚠⚠ READ FROM THE BOX THE OPERATOR CAN SEE, NOT FROM WHETHER A RECIPE EXISTS (H-class field 5).
+       This used to be assigned ONLY inside the two `recipeIngs.length > 0` branches below. But
+       `renderRecipeArea` offers "+ Build Recipe" on any manual-cost dish, and clicking it renders
+       this box — prefilled with the default — beside a single EMPTY ingredient row. So an operator
+       could type a Target Cost % of 45, press Update Item, watch the modal close clean, and have
+       the number thrown away: measured in the browser on a costed, priced, recipe-less appetizer,
+       stored `target_cost_pct` came back UNDEFINED with menuTargetPct still answering 32.
+       Worse, the 1-99 check above is type-agnostic and validated the very number nothing was going
+       to keep — the full "your entry was checked" experience over a silent discard.
+       A cost target grades cost against PRICE (App.menuItemPct); it has nothing to do with where
+       the cost came from, so a manual-cost dish is graded exactly like a recipe one.
+       ⚠ A CLEARED BOX STORES null, NOT the default constant. Storing 32 for "blank" pins the item
+       to today's default forever, while null means "no override" and menuTargetPct supplies the
+       live default — the same number on screen today, an honest record underneath ([[the-loop]] #40:
+       a default duplicated at the write door suppresses the real answer).
+       The box being ABSENT is a third state and is left alone: `targetPct` keeps whatever the item
+       already had, so a save from a form that never showed the field cannot wipe an override. */
+    if (document.getElementById('ri-target-pct')) targetPct = isNaN(typedTarget) ? null : typedTarget;
 
     if (type === 'plate') {
       category = document.getElementById('ri-cat')?.value || '';
@@ -1214,7 +1232,6 @@ S.RevenueMenuItems = {
           ingredients: recipeIngs,
           plate_yield: parseFloat(document.getElementById('ri-plate-yield')?.value) || 1
         };
-        targetPct = parseFloat(document.getElementById('ri-target-pct')?.value) || App.MENU_TARGET_COST_PCT.plate;
         const tmp = { recipe };
         computedCost = App.menuItemCost(tmp) || 0;
       } else {
@@ -1232,7 +1249,6 @@ S.RevenueMenuItems = {
         : [];
       if (recipeIngs.length > 0) {
         recipe = { mode: 'single', ingredients: recipeIngs, plate_yield: null };
-        targetPct = parseFloat(document.getElementById('ri-target-pct')?.value) || App.MENU_TARGET_COST_PCT.cocktail;
         const tmp = { recipe };
         computedCost = App.menuItemCost(tmp) || 0;
       } else {
