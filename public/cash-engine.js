@@ -985,7 +985,10 @@ window.CashEngine = {
   // numbers — or the demo's — never leaks them into another bar or a fresh
   // signup. A brand-new account has no scoped key, so it reads clean defaults.
   _acctScope() {
-    if (window.App && App.demoMode) return 'demo';
+    // ⚠ BARE `App`, NOT `window.App` (S320). Same defect as pos-ingest: `App` is a top-level `const`
+    // and never lands on `window`, so this could never return 'demo' and the demo's cash state was
+    // scoped to whatever real account id was resolved instead of to its own key.
+    if (App.demoMode) return 'demo';
     return (window.DB && DB._accountId)
       || (window.DB && DB._getStoredActiveAccountId && DB._getStoredActiveAccountId())
       || 'none';
