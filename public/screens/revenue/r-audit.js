@@ -112,7 +112,6 @@ S.RevenueAudit = {
     if (!end) return { start: '', end: '', weeks: 0 };
     return { start: this._shiftYmdUTC(end, -(weeks.length * 7 - 1)), end, weeks: weeks.length };
   },
-  _auditWinEndFromWeeks() { return this._auditWindow().end; },
   _shiftYmdUTC(ymd, days) { const d = new Date(ymd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); },
 
   // Mirror the server's S5 window: the audit only scores events that are COMPLETED and

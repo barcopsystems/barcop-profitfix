@@ -127,50 +127,7 @@ S.RevenueMenuPlanning = {
     return stats;
   },
 
-  // A single item-specific briefing "read" line, for reuse outside this screen
-  // (e.g. the Pre-Shift featured-items list). Unique per item, from the same
-  // category-relative margin/volume read the tiles use. Returns '' if it can't
-  // be read (unpriced/unranked or the engine is unavailable).
-  briefLineFor(item) {
-    if (!item) return '';
-    try {
-      const stats = this.categoryStats();
-      const gk = App.menuGroupKey(item);
-      const cs = stats[gk];
-      if (!cs) return '';
-      const quad = (window.S && S.RevenueMenuEngineering && S.RevenueMenuEngineering.classify)
-        ? S.RevenueMenuEngineering.classify()[item.id] : null;
-      const b = this.briefing(item, App.menuGroupLabel(gk, Object.keys(stats)), cs, quad, new Set());
-      return (b && b.lines && b.lines.length) ? b.lines[0] : '';
-    } catch (e) { return ''; }
-  },
 
-  // A tight one-liner for compact spots (Pre-Shift featured list): the item's
-  // class plus the single sharpest fact, e.g. "A Plowhorse. Top seller, thin
-  // margin." Distinct per item off its category ranks. '' if it can't be read.
-  shortReadFor(item) {
-    if (!item) return '';
-    try {
-      const cs = this.categoryStats()[App.menuGroupKey(item)];
-      const quad = (window.S && S.RevenueMenuEngineering && S.RevenueMenuEngineering.classify)
-        ? S.RevenueMenuEngineering.classify()[item.id] : null;
-      const QN = { STAR: 'A Star', PLOWHORSE: 'A Plowhorse', PUZZLE: 'A Puzzle', DOG: 'A Dog' };
-      const head = QN[quad];
-      if (!head || !cs || !cs.ranked || !cs.mRank[item.id]) {
-        // ⚠ `costed`, not `cost != null`. A ZERO cost passed the old test, and a zero cost
-        // makes the "margin" the whole menu price — so an uncosted dish read as the best
-        // thing on the menu. Same fix as sc-preshift._itemMargin; both now use the one
-        // definition in App.menuItemPct rather than each inventing their own.
-        const m = App.menuItemPct(item);
-        return (item.price != null && m.costed) ? 'Strong ' + App.fmtCurrency(item.price - m.cost) + ' margin.' : 'Feature it.';
-      }
-      const rn = cs.rankedN;
-      const band = r => r === 1 ? 'top' : r <= Math.ceil(rn * 0.34) ? 'high' : r >= Math.ceil(rn * 0.67) ? 'low' : 'mid';
-      const vol = { top: 'Top seller', high: 'Strong seller', mid: 'Steady seller', low: 'Slow mover' }[band(cs.cRank[item.id])];
-      const mar = { top: 'top margin', high: 'fat margin', mid: 'average margin', low: 'thin margin' }[band(cs.mRank[item.id])];
-      return head + '. ' + vol + ', ' + mar + '.';
-    } catch (e) { return ''; }
-  },
 
   topCostIngredient(item) {
     if (!item || !item.recipe || !Array.isArray(item.recipe.ingredients) || !item.recipe.ingredients.length) return null;

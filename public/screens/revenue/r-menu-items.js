@@ -775,16 +775,7 @@ S.RevenueMenuItems = {
     if (back) back(); else this.renderLanding();
   },
 
-  // Start Over on the inline add form = a clean, blank landing render.
-  resetAddForm() {
-    this.renderLanding();
-  },
 
-  // Flip the inline add form between typing one item and dropping a file.
-  setEntryMode(mode) {
-    this.entryMode = mode === 'import' ? 'import' : 'manual';
-    this.renderLanding();
-  },
 
   // Category is just the menu section now. It does not change the form or the item
   // type (that comes from the tile), so picking a section — including the blank
