@@ -8729,9 +8729,21 @@ const App = {
     const title       = opts.title       || 'Are you sure?';
     const message     = opts.message     || '';
     const confirmText = opts.confirmText || 'Confirm';
-    const cancelText  = opts.cancelText  || 'Cancel';
+    /* ⚠⚠ `== null`, NOT `||` — AN EMPTY STRING IS A DELIBERATE "NO CANCEL BUTTON" (2026-07-30).
+       This was `opts.cancelText || 'Cancel'`, and an empty string is falsy, so `cancelText: ''`
+       fell through to the default and rendered a button labelled **Cancel**. SEVEN call sites had
+       written `cancelText: ''` plainly meaning "one button" — "Could not save", "Connection
+       error", "Nothing to pull yet", "The file builder did not load" — and every one of them
+       showed a Cancel next to OK. On a notice the answer is discarded either way, so that button
+       was a choice that does not exist, inviting the operator to cancel something that had
+       already failed. Same family as [[the-loop]] #19: the code was written against an intent it
+       silently did not honour. Pinned by verify-notice-one-button.js, which RUNS this function and
+       counts the rendered buttons. */
+    const cancelText  = opts.cancelText == null ? 'Cancel' : opts.cancelText;
     const danger      = opts.danger !== false; // default to danger (red) confirm button
-    const oneButton   = opts.oneButton === true;   // ack-only dialog: render just the confirm button
+    // ack-only dialog: render just the confirm button. `cancelText: ''` means the same thing and is
+    // the spelling most call sites already use, so it counts here rather than needing both options.
+    const oneButton   = opts.oneButton === true || cancelText === '';
     return new Promise(resolve => {
       const overlay = document.createElement('div');
       // z defaults to 9500; callers layering over the plan gate (9700) pass higher.
