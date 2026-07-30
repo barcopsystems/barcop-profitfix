@@ -722,9 +722,25 @@ S.ShiftDashboard = {
     }
     if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
     this.setDone('import', true);   // a cockpit import is a deliberate "the week is in" action
+    /* ⚠⚠ SAY SO WHEN THIS LANDED INSIDE A WEEK ALREADY CONFIRMED (S281). Nothing here was blocked
+       and nothing was lost — Confirm the Week stores its own figures on the `week` / `revenue_week`
+       records, so the confirmed week still shows exactly what was signed off. But the DAYS behind it
+       now say something different, and until this line the operator had no way to know: the import
+       reported plain success while the two halves quietly disagreed. Kyle's call was warn, not
+       block, and the sentence has to carry both facts or it reads as an error. */
+    const cwEnds = App.confirmedWeeksTouched(allToAdd.map(r => r && r.date));
+    const cwLabel = d => { const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d
+      : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+    const cwNote = cwEnds.length
+      ? ' Heads up: ' + (cwEnds.length === 1 ? 'this covers a week you already confirmed (week ending '
+          + cwLabel(cwEnds[0]) + ')' : 'this covers ' + cwEnds.length + ' weeks you already confirmed ('
+          + cwEnds.map(cwLabel).join(', ') + ')')
+        + '. Your confirmed figures are unchanged. Re-confirm ' + (cwEnds.length === 1 ? 'that week' : 'those weeks')
+        + ' if you want them to pick this up.'
+      : '';
     this._flash = allToAdd.length + ' day' + (allToAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
       + salesOutcomes
-      + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + '.';
+      + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + '.' + cwNote;
     this._openStep = 'cash';
     this.render(this.container, this.actions);
   },
