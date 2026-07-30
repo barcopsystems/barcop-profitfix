@@ -460,7 +460,7 @@ S.LaborPayPeriods = {
         App.confirm({
           title: 'The week did not close',
           message: 'The logged hours for this week are locked on the server, but the pay period was not saved. Close the week again to finish it.',
-          confirmText: 'OK', cancelText: 'Dismiss', danger: false
+          confirmText: 'OK', cancelText: '', danger: false
         });
       }
       return;
@@ -520,7 +520,7 @@ S.LaborPayPeriods = {
         App.confirm({
           title: 'The week did not reopen',
           message: 'The logged hours are unlocked on the server, but the pay period still reads Closed. Reopen the week again to finish it.',
-          confirmText: 'OK', cancelText: 'Dismiss', danger: false
+          confirmText: 'OK', cancelText: '', danger: false
         });
       }
       return;

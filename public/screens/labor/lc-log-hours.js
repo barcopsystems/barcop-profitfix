@@ -415,7 +415,7 @@ S.LaborLogHours = {
       App.confirm({
         title: 'This entry is locked.',
         message: 'This record is in a closed pay period. Reopen the period in Pay Periods first, then edit here.',
-        confirmText: 'OK', cancelText: 'Cancel'
+        confirmText: 'OK', cancelText: ''
       });
       return;
     }
@@ -765,7 +765,7 @@ S.LaborLogHours = {
       App.confirm({
         title: 'This entry is locked.',
         message: 'This record is in a closed pay period. Reopen the period in Pay Periods first to delete it.',
-        confirmText: 'OK', cancelText: 'Cancel'
+        confirmText: 'OK', cancelText: ''
       });
       return;
     }
