@@ -139,11 +139,18 @@ S.InventoryDeliveryHistory = {
         /* S255: Edit reopens the delivery in the Receive form so a mistyped qty or price can be
            corrected. Hidden once a confirmed week has booked the period -- a delivery is the
            PURCHASES term in usage (starting + purchases - ending), so editing it after the fact
-           moves a COGS figure already signed off, exactly as editing a count would. */
+           moves a COGS figure already signed off, exactly as editing a count would.
+           ⚠⚠ AND SO IS DELETE (S282), for the stronger version of that same reason: a delivery IS
+           the purchases term, so removing it does not adjust the figure, it deletes the term. The
+           twin screen (ic-count-history) carried the identical split and is fixed in the same pass.
+           ⚠ Known consequence, deliberate: no reachable screen can un-confirm a week, so a booked
+           delivery is now permanently undeletable — same as Edit has always been. The re-open path
+           is its own LIST item, not a reason to leave signed-off COGS deletable. */
         + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm dh-view" data-id="' + d.id + '">View</button>'
         + ((App.canEdit('ic-delivery-history') && !App.countLockedByWeek(d))
             ? '<button class="btn btn-ghost btn-sm dh-edit" data-id="' + d.id + '">Edit</button>' : '')
-        + (App.canEdit('ic-delivery-history') ? '<button class="btn btn-danger btn-sm dh-del" data-id="' + d.id + '">Delete</button>' : '')
+        + ((App.canEdit('ic-delivery-history') && !App.countLockedByWeek(d))
+            ? '<button class="btn btn-danger btn-sm dh-del" data-id="' + d.id + '">Delete</button>' : '')
         + '</div></td></tr>';
     }).join('');
     const listCard = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'

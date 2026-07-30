@@ -158,11 +158,25 @@ S.InventoryCountHistory = {
           + '<td>' + status + '</td>'
           /* S250: Edit re-opens the count so a missed bottle can be added. Hidden once a
              confirmed week has booked this count -- editing then would rewrite COGS that has
-             already been signed off. Delete stays where it was, behind the same permission. */
+             already been signed off.
+             ⚠⚠ AND SO IS DELETE (S282). The two carried DIFFERENT rules and the comment here said so
+             out loud -- "Delete stays where it was". But deleting a booked count does not merely
+             rewrite a COGS figure, it removes a TERM FROM THE USAGE EQUATION outright:
+             computeUsagePair reads the two counts either side of a period, so dropping one silently
+             re-pairs the week against an older count and changes a number a confirmed week has
+             already signed off. Strictly worse than the edit this same line forbids.
+             ⚠ KNOWN CONSEQUENCE, and it is deliberate rather than overlooked: `countLockedByWeek`
+             locks a count once ANY confirmed week ends on or after its date, and NO reachable screen
+             can un-confirm a week (`removeRecord('core','week')` exists only in the retired
+             this-week.js, which navigate() intercepts). So a booked count is now permanently
+             undeletable. That matches what Edit has always done, and the escape hatch -- a way to
+             re-open a confirmed week -- is its own item on THE LIST rather than a reason to leave a
+             signed-off COGS figure deletable ([[the-loop]] #61). */
           + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm ch-view" data-id="' + c.id + '">View</button>'
           + ((App.canEdit('ic-count-history') && !App.countLockedByWeek(c))
               ? '<button class="btn btn-ghost btn-sm ch-edit" data-id="' + c.id + '">Edit</button>' : '')
-          + (App.canEdit('ic-count-history') ? '<button class="btn btn-danger btn-sm ch-del" data-id="' + c.id + '">Delete</button>' : '')
+          + ((App.canEdit('ic-count-history') && !App.countLockedByWeek(c))
+              ? '<button class="btn btn-danger btn-sm ch-del" data-id="' + c.id + '">Delete</button>' : '')
           + '</div></td></tr>';
       }).join('');
       const listCard = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
