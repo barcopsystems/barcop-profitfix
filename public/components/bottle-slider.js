@@ -63,7 +63,6 @@ const BottleSlider = {
         + '<path d="M78 88 C89 90 89 124 78 126" fill="none" stroke="var(--b1)" stroke-width="2"/>' }
   },
   _shape(s) { return this.SHAPES[s] || this.SHAPES.bottle; },
-  _range(shape) { return this._shape(shape).range; },
 
   // Fill color per category, from the locked palette (no hardcoded hex).
   COLORS: {

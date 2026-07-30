@@ -96,7 +96,6 @@ window.FileDrop = {
     renderChips();
   },
 
-  getFiles(id) { return (this._stores[id] || []).slice(); },
   count(id)    { return (this._stores[id] || []).length; },
   clear(id)    { this._stores[id] = []; }
 };

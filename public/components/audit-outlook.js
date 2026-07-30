@@ -18,27 +18,8 @@
 
 window.AuditOutlook = {
 
-  // Persisted per-audit cache: the rendered HTML is stored on
-  // App.data.audit_outlooks keyed by auditType:auditId. Generated once per
-  // audit; re-opening reuses it (no API spend) and a newly-run audit (new id)
-  // generates fresh. Survives reloads via App.save.
-  _stored(key) { const s = App.data && App.data.audit_outlooks; return (s && s[key]) ? s[key] : null; },
 
-  _cacheKey(auditType, audit) {
-    const id = audit?.audit_id || audit?.date || (audit?.id || '');
-    return auditType + ':' + id;
-  },
 
-  // Strip emdashes and double-dash sequences from model output. The prompt
-  // forbids them, but defense in depth keeps any slip from reaching screen.
-  _sanitize(text) {
-    if (!text) return '';
-    return text
-      .replace(/—/g, ', ')   // emdash to comma-space
-      .replace(/–/g, '-')    // en-dash to hyphen
-      .replace(/ -- /g, ', ')     // " -- " to comma-space
-      .replace(/--/g, '-');       // remaining "--" to single hyphen
-  },
 
   /* Mount the Outlook button into the given container element. Wires the
      click handler. Button-only, no inline text body — the paragraph renders

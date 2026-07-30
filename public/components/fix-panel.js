@@ -96,15 +96,6 @@ window.FixPanel = {
   },
 
   // ── "Fix Areas" rows. _fixAreasInner returns just the header + rows so the
-  // combined recoveryCard can drop it in. fixAreasCard wraps that in a
-  // standalone .card for any caller that wants Fix Areas on its own.
-  fixAreasCard(moduleKey) {
-    const inner = this._fixAreasInner(moduleKey);
-    if (!inner) return '';
-    return '<div class="card" style="padding:0;overflow:hidden;margin-bottom:18px;">'
-      + inner
-      + '</div>';
-  },
 
   // The ranked "leak board": each gap-area as one entry, the dollar-bearing
   // leaks rendered as proportional bars (largest dollar first) and the rest as
@@ -233,87 +224,10 @@ window.FixPanel = {
     return rows + '<div style="font-size:11px;color:var(--t4);padding-top:10px;border-top:1px solid var(--row-div);">Tap any line to dig in.</div>';
   },
 
-  auditScreen(moduleKey) {
-    return moduleKey === 'revenue' ? 'r-audit'
-         : 'audit-tracker';
-  },
 
-  _stepRow(num, title, target, isLast, done) {
-    const circle = done
-      ? '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold);color:var(--bg);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;">&#10003;</div>'
-      : '<div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">' + num + '</div>';
-    return '<div class="fp-step" data-screen="' + esc(target) + '" '
-      + 'style="display:flex;align-items:center;gap:13px;padding:14px 20px;cursor:pointer;'
-      + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
-      + circle
-      + '<div style="flex:1;min-width:0;font-size:12px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:' + (done ? 'var(--t3)' : 'var(--t1)') + ';">' + esc(title) + '</div>'
-      + '<span style="flex-shrink:0;font-size:13px;color:var(--t3);">&#9656;</span>'
-      + '</div>';
-  },
 
-  // Recovery dashboard hero set: the Scoreboard (what you have recovered) and
-  // the ranked leak board (where you are leaking now), as two cards. Shared by
-  // the Profit, Revenue, and Cash dashboards — designed once, lifts all three.
-  recoveryCard(moduleKey) {
-    if (!window.Recovery) return '';
-    return this._scoreboardCard(moduleKey) + this._leakBoardCard(moduleKey);
-  },
 
-  _leakBoardCard(moduleKey) {
-    const inner = this._fixAreasInner(moduleKey);
-    if (!inner) return '';
-    return '<div class="card form-card" style="margin-bottom:14px;">'
-      + '<div class="card-title">Where you\'re leaking now</div>'
-      + inner + '</div>';
-  },
 
-  // The Scoreboard: realized-to-date recovered dollars once fixes are measured,
-  // or the loop teach (run audit, pick a gap, mark implemented) before then.
-  _scoreboardCard(moduleKey, titleRight) {
-    const s = Recovery.moduleSummary(moduleKey);
-    const fixScreen = this.fixScreen(moduleKey);
-    let body = '';
-
-    if (s.logged === 0) {
-      const auditKey = moduleKey === 'profit' ? 'audits' : moduleKey + '_audits';
-      const audits = (App.data && App.data[auditKey]) || [];
-      const latest = App.latestEvent(audits);   // date-DESC store; never index by position
-      const monthly = latest ? (latest.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
-      const annual = monthly * 12;
-      const moduleName = moduleKey === 'profit' ? 'Profit' : moduleKey === 'revenue' ? 'Revenue' : 'Cash';
-      const hasAudit = !!latest;
-      // A dollarized opportunity headline when the latest audit surfaced gaps
-      // with a number on them; otherwise just the loop.
-      const oppHtml = annual > 0
-        ? '<div style="padding:6px 0 14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:600;line-height:1;color:var(--gold);">'
-            + App.fmtCurrency(annual, 0) + '<span style="font-size:13px;color:var(--t3);font-weight:600;"> /yr opportunity</span></div>'
-            + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">from your latest audit. Pick a gap below and work the fix; Bar Cop measures what you recover as you log your weeks.</div></div>'
-        : '';
-      body = oppHtml
-        + '<div class="card" style="padding:0;overflow:hidden;margin:0;">'
-        + this._stepRow(1, 'Run your ' + moduleName + ' Audit', this.auditScreen(moduleKey), false, hasAudit)
-        + this._stepRow(2, 'Pick a gap, work the fix', fixScreen, false, false)
-        + this._stepRow(3, 'Bar Cop tracks what you recover', fixScreen, true, false) + '</div>';
-    } else if (s.withFigure > 0) {
-      body = '<div style="padding:2px 0;">'
-        + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
-        + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--gold);">' + App.fmtCurrency(s.recovered, 0) + '</span>'
-        + '<span style="font-size:13px;color:var(--t2);">recovered to date</span></div>'
-        + '<div style="font-size:12px;color:var(--t3);margin-top:7px;">across ' + s.withFigure + ' measured fix' + (s.withFigure === 1 ? '' : 'es')
-        + (s.measuring > 0 ? ' &middot; ' + s.measuring + ' still measuring' : '')
-        + (s.annualRunRate > 0 ? ' &middot; on pace for ' + App.fmtCurrency(s.annualRunRate, 0) + '/yr' : '') + '</div></div>';
-    } else {
-      body = '<div style="font-size:13px;color:var(--t2);line-height:1.6;padding:2px 0;">'
-        + s.logged + ' fix' + (s.logged === 1 ? '' : 'es') + ' logged'
-        + (s.measuring > 0 ? ', ' + s.measuring + ' still measuring. A recovered figure shows once four weeks land: three to set the baseline and one to measure.' : '.') + '</div>';
-    }
-
-    return '<div class="card form-card" style="margin-bottom:14px;">'
-      + '<div class="card-title"' + (titleRight ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '>'
-      +   (titleRight ? '<span>Recovery Scoreboard</span>' + titleRight : 'Recovery Scoreboard')
-      + '</div>'
-      + body + '</div>';
-  },
 
   // Vertical fix-event markers for an annotated trend chart. xFn maps a week
   // index to an x coordinate; top/bottom are the plot edges.
@@ -338,15 +252,6 @@ window.FixPanel = {
   //  MASTER / DETAIL — the Fix screen (board landing → focused gap page)
   // ════════════════════════════════════════════════════════════════════════
 
-  // Called by each Fix screen's render(). Lands on the board; if a focus gap was
-  // handed in (dashboard / audit / step-return deep-link via App._fixFocus), it
-  // pushes that gap's detail on top so floating-back returns to the board.
-  renderModule(container, moduleKey, focusId) {
-    this.boardLanding(container, moduleKey);
-    if (focusId && this.gapAreas(moduleKey).some(g => g.id === focusId)) {
-      App.pushView(() => this.renderGapDetail(container, moduleKey, focusId));
-    }
-  },
 
   boardLanding(container, moduleKey) {
     const composite = (window.Recovery && Recovery.COMPOSITE_GAPS) || [];
@@ -724,15 +629,4 @@ window.FixPanel = {
     }));
   },
 
-  // Nav-"i" help for the Fix screens. Used by each Fix screen's showHowTo.
-  howToSections(moduleKey) {
-    return [
-      { p: ['This is where you work your leaks. Bar Cop ranks every gap by what it is costing you, the biggest dollar first. Tap one to open its fix process.'] },
-      { h: 'Where You\'re Leaking', p: ['Each gap shows its weekly status and, where Bar Cop has a live weekly number for it, the dollars a year you are losing at this week\'s pace. Gaps without a live dollar, like theft and loss or vendors, show as a review row, never an invented number. Open Leaks, In Progress, and Recovered to Date up top are your running picture.'] },
-      { h: 'Working a Gap', p: ['Every step in a fix process is a link into the part of Bar Cop that does the work. DO IT opens the screen where the work happens, SEE IT opens where Bar Cop already shows the number, and DOCUMENT downloads a policy, standard, or template. Check the boxes as you go; your progress saves and shows up in Recent Activity.'] },
-      { h: 'Watch Out For', p: ['Each gap lists the mistakes that quietly cost operators the most. Read them first. They are the things Bar Cop itself cannot stop.'] },
-      { h: 'Mark Implemented', p: ['When the fix is in place, lock in the date. You do not have to: a gap starts measuring on its own the first time you take a tracked action on it. From there Bar Cop tracks the gap’s weekly number against your own first three weeks and shows how far it has moved on the Recovery Scoreboard. A dollar figure shows once four weeks land after the date, three to set the baseline and one to measure.'] },
-      { h: 'The Honest Rule', p: ['A dollar figure only shows when the math comes from real data Bar Cop already holds. A fix that cannot be dollarized honestly still gets logged; its recovery shows as the score moving, not invented dollars.'] }
-    ];
-  }
 };
