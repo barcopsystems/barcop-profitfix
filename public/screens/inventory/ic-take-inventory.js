@@ -169,10 +169,20 @@ S.InventoryTakeInventory = {
     const saved = this.loadDraft();
     const resumeBar = saved
       ? '<div class="alert-bar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
-        + '<div class="alert-text">A ' + esc(saved.type) + ' count started ' + this.ago(saved.started_at) + ' is in progress.</div>'
+        /* ⚠ AN EDIT IS NOT "A COUNT IN PROGRESS" (S330c). `editCount` seeds the draft's
+           `started_at` from the ORIGINAL record's `created_at`, so an edit draft rendered here as
+           "A Full count started 5 hr ago is in progress" — the age and the type of the count being
+           CORRECTED, describing an activity the operator is not doing. And "Start Over" on an edit
+           sounds like it discards the submitted count, which it never touches. Reaching this state
+           at all is now rare (Save & Exit commits an edit), but a browser closed mid-edit still
+           lands here and it has to read true. */
+        + '<div class="alert-text">' + (saved._edit_id
+            ? 'You are part-way through editing the ' + esc(saved.type) + ' count from '
+              + esc(this._dayLabel(saved._edit_date)) + '. Your changes are not saved to it yet.'
+            : 'A ' + esc(saved.type) + ' count started ' + this.ago(saved.started_at) + ' is in progress.') + '</div>'
         + '<div style="display:flex;gap:8px;">'
-          + '<button class="btn btn-ghost btn-sm" id="ti-resume">Resume Count</button>'
-          + '<button class="btn btn-ghost btn-sm" id="ti-discard">Start Over</button>'
+          + '<button class="btn btn-ghost btn-sm" id="ti-resume">' + (saved._edit_id ? 'Resume Editing' : 'Resume Count') + '</button>'
+          + '<button class="btn btn-ghost btn-sm" id="ti-discard">' + (saved._edit_id ? 'Discard Changes' : 'Start Over') + '</button>'
         + '</div></div>'
       : '';
 
@@ -247,15 +257,59 @@ S.InventoryTakeInventory = {
     }
   },
 
+  /* ⚠⚠ SAVE & EXIT MEANS TWO DIFFERENT THINGS, AND IT USED TO DO ONLY ONE (S330c).
+     On a NEW count a draft is the whole point: you are forty products into Main Bar, you get pulled
+     away, you come back. On an EDIT the record ALREADY EXISTS, so there is nothing to defer — and
+     saving a draft instead created a second, invisible version of a submitted count: the saved
+     record said one thing, the unsaved edit another, and nothing on screen said which you were
+     looking at. The operator pressed a button reading "Save & Exit", landed on a red
+     "count in progress" banner, and their correction had NOT been applied.
+     Every other edit form in the app (products, vendors, registers) commits on Save; this screen
+     was the outlier only because it is a wizard. So on an edit this SAVES — same id, same business
+     date, same created_at, edit_count bumped, exactly as the review-screen button does.
+     ⚠ `submit()` owns the write, the failure message and the confirmation screen, so this delegates
+     rather than repeating any of it — a second write path is how the two would drift ([[the-loop]]
+     step 0.6). It also means a REFUSED write keeps the draft, which is the behaviour that matters:
+     the correction is not lost because the server said no. */
+  async _exitCount() {
+    if (this.draft && this.draft._edit_id) { await this.submit(); return; }
+    this.saveDraft();
+    this.draft = null;
+    this.renderSetup();
+    this.scrollTop();
+  },
+
   // Discard the in-progress draft. Confirmation because losing count data
   // part-way through is destructive. Standard App.confirm box (discard-draft is
   // a non-delete prompt, so it uses confirm, not confirmDelete).
+  /* A business date as "Jul 30". This screen had no date formatter of its own — the edit banner
+     needs one and inventing a second copy of the app's is how they drift, so it is one helper here
+     and nothing else formats a date on this screen. */
+  _dayLabel(ymd) {
+    const d = new Date(String(ymd || '') + 'T00:00:00');
+    return isNaN(d.getTime()) ? String(ymd || '')
+      : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  },
+
   async confirmDiscardDraft() {
+    /* ⚠ ON AN EDIT THIS DISCARDS THE CHANGES, NOT THE COUNT (S330c). "Start over on this count?"
+       reads, on an edit, as an offer to wipe the submitted count — which it never touches. Say
+       which of the two things is going away. */
+    /* ⚠ `this.draft` IS NULL AT ONE OF THE TWO ENTRY POINTS. This is reached from the counting
+       screen (draft live) AND from the setup banner (draft null — it was cleared on exit and only
+       the saved copy remains). Reading `this.draft` alone would have made the banner's
+       "Discard Changes" button raise a prompt headed "Start over on this count?" — the button and
+       the box disagreeing about what is about to happen. Ask the thing that is actually going to be
+       cleared. */
+    const d = this.draft || this.loadDraft();
+    const editing = !!(d && d._edit_id);
     const ok = await App.confirm({
-      title: 'Start over on this count?',
-      message: 'Any counts you have entered so far will be lost. The product master and your last finalized count stay untouched.',
-      confirmText: 'Start Over',
-      cancelText: 'Keep Counting'
+      title: editing ? 'Discard your changes?' : 'Start over on this count?',
+      message: editing
+        ? 'The count goes back to exactly what was saved before you opened it. Nothing you had entered here is kept.'
+        : 'Any counts you have entered so far will be lost. The product master and your last finalized count stay untouched.',
+      confirmText: editing ? 'Discard Changes' : 'Start Over',
+      cancelText: editing ? 'Keep Editing' : 'Keep Counting'
     });
     if (!ok) return;
     this.clearDraft();
@@ -508,6 +562,15 @@ S.InventoryTakeInventory = {
   },
 
   renderCounting(keepScroll) {
+    /* ⚠⚠ THE COUNTING SCREEN HAS TO KNOW IT IS AN EDIT (S330c — Kyle walked it).
+       `_edit_id` used to be read in exactly ONE place, at submit, so every word on this screen was
+       written for a brand-new count: "Save & Exit" (which saved a DRAFT, not the edit), "Start
+       Over", "Submit Count", and a resume banner announcing "a Full count started 5 hr ago is in
+       progress" — using the ORIGINAL count's `created_at`, because `editCount` seeds `started_at`
+       from it. Correcting a submitted count is a different activity, and the labels have to say so.
+       ⚠ The COUNTING UI itself is deliberately identical — same shelves, same inputs, same muscle
+       memory. Only the words that describe STATE change. */
+    const editingNow = !!(this.draft && this.draft._edit_id);
     const groups = this.groups();
     if (groups.length === 0) {
       this.container.innerHTML = '<div class="screen"><div class="card"><div class="empty">'
@@ -618,8 +681,8 @@ S.InventoryTakeInventory = {
       + '<div style="font-size:13px;font-weight:800;color:var(--t1);">' + esc(grp.location)
       + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">&nbsp;|&nbsp; <span id="ti-prog-txt" style="color:var(--green);">' + done + ' of ' + total + '</span></span></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-        + '<button class="btn btn-ghost btn-sm" id="ti-exit-top">Save &amp; Exit</button>'
-        + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">Start Over</button>'
+        + '<button class="btn btn-ghost btn-sm" id="ti-exit-top">' + (editingNow ? 'Save Changes' : 'Save &amp; Exit') + '</button>'
+        + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">' + (editingNow ? 'Discard Changes' : 'Start Over') + '</button>'
       + '</div></div>'
       + '<div style="height:6px;background:var(--input);border-radius:3px;overflow:hidden;">'
       + '<div id="ti-prog-bar" style="height:100%;width:' + pct + '%;background:var(--green);transition:width 0.2s;"></div></div></div>'
@@ -632,8 +695,8 @@ S.InventoryTakeInventory = {
         + (this.locStep > 0 ? '<button class="btn btn-ghost" id="ti-prev">Previous</button>' : '')
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-        + '<button class="btn btn-ghost" id="ti-exit">Save &amp; Exit</button>'
-        + '<button class="btn btn-ghost" id="ti-discard-count" style="color:var(--red);">Start Over</button>'
+        + '<button class="btn btn-ghost" id="ti-exit">' + (editingNow ? 'Save Changes' : 'Save &amp; Exit') + '</button>'
+        + '<button class="btn btn-ghost" id="ti-discard-count" style="color:var(--red);">' + (editingNow ? 'Discard Changes' : 'Start Over') + '</button>'
       + '</div>'
       + '</div></div>';
 
@@ -759,10 +822,10 @@ S.InventoryTakeInventory = {
     document.getElementById('ti-prev')?.addEventListener('click', () => { this.locStep--; this.draft._locStep = this.locStep; this.saveDraft(); this.renderCounting(); });
     document.getElementById('ti-next')?.addEventListener('click', () => { this.locStep++; this.draft._locStep = this.locStep; this.saveDraft(); this.renderCounting(); });
     document.getElementById('ti-review')?.addEventListener('click', () => { this.draft._view = 'review'; this.saveDraft(); this.renderReview(); });
-    document.getElementById('ti-exit')?.addEventListener('click', () => { this.saveDraft(); this.draft = null; this.renderSetup(); this.scrollTop(); });
+    document.getElementById('ti-exit')?.addEventListener('click', () => this._exitCount());
     document.getElementById('ti-discard-count')?.addEventListener('click', () => this.confirmDiscardDraft());
     // Top-right duplicates of the session actions, same handlers as the bottom.
-    document.getElementById('ti-exit-top')?.addEventListener('click', () => { this.saveDraft(); this.draft = null; this.renderSetup(); this.scrollTop(); });
+    document.getElementById('ti-exit-top')?.addEventListener('click', () => this._exitCount());
     document.getElementById('ti-discard-top')?.addEventListener('click', () => this.confirmDiscardDraft());
     if (!keepScroll) this.scrollTop();
   },
@@ -881,7 +944,7 @@ S.InventoryTakeInventory = {
       + '<th>Product</th><th>Category</th><th>Full</th><th>Open</th><th>Total</th><th>Value</th>'
       + '</tr></thead><tbody>' + tbody + '</tbody></table></div>'
       + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:16px;">'
-      + '<button class="btn btn-primary" id="ti-submit">Submit Count</button>'
+      + '<button class="btn btn-primary" id="ti-submit">' + ((this.draft && this.draft._edit_id) ? 'Save Changes' : 'Submit Count') + '</button>'
       + '<button class="btn btn-ghost" id="ti-back-count">Back to Counting</button>'
       + '<span id="ti-sub-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div></div>';
@@ -1064,7 +1127,7 @@ S.InventoryTakeInventory = {
     } else {
       const err = document.getElementById('ti-sub-err');
       if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
-      if (btn) { btn.disabled = false; btn.textContent = 'Submit Count'; }
+      if (btn) { btn.disabled = false; btn.textContent = editing ? 'Save Changes' : 'Submit Count'; }
     }
   },
 
@@ -1075,7 +1138,7 @@ S.InventoryTakeInventory = {
       + '<svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px;">'
       + '<circle cx="20" cy="20" r="17" stroke="var(--green)" stroke-width="1.8"/>'
       + '<path d="M12 20.5l5.5 5.5L28 14" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:6px;">Count Submitted</div>'
+      + '<div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:6px;">' + (record && record.edited_at ? 'Changes Saved' : 'Count Submitted') + '</div>'
       // item_count is everything on the sheet, including the products the operator skipped.
       // The review screen right before this said "Counted 12", so the confirmation says 12 too —
       // reporting 42 here contradicted the screen it followed. Count History uses the same basis.
