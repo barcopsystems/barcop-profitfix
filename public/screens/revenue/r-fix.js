@@ -46,7 +46,19 @@ S.RevenueFix = {
     week:        () => (App.data && App.data.revenue_weeks)         || [],
     forecast:    () => (App.data && App.data.revenue_forecasts)     || [],
     servercheck: () => (App.data && App.data.revenue_server_checks) || [],
-    pricelog:    () => (App.data && App.data.revenue_price_log)     || [],
+    /* ⚠⚠ A FILE DROP IS NOT A PRICE ROLLOUT (I12, 2026-07-30). This step is the recurring
+       quarterly one (`maxDays: 95`), and the menu importer logs every reprice a file carried
+       through the same canonical logger — correctly, so the Pricing Review Log sees it. But an
+       unfiltered read meant **dropping a menu list whose prices differ flipped this step to
+       "On track" for 95 days without the operator looking at pricing once**, and it reset the
+       quarterly clock: a real hand reprice in January plus an import today read as today.
+       Same family as I6 and I7 — activity that is not the work the step describes.
+       ⚠ DENY the import by name; do NOT allow-list the good sources. There are three today
+       (`menu-engineering`, `menu-items-edit`, `menu-items-import`) plus the logger's `'menu'`
+       default and legacy rows with no source at all — an allow-list would silently stop counting
+       any of those, and a new source added later would go dark ([[the-loop]] #27). */
+    pricelog:    () => ((App.data && App.data.revenue_price_log) || [])
+                         .filter(r => r && r.source !== 'menu-items-import'),
     dogtest:     () => (App.data && App.data.menu_dog_tests)        || [],
     schedule:    () => (App.laborData && App.laborData.lc_schedules) || [],
     briefing:    () => (App.shiftData && App.shiftData.sc_briefings) || []
