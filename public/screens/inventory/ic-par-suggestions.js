@@ -44,9 +44,6 @@ S.InventoryParSuggestions = {
     return [...byDate.values()];
   },
   deliveries() { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
-  categories() {
-    return (S.InventoryProducts && S.InventoryProducts.CATEGORIES) || ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer', 'Food', 'Misc'];
-  },
   vendorByName(name) {
     if (!name) return null;
     return ((App.inventoryData && App.inventoryData.ic_vendors) || []).find(v => v.name === name) || null;
@@ -135,11 +132,6 @@ S.InventoryParSuggestions = {
     return { ...usage, cycle_days: cycleDays, cycle_source: cycleSource, suggested, current, delta, status };
   },
 
-  // Dollar value of holding `units` of a product at par (per stock unit cost).
-  parValue(p, units) {
-    const c = App.unitCost(p);
-    return (c == null || units == null) ? 0 : c * units;
-  },
 
   // A suggestion the operator intentionally kept (dismissed) stays off the list
   // until usage drifts more than 20% from where it was when kept, so a par you

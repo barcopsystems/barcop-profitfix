@@ -196,9 +196,6 @@ S.InventoryProducts = {
     }
   },
 
-  // Unit types offered to Food and Misc. Operator can also pick "custom" and
-  // type a free-form unit (gal, qt, dozen, etc.) if their item does not fit.
-  get UNIT_TYPES() { return App.IC_FOOD_UNIT_TYPES; },   // single source on App
 
   SIZES: [
     {g:'Spirits',l:'50ml (1.7 oz)',oz:1.7},{g:'Spirits',l:'200ml (6.8 oz)',oz:6.8},
@@ -325,21 +322,6 @@ S.InventoryProducts = {
     return App.inventoryData.ic_products;
   },
 
-  // Custom sizes (oz not in the built-in SIZES) used by products in this category
-  // group, each carrying the operator's own name so the dropdown reads "Gallon
-  // (128 oz)" like the presets. Scoped to the group so a custom liquor size never
-  // leaks into wine / beer. Returns [{ oz, name, label }].
-  customSizesUsed(group) {
-    const builtIn = new Set(this.SIZES.filter(s => s.oz != null).map(s => s.oz));
-    const seen = new Map();   // oz -> name
-    (this.products() || []).forEach(p => {
-      if (group) { const pg = (this.FORM_SPEC[p.category] || {}).sizeGroup; if (pg !== group) return; }
-      const oz = parseFloat(p.container_size_oz);
-      if (!isNaN(oz) && oz > 0 && !builtIn.has(oz) && !seen.has(oz)) seen.set(oz, (p.container_size_label || '').trim());
-    });
-    return [...seen.entries()].map(([oz, name]) => ({ oz, name, label: name ? (name + ' (' + oz + ' oz)') : (oz + ' oz') }))
-      .sort((a, b) => a.oz - b.oz);
-  },
 
   vendorOpts(sel) {
     const vendors = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
@@ -399,17 +381,6 @@ S.InventoryProducts = {
     return h;
   },
 
-  unitTypeOpts(sel) {
-    let h = '';
-    this.UNIT_TYPES.forEach(u => {
-      h += '<option value="' + u + '"' + (sel === u ? ' selected' : '') + '>' + u + '</option>';
-    });
-    if (sel && !this.UNIT_TYPES.includes(sel) && sel !== 'custom') {
-      h += '<option value="' + esc(sel) + '" selected>' + esc(sel) + '</option>';
-    }
-    h += '<option value="custom"' + (sel === 'custom' ? ' selected' : '') + '>Custom (type one)</option>';
-    return h;
-  },
 
   // ── In-place custom cells (size / unit) ─────────────────────────────────────
   // Both cells carry a "| Edit" link that opens the shared list editor (add /
@@ -1069,10 +1040,6 @@ S.InventoryProducts = {
     return { 'Liquor':"Tito's", 'Wine':'Producer', 'Bottle Beer':'Constellation',
              'Draft Beer':'Austin Beerworks', 'Food':'', 'Misc':'' }[cat] || '';
   },
-  _subcatPlaceholder(cat) {
-    return { 'Liquor':'Vodka', 'Wine':'Red', 'Bottle Beer':'Domestic',
-             'Draft Beer':'Craft', 'Food':'Protein', 'Misc':'Mixer' }[cat] || '';
-  },
 
   // Required fields per category — matches isComplete() exactly so the
   // .field-missing highlights surface the same items as the Incomplete badge.
@@ -1201,21 +1168,7 @@ S.InventoryProducts = {
   },
 
   // ── Adaptive Food / Misc divisor field ────────────────────────────────────
-  // How one stock unit breaks into the measure a recipe uses. The field shown
-  // adapts to the product: a liquid needs ounces-per-container (cost per oz), a
-  // countable solid needs servings-per-unit (cost per serving), an "each" item
-  // is one serving, and a paper/cleaning supply just needs pieces-per-unit for
-  // ordering (never a recipe ingredient). Mirrors App.recipeBasis on the costing
-  // side, so what the form captures is exactly what the Menu Builder reads.
-  _divisorRole(unitType, miscType) {
-    return App.productRole({ unit_type: unitType, misc_type: miscType });
-  },
 
-  // The default Count By for the current form values. Delegates to the shared
-  // App.defaultCountStyle so the form and the count sheet never disagree.
-  _defaultCountStyle(unitType, miscType, packV) {
-    return App.defaultCountStyle({ unit_type: unitType, misc_type: miscType, pack_size: packV });
-  },
 
 
   // Only the INPUT cells for the grid. The derived cost readouts live in the calc
