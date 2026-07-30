@@ -72,10 +72,20 @@ S.InventoryTakeInventory = {
     const pendEdit = App._pendingCountEdit;
     if (pendEdit) {
       App._pendingCountEdit = null;
-      // ⚠ ONLY RETURN IF THE EDIT ACTUALLY OPENED (S312). This returned unconditionally, so a
-      // refusal (record gone, or a confirmed week now covering it) left a BLANK screen. Falling
-      // through renders the ordinary view, which is the honest outcome when the edit cannot open.
+      /* ⚠ ONLY RETURN IF THE EDIT ACTUALLY OPENED (S312). This returned unconditionally, so a
+         refusal (record gone, or a confirmed week now covering it) left a BLANK screen.
+         ⚠⚠ AND SAY SO. Falling through silently was the first fix and it is not enough: `this.draft`
+         is a singleton that survives navigation, so the fall-through can render an UNRELATED count
+         that is still in progress — which looks exactly like the edit having worked. An operator who
+         clicked Edit on last week's count could then submit against the draft's own `_edit_id` and
+         correct a count they never opened. A blank screen at least reads as broken; this reads as
+         fine. The refusal has to be visible. */
       if (this.editCount(pendEdit)) return;
+      App.confirm({
+        title: 'That count could not be opened',
+        message: 'It may have been removed, or the week it falls in has since been confirmed. Confirmed weeks lock the counts inside them so the numbers behind a closed week cannot move.',
+        confirmText: 'OK', cancelText: ''
+      });
     }
     if (this.draft && this.draft._view) this.route();
     else this.renderSetup();

@@ -67,6 +67,20 @@ S.InventoryReceiveDelivery = {
       // through renders the ordinary form, which is the honest outcome when the edit cannot open.
       if (this.editDelivery(pend)) return;
     }
+    /* ⚠⚠ ABANDONING AN EDIT DROPS ITS ID TOO. This reset cleared the four `_edit*` fields on every
+       ordinary entry but left `_pendingDeliveryId` armed — and during an edit that id IS the edited
+       record's. So LEAVING an edit by any route other than the Cancel button (a sidebar click, a Fix
+       link, browser back) dropped the edit banner while keeping the id, and `save()` reads
+       `_editId || _pendingDeliveryId || App.uid()`, so the next delivery keyed here silently REPLACED
+       the one that had been open — fresh `created_at`, no `edited_at`, and nothing in Delivery
+       History saying a record had been overwritten.
+       ⚠ GATED ON `_editId`, NOT UNCONDITIONAL, and that distinction is the whole care here.
+       `_pendingDeliveryId` has a second job: the delivery row is written FIRST, so a save that failed
+       on the product or order write has already put the row on the server and the id lets the
+       operator's RETRY reuse it instead of booking a second delivery for one invoice (S56/S112).
+       Clearing it on every entry would have reintroduced exactly that duplicate. Only the edit's copy
+       is dropped. */
+    if (this._editId) this._pendingDeliveryId = null;
     this._editId = null; this._editCreatedAt = null; this._editCount = 0; this._editPriceNote = 0;
     this.renderForm();
   },
@@ -369,7 +383,18 @@ S.InventoryReceiveDelivery = {
     // next, unrelated delivery reused it at save()'s `|| App.uid()` and UPSERTED OVER the first:
     // one row where there were two, and the abandoned delivery's cases silently gone from
     // purchases, COGS, usage variance and shrink. The other two clear sites already did this.
+    /* ⚠⚠ AND THE EDIT ID GOES TOO, WHICH THE COMMENT ABOVE MISSED BECAUSE IT WAS WRITTEN BEFORE EDIT
+       EXISTED. `save()` mints `this._editId || this._pendingDeliveryId || App.uid()` — `_editId` is
+       the FIRST term, so clearing only the second left Start Over inside an EDIT strictly more
+       dangerous than the S112 case this function was hardened for. Measured path: operator hits Edit
+       on a delivery, sees the wrong invoice, hits Start Over. `renderForm()` rebuilds, so the
+       "Editing the … delivery" banner is gone and the button reads Save Delivery again — but the
+       next, unrelated delivery they key saves under the OLD record's id and upserts over it. One row
+       where there were two, and the original invoice's cases gone from purchases, COGS, usage
+       variance and shrink. Second harm on the same path: `if (this._editId)` suppresses the price
+       updates, so the new delivery's price changes never reach the product master either. */
     this._pendingDeliveryId = null;
+    this._editId = null; this._editCreatedAt = null; this._editCount = 0; this._editPriceNote = 0;
     this.renderForm();
   },
 
@@ -595,6 +620,16 @@ S.InventoryReceiveDelivery = {
     if (!d) return false;
     if (App.countLockedByWeek(d)) return false;   // history hides Edit here; belt and braces
 
+    /* ⚠ REFUSE BEFORE MUTATING, AND REFUSE WHEN THE FORM ITSELF CANNOT DRAW. `renderForm()` bails to
+       a "Set Up Receiving" card when there are no vendors or products — so on that path every `set()`
+       below no-ops, there is no line table, and `_markEditing()` still prepends "Editing the … from
+       …" with a Cancel button on top of a setup card. Returning true there told the caller the edit
+       had opened when the operator can see it has not, which is the one thing this return value
+       exists to report. The state is put back rather than left armed. */
+    if (this.vendors().length === 0 || this.products().length === 0) {
+      this.renderForm();
+      return false;
+    }
     this._editId = d.id;
     this._editCreatedAt = d.created_at;
     this._editCount = d.edit_count || 0;
