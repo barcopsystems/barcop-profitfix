@@ -223,8 +223,11 @@ const CSVMapper = {
        the outlier, and when siblings disagree the odd one out is the bug ([[the-loop]] #27).
        Refusing is also the honest repair: a hard refresh re-runs the real tag. */
     if (typeof XLSX === 'undefined') {
-      this._msg(container, 'The Excel reader did not load. Hard refresh the page (Ctrl+Shift+R) and try '
-        + 'again, or save the file as CSV and drop that instead.', 'var(--red)');
+      /* One shared sentence across all five spreadsheet doors, and it logs (S292/S310).
+         ⚠ "save or rename it as .csv": a real `.csv` never reaches here (the extension branches
+         above it), so the file that does is a CSV or HTML export saved under an .xls name — for
+         which re-saving is a no-op and RENAMING is the actual fix. */
+      this._msg(container, App.excelMissing('csv-mapper', 'save or rename the file as .csv and drop that instead'), 'var(--red)');
       return;
     }
     run();
