@@ -4896,15 +4896,32 @@ const App = {
      no network request even after the wifi came back, until a full page reload. Same class M8 was
      closed for: advice that cannot work. The rejection is re-thrown so the caller's own message still
      fires; only the memo is dropped. */
+  /* ⚠⚠ THE READINESS PROBE TESTS THE PLUGIN, NOT JUST THE GLOBAL — and it has to, because clearing
+     the memo above made a PARTIAL load reachable for the first time. Two scripts load in sequence.
+     If jsPDF resolves and autoTable does NOT (an ad blocker on the second request, a 404, the
+     connection dropping between them), the jsPDF UMD has already executed and `window.jspdf.jsPDF`
+     is set. A probe that stopped there would answer "ready" on the retry, every caller's
+     `try { await _ensurePDFLib() } catch` would pass, and `doc.autoTable(...)` would then throw
+     OUTSIDE any catch: a silently dead Export button on ~20 doors instead of the honest message.
+     That is strictly worse than the cached-rejection bug, so the probe asks for the thing the code
+     actually calls. Erring strict is safe here: a false "not ready" costs one redundant fetch, a
+     false "ready" costs the export. */
+  _pdfLibReady() {
+    const j = window.jspdf && window.jspdf.jsPDF;
+    return !!(j && j.API && j.API.autoTable);
+  },
   _ensurePDFLib() {
     if (this._pdfLibPromise) return this._pdfLibPromise;
-    if (window.jspdf && window.jspdf.jsPDF) { this._pdfLibPromise = Promise.resolve(); return this._pdfLibPromise; }
+    if (this._pdfLibReady()) { this._pdfLibPromise = Promise.resolve(); return this._pdfLibPromise; }
     const load = src => new Promise((res, rej) => {
       const s = document.createElement('script');
       s.src = src; s.onload = res; s.onerror = rej;
       document.head.appendChild(s);
     });
-    this._pdfLibPromise = load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+    // Only fetch what is actually missing: after a partial load the retry needs the plugin alone,
+    // not another 300KB of a library already sitting in the page.
+    const havejsPDF = !!(window.jspdf && window.jspdf.jsPDF);
+    this._pdfLibPromise = (havejsPDF ? Promise.resolve() : load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'))
       .then(() => load('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'))
       .catch(err => { this._pdfLibPromise = null; throw err; });
     return this._pdfLibPromise;

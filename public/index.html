@@ -299,7 +299,16 @@
   if (document.body) { show(); } else { document.addEventListener('DOMContentLoaded', show); }
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- ⚠⚠ PINNED TO AN EXACT VERSION (M7). This read `@supabase/supabase-js@2`, which resolves to
+     WHATEVER THE NEWEST 2.x IS AT PAGE LOAD — so a breaking release, or a compromised publish,
+     reached production with no deploy on our side, and this library is the AUTH + DATABASE client
+     that sees every credential and every row. 2.106.2 is not a guess: it is the version
+     package-lock.json already resolves for the SERVER, so pinning here makes the browser and the
+     server run the same client instead of one pinned and one floating. Bump both together, never
+     one alone. ⚠ Still NO SRI here or on the other three CDN scripts (sheetjs, jspdf, autotable) —
+     each needs its file's real hash, and self-hosting is the stronger answer for the ones that never
+     change. That half of M7 is still open. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>var S = {};</script>
 <script src="sample-profile.js?v=3"></script>
@@ -357,8 +366,8 @@
 <script src="screens/revenue/r-forecast.js?v=22"></script>
 <script src="screens/revenue/r-this-week.js?v=37"></script>
 <script src="screens/revenue/r-server-check.js?v=50"></script>
-<script src="screens/revenue/r-menu-items.js?v=117"></script>
-<script src="screens/revenue/r-menu-planning.js?v=20"></script>
+<script src="screens/revenue/r-menu-items.js?v=118"></script>
+<script src="screens/revenue/r-menu-planning.js?v=21"></script>
 <script src="screens/revenue/r-menu-engineering.js?v=83"></script>
 <script src="screens/revenue/r-dog-test.js?v=18"></script>
 <script src="screens/revenue/r-help.js?v=26"></script>
@@ -440,6 +449,6 @@
 <script src="components/onboarding.js?v=32"></script>
 <script src="https://js.stripe.com/v3/"></script>
 <script src="db.js?v=158"></script>
-<script src="app.js?v=772"></script>
+<script src="app.js?v=773"></script>
 </body>
 </html>
