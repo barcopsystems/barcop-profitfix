@@ -70,6 +70,7 @@ S.InventoryTakeInventory = {
     /* One-shot handoff from Count History's Edit button (S250). Consumed immediately, like every
        other cross-screen jump in the app, so a later visit does not silently reopen the count. */
     const pendEdit = App._pendingCountEdit;
+    let switchAsk = null;
     if (pendEdit) {
       App._pendingCountEdit = null;
       /* ⚠ ONLY RETURN IF THE EDIT ACTUALLY OPENED (S312). This returned unconditionally, so a
@@ -80,15 +81,19 @@ S.InventoryTakeInventory = {
          clicked Edit on last week's count could then submit against the draft's own `_edit_id` and
          correct a count they never opened. A blank screen at least reads as broken; this reads as
          fine. The refusal has to be visible. */
-      if (this.editCount(pendEdit)) return;
-      App.confirm({
-        title: 'That count could not be opened',
-        message: 'It may have been removed, or the week it falls in has since been confirmed. Confirmed weeks lock the counts inside them so the numbers behind a closed week cannot move.',
-        confirmText: 'OK', cancelText: ''
-      });
+      /* ⚠ THREE OUTCOMES NOW, NOT TWO (S321). 'busy' means a count is in progress and opening this
+         one would destroy it — a question, not a dead end, so it must not get 'gone''s apology. */
+      const res = this.editCount(pendEdit);
+      if (res === 'opened') return;
+      if (res === 'busy') switchAsk = pendEdit;
+      else this._countGoneNotice();
     }
     if (this.draft && this.draft._view) this.route();
     else this.renderSetup();
+    /* ⚠ AFTER the render, deliberately. The prompt asks the operator to give up the count they are
+       in the middle of, so they have to be able to SEE it — asking over a blank or stale screen is
+       asking them to answer blind. render() stays synchronous; only the question is deferred. */
+    if (switchAsk) this._confirmSwitchCount(switchAsk);
   },
 
   showHowTo() {
@@ -306,10 +311,25 @@ S.InventoryTakeInventory = {
      be deleted, or a week covering it confirmed, while that list is still on screen. `render()`
      called this and then returned unconditionally, so a refusal left `content-area` EMPTY — no
      form, no error, nothing at all. The caller now falls through to the normal view instead. */
-  editCount(id) {
+  /* ⚠⚠ S321 — RETURNS A STATUS, NOT A BOOLEAN: 'opened' | 'gone' | 'busy'.
+     Two refusals now exist and they need OPPOSITE handling — 'gone' is a dead end that gets an
+     apology, 'busy' is a question the operator can answer. A boolean could only say "not opened",
+     and folding them together would have shown "that count could not be opened" about a count that
+     opens perfectly well. Only `render()` calls this. */
+  editCount(id, opts) {
+    opts = opts || {};
     const rec = this.counts().find(c => c.id === id);
-    if (!rec) return false;
-    if (App.countLockedByWeek(rec)) return false;    // the list hides Edit in this case; belt and braces
+    if (!rec) return 'gone';
+    if (App.countLockedByWeek(rec)) return 'gone';   // the list hides Edit in this case; belt and braces
+    /* ⚠⚠ NEVER OVERWRITE A COUNT IN PROGRESS WITHOUT ASKING (S321). This assigned `this.draft` and
+       called `saveDraft()` unconditionally — and `saveDraft` writes the SAME `ic_count_draft` key,
+       so a bartender forty bottles into the Back Bar who stepped over to Count History and clicked
+       Edit on last week's count lost the live count from MEMORY AND FROM THE DEVICE, with no prompt
+       and no undo. Closing the tab did not get it back either.
+       The screen already owned the right words and did not use them here: `confirmDiscardDraft`
+       says "Any counts you have entered so far will be lost", written because losing part-way
+       through a count is destructive. One destructive path asked and its twin did not. */
+    if (!opts.force && this._draftAtRisk(id)) return 'busy';
 
     const counts = {};
     (rec.items || []).forEach(it => {
@@ -345,7 +365,45 @@ S.InventoryTakeInventory = {
     this.locStep = 0;
     this.saveDraft();
     this.renderCounting();
-    return true;
+    return 'opened';
+  },
+
+  /* True when opening count `id` would destroy work that exists nowhere else.
+     ⚠ NOT simply "is there a draft". Two cases are deliberately silent, because a prompt raised
+     when nothing is at stake is its own defect and teaches the operator to click through:
+       · a count just STARTED and nothing entered yet (`counts` is {}) — nothing to lose;
+       · the draft is already a correction of THIS SAME count — re-opening it loses nothing.
+     `counts` is keyed per product as the operator enters each one, so its size is the honest
+     measure of "work done". A reopened count arrives with its saved numbers already in `counts`,
+     so an in-progress CORRECTION is protected by the same test. */
+  _draftAtRisk(id) {
+    const d = this.draft;
+    if (!d) return false;
+    if (d._edit_id && d._edit_id === id) return false;
+    return Object.keys(d.counts || {}).length > 0;
+  },
+
+  // One wording for "this count is not openable", used by both routes into it, so the two
+  // cannot drift apart ([[the-loop]] step 0.6).
+  _countGoneNotice() {
+    App.confirm({
+      title: 'That count could not be opened',
+      message: 'It may have been removed, or the week it falls in has since been confirmed. Confirmed weeks lock the counts inside them so the numbers behind a closed week cannot move.',
+      confirmText: 'OK', cancelText: ''
+    });
+  },
+
+  /* The 'busy' answer. Raised AFTER the normal render, so the operator is looking at the count
+     they are in the middle of while being asked about it. Cancel touches nothing at all. */
+  async _confirmSwitchCount(id) {
+    const ok = await App.confirm({
+      title: 'You have a count in progress',
+      message: 'Opening that count to correct it will discard the one you are in the middle of. Any counts you have entered so far will be lost. The product master and your last finalized count stay untouched.',
+      confirmText: 'Discard and Open',
+      cancelText: 'Keep Counting'
+    });
+    if (!ok) return;
+    if (this.editCount(id, { force: true }) !== 'opened') this._countGoneNotice();
   },
 
   // Products to count = active products whose primary_location is one of
