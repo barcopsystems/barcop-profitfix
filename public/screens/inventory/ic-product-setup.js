@@ -1501,6 +1501,45 @@ S.InventoryProducts = {
     const packSize = spec.showPackSize ? (parseInt(document.getElementById('ip-pack')?.value) || null) : null;
     // How this product is counted: number / loose / slider.
     const countStyle = spec.showPackSize ? (document.getElementById('ip-cstyle')?.value || 'number') : null;
+    /* Hoisted out of the record literal so they can be checked with the rest of the numbers below.
+       A value validated in one place and read in another is how a form grows a hole. */
+    const parLevel = num('ip-par');
+    const reorderPoint = num('ip-reorder');
+    /* ⚠⚠ NONE OF THESE NUMBERS CAN BE NEGATIVE, AND NOTHING WAS CHECKING (class D round 2).
+       This is the widest numeric door in the app: it refused a missing name and a duplicate name,
+       both by name, and then persisted SEVEN numbers raw. `min="0"` / `min="1"` sit on four of the
+       inputs and stop nothing — a number input still hands back "-6" and nothing calls
+       checkValidity.
+       ⭐ THE TELL THAT IT IS AN OVERSIGHT AND NOT A POLICY: this same function already applies the
+       rule twice — `ip-foz` is taken only `if (fromField > 0)`, and an extra serving-size row needs
+       `sz > 0 && pr > 0`. Two fields of nine got the test. That is the "the field two lines above
+       it in the same function" shape this class keeps producing.
+       MEASURED: `unit_cost` is the number every inventory dollar descends from. At -$30 a bottle,
+       the REAL `menuItemCost` prices a 1.5 oz pour at **-$1.77**, so a $12 gin and tonic shows a
+       **$13.77 margin on a $12 drink** and ranks as a STAR on the Menu Engineering board. It also
+       feeds COGS, usage variance and order value. `case_size` is worse than it looks, because
+       bottle beer is tracked, priced and counted BY THE CASE, so a negative inverts every count
+       that divides by it.
+       ⚠ ZERO AND BLANK BOTH STAY LEGAL. Blank is "not measured", which is not the same number as
+       zero; zero is a real answer (a comped house product genuinely costs nothing) and is already
+       inert everywhere it divides — `pours = oz && pour` is falsy at 0, and `parseInt('0') || null`
+       is null. Only a negative is impossible.
+       ⚠ ONLY FIELDS THIS FORM ACTUALLY SHOWS are judged. `price` falls back to the STORED
+       `cur.menu_price` on categories with no price cell, and refusing a save because of a legacy
+       value the operator cannot even see would be a guard that refuses real work. */
+    const negNums = [
+      [spec.costLabel || 'Cost', cost],
+      [spec.pourLabel || 'Pour Size', pour],
+      ['Menu Price', spec.showMenuPrice ? price : null],
+      ['Par', parLevel],
+      ['Reorder', reorderPoint],
+      ['Case Size', caseSize],
+      ['Pieces', packSize]
+    ].filter(f => f[1] != null && f[1] < 0).map(f => f[0]);
+    if (negNums.length) {
+      fail(negNums.join(' and ') + ' cannot be negative.');
+      return;
+    }
     // Other sizes sold: each row needs a size and a price to count.
     const servingSizes = [];
     if (spec.showServingSizes) {
@@ -1548,8 +1587,8 @@ S.InventoryProducts = {
       sold_on_menu:        soldOnMenu,
       servings_per_unit:   servingsPerUnit,
       cost_per_serving:    costPerServing,
-      par_level:           num('ip-par'),
-      reorder_point:       num('ip-reorder'),
+      par_level:           parLevel,
+      reorder_point:       reorderPoint,
       locations:           locsArr,
       primary_location:    primary,
       active,
