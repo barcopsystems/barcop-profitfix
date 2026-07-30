@@ -525,16 +525,40 @@ S.LaborReports = {
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Edit Hours' + (recs[0].name ? ' &middot; ' + esc(recs[0].name) : '') + '</div>'
       + bodyRows
+      // ⚠ A REFUSAL NEEDS SOMEWHERE TO LAND. This modal is `noClose: true` with Save All as its only
+      // control, so without this line a rejected edit had no way to say anything at all.
+      + '<div id="ws-em-err" style="color:var(--red);font-size:12px;margin:8px 0 0;display:none;"></div>'
       + '<div class="card-actions">'
         + '<button class="btn btn-primary" id="ws-em-save">Save All</button>'
       + '</div></div>';
     App.openModal(html, { id: 'ws-edit-modal', maxWidth: 600, noClose: true });
     document.getElementById('ws-em-save')?.addEventListener('click', async () => {
-      const edits = [];
+      /* ⚠⚠ REFUSE BY NAME, LIKE THE SINGLE-ROW DOOR ONE SCREEN OVER. This handed
+         `parseFloat(value)` straight to `App.updateActual` with no check — and `updateActual` guards
+         (`!isNaN(fields.hours) && fields.hours >= 0`), so a blanked or fat-fingered cell was silently
+         IGNORED while the modal closed and the notes on that same row saved. The operator edited five
+         days, four took, and nothing said which. Its sibling `openDayEdit` has always refused by name
+         ("Enter the hours worked."), so the two doors onto one field disagreed about what a bad cell
+         means — the second-consumer shape, in the write layer.
+         The guard in `updateActual` stays: it is the floor that keeps a bad number out of payroll.
+         This is the door telling the operator, which a floor cannot do. */
+      const edits = [], bad = [];
       document.querySelectorAll('#ws-edit-modal .wsem-line[data-id]').forEach(row => {
         const rec = this.actuals().find(a => a.id === row.dataset.id);
-        if (rec) edits.push({ rec, hours: parseFloat(row.querySelector('.ws-em-hours')?.value), notes: row.querySelector('.ws-em-notes')?.value || '' });
+        if (!rec) return;
+        const hours = parseFloat(row.querySelector('.ws-em-hours')?.value);
+        if (isNaN(hours) || hours < 0) { bad.push(this.fmtDay(rec.date)); return; }
+        edits.push({ rec, hours: hours, notes: row.querySelector('.ws-em-notes')?.value || '' });
       });
+      if (bad.length) {
+        const err = document.getElementById('ws-em-err');
+        if (err) {
+          err.textContent = 'Enter the hours worked for ' + bad.join(', ')
+            + '. Nothing was saved, so your other edits are still here.';
+          err.style.display = 'block';
+        }
+        return;   // ⚠ stays open: closing here is what made the drop invisible
+      }
       App.closeModal('ws-edit-modal');
       for (const e of edits) { await App.updateActual(e.rec, { hours: e.hours, notes: e.notes }); }
       this.renderReport();
