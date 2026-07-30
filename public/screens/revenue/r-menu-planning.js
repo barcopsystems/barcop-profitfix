@@ -153,9 +153,18 @@ S.RevenueMenuPlanning = {
          least-ordered of them" and "Nothing here earns and moves less" while a sibling on screen sold
          NOTHING. `counted` is every priced item whose covers are known, zeros included. */
       const counted = priced.filter(x => x.i.weekly_covers != null && x.i.weekly_covers >= 0);
+      /* ⚠⚠ AND THE COVERS POOL IS WIDER STILL (S308). Every item in the section renders a tile with a
+         MENU MIX, priced or not — the mix denominator is the whole section's units sold — so an
+         UNCOSTED item's volume is on screen in the one column an operator would check a volume claim
+         against. Ranking covers over the costed set alone let a ranked tile claim "the volume leader
+         at 90 a week" under an 11% Menu Mix while the tile beside it read 63%. Reachable from two
+         live doors together: a menu CSV with no cost column, then a PMIX drop.
+         So: `counted` (= classify's pool) still gates RANKING, and `coversPool` measures every
+         COVERS claim, because that is the set the operator can see. */
+      const coversPool = list.filter(x => x.i.weekly_covers != null && x.i.weekly_covers >= 0);
       const mRank = {}, cRank = {};
       priced.slice().sort((a, b) => (b.i.price - b.cost) - (a.i.price - a.cost)).forEach((x, idx) => { mRank[x.i.id] = idx + 1; });
-      counted.slice().sort((a, b) => (b.i.weekly_covers || 0) - (a.i.weekly_covers || 0)).forEach((x, idx) => { cRank[x.i.id] = idx + 1; });
+      coversPool.slice().sort((a, b) => (b.i.weekly_covers || 0) - (a.i.weekly_covers || 0)).forEach((x, idx) => { cRank[x.i.id] = idx + 1; });
       /* ⚠ WHICH VALUES TIE, so _rankWord can refuse to claim a position that nobody holds. A rank
          is a place in a sort, and a sort breaks a tie by array order — so two items on the same
          margin were told one had the fattest and the other the second-fattest. Compared in CENTS:
@@ -178,7 +187,7 @@ S.RevenueMenuPlanning = {
          (it gets the "no covers yet" line instead). Same family as the `n` vs `rankedN` note below,
          one level in. `atMin` is what lets the Dog tail claim a bottom only when it really is one. */
       const mMap = tieMap(priced, x => x.i.price - x.cost);
-      const cMap = tieMap(counted, x => x.i.weekly_covers || 0);
+      const cMap = tieMap(coversPool, x => x.i.weekly_covers || 0);
       const mTied = mMap.tied, cTied = cMap.tied, mAtMin = mMap.atMin, cAtMin = cMap.atMin;
       stats[cat] = {
         n: priced.length,
@@ -203,7 +212,7 @@ S.RevenueMenuPlanning = {
         rankN: counted.length,
         // The pool size PER AXIS, because the two ranks are measured over different sets. One shared
         // `n` is what let a margin rank be tested against the covers pool's size.
-        mN: priced.length, cN: counted.length,
+        mN: priced.length, cN: coversPool.length,
         mRank, cRank, mTied, cTied, mAtMin, cAtMin
       };
     });
@@ -245,6 +254,10 @@ S.RevenueMenuPlanning = {
     const cost = App.menuItemCost(item) || 0;
     const price = item.price || 0;
     const covers = item.weekly_covers || 0;
+    // ⚠ DECLARED HERE, not beside the trend block below, because the READ line now reads it too
+    // (S304) and a `const` used above its declaration is a TDZ throw, not a syntax error —
+    // `node --check` passes on it and only running the function finds it ([[the-loop]] #72).
+    const prev = item.prev_weekly_covers;
     const noun = this.nounFor(item);
     const catLc = this._catPhrase(cat);
 
@@ -327,6 +340,7 @@ S.RevenueMenuPlanning = {
          shown as it is; rounding only applies where there is a whole count to round. The real cure is
          refusing a fractional count at both write doors (S295). */
       margin: f(margin), covers: covers >= 1 ? Math.round(covers) : covers,
+      prevc: prev >= 1 ? Math.round(prev) : prev,   // same display rule as `covers`
       noun: noun, cat: catLc, n: cs.rankN, s: cs.rankN === 1 ? '' : 's',
       pct: costPct.toFixed(0), target: target, sugg: f(sugg || 0),
       name: drv ? drv.name : '', dcost: drv ? f(drv.cost) : '',
@@ -370,7 +384,9 @@ S.RevenueMenuPlanning = {
                     'A Plowhorse. {Cword} at {covers} a week on {mword} at {margin} a {noun}. Busy, but thin.'],
         PUZZLE: ['A Puzzle. The margin is there, {mword} at {margin} a {noun}, but it is {cword} at {covers} a week. It pays when it sells, it just is not selling.',
                  'A Puzzle. {Mword} at {margin} a {noun}, yet only {cword} at {covers} a week. People are not reaching for it.',
-                 'This one is a Puzzle. Good money at {margin} a {noun}, {mword}, but {cword} at {covers} a week. The plate earns, the menu is hiding it.',
+                 // ⚠ `{noun}`, not "plate" (S305). `nounFor()` exists to keep this page from calling
+                 // a bottled beer or an old fashioned a plate, and eight strings bypassed it.
+                 'This one is a Puzzle. Good money at {margin} a {noun}, {mword}, but {cword} at {covers} a week. The {noun} earns, the menu is hiding it.',
                  'A Puzzle. {Mword} at {margin} a {noun}, but {cword} at {covers} a week. Solve the covers and it is a winner.'],
         DOG: ['A Dog. It runs {mword} at {margin} a {noun} and it is {cword} at {covers} a week. {tail}',
               'A Dog. {Mword} at {margin} a {noun}, and {cword} at {covers} a week. {tail}',
@@ -398,16 +414,28 @@ S.RevenueMenuPlanning = {
          which printed it raw: "It clears $9.00 a plate on -5 covers a week." The form and the
          importer both refuse a negative now, so only data already on file can be shaped that way —
          and this branch is what it lands in, which is also the honest read for it. */
-      lines.push(pick(['It clears {margin} a {noun}, but no covers on it yet, so the volume read stays blank until you drop a product mix at the weekly close.',
-                       'Margin is {margin} a {noun}. No covers logged yet, so Bar Cop can read the plate but not the pull.',
-                       'It earns {margin} a {noun}. Once covers come in at the weekly close, the volume side fills in.'], 0));
+      /* ⚠⚠ TWO DIFFERENT STATES WERE SHARING ONE SENTENCE (S304). "No covers on it yet" is true for
+         an item that has never sold. It is FALSE for one that sold last read and sold NOTHING this
+         one — and that item then got the covers-trend line underneath, so the tile read "Once covers
+         come in at the weekly close, the volume side fills in." directly above "Units sold are down
+         100% since your last read." Covers did come in. They went to zero, which is exactly what the
+         Dog Test exists to surface, so it is worth saying out loud rather than describing as absent.
+         The trend line is suppressed for this case below, because this sentence already carries it. */
+      lines.push(prev > 0
+        ? pick(['It clears {margin} a {noun} when it sells, and it sold nothing this read against {prevc} the read before. That is the whole signal.',
+                'Margin is {margin} a {noun}, but it moved zero this read, down from {prevc}. Worth finding out why before it settles in.',
+                'It earns {margin} a {noun} on paper. Nothing sold this read against {prevc} last time, and that is a menu decision waiting to happen.'], 0)
+        : pick(['It clears {margin} a {noun}, but no covers on it yet, so the volume read stays blank until you drop a product mix at the weekly close.',
+                'Margin is {margin} a {noun}. No covers logged yet, so Bar Cop can read the {noun} but not the pull.',
+                'It earns {margin} a {noun}. Once covers come in at the weekly close, the volume side fills in.'], 0));
     } else {
       lines.push(fill('It clears {margin} a {noun} on {covers} covers a week.'));
     }
 
     // ── Covers trend (prev read vs now) ───────────────────────────────────
-    const prev = item.prev_weekly_covers;
-    if (prev != null && prev > 0 && covers >= 0) {
+    // ⚠ Not when it sold nothing: the read line above already states that in full, and printing
+    // "down 100%" underneath it says the same thing twice (S304).
+    if (prev != null && prev > 0 && covers > 0) {
       const tr = (covers - prev) / prev * 100;
       if (tr <= -10 || tr >= 10) {
         V.tr = Math.round(Math.abs(tr));
@@ -421,17 +449,35 @@ S.RevenueMenuPlanning = {
       }
     }
 
-    // ── Cost line ─────────────────────────────────────────────────────────
+    /* ── Cost line ─────────────────────────────────────────────────────────
+       ⚠⚠ MEASURED AND DELIBERATELY NOT "FIXED" (S301). A round-2 finder reported that "A Star.
+       Strong on both counts" prints directly above "Cost is running 63% against your 32% target, so
+       the margin is the lever here", and called it a contradiction. It is not, and the reason is
+       worth leaving here so the next round does not re-open it ([[the-loop]] #29/#57): write the two
+       questions out and they are different sentences. The VERDICT asks "how does this item compare
+       with the others in its group" — that is what Menu Engineering, the server audit and this page
+       all rank on. The COST LINE asks "is this item at the cost target you set". A section can be
+       entirely over target and still have a best and a worst inside it; both readings are true, and
+       an operator needs both (the Star is still the one to feature, and its recipe is still the one
+       leaking). Making them agree would mean either muting the verdict for a whole over-target
+       section or dropping the target reading, and each throws away a real fact.
+       ⚠ What WOULD be a defect is a verdict that reads as absolute when it is relative. The help
+       text says the comparison is within the section, the rank words all name the group, and the
+       cost line names the target explicitly. If Kyle ever wants the tile to lead with the target
+       instead, that is a voice decision, not a correctness one. */
     if (target) {
       lines.push(costPct > target + 0.5
         ? pick(['Cost is running {pct}% against your {target}% target, so the margin is the lever here, not the covers.',
-                'At {pct}% cost against a {target}% target, the leak is on the plate, not the volume.',
+                'At {pct}% cost against a {target}% target, the leak is on the {noun}, not the volume.',
                 'Cost is {pct}% versus your {target}% target. Fix the {noun} before you chase covers.',
                 'That {pct}% cost against a {target}% target is where the money is slipping. Tighten the recipe.'], 1)
         : pick(['Cost sits at {pct}% against your {target}% target, right where you want it.',
                 'At {pct}% cost against a {target}% target, the margin is clean.',
                 'Cost is {pct}% versus a {target}% target. No complaints there.',
-                'Plate cost is a tidy {pct}% against your {target}% target.'], 1));
+                // "Plate cost" was the one that opened a sentence, so it loses the noun rather than
+                // gaining a capitalised one — there is no {Noun} slot and inventing one for a single
+                // string is worse than the plainer sentence.
+                'Cost is a tidy {pct}% against your {target}% target.'], 1));
     } else {
       lines.push(fill('Cost runs {pct}% of the price.'));
     }
@@ -468,12 +514,35 @@ S.RevenueMenuPlanning = {
 
     // ── The move ──────────────────────────────────────────────────────────
     let move = '';
-    if (sugg) move = pick(['reprice to {sugg} to bring it back to target{dwkc}. Log it in Menu Engineering, roll it out on the next reprint, and watch covers hold after.',
-                           '{sugg} is the to-target price{dwkc}. Most guests will not blink at a bump this size, but confirm the volume sticks before you count the win.',
-                           'take it up to {sugg}{dwkc}. Put it on the next printed menu rather than mid-week, and keep an eye on covers for a couple weeks.',
-                           'walk it to {sugg}{dwkc}. Small move, real money at this count, just make sure the covers do not flinch once it lands.',
-                           'set it at {sugg}{dwkc}. Log the change so Recovery tracks it, then let the next menu print carry it in quietly.',
-                           'nudge it to {sugg}{dwkc}. A quarter here and there, but across this many covers it stacks up, so hold the line once it is on.'], 4);
+    /* ⚠⚠ TWO OF THESE SIX CLAIM VOLUME, AND THE REPRICE BRANCH RUNS BEFORE THE NO-COVERS ONE BELOW
+       (S303, second half — my first pass missed it because I gated the quad branches and forgot this
+       one sits above them). A reprice is sound advice with no units sold behind it: the item is over
+       its cost target, and that is true whatever it sells. But "real money at this count" and "across
+       this many covers it stacks up" are claims about traffic, and on a menu before its first product
+       mix drop there is none. So the volume-flavoured pair is only offered once there are covers to
+       flavour it with. Split explicitly rather than regex-filtered: which sentence claims volume is a
+       fact about the COPY, and a filter over my own wording would go stale the day someone edits it. */
+    const REPRICE_ANY = ['reprice to {sugg} to bring it back to target{dwkc}. Log it in Menu Engineering, roll it out on the next reprint, and watch covers hold after.',
+                         '{sugg} is the to-target price{dwkc}. Most guests will not blink at a bump this size, but confirm the volume sticks before you count the win.',
+                         'take it up to {sugg}{dwkc}. Put it on the next printed menu rather than mid-week, and keep an eye on covers for a couple weeks.',
+                         'set it at {sugg}{dwkc}. Log the change so Recovery tracks it, then let the next menu print carry it in quietly.'];
+    const REPRICE_WITH_VOLUME = ['walk it to {sugg}{dwkc}. Small move, real money at this count, just make sure the covers do not flinch once it lands.',
+                                 'nudge it to {sugg}{dwkc}. A quarter here and there, but across this many covers it stacks up, so hold the line once it is on.'];
+    if (sugg) move = pick(REPRICE_ANY.concat(covers > 0 ? REPRICE_WITH_VOLUME : []), 4);
+    /* ⚠⚠ NO VOLUME ADVICE WITHOUT VOLUME (S303). `classify()` compares with `>=`, so in a section
+       where NOTHING has sold `avgCovers` is 0 and `0 >= 0` makes every item high-volume — the whole
+       section comes back Stars and Plowhorses. The verdict-keyed moves below then talk about traffic
+       the item does not have: "a few cents times this many covers adds up fast", "every extra cover
+       here is your best margin working harder", "This many covers means small recipe savings stack
+       up". That is the day-one shape for any menu before the first product mix drop, so it is the
+       first thing a new operator would read. The margin half is still real and still worth saying;
+       the volume half is not, so the move says what would make the rest of the page true.
+       ⚠ Placed AFTER the `sugg` branch on purpose: a reprice does not need volume to be right, and
+       its weekly-dollar figure is already suppressed without covers. */
+    else if (!(covers > 0)) move = pick(['drop a product mix at the weekly close so the volume side fills in. Until it does, the only honest read here is the margin, and that clears {margin} a {noun}.',
+                                         'get units sold in before you act on this one. The margin reads {margin} a {noun}; what it actually does on the floor is still blank.',
+                                         'there is nothing to act on until it sells. Log a product mix at the weekly close and Bar Cop can tell you whether it is earning its spot.',
+                                         'let it run a week and drop your product mix. The {noun} clears {margin}, but a verdict without units sold behind it is not worth acting on.'], 4);
     else if (quad === 'DOG') move = pick(['rework or cut, but run a 90-day Dog Test first so the call is the data and not a hunch. Make one honest change, and if it still lags, pull it clean.',
                                           'fix it or retire it. Give it 90 days on a Dog Test with a single real change, and if margin or covers do not move, drop it and hand the spot to something that earns.',
                                           'this is a rework-or-cut. Dog Test it 90 days, try one thing that might move it, and if the numbers sit still, cut it and free the slot.',
@@ -484,20 +553,32 @@ S.RevenueMenuPlanning = {
                                            'protect it and push it. Build the section around it, put it up top, and coach the staff to recommend it. Do not touch a price that is already working.',
                                            'keep it front and center and let the staff sell it. It earns and it moves, so the only wrong move is burying it or messing with the price.',
                                            'lead with it. This is the one you want guests to see first, so give it the real estate and the staff mention, and hold the price steady.',
-                                           'showcase it and let it work. It carries the section, so the play is more eyes on it, not a single change to the plate or the price.',
+                                           'showcase it and let it work. It carries the section, so the play is more eyes on it, not a single change to the {noun} or the price.',
                                            'put it where people look and keep it there. A Star like this wants attention, not adjustment, so resist the urge to tinker.'], 4);
     else if (quad === 'PUZZLE') move = pick(['get it seen. The {noun} already pays, so the whole problem is visibility, a feature, a special, a server callout, or a better spot. Give it a month of real push.',
                                              'put it in front of people. It sells itself once it is tried, so the fix is a sample, a callout, or a spot on the menu that actually gets read.',
                                              'give it a better spot or a callout. The money is fine and the exposure is not, so treat it as a marketing problem, not a menu problem.',
                                              'push it hard for a few weeks. The margin is there, it just needs eyes, so feature it, name it on the specials, or have servers mention it.',
-                                             'move it up the menu and have the floor talk it up. The plate earns when it sells, so the only job is getting people to try it.',
+                                             'move it up the menu and have the floor talk it up. The {noun} earns when it sells, so the only job is getting people to try it.',
                                              'feature it and see what happens. A {noun} this profitable that nobody orders is usually a placement problem, not a recipe one.'], 4);
-    else if (quad === 'PLOWHORSE') move = pick(['it is at target on price, so trim the plate cost instead of raising the menu price. Start with the portion or the priciest ingredient, since a few cents times this many covers adds up fast.',
-                                                'the price is fine, so the lever is cost. Shave it out of the {noun} through portioning or a cheaper spec on the biggest cost line, and the volume does the rest.',
-                                                'hold the price and hunt cost in the recipe. It moves enough that even a small margin gain per {noun} turns into real money at this count.',
-                                                'leave the price and tighten the plate. At this volume, a dime saved on the recipe beats a quarter added to the price that scares covers off.',
-                                                'work the cost, not the price. Portion control or a smarter spec on the heaviest ingredient buys margin without touching what guests pay.',
-                                                'do not raise it, cut cost into it. This many covers means small recipe savings stack up, so start with the priciest line and the portion.'], 4);
+    /* ⚠ "AT TARGET" IS ONLY TRUE IF THERE IS A TARGET (S302). `suggested()` returns null for two
+       different reasons — the item is at/under target, and the item HAS NO TARGET — and this branch
+       collapsed them into "it is at target on price". `App.menuTargetPct` returns null for every No
+       Prep resale item (beer, wine, NA) unless the operator sets a per-item override, because they
+       are markup-priced rather than costed to a percentage. Those items also have no recipe, so the
+       portioning and ingredient-spec advice below is a dead end for them: the lever is the buy
+       price. Split by the fact rather than papering over it. */
+    else if (quad === 'PLOWHORSE') move = target
+      ? pick(['it is at target on price, so trim the {noun} cost instead of raising the menu price. Start with the portion or the priciest ingredient, since a few cents times this many covers adds up fast.',
+              'the price is fine, so the lever is cost. Shave it out of the {noun} through portioning or a cheaper spec on the biggest cost line, and the volume does the rest.',
+              'hold the price and hunt cost in the recipe. It moves enough that even a small margin gain per {noun} turns into real money at this count.',
+              'leave the price and tighten the {noun}. At this volume, a dime saved on the recipe beats a quarter added to the price that scares covers off.',
+              'work the cost, not the price. Portion control or a smarter spec on the heaviest ingredient buys margin without touching what guests pay.',
+              'do not raise it, cut cost into it. This many covers means small recipe savings stack up, so start with the priciest line and the portion.'], 4)
+      : pick(['the lever here is what you pay for it, not what you charge. Push your vendor on the case price or compare a second supplier, because at this volume every cent back is real money.',
+              'work the buy price. There is no cost target on a resale item like this, so the margin comes from what it costs you, and at this count a small drop per unit adds up fast.',
+              'the price is doing its job; the room is on the cost side. Get a quote from another distributor on this one, since volume like this makes a small unit saving worth chasing.',
+              'shop this one. It moves well and earns thin, and with no recipe to tighten the only real lever is the case price you are paying.'], 4);
 
     return { lines, move };
   },
@@ -647,9 +728,15 @@ S.RevenueMenuPlanning = {
   showHowTo() {
     App.showHelpModal('How Menu Rundown Works', [
       { p: ['Menu Rundown gives Bar Cop\'s read on every item on your menu, built from the numbers instead of from what you happen to like eating. Independents get attached to their own recipes, and this page is the honest second opinion: what is working, what is not, and the move that follows.'] },
-      { h: 'Built From Your Data', p: ['Every briefing is written from that item\'s own figures: its margin against the rest of its group, where it ranks in that group, its units-sold trend since your last read, its cost percent against target, the single biggest cost in the recipe, and the move that fits. Only your actual worst Dog is called the worst, because Bar Cop ranks them. It sharpens on its own as units sold and price history pile up.'] },
-      { h: 'What Each Item Is Compared Against', p: ['Dishes and No Prep items are read against the others in their own section, because an appetizer is not an entree and a six dollar beer is not a sixty dollar bottle of wine. Every cocktail is read against every other cocktail, whichever section you file it under, because a frozen margarita and a house old fashioned earn their money the same way. That is why your drinks show up here under one Cocktails heading even if your menu lays them out as Happy Hour, Frozen and Specials. It also means you can rearrange your drink menu without changing a single ranking.'] },
-      { h: 'The Numbers Up Top', p: ['Each tile leads with cost, cost percent, menu price, and menu mix, that item\'s share of the units sold in the group it is read against. The cost percent is colored by where it lands, red when it is over your target, amber when it is close, green when it is comfortably under.'] },
+      /* ⚠ THREE CLAIMS CORRECTED HERE (S306). "as units sold and price history pile up" was simply
+         untrue: this screen never reads the price log, and its only trend input is the previous
+         units-sold reading. "Only your actual worst Dog is called the worst" is now true again but
+         had to be earned (S300a/b) — it is kept because it states the rule the ranking follows. A
+         stale how-to is a bug ([[help-model]]), and the version that overstates what the page reads
+         is the one that sends an operator looking for a feature. */
+      { h: 'Built From Your Data', p: ['Every briefing is written from that item\'s own figures: its margin against the rest of its group, where it ranks in that group, its units-sold trend since your last read, its cost percent against target, the single biggest cost in the recipe, and the move that fits. Only an item that really is the bottom of its group is called the bottom, and one that ties with another is never called either. It sharpens on its own as units sold come in each week.'] },
+      { h: 'What Each Item Is Compared Against', p: ['Dishes and No Prep items are read against the others in their own section, because an appetizer is not an entree and a six dollar beer is not a sixty dollar bottle of wine. Every cocktail is read against every other cocktail, whichever section you file it under, because a frozen margarita and a house old fashioned earn their money the same way. That is why your drinks show up here under one Mixed Drinks heading even if your menu lays them out as Cocktails, Shots and Frozen. It also means you can rearrange your drink menu without changing a single ranking.'] },
+      { h: 'The Numbers Up Top', p: ['Each tile leads with cost, cost percent, menu price, and menu mix, that item\'s share of the units sold in the group it is read against. The cost percent is colored by where it lands, red when it is over your target, amber when it is close either side, green when it is comfortably under. Beer, wine and NA items carry no cost target, since they are priced on markup rather than to a percentage, so their cost percent is shown without a color.'] },
       { h: 'Read, Then Act', p: ['Items are grouped the way they are compared, the ones that need a decision first. Each tile ends with the move and a button that takes you straight to it: Reprice opens the change in Menu Engineering, Dog Test opens the 90-day test, and Edit Item opens Menu Builder. Make the change and the read updates next time you land here.'] }
     ]);
   }
