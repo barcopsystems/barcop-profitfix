@@ -51,7 +51,23 @@ const CSVMapper = {
     if (typeof opts.onState === 'function') opts.onState('drop');
   },
 
-  _area(c) { return c.querySelector('.csvm-area'); },
+  /* ⚠⚠ RE-RESOLVE A DETACHED CONTAINER (S291). Every message this component writes goes through
+     here, and the element arrives by REFERENCE, captured in a closure at mount time. A file read is
+     asynchronous, so a screen that re-renders between the drop and the FileReader callback leaves
+     this holding a node that is no longer in the document — and writing into a detached node throws
+     nothing and shows nothing. The operator sees a clean page and NO message: not the refusal, not
+     the error, not "Reading file...". Reachable wherever a visible control re-renders the mount
+     (the Manual/Import toggle on Operating Expenses, Cancel on Add Products, the period stepper on
+     Report Variance), which is ordinary behaviour while waiting on a big workbook.
+     The live node carries the same id, so it is findable — this is the shape the four sibling
+     doors already use (they re-resolve by id at message time instead of trusting a captured ref). */
+  _area(c) {
+    if (!c || !c.querySelector) return null;
+    const live = (c.id && typeof document !== 'undefined' && document.getElementById)
+      ? document.getElementById(c.id) : null;
+    const host = (live && live !== c && live.querySelector('.csvm-area')) ? live : c;
+    return host.querySelector('.csvm-area');
+  },
   // Resolve an optional external container for the action row (element, selector,
   // or function returning one). Lets a caller place Import/Cancel outside the card.
   _actionsEl(opts) {
@@ -62,7 +78,21 @@ const CSVMapper = {
     return a;
   },
   _msg(c, text, color) {
-    this._area(c).innerHTML = '<div style="font-size:12px;color:' + (color || 'var(--t3)') + ';margin-top:12px;">' + esc(text) + '</div>';
+    const el = this._area(c);
+    if (el) {
+      el.innerHTML = '<div style="font-size:12px;color:' + (color || 'var(--t3)') + ';margin-top:12px;">' + esc(text) + '</div>';
+      return;
+    }
+    /* ⚠ NOWHERE LEFT TO RENDER, AND AN ERROR MAY NOT BE DROPPED (S291). If the mount is gone
+       entirely (not just re-rendered), a transient status like "Reading file..." genuinely has no
+       home and losing it costs nothing. A RED message is different: it is the only thing telling the
+       operator their import did not happen, so it escalates to the app's own notice rather than
+       vanishing. This is deliberately NOT a blanket silent guard — swallowing the refusal is the
+       defect, and a guard that swallows it quietly would be the same bug wearing the fix's name
+       ([[the-loop]] #40 / #53). `cancelText: ''` is the one-button spelling App.confirm honours. */
+    if (String(color || '').indexOf('--red') >= 0 && typeof App !== 'undefined' && App.confirm) {
+      App.confirm({ title: 'Import', message: String(text), confirmText: 'OK', cancelText: '' });
+    }
   },
 
   _readFile(file, container, opts) {
