@@ -1144,7 +1144,15 @@ S.RevenueMenuItems = {
     // Recipe types carry a typed name; inventory items take the product's name
     // (set in the inventory branch below), so the name check waits until after.
     let name = document.getElementById('ri-name')?.value.trim() || '';
-    const price = parseFloat(document.getElementById('ri-price')?.value) || 0;
+    /* ⚠⚠ ROUNDED TO CENTS, because a menu price is money and this door was not treating it as money.
+       The REPRICE path already rounds (`Math.round(newPrice*100)/100`, r-menu-engineering:504), so a
+       price set by Menu Engineering was cents-clean while one typed here or imported was whatever the
+       source carried. `fmtCurrency` then rounds for DISPLAY, so a stored 12.999 showed as $13.00
+       while the margin, the cost % and the suggested-price math all ran on 12.999 — the screen saying
+       one number while the arithmetic used another ([[output-honesty]]).
+       The refusal below still runs on the rounded value, so a sub-cent price fails "Menu price
+       required" instead of being stored as a fraction of a cent. */
+    const price = Math.round((parseFloat(document.getElementById('ri-price')?.value) || 0) * 100) / 100;
     /* ⚠⚠ ROUNDED AT THE WRITE DOOR, because units sold is a COUNT and this door was the odd one out.
        Three doors write this field and they disagreed: the PMIX drop rounds (`PosIngest._count` →
        `Math.round`, and its comment says "rounded because this is a unit count"), while this form and
@@ -1466,7 +1474,10 @@ S.RevenueMenuItems = {
       // ⚠ `covers` ROUNDED here for the same reason as the form above: it is a unit COUNT, and this
       // was the third door writing the field under a third rule. Both use sites below (the refresh
       // branch and the insert) read this one local, so rounding once covers both.
-      const price = num(r.price), cost = +(num(r.cost)).toFixed(2), covers = Math.round(num(r.covers));
+      // ⚠ `price` ROUNDED TO CENTS TOO. It sat on this exact line beside a `cost` that WAS rounded —
+      // two money fields, one row, one door, treated differently. A POS export routinely carries
+      // float artefacts (12.989999999999998), and `num()` parses whatever is there.
+      const price = +(num(r.price)).toFixed(2), cost = +(num(r.cost)).toFixed(2), covers = Math.round(num(r.covers));
       const cat = canonCat(r.category);
       const cur = byKey[keyOf(this.activeType, name)];
       // ⚠ AN INACTIVE ITEM IS MATCHED BUT NOT TOUCHED. Matching it is what stops the import
