@@ -438,7 +438,8 @@ S.HubBooks = {
     const status = document.getElementById('hb-status');
 
     if (typeof XLSX === 'undefined') {
-      this._setStatus('The file builder did not load. Hard refresh the page (Ctrl+Shift+R) and try again.', 'var(--red)');
+      // One shared sentence across all five spreadsheet doors, and it logs (S292/S310).
+      this._setStatus(App.excelMissing('hub-books'), 'var(--red)');
       return;
     }
 

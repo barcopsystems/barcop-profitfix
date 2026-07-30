@@ -80,15 +80,12 @@ S.Reports = {
     document.getElementById('qbo-download').addEventListener('click', async () => {
       const filtered=this._filterWeeksByRange(weeks,rangeSel.value,fromInp.value,toInp.value);
       if(filtered.length===0){ this._setStatus('No weeks fall in that range.','var(--red)'); return; }
-      if(typeof XLSX==='undefined'){
-        await App.confirm({
-          title: 'File builder not loaded',
-          message: 'The Excel builder did not load. Hard refresh the page (Ctrl+Shift+R) and try again.',
-          confirmText: 'OK',
-          cancelText: ''
-        });
-        return;
-      }
+      /* ⚠ INLINE, LIKE THE REFUSAL ONE LINE ABOVE IT (S292). This was the only one of the five
+         spreadsheet doors that stopped the operator with a modal, on a screen that already owns
+         `#qbo-status` and uses it for the sibling refusal directly above — so two adjacent failures
+         on one screen were reported two different ways, one of them needing a click to dismiss.
+         Same shared sentence and the same logging as the other four. */
+      if(typeof XLSX==='undefined'){ this._setStatus(App.excelMissing('reports-qbo'),'var(--red)'); return; }
       this._buildAndDownloadXlsx(filtered, App.todayLocal());
     });
   },
