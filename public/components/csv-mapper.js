@@ -63,10 +63,23 @@ const CSVMapper = {
      doors already use (they re-resolve by id at message time instead of trusting a captured ref). */
   _area(c) {
     if (!c || !c.querySelector) return null;
-    const live = (c.id && typeof document !== 'undefined' && document.getElementById)
-      ? document.getElementById(c.id) : null;
-    const host = (live && live !== c && live.querySelector('.csvm-area')) ? live : c;
-    return host.querySelector('.csvm-area');
+    if (c.id && typeof document !== 'undefined' && document.getElementById) {
+      const live = document.getElementById(c.id);
+      /* ⚠⚠ THREE CASES, AND MY FIRST VERSION ONLY HANDLED ONE OF THEM. It fell back to `c` whenever
+         the live lookup came up empty — but a detached container still CONTAINS its own `.csvm-area`,
+         so that fallback returned a truthy node nobody can see and the error escalation below never
+         fired. S291 stayed live for the exact doors its own comment names, because those doors do not
+         RE-RENDER the container, they REMOVE it: `#oexa-csv` exists only while Operating Expenses is
+         in import mode, `#vr-import` only while Report Variance has no POS rows, and Add Products'
+         mount disappears on Cancel. So:
+           live && live !== c  → the screen re-rendered; write to the node that is on screen.
+           live === c          → nothing moved; ordinary path.
+           no live node        → the container is GONE. Return null so the caller can escalate,
+                                 because writing here is the same as saying nothing. */
+      if (live && live !== c) return live.querySelector('.csvm-area');
+      if (!live) return null;
+    }
+    return c.querySelector('.csvm-area');
   },
   // Resolve an optional external container for the action row (element, selector,
   // or function returning one). Lets a caller place Import/Cancel outside the card.
@@ -647,10 +660,17 @@ const CSVMapper = {
     const extEl = this._actionsEl(opts);
     html += '<div class="csvm-err" style="font-size:12px;color:var(--red);margin-top:10px;display:none;"></div>'
       + (extEl ? '' : actionRow);
-    this._area(container).innerHTML = html;
+    /* ⚠ THE CONTAINER CAN BE GONE BY NOW. Everything below runs from a FileReader callback, so the
+       operator has had the whole read to toggle to Manual, hit Cancel or navigate on — and `_area`
+       now answers null for a container that is no longer on the page rather than handing back a
+       detached node. Drawing a column mapper into nowhere is not worth a TypeError inside an async
+       callback, which is what these unguarded reads would have produced. */
+    const area = this._area(container);
+    if (!area) return;
+    area.innerHTML = html;
     // Action row goes in the external target when one was given, else inline.
     if (extEl) extEl.innerHTML = actionRow;
-    const scope = extEl || this._area(container);
+    const scope = extEl || area;
 
     // Cancel discards this file and returns to the drop zone to pick another.
     const cancelBtn = scope.querySelector('.csvm-cancel');
@@ -669,15 +689,15 @@ const CSVMapper = {
       // operator reads as "the app is broken" — reachable by cancelling a big import and dropping
       // the file again while the first one is still writing.
       if (this._importing) {
-        const busy = this._area(container).querySelector('.csvm-err');
+        const busy = area.querySelector('.csvm-err');
         if (busy) { busy.textContent = 'An import is still finishing. Give it a moment and try again.'; busy.style.display = 'block'; }
         return;
       }
       const sels = {};
-      this._area(container).querySelectorAll('.csvm-sel').forEach(s => { sels[s.dataset.key] = s.value; });
+      area.querySelectorAll('.csvm-sel').forEach(s => { sels[s.dataset.key] = s.value; });
       const missing = opts.fields.filter(f => f.required && !sels[f.key]);
       if (missing.length) {
-        const err = this._area(container).querySelector('.csvm-err');
+        const err = area.querySelector('.csvm-err');
         err.textContent = 'Map the required field: ' + missing.map(f => f.label).join(', ');
         err.style.display = 'block';
         return;
@@ -695,7 +715,7 @@ const CSVMapper = {
         // logs to the server but deliberately does NOT surface. The button re-enabled and the panel
         // sat there unchanged, so the only reading available to the operator was "nothing
         // happened" — and the natural next move is to click Import again.
-        const err = this._area(container).querySelector('.csvm-err');
+        const err = area.querySelector('.csvm-err');
         if (err) {
           err.textContent = 'The import could not be saved. Nothing was changed — check your connection and try again.';
           err.style.display = 'block';
