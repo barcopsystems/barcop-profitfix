@@ -66,6 +66,31 @@ S.ShiftDrawers = {
       + App.noteField({ id: p + 'notes', value: d?.notes });
   },
 
+  /* ⚠⚠ ONE VALIDATOR FOR BOTH DOORS (class D round 2). `fieldsHtml(d, p)` renders the add form and
+     the edit form from one template off a prefix, so the two doors read the identical fields —
+     two separate guards would be two things to keep in step, which is exactly how this class of
+     defect is born. Takes the same prefix the form was built with.
+     ⚠⚠ THE CASH TOLERANCE IS THE SHARP ONE, AND IT ONLY JUST BECAME REACHABLE. S320 fixed
+     `window.App && …`, which had been permanently false, so until then every bar was judged against
+     a hardcoded $10 and a stored tolerance did nothing. Now it is live, and
+     `ShiftVarianceLog.statusOf` reads `if (Math.abs(variance) <= tol) return 'Within Tolerance';
+     return variance > 0 ? 'Over' : 'Short';`. At tol = -5, `Math.abs(0) <= -5` is FALSE and
+     `0 > 0` is false — so a drawer counted EXACTLY right reads **Short**, in red, on the
+     loss-prevention screen, and so does every count that register will ever take. There is no
+     passing value. `ShiftVarianceLog.tolerance()` guards `!= null && !isNaN`, which a negative
+     sails through, so nothing downstream floors it either.
+     ⚠ ZERO IS LEGAL and deliberately still accepted: "every penny must match" is a real policy.
+     Blank still falls back to the defaults (null bank, $10 tolerance), unchanged. */
+  _negFields(p) {
+    const numOr = (id, def) => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? def : n; };
+    const bad = [];
+    const bank = numOr(p + 'bank', null);
+    const tol  = numOr(p + 'tol', 10);
+    if (bank != null && bank < 0) bad.push('Default Opening Bank');
+    if (tol != null && tol < 0)   bad.push('Cash Tolerance');
+    return bad;
+  },
+
   renderList() {
     // Name-sorted, matching App.drawerOptions (the dropdowns). Unsorted, the register table
     // inherited row order (newest-first) and disagreed with every picker built from the same data.
@@ -187,6 +212,13 @@ S.ShiftDrawers = {
     const numOr = (eid, def) => { const n = parseFloat(document.getElementById(eid)?.value); return isNaN(n) ? def : n; };
     const d = this.drawers().find(x => x.id === id);
     if (!d) { fail('Register not found.'); return; }
+    /* ⚠ ABOVE the snapshot and the four assignments below it. This handler mutates the LIVE row
+       before writing — the comment underneath explains that a failed write used to leave the new
+       tolerance showing in the list while the flags kept firing on the old one — so a refusal
+       placed after the mutation would leave a NEGATIVE tolerance live behind the modal
+       ([[the-loop]] #49). */
+    const neg = this._negFields('dre-');
+    if (neg.length) { fail(neg.join(' and ') + ' cannot be negative.'); return; }
     // ⚠ This one already CHECKED its write and told the operator it failed — but it never put the
     // live row back, so the list behind the modal kept showing the new name and the new
     // cash_tolerance. That tolerance is the threshold deciding whether a drawer count reads "out of
@@ -212,6 +244,9 @@ S.ShiftDrawers = {
     if (dup) { fail('A register with that name already exists.'); return; }
 
     const numOr = (id, def) => { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? def : n; };
+    // Same rule as the edit door, through the same helper, so the twins cannot drift.
+    const neg = this._negFields('dr-');
+    if (neg.length) { fail(neg.join(' and ') + ' cannot be negative.'); return; }
 
     // Row-per-record: build the one NEW drawer record and write just that row.
     // ⚠ This is the ADD card and it only ever ADDS. It used to branch on a screen-level
