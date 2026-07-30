@@ -1880,7 +1880,17 @@ S.InventoryProducts = {
 
   async applyBulk(ids) {
     const applied = {};
-    document.querySelectorAll('.be-apply').forEach(box => { if (box.checked) applied[box.dataset.key] = true; });
+    /* The label the modal actually rendered beside each checkbox, captured here rather than kept
+       as a second copy of the list: these names are PER CATEGORY ("Pour Size" vs "Glass Size",
+       "Par (btl)" vs "Par (cs)"), so a hardcoded set would be wrong on half the categories and
+       would drift the next time bulkFieldDefs changes. */
+    const applyLabel = {};
+    document.querySelectorAll('.be-apply').forEach(box => {
+      if (!box.checked) return;
+      applied[box.dataset.key] = true;
+      const span = box.parentElement && box.parentElement.querySelector('span');
+      applyLabel[box.dataset.key] = (span && span.textContent.trim()) || box.dataset.key;
+    });
     const err = document.getElementById('be-err');
     if (!Object.keys(applied).length) {
       if (err) { err.textContent = 'Turn on at least one field to apply.'; err.style.display = 'inline'; }
@@ -1900,6 +1910,28 @@ S.InventoryProducts = {
       return (opt && opt.dataset && opt.dataset.name) ? opt.dataset.name : '';
     };
     const getUnit = () => document.getElementById('be-unit')?.value || null;
+    /* ⚠⚠ THE BULK TWIN OF THE SINGLE FORM'S GUARD (class D round 2), and the worse of the pair:
+       one typo here lands on EVERY product in the selection. The single form now refuses a negative
+       on seven fields; this door writes five of the same ones — pour, case size, menu price, par,
+       reorder — into the same store and tested none of them.
+       ⚠⚠ IT SITS HERE, ABOVE THE SNAPSHOT, AND THAT PLACEMENT IS THE WHOLE CARE OF IT. Below the
+       loop this handler has already MUTATED the live rows, and its own comment fourteen lines down
+       explains what that costs: "THE RETRY IS THE WORSE HALF. The modal stays open on a failure,
+       and applyBulk assigns only the fields ticked THIS time — so a refused value left standing in
+       memory is written by the NEXT attempt." A refusal added after the mutation would rebuild
+       exactly that hole ([[the-loop]] #49). Refusing here touches nothing at all, so there is
+       nothing to roll back.
+       ⚠ ONLY TICKED FIELDS ARE JUDGED — `applied[key]` is what decides whether a value is written
+       at all, so a stale number in an un-ticked box must not block a save it has no part in.
+       ⚠ `size` is NOT judged: it is a select of preset sizes and cannot produce a negative. */
+    const negBulk = [
+      ['pour', num('be-pour')], ['case', intVal('be-case')], ['price', num('be-price')],
+      ['par', num('be-par')], ['reorder', num('be-reorder')]
+    ].filter(f => applied[f[0]] && f[1] != null && f[1] < 0).map(f => applyLabel[f[0]] || f[0]);
+    if (negBulk.length) {
+      if (err) { err.textContent = negBulk.join(' and ') + ' cannot be negative.'; err.style.display = 'inline'; }
+      return;
+    }
     const idSet = new Set(ids);
     // ⚠ LIVE rows, so putRecordsBulk cannot revert them for us (see App.putRecord) — the same
     // reason setActiveBulk above snapshots. SELECT FIRST, snapshot, THEN mutate: this used to
