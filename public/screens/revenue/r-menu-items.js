@@ -518,7 +518,7 @@ S.RevenueMenuItems = {
     // button sits on its own row below-left outside the card, and CSVMapper renders
     // its Import button into the actions row under that.
     return '<div class="card form-card">'
-      + '<div class="card-title">Upload ' + esc(t.label || 'Menu') + ' List</div>'
+      + '<div class="card-title">Upload ' + esc(t.imp || 'Menu List') + '</div>'
       + '<div id="mi-csv"></div><div id="mi-imp-result"></div>'
       + '</div>'
       + '<div id="mi-imp-cancel-row" class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost mi-imp-cancel">Cancel</button></div>'

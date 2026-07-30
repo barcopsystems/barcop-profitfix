@@ -189,11 +189,11 @@ S.RevenueMenuEngineering = {
     const nm = arr => esc(arr.map(i => i.name).filter(Boolean).join(', '));
     const parts = [];
     if (plain.length) parts.push((plain.length === 1
-      ? '1 dish is not costed and cannot be ranked: '
-      : plain.length + ' dishes are not costed and cannot be ranked: ') + nm(plain) + '.');
+      ? '1 menu item is not costed and cannot be ranked: '
+      : plain.length + ' menu items are not costed and cannot be ranked: ') + nm(plain) + '.');
     if (broken.length) parts.push((broken.length === 1
-      ? '1 dish cannot be costed because an ingredient was deleted: '
-      : broken.length + ' dishes cannot be costed because an ingredient was deleted: ')
+      ? '1 menu item cannot be costed because an ingredient was deleted: '
+      : broken.length + ' menu items cannot be costed because an ingredient was deleted: ')
       + nm(broken) + '. Replace or remove the missing ingredient.');
     const lead = parts.join(' ');
     // Categories below the ranking threshold, split by whether costing these would actually clear
@@ -219,12 +219,12 @@ S.RevenueMenuEngineering = {
     let why = '';
     if (blocked.length) {
       why = ' That also leaves ' + esc(blocked.join(', ')) + ' below the ' + this.MIN_PER_CAT
-        + ' costed dishes Bar Cop needs before it can rank a category, so nothing in '
+        + ' costed menu items Bar Cop needs before it can rank a category, so nothing in '
         + (blocked.length === 1 ? 'it' : 'them') + ' is ranked either. Cost '
         + (uncosted.length === 1 ? 'it' : 'them') + ' and the ranking comes back.';
     } else if (stuck.length) {
-      why = ' ' + stuck.map(s => esc(s.cat) + ' still needs ' + s.need + ' more costed dish'
-        + (s.need === 1 ? '' : 'es')).join(', ') + ' before Bar Cop can rank '
+      why = ' ' + stuck.map(s => esc(s.cat) + ' still needs ' + s.need + ' more costed menu item'
+        + (s.need === 1 ? '' : 's')).join(', ') + ' before Bar Cop can rank '
         + (stuck.length === 1 ? 'it' : 'them') + ', so fixing '
         + (uncosted.length === 1 ? 'this one' : 'these') + ' will not bring '
         + (uncosted.length === 1 ? 'it' : 'them') + ' into the ranking on its own.';
