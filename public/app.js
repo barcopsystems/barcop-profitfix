@@ -266,17 +266,6 @@ const App = {
     return this.DEV_EMAILS.indexOf(email) !== -1;
   },
 
-  // Suffix that scopes a device-local (localStorage) key to the active bar, so
-  // per-week cockpit "done" stamps never leak across accounts — or from the
-  // sample seed into a fresh signup — on the same browser. Also makes each bar's
-  // weekly-close state independent. Demo scopes to its own bucket.
-  acctScopeSuffix() {
-    if (this.demoMode) return '::demo';
-    const id = (window.DB && DB._accountId)
-      || (window.DB && DB._getStoredActiveAccountId && DB._getStoredActiveAccountId())
-      || 'none';
-    return '::' + id;
-  },
 
   // ── Account-synced small state ────────────────────────────────────────────────
   // Survives on the ACCOUNT across every device the operator logs into (localStorage is
@@ -1727,9 +1716,6 @@ const App = {
     return (window.DB && DB.screenCanEdit) ? DB.screenCanEdit(screen) : true;
   },
 
-  canAdd(screen) {
-    return (window.DB && DB.screenCanAdd) ? DB.screenCanAdd(screen) : true;
-  },
 
   // Staff Hub tiles: one per permission group, in display order.
   // Used by showStaffHub() to render the staff landing page.
@@ -1778,65 +1764,6 @@ const App = {
     return { module: 'inventory', screen: 'ic-take-inventory' };
   },
 
-  // Staff Hub: simplified landing page with one tile per accessible screen.
-  // Replaces the real Hub (financial overview) for staff role since they
-  // shouldn't see financial data, AND gives them a way to move between the
-  // operational modules (without it they'd be stuck in one module's sidebar).
-  showStaffHub() {
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('ob-overlay').classList.add('hidden');
-    document.getElementById('app').classList.add('hidden');
-    document.body.classList.remove('chrome-on');
-    let wrap = document.getElementById('hub-wrapper');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'hub-wrapper';
-      wrap.style.cssText = 'position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:100;';
-      document.body.appendChild(wrap);
-    }
-    wrap.style.display = 'block';
-    wrap.style.overflowY = 'auto';
-
-    const userEmail = DB._user?.email || '';
-    const accessibleTiles = this.STAFF_TILES.filter(t => this.canAccess(t.screen));
-
-    const tiles = accessibleTiles.map(t => {
-      return '<div class="staff-tile" data-screen="' + t.screen + '" data-module="' + t.module + '" '
-        + 'style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:22px 24px;cursor:pointer;transition:border-color 0.15s, background 0.15s;">'
-        + '<div style="font-size:13px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;">' + t.label + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:6px;letter-spacing:0.5px;">' + t.moduleName + '</div>'
-        + '</div>';
-    }).join('');
-
-    const empty = accessibleTiles.length === 0
-      ? '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:24px;font-size:13px;color:var(--t2);line-height:1.6;">You do not have access to any sections yet. Ask the account admin to grant you access from the User Accounts page.</div>'
-      : '';
-
-    wrap.innerHTML = '<div style="max-width:880px;margin:0 auto;padding:40px 24px;">'
-      + '<div style="font-size:18px;font-weight:800;color:var(--w);letter-spacing:0.5px;margin-bottom:6px;">Welcome back</div>'
-      + (userEmail ? '<div style="font-size:12px;color:var(--t3);margin-bottom:30px;">Signed in as ' + userEmail + '</div>' : '<div style="margin-bottom:30px;"></div>')
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;">Your Tasks</div>'
-      + (tiles ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">' + tiles + '</div>' : empty)
-      + '<div style="margin-top:40px;padding-top:20px;border-top:1px solid var(--b2);display:flex;justify-content:flex-end;">'
-      +   '<button class="btn btn-ghost" id="staff-signout">Sign Out</button>'
-      + '</div>'
-      + '</div>';
-
-    wrap.querySelectorAll('.staff-tile').forEach(tile => {
-      tile.addEventListener('click', () => {
-        const mod = tile.dataset.module;
-        const screen = tile.dataset.screen;
-        this.showApp(mod);
-        this.navigate(screen);
-      });
-      tile.addEventListener('mouseenter', () => { tile.style.borderColor = 'var(--gold)'; });
-      tile.addEventListener('mouseleave', () => { tile.style.borderColor = 'var(--b1)'; });
-    });
-    document.getElementById('staff-signout')?.addEventListener('click', async () => {
-      await DB.signOut();
-      this.showAuth();
-    });
-  },
 
   showApp(module) {
     // Close any open Hub overlay modal before entering a module view
@@ -2149,32 +2076,6 @@ const App = {
     } catch (e) {}
   },
 
-  // Transform a freshly-rendered mobile-style sidebar (module shell or Hub
-  // shell) before wireNavAccordion runs: (1) drop the Report a Bug link (being
-  // re-homed elsewhere); (2) flatten any group with a single visible link into
-  // a top-level leaf (its icon shows, no drop-down — matches the mobile menu);
-  // (3) apply desktop group-label remaps (the icon stays keyed to the ORIGINAL
-  // name via data-gkey, so the glyph matches mobile); (4) shorten the section
-  // Help link to "Help". Source navHTML + the mobile menu are untouched.
-  _mstyleSidebar(nav, opts) {
-    if (!nav) return;
-    opts = opts || {};
-    const gren = opts.groups || {};                                  // group-header (drop-down) label remaps
-    const iren = Object.assign({ 'Help and FAQ': 'Help' }, opts.items || {});  // link-label remaps (Help shortened everywhere)
-    nav.querySelectorAll('.nav-item[data-nav="report-bug"], .nav-item[data-hub-action="report-bug"]').forEach(el => el.remove());
-    nav.querySelectorAll('.nav-section').forEach(sec => {
-      const items = [];
-      let sib = sec.nextElementSibling;
-      while (sib && !sib.classList.contains('nav-section')) {
-        if (sib.classList.contains('nav-item') && sib.style.display !== 'none' && !sib.classList.contains('role-hidden')) items.push(sib);
-        sib = sib.nextElementSibling;
-      }
-      if (items.length === 1) { items[0].classList.add('nav-leaf'); sec.remove(); return; }
-      const label = (sec.textContent || '').trim();
-      if (gren[label]) { sec.dataset.gkey = label; sec.textContent = gren[label]; }
-    });
-    nav.querySelectorAll('.nav-item .nav-label').forEach(l => { const t = (l.textContent || '').trim(); if (iren[t]) l.textContent = iren[t]; });
-  },
 
   // PROTO (design prototype): the new full-width top nav + restyled sidebar,
   // scoped to the Shift section only so the other six sections render unchanged.
@@ -2831,16 +2732,6 @@ const App = {
     if (sub) sub.innerHTML = '';
   },
 
-  _goBackOne() {
-    if (!this._previousLocation) return;
-    const t = this._previousLocation;
-    if (t.mode === 'hub') {
-      this.showHub();
-    } else {
-      if (t.module && t.module !== this._activeModule) this.showApp(t.module);
-      this.navigate(t.screen);
-    }
-  },
 
   _recordLocation(newLoc) {
     // Same location as before — just refresh the back link (label may have
@@ -2910,23 +2801,6 @@ const App = {
     if (params.get('checkout')) window.history.replaceState({}, '', '/');
   },
 
-  // Hard paywall: signed in, but the account has no active subscription. Shows
-  // the Finish-your-subscription panel (plan picker + checkout) over the auth
-  // screen, hiding every other panel and the app.
-  showPaywall() {
-    document.getElementById('auth-screen').style.display = 'flex';
-    document.getElementById('app').classList.add('hidden');
-    document.body.classList.remove('chrome-on');
-    document.getElementById('ob-overlay').classList.add('hidden');
-    const hw = document.getElementById('hub-wrapper');
-    if (hw) hw.style.display = 'none';
-    ['auth-login','auth-signup','auth-reset','auth-set-password','auth-paywall'].forEach(x => {
-      const el = document.getElementById(x);
-      if (el) el.style.display = x === 'auth-paywall' ? '' : 'none';
-    });
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('checkout')) window.history.replaceState({}, '', '/');
-  },
 
   // After a Stripe checkout return, the webhook that activates the subscription
   // is async. Poll getSubscription a few times (showing a confirming state) so a
@@ -3808,17 +3682,6 @@ const App = {
     return !!(p && p.category === 'Bottle Beer' && p.case_size && p.case_size > 0);
   },
 
-  // Format a quantity with the product's container unit, e.g. "3.3 cases",
-  // "12 btls", "2 kegs", "40 lb". Keeps every quantity column labeled so a
-  // number is never ambiguous about which unit it is in. decimals defaults to a
-  // tidy 1 place for fractional values, whole numbers print without a decimal.
-  qtyWithUnit(p, n, decimals) {
-    if (n == null || isNaN(n)) return '-';
-    const num = Number(n);
-    const txt = (num % 1 === 0) ? String(num) : num.toFixed(decimals == null ? 1 : decimals);
-    const u = this.productUnit(p);
-    return u ? (txt + ' ' + u) : txt;
-  },
 
   // Abbreviated container unit for the count Full / Open / Total columns: cases
   // -> cs, bottles -> btls, kegs -> kegs, plus the common food units. Falls back
@@ -4648,17 +4511,6 @@ const App = {
   miscIsSupply(p) { return !!p && p.category === 'Misc' && this.MISC_SUPPLY_TYPES.includes(p.misc_type); },
 
   // ── Resale items (bought and sold whole) ──────────────────────────────
-  // A Food or Misc product the operator marked "Sold on the menu." Its cost
-  // flows to the menu item per SERVING, not per purchased unit (a case of 30
-  // bags costs cost/30 a bag), the same case→unit step Bottle Beer already
-  // does. Beer/Wine/Draft are never resale here — they keep their own cost path.
-  isResale(p) { return !!p && (p.category === 'Food' || p.category === 'Misc') && p.sold_on_menu === true; },
-  resaleCostPerServing(p) {
-    if (!p) return 0;
-    const c = parseFloat(p.unit_cost); if (isNaN(c)) return 0;
-    const n = parseFloat(p.servings_per_unit);
-    return (n && n > 0) ? c / n : c;
-  },
   // The per-sale cost of an inventory product when it is linked to a menu item:
   // resale items use cost per serving, bottle beer divides the case, everything
   // else is the straight per-container cost. One source for menuItemCost and the
@@ -4826,21 +4678,6 @@ const App = {
       + '</div>';
   },
 
-  // Shared report chrome: connected "folder" tabs + the panel they open into.
-  // tabs = [[key, label, tooltipKey?], ...]. The active tab visually connects
-  // to the panel, whose header shows the active report name + Export PDF. The
-  // controls/tabs are no-print so Export targets just the report table.
-  reportTabBar(tabs, activeKey) {
-    return '<div class="rpt-tabs no-print">' + (tabs || []).map(t =>
-      '<button class="rpt-tab' + (t[0] === activeKey ? ' on' : '') + '" data-tab="' + t[0] + '">' + esc(t[1]) + '</button>').join('') + '</div>';
-  },
-  reportPanel(tabs, activeKey, exportId, bodyHtml) {
-    const active = (tabs || []).find(t => t[0] === activeKey) || (tabs || [])[0] || ['', '', ''];
-    return '<div class="rpt-panel"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      + '<span>' + esc(active[1]) + (active[2] ? ' ' + tt(active[2]) : '') + '</span>'
-      + '<button class="btn btn-ghost btn-sm" id="' + exportId + '">Export PDF</button></div>'
-      + bodyHtml + '</div>';
-  },
 
   // Reusable empty / prerequisite state. Renders a centered card (real card
   // styling) with one or more numbered steps: gold badge + step title + a one
@@ -4888,12 +4725,6 @@ const App = {
   collapsed(key) {
     try { return localStorage.getItem(this._collapseKey(key)) === '1'; } catch (e) { return false; }
   },
-  // Standard help button. Centralized so the label and style are a one-place
-  // edit, not a per-page change. Ghost-button border kept on purpose — operators
-  // want an obvious target, not a faint link.
-  helpButton(id, label) {
-    return '<button type="button" class="btn btn-ghost btn-sm" id="' + esc(id) + '">' + esc(label || 'How it works') + '</button>';
-  },
 
   // Small neutral cadence tag for an import drop, so an operator can tell at a
   // glance what belongs in the weekly sitting versus what runs on demand. The
@@ -4939,10 +4770,6 @@ const App = {
     if (key === 'last-12') { const s = new Date(d); s.setDate(s.getDate() - 83); return { from: ymd(s), to: today }; }
     if (key === 'all') return { from: '', to: '' };
     return { from: '', to: '' };
-  },
-  datePresetButtons(cls, presets) {
-    return (presets || this.DATE_PRESETS).map(p =>
-      '<button type="button" class="btn btn-ghost btn-sm ' + (cls || 'date-preset') + '" data-preset="' + p[0] + '">' + p[1] + '</button>').join('');
   },
   // Single-select filter chips. options = [{ v, label }] with v:'' as the "All"
   // chip. Active chip = --sel-active-bg (the active selector look); inactive is
@@ -5685,9 +5512,6 @@ const App = {
     if (!Array.isArray(this.inventoryData.ic_prep_batches)) this.inventoryData.ic_prep_batches = [];
     return this.inventoryData.ic_prep_batches;
   },
-  prepBatchById(id) {
-    return this.prepBatches().find(b => b.id === id) || null;
-  },
   // Backward-compat alias for any consumer still referencing the old
   // top-level batches array. Resolves to the new ic_prep_batches home.
   batches() { return this.prepBatches(); },
@@ -6354,10 +6178,6 @@ const App = {
     const out = {};
     Object.keys(m).forEach(pid => { out[pid] = m[pid].onHand; });
     return out;
-  },
-  currentInventoryValue() {
-    const m = this._perpetualInventory();
-    return Object.keys(m).reduce((s, pid) => s + (m[pid].value || 0), 0);
   },
 
   // Products with COUNTED stock standing at a location right now: the newest counted on-hand for
@@ -9038,7 +8858,6 @@ const App = {
   // Strong scores use green (success), below-target stays white, critical red.
   // Gold is reserved for brand accents and CTAs, not "doing well" state.
   scoreColor(s) { s = Number(s) || 0; return s >= 70 ? 'var(--green)' : s >= 50 ? 'var(--amber)' : 'var(--red)'; },
-  scoreHex(s)   { s = Number(s) || 0; return s >= 70 ? '#518A79'      : s >= 50 ? '#9A5D34'      : '#C03828'; },
   scoreLabel(s) { s = Number(s) || 0; return s >= 70 ? 'Strong'       : s >= 50 ? 'Below Target' : 'Critical'; },
 
   // Slim 0-100 scale bar with red / amber / green zones and a marker at the score.
@@ -9064,49 +8883,6 @@ const App = {
   /* ── Reusable trend chart ─────────────────────────────────────────────────
      opts: { title, points:[{label,value}], target (optional), suffix (optional) }
      Returns a chart-card. Needs 2+ non-null values or shows a prompt.        */
-  trendChart(opts) {
-    const pts  = (opts.points || []).filter(Boolean);
-    const vals = pts.map(p => p.value).filter(v => v != null);
-    const title = opts.title || 'Trend';
-    const head = '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:12px;">' + esc(title) + '</div>';
-    if (vals.length < 2) {
-      return '<div class="chart-card" style="padding:20px 24px 16px;">' + head
-        + '<div style="text-align:center;padding:16px 0;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Enter at least 2 weeks to see this trend</div></div>';
-    }
-    const W = 700, H = 170, PAD = { t:24, r:18, b:34, l:46 };
-    const cw = W - PAD.l - PAD.r, ch = H - PAD.t - PAD.b;
-    let minV = Math.min(...vals), maxV = Math.max(...vals);
-    if (opts.target != null) { minV = Math.min(minV, opts.target); maxV = Math.max(maxV, opts.target); }
-    const span = (maxV - minV) * 0.15 || 1;
-    const minY = minV - span, maxY = maxV + span;
-    const xs = i => PAD.l + (pts.length > 1 ? (i/(pts.length-1))*cw : cw/2);
-    const ys = v => PAD.t + ch - ((v-minY)/(maxY-minY||1))*ch;
-    const valid = pts.map((p,i) => p.value != null ? { x:xs(i), y:ys(p.value) } : null).filter(Boolean);
-    let d = 'M' + valid[0].x.toFixed(1) + ',' + valid[0].y.toFixed(1);
-    for (let i = 1; i < valid.length; i++) {
-      const cp = (valid[i].x - valid[i-1].x) * 0.35;
-      d += ' C' + (valid[i-1].x+cp).toFixed(1) + ',' + valid[i-1].y.toFixed(1) + ' ' + (valid[i].x-cp).toFixed(1) + ',' + valid[i].y.toFixed(1) + ' ' + valid[i].x.toFixed(1) + ',' + valid[i].y.toFixed(1);
-    }
-    // Gradient area fill under the line — matches the module dashboard charts
-    const base = (PAD.t + ch).toFixed(1);
-    const area = d.replace('M' + valid[0].x.toFixed(1) + ',', 'M' + valid[0].x.toFixed(1) + ',' + base + ' L' + valid[0].x.toFixed(1) + ',')
-      + ' L' + valid[valid.length-1].x.toFixed(1) + ',' + base + ' Z';
-    const gid = 'tg' + Math.random().toString(36).slice(2,7);
-    const dots = pts.map((p,i) => p.value != null ? '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(p.value).toFixed(1) + '" r="4" fill="#0A1520" stroke="#DBAB46" stroke-width="2"/>' : '').join('');
-    const xl = pts.map((p,i) => '<text x="' + xs(i).toFixed(1) + '" y="' + (H-8) + '" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + esc(String(p.label||'')) + '</text>').join('');
-    const yt = [minY, (minY+maxY)/2, maxY].map(v => '<line x1="' + PAD.l + '" y1="' + ys(v).toFixed(1) + '" x2="' + (W-PAD.r) + '" y2="' + ys(v).toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/><text x="' + (PAD.l-8) + '" y="' + (ys(v)+4).toFixed(1) + '" text-anchor="end" fill="rgba(255,255,255,0.25)" font-family="Barlow,sans-serif" font-size="10" font-weight="600">' + (Math.round(v*10)/10) + '</text>').join('');
-    const tl = opts.target != null
-      ? '<line x1="' + PAD.l + '" y1="' + ys(opts.target).toFixed(1) + '" x2="' + (W-PAD.r) + '" y2="' + ys(opts.target).toFixed(1) + '" stroke="#DBAB46" stroke-width="1" stroke-dasharray="5,5" opacity="0.35"/><text x="' + (W-PAD.r+4) + '" y="' + (ys(opts.target)+4).toFixed(1) + '" fill="rgba(219,171,70,0.55)" font-family="Barlow,sans-serif" font-size="9" font-weight="700">TGT</text>'
-      : '';
-    return '<div class="chart-card" style="padding:20px 24px 14px;">' + head
-      + '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;overflow:visible;">'
-      + '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DBAB46" stop-opacity="0.18"/><stop offset="100%" stop-color="#DBAB46" stop-opacity="0.01"/></linearGradient></defs>'
-      + yt + tl
-      + '<path d="' + area + '" fill="url(#' + gid + ')" stroke="none"/>'
-      + '<path d="' + d + '" fill="none" stroke="#DBAB46" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
-      + dots + xl
-      + '</svg></div>';
-  },
 
   // SUPERSEDED by weekNumFor/renumberWeekStore below. Left only because the retired
   // this-week.js still references it; nothing live calls it. Do not reach for it: a

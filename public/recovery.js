@@ -92,7 +92,6 @@ window.Recovery = {
   // 'unit' means dollars = improvement x base x 52.
   _ptargets() { return (App.data.settings || {}).targets || {}; },
   _rtargets() { return ((App.data.revenue_settings || {}).targets) || {}; },
-  _checkAvg() { return Recovery._rtargets().check_avg ?? 35; },
 
   /* THE BASE RULE: a metric's `base` must be the DENOMINATOR its `value` was
      measured against, because a point of a % is worth exactly denominator/100.

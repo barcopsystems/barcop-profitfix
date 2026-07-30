@@ -248,9 +248,6 @@ const DB = {
     }
   },
 
-  hasModule(moduleName) {
-    return App.subscription?.active_modules?.includes(moduleName) || false;
-  },
 
   // ── Account resolution (Phase 2) ──────────────────────────────────────────
   // Looks up the current user's account_id from the memberships table and
@@ -362,13 +359,6 @@ const DB = {
     }
   },
 
-  // Sync accessor for callers that need the accounts list during render and
-  // cannot await. Returns whatever the last listMyAccounts() populated, or
-  // an empty array if nothing has been resolved yet. Pre-fetched by
-  // App.loadAllData() so by the time the Hub renders, the cache is populated.
-  cachedAccounts() {
-    return this._accountsCache || [];
-  },
 
   // Switch which account is active. Stores in localStorage and reloads so
   // every cached data structure starts fresh under the new account context.
@@ -396,7 +386,6 @@ const DB = {
   permissions() { return this._permissions || {}; },
   isAdmin()  { return this._role === 'admin'; },
   isStaff()  { return this._role === 'staff'; },
-  isViewer() { return this._role === 'viewer'; },
   canWrite() { return this._role !== 'viewer'; },
   // Owner = the accounts.owner_user_id for the active account. Ownership lives on the
   // account (not as a membership role), so isOwner compares the signed-in user to it.
@@ -490,7 +479,6 @@ const DB = {
   },
 
   screenAllowed(screen) { return this.canAccessLevel(screen) !== null; },
-  screenCanAdd(screen)  { return this.canAccessLevel(screen) === 'edit'; },   // Full Access
   screenCanEdit(screen) { return this.canAccessLevel(screen) === 'edit'; },   // Full Access
 
   // ── Data ──────────────────────────────────────────────────────────────────
@@ -724,11 +712,6 @@ const DB = {
     return { ok: true };
   },
 
-  async writeKey(key, value) {
-    if (!App.data) return { ok: false };
-    App.data[key] = value;
-    return await this.writeData(App.data);
-  },
 
   // ── Offline sync (Section 14) ─────────────────────────────────────────────
   // When a write to Supabase fails (offline or server unreachable), the local
@@ -1754,9 +1737,6 @@ const DB = {
     const stored = this._setEventQueue(filtered);
     if (stored) this._markPending('events');
     return stored;
-  },
-  hasPendingEvents() {
-    return !!(this._sb && this._user && this._liveEvents().length > 0);
   },
   // Replay queued record ops. Each op clears only on its own success.
   async syncPendingEvents() {
