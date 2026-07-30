@@ -170,8 +170,19 @@ S.ShiftPreShift = {
     // The trap is that this is reached BY the correct guard elsewhere: todayStars() and
     // _recommendedFor() do check `costed` and return nothing, which is exactly what sends
     // the operator to the "+ Add Item" picker that lands here.
+    /* ⚠⚠ AND A PRICE OF ZERO IS NOT A PRICE (I9, 2026-07-30). This tested only
+       `this.n(it.price) == null`, and `n(0)` returns 0 — not null — so an item with a real cost
+       and NO price passed the guard and returned `0 - cost`: a NEGATIVE contribution margin,
+       rendered `color:var(--gold);font-weight:700` in the Featured Items column, printed as
+       "<n> margin" in the "+ Add Item" picker, and put in the EXPORTED PDF's Margin column —
+       the briefing a shift lead reads to the floor. Measured: -$18.00 on a costed, unpriced dish.
+       ⚠ Price 0 is what the app really stores: the menu importer's INSERT branch does
+       `price: num(r.price)` → `App.parseNum('') ?? 0` → 0, so a recipe-cost sheet with no price
+       column produces exactly this item. Same shape as the `costed` guard above, which is stricter
+       than `!= null` for the same reason. */
     const m = App.menuItemPct(it);
-    if (this.n(it && it.price) == null || !m.costed) return null;
+    const p = this.n(it && it.price);
+    if (p == null || !(p > 0) || !m.costed) return null;
     return it.price - m.cost;
   },
 
