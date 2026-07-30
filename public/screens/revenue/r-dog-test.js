@@ -199,6 +199,17 @@ S.RevenueDogTest = {
     const fail = msg => { if (err) { err.textContent = msg; err.style.display = 'block'; } };
     if (!itemId) return fail('Pick the menu item to test.');
     if (!date)   return fail('Enter a start date.');
+    /* ⚠⚠ A NEGATIVE BASELINE INVERTS THE VERDICT THIS SCREEN EXISTS TO PRODUCE (class D round 2).
+       The whole output of a Dog Test is the lift:
+           const lift = cur - t.baseline_volume;
+           const lpct = t.baseline_volume ? lift / t.baseline_volume * 100 : 0;
+       At a baseline of -5 with the dish now selling 10 a week, lift is 15 and lpct is
+       15 / -5 * 100 = **-300%**. A dish that TRIPLED reads as a 300% collapse, on the one screen
+       whose job is deciding whether to keep it or cut it. Neither reader floors it.
+       ⚠ ZERO IS DELIBERATELY STILL ALLOWED: a dish that sold nothing last week is the purest Dog
+       there is, and is exactly what an operator would start a test on. `lpct`'s own
+       `t.baseline_volume ?` guard is the reader agreeing that zero is a real answer. */
+    if (!isNaN(base) && base < 0) return fail('Baseline weekly units cannot be negative.');
 
     const item = (App.data.menu_items || []).find(m => m.id === itemId);
     if (!item) return fail('Item no longer exists. Pick another.');
@@ -210,7 +221,12 @@ S.RevenueDogTest = {
       item_name: item.name,
       start_date: date,
       created_at: new Date().toISOString(),
-      baseline_volume: isNaN(base) ? (item.weekly_covers != null ? Math.round(item.weekly_covers) : null) : base,
+      /* ⚠ BOTH BRANCHES ROUND. This is a unit COUNT — the same quantity as `weekly_covers`, which
+         H-class field 1 rounded at every write door for exactly this reason — and the auto-fill
+         branch on this very line already called `Math.round` while the typed branch did not. So an
+         auto-filled baseline was 12 and a typed one 12.4, and the history table prints this value
+         raw, putting "12.4" in a column of whole units. One line, two branches, two rules. */
+      baseline_volume: isNaN(base) ? (item.weekly_covers != null ? Math.round(item.weekly_covers) : null) : Math.round(base),
       change_notes: notes,
       current_volume: null,  // legacy field; reads live from item.weekly_covers via currentFor()
       status: 'Testing',
