@@ -693,15 +693,39 @@ S.VendorTracker = {
     if (!date) { fail('Date is required.'); return; }
     if (!vendor) { fail('Vendor is required.'); return; }
     const pf = (this._vd && this._vd.prefill) || {};
+    const vdNum = sel => parseFloat(card.querySelector(sel)?.value) || 0;
+    const vdUnits = vdNum('#vdm-units'), vdAgreed = vdNum('#vdm-agreed');
+    const vdInvoiced = vdNum('#vdm-invoiced'), vdOver = vdNum('#vdm-over');
+    /* ⚠⚠ THREE DOORS WRITE `vendor_discrepancy` AND TWO OF THEM ALREADY CLAMP (class D round 2).
+       `ic-receive-delivery` ends its calculation with `if (overcharge < 0) overcharge = 0;` and
+       `ic-delivery-history` with `Math.max(0, …)`. Both of those are COMPUTED from a delivery. This
+       one is the MANUAL door — a claim the operator spotted themselves and is filing by hand — and
+       it took all four numbers raw. So the app had already decided, twice, that an overcharge is
+       never negative, and the only door anybody types into did not follow.
+       THE HARM: `hub-bar-cop-audit` totals open claims with
+       `aging.reduce((s, d) => s + (parseFloat(d.overcharge || d.claimed_amount) || 0), 0)` — no
+       floor. That total is `S5_UNCOLLECTED_CREDITS`, printed in the audit narrative ("You already
+       flagged $X in overcharges across N open discrepancies") and driving the chase-your-credits
+       action. One hand-filed negative SUBTRACTS from what the operator is told their vendors owe
+       them: $500 + $300 reads $800, and one -$500 claim drops it to $300. Understating a recovery
+       is the direction nobody chases. `ic-receive-delivery`'s table also colours on `> 0`, so the
+       row renders unflagged.
+       ⚠ ZERO STAYS LEGAL: a short count with no dollar value worked out yet is a real claim to
+       open, and blanks still file as 0 exactly as before. */
+    const negClaim = [
+      ['Units', vdUnits], ['Agreed Price', vdAgreed],
+      ['Invoiced Price', vdInvoiced], ['Overcharge / Loss', vdOver]
+    ].filter(f => f[1] < 0).map(f => f[0]);
+    if (negClaim.length) { fail(negClaim.join(' and ') + ' cannot be negative.'); return; }
     const rec = {
       id: App.uid(), date, vendor,
       reference: (card.querySelector('#vdm-ref')?.value || '').trim(),
       type: card.querySelector('#vdm-type')?.value || 'Other',
       sku: (card.querySelector('#vdm-product')?.value || '').trim(),
-      units: parseFloat(card.querySelector('#vdm-units')?.value) || 0,
-      agreed_price: parseFloat(card.querySelector('#vdm-agreed')?.value) || 0,
-      invoiced_price: parseFloat(card.querySelector('#vdm-invoiced')?.value) || 0,
-      overcharge: parseFloat(card.querySelector('#vdm-over')?.value) || 0,
+      units: vdUnits,
+      agreed_price: vdAgreed,
+      invoiced_price: vdInvoiced,
+      overcharge: vdOver,
       notes: (card.querySelector('#vdm-notes')?.value || '').trim(),
       status: 'Open',
       source: pf.source || 'inventory',
