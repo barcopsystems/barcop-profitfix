@@ -550,6 +550,18 @@ const App = {
     this.shiftData     = {};
     this.subscription  = { status:'demo', plan:'demo', active_modules:['profit','revenue','cash'], period_end:null };
     await S.HubSettings.loadSample();
+    /* ⛔ THE DEMO NEEDS THE SAME CATCH-UP A LOGIN GETS. boot() runs this so "Books reflects them
+       even if the operator never opens the Operating Expenses page" — and startDemo skips boot()
+       (see the note two lines below). So the Books landing opened on a month missing every
+       recurring bill: YTD operating income read $58,742.37 against a true $25,866.37, the month
+       $26,420.19 against $9,982.19, and it silently corrected itself the moment the visitor
+       wandered into Operating Expenses, which renders and calls this.
+       ⚠ It goes AFTER loadSample: App.data does not exist until the seed lands, so a call above
+       this would generate nothing and leave the bug looking fixed. The gate half was already
+       handled — the _dataReady note above was written for exactly this catch-up refusing — but
+       nothing ever called it. Pinned by verify-books-other-and-demo-catchup.js. */
+    try { if (S.HubOperatingExpenses && S.HubOperatingExpenses.catchUpRecurring) S.HubOperatingExpenses.catchUpRecurring(); }
+    catch (e) { console.error('demo recurring catch-up', e); }
     this._mountDemoBanner();
     this.showHub();
     this._wireChrome();   // demo skips boot(), so wire the top-nav (i-help, logo, mobile menu) here
@@ -3193,9 +3205,21 @@ const App = {
     }
     push(sel);
     const selLc = sel.toLowerCase();
-    // "Add your own" replaces the "Other" bucket entirely: never offer Other as an
-    // option (keep it only if a legacy record already has it selected).
-    const allF = all.filter(v => v.toLowerCase() === selLc || v.toLowerCase() !== 'other');
+    /* "Add your own" replaces the legacy "Other" bucket, so Other is not offered — EXCEPT for a
+       list that genuinely DECLARES it as one of its own options, and except for a legacy record
+       already sitting on it (so editing one cannot silently recategorise it).
+       ⛔ THAT EXCEPTION IS listOptions' RULE, AND THIS LAYER WAS STILL ENFORCING THE OLD ONE.
+       `listOptions` grew `declaresOther` when Kyle found the hole on 2026-07-28; this filter kept
+       its own unconditional copy, so listOptions returned NINE expense categories and this
+       rendered EIGHT. The symptom was the exact one that fix was written to close: 'Other' is
+       what the CSV importer falls back to, what _opExSums buckets unknowns into, and a rendered
+       line on the Income Statement and the By Category card — visible everywhere, choosable
+       nowhere. Two doors, one record, two rules, again.
+       Read the builtins actually in play: the keyed list registers them on _listBuiltins above,
+       an unkeyed one passes them inline. */
+    const _builtins = key ? (this._listBuiltins[key] || []) : (opts.builtin || []);
+    const declaresOther = _builtins.some(b => String(b == null ? '' : b).trim().toLowerCase() === 'other');
+    const allF = all.filter(v => declaresOther || v.toLowerCase() === selLc || v.toLowerCase() !== 'other');
     const blankHtml = opts.blank ? '<option value=""' + (sel === '' ? ' selected' : '') + '>' + esc(opts.blankLabel || '-') + '</option>' : '';
     const optionsHtml = blankHtml + allF.map(v => '<option value="' + esc(v) + '"' + (v.toLowerCase() === selLc ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
     const idAttr = opts.id ? ' id="' + esc(opts.id) + '"' : '';
