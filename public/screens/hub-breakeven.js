@@ -20,7 +20,28 @@ S.HubBreakEven = {
 
   open() {
     if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
-    App.openHubFullPage('Break-Even', (mount) => { this.container = mount; this._wf = null; this.render(mount); }, 'breakeven');
+    App.openHubFullPage('Break-Even', (mount) => { this.container = mount; this._wf = null; this._wfTouched = false; this.render(mount); }, 'breakeven');
+  },
+
+  /* ⛔ THE WHAT-IF'S BREAK-EVEN — ONE DECISION, SO THE SCREEN CANNOT PRINT TWO ANSWERS TO ONE
+     QUESTION (B8). Stacked on one page, before the operator touched a thing:
+         top strip   BREAK-EVEN / WEEK   $11,836
+         What If     BREAK-EVEN / WEEK   $11,833
+     The header uses the real figure; the What-If recomputed from its own input boxes, which are
+     ROUNDED for display. Measured, and this is why more precision is not the fix:
+         true nut 5608.7692307692305 · true rate 52.611435745552136% · true BE 11835.70
+         nut 5609 / rate 52.6%   -> 11833.33   ($3 out)
+         exact nut / rate to 2dp -> 11835.35   ($1 out, still wrong)
+         only the exact values land on 11835.70, and they are unprintable in an input box.
+     So: the panel is a SANDBOX seeded from the real numbers. Untouched, it simply agrees with the
+     figure above it. The moment a lever moves it is the operator's own scenario and computes from
+     what they typed. Returns null when there is no break-even to draw.
+     Pinned by verify-breakeven-whatif-agrees.js. */
+  _wfBreakEven(c, wf, touched) {
+    if (!touched) return (c && c.breakEven != null) ? c.breakEven : null;
+    const nut = parseFloat(wf.nut) || 0;
+    const rate = (parseFloat(wf.rate) || 0) / 100;
+    return (rate < 1 && nut > 0) ? nut / (1 - rate) : null;
   },
 
   _statItem(label, val, colorStyle) {
@@ -326,7 +347,9 @@ S.HubBreakEven = {
       const nut   = parseFloat(document.getElementById('be-wf-nut')?.value) || 0;
       const rate  = (parseFloat(document.getElementById('be-wf-rate')?.value) || 0) / 100;
       this._wf = { sales: Math.round(sales), nut: Math.round(nut), rate: +(rate * 100).toFixed(1) };
-      const be = (rate < 1 && nut > 0) ? nut / (1 - rate) : null;
+      // Untouched, this must equal the break-even printed in the strip above (B8) — see
+      // _wfBreakEven for why the rounded input boxes cannot reproduce it.
+      const be = this._wfBreakEven(c, this._wf, !!this._wfTouched);
       const profit = (be != null) ? (sales - be) : null;
       const out = document.getElementById('be-wf-out');
       if (!out) return;
@@ -340,9 +363,13 @@ S.HubBreakEven = {
       const si = document.getElementById('be-wf-sales'); if (si) si.value = defaults.sales;
       const ni = document.getElementById('be-wf-nut');   if (ni) ni.value = defaults.nut;
       const ri = document.getElementById('be-wf-rate');  if (ri) ri.value = defaults.rate;
+      // Reset means "back to my real numbers", so it must also put the panel back to agreeing
+      // with the headline — not to a recomputation off the rounded boxes.
+      this._wfTouched = false;
       drawWf();
     });
-    ['be-wf-sales', 'be-wf-nut', 'be-wf-rate'].forEach(id => document.getElementById(id)?.addEventListener('input', drawWf));
+    ['be-wf-sales', 'be-wf-nut', 'be-wf-rate'].forEach(id =>
+      document.getElementById(id)?.addEventListener('input', () => { this._wfTouched = true; drawWf(); }));
     drawWf();
   },
 

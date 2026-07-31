@@ -923,10 +923,13 @@ S.HubOperatingExpenses = {
     App.applyCollapsed(this.container);
     document.getElementById('oex-export-this')?.addEventListener('click', () => {
       const el = document.getElementById('oex-thismonth');
-      // This card and the filtered History below both saved as BarCop_OperatingExpenses_<today>.pdf.
-      // This one is a single month, so say which month; History keeps the plain name.
+      /* ⚠ THE MONTH GOES IN THE PERIOD SLOT, IN WORDS (B7). Putting it in `fileTag` left the
+         PERIOD slot empty, which pdfFileName fills with today — so this saved as
+         "Operating Expenses 2026-07 - 2026-07-31.pdf": two dates, one of them a machine key,
+         against a convention of `<Bar> - <What> - <Period>.pdf`. The History export below
+         already passes `range` for exactly this reason. */
       if (el) App.exportPDF({ title: 'Operating Expenses', root: el,
-        fileTag: 'Operating Expenses ' + this._currentMonthKey() });
+        range: this._monthLabel(this._currentMonthKey()) });
     });
     this._wireRows(this.container);
     if (this._entryMode === 'import') this._mountImporter();
