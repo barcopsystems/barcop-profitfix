@@ -115,8 +115,15 @@ S.InventorySpotCheck = {
         post: this.spReadRaw('sp-post-' + lid, p),
         pre_entered:  !!t.pre,
         post_entered: !!t.post,
-        added: isNaN(added) ? 0 : added,
-        sold:  (soldRaw == null || soldRaw === '') ? null : (parseFloat(soldRaw) || 0)
+        /* ⛔ FLOOR THE NEGATIVE, KEEP THE NULL. MEASURED live: POS SOLD -25 printed "Over by 58.9
+           pours - +$77.87" (invented overpour) and RESTOCKED -9 printed "Used -7.00 containers".
+           `added` blank already meant 0, so it floors cleanly. `sold` must NOT be floored to 0
+           when blank — null is the audit contract (see the note above `_notRecorded`): a line
+           nobody entered has to stay unmeasured so it cannot reach the shrink figure or cancel a
+           real overpour elsewhere. Only the numeric branch is clamped.
+           Pinned by verify-spot-check-inputs-clamped.js, which asserts BOTH halves. */
+        added: isNaN(added) ? 0 : Math.max(0, added),
+        sold:  (soldRaw == null || soldRaw === '') ? null : Math.max(0, parseFloat(soldRaw) || 0)
       };
     }).filter(Boolean);
     return {
@@ -180,14 +187,16 @@ S.InventorySpotCheck = {
   // fulls/value split instead of collapsing to a single total.
   spReadRaw(slotId, p) {
     if (this._isCaseBeer(p)) {
-      return { cases: parseFloat(document.querySelector('.sp-cases[data-slot="' + slotId + '"]')?.value) || 0,
-               loose: parseFloat(document.querySelector('.sp-loose[data-slot="' + slotId + '"]')?.value) || 0 };
+      // Floored: a shelf cannot hold a negative number of cases. Blank already read as 0 here,
+      // so there is no null contract to protect (unlike `sold` in collectState).
+      return { cases: Math.max(0, parseFloat(document.querySelector('.sp-cases[data-slot="' + slotId + '"]')?.value) || 0),
+               loose: Math.max(0, parseFloat(document.querySelector('.sp-loose[data-slot="' + slotId + '"]')?.value) || 0) };
     }
     if (this._isPourable(p)) {
       const g = (BottleSlider.get ? BottleSlider.get(slotId) : null) || { fulls: 0, value: 0 };
       return { fulls: g.fulls || 0, value: g.value || 0 };
     }
-    return { value: parseFloat(document.querySelector('.sp-num[data-slot="' + slotId + '"]')?.value) || 0 };
+    return { value: Math.max(0, parseFloat(document.querySelector('.sp-num[data-slot="' + slotId + '"]')?.value) || 0) };
   },
   // Container total for the variance math.
   spRead(slotId, p) {
