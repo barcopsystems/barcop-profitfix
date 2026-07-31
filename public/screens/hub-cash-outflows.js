@@ -19,6 +19,8 @@ S.HubCashOutflows = {
   TYPES: [['draw', 'Owner draw'], ['loan', 'Loan payment'], ['capital', 'Capital / equipment'], ['tax', 'Tax remittance'], ['other', 'Other']],
 
   open() {
+    // Books area gate, same as its siblings — see the note in hub-operating-expenses.open().
+    if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
     App.openHubFullPage('Cash Outflows', (mount) => {
       this.container = mount;
       this.draw();
@@ -442,7 +444,16 @@ S.HubCashOutflows = {
     App.applyCollapsed(this.container);
     this.container.onclick = async ev => {
       if (ev.target.closest('#cb-save') || ev.target.closest('#cb-clear') || ev.target.closest('.card-collapse-head')) return;
-      if (ev.target.closest('#cb-export')) { App.exportPDF({ title: 'Cash Outflows', root: this.container }); return; }
+      /* ⚠ THE PERIOD GOES IN `range` — the same defect as the Cash Bridge, in its twin. Both
+         screens carry the identical four-chip period selector, and both wrote every view to
+         "<Bar> - Cash Outflows - <today>.pdf", so saving This Month and then Last Quarter left
+         one file. Found by widening verify-export-states-its-period's census, which had gated
+         its whole sweep on App.filterChips( and could not see a hand-rolled selector at all. */
+      if (ev.target.closest('#cb-export')) {
+        const p = (this.PERIODS.find(([k]) => k === this._period) || [null, ''])[1];
+        App.exportPDF({ title: 'Cash Outflows', root: this.container, range: p });
+        return;
+      }
       const pc = ev.target.closest('.cb-period');
       if (pc) { this._period = pc.dataset.p; this.draw(); return; }
       const ed = ev.target.closest('.cb-edit');

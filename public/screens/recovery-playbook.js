@@ -673,7 +673,7 @@ S.RecoveryPlaybook = {
             { t: 'h', text: 'How Bar Cop runs it' },
             { t: 'p', text: 'The Cash Forecast projects the full quarter, thirteen weeks ahead, lining up your projected sales and event balances coming in against payroll, purchases, and every bill due that week, the recurring ones projected forward too. Enter your cash on hand and it becomes a running balance with your low-point week, your runway, and the line where you would go negative. Enter a line of credit too and Bar Cop counts it as your backstop, so the runway and the can-I-afford read both know what you can lean on. Slide sales down to stress-test a slow season, or drop in a what-if, a second bartender, an equipment buy, an owner draw, and see whether you can carry it before you commit. Export it as a clean thirteen-week cash flow to walk into a lender. The bills come from Books, the sales from your forecast, the labor from your schedule.' },
             { t: 'go', label: 'Cash Forecast', screen: 'c-forecast' },
-            { t: 'go', label: 'Review Bills', screen: 'books' },
+            { t: 'go', label: 'Review Bills', screen: 'operating-expenses' },
             { t: 'go', label: 'Stay Ahead system', screen: 'c-fix', focus: 'stay-ahead' },
             { t: 'h', text: 'Quick Reference' },
             { t: 'list', items: [
@@ -697,7 +697,7 @@ S.RecoveryPlaybook = {
             { t: 'h', text: 'How Bar Cop runs it' },
             { t: 'p', text: 'Set the real terms on each vendor record in List Vendors, net 7, 15, or 30. Bar Cop uses them to flag anything you are paying ahead of the due date and to time the cash-out side of your forecast. Your bills live in Books, where you pay on the due date and take the discounts worth taking.' },
             { t: 'go', label: 'List Vendors', screen: 'ic-vendors' },
-            { t: 'go', label: 'Review Bills', screen: 'books' },
+            { t: 'go', label: 'Review Bills', screen: 'operating-expenses' },
             { t: 'go', label: 'Pay on Terms system', screen: 'c-fix', focus: 'pay-on-terms' },
             { t: 'h', text: 'Quick Reference' },
             { t: 'list', items: [

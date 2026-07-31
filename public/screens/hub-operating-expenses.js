@@ -47,6 +47,14 @@ S.HubOperatingExpenses = {
   _catchUpStillCurrent() { return this._mountedAt === App._mountSeq; },
 
   open() {
+    /* ⚠ THE BOOKS-AREA GATE, which the three sibling Books pages already carry
+       (hub-books-home, hub-books, hub-breakeven) and these two did not. Surfaced 2026-08-01
+       when the Cash Playbook's "Review Bills" buttons were retargeted off 'books' (gated) onto
+       this screen: that would have moved two doors from behind the gate to in front of it.
+       The bills ARE Books data, so a member without Books access should be refused here for
+       the same reason they are refused on the P&L. Demo and any session before the role
+       resolves still pass — _hubBlocked returns false when there is no role. */
+    if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
     App.openHubFullPage('Operating Expenses', (mount) => {
       this.container = mount;
       this._mountedAt = App._mountSeq;   // stamped inside the mount callback, AFTER openHubFullPage bumps it

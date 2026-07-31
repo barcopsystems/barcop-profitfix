@@ -60,24 +60,22 @@ S.AuditTracker = {
     ];
   },
 
+  /* ⛔ ENTER THROUGH App.pushView — the twin of the Cash audit defect, found by the sweep that
+     closed it (2026-08-01). `audit-tracker` is in App._CONVERTED, so the old `.topbar` holding
+     `#topbar-actions` is display:none and both buttons appended below rendered at ZERO WIDTH.
+     From a Profit audit full view there was no visible Back anywhere, and browser Back left
+     the audit entirely. app.js's _viewStack comment states the convention: one floating back
+     button, no per-page back buttons. Export survives because the page body carries
+     `.at-export-btn` (wired at the bottom of this function). */
   viewAudit(idx) {
     const audits = (App.data.audits || []).slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     const audit  = audits[idx];
     if (!audit) return;
+    App.pushView(() => this._drawAudit(audit));
+  },
 
-    this.actions.innerHTML = '';
-    const backBtn = document.createElement('button');
-    backBtn.className = 'btn btn-ghost btn-sm';
-    backBtn.textContent = '← Back';
-    backBtn.style.marginRight = '8px';
-    backBtn.onclick = () => this.renderMain();
-    this.actions.appendChild(backBtn);
-
-    const printBtn = document.createElement('button');
-    printBtn.className = 'btn btn-ghost btn-sm';
-    printBtn.textContent = 'Print / Save PDF';
-    printBtn.onclick = () => this.exportPDF(audit);
-    this.actions.appendChild(printBtn);
+  _drawAudit(audit) {
+    if (this.actions) this.actions.innerHTML = '';
 
 
     const d = audit.raw || audit;

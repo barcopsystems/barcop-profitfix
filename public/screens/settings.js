@@ -1140,6 +1140,25 @@ S.HubSettings = {
       revenue: ['Check Average and Revenue','Labor Efficiency','Menu Performance','Server Performance','Events and Private Dining'],
       cash:    (window.S && S.CashAudit) ? S.CashAudit.SECTION_NAMES : ['Capital Efficiency','Cash Conversion Cycle','Liquidity & Runway','Payment Terms']
     };
+    /* ⛔ THE CASH AUDIT'S METRIC KEYS ARE NOT `S<n>_`-PREFIXED, so the prune below could never
+       reach them. Profit and Revenue name every display field `S1_...`, `S2_...`; Cash names
+       them for what they are (`TRAPPED_CASH`, `RUNWAY`, `VENDORS_ON_TERMS`). The prune deleted
+       the section's SCORE and FINDINGS and left every metric row populated, so a demo visitor
+       opening an early audit saw:
+         SECTION 3  Liquidity & Runway   N/A  "Not enough data"
+                    Tight Weeks Ahead 2 · Runway 6 wks · Low Point $3,200 · Safe to Spend $4,200
+       — "not enough data" printed directly above four populated figures. The live code cannot
+       produce that state (_computeAudit nulls each of these whenever its section is null), so
+       it was seed-only, but every demo visitor could reach it.
+       Mirrors _computeAudit's raw block, section for section. */
+    const RAW_KEYS = {
+      cash: {
+        0: ['TRAPPED_CASH', 'INVENTORY_VALUE', 'DEAD_STOCK', 'OVERSTOCK', 'BLENDED_TURNS', 'BLENDED_GMROI', 'LAZY_CATS'],
+        1: ['DIO', 'DPO', 'CYCLE_DAYS', 'LOCKED_CASH', 'DAILY_COGS'],
+        2: ['TIGHT_WEEKS', 'RUNWAY', 'HAS_OPENING', 'OPENING_CASH', 'END_BALANCE', 'LOW_POINT_BAL', 'LOW_POINT_WEEK', 'SAFE_TO_SPEND'],
+        3: ['VENDORS_ON_TERMS', 'TOTAL_VENDORS', 'WEIGHTED_DPO']
+      }
+    };
     const weeklySeries = (mod, richByDay) => {
       const PFX = mod === 'profit' ? 'PFA' : mod === 'revenue' ? 'RFA' : 'CA';
       const NSEC = mod === 'cash' ? 4 : 5;
@@ -1173,6 +1192,10 @@ S.HubSettings = {
               // Remove the whole section from the raw (score + findings), so the
               // full view shows a clean N/A, not N/A next to a written finding.
               if (rec.raw) Object.keys(rec.raw).forEach(k => { if (k.indexOf('S' + (i + 1) + '_') === 0) delete rec.raw[k]; });
+              // ...and the unprefixed METRIC keys, which the prefix rule cannot see. See the
+              // RAW_KEYS note above: without this the section reads N/A over populated rows.
+              const mk = (RAW_KEYS[mod] || {})[i];
+              if (rec.raw && mk) mk.forEach(k => { delete rec.raw[k]; });
             }
           }
           rec.action_items = (rec.action_items || []).filter(a => {
