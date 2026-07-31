@@ -173,7 +173,14 @@ S.EventsDashboard = {
       return { leads: 'Leads followed up.', deposits: 'Deposits handled.', prep: 'Run sheets handled.', close: 'Completed events closed.' }[k];
     }
     const n = info.newPend.length;
-    if (k === 'leads')    return n ? n + ' lead' + (n === 1 ? '' : 's') + ' to follow up' : 'No open leads right now';
+    /* Named as its parts (E1) — this counted Lead + Quote Sent and called all of them "leads",
+       so the Bookings screen's own LEAD chip disagreed with it. One phrase, shared. */
+    if (k === 'leads') {
+      if (!n) return 'No open leads right now';
+      const pend = new Set(info.newPend);
+      const of = s => st.open.filter(b => b.stage === s && pend.has(b.id)).length;
+      return (this.EB()._openLabel(of('Lead'), of('Quote Sent')) || n + ' open') + ' to follow up';
+    }
     if (k === 'deposits') {
       const amt = st.depDueList.filter(b => info.newPend.indexOf(b.id) !== -1)
         .reduce((s, b) => s + this.EB()._depositHeld(b), 0);   // same floor as the list it slices

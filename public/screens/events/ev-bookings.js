@@ -216,6 +216,45 @@ S.EventsBookings = {
     return long ? (p.party + ' guests (' + which + ')') : (p.party + ' ' + which);
   },
 
+  /* ⛔ NAME BOTH THINGS THE OPEN PIPELINE IS MADE OF (E1). The strip tile read "Open Leads 3"
+     while the LEAD chip directly under it showed 2 and QUOTE SENT showed 1 — "open" is Lead +
+     Quote Sent, which is the right set to chase, but "leads" is a word this same screen uses for
+     a narrower thing, so the operator goes hunting for a third lead. The cockpit step repeated it.
+     Naming the split is shorter than explaining it and matches the chips exactly.
+     Returns '' when nothing is open, so the caller decides the empty wording. */
+  _openLabel(leads, quotes) {
+    const bits = [];
+    if (leads > 0)  bits.push(leads + ' lead' + (leads === 1 ? '' : 's'));
+    if (quotes > 0) bits.push(quotes + ' quote' + (quotes === 1 ? '' : 's'));
+    return bits.join(', ');
+  },
+
+  /* ⛔ THE BALANCE SUB-LABEL IS A CLAIM ABOUT *WHEN* (E2). It read "on event day" whenever a
+     balance existed — but while the deposit is still owed, part of that figure is due BEFORE the
+     event, not on it. The number was right in both states; the label only in one. */
+  _balanceNote(b) {
+    if (b.balance_paid_date) {
+      return 'paid in full' + (b.payment_method === 'register' ? ', through the register'
+        : b.payment_method === 'direct' ? ', paid direct' : '');
+    }
+    const dep = parseFloat(b.deposit_amount) || 0;
+    if (dep > 0 && !b.deposit_paid_date) return 'deposit first, then the rest on event day';
+    return 'on event day';
+  },
+
+  /* ⛔ SAY WHICH RULE PRODUCED THE SUBTOTAL (E3). The parenthetical named the head count in both
+     cases, so an operator reading "F&B Subtotal (60 estimated) $6,000.00" does 60 x $75 in their
+     head, gets $4,500, and nothing on screen explains the difference — the F&B MINIMUM had
+     overridden the headcount. Naming the basis was already this line's stated job: "so a total
+     that moves when the final guarantee comes in is a change the operator can point at". */
+  _subtotalLabel(p) {
+    const base = 'F&amp;B Subtotal';
+    if (!p || !p.ph || !p.party) return base;
+    const perHead = p.ph * p.party;
+    if (p.fbMin && p.subtotal > perHead + 0.001) return base + ' (minimum applies)';
+    return base + ' (' + this._countLabel(p) + ')';
+  },
+
   quoteBreakdownHtml(p) {
     const line = (lbl, val, strong) => '<div style="display:flex;justify-content:space-between;gap:16px;padding:' + (strong ? '8px 0 0' : '5px 0') + ';' + (strong ? 'border-top:1px solid var(--b2);margin-top:4px;' : '') + 'font-size:' + (strong ? '14px' : '12px') + ';">'
       + '<span style="color:' + (strong ? 'var(--t1)' : 'var(--t3)') + ';font-weight:' + (strong ? '700' : '400') + ';">' + lbl + '</span>'
@@ -223,7 +262,7 @@ S.EventsBookings = {
     return '<div style="max-width:320px;">'
       // Name the count the subtotal was billed on, so a total that moves when the final guarantee
       // comes in is a change the operator can point at rather than one that just happens.
-      + line('F&amp;B Subtotal' + (p.ph && p.party ? ' (' + this._countLabel(p) + ')' : ''), p.subtotal)
+      + line(this._subtotalLabel(p), p.subtotal)
       + line('Service Charge (' + (p.svcPct || 0) + '%)', p.service)
       + line('Tax (' + (p.taxPct || 0) + '%)', p.tax)
       + (p.roomFee ? line('Room Fee', p.roomFee) : '')
@@ -546,7 +585,10 @@ S.EventsBookings = {
     const stat = (label, val, color) =>
       '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg"' + (color ? ' style="color:' + color + '"' : '') + '>' + val + '</div></div>';
     const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start;">'
-      + stat('Open Leads', String(open.length), open.length ? '' : 'var(--t3)')
+      // Named as its parts, so the tile and the LEAD / QUOTE SENT chips below cannot disagree (E1).
+      + stat('Open Pipeline', this._openLabel(
+            open.filter(b => b.stage === 'Lead').length,
+            open.filter(b => b.stage === 'Quote Sent').length) || '0', open.length ? '' : 'var(--t3)')
       + stat('Stale (3+ Days)', String(stale.length), stale.length ? 'var(--amber)' : '')
       + stat('Pipeline Value (incl. tax)', App.fmtCurrency(pipelineVal))
       + stat('Booked, Next 30d', String(bookedSoon.length))
@@ -737,10 +779,7 @@ S.EventsBookings = {
          and the Mark Balance Paid button is gated separately — so in that state the balance could
          never be marked paid at all, and (before the anchor fix) it flooded the forecast forever.
          They are two different facts and an overpaid deposit does not stop a balance existing. */
-      t.push(this.statTile('Balance Due', App.fmtCurrency(bal),
-        b.balance_paid_date
-          ? ('paid in full' + (b.payment_method === 'register' ? ', through the register' : b.payment_method === 'direct' ? ', paid direct' : ''))
-          : 'on event day', bal > 0 ? '' : 'good'));
+      t.push(this.statTile('Balance Due', App.fmtCurrency(bal), this._balanceNote(b), bal > 0 ? '' : 'good'));
       const over = this.refundOwed(b);
       if (over > 0) t.push(this.statTile('Refund Owed', App.fmtCurrency(over), 'deposit is over the quote', 'warn'));
     } else if (stage === 'Completed') {
