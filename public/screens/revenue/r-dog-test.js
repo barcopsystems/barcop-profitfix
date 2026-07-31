@@ -104,8 +104,11 @@ S.RevenueDogTest = {
           + '<div class="prog" style="margin-bottom:10px;"><div class="prog-fill" style="width:' + pct + '%;background:var(--green);"></div></div>'
           + (t.change_notes ? '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:10px;">' + esc(t.change_notes) + '</div>' : '')
           + '<div class="form-row" style="margin-bottom:10px;align-items:flex-end;">'
-          +   '<div class="f" style="width:150px;"><label>Baseline Weekly</label><div style="font-size:13px;color:var(--t2);padding:8px 0;">' + (t.baseline_volume != null ? t.baseline_volume + ' units' : '-') + '</div></div>'
-          +   '<div class="f" style="width:170px;"><label>Current Weekly</label><div style="font-size:13px;color:var(--t1);padding:8px 0;">' + (cur != null ? cur.toFixed(0) + ' units' : '<span style="color:var(--t4);">not set on item</span>') + '</div></div>'
+          // Singular at one through App.qtyUnit (F19). A dish that sold once a week read
+          // "1 units" in both cells; these are dish counts rather than container units, but
+          // the plural is just as wrong.
+          +   '<div class="f" style="width:150px;"><label>Baseline Weekly</label><div style="font-size:13px;color:var(--t2);padding:8px 0;">' + (t.baseline_volume != null ? App.qtyUnit(t.baseline_volume, 'units') : '-') + '</div></div>'
+          +   '<div class="f" style="width:170px;"><label>Current Weekly</label><div style="font-size:13px;color:var(--t1);padding:8px 0;">' + (cur != null ? App.qtyUnit(cur.toFixed(0), 'units') : '<span style="color:var(--t4);">not set on item</span>') + '</div></div>'
           +   (liftLine ? '<div class="f" style="flex:1;min-width:140px;"><label>&nbsp;</label><div style="font-size:12px;color:var(--t2);padding:8px 0;">' + liftLine + '</div></div>' : '')
           + '</div>'
           + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
