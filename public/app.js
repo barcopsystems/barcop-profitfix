@@ -3798,6 +3798,51 @@ const App = {
     return map[u] || u;
   },
 
+  /* ── A QUANTITY AND ITS UNIT, WITH THE UNIT SINGULAR AT EXACTLY ONE ────────
+     F19: Dynamic Pars printed "1 kegs", the Order Sheet's minimum dialog printed
+     "1 kegs under the 2 kegs minimum", and THREE screens (Stock Report, Usage
+     Report, Dynamic Pars) carried byte-identical private copies of the same
+     `num + ' ' + unitAbbr(...)` renderer. One wrong word written out seven times,
+     so it gets one door.
+
+     Takes the ALREADY-FORMATTED number STRING. Every caller has already decided
+     its own precision, and reformatting here would silently move figures on six
+     screens — only the word after the number changes.
+
+     Singular ONLY when that string is exactly "1":
+        "1 keg"   "2 kegs"   "1.0 kegs"   "0.5 kegs"
+     so nothing has to decide what 1.5 of a keg is called and a decimal never
+     changes shape. Pinned by verify-qty-unit-singular.js.
+
+     ⛔ unitAbbr is deliberately NOT quantity-aware. Its vocabulary is
+     ABBREVIATIONS — cs / ea / oz / qt / gal / L have no singular form — and it
+     feeds countCols, i.e. every count string in the app. */
+  qtyUnit(numStr, unit) {
+    const s = String(numStr == null ? '' : numStr);
+    const u = String(unit == null ? '' : unit);
+    if (!u) return s;
+    return s + ' ' + (s === '1' ? this.unitSingular(u) : u);
+  },
+  /* The singular of a stock unit.
+     ABBR is EVERY value unitAbbr can emit, written out rather than derived, and
+     each one maps to what it should read as at a count of one. That list is the
+     whole point: an abbreviation is not a plural. A bare `.replace(/s$/,'')`
+     turns "cs" — a perfectly good case count — into "1 c", which is how the
+     first version of this helper shipped and what the pin caught.
+     Anything else is a real word (MIN_UNITS, or the operator's own list) where
+     English's rule applies: `-es` after ss/x/z/ch/sh, `-s` otherwise. The trap
+     that rule exists for is that "glasses" is glass+es while "cases" is case+s —
+     stripping "es" from everything ending "ses" would print "1 cas". */
+  unitSingular(unit) {
+    const u = String(unit == null ? '' : unit);
+    const ABBR = { cs: 'cs', kegs: 'keg', btls: 'btl', ea: 'ea', lbs: 'lb',
+                   oz: 'oz', qt: 'qt', gal: 'gal', l: 'L' };
+    const hit = ABBR[u.toLowerCase()];
+    if (hit) return hit;
+    if (!/s$/i.test(u) || /ss$/i.test(u)) return u;   // gal, glass, anything singular
+    return /(?:ss|x|z|ch|sh)es$/i.test(u) ? u.slice(0, -2) : u.slice(0, -1);
+  },
+
   // The Full / Open / Total column strings for one counted product, formatted
   // IDENTICALLY everywhere a count is listed (Take Inventory review, Count
   // History detail, and any future inventory section — keep them all on this).
@@ -3813,19 +3858,20 @@ const App = {
     if (isBeer) {
       const cases = vals.cases != null ? vals.cases : Math.floor(total);
       const loose = vals.loose != null ? vals.loose : Math.round((total - Math.floor(total)) * caseSize);
-      return { full: cases + ' cs', open: loose + ' btls', total: total.toFixed(2) + ' cs' };
+      // Full cases and loose bottles are whole numbers, so "1 btls" is reachable
+      // here and nowhere else in this function — the totals carry decimals.
+      return { full: this.qtyUnit(cases, 'cs'), open: this.qtyUnit(loose, 'btls'), total: total.toFixed(2) + ' cs' };
     }
     // Food / Misc with a pack size: full units + loose pieces, total in units.
     const packSize = vals.packSize != null ? vals.packSize : ((p && p.pack_size) || 0);
     if (packSize > 0 && (((p && p.category) || vals.category) === 'Food' || ((p && p.category) || vals.category) === 'Misc') && vals.loose != null) {
       const pu = this.unitAbbr(this.productUnit(p || { category: vals.category, unit_type: vals.unit_type }));
-      const pus = pu ? ' ' + pu : '';
-      return { full: (vals.fulls || 0) + pus, open: (vals.loose || 0) + ' ea', total: total.toFixed(2) + pus };
+      return { full: this.qtyUnit(vals.fulls || 0, pu), open: this.qtyUnit(vals.loose || 0, 'ea'), total: total.toFixed(2) + (pu ? ' ' + pu : '') };
     }
     const u = this.unitAbbr(this.productUnit(p || { category: vals.category, unit_type: vals.unit_type }));
     const us = u ? ' ' + u : '';
     return {
-      full:  (vals.fulls || 0) + us,
+      full:  this.qtyUnit(vals.fulls || 0, u),
       open:  (vals.partial || 0).toFixed(1) + us,
       total: total.toFixed(1) + us
     };
