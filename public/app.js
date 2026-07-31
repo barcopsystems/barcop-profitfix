@@ -3587,7 +3587,8 @@ const App = {
     render();
   },
 
-  /* ⛔ A COUNT THAT A CONFIRMED WEEK HAS ALREADY BOOKED IS LOCKED.
+  /* ⛔ HAS A CONFIRMED WEEK ALREADY BOOKED THIS RECORD?  ("locked" is no longer the whole answer --
+     read the S331 note below before quoting this function's name as a rule.)
 
      Kyle, 2026-07-29: "if i inventory a location and submit it.. but then i realize i missed a
      couple of bottles.. how do i add those to the inventory count?" Today: you cannot. There is
@@ -3595,12 +3596,24 @@ const App = {
      ADJUSTMENT cannot stand in for it, because `computeUsagePair(start, end, deliveries)` never
      reads adjustments, so one would record a note without correcting a penny of COGS.
 
-     So counts become editable. But not ALL of them: a count is one end of a usage pair, and once a
-     week has been confirmed off that pair the COGS, prime cost and variance are booked. Editing
-     then rewrites history somebody already signed off. The rule is deliberately conservative and
-     easy to say out loud: ONCE A WEEK ENDING ON OR AFTER THIS COUNT IS CONFIRMED, THE COUNT IS
-     LOCKED. It leaves exactly the window Kyle described open -- you counted, you noticed, you fix
-     it -- and closes the moment the number has been used.
+     So counts become editable. The original rule was blanket: ONCE A WEEK ENDING ON OR AFTER THIS
+     COUNT IS CONFIRMED, THE COUNT IS LOCKED -- deliberately conservative, because a count is one
+     end of a usage pair and a confirmed week has booked COGS, prime and variance off it.
+
+     ⭐⭐ S331 NARROWED THAT, 2026-07-31, AND WHAT IT NOW GOVERNS DIFFERS BY ACTION AND BY STORE:
+       · a booked COUNT is still undeletable, and is now EDITABLE -- `ic-take-inventory.submit()`
+         asks `ConfirmWeek.cogsImpact` which confirmed weeks the correction moves, names each one
+         with real before/after figures, and writes them only if the operator says so;
+       · a booked DELIVERY is unchanged: both Edit and Delete stay off it, because no equivalent
+         impact popup exists for the purchases term.
+     The argument that made the narrowing safe: a confirmed week's figures were ALREADY editable
+     from Week History -> Edit, which reuses the Confirm the Week popup and writes back to the SAME
+     `week` / `revenue_week` records. **The blanket rule froze the SOURCE while leaving the RESULT
+     freely editable**, which is not the integrity it read like.
+     ⚠ Do not treat this function's return value as "the operator cannot touch this". It answers one
+     narrow question -- has a confirmed week ended on or after this record's date -- and each caller
+     decides what that costs. Callers: the Booked label and Delete on ic-count-history, both actions
+     on ic-delivery-history, and ic-receive-delivery's belt-and-braces refusal.
      ⚠ `this.`, not `App.`, so it stays liftable ([[the-loop]] #46). */
   /* ⚠⚠ WHICH CONFIRMED WEEKS DO THESE DATED ROWS FALL INSIDE? (S281.)
      An import writes per-day `sc_shifts` records with no idea whether the operator has already
@@ -8925,26 +8938,54 @@ const App = {
     // ack-only dialog: render just the confirm button. `cancelText: ''` means the same thing and is
     // the spelling most call sites already use, so it counts here rather than needing both options.
     const oneButton   = opts.oneButton === true || cancelText === '';
+    /* ⚠⚠ A THIRD ANSWER (S331). Some questions genuinely have two "yes"es and a "no": correcting a
+       count that a confirmed week has already booked can be saved WITH the week updated or WITHOUT,
+       and Esc must still mean "do nothing". A boolean cannot carry that, and building a second
+       dialog for it would be a second implementation of the app's one confirm box.
+       `altText` resolves the STRING 'alt', never `true` — so a caller that does not pass it can
+       never receive it, and every existing `if (!(await App.confirm(...)))` is untouched.
+       MEASURED at the time of writing: 65 call sites, exactly one passing altText. */
+    const altText     = opts.altText == null ? '' : String(opts.altText);
     return new Promise(resolve => {
       const overlay = document.createElement('div');
       // z defaults to 9500; callers layering over the plan gate (9700) pass higher.
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,11,17,0.88);z-index:' + (opts.z || 9500) + ';display:flex;align-items:center;justify-content:center;padding:20px;';
-      overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:24px 28px;max-width:420px;width:100%;">'
+      /* ⚠ `white-space:pre-line` so a message that carries its own line breaks renders as written.
+         MEASURED before adding it: not one of the app's 94 `message:` strings contains a newline,
+         and `pre-line` collapses runs of whitespace exactly as `normal` does — so every existing
+         dialog renders byte-for-byte where it always did ([[the-loop]] #65: a shared layout change
+         has to be proved inert at the old inputs, not assumed). */
+      overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:24px 28px;max-width:' + (opts.maxWidth || 420) + 'px;width:100%;">'
         + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:' + (message ? '10' : '18') + 'px;">' + (opts.titleHtml || esc(title)) + '</div>'
-        + (message ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;">' + esc(message) + '</div>' : '')
-        + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+        + (message ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:18px;white-space:pre-line;">' + esc(message) + '</div>' : '')
+        + '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">'
           + (oneButton ? '' : '<button class="btn btn-ghost" data-act="cancel">' + esc(cancelText) + '</button>')
+          + (altText ? '<button class="btn btn-ghost" data-act="alt">' + esc(altText) + '</button>' : '')
           + '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + '" data-act="confirm">' + esc(confirmText) + '</button>'
         + '</div></div>';
       document.body.appendChild(overlay);
-      const cleanup = (val) => { document.body.removeChild(overlay); resolve(val); };
+      /* ⚠⚠ CLEANUP HAS TO TAKE THE KEY LISTENER WITH IT (found scanning S331; PRE-EXISTING, not
+         introduced by it). Only the Esc path removed the listener, so every dialog closed by a
+         BUTTON left its `keydown` handler on `document` forever, holding a detached overlay in the
+         closure. The next Escape keypress anywhere in Bar Cop then ran the stale handler and
+         `document.body.removeChild(overlay)` threw NotFoundError on a node that is no longer a
+         child -- once per stale dialog, growing all session. The live dialog still closed (each
+         listener is its own registration and a throw in one does not stop the next), which is
+         precisely why nobody saw it. `cleanup` is the ONE exit now, so there is no second path to
+         keep in step ([[the-loop]] step 0.6). */
+      const cleanup = (val) => {
+        document.removeEventListener('keydown', onKey);
+        document.body.removeChild(overlay);
+        resolve(val);
+      };
       overlay.addEventListener('click', e => {
         const act = e.target.closest('[data-act]')?.dataset.act;
         if (act === 'confirm') cleanup(true);
+        else if (act === 'alt') cleanup('alt');
         else if (act === 'cancel' || e.target === overlay) cleanup(false);
       });
       // Esc cancels
-      const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); cleanup(false); } };
+      const onKey = (e) => { if (e.key === 'Escape') cleanup(false); };
       document.addEventListener('keydown', onKey);
     });
   },
