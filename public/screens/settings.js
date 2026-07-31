@@ -1607,8 +1607,22 @@ S.HubSettings = {
     App.data.bookings = [
       { id:uid(), stage:'Completed', event_name:'Reyes Rehearsal Dinner', event_type:'Rehearsal Dinner',
         contact_name:'Marisol Reyes', contact_phone:'512-555-0148', contact_email:'mreyes@example.com', source:'Referral',
-        date_received:dateStr(72), event_date:dateStr(38), event_time:'6:30 PM', party_size:34, space:'Private Room',
-        fb_minimum:2200, per_head:0, quoted_total:2840, deposit_amount:800, deposit_paid_date:dateStr(60), balance_paid_date:dateStr(37),
+        /* ⚠ 20 DAYS BACK, NOT 38, AND THE PLACEMENT IS LOAD-BEARING. The Revenue audit scores
+           events over a 4-week window ending at the LAST CONFIRMED WEEK, not today — 0..27 days
+           back on a Sunday, 6..33 on a Saturday. The three Completed bookings used to sit at 38,
+           3 and 2 days back, BRACKETING that window without ever landing in it, so S5 could never
+           score: the readiness card read "Partial data, 4 of 5 ready" while the seeded audit
+           beside it claimed Full data and an Events score of 60, and pressing Generate resolved
+           it the wrong way (64 -> 77, five sections -> four, Full -> Partial).
+           This one moves because it is the only one that can: Live Music Friday and the Westlake
+           catering are 3 and 2 days back and feed the CURRENT week's revenue and the Confirm the
+           Week catering line, so moving them would change this week's numbers. Reyes is a one-off
+           private dinner already far enough back to touch nothing.
+           10..25 days back is inside the window on EVERY weekday, so this survives the rolling
+           re-seed. Pinned in verify-seed-audit-window-events.js.
+           balance_paid moves with it (19d) to keep "paid the day after the event" true. */
+        date_received:dateStr(72), event_date:dateStr(20), event_time:'6:30 PM', party_size:34, space:'Private Room',
+        fb_minimum:2200, per_head:0, quoted_total:2840, deposit_amount:800, deposit_paid_date:dateStr(60), balance_paid_date:dateStr(19),
         actual_revenue:2640, event_food_cost:760, event_bar_cost:520, event_other_cost:0,
         requests:'Family-style, one toast mid-dinner.', created_at:daysAgoISO(72) },
       { id:uid(), stage:'Completed', event_name:'Live Music Friday', event_type:'Other',
