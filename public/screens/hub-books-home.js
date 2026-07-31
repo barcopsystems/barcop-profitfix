@@ -83,20 +83,19 @@ S.HubBooksHome = {
     // re-subtract comps or re-expense policy comps — that double-removed them and
     // made this landing disagree with the Income Statement it links to. Comps
     // stay tracked in Shift Control.
-    const cmRev   = curM ? curM.totalRev : 0;
+    // ⭐ ONE FORMULA, shared with the Income Statement and the workbook sheet (HB._plParts).
+    // This landing used to build the same arithmetic by hand, which is what let it disagree
+    // with the statement it links to.
+    const P  = (HB && HB._plParts) ? HB._plParts(curKey, false) : null;
+    const PY = (HB && HB._plParts) ? HB._plParts(curKey, true)  : null;
+    const cmRev   = P ? P.netRev : 0;
     const cmCogs  = curM ? curM.totalCogs : 0;
     const cmLabor = curM ? curM.totalLabor : 0;
     const cmPrimePct = cmRev ? (cmCogs + cmLabor) / cmRev : null;
-    const opexM = (HB && HB._opExSums) ? HB._opExSums(curKey, false) : {};
-    const totalOpExM = Object.values(opexM).reduce((s, v) => s + (v || 0), 0)
-      + ((curM && curM.maintenance) || 0) + ((curM && curM.platformFees) || 0);
-    const mInc = cmRev - cmCogs - cmLabor - totalOpExM;
+    const mInc = P ? P.opInc : 0;
 
-    const ytdNet = YTD ? YTD.totalRev : 0;
-    const opexY = (HB && HB._opExSums) ? HB._opExSums(curKey, true) : {};
-    const totalOpExY = Object.values(opexY).reduce((s, v) => s + (v || 0), 0)
-      + ((YTD && YTD.maintenance) || 0) + ((YTD && YTD.platformFees) || 0);
-    const ytdInc = ytdNet - (YTD ? YTD.totalCogs : 0) - (YTD ? YTD.totalLabor : 0) - totalOpExY;
+    const ytdNet = PY ? PY.netRev : 0;
+    const ytdInc = PY ? PY.opInc : 0;
     const ytdMargin = ytdNet ? ytdInc / ytdNet : null;
 
     const HP = S.HubPermits;
@@ -212,7 +211,18 @@ S.HubBooksHome = {
       return n ? n + ' bill' + (n === 1 ? '' : 's') + ' logged this month' : 'No bills logged yet this month';
     }
     if (k === 'pnl')      { const d = this._lastRun('books_report_run_weeklypnl'); return d ? 'Report last run ' + d : 'Not run yet'; }
-    if (k === 'review')   { return esc(st.monthName) + ' operating income ' + this._money(st.mInc); }
+    /* ⛔ QUOTE THE MONTH THE BUTTON OPENS. This read the month-to-date figure (`st.mInc`), so in
+       July it said "July 2026 operating income $9,982.19" and the Income Statement button under
+       it opened JUNE at $7,837.90. Month-End Books defaults to the month being CLOSED, which is
+       the right default — so this step has to speak about that month, off the same helper, or
+       the cockpit names one month while linking to another. */
+    if (k === 'review')   {
+      const HB = S.HubBooks;
+      const key = (HB && HB._closingMonthKey) ? HB._closingMonthKey() : st.curKey;
+      const P = (HB && HB._plParts) ? HB._plParts(key, false) : null;
+      const name = (HB && HB._monthLabel) ? HB._monthLabel(key) : key;
+      return esc(name) + ' operating income ' + this._money(P ? P.opInc : 0);
+    }
     if (k === 'generate') { const d = this._lastRun('books_report_run_monthend'); return d ? 'Report last run ' + d : 'Not run yet'; }
     return '';
   },

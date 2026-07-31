@@ -49,8 +49,9 @@ S.HubBooks = {
     }
     const months = this._availableMonths();
     // The newest month that is not the one we are standing in — see _availableMonths (S228d).
-    // Every month stays selectable; only the default steps back.
-    const defaultMonth = months.find(m => m !== this._currentMonthKey()) || months[0] || this._currentMonthKey();
+    // Every month stays selectable; only the default steps back. The rule lives in
+    // _closingMonthKey so the Close-The-Books cockpit quotes the month this screen will open.
+    const defaultMonth = this._closingMonthKey();
     const monthOpts = months.map(m =>
       '<option value="' + m + '"' + (m === defaultMonth ? ' selected' : '') + '>' + this._monthLabel(m) + '</option>'
     ).join('');
@@ -111,11 +112,13 @@ S.HubBooks = {
     // so the P&L must NOT re-subtract comps from revenue or re-expense policy comps
     // — either one double-removed them. Comps stay tracked in Shift Control for
     // discipline (comp %, theft signal). See the net-sales note on the statement.
-    const totalOpExM = opexSum(opexM) + (M.maintenance || 0) + (M.platformFees || 0);
-    const totalOpExY = opexSum(opexY) + (YTD.maintenance || 0) + (YTD.platformFees || 0);
-    const netRevM = M.totalRev, netRevY = YTD.totalRev;
-    const grossM = netRevM - M.totalCogs, grossY = netRevY - YTD.totalCogs;
-    const opIncM = grossM - M.totalLabor - totalOpExM, opIncY = grossY - YTD.totalLabor - totalOpExY;
+    // One formula for the whole statement — see _plParts. This card used to build it inline,
+    // as did the workbook sheet and the Books landing.
+    const P = this._plParts(monthKey, false), PY = this._plParts(monthKey, true);
+    const totalOpExM = P.totalOpEx, totalOpExY = PY.totalOpEx;
+    const netRevM = P.netRev, netRevY = PY.netRev;
+    const grossM = P.gross, grossY = PY.gross;
+    const opIncM = P.opInc, opIncY = PY.opInc;
 
     const sec = t => '<tr class="pnl-sec"><td colspan="3">' + t + '</td></tr>';
     const line = (label, m, y, o) => {
@@ -341,7 +344,11 @@ S.HubBooks = {
 
     b.disclaimer(App.deliverableFooter().workbookSubject);
 
-    const period = String(monthKey).replace('-', '') || App._pdfDateStamp();
+    /* ⚠ THE SAME PERIOD SPELLING AS THE WORKBOOK. This was `String(monthKey).replace('-','')`,
+       so one button row produced "…Worksheet - July 2026.xlsx" beside "…Worksheet - 202607.pdf"
+       — the accountant getting the machine key. `_monthLabel` is what the XLSX already used,
+       two lines away in this file. */
+    const period = this._monthLabel(monthKey) || App._pdfDateStamp();
     await b.save(App.pdfFileName('Month-End Books Worksheet', period));
   },
 
@@ -415,6 +422,38 @@ S.HubBooks = {
 
   _currentMonthKey() {
     return this._dateToMonthKey(new Date());
+  },
+
+  /* ⛔ THE MONTH BEING CLOSED — ONE ANSWER, READ BY BOTH SCREENS.
+     You close the month that ENDED, so this steps back off the one you are standing in; a bar in
+     its first month has nothing to step back to and closes the current one.
+     It was an inline expression here, and the Close-The-Books cockpit answered the same question
+     for itself off the CURRENT month — so step 3 read "July 2026 operating income $9,982.19" and
+     the button under it opened June at $7,837.90. Two screens, one question, two answers
+     ([[the-loop]] #54: the moment a quantity appears on two screens, the test is the equality).
+     Pinned by verify-books-month-agrees.js. */
+  _closingMonthKey() {
+    const months = this._availableMonths();
+    return months.find(m => m !== this._currentMonthKey()) || months[0] || this._currentMonthKey();
+  },
+
+  /* ⛔ THE P&L, COMPUTED ONCE. Four places built this same arithmetic by hand — the on-screen
+     Income Statement, the Income Statement SHEET in the workbook, the Books landing's hero, and
+     (as of the fix that added this) the cockpit's review step. They agreed today; four copies of
+     one formula is how they stop agreeing, and the two that disagreed already cost a finding.
+     Revenue entered from the POS is NET sales, so this must NOT re-subtract comps or re-expense
+     policy comps — either one double-removes them. Comps stay tracked in Shift Control.
+     Returns the PARTS as well as the total, so a caller printing "Total Operating Expenses"
+     beside "Operating Income" cannot sum the line one way and the total another.
+     Pinned by verify-books-month-agrees.js. */
+  _plParts(monthKey, ytd) {
+    const A = ytd ? this._aggregateYTD(monthKey) : this._aggregateMonth(monthKey);
+    const opex = this._opExSums(monthKey, !!ytd);
+    const totalOpEx = Object.values(opex).reduce((s, v) => s + (v || 0), 0)
+      + (A.maintenance || 0) + (A.platformFees || 0);
+    const netRev = A.totalRev;
+    const gross = netRev - A.totalCogs;
+    return { A, opex, totalOpEx, netRev, gross, opInc: gross - A.totalLabor - totalOpEx };
   },
 
   _dateToMonthKey(d) {
@@ -564,12 +603,11 @@ S.HubBooks = {
     // their own canonical stores to avoid double-counting.
     const opexM = this._opExSums(monthKey, false);
     const opexY = this._opExSums(monthKey, true);
-    const totalOpExM = Object.values(opexM).reduce((s, v) => s + (v || 0), 0)
-                      + (M.maintenance || 0) + (M.platformFees || 0);
-    const totalOpExY = Object.values(opexY).reduce((s, v) => s + (v || 0), 0)
-                      + (YTD.maintenance || 0) + (YTD.platformFees || 0);
-    const operatingIncomeM = M.totalRev - M.totalCogs - M.totalLabor - totalOpExM;
-    const operatingIncomeY = YTD.totalRev - YTD.totalCogs - YTD.totalLabor - totalOpExY;
+    // The workbook sheet reads the SAME _plParts the on-screen statement does, so the file an
+    // accountant opens cannot disagree with the screen it was generated from.
+    const _P = this._plParts(monthKey, false), _PY = this._plParts(monthKey, true);
+    const totalOpExM = _P.totalOpEx, totalOpExY = _PY.totalOpEx;
+    const operatingIncomeM = _P.opInc, operatingIncomeY = _PY.opInc;
 
     rows.push(['Operating Expenses', '', '']);
     rows.push(r('  Occupancy (rent, property tax)',                 opexM['Occupancy (Rent, Property Tax)']    || 0, opexY['Occupancy (Rent, Property Tax)']    || 0));
