@@ -91,13 +91,16 @@ S.CashDashboard = {
     const billsWeek = CashEngine.billsDue(ws, we);
     const freed = CashEngine.freed();
     const termVendors = CashEngine.termVendors();
-    const outThisWeek = billsWeek.total + reorder.total;
+    // `outThisWeek` (billsDue + reorderToPar) used to live here and fed the week step's
+    // "goes out this week" line. It is gone rather than left unread: that step now quotes
+    // survivalForecast row 0, the same row the Cash Forecast prints, so the two cannot
+    // disagree. A field that is computed and read nowhere reads as coverage ([[the-loop]] #25).
     // The deep treasury reads: the 13-week survival curve, what is truly safe to
     // spend, and how long the cash stays locked in the operating cycle.
     const survival = CashEngine.survivalForecast(13);
     const position = CashEngine.position();
     const cycle = CashEngine.cashCycle();
-    return { trapped, over, reorder, billsWeek, freed, termVendors, outThisWeek, survival, position, cycle };
+    return { trapped, over, reorder, billsWeek, freed, termVendors, survival, position, cycle };
   },
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -285,12 +288,19 @@ S.CashDashboard = {
     return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>';
   },
 
+  /* ⚠ ONE BANNER, TWO ACTIVITIES — so every word on it is a claim about which one you are in
+     ([[the-loop]] #79). Stepping back to a prior week kept the live week's sentences: "0 of 4
+     done THIS WEEK", the "close it out now" nudge, and "You're current THIS WEEK" — all under
+     a header reading MAY 4 - MAY 10. Only the words that describe WHEN change; the bar, the
+     stepper and the counts are identical in both modes. */
   banner(doneCount, total) {
     const allDone = doneCount === total;
+    const past = !this.atCurrentWeek();
     const pct = Math.round(doneCount / total * 100);
+    const wkLabel = this.fmtWk(this.weekStart());
     const doneLine = allDone
-      ? '<span style="color:var(--green);font-weight:700;">&#10003; You\'re current this week</span>'
-      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done this week</span>';
+      ? '<span style="color:var(--green);font-weight:700;">&#10003; ' + (past ? 'Closed out for the week of ' + wkLabel : 'You\'re current this week') + '</span>'
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + (past ? ' done for the week of ' + wkLabel : ' done this week') + '</span>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
       + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
@@ -301,7 +311,7 @@ S.CashDashboard = {
       +     '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
       +     '<div style="font-size:12px;">' + doneLine + '</div>'
       +   '</div>'
-      +   (allDone ? '' : '<div style="font-size:11px;color:var(--t3);margin-top:12px;">A quick weekly pass: free what is trapped, right-size the order, and check the week ahead.</div>')
+      +   ((allDone || past) ? '' : '<div style="font-size:11px;color:var(--t3);margin-top:12px;">A quick weekly pass: free what is trapped, right-size the order, and check the week ahead.</div>')
       + '</div>'
       + '</div>';
   },
@@ -395,9 +405,20 @@ S.CashDashboard = {
       // Part two: order to par, so you stop buying ahead of your use.
       if (o && o.hasData) {
         const w = o.weeksOnHand != null ? o.weeksOnHand.toFixed(1) : '-';
+        /* ⛔ THREE STATES, NOT TWO. overOrder() returns excess:0 whenever weeksOnHand <= target,
+           so ONE else-branch used to serve "exactly at target" and "not even half of target"
+           identically — and the demo bar, holding 1.1 weeks against a 3-week target, was told
+           it was "right in line" two lines above a note offering to spend $3,988 bringing 90
+           items up to par. Under-target is a real and different state: less cash on the shelf,
+           and less cover when a delivery slips. The discriminator is structural (which side of
+           the target the reading sits on), not a fitted band ([[the-loop]] #28). */
+        const under = o.weeksOnHand != null && o.weeksOnHand < o.targetWeeks;
+        const short = under ? Math.round((o.targetWeeks - o.weeksOnHand) * 10) / 10 : 0;
         const orderLead = o.excess > 0
           ? 'You are holding <strong style="color:var(--gold);">' + w + ' weeks</strong> of inventory against a ' + o.targetWeeks + '-week target, ' + App.fmtCurrency(o.excess, 0) + ' beyond what you use. Order to par this week, not to a number that feels safe.'
-          : 'You are holding ' + w + ' weeks of inventory, right in line with a ' + o.targetWeeks + '-week target. Keep ordering to par.';
+          : under
+            ? 'You are holding <strong>' + w + ' weeks</strong> of inventory against a ' + o.targetWeeks + '-week target, about ' + short + ' week' + (short === 1 ? '' : 's') + ' light. Less cash is sitting on the shelf, and less cover if a delivery slips.'
+            : 'You are holding ' + w + ' weeks of inventory, right in line with a ' + o.targetWeeks + '-week target. Keep ordering to par.';
         const reorderLine = st.reorder.count > 0
           ? '<div style="font-size:12px;color:var(--t2);margin-top:6px;">Bringing everything to par this week runs <strong>' + App.fmtCurrency(st.reorder.total, 0) + '</strong> across ' + st.reorder.count + ' item' + (st.reorder.count === 1 ? '' : 's') + '.</div>'
           : '';
@@ -423,11 +444,26 @@ S.CashDashboard = {
       const lead = sf.runway != null
         ? 'Your cash runs about <strong style="color:var(--gold);">' + this.runwayLabel(sf.runway) + '</strong> before it would go negative' + (low ? ', bottoming out the week of ' + this.fmtWk(low.ws) + ' at ' + App.fmtCurrency(low.balance, 0) : '') + '. Free trapped cash, hold payments to their due dates, and move a big buy off that week.'
         : 'Your cash holds all thirteen weeks' + (low ? ', with the low point the week of ' + this.fmtWk(low.ws) + ' at ' + App.fmtCurrency(low.balance, 0) : '') + '. ' + (sf.tightWeeks > 0 ? sf.tightWeeks + ' week' + (sf.tightWeeks === 1 ? '' : 's') + ' run tight on flow, catch them before they land.' : 'No tight weeks ahead.');
-      const outLine = st.outThisWeek > 0
-        ? '<div style="font-size:12px;color:var(--t2);margin-top:8px;">This week, about ' + App.fmtCurrency(st.outThisWeek, 0) + ' goes out in bills and buys.</div>'
+      /* ⛔ THIS WEEK'S MONEY IS THE FORECAST'S OWN ROW, NOT A SECOND OPINION. It used to print
+         billsDue + reorderToPar — a SHOPPING LIST total that appears nowhere in the forecast —
+         so the two Cash screens described the same week differently: $3,988 here against the
+         forecast's $9,225.81 out and $8,094.86 in. Labor and the logged cash outflows were
+         simply absent, though this step's own Directions promise "(bills, buys, labor) against
+         what is coming in" and Cash Help says the same. Understated by 57%, in the direction
+         that reads safer. Reading row 0 of the SAME survivalForecast the Cash Forecast renders
+         makes the two agree by construction rather than by coincidence ([[the-loop]] #54).
+         ⚠ Safe because this workspace only ever renders for the CURRENT week — a past week
+         takes the pastWeekCard branch — and survivalForecast always starts at this Monday. */
+      const wk0 = (sf.rows && sf.rows[0]) || null;
+      const outLine = wk0
+        ? '<div style="font-size:12px;color:var(--t2);margin-top:8px;">This week, about <strong>' + App.fmtCurrency(wk0.out, 0) + '</strong> goes out against about <strong>' + App.fmtCurrency(wk0.inflow, 0) + '</strong> coming in.</div>'
         : '';
       return explain(lead) + outLine
-        + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button><button class="btn btn-ghost btn-sm" data-bills="1">Review Bills</button>' + this.markBtn('week', 'Mark Done'));
+        // ONE door for the bills: data-go="operating-expenses", the same route the Cash
+        // Playbook's Review Bills buttons now use. This used to carry a bespoke `data-bills`
+        // attribute with its own branch in wire(), which is how the two ended up pointing at
+        // different screens under the same label.
+        + btnRow('<button class="btn btn-ghost btn-sm" data-go="c-forecast">Cash Forecast</button><button class="btn btn-ghost btn-sm" data-go="operating-expenses">Review Bills</button>' + this.markBtn('week', 'Mark Done'));
     }
 
     // terms
@@ -469,7 +505,6 @@ S.CashDashboard = {
       if (dn) { this.setDone(dn.dataset.done, true); this._openStep = null; this.render(this.container, this.actions); return; }
       const un = ev.target.closest('[data-undone]');
       if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
-      if (ev.target.closest('[data-bills]')) { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.open) S.HubOperatingExpenses.open(); return; }
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
       if (ev.target.closest('.c-wk-prev')) { this._stepWeek(-7); return; }
@@ -494,7 +529,12 @@ S.CashDashboard = {
   },
 
   _insBriefing(st) {
-    const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
+    /* ⛔ App.fmtBal, NOT a private '$' + n. Two of the figures below go under zero (the low
+       point, and Safe to Spend — whose own clause only fires when it IS negative), so the
+       private version printed "$-13,375" every time it mattered, two inches under the strip
+       above printing "-$13,375" for the same number. audit-outlook.js had already fixed its
+       copy of this and carried a comment explaining why; this was the THIRD implementation. */
+    const m = (n) => App.fmtBal(n || 0, 0);
     const sf = st.survival || {}, pos = st.position || {}, cyc = st.cycle || {}, t = st.trapped || {};
     const totalVendors = (window.CashEngine && CashEngine.vendors) ? CashEngine.vendors().length : 0;
     const onTerms = (st.termVendors || []).length;
@@ -519,7 +559,9 @@ S.CashDashboard = {
     let p2 = '';
     if (t.hasData && t.total > 0) p2 = m(t.total) + ' of shelf cash is stuck, ' + m(t.dead) + ' in dead stock and ' + m(t.overPar) + ' above par. ';
     else if (t.hasData) p2 = 'Almost nothing is trapped on the shelf, your inventory is working. ';
-    if (cyc.hasData) p2 += 'Your cash is locked about ' + Math.round(cyc.cycle) + ' days: product sits ' + Math.round(cyc.dio) + ' and you take ' + Math.round(cyc.dpo) + ' to pay.';
+    // ONE cycle sentence, shared with the audit briefing. A negative cycle is the GOOD side
+    // and used to render as "locked about -17 days" here — see App.cashCycleSentence.
+    if (cyc.hasData) p2 += App.cashCycleSentence(cyc.cycle, cyc.dio, cyc.dpo);
     if (p2.trim()) paras.push(p2.trim());
 
     // 3 — the single move that matters most

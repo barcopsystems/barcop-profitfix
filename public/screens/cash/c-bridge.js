@@ -153,7 +153,19 @@ S.CashBridge = {
   },
   wire() {
     this.container.onclick = ev => {
-      if (ev.target.closest('#cb-export')) { App.exportPDF({ title: 'Cash Bridge', root: this.container }); return; }
+      /* ⚠ THE PERIOD GOES IN `range`, OR ALL FOUR VIEWS SAVE AS ONE FILE. Measured before this
+         fix: This Month (+$5,660 kept), This Quarter, Last Quarter (-$10,116) and Last Month
+         (-$5,903) all wrote "<Bar> - Cash Bridge - <today>.pdf" with genuinely different
+         contents, so the second one saved silently replaced the first. `range` is what
+         App.pdfFileName reads for its period segment, and it also prints opposite the
+         generated date in the header, so the document can identify itself on paper too.
+         ⚠ The period chips sit in a no-print wrapper and never reach the exported blocks —
+         which is exactly why the file could not tell you which period it was. */
+      if (ev.target.closest('#cb-export')) {
+        const p = (this.PERIODS.find(([k]) => k === this._period) || [null, ''])[1];
+        App.exportPDF({ title: 'Cash Bridge', root: this.container, range: p });
+        return;
+      }
       const pc = ev.target.closest('.cb-period');
       if (pc) { this._period = pc.dataset.p; this.draw(); return; }
     };

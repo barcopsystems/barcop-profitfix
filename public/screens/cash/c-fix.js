@@ -83,6 +83,9 @@ S.CashFix = {
   // tight weeks. This is the Cash Fix "Stay Ahead" health read, so it must match.
   tightWeeks() { const sf = CashEngine.survivalForecast(13); return (sf && typeof sf.tightWeeks === 'number') ? sf.tightWeeks : 0; },
   termsSet()   { return CashEngine.termVendors().length; },
+  // The DENOMINATOR the terms step is judged against. Without it "have you set any terms at
+  // all" masquerades as "is this system running" — see stepStatus below.
+  vendorCount() { return CashEngine.vendors().length; },
 
   // Does the system behind a gap actually hold data yet? Gates the review steps so
   // they cannot read On track on a fresh account. Mirrors each gap's systemRead.
@@ -106,8 +109,23 @@ S.CashFix = {
         const n = this.tightWeeks(); const good = n === 0;
         return { kind: 'state', good, state: good ? 'clear' : 'open', label: good ? 'Clear ahead' : n + (n === 1 ? ' tight week ahead' : ' tight weeks ahead'), color: good ? 'var(--green)' : 'var(--amber)', sub: good ? '' : 'Cover it before it bites' };
       }
-      const n = this.termsSet(); const good = n > 0;
-      return { kind: 'state', good, state: good ? 'clear' : 'open', label: good ? n + (n === 1 ? ' vendor on terms' : ' vendors on terms') : 'No vendor terms set', color: good ? 'var(--green)' : 'var(--amber)', sub: good ? '' : 'Set your vendor terms' };
+      /* ⛔ "ANY VENDOR HAS TERMS" IS NOT "THE TERMS ARE SET". This read `good = n > 0`, so one
+         vendor on terms turned the step green and rolled the whole system up to "On track" —
+         while the Cash Audit ranked "Set payment terms on the 2 vendors without them" as an
+         open action item and its FIX THIS button deep-linked to THIS system. The operator was
+         sent here to do a job and told nothing was outstanding. Measured on the demo bar: 4 of
+         6 vendors on terms, step green, system On track, audit action item #3 open.
+         The denominator was available the whole time — gapHasData() two functions up already
+         calls CashEngine.vendors(). Same shape as [[the-loop]] #72: a count that goes green at
+         zero without asking what it could not evaluate. */
+      const n = this.termsSet(), total = this.vendorCount();
+      const missing = Math.max(0, total - n);
+      const good = total > 0 && missing === 0;
+      return { kind: 'state', good, state: good ? 'clear' : 'open',
+        label: total > 0 ? n + ' of ' + total + (total === 1 ? ' vendor on terms' : ' vendors on terms') : 'No vendor terms set',
+        color: good ? 'var(--green)' : 'var(--amber)',
+        sub: good ? '' : (n === 0 ? 'Set your vendor terms'
+          : missing + (missing === 1 ? ' vendor is' : ' vendors are') + ' still paying on delivery') };
     }
     const last = this.lastActivity(t.signal);
     // A review step (view:<screen>) goes green just by opening that screen. Until the
@@ -150,7 +168,10 @@ S.CashFix = {
     if (id === 'free-trapped') { const t = CashEngine.trapped(); return t.hasData ? App.fmtCurrency(t.total, 0) + ' trapped on the shelf right now' : 'Take a count and Bar Cop reads what is trapped'; }
     if (id === 'order-to-par') { const o = CashEngine.overOrder(3); if (!o.hasData) return 'Take two counts and Bar Cop reads your weeks on hand'; const w = o.weeksOnHand != null ? o.weeksOnHand.toFixed(1) + ' weeks on hand' : 'on par'; return w + (o.excess > 0 ? ', ' + App.fmtCurrency(o.excess, 0) + ' tied up beyond target' : ''); }
     if (id === 'stay-ahead') { const n = this.tightWeeks(); return n ? n + (n === 1 ? ' tight week' : ' tight weeks') + ' in the next thirteen' : 'no tight weeks in the next thirteen'; }
-    const tv = this.termsSet(); return tv ? tv + (tv === 1 ? ' vendor' : ' vendors') + ' on terms' : 'no vendor terms set yet';
+    // Same denominator as the step above, so the header line and the step cannot disagree
+    // about how much of this system is actually done.
+    const tv = this.termsSet(), tot = this.vendorCount();
+    return tot ? tv + ' of ' + tot + (tot === 1 ? ' vendor' : ' vendors') + ' on terms' : 'no vendors set up yet';
   },
 
   // ── Status ring (SVG literal hex per the SVG-fill rule) ─────────────────────

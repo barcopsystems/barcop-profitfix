@@ -83,6 +83,18 @@ S.CashTrapped = {
       + this.statItem('Dead Stock', App.fmtCurrency(t.dead))
       + this.statItem('Above Par', App.fmtCurrency(t.overPar)));
 
+    /* ⚠ THE HELP PROMISED THESE AND THE SCREEN DID NOT HAVE THEM. "What To Do" says outright:
+       "The buttons take you straight to Dynamic Pars and the movement report" — and this page
+       rendered exactly one control, Export PDF, with zero data-go anywhere. So the only
+       diagnose-then-act screen in Free Up Cash was a dead end: read what is trapped, then find
+       the fix screens yourself. The copy described the right design; the screen was the part
+       that was missing ([[the-loop]] #65 — when the copy and the code disagree, check which
+       one is actually wrong). Dead stock goes to the Stock Report's Dead Stock view, overstock
+       to Dynamic Pars, which is exactly the split the two tables below already make. */
+    const actBtns = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px;" class="no-print">'
+      + '<button class="btn btn-ghost btn-sm" data-go="ic-report-stock">Stock Report</button>'
+      + '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Dynamic Pars</button>'
+      + '</div>';
     const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="ct-export">Export PDF</button>';
 
     const dead = t.items.filter(it => it.kind === 'dead');
@@ -92,6 +104,7 @@ S.CashTrapped = {
       + stats
       + this.section('Dead Stock', dead, 'No dead stock right now. Every product moved.', exportBtn)
       + this.section('Overstock', over, 'Nothing above par right now.')
+      + '<div style="margin-top:18px;">' + actBtns + '</div>'
       + '</div>';
 
     this.container.onclick = ev => {

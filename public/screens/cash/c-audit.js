@@ -207,7 +207,16 @@ S.CashAudit = {
       bar_name: App.data.settings.bar_name,
       overall_score: overall,
       grade: 'Complete Cash Analysis',
-      audit_period: 'As of ' + App.todayLocal(),
+      /* ⚠ A PERIOD, NOT A SECOND COPY OF THE DATE. This wrote 'As of <today>', and the view
+         prints it as "<date>  |  <audit_period>  |  <id>" — so the header read
+         "2026-07-31 | As of 2026-07-31 | CA-14", saying the date twice and the window never.
+         Every other audit states its window (Profit and Revenue take AUDIT_PERIOD, "4 weeks
+         ending X"; the Bar Cop audit says "Last 30 days"); Cash was the only one of the four
+         that did not, and the demo seed papered over it by writing the Revenue-style string.
+         ⚠ It must NOT copy "4 weeks ending X": this audit does not read a trailing 4 weeks.
+         S1/S2 are a right-now shelf read against the last two counts, S3 is thirteen weeks
+         FORWARD, S4 is the vendor list as it stands. That is what the label now says. */
+      audit_period: 'Position today, 13 weeks ahead',
       audit_id: 'CA-' + (this.audits().length + 1),
       sections, action_items, cash_to_free: cashToFree, raw,
       signals: this._riskSignals(),
@@ -292,12 +301,26 @@ S.CashAudit = {
     // cannot claim anything is healthy, so it reads "Not enough data" like the
     // scored sections above. Scored-section count is the honest data signal.
     const hasData = Object.keys(audit.sections || {}).length > 0;
+    /* ⛔ THE ALL-CLEAR MAY ONLY NAME WHAT WAS ACTUALLY LOOKED AT. This sentence enumerated four
+       things — "Your runway, what is safe to spend, your draws, and your reserve are all in a
+       healthy range" — off nothing but "some section scored". Three of the four risk signals
+       are gated on the liquidity read (`sf.hasData && sf.hasOpening`), so a bar that has never
+       entered its bank balance fires NO signals, scores S1/S2 fine, and was told its runway
+       was healthy. That is live-reachable, not just a demo artefact: _computeAudit sets s3 to
+       null whenever survivalForecast has no data. Found via the seeded history, where an early
+       audit printed CLEAR beside a 6-week runway, but the live path has the same hole.
+       [[the-loop]] #72: when a count of problems goes green at zero, say what it could not
+       evaluate. */
+    const scored = Object.keys(audit.sections || {});
+    const liquidityScored = scored.indexOf(this.SECTION_NAMES[2]) >= 0;
     const tag = hasData
       ? '<div style="color:var(--green);font-weight:800;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;">Clear</div>'
       : '<div style="text-align:right;flex-shrink:0;"><div style="font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);line-height:1;">N/A</div><div style="font-size:10px;color:var(--t4);margin-top:3px;">Not enough data</div></div>';
-    const body = hasData
-      ? 'No cash risks flagged. Your runway, what is safe to spend, your draws, and your reserve are all in a healthy range.'
-      : 'Not enough data to flag cash risks yet. Set your opening cash balance and log a week of cash and inventory, then run it.';
+    const body = !hasData
+      ? 'Not enough data to flag cash risks yet. Set your opening cash balance and log a week of cash and inventory, then run it.'
+      : liquidityScored
+        ? 'No cash risks flagged. Your runway, what is safe to spend, your draws, and your reserve are all in a healthy range.'
+        : 'No cash risks flagged in what this audit could read. Your runway and what is safe to spend were not scored here, so this does not speak for them. Set your opening cash balance in Cash Position and run it again.';
     return '<div class="card" style="margin-bottom:14px;">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;">'
       + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">Section 5</div>'
@@ -376,13 +399,24 @@ S.CashAudit = {
     };
   },
 
+  /* ⛔ ENTER THROUGH App.pushView, WHICH IS WHAT RAISES THE FLOATING BACK BUTTON.
+     This used to append "← Back" and "Print / Save PDF" to `this.actions` — which is
+     `#topbar-actions`, inside the old `.topbar`. `c-audit` is in App._CONVERTED, so that
+     topbar is `display:none` and BOTH buttons rendered at zero width. Measured: from an audit
+     full view there was no visible Back anywhere (no #fn-back either, because nothing had
+     pushed a view), and browser Back left the audit entirely — from a historical audit opened
+     out of the history table it landed on Cash Fix. The only way back to the list was the nav
+     rail. Export survived only because the page body carries its own copy of that button.
+     app.js's _viewStack comment states the convention: one floating back button, no per-page
+     back buttons — the same door Count / Delivery / Order history already use. */
   viewAudit(idx) {
     const audit = this.audits()[idx];
     if (!audit) return;
-    this.actions.innerHTML = '';
-    const back = document.createElement('button'); back.className = 'btn btn-ghost btn-sm'; back.textContent = '← Back'; back.style.marginRight = '8px'; back.onclick = () => this.renderMain(); this.actions.appendChild(back);
-    const pr = document.createElement('button'); pr.className = 'btn btn-ghost btn-sm'; pr.textContent = 'Print / Save PDF'; pr.onclick = () => this.exportPDF(audit); this.actions.appendChild(pr);
+    App.pushView(() => this._drawAudit(audit));
+  },
 
+  _drawAudit(audit) {
+    if (this.actions) this.actions.innerHTML = '';
     const d = audit.raw || {};
     const sx = audit.sections || {};
     const cur = v => v != null && v !== 0 ? App.fmtCurrency(v) : '';

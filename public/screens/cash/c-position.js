@@ -82,7 +82,10 @@ S.CashPosition = {
     return '<div class="card form-card" style="margin-top:6px;"><div class="card-title">Safe to Spend</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:18px;">As of ' + today + '. A snapshot of your account right now, not a forecast.</div>'
       + '<div style="display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;">'
-      +   eq('Your Balance', App.fmtCurrency(p.opening || 0))
+      // ⚠ fmtBal, not fmtCurrency: an OVERDRAWN account is a real state a bar reaches, and
+      // fmtCurrency renders it "$-5,000.00". The minus belongs outside the dollar sign, the
+      // same rule the Safe to Spend figure four lines down already follows.
+      +   eq('Your Balance', App.fmtBal(p.opening || 0))
       +   op('&minus;')
       +   eq('Set Aside, Not Yours', App.fmtCurrency(p.setAside.total), { col: p.setAside.total > 0 ? 'var(--amber)' : 'var(--t1)' })
       +   op('&minus;')
@@ -105,7 +108,9 @@ S.CashPosition = {
     return '<div class="sh" style="margin:24px 0 10px;">Money That Isn\'t Yours</div>'
       + '<div class="card">'
       + (rateSet
-          ? row('Sales tax collected', sa.salesTax, 'Tax on your ' + sa.periodLabel + ' sales (' + App.fmtCurrency(sa.sales) + '), owed at your next remittance', true)
+          // "Tax on your this month sales" — periodLabel is a phrase ("this month" / "this
+          // quarter"), so it reads as a noun modifier where it sat. It goes after the noun.
+          ? row('Sales tax collected', sa.salesTax, 'Tax on your sales ' + sa.periodLabel + ' (' + App.fmtCurrency(sa.sales) + '), owed at your next remittance', true)
           : '<div style="font-size:12px;color:var(--t3);padding:6px 0;">Set your sales tax rate above and Bar Cop tracks the tax you have collected and owe since your last filing.</div>')
       + (CashEngine.payrollBurden() > 0 ? row('Payroll tax', sa.payrollTax, 'Estimated on ' + App.fmtCurrency(sa.wages) + ' in wages ' + sa.periodLabel, true) : '')
       + (sa.giftCards > 0 ? row('Gift cards outstanding', sa.giftCards, 'Cash you collected, product still owed', true) : '')

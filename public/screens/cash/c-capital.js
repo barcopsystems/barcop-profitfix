@@ -59,9 +59,18 @@ S.CashCapital = {
     const stats = this.statsCard(
       this.statItem('Average Capital On the Shelf', App.fmtCurrency(cap.totalCap))
       + this.statItem('Blended Turns', cap.turns != null ? cap.turns.toFixed(1) + 'x' : '-')
-      + this.statItem('Weeks On Hand', cap.turns != null && cap.turns > 0 ? (52 / cap.turns).toFixed(1) + 'w' : '-'));
+      /* ⚠ "AVG WEEKS", NOT "WEEKS ON HAND" — the label was the last thing on this card still
+         sold on the wrong basis. This figure is 52 / blended turns, i.e. how long a dollar sits
+         on the shelf on AVERAGE. Purchasing and the Close The Week step print "Weeks On Hand"
+         from overOrder(): the shelf RIGHT NOW over weekly COGS. Measured on the demo bar those
+         are 2.2w and 1.1w — one label, two meanings, 2x apart, one nav click from each other,
+         and both PDFs carried it. Its two neighbours were corrected to state their basis in an
+         earlier pass; this one and the Weeks column below were missed.
+         ⛔ FIX THE LABEL, NEVER THE MATH: turns and GMROI are only honest against average
+         inventory, and mixing the bases is the defect verify-capital-label.js exists to stop. */
+      + this.statItem('Avg Weeks on Shelf', cap.turns != null && cap.turns > 0 ? (52 / cap.turns).toFixed(1) + 'w' : '-'));
 
-    const headers = '<th>Category</th><th>Avg Capital</th><th>Turns/yr</th><th>Weeks</th><th>Verdict</th>';
+    const headers = '<th>Category</th><th>Avg Capital</th><th>Turns/yr</th><th>Avg Weeks</th><th>Verdict</th>';
     const rows = cap.rows.map(r => {
       const [vl, vc] = this.verdict(r.gmroi);
       return '<tr><td style="color:var(--t1);">' + esc(r.cat) + '</td>'
