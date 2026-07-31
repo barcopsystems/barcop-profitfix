@@ -280,7 +280,17 @@ S.Reports = {
       CreatedDate: new Date()
     };
 
-    const filename = App.fileSafe(barName) + ' - Weekly P&L Worksheet - ' + today + '.xlsx';
+    /* ⛔ NAME IT FOR THE PERIOD IT COVERS, NOT THE DAY IT WAS MADE. This was `+ today +`, so
+       "Last 13 weeks", "Year to date" and "All saved weeks" all produced ONE filename — the
+       second export silently replacing the first in the downloads folder — while the sheet's own
+       first row said "2026-05-03 through 2026-07-26". `firstWeek`/`lastWeek` were already in
+       scope, used in wb.Props.Title on the line above; nothing had to be traced. Month-End and
+       Annual Review both name their period, so this was the odd one out.
+       A single-week range reads as one date rather than "X to X". */
+    const span = (firstWeek && lastWeek)
+      ? (firstWeek === lastWeek ? firstWeek : firstWeek + ' to ' + lastWeek)
+      : today;
+    const filename = App.fileSafe(barName) + ' - Weekly P&L Worksheet - ' + span + '.xlsx';
     XLSX.writeFile(wb, filename);
     try { localStorage.setItem('books_report_run_weeklypnl', new Date().toISOString()); } catch (e) {}
     this._setStatus('Downloaded ' + filename, 'var(--gold)');

@@ -1712,11 +1712,48 @@ S.HubOperatingExpenses = {
   },
 
   // ── Delete ─────────────────────────────────────────────────────────────
+  /* ⛔ NAME THE BILL, AND SAY WHAT ELSE GOES WITH IT (B6).
+     This door showed the generic "Delete this? Deleting this data is a permanent action and
+     cannot be undone." on a record that feeds the Income Statement, the Books landing, the Cash
+     Forecast and the workbook an accountant opens. Two sections away a PRODUCT delete names every
+     menu item and prep batch at risk, a VENDOR delete names its products and open orders, and
+     Cancel Order names the vendor and the amount. This was the odd one out, on money.
+     And the generic sentence was actively WRONG for two of the three paths _delete takes:
+       · a SERIES PARENT   -> its children are detached and every past month STAYS on the books,
+                              which is the opposite of "cannot be undone" as an operator reads it
+       · a GENERATED month -> a skip is recorded so the catch-up cannot re-mint it
+       · a plain bill      -> it simply goes
+     Returns {title, message} so the wording is testable without a browser. */
+  _delExpenseSummary(rec) {
+    const money = App.fmtCurrency(rec.amount || 0);
+    const who = rec.vendor ? rec.vendor : rec.category;
+    const title = 'Delete ' + who + ' ' + money + '?';
+    const head = (rec.vendor ? rec.category + ' · ' : '') + (rec.date || '');
+    if (rec.recurring_parent) {
+      return { title, message: head + '\n\nThis is one generated month of a recurring bill. '
+        + 'Deleting it records the month as skipped, so it will not come back on the next load. '
+        + 'The rest of the series is untouched.' };
+    }
+    const kids = this.records().filter(r => r && r.recurring_parent === rec.id).length;
+    if (kids > 0 || rec.recurring) {
+      return { title, message: head + '\n\n'
+        + (kids > 0
+            ? 'This is the parent of a recurring bill. Its ' + kids + ' generated '
+              + (kids === 1 ? 'month stays' : 'months stay') + ' on your books, because that is money '
+              + 'you already spent. They stop being tied to a series.\n\n'
+            : 'This is a recurring bill.\n\n')
+        + 'Nothing new will be generated for it again.' };
+    }
+    return { title, message: head + '\n\nThis removes it from your operating expenses, your '
+      + 'income statement and your month-end file. It cannot be undone.' };
+  },
+
   async _delete(id) {
     const arr = this.records();
     const rec = arr.find(r => r.id === id);
     if (!rec) return;
-    const ok = await App.confirmDelete();
+    const s = this._delExpenseSummary(rec);
+    const ok = await App.confirm({ title: s.title, message: s.message, confirmText: 'Delete', maxWidth: 460 });
     if (!ok) return;
     /* ⚠⚠ DELETING A GENERATED MONTH HAS TO BE RECORDED, OR IT IS NOT A DELETE (S226a). These rows
        are DERIVED — the catch-up regenerates them from the parent on any later load — so removing
