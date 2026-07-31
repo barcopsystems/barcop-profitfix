@@ -819,8 +819,15 @@ S.InventoryTakeInventory = {
         const pid = inp.dataset.pid;
         const card = this.container.querySelector('.card[data-pid="' + pid + '"]');
         if (!card) return;
-        const cases = parseInt(card.querySelector('.ti-cases')?.value) || 0;
-        const loose = parseInt(card.querySelector('.ti-loose')?.value) || 0;
+        /* ⛔ CLAMP AT THE READ. min="0" on the input is a hint on the spinner arrows only — it does
+           not stop typing, and this handler both ECHOES and STORES (this.draft.counts three lines
+           down), so an unclamped read put the negative straight into the record. MEASURED: -3
+           cases of Bud Light rendered "$-86.40" on review, SUBMIT accepted it, and
+           _perpetualInventory then carried onHand -1.583 for a real product — into usage, COGS,
+           the reorder plan and Schedule C. The bottle-slider path next to it always clamped.
+           Pinned by verify-count-inputs-clamped.js. */
+        const cases = Math.max(0, parseInt(card.querySelector('.ti-cases')?.value) || 0);
+        const loose = Math.max(0, parseInt(card.querySelector('.ti-loose')?.value) || 0);
         const caseSize = parseFloat(card.dataset.caseSize) || 0;
         const echo = card.querySelector('.ti-echo');
         if (echo) echo.textContent = '= ' + (cases + (caseSize ? loose / caseSize : 0)).toFixed(2) + ' cases';
@@ -840,8 +847,8 @@ S.InventoryTakeInventory = {
         const pid = inp.dataset.pid;
         const card = this.container.querySelector('.card[data-pid="' + pid + '"]');
         if (!card) return;
-        const fulls = parseInt(card.querySelector('.ti-fulls')?.value) || 0;
-        const loose = parseInt(card.querySelector('.ti-looseea')?.value) || 0;
+        const fulls = Math.max(0, parseInt(card.querySelector('.ti-fulls')?.value) || 0);
+        const loose = Math.max(0, parseInt(card.querySelector('.ti-looseea')?.value) || 0);
         const packSize = parseFloat(card.dataset.packSize) || 0;
         const echo = card.querySelector('.ti-echo-pack');
         if (echo) {
@@ -863,7 +870,7 @@ S.InventoryTakeInventory = {
         const pid = inp.dataset.pid;
         const key = pid + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
-        this.draft.counts[key] = { value: parseFloat(inp.value) || 0, fulls: 0, notes: prev.notes || '' };
+        this.draft.counts[key] = { value: Math.max(0, parseFloat(inp.value) || 0), fulls: 0, notes: prev.notes || '' };
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
