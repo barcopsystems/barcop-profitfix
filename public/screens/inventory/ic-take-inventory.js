@@ -375,8 +375,11 @@ S.InventoryTakeInventory = {
         confirmText: 'Open That Count', cancelText: 'Cancel'
       });
       if (!openIt) return;
-      // no draft exists yet, so nothing can be lost — go straight in
-      if (this.editCount(prior.id) !== 'opened') this._countGoneNotice();
+      /* no draft exists yet, so nothing can be lost — go straight in.
+         ⚠ AND LAND ON THE LOCATION THE PROMPT JUST NAMED. Without `atLocation` this opened at step 0
+         of the existing count, which on a Full count is a different shelf entirely and 130-odd
+         products away from the one they asked about. */
+      if (this.editCount(prior.id, { atLocation: overlap[0] }) !== 'opened') this._countGoneNotice();
       return;
     }
 
@@ -480,7 +483,20 @@ S.InventoryTakeInventory = {
       _edit_created_at: rec.created_at,
       _edit_count:     (rec.edit_count || 0) + 1
     };
+    /* ⚠⚠ OPEN AT THE LOCATION THEY ASKED ABOUT (found by walking the live app, 2026-07-31).
+       S330b's offer is *"You already counted Kitchen Line today. Open that count and correct it
+       instead of starting a new one?"* — and it then dropped the operator on **Back Bar**, step 0
+       of 5, because this always set `_locStep: 0`. On the seed's Full count that is 133 products
+       and three presses of Next Location, with nothing on screen saying where Kitchen Line is. The
+       prompt names a location; the screen has to land on it. Same defect class as S330b itself:
+       the guard was right and the follow-through sent them somewhere useless.
+       ⚠ Falls back to step 0 when the caller names nothing, or names a location this count has no
+       products in — a step index that does not exist would render an empty shelf. */
     this.locStep = 0;
+    if (opts.atLocation) {
+      const at = this.groups().findIndex(g => g && g.location === opts.atLocation);
+      if (at > 0) { this.draft._locStep = at; this.locStep = at; }
+    }
     this.saveDraft();
     this.renderCounting();
     return 'opened';
