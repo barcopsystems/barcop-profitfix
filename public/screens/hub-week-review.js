@@ -166,7 +166,17 @@ S.WeekReview = {
         laborPct = ((b.labor || 0) + (f.labor || 0) + (c.labor || 0)) / totSales * 100;
       }
     }
-    return { netSales, prime, laborPct };
+    /* ⛔ REPORT WHETHER THE WEEK IS CONFIRMED, NOT JUST WHAT IT IS WORTH (W2). These tiles print
+       a bare '-' until the week is confirmed, while the Shift card ten inches below prints
+       "Net Sales $19,150" off the LOGGED shifts. Both are right and they answer different
+       questions — this one is "what did you sign off", that one is "what has been logged so far"
+       — but they carry the same label and nothing said which was which
+       ([[the-loop]] #57: different quantities are allowed to differ; the fix is the label).
+       ⚠ The flag is about the RECORD EXISTING, never about a value being null: a week can be
+       confirmed and still leave Labor % unknown (confirm-week is null-in/null-out there on
+       purpose), and captioning that "not confirmed" would be a false statement about the
+       operator's own work. */
+    return { netSales, prime, laborPct, confirmed: !!(w || rw) };
   },
   _topCard() {
     const m = this._weekMoney();
@@ -185,7 +195,15 @@ S.WeekReview = {
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Week In Review</div>'
       +   '<button class="btn btn-ghost btn-sm no-print" id="wr-brief" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>'
       + '</div>'
-      + '<div class="wr-statrow wr-topstats" style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + stats + '</div></div>';
+      + '<div class="wr-statrow wr-topstats" style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + stats + '</div>'
+      /* ⛔ SAY WHY THESE ARE BLANK (W2). Three dashes up here beside "Net Sales $19,150" in the
+         Shift card read as a contradiction; they are two different questions and only this one
+         waits on the weekly close. Said ONCE, under the row, rather than stuffing words into a
+         38px number slot. Gated on the week RECORD, never on a null figure. */
+      + (m.confirmed ? ''
+          : '<div class="wr-tophead" style="padding-top:0;font-size:11.5px;color:var(--t3);line-height:1.6;">'
+            + 'This week is not confirmed yet, so these fill in once you confirm it. The section cards below show what has been logged so far.</div>')
+      + '</div>';
   },
 
   // ── Inventory ───────────────────────────────────────────────────────────────
@@ -832,6 +850,10 @@ S.WeekReview = {
     const range = fmt(this._wkS()) + ' - ' + fmt(this._wkE());
     const b = App._pdfBuilder('Week in Review', {});
     b.header({ right: 'Week in Review', meta: range });
+    // The same fact on the artefact that leaves the building: a blank Net Sales on paper, with no
+    // explanation, is the identical ambiguity the screen had (step 0.6 — the PDF is the second
+    // consumer, and it is the one an accountant reads without the app in front of them).
+    if (!m.confirmed) b.paragraph('This week is not confirmed yet, so the sales and cost figures below are still open. The section notes show what was logged.', { gray: 70 });
     b.kv('Net Sales', m.netSales != null ? App.fmtCurrency(m.netSales, 0) : '-');
     b.kv('Prime Cost', pctv(m.prime));
     b.kv('Labor', pctv(m.laborPct));
