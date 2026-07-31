@@ -1006,7 +1006,23 @@ window.CashEngine = {
   setTaxFrequency(v) { return App.acctSet('cash_tax_freq', v === 'quarterly' ? 'quarterly' : 'monthly'); },
   payrollBurden()  { return this._cfgNum('cash_payroll_burden', 0); },
   setPayrollBurden(v) { return this._cfgSet('cash_payroll_burden', v); },
-  reserveWeeks()   { return this._cfgNum('cash_reserve_weeks', 8); },
+  /* ⛔ FLOORED AT ZERO, AND IT IS THE FLOOR THAT MATTERS MOST OF THE THREE ON THIS FORM.
+     Cash Position writes reserve weeks, available credit and gift cards from three number
+     inputs, none of which carries a `min`. The other two were already floored on read; this
+     one was not, and it is the one that SUBTRACTS:
+         reserveTarget() = reserveWeeks() * weeklyFixedCosts()
+         position().safe = cushion - reserveTarget()
+     so a negative weeks value made the target negative and the subtraction ADDED money.
+     Measured live at -3 weeks on a bank balance of -$5,000: Safe to Spend read +$4,821.32 in
+     green, the Cash Audit went 66 -> 71, and three separate warnings gated on `safe < 0` /
+     `reserve > 0` all fell silent at once. An overdrawn bar was told it had money to spend.
+     The floor lives on the READ because that is the single door every consumer comes through
+     (Cash Position, the Forecast's Save, a restored backup) — a guard on one form is a guard
+     on one form. An explicit 0 stays legitimate: it means "I do not want a reserve".
+     ⚠ It also fixes weeklyFixedCosts, whose horizon is `(reserveWeeks() || 8) * 7` days
+     FORWARD — at -3 that ran 21 days backwards and silently changed which recurring bills the
+     reserve was sized from. Pinned in verify-reserve-weeks-floor.js. */
+  reserveWeeks()   { return Math.max(0, this._cfgNum('cash_reserve_weeks', 8)); },
   setReserveWeeks(v) { return this._cfgSet('cash_reserve_weeks', v); },
   // Available credit (a line of credit or card) is the backstop you actually lean
   // on in a thin week, so it extends the survival runway past the bank balance.

@@ -2665,6 +2665,14 @@ const App = {
     // Hub Accounting deliverables a fix step can deep-link to.
     if (id === 'weekly-pnl') { if (window.S && S.Reports && S.Reports._openQboModal) S.Reports._openQboModal(); return; }
     if (id === 'books') { if (window.S && S.HubBooks && S.HubBooks.open) S.HubBooks.open(); return; }
+    /* ⚠ THE BILLS ARE NOT THE MONTH-END CLOSE. Two "Review Bills" buttons in the Cash Playbook
+       routed to 'books', which opens Month-End Books — a closing workbook picker — while the
+       prose directly above one of them reads "Your bills live in Books, where you pay on the
+       due date". The Cash cockpit's own Review Bills went to the right place through a bespoke
+       branch, so the section had one label, two destinations, and only one of them right.
+       Routing both by id here means there is ONE door, not two spellings of the job. */
+    if (id === 'operating-expenses') { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.open) S.HubOperatingExpenses.open(); return; }
+    if (id === 'cash-outflows') { if (window.S && S.HubCashOutflows && S.HubCashOutflows.open) S.HubCashOutflows.open(); return; }
     // Gate before swapping the shell so a locked screen shows the notice and
     // leaves the member where they were (mobile drawer routes through here).
     if (!this.canAccess(id)) { this.showNoAccess(); return; }
@@ -8273,6 +8281,27 @@ const App = {
   fmtBal(v, decimals) {
     const d = decimals !== undefined ? decimals : 2;
     return (Number(Number(v).toFixed(d)) < 0 ? '-' : '') + App.fmtCurrency(Math.abs(v), decimals);
+  },
+
+  /* ── ONE sentence for the cash conversion cycle, because a NEGATIVE cycle means the
+     OPPOSITE of a positive one and three screens print it.
+     DIO minus DPO. Positive = your money is tied up for that many days. Negative = your
+     vendors are financing the inventory and the cash is back before their bills are due,
+     which is the good side. Both briefings used to render it as
+        "Your cash is locked about -17 days"
+     — a duration that cannot exist, describing the healthy case as the sick one — while
+     Capital Efficiency and Cash Audit S2 both worded the same number correctly. That is a
+     third implementation of one job, so there is now exactly one
+     ([[the-loop]] "WHEN YOU FIX A SHARED THING, GREP FOR OTHER IMPLEMENTATIONS").
+     `cashCycle()` already agrees with this: it clamps lockedCash to 0 below zero, because
+     nothing is locked. Takes plain numbers so a stored audit `raw` block can call it too. */
+  cashCycleSentence(cycleDays, dio, dpo) {
+    const c = Math.round(cycleDays || 0), i = Math.round(dio || 0), p = Math.round(dpo || 0);
+    const sits = 'product sits ' + i + ' and you take ' + p + ' to pay.';
+    if (c > 0) return 'Your cash is locked about ' + c + ' days: ' + sits;
+    if (c === 0) return 'Your cash comes back about the day the bills are due: ' + sits;
+    return 'Your vendors are financing your inventory: your cash comes back about ' + Math.abs(c)
+      + ' day' + (Math.abs(c) === 1 ? '' : 's') + ' before the bills are due, because ' + sits;
   },
 
   fmtCurrency(n, decimals) {
