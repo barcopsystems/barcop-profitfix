@@ -194,16 +194,33 @@ const ConfirmWeek = {
 
   /* The week's numbers, derived in one place so the money strip and the saved
      record can never drift apart. Null in, null out: a percentage whose input was
-     never entered is unknown, and it stays unknown all the way into the store. */
+     never entered is unknown, and it stays unknown all the way into the store.
+     ⚠ This half only READS THE FORM. Every line of arithmetic lives in `_derive` below, because
+     the S331 count-edit updater has to ask the identical question about a week that is NOT on
+     screen — and a second copy of this math is exactly the drift [[the-loop]] #45 keeps finding. */
   _figures() {
-    const nz = v => (v == null ? 0 : v);
-    const bRev = this._valOrNull('cw-bar-rev'),  bCogs = this._valOrNull('cw-bar-cogs'),  bLab = this._valOrNull('cw-bar-lab');
-    const fRev = this._valOrNull('cw-food-rev'), fCogs = this._valOrNull('cw-food-cogs'), fLab = this._valOrNull('cw-food-lab');
-    const covers = this._valOrNull('cw-covers');
-    const oRev = this._val('cw-anc-rev'), oCogs = this._val('cw-anc-cogs'), fees = this._val('cw-fees');
     const cat = this._catering || {};
-    const cRev = parseFloat(cat.revenue) || 0, cCogs = parseFloat(cat.cogs) || 0, cLab = parseFloat(cat.labor) || 0;
-    const hours = this._hours || 0;
+    return this._derive({
+      bRev: this._valOrNull('cw-bar-rev'),  bCogs: this._valOrNull('cw-bar-cogs'),  bLab: this._valOrNull('cw-bar-lab'),
+      fRev: this._valOrNull('cw-food-rev'), fCogs: this._valOrNull('cw-food-cogs'), fLab: this._valOrNull('cw-food-lab'),
+      covers: this._valOrNull('cw-covers'),
+      oRev: this._val('cw-anc-rev'), oCogs: this._val('cw-anc-cogs'), fees: this._val('cw-fees'),
+      cRev: parseFloat(cat.revenue) || 0, cCogs: parseFloat(cat.cogs) || 0, cLab: parseFloat(cat.labor) || 0,
+      hours: this._hours || 0,
+      periodEnd: this._weekEnd
+    });
+  },
+
+  /* The arithmetic, with no DOM in it. Takes the raw cells, returns every figure the money strip
+     and the saved record are built from. */
+  _derive(r) {
+    const nz = v => (v == null ? 0 : v);
+    const bRev = r.bRev, bCogs = r.bCogs, bLab = r.bLab;
+    const fRev = r.fRev, fCogs = r.fCogs, fLab = r.fLab;
+    const covers = r.covers;
+    const oRev = r.oRev || 0, oCogs = r.oCogs || 0, fees = r.fees || 0;
+    const cRev = r.cRev || 0, cCogs = r.cCogs || 0, cLab = r.cLab || 0;
+    const hours = r.hours || 0;
 
     const totRev = nz(bRev) + nz(fRev) + cRev;
     // Total sales = F&B (bar+food+catering) + ancillary. Prime % and Labor % are measured
@@ -228,7 +245,7 @@ const ConfirmWeek = {
     // Hourly (schedulable) labor = bar+food hourly only, minus fixed salaried pay,
     // so the labor-scheduling recovery leak dollarizes only what the weekly schedule
     // can move (catering event crew is event-driven, not weekly-schedulable).
-    const salaried = App.salariedCost ? (App.salariedCost(App.weekStartFor(this._weekEnd), this._weekEnd).total || 0) : 0;
+    const salaried = App.salariedCost ? (App.salariedCost(App.weekStartFor(r.periodEnd), r.periodEnd).total || 0) : 0;
     const hourlyLabor = Math.max(0, (nz(bLab) + nz(fLab)) - salaried);
 
     return {
@@ -243,6 +260,28 @@ const ConfirmWeek = {
       hourlyPct: (laborIn && fbRev > 0)    ? hourlyLabor / fbRev * 100 : null,
       checkAvg:  (covers > 0) ? fbRev / covers : null,   // F&B revenue over F&B covers: check average is per-guest, so the numerator must match the cover population (catering revenue has no cover here). Matches the retired This Week screen and the metric's base=covers contract.
       rplh:      (hours  > 0) ? totRev / hours  : null
+    };
+  },
+
+  /* The `week` record's COMPUTED half — everything that follows from the figures, in ONE place.
+     ⚠ TWO doors now write this record: the weekly confirm below, and the S331 count-edit updater.
+     [[the-loop]] #54 — the moment a number is produced in two places the test is the EQUALITY, and
+     the cheapest way to guarantee it is one implementation. The caller owns the IDENTITY half
+     (id, week_num, period_end, saved_at, notes); everything here is derived and nothing else is. */
+  _weekShape(f) {
+    const t = (App.data.settings && App.data.settings.targets) || {};
+    const bTgt = t.bar_pour_cost_pct ?? 22, fTgt = t.food_cost_pct ?? 32;
+    return {
+      bar:  { revenue: f.bRev, cogs: f.bCogs, labor: f.bLab, cost_pct: f.barPct, labor_pct: f.barLabPct,
+              vs_target_pct: f.barPct != null ? f.barPct - bTgt : null,
+              vs_target_dollar: f.barPct != null ? ((f.barPct - bTgt) / 100) * f.bRev : null },
+      food: { revenue: f.fRev, cogs: f.fCogs, labor: f.fLab, cost_pct: f.foodPct, labor_pct: f.foodLabPct,
+              vs_target_pct: f.foodPct != null ? f.foodPct - fTgt : null,
+              vs_target_dollar: f.foodPct != null ? ((f.foodPct - fTgt) / 100) * f.fRev : null },
+      catering: { revenue: f.cRev, cogs: f.cCogs, labor: f.cLab, cost_pct: f.cRev > 0 ? f.cCogs / f.cRev * 100 : 0, labor_pct: f.cRev > 0 ? f.cLab / f.cRev * 100 : 0 },
+      other: { revenue: f.oRev, cogs: f.oCogs },
+      platform_fees: f.fees,
+      prime_cost_pct: f.primePct
     };
   },
 
@@ -341,28 +380,14 @@ const ConfirmWeek = {
     }
     if (f.totRev === 0) { fail('Enter at least one revenue figure before confirming.'); return; }
 
-    const t = (App.data.settings && App.data.settings.targets) || {};
-    const bTgt = t.bar_pour_cost_pct ?? 22, fTgt = t.food_cost_pct ?? 32;
-
     // ── Profit `week` record ──
     const pw = (App.data.weeks || []).find(w => w.period_end === pe) || null;
-    const week = {
+    const week = Object.assign({
       id: pw ? pw.id : App.uid(),
       week_num: pw ? pw.week_num : App.weekNumFor(App.data.weeks || [], pe),
       period_end: pe,
-      saved_at: new Date().toISOString(),
-      bar:  { revenue: f.bRev, cogs: f.bCogs, labor: f.bLab, cost_pct: f.barPct, labor_pct: f.barLabPct,
-              vs_target_pct: f.barPct != null ? f.barPct - bTgt : null,
-              vs_target_dollar: f.barPct != null ? ((f.barPct - bTgt) / 100) * f.bRev : null },
-      food: { revenue: f.fRev, cogs: f.fCogs, labor: f.fLab, cost_pct: f.foodPct, labor_pct: f.foodLabPct,
-              vs_target_pct: f.foodPct != null ? f.foodPct - fTgt : null,
-              vs_target_dollar: f.foodPct != null ? ((f.foodPct - fTgt) / 100) * f.fRev : null },
-      catering: { revenue: f.cRev, cogs: f.cCogs, labor: f.cLab, cost_pct: f.cRev > 0 ? f.cCogs / f.cRev * 100 : 0, labor_pct: f.cRev > 0 ? f.cLab / f.cRev * 100 : 0 },
-      other: { revenue: f.oRev, cogs: f.oCogs },
-      platform_fees: f.fees,
-      prime_cost_pct: f.primePct,
-      notes: notes
-    };
+      saved_at: new Date().toISOString()
+    }, this._weekShape(f), { notes: notes });
 
     // ── Revenue `revenue_week` record ──
     const rw = (App.data.revenue_weeks || []).find(w => (w.period_end || '').slice(0, 10) === pe) || null;
@@ -432,5 +457,215 @@ const ConfirmWeek = {
       if (btn) { btn.disabled = false; btn.textContent = 'Confirm the Week'; }
       fail('Could not save. Try again.');
     }
+  },
+
+  /* ── S331: WHAT WOULD A CORRECTED COUNT DO TO THE WEEKS ALREADY CONFIRMED? ────────────────────
+     Kyle: *"a submitted count that has been included in a confirmed week.. can't it just still have
+     an edit button that when it is changed and submitted a popup just says 'this count is included
+     in this confirmed week and the count will adjust in that week'?"* The alternative — re-open the
+     week, go to inventory, edit, come back, re-confirm — is exactly the hoops this app exists to
+     remove. And it opens no new hole: a confirmed week's figures are ALREADY editable from Week
+     History, which reuses this same popup and writes back to these same records. The old lock froze
+     the SOURCE while leaving the RESULT freely editable.
+
+     ⚠⚠ MORE THAN ONE WEEK MOVES. A count is the END of one usage pair and the START of the next, so
+     correcting count N moves the week whose pair ends at N *and* the one ending at N+1 — and it does
+     not stop at two: `icCOGS` will price a week off a pair up to nine days stale, so a week
+     confirmed early can share a pair with the week before it and three move at once. Rather than
+     re-deriving which weeks those are — a second copy of icCOGS's pair-and-span rules, which is how
+     [[the-loop]] #45 keeps biting — this asks EVERY confirmed week the question twice, once against
+     the stored counts and once against the corrected set, and reports the ones whose answer moved.
+     No window is assumed, so no future change to icCOGS can leave this behind, and nothing in the
+     copy may quote a count.
+
+     ⚠ THE COMPARISON IS AT CENT GRANULARITY on purpose. `submit()` rebuilds a count's items from the
+     live sheet, so an untouched re-save can reorder the summation and move a total by 1e-12. Money
+     is measured in cents; a float artefact is not a change an operator made. */
+  cogsImpact(nextCounts) {
+    /* ⚠ ONE ROW PER `period_end`, and it must be the SAME row `_save` would edit. Duplicate week
+       records are a shape this codebase already documents as reachable (app.js: two devices saving
+       for one untouched week leave two rows), and `_save` resolves them with `.find`, so only the
+       first is ever editable from the UI. Without this, a correction listed the same week twice in
+       the popup with identical figures and wrote both — including the row nothing can reach. */
+    const seenPe = new Set();
+    const weeks = ((App.data && App.data.weeks) || []).filter(w => {
+      const pe = w && String(w.period_end || '').slice(0, 10);
+      if (!pe || seenPe.has(pe)) return false;
+      seenPe.add(pe);
+      return true;
+    });
+    const inv = App.inventoryData;
+    if (!weeks.length || !inv || !Array.isArray(nextCounts)) return [];
+    const cents = v => (v == null ? null : Math.round(v * 100));
+    const r2 = v => (v == null ? null : Math.round(v * 100) / 100);
+    const num = (o, k) => (o && o[k] != null) ? o[k] : null;
+    const read = () => weeks.map(w => {
+      const pe = String(w.period_end).slice(0, 10);
+      return { bar: S.ThisWeek.icCOGS(App.BAR_CATS, pe), food: S.ThisWeek.icCOGS(App.KITCHEN_CATS, pe) };
+    });
+
+    /* ⚠⚠ THE STORE IS BORROWED, AND EVERY EXIT PUTS IT BACK ([[the-loop]] #49). `icCOGS` reads
+       `App.inventoryData.ic_counts` directly, so the only way to ask "what would this count do" with
+       the SHIPPED reader — rather than a second implementation of it — is to swap the array for the
+       length of one synchronous call. `finally`, not a happy path: a throw in the middle would
+       otherwise leave the app looking at a count that has not been saved. */
+    const original = inv.ic_counts;
+    let was, now;
+    try {
+      was = read();
+      inv.ic_counts = nextCounts;
+      now = read();
+    } finally {
+      inv.ic_counts = original;
+    }
+
+    const out = [];
+    weeks.forEach((w, i) => {
+      /* ⚠ `isFinite` on each side, NOT `!= null`. Two reasons and both matter: a correction that
+         makes a week's COGS UNCOMPUTABLE must never erase the figure that was signed off (icCOGS
+         says nothing rather than inventing a number, and writing its null over a confirmed week
+         would be inventing a zero) — and a NaN passes every `!= null` test while making
+         `cents(NaN) !== cents(x)` true for ANY x, so it would report a phantom move and write NaN
+         into the record. Nothing may be written that is not a real number. */
+      const barMoved  = Number.isFinite(now[i].bar)  && cents(now[i].bar)  !== cents(was[i].bar);
+      const foodMoved = Number.isFinite(now[i].food) && cents(now[i].food) !== cents(was[i].food);
+      /* ⚠ THE GATE IS "DID THE COUNT-DERIVED VALUE MOVE", NOT "does the stored value differ". Those
+         cells are hand-editable and Refresh from Control is opt-in, so a typed COGS legitimately
+         disagrees with the counts forever. Gating on the stored value would offer to overwrite that
+         typing on every unrelated count edit ([[user-chooses-conflicts]]). */
+      if (!barMoved && !foodMoved) return;
+      const pe = String(w.period_end).slice(0, 10);
+      const storedBar = num(w.bar, 'cogs'), storedFood = num(w.food, 'cogs');
+      const nextBar  = barMoved  ? r2(now[i].bar)  : storedBar;
+      const nextFood = foodMoved ? r2(now[i].food) : storedFood;
+      const f = this._derive({
+        bRev: num(w.bar, 'revenue'),  bCogs: nextBar,  bLab: num(w.bar, 'labor'),
+        fRev: num(w.food, 'revenue'), fCogs: nextFood, fLab: num(w.food, 'labor'),
+        covers: null, hours: 0,
+        oRev: num(w.other, 'revenue') || 0, oCogs: num(w.other, 'cogs') || 0,
+        fees: w.platform_fees || 0,
+        cRev: num(w.catering, 'revenue') || 0,
+        cCogs: num(w.catering, 'cogs') || 0,
+        cLab: num(w.catering, 'labor') || 0,
+        periodEnd: pe
+      });
+      /* ⚠ A FACT WORTH SAYING OUT LOUD, AND IT COSTS NOTHING TO KNOW. When `was` is null the count
+         feed could NOT price that week at the time it was confirmed, so a figure that IS stored was
+         typed into the Confirm the Week form — the cell would have been blank. That is not an
+         inference from a flag (the S140 / [[the-loop]] #37 trap, where an edit inherits the flag and
+         "how did this get here" is unanswerable); it is measured, from the same reader. Saying it
+         is what stops "Save and Update the Week" quietly replacing an operator's own arithmetic.
+         ⚠⚠ AND IT NEEDS BOTH HALVES. The first version tested only "the feed could not price it",
+         which is ALSO true when the operator left the cell blank — the form invites exactly that
+         ("Missing pieces read as blank. You can still confirm and fill them later"). On a new bar
+         with one count that produced a box reading "Bar COGS not set → $2,801.12" directly above
+         the sentence "so the figure in it was typed in", and then advised protecting a value that
+         does not exist. A claim about a figure has to check the figure is there. */
+      const typedBefore = (barMoved && was[i].bar == null && storedBar != null)
+                       || (foodMoved && was[i].food == null && storedFood != null);
+      out.push({
+        period_end: pe,
+        label: App.dateRangeLabel('', pe),
+        typedBefore: typedBefore,
+        bar:  { from: storedBar,  to: nextBar,  moved: barMoved },
+        food: { from: storedFood, to: nextFood, moved: foodMoved },
+        prime: { from: num(w, 'prime_cost_pct'), to: f.primePct },
+        /* The identity half survives untouched; `_weekShape` replaces exactly the derived half, so
+           the percentages can never be left describing the old COGS ([[the-loop]] #42). */
+        record: Object.assign({}, w, this._weekShape(f), { saved_at: new Date().toISOString() })
+      });
+    });
+    return out.sort((a, b) => (a.period_end < b.period_end ? -1 : 1));
+  },
+
+  /* ONE popup naming every affected week with real before/after figures.
+     Three answers, because there genuinely are three: 'update' (save the count and move the weeks),
+     'count-only' (save the count, leave the confirmed figures alone — which is what protects a
+     hand-typed COGS without ever having to work out where it came from, the S140 / #37 trap), and
+     'cancel', which Esc and a click outside both resolve to, so an accidental dismiss saves
+     nothing at all. */
+  /* ⚠⚠ `isEdit` — THE WORDS ARE A CLAIM ABOUT WHICH ACTIVITY THE OPERATOR IS IN ([[the-loop]] #79),
+     AND "correction" IS FALSE ON THE MOST ORDINARY PATH THERE IS. The Profit and Revenue cockpits
+     both confirm `App.nextSunday()`, i.e. the week that is still RUNNING, and this popup's own
+     sibling copy invites it ("Missing pieces read as blank. You can still confirm and fill them
+     later"). So: confirm on Wednesday, take the normal weekly count on Sunday, and that BRAND NEW
+     count lands inside the confirmed week and moves its COGS. Calling that "this correction" tells
+     a first-time counter they are rewriting signed-off history, and it makes "Save the Count Only"
+     read as the careful answer -- when on that path it is the one that leaves the week holding LAST
+     week's usage as this week's cost of goods. */
+  async askCogsImpact(impacts, isEdit) {
+    if (!impacts || !impacts.length) return 'count-only';
+    /* ⚠ `isFinite`, not `!= null` — `App.fmtCurrency` returns a bare SPACE for NaN, so a corrupt
+       stored figure would render as "Bar COGS   → $2,801.12" and read like a blank cell rather than
+       a value nobody can vouch for. */
+    const money = v => (Number.isFinite(v) ? App.fmtCurrency(v) : 'not set');
+    const p1 = v => (Number.isFinite(v) ? v.toFixed(1) + '%' : 'not set');
+    const lines = impacts.map(i => {
+      const bits = [];
+      if (i.bar.moved)  bits.push('Bar COGS ' + money(i.bar.from) + ' → ' + money(i.bar.to));
+      if (i.food.moved) bits.push('Food COGS ' + money(i.food.from) + ' → ' + money(i.food.to));
+      if (i.prime.from != null || i.prime.to != null) bits.push('Prime ' + p1(i.prime.from) + ' → ' + p1(i.prime.to));
+      return 'Week ending ' + i.label + '\n' + bits.join('  ·  ')
+        + (i.typedBefore
+            ? '\nYour counts could not price that week when it was confirmed, so the figure in it was typed in.'
+            : '');
+    });
+    /* ⚠ NOTHING HERE MAY SAY "BOTH". Two is the common case, not the bound: a count closes one
+       week's pair and opens the next, and `icCOGS` will price a week off a pair up to nine days
+       stale — so a week confirmed early can share a pair with the week before it and THREE move at
+       once. The first version said "both of them" under a title reading "sits inside 3 confirmed
+       weeks", contradicting itself in one box. Count-agnostic wording only. */
+    const many = impacts.length > 1;
+    const lead = isEdit
+      ? (many
+          ? 'A count closes one week and opens the next, so this correction changes the cost of goods every one of these weeks was confirmed with:'
+          : 'This correction changes the cost of goods that week was confirmed with:')
+      : (many
+          ? 'You have already confirmed these weeks, and this count is what prices their cost of goods:'
+          : 'You have already confirmed that week, and this count is what prices its cost of goods:');
+    const ans = await App.confirm({
+      title: many ? 'This count sits inside ' + impacts.length + ' confirmed weeks'
+                  : 'This count sits inside a confirmed week',
+      message: lead + '\n\n' + lines.join('\n\n')
+        /* ⚠ THE STEER IS SCOPED, AND READING THE RENDERED BOX IS WHAT CAUGHT IT ([[the-loop]] #34).
+           Printing all four modes side by side showed "…so the figure in it was typed in." and then,
+           three lines down, "Updating is usually what you want." Both sentences were true and they
+           must not share a box: once we KNOW the operator typed the figure, a default is exactly
+           what [[user-chooses-conflicts]] forbids. Nothing typed → the steer stands, because on a
+           first-time count "save the count only" silently leaves last week's usage in place. */
+        + '\n\n' + (isEdit
+            ? 'Update ' + (many ? 'them' : 'it') + ' now, or save the count on its own and leave the '
+              + 'confirmed figure' + (many ? 's' : '') + ' exactly where ' + (many ? 'they are' : 'it is') + '.'
+            : impacts.some(i => i.typedBefore)
+              ? 'That makes this your call: update with what the counts say, or save the count on its '
+                + 'own and keep the figure' + (many ? 's' : '') + ' you entered.'
+              : 'Updating is usually what you want: it puts this count\'s real usage into '
+                + (many ? 'those weeks' : 'that week') + '. Save the count on its own only if you '
+                + 'typed ' + (many ? 'those figures' : 'that figure') + ' in by hand and want to keep '
+                + (many ? 'them' : 'it') + '.'),
+      confirmText: many ? 'Save and Update the Weeks' : 'Save and Update the Week',
+      altText: 'Save the Count Only',
+      cancelText: 'Cancel',
+      danger: false,
+      /* ⚠ MEASURED, not chosen. The three rendered buttons come to 88 + 182 + 227 px plus 20 px of
+         gaps = 517, against 464 px of content at the old 520 — so the row wrapped and dropped the
+         PRIMARY alone onto a second line under the two ghosts, leaving Cancel reading first. 620
+         gives 564 px and they sit on one line. `flex-wrap` stays on as the small-screen fallback. */
+      maxWidth: 620
+    });
+    return ans === true ? 'update' : (ans === 'alt' ? 'count-only' : 'cancel');
+  },
+
+  /* Write the records cogsImpact built. Reports which weeks did NOT land rather than swallowing a
+     failure — a week that silently kept its old COGS while the count moved is the divergence this
+     whole item exists to close. */
+  async applyCogsImpact(impacts) {
+    const failed = [];
+    for (let i = 0; i < (impacts || []).length; i++) {
+      const ok = await App.putRecord('core', 'week', impacts[i].record);
+      if (!ok) failed.push(impacts[i].label || impacts[i].period_end);
+    }
+    if (!failed.length && App.updatePeriod) App.updatePeriod();
+    return { ok: failed.length === 0, failed };
   }
 };
