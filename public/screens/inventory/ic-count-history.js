@@ -84,15 +84,16 @@ S.InventoryCountHistory = {
         'Say you compare last Sunday to this Sunday and a 750ml of your house bourbon shows a drop of four bottles. At 1.5 oz a pour that is roughly 67 pours that should match what the register rang. If the bottles moved but the sales did not, that gap is the conversation you need to have.'
       ] },
       { h: 'Fixing A Count You Got Wrong', p: [
-        'Counted a location, submitted it, then realized you missed a couple of bottles? Hit Edit on that row. It reopens the count with your numbers already filled in, you add what you missed, and it saves back over the same count instead of creating a second one. It rebuilds off your current product list, so anything you have since made inactive or moved off that location will not be on the sheet.',
-        'Edit is on every count, including the ones tagged Booked. A Booked count is one that a week you already confirmed priced its cost of goods from, so correcting it changes a number you signed off. Bar Cop will not do that quietly. When you save, it names every confirmed week whose cost of goods actually moves and shows you the real before and after, then you pick: update those weeks with the corrected figures, or save the count on its own and leave the confirmed weeks exactly as they are.',
+        'Counted a location, submitted it, then realized you missed a couple of bottles? Hit Edit on that row. It reopens the count with your numbers already filled in, you add what you missed, and it saves back over the same count instead of creating a second one.',
+        'One thing to know before you edit an old count: it rebuilds off your current product list. Anything you have made inactive or moved off that location since will not be on the sheet, and saving drops it from the record too. If a count is old enough that your product list has moved on, leave it alone.',
+        'Edit is on every count, including the ones tagged Booked. Booked means a week you have already confirmed ends on or after that count\'s date, so the numbers behind it may be feeding a week you signed off. Bar Cop will not change one quietly. When you save, it names every confirmed week whose cost of goods actually moves and shows you the real before and after, then you pick: update those weeks with the corrected figures, or save the count on its own and leave the confirmed weeks exactly as they are.',
         'Expect more than one week. A count closes out the week behind it and opens the week in front of it, so a correction in the middle of your history usually moves the week either side, and sometimes a third. Every one of them is named in the box before anything is written.',
         'If you typed a cost of goods figure into a week by hand, "Save the Count Only" is how you keep it. Nothing is written to a week unless you say so.'
       ] },
       { h: 'Deleting A Count', p: [
         'Deleting a count is behind the edit permission for a reason. A finalized count feeds your cost of goods, usage, and variance, so pulling one out moves all of those numbers. Only delete a count that was entered wrong and cannot be trusted. If a single product was off, it is cleaner to recount than to throw out the whole record.',
         'Delete comes off a count once a confirmed week has booked it, and that is the difference between the two buttons. An edit has a new number to show you, so Bar Cop can price the change and let you decide. Deleting does not adjust a figure, it removes one end of the pair the week was measured from, and there is no corrected number to show in its place. Correct the count instead of removing it.',
-        'Note that confirming the week you are currently in books every count you have, including the newest one, because that week ends on a date they all fall before. Those rows read Latest and Booked together, and Edit is still there.'
+        'Note that confirming the week you are currently in books every count you have, including the newest one, because that week ends on or after every date you have counted. The newest row then reads Latest and Booked together. Edit is still there on all of them.'
       ] },
       { h: 'Export', p: ['Use Export PDF to save a clean PDF of any count for your accountant at month end, your insurance file, or a new manager who needs to see where the stock stands.'] }
     ]);
@@ -158,7 +159,12 @@ S.InventoryCountHistory = {
            included.** That row then lost its Delete button with the word explaining why nowhere on
            screen, which is the exact "why did the button vanish" defect this status was added to
            fix. Both facts now show; "Latest" keeps the gold, because that is the one the dashboard
-           and the reorder list read from. */
+           and the reorder list read from.
+           ⚠ "Booked" means ONLY what `countLockedByWeek` measures: a confirmed week ends on or
+           after this count's date. It does NOT mean that week priced its COGS from this count --
+           `icCOGS` uses exactly one pair, so a bar with 28 weekly counts that confirms its first
+           week ever tags all 28 rows Booked while one pair did the pricing. The help says it the
+           same way; do not tighten one without the other. */
         const booked = App.countLockedByWeek(c);
         const status = (r.isLatest ? '<span style="color:var(--gold);font-weight:700;">Latest</span>' : '')
           + (r.isLatest && booked ? '<span style="color:var(--t4);"> &middot; </span>' : '')

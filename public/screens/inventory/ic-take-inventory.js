@@ -66,6 +66,19 @@ S.InventoryTakeInventory = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
+    /* ⚠⚠ STAMPED AT RENDER TIME, WHICH IS THE WHOLE POINT OF THE TOKEN. `App._mountSeq` answers "am
+       I still the screen on the page?" and app.js says a screen that writes in the background MUST
+       capture it HERE and compare before repainting. `submit()` captured it inside itself for one
+       round, which is after `await App.confirm` — so the operator pressing browser Back while the
+       impact dialog was up (popstate is not gated on an open dialog, and the overlay outlives the
+       navigation because it hangs off `document.body`) bumped the token BEFORE the capture, and the
+       check then read "still here" about a screen that was gone. It marked the Inventory
+       Dashboard's wrapper inert and painted "Count Submitted" over it. Capturing late does not
+       merely weaken the check; it makes it lie in the one direction that does damage.
+       ⚠ Only `App.navigate` / `openHubFullPage` / the crash handler bump the token, so the screen's
+       own internal re-renders (setup → counting → review → done) keep the same stamp, which is what
+       makes it usable as "this mount" rather than "this paint". */
+    this._mountedAt = App._mountSeq;
     actions.innerHTML = '';
     /* One-shot handoff from Count History's Edit button (S250). Consumed immediately, like every
        other cross-screen jump in the app, so a later visit does not silently reopen the count. */
@@ -301,6 +314,12 @@ S.InventoryTakeInventory = {
        "Discard Changes" button raise a prompt headed "Start over on this count?" — the button and
        the box disagreeing about what is about to happen. Ask the thing that is actually going to be
        cleared. */
+    /* ⚠⚠ NOT WHILE A SAVE IS IN FLIGHT. Disabling the save buttons left this one live, and it is
+       the destructive twin: `clearDraft()` wipes the correction from memory AND the device while
+       `putRecord` is still out. Whichever way that write lands the operator is lied to — a success
+       paints "Changes Saved" over a setup screen for a record they just discarded, and a failure
+       says "Your numbers are still here, nothing has been lost" about numbers that are gone. */
+    if (this._writing) { await this._stillSavingNotice(); return; }
     const d = this.draft || this.loadDraft();
     const editing = !!(d && d._edit_id);
     const ok = await App.confirm({
@@ -489,6 +508,61 @@ S.InventoryTakeInventory = {
      opening one. A confirmed week is no longer a reason a count will not open, so the only cause
      left is that the record is genuinely gone ([[the-loop]] #79: reuse a message and every word in
      it becomes a claim about which case you are in). */
+  /* ONE wording for "a write is in flight", used by both doors that must refuse during it — Save
+     (which would start a second write) and Discard (which would wipe the draft out from under it).
+     Two copies would drift ([[the-loop]] step 0.6). */
+  /* ONE switch instead of a list of controls — and it took two goes to get the switch right.
+     ⚠⚠ THE FIRST VERSION WAS `this.container.style.pointerEvents = 'none'` AND IT WAS WRONG TWICE.
+     **(1) `pointer-events` is pointer hit-testing and nothing else.** It does not blur the focused
+     element, does not leave the tab order, and does not block `keydown` / `input` / `change` or the
+     synthetic click a focused button dispatches on Enter. The bottle slider's root carries
+     `tabindex="0"` and its own ArrowUp/ArrowDown handler, and every numeric cell still took typing —
+     so the exact silent loss it was added to close stayed reachable from the keyboard, and worse,
+     Tab + Enter on **Back to Counting** repainted the whole sheet with live listeners while the
+     write was still out. **(2) `#content-area` is PERMANENT and SHARED** — app.js says so in as
+     many words — and `App.navigate` resets `onclick`/`onchange`/`oninput` and scroll, never inline
+     style. So a write that never settles (there is no timeout on the Supabase upsert) left
+     `pointer-events:none` on the one element every screen renders into: Dashboard, Order Sheet,
+     Cash Control, all dead, nav still working, nothing on screen saying why. **A fix that bricks
+     the app on a dropped connection is worse than the bug it closed.**
+     ⭐ BOTH GO AWAY BY MOVING THE FLAG ONTO THE PER-RENDER `.screen` WRAPPER AND USING `inert`:
+     `inert` blocks pointer, keyboard, focus and click together, which is the mechanism the name
+     always claimed; and the wrapper is destroyed by the next `innerHTML` write, so a stalled write
+     can only ever leave THIS screen inert until the operator navigates away. `pointerEvents` rides
+     along as the fallback for a browser without `inert`, on the same short-lived node.
+     ⚠⚠ THAT DESTRUCTION CUTS BOTH WAYS AND `submit()` HANDLES THE OTHER EDGE, NOT THIS METHOD.
+     Navigating away destroys the wrapper, which is what keeps a stalled write from bricking the
+     app — and it is also the one route this guard cannot cover, because the nav rail and top bar
+     are siblings of the mount host rather than children of it. Coming back re-renders a live sheet
+     with no inert flag. `submit()` closes that with `App._mountSeq` (the app's documented answer to
+     "am I still the screen on the page?"); do not read this method as covering it.
+     ⚠ `App.confirm` appends its overlay to `document.body`, so the impact popup and the refusal
+     notices are outside this entirely — pinned as a control. */
+  _setScreenInert(on) {
+    const el = this.container && this.container.firstElementChild;
+    if (!el) return;
+    el.inert = !!on;
+    el.style.pointerEvents = on ? 'none' : '';
+  },
+
+  /* Fill the done screen's note slot after the fact. ⚠ Silent when the slot is gone: the operator
+     may have pressed "Take Another Count" while the week writes were still out, and painting a
+     warning into a screen they have left is worse than not painting it. */
+  _setDoneNote(text) {
+    const el = document.getElementById('ti-done-note');
+    if (!el || !text) return;
+    el.textContent = text;
+    el.style.display = '';
+  },
+
+  _stillSavingNotice() {
+    return App.confirm({
+      title: 'Still saving',
+      message: 'Bar Cop is writing this count now. Give it a second and it will tell you when it is done.',
+      confirmText: 'OK', cancelText: ''
+    });
+  },
+
   _countGoneNotice() {
     App.confirm({
       title: 'That count could not be opened',
@@ -965,11 +1039,72 @@ S.InventoryTakeInventory = {
   // ── Submit ────────────────────────────────────────────────────────────────
   async submit() {
     if (!App.canEdit('ic-take-inventory')) return;   // staff-permission guard
+    /* ⚠⚠⚠ THE TOKEN IS SNAPSHOT INTO A LOCAL, AT THE TOP, BEFORE ANY `await` — AND THIS EXACT
+       MISTAKE IS ALREADY WRITTEN UP IN THIS CODEBASE, IN `ic-prep-batches._resyncStillCurrent`:
+       *"It used to read `this._mountedAt` live, and that is a property on the screen object, not a
+       value belonging to the visit — so navigating away and BACK restamped it and the stale visit's
+       write was waved through by the very check written to stop it."* Reading it live is useless
+       here: `App.navigate` bumps `_mountSeq` and then re-renders, which re-stamps `_mountedAt` to
+       the same new number, so both sides move together and the comparison passes for a screen the
+       operator left and returned to. Round 8 captured `App._mountSeq` at write time (too late —
+       browser Back during an awaited dialog bumps it first); round 9 stamped at render time and
+       compared LIVE (too loose — a remount restamps it). It needs both: stamped at render, snapshot
+       per visit here, compared against the live counter.
+       ⚠ AND THE DRAFT IDENTITY WITH IT. `_confirmSwitchCount`'s dialog also survives a popstate, so
+       an operator can leave, open a DIFFERENT count, and have this write land against a draft that
+       never produced it. Stamping that draft with this record's id would point it at the wrong
+       count entirely. */
+    const visitToken = this._mountedAt;
+    const draftAtStart = this.draft;
+    const stillHere = () => App._mountSeq === visitToken;
+    /* ⚠ SAY IT, DO NOT JUST SWALLOW IT. A re-render during the write rebuilds the save buttons
+       ENABLED with their normal labels, so the operator can press Save again and see nothing happen
+       — which is the identical silence the disable was added to remove. Same notice as the discard
+       guard, so the two cannot drift ([[the-loop]] step 0.6). */
+    if (this._writing) { await this._stillSavingNotice(); return; }
     // Clear any refusal left by an earlier attempt: a stale "Save failed" sitting under a dialog
     // the operator then cancels reads as though THIS attempt failed.
     const priorErr = document.getElementById('ti-sub-err');
     if (priorErr) { priorErr.textContent = ''; priorErr.style.display = 'none'; }
     const rows = this.rows();
+    /* ⚠⚠ A COUNT WITH NO PRODUCTS IN IT IS NOT A COUNT (pre-existing, found in the S331 scan).
+       `renderCounting` refuses this state by name — "No products match this count" — and clears the
+       draft; `renderReview` never learned to, and `route()` sends a resumed draft with `_view:
+       'review'` straight there. So: count the Walk-In Cooler, press Review Count (which persists
+       that view to the device), close the tab; someone renames or deletes that location, which
+       cascades onto every product's `locations`; come back, press Resume, and the review screen
+       paints "Products 0 · Total Inventory Value $0.00" over a live Submit button. Pressing it wrote
+       `{ items: [], item_count: 0, total_value: 0, locations: [] }` dated today — and the same-day
+       merge guard cannot catch it either, because `mine` is empty so nothing ever clashes and every
+       press mints another one. `computeUsagePair` then reads an empty end map and Usage, Variance,
+       Top Movers, Dynamic Pars and Stock all go blank, while `CashEngine.trapped()` still reports
+       `hasData` true and prints $0 of dead stock as if it had been measured.
+       Refused HERE rather than in `renderReview`, because this is the one door every path to a
+       written record goes through ([[the-loop]] step 0.6). */
+    if (!rows.length) {
+      await App.confirm({
+        title: 'Nothing to save',
+        message: 'There are no products on this count. The locations it covers may have been renamed '
+          + 'or removed since you started. Start the count again and pick the locations you want.',
+        confirmText: 'OK', cancelText: ''
+      });
+      return;
+    }
+    /* ⚠⚠⚠ THE FLAG GOES UP HERE, BEFORE THE FIRST DIALOG — NOT AT THE WRITE. It was set three
+       `await`s later, and this file already documents why that is not safe: `App.confirm` blocks
+       the POINTER and nothing else. It never blurs, never traps focus, never marks the background
+       inert (see `_setScreenInert`'s note), so the Submit button the operator just clicked still
+       has DOM focus behind the overlay — and **Enter, the reflex answer to a dialog, fires it
+       again**. `submit()` #2 then runs while #1 is parked on the impact popup: it mints a fresh
+       `App.uid()`, finds no clash because nothing is written yet, and both records land. Two counts,
+       one date, one location set — `usageBase` pairs them, `computeUsagePair` finds no deliveries
+       between two identical dates, and the whole shelf reads as dead stock at zero velocity. That
+       is the S330 harm, arriving by the one door S330's guard cannot see, because both records were
+       built before either was written.
+       ⚠ EVERYTHING FROM HERE IS INSIDE THE `try`, so every exit — the merge cancel, the impact
+       cancel, a throw, the write — goes through the `finally` that lowers it. */
+    this._writing = true;
+    try {
     // Build per-item records. For bottle beer with case_size, store the
     // case-aware fields (cases, loose, case_size_at_count) alongside the
     // standard fields (fulls, partial, total) so downstream readers that
@@ -1025,12 +1160,23 @@ S.InventoryTakeInventory = {
       };
     });
     /* An EDIT updates the record in place (S250): same id, same business date, same created_at,
-       so it stays the same point in the usage timeline. `edited_at` / `edit_count` keep the
-       history honest -- Count History prints "Edited" rather than pretending nothing happened. */
+       so it stays the same point in the usage timeline.
+       ⚠⚠ NO SCREEN SURFACES THE EDIT HISTORY, and the comment here used to claim otherwise —
+       *"Count History prints 'Edited' rather than pretending nothing happened."*
+       MEASURED: the word "Edited" appears nowhere in `public/` and Count History's Status column
+       renders Latest / Booked / Past only. `edit_count` is read by nothing at all; `edited_at` has
+       exactly one reader, `renderDone`'s headline ("Changes Saved" vs "Count Submitted"), so do not
+       delete it on the strength of a sweep. So a count Maria took on Sunday
+       and Jake rewrote on Sunday night is indistinguishable from one nobody touched. The fields stay
+       (they cost nothing and the history is worth having the moment something reads them), but the
+       claim goes — a comment asserting a protection the app does not have is worse than none,
+       because the next reader stops looking ([[the-loop]] #53). On THE LIST as S336. */
     const editing = !!this.draft._edit_id;
     const record = {
       id:          editing ? this.draft._edit_id : App.uid(),
-      date:        editing ? this.draft._edit_date : App.todayLocal(),
+      // ⚠ `_business_date` pins the day for a MERGED draft that outlived its write (see below), so a
+      //    re-save after local midnight still finds its clash instead of minting a second record.
+      date:        editing ? this.draft._edit_date : (this.draft._business_date || App.todayLocal()),
       type:        this.draft.type,
       counted_by_id: this.draft.counted_by_id || '',
       counted_by:  this.draft.counted_by || (App.staffById(this.draft.counted_by_id) || {}).name || '',
@@ -1068,6 +1214,14 @@ S.InventoryTakeInventory = {
        stops rather than guessing ([[the-loop]] #30).
        ⚠ AND NEVER OVER A BOOKED COUNT: rewriting a count a confirmed week has signed off on is the
        exact thing S250 and S282 forbid. */
+    /* ⚠⚠ THE MERGE WRITES A RECORD WIDER THAN THE DRAFT, AND THAT MAKES THE DRAFT UNSAFE TO STAMP.
+       `mergedItems` keeps the other locations' lines from the clash and adds this draft's; the draft
+       still knows only its own `custom_locations`. Stamping it as an EDIT of that record would gate
+       the merge branch OFF on the next save (it is `if (!editing)`), and the re-save would rebuild
+       `items` / `locations` / `total_value` from this draft alone — silently deleting the other
+       locations' counts from the record. So the merged case keeps its draft UNSTAMPED: a re-save
+       re-enters this branch and merges correctly, which is what it is for. */
+    let mergedWider = false;
     if (!editing) {
       const mine = new Set(record.locations);
       const clash = this.counts().find(c => c
@@ -1092,8 +1246,17 @@ S.InventoryTakeInventory = {
            own, untouched. Nothing is guessed and nothing is lost. That removes the refusal
            entirely, and with it the loop ([[the-loop]] #65 — when a limitation pushes you somewhere
            obviously worse, the limitation is the bug). */
+        /* ⚠ "TODAY" IS A CLAIM AND IT CAN BE FALSE HERE. `record.date` is normally `todayLocal()`,
+           but a merged draft that outlived its own write carries `_business_date`, so this branch
+           can be reached on a LATER calendar day — and then "today" is wrong and the operator has
+           no way to see that they are about to write into an older count. Name the day when it is
+           not today; the wording is otherwise unchanged. ⚠ The remaining question — how long a
+           pinned business date should stay pinned — is S339 on THE LIST, not a number to invent
+           here ([[the-loop]] #28). */
+        const sameDayNow = record.date === App.todayLocal();
         const merge = await App.confirm({
-          title: 'You already counted ' + nameList(overlap) + ' today',
+          title: 'You already counted ' + nameList(overlap)
+            + (sameDayNow ? ' today' : ' on ' + this._dayLabel(record.date)),
           message: 'Two counts of the same shelf on one day cannot be used as a usage pair, so Bar Cop keeps one count '
             + 'per location per day. Update that count with what you just entered?'
             + (missing.length ? ' ' + nameList(missing) + ' stays exactly as counted earlier.' : ''),
@@ -1119,12 +1282,16 @@ S.InventoryTakeInventory = {
                            : (mergedLocs.length === 1 ? mergedLocs[0] : 'Multi-Location');
         record.item_count  = mergedItems.length;
         record.total_value = mergedItems.reduce((s, i) => s + (i.value || 0), 0);
+        mergedWider = keep.length > 0;   // the record now carries lines this draft does not
       }
     }
 
     /* ⭐⭐ S331 — PRICE THE CORRECTION BEFORE WRITING IT. A count is an endpoint of a usage pair, so
-       changing one moves the COGS of every confirmed week whose pair touches it — up to TWO of them,
-       because a count ENDS one week's pair and STARTS the next. `cogsImpact` asks every confirmed
+       changing one moves the COGS of every confirmed week whose pair touches it. ⚠ THERE IS NO
+       BOUND ON HOW MANY: a count ends one week's pair and starts the next, and a week confirmed
+       early can share a pair with the week before it, so three is reachable. This comment said "up
+       to TWO" for four rounds while the function it calls says the opposite in its own header — a
+       number in a comment is a claim, and nothing here enforced it. `cogsImpact` asks every confirmed
        week the question against the corrected set and reports only the ones whose answer actually
        moves; on the ordinary submit nothing moves and no popup is raised.
        ⚠ ASKED ON EVERY SUBMIT, not just on `editing`. The merge branch above turns a same-day
@@ -1185,25 +1352,152 @@ S.InventoryTakeInventory = {
       .map(el => ({ el: el, label: el.textContent }));
     btns.forEach(b => { b.el.disabled = true; b.el.textContent = 'Saving...'; });
 
+    /* ⚠⚠ THE BUTTON IS NOT THE GUARD, AND SAYING IT WAS IS HOW I NARROWED THIS TWICE. Disabling the
+       save controls leaves every OTHER control on the screen live through the write: Discard
+       Changes, Review Count, Previous/Next, Back to Counting. Two of those are destructive and one
+       re-renders the screen, which recreates a disabled button ENABLED and hands back a second
+       concurrent submit. So the guard is a flag on the screen, not on an element — it survives a
+       re-render, which is the whole point. Cleared in `finally`, because a throw that left it set
+       would lock the operator out of saving for the rest of the session ([[the-loop]] #49). */
+    /* ⚠⚠ THE GUARD SPANS THE WHOLE OPERATION, NOT JUST THE COUNT WRITE — I scoped it to `putRecord`
+       and left the part that takes longest outside it. "Save and Update the Weeks" then does one to
+       three MORE network writes through `applyCogsImpact`, and through that whole window the flag
+       was already false and the screen was already live again. */
+    /* ⚠⚠⚠ AND THE SCREEN ITSELF GOES INERT, BECAUSE FOUR ROUNDS OF NAMING CONTROLS WERE FOUR WRONG
+       LISTS. Round 3 disabled the save buttons; round 4 found Discard/Review/Prev/Next still live;
+       round 5 found every COUNT-ENTRY control live too — the bottle slider, cases/loose,
+       fulls/loose-each, the number cell, the note field, Out of Stock, each ending in `saveDraft()`
+       — so a value typed during the write was written to the draft and to the device and then wiped
+       by `clearDraft()` under a green check reading "Changes Saved". Round 5 answered that by
+       painting the done screen before the WEEK writes, which closed the second window and left the
+       first one open: `await App.putRecord` is a bare network round trip with no overlay, and on
+       the review screen **Back to Counting** rebuilds every entry control mid-flight.
+       **A list of controls is a guess about a surface. One switch is not.** `_setScreenInert` marks
+       the screen's own `.screen` wrapper `inert`, which blocks pointer, keyboard, focus and click
+       together and therefore covers every control that exists today and every one added later. The
+       save buttons already read "Saving...", so the screen says why nothing responds.
+       ⚠ It does NOT reach `App.confirm`, which appends its overlay to `document.body` — the impact
+       popup and the refusal notices still work.
+       ⚠ RELEASED THREE WAYS, and each is load-bearing: in `finally` for a throw ([[the-loop]] #49);
+       explicitly once the done screen is up, so the operator is not left staring at a frozen card
+       while the WEEK writes finish; and structurally, because the wrapper it is set on is destroyed
+       by the next `innerHTML` write. That last one is why it sits on the wrapper and not on
+       `#content-area`, which is permanent and shared by every screen in the app. */
+    /* ⚠⚠⚠ AND THE ONE THING THE INERT WRAPPER CANNOT COVER: NAVIGATION. The nav rail and the top bar
+       are siblings of `#content-area`, not children of it, and browser Back routes through
+       `App.navigate` too — so the operator can leave mid-write however inert the sheet is. Coming
+       BACK re-runs `render()`, which sees `this.draft` (not cleared until the write lands) and
+       repaints a brand-new `.screen` wrapper with fresh listeners and no inert flag. Round 5's
+       silent loss, verbatim: type into that sheet, and `clearDraft()` wipes it under a green check.
+       Worse, `App.putRecord` pushes the record into the store SYNCHRONOUSLY, so Count History shows
+       the new row and its Edit button opens a live correction sheet for a write still in flight.
+       ⭐ THE APP ALREADY HAS THE ANSWER AND DOCUMENTS IT AS MANDATORY. `App._mountSeq` is bumped on
+       every screen mount, and app.js says in as many words that a screen which writes in the
+       background and then re-renders MUST capture it and compare before repainting — *"or a late
+       write paints it over whatever the operator went to next (a half-entered count sheet, in the
+       worst case found)"*. Four screens honour it; this one had zero references to it.
+       ⚠ WHAT "NOT CURRENT" MEANS HERE IS DELIBERATE: leave them alone. The count is saved and the
+       week updates they authorised still run, but nothing paints over the screen they moved to and
+       nothing clears a draft they may be typing into. The draft is re-stamped as an EDIT of the
+       record that just landed (see below), so pressing Save again rewrites that record in place
+       rather than minting a second one, and every sentence the screen says about it reads true. */
+    /* ⚠ GATED. `_setScreenInert` resolves its target off the permanent shared `#content-area` at
+       CALL time, and the awaited dialogs above this line do not block browser Back — so on a
+       popstate this froze whatever screen the operator had moved to, pointer, keyboard and focus,
+       with no "Saving..." anywhere on it because the buttons went with the old markup. Round 9
+       closed the painting half of that and left this half open. */
+    if (stillHere()) this._setScreenInert(true);
     const ok = await App.putRecord('ic', 'count', record);
     if (ok) {
       App.markSetupDone('gs_ic_count');
-      this.clearDraft();
-      let weekNote = '';
+      /* ⚠⚠⚠ THE COUNTING SCREEN GOES FIRST, BEFORE THE WEEK WRITES — AND ROUND 4's VERSION TURNED A
+         CRASH INTO A SILENT LOSS, WHICH IS THE WORSE TRADE. Round 3 disabled the save buttons;
+         round 4 kept `this.draft` alive through `applyCogsImpact` so the other controls would stop
+         throwing on a null. But every COUNT-ENTRY control is live too — the bottle slider, the
+         cases/loose and fulls/loose-each inputs, the plain number cell, the note field and Out of
+         Stock — and each ends in `saveDraft()`. Before round 4 they threw and nothing moved; after
+         it they WORKED: drag the slider during those three or four seconds, watch the pill go green
+         and the header count to "42 of 60", and then `clearDraft()` wipes it and a full-screen green
+         check says "Changes Saved" over a record that does not contain those bottles.
+         Guarding each entry handler would be enumerating controls again, which is the narrowing
+         that has bitten this file three rounds running. THREE things close it together: the screen
+         wrapper is `inert` from before the count write until this line; the done screen is painted
+         BEFORE the week writes so `renderDone` rebuilds `container.innerHTML` and every one of those
+         listeners ends up on a detached node; and the `stillHere()` mount check above covers the one
+         route inert cannot touch, which is the operator leaving by the nav and coming back to a
+         freshly rendered sheet. With all three there is nothing left that can write to the record,
+         which is why the inert flag is released HERE rather than held through `applyCogsImpact` —
+         freezing a card that says "Changes Saved" would be theatre. The note arrives after and is
+         filled in place.
+         ⚠ `clearDraft()` sits immediately above `renderDone` with nothing awaited between them, so
+         no code ever observes the null draft — that was round 4's problem and it was solved by
+         removing the gap, not by delaying the teardown. */
+      /* ⚠ ONLY IF THIS IS STILL THE SCREEN ON THE PAGE. If they navigated away mid-write, painting
+         here lands "Count Submitted" on top of whatever they went to, and `clearDraft()` wipes a
+         sheet they may have come back to and typed into. */
+      if (stillHere()) {
+        this.clearDraft();
+        this.renderDone(record);
+        this._setScreenInert(false);   // the done screen is safe: nothing on it writes to the record
+      } else if (this.draft && this.draft === draftAtStart && mergedWider) {
+        /* ⚠⚠ A MERGED WRITE CANNOT BE STAMPED AS AN EDIT (it would gate the merge branch off and the
+           next save would rebuild the record from this narrower draft, deleting the other locations'
+           counts) — but leaving it wholly untouched put the midnight double-count straight back.
+           `record.date` is `todayLocal()`, so a re-save at 00:05 finds no same-day clash, skips the
+           merge and mints a SECOND record with the same items one day on, which `usageBase` then
+           pairs as dead stock at zero velocity. Pinning the business DAY is the whole fix: the
+           re-save lands on the same date, finds the clash and merges, which is the path that is
+           already correct.
+           ⚠ KNOWN LIMIT, RECORDED SO A LATER ROUND DOES NOT "FIND" IT: the merged draft still has no
+           `_edit_id`, so until they save again the resume banner says "a count is in progress", Start
+           Over warns their entries "will be lost", and Count History → Edit on that row offers to
+           discard "the one you are in the middle of". All three overstate — the numbers are on the
+           server — and all three cost at most a redundant re-save, which now merges correctly. The
+           alternative is a third draft state, and that is more surface than the harm. */
+        this.draft._business_date = record.date;
+        this.saveDraft();
+      } else if (this.draft && this.draft === draftAtStart) {
+        /* ⚠⚠ THE SURVIVING DRAFT BECOMES AN EDIT OF THE RECORD THAT WAS JUST WRITTEN. Keeping it was
+           right — they may have come back and typed — but a draft that still looks like a NEW count
+           made three sentences false the moment the record existed: the resume banner says "a Full
+           count started 5 hr ago is in progress" about one that is saved; Start Over warns that
+           entries "will be lost" when they are on the server; and Count History → Edit on that very
+           row raises "opening that count will discard the one you are in the middle of", about
+           itself. Stamping the edit fields makes every one of them read true — the banner switches
+           to "You are part-way through editing the … count from …. Your changes are not saved to it
+           yet", which is exactly the state — and `_draftAtRisk` then matches on the id and stops
+           prompting.
+           ⚠ IT ALSO CLOSES A REAL DOUBLE-COUNT. Without it a re-save re-derives the business date
+           from `todayLocal()`, so counting at 23:50, navigating away and pressing Save again at
+           00:05 finds no same-day clash, writes a SECOND record with identical items one day on,
+           and `usageBase` then pairs two identical counts — the dead-stock-at-zero-velocity
+           distortion S330 exists to prevent. An edit rewrites the record in place, whatever the
+           clock has done. */
+        this.draft._edit_id = record.id;
+        this.draft._edit_date = record.date;
+        this.draft._edit_created_at = record.created_at;
+        this.draft._edit_count = (record.edit_count || 0) + 1;
+        this.saveDraft();
+      }
       if (checkFailed) {
-        weekNote = 'Bar Cop could not check whether this count sits inside a week you have already '
-          + 'confirmed. If it does, open Week History, edit that week and press Refresh from Control to pull '
-          + 'the corrected cost of goods in.';
+        /* ⚠ PLURAL. `cogsImpact` puts no bound on how many weeks move (a count ends one usage pair
+           and starts the next, and a week confirmed early can share a pair with the week before it),
+           so a singular "that week" would send the operator to fix one of three. */
+        this._setDoneNote('Bar Cop could not check which of your confirmed weeks this count prices. '
+          + 'Open Week History, edit any week this count falls in or beside, and press Refresh from '
+          + 'Control to pull the corrected cost of goods in.');
       } else if (updateWeeks) {
         const res = await ConfirmWeek.applyCogsImpact(impacts);
         // Say which weeks did NOT move rather than reporting a clean save over a partial one.
         if (!res.ok) {
-          weekNote = 'The count was saved, but the week ending ' + res.failed.join(' and ')
-            + ' could not be updated. Open Week History, edit that week and press Refresh from Control to pull '
-            + 'the new figures in.';
+          // ⚠ the noun follows the LIST, or two failures read as one week with two end dates.
+          const n = res.failed.length;
+          this._setDoneNote('The count was saved, but the week' + (n > 1 ? 's' : '') + ' ending '
+            + (n > 1 ? res.failed.slice(0, -1).join(', ') + ' and ' + res.failed[n - 1] : res.failed[0])
+            + ' could not be updated. Open Week History, edit ' + (n > 1 ? 'those weeks' : 'that week')
+            + ' and press Refresh from Control to pull the new figures in.');
         }
       }
-      this.renderDone(record, weekNote);
     } else {
       /* ⚠⚠ THE FAILURE HAD NOWHERE TO GO ON THE COUNTING SCREEN (found scanning S331; the hole
          arrived with S330c, not with S331, but S331 makes it far easier to reach). `ti-submit` and
@@ -1215,24 +1509,34 @@ S.InventoryTakeInventory = {
          message and the confirmation screen", which is the confidence claim that made it invisible.
          So: use the inline slot where one exists, and otherwise SAY IT, because a save that was
          refused in silence reads exactly like a save that worked. */
+      /* ⚠ THE REASSURANCE IS CONDITIONAL, because it is a claim about state and it can be false.
+         It is only true while the draft is still in hand; if it went (a discard that raced the
+         write, a second device) then saying "nothing has been lost" is the worst kind of wrong. */
       const msg = 'Save failed. Try again.';
       const err = document.getElementById('ti-sub-err');
       if (err) { err.textContent = msg; err.style.display = 'inline'; }
-      else App.confirm({ title: 'Could not save this count', message: msg + ' Your numbers are still here, nothing has been lost.', confirmText: 'OK', cancelText: '' });
+      else App.confirm({ title: 'Could not save this count',
+        message: msg + (this.draft ? ' Your numbers are still here, nothing has been lost.' : ''),
+        confirmText: 'OK', cancelText: '' });
       btns.forEach(b => { b.el.disabled = false; b.el.textContent = b.label; });
     }
+    } finally { this._writing = false; this._setScreenInert(false); }
   },
 
-  renderDone(record, weekNote) {
+  renderDone(record) {
     const counted = ((record && record.items) || []).filter(it => it && it.counted !== false).length;
     /* ⚠ A PARTIAL RESULT IS SAID OUT LOUD (S331). The count can land while a confirmed week's
        update does not, and "Changes Saved" over a week that did not move is the silent divergence
        this item exists to close. The note sits inside the success card because the count really did
-       save — this is what is still outstanding, not a failure of the thing they pressed. */
-    const note = weekNote
-      ? '<div style="font-size:12px;color:var(--gold);line-height:1.6;margin-top:12px;max-width:520px;margin-left:auto;margin-right:auto;">'
-        + esc(weekNote) + '</div>'
-      : '';
+       save — this is what is still outstanding, not a failure of the thing they pressed.
+       ⚠ THE SLOT IS ALWAYS RENDERED AND ALWAYS EMPTY. The week writes finish AFTER this screen
+       paints — the counting screen has to be gone before they start, or the operator can type into
+       a record that is already written — so `_setDoneNote` fills it in place. It took a `weekNote`
+       parameter for one round after that change and every caller passed `''`; a parameter nothing
+       supplies is a second way to do the job, and the next reader would have used it and wondered
+       why nothing appeared ([[the-loop]] #25). */
+    const note = '<div id="ti-done-note" style="font-size:12px;color:var(--gold);line-height:1.6;'
+      + 'margin-top:12px;max-width:520px;margin-left:auto;margin-right:auto;display:none;"></div>';
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="text-align:center;padding:14px 0;">'
       + '<svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px;">'
