@@ -269,17 +269,37 @@ S.InventoryParSuggestions = {
   },
 
   wire() {
-    const onChange = async (val, key) => {
+    /* ⛔ CLAMP TO THE FIELD'S OWN DECLARED RANGE. HTML min/max is a hint on the spinner arrows
+       only — it does not stop typing, and this handler read the value with a bare parseInt.
+       MEASURED on the live app: buffer -50 was accepted, PERSISTED across navigation, and became
+       written pars — Tito's (8.3 btls a week, 3.5-day cycle) was suggested a par of 3 and UPDATE
+       PAR stored it. That par drives the Order Sheet, the dashboard's Below Par and
+       CashEngine.reorderToPar(). 999 inverted it (0 cuts, 102 raises).
+       The ranges live here as well as on the inputs; verify-par-settings-clamped.js reads the
+       DECLARED min/max out of the markup and tests the clamp against it, so the two cannot drift
+       apart silently. The correction is written back into the field: clamping in silence would
+       leave the operator looking at a number the app is not using. */
+    /* ⚠ `cycle_days`, NOT `delivery_days` — the settings key is cycle_days (defaults, :23; read at
+       :120). `delivery_days` is a VENDOR field on a different record entirely, and a map keyed on
+       it would have matched nothing and left the cycle silently unclamped. */
+    const onChange = async (val, key, el) => {
+      /* ⚠ FOLDED INSIDE the handler, not written as a sibling const. Every slicer in the harness
+         suite lifts this function by name; a constant declared beside it is invisible to all of
+         them and the lifted copy dies on "RANGE is not defined" ([[the-loop]] #16). */
+      const RANGE = { window_weeks: [2, 26], buffer_pct: [0, 100], cycle_days: [1, 30] };
       const s = this.settings();
-      const n = parseInt(val, 10);
-      if (isNaN(n)) return;
+      let n = parseInt(val, 10);
+      if (isNaN(n)) return;              // garbage is refused outright, never clamped to a bound
+      const r = RANGE[key];
+      if (r) { if (n < r[0]) n = r[0]; if (n > r[1]) n = r[1]; }
+      if (el && String(n) !== String(val)) el.value = n;
       s[key] = n;
       await App.saveInventory();
       this.draw();
     };
-    document.getElementById('ps-window')?.addEventListener('change', e => onChange(e.target.value, 'window_weeks'));
-    document.getElementById('ps-buffer')?.addEventListener('change', e => onChange(e.target.value, 'buffer_pct'));
-    document.getElementById('ps-cycle')?.addEventListener('change',  e => onChange(e.target.value, 'cycle_days'));
+    document.getElementById('ps-window')?.addEventListener('change', e => onChange(e.target.value, 'window_weeks', e.target));
+    document.getElementById('ps-buffer')?.addEventListener('change', e => onChange(e.target.value, 'buffer_pct', e.target));
+    document.getElementById('ps-cycle')?.addEventListener('change',  e => onChange(e.target.value, 'cycle_days', e.target));
     document.getElementById('ps-export')?.addEventListener('click', () => App.exportPDF({ title: 'Dynamic Pars', root: this.container }));
 
     // One deliberate Update per product: the operator weighs each suggestion on
