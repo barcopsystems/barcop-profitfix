@@ -2235,7 +2235,20 @@ S.HubSettings = {
     };
     const mkCount = (daysAgo, pick, countedBy) => {
       const items = icProducts.map((p, i) => icCountItem(p, pick(i)));
-      return { id:uid(), date:dateStr(daysAgo), type:'Full', counted_by:countedBy || 'Maria G.',
+      /* ⛔ THE TYPE IS DERIVED THE WAY THE FORM DERIVES IT, NOT WRITTEN DOWN (Q3, 2026-07-31).
+         It was hardcoded `'Full'` while the locations below are derived from the products —
+         and no seeded product sits on Main Bar, so every count covered FIVE of six shelves and
+         called itself Full. ic-take-inventory's own rule says a 5-of-6 count is NOT Full, so the
+         seed was writing a record the form could never produce ([[seed-roundtrip-verification]]).
+         Visible consequences: the Stock Report's BY LOCATION had no Main Bar row and no note
+         saying why, all ten counts in Count History read "Full", and the already-counted-today
+         prompt named five locations under a label claiming all of them.
+         Deriving it means the label stays honest if the seed's shelves ever change. */
+      const countedLocs = [...new Set(items.map(it => it.location).filter(Boolean))];
+      const allLocs = (App.inventoryData.ic_locations || []).filter(l => !l.archived).map(l => l.name);
+      const type = (countedLocs.length === allLocs.length && allLocs.length > 0) ? 'Full'
+        : (countedLocs.length === 1 ? countedLocs[0] : 'Multi-Location');
+      return { id:uid(), date:dateStr(daysAgo), type, counted_by:countedBy || 'Maria G.',
         // Derived from the items, not a hardcoded list: Take Inventory writes exactly the
         // locations it counted, and a seeded count that names a different set is a count the
         // form could never have produced.
