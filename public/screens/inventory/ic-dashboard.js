@@ -337,8 +337,10 @@ S.InventoryDashboard = {
     const allDone = doneCount === total;
     const pct = Math.round(doneCount / total * 100);
     const doneLine = allDone
-      ? '<span style="color:var(--green);font-weight:700;">&#10003; You\'re current this week</span>'
-      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done this week</span>';
+      ? '<span style="color:var(--green);font-weight:700;">&#10003; ' + (this.atCurrentWeek() ? 'You\'re current this week' : 'This week is closed out') + '</span>'
+      /* No "this week": the week is named in the pill directly above, and the selector walks back
+         through past weeks — so the phrase was wrong on every week but the current one (F2). */
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done</span>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
       + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
@@ -355,7 +357,8 @@ S.InventoryDashboard = {
   },
 
   _META: {
-    count:      { n: 1, title: 'Take this week\'s count', sub: 'Count your inventory' },
+    // "the week's", not "this week's": the selector walks back and the title renders on every week.
+    count:      { n: 1, title: 'Take the week\'s count', sub: 'Count your inventory' },
     deliveries: { n: 2, title: 'Receive deliveries',      sub: 'Log anything that came in since your last count' },
     orders:     { n: 3, title: 'Place your orders',       sub: 'Order what is below par, by vendor' },
     review:     { n: 4, title: 'Review the flags',        sub: 'Shrinkage, spot checks, dead stock' }
@@ -364,20 +367,28 @@ S.InventoryDashboard = {
     const st = this._st;
     if (k === 'count') {
       if (st.hasCountThisWeek) return 'Counted ' + this.fmtDate((st.weekCount || st.latest).date);
-      if (st.lastAge != null) return 'Last count ' + (st.lastAge === 0 ? 'today' : st.lastAge + 'd ago') + ', not counted this week';
+      if (st.lastAge != null) return 'Last count ' + (st.lastAge === 0 ? 'today' : st.lastAge + 'd ago') + ', nothing counted in this week';
       return this._META.count.sub;
     }
     if (k === 'deliveries') {
       const n = st.deliveriesThisWeek;
-      return n ? (n + ' deliver' + (n === 1 ? 'y' : 'ies') + ' logged this week') : (isDone ? 'None this week' : this._META.deliveries.sub);
+      return n ? (n + ' deliver' + (n === 1 ? 'y' : 'ies') + ' logged') : (isDone ? 'None logged' : this._META.deliveries.sub);
     }
+    /* ⚠ STEPS 3 AND 4 ARE "NOW" FIGURES AND CANNOT BE ANYTHING ELSE (F1). Steps 1 and 2 follow the
+       week selector because a count and a delivery HAPPENED on a date. Reorder and flags do not:
+       reorderTotal comes from the live below-par plan, shrink/spotFlags from a rolling 30 days off
+       today, deadAll from the newest count pair, menuOver from current pricing. You cannot reorder
+       into a past week, so back-dating them would be inventing a number nobody can act on.
+       Before this, stepping back to JUN 8 - JUN 14 still read "$3,988.05 to reorder, 6 vendors" and
+       "4 flags to review" with nothing saying those were today's. Now they say so. */
+    const asOfToday = this.atCurrentWeek() ? '' : ', as of today';
     if (k === 'orders') {
-      if (st.reorderCount) return App.fmtCurrency(st.reorderTotal) + ' to reorder, ' + st.vendors.length + ' vendor' + (st.vendors.length === 1 ? '' : 's');
-      return st.hasReorderBasis ? 'Everything at par' : this._META.orders.sub;
+      if (st.reorderCount) return App.fmtCurrency(st.reorderTotal) + ' to reorder, ' + st.vendors.length + ' vendor' + (st.vendors.length === 1 ? '' : 's') + asOfToday;
+      return (st.hasReorderBasis ? 'Everything at par' : this._META.orders.sub) + asOfToday;
     }
     if (k === 'review') {
       const flags = (st.shrink > 0 ? 1 : 0) + (st.spotFlags > 0 ? 1 : 0) + (st.deadAll > 0 ? 1 : 0) + (st.menuOver > 0 ? 1 : 0);
-      return isDone ? 'Reviewed' : (flags ? flags + ' flag' + (flags === 1 ? '' : 's') + ' to review' : 'Nothing flagged');
+      return isDone ? 'Reviewed' : ((flags ? flags + ' flag' + (flags === 1 ? '' : 's') + ' to review' : 'Nothing flagged') + asOfToday);
     }
     return '';
   },
@@ -411,7 +422,12 @@ S.InventoryDashboard = {
 
     if (k === 'count') {
       const lastInfo = st.latest
-        ? 'Last count: ' + this.fmtDate(st.latest.date) + (st.lastAge != null ? ' (' + (st.lastAge === 0 ? 'today' : st.lastAge + 'd ago') + ')' : '')
+        /* F3: on a past week this printed "Last count: Jul 31 (today)" directly under a header
+           reading "Counted Jul 17" — two different dates in one card, because the header uses
+           st.weekCount and this used st.latest. On the current week they are the same count and
+           the line is useful; on any other week it is noise, so it says which it means. */
+        ? (this.atCurrentWeek() ? 'Last count: ' : 'Your most recent count: ')
+          + this.fmtDate(st.latest.date) + (st.lastAge != null ? ' (' + (st.lastAge === 0 ? 'today' : st.lastAge + 'd ago') + ')' : '')
         : 'No counts yet';
       return explain('Count your inventory for the week. Bar Cop values it, builds your reorder plan, and reads what you used since your last count.')
         + '<div style="font-size:12px;color:var(--t2);">' + lastInfo + '</div>'
@@ -419,7 +435,7 @@ S.InventoryDashboard = {
     }
     if (k === 'deliveries') {
       return explain('Log anything that came in since your last count, checking each invoice against the order. Re-priced items feed Vendor Tracker. Nothing came in? Mark this done.')
-        + '<div style="font-size:12px;color:var(--t2);">' + st.deliveriesThisWeek + ' deliver' + (st.deliveriesThisWeek === 1 ? 'y' : 'ies') + ' logged this week.</div>'
+        + '<div style="font-size:12px;color:var(--t2);">' + st.deliveriesThisWeek + ' deliver' + (st.deliveriesThisWeek === 1 ? 'y' : 'ies') + ' logged in this week.</div>'
         + btnRow('<button class="btn btn-ghost btn-sm" data-go="ic-receive-delivery">Receive Delivery</button>' + this.markBtn('deliveries', 'Mark Done'));
     }
     if (k === 'orders') {
@@ -498,7 +514,7 @@ S.InventoryDashboard = {
       + hero + secondary + '</div>';
   },
 
-
+
 
   parNudge(n) {
     return '<div data-go="ic-par-suggestions" style="margin-top:12px;padding:11px 13px;background:var(--input);border:1px solid var(--b2);border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;">'

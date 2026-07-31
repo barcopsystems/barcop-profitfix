@@ -684,6 +684,14 @@ S.InventoryTakeInventory = {
     const total = groups.reduce((s, g) => s + g.products.length, 0);
     const done = this._countedTotal();
     const pct = total ? Math.round(done / total * 100) : 0;
+    /* ⚠ THE HEADER COUNTS THE SHELF YOU ARE STANDING AT; THE BAR COUNTS THE WHOLE COUNT (F7).
+       It used to read "<location> | <done across ALL locations> of <total across ALL>", so editing
+       the seed's Full count at Kitchen Line printed "Kitchen Line | 110 of 133" over a sheet
+       showing THREE products. On a single-location count the two are identical and the ambiguity
+       was invisible, which is why it survived. Now the words describe the location and the
+       progress bar underneath still describes the job. */
+    const grpTotal = grp.products.length;
+    const grpDone = grp.products.filter(p => this._hasCount(this.draft.counts[p.id + '@@' + grp.location])).length;
     const isLast = this.locStep === groups.length - 1;
 
     const cards = grp.products.map(p => {
@@ -776,7 +784,7 @@ S.InventoryTakeInventory = {
       + '<div style="position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0 10px;margin-bottom:8px;border-bottom:1px solid var(--b2);">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;">'
       + '<div style="font-size:13px;font-weight:800;color:var(--t1);">' + esc(grp.location)
-      + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">&nbsp;|&nbsp; <span id="ti-prog-txt" style="color:var(--green);">' + done + ' of ' + total + '</span></span></div>'
+      + ' <span style="color:var(--t3);font-weight:600;font-size:11px;">&nbsp;|&nbsp; <span id="ti-prog-txt" style="color:var(--green);">' + grpDone + ' of ' + grpTotal + '</span> counted here</span></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-ghost btn-sm" id="ti-exit-top">' + (editingNow ? 'Save Changes' : 'Save &amp; Exit') + '</button>'
         + '<button class="btn btn-ghost btn-sm" id="ti-discard-top" style="color:var(--red);">' + (editingNow ? 'Discard Changes' : 'Start Over') + '</button>'
@@ -935,11 +943,18 @@ S.InventoryTakeInventory = {
   },
 
   updateProgress() {
-    const total = this.groups().reduce((s, g) => s + g.products.length, 0);
+    const groups = this.groups();
+    const total = groups.reduce((s, g) => s + g.products.length, 0);
     const done = this._countedTotal();
+    /* Same split as the render (F7): the TEXT is this shelf, the BAR is the whole count. If these
+       two ever disagree with the render's own figures the header lies as soon as a box is typed
+       in, which is exactly how the original ambiguity stayed invisible. */
+    const grp = groups[this.locStep];
+    const grpTotal = grp ? grp.products.length : 0;
+    const grpDone = grp ? grp.products.filter(p => this._hasCount(this.draft.counts[p.id + '@@' + grp.location])).length : 0;
     const txt = document.getElementById('ti-prog-txt');
     const bar = document.getElementById('ti-prog-bar');
-    if (txt) txt.textContent = done + ' of ' + total;
+    if (txt) txt.textContent = grpDone + ' of ' + grpTotal;
     if (bar) bar.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
   },
 

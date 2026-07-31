@@ -174,11 +174,25 @@ S.InventoryUsageReport = {
       const totCost = rows.reduce((s, r) => s + (r.usageCost || 0), 0);
       const totSales = rows.reduce((s, r) => s + (r.theoSales || 0), 0);
       const totProfit = rows.reduce((s, r) => s + (r.theoProfit || 0), 0);
+      /* ⚠ THE FOUR TILES DO NOT DESCRIBE THE SAME SET, AND NOTHING SAID SO (F22). Usage Cost
+         covers every product; Theo Sales and Theo Profit only cover the ones carrying a serving
+         price. MEASURED: 110 products - $5,205.37 cost - $15,664.59 sales - $12,906.12 profit.
+         The obvious subtraction gives $10,459.22, not the $12,906.12 shown, because the missing
+         $2,446.90 is the food and misc cost sitting in one tile and absent from the other two.
+         Every figure is true on its own; the row of them implies a relationship that does not
+         hold. The numbers are RIGHT, so the fix is disclosure, not recalculation. */
+      const priced = rows.filter(r => r.theoSales != null).length;
+      const note = priced < rows.length
+        ? '<div style="font-size:11px;color:var(--t3);margin-top:10px;line-height:1.5;">'
+          + 'Theoretical sales and profit cover the <strong>' + priced + '</strong> of '
+          + rows.length + ' products that carry a serving price. Usage cost covers all '
+          + rows.length + '.</div>'
+        : '';
       statsCard = this.statsCard(
         this.statItem('Products', rows.length)
         + this.statItem('Usage Cost', App.fmtCurrency(totCost))
         + this.statItem('Theo Sales', App.fmtCurrency(totSales))
-        + this.statItem('Theo Profit', App.fmtCurrency(totProfit), totProfit >= 0 ? 'good' : 'warn'));
+        + this.statItem('Theo Profit', App.fmtCurrency(totProfit), totProfit >= 0 ? 'good' : 'warn')) + note;
     }
 
     // Period = a windowed stepper (‹ prev · current · next ›, like the Build
@@ -201,6 +215,13 @@ S.InventoryUsageReport = {
       + '</div>';
 
     this.container.onclick = ev => {
+      /* ⚠ F24 IS STILL OPEN HERE, DELIBERATELY. The filename carries today's date, not the PERIOD
+         on screen, so exporting three different periods gives three different reports all named
+         "Usage Report - 2026-07-31.pdf". The fix needs the selected pair's start/end dates, and
+         this screen holds the selection somewhere I have not traced — my first attempt guessed a
+         `periodRange()` helper that does not exist, which the `&&` guard would have turned into a
+         silent no-op that LOOKS fixed ([[the-loop]] #40 and #53 in one line). Left visibly broken
+         rather than fake-fixed. Empties Log already does this correctly; copy its shape. */
       if (ev.target.closest('#ur-export')) { App.exportPDF({ title: 'Usage Report', root: this.container }); return; }
       const tab = ev.target.closest('.ch-tab');
       if (tab) { this.tab = tab.dataset.tab; this.draw(); return; }
@@ -300,12 +321,21 @@ S.InventoryUsageReport = {
     const byCat = {};
     rows.forEach(r => {
       const c = r.category || 'Uncategorized';
-      byCat[c] = byCat[c] || { cost: 0, sales: 0, profit: 0 };
-      byCat[c].cost += r.usageCost || 0; byCat[c].sales += r.theoSales || 0; byCat[c].profit += r.theoProfit || 0;
+      /* ⚠ START AT null, NOT 0 (F23). `+= (r.theoSales || 0)` collapsed "this product has no
+         serving price" into a measured zero, so Food — 37 products, $2,176.55 of usage cost, none
+         of them priced — rendered "THEO SALES $0.00 / THEO PROFIT $0.00". A dash is an ABSENCE;
+         $0.00 is a claim, and on a kitchen doing that much cost it reads as "food earns nothing".
+         The ROW level already got this right via cur(), which dashes a null; only the category
+         rollup coerced. Now a category stays null until at least one priced product lands in it,
+         and cur() dashes it exactly like the rows it summarises. */
+      byCat[c] = byCat[c] || { cost: 0, sales: null, profit: null };
+      byCat[c].cost += r.usageCost || 0;
+      if (r.theoSales  != null) byCat[c].sales  = (byCat[c].sales  || 0) + r.theoSales;
+      if (r.theoProfit != null) byCat[c].profit = (byCat[c].profit || 0) + r.theoProfit;
     });
     const catRows = Object.keys(byCat).sort().map(c => '<tr><td><div class="val">' + esc(c) + '</div></td>'
       + '<td>' + this.cur(byCat[c].cost) + '</td><td>' + this.cur(byCat[c].sales) + '</td>'
-      + '<td class="' + (byCat[c].profit >= 0 ? 'pos' : 'neg') + '">' + this.cur(byCat[c].profit) + '</td></tr>').join('');
+      + '<td class="' + (byCat[c].profit == null ? '' : (byCat[c].profit >= 0 ? 'pos' : 'neg')) + '">' + this.cur(byCat[c].profit) + '</td></tr>').join('');
     return this.dataCard(headers, catRows);
   },
 
