@@ -84,10 +84,16 @@ S.InventoryCountHistory = {
         'Say you compare last Sunday to this Sunday and a 750ml of your house bourbon shows a drop of four bottles. At 1.5 oz a pour that is roughly 67 pours that should match what the register rang. If the bottles moved but the sales did not, that gap is the conversation you need to have.'
       ] },
       { h: 'Fixing A Count You Got Wrong', p: [
-        'Counted a location, submitted it, then realized you missed a couple of bottles? Hit Edit on that row. It reopens the count exactly as you left it, you add what you missed, and it saves back over the same count instead of creating a second one.',
-        'Edit only shows on counts that have not been booked yet. Once you confirm a week, the counts that week priced out are tagged Booked and Edit comes off them, because your cost of goods, prime cost, and variance for that week are already set from those numbers. Changing one after the fact would move a week you already signed off. If a Booked count is wrong, log the correction as an adjustment or delete the count and recount.'
+        'Counted a location, submitted it, then realized you missed a couple of bottles? Hit Edit on that row. It reopens the count with your numbers already filled in, you add what you missed, and it saves back over the same count instead of creating a second one. It rebuilds off your current product list, so anything you have since made inactive or moved off that location will not be on the sheet.',
+        'Edit is on every count, including the ones tagged Booked. A Booked count is one that a week you already confirmed priced its cost of goods from, so correcting it changes a number you signed off. Bar Cop will not do that quietly. When you save, it names every confirmed week whose cost of goods actually moves and shows you the real before and after, then you pick: update those weeks with the corrected figures, or save the count on its own and leave the confirmed weeks exactly as they are.',
+        'Expect more than one week. A count closes out the week behind it and opens the week in front of it, so a correction in the middle of your history usually moves the week either side, and sometimes a third. Every one of them is named in the box before anything is written.',
+        'If you typed a cost of goods figure into a week by hand, "Save the Count Only" is how you keep it. Nothing is written to a week unless you say so.'
       ] },
-      { h: 'Deleting A Count', p: ['Deleting a count is behind the edit permission for a reason. A finalized count feeds your cost of goods, usage, and variance, so pulling one out moves all of those numbers. Only delete a count that was entered wrong and cannot be trusted. If a single product was off, it is cleaner to recount than to throw out the whole record.'] },
+      { h: 'Deleting A Count', p: [
+        'Deleting a count is behind the edit permission for a reason. A finalized count feeds your cost of goods, usage, and variance, so pulling one out moves all of those numbers. Only delete a count that was entered wrong and cannot be trusted. If a single product was off, it is cleaner to recount than to throw out the whole record.',
+        'Delete comes off a count once a confirmed week has booked it, and that is the difference between the two buttons. An edit has a new number to show you, so Bar Cop can price the change and let you decide. Deleting does not adjust a figure, it removes one end of the pair the week was measured from, and there is no corrected number to show in its place. Correct the count instead of removing it.',
+        'Note that confirming the week you are currently in books every count you have, including the newest one, because that week ends on a date they all fall before. Those rows read Latest and Booked together, and Edit is still there.'
+      ] },
       { h: 'Export', p: ['Use Export PDF to save a clean PDF of any count for your accountant at month end, your insurance file, or a new manager who needs to see where the stock stands.'] }
     ]);
   },
@@ -137,17 +143,27 @@ S.InventoryCountHistory = {
         const varCell = r.variance == null
           ? '<span style="color:var(--t4);">-</span>'
           : (r.variance > 0 ? '+' : '') + App.fmtBal(r.variance);
-        /* ⚠ SAY WHY THE EDIT BUTTON IS NOT THERE. Kyle, seeing only the newest row offer Edit:
-           "why does only the latest take inventory have the edit button?" The lock was working
-           exactly as designed -- a confirmed week has already booked those counts into COGS -- but
-           the button simply VANISHED, so there was no way to tell a rule from a bug. A status the
-           operator can read beats a control that quietly disappears. */
+        /* ⚠ SAY WHY A CONTROL IS NOT THERE. Kyle, seeing only the newest row offer Edit: "why does
+           only the latest take inventory have the edit button?" The lock was working exactly as
+           designed, but the button simply VANISHED, so there was no way to tell a rule from a bug.
+           A status the operator can read beats a control that quietly disappears.
+           ⭐ S331 gave Edit back on these rows, so "Booked" now explains the missing DELETE and the
+           popup the operator gets on save. The word is still the right one: this count has been
+           booked into a week that is signed off. */
+        /* ⚠⚠ LATEST AND BOOKED ARE TWO DIFFERENT FACTS AND THE CELL SHOWED ONLY ONE. `isLatest`
+           won outright, so the newest count could never say "Booked" -- and it is booked far more
+           often than that reads: `countLockedByWeek` fires once ANY confirmed week ends on or after
+           the count's date, and both cockpits confirm `App.nextSunday()`, which is today or later.
+           **So the moment an operator confirms the running week, EVERY count is booked, newest
+           included.** That row then lost its Delete button with the word explaining why nowhere on
+           screen, which is the exact "why did the button vanish" defect this status was added to
+           fix. Both facts now show; "Latest" keeps the gold, because that is the one the dashboard
+           and the reorder list read from. */
         const booked = App.countLockedByWeek(c);
-        const status = r.isLatest
-          ? '<span style="color:var(--gold);font-weight:700;">Latest</span>'
-          : (booked
-              ? '<span style="color:var(--t3);font-weight:600;">Booked</span>'
-              : '<span style="color:var(--t3);font-weight:600;">Past</span>');
+        const status = (r.isLatest ? '<span style="color:var(--gold);font-weight:700;">Latest</span>' : '')
+          + (r.isLatest && booked ? '<span style="color:var(--t4);"> &middot; </span>' : '')
+          + (booked ? '<span style="color:var(--t3);font-weight:600;">Booked</span>'
+                    : (r.isLatest ? '' : '<span style="color:var(--t3);font-weight:600;">Past</span>'));
         return '<tr class="ch-row" data-id="' + c.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(c.date) + '</div></td>'
           + '<td>' + esc(c.type || '-') + '</td>'
@@ -156,24 +172,32 @@ S.InventoryCountHistory = {
           + '<td class="val">' + App.fmtCurrency(c.total_value || 0) + '</td>'
           + '<td>' + varCell + '</td>'
           + '<td>' + status + '</td>'
-          /* S250: Edit re-opens the count so a missed bottle can be added. Hidden once a
-             confirmed week has booked this count -- editing then would rewrite COGS that has
-             already been signed off.
-             ⚠⚠ AND SO IS DELETE (S282). The two carried DIFFERENT rules and the comment here said so
-             out loud -- "Delete stays where it was". But deleting a booked count does not merely
-             rewrite a COGS figure, it removes a TERM FROM THE USAGE EQUATION outright:
-             computeUsagePair reads the two counts either side of a period, so dropping one silently
-             re-pairs the week against an older count and changes a number a confirmed week has
-             already signed off. Strictly worse than the edit this same line forbids.
-             ⚠ KNOWN CONSEQUENCE, and it is deliberate rather than overlooked: `countLockedByWeek`
-             locks a count once ANY confirmed week ends on or after its date, and NO reachable screen
-             can un-confirm a week (`removeRecord('core','week')` exists only in the retired
-             this-week.js, which navigate() intercepts). So a booked count is now permanently
-             undeletable. That matches what Edit has always done, and the escape hatch -- a way to
-             re-open a confirmed week -- is its own item on THE LIST rather than a reason to leave a
-             signed-off COGS figure deletable ([[the-loop]] #61). */
+          /* S250: Edit re-opens the count so a missed bottle can be added.
+             ⭐⭐ S331 — EDIT NOW STAYS ON A BOOKED ROW, AND THE TWO ACTIONS SPLIT ON PURPOSE.
+             Kyle: *"a submitted count that has been included in a confirmed week.. can't it just
+             still have an edit button that when it is changed and submitted a popup just says 'this
+             count is included in this confirmed week and the count will adjust in that week'?"* He
+             is right, and the argument that settles it is that a confirmed week's figures are
+             ALREADY editable from Week History -> Edit, which opens the same Confirm the Week popup
+             and writes back to the SAME `week` / `revenue_week` records. **The old lock froze the
+             SOURCE while leaving the RESULT freely editable** -- you could not fix the count that
+             produced a COGS figure, but you could retype the figure itself. So this opens no new
+             hole; it makes an already-open door reachable from where the operator actually is, with
+             the real before/after numbers on screen. On save, `submit()` asks
+             `ConfirmWeek.cogsImpact` what moves, names every affected week, and updates only if the
+             operator says so.
+             ⚠⚠ DELETE STAYS LOCKED (S282), and the difference is not a nicety. An edit has a NEW
+             VALUE to show, so the popup can print "$2,758.47 -> $2,801.12" and the operator can
+             judge it. A deletion removes a TERM FROM THE USAGE EQUATION outright: computeUsagePair
+             reads the two counts either side of a period, so dropping one silently re-pairs the week
+             against an older count, and there is no "->" to display. Different question, its own
+             decision, still open on THE LIST.
+             ⚠ Known consequence, unchanged: `countLockedByWeek` locks a record once ANY confirmed
+             week ends on or after its date, and no reachable screen can un-confirm a week
+             (`removeRecord('core','week')` exists only in the retired this-week.js, which
+             navigate() intercepts). A booked count is still permanently undeletable. */
           + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm ch-view" data-id="' + c.id + '">View</button>'
-          + ((App.canEdit('ic-count-history') && !App.countLockedByWeek(c))
+          + (App.canEdit('ic-count-history')
               ? '<button class="btn btn-ghost btn-sm ch-edit" data-id="' + c.id + '">Edit</button>' : '')
           + ((App.canEdit('ic-count-history') && !App.countLockedByWeek(c))
               ? '<button class="btn btn-danger btn-sm ch-del" data-id="' + c.id + '">Delete</button>' : '')

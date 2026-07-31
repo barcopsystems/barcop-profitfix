@@ -139,7 +139,14 @@ S.InventoryDeliveryHistory = {
         /* S255: Edit reopens the delivery in the Receive form so a mistyped qty or price can be
            corrected. Hidden once a confirmed week has booked the period -- a delivery is the
            PURCHASES term in usage (starting + purchases - ending), so editing it after the fact
-           moves a COGS figure already signed off, exactly as editing a count would.
+           moves a COGS figure already signed off.
+           ⚠⚠ THE TWIN NO LONGER MATCHES, AND THAT IS DELIBERATE (S331, 2026-07-31). This used to
+           read "exactly as editing a count would" -- true then, false now. A booked COUNT is
+           editable: `ic-take-inventory.submit()` asks `ConfirmWeek.cogsImpact` which confirmed
+           weeks move, names each with real before/after COGS, and writes only on the operator's
+           say-so. **No equivalent exists for a delivery, so this door stays shut.** Reach is a
+           property of a screen, not of a family ([[the-loop]] #55) -- if this is ever opened, it
+           needs its own impact popup, not a copy of the count gate.
            ⚠⚠ AND SO IS DELETE (S282), for the stronger version of that same reason: a delivery IS
            the purchases term, so removing it does not adjust the figure, it deletes the term. The
            twin screen (ic-count-history) carried the identical split and is fixed in the same pass.

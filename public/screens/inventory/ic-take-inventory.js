@@ -330,11 +330,17 @@ S.InventoryTakeInventory = {
        was mine. **A check that can run before the work must run before the work.**
        Here nothing has been entered yet, so "open that count instead" costs the operator nothing —
        it is the sanctioned path (S250) arriving at the only moment it is free.
-       ⚠ A LOCKED prior count gets a plain notice and no offer: `editCount` would refuse it anyway,
-       and dangling a button that cannot work is worse than not offering one.
        ⚠ The submit-time guard STAYS as the backstop — a count begun before the other one existed,
        or on a second device, still has to be caught — but it now MERGES BY LOCATION instead of
-       refusing, so it can never again cost anyone their work. */
+       refusing, so it can never again cost anyone their work.
+       ⭐ S331 REMOVED THE SPECIAL CASE THAT USED TO SIT HERE. A prior count inside a confirmed week
+       got a plain notice and no offer, for one stated reason: *"editCount would refuse it anyway,
+       and dangling a button that cannot work is worse than not offering one."* That premise is
+       gone — `editCount` opens a booked count now and `submit()` prices the change for the operator
+       — so the notice had become a dead end telling them to "count this one tomorrow" about a
+       correction they can simply make. One offer, one path, whether the week is closed or not
+       ([[the-loop]] #65: when a limitation pushes you somewhere obviously worse, go and check
+       whether the limitation is still true). */
     const sameDay = App.todayLocal();
     const pickedSet = new Set(picked);
     const prior = this.counts().find(c => c
@@ -343,16 +349,6 @@ S.InventoryTakeInventory = {
     if (prior) {
       const overlap = (prior.locations || []).filter(l => pickedSet.has(l));
       const nameList = a => a.length === 1 ? a[0] : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
-      if (App.countLockedByWeek(prior)) {
-        await App.confirm({
-          title: 'Already counted today, and the week is confirmed',
-          message: nameList(overlap) + ' was counted earlier today, and the week it falls in has since been confirmed. '
-            + 'Confirmed weeks lock the counts inside them, so that count cannot be changed. Pick a different location, '
-            + 'or count this one tomorrow.',
-          confirmText: 'OK', cancelText: ''
-        });
-        return;
-      }
       const openIt = await App.confirm({
         title: 'You already counted ' + nameList(overlap) + ' today',
         message: 'Bar Cop keeps one count per location per day, because two counts of the same shelf on one day cannot '
@@ -417,7 +413,13 @@ S.InventoryTakeInventory = {
     opts = opts || {};
     const rec = this.counts().find(c => c.id === id);
     if (!rec) return 'gone';
-    if (App.countLockedByWeek(rec)) return 'gone';   // the list hides Edit in this case; belt and braces
+    /* ⭐ S331 — NO WEEK-LOCK REFUSAL HERE ANY MORE. This used to read
+       `if (App.countLockedByWeek(rec)) return 'gone';` as the belt-and-braces twin of the hidden
+       Edit button. Both halves went together: the button is back on a booked row, so a refusal here
+       would render a control that silently does nothing. The protection did not disappear, it MOVED
+       to where it can show its work — `submit()` asks `ConfirmWeek.cogsImpact` what the correction
+       does to every confirmed week and names each one with real before/after figures before
+       anything is written. */
     /* ⚠⚠ NEVER OVERWRITE A COUNT IN PROGRESS WITHOUT ASKING (S321). This assigned `this.draft` and
        called `saveDraft()` unconditionally — and `saveDraft` writes the SAME `ic_count_draft` key,
        so a bartender forty bottles into the Back Bar who stepped over to Count History and clicked
@@ -480,12 +482,17 @@ S.InventoryTakeInventory = {
     return Object.keys(d.counts || {}).length > 0;
   },
 
-  // One wording for "this count is not openable", used by both routes into it, so the two
-  // cannot drift apart ([[the-loop]] step 0.6).
+  /* One wording for "this count is not openable", used by both routes into it, so the two cannot
+     drift apart ([[the-loop]] step 0.6).
+     ⭐ S331 narrowed what this can mean. It used to say "or the week it falls in has since been
+     confirmed" — true when a booked count was refused, and a false claim the moment Edit started
+     opening one. A confirmed week is no longer a reason a count will not open, so the only cause
+     left is that the record is genuinely gone ([[the-loop]] #79: reuse a message and every word in
+     it becomes a claim about which case you are in). */
   _countGoneNotice() {
     App.confirm({
       title: 'That count could not be opened',
-      message: 'It may have been removed, or the week it falls in has since been confirmed. Confirmed weeks lock the counts inside them so the numbers behind a closed week cannot move.',
+      message: 'It looks like it has been removed. Take Inventory has your other counts; open Count History to see what is still there.',
       confirmText: 'OK', cancelText: ''
     });
   },
@@ -958,6 +965,10 @@ S.InventoryTakeInventory = {
   // ── Submit ────────────────────────────────────────────────────────────────
   async submit() {
     if (!App.canEdit('ic-take-inventory')) return;   // staff-permission guard
+    // Clear any refusal left by an earlier attempt: a stale "Save failed" sitting under a dialog
+    // the operator then cancels reads as though THIS attempt failed.
+    const priorErr = document.getElementById('ti-sub-err');
+    if (priorErr) { priorErr.textContent = ''; priorErr.style.display = 'none'; }
     const rows = this.rows();
     // Build per-item records. For bottle beer with case_size, store the
     // case-aware fields (cases, loose, case_size_at_count) alongside the
@@ -1068,16 +1079,11 @@ S.InventoryTakeInventory = {
         const overlap = theirs.filter(l => mine.has(l));
         const nameList = a => a.length === 1 ? a[0]
           : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
-        if (App.countLockedByWeek(clash)) {
-          await App.confirm({
-            title: 'That day is already confirmed',
-            message: 'You counted ' + nameList(overlap) + ' earlier today, and the week it falls in has since been '
-              + 'confirmed. Confirmed weeks lock the counts inside them so the numbers behind a closed week cannot '
-              + 'move. Nothing has been saved.',
-            confirmText: 'OK', cancelText: ''
-          });
-          return;
-        }
+        /* ⭐ S331 REMOVED THE "that day is already confirmed" REFUSAL THAT SAT HERE. It existed
+           only because a booked count could not be corrected; now it can, so refusing the merge
+           would throw away everything the operator just typed to protect a figure the very next
+           popup prices for them. The merged record IS an edit of a booked count, and the
+           cogsImpact gate below covers it exactly as it covers Count History -> Edit. */
         /* ⚠⚠ MERGE BY LOCATION — the earlier refusal was MY BAD REASONING (S330b). I wrote that a
            partial overlap "cannot be folded in without losing those numbers" and sent the operator
            to Count History, which then discarded everything they had typed. **Which items to
@@ -1116,23 +1122,117 @@ S.InventoryTakeInventory = {
       }
     }
 
-    const btn = document.getElementById('ti-submit');
-    if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+    /* ⭐⭐ S331 — PRICE THE CORRECTION BEFORE WRITING IT. A count is an endpoint of a usage pair, so
+       changing one moves the COGS of every confirmed week whose pair touches it — up to TWO of them,
+       because a count ENDS one week's pair and STARTS the next. `cogsImpact` asks every confirmed
+       week the question against the corrected set and reports only the ones whose answer actually
+       moves; on the ordinary submit nothing moves and no popup is raised.
+       ⚠ ASKED ON EVERY SUBMIT, not just on `editing`. The merge branch above turns a same-day
+       re-count into an edit of an existing record, and a new count on a day a confirmed week already
+       covers is the same question — gating this on a flag would be the narrowing that hides the
+       case ([[the-loop]] #21).
+       ⚠ IT SITS HERE, ABOVE THE FIRST WRITE AND BELOW EVERY MUTATION-FREE STEP. Nothing has been
+       persisted yet and `record` is a local object, so Cancel touches nothing at all — the rollback
+       rule ([[the-loop]] #49) is satisfied by there being nothing to roll back.
+       ⚠ THE COUNT IS WRITTEN FIRST AND THE WEEKS ONLY IF IT LANDED. A week updated against a count
+       that failed to save is a number with nothing behind it. */
+    // The count list as it will be once this write lands: the record replaces its own row if it
+    // already has one (an edit, or the merge above), otherwise it joins the list.
+    const stored = this.counts();
+    /* ⚠ `replacing`, NOT `editing`, decides both the array shape AND the popup's wording. `editing`
+       is `!!draft._edit_id`, and the same-day MERGE branch above rewrites an existing record with
+       `editing` false — so a re-count of a shelf already counted today is every bit a correction
+       while that flag says it is not. One measured fact ("is there already a row with this id?")
+       answers both questions and cannot drift from the write. */
+    const replacing = stored.some(c => c && c.id === record.id);
+    const nextCounts = replacing
+      ? stored.map(c => (c && c.id === record.id) ? record : c)
+      : stored.concat([record]);
+
+    let impacts = [];
+    let updateWeeks = false;
+    let checkFailed = false;
+    /* ⚠ A THROW MUST NOT COST THE OPERATOR THEIR COUNT — but it must not pass silently either.
+       Swallowing it would leave the confirmed weeks stale with nothing on screen to say so, which
+       is indistinguishable from "nothing changed" ([[the-loop]] #15: a green detector is worse than
+       no detector). The count still saves, and the note below tells them to re-confirm the week. */
+    try { impacts = ConfirmWeek.cogsImpact(nextCounts) || []; }
+    catch (e) { impacts = []; checkFailed = true; }
+    if (impacts.length) {
+      /* ⚠ `replacing` decides the WORDS, not the behaviour. Confirming the running week early is the
+         cockpit's normal door, so a brand-new weekly count routinely lands inside a confirmed week
+         and moves it — that is not a "correction" and must not be described as one ([[the-loop]]
+         #79). Same figures, same buttons, honest sentence either way. */
+      const answer = await ConfirmWeek.askCogsImpact(impacts, replacing);
+      if (answer === 'cancel') return;                  // nothing written, nothing lost
+      updateWeeks = (answer === 'update');
+    }
+
+    /* ⚠⚠ EVERY SAVE CONTROL ON EITHER SCREEN, NOT JUST THE REVIEW BUTTON — step 0.6, and I fixed
+       one half of this in the last round and left its twin two lines above it. `ti-submit` lives on
+       the REVIEW screen only; since S330c, `_exitCount()` also calls `submit()` from the COUNTING
+       screen, where the save controls are `ti-exit` and `ti-exit-top`. There `btn` was null, so
+       there was no "Submitting...", no disable and no visual change at all while the write was in
+       flight — and on a slow connection the natural response is to press again, which starts a
+       SECOND concurrent submit (a second putRecord, a second clearDraft, a second renderDone).
+       Nothing else guards it: the button is the guard, and there is no overlay up once the impact
+       popup has been answered.
+       ⚠ The label is CAPTURED and restored rather than rebuilt, because the three controls read
+       differently ("Submit Count" / "Save Changes" / "Save & Exit") and the counting screen's pair
+       already follows edit mode. Rebuilding one string for all three would relabel two of them. */
+    const btns = ['ti-submit', 'ti-exit-top', 'ti-exit']
+      .map(id => document.getElementById(id)).filter(Boolean)
+      .map(el => ({ el: el, label: el.textContent }));
+    btns.forEach(b => { b.el.disabled = true; b.el.textContent = 'Saving...'; });
 
     const ok = await App.putRecord('ic', 'count', record);
     if (ok) {
       App.markSetupDone('gs_ic_count');
       this.clearDraft();
-      this.renderDone(record);
+      let weekNote = '';
+      if (checkFailed) {
+        weekNote = 'Bar Cop could not check whether this count sits inside a week you have already '
+          + 'confirmed. If it does, open Week History, edit that week and press Refresh from Control to pull '
+          + 'the corrected cost of goods in.';
+      } else if (updateWeeks) {
+        const res = await ConfirmWeek.applyCogsImpact(impacts);
+        // Say which weeks did NOT move rather than reporting a clean save over a partial one.
+        if (!res.ok) {
+          weekNote = 'The count was saved, but the week ending ' + res.failed.join(' and ')
+            + ' could not be updated. Open Week History, edit that week and press Refresh from Control to pull '
+            + 'the new figures in.';
+        }
+      }
+      this.renderDone(record, weekNote);
     } else {
+      /* ⚠⚠ THE FAILURE HAD NOWHERE TO GO ON THE COUNTING SCREEN (found scanning S331; the hole
+         arrived with S330c, not with S331, but S331 makes it far easier to reach). `ti-submit` and
+         `ti-sub-err` are rendered by `renderReview` ALONE. Since S330c, `_exitCount()` also calls
+         `submit()` straight from the counting screen when the operator presses Save Changes in the
+         sticky header -- and there both lookups return null, so a REFUSED write (read-only
+         membership, storage full) changed nothing on screen at all: same buttons, same numbers, no
+         red text. The comment above `_exitCount` says `submit()` "owns the write, the failure
+         message and the confirmation screen", which is the confidence claim that made it invisible.
+         So: use the inline slot where one exists, and otherwise SAY IT, because a save that was
+         refused in silence reads exactly like a save that worked. */
+      const msg = 'Save failed. Try again.';
       const err = document.getElementById('ti-sub-err');
-      if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
-      if (btn) { btn.disabled = false; btn.textContent = editing ? 'Save Changes' : 'Submit Count'; }
+      if (err) { err.textContent = msg; err.style.display = 'inline'; }
+      else App.confirm({ title: 'Could not save this count', message: msg + ' Your numbers are still here, nothing has been lost.', confirmText: 'OK', cancelText: '' });
+      btns.forEach(b => { b.el.disabled = false; b.el.textContent = b.label; });
     }
   },
 
-  renderDone(record) {
+  renderDone(record, weekNote) {
     const counted = ((record && record.items) || []).filter(it => it && it.counted !== false).length;
+    /* ⚠ A PARTIAL RESULT IS SAID OUT LOUD (S331). The count can land while a confirmed week's
+       update does not, and "Changes Saved" over a week that did not move is the silent divergence
+       this item exists to close. The note sits inside the success card because the count really did
+       save — this is what is still outstanding, not a failure of the thing they pressed. */
+    const note = weekNote
+      ? '<div style="font-size:12px;color:var(--gold);line-height:1.6;margin-top:12px;max-width:520px;margin-left:auto;margin-right:auto;">'
+        + esc(weekNote) + '</div>'
+      : '';
     this.container.innerHTML = '<div class="screen"><div class="card">'
       + '<div style="text-align:center;padding:14px 0;">'
       + '<svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px;">'
@@ -1144,6 +1244,7 @@ S.InventoryTakeInventory = {
       // reporting 42 here contradicted the screen it followed. Count History uses the same basis.
       + '<div style="font-size:12px;color:var(--t3);">' + esc(record.type) + ' count &middot; ' + counted
       + ' product' + (counted === 1 ? '' : 's') + ' &middot; ' + App.fmtCurrency(record.total_value) + ' total value</div>'
+      + note
       + '</div>'
       + '<div class="card-actions" style="justify-content:center;">'
       + '<button class="btn btn-primary" id="ti-again">Take Another Count</button>'
