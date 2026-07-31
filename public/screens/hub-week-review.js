@@ -74,9 +74,24 @@ S.WeekReview = {
       + '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' + col + ';"></span>'
       + '<span style="font-size:12.5px;color:var(--t2);line-height:1.5;">' + text + '</span></div>';
   },
+  /* ⛔ URGENT FIRST, ON EVERY CARD (Kyle, 2026-07-31: "the carrying into next week sections on
+     each card are not consistent with the red urgent dot items all listed above the amber dot
+     items"). This rendered in PUSH ORDER, so whether a red sat above an amber depended on which
+     check happened to run first. Measured off the rendered dots, two of six populated cards were
+     out of order — and on the Cash card the single most urgent line, "Safe-to-spend is negative",
+     sat SECOND, under a merely-amber one.
+     ⚠⚠ AND THE ORDER DECIDES WHAT SURVIVES: the 5-item cap below truncates whatever is last, so
+     unsorted it could drop a RED while showing five ambers. The Labor card already pushes six.
+     Sorting fixes the ordering and the truncation together.
+     ⚠ STABLE within a band — the authored order inside red (and inside amber) is roughly
+     worst-first and must not be shuffled. Pinned by verify-week-review-urgency-and-period.js. */
   _openList(items) {
-    return items.length
-      ? '<div style="display:flex;flex-direction:column;gap:8px;">' + items.slice(0, 5).map(o => this._openItem(o.t, o.sev)).join('') + '</div>'
+    const rank = o => (o && o.sev === 'red') ? 0 : 1;
+    const ranked = items.map((o, i) => ({ o, i }))
+      .sort((a, b) => (rank(a.o) - rank(b.o)) || (a.i - b.i))
+      .map(x => x.o);
+    return ranked.length
+      ? '<div style="display:flex;flex-direction:column;gap:8px;">' + ranked.slice(0, 5).map(o => this._openItem(o.t, o.sev)).join('') + '</div>'
       : '<div style="font-size:12.5px;color:var(--green);padding:2px 0;">&#10003; Nothing open. Clean week.</div>';
   },
   // Status text (colored, no badge). Complete / N to do / N missed.
@@ -827,7 +842,11 @@ S.WeekReview = {
       b.paragraph('What it turned up: ' + s.results, { gray: 70 });
       b.paragraph('Carrying over: ' + s.open, { gray: 70 });
     });
-    await b.save(App.pdfFileName('Week in Review'));
+    /* ⛔ NAME IT FOR THE WEEK IT REVIEWS, NOT THE DAY IT WAS RUN. With no period this fell back
+       to today, so three different weeks exported as one filename and each overwrote the last in
+       the downloads folder — the same defect the Weekly P&L Brief had (B5). The week is right
+       here in _wkS/_wkE. */
+    await b.save(App.pdfFileName('Week in Review', this._wkS() + ' to ' + this._wkE()));
   },
 
   showHowTo() {
