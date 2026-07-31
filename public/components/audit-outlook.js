@@ -122,7 +122,10 @@ window.AuditOutlook = {
     // 2 — where the cash is stuck
     let p2 = '';
     if (d.TRAPPED_CASH > 0) p2 = m(d.TRAPPED_CASH) + ' of shelf cash is stuck, ' + m(d.DEAD_STOCK) + ' dead and ' + m(d.OVERSTOCK) + ' above par. ';
-    if (d.CYCLE_DAYS != null) p2 += 'Your cash is locked about ' + Math.round(d.CYCLE_DAYS) + ' days: product sits ' + Math.round(d.DIO) + ' and you take ' + Math.round(d.DPO) + ' to pay.';
+    // ONE cycle sentence, shared with the Cash cockpit briefing. This copy said "locked about
+    // -17 days" for a NEGATIVE cycle, which is the healthy case described as the sick one, and
+    // it disagreed with Capital Efficiency and Cash Audit S2 printing the same number.
+    if (d.CYCLE_DAYS != null) p2 += App.cashCycleSentence(d.CYCLE_DAYS, d.DIO, d.DPO);
     if (p2.trim()) paras.push(p2.trim());
 
     // 3 — the single move

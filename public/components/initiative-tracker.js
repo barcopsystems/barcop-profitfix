@@ -264,7 +264,15 @@ const InitiativeTracker = {
     });
     container.querySelectorAll('.init-del').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const ok = await App.confirmDelete();
+        /* ⚠ NAME THE EXPERIMENT. confirmDelete() with no subject renders "Delete this?" — and
+           this list is rows of the same shape, several of which look alike at a glance, each
+           with a name the record already carries. The one screen where an operator most needs
+           to know WHICH row they are about to lose is a list of near-identical rows. Falls
+           back to the generic wording when a record has somehow lost its name, rather than
+           printing "Delete ?". */
+        const rec = this.list(module).find(x => x.id === btn.dataset.id);
+        const name = rec && String(rec.name || '').trim();
+        const ok = await App.confirmDelete(name ? '"' + name + '"' : 'this experiment');
         if (!ok) return;
         await App.removeRecord('core', kind, btn.dataset.id);   // row-per-record
         rerender();
