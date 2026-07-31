@@ -561,14 +561,24 @@ const ConfirmWeek = {
          with one count that produced a box reading "Bar COGS not set → $2,801.12" directly above
          the sentence "so the figure in it was typed in", and then advised protecting a value that
          does not exist. A claim about a figure has to check the figure is there. */
-      const typedBefore = (barMoved && was[i].bar == null && storedBar != null)
-                       || (foodMoved && was[i].food == null && storedFood != null);
+      /* ⚠⚠ PER FIGURE, NOT PER WEEK. The first version ORed the two sides and hung ONE sentence off
+         the week block — and `icCOGS` answers per CATEGORY SET, so a bar with no kitchen products
+         gets a count-derived Bar COGS and a TYPED Food COGS in the same confirmed week. The box
+         then listed both figures and said "the figure in it was typed in", which is false about the
+         bar one. A claim about a figure belongs to that figure. */
+      /* ⚠ `Number.isFinite`, matching what `money()` renders with — `!= null` is true for NaN, and
+         a NaN stored figure prints as "not set", so the two tests disagreeing produced
+         "Bar COGS not set (you typed this) → $2,801.12". One value, one test. */
+      const barTyped  = barMoved  && was[i].bar  == null && Number.isFinite(storedBar);
+      const foodTyped = foodMoved && was[i].food == null && Number.isFinite(storedFood);
+      /* ⚠ NO WEEK-LEVEL `typedBefore` FIELD. It was emitted for one round and then read nowhere
+         once the tag moved onto the figure — a field computed, carried and never read is a fix that
+         never shipped ([[the-loop]] #25), and it invites the next reader to use the coarse answer. */
       out.push({
         period_end: pe,
         label: App.dateRangeLabel('', pe),
-        typedBefore: typedBefore,
-        bar:  { from: storedBar,  to: nextBar,  moved: barMoved },
-        food: { from: storedFood, to: nextFood, moved: foodMoved },
+        bar:  { from: storedBar,  to: nextBar,  moved: barMoved,  typed: barTyped },
+        food: { from: storedFood, to: nextFood, moved: foodMoved, typed: foodTyped },
         prime: { from: num(w, 'prime_cost_pct'), to: f.primePct },
         /* The identity half survives untouched; `_weekShape` replaces exactly the derived half, so
            the percentages can never be left describing the old COGS ([[the-loop]] #42). */
@@ -600,15 +610,14 @@ const ConfirmWeek = {
        a value nobody can vouch for. */
     const money = v => (Number.isFinite(v) ? App.fmtCurrency(v) : 'not set');
     const p1 = v => (Number.isFinite(v) ? v.toFixed(1) + '%' : 'not set');
+    // "(you typed this)" rides on the FIGURE it is true of, never on the week block.
+    const tag = t => (t ? ' (you typed this)' : '');
     const lines = impacts.map(i => {
       const bits = [];
-      if (i.bar.moved)  bits.push('Bar COGS ' + money(i.bar.from) + ' → ' + money(i.bar.to));
-      if (i.food.moved) bits.push('Food COGS ' + money(i.food.from) + ' → ' + money(i.food.to));
+      if (i.bar.moved)  bits.push('Bar COGS ' + money(i.bar.from) + tag(i.bar.typed) + ' → ' + money(i.bar.to));
+      if (i.food.moved) bits.push('Food COGS ' + money(i.food.from) + tag(i.food.typed) + ' → ' + money(i.food.to));
       if (i.prime.from != null || i.prime.to != null) bits.push('Prime ' + p1(i.prime.from) + ' → ' + p1(i.prime.to));
-      return 'Week ending ' + i.label + '\n' + bits.join('  ·  ')
-        + (i.typedBefore
-            ? '\nYour counts could not price that week when it was confirmed, so the figure in it was typed in.'
-            : '');
+      return 'Week ending ' + i.label + '\n' + bits.join('  ·  ');
     });
     /* ⚠ NOTHING HERE MAY SAY "BOTH". Two is the common case, not the bound: a count closes one
        week's pair and opens the next, and `icCOGS` will price a week off a pair up to nine days
@@ -616,16 +625,29 @@ const ConfirmWeek = {
        once. The first version said "both of them" under a title reading "sits inside 3 confirmed
        weeks", contradicting itself in one box. Count-agnostic wording only. */
     const many = impacts.length > 1;
+    /* ⚠ THE FIGURE PLURAL IS ITS OWN COUNT. It was driven by `many`, which counts WEEKS — so one
+       week with both bar and food moving (an ordinary Full count against the running week) printed
+       "leave the confirmed figure exactly where it is" directly under a block listing two. */
+    const figs = impacts.reduce((n, i) => n + (i.bar.moved ? 1 : 0) + (i.food.moved ? 1 : 0), 0);
+    /* ⚠ A THIRD COUNT, AND IT IS NOT `figs`. Two figures can move while exactly ONE of them was
+       typed, which read "including the ones you typed" about a single figure. Weeks, moved figures
+       and typed figures are three different collections; each sentence uses its own. */
+    const typedFigs = impacts.reduce((n, i) => n + (i.bar.typed ? 1 : 0) + (i.food.typed ? 1 : 0), 0);
+    const anyTyped = typedFigs > 0;
     const lead = isEdit
       ? (many
-          ? 'A count closes one week and opens the next, so this correction changes the cost of goods every one of these weeks was confirmed with:'
+          ? 'A count closes one week and opens the next, and a week confirmed early can share a count pair with the week before it. This correction changes the cost of goods every one of these weeks was confirmed with:'
           : 'This correction changes the cost of goods that week was confirmed with:')
       : (many
           ? 'You have already confirmed these weeks, and this count is what prices their cost of goods:'
           : 'You have already confirmed that week, and this count is what prices its cost of goods:');
     const ans = await App.confirm({
-      title: many ? 'This count sits inside ' + impacts.length + ' confirmed weeks'
-                  : 'This count sits inside a confirmed week',
+      /* ⚠ "SITS INSIDE" WAS FALSE THE MOMENT MORE THAN ONE WEEK WAS LISTED. A count carries one
+         date and confirmed weeks do not overlap, so it sits inside exactly ONE — the others move
+         because a count ENDS one usage pair and STARTS the next, which is a different sentence. The
+         title now says what the box is actually about: what this changes. */
+      title: many ? 'This changes ' + impacts.length + ' weeks you have already confirmed'
+                  : 'This changes a week you have already confirmed',
       message: lead + '\n\n' + lines.join('\n\n')
         /* ⚠ THE STEER IS SCOPED, AND READING THE RENDERED BOX IS WHAT CAUGHT IT ([[the-loop]] #34).
            Printing all four modes side by side showed "…so the figure in it was typed in." and then,
@@ -635,14 +657,14 @@ const ConfirmWeek = {
            first-time count "save the count only" silently leaves last week's usage in place. */
         + '\n\n' + (isEdit
             ? 'Update ' + (many ? 'them' : 'it') + ' now, or save the count on its own and leave the '
-              + 'confirmed figure' + (many ? 's' : '') + ' exactly where ' + (many ? 'they are' : 'it is') + '.'
-            : impacts.some(i => i.typedBefore)
-              ? 'That makes this your call: update with what the counts say, or save the count on its '
-                + 'own and keep the figure' + (many ? 's' : '') + ' you entered.'
+              + 'confirmed figure' + (figs > 1 ? 's' : '') + ' exactly where ' + (figs > 1 ? 'they are' : 'it is') + '.'
+            : anyTyped
+              ? 'Updating replaces every figure above with what the counts say, including the one'
+                + (typedFigs > 1 ? 's' : '') + ' you typed. Save the count on its own to keep what is there.'
               : 'Updating is usually what you want: it puts this count\'s real usage into '
                 + (many ? 'those weeks' : 'that week') + '. Save the count on its own only if you '
-                + 'typed ' + (many ? 'those figures' : 'that figure') + ' in by hand and want to keep '
-                + (many ? 'them' : 'it') + '.'),
+                + 'typed ' + (figs > 1 ? 'those figures' : 'that figure') + ' in by hand and want to keep '
+                + (figs > 1 ? 'them' : 'it') + '.'),
       confirmText: many ? 'Save and Update the Weeks' : 'Save and Update the Week',
       altText: 'Save the Count Only',
       cancelText: 'Cancel',
