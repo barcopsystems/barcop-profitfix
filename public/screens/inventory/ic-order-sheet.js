@@ -531,7 +531,7 @@ S.InventoryOrderSheet = {
     const lineItems = [];
     panel.querySelectorAll('.os-line').forEach(line => {
       const inp = line.querySelector('.os-qty');
-      const qty = parseFloat(inp.value) || 0;
+      const qty = Math.max(0, parseFloat(inp.value) || 0);
       const productId = inp.dataset.productId || '';
       if (qty <= 0 || !productId) return;
       const product = this.productById(productId);
@@ -824,7 +824,14 @@ S.InventoryOrderSheet = {
     let total = 0, count = 0, qtyTotal = 0;
     card.querySelectorAll('.os-line').forEach(line => {
       const inp = line.querySelector('.os-qty');
-      const qty = parseFloat(inp.value) || 0;
+      const qty = Math.max(0, parseFloat(inp.value) || 0);
+      /* ⛔ THE FLOOR ON `qty` ABOVE IS WHAT MAKES THIS TOTAL AGREE WITH "LINE ITEMS" (F15).
+         The two COLLECT paths drop non-positive lines (`if (qty <= 0 || !productId) return;`)
+         while this DISPLAY recalc counted everything — so a qty of -2 rendered EXTENDED
+         "$-330.00", dragged ORDER TOTAL to "$-140.00", and the header still said LINE ITEMS 1.
+         Two rows feeding the total under a heading that counted one. Flooring here makes the
+         negative line contribute 0 to both, and the collect guard still excludes it from the
+         order. Pinned by verify-order-sheet-qty-agrees.js. */
       const cost = parseFloat(inp.dataset.cost) || 0;
       const ext = qty * cost;
       line.querySelector('.os-ext').textContent = App.fmtCurrency(ext);
@@ -1005,7 +1012,7 @@ S.InventoryOrderSheet = {
     const lineItems = [];
     card.querySelectorAll('.os-line').forEach(line => {
       const inp = line.querySelector('.os-qty');
-      const qty = parseFloat(inp.value) || 0;
+      const qty = Math.max(0, parseFloat(inp.value) || 0);
       const productId = inp.dataset.productId || '';
       if (qty <= 0 || !productId) return;
       const product = this.productById(productId);
