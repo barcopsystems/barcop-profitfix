@@ -3089,18 +3089,62 @@ const App = {
     // ONLY if a field actually changed. A clean open-and-close never prompts.
     let _dirtyBaseline = null;
     if (opts.confirmDirty) setTimeout(() => { _dirtyBaseline = JSON.stringify(App.captureDraft(overlay) || {}); }, 0);
-    if (x) x.addEventListener('click', async () => {
+
+    /* ⛔⛔ THREE ESCAPES, ONE GUARDED PATH (2026-07-31). This helper had exactly one way out — the
+       corner X — and no ESC, no backdrop click, and nothing closing it on navigation. MEASURED on
+       the live app: open a delivery's FILE DISCREPANCY form, click "Order Sheet" in the sidebar,
+       and the Order Sheet renders UNDERNEATH a full-viewport overlay that still eats every click.
+       Reproduced on the Bar Cop Briefing too, and modals from different screens STACKED. With 83
+       call sites this was one function stranding operators app-wide.
+       App.confirm already did all three correctly; openModal is now brought up to its sibling.
+       ⚠ Every route goes through attemptClose so opts.confirmDirty keeps its say — an ESC on a
+       half-filled form must ask before discarding, exactly as the X does. */
+    let _busy = false;
+    const attemptClose = async () => {
+      if (_busy) return;                       // the discard-confirm is already up; ignore repeats
       if (opts.confirmDirty && _dirtyBaseline != null && JSON.stringify(App.captureDraft(overlay) || {}) !== _dirtyBaseline) {
+        _busy = true;
         const ok = await App.confirm({ title: 'Discard unsaved entry?', message: 'You have entered information that has not been saved yet. Close this form and lose it?', confirmText: 'Discard', cancelText: 'Keep Editing', danger: true });
+        _busy = false;
         if (!ok) return;
       }
+      cleanup();
       doClose();
-    });
+    };
+    /* The listener has to come off with the overlay. App.confirm's own comment records what
+       happens otherwise: a button-close left the keydown handler on document forever, and the next
+       Escape anywhere in Bar Cop ran a stale handler against a detached node. `cleanup` is called
+       on every close path, and onKey self-heals if the overlay was removed some other way
+       (closeModal, closeAllModals, a caller's own onClose). */
+    const cleanup = () => document.removeEventListener('keydown', onKey);
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (!document.body.contains(overlay)) { cleanup(); return; }
+      // Only the TOPMOST modal answers, so ESC peels a stack one layer at a time.
+      const stack = host.children;
+      if (stack.length && stack[stack.length - 1] !== overlay) return;
+      attemptClose();
+    };
+    document.addEventListener('keydown', onKey);
+    // Backdrop = the overlay itself; a click inside the card bubbles from a child and is ignored.
+    overlay.addEventListener('click', e => { if (e.target === overlay) attemptClose(); });
+    if (x) x.addEventListener('click', attemptClose);
     return overlay;
   },
   closeModal(id) {
     const el = document.getElementById(id || 'app-modal');
     if (el) el.remove();
+  },
+
+  /* Close EVERY open modal at once. Called on navigation, because an openModal overlay is
+     position:fixed over the whole viewport and does not belong to the screen underneath it —
+     leaving one up meant the next screen rendered behind a form it had nothing to do with, and
+     every click landed on the stale overlay. Modals stack (different ids), so one-by-one removal
+     is not enough; empty the host. Safe to call when no modal is open and at boot before the host
+     exists. Pinned by verify-modal-closes-on-navigation.js. */
+  closeAllModals() {
+    const host = document.getElementById('app-modal-host');
+    if (host) host.innerHTML = '';
   },
 
   // Shared "Get Started" setup box for the Control cockpits (Inventory / Labor /
@@ -7676,6 +7720,10 @@ const App = {
     // browser back on the sign-in page, or a queued callback after sign-out) painting
     // a broken app shell over the auth screen.
     if (!this.data) return;
+    /* A modal belongs to the screen that opened it. Bare call, no existence guard: this is a
+       method on this very object, and guarding a helper correctness depends on just turns a loud
+       failure into a silently stuck overlay ([[the-loop]] #40). */
+    this.closeAllModals();
     /* ⚠ SELF-HEAL THE BAR SWITCHER (S313, second half). `renderAccountSwitcher` runs at boot and
        after a bar-name save, never on navigation — so when the memberships query failed once, a
        multi-location owner's switcher stayed gone for the entire session with nothing on screen
