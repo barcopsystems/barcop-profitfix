@@ -112,12 +112,34 @@ S.CashDashboard = {
     const done = this.stepDone();
     const doneCount = this.ORDER.filter(k => done[k]).length;
 
-    // A PAST week renders as a closed-out summary, not the live action steps. The
-    // trapped cash, runway, and safe-to-spend are current-state reads with no
-    // per-week history, so re-showing them under a past week would be misleading.
-    // The current week is the live close; a past week shows what you closed out.
+    const gs = this.getStartedDone();
+    // Flip to Where You Stand the moment its hero number (trapped cash) can be
+    // read — i.e. inventory has been counted — regardless of which Get Started
+    // steps are done. Setting the Cash Position alone does NOT produce that number,
+    // so it stays on Get Started (with step 1 checked) until there is a real read.
+    const wysReady = !!(st.trapped && st.trapped.hasData);
+    /* ⛔ WHERE YOU STAND IS CURRENT STATE. IT DOES NOT FOLLOW THE WEEK SELECTOR AND IT NEVER
+       DISAPPEARS (Kyle, 2026-08-01, looking at a past week: *"the where you stand card
+       completely goes away... this needs fixed.. and the where you stand cards are not
+       supposed to move with the week selector.. they are where you currently stand.. and
+       stay current."*).
+       This used to sit BELOW an early return for a past week, so stepping back one week
+       deleted the trapped-cash hero, the survival strip (runway / tightest week / safe to
+       spend) and the Bar Cop Briefing button outright. The old comment argued they "would be
+       misleading" under a past week — but the card is titled Where You Stand, not Where You
+       Stood, and it reads the shelf and the bank as they are RIGHT NOW, which is true
+       whatever week you are closing. Measured across the six weekly-close cockpits: Cash was
+       the only one that hid its hero; Profit, Revenue, Inventory, Labor and Shift all render
+       theirs unconditionally. Pinned in verify-cash-dashboard-copy.js as an EQUALITY — the
+       card must be byte-identical on both weeks, because reappearing but recomputing per
+       week would break the rule while looking fixed. */
+    const whereYouStand = wysReady ? this.scoreboard(st) : this.getStartedBox(gs);
+
+    // A PAST week still swaps the live action steps for the closed-out summary — that half
+    // was right, and it IS week-relative. Only the hero above it is current-state.
     if (!this.atCurrentWeek()) {
       container.innerHTML = '<div class="screen">'
+        + whereYouStand
         + this.banner(doneCount, this.ORDER.length)
         + this.pastWeekCard(done)
         + '</div>';
@@ -128,14 +150,8 @@ S.CashDashboard = {
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
 
-    const gs = this.getStartedDone();
-    // Flip to Where You Stand the moment its hero number (trapped cash) can be
-    // read — i.e. inventory has been counted — regardless of which Get Started
-    // steps are done. Setting the Cash Position alone does NOT produce that number,
-    // so it stays on Get Started (with step 1 checked) until there is a real read.
-    const wysReady = !!(st.trapped && st.trapped.hasData);
     container.innerHTML = '<div class="screen">'
-      + (wysReady ? this.scoreboard(st) : this.getStartedBox(gs))
+      + whereYouStand
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -164,10 +180,13 @@ S.CashDashboard = {
         +   '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (isDone ? 'Closed out' : 'Not done') + '</div></div>'
         + toggle + '</div>';
     }).join('');
+    // ⚠ The old second sentence sent the operator to This Week for "your live trapped cash,
+    // runway and safe-to-spend" — figures that now sit in the Where You Stand card directly
+    // ABOVE this list, on every week. Pointing elsewhere for numbers already on screen is
+    // worse than saying nothing.
     return '<div class="card" style="padding:0;overflow:hidden;">' + rows + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:12px;line-height:1.6;">'
-      +   'This is your close for the week of ' + this.fmtWk(this.weekStart()) + ' to ' + this.fmtWk(this.weekEnd()) + '. '
-      +   'Your live trapped cash, runway, and safe-to-spend are on <strong>This Week</strong>.</div>';
+      +   'This is your close for the week of ' + this.fmtWk(this.weekStart()) + ' to ' + this.fmtWk(this.weekEnd()) + '.</div>';
   },
 
   // ── Day-one Get Started strip ────────────────────────────────────────────────
