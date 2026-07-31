@@ -402,7 +402,13 @@ S.InventoryReceiveDelivery = {
     const lid   = line.dataset.lid;
     const qty   = parseFloat(line.querySelector('.rd-qty').value) || 0;
     const price = parseFloat(line.querySelector('.rd-price').value);
-    const ext   = qty * (isNaN(price) ? 0 : price);
+    /* ⚠ Floor the PRICE only, never NaN — a blank price is load-bearing (it falls back to the
+       vendor's expected cost and drives the price-change dialog), so isNaN must stay 0-for-display
+       rather than become a real $0. Flooring it stops a negative price multiplying a negative qty
+       into a POSITIVE extended: -4 x -$15 printed "$60.00" and a plausible delivery total, which
+       is the one shape an operator cannot spot. The qty itself is left honest so they can see
+       what they typed; save() refuses it by name. */
+    const ext   = qty * (isNaN(price) ? 0 : Math.max(0, price));
     line.dataset.ext = ext;
     line.querySelector('.rd-ext').textContent = App.fmtCurrency(ext);
 
@@ -768,6 +774,7 @@ S.InventoryReceiveDelivery = {
     const productUpdates = [];
 
     let shortCounts = 0;
+    let negLines = 0;   // lines the operator typed a negative quantity into (refused below)
     lineEls.forEach(line => {
       const pid   = line.querySelector('.rd-prod').value;
       const qtyRaw = parseFloat(line.querySelector('.rd-qty').value);
@@ -782,7 +789,15 @@ S.InventoryReceiveDelivery = {
       // look fully received, and the item can be reordered. Skip a blank manual (non-order)
       // line; a negative qty is invalid.
       const qty = isNaN(qtyRaw) ? 0 : qtyRaw;
-      if (qty < 0) return;
+      /* ⛔ A NEGATIVE QTY IS REFUSED BY NAME, NOT DROPPED IN SILENCE. This used to be a bare
+         `return`, so the operator watched a DELIVERY TOTAL that included the line (measured:
+         -4 x -$15 rendered a positive $60.00 extended and a right-looking $189.00 total) and then
+         the line simply vanished from the saved record with nothing said. Silent-drop and
+         silent-zero are both wrong here — a real product would read as received-nothing instead
+         of not-received. Every good screen in this module names its refusal; this file already
+         has the channel (`fail()` / #rd-err, which is what prints "Choose a vendor.").
+         Pinned by verify-receive-delivery-refuses-negative.js. Closes F14. */
+      if (qty < 0) { negLines++; return; }
       if (!isOrderedLine && qty <= 0) return;
       const prevPrice = p.unit_cost != null ? p.unit_cost : null;
       const unitPrice = isNaN(price) ? prevPrice : price;
@@ -822,6 +837,14 @@ S.InventoryReceiveDelivery = {
       });
     });
 
+    /* Refuse BEFORE the empty-list check: with one negative line and nothing else, lineItems is
+       empty, and the generic "add a line item" message would be a lie about what is wrong. */
+    if (negLines) {
+      fail(negLines === 1
+        ? 'One line has a negative quantity. Enter how many you actually received, or delete the line.'
+        : negLines + ' lines have a negative quantity. Enter how many you actually received, or delete them.');
+      return;
+    }
     if (lineItems.length === 0) { fail('Add at least one line item with a product and quantity.'); return; }
 
     // Phase 1: confirm price-master updates before they apply. Operator can
