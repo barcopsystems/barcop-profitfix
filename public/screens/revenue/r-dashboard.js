@@ -220,8 +220,8 @@ S.RevenueDashboard = {
     const allDone = doneCount === total;
     const pct = Math.round(doneCount / total * 100);
     const doneLine = allDone
-      ? '<span style="color:var(--green);font-weight:700;">&#10003; You\'re current this week</span>'
-      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done this week</span>';
+      ? '<span style="color:var(--green);font-weight:700;">&#10003; ' + (this.atCurrentWeek() ? 'You\'re current this week' : 'This week is closed out') + '</span>'
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done</span>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
       + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
@@ -326,9 +326,12 @@ S.RevenueDashboard = {
           + '<span style="font-weight:700;color:' + col + ';">' + r.value + '</span></div>';
       }).join('');
       const off = this.metricsRows(w).filter(r => r.good === false);
+      /* ⚠ NO "this week": metricsRows reads the SELECTED week, so on a past week this was
+         describing Jul 20 while calling it this week. The week pill above the steps names it,
+         same rule as the banner (ic-dashboard's F2). */
       const lead = off.length
-        ? '<strong style="color:var(--red);">' + off.length + '</strong> off target this week: ' + off.map(r => r.label.toLowerCase()).join(', ') + '. Work the gap below.'
-        : 'Your numbers are at or better than target this week. Hold the line.';
+        ? '<strong style="color:var(--red);">' + off.length + '</strong> off target: ' + off.map(r => r.label.toLowerCase()).join(', ') + '. Work the gap below.'
+        : 'Your numbers are at or better than target. Hold the line.';
       return explain(lead) + rows
         + btnRow('<button class="btn btn-ghost btn-sm" data-go="r-fix">Work Your Leaks</button>' + this.markBtn('numbers', 'Mark Reviewed'));
     }
