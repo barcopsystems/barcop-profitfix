@@ -2244,20 +2244,44 @@ S.HubSettings = {
         total_value:+items.reduce((s, it) => s + it.value, 0).toFixed(2),
         created_at:daysAgoISO(daysAgo) };
     };
-    // The recent three counts drive the live weekly COGS + variance window and
-    // must stay exactly as-is. Weekly counts begin in week 4 (~63 days back): the
-    // operator spent the first weeks setting up before counting on a schedule, so
-    // the early audit windows honestly show few counts. The older counts oscillate
-    // around the well-stocked day-7 level so inventory reads flat across the
-    // quarter, with a couple of busy-week draw-downs — the sawtooth a real bar
-    // shows. Deterministic multipliers keep it reproducible.
+    /* ⚠⚠⚠ THE OLDER COUNTS ARE DERIVED FROM THE DELIVERIES, NOT INVENTED (2026-07-31, walking the
+       live demo). They used to be a hand-picked oscillation around the day-7 level — multipliers
+       1.05 / 0.92 / 1.10 / 0.86 / 1.03 / 0.95 / 1.09 — with a day-14 count extrapolated to
+       `[1] + ([1] - [0])`. **Stock cannot be authored independently of purchases.** Usage is
+       `starting + purchases - ending`, so once the deliveries are fixed, every count total is
+       DETERMINED by the count either side of it. Inventing both ends produced usage that had
+       nothing to do with the bar:
+         MEASURED on the live demo, week by week: $6,307 · $4,939 · $6,534 · $3,211 · $6,513 ·
+         $5,508 · **$615** · $6,115 · $5,205 — against a booked weekly COGS of a steady ~$5,100.
+       The $615 week is the one that hurt: split by category it is a **BAR COGS of -$970.46**, and
+       Confirm the Week's "Refresh from Control" will pull that negative straight into a signed-off
+       week. On screen it also read as a bar losing half its stock in seven days ("vs Last Count
+       -$5,205"), with the count series lurching $9,216 → $15,922 → $10,717 → $5,511.
+       ⭐ THE FIX IS THE IDENTITY, SOLVED BACKWARDS from the day-7 count:
+             count(older) = TARGET_WEEKLY_COGS + count(newer) - purchases(window)
+       The deliveries are the detailed records (real vendors, line prices, the price rises Vendor
+       Watch surfaces, the rows Order History matches), so THEY are the truth and the counts
+       reconcile to them. These multipliers are that solution, rounded to four places. Verified
+       against the shipped `S.ThisWeek.icCOGS`: every window now returns $5,100 against a booked
+       $5,092-$5,321, and nothing is negative.
+       ⚠ DO NOT "TIDY" THESE INTO A NEATER SERIES. They look irregular because the weekly delivery
+       spend is irregular ($4,589 to $6,902); a smooth series here means a jagged COGS there. If a
+       delivery is ever added, moved or repriced, RE-SOLVE the chain — do not adjust one number.
+       ⚠ The last two windows are deliberately dry ($910, then $0). That is the demo's story and it
+       is why on-hand slides from ~$14.9k to $5,511: the bar stopped ordering, which is exactly what
+       "Below Par $4,234" and the Order Sheet's "$2,199.70 to order" are telling them to fix.
+       Weekly counts still begin ~63 days back: the operator spent the first weeks setting up. */
     const icOlderCounters = ['Carlos P.', 'Maria G.', 'Jake T.'];
+    // solved to a $5,100 weekly COGS — the figure is in the note above, not a const nothing reads
     const icOlderWeeks = [
-      [21, 1.05], [28, 0.92], [35, 1.10], [42, 0.86], [49, 1.03],
-      [56, 0.95], [63, 1.09]
+      [21, 1.3743], [28, 1.2062], [35, 1.2538], [42, 1.1901], [49, 1.2264],
+      [56, 1.1607], [63, 1.1889]
     ];
     App.inventoryData.ic_counts = [
-      mkCount(14, i => icTotals[i][1] + (icTotals[i][1] - icTotals[i][0])),
+      // day 14 is part of the same solved chain — it used to be extrapolated
+      // (`[1] + ([1] - [0])`), which spiked it to $15,922 and gave the week after
+      // it only $615 of usage.
+      mkCount(14, i => +(icTotals[i][1] * 1.3910).toFixed(2)),
       mkCount(7,  i => icTotals[i][1]),
       mkCount(0,  i => icTotals[i][0]),
       ...icOlderWeeks.map(([d, m], k) =>
