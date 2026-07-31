@@ -474,7 +474,23 @@ S.InventoryLocations = {
     const name = (document.getElementById('il-new-name')?.value || '').trim();
     const err = document.getElementById('il-new-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    if (!name) { this._newNameError = true; this.renderList(); return; }   // empty -> red border, no save
+    /* ⚠⚠ SAY WHY, LIKE EVERY OTHER WRITE FORM IN THIS MODULE. This flagged the box red and stopped
+       there — no words anywhere on screen. Walking Inventory Control end to end, it is the ONLY save
+       that refuses silently: Vendors says "Vendor name required.", Prep Batches "Batch name
+       required.", Adjustments "Pick who logged the adjustment.", Empties "Pick who logged this.",
+       Transfers "Pick who performed the transfer." A bare red border is worst here, because the
+       operator may also have ticked a dozen products into the picker and has no way to tell whether
+       the save failed, half-worked, or did nothing.
+       ⚠ The error slot was already there and this path was deliberately skipping it — `renderList`
+       rebuilds the row, so the message has to be set on the FRESH element after the render, not
+       before it. */
+    if (!name) {
+      this._newNameError = true;
+      this.renderList();
+      const e2 = document.getElementById('il-new-err');
+      if (e2) { e2.textContent = 'Location name required.'; e2.style.display = 'inline'; }
+      return;
+    }
     this._newNameError = false;
     if (this.locations().some(l => l.name.toLowerCase() === name.toLowerCase())) { fail('A location with that name already exists.'); return; }
 

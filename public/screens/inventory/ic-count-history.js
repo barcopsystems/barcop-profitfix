@@ -131,12 +131,30 @@ S.InventoryCountHistory = {
       }).reverse()
         .filter(r => (!from || (r.c.date || '') >= from) && (!to || (r.c.date || '') <= to));
 
-      const latest = asc[asc.length - 1];
+      /* ⚠⚠ THE STRIP DESCRIBES THE LIST UNDERNEATH IT, SO IT FOLLOWS THE FILTER (Kyle, walking the
+         live app: *"the stat bar doesn't change the data with the different date filter times when
+         selected like delivery history does"*). It was computed off `asc` — every count ever — and
+         sat directly above the date chips and the list they filter. Measured on a custom Jun 1-20
+         window: three rows on screen under a strip reading **Counts 10 · Latest Value $5,511.26 ·
+         Last Count Jul 31**, a date not even inside the window.
+         ⭐ THIS WAS ALREADY FIXED ON THE SIBLINGS AND THIS ONE WAS MISSED. `ic-delivery-history`
+         carries the reasoning verbatim — *"The strip sits above the date chips and the list they
+         filter, so it describes the SAME SET"* — and `ic-order-history`, `ic-adjustments`,
+         `ic-transfers` and `ic-empties` all follow it. Count History and the Spot Check history were
+         the two that never got it (step 0.5: find the twin).
+         ⚠ `ordered` is newest-first (the `.reverse()` above), so `ordered[0]` is the newest IN
+         RANGE. Guarded, because a range with no counts has no newest row — `fmtDate` already renders
+         '-' for a blank, and the value falls to $0.00 rather than reading the all-time figure.
+         ⚠ NOT a standing balance. Where a figure genuinely means "right now" rather than "in this
+         window" the siblings deliberately leave it off the filter and say so (Empties' Deposit Owed,
+         Order History's Open Value). Nothing in this strip is that: all three describe the counts
+         in view. */
+      const inRange = ordered[0] ? ordered[0].c : null;
       const statsCard = '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
         + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-        + '<div class="calc-item"><div class="calc-label">Counts</div><div class="calc-val lg">' + asc.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Latest Value</div><div class="calc-val lg">' + App.fmtCurrency(latest.total_value || 0) + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Last Count</div><div class="calc-val lg">' + this.fmtDate(latest.date) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Counts</div><div class="calc-val lg">' + ordered.length + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Latest Value</div><div class="calc-val lg">' + App.fmtCurrency((inRange && inRange.total_value) || 0) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Last Count</div><div class="calc-val lg">' + this.fmtDate(inRange && inRange.date) + '</div></div>'
         + '</div></div></div>';
 
       const rows = ordered.slice(0, App.listLimit('ic', 'count')).map(r => {

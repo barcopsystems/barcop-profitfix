@@ -519,13 +519,29 @@ S.InventorySpotCheck = {
     // History is FINISHED checks only. An in-progress one has measured nothing yet and belongs on
     // the entry screen where it can be picked back up, not in the record (S249).
     const all = [...App.completedSpotChecks()].sort(App.cmpNewest);
-    const flagged = all.reduce((s, c) => s + (c.flagged_count || 0), 0);
-    const totalVar = all.reduce((s, c) => s + (c.total_variance_dollar || 0), 0);
+    /* ⚠⚠ THE STRIP FOLLOWS THE FILTER, because it sits above the date chips and the list they
+       filter and describes the SAME SET (Kyle, walking the live app). It was computed off `all`:
+       measured on a custom Jul 1-13 window, two rows on screen under a strip reading **Checks 4 ·
+       Flagged 5 · +$20.32 · Last Check Jul 27** — a date outside the window entirely.
+       ⭐ Every sibling had already been fixed for exactly this and this screen was missed, along
+       with Count History. `ic-delivery-history` states the rule: *"The strip sits above the date
+       chips and the list they filter, so it describes the SAME SET."* `ic-order-history`,
+       `ic-adjustments`, `ic-transfers` and `ic-empties` all follow it.
+       ⚠ `filtered` has to be computed BEFORE the strip now; it used to be built below it. `all` is
+       newest-first and `.filter` keeps that order, so `filtered[0]` is the newest IN RANGE.
+       ⚠ Nothing here is a standing balance. Where a figure genuinely means "right now" the siblings
+       deliberately leave it off the filter and say so (Empties' Deposit Owed, Order History's Open
+       Value); all four of these describe the checks in view. */
+    const { from: _sFrom, to: _sTo } = this.effectiveRange();
+    const filtered = all.filter(c =>
+      (!_sFrom || (c.date || '') >= _sFrom) && (!_sTo || (c.date || '') <= _sTo));
+    const flagged = filtered.reduce((s, c) => s + (c.flagged_count || 0), 0);
+    const totalVar = filtered.reduce((s, c) => s + (c.total_variance_dollar || 0), 0);
     const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + '<div class="calc-item"><div class="calc-label">Checks</div><div class="calc-val lg">' + all.length + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Checks</div><div class="calc-val lg">' + filtered.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg' + (flagged ? ' warn' : '') + '">' + flagged + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val lg">' + (totalVar > 0 ? '+' : '') + App.fmtCurrency(totalVar, 2) + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Last Check</div><div class="calc-val lg">' + (all.length ? this.fmtDate(all[0].date) : '-') + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Last Check</div><div class="calc-val lg">' + (filtered.length ? this.fmtDate(filtered[0].date) : '-') + '</div></div>'
       + '</div></div>';
 
     if (all.length === 0) {
@@ -538,10 +554,7 @@ S.InventorySpotCheck = {
       return;
     }
 
-    const { from, to } = this.effectiveRange();
-    const filtered = all.filter(c =>
-      (!from || (c.date || '') >= from) && (!to || (c.date || '') <= to));
-
+    // `filtered` is built above, with the stat strip that describes it.
     const rows = filtered.slice(0, App.listLimit('ic', 'spot_check')).map(c => {
       const vd = c.total_variance_dollar || 0;
       return '<tr class="sp-hrow" data-id="' + c.id + '" style="cursor:pointer;">'
