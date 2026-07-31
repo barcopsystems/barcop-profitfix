@@ -138,10 +138,15 @@ S.CashDashboard = {
     // A PAST week still swaps the live action steps for the closed-out summary — that half
     // was right, and it IS week-relative. Only the hero above it is current-state.
     if (!this.atCurrentWeek()) {
+      /* ⚠ The "As needed" row belongs here too. Capital Efficiency and the Cash Bridge are
+         deep reads of CURRENT state, off the weekly flow entirely — the same reason Where You
+         Stand stays put. They sat below this early return and so were simply absent on a past
+         week, which made the page look stripped for no reason anyone could name. */
       container.innerHTML = '<div class="screen">'
         + whereYouStand
         + this.banner(doneCount, this.ORDER.length)
         + this.pastWeekCard(done)
+        + this.asNeeded()
         + '</div>';
       this.wire();
       return;
@@ -180,13 +185,12 @@ S.CashDashboard = {
         +   '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (isDone ? 'Closed out' : 'Not done') + '</div></div>'
         + toggle + '</div>';
     }).join('');
-    // ⚠ The old second sentence sent the operator to This Week for "your live trapped cash,
-    // runway and safe-to-spend" — figures that now sit in the Where You Stand card directly
-    // ABOVE this list, on every week. Pointing elsewhere for numbers already on screen is
-    // worse than saying nothing.
-    return '<div class="card" style="padding:0;overflow:hidden;">' + rows + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:12px;line-height:1.6;">'
-      +   'This is your close for the week of ' + this.fmtWk(this.weekStart()) + ' to ' + this.fmtWk(this.weekEnd()) + '.</div>';
+    /* ⚠ NO EXPLAINER FOOTNOTE. This carried two sentences: "This is your close for the week of
+       X to Y" and "Your live trapped cash, runway, and safe-to-spend are on This Week." The
+       second became false once Where You Stand started rendering on every week, and the first
+       only restated the week pill sitting directly above the list. Kyle, 2026-08-01: *"get rid
+       of that explainer text."* The week is already named twice on screen. */
+    return '<div class="card" style="padding:0;overflow:hidden;">' + rows + '</div>';
   },
 
   // ── Day-one Get Started strip ────────────────────────────────────────────────
