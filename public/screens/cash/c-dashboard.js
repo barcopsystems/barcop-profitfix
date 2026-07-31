@@ -320,10 +320,14 @@ S.CashDashboard = {
     const allDone = doneCount === total;
     const past = !this.atCurrentWeek();
     const pct = Math.round(doneCount / total * 100);
-    const wkLabel = this.fmtWk(this.weekStart());
+    /* ⚠ WORDED TO MATCH ic-dashboard's F2 PATTERN, not a second invention. My first version
+       said "done for the week of May 4" — which repeats what the week pill directly above
+       already says, the exact duplication Kyle objected to in the past-week explainer text.
+       Inventory had already solved this and its rule is the house one: the count line names
+       no week at all, and only the all-done line branches. */
     const doneLine = allDone
-      ? '<span style="color:var(--green);font-weight:700;">&#10003; ' + (past ? 'Closed out for the week of ' + wkLabel : 'You\'re current this week') + '</span>'
-      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + (past ? ' done for the week of ' + wkLabel : ' done this week') + '</span>';
+      ? '<span style="color:var(--green);font-weight:700;">&#10003; ' + (past ? 'This week is closed out' : 'You\'re current this week') + '</span>'
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done</span>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
       + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
