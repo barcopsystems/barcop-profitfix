@@ -238,7 +238,9 @@ S.InventoryDeliveryHistory = {
       const isCase = it.display_unit === 'case';
       const p = ((App.inventoryData && App.inventoryData.ic_products) || []).find(pr => pr.id === it.product_id);
       const ab = p ? App.unitAbbr(App.productUnit(p)) : '';
-      const unitSuffix = isCase ? ' cs' : (ab ? ' ' + ab : '');
+      // Singular at exactly one (F19); a received quantity is a whole number, so "1 kegs" was
+      // reachable on any single-keg line.
+      const qtyText = it.qty != null ? App.qtyUnit(it.qty, isCase ? 'cs' : ab) : '-';
       const priceSuffix = isCase ? '<div style="font-size:9px;color:var(--t3);">per case</div>' : '';
       const change = it.price_changed
         ? '<span style="color:var(--gold);font-weight:700;">was ' + App.fmtCurrency(it.prev_price) + '</span>'
@@ -254,7 +256,7 @@ S.InventoryDeliveryHistory = {
       return '<tr>'
         + '<td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + containerCol + '</td>'
-        + '<td>' + (it.qty != null ? it.qty + unitSuffix : '-') + '</td>'
+        + '<td>' + qtyText + '</td>'
         + '<td>' + (it.price_per_unit != null ? App.fmtCurrency(it.price_per_unit) + priceSuffix : '-') + '</td>'
         + '<td>' + change + '</td>'
         + '<td class="val">' + App.fmtCurrency(it.extended || 0) + '</td>'

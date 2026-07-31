@@ -340,6 +340,17 @@ S.InventoryTakeInventory = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const picked = [...this.container.querySelectorAll('.ti-loc-tile.selected')].map(t => t.dataset.loc);
     if (picked.length === 0) { fail('Pick at least one location to count.'); return; }
+    /* ⛔ F6: A COUNT USED TO SAVE WITH counted_by:"" AND NOTHING ASKED. Every sibling write form
+       in the module names its counter — Transfers "Pick who performed the transfer.", Empties
+       "Pick who logged this.", Adjustments "Pick who logged the adjustment." — and the one
+       record that reaches the books had no such refusal. The name prints on the count detail,
+       every count export, and hub-books' year-end pack.
+       It goes HERE, beside the location check, for the reason written out below: the picker is
+       on this screen, nothing has been entered yet, so the refusal costs nothing. At submit it
+       would arrive after a 64-product shelf had been counted.
+       The select is pre-filled from the active shift's manager, so on the ordinary path this
+       never fires. */
+    if (!(document.getElementById('ti-by')?.value || '')) { fail('Pick who is counting.'); return; }
     /* ⚠⚠ TELL THEM BEFORE THEY COUNT, NOT AFTER (S330b — Kyle, and he was right).
        The duplicate guard shipped on the SUBMIT handler, which is the last possible moment: the
        operator picked Kitchen Line, counted every product on it, pressed Submit, and only THEN

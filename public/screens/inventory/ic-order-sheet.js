@@ -528,27 +528,12 @@ S.InventoryOrderSheet = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     if (err) { err.textContent = ''; err.style.display = 'none'; }
 
-    const lineItems = [];
-    panel.querySelectorAll('.os-line').forEach(line => {
-      const inp = line.querySelector('.os-qty');
-      const qty = Math.max(0, parseFloat(inp.value) || 0);
-      const productId = inp.dataset.productId || '';
-      if (qty <= 0 || !productId) return;
-      const product = this.productById(productId);
-      const nameEl = line.querySelector('.val');
-      const name = product ? product.name : (nameEl ? nameEl.textContent : '');
-      const cost = parseFloat(inp.dataset.cost) || 0;
-      const isCaseBeer = product && product.category === 'Bottle Beer' && product.case_size && product.case_size > 0;
-      lineItems.push({
-        product_id: productId,
-        name,
-        qty,
-        unit_cost: cost,
-        extended: qty * cost,
-        display_unit: isCaseBeer ? 'case' : 'unit',
-        case_size: isCaseBeer ? product.case_size : null
-      });
-    });
+    /* ⛔ THE CUSTOM PANEL IS A CARD LIKE ANY OTHER — collectLines, not a private copy of it.
+       This function carried a byte-identical third copy of the line-reading rule, and a third
+       copy is exactly how F16 happened: the display recalc and the two collect paths each
+       decided independently which lines count, and they stopped agreeing. The refusal wording
+       stays this door's own; only the collection is shared. */
+    const lineItems = this.collectLines(panel);
     if (lineItems.length === 0) { fail('Add at least one item with a product and a quantity above zero.'); return; }
 
     const rec = {
@@ -600,10 +585,10 @@ S.InventoryOrderSheet = {
       return cases + ' cs' + (loose > 0 ? ' + ' + loose + ' btl' : '');
     }
     const n = Number(onHand);
-    return (n % 1 === 0 ? n.toString() : n.toFixed(1)) + (unit ? ' ' + unit : '');
+    return App.qtyUnit(n % 1 === 0 ? n.toString() : n.toFixed(1), unit);
   },
   parText(par, unit) {
-    return (par != null && par !== '' && !isNaN(par)) ? (par + (unit ? ' ' + unit : '')) : '-';
+    return (par != null && par !== '' && !isNaN(par)) ? App.qtyUnit(par, unit) : '-';
   },
 
   // ── Line row builder (ing-tbl row for a known product: suggested + added) ──
@@ -823,20 +808,19 @@ S.InventoryOrderSheet = {
   recalcVendor(card) {
     let total = 0, count = 0, qtyTotal = 0;
     card.querySelectorAll('.os-line').forEach(line => {
-      const inp = line.querySelector('.os-qty');
-      const qty = Math.max(0, parseFloat(inp.value) || 0);
-      /* ⛔ THE FLOOR ON `qty` ABOVE IS WHAT MAKES THIS TOTAL AGREE WITH "LINE ITEMS" (F15).
-         The two COLLECT paths drop non-positive lines (`if (qty <= 0 || !productId) return;`)
-         while this DISPLAY recalc counted everything — so a qty of -2 rendered EXTENDED
-         "$-330.00", dragged ORDER TOTAL to "$-140.00", and the header still said LINE ITEMS 1.
-         Two rows feeding the total under a heading that counted one. Flooring here makes the
-         negative line contribute 0 to both, and the collect guard still excludes it from the
-         order. Pinned by verify-order-sheet-qty-agrees.js. */
-      const cost = parseFloat(inp.dataset.cost) || 0;
-      const ext = qty * cost;
-      line.querySelector('.os-ext').textContent = App.fmtCurrency(ext);
-      total += ext; qtyTotal += qty;
-      if (qty > 0) count++;
+      /* ⛔ EVERY FIGURE ON THIS CARD COUNTS THE LINES THE ORDER WILL CONTAIN, and _readLine is
+         what decides that — one predicate, shared with both collect paths.
+         F15 (the floor): a qty of -2 rendered EXTENDED "$-330.00", dragged ORDER TOTAL to
+         "$-140.00", and the header still said LINE ITEMS 1.
+         F16 (the product): a quantity typed into a blank "+ Add Item" row counted here and not
+         in the order, so the under-minimum strip and the Create Order confirm disagreed by
+         2 kegs. Flooring alone did not close it — that half was `!productId`.
+         Pinned by verify-order-sheet-qty-agrees.js and verify-order-min-agrees.js. */
+      const r = this._readLine(line);
+      if (!r) return;
+      line.querySelector('.os-ext').textContent = App.fmtCurrency(r.extended);
+      if (!r.counts) return;
+      total += r.extended; qtyTotal += r.qty; count++;
     });
     const cEl = card.querySelector('.os-vcount');
     const tEl = card.querySelector('.os-vtotal');
@@ -857,6 +841,55 @@ S.InventoryOrderSheet = {
     };
   },
   _qtyStr(x) { return Number.isInteger(x) ? String(x) : (Math.round(x * 100) / 100); },
+
+  /* ── ONE READING OF A LINE, USED BY EVERY DOOR ─────────────────────────────
+     The display recalc and the collect paths used to decide independently which
+     lines count, and they disagreed on the most ordinary row there is: a quantity
+     typed before the product is picked. "+ Add Item" drops in a row whose select
+     still reads "Select a product..." with the quantity box right beside it — and
+     in that state the CARD counted the line (LINE ITEMS, the running total, the
+     under-minimum strip) while the ORDER did not contain it. F16 measured the two
+     sentences 2 kegs apart in one state: "3 kegs under" on the strip against
+     "1 kegs under" in the confirm.
+     A line counts when it has a product AND a quantity above zero — the collect
+     paths' rule, because that is the rule deciding what the vendor receives.
+     The floor is F15's: a negative typed quantity contributes nothing rather than
+     dragging the total below the lines that are really on the card.
+     Pinned by verify-order-min-agrees.js. */
+  _readLine(line) {
+    const inp = line.querySelector('.os-qty');
+    if (!inp) return null;
+    const qty = Math.max(0, parseFloat(inp.value) || 0);
+    const productId = inp.dataset.productId || '';
+    const cost = parseFloat(inp.dataset.cost) || 0;
+    const counts = qty > 0 && !!productId;
+    return { inp, qty, productId, cost, counts, extended: counts ? qty * cost : 0 };
+  },
+
+  /* THE ONE MEASUREMENT of an order against its vendor's minimum, and the words
+     for it. Both doors come through here — the strip under the card and the
+     Create Order confirm — so they can never disagree about one card again.
+     Each door keeps its own framing (the strip is a fragment, the confirm names
+     the vendor); what they share is the two AMOUNTS. Returns null when the vendor
+     has no minimum on file. */
+  _minNote(info, total, qtyTotal) {
+    if (!info || info.min == null) return null;
+    const money = info.unit === '$';
+    const measure = money ? total : qtyTotal;
+    const under = info.min - measure;
+    const amt = x => money ? App.fmtCurrency(x) : App.qtyUnit(this._qtyStr(x), info.unit);
+    const shortAmt = amt(under), minAmt = amt(info.min);
+    return {
+      under, short: under > 0.001, shortAmt, minAmt,
+      text: under > 0.001
+        ? shortAmt + ' under the ' + minAmt + ' minimum'
+        : 'Meets the ' + minAmt + ' minimum'
+    };
+  },
+  _minConfirmMsg(vendor, note) {
+    return 'This order is ' + note.shortAmt + ' under ' + vendor + '’s ' + note.minAmt + ' minimum. Create it anyway?';
+  },
+
   // How this order measures against the minimum: dollars for a '$' minimum, else the
   // raw quantity of units ordered.
   _updateMinReadout(card, total, qtyTotal) {
@@ -866,15 +899,11 @@ S.InventoryOrderSheet = {
     const info = this._vendorInfo(card.dataset.vendor || '');
     if (!info || (info.min == null && info.fee == null && info.free == null)) { row.style.display = 'none'; return; }
     const parts = [];
-    let under = 0;
-    if (info.min != null) {
-      const money = info.unit === '$';
-      const measure = money ? total : qtyTotal;
-      const fmt = x => money ? App.fmtCurrency(x) : (this._qtyStr(x) + ' ' + info.unit);
-      under = info.min - measure;
-      parts.push(under > 0.001
-        ? '<span style="color:var(--amber);font-weight:700;">' + fmt(under) + ' under the ' + fmt(info.min) + ' minimum</span>'
-        : '<span style="color:var(--green);font-weight:700;">Meets the ' + fmt(info.min) + ' minimum</span>');
+    const note = this._minNote(info, total, qtyTotal);
+    if (note) {
+      parts.push(note.short
+        ? '<span style="color:var(--amber);font-weight:700;">' + note.text + '</span>'
+        : '<span style="color:var(--green);font-weight:700;">' + note.text + '</span>');
     }
     if (info.free != null) {
       parts.push(total >= info.free
@@ -970,16 +999,14 @@ S.InventoryOrderSheet = {
     const lineItems = this.collectLines(card);
     if (lineItems.length === 0) { fail('Set an order quantity above zero first.'); return; }
 
-    // Warn (never block) when the order is under the vendor's minimum.
-    const info = this._vendorInfo(vendor);
-    if (info && info.min != null) {
-      const money = info.unit === '$';
-      const measure = money ? lineItems.reduce((t, i) => t + i.extended, 0) : lineItems.reduce((t, i) => t + (parseFloat(i.qty) || 0), 0);
-      if (measure < info.min - 0.001) {
-        const fmt = x => money ? App.fmtCurrency(x) : (this._qtyStr(x) + ' ' + info.unit);
-        const ok = await App.confirm({ title: 'Under the vendor minimum', message: 'This order is ' + fmt(info.min - measure) + ' under ' + vendor + '’s ' + fmt(info.min) + ' minimum. Create it anyway?', confirmText: 'Create Anyway' });
-        if (!ok) return;
-      }
+    // Warn (never block) when the order is under the vendor's minimum. Measured and worded by
+    // _minNote, the same call the strip under the card makes, so the two cannot disagree (F16).
+    const note = this._minNote(this._vendorInfo(vendor),
+      lineItems.reduce((t, i) => t + i.extended, 0),
+      lineItems.reduce((t, i) => t + (parseFloat(i.qty) || 0), 0));
+    if (note && note.short) {
+      const ok = await App.confirm({ title: 'Under the vendor minimum', message: this._minConfirmMsg(vendor, note), confirmText: 'Create Anyway' });
+      if (!ok) return;
     }
 
     const rec = {
@@ -1011,21 +1038,18 @@ S.InventoryOrderSheet = {
   collectLines(card) {
     const lineItems = [];
     card.querySelectorAll('.os-line').forEach(line => {
-      const inp = line.querySelector('.os-qty');
-      const qty = Math.max(0, parseFloat(inp.value) || 0);
-      const productId = inp.dataset.productId || '';
-      if (qty <= 0 || !productId) return;
-      const product = this.productById(productId);
+      const r = this._readLine(line);
+      if (!r || !r.counts) return;
+      const product = this.productById(r.productId);
       const nameEl = line.querySelector('.val');
       const name = product ? product.name : (nameEl ? nameEl.textContent : '');
-      const cost = parseFloat(inp.dataset.cost) || 0;
       const isCaseBeer = product && product.category === 'Bottle Beer' && product.case_size && product.case_size > 0;
       lineItems.push({
-        product_id: productId,
+        product_id: r.productId,
         name,
-        qty,
-        unit_cost: cost,
-        extended: qty * cost,
+        qty: r.qty,
+        unit_cost: r.cost,
+        extended: r.extended,
         display_unit: isCaseBeer ? 'case' : 'unit',
         case_size: isCaseBeer ? product.case_size : null
       });

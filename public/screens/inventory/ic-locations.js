@@ -597,7 +597,17 @@ S.InventoryLocations = {
     this.editChecked = new Set();
     this._nameDraft = null;
     this._dispPending = false;   // S181: clear any strand from an abandoned untick-disposition prompt
-    this._renderEdit(id);
+    /* ⛔ F11: THIS WAS THE ONE FULL-PAGE VIEW IN THE MODULE WITH NO WAY BACK. The three history
+       detail screens all enter through App.pushView, which is what raises the floating back
+       control (#fn-back) — app.js documents that as the design, "no per-page back buttons, no
+       layout impact". This entry rendered straight into the host, so the stack stayed empty, the
+       control never appeared, and "Editing <name>" — a full page with a 36-row drag-to-order
+       list — could only be left via the sidebar.
+       ⚠ ONLY THE ENTRY PUSHES. `_renderEdit` is re-called from six places (mode switch, rename,
+       product assignment, disposition); pushing on each would stack one level per re-render and
+       Back would take six presses to leave one screen. Pinned both ways by
+       verify-detail-views-have-back.js. */
+    App.pushView(() => this._renderEdit(id));
   },
   // Re-render the edit screen in its CURRENT mode (keeps the name draft + mode).
   _renderEdit(id) {
@@ -1045,9 +1055,32 @@ S.InventoryLocations = {
     // writes the disposition to ic_dispositions (S182), kept OUT of ic_counts so the computeUsagePair
     // usage readers are untouched while _perpetualInventory still values it — THEN archive; if they
     // cancel, nothing is archived. Restoring (val=false) or an empty shelf skip the prompt.
+    /* ⛔ F29: THAT GUARD ASKS ABOUT STRANDED VALUE, WHICH IS NOT THE ONLY THING AT STAKE.
+       Main Bar holds 64 products and no counted stock — the newest count covers five of the six
+       shelves and Main Bar is the one it omits — so it fell straight through the check above and
+       archived INSTANTLY: LOCATIONS 7 -> 6, and 64 products off every count sheet, from a button
+       sitting directly beside Edit. Reversible, but it is the biggest state change in the module
+       and it had the least friction of any action in it.
+       Two different facts, one dialog each, never both: counted stock is a disposition question,
+       placed products is a "you will stop counting these" question. An empty shelf is neither.
+       Restoring is never gated — undoing a mistake must not need permission. */
     if (val) {
       const stock = App.countedStockAt(l.name);
       if (stock.length) { App.promptShelfDisposition(l.name, stock, () => this._writeArchived(l, true)); return; }
+      const n = this.productCount(l.name);
+      if (n > 0) {
+        const ok = await App.confirm({
+          title: 'Archive ' + l.name + '?',
+          message: n + ' ' + (n === 1 ? 'product is' : 'products are') + ' placed on ' + l.name + '. '
+            + 'Archiving pulls the shelf out of your counts and the order flow, so '
+            + (n === 1 ? 'it stops' : 'they stop') + ' being counted until you place '
+            + (n === 1 ? 'it' : 'them') + ' somewhere else.\n\n'
+            + l.name + ' moves to the Archived list at the bottom, with its products intact. '
+            + 'Restore brings it back any time.',
+          confirmText: 'Archive Shelf', maxWidth: 460
+        });
+        if (!ok) return;
+      }
     }
     this._writeArchived(l, val);
   },

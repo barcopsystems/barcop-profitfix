@@ -60,12 +60,13 @@ S.InventoryStockReport = {
     });
     return Object.values(m);
   },
-  // Quantity with the product's abbreviated container unit (cs / btls / kegs / lbs).
+  // Quantity with the product's abbreviated container unit (cs / btls / kegs / lbs),
+  // singular at exactly one — App.qtyUnit, shared with the Usage Report and Dynamic
+  // Pars, which carried byte-identical copies of this and all printed "1 kegs" (F19).
   qtyU(p, n) {
     if (n == null || isNaN(n)) return '-';
     const u = p ? App.unitAbbr(App.productUnit(p)) : '';
-    const num = (Number(n) % 1 === 0) ? String(Number(n)) : Number(n).toFixed(1);
-    return u ? (num + ' ' + u) : num;
+    return App.qtyUnit((Number(n) % 1 === 0) ? String(Number(n)) : Number(n).toFixed(1), u);
   },
   selectedIdx(asc) {
     let i = asc.findIndex(c => c.id === this.countId);

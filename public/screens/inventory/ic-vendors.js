@@ -45,6 +45,7 @@ S.InventoryVendors = {
     this.actions = actions;
     actions.innerHTML = '';
     this.editId = null;
+    this._setupFor = null;   // a fresh visit is an Add, whatever the last one was
     this.renderList();
   },
 
@@ -230,8 +231,13 @@ S.InventoryVendors = {
         + '<span id="iv-err" style="color:var(--red);font-size:12px;display:none;"></span>'
       + '</div>';
     }
+    /* ⛔ THE HEADING IS A CLAIM ABOUT WHICH ACTIVITY THIS IS ([[the-loop]] #79). Set Up reuses the
+       add form, correctly — same fields, same save — but the operator pressed "Set Up" on a
+       vendor 50 products already point at and landed under "ADD A VENDOR" (F27). `_setupFor`
+       outlives `_setupName` (which wireAdd consumes the moment it prefills the box) so a
+       re-render keeps the heading true while App.captureDraft keeps the name in the field. */
     return '<div class="card form-card">'
-      + App.collapsibleCardTitle('ic-vendors', 'Add a Vendor')
+      + App.collapsibleCardTitle('ic-vendors', this._setupFor ? 'Set Up ' + this._setupFor : 'Add a Vendor')
       + '<div class="collapse-body">'
       + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
@@ -289,6 +295,7 @@ S.InventoryVendors = {
   startSetup(name) {
     this.entryMode = 'manual';
     this._setupName = name;
+    this._setupFor = name;
     this._draft = null;
     try { localStorage.removeItem(App._collapseKey('ic-vendors')); } catch (e) {}
     this.renderList();
@@ -298,6 +305,9 @@ S.InventoryVendors = {
   // back to a clean form, the card stays open.
   startOver() {
     this._setupName = null;
+    // The heading goes with the prefill: a stale "Set Up X" over an emptied form is the same
+    // wrong claim pointing the other way.
+    this._setupFor = null;
     this._draft = null;
     ['iv-name', 'iv-rep', 'iv-phone', 'iv-email', 'iv-account', 'iv-notes', 'iv-min', 'iv-fee', 'iv-free'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
@@ -996,7 +1006,7 @@ S.InventoryVendors = {
     }
     if (ok) {
       if (vendorId) this.openEdit(savedId);
-      else { this.editId = null; this._draft = null; this.renderList(); }
+      else { this.editId = null; this._draft = null; this._setupFor = null; this.renderList(); }
     } else {
       // Put memory back the way it was, WHOLE and by IDENTITY — the vendor record AND every product,
       // order, delivery and claim the rename touched were snapshotted before mutating, so one
@@ -1017,8 +1027,60 @@ S.InventoryVendors = {
   },
 
   // ── Delete ────────────────────────────────────────────────────────────────
+  /* What still points at this vendor. Products and orders reference a vendor BY NAME
+     ([[two-doors-same-data]]), not by id, which is exactly why deleting the record does not
+     break them — and why the confirm has to explain that rather than leave the operator to
+     guess. Open orders only: a received order is history, not a live commitment. */
+  vendorReferences(name) {
+    const key = String(name || '').trim().toLowerCase();
+    const products = this.products().filter(p => p && String(p.vendor || '').trim().toLowerCase() === key);
+    const orders = (App.inventoryData && App.inventoryData.ic_orders) || [];
+    const openOrders = orders.filter(o => o && o.status === 'Open' && String(o.vendor || '').trim().toLowerCase() === key);
+    return { products, openOrders, any: products.length > 0 || openOrders.length > 0 };
+  },
+
+  /* ⛔ THE CONFIRM ON THE MODULE'S ONE DESTRUCTIVE VENDOR ACTION SAID LEAST ABOUT THE MOST (F26).
+     Deleting a vendor with 50 products attached showed the generic "Delete this?", while
+     ic-product-setup's delete two screens away names every menu item, prep batch and open
+     investigation at risk, and Cancel Order names the vendor and the amount.
+     The two facts an operator needs are BOTH missing from the generic wording, and they point in
+     opposite directions: what is LOST (rep, phone, terms, minimums, delivery days) and what
+     SURVIVES (every product keeps its vendor name, keeps grouping on the Order Sheet, and the
+     name comes back under Set Up From Your Products). Saying only "permanent and cannot be
+     undone" over a vendor with 50 products reads as the worse of those two. */
+  /* ⚠ PLAIN TEXT WITH REAL LINE BREAKS, NOT MARKUP. App.confirm renders its message through
+     `esc(message)` — there is no html option — so a <div> here would print as literal angle
+     brackets on the dialog. It does set `white-space:pre-line`, and app.js says in as many words
+     that a message carrying its own breaks renders as written, so newlines are the supported
+     shape. Checked in the source before writing this, not assumed. */
+  _delVendorSummary(name, refs) {
+    const n = refs.products.length;
+    const bits = [];
+    if (n > 0) bits.push(n + ' ' + (n === 1 ? 'product' : 'products'));
+    if (refs.openOrders.length > 0) bits.push(refs.openOrders.length + ' open ' + (refs.openOrders.length === 1 ? 'order' : 'orders'));
+    return name + ' is still on ' + bits.join(' and ') + '.\n\n'
+      + 'Deleting removes the rep, phone, email, terms, account number, order minimum, delivery fee '
+      + 'and delivery days you have on file. That part cannot be undone.\n\n'
+      + 'Nothing on your products changes. ' + (n === 1 ? 'It keeps' : 'They keep') + ' the name '
+      + name + ', ' + (n === 1 ? 'it still groups' : 'they still group') + ' together on the Order '
+      + 'Sheet, and the name comes back under Set Up From Your Products so you can enter the '
+      + 'details again.';
+  },
+
   async confirmDel(id) {
-    if (!(await App.confirmDelete())) return;
+    const v = this.vendors().find(x => x.id === id);
+    const refs = v ? this.vendorReferences(v.name) : { products: [], openOrders: [], any: false };
+    if (refs.any) {
+      const ok = await App.confirm({
+        title: 'Delete ' + v.name + '?',
+        message: this._delVendorSummary(v.name, refs),
+        confirmText: 'Delete Vendor',
+        maxWidth: 480
+      });
+      if (!ok) return;
+    } else if (!(await App.confirmDelete())) {
+      return;
+    }
     await App.removeRecord('ic', 'vendor', id);   // row-per-record
     this.renderList();
   },

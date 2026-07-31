@@ -117,12 +117,13 @@ S.InventoryUsageReport = {
     return '<tr><td colspan="' + cols + '" style="color:var(--t3);padding:12px 8px;">'
       + esc(msg || 'No products match this period and filter. Both counts must include the same products.') + '</td></tr>';
   },
-  // Quantity with the product's abbreviated container unit (cs / btls / kegs / lbs).
+  // Quantity with the product's abbreviated container unit (cs / btls / kegs / lbs),
+  // singular at exactly one — App.qtyUnit, shared with the Stock Report and Dynamic
+  // Pars, which carried byte-identical copies of this and all printed "1 kegs" (F19).
   qtyU(p, n) {
     if (n == null || isNaN(n)) return '-';
     const u = p ? App.unitAbbr(App.productUnit(p)) : '';
-    const num = (Number(n) % 1 === 0) ? String(Number(n)) : Number(n).toFixed(1);
-    return u ? (num + ' ' + u) : num;
+    return App.qtyUnit((Number(n) % 1 === 0) ? String(Number(n)) : Number(n).toFixed(1), u);
   },
   // Trend tables group by category, so they share a fixed colgroup (Product wide,
   // the four data columns equal) and line their columns up down the page.

@@ -241,6 +241,14 @@ S.InventoryAdjustments = {
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
           + '<select id="ajb-witness">' + App.staffOptions('', { placeholder: 'Optional' }) + '</select></div>'
       + '</div>'
+      /* ⚠ SAY WHAT AN ADJUSTMENT DOES AND DOES NOT DO (Q1, Kyle's call 2026-07-31). The model is
+         CORRECT and stays: on-hand moves on counts and dispositions only (app.js:6201), because
+         the next count already reveals the loss — subtracting it here as well would book it
+         twice. What was missing is that nothing on this screen said so, so between logging a
+         loss and the next count the reorder plan still reads the old stock and the operator has
+         no way to know that is deliberate. */
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin:-4px 0 12px;">'
+        + 'Logged losses show up in your next count. They do not change on-hand right now.</div>'
       + '<div class="pill-wrap" style="margin-bottom:12px;">'
       + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:22%;">Product</th><th style="width:11%;">Qty</th><th style="width:13%;">Unit</th>'

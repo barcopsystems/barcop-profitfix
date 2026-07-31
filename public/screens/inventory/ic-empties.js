@@ -63,6 +63,21 @@ S.InventoryEmpties = {
   // else (liquor, wine, bottle beer) is by the bottle.
   unitFor(category) { return category === 'Draft Beer' ? 'kegs' : 'bottles'; },
 
+  /* ⛔ WHAT ONE EMPTY IS WORTH — ONE RULE, EVERY CONSUMER.
+     Deposit money comes back only on a Return for Deposit; a Recycle or a Trash is worth
+     nothing however big the deposit on file is. Three places answer that question — the
+     Deposit Owed strip, the saved row's Deposit Value cell, and the live preview on the entry
+     form — and the form was the one that did not ask it: 24 bottles at $0.05 set to **Trash**
+     previewed **$1.20**, and the record it then wrote correctly stored a dash (F21). A number
+     shown while typing that the save discards is exactly the thing [[output-honesty]] forbids.
+     Pinned by verify-empties-value-follows-disposition.js. */
+  _depositValue(disposition, quantity, deposit) {
+    if (disposition !== 'Return for Deposit') return 0;
+    const q = parseFloat(quantity) || 0;
+    const d = parseFloat(deposit) || 0;
+    return (q > 0 && d > 0) ? q * d : 0;
+  },
+
   // Effective window from the active range chip; Custom reads From/To; All clears.
   effectiveRange() {
     if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
@@ -127,9 +142,7 @@ S.InventoryEmpties = {
       // understate a real liability, so it reads `all` and always will. Do not "tidy" it onto
       // the filter to match its neighbours.
       let depositOwed = 0;
-      all.forEach(e => {
-        if (e.disposition === 'Return for Deposit') depositOwed += (parseFloat(e.deposit_amount) || 0) * (parseFloat(e.quantity) || 0);
-      });
+      all.forEach(e => { depositOwed += this._depositValue(e.disposition, e.quantity, e.deposit_amount); });
       // Entries and Last Entry describe the list underneath, so they follow the filter — off
       // `all` they showed an all-time count over a four-week list on the default chip.
       let lastDate = '';
@@ -152,13 +165,13 @@ S.InventoryEmpties = {
         const rows = filtered.slice(0, App.listLimit('ic', 'empty')).map(e => {
           // Deposit money is only owed back on a Return for Deposit; Recycle/Trash
           // rows show a dash, matching the Deposit Owed total which sums only those.
-          const deposit = (e.disposition === 'Return for Deposit')
-            ? (parseFloat(e.deposit_amount) || 0) * (parseFloat(e.quantity) || 0) : 0;
+          const deposit = this._depositValue(e.disposition, e.quantity, e.deposit_amount);
           return '<tr class="em-row" data-id="' + e.id + '" style="cursor:pointer;">'
             + '<td><div class="val">' + this.fmtDate(e.date) + '</div></td>'
             + '<td><div class="val">' + esc(e.product_name || '-') + '</div>'
             + (e.category ? '<div style="font-size:10px;color:var(--t3);">' + esc(e.category) + '</div>' : '') + '</td>'
-            + '<td>' + (e.quantity != null ? e.quantity : '-') + ' ' + esc(e.unit || '') + '</td>'
+            // Singular at exactly one (F19) — a single keg read "1 kegs" here.
+            + '<td>' + (e.quantity != null ? esc(App.qtyUnit(e.quantity, e.unit || '')) : '-') + '</td>'
             + '<td>' + esc(e.disposition || '-') + '</td>'
             + '<td>' + (deposit > 0 ? App.fmtCurrency(deposit) : '<span style="color:var(--t4);">-</span>') + '</td>'
             + '<td>' + esc(e.performed_by || '-') + '</td>'
@@ -267,11 +280,14 @@ S.InventoryEmpties = {
     const p = this.productById(line.querySelector('.eml-prod')?.value || '');
     const unitCell = line.querySelector('.eml-unit');
     if (unitCell) unitCell.textContent = p ? this.unitFor(p.category) : '-';
-    const qty = parseFloat(line.querySelector('.eml-qty')?.value);
-    const dep = parseFloat(line.querySelector('.eml-deposit')?.value);
     const cell = line.querySelector('.eml-val');
     if (cell) {
-      const val = (qty > 0 && dep > 0) ? qty * dep : 0;
+      // The SAME rule the saved row and the Deposit Owed strip use, so the preview cannot
+      // promise a deposit the save then discards (F21).
+      const val = this._depositValue(
+        line.querySelector('.eml-disp')?.value,
+        line.querySelector('.eml-qty')?.value,
+        line.querySelector('.eml-deposit')?.value);
       cell.textContent = val > 0 ? App.fmtCurrency(val) : '-';
     }
   },
@@ -279,7 +295,11 @@ S.InventoryEmpties = {
   onLineChange(ev) {
     const line = ev.target.closest('.em-line');
     if (!line) return;
-    if (ev.target.classList.contains('eml-prod') || ev.target.classList.contains('eml-qty') || ev.target.classList.contains('eml-deposit')) this.refreshLineCalc(line);
+    // ⚠ .eml-disp BELONGS IN THIS LIST. The value now depends on the disposition, so leaving it
+    // out would keep the old rule alive in a new costume: pick Return for Deposit, see $1.20,
+    // switch to Trash, and $1.20 stays on screen. The rule and its trigger are one fix.
+    if (ev.target.classList.contains('eml-prod') || ev.target.classList.contains('eml-qty')
+      || ev.target.classList.contains('eml-deposit') || ev.target.classList.contains('eml-disp')) this.refreshLineCalc(line);
   },
 
   async saveBatch(after) {

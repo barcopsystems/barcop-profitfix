@@ -87,7 +87,9 @@ S.InventoryOrderHistory = {
       const unit = parseFloat(li.unit_cost || 0).toFixed(2);
       const ext  = parseFloat(li.extended  || 0).toFixed(2);
       const isCase = li.display_unit === 'case';
-      lines.push('  ' + (li.name || '(unnamed)') + '  -  ' + qty + (isCase ? ' cases' : '')
+      // F19: a one-case line read "1 cases" — and this one is the body of the email that goes
+      // to the distributor, so it is the copy that leaves the building.
+      lines.push('  ' + (li.name || '(unnamed)') + '  -  ' + (isCase ? App.qtyUnit(qty, 'cases') : qty)
         + '  @  $' + unit + (isCase ? '/case' : '') + '  =  $' + ext);
     });
     lines.push('');
@@ -245,7 +247,7 @@ S.InventoryOrderHistory = {
     const rows = (order.line_items || []).map(li => {
       const isCase = li.display_unit === 'case';
       return '<tr><td>' + esc(li.name || '') + '</td>'
-        + '<td>' + (li.qty || 0) + (isCase ? ' cases' : '') + '</td>'
+        + '<td>' + (isCase ? App.qtyUnit(li.qty || 0, 'cases') : (li.qty || 0)) + '</td>'
         + '<td>' + App.fmtCurrency(li.unit_cost || 0) + (isCase ? ' /case' : '') + '</td>'
         + '<td>' + App.fmtCurrency(li.extended || 0) + '</td></tr>';
     }).join('');
@@ -303,7 +305,7 @@ S.InventoryOrderHistory = {
         const isCase = li.display_unit === 'case';
         return '<tr>'
           + '<td><div class="val">' + esc(li.name) + '</div></td>'
-          + '<td>' + (li.qty || 0) + (isCase ? ' cases' : '') + '</td>'
+          + '<td>' + (isCase ? App.qtyUnit(li.qty || 0, 'cases') : (li.qty || 0)) + '</td>'
           + '<td>' + App.fmtCurrency(li.unit_cost || 0) + (isCase ? '<div style="font-size:9px;color:var(--t3);">per case</div>' : '') + '</td>'
           + '<td class="val">' + App.fmtCurrency(li.extended || 0) + '</td>'
           + '</tr>';

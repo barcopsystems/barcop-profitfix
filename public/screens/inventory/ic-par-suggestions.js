@@ -53,11 +53,12 @@ S.InventoryParSuggestions = {
   unitFor(p) { return App.unitAbbr(App.productUnit(p)); },
   // Quantity with the product's ABBREVIATED stock unit (cs / btls / kegs / lbs
   // ...), so Current Par, Avg Weekly, and Suggested Par all read identically.
+  // Singular at exactly one through App.qtyUnit — the Stock Report and the Usage
+  // Report carried byte-identical copies of this and all three printed "1 kegs" (F19).
   qtyAbbr(p, n) {
     if (n == null || isNaN(n)) return '<span style="color:var(--t4);">-</span>';
     const u = this.unitFor(p);
-    const num = (Number(n) % 1 === 0) ? String(Number(n)) : Number(n).toFixed(1);
-    return u ? (num + ' ' + u) : num;
+    return App.qtyUnit((Number(n) % 1 === 0) ? String(Number(n)) : Number(n).toFixed(1), u);
   },
 
   // ── Delivery cycle ───────────────────────────────────────────────────────
