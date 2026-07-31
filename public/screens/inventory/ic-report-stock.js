@@ -162,7 +162,10 @@ S.InventoryStockReport = {
     if (prior) {
       const priorVal = this.countedItems(prior).reduce((s, it) => s + this.itemValue(it), 0);
       const change = totalValue - priorVal;
-      changeStat = this.statItem('vs Last Count', (change > 0 ? '+' : '') + App.fmtCurrency(change));
+      /* fmtBal, never fmtCurrency: a stock DROP is the normal case here and fmtCurrency renders the
+         sign inside the dollar ("$-5,205.37"). The positive branch already reads "+$1,799.15", so
+         the two directions disagreed in one column. See verify-neg-currency-inventory.js. */
+      changeStat = this.statItem('vs Last Count', (change > 0 ? '+' : '') + App.fmtBal(change));
     }
     const statsCard = this.statsCard(
       this.statItem('Stock Value', App.fmtCurrency(totalValue))
@@ -236,7 +239,7 @@ S.InventoryStockReport = {
       return '<tr><td><div class="val">' + esc(c) + '</div></td>'
         + '<td>' + App.fmtCurrency(bv) + '</td>'
         + '<td>' + App.fmtCurrency(av) + '</td>'
-        + '<td>' + (d > 0 ? '+' : '') + App.fmtCurrency(d) + '</td></tr>';
+        + '<td>' + (d > 0 ? '+' : '') + App.fmtBal(d) + '</td></tr>';
     }).join('');
     return this.dataCard('<th>Category</th><th>Last Count</th><th>This Count</th><th>Change</th>', rows);
   },

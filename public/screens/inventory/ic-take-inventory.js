@@ -1025,7 +1025,7 @@ S.InventoryTakeInventory = {
         + '<td>' + cols.full + '</td>'
         + '<td>' + cols.open + '</td>'
         + '<td class="val">' + cols.total + '</td>'
-        + '<td>' + (r.value != null ? App.fmtCurrency(r.value) : '<span style="color:var(--t4);">-</span>') + '</td>'
+        + '<td>' + (r.value != null ? App.fmtBal(r.value) : '<span style="color:var(--t4);">-</span>') + '</td>'
         + '</tr>';
     }).join('');
 
@@ -1034,7 +1034,7 @@ S.InventoryTakeInventory = {
       + '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Products</div><div class="calc-val lg">' + rows.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Counted</div><div class="calc-val lg">' + counted + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Inventory Value</div><div class="calc-val lg good">' + App.fmtCurrency(totalValue) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Inventory Value</div><div class="calc-val lg good">' + App.fmtBal(totalValue) + '</div></div>'
       + '</div></div>'
       + '<div class="sh" style="margin:24px 0 10px;">Counted Products</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'

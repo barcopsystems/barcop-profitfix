@@ -1367,12 +1367,12 @@ S.InventoryProducts = {
       const cb = cs > 0 ? (parseFloat(document.getElementById('ip-cost')?.value) / cs) : null;
       const pct = cb && price ? cb / price * 100 : null;
       set('ip-pours', cs > 0 ? cs.toString() : '-');
-      set('ip-cpp',   cb ? App.fmtCurrency(cb) : '-');
+      set('ip-cpp',   cb ? App.fmtBal(cb) : '-');
       set('ip-pct',   pct ? App.fmtPct(pct) : '-', pct ? (pct > target ? 'warn' : 'good') : '');
       return;
     }
     set('ip-pours', pours ? pours.toFixed(1) : '-');
-    set('ip-cpp',   cpp   ? App.fmtCurrency(cpp) : '-');
+    set('ip-cpp',   cpp   ? App.fmtBal(cpp) : '-');
     set('ip-pct',   pct   ? App.fmtPct(pct) : '-', pct ? (pct > target ? 'warn' : 'good') : '');
     this.recalcAllServing();
   },

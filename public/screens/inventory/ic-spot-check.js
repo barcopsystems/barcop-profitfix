@@ -540,7 +540,7 @@ S.InventorySpotCheck = {
     const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Checks</div><div class="calc-val lg">' + filtered.length + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Flagged</div><div class="calc-val lg' + (flagged ? ' warn' : '') + '">' + flagged + '</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val lg">' + (totalVar > 0 ? '+' : '') + App.fmtCurrency(totalVar, 2) + '</div></div>'
+      + '<div class="calc-item"><div class="calc-label">Total Variance</div><div class="calc-val lg">' + (totalVar > 0 ? '+' : '') + App.fmtBal(totalVar, 2) + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Last Check</div><div class="calc-val lg">' + (filtered.length ? this.fmtDate(filtered[0].date) : '-') + '</div></div>'
       + '</div></div>';
 
@@ -564,7 +564,7 @@ S.InventorySpotCheck = {
         + '<td>' + esc(c.checked_by || '-') + '</td>'
         + '<td>' + (c.product_count || 0) + '</td>'
         + '<td class="' + (c.flagged_count ? 'neg' : '') + '">' + (c.flagged_count || 0) + '</td>'
-        + '<td class="' + (vd > 0 ? 'neg' : '') + '">' + (vd > 0 ? '+' : '') + App.fmtCurrency(vd, 2) + '</td>'
+        + '<td class="' + (vd > 0 ? 'neg' : '') + '">' + (vd > 0 ? '+' : '') + App.fmtBal(vd, 2) + '</td>'
         + '<td><div class="row-actions">'
         + '<button class="btn btn-ghost btn-sm sp-hview" data-id="' + c.id + '">View</button>'
         /* S252: Edit re-opens a FINISHED check in the entry form. Delete already existed; edit did
@@ -906,12 +906,20 @@ S.InventorySpotCheck = {
     this.clearMissing();
     const mark = id => { document.getElementById(id)?.closest('.f')?.classList.add('field-missing'); };
     const date = document.getElementById('sp-date')?.value;
-    if (!date) { this.expandSetup(); mark('sp-date'); return; }
+    /* ⛔ EVERY REFUSAL BELOW SAYS SOMETHING. These four used to return SILENTLY, relying on
+       `.field-missing` turning the cell red — and that border does not render on these controls
+       (measured: class lands, selector matches, --red resolves, computed border unchanged, and it
+       cannot be overridden even by inline !important). So the operator pressed FINISH SPOT CHECK
+       and the app did nothing at all. Every sibling screen in this module names its refusal
+       ("Choose a vendor.", "Location name required.", "Enter a quantity above zero on every
+       line."); this one screen was the outlier. Pinned by verify-spot-check-refusal-speaks.js.
+       The border is a separate open item — words are the fix that does not rest on a guess. */
+    if (!date) { this._saveMsg('Pick the date of this spot check.'); this.expandSetup(); mark('sp-date'); return; }
     const location = document.getElementById('sp-loc')?.value || '';
-    if (!location) { this.expandSetup(); mark('sp-loc'); return; }
+    if (!location) { this._saveMsg('Choose a bar station.'); this.expandSetup(); mark('sp-loc'); return; }
 
     const lines = [...document.querySelectorAll('.sp-line')];
-    if (lines.length === 0) { this.expandSetup(); mark('sp-add'); return; }
+    if (lines.length === 0) { this._saveMsg('Add at least one product to check.'); this.expandSetup(); mark('sp-add'); return; }
 
     const items = [];
     let valid = false;
@@ -951,7 +959,7 @@ S.InventorySpotCheck = {
         flagged:         line.dataset.flag === '1'
       });
     });
-    if (!valid) { lines.forEach(l => l.classList.add('sp-missing')); return; }
+    if (!valid) { this._saveMsg('Enter a count on at least one product first.'); lines.forEach(l => l.classList.add('sp-missing')); return; }
 
     /* ⛔ THE GATE. Finalising is refused while any STARTED line is half-done, which is the whole
        of S249: a pre-only check used to save straight into history, unfixable, and land in the
