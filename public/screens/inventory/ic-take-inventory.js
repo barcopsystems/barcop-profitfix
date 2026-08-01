@@ -615,6 +615,34 @@ S.InventoryTakeInventory = {
   // the picked locations on the draft. Backward compat: old draft types
   // ('Full' / 'Bar Only' / 'Kitchen Only' without custom_locations) still
   // resolve so a resumed pre-rebuild draft does not break.
+  /* ── S338 — the lines an EDIT cannot re-render, kept rather than deleted ────────────────
+     Returns the item list to WRITE: everything the live sheet built, plus any line the stored
+     record holds under a key the sheet could not produce.
+
+     Reached only on an edit — a new count has no stored record to carry, and the caller passes
+     `_edit_id` through `this.draft`, so a fresh count returns its own list untouched.
+
+     ⚠ THE RENDERED LINE WINS. Keying on `product_id@@location` means a re-counted product
+     overwrites its stored figure and is never carried twice. That is also why a product that
+     MOVED shelves ends up with both positions: the stored `pid@@Store Room` is a real recorded
+     position and the new `pid@@Main Bar` row is `counted:false`, which `computeUsagePair` skips.
+     Deleting the old position — what this used to do — is the one option that loses a fact.
+
+     ⚠ Deliberately NOT deduped by product. Two shelves of the same product are two positions to
+     `_perpetualInventory`, and collapsing them here would re-introduce the loss from the other
+     side. */
+  _carryForwardStoredLines(renderedItems) {
+    const rendered = renderedItems || [];
+    if (!this.draft || !this.draft._edit_id) return rendered;
+    const orig = (this.counts() || []).find(c => c && c.id === this.draft._edit_id);
+    const stored = (orig && orig.items) || [];
+    if (!stored.length) return rendered;
+    const k = it => it.product_id + '@@' + (it.location || 'Unassigned');
+    const shown = new Set(rendered.map(k));
+    const carried = stored.filter(it => it && it.product_id && !shown.has(k(it)));
+    return carried.length ? rendered.concat(carried) : rendered;
+  },
+
   countProducts() {
     const all = this.products();
     const locs = this.draft.custom_locations || [];
@@ -1158,7 +1186,9 @@ S.InventoryTakeInventory = {
     // case-aware fields (cases, loose, case_size_at_count) alongside the
     // standard fields (fulls, partial, total) so downstream readers that
     // only know about fulls/partial/total keep working unchanged.
-    const items = rows.map(r => {
+    // What the LIVE sheet could build. `_carryForwardStoredLines` below folds back anything an
+    // edit's stored record holds that this could not render (S338).
+    const renderedItems = rows.map(r => {
       if (r.isCaseBeer) {
         return {
           product_id: r.p.id,
@@ -1221,6 +1251,18 @@ S.InventoryTakeInventory = {
        claim goes — a comment asserting a protection the app does not have is worse than none,
        because the next reader stops looking ([[the-loop]] #53). On THE LIST as S336. */
     const editing = !!this.draft._edit_id;
+    /* ⚠⚠ S338 — CARRY FORWARD WHAT THE LIVE SHEET CANNOT RENDER.
+       An edit rebuilds `items` from `rows()`, which walks the LIVE product list under the LIVE
+       locations. Three ordinary things therefore used to delete counted lines from an old record
+       with no warning: a RENAMED location (its whole shelf stops matching), an ARCHIVED product
+       (`products()` filters `active !== false`), and a product MOVED between two shelves that are
+       both in the count (the stored key is `pid@@Store Room`, the row key `pid@@Main Bar`, so the
+       line rendered NOT COUNTED and was written back `counted:false, total:0`).
+       `_perpetualInventory` is newest-wins per `pid@@loc`, so those deletions landed on inventory
+       value and Schedule C Line 41.
+       A rendered line always wins over a stored line with the same key, so a re-count overwrites
+       and nothing double-counts — see `_carryForwardStoredLines`. */
+    const items = this._carryForwardStoredLines(renderedItems);
     const record = {
       id:          editing ? this.draft._edit_id : App.uid(),
       // ⚠ `_business_date` pins the day for a MERGED draft that outlived its write (see below), so a
@@ -1229,7 +1271,10 @@ S.InventoryTakeInventory = {
       type:        this.draft.type,
       counted_by_id: this.draft.counted_by_id || '',
       counted_by:  this.draft.counted_by || (App.staffById(this.draft.counted_by_id) || {}).name || '',
-      locations:   [...new Set(rows.map(r => r.location || 'Unassigned'))],
+      // ⚠ S338: derived from the FINAL item set, not from `rows`. A carried shelf that keeps its
+      // lines but loses its name off `locations` (and its money off `total_value`) is the same
+      // deletion wearing a different hat.
+      locations:   [...new Set(items.map(i => i.location || 'Unassigned'))],
       items,
       item_count:  items.length,
       total_value: items.reduce((s, i) => s + (i.value || 0), 0),
