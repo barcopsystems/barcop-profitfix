@@ -27,18 +27,6 @@ S.RevenueHelp = {
       { q: 'Do I need every screen?',
         a: 'No. Start with three and you have most of the value: Menu Builder (your priced catalog), Revenue Forecast (next week\'s revenue and cover goals, projected for you automatically so the schedule has a number to build against), and Server Check (per-server check average tracking). Add Menu Engineering once your item list is built, and the Dog Test Tracker for items you are deciding whether to cut. The Revenue Audit works with whatever data exists.' }
     ]},
-    { t: 'How It Connects', qa: [
-      { q: 'What flows from Shift Control into Revenue Recovery?',
-        a: 'Shift revenue (bar plus floor) feeds Confirm the Week\'s total revenue and RPLH, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every shift in Shift Control on the day it happened and Confirm the Week sums it for you, so you confirm a week instead of typing it. A per-server sales report dropped at the Shift weekly close fills your Server Check scorecard, and a product-mix report refreshes Menu Engineering units sold, off the same sitting.' },
-      { q: 'What flows from Labor Control into Revenue Recovery?',
-        a: 'Your staff roster auto-syncs to Server Check, so there is no duplicate server list to maintain. Logged hours feed This Week\'s RPLH and labor cost. Tip pool participant shares feed the Server Scorecard\'s Tips percent column, with the raw Tip Tracking entries as the fallback for shifts without a saved pool.' },
-      { q: 'What flows from Inventory Control into Revenue Recovery?',
-        a: 'Product prices flow into Menu Builder: a recipe-based cost auto-updates whenever you change a product price in Inventory Control, so menu costs never go stale. Menu Inventory items (Beer, Wine, NA) link directly to an inventory product for their cost, and the Variance Report reads any Pour Size override you set on a Menu Item for multi-size matching.' },
-      { q: 'How does a price change get tracked?',
-        a: 'Menu Engineering is the one place a menu price changes now. Repricing an item first saves a planned price you can model against volume; Mark Live is the moment it becomes real, sets the price, and logs the change with its date. Editing a price directly on a Menu Item logs it the same way. Pricing is tracked as a logged change, not a recovered-dollar figure, because a raise only pays if volume holds. So the dashboard shows Pricing as a Review row, and the Pricing Review Log at the bottom of Menu Engineering checks the real weekly margin swing against what you predicted once three weeks of covers land. Covers come from your weekly product-mix import.' },
-      { q: 'Why do my Revenue numbers not match my POS exactly?',
-        a: 'Two common reasons. First, Bar Cop reads net sales (after voids and comps) from Shift Control, while your POS export may show gross. Second, timing: Bar Cop sums shifts by their date, while your POS report may use a different daypart or fiscal cutoff. Log every shift on the day it happened and let Confirm the Week sum from there.' }
-    ]},
     { t: 'Decisions', qa: [
       { q: 'What do Star, Plowhorse, Puzzle and Dog mean?',
         a: 'They are the four boxes Menu Engineering sorts every priced item into, and each one names a different move. Bar Cop measures two things per item against the other items in its own category: contribution margin in dollars, which is menu price minus item cost, and weekly units sold. A Star is at or above the category average on both, so feature it and push it. A Plowhorse sells well on a thin margin, so raise the price. A Puzzle earns well but nobody orders it, so promote it. A Dog is below average on both, so rework it or cut it. Every item is judged inside its own category, never against the whole menu, and a category needs at least four priced items before Bar Cop will rank it at all. Menu Rundown counts the four across the top and prints each item\'s verdict on its tile.' },
@@ -56,6 +44,18 @@ S.RevenueHelp = {
         a: 'RPLH is revenue per labor hour: total revenue divided by total labor hours. It is the single cleanest read on labor productivity, because it holds up regardless of headcount. Benchmarks vary by concept; many full-service operators start around $50 to $75 per hour blended. Set your own target in Settings and track it on Confirm the Week and the Revenue dashboard.' },
       { q: 'Why are cost savings and revenue growth never combined into one number?',
         a: 'Because they are different jobs with different levers. Cutting labor cost and lifting check average both add to profit, but blending them into one "recovery" figure hides which one is actually moving and lets a win on one side paper over a loss on the other. Bar Cop keeps cost savings (labor) and revenue growth (check average, menu, servers) separate, and every figure is computed from your real data.' }
+    ]},
+    { t: 'Connections', qa: [
+      { q: 'What flows from Shift Control into Revenue Recovery?',
+        a: 'Shift revenue (bar plus floor) feeds Confirm the Week\'s total revenue and RPLH, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every shift in Shift Control on the day it happened and Confirm the Week sums it for you, so you confirm a week instead of typing it. A per-server sales report dropped at the Shift weekly close fills your Server Check scorecard, and a product-mix report refreshes Menu Engineering units sold, off the same sitting.' },
+      { q: 'What flows from Labor Control into Revenue Recovery?',
+        a: 'Your staff roster auto-syncs to Server Check, so there is no duplicate server list to maintain. Logged hours feed This Week\'s RPLH and labor cost. Tip pool participant shares feed the Server Scorecard\'s Tips percent column, with the raw Tip Tracking entries as the fallback for shifts without a saved pool.' },
+      { q: 'What flows from Inventory Control into Revenue Recovery?',
+        a: 'Product prices flow into Menu Builder: a recipe-based cost auto-updates whenever you change a product price in Inventory Control, so menu costs never go stale. Menu Inventory items (Beer, Wine, NA) link directly to an inventory product for their cost, and the Variance Report reads any Pour Size override you set on a Menu Item for multi-size matching.' },
+      { q: 'How does a price change get tracked?',
+        a: 'Menu Engineering is the one place a menu price changes now. Repricing an item first saves a planned price you can model against volume; Mark Live is the moment it becomes real, sets the price, and logs the change with its date. Editing a price directly on a Menu Item logs it the same way. Pricing is tracked as a logged change, not a recovered-dollar figure, because a raise only pays if volume holds. So the dashboard shows Pricing as a Review row, and the Pricing Review Log at the bottom of Menu Engineering checks the real weekly margin swing against what you predicted once three weeks of covers land. Covers come from your weekly product-mix import.' },
+      { q: 'Why do my Revenue numbers not match my POS exactly?',
+        a: 'Two common reasons. First, Bar Cop reads net sales (after voids and comps) from Shift Control, while your POS export may show gross. Second, timing: Bar Cop sums shifts by their date, while your POS report may use a different daypart or fiscal cutoff. Log every shift on the day it happened and let Confirm the Week sum from there.' }
     ]}
   ],
 
