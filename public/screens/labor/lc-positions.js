@@ -265,8 +265,28 @@ S.LaborPositions = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const name = document.getElementById(p + 'name')?.value.trim();
     if (!name) { fail('Position name is required.'); return; }
+    /* ⚠⚠ THE TWIN 40 LINES AWAY ALREADY REFUSES BOTH OF THESE (L11/L12). Staff Roster turns down a
+       duplicate name and a negative wage with the best-worded messages in the app; Positions, which
+       feeds the same staff records, accepted both in silence. Measured on the live app: a second
+       "Bartender" saved with `tipped:false, tip_out_pct:0`, so the staff form then offered two
+       identical "Bartender, Bar" entries and a new hire assigned the wrong one would get NO
+       tip-out at all — and a `default_wage: -5` became the default for anyone hired into the role.
+       ⚠ The duplicate test excludes the row being edited, or renaming a position to its own name
+       refuses itself. `save(p)` is shared by the add form ('lp-') and the edit modal ('lpe-'), so
+       one guard covers both doors. */
+    const clash = this.positions().find(x => x && x.id !== this.editId
+      && String(x.name || '').trim().toLowerCase() === name.toLowerCase());
+    if (clash) {
+      fail('"' + name + '" is already one of your positions. Staff are matched to a position by name, '
+        + 'so two cannot share one. Rename this, or edit the existing position instead.');
+      return;
+    }
     const payType = (document.getElementById(p + 'paytype')?.value === 'Salary') ? 'Salary' : 'Hourly';
     const payNum = parseFloat(document.getElementById(p + 'wage')?.value);
+    if (!isNaN(payNum) && payNum < 0) {
+      fail((payType === 'Salary' ? 'Default salary' : 'Default wage') + ' cannot be negative.');
+      return;
+    }
 
     const isTipped = (document.getElementById(p + 'tipped')?.value || 'no') === 'yes';
     const pays = isTipped && (document.getElementById(p + 'pays')?.value || 'no') === 'yes';

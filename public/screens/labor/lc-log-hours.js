@@ -505,6 +505,17 @@ S.LaborLogHours = {
     };
     if (!this.editId) rec.created_at = new Date().toISOString();
 
+    /* ⚠⚠ A CLOSED PERIOD REFUSES NEW ROWS, NOT JUST EDITS TO THE OLD ONES (L6). The lock is
+       stamped on the records that existed when the period closed, so a brand-new entry carries no
+       flag and the edit guard below never sees it. Measured: a period closed at 87 entries grew to
+       98 and $823.75 through this door, still reading "Closed", and the payroll export carried the
+       new total. Checked BEFORE the record is pushed into memory, so a refusal leaves nothing
+       behind ([[the-loop]] #49: an exit from a handler that has already mutated must put memory
+       back — easier not to mutate). */
+    if (!this.editId && App.payPeriodClosedFor(rec.date)) {
+      fail('That week\'s pay period is closed. Reopen it in Pay Periods before logging more hours.');
+      return;
+    }
     const list = this.actuals();
     let saved = rec;
     if (this.editId) {
@@ -720,6 +731,16 @@ S.LaborLogHours = {
       });
     });
     if (!recs.length) { fail('Nothing to log. Check at least one row with hours above zero.'); return; }
+    /* ⚠ THE SAME GUARD, THE SECOND DOOR. This batch is how the 11 phantom shifts actually got in:
+       the fill-from-schedule modal writes straight to lc_actuals and never asked. Name the weeks so
+       a mixed batch says which part is blocked rather than refusing the lot without a reason. */
+    const closedDates = [...new Set(recs.map(r => r.date).filter(d => App.payPeriodClosedFor(d)))].sort();
+    if (closedDates.length) {
+      const wk = [...new Set(closedDates.map(d => App.weekStartFor(d)))];
+      fail('That week\'s pay period is closed. Reopen it in Pay Periods before logging more hours.'
+        + (wk.length > 1 ? ' (' + wk.length + ' closed weeks in this batch.)' : ''));
+      return;
+    }
     const btn = document.getElementById('lo-fmodal-log');
     if (btn) { btn.disabled = true; btn.textContent = 'Logging...'; }
     let ok = true;

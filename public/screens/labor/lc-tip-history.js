@@ -204,7 +204,7 @@ S.LaborTipHistory = {
     if (hasTipOut) {
       const trs = Object.keys(g).sort((a, b) => g[b].net - g[a].net).map(k => {
         const s = g[k];
-        const toCell = Math.abs(s.tipout) < 0.005 ? '-' : (s.tipout > 0 ? '+' : '') + App.fmtCurrency(s.tipout, 2);
+        const toCell = Math.abs(s.tipout) < 0.005 ? '-' : (App.fmtSigned(s.tipout, 2).sign > 0 ? '+' : '') + App.fmtBal(s.tipout, 2);
         return '<tr><td><div class="val">' + esc(s.name) + '</div></td>'
           + '<td>' + s.count + '</td>'
           + '<td>' + App.fmtCurrency(s.cash) + '</td>'
@@ -247,7 +247,7 @@ S.LaborTipHistory = {
     if (hasTipOut) {
       const trs = keys.map(wk => {
         const s = g[wk];
-        const toCell = Math.abs(s.tipout) < 0.005 ? '-' : (s.tipout > 0 ? '+' : '') + App.fmtCurrency(s.tipout, 2);
+        const toCell = Math.abs(s.tipout) < 0.005 ? '-' : (App.fmtSigned(s.tipout, 2).sign > 0 ? '+' : '') + App.fmtBal(s.tipout, 2);
         return '<tr><td><div class="val">Week of ' + this.fmtDate(wk) + '</div></td>'
           + '<td>' + s.count + '</td>'
           + '<td>' + App.fmtCurrency(s.cash) + '</td>'

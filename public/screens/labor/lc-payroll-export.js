@@ -184,8 +184,14 @@ S.LaborPayrollExport = {
     return { ws: agg.weekStart, we: agg.weekEnd, rows, totals: agg.totals, totalCount: agg.totalCount };
   },
 
+  /* ⚠ "Gross Pay" IS WAGES, AND THE HEADER NOW SAYS SO (L10). Gross = Regular + OT and deliberately
+     excludes Tip Share — the employer pays the wage, the tips are income the employee already
+     received — which is the right side of the worksheet lane ([[payroll-legal-posture]]). But the
+     bare word "Gross" invites a bookkeeper to read it as total taxable wages and wonder why the
+     Tip Share beside it is not in the sum. Name the basis on the column rather than leave it to be
+     inferred, the same fix the Labor cockpit's percentages needed. */
   _columns: ['Staff Name', 'Position', 'Pay Type', 'Regular Hours', 'OT Hours', 'Total Hours',
-    'Wage Rate', 'Regular Pay', 'OT Pay', 'Tip Share', 'Gross Pay', 'Status'],
+    'Wage Rate', 'Regular Pay', 'OT Pay', 'Tip Share', 'Gross Pay (wages only)', 'Status'],
 
   _fileBase(ws) {
     const barName = (App.data?.settings?.bar_name) || 'Bar Cop';
@@ -234,7 +240,13 @@ S.LaborPayrollExport = {
       const dataEnd = aoa.length - 1;
 
       const t = d.totals;
-      aoa.push(['TOTAL', '', '', t.regular_hours, t.ot_hours, t.hours, '', t.regular_cost, t.ot_cost, '', t.gross, '']);
+      /* ⚠ TIP SHARE IS SUMMED FROM THE ROWS, NOT READ OFF `totals` (L10). `aggregateWeek` builds
+         hours and pay; it has no tip_share, so `t.tip_share` would have been undefined and this
+         cell would have stayed blank while looking fixed — a field written nowhere reads exactly
+         like the bug it was meant to close ([[the-loop]] #25). It was the ONE numeric column with
+         no total, on the worksheet a bookkeeper reconciles. */
+      const tipTotal = (d.rows || []).reduce((s, r) => s + (Number(r.tipShare) || 0), 0);
+      aoa.push(['TOTAL', '', '', t.regular_hours, t.ot_hours, t.hours, '', t.regular_cost, t.ot_cost, tipTotal, t.gross, '']);
       const totalRow = aoa.length - 1;
 
       this._pushFooter(aoa, merges, line, fullMerge);
@@ -308,7 +320,7 @@ S.LaborPayrollExport = {
     ]);
     const sum = (k) => rows.reduce((t, r) => t + (Number(r[k]) || 0), 0);
     dataRows.push(['TOTAL', '', '', f2(sum('regHours')), f2(sum('otHours')), f2(sum('totalHours')), '',
-      f2(sum('regPay')), f2(sum('otPay')), '', f2(sum('gross')), '']);
+      f2(sum('regPay')), f2(sum('otPay')), f2(sum('tipShare')), f2(sum('gross')), '']);
     /* Excel and Google Sheets EVALUATE a cell that begins with `=`, `+`, `-` or `@` as a formula
        when the file opens, instead of showing it as text. This file carries the staff name,
        position, pay type and status exactly as the operator typed them, and it is the one export

@@ -371,7 +371,7 @@ S.LaborTipLog = {
           let extra = '';
           if (hasTipOut) {
             const adj = (parseFloat(x.tip_out_received) || 0) - (parseFloat(x.tip_out_paid) || 0);
-            const adjTxt = Math.abs(adj) < 0.005 ? '-' : (adj > 0 ? '+' : '') + App.fmtCurrency(adj, 2);
+            const adjTxt = Math.abs(adj) < 0.005 ? '-' : (App.fmtSigned(adj, 2).sign > 0 ? '+' : '') + App.fmtBal(adj, 2);
             extra = '<td>' + adjTxt + '</td><td class="val">' + App.fmtCurrency(App.netTips(x)) + '</td>';
           }
           return '<tr class="tl-row" data-id="' + x.id + '" style="cursor:pointer;">'
@@ -1211,6 +1211,27 @@ S.LaborTipLog = {
     const shares = this.computeShares().filter(s => s.staff_id);
     if (shares.length === 0) { fail('Add at least one participant.'); return; }
     if (this._poolMethod === 'hours' && shares.every(s => s.hours <= 0)) { fail('Enter hours for the hours-based split.'); return; }
+
+    /* ⚠⚠ ONE POOL PER DAY, OR SAY WHY NOT (L7). Nothing checked, and `tipShareForStaffInWeek` adds
+       EVERY pool in the week straight into the tip-credit basis — so a second pool on one date
+       double-counts silently into a legal-adjacent number and into the payroll worksheet. Measured
+       on the live app: a barback's week read $410.65 in tips ($110.65 + $300 from two pools on one
+       day) against $378 of wages, and it exported that way.
+       The Log Tips half of this very screen already guards its own duplicate and says so out loud;
+       the pool had nothing. ASK rather than refuse — a house that runs a lunch and a dinner pot is
+       real — and name the pool already on file, the way the drawer-count guard names the count. */
+    const priorPool = this.pools().find(x => x && x.id !== this._poolEditId && x.date === this._addDate);
+    if (priorPool) {
+      const okDup = await App.confirm({
+        title: 'A tip pool is already saved for that day',
+        message: 'That day already has a pool of ' + App.fmtCurrency(priorPool.pool_amount || 0)
+          + ' split between ' + ((priorPool.participants || []).length) + ' people. Tips are tracked per DAY, so a'
+          + ' second pool adds to everyone\'s tip income for the week, including the tip-credit check and the'
+          + ' payroll worksheet. Cancel and edit the existing pool unless this really was a separate pot.',
+        confirmText: 'Save anyway', cancelText: 'Cancel', danger: true
+      });
+      if (!okDup) return;   // runs before the Save button is disabled, so there is nothing to restore
+    }
 
     let totalHours = 0;
     const participants = shares.map(s => { totalHours += s.hours; const staff = this.staffById(s.staff_id); return { staff_id: s.staff_id, name: staff ? staff.name : '', hours: s.hours, share: s.share }; });

@@ -62,8 +62,13 @@ S.LaborTimeOff = {
           '<option value="' + s.id + '"' + (r && r.staff_id === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
     const typeOpts = this.TYPES.map(t =>
       '<option' + ((r ? r.type : 'Requested Off') === t ? ' selected' : '') + '>' + t + '</option>').join('');
+    /* ⚠ A NEW ENTRY DEFAULTED TO Approved WHILE Type DEFAULTED TO "Requested Off" (L8b) — the
+       form's own two fields disagreed about what the record was, with the manager touching
+       neither, and the cockpit's "Time-off requests to review" counter (which counts Requested)
+       could never fill. A new row now opens as Requested, matching the type beside it; approving
+       is one click and is the manager's decision to make, not the form's. */
     const statusOpts = this.STATUSES.map(st =>
-      '<option' + ((r ? r.status : 'Approved') === st ? ' selected' : '') + '>' + st + '</option>').join('');
+      '<option' + ((r ? r.status : 'Requested') === st ? ' selected' : '') + '>' + st + '</option>').join('');
     return '<div class="form-row data-row" style="gap:12px;">'
       + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Staff</label>'
         + '<select id="' + p + 'staff">' + staffOpts + '</select></div>'
@@ -186,8 +191,17 @@ S.LaborTimeOff = {
     if (!staff) { fail('Choose a staff member.'); return; }
     const from = document.getElementById(p + 'from')?.value;
     if (!from) { fail('Set the From date.'); return; }
-    let to = document.getElementById(p + 'to')?.value || from;
-    if (to < from) to = from;   // a backwards range collapses to one day, no silent error
+    /* ⚠⚠ A BACKWARDS RANGE IS A TYPO, NOT A ONE-DAY REQUEST (L8). This clamped it and the comment
+       beside it claimed "no silent error" — it was exactly that ([[the-loop]] #53: a comment
+       naming a defect reads as handled to every later reader). Measured on the live app: From
+       Sep 20 / To Sep 15 saved as Sep 20 to Sep 20 with nothing on screen, so a four-day vacation
+       typed with the dates swapped became a single day on the record the schedule reads. Refuse and
+       say which way round it is; the operator can see both boxes. */
+    const to = document.getElementById(p + 'to')?.value || from;
+    if (to < from) {
+      fail('The To date is before the From date. Swap them, or leave To empty for a single day.');
+      return;
+    }
 
     const rec = {
       id:         this.editId || App.uid(),
@@ -196,7 +210,7 @@ S.LaborTimeOff = {
       start_date: from,
       end_date:   to,
       type:       document.getElementById(p + 'type')?.value || 'Requested Off',
-      status:     document.getElementById(p + 'status')?.value || 'Approved',
+      status:     document.getElementById(p + 'status')?.value || 'Requested',   // L8b, matches the form default
       notes:      document.getElementById(p + 'notes')?.value.trim() || ''
     };
     if (!this.editId) rec.created_at = new Date().toISOString();

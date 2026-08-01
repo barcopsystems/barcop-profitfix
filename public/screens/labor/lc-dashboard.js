@@ -190,7 +190,19 @@ S.LaborDashboard = {
       const n = this.tips().filter(t => this.inWeek(t.date)).length;
       return n ? (n + ' tip entr' + (n === 1 ? 'y' : 'ies') + ' logged') : (isDone ? 'Nothing to log' : this._META.tips.sub);
     }
-    if (k === 'schedule') return isDone ? 'Next week scheduled' : this._META.schedule.sub;
+    /* ⚠ THIS SUBTITLE STATES A DATA FACT, SO IT READS THE DATA (L1). It came off the manual
+       done-flag alone, so ticking the step made the cockpit say "Next week scheduled" while the
+       workspace directly underneath read the store and said "Not built yet" — the two halves of one
+       step contradicting each other on screen. The ✓ still belongs to the operator
+       ([[cockpit-steps-manual]]); only the sentence describing the schedule has to be true. */
+    if (k === 'schedule') {
+      const d = new Date(this.weekStart() + 'T00:00:00');
+      d.setDate(d.getDate() + 7);
+      const nextWs = App.ymdLocal(d);
+      // Through the screen's own reader, not a second hand-rolled read of the same store.
+      const built = this.schedules().some(s => s && s.week_start === nextWs && (s.shifts || []).length);
+      return built ? 'Next week scheduled' : (isDone ? 'Next week not built yet' : this._META.schedule.sub);
+    }
     if (k === 'review') return isDone ? 'Reviewed' : this._META.review.sub;
     return '';
   },
@@ -357,14 +369,29 @@ S.LaborDashboard = {
       // Labor % and RPLH read actual revenue for the week (sc_shifts), not a forecast,
       // so they read "-" until the week's sales are imported rather than dressing a
       // projection as actual.
+      /* ⚠⚠ THE NUMERATOR AND THE DENOMINATOR HAVE TO COVER THE SAME DAYS (L3b). Salaried pay is
+         prorated to `endCap` (today, mid-week) so a Wednesday read does not book a whole week's
+         salary — that part is right. The revenue underneath it was the WHOLE week, including days
+         that have not happened, so labor % read low every time the week's sales were imported ahead
+         of the week ending. Measured on the seeded bar: 6/7 of the salary over 7/7 of the sales.
+         Cap both at the same day and the tile is internally consistent whatever day it is opened.
+         ⚠ This is deliberately NOT the same question Labor Reports answers (it books the full week,
+         $186.81 more), and they must not be aligned — different questions, different numbers
+         ([[the-loop]] #57). The tile says which one it is, below. */
       const weekRevenue = ((App.shiftData && App.shiftData.sc_shifts) || [])
-        .filter(s => this.inWeek(s.date)).reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
+        .filter(s => this.inWeek(s.date) && String(s.date || '').slice(0, 10) <= endCap)
+        .reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
       const laborPct = weekRevenue > 0 ? (wkCost / weekRevenue * 100) : null;
       const rplh = (wkHours > 0 && weekRevenue > 0) ? (weekRevenue / wkHours) : null;
       return {
         wkStart, wkEnd, wkHours, wkCost, weekRevenue, laborPct, rplh, lastWk: sw.lastWk,
         over: p.over, approaching: p.approaching, otRisk: p.over + p.approaching, otPremium: p.otPremium,
-        hasHours: wkActuals.length > 0
+        hasHours: wkActuals.length > 0,
+        // L3 — true mid-week, when salaried pay and revenue are both counted only through today.
+        // Labor Reports books the WHOLE week and is $186.81 higher on the seeded bar; that is a
+        // different question, not a disagreement, so the hero says which one it answers rather
+        // than the two being aligned ([[the-loop]] #57).
+        partialWeek: endCap < wkEnd
       };
     } finally { this._weekStart = sv; }
   },
@@ -379,7 +406,7 @@ S.LaborDashboard = {
     const hero = '<div style="padding:2px 0;">'
       + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
       +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:46px;font-weight:600;line-height:0.9;color:var(--w);">' + App.fmtCurrency(st.wkCost, 0) + '</span>'
-      +   '<span style="font-size:13px;color:var(--t2);">labor cost</span>'
+      +   '<span style="font-size:13px;color:var(--t2);">labor cost' + (st.partialWeek ? ' so far' : '') + '</span>'
       + '</div>'
       + '<div style="font-size:12px;color:var(--t3);margin-top:12px;">' + sub + '</div></div>';
     const vdiv = '<div style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 30px;"></div>';
@@ -389,8 +416,15 @@ S.LaborDashboard = {
     const secondary = '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">What This Week\'s Crew Cost You</div>'
       + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
-      +   mini('Labor %', st.laborPct != null ? App.fmtPct(st.laborPct) : '-', (st.laborPct != null && st.laborPct > target) ? 'var(--amber)' : 'var(--t1)') + vdiv
-      +   mini('RPLH', st.rplh != null ? App.fmtCurrency(st.rplh) : '-') + vdiv
+      /* ⚠ THE BASIS BELONGS ON THE TILE (L5). Bar Cop prints THREE labor percentages on three
+         deliberately different denominators and [[labor-cost-model]] says never to align them —
+         the label IS the mitigation. lc-reports already labels its own "(vs forecast)", and the
+         Briefing prose says "of floor sales"; this tile, the first number on the page, said just
+         "Labor %" while the last confirmed week reads 28.77% on total sales and Schedule History
+         reads a scheduled figure. Same for RPLH, which divides by ACTUAL hours here and by
+         SCHEDULED hours on Schedule History. */
+      +   mini('Labor % (floor sales)', st.laborPct != null ? App.fmtPct(st.laborPct) : '-', (st.laborPct != null && st.laborPct > target) ? 'var(--amber)' : 'var(--t1)') + vdiv
+      +   mini('RPLH (hours logged)', st.rplh != null ? App.fmtCurrency(st.rplh) : '-') + vdiv
       +   mini('Overtime Risk', String(st.otRisk), st.otRisk > 0 ? 'var(--amber)' : 'var(--t1)')
       + '</div>'
       + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="lc-build-schedule">Build Schedule</button></div>'
@@ -493,6 +527,18 @@ S.LaborDashboard = {
        is worse than the bug: the operator's row count stops matching Bar Cop's and nothing says why. */
     const { toAdd, skipped, incomplete, undated, dupCount, fileRepeats } = PosIngest.build(type, rows);
     const noun = type === 'hours' ? 'hour' : 'tip';
+    /* ⚠ THE THIRD DOOR INTO lc_actuals, AND IT HAD NO LOCK CHECK EITHER (L6). A closed pay period
+       stamps the rows that existed at the time, so an import writes straight past it. Dropped here
+       rather than at the commit so every downstream count (`toAdd.length`, the partial-save note,
+       the flash) is already the WRITABLE set — and spliced in place rather than rebound, because
+       `toAdd` is a destructured const and reassigning it throws only on the branch that runs
+       ([[the-loop]] #72). Hours only: the lock is a property of logged hours, not of tips. */
+    let lockedOut = 0;
+    if (type === 'hours') {
+      for (let i = toAdd.length - 1; i >= 0; i--) {
+        if (App.payPeriodClosedFor(toAdd[i].date)) { toAdd.splice(i, 1); lockedOut++; }
+      }
+    }
     const setRes = html => { const r = document.getElementById(resultId); if (r) r.innerHTML = html; };
     /* ⚠ ROWS WHOSE DATE COULD NOT BE READ ARE NOW REFUSED RATHER THAN WRITTEN BLANK, so they have to
        be reported — this is the one skip an operator can actually fix in the file. Before the
@@ -513,6 +559,9 @@ S.LaborDashboard = {
       + (nInc ? ' (' + nInc + ' row' + (nInc === 1 ? '' : 's') + ' skipped, ' + figure + ')' : '')
       + (nUnd ? ' (' + nUnd + ' row' + (nUnd === 1 ? '' : 's') + ' skipped, no readable date)' : '')
       + (dupCount ? ' (' + dupCount + ' already logged)' : '')
+      // L6 — never drop a locked row in silence: it is the one skip that looks like data loss.
+      + (lockedOut ? ' (' + lockedOut + ' row' + (lockedOut === 1 ? '' : 's')
+          + ' skipped, that week\'s pay period is closed. Reopen it in Pay Periods before logging more hours.)' : '')
       // Counted once, and said so — never folded into "already logged", which would be false.
       + ((fileRepeats || 0) ? ' (' + fileRepeats + ' repeated line' + (fileRepeats === 1 ? '' : 's') + ' counted once)' : '');
     if (!toAdd.length) {

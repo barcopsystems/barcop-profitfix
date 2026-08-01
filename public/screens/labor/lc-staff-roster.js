@@ -584,7 +584,7 @@ S.LaborStaffRoster = {
         const delta = (h.new_wage != null && h.prior_wage != null) ? h.new_wage - h.prior_wage : null;
         const deltaCell = delta == null ? '<span style="color:var(--t3);">-</span>'
           : '<span style="color:' + (delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--amber)' : 'var(--t3)') + ';font-weight:600;">'
-            + (delta > 0 ? '+' : '') + App.fmtCurrency(delta) + '/hr</span>';
+            + (App.fmtSigned(delta, 2).sign > 0 ? '+' : '') + App.fmtBal(delta) + '/hr</span>';
         return '<tr>'
           + '<td><div class="val">' + this.fmtDate(h.effective_date) + '</div></td>'
           + '<td>' + (h.prior_wage != null ? App.fmtCurrency(h.prior_wage) + '/hr' : '-') + '</td>'
