@@ -1415,7 +1415,21 @@ S.RevenueMenuItems = {
         { key: 'category', label: 'Category',     required: true,  match: ['category', 'type', 'group', 'section', 'menu category', 'menu section', 'course', 'class', 'department'] },
         { key: 'price',    label: 'Menu Price',   required: false, match: ['price', 'menu price', 'sell price', 'sell', 'retail', 'selling price', 'list price', 'price each'] },
         { key: 'cost',     label: 'Cost',         required: false, match: ['cost', 'item cost', 'cogs', 'food cost', 'plate cost', 'recipe cost', 'cost each', 'ingredient cost', 'unit cost'] },
-        { key: 'covers',   label: 'Weekly Units Sold',required: false, match: ['covers', 'cover', 'weekly covers', 'units', 'units sold', 'volume', 'qty', 'quantity', 'count', 'sold', 'weekly units', 'qty sold', 'quantity sold', 'units per week', 'sales count'] }
+        /* ⚠ I2 — EXPLICIT SOLD-TERMS ONLY. This list used to carry 'volume', 'quantity', 'qty' and
+           'count', and this door is dropped on by wine lists, stock exports and inventory reports
+           as often as by sales reports. Measured on real header rows: Square's "Current Quantity"
+           (stock ON HAND) and a wine list's "Volume" (bottle SIZE) both bound to Weekly Units
+           Sold, which drives `weekly_covers` and the whole Stars/Dogs board.
+           The PMIX door already reached this conclusion and wrote it down — it dropped 'count'
+           for claiming a "Count Date" column and parks 'quantity' LAST as a named known limit,
+           because that word is units-sold on an item-sales report and on-hand on an inventory
+           export from the same vendor.
+           ⭐ THE DIFFERENCE HERE, and it is why this door goes further than its sibling: `covers`
+           is NOT REQUIRED. PMIX has to bind something or the import cannot run, so it accepts a
+           last-resort guess; this door loses nothing by declining, and the operator picks the
+           column in the preview. On an optional field a wrong guess is strictly worse than none,
+           because nothing makes anyone look at it. */
+        { key: 'covers',   label: 'Weekly Units Sold',required: false, match: ['weekly units sold', 'weekly units', 'units sold', 'units per week', 'qty sold', 'quantity sold', 'sold qty', 'total sold', 'number sold', 'weekly covers', 'covers', 'cover', 'sales count', 'units', 'sold'] }
       ],
       confirmLabel: 'Import',
       onComplete: rows => this.importItems(rows)
