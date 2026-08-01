@@ -102,7 +102,9 @@ S.HubUserAccounts = {
       + '</div>'
       + '<div style="margin-top:12px;"><button class="btn btn-ghost" id="ua-pw-btn">Update Password</button></div>'
       + '<div id="ua-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>';
-    const barsBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Each bar is its own subscription and books. Switch between them up top.</div>'
+    // ⚠ "Switch between them up top" was cut in BOTH the demo and the real app (Kyle,
+    // 2026-08-01): it points at the bar switcher, which is not on screen in the demo at all.
+    const barsBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Each bar is its own subscription and books.</div>'
       + '<button class="btn btn-ghost" id="ua-add-bar">Add Another Bar</button>';
     const backupBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Export everything to one file you keep offsite. Restore to recover or move your data.</div>'
       + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
@@ -562,10 +564,11 @@ S.HubUserAccounts = {
 
   // ── Backup export/import/sample helpers — delegate to S.HubSettings ──────
   // SET-2 LAYER 2. render() disables these controls, but a disabled button is not a guard —
-  // any re-render rebuilds it ENABLED ([[the-loop]] #85) — so every write door refuses on its
-  // own. Export is the one READ here (it only reads the account out to a file), and it stays
-  // open on purpose: letting a prospect see a real export is the point of the page.
-  exportBackup() { S.HubSettings?.exportBackup?.call(this._asSettingsHost('ua-backup-msg')); },
+  // any re-render rebuilds it ENABLED ([[the-loop]] #85) — so every door refuses on its own.
+  // ⚠ EXPORT IS IN THE LIST TOO. It was briefly left open on the reasoning that it is the one
+  // READ here, but demoLockScreen disables every control, so the button was dead anyway and the
+  // two layers were quietly disagreeing. Kyle's call: keep it disabled, both layers agreeing.
+  exportBackup() { if (App.demoBlock && App.demoBlock()) return; S.HubSettings?.exportBackup?.call(this._asSettingsHost('ua-backup-msg')); },
   importBackup(e) { if (App.demoBlock && App.demoBlock()) return; S.HubSettings?.importBackup?.call(this._asSettingsHost('ua-backup-msg'), e); },
   loadSample() { if (App.demoBlock && App.demoBlock()) return; S.HubSettings?.loadSample?.call(this._asSettingsHost('ua-test-msg')); },
   clearAll() { if (App.demoBlock && App.demoBlock()) return; S.HubSettings?.clearAll?.call(this._asSettingsHost('ua-test-msg')); },
