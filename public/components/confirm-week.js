@@ -251,6 +251,13 @@ const ConfirmWeek = {
     return {
       bRev, bCogs, bLab, fRev, fCogs, fLab, cRev, cCogs, cLab, oRev, oCogs, fees, covers, hours,
       totRev, totSales, primeCost, laborCost, hourlyLabor,
+      // ⚠ S334: these two are RETURNED so the record writer can gate on the SAME fact the
+      // percentages below already gate on. Before this, `_save` wrote total_labor_cost and
+      // hourly_labor_cost straight off `laborCost`/`hourlyLabor` — which `nz()` has already
+      // turned from "not entered" into 0 — so one record said "labor % unknown" and
+      // "labor cost $0.00" about the same week. Re-deriving the test in the writer would be a
+      // second implementation of it ([[the-loop]] step 0.5); exposing it keeps ONE.
+      cogsIn, laborIn,
       barPct:     (bRev > 0 && bCogs != null) ? bCogs / bRev * 100 : null,
       foodPct:    (fRev > 0 && fCogs != null) ? fCogs / fRev * 100 : null,
       barLabPct:  (bRev > 0 && bLab  != null) ? bLab  / bRev * 100 : null,
@@ -409,8 +416,13 @@ const ConfirmWeek = {
       other_revenue: f.oRev,
       covers: f.covers,
       check_avg: r2(f.checkAvg),
-      total_labor_cost: f.laborCost,
-      hourly_labor_cost: parseFloat(f.hourlyLabor.toFixed(2)),
+      // ⚠ S334: NULL when labor was never entered, never 0. `nz()` turns a blank cell into 0
+      // upstream so the arithmetic can run, but a week nobody typed labor into did not measure
+      // zero labor, and storing 0 says it did — on the record Books, Recovery and break-even
+      // all read. Same `laborIn` that already governs labor_pct_blended two lines down, so the
+      // record can no longer say "percentage unknown" and "cost $0.00" in one breath.
+      total_labor_cost: f.laborIn ? f.laborCost : null,
+      hourly_labor_cost: f.laborIn ? parseFloat(f.hourlyLabor.toFixed(2)) : null,
       total_hours: f.hours,
       labor_pct_blended: r2(f.laborPct),
       // Hourly labor % divides by BAR + FOOD revenue, matching its own numerator.
