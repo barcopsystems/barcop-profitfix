@@ -1310,6 +1310,24 @@ const DB = {
     return { ok: true };
   },
   async listBackups() {
+    // SET-2: the demo has no session, so this used to return [] and the Data and Backup page —
+    // the whole reason that page exists — showed "No automatic backups yet." to every prospect.
+    // Seeded here rather than in the screen so the screen keeps ONE code path.
+    // ⚠ Dates are derived from today, never hardcoded: a literal day-of-month goes stale the
+    // moment the clock rolls ([[the-loop]] #39/#100).
+    if (this._demo) {
+      const day = 86400000, now = Date.now();
+      const at = (n, h) => new Date(now - n * day - h * 3600000).toISOString();
+      return [
+        { id: 'demo-b1', created_at: at(0, 5),  reason: 'auto-daily' },
+        { id: 'demo-b2', created_at: at(1, 4),  reason: 'auto-daily' },
+        { id: 'demo-b3', created_at: at(2, 6),  reason: 'manual' },
+        { id: 'demo-b4', created_at: at(3, 5),  reason: 'auto-daily' },
+        { id: 'demo-b5', created_at: at(4, 5),  reason: 'auto-daily' },
+        { id: 'demo-b6', created_at: at(7, 3),  reason: 'manual' },
+        { id: 'demo-b7', created_at: at(11, 5), reason: 'auto-daily' }
+      ];
+    }
     if (!this._sb || !this._user) return [];
     const accountId = await this._ensureAccountId();
     if (!accountId) return [];

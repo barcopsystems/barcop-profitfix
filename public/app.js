@@ -618,6 +618,42 @@ const App = {
     m.addEventListener('click', e => { if (e.target === m) close(); });
   },
 
+  // ── DEMO READ-ONLY LOCK (SET-2) ────────────────────────────────────────────────────────
+  // App Settings is visible in the demo so a prospect can see what they would be buying, and
+  // none of it can be changed. This is LAYER 1 OF TWO, and it exists so a visitor never fills
+  // in a form and gets refused afterwards ([[the-loop]] #78: a check that CAN run before the
+  // work MUST run before the work). LAYER 2 is App.demoBlock() inside each write handler, and
+  // it is not optional — a re-render rebuilds a disabled button ENABLED ([[the-loop]] #85), so
+  // the disabled attribute can only ever be the courtesy, never the guard.
+  //
+  // ⚠ NAVIGATION IS DELIBERATELY NOT LOCKED. The Settings overview moves the visitor around
+  // the section with data-act buttons ("Edit", "Manage", "Export or Restore"); disabling those
+  // would turn the tour into a dead end, which is the opposite of the point.
+  //
+  // ⚠ `disabled` and not `pointer-events:none` — that property is pointer hit-testing only and
+  // leaves the field fully writable by keyboard ([[the-loop]] #92).
+  demoLockScreen(container) {
+    if (!this.demoMode || !container) return;
+    const NAV = ['data-act', 'data-hub-action', 'data-go'];
+    const nodes = container.querySelectorAll('input, select, textarea, button') || [];
+    Array.prototype.forEach.call(nodes, (el) => {
+      if (el.hasAttribute && NAV.some(a => el.hasAttribute(a))) return;
+      el.disabled = true;
+      if (el.setAttribute) el.setAttribute('aria-disabled', 'true');
+      if (el.style) { el.style.cursor = 'not-allowed'; el.style.opacity = '0.55'; }
+    });
+    // One note, in one place, so the greyed-out controls are explained rather than looking
+    // broken. The global demo banner says nothing about Settings being read-only.
+    if (container.querySelector && !container.querySelector('#demo-ro-note') && container.insertBefore) {
+      const note = document.createElement('div');
+      note.id = 'demo-ro-note';
+      note.style.cssText = 'font-size:12px;color:var(--t2);background:var(--surface);border:1px solid var(--b-edge);'
+        + 'border-radius:var(--r2);padding:10px 12px;margin-bottom:14px;line-height:1.5;';
+      note.textContent = 'This is the live demo, so Settings is read-only. Everything here is a real Bar Cop screen with the sample bar loaded.';
+      container.insertBefore(note, container.firstChild);
+    }
+  },
+
   _mountDemoBanner() {
     if (document.getElementById('demo-banner')) return;
     document.body.classList.add('demo');
@@ -628,7 +664,10 @@ const App = {
       // so the last content never hides behind it and the sticky top nav is untouched.
       'body.demo #app{height:calc(100vh - 40px);}'
       + 'body.demo #hub-wrapper{bottom:40px !important;}'
-      + 'body.demo #tn-settings{display:none;}'   // App Settings is off in the demo
+      // SET-2: App Settings is VISIBLE in the demo now (read-only), so the gear stays. A
+      // prospect who cannot find Business Profile, Team Members or Data and Backup has no way
+      // to know Bar Cop has them. App.demoLockScreen disables the controls; each write handler
+      // still refuses on its own (see there — a disabled button is not a guard).
       + 'body.demo #signout-btn,body.demo #hub-signout{display:none;}'   // no account to sign out of in the demo; visitor just closes the tab
       + '#demo-banner{position:fixed;bottom:0;left:0;right:0;height:40px;z-index:200;'
       + 'display:flex;align-items:center;gap:14px;padding:0 16px;background:#1E2B34;'
