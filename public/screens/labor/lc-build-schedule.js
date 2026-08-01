@@ -879,7 +879,12 @@ S.LaborBuildSchedule = {
     document.getElementById('bs-lt-save')?.addEventListener('click', async () => {
       const v = parseFloat(document.getElementById('bs-lt-val')?.value);
       const err = document.getElementById('bs-lt-err');
-      if (isNaN(v) || v <= 0) { if (err) { err.textContent = 'Enter a labor cost target percent.'; err.style.display = 'inline'; } return; }
+      // ⚠ THE UPPER BOUND MUST MATCH App Settings' Profit Targets, which writes this SAME
+      // settings.targets.labor_cost_pct. Before SET-5 this door refused 0 and negatives while
+      // Settings accepted them, and NEITHER door had a ceiling — so 250% saved from both.
+      // verify-settings-numbers-refused.js X3 pins the two doors against each other on every
+      // value rather than pinning either one's number ([[the-loop]] #54).
+      if (isNaN(v) || v <= 0 || v > 100) { if (err) { err.textContent = 'Labor Cost % must be between 1 and 100.'; err.style.display = 'inline'; } return; }
       if (!App.data.settings) App.data.settings = {};
       if (!App.data.settings.targets) App.data.settings.targets = {};
       App.data.settings.targets.labor_cost_pct = Math.round(v * 10) / 10;
