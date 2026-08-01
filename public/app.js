@@ -4431,6 +4431,21 @@ const App = {
     // split 3-to-5 on it and fabricated either 46 or 4. Refusing is the honest answer; the caller's
     // own default then applies.
     if (/\d\s*-\s*\d/.test(t)) return null;
+    /* I13 — A CELL HOLDING MORE THAN ONE NUMBER IS NOT A QUANTITY.
+       The parse below strips every non-digit and reads what is left, so two numbers in one cell
+       were CONCATENATED into a third that appears nowhere in the data: "2 for $10" -> 210,
+       "9 / 34" -> 934, "16oz $7" -> 167, "1e3" -> 13. Price-per-size cells are ordinary on a real
+       menu, and measured downstream one "2 for $10" entree moved avgCM 13.57 -> 45.79 and flipped
+       two dishes from Puzzle to Dog.
+       ⭐ This is the SAME RULE as the range guard directly above, applied consistently — that line
+       already refuses "4-6" for exactly this reason. A ',' or '.' BETWEEN digits belongs to one
+       number ("1,234.50"); anything else between two digit runs means the cell holds two.
+       ⚠ Counted on `s`, the ORIGINAL string — not on `t`, which has already had the letters
+       stripped, so "2 for $10" would look like the single run "210" there.
+       ⚠ No lookbehind: the browser floor is ES2020 and Safari shipped lookbehind only in 16.4,
+       far above the floor L10 measured. Lookahead is ES3 and safe. */
+    const runs = s.replace(/(\d)[.,](?=\d)/g, '$1').match(/\d+/g);
+    if (runs && runs.length > 1) return null;
     const neg = /^\(.*\)$/.test(t) || /^-/.test(t) || /-$/.test(t);
     const n = parseFloat(s.replace(/[^0-9.]/g, ''));
     if (isNaN(n)) return null;
