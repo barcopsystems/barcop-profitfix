@@ -98,7 +98,29 @@ S.ThisWeek = {
       cogs += u.rawUsed * u.unitCost;
       any = true;
     });
-    return any ? cogs : null;
+    if (!any) return null;
+    /* ⚠⚠ S332 — A NEGATIVE TOTAL IS NOT A COST, IT IS A MISSING RECORD.
+       `computeUsagePair` has no negative floor, so when the end count exceeds the start count plus
+       deliveries the sum goes negative. That is never a real cost of goods: it says the bar has
+       MORE than it started with and bought, which means an unrecorded delivery, an unrecorded
+       transfer between locations, or a miscount (a case keyed as bottles). All ordinary.
+       This mattered because `confirm-week.js` uses this as the Bar/Food COGS PREFILL, and that
+       form's negative refusal covers revenue and covers but NOT cogs — so the figure saved into
+       `week.bar.cogs` silently. MEASURED on the live seed: -$970.46 for the week ending 07-19,
+       pullable through Week History -> Edit -> Refresh from Control.
+       ⚠ DIRECTION is why it can sit unnoticed: a negative COGS INFLATES gross profit on the
+       income statement and understates prime cost ([[the-loop]] #42 — the flattering direction is
+       the one nobody reports).
+       ⭐ NULL IS ALREADY THIS FUNCTION'S WORD FOR "I CANNOT MEASURE THIS HONESTLY" — see the
+       `idx < 1` return above. A negative result is the same situation, so it gets the same answer
+       rather than a new mechanism. Every caller already handles null by leaving the cell blank,
+       and `cogsImpact` gates on `Number.isFinite`, so a null can never overwrite a signed-off week.
+       ⚠ ZERO IS NOT REFUSED. Nothing moved is a legitimate reading; only a negative is impossible.
+       ⚠ SCOPE: this refuses a negative TOTAL. A week where ONE product's usage is negative but the
+       total stays positive is still wrong by that amount, and is NOT refused here — killing a
+       whole week's COGS over one shelf is the refuses-too-much trap ([[the-loop]] "a guard that
+       refuses too much is a defect with a support call attached"). Named on THE LIST instead. */
+    return cogs < 0 ? null : cogs;
   },
 
   // ── Weekly sales feed: the per-day POS sales imported in Shift (sc_shifts) ──
