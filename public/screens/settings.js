@@ -3711,11 +3711,23 @@ S.HubSettings = {
         rplh:+(forecast / total_hours).toFixed(2),
         notes:'', status:'Posted', created_at:new Date().toISOString() };
     };
+    /* ⚠⚠ THE DEMO PLANS AHEAD, BECAUSE REAL BARS DO (Kyle, 2026-08-01). This stopped at the CURRENT
+       week, so on any day of the week the Labor cockpit's step 3 sat ticked over "Next week not
+       built yet" — a bar that had apparently never written a schedule in advance. Nobody waits
+       until Sunday night to staff the following week; the schedule goes up mid-week so people can
+       plan their lives.
+       ⚠ AND THE FIRST FIX WAS THE WRONG ONE. I rewrote the step's subtitle so it told the truth and
+       left the contradiction standing — better words on the same disagreement. The state should not
+       arise at all. With next week posted, the tick, the subtitle and the workspace all say the
+       same thing, and `stepStatus` reading the store (L1) becomes the honest fallback for a live
+       operator who ticks the step without building, rather than the demo's normal state.
+       `mondayISO` counts days BACKWARDS, so next week is a negative argument. */
     App.laborData.lc_schedules = [
       buildSchedule(mondayISO(21), 17980),
       buildSchedule(mondayISO(14), 18420),
       buildSchedule(mondayISO(7),  18812),
       buildSchedule(mondayISO(0),  19150),
+      buildSchedule(mondayISO(-7), 19500),
     ];
 
     // Offsite catering crew — tag a small crew to the Completed offsite booking on
