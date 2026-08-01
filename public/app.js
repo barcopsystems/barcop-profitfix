@@ -5377,6 +5377,22 @@ const App = {
     return name ? name + ' · ' + span : span;
   },
 
+  /* ⚠ A REVERSED CUSTOM RANGE IS NOT AN EMPTY ONE (SH10). From after To matches nothing, so every
+     list falls through to its DAY-ONE empty state — "No cash activity in this range. Log a drop,
+     deposit, or safe count above to get started." — which sends the operator off to create data
+     when the only thing wrong is that two dates are the wrong way round. The empty-state copy is
+     right for an empty range and wrong for an impossible one, and nothing on screen told them
+     apart.
+     Returns '' whenever the range is usable — including a half-typed one, because they are still
+     typing, and including from === to, which is a legitimate single day — so a screen can drop it
+     in unconditionally next to its date inputs. */
+  rangeWarning(from, to) {
+    const f = String(from || '').slice(0, 10), t = String(to || '').slice(0, 10);
+    if (!f || !t || f <= t) return '';
+    return '<div style="width:100%;font-size:11px;color:var(--amber);margin-top:2px;">'
+      + 'From is after To, so no date can fall inside this range. Swap the two dates.</div>';
+  },
+
   /* Export a LIST screen as the WHOLE CHIP SELECTION, not just the page on screen.
 
      Every log renders `filtered.slice(0, App.listLimit(mod, kind))` — LIST_PAGE (50) rows at
