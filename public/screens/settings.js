@@ -690,7 +690,7 @@ S.HubSettings = {
     return !!(r && r.ok);
   },
 
-  // Restore a stored server snapshot by id (from the automatic-backup list on Your Account).
+  // Restore a stored server snapshot by id (from the automatic-backup list on Data and Backup).
   async restoreSnapshot(id, whenLabel) {
     const ok = await App.confirm({
       title: 'Restore your account to ' + (whenLabel || 'this backup') + '?',

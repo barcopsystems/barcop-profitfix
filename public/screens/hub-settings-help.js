@@ -20,7 +20,7 @@ S.HubSettingsHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What is in Settings?',
-        a: 'Two things: how Bar Cop is tuned to your operation, and your account. Business Profile and Recovery Targets hold your operation details and the benchmarks Bar Cop measures you against. Your Account and Team Members handle your login, subscription, backups, and who else can get in. The overview shows your account, profile, and targets at a glance, each with an Edit link.' },
+        a: 'Two things: how Bar Cop is tuned to your operation, and your account. Business Profile and Recovery Targets hold your operation details and the benchmarks Bar Cop measures you against. Your Account holds your login and subscription, Data and Backup holds getting your data out and back in, and Team Members controls who else can get in. The overview shows your account, profile, and targets at a glance, each with an Edit link.' },
       { q: 'How do I set up Bar Cop?',
         a: 'Setup happens as you go, not from a separate checklist. When you first sign in, onboarding captures your business name, location, and service periods. From there, each section walks you through its own setup the first time you open it with no data, showing the steps in order right on that page. Your profile and targets always live here in Settings if you need to adjust them later.' }
     ]},
@@ -38,7 +38,7 @@ S.HubSettingsHelp = {
       { q: 'How do I change my password?',
         a: 'On Your Account, under Password. Everyone on the team can change their own password there, whatever their role.' },
       { q: 'Who can see billing and backups?',
-        a: 'Only the owner. Your Account shows the subscription, Manage Billing, Add Another Bar, and the full Data Backup to the account owner alone. A backup is the entire account in one file, so it stays with the owner. Admins and staff see just their password on that page.' }
+        a: 'Only the owner. Your Account shows the subscription, Manage Billing and Add Another Bar to the account owner alone, and Data and Backup is a separate owner-only page one row down the sidebar. A backup is the entire account in one file, so it stays with the owner. Admins and staff see just their password on Your Account, and no Data and Backup row at all.' }
     ]},
     { t: 'Team and Access', qa: [
       { q: 'What are the roles?',
