@@ -62,7 +62,15 @@ window.BarCopBriefing = {
     if (below.length === 0 && runTxt.length) p1 += 'Everything scored is at or above the ' + target + ' line, which is the whole point. ';
     else if (below.length >= 3) p1 += 'Most of it sits under the ' + target + ' line, so there is real room here. ';
     else if (below.length) p1 += below.join(' and ') + ' ' + (below.length === 1 ? 'is' : 'are') + ' under the ' + target + ' line. ';
-    if (s.opportunity != null) p1 += 'Total monthly opportunity across recovery and revenue is ' + money(s.opportunity) + '.';
+    /* ⚠ TWO OPPORTUNITY FIGURES SIT IN CONSECUTIVE SENTENCES AND THEY ANSWER DIFFERENT
+       QUESTIONS. This one is the AUDIT's monthly number (each action item's monthly_impact,
+       fixed when the audit ran); the weekly line in the next paragraph is Recovery.gapImpact
+       "at this week's pace". MEASURED on the live demo: $6,055/mo = $72,660/yr against
+       $160 + $850 a week = $52,520/yr, a $20,140 gap between adjacent sentences with nothing
+       saying why. ⛔ THE FIX IS THE WORDING, NOT THE ARITHMETIC — forcing two different
+       quantities to agree is what produced six new defects in the events door ([[the-loop]]
+       #57). Each sentence now names its own basis. */
+    if (s.opportunity != null) p1 += 'Total monthly opportunity across recovery and revenue is ' + money(s.opportunity) + ', from your latest audits.';
     if ((s.recovered || 0) > 0) p1 += ' You have pulled back ' + money(s.recovered) + ' across ' + (s.fixes || 0) + ' measured fix' + ((s.fixes || 0) === 1 ? '' : 'es') + ' so far.';
     if (p1.trim()) paras.push(p1.trim());
 
@@ -70,7 +78,9 @@ window.BarCopBriefing = {
     const wk = s.weekly || {};
     const items = (wk.items || []);
     if ((wk.leak || 0) > 0 || (wk.opp || 0) > 0) {
-      let p2 = 'Week to week, ' + money(wk.leak) + ' is leaking in recoverable cost and ' + money(wk.opp) + ' in revenue is sitting on the table. ';
+      // The other half of the pair above: this one is measured at the CURRENT PACE off your
+      // logged weeks, so it moves every week while the audit figure holds until you re-run it.
+      let p2 = 'Week to week at your current pace, ' + money(wk.leak) + ' is leaking in recoverable cost and ' + money(wk.opp) + ' in revenue is sitting on the table. ';
       if (items.length) {
         const top = items[0];
         p2 += 'The fattest single line is ' + String(top.label).toLowerCase() + ' at about ' + money(top.weekly) + ' a week';
