@@ -3675,13 +3675,36 @@ S.HubSettings = {
       });
       return out;
     };
+    /* ⚠⚠ A SEEDED SCHEDULE MUST STORE THE SAME SHAPE THE REAL DOOR STORES (L2). `total_cost` is a
+       stored snapshot that Schedule History renders without recomputing, and
+       `lc-build-schedule.save()` writes hourly + the OT premium + salaried — every cost number is
+       TOTAL labor ([[labor-cost-model]]). The seed wrote hourly straight time only, so the same
+       week read "$5,680.50 · 29.7%, inside a 30% target" on Schedule History and
+       "SCHEDULED $6,988.19 · OVER BUDGET $754.79" on Build Schedule, on the shipping demo, before
+       anyone touched anything. Proven by re-saving that very schedule through the real door: the
+       stored figure moved 5,680.50 -> 6,988.19 and 29.66% -> 33.63%. The code was right; this was.
+       ⚠ Guarded, because the seed also runs before App.salariedCost has a roster to read on some
+       paths — a missing helper must cost nothing, never throw mid-seed. */
+    const schedExtras = (weekStart, shifts) => {
+      let extra = 0;
+      try {
+        const we = new Date(weekStart + 'T00:00:00'); we.setDate(we.getDate() + 6);
+        if (App.salariedCost) extra += (App.salariedCost(weekStart, App.ymdLocal(we)) || {}).total || 0;
+        if (App.otPremiumForRows) {
+          const rows = (shifts || []).map(sh => ({ staff_id: sh.staff_id, name: sh.name,
+            date: weekStart, hours: sh.hours || 0, cost: sh.cost || 0 }));
+          extra += (App.otPremiumForRows(rows) || {}).total || 0;
+        }
+      } catch (e) { extra = extra || 0; }
+      return extra;
+    };
     const buildSchedule = (weekStart, forecast) => {
       const shifts = expandPlan(SCHED_PLAN).map(({ st, day, plan }) => ({
         staff_id:st.id, name:st.name, position_id:st.position_id, day:day,
         start:plan.start, end:plan.end, hours:plan.hours, wage:st.wage,
         cost:+(plan.hours * st.wage).toFixed(2) }));
       const total_hours = shifts.reduce((s, x) => s + x.hours, 0);
-      const total_cost  = +shifts.reduce((s, x) => s + x.cost, 0).toFixed(2);
+      const total_cost  = +(shifts.reduce((s, x) => s + x.cost, 0) + schedExtras(weekStart, shifts)).toFixed(2);
       return { id:uid(), week_start:weekStart, revenue_forecast:forecast, shifts:shifts,
         total_hours:total_hours, total_cost:total_cost,
         labor_pct:+(total_cost / forecast * 100).toFixed(2),
@@ -3728,7 +3751,9 @@ S.HubSettings = {
           position_id: c.st.position_id, shift_type: 'Lunch', hours: c.hours, wage: c.st.wage, cost: cost, notes: 'Offsite catering' });
       });
       sched.total_hours = +sched.shifts.reduce((s, x) => s + (x.hours || 0), 0).toFixed(1);
-      sched.total_cost  = +sched.shifts.reduce((s, x) => s + (x.cost || 0), 0).toFixed(2);
+      // L2 — the same total shape as buildSchedule and as lc-build-schedule.save().
+      sched.total_cost  = +(sched.shifts.reduce((s, x) => s + (x.cost || 0), 0)
+        + schedExtras(sched.week_start, sched.shifts)).toFixed(2);
       if (sched.revenue_forecast) {
         sched.labor_pct = +(sched.total_cost / sched.revenue_forecast * 100).toFixed(2);
         sched.rplh = +(sched.revenue_forecast / sched.total_hours).toFixed(2);
