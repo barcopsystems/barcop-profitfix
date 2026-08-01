@@ -8613,6 +8613,26 @@ const App = {
   // counts it, and Total Wages Paid stops equalling the sum of its own breakdowns.
   otStaffKey(a) { return (a && (a.staff_id || a.name)) || '?'; },
 
+  /* ⚠⚠ IS THIS DATE INSIDE A CLOSED PAY PERIOD? (L6) Closing a period stamps `locked: true` on
+     every lc_actuals row that EXISTS AT THAT MOMENT, so the lock is a property of the rows, not of
+     the week. Anything created afterwards is unlocked by construction and walks straight in.
+     Measured on the live app: a period closed at 87 entries / $5,867.49 took 11 more shifts through
+     Log Hours and became 98 / $6,691.24 while still reading "Closed" — and the payroll CSV then
+     exported the post-lock total. The Close & Lock confirm promises the period is settled; an
+     operator does not read "locked" as "still open to additions".
+     THREE doors write lc_actuals (the Log Hours form, its fill-from-schedule batch, and the
+     timeclock import), so this is ONE shared question rather than three copies that drift
+     ([[the-loop]]: find the second implementation, not the second caller). A bar that has never
+     closed a period is never blocked, because there is nothing to be inside of. */
+  payPeriodClosedFor(dateStr) {
+    const d = String(dateStr || '').slice(0, 10);
+    if (!d) return false;
+    const ws = this.weekStartFor(d);
+    if (!ws) return false;
+    return ((this.laborData && this.laborData.lc_pay_periods) || [])
+      .some(p => p && p.status === 'Closed' && p.week_start === ws);
+  },
+
   otPremiumForRows(rows) {
     const OT = this.OT_THRESHOLD || 40;
     const wk = {};
