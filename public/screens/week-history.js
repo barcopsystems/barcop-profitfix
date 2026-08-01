@@ -8,6 +8,21 @@
    Confirm the Week popup for that week. */
 S.WeekHistory = {
 
+  /* ⚠ WITHOUT THIS, THE TOP-NAV "Directions for this page" BUTTON IS DEAD ON THIS SCREEN.
+     `App.openPageHelp()` calls the active screen's showHowTo() and otherwise falls through to
+     `S.HubHelp.open()`, which NAVIGATES to the Hub Help page — so the operator pressed a button
+     labelled "Directions for this page" and got silently thrown out of the section they were in.
+     This was the only screen in any rail without one, and it sits in BOTH the Profit and the
+     Revenue sidebar, which is where Kyle hit it. Pinned tree-wide by verify-profit-walk-fixes P9. */
+  showHowTo() {
+    App.showHelpModal('How Week History Works', [
+      { p: ['Every week you have confirmed, newest first, in one table. This is the record, not a worksheet: nothing is typed here. It joins your Profit numbers and your Revenue numbers for the same week, so one row is the whole picture of how that week actually went.'] },
+      { h: 'What The Columns Mean', p: ['Revenue is the week\'s total sales including catering. Prime Cost is COGS plus labor against total sales, the one number that says whether the week paid. Check Avg is food and beverage sales per cover. Labor % is total labor, hourly plus salaried, against total sales. RPLH is revenue per labor hour. Reading down the list is how you see a trend instead of a single week.'] },
+      { h: 'Fixing A Week', p: ['Edit on any row re-opens that week in the same Confirm the Week popup you closed it with, prefilled with what you saved. Correct a figure and confirm again, and everything downstream, your audits, your Fix systems, and Books, follows the corrected number. A week you never closed shows up here too if Shift has sales imported for it, so you can catch one you missed and confirm it late.'] },
+      { h: 'Two Doors, One Page', p: ['Week History sits in both the Profit and the Revenue sidebar and it is the same page either way. There is one set of weekly records behind it, so a week you correct from Revenue is corrected for Profit at the same moment.'] }
+    ]);
+  },
+
   render(container, actions) {
     this.container = container;
     if (actions) actions.innerHTML = '';

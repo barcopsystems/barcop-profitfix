@@ -203,7 +203,9 @@ S.AuditTracker = {
 
     const venue = audit.bar_name || App.data.settings.bar_name || 'Your Bar';
     const metaBits = [(audit.date || '').slice(0, 10)];
-    if (audit.audit_period) metaBits.push(audit.audit_period);
+    // Through the shared formatter, same as the hero and the landing card: a computed period is
+    // "N weeks ending YYYY-MM-DD" and a raw ISO date does not belong in an operator-facing header.
+    if (audit.audit_period) metaBits.push(AuditUI.prettyPeriod(audit.audit_period));
     if (audit.audit_id)     metaBits.push(audit.audit_id);
 
     // A null score is "not enough data", NOT a zero. `|| 0` turned it into a fabricated

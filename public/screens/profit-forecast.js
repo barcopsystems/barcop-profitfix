@@ -116,7 +116,16 @@ S.ProfitForecast = {
       + stat('Projected Sales', money(sales))
       + stat('Profit at Current Pace', money(profitCur), profitCur < 0 ? 'warn' : '')
       + stat('Profit at Targets', money(profitTgt), profitTgt < 0 ? 'warn' : '')
-      + stat('Target Upside', '+' + money(swing), '', ' style="color:var(--gold);"')
+      /* ⚠ "+$0" IS NOT AN ANSWER. `swing` is clamped at zero, so a bar already running BETTER
+         than its targets printed "Target Upside +$0" next to two columns $8,777 apart, which
+         reads as broken rather than as good news. Three genuinely different states, three
+         labels: money on the table (gold, it is a call to action), already ahead (neutral —
+         gold is for opportunity, not for doing well), and exactly on target. */
+      + (swing > 0
+          ? stat('Target Upside', '+' + money(swing), '', ' style="color:var(--gold);"')
+          : (profitCur > profitTgt
+              ? stat('Ahead of Target', money(profitCur - profitTgt))
+              : stat('Target Upside', 'On target')))
       + '</div></div>';
 
     // ── Horizon chips (left) + Export (right) ──
@@ -172,7 +181,7 @@ S.ProfitForecast = {
     App.showHelpModal('How Profit Forecast Works', [
       { p: ['A look ahead at your profit, projected from the weeks you have already confirmed. It runs two scenarios side by side: where you land at your current pace, and where you would land at your cost targets. The gap between them is what cleaning up is worth.'] },
       { h: 'How the Projection Is Built', p: ['Bar Cop takes your recent weekly sales and prime cost percentage, holds them forward across the window you pick, and subtracts your operating costs (the same expenses Books uses). It is a run-rate estimate from real history, not a promise. Pick Next Month, Quarter, 6 Months, or Year.'] },
-      { h: 'Current Pace vs Your Targets', p: ['Current Pace uses your recent prime cost. At Your Targets swaps in your target prime cost from App Settings. The Target Upside up top is the profit difference, the money on the table if you hit your targets. That is exactly what Profit Fix is for.'] },
+      { h: 'Current Pace vs Your Targets', p: ['Current Pace uses your recent prime cost. At Your Targets swaps in your target prime cost from App Settings. The Target Upside up top is the profit difference, the money on the table if you hit your targets. That is exactly what Profit Fix is for. If you are already running better than your targets, that tile reads Ahead of Target and shows by how much instead, which is usually a sign your targets are due a look in App Settings.'] },
       { h: 'Reaching True Profit', p: ['Profit here is sales minus prime cost minus operating costs. If you have not logged operating costs yet, it shows profit before operating costs and tells you so. Log them under Accounting, Operating Expenses, to get the full net number.'] },
       { h: 'Honesty', p: ['Every figure is a projection in whole dollars, built from your own averages. It needs a few weeks of history before it will show. It is a planning tool, not financial advice.'] }
     ]);

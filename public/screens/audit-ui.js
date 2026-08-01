@@ -157,7 +157,7 @@ const AuditUI = {
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
       + '<div><div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Latest Audit</div>'
       + '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(latest.bar_name||App.data.settings.bar_name||'Your Bar') + '</div>'
-      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date||'').slice(0,10) + (latest.audit_period ? '  ' + esc(latest.audit_period) : '') + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + (latest.date||'').slice(0,10) + (latest.audit_period ? '  ' + esc(AuditUI.prettyPeriod(latest.audit_period)) : '') + '</div>'
       + vsLine + '</div>'
       + '<div style="text-align:right;">'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:52px;font-weight:700;color:' + scoreColor + ';line-height:1;">' + (naO ? 'N/A' : latest.overall_score) + '</div>'
@@ -326,12 +326,27 @@ const AuditUI = {
   // ── Full view: score hero — full-bleed divider header (title left, Briefing
   //    right), then bar name + period + grade badge on the left and the overall
   //    score + band on the right. ──────────────────────────────────────────────
+  /* ⚠ THE AUDIT PERIOD IS BUILT AS "N weeks ending YYYY-MM-DD" by the audit engine, so every
+     audit a real operator generates printed a RAW ISO DATE in the report header — including the
+     PDF that goes to a lender or an accountant, where every other date reads "Jul 26, 2026".
+     (Only the seeded demo audits carried a friendly label, which is why it read fine on the
+     demo and wrong for everyone else.) Formatted at DISPLAY time on purpose: the stored value
+     and the engine's own pinned checks stay exactly as they are, and any period string that is
+     not that shape passes through untouched. */
+  prettyPeriod(p) {
+    return String(p || '').replace(/(\d{4}-\d{2}-\d{2})/g, ymd => {
+      const d = new Date(ymd + 'T00:00:00');
+      return isNaN(d.getTime()) ? ymd
+        : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    });
+  },
+
   viewHero(audit, heroLabel, pfx, sectionCount) {
     const naO = audit.overall_score == null;
     const dqChip = AuditUI.dataQualityChip(audit, sectionCount);
     const scoreColor = naO ? 'var(--t3)' : App.scoreColor(audit.overall_score||0);
     const scoreLabel = naO ? '' : App.scoreLabel(audit.overall_score);
-    const sub = (audit.date||'').slice(0,10) + (audit.audit_period ? '  |  ' + esc(audit.audit_period) : '') + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '');
+    const sub = (audit.date||'').slice(0,10) + (audit.audit_period ? '  |  ' + esc(AuditUI.prettyPeriod(audit.audit_period)) : '') + (audit.audit_id ? '  |  ' + esc(audit.audit_id) : '');
     return '<div class="card form-card" style="margin-bottom:16px;">'
       + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       +   '<span>' + esc(heroLabel) + '</span>'

@@ -79,13 +79,20 @@ S.CashRecon = {
     const rows = sorted.map(x => {
       const gated = x.counts >= MIN;
       const t = this.tierOf(x.counts, x.shorts);
-      const netColor = x.net < 0 ? 'var(--red)' : x.net > 0 ? 'var(--amber)' : 'var(--t1)';
+      /* ⚠ OVER / SHORT IS A CHANGE, SO THE SIGN GOES OUTSIDE THE DOLLAR SIGN. fmtCurrency is
+         literally '$' + v, so a short drawer printed "$-30.00" — and a drawer is negative
+         exactly when it matters. App.fmtBal carries the minus; the '+' on an over and the
+         red/amber both come off fmtSigned's ROUNDED sign, so a drawer that balances to the
+         cent cannot be painted red by floating-point residue. Same rule as the Forecast
+         screen's Gap $ column. */
+      const netSign = App.fmtSigned(x.net, 2).sign;
+      const netColor = netSign < 0 ? 'var(--red)' : netSign > 0 ? 'var(--amber)' : 'var(--t1)';
       const rate = gated ? Math.round((x.shorts / x.counts) * 100) + '%' : '<span style="color:var(--t3);">-</span>';
       return '<tr>'
         + '<td><div class="val">' + esc(x.name) + '</div></td>'
         + '<td>' + x.counts + '</td>'
         + '<td>' + x.shorts + '</td>'
-        + '<td style="color:' + netColor + ';font-weight:700;">' + (x.net > 0 ? '+' : '') + App.fmtCurrency(x.net) + '</td>'
+        + '<td style="color:' + netColor + ';font-weight:700;">' + (netSign > 0 ? '+' : '') + App.fmtBal(x.net) + '</td>'
         + '<td>' + rate + '</td>'
         + '<td style="color:' + t.color + ';font-weight:700;">' + t.label + '</td>'
         + '</tr>';
@@ -138,7 +145,10 @@ S.CashRecon = {
     const stat = (label, val, cls) =>
       '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg' + (cls ? ' ' + cls : '') + '">' + val + '</div></div>';
     const statStrip = '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
-      + stat('Net Over / Short', (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), netVar < 0 ? 'warn' : '')
+      // Same rule as the per-cashier cell above: minus outside the $, sign and warn state both
+      // decided on the ROUNDED value so a balanced range cannot read as a shortage.
+      + stat('Net Over / Short', (App.fmtSigned(netVar, 2).sign > 0 ? '+' : '') + App.fmtBal(netVar),
+             App.fmtSigned(netVar, 2).sign < 0 ? 'warn' : '')
       + stat('Out of Tolerance', String(flagged), flagged ? 'warn' : '')
       + stat('Short Rate', shortRate)
       + stat('Cash Dropped', App.fmtCurrency(dropTotal))

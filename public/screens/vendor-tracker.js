@@ -489,8 +489,15 @@ S.VendorTracker = {
     const fuN = (r.followups && r.followups.length) || 0;
     const meta = {
       filed: { label: 'Filed', sub: this.fmtDate(r.date) },
+      /* ⚠ DO NOT SLICE AN INSTANT. `credit_requested_at` / `resolved_at` / `followups[]` are
+         stamped with `new Date().toISOString()`, i.e. UTC instants. `.slice(0, 10)` takes the
+         UTC calendar date, so a credit requested at 7:30pm in Austin displayed TOMORROW — the
+         exact idiom [[local-date-convention]] bans, and the one sales-integrity.js already
+         removed from its own header. fmtDate handles both shapes: a bare ymd gets local
+         midnight, and an instant longer than 10 chars is rendered by toLocaleDateString, which
+         is already local. Passing the instant WHOLE is the fix; the slice was the bug. */
       requested: { label: 'Credit Requested', sub: reached.requested
-          ? (this.fmtDate((r.credit_requested_at || '').slice(0, 10)) + (fuN ? ' &middot; ' + fuN + ' follow-up' + (fuN === 1 ? '' : 's') : ''))
+          ? (this.fmtDate(r.credit_requested_at) + (fuN ? ' &middot; ' + fuN + ' follow-up' + (fuN === 1 ? '' : 's') : ''))
           : '&ndash;' },
       resolved: { label: (st === 'Resolved' && r.no_credit) ? 'Closed' : 'Resolved', sub: reached.resolved
           ? (r.no_credit ? 'No credit' : App.fmtCurrency(r.recovered_amount || 0))
@@ -520,6 +527,9 @@ S.VendorTracker = {
   openDiscrepancyModal(opts) {
     opts = opts || {};
     this._vd = { prefill: opts.prefill || {}, onClose: opts.onClose || null, onFiled: opts.onFiled || null };
+    // The "save again to file it as typed" acknowledgement is per CLAIM, not per session — without
+    // this reset the first override would silently disable the check for every later discrepancy.
+    this._vdOverAcked = false;
     App.openModal('<div class="card form-card" id="vdm-card" style="margin:0;"></div>', { id: 'vd-modal', maxWidth: 700, onClose: () => this._vdClose() });
     this._renderVdBody(opts.discrepancyId || null);
   },
@@ -576,8 +586,8 @@ S.VendorTracker = {
       const wd = this.waitDays(r), overdue = this.isOverdue(r), fuN = (r.followups && r.followups.length) || 0;
       const ageText = overdue
         ? 'Waiting ' + wd + ' days on ' + esc(r.vendor || 'this vendor') + ' with no response. Time to follow up.'
-        : 'Credit requested ' + this.fmtDate((r.credit_requested_at || '').slice(0, 10)) + (wd != null ? ', waiting ' + wd + ' day' + (wd === 1 ? '' : 's') + ' so far.' : '.');
-      const fuLine = fuN ? '<div style="font-size:11px;color:var(--t3);margin-top:4px;">Followed up ' + fuN + ' time' + (fuN === 1 ? '' : 's') + ', last ' + this.fmtDate((r.followups[fuN - 1] || '').slice(0, 10)) + '.</div>' : '';
+        : 'Credit requested ' + this.fmtDate(r.credit_requested_at) + (wd != null ? ', waiting ' + wd + ' day' + (wd === 1 ? '' : 's') + ' so far.' : '.');
+      const fuLine = fuN ? '<div style="font-size:11px;color:var(--t3);margin-top:4px;">Followed up ' + fuN + ' time' + (fuN === 1 ? '' : 's') + ', last ' + this.fmtDate(r.followups[fuN - 1]) + '.</div>' : '';
       // Vendor contact, right in the step, so a follow-up can be a call or an email
       // without hunting the rep down. Email reminder drafts the message; logging the
       // follow-up is the separate button (a call counts the same).
@@ -597,9 +607,11 @@ S.VendorTracker = {
         + '<button class="btn btn-ghost" id="vdm-closenc">Close, no credit</button>';
     } else {
       const rec = r.recovered_amount != null ? r.recovered_amount : r.overcharge;
+      // Same instant-not-a-date rule as the timeline above, and these two printed the raw
+      // sliced string rather than a formatted date, so they read "2026-08-01" mid-sentence.
       statusBlock = r.no_credit
-        ? '<div style="font-size:12px;color:var(--t3);font-weight:700;">Closed ' + esc((r.resolved_at || '').slice(0, 10)) + ' &middot; No credit recovered</div>'
-        : '<div style="font-size:12px;color:var(--green);font-weight:700;">Resolved ' + esc((r.resolved_at || '').slice(0, 10)) + ' &middot; Recovered ' + App.fmtCurrency(parseFloat(rec) || 0) + '</div>';
+        ? '<div style="font-size:12px;color:var(--t3);font-weight:700;">Closed ' + esc(this.fmtDate(r.resolved_at)) + ' &middot; No credit recovered</div>'
+        : '<div style="font-size:12px;color:var(--green);font-weight:700;">Resolved ' + esc(this.fmtDate(r.resolved_at)) + ' &middot; Recovered ' + App.fmtCurrency(parseFloat(rec) || 0) + '</div>';
       actions = '<button class="btn btn-ghost" id="vdm-reopen">Reopen</button>';
     }
 
@@ -717,6 +729,26 @@ S.VendorTracker = {
       ['Invoiced Price', vdInvoiced], ['Overcharge / Loss', vdOver]
     ].filter(f => f[1] < 0).map(f => f[0]);
     if (negClaim.length) { fail(negClaim.join(' and ') + ' cannot be negative.'); return; }
+    /* ⚠ THE FOUR MONEY FIELDS MUST FOOT. Units, Agreed and Invoiced imply an overcharge, and
+       Overcharge / Loss is typed independently, so nothing stopped a card reading
+       "UNITS 48 · AGREED $1.35 · INVOICED $1.50 · OVERCHARGE $72.00" — where the first three
+       say $7.20. That total is what `hub-bar-cop-audit` sums into S5_UNCOLLECTED_CREDITS and
+       prints as "You already flagged $X in overcharges", and it is what the operator quotes at
+       the vendor. The guard right above this one reasoned carefully about NEGATIVE values and
+       never about INCONSISTENT ones.
+       Only checked when all three inputs are present and a per-unit difference actually exists,
+       because a short delivery or a damaged case is a real claim with no price pair behind it.
+       A warning the operator can override, not a refusal: they may be claiming freight, a
+       restocking fee or a partial credit on top, and Bar Cop does not know their deal. */
+    if (vdUnits > 0 && vdAgreed > 0 && vdInvoiced > vdAgreed) {
+      const implied = Math.round(vdUnits * (vdInvoiced - vdAgreed) * 100) / 100;
+      if (implied > 0 && Math.abs(vdOver - implied) >= 0.01 && !this._vdOverAcked) {
+        this._vdOverAcked = true;   // one nudge, then their number stands
+        fail('Those units and prices come to ' + App.fmtCurrency(implied) + ', not '
+          + App.fmtCurrency(vdOver) + '. Correct the Overcharge / Loss figure, or press Save again to file it as typed.');
+        return;
+      }
+    }
     const rec = {
       id: App.uid(), date, vendor,
       reference: (card.querySelector('#vdm-ref')?.value || '').trim(),

@@ -350,7 +350,13 @@ S.Dashboard = {
         return explain('Run a Profit audit and log a week, and your leaks rank here, the biggest dollar first, each one a tap into its fix process.')
           + btnRow('<button class="btn btn-ghost btn-sm" data-go="profit-fix">Open Profit Fix</button>' + this.markBtn('leaks', 'Mark Done'));
       }
-      return explain('Your leaks, ranked by what they cost you a year at this week\'s pace. Tap the biggest one to open its fix process, or open Profit Fix to work the whole board.')
+      /* ⚠ "AT THIS WEEK'S PACE" WAS FALSE ON EVERY WEEK BUT ONE. Recovery.gapImpact always reads
+         the LATEST confirmed week (`weeks[weeks.length - 1]`), never the week the selector is on.
+         MEASURED across five weeks: step 1's sales changed every week while this line held at
+         "$4,979/yr on Pour Cost" on all five, under copy claiming it was that week's pace. The
+         leak board is a CURRENT-STATE read, like Where You Stand above it — so the copy now says
+         which week it is measured on instead of implying it follows the selector. */
+      return explain('Your leaks, ranked by what they cost you a year at your latest confirmed week\'s pace. This board reads your current position, so it stays the same whichever week you have selected above. Tap the biggest one to open its fix process, or open Profit Fix to work the whole board.')
         + leak
         + btnRow('<button class="btn btn-ghost btn-sm" data-go="profit-fix">Open Profit Fix</button>' + this.markBtn('leaks', 'Mark Done'));
     }
