@@ -689,8 +689,13 @@ const App = {
   demoBlock(opts) {
     if (!this.demoMode) return false;
     opts = opts || {};
-    const title = opts.title || 'Settings Is Off in the Demo';
-    const body  = opts.body  || 'App Settings is locked in the demo so the sample bar stays put. Sign up to set up your own bar and make it yours.';
+    // ⚠ THE DEFAULT CHANGED WITH SET-2 AND HAD TO. It read "Settings Is Off in the Demo" from
+    // the days when the whole section was blocked at the door — so once Settings became visible,
+    // that box told a visitor the page was off while they were looking straight at it
+    // ([[copy-matches-app]]). The default now only ever fires from a Settings WRITE handler;
+    // Report a Bug and Contact Support pass their own title/body and are genuinely off.
+    const title = opts.title || 'Settings Is Read-Only in the Demo';
+    const body  = opts.body  || 'Look around every Settings page you like. Changing them takes your own bar, with your own numbers in it.';
     const m = document.createElement('div');
     m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px;';
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:8px;padding:30px;max-width:430px;text-align:center;">'
