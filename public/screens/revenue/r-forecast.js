@@ -121,13 +121,21 @@ S.RevenueForecast = {
     const sumAbs = recent.reduce((s, p) => s + (p.gapPct != null ? Math.abs(p.gapPct) : 0), 0);
     const avgErr = sumAbs / recent.length;
     const rows = recent.map(p => {
-      const cls = p.gap >= 0 ? 'pos' : 'neg';
+      /* ⚠ THE GAP IS A CHANGE, SO IT TAKES A SIGN — AND THE SIGN GOES OUTSIDE THE DOLLAR SIGN.
+         `this.fmt` is App.fmtCurrency, which is literally '$' + v, so
+         `(p.gap >= 0 ? '+' : '') + this.fmt(p.gap)` printed a miss as "$-2,097.00" while the
+         Gap % cell beside it read "-10.0%" through fmtSigned: two columns of one row
+         disagreeing about where a minus goes. App.fmtBal is the canonical negative-safe
+         money formatter, and the '+' on a beat now comes off fmtSigned's sign, so the sign
+         AND the red/green class are both decided on the ROUNDED value — the same fix the %
+         column already had. A week that hit its forecast exactly still leaves floating-point
+         residue, and the old raw `>= 0` test let that residue paint a balanced row red. */
+      const g = App.fmtSigned(p.gap, 2);
+      const cls = g.sign < 0 ? 'neg' : 'pos';
       return '<tr><td>' + p.period_end + '</td>'
         + '<td>' + this.fmt(p.forecast) + '</td>'
         + '<td class="val">' + this.fmt(p.actual) + '</td>'
-        + '<td class="' + cls + '">' + (p.gap >= 0 ? '+' : '') + this.fmt(p.gap) + '</td>'
-        // App.fmtSigned: a week that hit its forecast exactly still leaves floating-point
-        // residue, and `>= 0 ? '+'` made the sign depend on which way it fell.
+        + '<td class="' + cls + '">' + (g.sign > 0 ? '+' : '') + App.fmtBal(p.gap) + '</td>'
         + '<td class="' + cls + '">' + App.fmtSigned(p.gapPct, 1, '%').text + '</td></tr>';
     }).join('');
     return '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 12px;">'

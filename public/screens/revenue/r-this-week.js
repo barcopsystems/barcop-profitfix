@@ -407,7 +407,13 @@ S.RevenueThisWeek = {
     const fcGap = fcTotal > 0 && totalRev > 0 ? totalRev - fcTotal : null;
 
     set('rw-h-rev', totalRev > 0 ? App.fmtCurrency(totalRev) : '-', 'var(--t1)');
-    set('rw-h-fcgap', fcGap != null ? ((fcGap >= 0 ? '+' : '') + App.fmtCurrency(fcGap)) : '-', fcGap == null ? 'var(--t3)' : (fcGap >= 0 ? 'var(--green)' : 'var(--red)'));
+    /* ⚠ THE SAME QUANTITY AS THE FORECAST SCREEN'S "Gap $" COLUMN, so it is formatted by the
+       same rule. fmtCurrency is '$' + v, so a week under forecast printed "$-2,097.00" here
+       while r-forecast's Gap % read "-10.0%". Minus outside the $ via App.fmtBal, and the
+       sign and the colour both decided on the ROUNDED value so residue on a week that hit its
+       forecast exactly cannot paint it red. */
+    const fcSign = fcGap != null ? App.fmtSigned(fcGap, 2).sign : 0;
+    set('rw-h-fcgap', fcGap != null ? ((fcSign > 0 ? '+' : '') + App.fmtBal(fcGap)) : '-', fcGap == null ? 'var(--t3)' : (fcSign < 0 ? 'var(--red)' : 'var(--green)'));
     set('rw-h-fcsub', fcTotal > 0 ? 'forecast ' + App.fmtCurrency(fcTotal) : 'no forecast set');
     set('rw-h-ca', checkAvg != null ? App.fmtCurrency(checkAvg) : '-', checkAvg == null ? 'var(--t3)' : (checkAvg >= targetCA ? 'var(--gold)' : 'var(--red)'));
     set('rw-h-casub', 'target ' + App.fmtCurrency(targetCA));

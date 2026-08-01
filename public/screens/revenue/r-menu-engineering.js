@@ -347,8 +347,13 @@ S.RevenueMenuEngineering = {
       else suggCell = '<span style="color:var(--t3);">' + (this.targetPctFor(i) ? 'On target' : '-') + '</span>';
 
       const dwk = eff ? (eff - i.price) * i.weekly_covers : null;
+      /* ⚠ `eff` is the PLANNED price when one exists, and a planned price can be a CUT, so this
+         goes negative. `f` is App.fmtCurrency ('$' + v), which printed that as "$-84.00".
+         Minus outside the $ through App.fmtBal, sign and colour both off the ROUNDED value —
+         the same rule as the Forecast screen's Gap $ column. */
+      const dwkSign = dwk != null ? App.fmtSigned(dwk, 2).sign : 0;
       const dwkCell = dwk != null
-        ? '<span style="color:' + (dwk >= 0 ? 'var(--gold)' : 'var(--t2)') + ';">' + (dwk >= 0 ? '+' : '') + f(dwk) + '</span>'
+        ? '<span style="color:' + (dwkSign < 0 ? 'var(--t2)' : 'var(--gold)') + ';">' + (dwkSign > 0 ? '+' : '') + App.fmtBal(dwk) + '</span>'
         : '<span style="color:var(--t3);">-</span>';
 
       /* ⚠ THROUGH THE SHARED RULE (S322), not three inline tests — Menu Rundown asks the same
@@ -510,7 +515,11 @@ S.RevenueMenuEngineering = {
     const set = (id, txt, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = txt; if (cls !== undefined) el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
     set('re-pct', pct != null ? pct.toFixed(1) + '%' : '-', tgt ? (pct > tgt ? 'warn' : 'good') : '');
     set('re-margin', App.fmtCurrency(margin));
-    set('re-impact', (impact >= 0 ? '+' : '') + App.fmtCurrency(impact));
+    /* ⚠ A price the operator adjusts DOWN, or an expected volume drop big enough to swamp the
+       raise, makes the weekly impact negative — and fmtCurrency is '$' + v, so it printed
+       "$-84.00". Minus outside the $, sign off the ROUNDED value. */
+    const impSign = App.fmtSigned(impact, 2).sign;
+    set('re-impact', (impSign > 0 ? '+' : '') + App.fmtBal(impact));
     const oldMargin = (item.price || 0) - cost;
     if (np > (item.price || 0) && margin > 0 && oldMargin > 0) {
       set('re-be', Math.max(0, (1 - oldMargin / margin) * 100).toFixed(0) + '%');
@@ -936,12 +945,17 @@ S.RevenueMenuEngineering = {
     const v = this.verify(entry);
     let vCell;
     if (v.status === 'ok') {
-      const tone = v.actualWeekly >= 0 ? 'var(--gold)' : 'var(--red)';
+      /* ⚠ A RAISE THAT LOST VOLUME IS THE ROW THIS LOG EXISTS TO SURFACE, and it was the one
+         printing "$-312.00/wk actual" — fmtCurrency is '$' + v. Both figures carry the minus
+         outside the $ now, and the tone follows the same ROUNDED sign as the text it colours,
+         so a wash cannot read red off floating-point residue. */
+      const actSign = App.fmtSigned(v.actualWeekly, 2).sign;
+      const tone = actSign < 0 ? 'var(--red)' : 'var(--gold)';
       const pred = v.predicted != null
-        ? 'predicted ' + (v.predicted > 0 ? '+' : '') + App.fmtCurrency(v.predicted) + '/wk'
+        ? 'predicted ' + (App.fmtSigned(v.predicted, 2).sign > 0 ? '+' : '') + App.fmtBal(v.predicted) + '/wk'
         : 'no prediction on file';
       vCell = '<div style="font-weight:700;color:' + tone + ';">'
-        + (v.actualWeekly > 0 ? '+' : '') + App.fmtCurrency(v.actualWeekly) + '/wk actual</div>'
+        + (actSign > 0 ? '+' : '') + App.fmtBal(v.actualWeekly) + '/wk actual</div>'
         + '<div style="font-size:10px;color:var(--t3);">sold ' + v.coversThen + ' to ' + v.coversNow + ', ' + pred + '</div>';
     } else if (v.status === 'pending') {
       vCell = '<span style="color:var(--t3);">Measuring, week ' + v.weeks + ' of 3</span>';
