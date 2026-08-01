@@ -3020,6 +3020,32 @@ const App = {
     // whole account so there's always a recent restore point (see Your Account → Data & Backup).
     // Fire-and-forget so it never delays boot.
     this._maybeAutoBackup();
+    // Fix baselines feed the COCKPITS, so they cannot depend on visiting the Fix screen.
+    this._startFixBaselines();
+  },
+
+  /* ⛔ A HEADLINE MONEY FIGURE MUST NOT DEPEND ON WHICH SCREEN YOU HAPPENED TO OPEN.
+     profit-fix and r-fix each derive a gap's start date from its first tracked action and record
+     a durable baseline (Recovery.ensureBaseline); Recovery.moduleSummary scores off those
+     baselines, and BOTH cockpits print that total as "$X recovered so far".
+     Both screens ran the backfill from their own render() only. MEASURED on the live build: the
+     Profit cockpit read "$5,026 recovered so far" on a clean load, and opening Profit Fix once
+     wrote 5 baselines (0 -> 5), moved the figure to $9,869 and left it there — a 96% change in a
+     money headline caused by looking at a screen, in the understating direction. The per-system
+     parts ($6,248 + $3,621) sum to $9,869, so the pre-visit number was the wrong one.
+     Revenue carries the identical mechanism; on the current seed it happens not to diverge
+     (every revenue gap already has a fix_log row), which is exactly why it went unnoticed there.
+     Running it once at load makes every consumer agree from the first paint. The screens still
+     call it — harmless, and it keeps a mid-session action recorded promptly. */
+  _startFixBaselines() {
+    try {
+      if (!DB._dataReady) return;                 // same gate the screens' own _autoStart uses
+      // Idempotent by construction: ensureBaseline only writes when it LOWERS a gap's start date,
+      // and each _autoStart re-checks fix_log before adding a row.
+      [(window.S && S.ProfitFix), (window.S && S.RevenueFix)].forEach(scr => {
+        if (scr && typeof scr._autoStart === 'function') scr._autoStart();
+      });
+    } catch (e) { /* best-effort; a baseline backfill must never block boot */ }
   },
 
   // Create a fresh account backup at most once a day, on OWNER login. Best-effort — a failed
