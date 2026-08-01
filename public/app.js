@@ -562,6 +562,17 @@ const App = {
        nothing ever called it. Pinned by verify-books-other-and-demo-catchup.js. */
     try { if (S.HubOperatingExpenses && S.HubOperatingExpenses.catchUpRecurring) S.HubOperatingExpenses.catchUpRecurring(); }
     catch (e) { console.error('demo recurring catch-up', e); }
+    /* ⛔ AND THE SAME GOES FOR THE FIX BASELINES — I MADE THE EXACT MISTAKE THE NOTE ABOVE
+       DESCRIBES, ONE SESSION AFTER READING IT. `_startFixBaselines` was added to the account
+       load routine so "recovered so far" stops depending on visiting the Fix screen. startDemo
+       skips boot(), so on the DEMO the cockpit went straight back to reading $5,026 until the
+       visitor wandered into Profit Fix, then jumped to $9,869 — the original defect, live, on
+       the build every prospective customer sees. MEASURED after the fix shipped: baselines 0,
+       profit $5,026; calling it by hand -> baselines 11, profit $9,869.
+       Same placement rule as the catch-up directly above: AFTER loadSample, because App.data
+       does not exist until the seed lands. Pinned by verify-profit-walk-fixes P1h/P1i. */
+    try { this._startFixBaselines(); }
+    catch (e) { console.error('demo fix-baseline start', e); }
     this._mountDemoBanner();
     this.showHub();
     this._wireChrome();   // demo skips boot(), so wire the top-nav (i-help, logo, mobile menu) here
