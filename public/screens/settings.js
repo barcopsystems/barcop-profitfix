@@ -54,7 +54,12 @@ S.HubSettings = {
       };
       const parts = secs.map((s, i) =>
         '<div class="auth-inputs" data-section="' + s.id + '" style="text-align:left;margin-bottom:' + (i === secs.length - 1 ? '0' : '16px') + ';">'
-        + '<div style="' + secLabel + '">' + esc(s.title) + '</div>'
+        + '<div style="' + secLabel + '">' + esc(s.title)
+        // Refusal slot (SET-5). Styled to match the Build Schedule modal's bs-lt-err rather
+        // than inventing a look; the title is uppercase + letter-spaced, so the span resets
+        // both or the message renders as shouting.
+        +   '<span class="hs-err" id="hs-' + s.id + '-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;text-transform:none;letter-spacing:0;font-weight:600;"></span>'
+        + '</div>'
         + (EXPLAIN[s.id] ? '<div style="' + help + '">' + EXPLAIN[s.id] + '</div>' : '')
         + s.body
         + '</div>'
@@ -85,6 +90,9 @@ S.HubSettings = {
   sectionHead(id, title, hasSave) {
     return '<div class="card-title" style="display:flex;align-items:center;gap:12px;">'
       + '<span style="flex:1;">' + esc(title) + '</span>'
+      // The refusal slot exists in BOTH layouts. Only the grouped one ships today, but a
+      // guard that can only report itself on one layout is a silent refusal on the other.
+      + '<span class="hs-err" id="hs-' + id + '-err" style="color:var(--red);font-size:12px;display:none;font-weight:600;"></span>'
       + (hasSave
           ? '<span class="hs-msg" data-msg="' + id + '" style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gold);display:none;">Saved</span>'
             + '<button class="btn btn-ghost btn-sm hs-save" data-save="' + id + '">Save Data</button>'
@@ -177,8 +185,77 @@ S.HubSettings = {
   // ── Write one section's fields into the live stores; return the App.data keys
   // to persist ([] = nothing to push, e.g. Taxes writes device-local + Labor),
   // or null when validation fails (Service Periods) so the caller aborts. ──────
+  // ── NUMERIC BOUNDS (SET-5) ────────────────────────────────────────────────────────────
+  // Returns '' when every number in the section is allowed, or the operator-facing refusal
+  // naming each bad field.
+  // ⛔ THIS IS A SEPARATE METHOD ON PURPOSE. saveGroup writes several sections in a row, so
+  // every section has to be JUDGED before the first one MUTATES — validating inside the write
+  // meant a later section's refusal left an earlier section's edit live in memory, unsaved.
+  _boundsError(which) {
+    // MEASURED in the live app before this existed: -5% pour cost, 250% labor, 500% sales tax,
+    // 900% payroll and a -$5 minimum wage all saved, silently, and the Settings overview then
+    // printed "POUR COST -5%" as fact. 74 read sites across 19 files consume settings.targets.*,
+    // and every one falls back with `|| 22`, which is FALSY — so 0 falls back to the default
+    // but -5 is truthy and reaches all of them.
+    //
+    // The bounds are STRUCTURAL, not fitted to a fixture ([[the-loop]] #28): a cost target above
+    // 100% of sales is arithmetically meaningless; a $0 check-average or RPLH target is
+    // meaningless; and a tax RATE of 0 is legitimate (no-sales-tax states), which is why tax and
+    // wage take min 0 while the targets take min 1. Blank always means "not set" and stays
+    // allowed — that is how an operator clears the payroll figure.
+    const BOUNDS = {
+      profit: [
+        ['hs-bpc', 'Bar Pour Cost %', 1, 100], ['hs-fc', 'Food Cost %', 1, 100],
+        ['hs-lc', 'Labor Cost %',     1, 100], ['hs-pc', 'Prime Cost %', 1, 100]
+      ],
+      revenue: [
+        ['hs-r-ca', 'Check Average',    0.01, null], ['hs-r-rl', 'Lunch RPLH',  0.01, null],
+        ['hs-r-rd', 'Dinner RPLH',      0.01, null], ['hs-r-rb', 'Bar RPLH',    0.01, null],
+        ['hs-r-ec', 'Event Close Rate', 1,    100],  ['hs-r-cp', 'Comp Target', 0,    100]
+      ],
+      tax: [
+        ['hs-tax',     'Sales tax rate',     0, 100], ['hs-burden', 'Payroll tax', 0, 100],
+        ['hs-minwage', 'State minimum wage', 0, null]
+      ]
+    };
+    if (!BOUNDS[which]) return '';
+    const bad = [];
+    for (const [id, label, min, max] of BOUNDS[which]) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const raw = String(el.value == null ? '' : el.value).trim();
+      if (raw === '') continue;                       // blank = not set, always allowed
+      const v = parseFloat(raw);
+      if (isNaN(v) || v < min || (max != null && v > max)) {
+        bad.push(max != null ? label + ' must be between ' + min + ' and ' + max + '.'
+               : min > 0     ? label + ' must be greater than zero.'
+                             : label + ' cannot be negative.');
+      }
+    }
+    return bad.join(' ');
+  },
+
+  // One writer for the per-section refusal line, so the two callers cannot word it differently.
+  _showSectionErr(which, msg) {
+    const el = document.getElementById('hs-' + which + '-err');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.style.display = msg ? 'inline' : 'none';
+  },
+
   _writeSection(which) {
     const numOr = (id, d) => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? d : v; };
+
+    // Last line of defence for the PER-SECTION Save button (the card layout). saveGroup judges
+    // every section up front; this keeps the single-section path honest on its own, and it must
+    // stay ABOVE every mutation below ([[the-loop]] #49: a refusal is an exit, and an exit from
+    // a handler that has already mutated has to put memory back. Refusing here means there is
+    // nothing to put back).
+    const boundsMsg = this._boundsError(which);
+    this._showSectionErr(which, boundsMsg);
+    if (boundsMsg) return null;
+    // END GUARD
+
 
     if (which === 'profile') {
       const s = App.data.settings;
@@ -278,6 +355,24 @@ S.HubSettings = {
   // first so a bad daypart aborts the whole save (nothing writes half-done). ──
   saveGroup(ids) {
     ids = ids || [];
+    // ⛔ JUDGE EVERY SECTION BEFORE WRITING ANY OF THEM (SET-5). The loop below swallows a
+    // refusal (`this._writeSection(id) || []`), so before this check a refused Profit Targets
+    // still let Revenue save and STILL FLASHED "Saved" in gold beside the red refusal. Worse,
+    // when every section refused, `keys` came out empty, `Promise.all([])` resolved to `[]`,
+    // and `[].every(Boolean)` is TRUE ([[the-loop]] #23 — a claim about "every" is vacuous on
+    // an empty collection), so "Saved" flashed over nothing having been saved at all.
+    // Judging up front also means a LATER section's refusal cannot leave an EARLIER section's
+    // edit sitting live in memory unsaved ([[the-loop]] #49).
+    // ⚠ An empty `keys` is still legitimate on its own: the tax section writes through
+    // CashEngine and saveLabor and returns no App.data keys, so the flash below is correct
+    // for a tax-only group. That is why this guards on the REFUSAL, not on the key count.
+    let refused = false;
+    ids.forEach(id => {
+      const msg = this._boundsError(id);
+      this._showSectionErr(id, msg);
+      if (msg) refused = true;
+    });
+    if (refused) return;
     const keys = new Set();
     if (ids.includes('service')) {
       const svcKeys = this._writeSection('service');
