@@ -407,13 +407,27 @@ S.LaborBuildSchedule = {
         + '<button class="btn btn-primary btn-sm" id="bs-fc">Set Forecast</button></div></div>';
     } else {
       const leftCls = left >= 0 ? 'good' : 'warn';
-      budgetCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      /* ⚠⚠ EVERY FIGURE ON THIS CARD HAS TO BE ACCOUNTABLE FROM THIS CARD (L13, Kyle 2026-08-01).
+         Stepping to a week with no shifts, Scheduled read $1,307.69 and nothing on screen explained
+         it: `computeTotals` adds the salaried week cost unconditionally, so a salaried GM shows up
+         in the total while never appearing as a rostered shift. The ARITHMETIC is right and worth
+         keeping — he is paid that week regardless, so Budget Left is honestly what is left for the
+         crew — but an operator staring at an empty grid could not reconcile the number to anything.
+         Say what the salary is, and say what percent the budget was set at. Both numbers already
+         existed: `pct` was computed on the line above and never rendered, which is exactly the
+         "computed, persisted, read nowhere" shape ([[the-loop]] #25) hiding in plain sight. */
+      const salWk = this.salariedWeekCost(d.week_start);
+      const sub = t => '<div style="font-size:10px;color:var(--t3);margin-top:3px;">' + t + '</div>';
+      budgetCard = '<div class="card"><div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Revenue Forecast</div><div class="calc-val lg">' + App.fmtCurrency(fc)
         + ' <button class="btn btn-ghost btn-sm" id="bs-fc" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
         + '<div class="calc-item"><div class="calc-label">Labor Budget</div><div class="calc-val lg">' + App.fmtCurrency(budget)
-        + ' <button class="btn btn-ghost btn-sm" id="bs-lt" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div></div>'
+        + ' <button class="btn btn-ghost btn-sm" id="bs-lt" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div>'
+        + sub(App.fmtPct(target) + ' of forecast &middot; Edit to change') + '</div>'
         + '<div class="calc-item"><div class="calc-label">Target Hours</div><div class="calc-val lg">' + (targetHrs > 0 ? targetHrs.toFixed(1) + ' hrs' : '-') + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Scheduled</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div></div>'
+        + '<div class="calc-item"><div class="calc-label">Scheduled</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div>'
+        + sub((pct != null ? App.fmtPct(pct) + ' of forecast' : '')
+            + (salWk > 0 ? (pct != null ? ' &middot; ' : '') + 'includes ' + App.fmtCurrency(salWk) + ' salaried' : '')) + '</div>'
         + '<div class="calc-item"><div class="calc-label">' + (left >= 0 ? 'Budget Left' : 'Over Budget') + '</div><div class="calc-val lg ' + leftCls + '">' + App.fmtCurrency(Math.abs(left)) + '</div></div>'
         + '</div></div>';
     }
