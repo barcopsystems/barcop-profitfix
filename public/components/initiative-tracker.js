@@ -117,8 +117,20 @@ const InitiativeTracker = {
       .slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || ''));
     const sd = init.start_date;
     if (!sd) return { before: null, after: null, lift: null, weeksAfter: 0 };
+    /* ⚠ AN "AFTER" WEEK MUST HAVE BEEN LIVED ENTIRELY UNDER THE CHANGE. Filtering on
+       `period_end >= start` counted the week the experiment STARTED IN, almost all of which
+       happened before it — so a test created today immediately reported a lift, and marking it
+       Complete banked it as a WIN, off data the change could not have caused. MEASURED: a
+       brand-new experiment showed "-0.8%" and moved Wins 1 -> 2 on day one, while the Fix
+       System's own help promises Bar Cop "says so plainly instead of inventing a figure".
+       The discriminator is structural, not a threshold: a week counts once its START is on or
+       after the start date. With none yet, lift is null, outcome() reads 'pending', and the
+       card says Measuring — which is the truth on day one.
+       ⚠ App.weekStartFor is called BARE on purpose. Guarding it (`App.weekStartFor ? … : old`)
+       would mean "if the helper is missing, go quietly back to counting the straddling week" —
+       a silent wrong number in place of a loud failure ([[the-loop]] #40). */
     const before = weeks.filter(w => w.period_end < sd).slice(-8);
-    const after  = weeks.filter(w => w.period_end >= sd).slice(0, 8);
+    const after  = weeks.filter(w => App.weekStartFor(w.period_end) >= sd).slice(0, 8);
     const avg = arr => {
       const vals = arr.map(w => c.metricFor(w, init.metric)).filter(v => v != null && !isNaN(v));
       if (!vals.length) return null;
