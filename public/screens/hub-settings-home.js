@@ -8,7 +8,8 @@
 S.HubSettingsHome = {
 
   open() {
-    if (App.demoBlock && App.demoBlock()) return;   // App Settings is off in the demo
+    // SET-2: the demo may SEE the Settings overview. It is navigation and read-only snapshots
+    // only — every control on it is a link to another Settings page, so there is nothing to guard.
     if (App._hubBlocked && App._hubBlocked()) return;   // Settings — not for Staff
     App.openHubFullPage('Settings', (mount) => { this.container = mount; this.render(mount); }, 'settings-home');
   },

@@ -42,7 +42,8 @@ S.HubUserAccounts = {
   // restore points (db.js saveBackup), so a mature account renders up to FORTY
   // dated rows — and they were sitting under the fourth section of Your Account.
   async open(group) {
-    if (App.demoBlock && App.demoBlock()) return;   // App Settings (incl. Your Account) is off in the demo
+    // SET-2: the demo may SEE Your Account, Data and Backup and Team Members. Each write door
+    // in this file refuses on its own, and render() locks the controls via App.demoLockScreen.
     const meta = {
       account: { title: 'Your Account',    action: 'user-account' },
       data:    { title: 'Data and Backup', action: 'user-data' },
@@ -65,7 +66,12 @@ S.HubUserAccounts = {
     // without ever passing the sidebar, so the refusal lives here as well.
     // ⚠ THIS MUST SIT AFTER _ensureAccountId: isOwner() compares against
     // DB._ownerUserId, and _ensureAccountId is the only thing that sets it.
-    if (g === 'data' && !(window.DB && DB.isOwner && DB.isOwner())) { App.showNoAccess(); return; }
+    // ⚠ SET-2: the demo counts as the owner HERE ONLY, the same way hub-settings-home has always
+    // written `App.demoMode || DB.isOwner()`. Identity is NOT faked on DB — setting DB._role
+    // would flip isAdmin() app-wide, far outside Settings ([[the-loop]] #58). All three doors to
+    // this page (sidebar row, overview button, this refusal) now use the SAME predicate, which
+    // is what closes SET-A.
+    if (g === 'data' && !App.demoMode && !(window.DB && DB.isOwner && DB.isOwner())) { App.showNoAccess(); return; }
     App.openHubFullPage(meta[g].title, (mount) => {
       this.container = mount;
       this.render(mount, g);
@@ -74,8 +80,10 @@ S.HubUserAccounts = {
 
   render(container, group) {
     const userEmail = DB._user?.email || (App.demoMode ? 'Demo Account' : '');
-    const isAdmin = (window.DB && DB.isAdmin && DB.isAdmin());
-    const isOwnerNow = !!(window.DB && DB.isOwner && DB.isOwner());   // only the owner invites admins
+    // SET-2: the demo counts as owner+admin on this surface only, so a prospect sees the panels
+    // instead of a lone password box. Same predicate as the sidebar, the overview and open().
+    const isAdmin = App.demoMode || (window.DB && DB.isAdmin && DB.isAdmin());
+    const isOwnerNow = App.demoMode || !!(window.DB && DB.isOwner && DB.isOwner());   // only the owner invites admins
     // THREE mutually-exclusive pages out of one render. This used to be a two-way
     // either/or (`showAccount = group !== 'team' || !showTeam`) which cannot express a
     // third page — adding one means rewriting the pair, not appending to it.
@@ -141,7 +149,9 @@ S.HubUserAccounts = {
       sections.push({ title: 'Password', body: pwBody });
       if (isOwnerNow) {
         sections.push({ title: 'Subscription', body: '<div id="ua-sub-content"></div>' });
-        if (!App.demoMode) sections.push({ title: 'Multiple Locations', body: barsBody });
+        // SET-2: shown in the demo now (Kyle named "add another bar" as something a prospect
+        // should see). _addBar refuses, so it is a shop window, not a door.
+        sections.push({ title: 'Multiple Locations', body: barsBody });
       }
       if (!isStaff && !App.demoMode && App.isDevAccount && App.isDevAccount()) sections.push({ title: 'Testing Tools', body: testBody });
     }
@@ -210,6 +220,11 @@ S.HubUserAccounts = {
     this.wire();
     if (showAccount && isOwnerNow) this.renderSubscription();   // Subscription section is owner-only
     if (showTeam) { this._teamRoleChange(); this._teamRefresh(); }
+    // SET-2, LAST: this locks everything rendered SYNCHRONOUSLY.
+    // ⚠ renderSubscription / _teamRefresh / _renderSnapshots paint AFTER this returns, so this
+    // call cannot reach them. They are not locked here — in demo they render read-only content
+    // with no controls in it at all, which is stronger than disabling controls after the fact.
+    if (App.demoLockScreen) App.demoLockScreen(container);
   },
 
   // One dropdown per operating area: No Access / Full Access. currentPerms =
@@ -354,8 +369,13 @@ S.HubUserAccounts = {
   async renderSubscription() {
     const el = document.getElementById('ua-sub-content');
     if (!el) return;
+    // SET-2: show a real-looking plan instead of hiding it. A prospect is here to find out what
+    // an account looks like; "hidden in demo mode" tells them nothing. No Manage Billing button
+    // is rendered at all, so there is no Stripe door to guard on this panel.
     if (App.demoMode) {
-      el.innerHTML = '<div style="font-size:12px;color:var(--t3);">Subscription details are hidden in demo mode.</div>';
+      el.innerHTML = '<div style="font-size:12px;color:var(--t1);">Plan <span style="color:var(--green);font-weight:700;">Active</span>'
+        + ' <span style="color:var(--t3);">Bar Cop, monthly</span></div>'
+        + '<div style="font-size:12px;color:var(--t3);margin-top:6px;">Billing and invoices live here on a real account.</div>';
       return;
     }
     const sub = App.subscription || { status: 'inactive', plan: null };
@@ -515,6 +535,7 @@ S.HubUserAccounts = {
 
   // ── Password change — copied from settings.js ────────────────────────────
   async changePassword() {
+    if (App.demoBlock && App.demoBlock()) return;   // SET-2 layer 2 — see the backup doors above
     const pw1 = document.getElementById('ua-pw1').value;
     const pw2 = document.getElementById('ua-pw2').value;
     const msg = document.getElementById('ua-pw-msg');
@@ -536,12 +557,16 @@ S.HubUserAccounts = {
   },
 
   // ── Backup export/import/sample helpers — delegate to S.HubSettings ──────
+  // SET-2 LAYER 2. render() disables these controls, but a disabled button is not a guard —
+  // any re-render rebuilds it ENABLED ([[the-loop]] #85) — so every write door refuses on its
+  // own. Export is the one READ here (it only reads the account out to a file), and it stays
+  // open on purpose: letting a prospect see a real export is the point of the page.
   exportBackup() { S.HubSettings?.exportBackup?.call(this._asSettingsHost('ua-backup-msg')); },
-  importBackup(e) { S.HubSettings?.importBackup?.call(this._asSettingsHost('ua-backup-msg'), e); },
-  loadSample() { S.HubSettings?.loadSample?.call(this._asSettingsHost('ua-test-msg')); },
-  clearAll() { S.HubSettings?.clearAll?.call(this._asSettingsHost('ua-test-msg')); },
-  backupNow() { return S.HubSettings?.backupNow?.call(this._asSettingsHost('ua-backup-msg')); },
-  restoreSnapshot(id, when) { return S.HubSettings?.restoreSnapshot?.call(this._asSettingsHost('ua-backup-msg'), id, when); },
+  importBackup(e) { if (App.demoBlock && App.demoBlock()) return; S.HubSettings?.importBackup?.call(this._asSettingsHost('ua-backup-msg'), e); },
+  loadSample() { if (App.demoBlock && App.demoBlock()) return; S.HubSettings?.loadSample?.call(this._asSettingsHost('ua-test-msg')); },
+  clearAll() { if (App.demoBlock && App.demoBlock()) return; S.HubSettings?.clearAll?.call(this._asSettingsHost('ua-test-msg')); },
+  backupNow() { if (App.demoBlock && App.demoBlock()) return; return S.HubSettings?.backupNow?.call(this._asSettingsHost('ua-backup-msg')); },
+  restoreSnapshot(id, when) { if (App.demoBlock && App.demoBlock()) return; return S.HubSettings?.restoreSnapshot?.call(this._asSettingsHost('ua-backup-msg'), id, when); },
   // Render the owner's list of automatic backups (newest first), each with a Restore button.
   async _renderSnapshots() {
     const el = document.getElementById('ua-snap-list');
@@ -558,9 +583,14 @@ S.HubUserAccounts = {
       return '<tr><td style="font-size:12px;color:var(--t1);">' + esc(when) + tag + '</td>'
         // Delete is offered on MANUAL restore points only. The automatic dailies are the safety
         // net — they age out under retention rather than being removable by hand.
+        // ⚠ SET-2: no Restore or Delete in the demo. This list paints AFTER render()'s
+        // demoLockScreen has run, so a disabled attribute could never be applied to these —
+        // not rendering the controls at all is the only version that is actually read-only.
+        // Restore is destructive on a real account, which is why it gets the stronger treatment.
         + '<td style="text-align:right;"><div class="row-actions" style="justify-content:flex-end;">'
-        + '<button class="btn btn-ghost btn-sm ua-snap-restore" data-id="' + esc(r.id) + '" data-when="' + esc(when) + '">Restore</button>'
-        + (r.reason === 'manual'
+        + (App.demoMode ? '<span style="font-size:11px;color:var(--t3);">Restore</span>'
+            : '<button class="btn btn-ghost btn-sm ua-snap-restore" data-id="' + esc(r.id) + '" data-when="' + esc(when) + '">Restore</button>')
+        + (r.reason === 'manual' && !App.demoMode
             ? '<button class="btn btn-danger btn-sm ua-snap-del" data-id="' + esc(r.id) + '" data-when="' + esc(when) + '">Delete</button>'
             : '')
         + '</div></td></tr>';
@@ -742,8 +772,23 @@ S.HubUserAccounts = {
     this._invitesRefresh();   // L17 — independent of the member list; never blocks it
     const box = document.getElementById('ua-team-members');
     if (!box) return;
+    // SET-2: a seeded crew, so a prospect can see what roles and per-area access look like.
+    // Rendered WITHOUT the Edit Access / Remove / role controls a real account gets — read-only
+    // by construction rather than by disabling something afterwards, because this paints after
+    // render()'s demoLockScreen has already run and could not be reached by it.
     if (App.demoMode) {
-      box.innerHTML = '<div style="color:var(--t3);">Team management is disabled in demo mode.</div>';
+      const crew = [
+        { name: 'You',            email: 'demo@barcop.com',      role: 'Owner', areas: 'Everything' },
+        { name: 'Dana Whitfield', email: 'dana@anchorbar.test',  role: 'Admin', areas: 'Inventory · Labor · Shift · Books' },
+        { name: 'Marcus Reyes',   email: 'marcus@anchorbar.test',role: 'Staff', areas: 'Shift · Labor' },
+        { name: 'Priya Nandan',   email: 'priya@anchorbar.test', role: 'Staff', areas: 'Inventory' }
+      ];
+      box.innerHTML = '<table class="pnl-list" style="width:100%;"><tbody>' + crew.map(m =>
+        '<tr><td style="font-size:12px;color:var(--t1);">' + esc(m.name)
+        + '<div style="color:var(--t3);font-size:11px;">' + esc(m.email) + '</div></td>'
+        + '<td style="font-size:12px;color:var(--t2);">' + esc(m.role) + '</td>'
+        + '<td style="font-size:12px;color:var(--t3);">' + esc(m.areas) + '</td></tr>'
+      ).join('') + '</tbody></table>';
       return;
     }
     const accountId = await DB._ensureAccountId();
@@ -887,6 +932,9 @@ S.HubUserAccounts = {
   },
 
   async _teamInvite() {
+    // SET-2 layer 2. This one SENDS AN EMAIL from a public page, so it is a spam vector as
+    // well as a write — the same reason Report a Bug and Contact Support have always been gated.
+    if (App.demoBlock && App.demoBlock()) return;
     const emailInput = document.getElementById('ua-team-email');
     const roleSelect = document.getElementById('ua-team-role');
     const btn = document.getElementById('ua-team-invite');
@@ -1031,6 +1079,8 @@ S.HubUserAccounts = {
   // account is created only at payment, so any cancel before then leaves nothing
   // behind and drops back here. See App.startAddBar / startNewBarCheckout.
   _addBar() {
+    // SET-2 layer 2. This one reaches STRIPE CHECKOUT, so it is the least optional guard here.
+    if (App.demoBlock && App.demoBlock()) return;
     App.startAddBar();
   },
 

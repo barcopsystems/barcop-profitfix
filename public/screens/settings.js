@@ -18,7 +18,8 @@ S.HubSettings = {
 
   // Full-page Hub screen. Sidebar stays mounted, content area swaps.
   open(group) {
-    if (App.demoBlock && App.demoBlock()) return;   // App Settings is off in the demo
+    // SET-2: the demo may SEE this page. The guard moved to saveSection/saveGroup, so a visitor
+    // reads their way round Business Profile and Recovery Targets and can change nothing.
     if (App._hubBlocked && App._hubBlocked()) return;   // Business Profile / Targets — not for Staff
     const g = this._GROUPS[group] ? group : 'business-profile';
     const meta = this._GROUPS[g];
@@ -83,6 +84,10 @@ S.HubSettings = {
     container.innerHTML = '<div class="screen">' + inner + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
     this.wire(container);
+    // SET-2: AFTER wire(), so the ServicePeriods component has mounted its own buttons and
+    // time inputs and they get locked too. Locking before wire() would miss every control the
+    // component creates, which is most of the Service Periods section.
+    if (App.demoLockScreen) App.demoLockScreen(container);
   },
 
   // Card header: title left, Saved indicator + Save Data button right.
@@ -330,6 +335,11 @@ S.HubSettings = {
 
   // ── Per-section save (Recovery Targets page uses this per card) ─────────────
   saveSection(which) {
+    // SET-2 layer 2. render() disables these fields in the demo, but a disabled control is a
+    // courtesy and not a guard ([[the-loop]] #85), and DB._demo would otherwise ACCEPT the edit
+    // and report success — a visitor could rename the bar and carry it onto their exported PDFs
+    // for the session, which is the exact thing the original page gate existed to stop.
+    if (App.demoBlock && App.demoBlock()) return;
     const keys = this._writeSection(which);
     if (keys == null) return;  // validation failed
     Promise.all(keys.map(k => App.saveKey(k))).then(results => {
@@ -354,6 +364,9 @@ S.HubSettings = {
   // one button writes every section in the group. Service Periods is validated
   // first so a bad daypart aborts the whole save (nothing writes half-done). ──
   saveGroup(ids) {
+    // SET-2 layer 2 — and THIS is the button both Settings pages actually render, so it matters
+    // more than saveSection. See saveSection for why the disabled attribute is not enough.
+    if (App.demoBlock && App.demoBlock()) return;
     ids = ids || [];
     // ⛔ JUDGE EVERY SECTION BEFORE WRITING ANY OF THEM (SET-5). The loop below swallows a
     // refusal (`this._writeSection(id) || []`), so before this check a refused Profit Targets

@@ -109,8 +109,10 @@ S.Hub = {
     // Data and Backup is OWNER-only, not admin-only: the page it opens renders its
     // controls inside `if (isOwnerNow)`, so an admin-gated row would be a link to an
     // empty page. hub-user-accounts.open('data') refuses non-owners for the same reason.
-    const isAdmin   = !!(window.DB && DB.isAdmin && DB.isAdmin());
-    const isOwner   = !!(window.DB && DB.isOwner && DB.isOwner());
+    // SET-2: the demo sees both rows, so a prospect can find Team Members and Data and Backup.
+    // Same predicate as hub-settings-home, hub-user-accounts.render and open('data')'s refusal.
+    const isAdmin   = App.demoMode || !!(window.DB && DB.isAdmin && DB.isAdmin());
+    const isOwner   = App.demoMode || !!(window.DB && DB.isOwner && DB.isOwner());
     return ''
       + '<div class="nav-section">Settings</div>'
       + row('settings-profile', 'Business Profile', 'profile')
