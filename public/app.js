@@ -642,16 +642,9 @@ const App = {
       if (el.setAttribute) el.setAttribute('aria-disabled', 'true');
       if (el.style) { el.style.cursor = 'not-allowed'; el.style.opacity = '0.55'; }
     });
-    // One note, in one place, so the greyed-out controls are explained rather than looking
-    // broken. The global demo banner says nothing about Settings being read-only.
-    if (container.querySelector && !container.querySelector('#demo-ro-note') && container.insertBefore) {
-      const note = document.createElement('div');
-      note.id = 'demo-ro-note';
-      note.style.cssText = 'font-size:12px;color:var(--t2);background:var(--surface);border:1px solid var(--b-edge);'
-        + 'border-radius:var(--r2);padding:10px 12px;margin-bottom:14px;line-height:1.5;';
-      note.textContent = 'This is the live demo, so Settings is read-only. Everything here is a real Bar Cop screen with the sample bar loaded.';
-      container.insertBefore(note, container.firstChild);
-    }
+    // ⚠ NO BANNER HERE. A read-only note used to be inserted at the top of every locked screen;
+    // Kyle cut it as noise (2026-08-01). The disabled controls plus the global demo bar carry
+    // it, and a visitor who presses something anyway still gets App.demoBlock()'s notice.
   },
 
   _mountDemoBanner() {
