@@ -111,8 +111,14 @@ S.ShiftDashboard = {
       const stats = [
         { label: 'Revenue', value: App.fmtCurrency(rev) },
         { label: 'Voids', value: App.fmtCurrency(voidTot) },
+        /* ⚠ OVER / SHORT IS A CHANGE, SO THE MINUS GOES OUTSIDE THE DOLLAR SIGN. fmtCurrency is
+           '$' + v, so a short drawer printed "$-3.00" — and this stat is mirrored onto the HUB
+           LANDING PAGE, which is the first screen every operator opens. App.fmtBal carries the
+           minus; the '+' and the warn state both come off fmtSigned's ROUNDED sign so a range
+           that balances to the cent cannot read as a shortage. Same rule as cash-recon. */
         varCount
-          ? { label: 'Over / Short', value: (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar), warn: netVar < 0 }
+          ? { label: 'Over / Short', value: (App.fmtSigned(netVar, 2).sign > 0 ? '+' : '') + App.fmtBal(netVar),
+              warn: App.fmtSigned(netVar, 2).sign < 0 }
           : { label: 'Over / Short', value: 'Not counted', color: 'var(--t3)' }
       ];
       return { steps, stats, doneCount: steps.filter(s => s.done).length, total: steps.length, lastWk: sw.lastWk };
@@ -374,8 +380,11 @@ S.ShiftDashboard = {
       + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">Where The Money Walked</div>'
       + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
       +   mini('Covers', String(st.covers)) + vdiv
+      // Same fix as the stat strip above — the twin, fixed in the same edit so the two cannot
+      // drift apart on the one number a drawer count exists to produce.
       +   (st.varCount
-            ? mini('Cash Over / Short', (st.netVar > 0 ? '+' : '') + App.fmtCurrency(st.netVar, 0), st.netVar < 0 ? 'var(--red)' : 'var(--t1)')
+            ? mini('Cash Over / Short', (App.fmtSigned(st.netVar, 0).sign > 0 ? '+' : '') + App.fmtBal(st.netVar, 0),
+                   App.fmtSigned(st.netVar, 0).sign < 0 ? 'var(--red)' : 'var(--t1)')
             : mini('Cash Over / Short', 'Not counted', 'var(--t3)')) + vdiv
       +   mini('Voids + Comps', App.fmtCurrency(vcTot, 0))
       + '</div>'
