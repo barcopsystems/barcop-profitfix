@@ -113,7 +113,7 @@ S.HubSettings = {
       + '<div class="f" style="width:200px;"><label>Street Address</label><input type="text" id="hs-address" value="' + esc(s.address||'') + '" placeholder="123 Main St"/></div>'
       + '<div class="f" style="width:95px;"><label>City</label><input type="text" id="hs-city" value="' + esc((s.city_state||'').split(',')[0]?.trim()||'') + '" placeholder="Austin"/></div>'
       + '<div class="f" style="width:125px;"><label>State / Province</label><input type="text" id="hs-state" value="' + esc((s.city_state||'').split(',')[1]?.trim()||'') + '" placeholder="TX"/></div>'
-      + '<div class="f" style="width:120px;"><label>Phone</label><input type="text" id="hs-phone" value="' + esc(s.phone||'') + '" placeholder="(512) 555-0142"/></div>'
+      + '<div class="f" style="width:120px;"><label>Phone</label><input type="text" id="hs-phone" value="' + esc(s.phone||'') + '" placeholder="(512) 555-5555"/></div>'
       + '</div>';
   },
 
@@ -965,8 +965,11 @@ S.HubSettings = {
 
     // ── Settings ──
     App.data.settings.bar_name           = 'The Anchor Bar & Kitchen';
-    App.data.settings.phone              = '(512) 555-0142';
-    App.data.settings.address            = '1900 Barton Springs Rd';
+    // ⚠ FAKE ON PURPOSE. These ship in the public demo and print on exported PDFs, so they must
+    // not resolve to a real business: "1900 Barton Springs Rd" was a real Austin address. 555-5555
+    // and a plainly invented street keep the demo obviously fictional (Kyle, 2026-08-01).
+    App.data.settings.phone              = '(512) 555-5555';
+    App.data.settings.address            = '1111 East Street';
     App.data.settings.city_state         = 'Austin, TX';
     App.data.settings.annual_bar_revenue = 624000;
     App.data.settings.annual_food_revenue= 374400;

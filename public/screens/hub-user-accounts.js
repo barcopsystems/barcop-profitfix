@@ -233,7 +233,11 @@ S.HubUserAccounts = {
   // owner sees all areas.
   renderPermsGrid(currentPerms, mode) {
     const perms = currentPerms || {};
-    const isOwner = !!(window.DB && DB.isOwner && DB.isOwner());
+    // SET-2: the demo counts as owner here too, or `grantable` comes out empty and the whole
+    // grid collapses to "You do not have access to any areas you can grant" — which is what a
+    // prospect saw instead of the nine-area permission table, i.e. the single most explanatory
+    // screen in the section. Same predicate as the sidebar, render() and open('data').
+    const isOwner = App.demoMode || !!(window.DB && DB.isOwner && DB.isOwner());
     const myPerms = (window.DB && DB.permissions) ? DB.permissions() : {};
     const LEVELS = [
       { v: '',     t: 'No Access' },
@@ -777,11 +781,18 @@ S.HubUserAccounts = {
     // by construction rather than by disabling something afterwards, because this paints after
     // render()'s demoLockScreen has already run and could not be reached by it.
     if (App.demoMode) {
+      // ⚠ THESE ARE THE SEEDED ROSTER'S TWO MANAGERS, NOT INVENTED PEOPLE AND NOT LINE STAFF.
+      // Bar Cop is a manager tool and its own help text says so — "the people you invite here
+      // are other managers and your bookkeeper, not every employee" — so a demo team of
+      // bartender-tier staff contradicted the app in the one place explaining the feature
+      // (Kyle, 2026-08-01). Carlos P. is the salaried GM and Renee K. the assistant manager in
+      // `lcStaff`; showing one Admin and one Staff also demonstrates both roles.
+      // verify-demo-settings-readonly.js K3c derives this from the roster, so putting a
+      // bartender back here goes red.
       const crew = [
-        { name: 'You',            email: 'demo@barcop.com',      role: 'Owner', areas: 'Everything' },
-        { name: 'Dana Whitfield', email: 'dana@anchorbar.test',  role: 'Admin', areas: 'Inventory · Labor · Shift · Books' },
-        { name: 'Marcus Reyes',   email: 'marcus@anchorbar.test',role: 'Staff', areas: 'Shift · Labor' },
-        { name: 'Priya Nandan',   email: 'priya@anchorbar.test', role: 'Staff', areas: 'Inventory' }
+        { name: 'You',       email: 'demo@barcop.com',       role: 'Owner', areas: 'Everything' },
+        { name: 'Carlos P.', email: 'carlos@anchorbar.test', role: 'Admin', areas: 'Inventory · Labor · Shift · Books' },
+        { name: 'Renee K.',  email: 'renee@anchorbar.test',  role: 'Staff', areas: 'Shift · Labor' }
       ];
       box.innerHTML = '<table class="pnl-list" style="width:100%;"><tbody>' + crew.map(m =>
         '<tr><td style="font-size:12px;color:var(--t1);">' + esc(m.name)
