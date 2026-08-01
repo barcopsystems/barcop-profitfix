@@ -49,6 +49,9 @@ S.HubSettingsHome = {
       email ? kvRow('Signed in', esc(email)) : '',
       isOwnerHere ? kvRow('Plan', planVal) : '',
       isOwnerHere && renewVal ? kvRow('Renews', esc(renewVal)) : '',
+      // Owner-only, matching the sidebar row and open('data')'s own refusal: a backup
+      // is the whole account, so a restricted admin never gets a door to it.
+      isOwnerHere ? kvRow('Backup', '<button class="btn btn-ghost btn-sm" data-act="user-data">Export or Restore</button>') : '',
       isAdmin ? kvRow('Team', '<button class="btn btn-ghost btn-sm" data-act="user-team">Manage Members</button>') : ''
     ];
     const acctCard = card('Account', 'user-account', 'Manage', acctRows);
@@ -85,6 +88,7 @@ S.HubSettingsHome = {
   _wire() {
     const go = (act) => {
       if (act === 'user-account')          S.HubUserAccounts?.open?.('account');
+      else if (act === 'user-data')        S.HubUserAccounts?.open?.('data');
       else if (act === 'user-team')        S.HubUserAccounts?.open?.('team');
       else if (act === 'settings-profile') S.HubSettings?.open?.('business-profile');
       else if (act === 'settings-targets') S.HubSettings?.open?.('recovery-targets');

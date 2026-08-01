@@ -33,15 +33,20 @@ S.HubUserAccounts = {
   ],
 
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
-  // shows "USER ACCOUNTS | Back to Dashboard".
-  // Split across two Settings-sidebar pages so the long Team / permissions card
-  // does not push everything down one scroll: 'account' = Your Account, 'team'
-  // = Team Members (admin only). No group = both (backward compatible).
+  // shows the page name | Back to Dashboard.
+  // Split across THREE Settings-sidebar pages so no one page carries everything:
+  // 'account' = Your Account (password, subscription, other bars), 'data' = Data
+  // and Backup (owner only), 'team' = Team Members (admin only). Unknown/no group
+  // falls back to 'account'.
+  // ⚠ 'data' got its own page because retention keeps 30 auto-daily + 10 manual
+  // restore points (db.js saveBackup), so a mature account renders up to FORTY
+  // dated rows — and they were sitting under the fourth section of Your Account.
   async open(group) {
     if (App.demoBlock && App.demoBlock()) return;   // App Settings (incl. Your Account) is off in the demo
     const meta = {
-      account: { title: 'Your Account',  action: 'user-account' },
-      team:    { title: 'Team Members',  action: 'user-team' }
+      account: { title: 'Your Account',    action: 'user-account' },
+      data:    { title: 'Data and Backup', action: 'user-data' },
+      team:    { title: 'Team Members',    action: 'user-team' }
     };
     const g = meta[group] ? group : 'account';
     // Staff can reach Your Account (to change their password — the page renders
@@ -54,6 +59,13 @@ S.HubUserAccounts = {
       return;
     }
     if (window.DB && DB._ensureAccountId) await DB._ensureAccountId();
+    // Data and Backup is OWNER-ONLY: a backup is the whole account, so a restricted
+    // admin must not be able to export it or roll it back. The sidebar row is
+    // owner-gated too, but a deep link, a bookmark or a stale tab reaches open('data')
+    // without ever passing the sidebar, so the refusal lives here as well.
+    // ⚠ THIS MUST SIT AFTER _ensureAccountId: isOwner() compares against
+    // DB._ownerUserId, and _ensureAccountId is the only thing that sets it.
+    if (g === 'data' && !(window.DB && DB.isOwner && DB.isOwner())) { App.showNoAccess(); return; }
     App.openHubFullPage(meta[g].title, (mount) => {
       this.container = mount;
       this.render(mount, g);
@@ -64,8 +76,13 @@ S.HubUserAccounts = {
     const userEmail = DB._user?.email || (App.demoMode ? 'Demo Account' : '');
     const isAdmin = (window.DB && DB.isAdmin && DB.isAdmin());
     const isOwnerNow = !!(window.DB && DB.isOwner && DB.isOwner());   // only the owner invites admins
-    const showTeam    = group !== 'account' && isAdmin;
-    const showAccount = group !== 'team' || !showTeam;   // non-admin 'team' falls back to account
+    // THREE mutually-exclusive pages out of one render. This used to be a two-way
+    // either/or (`showAccount = group !== 'team' || !showTeam`) which cannot express a
+    // third page — adding one means rewriting the pair, not appending to it.
+    // A non-admin asking for 'team' still falls back to Your Account, as before.
+    const showTeam    = group === 'team' && isAdmin;
+    const showData    = group === 'data';
+    const showAccount = !showTeam && !showData;   // non-admin 'team' falls back to account
 
     const sh = (txt) => '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:18px 0 12px;">' + txt + '</div>';
     const eye = (id) => '<button type="button" class="pw-eye" tabindex="-1" style="background:var(--input);border:1px solid var(--b1);border-radius:var(--r2);margin-left:6px;padding:0 9px;cursor:pointer;color:var(--t3);display:flex;align-items:center;flex-shrink:0;" onclick="const i=document.getElementById(\'' + id + '\');i.type=i.type===\'password\'?\'text\':\'password\';this.style.color=i.type===\'text\'?\'var(--gold)\':\'var(--t3)\';"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg></button>';
@@ -112,19 +129,33 @@ S.HubUserAccounts = {
       + '</div>'
       + '<div id="ua-test-msg" style="font-size:11px;font-weight:700;letter-spacing:1px;margin-top:12px;display:none;"></div>';
 
-    // Password is for everyone. Billing (Subscription + Multiple Locations) and
-    // account-wide Data & Backup are OWNER-ONLY (a restricted admin must not be
-    // able to export the whole account). Staff get password only; a non-owner
+    // Password is for everyone. Billing (Subscription + Multiple Locations) is
+    // OWNER-ONLY, and so is Data and Backup — which now has its OWN page rather than
+    // sitting fourth on this one (a restored account is the whole account, so a
+    // restricted admin must never reach it). Staff get password only; a non-owner
     // admin gets password here (their bar config lives on the Settings pages).
-    // Testing Tools stays dev-account only.
+    // Testing Tools stays dev-account only, and stays on Your Account.
     const isStaff = (window.DB && DB.role && DB.role()) === 'staff';
-    const sections = [{ title: 'Password', body: pwBody }];
-    if (isOwnerNow) {
-      sections.push({ title: 'Subscription', body: '<div id="ua-sub-content"></div>' });
-      if (!App.demoMode) sections.push({ title: 'Multiple Locations', body: barsBody });
-      sections.push({ title: 'Data and Backup', body: backupBody });
+    const sections = [];
+    if (showAccount) {
+      sections.push({ title: 'Password', body: pwBody });
+      if (isOwnerNow) {
+        sections.push({ title: 'Subscription', body: '<div id="ua-sub-content"></div>' });
+        if (!App.demoMode) sections.push({ title: 'Multiple Locations', body: barsBody });
+      }
+      if (!isStaff && !App.demoMode && App.isDevAccount && App.isDevAccount()) sections.push({ title: 'Testing Tools', body: testBody });
     }
-    if (!isStaff && !App.demoMode && App.isDevAccount && App.isDevAccount()) sections.push({ title: 'Testing Tools', body: testBody });
+    if (showData) {
+      // The section label is "Export and Restore" rather than "Data and Backup" now
+      // that the PAGE carries that name — the old label would print twice, once as the
+      // page heading and again immediately under it.
+      // A non-owner cannot reach this page through open(), which refuses them before
+      // render. This branch covers the direct call: say why the controls are absent
+      // rather than paint an empty card.
+      sections.push(isOwnerNow
+        ? { title: 'Export and Restore', body: backupBody }
+        : { title: 'Export and Restore', body: '<div style="font-size:12px;color:var(--t2);line-height:1.6;">Account owner only.</div>' });
+    }
 
     // Each section wrapped in the same dark box + grey title as Business Profile
     // and Recovery Targets, all inside one page card (last section's margin
@@ -137,10 +168,14 @@ S.HubUserAccounts = {
       + '</div>'
     ).join('');
 
-    // "Your Account" + Signed-in-as sit inside the card on the card background
-    // (the only part not in an inner wrapper), above the wrapped sections.
-    const accountHeader = '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;">Your Account</div>'
-      + (userEmail ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Signed in as <span style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span></div>' : '');
+    // The page title + Signed-in-as sit inside the card on the card background (the
+    // only part not in an inner wrapper), above the wrapped sections. The title follows
+    // the GROUP: one card chrome serves two pages, so the word on it is a claim about
+    // which one you are on ([[the-loop]] #79). "Signed in as" belongs to Your Account
+    // alone — on Data and Backup it would be answering a question nobody asked.
+    const accountHeader = '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;">'
+      + (showData ? 'Data and Backup' : 'Your Account') + '</div>'
+      + ((showAccount && userEmail) ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Signed in as <span style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span></div>' : '');
     const accountCard = '<div class="card form-card" style="margin-bottom:16px;">' + accountHeader + cardInner + '</div>';
 
     // Team Members heading + the member list sit on the card background (like
@@ -167,7 +202,7 @@ S.HubUserAccounts = {
 
     container.innerHTML =
       '<div class="screen">'
-      + (showAccount ? accountCard : '')
+      + ((showAccount || showData) ? accountCard : '')
       + (showTeam ? teamCard : '')
       + '</div>';
 

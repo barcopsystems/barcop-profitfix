@@ -95,6 +95,7 @@ S.Hub = {
       target:  '<circle cx="8.5" cy="8.5" r="6.3" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="3.4" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="8.5" r="1" fill="currentColor"/>',
       user:    '<circle cx="8.5" cy="6" r="2.8" stroke="currentColor" stroke-width="1.3"/><path d="M3 14.5c0-2.7 2.5-4.5 5.5-4.5s5.5 1.8 5.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       team:    '<circle cx="6" cy="6.5" r="2.3" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.4 1.9-4 4.2-4s4.2 1.6 4.2 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="12" cy="6" r="1.9" stroke="currentColor" stroke-width="1.2"/><path d="M11.4 10.1c1.8.3 3.1 1.7 3.1 3.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      data:    '<ellipse cx="8.5" cy="4.2" rx="5.4" ry="2.2" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M3.1 4.2v8.4c0 1.22 2.42 2.2 5.4 2.2s5.4-.98 5.4-2.2V4.2" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M3.1 8.4c0 1.22 2.42 2.2 5.4 2.2s5.4-.98 5.4-2.2" stroke="currentColor" stroke-width="1.2" fill="none"/>',
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       support: '<path d="M2.5 3.8h12v7.5H7.8l-3 2.3v-2.3H2.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M5.3 6.6h6.4M5.3 8.7h4.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
@@ -105,13 +106,18 @@ S.Hub = {
         + '<span class="nav-label">' + name + '</span></div>';
     // Getting Started (and its Setup heading) drop off once setup is complete,
     // the same way the old grab-bag hid it. Team Members is admin-only.
+    // Data and Backup is OWNER-only, not admin-only: the page it opens renders its
+    // controls inside `if (isOwnerNow)`, so an admin-gated row would be a link to an
+    // empty page. hub-user-accounts.open('data') refuses non-owners for the same reason.
     const isAdmin   = !!(window.DB && DB.isAdmin && DB.isAdmin());
+    const isOwner   = !!(window.DB && DB.isOwner && DB.isOwner());
     return ''
       + '<div class="nav-section">Settings</div>'
       + row('settings-profile', 'Business Profile', 'profile')
       + row('settings-targets', 'Recovery Targets', 'target')
       + '<div class="nav-section">Account</div>'
       + row('user-account', 'Your Account', 'user')
+      + (isOwner ? row('user-data', 'Data and Backup', 'data') : '')
       + (isAdmin ? row('user-team', 'Team Members', 'team') : '')
       + '<div class="nav-section">Support</div>'
       + row('contact-support', 'Contact Support', 'support')
@@ -1322,6 +1328,7 @@ S.Hub = {
       else if (action === 'settings-targets')   S.HubSettings.open('recovery-targets');
       else if (action === 'settings')           S.HubSettings.open();
       else if (action === 'user-account')       S.HubUserAccounts.open('account');
+      else if (action === 'user-data')          S.HubUserAccounts.open('data');
       else if (action === 'user-team')          S.HubUserAccounts.open('team');
       else if (action === 'user-accounts')      S.HubUserAccounts.open();
       else if (action === 'bar-cop-audit')      S.HubBarCopAudit?.open?.();
