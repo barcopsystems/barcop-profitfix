@@ -1398,6 +1398,33 @@ S.Hub = {
     App.navigate(scr);
   },
 
+  /* ⚠ A NEEDS ATTENTION ROW NAMES AN ITEM, SO IT HAS TO LAND ON THAT ITEM. These two rows name
+     a specific person or permit — "ServSafe Food Handler for Hector M. expired 13d ago" — and
+     both landed on the destination screen scrolled to its inline ADD form, with the named record
+     somewhere down the list. The operator pressed a row about Hector and got a blank New Staff
+     form. Meanwhile the module cards on the SAME Hub deep-link to their exact step, so the page
+     was already doing this correctly eight inches away.
+     Same shape as _enterFix directly above, and both reuse a door the destination already owns:
+     the roster's own staff page (profile + Certifications) and the Permits screen's own filter.
+     No new mechanism, nothing visual. */
+  /* ⭐ App._staffFocus ALREADY EXISTED with two callers (lc-reports, lc-training) and the roster
+     already honours it and self-clears. The contract is an OBJECT — `{ staff_id }` — and my first
+     version set a bare string, which would have matched nothing and silently landed on the list
+     exactly as before. Grep the NAME of any mechanism you are about to invent ([[the-loop]] #95);
+     here the mechanism was already built and the Hub simply was not using it. */
+  _enterStaff(staffId) {
+    if (!App.canAccess('lc-staff-roster')) { App.showNoAccess(); return; }
+    App.showApp('labor');
+    if (staffId) App._staffFocus = { staff_id: staffId };
+    App.navigate('lc-staff-roster');
+  },
+  _enterPermits(filter) {
+    if (!S.HubPermits) return;
+    // 'expired' and 'due' are the screen's own filter values; anything else falls back to all.
+    if (filter) S.HubPermits._filter = filter;
+    S.HubPermits.open();
+  },
+
   /* Weekly money readout (Section 10.3) — what is leaking this week, where, and
      biggest first. Profit and Revenue read live from Recovery.gapImpact (same
      engine the dashboards use). A gap-area only counts when its weekly dollar
@@ -1571,21 +1598,21 @@ S.Hub = {
           sev: 'bad',
           label: (p.name || 'Permit'), value: 'expired ' + Math.abs(days) + 'd ago',
           text: (p.name || 'Permit') + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Review and renew right away.',
-          screen: 'permits', mod: 'hub'
+          screen: 'permits', mod: 'hub', go: "S.Hub._enterPermits('expired')"
         });
       } else if (days <= 14) {
         out.push({
           sev: 'bad',
           label: (p.name || 'Permit'), value: 'renew in ' + days + 'd',
           text: (p.name || 'Permit') + ' renewal due in ' + days + ' day' + (days===1?'':'s') + '. Mark Renewed once paid so Books picks up the cost.',
-          screen: 'permits', mod: 'hub'
+          screen: 'permits', mod: 'hub', go: "S.Hub._enterPermits('due')"
         });
       } else if (days <= 30) {
         out.push({
           sev: 'warn',
           label: (p.name || 'Permit'), value: 'due in ' + days + 'd',
           text: (p.name || 'Permit') + ' renewal due in ' + days + ' days. Get the check or card ready.',
-          screen: 'permits', mod: 'hub'
+          screen: 'permits', mod: 'hub', go: "S.Hub._enterPermits('due')"
         });
       }
     });
@@ -1602,26 +1629,29 @@ S.Hub = {
       const certType = c.cert_type || c.cert_name || c.name || 'Certification';
       const certWho = (lcStaff.find(s => s.id === c.staff_id) || {}).name || c.staff_name || '';
       const certLabel = certType + (certWho ? ' for ' + certWho : '');
+      // The row names a PERSON, so it opens that person's page, where their Certifications
+      // live. A cert with no staff link falls back to the roster itself.
+      const certGo = c.staff_id ? "S.Hub._enterStaff('" + c.staff_id + "')" : null;
       if (days < 0) {
         out.push({
           sev: 'bad',
           label: certLabel, value: 'expired ' + Math.abs(days) + 'd ago',
           text: certLabel + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Not current until renewed.',
-          screen: 'lc-staff-roster', mod: 'labor'
+          screen: 'lc-staff-roster', mod: 'labor', go: certGo
         });
       } else if (days <= 14) {
         out.push({
           sev: 'bad',
           label: certLabel, value: 'expires in ' + days + 'd',
           text: certLabel + ' expires in ' + days + ' day' + (days===1?'':'s') + '. Schedule renewal now.',
-          screen: 'lc-staff-roster', mod: 'labor'
+          screen: 'lc-staff-roster', mod: 'labor', go: certGo
         });
       } else if (days <= 30) {
         out.push({
           sev: 'warn',
           label: certLabel, value: 'expires in ' + days + 'd',
           text: certLabel + ' expires in ' + days + ' days. Renewal window opens soon.',
-          screen: 'lc-staff-roster', mod: 'labor'
+          screen: 'lc-staff-roster', mod: 'labor', go: certGo
         });
       }
     });
