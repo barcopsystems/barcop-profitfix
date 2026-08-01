@@ -90,6 +90,15 @@ window.CashCounter = {
 
     const ctrl = {
       total() { return CashCounter.totalOf(ctrl.denoms()); },
+      /* HAS THE OPERATOR ENTERED ANYTHING AT ALL? `total()` cannot answer this — an untouched
+         counter and a counter typed full of zeros both total 0, and `denoms()` drops every
+         non-positive cell. A caller that reads 0 as a real count prints a full-balance shortage
+         on a form nobody has filled in (SH3). A BLANK cell is the discriminator: typed zeros are
+         still a count. */
+      touched() {
+        return [...wrap.querySelectorAll('.ccd-cnt, .ccd-coins')]
+          .some(inp => String(inp.value != null ? inp.value : '').trim() !== '');
+      },
       denoms() {
         const d = {};
         wrap.querySelectorAll('.ccd-cnt').forEach(inp => {

@@ -1367,6 +1367,29 @@ const PosIngest = {
        fixed for exactly this and never carried across to cash. */
     const has = v => App.parseNum(v) != null;
     const cents = n => Math.round(n * 100) / 100;
+    /* ⚠⚠ NEVER ZERO A COLUMN THE FILE CANNOT CARRY — S140's rule, finally stated for cash (SH2).
+       A replacement REUSES the prior row's id, so it overwrites the whole record, and the record
+       this door builds is blank in every operator-authored field. Of the six keys FIELDS.cash can
+       map (date, drawer, cashier, expected, counted, over_short) only `cashier` is one of these:
+       `reason`, `notes` and `shift_type` can NEVER arrive in a file, so a file can only ever
+       DESTROY them.
+       Measured on the live app: a re-drop turned the BY column from "Maria G." into "-", and
+       choosing "Use the file" at the conflict prompt erased the manager's reason AND their note —
+       under a modal whose own words promise only "Pick which FIGURES to keep." On the screen loss
+       prevention runs on, who counted the drawer and why it was short is the evidence.
+       ⚠ `cashier` is the one field a file CAN carry, so it is only preserved when the row did not
+       name one. Carrying is not freezing. */
+    const carryPrior = (rec, prior, fileNamedCashier) => {
+      if (!prior) return rec;
+      if (!fileNamedCashier) {
+        rec.cashier = prior.cashier || '';
+        rec.cashier_id = prior.cashier_id || '';
+      }
+      rec.reason = prior.reason || '';
+      rec.notes = prior.notes || '';
+      rec.shift_type = prior.shift_type || '';
+      return rec;
+    };
     /* Which dates have a NAMED-register row? Used to recognise a column-less TOTALS line (S142).
        ⚠ ONLY A ROW THAT WILL ACTUALLY IMPORT COUNTS. This asked "is there a named row on this
        date", not "is there a named row that produces a FIGURE" — so a report whose per-register
@@ -1493,6 +1516,7 @@ const PosIngest = {
         if (this._sameVariance(manual, rec)) { keptKeys.add(dayKey); keptManual++; return; }
         conflictKeys.add(dayKey);
         rec.id = manual.id;   // "use the file" replaces the hand count IN PLACE (idempotent retry, S147)
+        carryPrior(rec, manual, !!cName);   // SH2 — the figures are the choice; the note is not
         conflicts.push({
           key: dayKey, date, drawer_id: drawerId, drawer,
           mine:   { variance: cents(+manual.variance || 0),
@@ -1514,7 +1538,7 @@ const PosIngest = {
       // (after a refused write) re-upserts the SAME id instead of inserting another row — the retry
       // is idempotent and a register-day can never grow unbounded. _commitCashRows still retires any
       // EXTRA prior for the key (a re-import with fewer rows than before) as the backstop.
-      if (prior) { dupCount++; rec.id = prior.id; }
+      if (prior) { dupCount++; rec.id = prior.id; carryPrior(rec, prior, !!cName); }   // SH2
       toAdd.push(rec);
     });
     // `dupCount` means REPLACED (an earlier import), `keptManual` counts register-days the file
