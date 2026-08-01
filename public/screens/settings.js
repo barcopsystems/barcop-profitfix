@@ -1304,7 +1304,7 @@ S.HubSettings = {
       90: mkAudit('revenue', { date: dateStr(90), generated_at: daysAgoISO(90), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 39,
         DATA_TIER_LABEL: 'Bar Cop operating data',
-        AUDIT_PERIOD: periodLabel(90), AUDIT_ID: 'RVA-2026-0012',
+        AUDIT_PERIOD: periodLabel(90), AUDIT_ID: 'RFA-2026-0012',
         INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 38, S1_CHECK_AVG: 35.40, S1_CHECK_AVG_TARGET: 40.00, S1_BAR_CHECK_AVG: 28.40,
         // 73,986 = 35.40 x 2,090. r-audit prints Monthly Revenue, Cover Count and Check
@@ -1330,7 +1330,7 @@ S.HubSettings = {
       60: mkAudit('revenue', { date: dateStr(60), generated_at: daysAgoISO(60), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 48,
         DATA_TIER_LABEL: 'Bar Cop operating data',
-        AUDIT_PERIOD: periodLabel(60), AUDIT_ID: 'RVA-2026-0017',
+        AUDIT_PERIOD: periodLabel(60), AUDIT_ID: 'RFA-2026-0017',
         INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 47, S1_CHECK_AVG: 36.20, S1_CHECK_AVG_TARGET: 40.00, S1_BAR_CHECK_AVG: 29.60,
         S1_FOOD_CHECK_AVG: 42.40, S1_COVER_COUNT: 2110, S1_MONTHLY_REVENUE: 76400,
@@ -1347,7 +1347,7 @@ S.HubSettings = {
       30: mkAudit('revenue', { date: dateStr(30), generated_at: daysAgoISO(30), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 56,
         DATA_TIER_LABEL: 'Bar Cop operating data',
-        AUDIT_PERIOD: periodLabel(30), AUDIT_ID: 'RVA-2026-0022',
+        AUDIT_PERIOD: periodLabel(30), AUDIT_ID: 'RFA-2026-0022',
         INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 56, S1_CHECK_AVG: 36.90, S1_CHECK_AVG_TARGET: 40.00, S1_BAR_CHECK_AVG: 30.60,
         S1_FOOD_CHECK_AVG: 43.00, S1_COVER_COUNT: 2140, S1_MONTHLY_REVENUE: 78900,
@@ -1364,7 +1364,7 @@ S.HubSettings = {
       0: mkAudit('revenue', { date: dateStr(0), generated_at: daysAgoISO(0), raw: {
         BAR_NAME: 'The Anchor Bar & Kitchen', OVERALL_SCORE: 64,
         DATA_TIER_LABEL: 'Bar Cop operating data',
-        AUDIT_PERIOD: periodLabel(0), AUDIT_ID: 'RVA-2026-0028',
+        AUDIT_PERIOD: periodLabel(0), AUDIT_ID: 'RFA-2026-0028',
         INDUSTRY_AVG: 61, TARGET_SCORE: 70,
         S1_SCORE: 64, S1_CHECK_AVG: 38.10, S1_CHECK_AVG_TARGET: 40.00, S1_BAR_CHECK_AVG: 31.80,
         S1_FOOD_CHECK_AVG: 44.20, S1_COVER_COUNT: 2170, S1_MONTHLY_REVENUE: 82700,

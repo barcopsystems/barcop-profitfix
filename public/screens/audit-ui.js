@@ -214,7 +214,17 @@ const AuditUI = {
       return '<tr>'
         + '<td>' + (a.date||'').slice(0,10) + '</td>'
         + '<td style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + (naA ? 'N/A' : a.overall_score) + '</td>'
-        + '<td style="color:' + (diff==null||diff===0?'var(--t3)':diff>0?'var(--green)':'var(--red)') + ';">' + (diff!=null&&diff!==0?(diff>0?'+':'')+diff+' pts':'') + '</td>'
+        /* ⚠ A SCORE THAT HELD AND AN AUDIT WITH NO PRIOR ARE NOT THE SAME FACT. This printed ''
+           for BOTH `diff === 0` and `diff === null`, so on the live Bar Cop history the rows
+           that held steady (51 -> 51, 43 -> 43) were indistinguishable from the oldest row,
+           which has nothing to compare against. Holding after a run of gains is information,
+           and the app's convention elsewhere is to PRINT the zero — App.fmtSigned normalises
+           +/-0 to "0.0" rather than blanking it. Zero now reads "0 pts" in neutral; only a
+           genuinely absent comparison gets the empty marker. */
+        + '<td style="color:' + (diff==null||diff===0?'var(--t3)':diff>0?'var(--green)':'var(--red)') + ';">'
+        +   (diff == null ? '<span style="color:var(--t4);">&ndash;</span>'
+              : diff === 0 ? '0 pts'
+              : (diff > 0 ? '+' : '') + diff + ' pts') + '</td>'
         + '<td>' + AuditUI.dataQualityChip(a, total) + '</td>'
         + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm ' + pfx + '-view-btn" data-idx="' + i + '">View</button></td>'
         + '</tr>';
