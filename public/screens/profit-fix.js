@@ -32,7 +32,18 @@ S.ProfitFix = {
   // step stays On track; up to 2x is Slipping; beyond is Behind.
   TRACK: {
     'pour-cost':      { 0: { kind: 'setup', key: 'yields' }, 1: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' }, 2: { kind: 'recur', signal: 'view:dashboard', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'variancereport', maxDays: 12, every: 'every week' }, 5: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' } },
-    'theft-loss':     { 1: { kind: 'recur', signal: 'voidcomp', maxDays: 4, every: 'every shift' }, 2: { kind: 'recur', signal: 'salesreview', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'drawer', maxDays: 3, every: 'every shift' }, 4: { kind: 'recur', signal: 'delivery', maxDays: 10, every: 'every delivery' }, 5: { kind: 'recur', signal: 'spotcheck', maxDays: 7, every: 'a couple times a week' }, 6: { kind: 'recur', signal: 'view:theft-risk', maxDays: 9, every: 'every week' } },
+    /* ⚠ TWO OF THESE WATCHED A SIGNAL A WEEKLY POS DROP ALREADY WRITES, AND STILL DEMANDED IT
+       EVERY SHIFT. `voidcomp` reads sc_void_comps and `drawer` reads sc_variances — exactly what
+       PosIngest's 'voids' and 'cash' imports commit at the Shift weekly close. At maxDays 4 and 3
+       an operator doing precisely what Bar Cop's weekly model asks showed these SLIPPING about
+       four days in every seven. The tell that it was a misconfiguration rather than a decision:
+       `salesreview` beside them is the same shape — a weekly POS drop — at maxDays 9.
+       Kyle, 2026-08-01: "the whole point of bar cop is supposed to be do it at the end of the
+       week.. reconcile drawers daily should be the fallback for users who don't have a weekly
+       pos to drop." Both now weekly; the per-shift path stays in the step copy as the fallback.
+       ⚠ `waste` (food-cost) and `briefing` (r-fix) KEEP their tight cadence on purpose — nothing
+       imports them, so per-shift really is the only way they get logged. Pinned by P12. */
+    'theft-loss':     { 1: { kind: 'recur', signal: 'voidcomp', maxDays: 9, every: 'every week' }, 2: { kind: 'recur', signal: 'salesreview', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'drawer', maxDays: 9, every: 'every week' }, 4: { kind: 'recur', signal: 'delivery', maxDays: 10, every: 'every delivery' }, 5: { kind: 'recur', signal: 'spotcheck', maxDays: 7, every: 'a couple times a week' }, 6: { kind: 'recur', signal: 'view:theft-risk', maxDays: 9, every: 'every week' } },
     'food-cost':      { 0: { kind: 'setup', key: 'recipes' }, 1: { kind: 'recur', signal: 'count', maxDays: 9, every: 'every week' }, 2: { kind: 'recur', signal: 'view:dashboard', maxDays: 9, every: 'every week' }, 3: { kind: 'recur', signal: 'waste', maxDays: 4, every: 'every shift' }, 6: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }, 7: { kind: 'state', key: 'reprice' } },
     'vendor-control': { 0: { kind: 'recur', signal: 'order', maxDays: 14, every: 'every order you place' }, 1: { kind: 'recur', signal: 'delivery', maxDays: 10, every: 'every delivery' }, 4: { kind: 'state', key: 'chase' }, 5: { kind: 'recur', signal: 'view:vendor-tracker:watch', maxDays: 35, every: 'once a month' }, 6: { kind: 'recur', signal: 'view:vendor-tracker:scorecard', maxDays: 95, every: 'once a quarter' } },
     'prime-cost':     { 0: { kind: 'recur', signal: 'week', maxDays: 9, every: 'every week' }, 1: { kind: 'recur', signal: 'view:dashboard', maxDays: 9, every: 'every week' }, 4: { kind: 'recur', signal: 'view:weekly-pnl', maxDays: 9, every: 'every week' }, 5: { kind: 'recur', signal: 'view:books', maxDays: 35, every: 'once a month' } }
