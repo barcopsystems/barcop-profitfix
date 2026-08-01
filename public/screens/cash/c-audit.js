@@ -16,6 +16,20 @@ S.CashAudit = {
 
   audits() { return (App.data.cash_audits || []).slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)); },
 
+  /* CA-<year>-<4 digits>, matching PFA/RFA, and never one that is already on file. The server
+     pair draw blind because they cannot see the account's history; this runs in the browser
+     with the whole list in hand, so it costs nothing to check. Bounded retries, then a
+     timestamp tail, because an unbounded loop on a full keyspace is worse than a long id. */
+  _newAuditId() {
+    const yr = new Date().getFullYear();
+    const taken = new Set(this.audits().map(a => a && a.audit_id).filter(Boolean));
+    for (let i = 0; i < 50; i++) {
+      const id = 'CA-' + yr + '-' + String(Math.floor(Math.random() * 9000) + 1000);
+      if (!taken.has(id)) return id;
+    }
+    return 'CA-' + yr + '-' + String(Date.now()).slice(-6);
+  },
+
   fmtWk(ws) { const d = new Date(ws + 'T00:00:00'); return isNaN(d.getTime()) ? ws : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); },
 
   // Balances below (Safe to Spend, the low point, cash kept) go through App.fmtBal:
@@ -217,7 +231,13 @@ S.CashAudit = {
          S1/S2 are a right-now shelf read against the last two counts, S3 is thirteen weeks
          FORWARD, S4 is the vendor list as it stands. That is what the label now says. */
       audit_period: 'Position today, 13 weeks ahead',
-      audit_id: 'CA-' + (this.audits().length + 1),
+      /* ⚠ A COUNT IS NOT AN IDENTIFIER. This was `'CA-' + (this.audits().length + 1)`, which
+         printed "CA-14" against the siblings' "PFA-2026-6185" and "RFA-2026-1578" — no year, no
+         padding — on a document that gets handed to a lender. Worse, it reuses a value the
+         moment any record leaves the list, so two different audits could carry one id.
+         Same shape as PFA/RFA now, and because this one is generated client-side we can do what
+         the server-side pair cannot: check it against the ids already on file and redraw. */
+      audit_id: this._newAuditId(),
       sections, action_items, cash_to_free: cashToFree, raw,
       signals: this._riskSignals(),
       generated_at: new Date().toISOString()
@@ -504,8 +524,14 @@ S.CashAudit = {
     }
     const f = App.deliverableFooter();
     b.disclaimer(f.workbookSubject);
-    const venue = (App.data && App.data.settings && App.data.settings.bar_name) || 'Bar Cop';
-    await b.save(venue + ' - Cash Audit - ' + (audit.date || ''));
+    /* ⚠ THROUGH THE SHARED BUILDER, LIKE THE OTHER THREE AUDITS. This hand-rolled the filename
+       — which is why it was one of the three that once shipped a file with NO .pdf extension
+       (see App._savePDF's note) — and it stamped a dashed date while Profit, Revenue and Bar Cop
+       all use App._pdfDateStamp()'s YYYYMMDD. One audit out of four with a different filename
+       shape, on the documents most likely to be filed side by side. */
+    const ds = /^\d{4}-\d{2}-\d{2}/.test(audit.date || '')
+      ? (audit.date || '').slice(0, 10).replace(/-/g, '') : App._pdfDateStamp();
+    await b.save(App.pdfFileName('Cash Audit', ds));
   },
 
   showHowTo() {
