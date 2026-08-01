@@ -204,7 +204,8 @@ S.ShiftCashHistory = {
     const flagged = filtered.filter(v => v.status === 'Over' || v.status === 'Short').length;
     const stats = this.statsCard(
       this.statItem('Variances', filtered.length)
-      + this.statItem('Net Over/Short', (net > 0 ? '+' : '') + App.fmtCurrency(net), net < 0 ? 'warn' : '')
+      // SH4/R6 — minus outside the '$'; warn off the ROUNDED sign so a to-the-cent balance is not red.
+      + this.statItem('Net Over/Short', (App.fmtSigned(net, 2).sign > 0 ? '+' : '') + App.fmtBal(net), App.fmtSigned(net, 2).sign < 0 ? 'warn' : '')
       + this.statItem('Out of Tolerance', flagged, flagged ? 'warn' : ''));
     let rows;
     if (!filtered.length) rows = this.noMatchRow(7);
@@ -214,7 +215,9 @@ S.ShiftCashHistory = {
       // Variance value follows the status scheme, same as the badge: Within = green,
       // Short = red, Over = amber, Not Counted = grey.
       const col = v.status === 'Short' ? 'var(--red)' : v.status === 'Over' ? 'var(--amber)' : nc ? 'var(--t3)' : 'var(--green)';
-      const vc = nc ? '-' : (vr > 0 ? '+' : '') + App.fmtCurrency(vr);
+      // SH4/R6 — minus outside the '$'. This is the whole Variance column, negative exactly when
+      // it matters, and it printed "$-12.00" on every short drawer in the log.
+      const vc = nc ? '-' : (App.fmtSigned(vr, 2).sign > 0 ? '+' : '') + App.fmtBal(vr);
       return '<tr><td><div class="val">' + this.fmtDate(v.date) + '</div></td>'
         + '<td>' + esc(v.drawer || '-') + '</td>'
         // ⚠ buildCash leaves these NULL when the POS report carried only an Over/Short column — a

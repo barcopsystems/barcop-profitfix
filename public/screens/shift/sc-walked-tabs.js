@@ -100,6 +100,7 @@ S.ShiftWalkedTabs = {
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="wt-f-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="wt-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + App.rangeWarning(this.filterFrom, this.filterTo)
       + '</div>';
     return row + custom;
   },
@@ -243,6 +244,7 @@ S.ShiftWalkedTabs = {
     const date = document.getElementById('wte-date')?.value;
     if (!date) { fail('Date is required.'); return; }
     const amount = parseFloat(document.getElementById('wte-amount')?.value);
+    if (amount < 0) { fail('The amount lost cannot be negative.'); return; }
     if (isNaN(amount) || amount <= 0) { fail('Enter the dollar amount lost.'); return; }
     const serverId = document.getElementById('wte-server')?.value || '';
     if (!serverId) { fail('Pick the server.'); return; }
@@ -278,6 +280,7 @@ S.ShiftWalkedTabs = {
     const date = document.getElementById('wt-date')?.value;
     if (!date) { fail('Date is required.'); return; }
     const amount = parseFloat(document.getElementById('wt-amount')?.value);
+    if (amount < 0) { fail('The amount lost cannot be negative.'); return; }
     if (isNaN(amount) || amount <= 0) { fail('Enter the dollar amount lost.'); return; }
     const serverId = document.getElementById('wt-server')?.value || '';
     if (!serverId) { fail('Pick the server.'); return; }
@@ -321,7 +324,13 @@ S.ShiftWalkedTabs = {
   },
 
   async confirmDel(id) {
-    const ok = await App.confirmDelete();
+    // K3 — name the record. A walked tab is a logged loss that Loss Prevention reads.
+    const r = this.tabs().find(x => x && x.id === id);
+    const subject = r
+      ? 'this ' + App.fmtCurrency(r.amount || 0) + ' walked tab'
+        + (r.server ? ' on ' + r.server : '') + ' from ' + this.fmtDate(r.date)
+      : undefined;
+    const ok = await App.confirmDelete(subject);
     if (!ok) return;
     await App.removeRecord('sc', 'walked_tab', id);
     this.renderList();

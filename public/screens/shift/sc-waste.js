@@ -297,6 +297,7 @@ S.ShiftWaste = {
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="wl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="wl-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + App.rangeWarning(this.filterFrom, this.filterTo)
       + '</div>';
     return row + custom;
   },

@@ -270,7 +270,9 @@ S.ShiftPreShift = {
     this.container.innerHTML = '<div class="screen">'
       // Live stat strip (top)
       + '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:32px;align-items:center;flex-wrap:wrap;">'
-      +   stat('Check Average Target', tgt != null ? App.fmtCurrency(tgt) : '-', 'your target this service')
+      // ⚠ "your target this service" was a per-daypart claim on ONE figure: the same $40 shows on
+      // Lunch, Happy Hour, Dinner and Late Night, because the target is set once for the bar.
+      +   stat('Check Average Target', tgt != null ? App.fmtCurrency(tgt) : '-', 'your target, every service')
       +   stat('Covers Forecast', covers != null ? String(covers) : '-', covers != null ? 'expected today' : 'set a forecast in Build Schedule')
       +   stat('Items Featured', String(featured.length), 'push these')
       + '</div></div>'

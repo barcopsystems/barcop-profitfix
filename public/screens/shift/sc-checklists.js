@@ -79,6 +79,7 @@ S.ShiftChecklists = {
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="cl-f-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="cl-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + App.rangeWarning(this.filterFrom, this.filterTo)
       + '</div>';
     return row + custom;
   },
@@ -124,6 +125,9 @@ S.ShiftChecklists = {
       notes: '',
       items: this.itemsFor(tid)
     };
+    // SH11 — startRun IS "begin fresh", so the edit pointer is cleared here rather than in a
+    // separate method: this covers Start Over, a successful save and a type switch at once.
+    this._editRunId = null;
     this._runs[this.TYPE] = this._run;
   },
 
@@ -218,6 +222,7 @@ S.ShiftChecklists = {
             + '<td>' + status + '</td>'
             + '<td><div class="row-actions">'
             + '<button class="btn btn-ghost btn-sm cl-hview" data-id="' + r.id + '">View</button>'
+            + '<button class="btn btn-ghost btn-sm cl-hedit" data-id="' + r.id + '">Edit</button>'
             + '<button class="btn btn-danger btn-sm cl-hdel" data-id="' + r.id + '">Delete</button>'
             + '</div></td></tr>';
         }).join('');
@@ -252,8 +257,10 @@ S.ShiftChecklists = {
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderMain()); return; }
       const hrow = ev.target.closest('.cl-hrow');
       const hview = ev.target.closest('.cl-hview');
+      const hedit = ev.target.closest('.cl-hedit');
       const hdel = ev.target.closest('.cl-hdel');
       if (hdel) { ev.stopPropagation(); this.confirmDel(hdel.dataset.id); }
+      else if (hedit) { ev.stopPropagation(); this.editRun(hedit.dataset.id); }
       else if (hview) { ev.stopPropagation(); const id = hview.dataset.id; App.pushView(() => this.renderDetail(id)); }
       else if (hrow) { const id = hrow.dataset.id; App.pushView(() => this.renderDetail(id)); }
     };
@@ -278,14 +285,43 @@ S.ShiftChecklists = {
     document.getElementById('cl-save')?.addEventListener('click', () => { this._syncRun(); this.save(); });
   },
 
+  /* ── Re-open a filed checklist so a mistake can be corrected (SH11) ───────────────────────────
+     The run list gave View and Delete only, and the detail page carried nothing but Export PDF, so
+     the only way to fix a wrongly-ticked line was to delete the run and do it again. That is the
+     shape Kyle found four times over in Inventory: submit, then discover a mistake, with no way
+     back. The runner already holds every field a run has, so re-opening is a matter of pointing it
+     at the saved record and letting `save` upsert in place. */
+  editRun(id) {
+    if (!App.canEdit || App.canEdit('sc-checklists')) {
+      const r = this.runs().find(x => x && x.id === id);
+      if (!r) return;
+      this.TYPE = r.type || this.TYPE;
+      this._editRunId = r.id;
+      this._run = {
+        templateId: r.template_id || '',
+        date: r.date || App.todayLocal(),
+        completed_by_id: r.completed_by_id || '',
+        completed_by: r.completed_by || '',
+        notes: r.notes || '',
+        // The RUN's own items, never the template's — a template edited since is a different list,
+        // and the operator is correcting what they filed, not re-running today's version.
+        items: (r.items || []).map(i => ({ text: i.text, done: !!i.done }))
+      };
+      this.renderMain();
+    }
+  },
+
   async save() {
     const err = document.getElementById('cl-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     if (!this._run.completed_by_id) { fail('Pick who completed the checklist.'); return; }
     const tpl = this.templates().find(t => t.id === this._run.templateId);
     const items = this._run.items;
+    // SH11 — an edit upserts the SAME record; only a fresh run mints an id.
+    const editId = this._editRunId || null;
+    const prior = editId ? this.runs().find(x => x && x.id === editId) : null;
     const rec = {
-      id:            App.uid(),
+      id:            editId || App.uid(),
       type:          this.TYPE,
       template_id:   this._run.templateId || '',
       template_name: tpl ? tpl.name : ('Default ' + this.TYPE + ' Checklist'),
@@ -297,15 +333,23 @@ S.ShiftChecklists = {
       total_count:   items.length,
       notes:         this._run.notes.trim(),
       completed_at:  new Date().toISOString(),
-      created_at:    new Date().toISOString()
+      // The run was filed when it was filed. Re-stamping created_at on a correction would re-sort
+      // it to the top of a date-ordered log and lose when it actually happened.
+      created_at:    prior ? prior.created_at : new Date().toISOString()
     };
     const btn = document.getElementById('cl-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    this.runs().push(rec);
+    /* ⚠ UNDO MEMORY ON A FAILED WRITE, AND THE UNDO FOR AN EDIT IS NOT A `pop()` ([[test-the-retry]]).
+       The old path pushed then popped; an edit REPLACES an element, so a refused write has to put
+       the previous record back at its own index or the operator's filed run is gone from memory
+       while the screen says the save failed. */
+    const list = this.runs();
+    const at = prior ? list.indexOf(prior) : -1;
+    if (at > -1) list[at] = rec; else list.push(rec);
     const ok = await App.putRecord('sc', 'checklist', rec);
-    if (ok) { this.startRun(this._run.templateId); this.renderMain(); }
+    if (ok) { this._editRunId = null; this.startRun(this._run.templateId); this.renderMain(); }
     else {
-      this.runs().pop();
+      if (at > -1) list[at] = prior; else list.pop();
       if (btn) { btn.disabled = false; btn.textContent = 'Save Checklist'; }
       fail('Save failed. Try again.');
     }

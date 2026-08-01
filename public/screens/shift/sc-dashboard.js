@@ -219,8 +219,18 @@ S.ShiftDashboard = {
   },
   stepStatus(k, isDone) {
     if (k === 'import') {
-      const n = this.shifts().filter(s => this.inWeek(s.date)).length;
-      return n ? (n + ' day' + (n === 1 ? '' : 's') + ' imported') : this._META.import.sub;
+      /* ⚠ SAY HOW THE DAYS GOT HERE (SH12). This counted records and called every one of them
+         "imported", so a bar with no POS export that keys its week into the Enter Manually grid
+         read "7 days imported" about figures they typed by hand. The step offers both doors, so
+         the subtitle has to describe whichever they used rather than naming one of them. */
+      const wk = this.shifts().filter(s => this.inWeek(s.date));
+      const n = wk.length;
+      if (!n) return this._META.import.sub;
+      const days = n + ' day' + (n === 1 ? '' : 's');
+      const manual = wk.filter(s => s.source === 'manual').length;
+      if (manual === 0) return days + ' imported';
+      if (manual === n) return days + ' entered';
+      return days + ' in';
     }
     if (k === 'cash') return isDone ? 'Reconciled' : this._META.cash.sub;
     if (k === 'exc') {
@@ -888,6 +898,44 @@ S.ShiftDashboard = {
       return;
     }
 
+    /* ⚠⚠ WRITE THE DAYS THAT CHANGED, NEVER THE WHOLE WEEK (SH1). Every cell in this grid arrives
+       PRE-FILLED from the saved record, so a day the operator never looked at is byte-identical to
+       one they retyped, and writing it stamps source:'manual' / imported:false / a fresh
+       created_at over a day that came from their POS file.
+       That is not cosmetic. `PosIngest.buildSales` decides protect-vs-replace on exactly
+       `prior.source === 'manual'`, so ONE hand correction turned the next weekly drop into a
+       conflict prompt reading "2 days you already entered by hand" about days nobody had ever
+       typed, offering "Keep mine" over figures that were never the operator's, on the screen that
+       feeds Confirm the Week and every Recovery revenue read.
+       ⚠ Compare against the record the CELL WAS FILLED FROM, built the same way _manualSalesGrid
+       builds it (last row per date wins), or the comparison is against a different record than the
+       one on screen ([[the-loop]] #36). A date with no saved record can never match, so a brand-new
+       day always writes. */
+    const priorByDate = {};
+    this.shifts().filter(s => this.inWeek(s.date)).forEach(s => { priorByDate[String(s.date).slice(0, 10)] = s; });
+    const cents = x => Math.round((App.parseNum(x) ?? 0) * 100);
+    const unchanged = r => {
+      const p = priorByDate[r.date];
+      if (!p) return false;
+      return cents(r.bar) === cents(p.bar_revenue)
+          && cents(r.food) === cents(p.floor_revenue)
+          && cents(r.covers) === cents(p.covers);
+    };
+    // ⚠ A NEW BINDING, NOT A REASSIGNMENT. `rows` is a const up top, and "Assignment to constant
+    // variable" only throws on the branch that runs it ([[the-loop]] #72).
+    const untouched = rows.filter(unchanged).length;
+    const changedRows = rows.filter(r => !unchanged(r));
+    // Everything on screen already matches what is saved, and nothing was zeroed. Say that rather
+    // than reporting a write that did not happen. "Those days were already empty" is the zeroed-day
+    // wording and is false here, because these days have figures.
+    if (!changedRows.length && !zeroDays.length) {
+      this._flash = untouched === 1
+        ? 'Nothing to save. That day already reads exactly this way.'
+        : 'Nothing to save. Those ' + untouched + ' days already read exactly this way.';
+      this.render(this.container, this.actions);
+      return;
+    }
+
     /* ⚠ COUNT DAYS, NOT RECORDS. `cleared++` sat inside the per-RECORD loop, and a date can
        legitimately hold more than one sc_shifts row — _commitSales deliberately leaves a superseded
        row in place when its retirement delete is refused (S102). So clearing ONE such day reported
@@ -919,7 +967,7 @@ S.ShiftDashboard = {
             : (attempted === 1 ? 'the day' : 'those ' + attempted + ' days') + '. Try the save again.') + coTail);
       return;
     }
-    if (rows.length) { await this.importSales(rows, { manual: true, cleared: cleared, coversOnly: coversOnlyLabels }); return; }
+    if (changedRows.length) { await this.importSales(changedRows, { manual: true, cleared: cleared, coversOnly: coversOnlyLabels }); return; }
 
     // Zeroed days only: nothing left to write, so report the clear from here.
     const co = coversOnlyLabels.length

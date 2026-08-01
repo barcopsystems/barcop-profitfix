@@ -118,6 +118,7 @@ S.ShiftMaintenance = {
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="mt-f-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="mt-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + App.rangeWarning(this.filterFrom, this.filterTo)
       + '</div>';
     return row + custom;
   },
@@ -324,6 +325,13 @@ S.ShiftMaintenance = {
     const dateResolved = document.getElementById(p + 'resolved')?.value || '';
     if (status === 'Resolved' && !dateResolved) { fail('Resolved issues need a resolution date. Set Date Resolved or change the status.'); return null; }
     const cost = parseFloat(document.getElementById(p + 'cost')?.value);
+    /* ⚠ A NEGATIVE REPAIR COST SUBTRACTS FROM WHAT THE BAR HAS SPENT (SH5). This stored -50 in
+       silence and the Repair Cost tile read $755 -> $705, so the screen UNDER-reported the spend
+       with nothing on it saying why. `min="0"` on the input does not stop it: a number input still
+       hands back "-50" and nothing calls checkValidity. Blank stays optional and an explicit 0 is a
+       real answer (a warranty call), so only a genuine negative is refused. Add Registers in this
+       same section already words it this way. */
+    if (!isNaN(cost) && cost < 0) { fail('Repair cost cannot be negative.'); return null; }
     const byId = document.getElementById(p + 'by')?.value || '';
     return {
       date_reported: date,

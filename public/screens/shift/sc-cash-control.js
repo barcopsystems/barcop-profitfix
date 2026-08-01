@@ -30,6 +30,10 @@ S.ShiftCashControl = {
   // register's own tolerance (App.drawerTolerance), set on the Add Register form.
   safeTolerance() { return 10; },
 
+  // Is there anybody on the roster to name? The out-of-tolerance guards (K1) only bite once there
+  // is, so a bar in its first week can still record a short drawer before it has entered staff.
+  _haveStaff() { return (((App.laborData && App.laborData.lc_staff) || []).length > 0); },
+
   // One cash-status color scheme used everywhere a count/variance status shows:
   // green = within tolerance (clean), red = short, amber = over, grey = not counted.
   statusColor(status) {
@@ -183,6 +187,7 @@ S.ShiftCashControl = {
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="cc-f-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="cc-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + App.rangeWarning(this.filterFrom, this.filterTo)
       + '</div>';
     return row + custom;
   },
@@ -228,7 +233,21 @@ S.ShiftCashControl = {
       const st = lastCount.status || '';
       const col = this.statusColor(st);
       countLine = '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Last safe count ' + this.fmtDate(lastCount.date) + ': '
-        + '<span style="color:' + col + ';font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span> ' + esc(st) + '</div>';
+        /* SH4/R6 — the minus goes OUTSIDE the dollar sign, and the '+' is decided on the ROUNDED
+           value so a range that balances to the cent cannot read as a shortage. fmtCurrency is
+           '$' + v, which printed "$-100.00" on the one line that says the safe came up light. */
+        + '<span style="color:' + col + ';font-weight:700;">' + (App.fmtSigned(vr, 2).sign > 0 ? '+' : '') + App.fmtBal(vr) + '</span> ' + esc(st) + '</div>'
+        /* ⚠ THE BALANCE MUST NOT SILENTLY CONTRADICT THE COUNT ABOVE IT (K2). The balance is
+           DERIVED from the safe log and stays that way — a count is an observation, not a
+           transaction, and minting an adjusting entry would make the ledger disagree with the bank.
+           But after a count that came up $100 light the card still read "Current Safe Balance
+           $8,791.00" with nothing saying the safe had just been measured lighter than that. Say it
+           where the two numbers sit together, and only when they actually disagree. */
+        + (st && st !== 'Within Tolerance'
+          ? '<div style="font-size:11px;color:var(--amber);margin-top:4px;">That count came up '
+            + App.fmtBal(Math.abs(vr)) + ' ' + (vr < 0 ? 'short' : 'over') + ' of this figure, and '
+            + 'the balance below still follows the log. Log the correction as a safe entry if the money really moved.</div>'
+          : '');
     }
     const safeCard = '<div class="card form-card no-print" style="margin-bottom:16px;">'
       + App.collapsibleCardTitle('sc-cash-safe', 'The Safe')
@@ -255,7 +274,8 @@ S.ShiftCashControl = {
         const col = this.statusColor(status);
         const sd = new Date((st.lastVar.date || '') + 'T00:00:00');
         const shortDate = isNaN(sd.getTime()) ? '' : sd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        reconcileBlock = '<div style="font-size:12px;color:var(--t2);margin-top:8px;">Last reconcile: <span style="color:var(--t1);font-weight:700;">' + (vr > 0 ? '+' : '') + App.fmtCurrency(vr) + '</span>' + (shortDate ? '<span style="color:var(--t3);margin-left:6px;">(' + shortDate + ')</span>' : '') + '</div>'
+        // SH4/R6 — minus outside the '$', sign off the rounded value (same rule as cash-recon).
+        reconcileBlock = '<div style="font-size:12px;color:var(--t2);margin-top:8px;">Last reconcile: <span style="color:var(--t1);font-weight:700;">' + (App.fmtSigned(vr, 2).sign > 0 ? '+' : '') + App.fmtBal(vr) + '</span>' + (shortDate ? '<span style="color:var(--t3);margin-left:6px;">(' + shortDate + ')</span>' : '') + '</div>'
           + '<div style="font-size:11px;font-weight:700;color:' + col + ';margin-top:2px;">' + esc(status) + '</div>';
       } else {
         reconcileBlock = '<div style="font-size:12px;color:var(--t4);margin-top:8px;">No reconcile logged yet</div>';
@@ -289,12 +309,15 @@ S.ShiftCashControl = {
 
     const netBox = '<div style="margin-left:auto;text-align:right;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">' + netLabel + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:' + netColor + ';line-height:1.1;">' + (netWin > 0 ? '+' : '') + App.fmtCurrency(netWin) + '</div></div>';
+      // SH4/R6 — minus outside the '$'.
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:600;color:' + netColor + ';line-height:1.1;">' + (App.fmtSigned(netWin, 2).sign > 0 ? '+' : '') + App.fmtBal(netWin) + '</div></div>';
 
     const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + '<div class="calc-item"><div class="calc-label">Drops In</div><div class="calc-val lg">' + App.fmtCurrency(totDrops) + '</div><div style="font-size:10px;color:var(--t3);">' + drops.length + ' drop' + (drops.length === 1 ? '' : 's') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Safe Out</div><div class="calc-val lg">' + App.fmtCurrency(totOut) + '</div><div style="font-size:10px;color:var(--t3);">deposits and banks</div></div>'
-      + '<div class="calc-item"><div class="calc-label">Drawer Net</div><div class="calc-val lg ' + (netVar < 0 ? 'warn' : '') + '">' + (netVar > 0 ? '+' : '') + App.fmtCurrency(netVar) + '</div><div style="font-size:10px;color:var(--t3);">' + variances.length + ' reconcil' + (variances.length === 1 ? 'iation' : 'iations') + '</div></div>'
+      + /* SH4/R6 — minus outside the '$'; the warn state also moves to the ROUNDED sign so a net that
+         balances to the cent cannot paint red. */
+      '<div class="calc-item"><div class="calc-label">Drawer Net</div><div class="calc-val lg ' + (App.fmtSigned(netVar, 2).sign < 0 ? 'warn' : '') + '">' + (App.fmtSigned(netVar, 2).sign > 0 ? '+' : '') + App.fmtBal(netVar) + '</div><div style="font-size:10px;color:var(--t3);">' + variances.length + ' reconcil' + (variances.length === 1 ? 'iation' : 'iations') + '</div></div>'
       + '<div class="calc-item"><div class="calc-label">Out of Tolerance</div><div class="calc-val lg ' + (flagged.length ? 'warn' : '') + '">' + flagged.length + '</div><div style="font-size:10px;color:var(--t3);">flagged variances</div></div>'
       + netBox
       + '</div></div>';
@@ -378,10 +401,15 @@ S.ShiftCashControl = {
     else if (cat === 'safe_count') { const r = this.safeCounts().find(x => x.id === id); if (r) this.openSafeCount(r); }
   },
 
-  // ── Shared delete confirm (a small modal above the form) ────────────────────
-  // label kept for call-site compatibility; the wording is now the standard box.
+  /* ── Shared delete confirm (a small modal above the form) ────────────────────
+     ⚠ THE LABEL WAS BEING THROWN AWAY (K3). Every call site already passes what it is deleting
+     ('drawer count', 'safe count', 'cash drop', 'safe entry') and this dropped it on the floor, so
+     all four printed the generic "Delete this?" — on records that feed Loss Prevention, the Profit
+     Audit, Cash Reconciliation and the Books cash sheet. Two sections away a PRODUCT delete names
+     every menu item at risk and an operating-expense delete names the bill (B6); cash was the odd
+     one out, on money. App.confirmDelete has taken a subject the whole time. */
   confirmDelete(label, onYes) {
-    App.confirmDelete().then(async ok => { if (ok) await onYes(); });
+    App.confirmDelete(label ? 'this ' + label : undefined).then(async ok => { if (ok) await onYes(); });
   },
 
   _delBtn(editing) {
@@ -613,10 +641,24 @@ S.ShiftCashControl = {
       const varEl = document.getElementById('ccc-variance');
       const stEl = document.getElementById('ccc-status');
       if (cEl) cEl.textContent = App.fmtCurrency(total);
+      /* ⚠⚠ AN UNCOUNTED SAFE IS NOT A SHORT SAFE (SH3). This form opened reading
+         "OVER / SHORT $-8,791.00 · Short" in red before a single bill was entered — the whole
+         balance, asserted as missing, on the screen loss prevention runs on. Zero counted is not
+         zero over/short: sc-dashboard says so in its own comment and the Hub tile already prints
+         "Not counted" for exactly this. The sibling DRAWER form two functions down does the same
+         thing correctly (it shows "-" until both figures are present); the safe form never got it.
+         `touched()` and not `total()`, because an untouched counter and one typed full of zeros
+         both total 0 — a blank cell is the discriminator. */
+      if (!(counter && counter.touched && counter.touched())) {
+        if (varEl) { varEl.textContent = '-'; varEl.className = 'calc-val'; varEl.style.color = 'var(--t3)'; }
+        if (stEl) { stEl.textContent = 'Not counted'; stEl.className = 'calc-val'; stEl.style.color = 'var(--t3)'; }
+        return;
+      }
       const variance = Math.round((total - expected) * 100) / 100;
       const status = Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over';
       const col = this.statusColor(status);
-      if (varEl) { varEl.textContent = (variance > 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col; }
+      // SH4/R6 — minus outside the '$', sign off the rounded value.
+      if (varEl) { varEl.textContent = (App.fmtSigned(variance, 2).sign > 0 ? '+' : '') + App.fmtBal(variance); varEl.className = 'calc-val'; varEl.style.color = col; }
       if (stEl) { stEl.textContent = status; stEl.className = 'calc-val'; stEl.style.color = col; }
     };
     const counter = CashCounter.mount(document.getElementById('ccc-counter'), { onChange: total => update(total) });
@@ -642,6 +684,15 @@ S.ShiftCashControl = {
     const status = Math.abs(variance) <= tol ? 'Within Tolerance' : variance < 0 ? 'Short' : 'Over';
     const byId  = document.getElementById('ccc-by')?.value || '';
     const witId = document.getElementById('ccc-witness')?.value || '';
+    /* ⚠ A COUNT NOBODY SIGNED IS THE ONE THAT MATTERS (K1). Performed By stays OPTIONAL inside
+       tolerance — a manager counting the safe and four drawers at 2am should not be blocked by a
+       dropdown — but the moment the safe is out of tolerance this is the row loss prevention reads,
+       and I saved one $100 short with a "-" in the BY column during trial use. Gated on the STATUS,
+       never unconditional. */
+    if (status !== 'Within Tolerance' && !byId && this._haveStaff()) {
+      fail('A safe count that is out of tolerance has to name who counted it. Pick a name under Performed By.');
+      return;
+    }
     const rec = {
       id: editId || App.uid(),
       date,
@@ -707,7 +758,8 @@ S.ShiftCashControl = {
       const variance = Math.round((cnt - exp) * 100) / 100;
       const status = S.ShiftVarianceLog.statusOf(variance, exp, cnt, drawerId);
       const col = this.statusColor(status);
-      varEl.textContent = (variance > 0 ? '+' : '') + App.fmtCurrency(variance); varEl.className = 'calc-val'; varEl.style.color = col;
+      // SH4/R6 — minus outside the '$', sign off the rounded value.
+      varEl.textContent = (App.fmtSigned(variance, 2).sign > 0 ? '+' : '') + App.fmtBal(variance); varEl.className = 'calc-val'; varEl.style.color = col;
       stEl.textContent = status; stEl.className = 'calc-val'; stEl.style.color = col;
     };
     document.getElementById('ccv-drawer')?.addEventListener('change', calc);
@@ -760,14 +812,35 @@ S.ShiftCashControl = {
       const prior = sameDay.sort(App.cmpNewest)[0];
       const ok = await App.confirm({
         title: 'This register is already counted for that day',
+        /* ⚠ THIS BOX SERVES TWO ACTIVITIES, SO EVERY WORD IN IT IS A CLAIM ABOUT WHICH ONE YOU ARE
+           IN (SH9, [[the-loop]] #79). Pressing UPDATE inside "Edit Drawer Reconcile" raised
+           "Adding another counts the day twice everywhere. Cancel and use Edit on the existing
+           count" over a button reading ADD ANYWAY — advice to go and do the thing they were already
+           doing. The situation is real either way (a second row for the register-day still exists),
+           so the warning stays; only the words that describe what the operator is about to do
+           change. */
         message: (prior.drawer || 'That register') + ' on ' + date + ' is already logged at '
-          + App.fmtCurrency(prior.variance || 0) + '. Adding another counts the day twice everywhere.'
-          + ' Cancel and use Edit on the existing count unless this really is a second, separate count.',
-        confirmText: 'Add anyway', cancelText: 'Cancel', danger: true
+          + App.fmtCurrency(prior.variance || 0) + '. '
+          + (editId
+            ? 'That is a different count from the one you are editing, so this register-day will still be counted twice everywhere. Save only if both counts are real.'
+            : 'Adding another counts the day twice everywhere. Cancel and use Edit on the existing count unless this really is a second, separate count.'),
+        confirmText: editId ? 'Save anyway' : 'Add anyway', cancelText: 'Cancel', danger: true
       });
       if (!ok) return;   // runs before the Save button is disabled below, so nothing to restore
     }
     const cashId   = document.getElementById('ccv-cashier')?.value || '';
+    /* ⚠ K1 — the same rule as the safe count: optional inside tolerance, required the moment the
+       drawer lands outside it. A short drawer with no cashier on it is the row Loss Prevention and
+       the Profit Audit both read, and it is the one that cannot say who counted it. */
+    /* ⚠ AND ONLY WHEN THERE IS SOMEBODY TO PICK. A bar on its first week has no roster yet, so an
+       unconditional requirement would make an out-of-tolerance drawer impossible to record at all —
+       a guard that refuses real data is a defect with a support call attached ([[the-loop]]:
+       scan a guard in BOTH directions). */
+    if (S.ShiftVarianceLog.statusOf(variance, exp, cnt, drawerId) !== 'Within Tolerance'
+        && !cashId && this._haveStaff()) {
+      fail('A drawer that is out of tolerance has to name the cashier who counted it.');
+      return;
+    }
     const rec = {
       id: editId || App.uid(),
       date,

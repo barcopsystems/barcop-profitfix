@@ -192,6 +192,7 @@ S.ShiftVoidComp = {
       '<div class="no-print" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:0 0 16px;">'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>From</label><input type="date" id="vc-f-from" value="' + esc(this.filterFrom) + '"/></div>'
       + '<div class="f" style="width:160px;flex-shrink:0;"><label>To</label><input type="date" id="vc-f-to" value="' + esc(this.filterTo) + '"/></div>'
+      + App.rangeWarning(this.filterFrom, this.filterTo)
       + '</div>';
     return row + custom;
   },
@@ -237,11 +238,21 @@ S.ShiftVoidComp = {
       const compTarget = parseFloat(App.data.revenue_settings && App.data.revenue_settings.targets && App.data.revenue_settings.targets.comp_pct) || 3;
       const compPct = rangeSales > 0 ? giveAway / rangeSales * 100 : null;
       const pctCol = compPct == null ? 'var(--t3)' : compPct > compTarget + 0.3 ? 'var(--red)' : compPct >= compTarget - 1 ? 'var(--amber)' : 'var(--green)';
-      const compRead = giveAway > 0
-        ? '<div style="margin-top:14px;border:1px solid var(--b-edge);background:var(--surface);border-radius:var(--r2);padding:11px 14px;font-size:12px;color:var(--t3);line-height:1.6;">' + App.fmtCurrency(giveAway) + ' in customer comps this range'
+      /* ⚠⚠ THE SENTENCE IS SUPPRESSED IN EXACTLY THE CASE THAT NEEDS IT (SH8). Gated on
+         `giveAway > 0`, a range whose only comps were staff meals printed "Comp Total $14.00 /
+         Given Away $0.00 / 0.0%" with NOTHING explaining the contradiction — and a number that
+         looks self-contradictory is precisely when an operator reads the line under it. Seen on the
+         seeded bar at Last Week. The card renders whenever there are comps at all; only the wording
+         changes. Zero comps still says nothing, because then there is nothing to explain. */
+      const box = t => '<div style="margin-top:14px;border:1px solid var(--b-edge);background:var(--surface);border-radius:var(--r2);padding:11px 14px;font-size:12px;color:var(--t3);line-height:1.6;">' + t + '</div>';
+      const compRead = !comps.length ? ''
+        : giveAway > 0
+        ? box(App.fmtCurrency(giveAway) + ' in customer comps this range'
           + (compPct != null ? ', ' + compPct.toFixed(1) + '% of sales, ' + (compPct > compTarget + 0.3 ? 'over' : compPct >= compTarget - 1 ? 'right around' : 'under') + ' your ' + compTarget + '% line' : ', log your weekly sales to read this as a share of the top line')
-          + '. Not every comp is a leak; the question is whether it is buying loyalty or giving away margin.</div>'
-        : '';
+          + '. Not every comp is a leak; the question is whether it is buying loyalty or giving away margin.')
+        : box('None of the ' + App.fmtCurrency(compTot) + ' comped this range was given away to a guest. '
+          + (comps.length === 1 ? 'It was a staff meal or shift drink' : 'They were staff meals or shift drinks')
+          + ', which is a policy expense rather than revenue handed over, so Given Away reads $0.00.');
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Voids</div><div class="calc-val lg">' + voids.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Void Total</div><div class="calc-val lg warn">' + App.fmtCurrency(voidTot) + '</div></div>'
@@ -350,16 +361,30 @@ S.ShiftVoidComp = {
       const reason = line.querySelector('.vcl-reason');
       if (reason) reason.innerHTML = this.reasonOptions(ev.target.value, '');
     } else if (ev.target.classList.contains('vcl-item')) {
-      const price = this.itemPrice(ev.target.value);
+      /* ⚠⚠ UNITS BELONGS TO A PRODUCT LINE ONLY (SH6). `_saveBatch` stores `units` on the 'p:'
+         branch alone, and the single-entry form on this same screen already shows its units field
+         only for 'p:' — the grid never got the rule, so on a MENU-ITEM line Units was a live
+         control that rewrote the operator's typed Amount from the menu price and was then thrown
+         away. Measured: Amount 19.50 + Units 1 on Anchor Burger stored `amount: 16, units: null`,
+         and which figure won depended on which cell they typed LAST.
+         A menu item is priced per item, so the money IS the amount: fill it once from the price and
+         turn the cell off rather than leaving a control that changes a figure and is ignored. */
+      const key = ev.target.value || '';
+      const isProduct = key.startsWith('p:');
+      const price = this.itemPrice(key);
       const units = line.querySelector('.vcl-units');
       const amt = line.querySelector('.vcl-amount');
+      if (units) { units.disabled = !isProduct; if (!isProduct) units.value = ''; }
       if (price != null) {
-        if (units && !(parseFloat(units.value) > 0)) units.value = '1';
-        if (amt) amt.value = (price * (parseFloat(units && units.value) || 1)).toFixed(2);
+        if (isProduct && units && !(parseFloat(units.value) > 0)) units.value = '1';
+        if (amt) amt.value = (price * (isProduct ? (parseFloat(units && units.value) || 1) : 1)).toFixed(2);
       }
     } else if (ev.target.classList.contains('vcl-units')) {
       const itemSel = line.querySelector('.vcl-item');
-      const price = this.itemPrice(itemSel ? itemSel.value : '');
+      const key = itemSel ? (itemSel.value || '') : '';
+      // SH6 — only a PRODUCT line derives its amount from units. Anything else keeps what was typed.
+      if (!key.startsWith('p:')) return;
+      const price = this.itemPrice(key);
       const amt = line.querySelector('.vcl-amount');
       if (price != null && amt) amt.value = (price * (parseFloat(ev.target.value) || 0)).toFixed(2);
     }
@@ -653,7 +678,14 @@ S.ShiftVoidComp = {
   },
 
   async confirmDel(id) {
-    const ok = await App.confirmDelete();
+    // K3 — name the record. A void or comp feeds Loss Prevention, the Bar Cop Audit and the Books
+    // comp split, so "Delete this?" is the weakest sentence on the screen.
+    const r = this.records().find(x => x && x.id === id);
+    const subject = r
+      ? 'this ' + String(r.type || 'entry').toLowerCase() + ' of ' + App.fmtCurrency(r.amount || 0)
+        + (r.item ? ' on ' + r.item : '') + ' from ' + this.fmtDate(r.date)
+      : undefined;
+    const ok = await App.confirmDelete(subject);
     if (!ok) return;
     await App.removeRecord('sc', 'void_comp', id);
     this.renderList();
