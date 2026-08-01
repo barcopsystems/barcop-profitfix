@@ -413,9 +413,11 @@ S.LaborBuildSchedule = {
          in the total while never appearing as a rostered shift. The ARITHMETIC is right and worth
          keeping — he is paid that week regardless, so Budget Left is honestly what is left for the
          crew — but an operator staring at an empty grid could not reconcile the number to anything.
-         Say what the salary is, and say what percent the budget was set at. Both numbers already
-         existed: `pct` was computed on the line above and never rendered, which is exactly the
-         "computed, persisted, read nowhere" shape ([[the-loop]] #25) hiding in plain sight. */
+         Say what the salary is, and say what percent the budget was set at.
+         ⚠ The salaried figure is the ONLY one here with no other source on screen. `pct` and
+         `target` are both already printed in the totals strip lower down (Labor % / Target), which
+         is why the first version of the Scheduled sub-line read as clutter the moment it rendered:
+         it repeated a number the page already carried. Do not re-add it. */
       const salWk = this.salariedWeekCost(d.week_start);
       const sub = t => '<div style="font-size:10px;color:var(--t3);margin-top:3px;">' + t + '</div>';
       budgetCard = '<div class="card"><div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;">'
@@ -425,9 +427,14 @@ S.LaborBuildSchedule = {
         + ' <button class="btn btn-ghost btn-sm" id="bs-lt" style="font-size:10px;letter-spacing:1px;padding:2px 8px;vertical-align:middle;">Edit</button></div>'
         + sub(App.fmtPct(target) + ' of forecast &middot; Edit to change') + '</div>'
         + '<div class="calc-item"><div class="calc-label">Target Hours</div><div class="calc-val lg">' + (targetHrs > 0 ? targetHrs.toFixed(1) + ' hrs' : '-') + '</div></div>'
+        /* ⚠ THE SUB-LINE SAYS ONE THING (Kyle, on seeing it rendered). It first carried the
+           scheduled percent AND the salaried note; two clauses under a tile is more text than the
+           row can hold, and the percent is the one that was not asked for — Labor Budget already
+           states the percent basis two tiles left, so repeating it here bought nothing. The
+           salaried note is the whole point: it is the figure with no other source on screen.
+           Nothing renders at all when there is no salaried cost. */
         + '<div class="calc-item"><div class="calc-label">Scheduled</div><div class="calc-val lg">' + App.fmtCurrency(T.cost) + '</div>'
-        + sub((pct != null ? App.fmtPct(pct) + ' of forecast' : '')
-            + (salWk > 0 ? (pct != null ? ' &middot; ' : '') + 'includes ' + App.fmtCurrency(salWk) + ' salaried' : '')) + '</div>'
+        + (salWk > 0 ? sub('includes ' + App.fmtCurrency(salWk) + ' salaried') : '') + '</div>'
         + '<div class="calc-item"><div class="calc-label">' + (left >= 0 ? 'Budget Left' : 'Over Budget') + '</div><div class="calc-val lg ' + leftCls + '">' + App.fmtCurrency(Math.abs(left)) + '</div></div>'
         + '</div></div>';
     }
