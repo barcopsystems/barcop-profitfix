@@ -2128,7 +2128,7 @@ const App = {
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'cash-outflows': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'cash-outflows': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -2253,11 +2253,18 @@ const App = {
       ] }
     ] },
     'user-account': { title: 'How Your Account Works', sections: [
-      { h: 'What this page is', p: ['Your password lives here, and every member can change their own. If you own the account, this is also where your subscription, a full data backup, and your other bars live.'] },
+      { h: 'What this page is', p: ['Your password lives here, and every member can change their own. If you own the account, this is also where your subscription and your other bars live, and backing up or restoring your data has its own page, Data and Backup, one row down the sidebar.'] },
       { h: 'Password', p: ['Set a new password any time. This is the one thing everyone on the team can do here.'] },
       { h: 'Subscription and bars (owner only)', p: ['The owner sees the plan and status, with Manage Billing to update the card, pull past invoices, or change the plan, and Add Another Bar to start a second location on its own subscription. Admins and staff never see billing.'] },
-      { h: 'Data and backup (owner only)', p: ['Export Backup saves everything in the account (settings, weekly numbers, audits, and every Inventory, Labor, and Shift record) to one file you keep offsite. Restore from Backup loads it back to recover your data or move it. Because a backup is the whole account, only the owner can run it.'] },
       { h: 'Testing tools', p: ['Owner testing accounts only, and never in the demo. Load Sample Data fills every system with realistic records, Clear All Data wipes it, and Reset Onboarding replays first-run setup. For setting up and testing, not daily use.'] }
+    ] },
+    'user-data': { title: 'How Data and Backup Works', sections: [
+      { h: 'What this page is', p: ['Everything that gets your data out of Bar Cop and back in. Because a backup is the whole account, this page is the account owner only. Admins and staff never see it.'] },
+      { h: 'Your own copy', p: ['Export Backup writes the entire account to one file: settings, targets, weekly numbers, all three Recovery Audits, your Bar Cop Audits, recipes, the fix log, Operating Expenses, Permits, and every Inventory, Labor and Shift record. Keep it offsite. Restore from Backup reads that same file back to recover your data or move it to another account.'] },
+      { h: 'Automatic backups', p: ['Bar Cop saves a full backup of this bar on its own, about once a day, so there is always a recent point to fall back to without you remembering anything. Pick a date in the list and Restore rolls the whole account back to how it stood then.'] },
+      { h: 'Restore points you take yourself', p: ['Create Restore Point saves the account as it is right now. Take one before anything big: a price change across the menu, a bulk import, a first inventory count. Those are the only ones you can delete by hand, because the automatic dailies are the safety net and must not be crowded out.'] },
+      { h: 'How far back it goes', p: ['Bar Cop keeps the last 30 automatic daily backups and the last 10 restore points you took yourself, each in its own pool so a busy day of manual saves can never push the dailies off the end.'] },
+      { h: 'Changes the server would not take', p: ['This panel only appears when there is something in it. A change saved on this device that the server refused ends up here rather than disappearing quietly. Try Again re-sends it, Discard drops it for good. Nothing in that list blocks a restore.'] }
     ] },
     'user-team': { title: 'How Team Members Work', sections: [
       { h: 'What this page is', p: ['Where you invite the rest of your management, choose which areas each person can use, and manage who has access. Owners and admins only. Bar Cop is a manager tool: your floor staff work off printed worksheets, so the people you invite here are other managers and your bookkeeper, not every employee.'] },
@@ -2436,6 +2443,7 @@ const App = {
         'settings-profile':   () => S2.HubSettings && S2.HubSettings.open('business-profile'),
         'settings-targets':   () => S2.HubSettings && S2.HubSettings.open('recovery-targets'),
         'user-account':       () => S2.HubUserAccounts && S2.HubUserAccounts.open('account'),
+        'user-data':          () => S2.HubUserAccounts && S2.HubUserAccounts.open('data'),
         'user-team':          () => S2.HubUserAccounts && S2.HubUserAccounts.open('team'),
         'settings-help':      () => S2.HubSettingsHelp && S2.HubSettingsHelp.open(),
         'help':               () => S2.HubHelp && S2.HubHelp.open()
@@ -3028,7 +3036,7 @@ const App = {
     // Locations section synchronously (multi-account users only).
     if (DB.listMyAccounts) { await DB.listMyAccounts(); }
     // Automatic daily backup: on owner login, if the last snapshot is >~20h old, capture the
-    // whole account so there's always a recent restore point (see Your Account → Data & Backup).
+    // whole account so there's always a recent restore point (see Settings → Data and Backup).
     // Fire-and-forget so it never delays boot.
     this._maybeAutoBackup();
     // Fix baselines feed the COCKPITS, so they cannot depend on visiting the Fix screen.
