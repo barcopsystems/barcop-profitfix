@@ -636,6 +636,17 @@ S.ShiftCashControl = {
       +   '<span id="ccc-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>' + this._delBtn(editing) + '</div></div>';
 
     App.openModal(html, { id: 'cc-modal', maxWidth: 540, noClose: true });
+    /* ⚠⚠ DECLARED BEFORE `update`, AND WITH `let`, BECAUSE MOUNT CALLS BACK BEFORE IT RETURNS.
+       CashCounter.mount ends with `recompute()`, which fires `opts.onChange` — so `update` runs
+       once while the assignment on the next line is still evaluating. Written as
+       `const counter = CashCounter.mount(...)` with `update` reading `counter`, that first call
+       threw "Cannot access 'counter' before initialization" and took the whole screen down with
+       the generic error card. `node --check` passes on it; only running the branch finds it
+       ([[the-loop]] #72). The sibling drop modal twelve functions up already documents this in its
+       own comment — "The counter fires onChange on mount" — and sidesteps it by reading the DOM.
+       Null on that first call is correct and not a special case: nothing has been typed yet, which
+       is exactly what "Not counted" means. */
+    let counter = null;
     const update = total => {
       const cEl = document.getElementById('ccc-counted');
       const varEl = document.getElementById('ccc-variance');
@@ -661,7 +672,7 @@ S.ShiftCashControl = {
       if (varEl) { varEl.textContent = (App.fmtSigned(variance, 2).sign > 0 ? '+' : '') + App.fmtBal(variance); varEl.className = 'calc-val'; varEl.style.color = col; }
       if (stEl) { stEl.textContent = status; stEl.className = 'calc-val'; stEl.style.color = col; }
     };
-    const counter = CashCounter.mount(document.getElementById('ccc-counter'), { onChange: total => update(total) });
+    counter = CashCounter.mount(document.getElementById('ccc-counter'), { onChange: total => update(total) });
     update(counter ? counter.total() : 0);
     document.getElementById('ccc-save')?.addEventListener('click', () => this.saveSafeCount(counter, editing ? rec.id : null));
     document.getElementById('ccm-del')?.addEventListener('click', () => this.confirmDelete('safe count', async () => {
