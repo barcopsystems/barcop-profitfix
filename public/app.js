@@ -3170,6 +3170,36 @@ const App = {
   // a form can pop OVER the current page instead of swapping it out. `layer`
   // sets z-index: 9000 for a base popup, 9100 for one opened from inside
   // another popup (keeps nested modals stacking correctly). Returns the overlay.
+  /* ⛔⛔ KEEP FOCUS INSIDE THE OPEN POPUP (S296's last sibling).
+     Nothing contained focus in a modal: Tab walked out of the card into the screen behind it, which
+     is still fully focusable, so an operator on a keyboard could activate controls on a page they
+     cannot see under the scrim. It was invisible until `:focus-visible` shipped; now they watch the
+     ring vanish behind the overlay.
+     ⚠ `inert`, NOT `pointer-events` and NOT a hand-rolled Tab handler. `pointer-events:none` is
+     hit-testing and nothing else — it does not blur the focused element, does not leave the tab
+     order and does not block keydown ([[the-loop]] #92). `inert` means off for pointer, keyboard,
+     focus and screen reader together, and it gives the trap for FREE: with the background inert,
+     Tab has nowhere to go but the modal, so there is no first/last-element bookkeeping to drift.
+     ⛔⛔ AND THE FAILURE MODE THIS MUST NOT HAVE. `#app` is a shared, permanent node, and
+     [[the-loop]] #93 is exactly what happens when a guard is TOGGLED onto one and a promise never
+     settles: the whole app goes dead with the nav still working. So this is DERIVED, never toggled.
+     It reads how many modals are actually open and sets everything from that, which means a missed
+     call, a thrown handler or a hung write cannot leave the app inert — the next sync recomputes
+     from truth. `verify-modal-focus-trap.js` case I6 pins that by setting the flag by hand with no
+     modal open and asserting a sync clears it.
+     ⚠ STACKED MODALS: only the TOPMOST is live, matching the way ESC already peels a stack one
+     layer at a time. Otherwise Tab reaches a form sitting under another form. */
+  _syncModalInert() {
+    const host = document.getElementById('app-modal-host');
+    const kids = host ? [].slice.call(host.children) : [];
+    const open = kids.length > 0;
+    ['app', 'auth-screen'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.inert = open;
+    });
+    kids.forEach((el, i) => { el.inert = i !== kids.length - 1; });
+  },
+
   openModal(html, opts) {
     opts = opts || {};
     const id = opts.id || 'app-modal';
@@ -3178,6 +3208,9 @@ const App = {
     if (!host) { host = document.createElement('div'); host.id = 'app-modal-host'; document.body.appendChild(host); }
     const old = document.getElementById(id);
     if (old) old.remove();
+    // Captured BEFORE the overlay goes in, because appending it and inerting the background is what
+    // takes focus away (S296).
+    const prevFocus = document.activeElement;
     const overlay = document.createElement('div');
     overlay.id = id;
     // Near-opaque navy scrim (the --bg family) so the popup reads as nested in the
@@ -3241,11 +3274,41 @@ const App = {
     // Backdrop = the overlay itself; a click inside the card bubbles from a child and is ignored.
     overlay.addEventListener('click', e => { if (e.target === overlay) attemptClose(); });
     if (x) x.addEventListener('click', attemptClose);
+    /* ⚠ THE BACKGROUND GOING INERT DROPS FOCUS TO `<body>` unless something inside the modal takes
+       it, and the operator's next Tab would then start from the top of the document. So focus moves
+       IN — to the first real control if there is one, else the card itself, which is given
+       tabindex="-1" only so it can receive focus programmatically (never a tab stop of its own).
+       ⚠ `_bcRestore` remembers what had focus so closing gives it back. Without it a keyboard
+       operator who opens and closes a popup is returned to the top of the page every time.
+       ⚠ Guarded: a modal opened from a control that has since been re-rendered away must not throw
+       on the way out, so the restore checks the node is still in the document. */
+    overlay._bcRestore = (prevFocus && typeof prevFocus.focus === 'function') ? prevFocus : null;
+    App._syncModalInert();
+    const card = overlay.firstElementChild;
+    const first = overlay.querySelector('input:not([type=hidden]),select,textarea,button:not(.app-modal-x),[tabindex]:not([tabindex="-1"])');
+    try {
+      if (first) first.focus();
+      else if (card) { card.setAttribute('tabindex', '-1'); card.focus(); }
+    } catch (e) { /* a detached or hidden node is not worth throwing over */ }
     return overlay;
+  },
+  /* Give focus back to whatever opened the modal. Reads `_bcRestore` off the overlays being
+     removed, topmost first, and only if that node is still on the page. */
+  _restoreModalFocus(els) {
+    for (let i = els.length - 1; i >= 0; i--) {
+      const t = els[i] && els[i]._bcRestore;
+      if (t && typeof t.focus === 'function' && document.body.contains(t)) {
+        try { t.focus(); } catch (e) {}
+        return;
+      }
+    }
   },
   closeModal(id) {
     const el = document.getElementById(id || 'app-modal');
     if (el) el.remove();
+    // Derived, so this is also what un-inerts the app when the last modal goes (S296).
+    this._syncModalInert();
+    if (el) this._restoreModalFocus([el]);
   },
 
   /* Close EVERY open modal at once. Called on navigation, because an openModal overlay is
@@ -3256,7 +3319,12 @@ const App = {
      exists. Pinned by verify-modal-closes-on-navigation.js. */
   closeAllModals() {
     const host = document.getElementById('app-modal-host');
+    const gone = host ? [].slice.call(host.children) : [];
     if (host) host.innerHTML = '';
+    // The app must come back out of inert here too, or navigating away from a modal leaves every
+    // screen unreachable by keyboard (S296). Derived, so it cannot get out of step.
+    this._syncModalInert();
+    this._restoreModalFocus(gone);
   },
 
   // Shared "Get Started" setup box for the Control cockpits (Inventory / Labor /
