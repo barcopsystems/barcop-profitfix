@@ -413,7 +413,20 @@ app.post('/api/create-checkout-session', async (req, res) => {
       // Stamp account_id onto the SUBSCRIPTION itself (session metadata does NOT propagate to
       // the subscription). The source-of-truth dup guard above reads this to scope "already
       // has a live sub" to THIS bar, so a multi-bar owner isn't blocked from adding another.
-      subscription_data: { metadata: { user_id: userId, account_id: accountId } }
+      subscription_data: { metadata: { user_id: userId, account_id: accountId } },
+      /* ⭐ THE PROMO-CODE BOX (P2). Embedded Checkout shows a "add promotion code" field only when
+         the session is created with this. Without it there is no field on the payment screen, and
+         every code sent out in the win-back email is unredeemable.
+         ⚠ HOW MANY CODES IS A DASHBOARD MATTER, NOT A CODE ONE. In Stripe a COUPON is the discount
+         ("50% off, duration forever") and a PROMOTION CODE is the customer-typed string wrapping
+         it. Any number of codes, restrictions and expiries are created in the dashboard and all of
+         them work through this one flag; nothing here needs to know a code exists.
+         ⛔⛔ NEVER ADD A `discounts` PARAM ALONGSIDE THIS. Stripe treats the two as mutually
+         exclusive and REJECTS the session outright — not a missing discount, a payment screen that
+         does not open at all. "Apply the coupon automatically instead of making them type it" is
+         the obvious next request and it is the thing that would break checkout;
+         verify-checkout-promo-codes.js pins the absence of `discounts` for exactly that reason. */
+      allow_promotion_codes: true
     };
     // Pre-fill the checkout with the account's own email so Stripe Link can't
     // auto-fill a different email remembered from a prior checkout in the same
