@@ -159,6 +159,57 @@ const CSVMapper = {
     return best;
   },
 
+  /* ⚠⚠ THE HEADER IS NOT ALWAYS ROW 1 (I3). Every POS that writes a REPORT rather than a data
+     extract puts a title block on top — a title line, a date range, a blank — and both parsers
+     took row 0 as the header. The operator then got ONE dropdown option reading "Sales Summary
+     Report", the required Name field could never be mapped, and the drop was a hard dead end. The
+     only explanation on screen was the ragged-row banner, which blames an unquoted comma in a
+     number cell: actively wrong here, and it sends them to re-save a file that was fine.
+
+     ⚠⚠ THE RISK RUNS THE OTHER WAY, and it is why this rule is as narrow as it is. This code is on
+     the path of EVERY import in the app, so a heuristic that guesses wrong on a file that works
+     today is far worse than the dead end it closes. The rule was stated in words before it was
+     written ([[the-loop]] #28):
+
+         THE HEADER ROW IS THE FIRST ROW THAT IS AS WIDE AS THE WIDEST ROW IN THE OPENING BLOCK
+         AND CARRIES NO PURELY-NUMERIC CELL. If no row satisfies both, it is row 0.
+
+     Both halves are load-bearing. Width alone picks a DATA row whenever the header has a trailing
+     empty column — which eats a real record — and the no-numbers half is what refuses it, because
+     a data row carries numbers and a row of labels does not. And it cannot fire at all on a file
+     whose row 0 is already a full-width row of labels, which is every file that works today.
+     ⚠ "Purely numeric" means the WHOLE cell is a number. `2026 Sales` and `Q1 Units` are labels
+     that contain digits and stay labels; `240.00` is data.
+     ⚠ The operator gets an explicit override in the mapper, because a heuristic that cannot be
+     corrected is a guess with no escape ([[the-loop]] #30), and the mapper says out loud when rows
+     were skipped so it is never silent. */
+  _headerRowIdx(grid) {
+    const g = grid || [];
+    if (g.length < 2) return 0;
+    // Never past the last row: a header row with nothing under it is not a header.
+    const WINDOW = Math.min(g.length - 1, 12);
+    const txt = c => String(c == null ? '' : c).trim();
+    const filled = r => (r || []).filter(c => txt(c) !== '').length;
+    const isNum = c => { const s = txt(c); return s !== '' && /^[-+(]?[$€£]?\s*[\d,]+(\.\d+)?\)?%?$/.test(s); };
+    const allText = r => (r || []).every(c => txt(c) === '' || !isNum(c));
+    let max = 0;
+    for (let i = 0; i < WINDOW; i++) max = Math.max(max, filled(g[i]));
+    // A one-column file has no shape to read, so leave it exactly as it is.
+    if (max < 2) return 0;
+    for (let i = 0; i < WINDOW; i++) if (filled(g[i]) === max && allText(g[i])) return i;
+    return 0;
+  },
+
+  // Split a parsed grid into headers + data rows at a given header row. One implementation for
+  // both formats and for the operator's override, so the three cannot drift.
+  _splitGrid(grid, idx) {
+    const g = grid || [];
+    const at = (idx > 0 && idx < g.length) ? idx : 0;
+    const headers = (g[at] || []).map(h => String(h == null ? '' : h).trim().replace(/^"|"$/g, ''));
+    const rows = g.slice(at + 1).filter(r => (r || []).some(c => String(c == null ? '' : c).trim() !== ''));
+    return { headers, rows };
+  },
+
   _parseCSV(text) {
     // Strip a BOM and any leading blank lines before anything reads column 0. (Neither can sit
     // inside a quoted field at position 0, so this is safe to do up front.)
@@ -192,8 +243,11 @@ const CSVMapper = {
     // A file ending in a newline leaves one empty row; drop those rather than import blanks.
     while (rows.length && rows[rows.length - 1].every(c => c === '')) rows.pop();
     if (rows.length < 2) return null;
-    const headers = rows[0].map(h => h.replace(/^"|"$/g, ''));
-    return { headers, rows: rows.slice(1).filter(r => r.some(c => c !== '')) };
+    // I3: the grid is carried through so the mapper can offer "Headers are on row N".
+    const headerIdx = this._headerRowIdx(rows);
+    const sp = this._splitGrid(rows, headerIdx);
+    if (!sp.rows.length) return null;
+    return { headers: sp.headers, rows: sp.rows, grid: rows, headerIdx };
   },
 
   // Resolve the operator's picks to COLUMN POSITIONS and read each row. `sels` holds a column INDEX
@@ -264,13 +318,19 @@ const CSVMapper = {
           + 'this file also has: ' + others.join(', ') + '. Move your data to the first sheet and try again.'
         : 'File appears empty.';
       if (data.length < 2) { this._msg(container, emptyMsg, 'var(--red)'); return; }
-      const headers = data[0].map(h => String(h).trim());
-      const rows = data.slice(1).filter(r => r.some(c => c !== '')).map(r => r.map(c => String(c).trim()));
+      /* ⚠ THE SAME HEADER DETECTION AS THE CSV PATH (I3). This carried the identical `data[0]`
+         assumption, and an Excel export from a POS is MORE likely to carry a title block than a
+         CSV one, not less. A fix that reaches one format and not the other is the half-migration
+         shape ([[the-loop]] #42). Trimmed up front so the grid handed to _splitGrid is the same
+         shape the CSV parser produces — one splitter, one result. */
+      const grid = data.map(r => (r || []).map(c => String(c == null ? '' : c).trim()));
+      const headerIdx = this._headerRowIdx(grid);
+      const { headers, rows } = this._splitGrid(grid, headerIdx);
       // ⚠ The guard above runs on the UNFILTERED rows, so a sheet of blank data rows passed it and
       // then filtered down to nothing — rendering a live "Import 0 Rows" button that fired
       // onComplete with an empty array. Re-check after filtering.
       if (!rows.length) { this._msg(container, 'That sheet has headers but no data rows.', 'var(--red)'); return; }
-      this._afterParse({ headers, rows }, container, opts);
+      this._afterParse({ headers, rows, grid, headerIdx }, container, opts);
     }
   },
 
@@ -611,10 +671,12 @@ const CSVMapper = {
       const auto = this._autoMap(headers, remaining, taken);
       Object.keys(auto).forEach(k => { map[k] = auto[k]; });
     }
-    this._renderMapper(headers, rows, map, sig, container, opts);
+    this._renderMapper(headers, rows, map, sig, container, opts, parsed);
   },
 
-  _renderMapper(headers, rows, map, sig, container, opts) {
+  // `parsed` is optional and carries the whole grid (I3) so the header row can be corrected.
+  // Older callers pass six arguments and simply get no header-row control.
+  _renderMapper(headers, rows, map, sig, container, opts, parsed) {
     // Option VALUES are column INDEXES, never header names. With names, an unnamed column emitted a
     // second <option value="">, indistinguishable from "(skip)" and silently importing column 0 for
     // every skipped field; and two columns sharing a name made the second one unreachable. An
@@ -624,6 +686,37 @@ const CSVMapper = {
           const label = String(h).trim() === '' ? '(column ' + (i + 1) + ', no header)' : h;
           return '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>' + esc(label) + '</option>';
         }).join('');
+    /* ── "Headers are on row N" (I3) ────────────────────────────────────────────────────────────
+       The detector handles the clear case; this handles every case it cannot read, and it is what
+       stops the detection being a silent guess. It also SAYS when rows were skipped, because a
+       drop that quietly threw away the top of the file is the same class of defect as a drop that
+       quietly threw away rows ([[the-loop]] #25). Only rendered when there is a real choice to
+       make, and only when a caller handed the grid over. */
+    const grid = (parsed && Array.isArray(parsed.grid)) ? parsed.grid : null;
+    const hdrIdx = (parsed && parsed.headerIdx) || 0;
+    let hdrPick = '';
+    if (grid && grid.length > 2) {
+      const cap = Math.min(grid.length - 1, 12);
+      const peek = r => {
+        const cells = (r || []).map(c => String(c == null ? '' : c).trim()).filter(c => c !== '');
+        const s = cells.join(', ');
+        return (s.length > 58 ? s.slice(0, 58) + '...' : s) || '(blank row)';
+      };
+      let picks = '';
+      for (let i = 0; i < cap; i++) {
+        picks += '<option value="' + i + '"' + (i === hdrIdx ? ' selected' : '') + '>Row ' + (i + 1)
+          + ': ' + esc(peek(grid[i])) + '</option>';
+      }
+      hdrPick = '<div style="margin-bottom:14px;">'
+        + '<div class="f" style="max-width:420px;"><label>Column headers are on</label>'
+        + '<select class="csvm-hdr">' + picks + '</select></div>'
+        + (hdrIdx > 0
+            ? '<div style="font-size:12px;color:var(--t2);margin-top:6px;">Bar Cop skipped '
+              + hdrIdx + ' row' + (hdrIdx === 1 ? '' : 's') + ' above your column headers. '
+              + 'If that is wrong, pick the right row above.</div>'
+            : '')
+        + '</div>';
+    }
     // No card wrapper: the mapper sits directly on the canvas of whatever card it
     // was mounted in, laying out like the manual entry form (a thin divider off
     // the drop zone, a section heading, the field grid, then the action row).
@@ -638,6 +731,7 @@ const CSVMapper = {
       + (rows.filter(r => r.length !== headers.length).length
           ? '<div style="font-size:12px;color:var(--gold);background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:10px 12px;margin-bottom:14px;">Heads up: some rows have a different number of columns than the header. That usually means a number cell holds an unquoted comma (like 1,234), which splits the row and shifts the columns after it. Check the preview below lines up, or re-save the file with number columns quoted.</div>'
           : '')
+      + hdrPick
       + '<div class="form-row" style="flex-wrap:wrap;gap:12px 20px;">';
     opts.fields.forEach(f => {
       html += '<div class="f" style="width:210px;flex-shrink:0;"><label>' + esc(f.label)
@@ -671,6 +765,29 @@ const CSVMapper = {
     // Action row goes in the external target when one was given, else inline.
     if (extEl) extEl.innerHTML = actionRow;
     const scope = extEl || area;
+
+    /* Re-reading the grid at a new header row re-runs the WHOLE resolve — saved map, auto-detect,
+       preview — because the header signature has changed and a mapping remembered against the old
+       one means nothing. Going back through _afterParse is what guarantees that; re-rendering in
+       place would keep the stale picks. */
+    const hdrSel = area.querySelector('.csvm-hdr');
+    if (hdrSel && grid) hdrSel.addEventListener('change', () => {
+      const i = Number(hdrSel.value) || 0;
+      const sp = this._splitGrid(grid, i);
+      // ⚠ SAY SO RATHER THAN RETURN. A silent refusal here is a dropdown that does nothing, which
+      // reads as the app being broken ([[the-loop]] #89) — and picking the last row of the file is
+      // an easy mis-click.
+      if (!sp.headers.length || !sp.rows.length) {
+        const e2 = area.querySelector('.csvm-err');
+        if (e2) {
+          e2.textContent = 'That row leaves no data underneath it. Pick the row that holds your column headings.';
+          e2.style.display = 'block';
+        }
+        hdrSel.value = String(hdrIdx);
+        return;
+      }
+      this._afterParse({ headers: sp.headers, rows: sp.rows, grid, headerIdx: i }, container, opts);
+    });
 
     // Cancel discards this file and returns to the drop zone to pick another.
     const cancelBtn = scope.querySelector('.csvm-cancel');

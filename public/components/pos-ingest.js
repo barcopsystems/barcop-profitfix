@@ -1698,9 +1698,32 @@ const PosIngest = {
        The cash door already does exactly this two-pass ordering for registers (S145); PMIX never
        got it. Archived items are still indexed, so a POS still selling a retired item matches
        rather than reporting a false "name not matched". */
+    /* ⚠⚠ ONE NAME CAN BELONG TO MORE THAN ONE ITEM, AND A LAST-WRITE-WINS MAP HID BOTH WAYS (I4).
+       The two-pass ordering above was right about live-beats-archived and blind to everything else,
+       because a plain `byName[k] = it` keeps exactly one item per name:
+         · A "Margarita" pizza on Dishes and a "Margarita" on Mixed Drinks is an ordinary menu. The
+           LAST one in array position silently took the week's units while the other kept last
+           week's figure — which every board then presents as current. ARRAY POSITION decided it.
+         · A name only an ARCHIVED item carries was written to the retired row, and Menu
+           Engineering, Menu Rundown, `_dogIds` and the server audit all filter `!archived`, so the
+           figure landed nowhere while the message said "N menu items updated from sales mix".
+       The sibling door that writes this same field (`r-menu-items.importItems`) keys on `type|name`
+       and skips-and-reports an archived match; this one did neither.
+       ⚠ Keeping BOTH lists rather than one winner is what makes the ambiguity visible at all. A
+       product-mix export has no type column, so the file genuinely cannot say which Margarita rang,
+       and inferring it would be [[the-loop]] #30 — a guess about a fact the file does not carry,
+       wrong in both directions. Refused and reported instead, which leaves both items at their real
+       last-known figure and names the one thing that fixes it. */
     const byName = {};
-    items.forEach(it => { if (it && it.name && it.archived) byName[it.name.trim().toLowerCase()] = it; });
-    items.forEach(it => { if (it && it.name && !it.archived) byName[it.name.trim().toLowerCase()] = it; });
+    items.forEach(it => {
+      if (!it || !it.name) return;
+      const k = String(it.name).trim().toLowerCase();
+      const b = byName[k] || (byName[k] = { live: [], archived: [] });
+      (it.archived ? b.archived : b.live).push(it);
+    });
+    /* Reported per ITEM NAME, not per row: a daypart-split file names the same item several times
+       and "3 names matched two menu items" for one clash would be its own wrong number. */
+    const retiredSet = new Set(), ambiguousSet = new Set();
     // AGGREGATE BY ITEM — never one entry per CSV row. A PMIX split by daypart, revenue centre or
     // order type lists the same item several times, which is an ordinary export shape, and the
     // week's units sold is their SUM. One-entry-per-row meant the LAST row won (lunch silently
@@ -1722,8 +1745,15 @@ const PosIngest = {
       const nm = (r.name || '').trim().toLowerCase();
       const units = this._count(r.units);   // signed: a "-3" return REDUCES the week's units; NaN (junk) is skipped below
       if (!nm) { skipped.push(r.name || '(blank)'); return; }
-      const it = byName[nm];
-      if (!it) { skipped.push(r.name); return; }
+      const bucket = byName[nm];
+      if (!bucket) { skipped.push(r.name); return; }
+      /* ⚠ THE NAME PROBLEM IS REPORTED BEFORE THE CELL PROBLEM, because it is the blocking one: the
+         units cell does not matter until the row knows which item it belongs to. */
+      if (bucket.live.length > 1) { ambiguousSet.add(bucket.live[0].name); return; }
+      const it = bucket.live[0];
+      // Matched, but every copy of this name is retired. Writing it puts the units on a row that is
+      // filtered out of every board — an update the operator is told about and can never see.
+      if (!it) { retiredSet.add((bucket.archived[0] && bucket.archived[0].name) || r.name); return; }
       if (isNaN(units)) { incomplete.push(r.name); return; }
       const prior = byItem.get(it.id);
       if (prior) { prior.covers += units; merged++; }
@@ -1751,7 +1781,9 @@ const PosIngest = {
     // opposite of what happened here, where N rows were FOLDED INTO a total. Reusing the name
     // would have been a message waiting to lie the moment someone wired it up. dupCount stays 0
     // so the shared build() contract documented at the top of this file still holds.
-    return { toAdd, skipped, incomplete, netNegative, dupCount, merged };
+    // `retired` / `ambiguous` are I4's two new outcomes — both are rows the file matched and this
+    // builder deliberately refused, so both must reach the operator or they are silent drops.
+    return { toAdd, skipped, incomplete, netNegative, retired: [...retiredSet], ambiguous: [...ambiguousSet], dupCount, merged };
   },
 
   // ── Persist ──────────────────────────────────────────────────────────────
