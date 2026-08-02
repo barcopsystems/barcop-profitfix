@@ -863,8 +863,11 @@ S.HubYearEnd = {
       // INSIDE tolerance) got "Short Count: 680" here while Cash History and Over-and-Short both
       // said 11 out of tolerance. Same words, wildly different numbers, and this is the sheet an
       // accountant reads. Sign is kept only as a fallback for a row with no status recorded.
-      const isOver  = v => (v.status ? v.status === 'Over'  : (parseFloat(v.variance) || 0) > 0);
-      const isShort = v => (v.status ? v.status === 'Short' : (parseFloat(v.variance) || 0) < 0);
+      // ⚠ Over/Short still need telling apart for their two columns, so the sign half stays here —
+      // but WHETHER a row counts at all now goes through the one shared predicate (S80), so this
+      // sheet and the PDF beside it cannot answer the same question two ways again.
+      const isOver  = v => App.varianceIsOut(v) && (v.status ? v.status === 'Over'  : (parseFloat(v.variance) || 0) > 0);
+      const isShort = v => App.varianceIsOut(v) && (v.status ? v.status === 'Short' : (parseFloat(v.variance) || 0) < 0);
       const overCount  = monthVar.filter(isOver).length;
       const shortCount = monthVar.filter(isShort).length;
       rows.push([this.MONTHS_FULL[m - 1], dropsSum, monthDrops.length, varSum, overCount, shortCount]);
@@ -1120,6 +1123,8 @@ S.HubYearEnd = {
     const voids = voidComps.filter(v => v.type === 'void' || v.type === 'Void');
     const comps = voidComps.filter(v => v.type === 'comp' || v.type === 'Comp');
     const variances = (App.shiftData?.sc_variances || []).filter(v => inYear(v.date));
+    // The out-of-tolerance subset, through the same predicate the workbook sheet uses (S80).
+    const variancesOut = variances.filter(v => App.varianceIsOut(v)).length;
     const callouts = (App.laborData?.lc_callouts || []).filter(c => inYear(c.date));
     const walked = (App.shiftData?.sc_walked_tabs || []).filter(w => inYear(w.date));
     const tips = (App.laborData?.lc_tips || []).filter(t => inYear(t.date));
@@ -1212,7 +1217,14 @@ S.HubYearEnd = {
       ['Voids logged', String(voids.length)],
       ['Comps logged', comps.length + ' (' + fmt$(comps.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0)) + ')'],
       ['Walked Tabs', walked.length + ' (' + fmt$(walked.reduce((s, w) => s + (parseFloat(w.amount) || 0), 0)) + ')'],
-      ['Cash variances logged', String(variances.length)],
+      /* ⚠ TWO FACTS, NOT ONE (S80). This printed `variances.length` — the raw row count of every
+         drawer that was COUNTED — under the words "Cash variances logged", while the Cash Control
+         Summary sheet in the same workbook counts Over and Short by status. Measured on the seed:
+         sheet 6 said 37, this line said 364, in two documents an accountant reads side by side.
+         Both numbers are worth having and they answer different questions, so both are printed and
+         each says which one it is. */
+      ['Cash counts logged', String(variances.length)],
+      ['Cash variances (over or short)', String(variancesOut)],
       ['Call-outs logged', String(callouts.length)],
       ['Tips logged (total)', fmt$(totalTips)]
     ], { columnStyles: { 1: { halign: 'right' } } });
@@ -1234,7 +1246,21 @@ S.HubYearEnd = {
     b.paragraph('Weakest revenue month (with data): '
       + (weakIdx >= 0 ? (this.MONTHS_FULL[weakIdx] + ', net revenue ' + fmt$(weakVal)) : 'No data') + '.');
     b.paragraph('Prime cost ran at: ' + fmtPct(primeCost) + ' for the year. The target for a healthy operation is 60% to 65%. Numbers above that are where money is leaking; numbers below are where the operation is making real margin.');
-    b.paragraph('Cash control: ' + variances.length + ' shifts had a cash variance logged. ' + (variances.length === 0 ? 'Either the year ran clean or the shifts did not get fully reconciled. Worth a look either way.' : 'See the Cash Control Summary sheet in the workbook for the worst-offender shifts.'));
+    /* ⚠⚠ THE ZERO-BRANCH HAD TO MOVE WITH THE NUMBER (S80 / [[the-loop]] #24). It read
+       `variances.length === 0 ? 'Either the year ran clean or the shifts did not get fully
+       reconciled.'` — written when the number meant ROWS, where zero genuinely can mean nobody
+       reconciled anything. Swapping in the out-of-tolerance count without moving this test would
+       have told a bar that counted its drawers 364 times, every one inside tolerance, that its
+       shifts "did not get fully reconciled" — the best possible result reported as the worst.
+       So the sentence carries both numbers and each branch asks the one it is about: whether
+       anything was counted (rows), and how it went (out of tolerance). */
+    b.paragraph('Cash control: ' + variances.length + ' drawer count' + (variances.length === 1 ? '' : 's')
+      + ' logged for the year, ' + variancesOut + ' of them over or short. '
+      + (variances.length === 0
+          ? 'Nothing was reconciled at all this year, so there is no cash control read to give. Worth a look.'
+          : variancesOut === 0
+            ? 'Every count came in inside tolerance, which is what you want to see.'
+            : 'See the Cash Control Summary sheet in the workbook for the worst-offender shifts.'));
     if (topFive.length > 0) {
       b.paragraph('Biggest opportunity surfaced: ' + topFive[0].system + ' audit flagged "' + topFive[0].title + '" at ' + fmt$(topFive[0].monthly * 12) + ' annual. Worth running the corresponding Fix Process if it is still open.');
     }

@@ -327,7 +327,11 @@ S.HubBooks = {
     b.sectionTitle('Operational Events This Month');
     b.table(null, [
       ['Voids and Comps Logged', String(voidComps.length)],
-      ['Cash Variances Logged', String(variances.length)],
+      // ⚠ TWO FACTS, NOT ONE (S80), same as the Year-End PDF and for the same reason: this printed
+      // the raw count of every drawer COUNTED under the words "Cash Variances Logged", while the
+      // Year-End workbook counts the out-of-tolerance ones by status. One shared predicate now.
+      ['Cash Counts Logged', String(variances.length)],
+      ['Cash Variances (Over or Short)', String(variances.filter(v => App.varianceIsOut(v)).length)],
       ['Tips Logged (total)', fmt$(totalTips)],
       ['Call-Outs Logged', String(callouts.length)]
     ], { columnStyles: { 1: { halign: 'right' } } });
