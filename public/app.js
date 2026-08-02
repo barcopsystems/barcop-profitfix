@@ -3802,6 +3802,57 @@ const App = {
     return [...hit].sort();
   },
 
+  /* IS THIS DRAWER COUNT ACTUALLY A VARIANCE? (S80)
+     ⚠ COUNTING ROWS IS NOT COUNTING VARIANCES, and this app has now got that wrong in two
+     documents an accountant reads side by side. The Year-End WORKBOOK already counts Over and Short
+     BY STATUS — S27(h), whose own comment measured a bar counting four registers nightly getting
+     "Short Count: 680" from raw sign while Cash History said 11 out of tolerance. The Year-End PDF
+     and the monthly Books PDF were missed in that same export and printed `variances.length`, the
+     raw row count, under the words "Cash variances logged": measured on the seed, the workbook says
+     37 and the PDF says 364.
+     An `sc_variances` row is a drawer count that was RECONCILED. Most of them are a few dollars off
+     and INSIDE the register's tolerance, which is why `status` exists: 'Over' and 'Short' are the
+     ones out of tolerance, and everything else is a clean count.
+     ⚠ THE SIGN FALLBACK IS CARRIED OVER DELIBERATELY, not invented here — a legacy row with no
+     status recorded has only its amount to go on, and that is the rule the workbook already uses.
+     One implementation, because two files ask this and two files is exactly how the first pair
+     drifted ([[the-loop]] #54: when a number appears on two screens, pin the EQUALITY). */
+  /* CAN THIS POOL BE RANKED AT ALL? (S298 / S303)
+     A Star/Plowhorse/Puzzle/Dog verdict is a COMPARISON: `hiM = margin >= avgMargin`,
+     `hiV = covers >= avgCovers`. `>=` means an item sitting exactly ON the mean counts as high — so
+     when every item in a pool holds the SAME value on an axis, every item is on that mean and every
+     item is "high" on it:
+       · S303  nothing has sold yet, so `avgCovers` is 0 and `0 >= 0` holds for everyone. The whole
+               section comes back Stars and Plowhorses. That is the DAY-ONE shape for any menu
+               before its first product-mix drop, so it is the first thing a new operator reads.
+       · S298  four bottle-beer cases at one case price are all on the margin mean and all Stars,
+               under a tile reading "Strong on both counts" about items nothing can tell apart.
+     THE RULE: if an axis separates nobody, no verdict can be reached, and the pool is UNRANKED —
+     which is precisely the answer a too-small pool already gets, and every consumer already handles
+     it. EITHER axis, not both: a flat covers pool with varied margins yields only Stars and
+     Plowhorses and never a Puzzle or a Dog, and both of those words assert a volume side that does
+     not exist.
+     ⚠ COMPARED IN CENTS. `price - cost` carries float noise, and at full precision two genuinely
+     equal margins read as distinct — which hands the verdict straight back out. Menu Rundown's tie
+     map already compares in cents for exactly this reason.
+     ⚠ MIRRORED VERBATIM in server/audit-compute.js, the same arrangement `menuGroupKey` has, and
+     held to it by verify-flat-pool-no-verdict.js — the audit must name the same Stars as the screen
+     its action item links to. */
+  menuPoolSeparable(list) {
+    const l = Array.isArray(list) ? list : [];
+    if (l.length < 2) return false;
+    const cents = v => Math.round((Number(v) || 0) * 100);
+    const m = new Set(), c = new Set();
+    l.forEach(i => { m.add(cents((i && i.price) - (i && i.cost))); c.add(Number((i && i.weekly_covers) || 0)); });
+    return m.size > 1 && c.size > 1;
+  },
+
+  varianceIsOut(v) {
+    if (!v) return false;
+    if (v.status) return v.status === 'Over' || v.status === 'Short';
+    return (parseFloat(v.variance) || 0) !== 0;
+  },
+
   countLockedByWeek(c) {
     const d = String((c && (c.date || c.created_at)) || '').slice(0, 10);
     if (!d) return false;
