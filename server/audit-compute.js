@@ -75,6 +75,23 @@ function menuTypeOf(item) {
   return 'plate';
 }
 
+/* MIRRORED VERBATIM from App.menuPoolSeparable (public/app.js) — S298/S303. The audit names the
+   same Stars and Dogs as the screen its action item links to, so the rule that decides whether a
+   pool can be ranked at all has to be the same rule, not a similar one. Held byte-identical (after
+   comments) by verify-flat-pool-no-verdict.js, the same arrangement menuGroupKey already has.
+   The rule: a verdict is a comparison, and `>=` puts an item sitting ON the mean on the high side —
+   so an axis where every item holds the same value makes EVERY item high on it. Nothing sold yet
+   scores a whole section as Stars and Plowhorses; four beers at one case price score as four Stars.
+   Neither is a reading, so neither is scored. */
+function menuPoolSeparable(list) {
+  const l = Array.isArray(list) ? list : [];
+  if (l.length < 2) return false;
+  const cents = v => Math.round((Number(v) || 0) * 100);
+  const m = new Set(), c = new Set();
+  l.forEach(i => { m.add(cents((i && i.price) - (i && i.cost))); c.add(Number((i && i.weekly_covers) || 0)); });
+  return m.size > 1 && c.size > 1;
+}
+
 function menuGroupKey(item) {
   const t = menuTypeOf(item);
   if (t === 'cocktail') return 'cocktail';          // one pool; categories are presentational
@@ -528,7 +545,9 @@ function computeRevenueAudit(appData, controlData) {
     menuItems.forEach(i => { const c = menuGroupKey(i); (byCat[c] = byCat[c] || []).push(i); });
     Object.keys(byCat).forEach(cat => {
       const list = byCat[cat];
-      if (list.length < MENU_MIN_PER_CAT) return;
+      // Same gate the screen uses (S298/S303): a pool nothing can separate is not scored, so the
+      // audit cannot report Stars the board refuses to name.
+      if (list.length < MENU_MIN_PER_CAT || !menuPoolSeparable(list)) return;
       const avgCM = avg(list.map(i => i.price - i.cost));
       const avgCov = avg(list.map(i => i.weekly_covers));
       list.forEach(i => {
@@ -543,8 +562,24 @@ function computeRevenueAudit(appData, controlData) {
     if (menuKnown) {
       // S161: Top Category by REVENUE (price x units), not a raw unit count — a cheap high-volume
       // category used to win the "revenue" label off sheer covers.
+      /* ⚠⚠ I8: A CATEGORY THE OPERATOR NEVER NAMED CANNOT LEAD THEIR REVENUE. This bucketed every
+         item under `i.category || 'Other'`, so a menu carrying no Category values — legacy rows,
+         seeded rows, anything imported before Category became a required mapping — put the whole
+         menu in ONE bucket and the audit reported "Top Category by Revenue: Other" on screen, in
+         the exported PDF, and in the narrative as "Other leads the revenue."
+         ⚠ 'Other' IS A REAL CATEGORY NAME in this app, which is what makes the invented label worse
+         than a blank: the sentence is indistinguishable from a true statement about a section the
+         operator really does call Other. So the test is on the category being EMPTY, never on the
+         word — a real Other still competes and can still win.
+         Menu Engineering and Menu Rundown both already handle the blank case; this was the one door
+         that named it. `topCategory` null renders as "Not available" and audit-narrative already
+         suppresses the sentence for that value, so refusing costs nothing downstream. */
       const catRev = {};
-      menuItems.forEach(i => { const c = i.category || 'Other'; catRev[c] = (catRev[c] || 0) + (num(i.price) || 0) * (num(i.weekly_covers) || 0); });
+      menuItems.forEach(i => {
+        const c = String(i.category == null ? '' : i.category).trim();
+        if (!c) return;
+        catRev[c] = (catRev[c] || 0) + (num(i.price) || 0) * (num(i.weekly_covers) || 0);
+      });
       topCategory = Object.keys(catRev).sort((a, b) => catRev[b] - catRev[a])[0] || null;
     }
   }
@@ -894,6 +929,101 @@ if (require.main === module) {
   rChecks.push(['Rev S5 scores when events exist', revEv.S5_SCORE > 0, true]);
   const revNoServer = computeRevenueAudit({ settings: {}, revenue_settings: { targets: {} }, revenue_server_checks: [{ server_name: 'A', covers: 10, sales: 300 }] }, null);
   rChecks.push(['Rev S4 N/A with <3 checks and no comp data', revNoServer.S4_SCORE, null]);
+
+  /* ── I8: A CATEGORY THE OPERATOR NEVER NAMED CANNOT LEAD THEIR REVENUE ───────────────────────
+     `catRev` bucketed every item under `i.category || 'Other'`, so a menu carrying no Category
+     values — legacy rows, seeded rows, anything imported before Category became required — put the
+     whole menu in one bucket and the audit reported **Top Category by Revenue: Other** on screen,
+     in the exported PDF, and in the narrative as *"Other leads the revenue."*
+     ⚠ AND 'Other' IS A REAL CATEGORY NAME, which is what makes this worse than a cosmetic label:
+     it is a live option elsewhere in the app, so the sentence is indistinguishable from a true
+     statement about a section actually called Other. Menu Engineering and Menu Rundown both handle
+     the blank case ("Uncategorized"); the audit was the one door that named it.
+     The honest answer is the one the field already has: `topCategory` null renders as
+     "Not available" and `audit-narrative` already suppresses the sentence for it. */
+  const revNoCat = computeRevenueAudit({
+    settings: {}, revenue_settings: { targets: {} }, revenue_weeks: rWeeks,
+    menu_items: [
+      { name: 'A', price: 20, cost: 6, weekly_covers: 50 }, { name: 'B', price: 22, cost: 7, weekly_covers: 40 },
+      { name: 'C', price: 18, cost: 5, weekly_covers: 90 }, { name: 'D', price: 24, cost: 9, weekly_covers: 20 }
+    ]
+  }, null);
+  rChecks.push(['Rev S3 I8 an uncategorized menu names NO top category', revNoCat.S3_TOP_CATEGORY, 'Not available']);
+  /* CONTROL, the other direction: a category REALLY called "Other" must still be able to win, so
+     the fix discriminates on the category being BLANK and never on the word. */
+  const revRealOther = computeRevenueAudit({
+    settings: {}, revenue_settings: { targets: {} }, revenue_weeks: rWeeks,
+    // ⚠ COVERS AND MARGINS BOTH VARY. My first version of this fixture gave every item 90 covers,
+    // and S298/S303's separability rule then correctly refused to rank the pool — so the assertion
+    // went red measuring something it was not about (harness-review #14). A real section varies.
+    menu_items: [
+      { name: 'A', category: 'Other', price: 40, cost: 6, weekly_covers: 90 },
+      { name: 'B', category: 'Other', price: 42, cost: 7, weekly_covers: 80 },
+      { name: 'C', category: 'Other', price: 38, cost: 5, weekly_covers: 70 },
+      { name: 'D', category: 'Other', price: 44, cost: 9, weekly_covers: 60 },
+      { name: 'E', category: 'Side',  price: 5,  cost: 1, weekly_covers: 10 }
+    ]
+  }, null);
+  rChecks.push(['Rev S3 I8 CONTROL a real category called Other still wins on revenue', revRealOther.S3_TOP_CATEGORY, 'Other']);
+  /* CONTROL: a menu that is PART uncategorized still names its real top category, and the unnamed
+     bucket is simply not a contender — the blank items carry the biggest revenue here on purpose. */
+  const revMixed = computeRevenueAudit({
+    settings: {}, revenue_settings: { targets: {} }, revenue_weeks: rWeeks,
+    menu_items: [
+      { name: 'A', price: 99, cost: 6, weekly_covers: 500 }, { name: 'B', price: 99, cost: 7, weekly_covers: 450 },
+      { name: 'C', category: 'Entree', price: 20, cost: 5, weekly_covers: 40 },
+      { name: 'D', category: 'Entree', price: 22, cost: 6, weekly_covers: 35 },
+      { name: 'E', category: 'Entree', price: 24, cost: 7, weekly_covers: 30 },
+      { name: 'F', category: 'Entree', price: 26, cost: 8, weekly_covers: 25 }
+    ]
+  }, null);
+  rChecks.push(['Rev S3 I8 CONTROL a part-uncategorized menu still names its real top category', revMixed.S3_TOP_CATEGORY, 'Entree']);
+
+  /* ── S298 / S303: A POOL NOTHING CAN SEPARATE IS NOT SCORED, ON THE SERVER TOO ───────────────
+     `hiM = margin >= avgCM` with `>=` puts an item sitting ON the mean on the high side, so an axis
+     where every item holds the same value makes EVERY item high on it. Before this, a menu whose
+     first product-mix drop had not happened scored as a section of Stars and Plowhorses — the
+     day-one shape — and four bottle-beer cases at one case price scored as four Stars.
+     The audit must reach the same answer as the board its action item links to, so the rule is
+     mirrored verbatim and RUN here rather than only matched in source. */
+  const flatCovers = computeRevenueAudit({
+    settings: {}, revenue_settings: { targets: {} }, revenue_weeks: rWeeks,
+    menu_items: [
+      { name: 'A', category: 'Entree', price: 20, cost: 5, weekly_covers: 0 },
+      { name: 'B', category: 'Entree', price: 22, cost: 6, weekly_covers: 0 },
+      { name: 'C', category: 'Entree', price: 24, cost: 7, weekly_covers: 0 },
+      { name: 'D', category: 'Entree', price: 26, cost: 8, weekly_covers: 0 }
+    ]
+  }, null);
+  /* ⚠ null, NOT 0, AND THE DIFFERENCE IS THE POINT. S160 already established that the menu is only
+     "known" once at least one category could actually be ranked, so an unrankable menu reports NO
+     READING rather than a count of zero — "0 Stars" would be a claim about a menu nobody has
+     measured. My first version of these expectations said 0 and was wrong about the app. */
+  rChecks.push(['Rev S3 S303 nothing sold yet gives no star reading at all', flatCovers.S3_STARS_COUNT, null]);
+  rChecks.push(['Rev S3 S303 and nothing is classified', flatCovers.S3_MENU_SCORED, null]);
+  const flatMargin = computeRevenueAudit({
+    settings: {}, revenue_settings: { targets: {} }, revenue_weeks: rWeeks,
+    menu_items: [
+      { name: 'A', category: 'Beer', type: 'inventory', price: 30, cost: 18, weekly_covers: 40 },
+      { name: 'B', category: 'Beer', type: 'inventory', price: 30, cost: 18, weekly_covers: 25 },
+      { name: 'C', category: 'Beer', type: 'inventory', price: 30, cost: 18, weekly_covers: 60 },
+      { name: 'D', category: 'Beer', type: 'inventory', price: 30, cost: 18, weekly_covers: 12 }
+    ]
+  }, null);
+  rChecks.push(['Rev S3 S298 four identical-margin cases give no star reading', flatMargin.S3_STARS_COUNT, null]);
+  rChecks.push(['Rev S3 S298 and nothing is classified', flatMargin.S3_MENU_SCORED, null]);
+  /* CONTROL — vary ONE number on the flat-margin pool and it ranks normally, so the rule is
+     refusing the flatness and not the pool ([[the-loop]] #22). */
+  const notFlat = computeRevenueAudit({
+    settings: {}, revenue_settings: { targets: {} }, revenue_weeks: rWeeks,
+    menu_items: [
+      { name: 'A', category: 'Beer', type: 'inventory', price: 30, cost: 18, weekly_covers: 40 },
+      { name: 'B', category: 'Beer', type: 'inventory', price: 31, cost: 18, weekly_covers: 25 },
+      { name: 'C', category: 'Beer', type: 'inventory', price: 30, cost: 18, weekly_covers: 60 },
+      { name: 'D', category: 'Beer', type: 'inventory', price: 30, cost: 18, weekly_covers: 12 }
+    ]
+  }, null);
+  rChecks.push(['Rev S3 CONTROL one price apart and the same pool ranks all 4', notFlat.S3_MENU_SCORED, 4]);
 
   // The S5 event window must follow the REAL number of confirmed weeks, not a hardcoded 4 — the
   // same fix already applied to S2_LABOR_PERIOD. With 2 confirmed weeks the heading reads "2 weeks
