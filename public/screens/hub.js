@@ -777,13 +777,17 @@ S.Hub = {
        because an unreadable section has no known total to add either — so the denominator really
        does shrink, and the whole point is that the shrink is SAID OUT LOUD ("Could not read Cash.")
        instead of leaving "20 of 20 done" looking like a finished week ([[the-loop]] #72). */
+    /* ⚠ NO `lead` COPY HERE ANY MORE. Each entry used to carry a hardcoded first-step phrase, and
+       with Shift's import already ticked the banner still read "Start with Shift, import this
+       week's sales" — flatly contradicting the green tick on the card below it. The step name now
+       comes from the step the roll-up actually stopped on, so the two cannot disagree. */
     const WEEK_CLOSE_ORDER = [
-      { key:'shift',     title:'Shift',     screen:'sc-dashboard', mod:'shift',     lead:'import this week\'s sales' },
-      { key:'labor',     title:'Labor',     screen:'lc-dashboard', mod:'labor',     lead:'get this week\'s hours in' },
-      { key:'inventory', title:'Inventory', screen:'ic-dashboard', mod:'inventory', lead:'take the week\'s count' },
-      { key:'revenue',   title:'Revenue',   screen:'r-dashboard',  mod:'revenue',   lead:'confirm the week' },
-      { key:'profit',    title:'Profit',    screen:'dashboard',    mod:'profit',    lead:'check the costs' },
-      { key:'cash',      title:'Cash',      screen:'c-dashboard',  mod:'cash',      lead:'read the cash position' }
+      { key:'shift',     title:'Shift',     screen:'sc-dashboard', mod:'shift'     },
+      { key:'labor',     title:'Labor',     screen:'lc-dashboard', mod:'labor'     },
+      { key:'inventory', title:'Inventory', screen:'ic-dashboard', mod:'inventory' },
+      { key:'revenue',   title:'Revenue',   screen:'r-dashboard',  mod:'revenue'   },
+      { key:'profit',    title:'Profit',    screen:'dashboard',    mod:'profit'    },
+      { key:'cash',      title:'Cash',      screen:'c-dashboard',  mod:'cash'      }
     ];
     const catchup = this.weekCloseRollup({ shift: scSum, labor: lcSum, inventory: icSum,
                                            revenue: rvSum, profit: pfSum, cash: csSum });
@@ -806,8 +810,11 @@ S.Hub = {
         catchupBanner = wrap(
           '<span style="font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);">Closing the week</span>'
           + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + catchup.done + ' of ' + catchup.total + ' done</span>'
+          // The step's own label, first letter lowered so it reads as one sentence.
           + (nx ? '<span style="font-size:12px;color:var(--t2);">Start with <strong style="color:var(--gold);">'
-              + esc(nx.title) + '</strong>, ' + esc(nx.lead) + '.</span>' : '')
+              + esc(nx.title) + '</strong>' + (catchup.next.label
+                  ? ', ' + esc(catchup.next.label.charAt(0).toLowerCase() + catchup.next.label.slice(1)) : '')
+              + '.</span>' : '')
           + gap,
           nx ? 'onclick="S.Hub._enter(\'' + nx.screen + '\',\'' + nx.mod + '\')"' : '');
       }
@@ -1215,6 +1222,7 @@ S.Hub = {
     const hubGrid = `<div class="hub-grid" style="display:grid;grid-template-rows:auto auto auto auto;gap:18px;padding-bottom:18px;">
           <div class="hub-grid-tiles">${topCard}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">${priorityCard}${needsBand}</div>
+          ${catchupBanner}
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${icCard}${lcCard}${scCard}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${pfCard}${rvCard}${csCard}</div>
         </div>`;
@@ -1308,7 +1316,6 @@ S.Hub = {
             <div class="topbar-right"></div>
           </header>
           <main class="content">
-            ${catchupBanner}
             ${hubGrid}
           </main>
         </div>
@@ -1503,21 +1510,50 @@ S.Hub = {
      failure this guards ([[the-loop]] #72), which is why `closed` additionally requires that every
      section was readable. With none readable the caller renders nothing at all, because "0 of 0"
      reads as closed. */
-  WEEK_CLOSE_KEYS: ['shift', 'labor', 'inventory', 'revenue', 'profit', 'cash'],
   weekCloseRollup(sums) {
-    const keys = this.WEEK_CLOSE_KEYS || ['shift', 'labor', 'inventory', 'revenue', 'profit', 'cash'];
+    /* ⚠ BOTH CONSTANTS LIVE INSIDE THE FUNCTION, DELIBERATELY ([[the-loop]] #16). Written as
+       sibling data properties they were invisible to every harness in the suite — those lift
+       METHODS by name — so `this.WEEK_CLOSE_SHARED` came back undefined, the `|| []` fallback
+       quietly disabled the de-duplication, and the pin went GREEN while measuring none of it.
+       Nothing else reads either list, so nothing has to lift a second name. */
+    const keys = ['shift', 'labor', 'inventory', 'revenue', 'profit', 'cash'];
+    /* ⚠⚠ ONE ACTION WEARING TWO NAMES. Confirming the week writes a single `week`/`revenue_week`
+       record, and BOTH Revenue's step 1 and Profit's step 1 derive their done-state from that same
+       record ([[cockpit-steps-manual]]'s documented exception) — so one click ticks both. Counted
+       twice it claims 24 steps where there are 23 actions, and the progress jumps by two for one
+       piece of work, which is the kind of number that makes the whole line untrustworthy.
+       ⛔ SCOPED TO SECTION AND STEP, NEVER THE STEP KEY ALONE. Cash ALSO has a step keyed `week`
+       ("Stay ahead of the week"), an unrelated manual cash-flow review — deduping on the bare key
+       would silently swallow it and under-count Cash by one for ever. */
+    const shared = [{ id: 'confirm-week', members: [['revenue', 'week'], ['profit', 'week']] }];
+    const idOf = (sec, k) => {
+      const g = shared.find(gr => (gr.members || []).some(m => m[0] === sec && m[1] === k));
+      return g ? g.id : sec + '|' + k;
+    };
     const s = sums || {};
     let done = 0, total = 0, covered = 0, next = null;
-    const seen = {};
+    const seen = {}, counted = {};
     keys.forEach(k => {
       const v = s[k];
-      const ok = !!(v && typeof v.doneCount === 'number' && typeof v.total === 'number');
+      /* ⚠ THE STEPS ARRAY IS REQUIRED, not the counts. Both jobs this does — skipping a shared step
+         and naming the NEXT one — need the individual steps, and a summary without them cannot be
+         deduped or read from. Treated as unreadable rather than trusted at face value. */
+      const ok = !!(v && Array.isArray(v.steps) && v.steps.length);
       seen[k] = ok;
       if (!ok) return;
       covered++;
-      done += v.doneCount;
-      total += v.total;
-      if (!next && v.doneCount < v.total) next = { key: k, done: v.doneCount, total: v.total };
+      v.steps.forEach(st => {
+        const id = idOf(k, st && st.key);
+        if (counted[id]) return;              // already counted under its other name
+        counted[id] = true;
+        total++;
+        if (st && st.done) done++;
+        /* ⚠ THE FIRST UNFINISHED STEP, NOT THE SECTION'S FIRST STEP. The first version named a
+           hardcoded lead per section, so with Shift's import already ticked the banner still read
+           "Start with Shift, import this week's sales" — contradicting the tick on the card
+           directly beneath it. The label comes from the step itself now, so it cannot disagree. */
+        else if (!next) next = { key: k, step: st && st.key, label: (st && st.label) || '' };
+      });
     });
     return {
       done, total, covered, sections: keys.length, seen, next,
