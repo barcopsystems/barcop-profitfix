@@ -482,7 +482,17 @@ const App = {
   // is the one way this ends badly, and at zero users closing the door costs nothing.
   // ⚠ There is a MATCHING constant in server/index.js (SIGNUPS_OPEN) that blocks checkout.
   // CHANGE BOTH. verify-signups-closed.js FAILS if they disagree, so reopening is one decision.
-  SIGNUPS_OPEN: false,
+  /* ⭐ REOPENED 2026-08-02, deliberately, by Kyle. The paragraph above is now HISTORY, kept because
+     it records why the door was shut and what had to be true before it opened again.
+     WHAT CHANGED: the hardening converged. Every one of the thirteen operator-facing sections has
+     been trial-used end to end, the calculation coverage audit is closed, and the suite reached 369
+     harnesses / 12,593 assertions green, including the row-per-record migration and the `_dataReady`
+     hydration gate that the 07-19 data-loss bug produced.
+     ⚠ The one path that had NOT been exercised since 07-13 is a brand-new account's first load —
+     every boot since the fix has been an EXISTING account with a populated row, which is the other
+     side of that branch. It is now pinned by verify-new-account-first-load.js, including the
+     false-empty case that IS the 07-19 wipe. */
+  SIGNUPS_OPEN: true,
 
   // Last-resort boot guard (L14). init() IS the whole boot chain, and at page load BOTH containers
   // are hidden (#auth-screen display:none, #app .hidden) — so a rejection anywhere in that chain
