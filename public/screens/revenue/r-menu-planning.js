@@ -823,7 +823,14 @@ S.RevenueMenuPlanning = {
         const a = this.actionFor(i, quad);
         const moveBand = b.move
           ? '<div class="mp-move"><div class="mp-move-txt"><span class="mp-move-lbl">Move:</span> ' + esc(b.move) + '</div>'
-            + '<span class="mp-act" role="button" tabindex="0" data-id="' + esc(i.id) + '" data-act="' + a.act + '">+ ' + a.label + '</span></div>'
+            /* ⚠ THE "+" IS DECORATION AND A SCREEN READER READ IT ALOUD (S296's other sibling):
+               "plus Reprice, button". `aria-label` states the action on its own, and the visible
+               "+" is marked `aria-hidden` so it is not announced twice. The label names the ITEM as
+               well, because a page of tiles announces a dozen identical "Reprice" buttons
+               otherwise, and nothing in the reading order says which dish is which. */
+            + '<span class="mp-act" role="button" tabindex="0" aria-label="' + esc(a.label + ' ' + (i.name || 'this item'))
+            + '" data-id="' + esc(i.id) + '" data-act="' + a.act + '">'
+            + '<span aria-hidden="true">+ </span>' + a.label + '</span></div>'
           : '';
         return '<div class="mp-tile">'
           + '<div class="mp-name">' + esc(i.name || 'Unnamed') + '</div>'
