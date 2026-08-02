@@ -49,7 +49,16 @@ S.HubSettingsHome = {
       kvRow('Operation', esc(s.bar_name || 'Your operation')),
       email ? kvRow('Signed in', esc(email)) : '',
       isOwnerHere ? kvRow('Plan', planVal) : '',
-      isOwnerHere && renewVal ? kvRow('Renews', esc(renewVal)) : '',
+      /* ⚠⚠ "RENEWS" WAS WRONG FOR A CANCELLING SUBSCRIPTION, and Kyle found it on his own real
+         account: Stripe's portal said "Cancels Aug 13" while this row said "Renews Aug 13, 2026".
+         Same date, opposite meaning, on the two screens a cancelling customer reads back to back.
+         The date is the END of the paid period either way; what it MEANS comes from
+         `cancel_at_period_end`, which nothing stored until now. The word matches Stripe's own so
+         the two screens read the same, rather than inventing a third phrasing for it.
+         ⚠ "Plan: Active" above is deliberately UNCHANGED — the subscription really is active and
+         the operator really does keep everything until that date. Only this word was untrue. */
+      isOwnerHere && renewVal
+        ? kvRow(sub.cancel_at_period_end ? 'Cancels' : 'Renews', esc(renewVal)) : '',
       // Owner-only, matching the sidebar row and open('data')'s own refusal: a backup
       // is the whole account, so a restricted admin never gets a door to it.
       isOwnerHere ? kvRow('Backup', '<button class="btn btn-ghost btn-sm" data-act="user-data">Export or Restore</button>') : '',
