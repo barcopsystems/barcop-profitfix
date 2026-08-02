@@ -87,6 +87,37 @@ input,select,textarea{color-scheme:dark;}
 .ccd-step:focus{outline:none;}
 /* Service-period drop-down inputs sit in a popover outside .app — give them the steel focus, not the browser white ring. */
 .sp-pop input:focus{border-color:var(--focus-cell)!important;outline:none;}
+/* ── KEYBOARD FOCUS ON CONTROLS THAT ARE NOT TYPING CELLS (S296) ──────────────────────────────────
+   Every rule above replaces the browser's white ring with a steel BORDER, and four of them say so
+   by name. That is the app's focus language, and it only ever covered things you type into. A
+   button has no border to change (`.btn` is `border:none`) and `.mp-act` is a `<span role="button"
+   tabindex="0">`, so 991 buttons and the two custom controls fell through to whatever the browser
+   draws — the one colour the locked palette does not control ([[color-system-locked]]). M3 made
+   `.mp-act` keyboard-operable, which turned that from untidy into a dead end: a keyboard operator
+   can fire the control and cannot see which one they are standing on.
+
+   ⚠ `:focus-visible`, NEVER `:focus`. The browser matches it only when focus arrived from the
+   KEYBOARD, so clicking a button with a mouse draws nothing at all. Writing this with `:focus`
+   would put a ring on every button anyone clicks, which is noise on a screen nobody is tabbing
+   through, and it is the most likely way for this to get "fixed" wrongly later.
+   ⚠ `--steel`, NOT `--gold`. Gold means "this is the action to take" everywhere else in this app,
+   so a gold ring on a Cancel button would read as if Cancel were the primary one. Steel is the
+   colour the focus language already speaks; `--focus-cell` is the same family, just too dark to be
+   seen as a ring on a card.
+   ⚠ NO `border-radius` HERE. `outline` already follows the element's own corners, so setting one
+   would change the control's SHAPE while it is focused — a layout change wearing an accessibility
+   fix's name.
+   ⚠ `:where()` gives this ZERO specificity, so every rule above keeps its own treatment untouched
+   and any control that wants a different focus style can have one without an `!important` fight.
+   ⚠ `tabindex="-1"` is EXCLUDED: that is programmatic focus (moving a screen reader to a panel),
+   not a tab stop, and ringing it would paint a box around a whole section.
+   ⚠ SAFARI FLOOR: `:focus-visible` landed in Safari 15.4 and this app's floor is 13.4. An
+   unsupported pseudo-class makes the browser drop the whole rule, so on an old Safari this is
+   exactly today's behaviour. Degrades to the status quo, never to something broken. */
+:where(button,[role="button"],[tabindex]:not([tabindex="-1"]),a[href],summary):focus-visible{
+  outline:2px solid var(--steel);
+  outline-offset:2px;
+}
 .form-input[type=number]{-moz-appearance:textfield;}
 .form-input[type=number]::-webkit-inner-spin-button,
 .form-input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
