@@ -451,7 +451,21 @@ S.InventoryDashboard = {
         const order = (S.InventoryOrderSheet && S.InventoryOrderSheet.openOrderForVendor) ? S.InventoryOrderSheet.openOrderForVendor(v.vendor) : null;
         const action = order
           ? '<span data-go="ic-order-sheet" style="font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;color:' + (order.status === 'Submitted' ? 'var(--green)' : 'var(--gold)') + ';">Order ' + esc(order.status || 'Open') + '</span>'
-          : '<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet" style="margin:0;">Create Order</button>';
+          /* ⚠ "Create Order" CREATED NOTHING (2026-08-02, Kyle found it using the app). This is
+             `data-go="ic-order-sheet"` — the same destination as the "Open Order Sheet" button at
+             the bottom of this step — so six vendor rows offered six buttons that all opened one
+             screen, under a verb promising a finished action.
+             ⭐ GOING TO THE ORDER SHEET IS THE RIGHT BEHAVIOUR and is unchanged. Kyle: "creating an
+             order right from that step doesn't make sense, because the user has no idea what they
+             are actually ordering unless they go to the order sheet." The word was the defect, not
+             the destination — the same class as "Renews" on a cancelled subscription, where the
+             label says one thing and the system does another.
+             ⚠ NAMES ITS DESTINATION, which is the convention every other verb-labelled navigation
+             in the six cockpits already follows: Build Schedule → lc-build-schedule, Take Inventory
+             → ic-take-inventory, Payroll Export → lc-payroll-export, Run Checklists → sc-checklists.
+             Four of four named a screen; this was the only one naming an outcome, which is what made
+             it the outlier rather than a matter of taste. Held by verify-cockpit-button-labels.js. */
+          : '<button class="btn btn-ghost btn-sm" data-go="ic-order-sheet" style="margin:0;">Order Sheet</button>';
         return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;' + (i < st.vendors.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
           + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:var(--t1);">' + esc(v.vendor) + '</div>'
           + '<div style="font-size:11px;color:var(--t3);">' + v.items + ' item' + (v.items === 1 ? '' : 's') + ' below par</div></div>'
