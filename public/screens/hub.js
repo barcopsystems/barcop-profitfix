@@ -761,7 +761,57 @@ S.Hub = {
     // (The old "Continue Setup" catch-up banner was removed with the Getting
     // Started checklist; the Hub's empty-state tiles + each section's day-one
     // guide are the onboarding now.)
-    const catchupBanner = '';
+    /* ── CLOSING THE WEEK — the one thing the six cockpits cannot tell you ──────────────────────
+       Every cockpit shows its own "X of 4 done" and nothing adds them up, so the operator cannot
+       answer "am I finished with the week" without visiting six pages, and nothing says where to
+       START. This is a signpost, not a sequencer: it gates nothing, ticks nothing, and changes no
+       cockpit. Ignore it and the app behaves exactly as before.
+       ⚠ THE ORDER IS A FACT, NOT A PREFERENCE, and it is measured in the code:
+         · `confirm-week.js` prefills sales from `sc_shifts`           -> SHIFT first
+         · it needs labor hours (`laborIn`)                            -> LABOR next
+         · it prefills COGS from `S.ThisWeek.icCOGS(...)`, the counts  -> INVENTORY next
+         · Revenue step 1 IS Confirm the Week; Profit step 1 is the same record
+       So an operator who opens Revenue first meets a step that cannot honestly complete, and today
+       only Revenue step 2 says anything about why. Cash is genuinely independent and goes last.
+       ⛔ A COCKPIT THAT CANNOT REPORT IS NEVER COUNTED AS DONE. It drops out of the count entirely,
+       because an unreadable section has no known total to add either — so the denominator really
+       does shrink, and the whole point is that the shrink is SAID OUT LOUD ("Could not read Cash.")
+       instead of leaving "20 of 20 done" looking like a finished week ([[the-loop]] #72). */
+    const WEEK_CLOSE_ORDER = [
+      { key:'shift',     title:'Shift',     screen:'sc-dashboard', mod:'shift',     lead:'import this week\'s sales' },
+      { key:'labor',     title:'Labor',     screen:'lc-dashboard', mod:'labor',     lead:'get this week\'s hours in' },
+      { key:'inventory', title:'Inventory', screen:'ic-dashboard', mod:'inventory', lead:'take the week\'s count' },
+      { key:'revenue',   title:'Revenue',   screen:'r-dashboard',  mod:'revenue',   lead:'confirm the week' },
+      { key:'profit',    title:'Profit',    screen:'dashboard',    mod:'profit',    lead:'check the costs' },
+      { key:'cash',      title:'Cash',      screen:'c-dashboard',  mod:'cash',      lead:'read the cash position' }
+    ];
+    const catchup = this.weekCloseRollup({ shift: scSum, labor: lcSum, inventory: icSum,
+                                           revenue: rvSum, profit: pfSum, cash: csSum });
+    let catchupBanner = '';
+    if (catchup.covered > 0) {
+      const wrap = (inner, click) => '<div class="hd-row" ' + (click || '')
+        + ' style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);'
+        + 'padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;'
+        + (click ? 'cursor:pointer;' : 'cursor:default;') + '">' + inner + '</div>';
+      // Which sections it could not read, named — an unread section is not a finished one.
+      const missing = WEEK_CLOSE_ORDER.filter(o => !catchup.seen[o.key]).map(o => o.title);
+      const gap = missing.length
+        ? '<span style="font-size:11px;color:var(--t3);">Could not read ' + esc(missing.join(', ')) + '.</span>' : '';
+      if (catchup.closed) {
+        catchupBanner = wrap(
+          '<span style="font-size:13px;font-weight:700;color:var(--green);">This week is closed.</span>'
+          + '<span style="font-size:12px;color:var(--t2);">All ' + catchup.total + ' steps done.</span>' + gap);
+      } else {
+        const nx = WEEK_CLOSE_ORDER.find(o => catchup.next && o.key === catchup.next.key);
+        catchupBanner = wrap(
+          '<span style="font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);">Closing the week</span>'
+          + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + catchup.done + ' of ' + catchup.total + ' done</span>'
+          + (nx ? '<span style="font-size:12px;color:var(--t2);">Start with <strong style="color:var(--gold);">'
+              + esc(nx.title) + '</strong>, ' + esc(nx.lead) + '.</span>' : '')
+          + gap,
+          nx ? 'onclick="S.Hub._enter(\'' + nx.screen + '\',\'' + nx.mod + '\')"' : '');
+      }
+    }
     // Key metrics panel — 6 tiles in a 3x2 grid (2 rows of 3). Tighter padding
     // and a 22px number so each tile fits in the shorter container that now
     // shares the middle column with the Recovery Scoreboard above it.
@@ -1439,6 +1489,44 @@ S.Hub = {
      engine the dashboards use). A gap-area only counts when its weekly dollar
      loss computes from real data. Cash's opportunity is a one-time trapped
      amount, not a weekly leak, so it lives on the Cash screens, not here. */
+  /* Roll the six weekly cockpits' own `hubSteps()` results into one answer: how much of the week is
+     closed, and which section to open next. PURE — it takes the six summaries and returns numbers,
+     so it can be run in a harness (verify-hub-week-rollup.js) without a DOM or an account.
+     ⚠ THE ORDER IS THE DEPENDENCY ORDER, measured in the code and written out at the call site. The
+     obvious wrong answer is "send them to whichever section has the most left", which would open
+     Revenue on a week whose sales are not imported yet.
+     ⛔ A SECTION THAT COULD NOT REPORT IS NOT DONE. It leaves BOTH sides of the count, because a
+     section you cannot read has no known total either — inventing one would be worse than omitting
+     it. That does shrink the denominator, so the shrink is made VISIBLE rather than hidden:
+     `covered`/`sections` carry how many were readable, `seen` says which, and the caller names the
+     missing ones on screen. Silently reporting "20 of 20 done" on five of six sections is the
+     failure this guards ([[the-loop]] #72), which is why `closed` additionally requires that every
+     section was readable. With none readable the caller renders nothing at all, because "0 of 0"
+     reads as closed. */
+  WEEK_CLOSE_KEYS: ['shift', 'labor', 'inventory', 'revenue', 'profit', 'cash'],
+  weekCloseRollup(sums) {
+    const keys = this.WEEK_CLOSE_KEYS || ['shift', 'labor', 'inventory', 'revenue', 'profit', 'cash'];
+    const s = sums || {};
+    let done = 0, total = 0, covered = 0, next = null;
+    const seen = {};
+    keys.forEach(k => {
+      const v = s[k];
+      const ok = !!(v && typeof v.doneCount === 'number' && typeof v.total === 'number');
+      seen[k] = ok;
+      if (!ok) return;
+      covered++;
+      done += v.doneCount;
+      total += v.total;
+      if (!next && v.doneCount < v.total) next = { key: k, done: v.doneCount, total: v.total };
+    });
+    return {
+      done, total, covered, sections: keys.length, seen, next,
+      // Closed only when everything readable is finished AND everything was readable. Five of six
+      // sections complete is not a closed week, however good the count looks.
+      closed: covered === keys.length && covered > 0 && next === null
+    };
+  },
+
   weeklyReadout() {
     if (!window.Recovery || !window.FIX) return { items: [], total: 0, leakTotal: 0, oppTotal: 0 };
     const seen = {};
