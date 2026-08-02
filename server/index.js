@@ -22,7 +22,12 @@ const PORT = process.env.PORT || 3000;
 // paused, and it returns the moment this flips back to true.
 // ⚠ MIRRORS App.SIGNUPS_OPEN in public/app.js, which blocks the signup form in the browser.
 // CHANGE BOTH. verify-signups-closed.js FAILS if they disagree, so a half-open door is caught.
-const SIGNUPS_OPEN = false;
+/* ⭐ REOPENED 2026-08-02 alongside the browser flag. The paragraph above is HISTORY now — it records
+   why the door was shut and what had to converge first. Flipping this restores BOTH gated
+   endpoints: /api/create-checkout-session (a new bar reaching payment) and /api/add-account
+   (an existing customer adding a second bar), which was paused only as a side effect of the same
+   switch. Everything else was open the whole time. */
+const SIGNUPS_OPEN = true;
 
 // Skip JSON parsing for the Stripe webhook route — it needs the raw body for signature verification
 app.use((req, res, next) => {
