@@ -1028,6 +1028,7 @@ const PosIngest = {
     // rejected whole).
     const byDate = new Map();          // date -> aggregated { bar, food, covers } from the file
     const carry  = new Map();          // date -> { bar, food, covers } booleans: which columns the file CARRIES
+    const covSeen = new Map();         // date -> the covers values the rows for that day actually STATED (P1c)
     const skipped = []; const zeroSkipped = []; const unchanged = []; const undated = []; let dupCount = 0; let merged = 0; let keptManual = 0;
     const keptDates = new Set();       // a kept hand day reported once, not once per row
     const cents = n => Math.round(n * 100) / 100;   // summing floats across services must not drift
@@ -1057,10 +1058,45 @@ const PosIngest = {
       const c = carry.get(date) || { bar: false, food: false, covers: false };
       if (numeric(r.bar)) c.bar = true; if (numeric(r.food)) c.food = true; if (numeric(r.covers)) c.covers = true;
       carry.set(date, c);
+      // Every covers value the rows for this day actually STATED. Only a row that carries a
+      // readable count can agree with another, so a blank cell contributes nothing here (P1c).
+      if (numeric(r.covers)) { const seen = covSeen.get(date) || []; seen.push(covers); covSeen.set(date, seen); }
       const prior = byDate.get(date);
       if (prior) { prior.bar = cents(prior.bar + bar); prior.food = cents(prior.food + food); prior.covers += covers; merged++; }
       else byDate.set(date, { bar, food, covers });
     });
+    /* ⚠⚠ A GUEST COUNT REPEATED ON EVERY ROW OF A DAY IS ONE COUNT, NOT SEVERAL (P1c).
+       Summing a multi-row day is RIGHT for a daypart split — lunch 40 + dinner 60 really is 100
+       guests — and WRONG for an export broken out by revenue centre, where the POS repeats THE
+       DAY'S guest count on every line:
+           07/01  Bar      1,240.00   87
+           07/01  Kitchen  2,880.00   87
+           07/01  Patio      610.00   87
+       Summed, that books 261 guests against a real 87. MONEY IS UNTOUCHED, which is why nothing
+       looks broken — but the check average is cut to a third ($18.12 against $54.37 on those rows),
+       and check average is what the Revenue audit's S1 gap is measured from, what Confirm the Week
+       prefills, and what next week's cover goal is set against.
+       ⚠ THE DISCRIMINATOR IS EQUALITY, so there is no threshold in it and nothing fitted to a
+       sample: a real daypart split does not produce identical counts, and a repeated day total is
+       identical by construction. Decided PER DATE, so one shape on Monday cannot change Tuesday.
+       ⚠ ZERO IS NOT AGREEMENT. Two rows both reading 0 are an absent count, not a repeated one.
+       ⚠ SALES ARE NEVER DE-DUPLICATED — bar and food genuinely differ per row and genuinely add up.
+       The whole defect is that in this shape ONE column is a repeat and the others are not.
+       ⚠ AND IT IS NOT SILENT. Two dayparts that genuinely drew the same count do exist, and for
+       those this stores the smaller, true-looking number — so the dates are REPORTED and the door
+       says what it assumed. Being wrong the other way (the old behaviour) said nothing at all,
+       which is what let a tripled guest count sit there looking fine. */
+    const coversRepeated = [];
+    covSeen.forEach((vals, date) => {
+      if (vals.length < 2) return;                        // nothing to repeat
+      const first = vals[0];
+      if (!(first > 0)) return;                           // an absent count, not an agreeing one
+      if (!vals.every(v => v === first)) return;          // a real split differs
+      const agg = byDate.get(date);
+      if (agg) agg.covers = first;
+      coversRepeated.push(date);
+    });
+    coversRepeated.sort();
     const toAdd = []; const conflicts = [];
     /* ⚠ WHICH COLUMN, AND WHAT HAPPENED TO IT — one list was never enough. This was a flat
        `covDropped` array of dates, born when the mechanism only fired for covers, and the cockpit
@@ -1288,7 +1324,9 @@ const PosIngest = {
     // `merged`, NOT dupCount — the same reasoning spelled out in buildPmix. dupCount means "rows
     // already logged" everywhere else and the cockpit renders it as "N replaced earlier figures";
     // rows FOLDED INTO a total are the opposite of that.
-    return { toAdd, skipped, zeroSkipped, unchanged, undated, dupCount, merged, keptManual, conflicts, colGaps };
+    // `coversRepeated` is P1c's outcome: dates where every row stated the SAME guest count, so it
+    // was taken once instead of added up. An assumption the operator has to be able to see.
+    return { toAdd, skipped, zeroSkipped, unchanged, undated, dupCount, merged, keptManual, conflicts, colGaps, coversRepeated };
   },
 
   // A row is one drawer's (or the day's) over/short. Resolves Register + Cashier
