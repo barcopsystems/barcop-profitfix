@@ -84,7 +84,11 @@ S.RevenueMenuEngineering = {
     const map = {};
     Object.keys(byCat).forEach(cat => {
       const list = byCat[cat];
-      if (list.length < this.MIN_PER_CAT) { list.forEach(i => { map[i.id] = null; }); return; }
+      // ⚠ A POOL THAT SEPARATES NOBODY IS UNRANKED, exactly as a too-small one is (S298/S303).
+      // `>=` puts an item that sits ON the mean on the high side, so a flat axis makes EVERY item
+      // high on it — nothing sold yet reads as a section of Stars and Plowhorses, and four
+      // identical beers read as four Stars. Same answer, same null, already handled everywhere.
+      if (list.length < this.MIN_PER_CAT || !App.menuPoolSeparable(list)) { list.forEach(i => { map[i.id] = null; }); return; }
       const avgCM = list.reduce((s, i) => s + (i.price - i.cost), 0) / list.length;
       const avgCovers = list.reduce((s, i) => s + i.weekly_covers, 0) / list.length;
       list.forEach(i => {
@@ -389,7 +393,9 @@ S.RevenueMenuEngineering = {
     // ── Ranked category cards ──────────────────────────────────────────────────
     const cards = Object.keys(byCat).sort(catSort).map(cat => {
       const list = byCat[cat];
-      if (list.length < this.MIN_PER_CAT) { unranked.push(...list); return ''; }
+      // Same gate as classify(), because this is the SECOND copy of that math and a board showing
+      // verdicts classify() refuses to reach is the drift this pair keeps producing (S298/S303).
+      if (list.length < this.MIN_PER_CAT || !App.menuPoolSeparable(list)) { unranked.push(...list); return ''; }
       const avgCM = list.reduce((s, i) => s + (i.price - i.cost), 0) / list.length;
       const avgCovers = list.reduce((s, i) => s + i.weekly_covers, 0) / list.length;
       const classed = list.map(i => {
@@ -649,7 +655,10 @@ S.RevenueMenuEngineering = {
     const byCat = {}; items.forEach(i => { const c = App.menuGroupKey(i); (byCat[c] = byCat[c] || []).push(i); });
     const dogs = new Set();
     Object.values(byCat).forEach(list => {
-      if (list.length < this.MIN_PER_CAT) return;
+      // The THIRD copy of the quad math, and the one that spends money: it drives Weekly Upside and
+      // the batch reprice. Same gate (S298/S303) or this offers to reprice items the board beside
+      // it refuses to call Dogs.
+      if (list.length < this.MIN_PER_CAT || !App.menuPoolSeparable(list)) return;
       const avgCM = list.reduce((s, i) => s + (i.price - i.cost), 0) / list.length;
       const avgCovers = list.reduce((s, i) => s + i.weekly_covers, 0) / list.length;
       list.forEach(i => { if ((i.price - i.cost) < avgCM && i.weekly_covers < avgCovers) dogs.add(i.id); });
@@ -786,6 +795,12 @@ S.RevenueMenuEngineering = {
       const note = t => '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">' + t + '</div>';
       const list = a => a.slice(0, 8).map(esc).join(', ') + (a.length > 8 ? ', and ' + (a.length - 8) + ' more' : '');
       const nSkip = fl.nSkipped || 0, nInc = fl.nIncomplete || 0, nNeg = fl.nNegative || 0;
+      /* ⚠ I4's two outcomes join the NAME side of every gate below. Each of those `!nSkip` tests is
+         really asking "was anything wrong with the names?", and a retired match and an ambiguous
+         one are both exactly that — so leaving them out would print "The item names matched" over a
+         file whose names were the whole problem ([[the-loop]] #24). */
+      const nRet = fl.nRetired || 0, nAmb = fl.nAmbiguous || 0;
+      const nameTrouble = nSkip + nRet + nAmb;
       flash = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.updated ? 'var(--gold)' : 'var(--red)') + ';">'
         + (fl.failed ? 'Save failed. Try the import again.'
            : fl.updated ? 'Updated units sold on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's')
@@ -802,12 +817,14 @@ S.RevenueMenuEngineering = {
               `unmatched` come out EMPTY and the headline claimed "The item names matched" about a
               file that had an unmatched row — one that was itself rendered nowhere. */
            : 'No items updated. ' + (
-               (nInc && !nSkip && !nNeg)
+               (nInc && !nameTrouble && !nNeg)
                  ? 'The item names matched, but Bar Cop could not read a units-sold figure for any of them.'
-             : (nNeg && !nSkip && !nInc)
+             : (nNeg && !nameTrouble && !nInc)
                  ? 'Every item came out at negative units after returns, so the previous figures were left alone.'
-             : ((nInc || nNeg) && !nSkip)
+             : ((nInc || nNeg) && !nameTrouble)
                  ? 'The item names matched — see below for what happened to each row.'
+             : ((nRet || nAmb) && !nSkip)
+                 ? 'Bar Cop found every name on your menu but could not use them. See below.'
              : 'Check that the item names in your export match your menu.'))
         + '</div>'
         // ⚠ GUARDED like its two neighbours. coversImportHtml() is ONE TERM inside draw()'s single
@@ -815,6 +832,14 @@ S.RevenueMenuEngineering = {
         // Engineering screen, classification board and all. One writer sets this key today; the
         // guard is for the next one.
         + ((fl.unmatched || []).length ? note('Not matched: ' + list(fl.unmatched) + '. Add them in Menu Builder or rename to match.') : '')
+        // I4: the two outcomes the builder now refuses. Each names what happened and the one thing
+        // that fixes it, the same shape as the three notes around it.
+        + ((fl.retired || []).length ? note('Still selling but no longer on your live menu: ' + list(fl.retired)
+            + '. Left alone, because units on an inactive item never show anywhere. Make ' + ((fl.retired || []).length === 1 ? 'it' : 'them')
+            + ' active on the Inactive tab in Menu Builder if you are still selling ' + ((fl.retired || []).length === 1 ? 'it' : 'them') + '.') : '')
+        + ((fl.ambiguous || []).length ? note('Matches more than one menu item: ' + list(fl.ambiguous)
+            + '. Bar Cop could not tell which one rang, so both were left at their previous figures. '
+            + 'Rename one of each pair in Menu Builder and drop the file again.') : '')
         + (fl.incomplete && fl.incomplete.length ? note('Skipped, no readable units-sold figure: ' + list(fl.incomplete) + '. These names matched your menu, so check the units column in your export.') : '')
         // A dropped item is a MEASUREMENT THAT WENT MISSING. It keeps last week's units, and this
         // screen presents those as this week's mix — so silence here is a wrong Star/Dog call.
@@ -847,7 +872,11 @@ S.RevenueMenuEngineering = {
 
   async applyCoversImport(rows) {
     // One ingest path: PosIngest matches by name + upserts weekly_covers.
-    const { toAdd, skipped, incomplete, netNegative, merged } = PosIngest.build('pmix', rows);
+    // ⚠ `retired` and `ambiguous` are I4's two refused outcomes — a name only an inactive item
+    // carries, and a name two LIVE items share. Both were previously written or silently dropped;
+    // both are now refused by the builder, so both must be carried here or they become the exact
+    // silent drop the other three buckets exist to prevent.
+    const { toAdd, skipped, incomplete, netNegative, retired, ambiguous, merged } = PosIngest.build('pmix', rows);
     let updated = 0, failed = false;
     if (toAdd.length) {
       // Honor the commit result: discarding it reported "Updated units sold on N items" after a
@@ -880,7 +909,11 @@ S.RevenueMenuEngineering = {
       // rendered nowhere. Same hole as the server door. Count what the builder counted.
       nSkipped: (skipped || []).length,
       nIncomplete: (incomplete || []).length,
-      nNegative: (netNegative || []).length };
+      nNegative: (netNegative || []).length,
+      retired: (retired || []).filter(Boolean),
+      ambiguous: (ambiguous || []).filter(Boolean),
+      nRetired: (retired || []).length,
+      nAmbiguous: (ambiguous || []).length };
     this.draw();
   },
 

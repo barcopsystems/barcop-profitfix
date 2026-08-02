@@ -29,6 +29,7 @@ S.RevenueMenuItems = {
   // pattern this mirrors — deliberately NOT "Archived", the word this screen used before.
   INACTIVE_TAB:     'Inactive',
   _importOpen:      false,       // Upload panel open in place of the list
+  _importFlash:     null,        // one-shot import summary, rendered by renderLanding (I14)
   _selected:        null,        // Set of item ids checked for bulk delete
   _recipeOpen:      false,       // recipe builder revealed (allow-but-nudge toggle)
 
@@ -398,7 +399,15 @@ S.RevenueMenuItems = {
     // The upload panel REPLACES the list, so the tabs above it would be pointing at something that
     // is not on screen — and clicking one silently swaps what you are looking at mid-upload. Add
     // Products drops them for exactly this reason; the Cancel button is the way back.
-    this.container.innerHTML = '<div class="screen">' + tilesBlock
+    /* The import result (I14). It renders HERE rather than being written into the DOM afterwards,
+       because the slot it used to be written into (`#mi-imp-result`) lives INSIDE the upload panel
+       — so showing it meant leaving the panel open over the operator's own menu. Cleared once
+       shown, so it cannot greet them again on a later visit. Same shape as Add Products. */
+    const _flash = this._importFlash; this._importFlash = null;
+    const _flashHtml = _flash
+      ? '<div style="font-size:13px;color:var(--gold);font-weight:700;margin:0 0 14px;">' + esc(_flash) + '</div>'
+      : '';
+    this.container.innerHTML = '<div class="screen">' + tilesBlock + _flashHtml
       + (this._importOpen ? '' : tabsBlock) + lower + archivedSection + '</div>';
     this.wireLanding();
   },
@@ -1394,11 +1403,20 @@ S.RevenueMenuItems = {
        never named. The section names are the real builtins (App.MENU_CATEGORIES_BY_TYPE), not
        examples someone invented. "Mixed drink" also matches the tab and the drop title directly
        above it; the subtitle still said "cocktail". */
+    /* ⚠ NAME WEEKLY UNITS SOLD (I16). None of these three mentioned it, and it is a MAPPED,
+       auto-detected column that overwrites the figure a product mix drop maintains — the one that
+       drives Menu Engineering's Stars and Dogs. A column the operator is never told about is one
+       they cannot decide to leave out.
+       ⚠ AND THE NO PREP STRING PROMISED SOMETHING IT THEN TAKES AWAY (I16). It said cost "comes in
+       if your file has it" and, in the same breath, told the operator to link an inventory product
+       afterwards — but `App.menuItemCost` returns the LINKED product's cost UNCONDITIONALLY and
+       never falls back to `item.cost`, so following that instruction discards the imported cost.
+       The advice is right; the promise was wrong, so the promise goes. */
     const dropSub = this.activeType === 'plate'
-      ? 'Needs columns for dish name and Category (Appetizers, Entrees, Sides, Desserts). Price and cost come in if your file has them. Dishes import without recipes; edit one afterward to build its recipe.'
+      ? 'Needs columns for dish name and Category (Appetizers, Entrees, Sides, Desserts). Price, cost and Weekly Units Sold come in if your file has them. Dishes import without recipes; edit one afterward to build its recipe.'
       : this.activeType === 'cocktail'
-      ? 'Needs columns for mixed drink name and Category (Cocktails, Shots, Frozen). Price and cost come in if your file has them. Mixed drinks import without recipes; edit one afterward to build its recipe.'
-      : 'Needs columns for item name and Category (Beer, Wine, NA Beverages, Snacks). Price and cost come in if your file has them. Edit an item afterward to link its inventory product.';
+      ? 'Needs columns for mixed drink name and Category (Cocktails, Shots, Frozen). Price, cost and Weekly Units Sold come in if your file has them. Mixed drinks import without recipes; edit one afterward to build its recipe.'
+      : 'Needs columns for item name and Category (Beer, Wine, NA Beverages, Snacks). Price and Weekly Units Sold come in if your file has them. Cost comes from the inventory product you link the item to, so edit an item afterward to link its product and the cost fills in from there.';
     CSVMapper.mount(el, {
       dropTitle: 'Drop your ' + t.noun + ' items file here',
       dropSub: dropSub,
@@ -1440,7 +1458,13 @@ S.RevenueMenuItems = {
     // App.parseNum is the ONE coercion (see app.js). 0 is this caller's own default for "no number".
     const num = v => App.parseNum(v) ?? 0;
     const existing = this.items();
-    const keyOf = (t, n) => String(t || '') + '|' + String(n || '').trim().toLowerCase();
+    /* ⚠ INTERNAL WHITESPACE IS COLLAPSED (I15). `trim()` alone left `"House  Salad"` — two spaces,
+       which is what a spreadsheet holds the moment somebody lines a column up by hand — a DIFFERENT
+       key from `"House Salad"`, so the row missed the item it names and minted a duplicate instead
+       of refreshing it. That duplicate then double-counts in Menu Engineering, which is the exact
+       failure keying on type|name exists to prevent. A menu name is the same name however it is
+       spaced, so the key says so. */
+    const keyOf = (t, n) => String(t || '') + '|' + String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
     const byKey = {};
     // ⚠ menuTypeOf, NOT the raw `type` field. Re-dropping an export is supposed to REFRESH the
     // matching items, but legacy and seeded items carry no `type` at all, so their key was
@@ -1485,6 +1509,22 @@ S.RevenueMenuItems = {
     // Rows the file could not file into a section. Counted so they can be REPORTED (M5) — a dropped
     // row nothing mentions is the defect this codebase keeps rediscovering.
     let noCat = 0;
+    /* ⚠ AND ROWS WITH NO NAME AT ALL (I15), for the identical reason, with `noCat` sitting right
+       here as the precedent. These were dropped in TOTAL SILENCE: a 50-row file with 10 blank name
+       cells reported "Imported 40" and nothing anywhere mentioned the other 10. Blank name cells
+       are exactly what a spreadsheet's spacer rows, subtotal lines and trailing notes look like to
+       this door, so the operator has no way to tell "my file had 10 junk rows" from "Bar Cop lost
+       10 of my items" — and no reason to go and look. */
+    let noName = 0;
+    /* ⚠ ONE NAME ARRIVING UNDER TWO SECTIONS IN ONE FILE (I15). The key is type|name deliberately —
+       it has to be, or re-dropping a file after the operator re-files an item duplicates it — so the
+       rows collapse onto ONE item at the last row's figures. That collapse is the right behaviour
+       and the COUNT was the lie: a No Prep file listing "House Red" under Wine at $9 and under NA
+       Beverages at $4 produced one item at $4 and reported "Imported 1 new item" for a two-row file.
+       ⚠ A daypart split repeating one item in ONE section is ordinary and this door supports it on
+       purpose, so the discriminator is the SECTION differing, never the repeat. */
+    const firstCat = new Map();   // key -> the first non-blank canonical section the file gave it
+    const catClash = new Set();   // keys that arrived under more than one
     // ⚠ KEYED BY ITEM, HOLDING THE PRICE THE ITEM HAD BEFORE THIS FILE. It used to be an array
     // pushed once per ROW, and the log loop read the item's FINAL price for every entry — so a
     // file naming one item twice at two prices (a dinner sheet and a happy-hour sheet, which is
@@ -1492,6 +1532,16 @@ S.RevenueMenuItems = {
     // was never live. Those rows also feed Week Review's price-change stat and the Recovery fix
     // count, so the counts were wrong wherever they appeared.
     const repriced = new Map();
+    /* ⚠ THE SAME SHAPE FOR weekly_covers (I5), and for the same reason. Both other doors that write
+       this field maintain `prev_weekly_covers` + `weekly_covers_updated_at` (`_save` below, and
+       `_commitPmix` in pos-ingest); this one wrote the figure and left the pair, so Menu Rundown's
+       units-sold trend was read against whatever reading happened to be sitting there.
+       ⚠ RECORDED PER ITEM AND APPLIED ON THE NET MOVE, never per row. A file may name one item on
+       several rows, so moving `prev` inside the loop banks an INTERMEDIATE figure that was never
+       live — the identical defect `_commitPmix`'s snapshot-once guard exists to stop, and the same
+       one `repriced` above was rewritten to fix for price. Holds the value the item carried BEFORE
+       this file. */
+    const coversMoved = new Map();
     // Snapshot the whole menu before the import touches it, and track the rows it appends. The
     // bulk write below cannot revert itself, so without these a failed import left the new prices
     // and new items on screen while the server kept the old menu — and the repricing below would
@@ -1500,16 +1550,35 @@ S.RevenueMenuItems = {
     const addedRecs = [];
     rows.forEach(r => {
       const name = (r.name || '').trim();
-      if (!name) return;
+      if (!name) { noName++; return; }
       // ⚠ `covers` ROUNDED here for the same reason as the form above: it is a unit COUNT, and this
       // was the third door writing the field under a third rule. Both use sites below (the refresh
       // branch and the insert) read this one local, so rounding once covers both.
       // ⚠ `price` ROUNDED TO CENTS TOO. It sat on this exact line beside a `cost` that WAS rounded —
       // two money fields, one row, one door, treated differently. A POS export routinely carries
       // float artefacts (12.989999999999998), and `num()` parses whatever is there.
-      const price = +(num(r.price)).toFixed(2), cost = +(num(r.cost)).toFixed(2), covers = Math.round(num(r.covers));
+      const price = +(num(r.price)).toFixed(2), cost = +(num(r.cost)).toFixed(2);
+      /* ⚠⚠ THE RAW PARSE IS WHAT DECIDES WHETHER THE FILE SAID ANYTHING (I5). `num()` defaults an
+         absent, blank or unreadable covers cell to 0 — and that 0 is indistinguishable from a
+         genuine "this item sold none this week", while the two need OPPOSITE treatment. A real zero
+         must overwrite: leaving last week's figure on screen as though it were current is precisely
+         the lie `buildPmix`'s own comment refuses to tell, and a zero-seller is what the Dog Test
+         exists to surface. A missing column must never zero the whole menu. `App.parseNum` returns
+         null for exactly the second case and a number (0 included) for the first, so it is the test.
+         ⚠ A NEGATIVE IS REFUSED rather than stored, matching the insert branch below (which clamps)
+         and buildPmix (which drops a net negative) — three doors, one rule. */
+      const coversRaw = App.parseNum(r.covers);
+      const covers = coversRaw == null ? 0 : Math.round(coversRaw);
+      const coversGiven = coversRaw != null && covers >= 0;
       const cat = canonCat(r.category);
-      const cur = byKey[keyOf(this.activeType, name)];
+      const k = keyOf(this.activeType, name);
+      // Which sections this name arrived under, for the clash report above. Blank cells are not a
+      // disagreement — the refresh branch keeps the section the item already has.
+      if (cat) {
+        if (!firstCat.has(k)) firstCat.set(k, cat);
+        else if (firstCat.get(k).toLowerCase() !== cat.toLowerCase()) catClash.add(k);
+      }
+      const cur = byKey[k];
       // ⚠ AN INACTIVE ITEM IS MATCHED BUT NOT TOUCHED. Matching it is what stops the import
       // creating a duplicate of something the operator retired; repricing it would put a price
       // change into the Pricing Review Log and Recovery for an item that is off the live menu.
@@ -1524,7 +1593,14 @@ S.RevenueMenuItems = {
           cur.price = price;
         }
         if (cost > 0)   cur.cost = cost;
-        if (covers > 0) cur.weekly_covers = covers;
+        // ⚠ `coversGiven`, NOT `covers > 0` (I5). See the parse above: `> 0` swallowed a real zero
+        // and left last week's number standing as this week's. The prev/updated_at pair is recorded
+        // here and decided on the NET move after the loop, so a daypart split cannot bank a figure
+        // that was never live.
+        if (coversGiven) {
+          if (!coversMoved.has(cur.id)) coversMoved.set(cur.id, { item: cur, from: cur.weekly_covers ?? null });
+          cur.weekly_covers = covers;
+        }
         if (cat)        cur.category = cat;
         // ⚠ STAMP THE TYPE. The insert branch below sets it from the tile; this branch never did,
         // and legacy and seeded items carry NO type at all — so menuTypeOf falls back to inferring
@@ -1571,7 +1647,7 @@ S.RevenueMenuItems = {
           updated_at:         new Date().toISOString()
         };
         existing.push(it); addedRecs.push(it);
-        byKey[keyOf(this.activeType, name)] = it;
+        byKey[k] = it;
         addedIds.add(it.id);
       }
     });
@@ -1585,6 +1661,21 @@ S.RevenueMenuItems = {
     for (const rp of repriced.values()) {
       if (rp.item.price === rp.from) continue;   // moved and moved back — the plan is still valid
       rp.item.planned_price = null; rp.item.planned_vol_pct = null; rp.item.planned_at = null;
+    }
+    /* ⚠ THE COVERS PAIR IS DECIDED ON THE NET MOVE TOO (I5) — same rule, same reason, same shape as
+       the reprice plan directly above. A file that moves a figure and moves it back has changed
+       nothing, and a file naming one item on two rows must bank the value the item held BEFORE the
+       file rather than whichever row happened to come first.
+       ⚠ `from == null` MEANS THERE IS NO PREVIOUS READING, so nothing becomes "previous" — the same
+       test `_save` runs (`existing.weekly_covers != null`) and the same one `_commitPmix` runs
+       (`it.weekly_covers != null`). Three doors, one rule, so Menu Rundown's trend cannot depend on
+       which door the figure came through. */
+    const coversStamp = new Date().toISOString();
+    for (const cm of coversMoved.values()) {
+      if (cm.from == null) continue;
+      if (cm.item.weekly_covers === cm.from) continue;
+      cm.item.prev_weekly_covers = cm.from;
+      cm.item.weekly_covers_updated_at = coversStamp;
     }
     // An item created by an earlier row and touched again by a later one was CREATED, not
     // refreshed — counting it in both is how one item became "1 new and 1 existing".
@@ -1610,7 +1701,13 @@ S.RevenueMenuItems = {
             ? 'No items imported. ' + skippedInactive + ' item' + (skippedInactive > 1 ? 's are' : ' is')
               + ' inactive, so nothing was changed. Make ' + (skippedInactive > 1 ? 'them' : 'it')
               + ' active on the Inactive tab first.'
-            : 'No items imported. No item names were found in the file.')
+            // ⚠ AND SAY HOW MANY WHEN THE REASON IS A BLANK NAME (I15). "No item names were found"
+            // was already true for this case, but it reads as "Bar Cop could not find the column"
+            // rather than "your rows have no name in them", which is a different thing to go and fix.
+            : noName
+              ? 'No items imported. ' + (noName === 1 ? 'The only row' : 'None of the ' + noName + ' rows')
+                + ' carried an item name. Check the Menu Name column and drop the file again.'
+              : 'No items imported. No item names were found in the file.')
         + '</div>';
       return;
     }
@@ -1662,26 +1759,45 @@ S.RevenueMenuItems = {
       await App.logPriceChange(rp.item, rp.from, rp.item.price, { reason: 'Menu list import', source: 'menu-items-import' });
     }
     App.markSetupDone('gs_r_menu');
-    // Re-render so the new items show in the list below (stays in import mode),
-    // then drop the summary into the freshly-mounted result slot.
+    const parts = [];
+    if (added)   parts.push('imported ' + added + ' new item' + (added === 1 ? '' : 's'));
+    if (updated) parts.push('refreshed ' + updated + ' existing');
+    // A skipped row is not a silent drop — the operator must be told their file mentioned items
+    // that are off the live menu, or the counts look wrong and they re-drop the file.
+    if (skippedInactive) parts.push('skipped ' + skippedInactive + ' inactive item' + (skippedInactive === 1 ? '' : 's'));
+    // ⚠ THE PARTIAL CASE (M5), and it is the one that matters: some rows imported and some did not.
+    // A count that omits the dropped rows makes the file look fully imported, and the operator has
+    // no reason to look at their spreadsheet again.
+    if (noCat)  parts.push('skipped ' + noCat + ' row' + (noCat === 1 ? '' : 's') + ' with no section');
+    // Same rule for a row with no name in it (I15). It sat beside `noCat` and was the one drop
+    // this door made in silence.
+    if (noName) parts.push('skipped ' + noName + ' row' + (noName === 1 ? '' : 's') + ' with no name');
+    const nClash = catClash.size;
+    /* ⚠ SET BEFORE renderLanding, WHICH IS WHAT RENDERS IT (I14). It used to be written into
+       `#mi-imp-result` — a slot that lives inside the upload panel — which is exactly why the panel
+       had to stay open to show it, and why the operator never saw their own menu afterwards. Same
+       one-shot flash Add Products uses (`_importMsg`, ic-product-setup:615). */
+    this._importFlash = parts.join(' and ').replace(/^./, c => c.toUpperCase())
+      + '. Edit any item to set its price, cost, or recipe.'
+      + (noCat ? ' Bar Cop files every item under a section, so fill the Category cells in and drop the file again to add '
+        + (noCat === 1 ? 'that row' : 'those rows') + '.' : '')
+      // ⚠ "each" COUNTS THE NAMES, not the rows ([[the-loop]] #86). One clashing name folds into
+      // one item; three clashing names fold into one item EACH, which is a different sentence.
+      + (nClash ? ' ' + nClash + ' item name' + (nClash === 1 ? '' : 's') + ' arrived under more than one section, so '
+        + (nClash === 1 ? 'its rows were folded into one item' : 'their rows were each folded into one item')
+        + ' at the last row\'s figures.' : '');
+    /* ⚠⚠ SHOW THE OPERATOR WHAT LANDED (I14). `_importOpen` stayed true, so `renderLanding` drew the
+       upload card where the menu belongs — and the comment that used to sit on this line, "so the
+       new items show in the list below", was simply false: with the panel open there IS no list
+       below, and the tabs are dropped too. `openImport` sets `activeType` (which type an upload
+       CREATES) and never `activeTab` (which type is on SCREEN) — deliberately separate, per the
+       note on those two fields — so uploading a drink list while browsing Dishes left the operator
+       on Dishes, looking at a page where nothing had changed, with a success message over it.
+       ⚠ ONLY ON SUCCESS. Every failure exit above returns before this line, so a rolled-back write
+       and a whole-file refusal both leave the panel open: that is where the operator fixes the file
+       and drops it again, and closing it would read as "that worked". */
+    this._importOpen = false;
+    this.activeTab = this.activeType;
     this.renderLanding();
-    const res2 = document.getElementById('mi-imp-result');
-    if (res2) {
-      const parts = [];
-      if (added)   parts.push('imported ' + added + ' new item' + (added === 1 ? '' : 's'));
-      if (updated) parts.push('refreshed ' + updated + ' existing');
-      // A skipped row is not a silent drop — the operator must be told their file mentioned items
-      // that are off the live menu, or the counts look wrong and they re-drop the file.
-      if (skippedInactive) parts.push('skipped ' + skippedInactive + ' inactive item' + (skippedInactive === 1 ? '' : 's'));
-      // ⚠ THE PARTIAL CASE (M5), and it is the one that matters: some rows imported and some did not.
-      // A count that omits the dropped rows makes the file look fully imported, and the operator has
-      // no reason to look at their spreadsheet again.
-      if (noCat) parts.push('skipped ' + noCat + ' row' + (noCat === 1 ? '' : 's') + ' with no section');
-      res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
-        + parts.join(' and ').replace(/^./, c => c.toUpperCase()) + '. Edit any item to set its price, cost, or recipe.'
-        + (noCat ? ' Bar Cop files every item under a section, so fill the Category cells in and drop the file again to add '
-          + (noCat === 1 ? 'that row' : 'those rows') + '.' : '')
-        + '</div>';
-    }
   }
 };

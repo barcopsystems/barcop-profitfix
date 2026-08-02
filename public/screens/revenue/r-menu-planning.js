@@ -202,7 +202,20 @@ S.RevenueMenuPlanning = {
            and a Star got "feature it. Give it a power spot" with no Star named. `counted` is exactly
            classify's pool, so the two cannot disagree, and the threshold is READ from the classifier
            rather than the literal 4 that used to sit here and drift silently. */
-        ranked: counted.length >= (S.RevenueMenuEngineering.MIN_PER_CAT || 4),
+        /* ⚠ AND THE SEPARABILITY GATE, because classify() now carries it too (S298/S303) and this
+           value's whole job is to not disagree with classify(). A pool where every item holds the
+           same margin, or where nothing has sold, reaches no verdict — so this page must not
+           promise one either. */
+        ranked: counted.length >= (S.RevenueMenuEngineering.MIN_PER_CAT || 4)
+          && App.menuPoolSeparable(counted.map(x => ({ price: x.i.price, cost: x.cost, weekly_covers: x.i.weekly_covers }))),
+        /* ⚠ WHY IT IS UNRANKED, NOT JUST THAT IT IS (S309's lesson, applied in the same edit that
+           creates the second reason). The "not enough to rank" copy names a COUNT, and it would be
+           simply false for a section of four items that are all identical. Two reasons, two
+           sentences, and the branch below reads this rather than guessing from the count. */
+        notSeparable: counted.length >= (S.RevenueMenuEngineering.MIN_PER_CAT || 4)
+          && !App.menuPoolSeparable(counted.map(x => ({ price: x.i.price, cost: x.cost, weekly_covers: x.i.weekly_covers }))),
+        // Which axis carries no information, so the sentence can say the true one.
+        flatCovers: !(new Set(counted.map(x => Number(x.i.weekly_covers) || 0)).size > 1),
         // The count that actually gates ranking. `n` below is the PRICED count and means something
         // else; quoting it in the "cannot rank yet" copy is what S309 was.
         rankN: counted.length,
@@ -257,8 +270,16 @@ S.RevenueMenuPlanning = {
     const noun = this.nounFor(item);
     const catLc = this._catPhrase(cat);
 
-    if (!(price > 0)) return { lines: ['No price on this one yet. Price it in Menu Builder and Bar Cop can start reading it.'], move: '' };
-    if (!(cost > 0)) return { lines: ['No cost yet, so there is no margin to read. Attach a recipe or enter a cost in Menu Builder and this fills in.'], move: '' };
+    /* ⚠⚠ BOTH OF THESE KEEP THEIR BUTTON (I10). `moveBand` renders only when `move` is non-empty, so
+       returning '' here left a tile whose own copy says "Price it in Menu Builder" with no way to
+       get to Menu Builder — on the page whose help promises "a button that takes you straight to
+       it", in the DAY-ONE state after any import (a menu file with no price column produces a whole
+       page of them). The loss guard directly below already carries this fix, with a comment naming
+       I10; these two were the pair still open. */
+    if (!(price > 0)) return { lines: ['No price on this one yet. Price it in Menu Builder and Bar Cop can start reading it.'],
+      move: 'open it in Menu Builder and put a menu price on it. Every other read on this tile waits on that one number.' };
+    if (!(cost > 0)) return { lines: ['No cost yet, so there is no margin to read. Attach a recipe or enter a cost in Menu Builder and this fills in.'],
+      move: 'open it in Menu Builder and give it a cost, either by building the recipe or typing a flat figure. Until it has one there is no margin to read.' };
     /* ⚠⚠ A LOSS IS NOT A MARGIN, AND EVERY READ BELOW ASSUMES IT IS. Nothing guarded `cost >= price`,
        and a group whose mean margin is negative makes an above-mean LOSS a Puzzle — so the page
        printed "Good money at $-10.00 a plate", "The best margin of the bunch at $-3.00" and
@@ -360,7 +381,12 @@ S.RevenueMenuPlanning = {
       tail: dogBucket[seed % dogBucket.length],
       dwkc: dwk ? ', about ' + f(dwk) + ' more a week if covers hold' : ''
     };
-    V.Mword = this._cap(V.mword); V.Cword = this._cap(V.cword);
+    /* ⚠ `{Name}` EXISTS BECAUSE ONE TEMPLATE OPENS WITH IT (S305). `topCostIngredient` falls back to
+       the lower-case literal 'an ingredient' for a row with no resolvable product, and the
+       cost-driver pool's second template starts with `{name}` — so an unnamed ingredient printed
+       "an ingredient is the biggest single cost, $3.00 a plate." mid-page, sentence-initial and
+       lower case. Same treatment `{Mword}`/`{Cword}` already get, for the same reason. */
+    V.Mword = this._cap(V.mword); V.Cword = this._cap(V.cword); V.Name = this._cap(V.name);
     const fill = s => s.replace(/\{(\w+)\}/g, (_, k) => (V[k] != null ? String(V[k]) : ''));
     const pick = (arr, salt) => fill(arr[(seed + (salt || 0)) % arr.length]);
 
@@ -425,9 +451,23 @@ S.RevenueMenuPlanning = {
          "item{s} in {cat}" rather than "{n} {cat}": the count and the section name were glued
          together, so a section with one item in it read "Only 1 priced desserts" — and an import
          with no category column read "Only 3 priced uncategorized". */
-      lines.push(pick(['Only {n} item{s} in {cat} have a price, a cost and units sold, so there is no pack to rank it against yet. It clears {margin} a {noun}. A few more and this read sharpens.',
-                       'Just {n} item{s} in {cat} carry all three numbers, not enough to rank it fairly. For now it clears {margin} a {noun}.',
-                       'With only {n} complete item{s} in {cat}, Bar Cop cannot stack it against the group yet. It clears {margin} a {noun} in the meantime.'], 0));
+      /* ⚠⚠ TWO REASONS A SECTION CANNOT BE RANKED NOW, SO TWO SENTENCES (S298/S303, and S309's
+         lesson applied in the same edit that creates the second reason rather than a round later).
+         The copy below names a COUNT, and it is simply FALSE for a section of four items that all
+         carry the same margin or where none of them has sold: there are plenty of items, and
+         nothing separates them. Printing "only 4 items have all three numbers" there sends the
+         operator off to fill in data that is already filled in. */
+      lines.push(cs.notSeparable
+        ? (cs.flatCovers
+            ? pick(['Nothing in {cat} has sold yet, so there is no volume to rank it on. It clears {margin} a {noun}. Drop a product mix at the weekly close and the verdicts come with it.',
+                    'Every item in {cat} is sitting at the same units sold, so there is no pack to place it in yet. For now it clears {margin} a {noun}.',
+                    'No units sold anywhere in {cat} yet, and Bar Cop will not call this one a Star or a Dog on nothing. It clears {margin} a {noun}.'], 0)
+            : pick(['Everything in {cat} runs the same margin, so there is nothing to separate them on and no honest verdict to give. It clears {margin} a {noun}.',
+                    'The items in {cat} are too alike to rank against each other, so Bar Cop is not going to pick a winner between them. This one clears {margin} a {noun}.',
+                    'Nothing separates the items in {cat} on margin, so a Star or a Dog here would be made up. It clears {margin} a {noun}.'], 0))
+        : pick(['Only {n} item{s} in {cat} have a price, a cost and units sold, so there is no pack to rank it against yet. It clears {margin} a {noun}. A few more and this read sharpens.',
+                'Just {n} item{s} in {cat} carry all three numbers, not enough to rank it fairly. For now it clears {margin} a {noun}.',
+                'With only {n} complete item{s} in {cat}, Bar Cop cannot stack it against the group yet. It clears {margin} a {noun} in the meantime.'], 0));
     } else if (!(covers > 0)) {
       /* ⚠ `> 0`, NOT FALSY. A count that cannot legitimately be zero takes the strict test
          ([[the-loop]] #73). `!covers` let a legacy NEGATIVE through to the bare template below,
@@ -516,7 +556,9 @@ S.RevenueMenuPlanning = {
 
     // ── Cost driver ───────────────────────────────────────────────────────
     if (drv) lines.push(pick(['The heaviest cost in it is {name} at {dcost} a {noun}.',
-                              '{name} is the biggest single cost, {dcost} a {noun}.',
+                              // `{Name}` — this is the one template in the pool that OPENS with the
+                              // ingredient name, so it takes the capitalised slot (S305).
+                              '{Name} is the biggest single cost, {dcost} a {noun}.',
                               'Most of the cost is {name}, {dcost} a {noun}.',
                               'Your priciest line in it is {name}, {dcost} a {noun}.'], 2));
 
@@ -611,17 +653,46 @@ S.RevenueMenuPlanning = {
        are markup-priced rather than costed to a percentage. Those items also have no recipe, so the
        portioning and ingredient-spec advice below is a dead end for them: the lever is the buy
        price. Split by the fact rather than papering over it. */
-    else if (quad === 'PLOWHORSE') move = target
+    /* ⚠⚠ RECIPE ADVICE ONLY WHERE THERE IS A RECIPE LINE TO ACT ON (S305). This split on `target`
+       alone, so all six templates below — "start with the portion or the priciest ingredient",
+       "a smarter spec on the biggest cost line", "hunt cost in the recipe" — printed on any item
+       carrying a cost TARGET, including one whose cost is a single flat figure the operator typed.
+       There is no cost-driver line on that tile to act on, so the advice points at nothing.
+       `drv` IS the thing those sentences refer to (`topCostIngredient`, null when there is no
+       recipe or nothing in it costs anything), so it is the discriminator rather than a proxy.
+       ⚠ AND A RESALE ITEM IS SPLIT OFF BY ITS LINK, NOT BY ITS TARGET. `menuTargetPct` returns null
+       for beer/wine/NA, which is what routed them to the buy-price advice — but that answer comes
+       back the moment an operator sets a per-item override, and then a bottled beer was being told
+       to tighten its recipe. The lever on a resale item is the case price whatever target it
+       carries, so the test is the link. */
+    else if (quad === 'PLOWHORSE') move = (target && drv)
       ? pick(['it is at target on price, so trim the {noun} cost instead of raising the menu price. Start with the portion or the priciest ingredient, since a few cents times this many covers adds up fast.',
               'the price is fine, so the lever is cost. Shave it out of the {noun} through portioning or a cheaper spec on the biggest cost line, and the volume does the rest.',
               'hold the price and hunt cost in the recipe. It moves enough that even a small margin gain per {noun} turns into real money at this count.',
               'leave the price and tighten the {noun}. At this volume, a dime saved on the recipe beats a quarter added to the price that scares covers off.',
               'work the cost, not the price. Portion control or a smarter spec on the heaviest ingredient buys margin without touching what guests pay.',
               'do not raise it, cut cost into it. This many covers means small recipe savings stack up, so start with the priciest line and the portion.'], 4)
-      : pick(['the lever here is what you pay for it, not what you charge. Push your vendor on the case price or compare a second supplier, because at this volume every cent back is real money.',
-              'work the buy price. There is no cost target on a resale item like this, so the margin comes from what it costs you, and at this count a small drop per unit adds up fast.',
-              'the price is doing its job; the room is on the cost side. Get a quote from another distributor on this one, since volume like this makes a small unit saving worth chasing.',
-              'shop this one. It moves well and earns thin, and with no recipe to tighten the only real lever is the case price you are paying.'], 4);
+      // A resale item: the case price is the lever whatever target it carries.
+      : item.linked_product_id
+        ? pick(['the lever here is what you pay for it, not what you charge. Push your vendor on the case price or compare a second supplier, because at this volume every cent back is real money.',
+                // ⚠ NOT "there is no cost target on a resale item like this" — that was true only
+                // while this branch was gated on a missing target, and it is gated on the LINK now,
+                // so an item carrying an override would have been told a fact about itself that is
+                // false. Markup pricing is the reason either way, so the reason is what it says.
+                'work the buy price. A resale item like this is priced on markup rather than to a cost percent, so the margin comes from what it costs you, and at this count a small drop per unit adds up fast.',
+                'the price is doing its job; the room is on the cost side. Get a quote from another distributor on this one, since volume like this makes a small unit saving worth chasing.',
+                'shop this one. It moves well and earns thin, and with no recipe to tighten the only real lever is the case price you are paying.'], 4)
+      /* A dish or a drink at a cost target whose cost is one typed figure. The lever really is the
+         cost, and the honest first step is the thing that would let Bar Cop name where it goes. */
+      : target
+        ? pick(['the price is where you want it, so the money is in the cost, and this one carries a flat cost with nothing behind it. Build its recipe in Menu Builder and Bar Cop can show you which line is eating the margin.',
+                'hold the price and go after the cost. Right now that cost is a single typed figure, so there is nothing to take apart. Build the recipe in Menu Builder and this tile will name the biggest line for you.',
+                'the price is fine; the room is on the cost side. Build the recipe in Menu Builder so the cost comes off real ingredients, and at this volume even a few cents back per {noun} is real money.',
+                'do not raise it. At this count the lever is what the {noun} costs you, and a flat typed cost hides where that goes. Build the recipe in Menu Builder and you will see it.'], 4)
+        : pick(['the lever here is what you pay for it, not what you charge. Push your vendor on the case price or compare a second supplier, because at this volume every cent back is real money.',
+                'work the buy price. There is no cost target on this one, so the margin comes from what it costs you, and at this count a small drop per unit adds up fast.',
+                'the price is doing its job; the room is on the cost side. Get a quote from another supplier on this one, since volume like this makes a small unit saving worth chasing.',
+                'shop this one. It moves well and earns thin, and with no recipe to tighten the only real lever is the price you are paying.'], 4);
     /* ⚠ NOBODY FALLS OFF THE END OF THIS CHAIN. Every branch above needs either a suggested price or
        a quad, so an item that is selling, on target, and sitting in a section too small to rank got
        NO move and therefore no button at all — `moveBand` renders only when `move` is non-empty. The
@@ -674,7 +745,11 @@ S.RevenueMenuPlanning = {
         title: 'Menu Rundown',
         lead: 'Menu Rundown gives Bar Cop\'s read on every menu item from the numbers, so the call is the data and not what you happen to like eating. Add and price your menu items first.',
         steps: [
-          { title: 'Build your menu', desc: 'Add and price your menu items in Menu Builder. Each one gets its own briefing here, and it sharpens as units sold and price history come in.', btn: 'Go to Menu Builder', screen: 'r-menu-items', done: false }
+          // ⚠ NOT "and price history" (S306). This screen never reads `revenue_price_log` — its only
+          // trend input is `prev_weekly_covers`. The how-to was corrected for exactly this claim and
+          // the empty-state lead kept it, which is the copy a brand-new operator reads FIRST. A
+          // stale promise sends them looking for a feature that is not there ([[help-model]]).
+          { title: 'Build your menu', desc: 'Add and price your menu items in Menu Builder. Each one gets its own briefing here, and it sharpens as units sold come in each week.', btn: 'Go to Menu Builder', screen: 'r-menu-items', done: false }
         ]
       });
       return;
