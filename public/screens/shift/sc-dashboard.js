@@ -515,7 +515,23 @@ S.ShiftDashboard = {
   async _doImportSales(rows, opts) {
     opts = opts || {};
     const built = PosIngest.build('sales', rows, opts);
-    const { toAdd, skipped, zeroSkipped, unchanged, undated, dupCount, merged, keptManual, conflicts, colGaps } = built;
+    const { toAdd, skipped, zeroSkipped, unchanged, undated, dupCount, merged, keptManual, conflicts, colGaps, coversRepeated } = built;
+    /* ⚠ P1c: days where EVERY row stated the same guest count, so it was taken once instead of
+       added up (a by-revenue-centre export repeats the day's total on every line). That is an
+       ASSUMPTION, and the one shape it can get wrong is two dayparts that genuinely drew the same
+       count — so it is said out loud with the dates, rather than quietly picked. The old behaviour
+       was wrong in the other direction and said nothing at all, which is how a tripled guest count
+       sat there looking fine. */
+    const nRep = (coversRepeated || []).length;
+    /* ⚠ Its OWN formatter. The `dayLabel` further down is declared inside the conflicts block, so
+       reaching for it here is a ReferenceError at runtime and `node --check` cannot see it. */
+    const repDay = d => { const t = new Date(d + 'T00:00:00'); return isNaN(t.getTime()) ? d
+      : t.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
+    const repNote = nRep
+      ? ' (' + nRep + ' day' + (nRep === 1 ? '' : 's')
+        + ' had the same guest count on every row, so it was counted once rather than added up: '
+        + coversRepeated.map(repDay).join(', ') + ')'
+      : '';
     // ⚠ ROWS whose DATE could not be read, split out of `skipped` (which is keyed per DAY). Two
     // different problems with two different fixes; the red headline below used to blame the Date
     // column for both, so a file whose dates all parsed could still be told to go check them.
@@ -759,7 +775,7 @@ S.ShiftDashboard = {
       : '';
     this._flash = allToAdd.length + ' day' + (allToAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
       + salesOutcomes
-      + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + '.' + cwNote;
+      + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + repNote + '.' + cwNote;
     this._openStep = 'cash';
     this.render(this.container, this.actions);
   },
