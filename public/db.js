@@ -222,7 +222,7 @@ const DB = {
       }
       const { data, error } = await this._sb
         .from('subscriptions')
-        .select('subscription_status, subscription_plan, active_modules, current_period_end')
+        .select('subscription_status, subscription_plan, active_modules, current_period_end, cancel_at_period_end')
         .eq('account_id', accountId)
         .single();
 
@@ -243,7 +243,14 @@ const DB = {
         status:         data.subscription_status,
         plan:           data.subscription_plan,
         active_modules: data.active_modules || [],
-        period_end:     data.current_period_end
+        period_end:     data.current_period_end,
+        /* ⚠ Is `period_end` a RENEWAL DATE or an ENDING? Status cannot answer it — Stripe keeps a
+           cancelling subscription 'active' until the paid period actually runs out. Without this
+           the Your Account card printed "Renews Aug 13" while Stripe's portal said "Cancels Aug 13".
+           ⚠ `!!` so the four early-return shapes above (inactive / unknown / no row), which do not
+           carry the field at all, and this one agree on FALSE rather than one of them being
+           undefined. A reader that has to remember which is which is a reader that will forget. */
+        cancel_at_period_end: !!data.cancel_at_period_end
       };
     } catch (e) {
       console.error('getSubscription error:', e);
