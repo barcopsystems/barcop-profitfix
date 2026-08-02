@@ -5237,9 +5237,23 @@ const App = {
   _ensurePDFLib() {
     if (this._pdfLibPromise) return this._pdfLibPromise;
     if (this._pdfLibReady()) { this._pdfLibPromise = Promise.resolve(); return this._pdfLibPromise; }
-    const load = src => new Promise((res, rej) => {
+    /* ⚠⚠ HASH-PINNED (M7). These two are fetched at runtime, so they get the same protection the
+       tags in index.html do: `integrity` refuses bytes that changed at a URL that did not.
+       ⚠ `crossOrigin` IS NOT OPTIONAL — a cross-origin script carrying `integrity` and no
+       `crossorigin` is blocked outright and the hash is never checked. cdnjs was measured sending
+       `Access-Control-Allow-Origin: *`.
+       ⚠ The hash is a REQUIRED argument, not an optional one. Written as `sri && (s.integrity = sri)`
+       a call site that forgot it would load the script unprotected and silently — the shape
+       [[the-loop]] #40 is about. A missing hash throws here instead, and `verify-cdn-integrity.js`
+       asserts BOTH call sites pass one.
+       ⭐ A failed hash rejects this promise, which lands in `_ensurePDFLib`'s own catch: the memo is
+       dropped and the operator gets the real "PDF library did not load" message. So the worst case
+       here is Export PDF refusing out loud, never a silent wrong number. */
+    const load = (src, sri) => new Promise((res, rej) => {
+      if (!sri) { rej(new Error('load() needs an integrity hash for ' + src)); return; }
       const s = document.createElement('script');
-      s.src = src; s.onload = res; s.onerror = rej;
+      s.src = src; s.integrity = sri; s.crossOrigin = 'anonymous';
+      s.onload = res; s.onerror = rej;
       document.head.appendChild(s);
     });
     // Only fetch what is actually missing: after a partial load the retry needs the plugin alone,
@@ -5253,8 +5267,11 @@ const App = {
        Export button the strict probe was added to prevent, arriving through the other door. The
        probe only ever gated the SKIP; it has to gate the result too. Rejecting here reuses the catch
        below, so the memo is dropped and the operator gets the real message. */
-    this._pdfLibPromise = (havejsPDF ? Promise.resolve() : load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'))
-      .then(() => load('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'))
+    /* The two hashes are cdnjs's OWN published sha512 for these exact files, re-derived from the
+       downloaded bytes and confirmed to agree — an independent second source, not a value copied
+       off one measurement ([[the-loop]] #36). Re-measure both if either version is bumped. */
+    this._pdfLibPromise = (havejsPDF ? Promise.resolve() : load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA=='))
+      .then(() => load('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js', 'sha512-2/YdOMV+YNpanLCF5MdQwaoFRVbTmrJ4u4EpqS/USXAQNUDgI5uwYi6J98WVtJKcfe1AbgerygzDFToxAlOGEQ=='))
       .then(() => { if (!this._pdfLibReady()) throw new Error('PDF library loaded but did not register'); })
       .catch(err => { this._pdfLibPromise = null; throw err; });
     return this._pdfLibPromise;

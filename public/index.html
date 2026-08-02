@@ -307,9 +307,31 @@
      server run the same client instead of one pinned and one floating. Bump both together, never
      one alone. ⚠ Still NO SRI here or on the other three CDN scripts (sheetjs, jspdf, autotable) —
      each needs its file's real hash, and self-hosting is the stronger answer for the ones that never
-     change. That half of M7 is still open. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+     change. -->
+<!-- ⚠⚠ SUBRESOURCE INTEGRITY (M7, second half). The version pin above stops a DIFFERENT RELEASE
+     reaching production; `integrity` stops different BYTES reaching it at the same URL.
+
+     ⚠ THE URL MOVED, AND THAT IS THE IMPORTANT PART. This used to load the package root,
+     `@supabase/supabase-js@2.106.2` with no file. jsDelivr resolves that itself and serves a file
+     whose own banner reads "Minified by jsDelivr using Terser v5.39.0" — those are the CDN's BUILD
+     OUTPUT, not Supabase's release. jsDelivr upgrades Terser, and on the day it does, a hash pinned
+     to today's output stops matching and this script does not load. It is the AUTH + DATABASE
+     client, and `db.js` does not fail loudly without it: `if (window.supabase)` falls through to
+     "Supabase not loaded — using localStorage", so the app would quietly run on local storage.
+     `/dist/umd/supabase.js` is the file Supabase actually publishes to npm. jsDelivr and unpkg were
+     measured serving it BYTE FOR BYTE IDENTICALLY, which is what proves it is the release rather
+     than a CDN artifact. ⚠ Not the `.min.js` beside it — jsDelivr rebuilds that one too.
+     ⚠ `crossorigin="anonymous"` IS NOT OPTIONAL. A cross-origin script with `integrity` and no
+     `crossorigin` is blocked outright and the hash is never even checked. All three CDNs were
+     measured sending `Access-Control-Allow-Origin: *`.
+     ⚠ TO BUMP EITHER LIBRARY: change the version AND re-measure the hash from the new file. A stale
+     hash is a dead script. Bump `package-lock.json` with Supabase, never one alone. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2/dist/umd/supabase.js"
+        integrity="sha384-m/8UHFJHeU6nrCKP2hBnAseuvAKUmLF+8e5bWos5CJL023vuxX7kiVL5t8yjsJhV"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"
+        integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT"
+        crossorigin="anonymous"></script>
 <script>var S = {};</script>
 <script src="sample-profile.js?v=3"></script>
 <script src="nav.js?v=120"></script>
@@ -447,8 +469,17 @@
 <script src="screens/labor/lc-dashboard.js?v=52"></script>
 <script src="components/service-periods.js?v=8"></script>
 <script src="components/onboarding.js?v=32"></script>
+<!-- ⛔⛔ DELIBERATELY NOT PINNED, AND DO NOT "FIX" THIS (M7). Every other third-party script on this
+     page carries an `integrity` hash. Stripe's must not. `js.stripe.com/v3/` is UNVERSIONED BY
+     DESIGN and served with `cache-control: max-age=120` — Stripe ships to that one URL
+     continuously, and their terms require it be loaded directly from their domain, so it can be
+     neither self-hosted nor pinned. An `integrity` here would pass on the day it was added and
+     BREAK CHECKOUT the next time Stripe deploys, which is a matter of days.
+     ⚠ The obvious future change is a sweep that adds integrity to every remote script. That sweep
+     would kill payments. `verify-cdn-integrity.js` asserts this tag stays unpinned BY NAME so the
+     sweep goes red instead. -->
 <script src="https://js.stripe.com/v3/"></script>
 <script src="db.js?v=160"></script>
-<script src="app.js?v=794"></script>
+<script src="app.js?v=795"></script>
 </body>
 </html>
