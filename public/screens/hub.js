@@ -810,11 +810,15 @@ S.Hub = {
         catchupBanner = wrap(
           '<span style="font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);">Closing the week</span>'
           + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + catchup.done + ' of ' + catchup.total + ' done</span>'
-          // The step's own label, first letter lowered so it reads as one sentence.
+          /* Only ever names a step that is BLOCKING something. When nothing is, the remaining work
+             genuinely can be done in any order and telling the operator to "start with" one of it
+             would be inventing a priority the app does not have. */
           + (nx ? '<span style="font-size:12px;color:var(--t2);">Start with <strong style="color:var(--gold);">'
               + esc(nx.title) + '</strong>' + (catchup.next.label
                   ? ', ' + esc(catchup.next.label.charAt(0).toLowerCase() + catchup.next.label.slice(1)) : '')
-              + '.</span>' : '')
+              + '. The rest of the week is waiting on it.</span>'
+            : '<span style="font-size:12px;color:var(--t2);">Nothing is waiting on anything else. '
+              + 'The rest can be done in any order.</span>')
           + gap,
           nx ? 'onclick="S.Hub._enter(\'' + nx.screen + '\',\'' + nx.mod + '\')"' : '');
       }
@@ -1517,6 +1521,21 @@ S.Hub = {
        quietly disabled the de-duplication, and the pin went GREEN while measuring none of it.
        Nothing else reads either list, so nothing has to lift a second name. */
     const keys = ['shift', 'labor', 'inventory', 'revenue', 'profit', 'cash'];
+    /* ⚠⚠ ONLY FOUR STEPS BLOCK ANYTHING, and pointing at anything else is worse than pointing at
+       nothing. The first version walked section by section and named the first unfinished step it
+       met — so with Shift's import done it sent the operator to "review loss flags" while the
+       inventory COUNT, which Confirm the Week cannot run without, sat untouched. Kyle, correctly:
+       "there is almost zero importance to reviewing the loss flags when closing the week compared
+       to anything in inventory."
+       THESE FOUR, in this order, are the whole dependency chain, measured in the code:
+         shift/import    `confirm-week.js` prefills sales from `sc_shifts`
+         labor/hours     it needs the hours   (`laborIn`)
+         inventory/count it prefills COGS from `S.ThisWeek.icCOGS(...)`, which reads the counts
+         revenue/week    Confirm the Week itself, which everything downstream of it reads
+       Nothing else gates anything. Receiving deliveries, placing orders, logging exceptions,
+       reviewing flags and the cash steps are all real work in any order, so once the four above are
+       clear the banner stops naming a next step and says the week is unblocked. */
+    const BLOCKERS = [['shift', 'import'], ['labor', 'hours'], ['inventory', 'count'], ['revenue', 'week']];
     /* ⚠⚠ ONE ACTION WEARING TWO NAMES. Confirming the week writes a single `week`/`revenue_week`
        record, and BOTH Revenue's step 1 and Profit's step 1 derive their done-state from that same
        record ([[cockpit-steps-manual]]'s documented exception) — so one click ticks both. Counted
@@ -1531,31 +1550,46 @@ S.Hub = {
       return g ? g.id : sec + '|' + k;
     };
     const s = sums || {};
-    let done = 0, total = 0, covered = 0, next = null;
-    const seen = {}, counted = {};
+    let done = 0, total = 0, covered = 0;
+    const seen = {}, counted = {}, stepAt = {};
     keys.forEach(k => {
       const v = s[k];
-      /* ⚠ THE STEPS ARRAY IS REQUIRED, not the counts. Both jobs this does — skipping a shared step
-         and naming the NEXT one — need the individual steps, and a summary without them cannot be
-         deduped or read from. Treated as unreadable rather than trusted at face value. */
+      /* ⚠ THE STEPS ARRAY IS REQUIRED, not the counts. Every job this does — skipping the shared
+         step, finding the blocker, naming it — needs the individual steps, and a summary without
+         them cannot be read from. Treated as unreadable rather than trusted at face value. */
       const ok = !!(v && Array.isArray(v.steps) && v.steps.length);
       seen[k] = ok;
       if (!ok) return;
       covered++;
+      stepAt[k] = {};
       v.steps.forEach(st => {
+        if (st && st.key) stepAt[k][st.key] = st;
         const id = idOf(k, st && st.key);
         if (counted[id]) return;              // already counted under its other name
         counted[id] = true;
         total++;
         if (st && st.done) done++;
-        /* ⚠ THE FIRST UNFINISHED STEP, NOT THE SECTION'S FIRST STEP. The first version named a
-           hardcoded lead per section, so with Shift's import already ticked the banner still read
-           "Start with Shift, import this week's sales" — contradicting the tick on the card
-           directly beneath it. The label comes from the step itself now, so it cannot disagree. */
-        else if (!next) next = { key: k, step: st && st.key, label: (st && st.label) || '' };
       });
     });
+    /* ⚠ THE NEXT STEP IS THE NEXT BLOCKER, never simply the next unfinished thing. Walking the
+       sections in order and naming whatever came first pointed at "review loss flags" while the
+       inventory count — which Confirm the Week cannot run without — was outstanding. An operator
+       reading that would do the least useful thing on the list.
+       ⚠ A blocker in a section that could not be read is SKIPPED rather than treated as done: it is
+       unknown, and claiming the week is unblocked on an unread section is the same lie `closed`
+       guards against below. */
+    let next = null;
+    for (let i = 0; i < BLOCKERS.length && !next; i++) {
+      const sec = BLOCKERS[i][0], key = BLOCKERS[i][1];
+      const st = stepAt[sec] && stepAt[sec][key];
+      if (!st) continue;                       // unreadable section, or the step was renamed
+      if (!st.done) next = { key: sec, step: key, label: st.label || '', blocking: true };
+    }
+    /* Every blocker is either done or unreadable, so nothing is waiting on anything: the rest of
+       the week can be worked in any order and the banner stops naming a step. */
+    const blocked = !!next;
     return {
+      blocked,
       done, total, covered, sections: keys.length, seen, next,
       // Closed only when everything readable is finished AND everything was readable. Five of six
       // sections complete is not a closed week, however good the count looks.
