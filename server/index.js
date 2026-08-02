@@ -924,7 +924,11 @@ async function reconcileSubscriptions() {
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabaseAdmin
       .from('subscriptions')
-      .select('account_id, stripe_subscription_id, subscription_status')
+      // ⚠ `cancel_at_period_end` IS SELECTED BECAUSE THE SKIP TEST BELOW COMPARES IT. Left out, it
+      // reads `undefined` on every row, so a genuinely cancelling subscription would look different
+      // from Stripe every single night: rewritten each run and counted as a "fix" that fixed
+      // nothing, in the log this job keeps specifically to be honest about that.
+      .select('account_id, stripe_subscription_id, subscription_status, cancel_at_period_end')
       .not('stripe_subscription_id', 'is', null)
       .order('account_id', { ascending: true })
       .range(from, from + 999);
@@ -975,12 +979,21 @@ async function reconcileSubscriptions() {
     try {
       const sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
       checked++;
-      if (sub.status === row.subscription_status) continue;   // in sync, nothing to do
+      /* ⚠⚠ STATUS ALONE WAS NOT THE WHOLE "IN SYNC" QUESTION, AND THAT MADE THIS JOB STRUCTURALLY
+         BLIND TO A CANCELLATION. This read `if (sub.status === row.subscription_status) continue;`
+         — and scheduling a cancellation leaves the status EQUAL ('active' until the period really
+         ends), so the one mechanism that exists to repair a missed webhook could never repair this
+         fact. The webhook was the only writer, so a single missed event would have left the row
+         saying "renews" forever ([[the-loop]] #24: once a new fact appears, every gate derived from
+         the old one is pointing at the wrong set).
+         The gate now asks what it always meant: does anything we STORE differ from Stripe. */
+      const subCancel = !!sub.cancel_at_period_end;
+      if (sub.status === row.subscription_status && subCancel === !!row.cancel_at_period_end) continue;
       const cpe = sub.current_period_end != null ? sub.current_period_end
                 : (sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].current_period_end);
       const periodEnd = cpe ? new Date(cpe * 1000).toISOString() : null;
       const nowIso = new Date().toISOString();
-      const update = { subscription_status: sub.status, updated_at: nowIso };
+      const update = { subscription_status: sub.status, updated_at: nowIso, cancel_at_period_end: subCancel };
       if (periodEnd) update.current_period_end = periodEnd;
       if (sub.status === 'active') { update.active_modules = ALL_MODULES; update.subscription_plan = 'full_access'; }
       else if (sub.status === 'canceled') { update.active_modules = []; }
@@ -1203,6 +1216,16 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
       const update = { subscription_status: status, updated_at: eventIso };
       if (periodEnd) update.current_period_end = periodEnd;
+      /* ⚠⚠ IS THIS DATE A RENEWAL OR AN ENDING? Nothing recorded that, and the Your Account card
+         printed "Renews Aug 13" on the same day Stripe's own portal said "Cancels Aug 13" — the
+         same date, the opposite meaning, on the two screens a cancelling customer reads back to
+         back. Cancelling AT PERIOD END does not change `status`: Stripe keeps 'active' until the
+         paid period actually ends and sets this flag beside it, so status alone can never tell them
+         apart. This is the ONE event that carries the change, which is why it is written here.
+         ⚠ `!!` ON PURPOSE. Stripe sends a boolean, but an older API shape sending nothing would
+         write NULL — and a null is not false, so every reader downstream would need its own guard
+         and the one that got missed would read as cancelling. Normalise at the writer. */
+      update.cancel_at_period_end = !!sub.cancel_at_period_end;
       // On (re)activation restore module access — a prior 'deleted' event clears
       // active_modules to [], so an active payer whose subscription reactivated via
       // an update (not a fresh checkout) would otherwise be locked out of every
