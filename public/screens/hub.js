@@ -761,68 +761,9 @@ S.Hub = {
     // (The old "Continue Setup" catch-up banner was removed with the Getting
     // Started checklist; the Hub's empty-state tiles + each section's day-one
     // guide are the onboarding now.)
-    /* ── CLOSING THE WEEK — the one thing the six cockpits cannot tell you ──────────────────────
-       Every cockpit shows its own "X of 4 done" and nothing adds them up, so the operator cannot
-       answer "am I finished with the week" without visiting six pages, and nothing says where to
-       START. This is a signpost, not a sequencer: it gates nothing, ticks nothing, and changes no
-       cockpit. Ignore it and the app behaves exactly as before.
-       ⚠ THE ORDER IS A FACT, NOT A PREFERENCE, and it is measured in the code:
-         · `confirm-week.js` prefills sales from `sc_shifts`           -> SHIFT first
-         · it needs labor hours (`laborIn`)                            -> LABOR next
-         · it prefills COGS from `S.ThisWeek.icCOGS(...)`, the counts  -> INVENTORY next
-         · Revenue step 1 IS Confirm the Week; Profit step 1 is the same record
-       So an operator who opens Revenue first meets a step that cannot honestly complete, and today
-       only Revenue step 2 says anything about why. Cash is genuinely independent and goes last.
-       ⛔ A COCKPIT THAT CANNOT REPORT IS NEVER COUNTED AS DONE. It drops out of the count entirely,
-       because an unreadable section has no known total to add either — so the denominator really
-       does shrink, and the whole point is that the shrink is SAID OUT LOUD ("Could not read Cash.")
-       instead of leaving "20 of 20 done" looking like a finished week ([[the-loop]] #72). */
-    /* ⚠ NO `lead` COPY HERE ANY MORE. Each entry used to carry a hardcoded first-step phrase, and
-       with Shift's import already ticked the banner still read "Start with Shift, import this
-       week's sales" — flatly contradicting the green tick on the card below it. The step name now
-       comes from the step the roll-up actually stopped on, so the two cannot disagree. */
-    const WEEK_CLOSE_ORDER = [
-      { key:'shift',     title:'Shift',     screen:'sc-dashboard', mod:'shift'     },
-      { key:'labor',     title:'Labor',     screen:'lc-dashboard', mod:'labor'     },
-      { key:'inventory', title:'Inventory', screen:'ic-dashboard', mod:'inventory' },
-      { key:'revenue',   title:'Revenue',   screen:'r-dashboard',  mod:'revenue'   },
-      { key:'profit',    title:'Profit',    screen:'dashboard',    mod:'profit'    },
-      { key:'cash',      title:'Cash',      screen:'c-dashboard',  mod:'cash'      }
-    ];
-    const catchup = this.weekCloseRollup({ shift: scSum, labor: lcSum, inventory: icSum,
-                                           revenue: rvSum, profit: pfSum, cash: csSum });
-    let catchupBanner = '';
-    if (catchup.covered > 0) {
-      const wrap = (inner, click) => '<div class="hd-row" ' + (click || '')
-        + ' style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);'
-        + 'padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;'
-        + (click ? 'cursor:pointer;' : 'cursor:default;') + '">' + inner + '</div>';
-      // Which sections it could not read, named — an unread section is not a finished one.
-      const missing = WEEK_CLOSE_ORDER.filter(o => !catchup.seen[o.key]).map(o => o.title);
-      const gap = missing.length
-        ? '<span style="font-size:11px;color:var(--t3);">Could not read ' + esc(missing.join(', ')) + '.</span>' : '';
-      if (catchup.closed) {
-        catchupBanner = wrap(
-          '<span style="font-size:13px;font-weight:700;color:var(--green);">This week is closed.</span>'
-          + '<span style="font-size:12px;color:var(--t2);">All ' + catchup.total + ' steps done.</span>' + gap);
-      } else {
-        const nx = WEEK_CLOSE_ORDER.find(o => catchup.next && o.key === catchup.next.key);
-        catchupBanner = wrap(
-          '<span style="font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);">Closing the week</span>'
-          + '<span style="font-size:13px;font-weight:700;color:var(--t1);">' + catchup.done + ' of ' + catchup.total + ' done</span>'
-          /* Only ever names a step that is BLOCKING something. When nothing is, the remaining work
-             genuinely can be done in any order and telling the operator to "start with" one of it
-             would be inventing a priority the app does not have. */
-          + (nx ? '<span style="font-size:12px;color:var(--t2);">Start with <strong style="color:var(--gold);">'
-              + esc(nx.title) + '</strong>' + (catchup.next.label
-                  ? ', ' + esc(catchup.next.label.charAt(0).toLowerCase() + catchup.next.label.slice(1)) : '')
-              + '. The rest of the week is waiting on it.</span>'
-            : '<span style="font-size:12px;color:var(--t2);">Nothing is waiting on anything else. '
-              + 'The rest can be done in any order.</span>')
-          + gap,
-          nx ? 'onclick="S.Hub._enter(\'' + nx.screen + '\',\'' + nx.mod + '\')"' : '');
-      }
-    }
+    // (A "Closing the week" roll-up banner lived here and was PULLED 2026-08-02 — see the note
+    //  on weekCloseRollup's removal in THE LIST: the app has no notion of which steps are
+    //  REQUIRED to close a week, so any count it printed was a number nobody had defined.)
     // Key metrics panel — 6 tiles in a 3x2 grid (2 rows of 3). Tighter padding
     // and a 22px number so each tile fits in the shorter container that now
     // shares the middle column with the Recovery Scoreboard above it.
@@ -1226,7 +1167,6 @@ S.Hub = {
     const hubGrid = `<div class="hub-grid" style="display:grid;grid-template-rows:auto auto auto auto;gap:18px;padding-bottom:18px;">
           <div class="hub-grid-tiles">${topCard}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">${priorityCard}${needsBand}</div>
-          ${catchupBanner}
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${icCard}${lcCard}${scCard}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${pfCard}${rvCard}${csCard}</div>
         </div>`;
@@ -1500,103 +1440,6 @@ S.Hub = {
      engine the dashboards use). A gap-area only counts when its weekly dollar
      loss computes from real data. Cash's opportunity is a one-time trapped
      amount, not a weekly leak, so it lives on the Cash screens, not here. */
-  /* Roll the six weekly cockpits' own `hubSteps()` results into one answer: how much of the week is
-     closed, and which section to open next. PURE — it takes the six summaries and returns numbers,
-     so it can be run in a harness (verify-hub-week-rollup.js) without a DOM or an account.
-     ⚠ THE ORDER IS THE DEPENDENCY ORDER, measured in the code and written out at the call site. The
-     obvious wrong answer is "send them to whichever section has the most left", which would open
-     Revenue on a week whose sales are not imported yet.
-     ⛔ A SECTION THAT COULD NOT REPORT IS NOT DONE. It leaves BOTH sides of the count, because a
-     section you cannot read has no known total either — inventing one would be worse than omitting
-     it. That does shrink the denominator, so the shrink is made VISIBLE rather than hidden:
-     `covered`/`sections` carry how many were readable, `seen` says which, and the caller names the
-     missing ones on screen. Silently reporting "20 of 20 done" on five of six sections is the
-     failure this guards ([[the-loop]] #72), which is why `closed` additionally requires that every
-     section was readable. With none readable the caller renders nothing at all, because "0 of 0"
-     reads as closed. */
-  weekCloseRollup(sums) {
-    /* ⚠ BOTH CONSTANTS LIVE INSIDE THE FUNCTION, DELIBERATELY ([[the-loop]] #16). Written as
-       sibling data properties they were invisible to every harness in the suite — those lift
-       METHODS by name — so `this.WEEK_CLOSE_SHARED` came back undefined, the `|| []` fallback
-       quietly disabled the de-duplication, and the pin went GREEN while measuring none of it.
-       Nothing else reads either list, so nothing has to lift a second name. */
-    const keys = ['shift', 'labor', 'inventory', 'revenue', 'profit', 'cash'];
-    /* ⚠⚠ ONLY FOUR STEPS BLOCK ANYTHING, and pointing at anything else is worse than pointing at
-       nothing. The first version walked section by section and named the first unfinished step it
-       met — so with Shift's import done it sent the operator to "review loss flags" while the
-       inventory COUNT, which Confirm the Week cannot run without, sat untouched. Kyle, correctly:
-       "there is almost zero importance to reviewing the loss flags when closing the week compared
-       to anything in inventory."
-       THESE FOUR, in this order, are the whole dependency chain, measured in the code:
-         shift/import    `confirm-week.js` prefills sales from `sc_shifts`
-         labor/hours     it needs the hours   (`laborIn`)
-         inventory/count it prefills COGS from `S.ThisWeek.icCOGS(...)`, which reads the counts
-         revenue/week    Confirm the Week itself, which everything downstream of it reads
-       Nothing else gates anything. Receiving deliveries, placing orders, logging exceptions,
-       reviewing flags and the cash steps are all real work in any order, so once the four above are
-       clear the banner stops naming a next step and says the week is unblocked. */
-    const BLOCKERS = [['shift', 'import'], ['labor', 'hours'], ['inventory', 'count'], ['revenue', 'week']];
-    /* ⚠⚠ ONE ACTION WEARING TWO NAMES. Confirming the week writes a single `week`/`revenue_week`
-       record, and BOTH Revenue's step 1 and Profit's step 1 derive their done-state from that same
-       record ([[cockpit-steps-manual]]'s documented exception) — so one click ticks both. Counted
-       twice it claims 24 steps where there are 23 actions, and the progress jumps by two for one
-       piece of work, which is the kind of number that makes the whole line untrustworthy.
-       ⛔ SCOPED TO SECTION AND STEP, NEVER THE STEP KEY ALONE. Cash ALSO has a step keyed `week`
-       ("Stay ahead of the week"), an unrelated manual cash-flow review — deduping on the bare key
-       would silently swallow it and under-count Cash by one for ever. */
-    const shared = [{ id: 'confirm-week', members: [['revenue', 'week'], ['profit', 'week']] }];
-    const idOf = (sec, k) => {
-      const g = shared.find(gr => (gr.members || []).some(m => m[0] === sec && m[1] === k));
-      return g ? g.id : sec + '|' + k;
-    };
-    const s = sums || {};
-    let done = 0, total = 0, covered = 0;
-    const seen = {}, counted = {}, stepAt = {};
-    keys.forEach(k => {
-      const v = s[k];
-      /* ⚠ THE STEPS ARRAY IS REQUIRED, not the counts. Every job this does — skipping the shared
-         step, finding the blocker, naming it — needs the individual steps, and a summary without
-         them cannot be read from. Treated as unreadable rather than trusted at face value. */
-      const ok = !!(v && Array.isArray(v.steps) && v.steps.length);
-      seen[k] = ok;
-      if (!ok) return;
-      covered++;
-      stepAt[k] = {};
-      v.steps.forEach(st => {
-        if (st && st.key) stepAt[k][st.key] = st;
-        const id = idOf(k, st && st.key);
-        if (counted[id]) return;              // already counted under its other name
-        counted[id] = true;
-        total++;
-        if (st && st.done) done++;
-      });
-    });
-    /* ⚠ THE NEXT STEP IS THE NEXT BLOCKER, never simply the next unfinished thing. Walking the
-       sections in order and naming whatever came first pointed at "review loss flags" while the
-       inventory count — which Confirm the Week cannot run without — was outstanding. An operator
-       reading that would do the least useful thing on the list.
-       ⚠ A blocker in a section that could not be read is SKIPPED rather than treated as done: it is
-       unknown, and claiming the week is unblocked on an unread section is the same lie `closed`
-       guards against below. */
-    let next = null;
-    for (let i = 0; i < BLOCKERS.length && !next; i++) {
-      const sec = BLOCKERS[i][0], key = BLOCKERS[i][1];
-      const st = stepAt[sec] && stepAt[sec][key];
-      if (!st) continue;                       // unreadable section, or the step was renamed
-      if (!st.done) next = { key: sec, step: key, label: st.label || '', blocking: true };
-    }
-    /* Every blocker is either done or unreadable, so nothing is waiting on anything: the rest of
-       the week can be worked in any order and the banner stops naming a step. */
-    const blocked = !!next;
-    return {
-      blocked,
-      done, total, covered, sections: keys.length, seen, next,
-      // Closed only when everything readable is finished AND everything was readable. Five of six
-      // sections complete is not a closed week, however good the count looks.
-      closed: covered === keys.length && covered > 0 && next === null
-    };
-  },
-
   weeklyReadout() {
     if (!window.Recovery || !window.FIX) return { items: [], total: 0, leakTotal: 0, oppTotal: 0 };
     const seen = {};
