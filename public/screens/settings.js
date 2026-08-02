@@ -932,7 +932,17 @@ S.HubSettings = {
       // demo would read 0/4 everywhere. Each = most of the week's steps done, the
       // last one or two still open so there is visible work to do.
       if (window.S) {
-        if (S.InventoryDashboard) App.acctSet(S.InventoryDashboard._doneKey(), { count: true, deliveries: true, orders: true });
+        /* ⚠ `orders` IS NOT STAMPED (2026-08-02, Kyle spotted it in the demo). It used to be, and
+           the same step renders "$3,988.05 to reorder, 6 vendors" from the seeded below-par stock —
+           so the demo showed a green tick on "Place your orders" sitting directly beside four
+           thousand dollars of ordering still to do, in one row, on the page a prospect sees first.
+           A seeded done-stamp is a CLAIM about what the sample operator has already done, and it
+           has to agree with the data seeded beside it ([[demo-coherence-over-accuracy]]).
+           ⚠ The app was never wrong here: the tick is the operator's manual call and the subtitle
+           reads live data, exactly as [[cockpit-steps-manual]] intends. Only the sample lied.
+           Inventory now opens 2 of 4 with ordering and the flag review still to do, which is also
+           the shape Shift and Cash already seed. */
+        if (S.InventoryDashboard) App.acctSet(S.InventoryDashboard._doneKey(), { count: true, deliveries: true });
         if (S.LaborDashboard)     App.acctSet(S.LaborDashboard._doneKey(),     { hours: true, tips: true, schedule: true });
         if (S.ShiftDashboard)     App.acctSet(S.ShiftDashboard._doneKey(),     { import: true, cash: true });
         // Profit + Revenue: no stamp. Their step 1 (Confirm the Week) now derives
