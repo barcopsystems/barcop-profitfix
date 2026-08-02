@@ -1150,7 +1150,19 @@ S.ShiftDashboard = {
     });
   },
   async importPmix(rows) {
-    const { toAdd, skipped, incomplete, netNegative, merged } = PosIngest.build('pmix', rows);
+    // ⚠ `retired` and `ambiguous` are I4's two refused outcomes and they are read HERE and in
+    // r-menu-engineering's twin door. A bucket the consumer never destructures is a fix that never
+    // shipped ([[the-loop]] #25), and reaching one of two doors is the half-migration shape (#42).
+    const { toAdd, skipped, incomplete, netNegative, retired, ambiguous, merged } = PosIngest.build('pmix', rows);
+    const nRet = (retired || []).length, nAmb = (ambiguous || []).length;
+    // One sentence per outcome, built once, so the zero-row path and the success line cannot drift.
+    const scopeNote = (nRet ? ' (' + nRet + ' item' + (nRet === 1 ? '' : 's') + ' in your file '
+        + (nRet === 1 ? 'is' : 'are') + ' no longer on your live menu, so ' + (nRet === 1 ? 'it was' : 'they were')
+        + ' left alone: ' + (retired || []).join(', ') + ')' : '')
+      + (nAmb ? ' (' + nAmb + ' name' + (nAmb === 1 ? '' : 's') + ' in your file match'
+        + (nAmb === 1 ? 'es' : '') + ' more than one menu item, so Bar Cop could not tell which one rang and left '
+        + (nAmb === 1 ? 'it' : 'them') + ' alone: ' + (ambiguous || []).join(', ')
+        + '. Rename one of each pair and drop the file again.)' : '');
     const res = document.getElementById('sc-ck-pmix-res');
     if (!toAdd.length) {
       /* ⚠ THE ZERO-ROW PATH DROPPED ALL THREE LISTS AND THEN GUESSED WRONG. It said "Each row needs
@@ -1161,16 +1173,24 @@ S.ShiftDashboard = {
          never mentioned at all. Same rule as the success path below: three outcomes, three
          sentences. Anything involving a genuinely unmatched name still gets the name message. */
       const nSkip = skipped.length, nInc = (incomplete || []).length, nNeg = (netNegative || []).length;
+      /* ⚠ THE HEADLINE'S "the item names matched" BRANCHES ARE GATED ON `!nSkip` ALONE, so I4's two
+         new outcomes have to join that gate or the sentence claims a clean match over a file whose
+         names were the whole problem ([[the-loop]] #24: after splitting a predicate, every counter
+         derived from the old one is now pointing at the wrong set). `otherName` is "something about
+         a NAME went wrong", which is what that branch was really asking. */
+      const otherName = nSkip + nRet + nAmb;
       if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No items updated.'
-        + (!nSkip && nInc && !nNeg ? ' The item names matched, but Bar Cop could not read a units-sold figure for any of them.'
-         : !nSkip && nNeg && !nInc ? ' Every item came out at negative units after returns, so the previous figures were left alone.'
+        + (!otherName && nInc && !nNeg ? ' The item names matched, but Bar Cop could not read a units-sold figure for any of them.'
+         : !otherName && nNeg && !nInc ? ' Every item came out at negative units after returns, so the previous figures were left alone.'
          // ⚠ NOT "no row carried a usable units figure" — a net-negative item DID carry one; it went
          // negative after returns. That sentence denied what the note printed under it stated.
-         : !nSkip && (nInc || nNeg) ? ' The item names matched — see below for what happened to each row.'
+         : !otherName && (nInc || nNeg) ? ' The item names matched — see below for what happened to each row.'
+         : (nRet || nAmb) && !nSkip ? ' Bar Cop found every name on your menu but could not use them. See below.'
          : ' Each row needs an item name Bar Cop can match on your menu and a units-sold number.')
         + (nSkip ? ' (' + nSkip + ' name' + (nSkip === 1 ? '' : 's') + ' not matched)' : '')
         + (nInc ? ' (' + nInc + ' row' + (nInc === 1 ? '' : 's') + ' had no readable units figure)' : '')
         + (nNeg ? ' (' + nNeg + ' item' + (nNeg === 1 ? '' : 's') + ' came out at negative units after returns)' : '')
+        + scopeNote
         + '</div>';
       return;
     }
@@ -1190,7 +1210,8 @@ S.ShiftDashboard = {
       + (inc.length ? ' (' + inc.length + ' row' + (inc.length === 1 ? '' : 's') + ' had no readable units figure)' : '')
       + (neg.length ? ' (' + neg.length + ' item' + (neg.length === 1 ? '' : 's')
           + ' came out at negative units after returns and ' + (neg.length === 1 ? 'was' : 'were')
-          + ' left at the previous figure)' : '') + '.';
+          + ' left at the previous figure)' : '')
+      + scopeNote + '.';
     if (this._optOpen) this._optOpen.pmix = false;   // collapse back to the link
     this._openStep = 'import';
     this.render(this.container, this.actions);

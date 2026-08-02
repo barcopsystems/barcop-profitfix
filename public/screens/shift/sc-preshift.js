@@ -85,7 +85,15 @@ S.ShiftPreShift = {
       // reads to the floor, with a Margin column, so it has to be a margin we actually know.
       .map(i => ({ item: i, price: this.n(i.price), cost: this.n(App.menuItemCost(i)), covers: this.n(i.weekly_covers), costed: App.menuItemPct(i).costed }))
       .filter(x => x.costed && x.price != null && x.cost != null && x.covers != null && x.covers > 0);
+    /* ⚠ THE FOURTH COPY OF THE QUAD MATH, and the one a shift lead reads out loud to the floor.
+       Same gate as classify() (S298/S303): with `>=`, a flat axis makes every item "high" on it, so
+       a menu where nothing has sold yet — or a beer list at one case price — handed the floor five
+       "best sellers" picked out of items nothing could tell apart, with a Margin column beside them.
+       ⚠ The pool here is the WHOLE menu rather than one section, and it is already covers-filtered
+       (`covers > 0`), so the covers axis is rarely flat — but the margin axis is not, and the
+       briefing is the last place to be confidently wrong. */
     if (items.length < 4) return [];
+    if (!App.menuPoolSeparable(items.map(x => ({ price: x.price, cost: x.cost, weekly_covers: x.covers })))) return [];
     const avgCM = items.reduce((s, x) => s + (x.price - x.cost), 0) / items.length;
     const avgCov = items.reduce((s, x) => s + x.covers, 0) / items.length;
     return items.filter(x => (x.price - x.cost) >= avgCM && x.covers >= avgCov)
