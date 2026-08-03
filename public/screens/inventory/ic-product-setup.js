@@ -272,9 +272,32 @@ S.InventoryProducts = {
        App.parseNum read a trailing minus and hand back -12 — so the function's own answer must be
        null. Leaving that to the one call site meant any second caller would inherit the bug. */
     if (n < 0) return null;
-    const m = s.match(/[\d.]\s*([a-z]+)/);                   // the unit token attached to the number
-    const per = (m && App.ozPerUnit) ? App.ozPerUnit(m[1]) : null;
-    if (per == null) return n;                               // no unit, or one we do not convert: already ounces
+    /* ⛔⛔ A NUMBER CARRYING A UNIT IS OUNCES ONLY IF THE UNIT IS ONE WE CAN CONVERT.
+       This used to end `if (per == null) return n;` — *"no unit, or one we do not convert:
+       already ounces"* — which is right for a bare `25.4` and wrong for everything else.
+       Found on Kyle's first real food order guide (2026-08-03), where a broadline Size
+       column reads "25 LB", "165 CT", "3 CT", "50 LB":
+         Tomatoes 25 LB -> a 25 fl oz container · Lemons 165 CT -> 165 fl oz
+         Napkins 1 CT   -> 1 fl oz              · Romaine 3 CT  -> 3 fl oz
+       ⛔ AND THE REAL COST WAS THE PACK COLUMN, not the wrong ounces. `runImport` tracks a
+       Food/Misc product ONE way and prefers ounces when a size is present, so a fabricated
+       ounce value DISCARDED the piece count on every row: 200 to-go containers per case and
+       4000 napkins per case, gone. All 22 rows read Complete and rendered green, with a
+       recipe cost per ounce computed off the fiction.
+       A weight is not a volume and a count is neither. Refusing is the same call the
+       two-number guard and the pack-descriptor guard already make: a plausible wrong size
+       is worse than none, because none is visible as Incomplete and wrong is not.
+       ⚠ THE CAPTURE TAKES TWO WORDS, and that is not optional. A unit can be two ("fl oz")
+       and the hyphen rewrite above already learned this; the final capture never had. With
+       one word, "16 FL OZ" yields `fl`, which `ozPerUnit` does not know — under the old
+       fall-through that was accidentally RIGHT, and under a strict rule it would refuse a
+       real 16 oz bottle. Two words first, then the first word alone, so "5 gallon bag" and
+       "750 ml bottle" keep working too. */
+    const m = s.match(/[\d.]\s*([a-z]+(?:\s+[a-z]+)?)/);
+    if (!m) return n;                                        // a bare number really is already ounces
+    const two = m[1].trim(), one = two.split(/\s+/)[0];
+    const per = App.ozPerUnit ? (App.ozPerUnit(two) != null ? App.ozPerUnit(two) : App.ozPerUnit(one)) : null;
+    if (per == null) return null;                            // a unit we cannot convert is NOT ounces
     return Math.round(n * per * 10) / 10;                    // matches the SIZES table's precision
   },
 
