@@ -676,6 +676,40 @@ const CSVMapper = {
 
   // `parsed` is optional and carries the whole grid (I3) so the header row can be corrected.
   // Older callers pass six arguments and simply get no header-row control.
+  /* ⛔⛔ "(SKIP)" IS AN INSTRUCTION, NOT A PROMPT (Kyle, 2026-08-03). Sixteen dropdowns
+     with seven of them reading "(skip)" is a wall, and worse than a wall: it tells the
+     operator those are dealt with. *"even if there was a column the mapper didn't match
+     what would make a user think to look when they are visually telling the user to skip
+     them.. the only reason the std pour was noticed is because we walked the process."*
+     He is right, and it inverts the case for keeping them on screen. Showing an unmatched
+     FIELD does not protect a column that failed to bind; nobody reads past "(skip)".
+     So the unmatched fields fold away, and the thing that actually protects the data gets
+     surfaced instead: a column IN THE FILE that nothing is reading, named out loud. That
+     signal has never existed anywhere in this app, and its absence is exactly how a beer
+     guide's `Std Pour` column was dropped and eight kegs imported with no pour size
+     ([[the-loop]] #38).
+     ⚠ SHARED COMPONENT: 20 mount sites across 15 screens. Both rules below are written to
+     be true of every one of them, which is why neither can ever produce an empty mapper. */
+  _splitFields(fields, map) {
+    const all = fields || [];
+    const bound = f => map && map[f.key] != null && map[f.key] >= 0;
+    /* A REQUIRED field never folds, matched or not: it is the one the operator MUST set,
+       and hiding it puts the Import button's refusal off screen — a button that says no
+       for a reason you cannot see ([[the-loop]] #89). */
+    const shown = all.filter(f => bound(f) || f.required);
+    /* ⛔ AND NEVER AN EMPTY MAPPER. A file that matches nothing, on a door with no required
+       field, would otherwise render zero dropdowns and no way to map anything at all —
+       turning a fixable mapping into a dead screen. */
+    if (!shown.length) return { shown: all.slice(), hidden: [] };
+    return { shown: shown, hidden: all.filter(f => shown.indexOf(f) < 0) };
+  },
+  /* Columns the FILE has that nothing is reading. ⚠ A blank header is skipped: there is no
+     name to tell the operator about, and `_autoMap` already refuses to claim one. */
+  _unreadColumns(headers, map) {
+    const used = new Set(Object.keys(map || {}).map(k => map[k]).filter(i => i != null && i >= 0));
+    return (headers || []).map((h, i) => ({ h: String(h == null ? '' : h).trim(), i }))
+      .filter(x => x.h !== '' && !used.has(x.i)).map(x => x.h);
+  },
   _renderMapper(headers, rows, map, sig, container, opts, parsed) {
     // Option VALUES are column INDEXES, never header names. With names, an unnamed column emitted a
     // second <option value="">, indistinguishable from "(skip)" and silently importing column 0 for
@@ -731,14 +765,41 @@ const CSVMapper = {
       + (rows.filter(r => r.length !== headers.length).length
           ? '<div style="font-size:12px;color:var(--gold);background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:10px 12px;margin-bottom:14px;">Heads up: some rows have a different number of columns than the header. That usually means a number cell holds an unquoted comma (like 1,234), which splits the row and shifts the columns after it. Check the preview below lines up, or re-save the file with number columns quoted.</div>'
           : '')
-      + hdrPick
-      + '<div class="form-row" style="flex-wrap:wrap;gap:12px 20px;">';
-    opts.fields.forEach(f => {
-      html += '<div class="f" style="width:210px;flex-shrink:0;"><label>' + esc(f.label)
-        + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</label>'
-        + '<select class="csvm-sel" data-key="' + f.key + '">' + optsFor(map[f.key] != null ? map[f.key] : -1) + '</select></div>';
-    });
-    html += '</div>';
+      + hdrPick;
+    const cell = f => '<div class="f" style="width:210px;flex-shrink:0;"><label>' + esc(f.label)
+      + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</label>'
+      + '<select class="csvm-sel" data-key="' + f.key + '">' + optsFor(map[f.key] != null ? map[f.key] : -1) + '</select></div>';
+    const split = this._splitFields(opts.fields, map);
+    const unread = this._unreadColumns(headers, map);
+    /* ⛔ THE ONE LINE THAT DID NOT EXIST. A column the file has and nothing reads is the
+       only thing on this screen worth interrupting for, and it is what "(skip)" was
+       drowning. Named, not counted, because a count gives the operator nothing to act on. */
+    if (unread.length) {
+      const list = unread.slice(0, 4).join(', ')
+        + (unread.length > 4 ? ' and ' + (unread.length - 4) + ' more' : '');
+      html += '<div style="font-size:12px;color:var(--gold);background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:10px 12px;margin-bottom:14px;">'
+        + 'Your file has ' + (unread.length === 1 ? 'a column' : unread.length + ' columns')
+        + ' Bar Cop is not reading: <strong>' + esc(list) + '</strong>. '
+        + (split.hidden.length
+            ? 'If ' + (unread.length === 1 ? 'it belongs' : 'they belong')
+              + ' in one of Bar Cop\'s fields, show the rest of the fields below and pick '
+              + (unread.length === 1 ? 'it' : 'them') + '.'
+            : 'Bar Cop has no field for ' + (unread.length === 1 ? 'it' : 'them') + ', so '
+              + (unread.length === 1 ? 'it is' : 'they are') + ' left out.')
+        + '</div>';
+    }
+    html += '<div class="form-row" style="flex-wrap:wrap;gap:12px 20px;">'
+      + split.shown.map(cell).join('') + '</div>';
+    /* The folded fields are RENDERED, not omitted: the confirm handler reads every
+       `.csvm-sel` in the area, so a field the operator opens and sets has to already be in
+       the DOM. Hidden by style, one click away, never unreachable. */
+    if (split.hidden.length) {
+      html += '<div style="margin-top:12px;">'
+        + '<button type="button" class="btn btn-ghost btn-sm csvm-more">Show ' + split.hidden.length
+        + ' more field' + (split.hidden.length === 1 ? '' : 's') + ' Bar Cop did not find in your file</button>'
+        + '<div class="csvm-more-wrap form-row" style="display:none;flex-wrap:wrap;gap:12px 20px;margin-top:12px;">'
+        + split.hidden.map(cell).join('') + '</div></div>';
+    }
     // First rows preview so the operator can confirm they mapped the right columns.
     const previewRows = rows.slice(0, 3);
     if (previewRows.length) {
@@ -788,6 +849,17 @@ const CSVMapper = {
       }
       this._afterParse({ headers: sp.headers, rows: sp.rows, grid, headerIdx: i }, container, opts);
     });
+
+    /* Reveal the folded fields. A style flip, not a re-render: re-rendering here would
+       rebuild every select and throw away any pick the operator had already made. */
+    const moreBtn = area.querySelector('.csvm-more');
+    const moreWrap = area.querySelector('.csvm-more-wrap');
+    if (moreBtn && moreWrap) moreBtn.addEventListener('click', () => {
+      const open = moreWrap.style.display !== 'none';
+      moreWrap.style.display = open ? 'none' : 'flex';
+      moreBtn.textContent = open ? moreBtn.dataset.closed : 'Hide those fields again';
+    });
+    if (moreBtn) moreBtn.dataset.closed = moreBtn.textContent;
 
     // Cancel discards this file and returns to the drop zone to pick another.
     const cancelBtn = scope.querySelector('.csvm-cancel');
