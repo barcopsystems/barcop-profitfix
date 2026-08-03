@@ -716,7 +716,7 @@ S.InventoryProducts = {
       + (p.active !== false && App.productLocations(p).length === 0 ? '<div style="font-size:10px;color:var(--red);font-weight:600;letter-spacing:0.5px;">Needs a location</div>' : '') + '</td>'
       + '<td>' + esc(p.vendor || '-') + '</td>'
       + tds
-      + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
+      + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p, p.par_level) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
       + '<td><div class="row-actions">'
       // One-click restore, so putting a product back does not mean opening the editor
       // and hunting for the status toggle (Kyle 2026-07-21). Only on the Inactive tab,

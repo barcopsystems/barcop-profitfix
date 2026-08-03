@@ -797,7 +797,7 @@ S.InventoryVendors = {
     const rowHtml = p => '<tr><td><div class="val">' + esc(p.name) + '</div>'
       + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
       + '<td>' + esc(this.sizeLabel(p)) + '</td>'
-      + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
+      + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p, p.par_level) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
       + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td></tr>';
     // Group by category like the Count History view: one table per category, the
     // category in the first header, a shared fixed colgroup so columns line up
