@@ -219,7 +219,14 @@ S.HubBooks = {
     return '<div class="sh" style="margin:24px 0 10px;">Sales Tax</div>'
       + '<div class="card"><table class="pnl-list" style="table-layout:fixed;">'
       + '<colgroup><col style="width:34%"><col style="width:24%"><col style="width:18%"><col style="width:24%"></colgroup>'
-      + '<thead><tr><th>Period</th><th>Taxable Sales</th><th>Rate</th><th>Tax Due</th></tr></thead>'
+      /* "Estimated Tax", not "Tax Due". The figure is rate x taxable sales, which is an
+         approximation by construction: several states use tax BRACKET tables rather than a flat
+         multiplication, and even at a flat rate per-ticket rounding moves the register's total.
+         The caveat under the table has always said so, but it renders in --t4 at 11px while a
+         header sitting directly over the number reads as a claim about what is owed.
+         ⛔ The XLSX sheet header must say the same thing — pinned in
+         verify-sales-tax-estimated-label.js, which asserts the two against each other. */
+      + '<thead><tr><th>Period</th><th>Taxable Sales</th><th>Rate</th><th>Estimated Tax</th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></div>'
       + '<div style="font-size:11px;color:var(--t4);margin-top:8px;line-height:1.5;">Estimated at your ' + rateTxt + ' rate on your taxable sales. The exact tax collected is on your POS tax report, confirm against it before you file. You file ' + (freq === 'quarterly' ? 'quarterly' : 'monthly') + '.</div>';
   },
@@ -672,7 +679,9 @@ S.HubBooks = {
     rows.push(this._lineRow(this._baseTitle('Sales Tax Worksheet', monthKey), COL_COUNT));
     merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } });
     rows.push(this._blankRow(COL_COUNT));
-    rows.push(['Period', 'Taxable Sales', 'Rate', 'Tax Due']);
+    // Same label as the screen table above, deliberately. This sheet is the one that reaches
+    // an accountant, so it is the worst place for the number to look more certain than it is.
+    rows.push(['Period', 'Taxable Sales', 'Rate', 'Estimated Tax']);
     const monthSales = this._taxableSales(monthKey);
     rows.push([this._monthLabel(monthKey), monthSales, rateFrac, monthSales * rateFrac]);
     if (freq === 'quarterly') {
