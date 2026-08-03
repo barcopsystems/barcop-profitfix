@@ -815,7 +815,11 @@ S.InventoryProducts = {
           // The UNION, not just this card's fields: the file may route into other
           // categories, and a column with nowhere to bind is a column thrown away.
           fields: this.importFieldsForImport(cat).map(f => ({ key: f.key, label: f.label, required: f.required, match: f.aliases })),
-          onState: state => { const row = document.getElementById('ip-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : ''; },
+          onState: state => {
+            const row = document.getElementById('ip-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : '';
+            // The step number and its one line move with the state; the panel renders once.
+            const head = document.getElementById('ip-step-head'); if (head) head.innerHTML = this._importStepHead(cat, state);
+          },
           // The mapper no longer imports. It hands the rows to the routing question,
           // which is what resolves each row's category before anything is written.
           onComplete: rows => { this._formCategory = cat; this._openRouting(rows, cat); }
@@ -2108,15 +2112,19 @@ S.InventoryProducts = {
     const COMMON = [
       {key:'name',          label:'Product Name',  required:true,  aliases:['name','item','product','description','item name','product name','item description','product description','item desc']},
       {key:'brand',         label:'Brand',         required:false, aliases:['brand','make','label','manufacturer','producer','brand name','maker']},
-      {key:'sub_category',  label:'Sub-Category',  required:false, aliases:['sub-category','subcategory','sub category','subtype','type','category','style','varietal','class']},
+      // ⚠ `dept`/`department`/`group`: a distributor guide labels its category column that
+      // way constantly, and without them the whole column went unbound and unsortable.
+      {key:'sub_category',  label:'Sub-Category',  required:false, aliases:['sub-category','subcategory','sub category','subtype','type','category','style','varietal','class','dept','department','group','family','major group','product type','product class']},
       {key:'vendor',        label:'Primary Vendor',required:false, aliases:['vendor','supplier','distributor','source','primary vendor','supplier name','vendor name','distributor name','purveyor']},
-      {key:'unit_cost',     label:'Unit Cost ($)', required:false, aliases:['cost','unit cost','cogs','item cost','wholesale','price paid','case cost','cost per unit','wholesale cost','purchase price','buy price','cost each']},
+      // ⚠ `unit price`/`your price`/`net`: measured unbound on a real-shaped guide, which
+      // left every product with no cost at all. `price` alone stays with MENU price.
+      {key:'unit_cost',     label:'Unit Cost ($)', required:false, aliases:['cost','unit cost','cogs','item cost','wholesale','price paid','case cost','cost per unit','wholesale cost','purchase price','buy price','cost each','unit price','your price','net price','net cost','case price','bottle cost','invoice cost']},
     ];
     if (cat === 'Liquor' || cat === 'Wine') {
       return COMMON.concat([
         {key:'container_size_oz',label:'Bottle Size (oz)', required:false, aliases:['size','bottle size','container','volume','oz','ounces','container size','bottle volume','size (oz)']},
-        {key:'pour_size_oz',     label:'Pour Size (oz)',   required:false, aliases:['pour','pour size','standard pour','std pour','pour (oz)','serving size','shot size']},
-        {key:'menu_price',       label:'Menu Price ($)',   required:false, aliases:['price','menu price','sell price','retail','selling price','pour price','glass price','list price']},
+        {key:'pour_size_oz',     label:'Pour Size (oz)',   required:false, aliases:['pour','pour size','standard pour','std pour','serving','pour (oz)','serving size','shot size']},
+        {key:'menu_price',       label:'Menu Price ($)',   required:false, aliases:['price','menu price','sell price','retail','selling price','pour price','glass price','list price','sell','sells for','menu','shelf price','rtl']},
         {key:'par_level',        label:'Par (bottles)',    required:false, aliases:['par','par level','target stock','par stock','target par']},
         {key:'reorder_point',    label:'Reorder Point (bottles)', required:false, aliases:['reorder','reorder point','min','minimum','reorder level','min stock','minimum stock']},
       ]);
@@ -2124,7 +2132,7 @@ S.InventoryProducts = {
     if (cat === 'Bottle Beer') {
       return COMMON.map(f => f.key === 'unit_cost' ? {...f, label:'Cost per Case ($)'} : f).concat([
         {key:'case_size',        label:'Case Size (bottles per case)', required:false, aliases:['case','case size','case pack','pack','bottles per case','pack size','units per case','case qty','case quantity','case count','pack count']},
-        {key:'menu_price',       label:'Menu Price ($ per bottle)', required:false, aliases:['price','menu price','sell price','retail','bottle price','selling price','list price']},
+        {key:'menu_price',       label:'Menu Price ($ per bottle)', required:false, aliases:['price','menu price','sell price','retail','bottle price','selling price','list price','sell','sells for','menu','shelf price','rtl']},
         {key:'par_level',        label:'Par (cases)',      required:false, aliases:['par','par level','target stock','par stock','target par']},
         {key:'reorder_point',    label:'Reorder Point (cases)', required:false, aliases:['reorder','reorder point','min','minimum','reorder level','min stock','minimum stock']},
       ]);
@@ -2132,8 +2140,8 @@ S.InventoryProducts = {
     if (cat === 'Draft Beer') {
       return COMMON.map(f => f.key === 'unit_cost' ? {...f, label:'Cost per Keg ($)'} : f).concat([
         {key:'container_size_oz',label:'Keg Size (oz)',   required:false, aliases:['size','keg','keg size','volume','oz','ounces','keg volume','container size','size (oz)']},
-        {key:'pour_size_oz',     label:'Pour Size (oz)',  required:false, aliases:['pour','pour size','standard pour','std pour','pour (oz)','serving size','glass size']},
-        {key:'menu_price',       label:'Menu Price ($)',  required:false, aliases:['price','menu price','sell price','retail','pour price','glass price','selling price']},
+        {key:'pour_size_oz',     label:'Pour Size (oz)',  required:false, aliases:['pour','pour size','standard pour','std pour','serving','pour (oz)','serving size','glass size']},
+        {key:'menu_price',       label:'Menu Price ($)',  required:false, aliases:['price','menu price','sell price','retail','pour price','glass price','selling price','sell','sells for','menu','shelf price','rtl']},
         {key:'par_level',        label:'Par (kegs)',      required:false, aliases:['par','par level','target stock','par stock','target par']},
         {key:'reorder_point',    label:'Reorder Point (kegs)', required:false, aliases:['reorder','reorder point','min','minimum','reorder level','min stock','minimum stock']},
       ]);
@@ -2142,7 +2150,7 @@ S.InventoryProducts = {
       {key:'unit_type',         label:'Unit Type (lb / case / each / gallon / ...)', required:false, aliases:['unit','unit type','uom','unit of measure','measure','buy unit','order unit','purchase unit']},
       {key:'container_size_oz', label:'Container Size (oz, for a liquid)', required:false, aliases:['size','container','container size','volume','oz','ounces','bottle size','size (oz)','net weight','fluid ounces']},
       {key:'pack_size',         label:'Pieces / Servings per Unit', required:false, aliases:['pack','pack size','servings','servings per unit','pieces','pieces per unit','units per','per unit','yield','count per unit','pieces per case','servings per case','pieces per pack']},
-      {key:'serving_name',      label:'Serving / Piece Name', required:false, aliases:['serving name','serving','piece','piece name','portion name','each name','unit name','portion','piece unit']},
+      {key:'serving_name',      label:'Serving / Piece Name', required:false, aliases:['serving name','piece','piece name','portion name','each name','unit name','portion','piece unit']},
       {key:'par_level',         label:'Par Level',     required:false, aliases:['par','par level','target stock','par stock','target par']},
       {key:'reorder_point',     label:'Reorder Point', required:false, aliases:['reorder','reorder point','min','minimum','reorder level','min stock','minimum stock']},
     ];
@@ -2212,11 +2220,36 @@ S.InventoryProducts = {
   // spot, no page change. Wired in wireLanding().
   // The upload uses the shared CSVMapper (drop -> Map Your Columns -> preview ->
   // Import), mounted in wireLanding, so it matches every other import in the app.
+  /* ── THE WALK ─────────────────────────────────────────────────────────────
+     Kyle, 2026-08-03, and he is right: *"The process has no steps.. it's just drop
+     downs and buttons"*. An operator does this ONCE, on day one, having never seen it,
+     and it is one of the first things they do — so a bad five minutes here is where
+     they decide the whole app is not worth the trouble.
+     ⛔ THIS IS THE DOCUMENTED EXCEPTION TO "no explainer text on cards"
+     ([[form-table-standard]]). That rule exists to kill tiny grey afterthoughts under
+     fields somebody already understands. Here nobody understands anything yet. The
+     lead is normal readable body text, not a 11px whisper, because it is meant to be
+     read — which is also why D2's card-prose ratchet does not see it. ONE line per
+     step, never a paragraph. */
+  _stepHead(n, title, lead) {
+    return '<div class="card-title"><span class="setup-num" style="margin-right:11px;">' + n + '</span>' + esc(title) + '</div>'
+      + (lead ? '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin:0 0 20px;">' + lead + '</div>' : '');
+  },
+
+  // Step 2 while the drop zone is up, step 3 once the columns are on screen. Swapped in
+  // place by CSVMapper's onState, because the panel itself is only rendered once.
+  _importStepHead(cat, state) {
+    return state === 'map'
+      ? this._stepHead(3, 'Line Up Your Columns',
+          'Bar Cop has matched your columns to its own. Check the ones it picked and change any it got wrong. Only Product Name has to be filled in.')
+      : this._stepHead(2, 'Drop Your ' + esc(cat) + ' File',
+          'A list from your vendor, from another program, or your own spreadsheet. Nothing is saved yet.');
+  },
+
   importPanelHTML() {
     const cat = this._import.cat;
-    const spec = this.FORM_SPEC[cat] || {};
     return '<div class="card form-card" id="ip-import-panel">'
-      + '<div class="card-title">Upload ' + esc(spec.title || cat) + ' Product List</div>'
+      + '<div id="ip-step-head">' + this._importStepHead(cat, 'drop') + '</div>'
       + '<div id="ip-csv"></div>'
       + '</div>'
       + '<div id="ip-imp-cancel-row" class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>'
@@ -2288,7 +2321,7 @@ S.InventoryProducts = {
       'liqueur','liqueurs','cordial','cordials','schnapps','amaro','amari','absinthe','anisette',
       'sambuca','ouzo','triple sec','curacao','irish cream','aperitif','apertif','digestif',
       'bitters','blanco','reposado','anejo','overproof','well','call','premium','top shelf'],
-    'Wine': ['wine','wines','red wine','white wine','rose','rosé','blush','sparkling','champagne',
+    'Wine': ['wine','wines','red blend','white blend','red wine','white wine','rose','rosé','blush','sparkling','champagne',
       'prosecco','cava','chardonnay','cabernet','sauvignon','merlot','pinot','noir','grigio','gris',
       'riesling','malbec','zinfandel','syrah','shiraz','moscato','muscat','tempranillo','sangiovese',
       'chianti','rioja','bordeaux','burgundy','barolo','nebbiolo','viognier','albarino','verdejo',
@@ -2335,11 +2368,37 @@ S.InventoryProducts = {
     }
     return hits.size === 1 ? [...hits][0] : '';
   },
+  /* A group the vocabulary cannot name may still be settled by ANOTHER column in the same
+     file, and this is where a real guide gets rescued: "Stout" says nothing about draft or
+     bottle, but if every Stout row reads 1/2 BBL in the pack column then the file has
+     answered it.
+     ⛔ ALL OR NOTHING. One row in the group disagreeing, or one row the other column
+     cannot name either, and it stays unset. That is what keeps "Light Lager" — which
+     genuinely ships as both a keg and a case — out of the wrong category, and it is the
+     difference between reading a fact the file contains and inferring one it does not
+     ([[the-loop]] #30). */
+  _agreeAcross(rows, key, value, others) {
+    const mine = (rows || []).filter(row => String(row[key] == null ? '' : row[key]).trim() === value);
+    if (!mine.length) return '';
+    for (const c of others) {
+      const seen = new Set();
+      let all = true;
+      for (const row of mine) {
+        const g = this._guessCategory(String(row[c.key] == null ? '' : row[c.key]).trim());
+        if (!g) { all = false; break; }
+        seen.add(g);
+      }
+      if (all && seen.size === 1) return [...seen][0];
+    }
+    return '';
+  },
   _seedAssign() {
     const r = this._routing;
     if (!r || !r.groupBy) return;
+    const others = this._groupableColumns(r.rows).filter(c => c.key !== r.groupBy);
     this._routeGroups(r.rows, r.groupBy).forEach(g => {
-      if (r.assign[g.value] === undefined) r.assign[g.value] = this._guessCategory(g.value);
+      if (r.assign[g.value] !== undefined) return;
+      r.assign[g.value] = this._guessCategory(g.value) || this._agreeAcross(r.rows, r.groupBy, g.value, others);
     });
   },
 
@@ -2365,6 +2424,17 @@ S.InventoryProducts = {
         best = { key: c.key, placed: placed, cats: cats.size };
       }
     });
+    /* ⛔ AND IT HAS TO NAME MOST OF THE FILE, OR IT IS NOT THE CATEGORY COLUMN.
+       Measured on a real-shaped guide whose category column was unbound: the only
+       candidate left was the PACK column, which resolved the two keg rows and the two
+       can rows and nothing else. Four values across two categories cleared the old
+       "2 or more categories" test, so column mode won — and **4 of 14 products imported
+       while 10 spirits and wines were left out.** Dropping a liquor guide on the Liquor
+       card and getting four products is the worst outcome this screen can produce.
+       The discriminator in words: a column is the category column only if it can name the
+       category for MOST of the file. Anything less and the card the operator clicked is
+       the better answer, because it at least brings everything in. */
+    if (best && best.placed * 2 <= (rows || []).length) return null;
     return best;
   },
 
@@ -2376,7 +2446,14 @@ S.InventoryProducts = {
        for a wine list off the Wine card, and adding a screen and a click to that path
        would be a regression dressed as a feature. The question appears only when the file
        actually carries something that could name a category. */
-    if (!groupable.length && cardCat) { this._routing = null; return this.runImport(rows); }
+    /* ⛔ THE EARLY RETURN USED TO LIVE HERE AND IT SKIPPED THE VENDOR QUESTION.
+       "No groupable column" was treated as "no question", but a file can have nothing to
+       sort AND still name no supplier — a plain name-and-cost list is exactly that, and
+       it is the commonest shape a first-time operator brings. Every product landed with
+       no vendor and they were never asked. Found by designing the bare-minimum test file,
+       which is the whole argument for building the rough one first.
+       The decision now belongs to `_routeHasQuestion()`, which already knows about all
+       three reasons to stop: mixed categories, rows left behind, and no supplier. */
     /* ⛔ COLUMN MODE ONLY WHEN THE COLUMN SHOWS THE FILE REALLY SPANS CATEGORIES.
        A wine list's varietal column resolves every row to Wine — one category — and
        sorting by it would SKIP any varietal the vocabulary happens not to know, where
@@ -2435,16 +2512,29 @@ S.InventoryProducts = {
       .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const known = vendorRows.some(v => v.name === r.vendor);
     let body = '';
-    body += '<div class="form-row" style="margin-bottom:20px;">'
-      + '<div class="f" style="max-width:260px;"><label>Who are these from</label>'
-      + '<select class="form-input" id="ip-route-vendor">'
-      + '<option value=""' + (r.vendor || r.vendorNew ? '' : ' selected') + '>Leave as in the file</option>'
-      + vendorRows.map(v => '<option value="' + esc(v.name) + '"' + (!r.vendorNew && r.vendor === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')
-      + '<option value="__new"' + (r.vendorNew ? ' selected' : '') + '>A vendor not on my list...</option>'
-      + '</select></div>'
-      + (r.vendorNew ? '<div class="f" style="max-width:260px;"><label>Vendor name</label>'
-          + '<input class="form-input" id="ip-route-vendor-new" type="text" value="' + esc(known ? '' : (r.vendor || '')) + '" placeholder="Coastal Beverage"/></div>' : '')
-      + '</div>';
+    /* ⛔ ONLY ASK WHEN THE FILE DOES NOT ANSWER. Half of what confused Kyle was a
+       control that should never have been on screen: his file names a supplier on every
+       row, so there was no question, and it still showed a dropdown reading "Leave as in
+       the file" — four unanswered questions in one control ("from what?", "what file?",
+       "what list?", and nothing saying a typed name becomes a vendor).
+       When the file DOES leave it blank, it is a real question and it says what happens. */
+    const needVendor = this._needsVendor();
+    if (needVendor) {
+      const n = r.rows.length;
+      body += this._stepHead('', 'Who Supplies These?',
+        'Your file does not say. Pick who these came from and Bar Cop puts them on all '
+        + n + ' product' + (n === 1 ? '' : 's') + ', and adds that vendor to your list so you can order from them. You can skip this and set it later.')
+        + '<div class="form-row" style="margin-bottom:20px;">'
+        + '<div class="f" style="max-width:260px;"><label>Supplier</label>'
+        + '<select class="form-input" id="ip-route-vendor">'
+        + '<option value=""' + (r.vendor || r.vendorNew ? '' : ' selected') + '>Skip for now</option>'
+        + vendorRows.map(v => '<option value="' + esc(v.name) + '"' + (!r.vendorNew && r.vendor === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')
+        + '<option value="__new"' + (r.vendorNew ? ' selected' : '') + '>Type in a new one...</option>'
+        + '</select></div>'
+        + (r.vendorNew ? '<div class="f" style="max-width:260px;"><label>Their name</label>'
+            + '<input class="form-input" id="ip-route-vendor-new" type="text" value="' + esc(known ? '' : (r.vendor || '')) + '" placeholder="Coastal Beverage"/></div>' : '')
+        + '</div>';
+    }
 
     /* ── THE DEFAULT VIEW IS THE OUTCOME, NOT THE MACHINERY ──────────────────
        The first build asked three questions before anything happened, and the middle
@@ -2455,6 +2545,11 @@ S.InventoryProducts = {
        that needs it, and for a beer guide where the styles genuinely cannot answer. */
     if (!r.detail) {
       const s = this._routeSummary();
+      const placed = s.cats.reduce((n, c) => n + s.by[c], 0);
+      body = this._stepHead(4, 'Check Where They Are Going',
+        'Bar Cop sorted your ' + r.rows.length + ' row' + (r.rows.length === 1 ? '' : 's')
+        + ' into categories on its own. Have a look, then import. Nothing is saved until you do.')
+        + body;
       body += '<table class="tbl"><thead><tr>'
         + '<th>Going into</th><th style="width:150px;">Products</th></tr></thead><tbody>'
         + s.cats.map(c => '<tr><td>' + esc(c) + '</td><td>' + s.by[c] + '</td></tr>').join('')
@@ -2463,12 +2558,26 @@ S.InventoryProducts = {
         + '</tbody></table>';
       if (s.missing.length) {
         // Named, not counted: the operator can act on a name and cannot act on a number.
+        // And SAY WHY, because "not importing" with no reason is the kind of dead end
+        // that makes somebody close the tab on their first day.
         const shown = s.missing.slice(0, 6);
-        body += '<div style="margin-top:14px;font-size:12px;color:var(--t3);">'
+        body += '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin-top:16px;">'
+          + 'Bar Cop could not tell what ' + (s.missing.length === 1 ? 'this one is' : 'these are')
+          + ', so ' + (s.missing.length === 1 ? 'it' : 'they') + ' will be left out: <span style="color:var(--t3);">'
           + esc(shown.join(', ')) + (s.missing.length > shown.length
-            ? ' and ' + (s.missing.length - shown.length) + ' more' : '') + '.</div>';
+            ? ' and ' + (s.missing.length - shown.length) + ' more' : '') + '</span>. '
+          + 'If any of them are real products, use Change What Goes Where below.</div>';
+      }
+      if (!placed) {
+        body += '<div style="font-size:13.5px;color:var(--gold);line-height:1.55;margin-top:16px;">'
+          + 'Bar Cop could not place any of these on its own. Open Change What Goes Where and tell it '
+          + 'which category each one belongs in.</div>';
       }
     } else {
+
+    body = this._stepHead(4, 'Sort Them Yourself',
+      'Bar Cop groups your rows by one of the columns in your file. Set what each group is, '
+      + 'and anything left on Skip will not be imported.') + body;
 
     if (groupable.length) {
       body += '<div class="seg-toggle" style="margin-bottom:18px;">'
@@ -2538,14 +2647,9 @@ S.InventoryProducts = {
        (a button that looks live and does nothing is the bug, not the fix). */
     const ready = this._routeReadyCount();
     const busy = !!this._routeWriting;
+    /* The step head IS the card title now, and it carries the row count in its own lead,
+       so the old separate title and status line would be a second heading in one card. */
     return '<div class="card form-card" id="ip-route-panel">'
-      + '<div class="card-title">What is in this file?</div>'
-      /* A live computed status line, which is the allowed exception. It originally carried
-         a second, instructional sentence ("Tell it which category each one belongs in")
-         and D2's card-prose ratchet failed the build over it — correctly. Instructions
-         live in the nav-"i" (showHowTo), never on the card. */
-      + '<div style="font-size:12.5px;color:var(--t2);margin-bottom:18px;">Bar Cop read ' + r.rows.length
-      + ' row' + (r.rows.length === 1 ? '' : 's') + ' from your file.</div>'
       + body
       + '</div>'
       + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
@@ -2584,7 +2688,13 @@ S.InventoryProducts = {
     if (!r) return false;
     const s = this._routeSummary();
     if (s.cats.length > 1 || s.missing.length) return true;
-    return r.rows.some(row => !String(row.vendor == null ? '' : row.vendor).trim());
+    return this._needsVendor();
+  },
+  // Does the file leave anybody without a supplier? If not there is no question to ask,
+  // and the control does not belong on screen at all.
+  _needsVendor() {
+    const r = this._routing;
+    return !!r && r.rows.some(row => !String(row.vendor == null ? '' : row.vendor).trim());
   },
 
   // How many rows would actually import. Drives the button label AND the disabled state,
@@ -2698,11 +2808,15 @@ S.InventoryProducts = {
          ⚠ WHY THIS IS NOT A GUESS: `_sizeToOz` is the validator and it is strict by
          design — it refuses two-number cells ("24/12 oz") and refuses pack descriptors
          ("12-PACK"), with a comment above it explaining that a plausible wrong size is
-         worse than none. So this can only ever succeed on something that really is a
-         size. Scoped to Draft Beer, and only when the size is otherwise missing, because
-         `case_size` is read by nothing on a draft row ([[the-loop]] #48: a shared
-         fallback needs a discriminator, not an `||` chain). */
-      if (oz == null && cat === 'Draft Beer') oz = nonNeg(this._sizeToOz(val(row, 'case_size')));
+         worse than none. So this can only ever succeed on something that really is a size.
+         ⛔ IT WAS SCOPED TO DRAFT BEER AND THAT WAS TOO NARROW. Measured on a 60-product
+         guide whose one Pack column reads "1.75 L" for spirits and "1/2 BBL" for kegs:
+         the spirits bound their size to nothing and 44 of 46 products landed Incomplete.
+         One column carrying the size for every category is the normal shape, not a beer
+         quirk. It stays a FALLBACK — a row with a real size column of its own is never
+         overridden — and the validator is what keeps it honest for a bottle-beer row,
+         whose "24/12 oz CAN" it refuses and whose 12 oz nominal is forced below anyway. */
+      if (oz == null) oz = nonNeg(this._sizeToOz(val(row, 'case_size')));
       // Bottle beer has no oz field; store a fixed nominal size so the usage-variance
       // oz round-trip cancels (never shown or entered — matches the manual form).
       if (cat === 'Bottle Beer') oz = 12;
