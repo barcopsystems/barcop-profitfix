@@ -592,6 +592,22 @@ const CSVMapper = {
          ⚠ The hyphenated form is also Bar Cop's OWN column label ("No-Sale Opens") minus one word,
          which is exactly why it was in the match array — it still binds, in pass 1, exactly. */
       'no-sale': 1, 'no sales': 1, nosale: 1,
+      /* ⚠ `case` and `pack` joined 2026-08-03, off the first real food order guide. A
+         broadline guide carries BOTH "Case Cost" and "Unit Cost": `unit cost` wins the
+         exact pass, and `case` was then free to hunt inside "Case Cost" — so a DOLLAR
+         AMOUNT bound the case-SIZE field. That is inert on a Food card until the size
+         reader gets strict, at which point the product import's fallback to the pack cell
+         read **$49.80 as a 49.8 oz container**. Measured on the Marinara row.
+         `hasMoneyMark` cannot catch it: it knows `$`, usd, amount, amt, dollars, and the
+         money noun here is `cost`.
+         ⚠ SEALED, NOT DELETED — the same lesson `pay`/`delivery`/`shipping` above paid
+         for. A beer order guide's column is literally headed "Pack", and that bare header
+         is what separates a keg from a case, so it must still win pass 1. Only the hunt
+         inside a longer header is withdrawn; `case size`, `case pack`, `pack size` and
+         `bottles per case` all still hunt.
+         Measured reach before sealing: exactly two field lists in the app carry these as
+         bare candidates, `case_size` and `pack_size`, both on Add Products. */
+      case: 1, pack: 1,
       /* ⛔⛔ `transactions`/`orders`/`tickets`/`tabs` WERE SEALED HERE FOR ONE ROUND AND IT COST FAR
          MORE THAN IT FIXED — REVERTED. The seal stopped "Voided Transactions" reaching `checks`, and
          took every ORDINARY qualified spelling with it. Measured: `Total Transactions`,
