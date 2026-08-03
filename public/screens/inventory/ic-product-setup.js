@@ -416,8 +416,9 @@ S.InventoryProducts = {
       { h: 'Food and Misc: How You Track It', p: ['Food and Misc pick a Unit Type (how you buy it: the pound, case, bag, each, gallon, or your own word), then a Track By, which is the one thing that decides how Bar Cop counts and costs it. Three ways. By the unit: you weigh or count whole units, like ground beef by the pound (count 11.42 lb), and recipes pull pounds. By pieces: one unit breaks into pieces, like a bag of 45 wings or a pound sliced into 16 bacon slices; you count full units plus loose pieces and recipes pull pieces. By ounces: a liquid measured by the ounce, like oil or syrup; a gallon fills in 128 for you, your own units you type the ounces, and recipes pull ounces. The same unit can go either way, which is the point: buy bacon by the pound but Track By pieces. Pick it once and the count sheet, the cost, and the recipe all line up. Serving sizes and prices are the menu side and live in the Menu Builder.'] },
       { h: 'Sold On The Menu (Food and Misc)', p: ['Most Food and Misc products are things you cook or clean with, not sell straight. But some you do sell as-is: a bag of chips, a bottled soda, a canned non-alcoholic drink. For those, tick Non prep menu item in the Sold on the Menu section at the bottom of the form. That lists the product in the Menu Builder as a No Prep item, so you can add it to a menu section with its own price. Leave it off for raw ingredients and supplies so they stay out of the menu picker. Beer and wine are always available on the menu, so they carry no tick.'] },
       { h: 'Other Pour Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Pour Sizes Sold with its own price and Bar Cop shows that size its own pour cost. A thinner happy hour price reads its own honest margin instead of hiding inside the standard pour.'] },
-      { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. The category is locked to the card you uploaded from, so the columns offered match that category and Bar Cop never figures a cost per pour with the wrong divisor.'] },
-      { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Every row comes in as a product in that category, and any row missing required data shows as Incomplete so you can finish it later.'] },
+      { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. Starting from a category card just tells Bar Cop what to expect, so the columns it offers match that category. It is not locked to it. A file that turns out to hold more than one category is sorted out in the next step.'] },
+      { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Any row missing required data comes in as Incomplete so you can finish it later.'] },
+      { h: 'When One File Holds More Than One Category', p: ['A distributor order guide is one file with kegs and cases in it, and an export from another program is usually one file with everything in it. So after the columns are matched, Bar Cop asks what is actually in the file. If it is all one category you pick that category once and you are done. If a column in your file names the category, pick that column and Bar Cop lists every value it found with the number of products behind each one, and you say which Bar Cop category each value belongs in.', 'Bar Cop fills in what a word settles on its own. Bourbon, Vodka and Gin are Liquor and it will say so. It leaves a beer style alone on purpose, because an IPA can be a keg or a case and the file does not say which, and it would rather ask than put your product in the wrong place. Anything left on Skip is not imported, and the products it skipped are named in the result so you know exactly what did not come in. Nothing is written to your account until you press Import.'] },
       { h: 'Bulk Edit Many At Once', p: ['After an upload you often need the same value across a whole category: a 1.5 oz pour on every liquor, one vendor or storage location across a list, the same par. Check the products you want, or use Select All on the category tab, then tap Bulk Edit. Turn on only the fields you want to change, set each value, and Apply. Bar Cop writes those fields to every selected product at once and leaves everything else untouched, then refigures pours per container, cost per pour, and pour cost percent for each one. Anything that was Incomplete and now has what it needs clears its flag.'] },
       { h: 'Hiding A Product', p: ['When you Edit a product, the status across from the title reads ACTIVE or INACTIVE. Hit Hide from operations to pull a seasonal pour or a discontinued item out of counts, orders, and the menu side without throwing away its history, then Update to commit. An inactive product moves to the Inactive tab after Misc, so your category lists stay clean; open it there and Make active brings it back.'] }
     ]);
@@ -607,7 +608,11 @@ S.InventoryProducts = {
     // panel (drop zone -> column mapper) instead of the product list. The list
     // sits in an .rpt-panel so the active category tab connects into it cleanly
     // (same connected look as the report tabs) and the header row gets padding.
-    const lower = this._import ? this.importPanelHTML() : (tabs + body);
+    // Three states in the lower area, not two: the drop/mapper, then the routing
+    // question, then back to the list. `_routing` only exists while `_import` does.
+    const lower = this._import
+      ? (this._routing ? this.routePanelHTML() : this.importPanelHTML())
+      : (tabs + body);
     /* The import result (S206). It has to render HERE, not be written into the DOM by `note()`:
        `note()` targets `#ip-csv-actions`, which is the importer's own action row, and a successful
        import closes the importer and calls renderLanding — so anything written first is destroyed
@@ -794,8 +799,11 @@ S.InventoryProducts = {
 
     // In-place import panel (drop zone -> column mapper, same spot). Wired only
     // while an upload is active for a category.
-    if (this._import) {
-      document.getElementById('ip-imp-cancel')?.addEventListener('click', () => { this._import = null; this.renderLanding(); });
+    // `else if`, not an early return: this block is currently last in wireLanding,
+    // and a return would silently swallow anything added after it later.
+    if (this._routing) { this.wireRouting(); }
+    else if (this._import) {
+      document.getElementById('ip-imp-cancel')?.addEventListener('click', () => { this._import = null; this._routing = null; this.renderLanding(); });
       const cat = this._import.cat;
       const el = document.getElementById('ip-csv');
       if (el && typeof CSVMapper !== 'undefined') {
@@ -806,10 +814,75 @@ S.InventoryProducts = {
           confirmLabel: 'Import',
           fields: this.importFieldsForCategory(cat).map(f => ({ key: f.key, label: f.label, required: f.required, match: f.aliases })),
           onState: state => { const row = document.getElementById('ip-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : ''; },
-          onComplete: rows => { this._formCategory = cat; this.runImport(rows); }
+          // The mapper no longer imports. It hands the rows to the routing question,
+          // which is what resolves each row's category before anything is written.
+          onComplete: rows => { this._formCategory = cat; this._openRouting(rows, cat); }
         });
       }
     }
+  },
+
+  wireRouting() {
+    const r = this._routing;
+    if (!r) return;
+    // Any change re-renders from state, so the button count and the disabled state are
+    // always computed from the same place the import will read (never from the DOM).
+    const redraw = () => this.renderLanding();
+
+    this.container.querySelectorAll('[data-route-mode]').forEach(b =>
+      b.addEventListener('click', () => { r.mode = b.dataset.routeMode; redraw(); }));
+
+    document.getElementById('ip-route-col')?.addEventListener('change', e => {
+      r.groupBy = e.target.value; r.assign = {}; this._seedAssign(); redraw();
+    });
+
+    this.container.querySelectorAll('[data-route-val]').forEach(sel =>
+      sel.addEventListener('change', () => { r.assign[sel.dataset.routeVal] = sel.value; redraw(); }));
+
+    document.getElementById('ip-route-one')?.addEventListener('change', e => { r.one = e.target.value; redraw(); });
+
+    // Bulk setter: fills only what is still on Skip, so it can never silently overwrite
+    // a choice the operator already made row by row.
+    document.getElementById('ip-route-bulk')?.addEventListener('change', e => {
+      const v = e.target.value;
+      if (!v) return;
+      this._routeGroups(r.rows, r.groupBy).forEach(g => { if (!r.assign[g.value]) r.assign[g.value] = v; });
+      redraw();
+    });
+
+    document.getElementById('ip-route-back')?.addEventListener('click', () => {
+      // Back to the drop zone, not out of the import. The file is re-dropped from scratch
+      // because a mapping belongs to the file it was made for.
+      this._routing = null; this.renderLanding();
+    });
+
+    document.getElementById('ip-route-go')?.addEventListener('click', async () => {
+      const btn = document.getElementById('ip-route-go');
+      if (!btn || btn.disabled || this._routeWriting) return;
+      // One press, one import. A double-click on a button that survives to the next
+      // render is the shape that produced two concurrent writes elsewhere in the app.
+      this._routeWriting = true;
+      btn.disabled = true; btn.textContent = 'Importing...';
+      const rows = this._routeStamp();
+      const label = btn.textContent;
+      try { await this.runImport(rows); }
+      finally {
+        this._routeWriting = false;
+        /* ⛔ ONLY CLEAR THE ROUTING ON SUCCESS, and `_import` is how we know: runImport
+           nulls it when the write lands. A failed save, or a run where everything was
+           skipped, keeps BOTH so the operator can fix a value and press Import again.
+           Clearing unconditionally sent them back to the drop zone to re-choose every
+           category, which is the one thing they had just finished doing.
+           ⚠ And do NOT re-render here. runImport's failure exits write into
+           #ip-csv-actions, and a re-render rebuilds innerHTML and destroys the message
+           explaining what went wrong. Restore the button in place instead. */
+        if (!this._import) { this._routing = null; }
+        else {
+          const b = document.getElementById('ip-route-go');
+          if (b) { b.disabled = false; b.textContent = label; }
+        }
+      }
+    });
   },
 
   // ── Form ──────────────────────────────────────────────────────────────────
@@ -2077,12 +2150,216 @@ S.InventoryProducts = {
       + '<div id="ip-csv-actions" class="no-print" style="margin:0 0 24px;"></div>';
   },
 
+  /* ── ROUTING: what is actually in this file? ──────────────────────────────
+     Sits between the column mapper and runImport. The import used to assume its
+     category from whichever card was clicked, which is right for a wine list and
+     wrong for the file operators actually have: a vendor order guide holds kegs
+     AND cases, and an export from another system holds everything. Dropped on one
+     card, every row became that category silently.
+     ⛔ NOTHING IS GUESSED INTO EXISTENCE. Every value the operator has not set
+     stays on Skip, and a skipped row is not imported and is named in the result. */
+
+  // Columns that could name a category. Only ones already mapped, holding more than
+  // one distinct value, and few enough to be a category rather than free text.
+  /* ⛔ THE PACK COLUMN IS IN HERE ON PURPOSE, AND IT IS THE WHOLE BEER CASE.
+     A beer distributor's order guide is THE file this feature exists for, and its type
+     column holds STYLES: IPA, Lager, Stout. A style cannot answer draft-or-bottle, because
+     the same IPA is sold as a 1/2 BBL keg and as a 24/12 oz case, and grouping by style
+     puts both in one group where the operator can only pick one category for the pair.
+     The pack column is the only thing in the file that separates them. It survives to here
+     as its RAW string (`_packCount`/`_sizeToOz` do not run until runImport), so
+     "1/2 BBL" and "24/12 oz CAN" are groupable values. Measured before adding it. */
+  ROUTE_CANDIDATES: [
+    { key: 'sub_category',     label: 'Sub-Category' },
+    { key: 'case_size',        label: 'Case / Pack' },
+    { key: 'container_size_oz', label: 'Size' },
+    { key: 'unit_type',        label: 'Unit Type' },
+    { key: 'misc_type',        label: 'Misc Type' }
+  ],
+  _groupableColumns(rows) {
+    return this.ROUTE_CANDIDATES.filter(c => {
+      const vals = new Set((rows || []).map(r => String(r[c.key] == null ? '' : r[c.key]).trim()).filter(Boolean));
+      return vals.size > 1 && vals.size <= 60;
+    });
+  },
+  // Distinct values of the chosen column, biggest group first. '' collects every row
+  // whose cell is empty, which is a real bucket on an order guide (header and subtotal
+  // lines) and must be visible rather than silently folded into something.
+  _routeGroups(rows, key) {
+    const n = {};
+    (rows || []).forEach(r => { const v = String(r[key] == null ? '' : r[key]).trim(); n[v] = (n[v] || 0) + 1; });
+    return Object.keys(n).map(v => ({ value: v, count: n[v] }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+  },
+
+  /* Pre-fill only what the word itself settles. A spirit names its own category; a beer
+     STYLE does not, because an IPA is a keg or a case and the file does not say which.
+     Guessing there would put product in the wrong category on the app's most common
+     order guide, so those come back '' and the operator picks. */
+  _ROUTE_HINTS: {
+    'Liquor':  ['vodka','gin','rum','tequila','mezcal','whiskey','whisky','bourbon','rye','scotch','cognac','brandy','liqueur','cordial','schnapps','aperitif','bitters','spirit','spirits','liquor'],
+    'Wine':    ['wine','red wine','white wine','rose','rosé','sparkling','champagne','prosecco','chardonnay','cabernet','merlot','pinot','sauvignon','riesling','malbec','zinfandel','syrah','shiraz','moscato','sangria','port','sherry'],
+    'Draft Beer':  ['draft','draught','keg','kegs','on tap','tap'],
+    'Bottle Beer': ['bottle beer','bottled beer','can','cans','canned','package beer','packaged beer','six pack','sixpack'],
+    'Food':    ['food','produce','meat','poultry','seafood','dairy','bakery','bread','frozen','dry goods','grocery'],
+    'Misc':    ['na beverage','non alcoholic','non-alcoholic','soda','juice','mixer','mixers','garnish','garnishes','supply','supplies','paper','paper goods','chemical','chemicals','cleaning','glassware','smallwares']
+  },
+  _guessCategory(value) {
+    const s = String(value || '').trim().toLowerCase();
+    if (!s) return '';
+    for (const cat of Object.keys(this._ROUTE_HINTS)) {
+      if (this._ROUTE_HINTS[cat].some(w => w === s)) return cat;
+    }
+    return '';
+  },
+  _seedAssign() {
+    const r = this._routing;
+    if (!r || !r.groupBy) return;
+    this._routeGroups(r.rows, r.groupBy).forEach(g => {
+      if (r.assign[g.value] === undefined) r.assign[g.value] = this._guessCategory(g.value);
+    });
+  },
+
+  // Entry from CSVMapper. `cardCat` is the category card the operator came in through,
+  // which pre-answers the question for the six existing doors.
+  _openRouting(rows, cardCat) {
+    const groupable = this._groupableColumns(rows);
+    /* ⛔ DO NOT ASK A QUESTION THAT HAS ONLY ONE ANSWER. The operator came in through a
+       category card, and if nothing in the file could possibly name a different category
+       there is nothing to decide: importing straight through is exactly today's behaviour
+       for a wine list off the Wine card, and adding a screen and a click to that path
+       would be a regression dressed as a feature. The question appears only when the file
+       actually carries something that could name a category. */
+    if (!groupable.length && cardCat) { this._routing = null; return this.runImport(rows); }
+    this._routing = {
+      rows: rows || [],
+      cardCat: cardCat || '',
+      /* Default to "all one category" with the card's category filled in, NOT to the
+         column. A wine list has a dozen varietals in its type column, so defaulting to
+         the column would hand the operator twelve dropdowns to answer a question they
+         already answered by clicking Wine. Coming in through a card IS an answer; the
+         column mode is one click away for the file that really is mixed. */
+      mode: 'one',
+      groupBy: groupable.length ? groupable[0].key : '',
+      one: cardCat || '',
+      assign: {}
+    };
+    this._seedAssign();
+    this.renderLanding();
+    setTimeout(() => document.getElementById('ip-route-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  },
+
+  routePanelHTML() {
+    const r = this._routing;
+    const groupable = this._groupableColumns(r.rows);
+    const cats = App.IC_CATEGORIES || [];
+    /* ⚠ `attrs` rather than post-hoc string surgery, and the row selects are keyed by
+       INDEX not by the value itself: a value off a real order guide can hold quotes,
+       spaces and slashes ("1/2 BBL"), none of which belong in an element id. */
+    const catSel = (id, sel, skipLabel, attrs) => '<select class="form-input" id="' + id + '"'
+      + (attrs ? ' ' + attrs : '') + ' style="max-width:210px;">'
+      + '<option value=""' + (sel ? '' : ' selected') + '>' + (skipLabel || 'Skip') + '</option>'
+      + cats.map(c => '<option value="' + esc(c) + '"' + (sel === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('')
+      + '</select>';
+
+    let body = '';
+    if (groupable.length) {
+      body += '<div class="seg-toggle" style="margin-bottom:18px;">'
+        + '<button type="button" class="btn btn-sm ' + (r.mode === 'one' ? 'btn-primary' : 'btn-ghost') + '" data-route-mode="one">All one category</button>'
+        + '<button type="button" class="btn btn-sm ' + (r.mode === 'column' ? 'btn-primary' : 'btn-ghost') + '" data-route-mode="column">Sorted by a column</button>'
+        + '</div>';
+    }
+
+    if (r.mode === 'column' && groupable.length) {
+      if (groupable.length > 1) {
+        body += '<div class="f" style="max-width:260px;margin-bottom:16px;"><label>Which column names the category</label>'
+          + '<select class="form-input" id="ip-route-col">'
+          + groupable.map(c => '<option value="' + esc(c.key) + '"' + (r.groupBy === c.key ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('')
+          + '</select></div>';
+      }
+      const groups = this._routeGroups(r.rows, r.groupBy);
+      const unset = groups.filter(g => !r.assign[g.value]).reduce((n, g) => n + g.count, 0);
+      body += '<table class="tbl"><thead><tr>'
+        + '<th>In your file</th><th style="width:130px;">Products</th><th style="width:230px;">Goes into</th>'
+        + '</tr></thead><tbody>'
+        + groups.map((g, i) => '<tr><td>' + (g.value ? esc(g.value) : '<span style="color:var(--t3);">(blank)</span>') + '</td>'
+            + '<td>' + g.count + '</td>'
+            + '<td>' + catSel('ip-rt-' + i, r.assign[g.value] || '', 'Skip', 'data-route-val="' + esc(g.value) + '"') + '</td></tr>').join('')
+        + '</tbody></table>'
+        /* A real `.f` + `<label>`, not a dim sentence beside a control. D2's card-prose
+           ratchet flagged the sentence version and it was right: a field's own label is
+           the exception, a floating six-word instruction is not. This is a label. */
+        + '<div class="f" style="max-width:260px;margin-top:18px;"><label>Set remaining to</label>'
+        + catSel('ip-route-bulk', '', 'Choose...') + '</div>'
+        // ⚠ No `note-line` class: it does not exist in style.css. Inline, like its neighbours.
+        // A live count of what the current choices would leave behind, not an instruction.
+        + (unset ? '<div style="margin-top:14px;font-size:12px;color:var(--t3);">'
+            + unset + ' product' + (unset === 1 ? '' : 's') + ' still on Skip will not be imported.</div>' : '');
+    } else {
+      body += '<div class="f" style="max-width:260px;"><label>These are all</label>'
+        + catSel('ip-route-one', r.one, 'Choose...') + '</div>';
+    }
+
+    /* ⚠ THE WRITE STATE HAS TO SURVIVE A RE-RENDER. Every select on this panel re-renders
+       the whole thing, and a re-render rebuilds the Import button ENABLED from the ready
+       count alone — handing back the second press the `_routeWriting` flag exists to stop.
+       So the render reads the flag too, and a refused second press is never silent
+       (a button that looks live and does nothing is the bug, not the fix). */
+    const ready = this._routeReadyCount();
+    const busy = !!this._routeWriting;
+    return '<div class="card form-card" id="ip-route-panel">'
+      + '<div class="card-title">What is in this file?</div>'
+      /* A live computed status line, which is the allowed exception. It originally carried
+         a second, instructional sentence ("Tell it which category each one belongs in")
+         and D2's card-prose ratchet failed the build over it — correctly. Instructions
+         live in the nav-"i" (showHowTo), never on the card. */
+      + '<div style="font-size:12.5px;color:var(--t2);margin-bottom:18px;">Bar Cop read ' + r.rows.length
+      + ' row' + (r.rows.length === 1 ? '' : 's') + ' from your file.</div>'
+      + body
+      + '</div>'
+      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && !busy ? '' : ' disabled')
+      + '>' + (busy ? 'Importing...' : 'Import ' + ready + ' Product' + (ready === 1 ? '' : 's')) + '</button>'
+      + '<button type="button" class="btn btn-ghost" id="ip-route-back"' + (busy ? ' disabled' : '') + '>Start Over</button>'
+      + '</div>'
+      + '<div id="ip-csv-actions" class="no-print" style="margin:0 0 24px;"></div>';
+  },
+
+  // How many rows would actually import. Drives the button label AND the disabled state,
+  // so "Import 0 Products" can never be a live button (S125's shape).
+  _routeReadyCount() {
+    const r = this._routing;
+    if (!r) return 0;
+    return this._routeStamp().filter(row => row._category).length;
+  },
+  // The rows with `_category` resolved. runImport treats '' as unplaceable: not imported,
+  // named in the result. That is the whole contract, and it is pinned.
+  _routeStamp() {
+    const r = this._routing;
+    if (!r) return [];
+    return r.rows.map(row => {
+      const cat = (r.mode === 'column' && r.groupBy)
+        ? (r.assign[String(row[r.groupBy] == null ? '' : row[r.groupBy]).trim()] || '')
+        : (r.one || '');
+      return Object.assign({}, row, { _category: cat });
+    });
+  },
+
   // CSVMapper hands back rows already keyed by field (name, unit_cost, ...). Build
   // a product per row with the same category-specific cost math the form uses.
   async runImport(rows) {
     rows = rows || [];
-    const cat = this._formCategory || 'Liquor';
-    const spec = this.FORM_SPEC[cat];
+    /* ⚠ THE CATEGORY IS A PROPERTY OF THE ROW, NOT OF THE FILE. This used to read
+       `this._formCategory` ONCE and apply `FORM_SPEC[cat]` to the whole run, which was
+       correct while the only way in was clicking a category card. It is not correct for a
+       vendor order guide, which is one file holding kegs AND cases, and a real export from
+       another system, which is one file holding everything. Dropped on the Liquor card,
+       every row became a Liquor product silently: wrong cost divisor, wrong size, wrong
+       tab, 400 rows to delete by hand.
+       So `cardCat` is now only the FALLBACK, used when a row carries no category of its own,
+       which is exactly the six existing card doors. `cat` and `spec` are resolved PER ROW
+       inside the loop below. */
+    const cardCat = this._formCategory || 'Liquor';
     const val = (row, k) => String(row[k] != null ? row[k] : '').trim();
     // App.parseNum is the ONE coercion; null for "no number" is already this caller's contract.
     // ⚠ It also FIXES the sign here: this stripped the minus entirely, so a "-4.50" cell read +4.50.
@@ -2122,9 +2399,22 @@ S.InventoryProducts = {
     const archived = new Set(this.products().filter(p => p.active === false)
       .map(p => (p.name || '').trim().toLowerCase()));
     let dup = 0, dupArchived = 0, nameless = 0;
+    // Rows the operator left on Skip, or whose value was never mapped to a category.
+    // They are NOT imported and they are named in the result (Kyle, 2026-08-03).
+    const unplaceable = [];
     rows.forEach(row => {
       const name = val(row, 'name');
       if (!name) { nameless++; return; }
+      /* THE ROW'S OWN CATEGORY WINS. A row that carries the key with no value was left on
+         Skip or its value was never mapped, and a fallback category is exactly the defect
+         this whole change exists to remove: a product filed somewhere the operator never
+         chose is invisible until they go looking for it.
+         ⚠ This sits ABOVE the duplicate check on purpose. A skipped row must not consume a
+         `taken` slot, or the same name appearing later on a row that IS placeable would be
+         thrown away as a duplicate of something that was never imported. */
+      const cat = ('_category' in row) ? String(row._category || '').trim() : cardCat;
+      const spec = cat ? this.FORM_SPEC[cat] : null;
+      if (!spec) { unplaceable.push(name); return; }
       const nameKey = name.toLowerCase();
       if (taken.has(nameKey)) { if (archived.has(nameKey)) dupArchived++; else dup++; return; }
       taken.add(nameKey);
@@ -2211,6 +2501,23 @@ S.InventoryProducts = {
       if (dup) b.push(dup + ' duplicate name' + (dup === 1 ? '' : 's') + ' skipped');
       if (dupArchived) b.push(dupArchived + ' already exist' + (dupArchived === 1 ? 's' : '') + ' but ' + (dupArchived === 1 ? 'is' : 'are') + ' hidden — see the Inactive tab');
       if (nameless) b.push(nameless + ' row' + (nameless === 1 ? '' : 's') + ' skipped with no product name');
+      /* ⚠ NAMED, not counted. Every other bucket here is a count because the operator can
+         find those rows again in their own file. An unplaceable row is different: it was
+         dropped on a decision the operator made on the mapping screen, and a bare "9 rows
+         skipped" gives them nothing to act on. Cap the list so a 200-row miss does not
+         render a wall of text, and say how many are behind it. */
+      /* ⛔ REPORT PRODUCTS, NOT ROWS. An order guide repeats a name across sections, so the
+         same product can appear on a skipped row AND on a placeable one. Reporting the raw
+         row list told the operator "House Vodka not imported" while House Vodka was sitting
+         in their list — true about a row, false about their bar, and the only version they
+         can act on is the one about their bar. Drop any name that did come in. */
+      const gone = unplaceable.filter(n =>
+        !imported.some(p => (p.name || '').trim().toLowerCase() === n.trim().toLowerCase()));
+      if (gone.length) {
+        const shown = gone.slice(0, 5);
+        b.push(gone.length + ' not imported, no category set: ' + shown.join(', ')
+          + (gone.length > shown.length ? ' and ' + (gone.length - shown.length) + ' more' : ''));
+      }
       return b;
     };
     if (!imported.length) {
@@ -2229,7 +2536,15 @@ S.InventoryProducts = {
     const ok = await App.putRecordsBulk('ic', 'product', imported);
     if (ok) {
       App.markSetupDone('gs_ic_products');
-      this.activeCat = cat;
+      /* Land on the tab where most of the import actually went. `cat` used to be the one
+         file-level category and is now per row, so there is no single answer any more —
+         and for a single-category file (every card door) the largest group IS that
+         category, so those doors land exactly where they always did. */
+      this.activeCat = (() => {
+        const n = {};
+        imported.forEach(p => { n[p.category] = (n[p.category] || 0) + 1; });
+        return Object.keys(n).sort((a, b) => n[b] - n[a] || a.localeCompare(b))[0] || cardCat;
+      })();
       this.editId = null;
       this._formCategory = null;
       this._import = null;
