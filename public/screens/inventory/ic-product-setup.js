@@ -2678,22 +2678,44 @@ S.InventoryProducts = {
      Measured on a messy file: the table read 13, the button promised 14, and 12 landed —
      it was counting a row with no product name and a name the file repeats. That is the
      last number an operator reads before pressing ([[output-honesty]]). */
+  /* ⛔ IT ALSO RETURNS *WHY*, PER ROW, AND THAT IS WHAT THE SCREEN RENDERS (Kyle, chat 27).
+     The counts alone forced the operator to do arithmetic: a header saying 8 over a button
+     saying 1, with a sentence underneath about rows being left out. *"visually is making
+     the user try to do math and figure out what the heck it is talking about."* So the same
+     single walk that produces the counts now also stamps each row with the reason it will
+     or will not land, and the row says it for itself.
+     ⚠ ONE WALK, NOT TWO. The status map and the counts have to come from the same pass in
+     the same order, or the dim and the number can disagree — which is the exact defect this
+     function was written to end.
+     ⚠ THE ORDER IS runImport's ORDER: no name, then no category, then already-taken. A row
+     with no category NEVER reaches the duplicate test, so it must read as unsorted work and
+     not as a duplicate, or the screen tells the operator to leave alone the one row they
+     have to act on.
+     ⚠ AND `taken` IS SPLIT IN TWO WITHOUT CHANGING THE VERDICT. runImport keeps one set,
+     seeded from the product list and added to as it goes; `mine` + `seen` is that same set,
+     separated only so the row can say WHICH it is — a name you already own is a dead end,
+     a name repeated inside this file is not. `dup` still totals both, as it always did. */
   _routeSummary() {
-    const by = {}, missing = [];
+    const by = {}, missing = [], status = {};
     let nameless = 0, dup = 0;
-    const taken = new Set((this.products() || []).map(p => (p.name || '').trim().toLowerCase()));
+    const all = this.products() || [];
+    const mine = new Set(all.map(p => (p.name || '').trim().toLowerCase()));
+    const hidden = new Set(all.filter(p => p.active === false).map(p => (p.name || '').trim().toLowerCase()));
+    const seen = new Set();
     this._routeStamp().forEach(row => {
       const nm = String(row.name == null ? '' : row.name).trim();
-      if (!nm) { nameless++; return; }
-      if (!row._category) { missing.push(nm); return; }
+      if (!nm) { nameless++; status[row._rid] = 'nameless'; return; }
+      if (!row._category) { missing.push(nm); status[row._rid] = 'unplaced'; return; }
       const key = nm.toLowerCase();
-      if (taken.has(key)) { dup++; return; }
-      taken.add(key);
+      if (mine.has(key)) { dup++; status[row._rid] = hidden.has(key) ? 'dupArchived' : 'dup'; return; }
+      if (seen.has(key)) { dup++; status[row._rid] = 'repeat'; return; }
+      seen.add(key);
+      status[row._rid] = 'ok';
       by[row._category] = (by[row._category] || 0) + 1;
     });
     const order = App.IC_CATEGORIES || [];
     const cats = Object.keys(by).sort((a, b) => order.indexOf(a) - order.indexOf(b));
-    return { by: by, cats: cats, missing: missing, nameless: nameless, dup: dup };
+    return { by: by, cats: cats, missing: missing, nameless: nameless, dup: dup, status: status };
   },
   // ONE SOURCE with the list above it, or the button and the screen disagree.
   _routeReadyCount() {
@@ -2724,18 +2746,35 @@ S.InventoryProducts = {
     return '<colgroup><col style="width:5%;"/><col style="width:33%;"/><col style="width:16%;"/>'
       + '<col style="width:15%;"/><col style="width:16%;"/><col style="width:15%;"/></colgroup>';
   },
-  _routeRowHtml(row) {
+  /* ⛔ A ROW THAT WILL NOT LAND SAYS SO ON ITSELF (Kyle, chat 27). Dim, plus one short
+     line under the name giving the actual reason. That is what lets the header above it
+     count only what lands: the arithmetic disappears because nothing has to be inferred
+     from a difference between two numbers.
+     ⚠ FOUR REASONS, NOT ONE. "already yours" is a dead end, "hidden" needs the Inactive
+     tab named or the operator cannot act on it, "repeated in this file" is about the file
+     and not about their bar, and a nameless row is neither. One label per cause. */
+  _ROUTE_ROW_NOTE: {
+    dup:         'Already in your list',
+    dupArchived: 'Already in your list, hidden on the Inactive tab',
+    repeat:      'Repeated in this file',
+    nameless:    'No product name'
+  },
+  _routeRowHtml(row, status) {
     const r = this._routing;
     const size = String(row.container_size_oz || row.case_size || '').trim();
+    // 'unplaced' is deliberately unmarked: that row is the WORK, not a row to leave alone.
+    const note = this._ROUTE_ROW_NOTE[status] || '';
     /* ⛔ REMOVAL LIVES ON THE ROW (Kyle, chat 27). It replaces a bulk "Not a product"
        button, and that is not only tidier: a control sitting on the row can only ever
        act on a row the operator is looking at, by name. The bulk one took his entire
        import because it reached past the screen. Ghost, and in `.row-actions`, which is
        exactly how the product list below does its Edit and Delete. */
-    return '<tr>'
+    return '<tr' + (note ? ' style="opacity:0.5;"' : '') + '>'
       + '<td class="cb-left"><input type="checkbox" class="bc-check ip-rt-cb" value="' + esc(row._rid) + '"'
         + (r.checked[row._rid] ? ' checked' : '') + '/></td>'
-      + '<td>' + esc(row.name || '') + '</td>'
+      + '<td>' + esc(row.name || '')
+        + (note ? '<div style="font-size:10px;color:var(--t3);letter-spacing:0.5px;margin-top:2px;">' + esc(note) + '</div>' : '')
+        + '</td>'
       + '<td>' + esc(row.brand || '') + '</td>'
       + '<td>' + esc(size) + '</td>'
       + '<td>' + esc(row.sub_category || '') + '</td>'
@@ -2756,7 +2795,7 @@ S.InventoryProducts = {
      ⚠ `container-type:inline-size` is inline because `.card:has(> .row-list)` was giving
      this card exactly that for free, and the table just moved a level down. Without it
      the @container rule that stacks a row-list on a narrow screen never fires again. */
-  _routeSection(rows, title, sub, key, isOpen, first) {
+  _routeSection(rows, title, sub, key, isOpen, first, status) {
     const head = '<div' + (key ? ' class="ip-rt-head" data-cat="' + esc(key) + '"' : '')
       + ' style="display:flex;align-items:center;gap:13px;padding:14px 16px;' + (key ? 'cursor:pointer;' : '') + '">'
       + '<div style="flex:1;min-width:0;">'
@@ -2767,7 +2806,7 @@ S.InventoryProducts = {
     const table = '<div style="padding:0 16px 16px;overflow-x:auto;">'
       + '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._routeColgroup()
       + '<thead><tr><th></th><th>Product</th><th>Brand</th><th>Size</th><th>In Your File</th><th></th></tr></thead>'
-      + '<tbody>' + rows.map(row => this._routeRowHtml(row)).join('') + '</tbody></table></div>';
+      + '<tbody>' + rows.map(row => this._routeRowHtml(row, (status || {})[row._rid])).join('') + '</tbody></table></div>';
     return '<div class="card' + (key && !isOpen ? ' collapsed' : '')
       + '" style="padding:0;container-type:inline-size;margin-top:' + (first ? '0' : '16') + 'px;">'
       + head + (isOpen ? table : '') + '</div>';
@@ -2800,26 +2839,41 @@ S.InventoryProducts = {
 
     /* Groups Bar Cop already worked out are COLLAPSED (Kyle's call), so the only thing at
        eye level is what needs doing; the count rides on the head, so a closed section
-       still says what it holds and where it is going. */
+       still says what it holds and where it is going.
+       ⛔ THE HEAD COUNTS WHAT LANDS, NOT HOW MANY ROWS ARE IN IT (Kyle, chat 27). It used
+       to count rows, so a re-drop read "8 products moving into Draft Beer" over a button
+       promising 1 — and the difference was explained by a sentence at the bottom of the
+       page, which is arithmetic in two places at once. `s.by[c]` is the count of rows in
+       that group that will ACTUALLY be written, from the same walk the button reads, so
+       the section heads now SUM to the button and every row that is not in the total says
+       why on itself. */
+    const s = this._routeSummary();
     if (unsorted.length) {
       body += this._routeSection(unsorted, 'Not Sorted Yet',
         unsorted.length + ' row' + (unsorted.length === 1 ? '' : 's') + ' Bar Cop could not work out',
-        null, true, true);
+        null, true, true, s.status);
     }
     order.forEach((c, i) => {
+      const n = s.by[c] || 0;
       body += this._routeSection(sorted[c], c,
-        sorted[c].length + ' product' + (sorted[c].length === 1 ? '' : 's') + ' moving into ' + c,
-        c, !!r.open[c], !unsorted.length && i === 0);
+        n + ' product' + (n === 1 ? '' : 's') + ' moving into ' + c,
+        c, !!r.open[c], !unsorted.length && i === 0, s.status);
     });
 
-    const s = this._routeSummary();
-    const gap = [];
-    if (s.nameless) gap.push(s.nameless + ' row' + (s.nameless === 1 ? ' has' : 's have') + ' no product name');
-    if (s.dup) gap.push(s.dup + (s.dup === 1 ? ' is a name' : ' are names') + ' you already have');
-    if (gap.length) {
-      body += '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin-top:16px;">'
-        + gap.join(', and ') + ', so ' + (s.nameless + s.dup === 1 ? 'it is' : 'they are') + ' left out.</div>';
-    }
+    /* ⛔ THE GAP LINE IS GONE (Kyle, chat 27, looking at his own re-drop): *"i have no
+       idea what '7 are names you already have, so they are left out' means... it just
+       reads as confusing to a user that just has all 17 of their beer products sorted and
+       correct ready to add."*
+       It was written in chat 26 for a real defect — the button promised 14, the table said
+       13 and 12 landed — and it explained the difference in prose. The trouble is WHEN it
+       fires: only on a re-drop or a name you already own, which is precisely the moment
+       the operator is looking at a screen that otherwise reads as finished, so a sentence
+       about rows being "left out" lands as an error nobody made.
+       ⭐ AND THE DIVERGENCE IT USED TO EXPLAIN IS CLOSED, which is why no sentence is
+       needed here at all. Kyle worked out the right answer immediately afterwards: the
+       section head counts what LANDS, and any row that will not land is dimmed and says
+       why on itself. Deleting the line first and closing the gap second is the wrong order
+       and it was mine; the line was a symptom of counting two different things. */
 
     /* ⛔ ONLY ASK WHEN THE FILE DOES NOT ANSWER. A file that names a supplier on every row
        has no question, and the control does not belong on screen at all. */
@@ -3075,16 +3129,16 @@ S.InventoryProducts = {
         !imported.some(p => (p.name || '').trim().toLowerCase() === n.trim().toLowerCase()));
       if (gone.length) {
         const shown = gone.slice(0, 5);
-        b.push(gone.length + ' not imported, no category set: ' + shown.join(', ')
+        b.push(gone.length + ' not added, no category set: ' + shown.join(', ')
           + (gone.length > shown.length ? ' and ' + (gone.length - shown.length) + ' more' : ''));
       }
       return b;
     };
     if (!imported.length) {
       const b = buckets();
-      const head = (dup || dupArchived) && !nameless ? 'No new products imported.'
+      const head = (dup || dupArchived) && !nameless ? 'No new products added.'
         : nameless && !dup && !dupArchived ? 'No rows with a product name were found.'
-        : b.length ? 'No new products imported.'
+        : b.length ? 'No new products added.'
         : 'No rows with a product name were found.';
       note(head + (b.length ? ' ' + b.join('. ') + '.' : ''));
       return;
@@ -3110,7 +3164,11 @@ S.InventoryProducts = {
       this._import = null;
       // Say what landed AND what did not. Set before renderLanding, which is what renders it.
       const b = buckets();
-      this._importMsg = 'Imported ' + imported.length + ' product' + (imported.length === 1 ? '' : 's') + '.'
+      /* ⚠ "ADDED", NOT "IMPORTED" (Kyle, chat 27). The button was renamed off Import
+         because by this point the file has already been imported and the word made the
+         work read as done; this sentence prints the instant it is pressed and kept saying
+         the old word, which is the same confusion arriving one screen later. */
+      this._importMsg = 'Added ' + imported.length + ' product' + (imported.length === 1 ? '' : 's') + '.'
         + (b.length ? ' ' + b.join('. ') + '.' : '');
       this.renderLanding();
     } else {
