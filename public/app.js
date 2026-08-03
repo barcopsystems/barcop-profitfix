@@ -5001,7 +5001,21 @@ const App = {
       if (ib != null) return 1;
       return a.localeCompare(b);
     });
-    return keys.map(k => ({ key: k, items: groups[k].slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')) }));
+    /* ⭐ `label` IS THE HEADING TO PRINT, and it exists so the three call sites cannot
+       drift: ic-product-setup and BOTH ic-locations lists were each building
+       `(g.key ? g.key : 'Uncategorized') + ' (n)'` by hand.
+       ⛔ THE ONE RULE IN IT (Kyle, 2026-08-03): when the ungrouped set is the ONLY group,
+       the heading is the CATEGORY, not "Uncategorized". A bar that deliberately never uses
+       sub-categories was reading "Uncategorized" over every product it owns, forever — an
+       unfinished-looking word for a finished state. With real groups alongside it the word
+       is doing actual work (which ones are unsorted), so it stays.
+       ⚠ Only when grouping by SUB-category. Grouped by category (`byCat`) an empty key
+       means the product has no category at all, and there is no name to fall back to. */
+    return keys.map(k => ({
+      key: k,
+      label: k || ((keys.length === 1 && !byCat && category) ? String(category) : 'Uncategorized'),
+      items: groups[k].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    }));
   },
 
   // The menu category an inventory product belongs to when linked to a menu
