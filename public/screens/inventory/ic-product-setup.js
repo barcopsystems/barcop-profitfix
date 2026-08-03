@@ -2444,13 +2444,39 @@ S.InventoryProducts = {
     }
     return '';
   },
+  /* ⛔ THE FILE'S OWN FURNITURE IS NOT A PRODUCT — and reading the product name is what
+     made this urgent. An order guide is full of section dividers and subtotal lines, and
+     the moment Bar Cop started matching on the name, "*** LIQUOR SECTION ***" matched the
+     word LIQUOR and imported itself as a product. Measured on test-2-messy: three junk
+     rows came in that had correctly stayed out before.
+     ⚠ DELIBERATELY NARROW ([[the-loop]] #26 — a name-classifying vocabulary has eaten a
+     real record three times in this codebase). Two structural tests, no general word list:
+       1. wrapped in a run of decoration (`*** X ***`, `--- X ---`). Nobody names a product
+          that, and no vocabulary is involved.
+       2. begins or ends with SUBTOTAL / GRAND TOTAL. ⛔ Bare "total" is NOT here: it is a
+          real first word ("Total Eclipse"), and the existing `PosIngest.isSummaryName`
+          already catches a lone "Grand Total".
+     Pinned in the same edit against real product names, which is what the rule demands. */
+  _isFurnitureRow(row) {
+    const n = String((row && row.name) == null ? '' : row.name).trim();
+    if (!n) return false;                       // nameless rows have their own bucket
+    if (/^[*=\-_~#]{2,}.*[*=\-_~#]{2,}$/.test(n)) return true;
+    const flat = n.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    return /^(sub total|subtotal|grand total)\b/.test(flat) || /\b(sub total|subtotal|grand total)$/.test(flat);
+  },
+
   _seedAssign() {
     const r = this._routing;
     if (!r || !r.groupBy) return;
     const others = this._groupableColumns(r.rows).filter(c => c.key !== r.groupBy);
+    /* ⚠ ONLY SET IT WHEN THERE IS AN ANSWER. `undefined` now means "nobody has decided
+       this yet", which is what lets a row fall through to its own NAME below; an explicit
+       `''` means the operator chose Skip and must be obeyed. Writing '' here made those
+       two states identical and there was no way to tell a guess-failure from a decision. */
     this._routeGroups(r.rows, r.groupBy).forEach(g => {
       if (r.assign[g.value] !== undefined) return;
-      r.assign[g.value] = this._guessCategory(g.value) || this._agreeAcross(r.rows, r.groupBy, g.value, others);
+      const guess = this._guessCategory(g.value) || this._agreeAcross(r.rows, r.groupBy, g.value, others);
+      if (guess) r.assign[g.value] = guess;
     });
   },
 
@@ -2666,8 +2692,11 @@ S.InventoryProducts = {
 
     if (groupable.length) {
       body += '<div class="seg-toggle" style="margin-bottom:18px;">'
-        + '<button type="button" class="btn btn-sm ' + (r.mode === 'one' ? 'btn-primary' : 'btn-ghost') + '" data-route-mode="one">All one category</button>'
-        + '<button type="button" class="btn btn-sm ' + (r.mode === 'column' ? 'btn-primary' : 'btn-ghost') + '" data-route-mode="column">Sorted by a column</button>'
+        /* Relabelled once the product NAME started resolving rows on its own: "all one
+           category" stopped being true the moment Bar Cop could tell a Chardonnay from a
+           vodka without being told. */
+        + '<button type="button" class="btn btn-sm ' + (r.mode === 'one' ? 'btn-primary' : 'btn-ghost') + '" data-route-mode="one">Let Bar Cop sort them</button>'
+        + '<button type="button" class="btn btn-sm ' + (r.mode === 'column' ? 'btn-primary' : 'btn-ghost') + '" data-route-mode="column">Sort by a column in my file</button>'
         + '</div>';
     }
 
@@ -2679,7 +2708,10 @@ S.InventoryProducts = {
           + '</select></div>';
       }
       const groups = this._routeGroups(r.rows, r.groupBy);
-      const unset = groups.filter(g => !r.assign[g.value]).reduce((n, g) => n + g.count, 0);
+      /* ⚠ COUNTED OFF THE STAMP, not off the assign map. A group with no assignment is no
+         longer the same as a row that will not import — the row's own NAME gets a go
+         first. Counting unassigned GROUPS would now overstate what is being left behind. */
+      const unset = this._routeStamp().filter(row => !row._category).length;
       body += '<table class="tbl"><thead><tr>'
         + '<th>In your file</th><th style="width:130px;">Products</th><th style="width:230px;">Goes into</th>'
         + '</tr></thead><tbody>'
@@ -2697,8 +2729,10 @@ S.InventoryProducts = {
         + (unset ? '<div style="margin-top:14px;font-size:12px;color:var(--t3);">'
             + unset + ' product' + (unset === 1 ? '' : 's') + ' still on Skip will not be imported.</div>' : '');
     } else {
-      body += '<div class="f" style="max-width:260px;"><label>These are all</label>'
-        + catSel('ip-route-one', r.one, 'Choose...') + '</div>';
+      // ⚠ NOT "These are all". Bar Cop places what it recognises from the product name;
+      // this is only the answer for what is left over.
+      body += '<div class="f" style="max-width:300px;"><label>Anything it cannot work out goes in</label>'
+        + catSel('ip-route-one', r.one, 'Leave it out') + '</div>';
       /* ⚠ THE MIXED-FILE WARNING. This mode is the default and it is pre-filled with the
          card, so pressing Import without looking gives the exact outcome this whole change
          exists to stop: a mixed file filed entirely under one category. The routing screen
@@ -2812,10 +2846,32 @@ S.InventoryProducts = {
   _routeStamp() {
     const r = this._routing;
     if (!r) return [];
+    /* ⛔ THE PRODUCT NAME IS A PER-ROW FACT AND IT MUST NOT NEED A GROUPING COLUMN.
+       Kyle dropped a one-column list — Well Vodka, House Chardonnay, Domestic Draft,
+       Bottled Water — and all ten landed as Liquor. Bar Cop knew every one of those words
+       by then; it simply never looked, because name matching only ran through
+       `_agreeAcross`, which needs a column to group by. A file with one column has none,
+       so the whole mechanism sat idle on the file that needs it most.
+       Precedence, and each step is a real distinction:
+         1. the operator's own choice for this group (including an explicit Skip)
+         2. the row's NAME
+         3. whatever the operator said to do with the rest
+       So "these are all Liquor" is the answer for what Bar Cop cannot work out, not an
+       instruction to ignore what it can. */
+    const named = row => this._guessCategory(String(row.name == null ? '' : row.name).trim());
     return r.rows.map(row => {
-      const cat = (r.mode === 'column' && r.groupBy)
-        ? (r.assign[String(row[r.groupBy] == null ? '' : row[r.groupBy]).trim()] || '')
-        : (r.one || '');
+      let cat;
+      /* ⛔ FURNITURE IS CHECKED FIRST AND CANNOT FALL BACK. Returning '' from the name
+         test was not enough: the leftover rule then handed it the card category, so
+         "*** LIQUOR SECTION ***" imported as a Liquor product anyway. A row that is the
+         file's own scaffolding is not a product under ANY answer the operator gives. */
+      if (this._isFurnitureRow(row)) cat = '';
+      else if (r.mode === 'column' && r.groupBy) {
+        const chosen = r.assign[String(row[r.groupBy] == null ? '' : row[r.groupBy]).trim()];
+        cat = chosen !== undefined ? chosen : (named(row) || '');
+      } else {
+        cat = named(row) || r.one || '';
+      }
       /* ⛔ FILL, NEVER OVERWRITE. The chosen vendor is the answer for a file that does not
          name one, so it only applies where the row's own cell is empty. A file that DOES
          carry a Supplier column has already told us, per row, and a broadline guide can
