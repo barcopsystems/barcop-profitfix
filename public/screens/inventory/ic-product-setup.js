@@ -839,11 +839,17 @@ S.InventoryProducts = {
         redraw();
       }));
 
-    /* ⚠ Select All means every row ON SCREEN, which is every row still in the import —
-       including the ones inside collapsed groups. A control that silently meant 'only the
-       ones you can see' would be the same class of lie the group worksheet told. */
+    /* ⛔⛔ SELECT ALL MEANS WHAT IS OPEN, AND THE FIRST VERSION MEANT EVERYTHING.
+       I wrote a comment arguing that 'only the ones you can see' would be a lie. It is
+       the other way round: Kyle pressed Select All meaning the Not Sorted table, pressed
+       Not A Product, and it took the whole import — 21 rows including everything inside
+       the collapsed groups he could not see. A control that reaches past what is on
+       screen is not honest, it is invisible.
+       So it selects the rows in OPEN sections only. Not Sorted is always open; a group
+       has to be expanded before Select All can touch it, which also means the operator
+       is looking at what they are about to act on. */
     document.getElementById('ip-rt-all')?.addEventListener('click', () => {
-      this._routeRows().forEach(row => { r.checked[row._rid] = true; }); redraw();
+      this._routeVisibleRows().forEach(row => { r.checked[row._rid] = true; }); redraw();
     });
     document.getElementById('ip-rt-none')?.addEventListener('click', () => { r.checked = {}; redraw(); });
 
@@ -2562,6 +2568,16 @@ S.InventoryProducts = {
     setTimeout(() => document.getElementById('ip-route-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   },
 
+  /* The rows Select All and the batch buttons may touch: the unsorted table, which is
+     always open, plus any group the operator has expanded. Nothing hidden. */
+  _routeVisibleRows() {
+    const r = this._routing;
+    if (!r) return [];
+    return this._routeRows().filter(row => {
+      const c = r.assignById[row._rid];
+      return !c || !!r.open[c];
+    });
+  },
   // Every row still in the import. A removed row is gone from the list and the counts.
   _routeRows() {
     const r = this._routing;
@@ -2640,24 +2656,44 @@ S.InventoryProducts = {
   },
 
   // ── The screen ─────────────────────────────────────────────────────────────
-  _routeRowHtml(row, cat) {
+  /* ⚠ ONE SHARED COLGROUP for every section on the screen. Percentage widths, not px,
+     exactly as the product list below does it: the columns then line up across the
+     Not-Sorted table and every Going-Into table, AND each table always fits its card so
+     nothing scrolls sideways. Kyle: *"column in different sections should still be
+     aligned with each other"*. */
+  _routeColgroup() {
+    return '<colgroup><col style="width:5%;"/><col style="width:37%;"/><col style="width:20%;"/>'
+      + '<col style="width:19%;"/><col style="width:19%;"/></colgroup>';
+  },
+  _routeRowHtml(row) {
     const r = this._routing;
     const size = String(row.container_size_oz || row.case_size || '').trim();
     return '<tr>'
-      + '<td style="width:38px;"><input type="checkbox" class="bc-check ip-rt-cb" value="' + esc(row._rid) + '"'
+      + '<td class="cb-left"><input type="checkbox" class="bc-check ip-rt-cb" value="' + esc(row._rid) + '"'
         + (r.checked[row._rid] ? ' checked' : '') + '/></td>'
       + '<td>' + esc(row.name || '') + '</td>'
-      + '<td style="color:var(--t3);">' + esc(row.brand || '') + '</td>'
-      + '<td style="color:var(--t3);">' + esc(size) + '</td>'
-      + '<td style="color:var(--t3);">' + esc(row.sub_category || '') + '</td>'
+      + '<td>' + esc(row.brand || '') + '</td>'
+      + '<td>' + esc(size) + '</td>'
+      + '<td>' + esc(row.sub_category || '') + '</td>'
       + '</tr>';
   },
-  _routeTable(rows, cat) {
-    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
-      + '<th style="width:38px;"></th><th>Product</th><th>Brand</th><th>Size</th><th>In your file</th>'
-      + '</tr></thead><tbody>' + rows.map(row => this._routeRowHtml(row, cat)).join('') + '</tbody></table></div></div>';
+  /* The group name lives in the FIRST COLUMN HEADER, which is how every grouped table in
+     the app reads, and the standalone `.sh` above it is gone ([[form-table-standard]]).
+     `key` null means the always-open Not Sorted table. */
+  _routeTable(rows, title, key, isOpen, first) {
+    /* ⚠ `collapsed` goes on the CARD, not on the header row. `.card.collapsed .card-chevron`
+       is already in style.css and rotates it -90deg, so the chevron behaves like every other
+       one in the app with no new CSS. Putting the class on the thead would have needed a new
+       selector — which is a design change, and design changes get walked one at a time. */
+    const head = esc(title) + (key ? ' <span class="card-chevron">&#9662;</span>' : '');
+    return '<div class="card' + (key && !isOpen ? ' collapsed' : '') + '" style="overflow-x:auto;margin-top:' + (first ? '0' : '16') + 'px;">'
+      + '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._routeColgroup()
+      + '<thead><tr' + (key ? ' class="ip-rt-head" data-cat="' + esc(key) + '" style="cursor:pointer;"' : '') + '>'
+      + '<th></th><th>' + head + '</th><th>Brand</th><th>Size</th><th>In Your File</th>'
+      + '</tr></thead>'
+      + (isOpen ? '<tbody>' + rows.map(row => this._routeRowHtml(row)).join('') + '</tbody>' : '')
+      + '</table></div>';
   },
-
   routePanelHTML() {
     const r = this._routing;
     const cats = App.IC_CATEGORIES || [];
@@ -2682,19 +2718,16 @@ S.InventoryProducts = {
       + ' style="color:var(--red);margin-left:auto;">Not a product</button>'
       + '</div>';
 
+    /* Every section is a table in the app's own grouped-table shape, with the group name in
+       the first column header and the standalone `.sh` gone. Groups Bar Cop already worked
+       out are COLLAPSED (Kyle's call), so the only thing at eye level is what needs doing;
+       the count rides on the header, so a closed group still says what it holds. */
     if (unsorted.length) {
-      body += '<div class="sh" style="margin-top:6px;">Not Sorted Yet (' + unsorted.length + ')</div>'
-        + this._routeTable(unsorted, '');
+      body += this._routeTable(unsorted, 'Not Sorted Yet (' + unsorted.length + ')', null, true, true);
     }
-    /* Groups Bar Cop already worked out are COLLAPSED (Kyle's call), so the only thing at
-       eye level is what still needs doing. The count is on the heading, so a collapsed
-       group still tells you what it holds. */
-    order.forEach(c => {
-      const isOpen = !!r.open[c];
-      body += '<div class="sh ip-rt-head" data-cat="' + esc(c) + '" style="margin-top:22px;cursor:pointer;display:flex;align-items:center;gap:8px;">'
-        + '<span>Going Into ' + esc(c) + ' (' + sorted[c].length + ')</span>'
-        + '<span style="font-size:11px;">' + (isOpen ? '&#9662;' : '&#9656;') + '</span></div>'
-        + (isOpen ? this._routeTable(sorted[c], c) : '');
+    order.forEach((c, i) => {
+      body += this._routeTable(sorted[c], 'Going Into ' + c + ' (' + sorted[c].length + ')',
+        c, !!r.open[c], !unsorted.length && i === 0);
     });
 
     const s = this._routeSummary();
