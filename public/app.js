@@ -3966,11 +3966,19 @@ const App = {
   // the product's unit_type (lb, each, case, qt…). Keeps every category's
   // quantity columns labeled the same way instead of baking the unit into the
   // product name.
-  productUnit(p) {
+  /* `n` is OPTIONAL and only changes the answer at exactly 1, so all 18 existing callers
+     keep today's behaviour byte for byte. It exists because a par of one keg rendered
+     "1 kegs" on the product list and on the vendor's product list — the same cell in two
+     files, which is why the fix is here and not at either call site.
+     ⚠ Only the three units Bar Cop owns are singularised. `unit_type` is free text the
+     operator typed (lb, case, each, gallon, or their own word) and there is no rule that
+     turns an arbitrary word singular without getting it wrong ("each" -> "eac"). */
+  productUnit(p, n) {
     if (!p) return '';
-    if (p.category === 'Bottle Beer') return 'cases';
-    if (p.category === 'Draft Beer')  return 'kegs';
-    if (p.category === 'Liquor' || p.category === 'Wine') return 'btls';
+    const one = Number(n) === 1;
+    if (p.category === 'Bottle Beer') return one ? 'case' : 'cases';
+    if (p.category === 'Draft Beer')  return one ? 'keg'  : 'kegs';
+    if (p.category === 'Liquor' || p.category === 'Wine') return one ? 'btl' : 'btls';
     return p.unit_type || '';
   },
 
