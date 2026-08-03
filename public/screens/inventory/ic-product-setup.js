@@ -815,11 +815,7 @@ S.InventoryProducts = {
           // The UNION, not just this card's fields: the file may route into other
           // categories, and a column with nowhere to bind is a column thrown away.
           fields: this.importFieldsForImport(cat).map(f => ({ key: f.key, label: f.label, required: f.required, match: f.aliases })),
-          onState: state => {
-            const row = document.getElementById('ip-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : '';
-            // The step number and its one line move with the state; the panel renders once.
-            const head = document.getElementById('ip-step-head'); if (head) head.innerHTML = this._importStepHead(cat, state);
-          },
+          onState: state => { const row = document.getElementById('ip-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : ''; },
           // The mapper no longer imports. It hands the rows to the routing question,
           // which is what resolves each row's category before anything is written.
           onComplete: rows => { this._formCategory = cat; this._openRouting(rows, cat); }
@@ -2244,25 +2240,25 @@ S.InventoryProducts = {
      lead is normal readable body text, not a 11px whisper, because it is meant to be
      read — which is also why D2's card-prose ratchet does not see it. ONE line per
      step, never a paragraph. */
-  _stepHead(n, title, lead) {
-    return '<div class="card-title"><span class="setup-num" style="margin-right:11px;">' + n + '</span>' + esc(title) + '</div>'
-      + (lead ? '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin:0 0 20px;">' + lead + '</div>' : '');
-  },
-
-  // Step 2 while the drop zone is up, step 3 once the columns are on screen. Swapped in
-  // place by CSVMapper's onState, because the panel itself is only rendered once.
-  _importStepHead(cat, state) {
-    return state === 'map'
-      ? this._stepHead(3, 'Line Up Your Columns',
-          'Bar Cop has matched your columns to its own. Check the ones it picked and change any it got wrong. Only Product Name has to be filled in.')
-      : this._stepHead(2, 'Drop Your ' + esc(cat) + ' File',
-          'A list from your vendor, from another program, or your own spreadsheet. Nothing is saved yet.');
+  /* ⛔ SECTIONS, NOT STEP NUMBERS (Kyle, 2026-08-03, after seeing them): *"the step circle
+     numbers are messed up and not needed.. it just needs to be clearly sectioned and
+     explain what each section is"*. Numbering broke the moment a section was conditional
+     (the supplier one rendered a blank circle), and the numbers were never the point.
+     A heading that says what the section is, and one line only where the section is not
+     self-explanatory. */
+  _sectionHead(title, lead) {
+    return '<div class="card-title">' + esc(title) + '</div>'
+      + (lead ? '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin:0 0 18px;">' + lead + '</div>' : '');
   },
 
   importPanelHTML() {
-    const cat = this._import.cat;
+    /* ⚠ NO HEADING AND NO LEAD ON THIS ONE. CSVMapper already prints "Drop your Liquor
+       product file here" with its own requirements line, and then "MAP YOUR COLUMNS /
+       Match each field to a column from your file. Detected columns are pre-selected."
+       Adding a section head over the top of that said the same thing twice, which is the
+       "too much text" half of the complaint. A screen that already explains itself gets
+       nothing from us. */
     return '<div class="card form-card" id="ip-import-panel">'
-      + '<div id="ip-step-head">' + this._importStepHead(cat, 'drop') + '</div>'
       + '<div id="ip-csv"></div>'
       + '</div>'
       + '<div id="ip-imp-cancel-row" class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>'
@@ -2360,7 +2356,34 @@ S.InventoryProducts = {
       'sodas','cola','juice','juices','mixer','mixers','syrup','syrups','puree','garnish','garnishes',
       'supply','supplies','paper','paper goods','disposable','disposables','chemical','chemicals',
       'cleaning','glassware','smallwares','straws','napkins','co2','ice','tonic','seltzer','water',
-      'energy drink','coffee','tea']
+      'energy drink','coffee','tea','bib','bag in box','sprite','pepsi','fanta','dr pepper',
+      'mountain dew','canada dry','schweppes','red bull','monster','ocean spray','monin','torani']
+  },
+  /* ⭐⭐ THE BRAND LIST — Kyle, 2026-08-03: *"is there no way to store a master list to auto
+     recognize the names? Jim Beam and Jack Daniels.. Bar Cop should be able to know those
+     are bourbon"*. He is right, and the bigger miss was that I was only ever reading the
+     CATEGORY COLUMN. The PRODUCT NAME says it outright most of the time — "Smirnoff VODKA
+     80", "Barefoot CHARDONNAY", "Coors Light Half BBL", "Coca-COLA BIB" — and this list is
+     only for the ones where it does not.
+     ⛔ NO BEER BRANDS, deliberately. A brand cannot say draft or bottle: Coors Light ships
+     as both, which is the same reason beer STYLES are not in the vocabulary. Beer is
+     answered by the pack column or not at all.
+     Merged into `_ROUTE_HINTS` rather than matched separately, so brands get the same token
+     rules, the same phrase rules and the same two-categories-means-unset conflict test. */
+  _BRAND_HINTS: {
+    'Liquor': ['jim beam','jack daniel','makers mark','wild turkey','knob creek','bulleit','woodford',
+      'buffalo trace','evan williams','four roses','elijah craig','jameson','tullamore','bushmills',
+      'crown royal','canadian club','johnnie walker','dewar','chivas','glenlivet','glenfiddich',
+      'macallan','smirnoff','absolut','stolichnaya','stoli','titos','grey goose','ketel one',
+      'belvedere','svedka','new amsterdam','bacardi','captain morgan','malibu','kraken','sailor jerry',
+      'patron','jose cuervo','don julio','casamigos','espolon','herradura','milagro','hornitos',
+      'tanqueray','bombay','beefeater','hendricks','aviation','jagermeister','fireball','baileys',
+      'kahlua','cointreau','grand marnier','disaronno','frangelico','chambord','campari','aperol',
+      'hennessy','courvoisier','remy martin','martell','rumchata','southern comfort'],
+    'Wine': ['barefoot','sutter home','yellow tail','kendall jackson','la crema','josh cellars',
+      'louis martini','meiomi','apothic','cupcake','la marca','kim crawford','whitehaven',
+      'santa margherita','ruffino','bogle','19 crimes','dark horse','beringer','robert mondavi',
+      'caymus','decoy','menage a trois','sonoma cutrer','oyster bay','matua','mark west','clos du bois']
   },
   /* Matches the whole cell, a multi-word phrase inside it, or a single WHOLE TOKEN.
      ⚠ TOKENS, NEVER SUBSTRINGS. "Ginger Beer" contains the letters g-i-n and a substring
@@ -2370,14 +2393,16 @@ S.InventoryProducts = {
      "Bourbon Barrel Aged" line hits both Liquor and Draft Beer, and unset is the honest
      answer there, not whichever category happened to be checked first. */
   _guessCategory(value) {
-    const s = String(value || '').trim().toLowerCase();
+    // Apostrophes out first, so one spelling covers "Tito's"/"Titos",
+    // "Jack Daniel's"/"Jack Daniels", "Maker's Mark"/"Makers Mark".
+    const s = String(value || '').trim().toLowerCase().replace(/['’]/g, '');
     if (!s) return '';
     const tokens = s.split(/[^a-z0-9]+/).filter(Boolean);
     const hits = new Set();
+    const test = list => (list || []).some(w =>
+      w === s || (w.indexOf(' ') > -1 ? s.indexOf(w) > -1 : tokens.indexOf(w) > -1));
     for (const cat of Object.keys(this._ROUTE_HINTS)) {
-      const hit = this._ROUTE_HINTS[cat].some(w =>
-        w === s || (w.indexOf(' ') > -1 ? s.indexOf(w) > -1 : tokens.indexOf(w) > -1));
-      if (hit) hits.add(cat);
+      if (test(this._ROUTE_HINTS[cat]) || test(this._BRAND_HINTS[cat])) hits.add(cat);
     }
     return hits.size === 1 ? [...hits][0] : '';
   },
@@ -2393,6 +2418,20 @@ S.InventoryProducts = {
   _agreeAcross(rows, key, value, others) {
     const mine = (rows || []).filter(row => String(row[key] == null ? '' : row[key]).trim() === value);
     if (!mine.length) return '';
+    /* ⭐ THE PRODUCT NAME IS TRIED FIRST, and it is the source I had ignored completely.
+       "DEPT-12" says nothing, but every row under it reads Smirnoff Vodka, Absolut Vodka,
+       Jim Beam, Jack Daniels, Bombay Sapphire — the answer was in the name column the
+       whole time, on the same row ([[the-loop]] #38: the fact was in the column next to
+       the one being read).
+       Same all-or-nothing rule: every row in the group has to agree, or it stays unset. */
+    const byName = new Set();
+    let allNamed = true;
+    for (const row of mine) {
+      const g = this._guessCategory(String(row.name == null ? '' : row.name).trim());
+      if (!g) { allNamed = false; break; }
+      byName.add(g);
+    }
+    if (allNamed && byName.size === 1) return [...byName][0];
     for (const c of others) {
       const seen = new Set();
       let all = true;
@@ -2426,11 +2465,18 @@ S.InventoryProducts = {
      nearly everything. Picking `groupable[0]` would have taken the useless one. */
   _bestGrouping(rows) {
     let best = null;
-    this._groupableColumns(rows).forEach(c => {
+    const cands = this._groupableColumns(rows);
+    cands.forEach(c => {
       const cats = new Set();
       let placed = 0;
+      const others = cands.filter(x => x.key !== c.key);
       this._routeGroups(rows, c.key).forEach(g => {
-        const guess = this._guessCategory(g.value);
+        /* ⚠ RESOLVE A GROUP THE SAME WAY `_seedAssign` WILL, or this measurement is about
+           a different thing than the screen shows. It used to test the group VALUE only,
+           so a column of DEPT-12 codes measured as placing nothing — even though every
+           row under it is named Smirnoff Vodka, Jim Beam and so on and the names agree.
+           The column was judged useless and the whole file fell back to the card. */
+        const guess = this._guessCategory(g.value) || this._agreeAcross(rows, c.key, g.value, others);
         if (guess) { placed += g.count; cats.add(guess); }
       });
       if (!best || placed > best.placed || (placed === best.placed && cats.size > best.cats)) {
@@ -2532,13 +2578,20 @@ S.InventoryProducts = {
        the file" — four unanswered questions in one control ("from what?", "what file?",
        "what list?", and nothing saying a typed name becomes a vendor).
        When the file DOES leave it blank, it is a real question and it says what happens. */
+    /* ⛔ BUILT INTO ITS OWN VARIABLE AND APPENDED LAST. It used to be assembled straight
+       into `body` FIRST, so the screen read: "check where they are going" · supplier
+       question · the table you were just told to check. Kyle: *"the thing in that first
+       section you are telling the user to check is at the bottom.. with the supplier step
+       in between them"*. An instruction separated from its subject by an unrelated
+       question is worse than no instruction. Each section is now whole. */
+    let vendorBlock = '';
     const needVendor = this._needsVendor();
     if (needVendor) {
       const n = r.rows.length;
-      body += this._stepHead('', 'Who Supplies These?',
+      vendorBlock = this._sectionHead('Who Supplies These?',
         'Your file does not say. Pick who these came from and Bar Cop puts them on all '
         + n + ' product' + (n === 1 ? '' : 's') + ', and adds that vendor to your list so you can order from them. You can skip this and set it later.')
-        + '<div class="form-row" style="margin-bottom:20px;">'
+        + '<div class="form-row" style="margin-bottom:6px;">'
         + '<div class="f" style="max-width:260px;"><label>Supplier</label>'
         + '<select class="form-input" id="ip-route-vendor">'
         + '<option value=""' + (r.vendor || r.vendorNew ? '' : ' selected') + '>Skip for now</option>'
@@ -2560,7 +2613,7 @@ S.InventoryProducts = {
     if (!r.detail) {
       const s = this._routeSummary();
       const placed = s.cats.reduce((n, c) => n + s.by[c], 0);
-      body = this._stepHead(4, 'Check Where They Are Going',
+      body = this._sectionHead('Check Where They Are Going',
         'Bar Cop sorted your ' + r.rows.length + ' row' + (r.rows.length === 1 ? '' : 's')
         + ' into categories on its own. Have a look, then import. Nothing is saved until you do.')
         + body;
@@ -2607,7 +2660,7 @@ S.InventoryProducts = {
       }
     } else {
 
-    body = this._stepHead(4, 'Sort Them Yourself',
+    body = this._sectionHead('Sort Them Yourself',
       'Bar Cop groups your rows by one of the columns in your file. Set what each group is, '
       + 'and anything left on Skip will not be imported.') + body;
 
@@ -2681,8 +2734,13 @@ S.InventoryProducts = {
     const busy = !!this._routeWriting;
     /* The step head IS the card title now, and it carries the row count in its own lead,
        so the old separate title and status line would be a second heading in one card. */
+    /* Each section whole, in the order the operator needs them: what Bar Cop did with the
+       file, then the one thing it still needs from them. The supplier question sits under
+       a hairline so it reads as its own section rather than more of the one above. */
     return '<div class="card form-card" id="ip-route-panel">'
       + body
+      + (vendorBlock ? '<div style="border-top:1px solid var(--b2);margin:24px -20px 0;padding:20px 20px 0;">'
+          + vendorBlock + '</div>' : '')
       + '</div>'
       + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && !busy ? '' : ' disabled')
