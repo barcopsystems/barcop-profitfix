@@ -418,7 +418,7 @@ S.InventoryProducts = {
       { h: 'Other Pour Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Pour Sizes Sold with its own price and Bar Cop shows that size its own pour cost. A thinner happy hour price reads its own honest margin instead of hiding inside the standard pour.'] },
       { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. Starting from a category card just tells Bar Cop what to expect, so the columns it offers match that category. It is not locked to it. A file that turns out to hold more than one category is sorted out in the next step.'] },
       { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Any row missing required data comes in as Incomplete so you can finish it later.'] },
-      { h: 'When One File Holds More Than One Category', p: ['A distributor order guide is one file with kegs and cases in it, and an export from another program is usually one file with everything in it. So after the columns are matched, Bar Cop asks what is actually in the file. If it is all one category you pick that category once and you are done. If a column in your file names the category, pick that column and Bar Cop lists every value it found with the number of products behind each one, and you say which Bar Cop category each value belongs in.', 'Bar Cop fills in what a word settles on its own. Bourbon, Vodka and Gin are Liquor and it will say so. It leaves a beer style alone on purpose, because an IPA can be a keg or a case and the file does not say which, and it would rather ask than put your product in the wrong place. Anything left on Skip is not imported, and the products it skipped are named in the result so you know exactly what did not come in. Nothing is written to your account until you press Import.'] },
+      { h: 'When One File Holds More Than One Category', p: ['A distributor order guide is one file with kegs and cases in it, and an export from another program is usually one file with everything in it. So once the columns are matched, Bar Cop lists every product it found and shows you where each one is going before anything is written. The ones it has already worked out sit in a closed section per category, with the count on the section, so you can open one and check it. Anything it could not work out sits at the top, open, and that is the only part you have to do.', 'Bar Cop fills in whatever the product name or a column in your file settles on its own. Bourbon, Vodka and Gin are Liquor, and it knows the common spirit and wine brands by name. It leaves a beer style alone on purpose, because an IPA can be a keg or a case and the file does not say which, and it would rather ask than put your product in the wrong place. Tick the ones it left, pick a category, and press Move To. Every row also has a Remove button, for the section headings and subtotal lines an order guide is full of.', 'If your file does not name a supplier, Bar Cop asks once and puts that vendor on every product it adds that does not already name one, and adds them to your vendor list so you can order from them. Nothing is written to your account until you press Add, and that button says exactly how many products are coming in.'] },
       { h: 'Bulk Edit Many At Once', p: ['After an upload you often need the same value across a whole category: a 1.5 oz pour on every liquor, one vendor or storage location across a list, the same par. Check the products you want, or use Select All on the category tab, then tap Bulk Edit. Turn on only the fields you want to change, set each value, and Apply. Bar Cop writes those fields to every selected product at once and leaves everything else untouched, then refigures pours per container, cost per pour, and pour cost percent for each one. Anything that was Incomplete and now has what it needs clears its flag.'] },
       { h: 'Hiding A Product', p: ['When you Edit a product, the status across from the title reads ACTIVE or INACTIVE. Hit Hide from operations to pull a seasonal pour or a discontinued item out of counts, orders, and the menu side without throwing away its history, then Update to commit. An inactive product moves to the Inactive tab after Misc, so your category lists stay clean; open it there and Make active brings it back.'] }
     ]);
@@ -831,7 +831,6 @@ S.InventoryProducts = {
        from the same place the import reads, so the button count, the group counts and the
        write can never disagree with each other or with the DOM. */
     const redraw = () => this.renderLanding();
-    const checkedIds = () => this._routeRows().filter(row => r.checked[row._rid]).map(row => row._rid);
 
     this.container.querySelectorAll('.ip-rt-cb').forEach(cb =>
       cb.addEventListener('change', () => {
@@ -839,24 +838,10 @@ S.InventoryProducts = {
         redraw();
       }));
 
-    /* ⛔⛔ SELECT ALL MEANS WHAT IS OPEN, AND THE FIRST VERSION MEANT EVERYTHING.
-       I wrote a comment arguing that 'only the ones you can see' would be a lie. It is
-       the other way round: Kyle pressed Select All meaning the Not Sorted table, pressed
-       Not A Product, and it took the whole import — 21 rows including everything inside
-       the collapsed groups he could not see. A control that reaches past what is on
-       screen is not honest, it is invisible.
-       So it selects the rows in OPEN sections only. Not Sorted is always open; a group
-       has to be expanded before Select All can touch it, which also means the operator
-       is looking at what they are about to act on. */
-    document.getElementById('ip-rt-all')?.addEventListener('click', () => {
-      this._routeVisibleRows().forEach(row => { r.checked[row._rid] = true; }); redraw();
-    });
-    document.getElementById('ip-rt-none')?.addEventListener('click', () => { r.checked = {}; redraw(); });
-
     document.getElementById('ip-rt-add')?.addEventListener('click', () => {
       const cat = (document.getElementById('ip-rt-cat') || {}).value || '';
-      if (!cat) { this._routeNote('Pick a category first, then press Add.'); return; }
-      const ids = checkedIds();
+      if (!cat) { this._routeNote('Pick a category first, then press Move To.'); return; }
+      const ids = this._routeCheckedIds();
       if (!ids.length) return;
       this._assignRows(ids, cat);
       /* The checks clear and the group they went to OPENS, so the operator sees where
@@ -865,18 +850,13 @@ S.InventoryProducts = {
       redraw();
     });
 
-    document.getElementById('ip-rt-del')?.addEventListener('click', async () => {
-      const ids = checkedIds();
-      if (!ids.length) return;
-      const ok = await App.confirm({
-        title: 'Leave ' + ids.length + ' row' + (ids.length === 1 ? '' : 's') + ' out of this import?',
-        message: 'They will not be added as products. Nothing is deleted from your file, and you can drop it again.',
-        confirmText: 'Leave Them Out', cancelText: 'Cancel'
-      });
-      if (!ok) return;
-      this._removeRows(ids);
-      redraw();
-    });
+    /* ⛔ REMOVAL IS PER ROW NOW. It replaces a bulk "Not a product" button that took
+       Kyle's whole import, and the fix is structural rather than a filter: a control
+       rendered on the row can only ever act on a row that is on screen, by name.
+       No confirm — nothing is written until Add, the row is named right beside the
+       button, and Start Over re-drops the file. */
+    this.container.querySelectorAll('.ip-rt-rm').forEach(b =>
+      b.addEventListener('click', () => { this._removeRows([b.dataset.rid]); redraw(); }));
 
     this.container.querySelectorAll('.ip-rt-head').forEach(h =>
       h.addEventListener('click', () => { const c = h.dataset.cat; r.open[c] = !r.open[c]; redraw(); }));
@@ -2568,8 +2548,8 @@ S.InventoryProducts = {
     setTimeout(() => document.getElementById('ip-route-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   },
 
-  /* The rows Select All and the batch buttons may touch: the unsorted table, which is
-     always open, plus any group the operator has expanded. Nothing hidden. */
+  /* The rows the batch verb may touch: the unsorted section, which is always open, plus
+     any group the operator has expanded. Nothing hidden. */
   _routeVisibleRows() {
     const r = this._routing;
     if (!r) return [];
@@ -2582,6 +2562,17 @@ S.InventoryProducts = {
   _routeRows() {
     const r = this._routing;
     return r ? r.rows.filter(row => !r.removed[row._rid]) : [];
+  },
+  /* ⛔ ONLY WHAT IS ON SCREEN. A check SURVIVES a collapse, so without this an operator
+     could tick three rows, close the group, pick a different category and move rows they
+     can no longer see — the identical defect Select All had, arriving through the control
+     that replaced it. `_routeVisibleRows` was that fix and this is its second consumer:
+     the toolbar's enabled state reads the same list, so the button cannot offer to move
+     something it will not move. */
+  _routeCheckedIds() {
+    const r = this._routing;
+    if (!r) return [];
+    return this._routeVisibleRows().filter(row => r.checked[row._rid]).map(row => row._rid);
   },
   _assignRows(ids, cat) {
     const r = this._routing;
@@ -2662,12 +2653,17 @@ S.InventoryProducts = {
      nothing scrolls sideways. Kyle: *"column in different sections should still be
      aligned with each other"*. */
   _routeColgroup() {
-    return '<colgroup><col style="width:5%;"/><col style="width:37%;"/><col style="width:20%;"/>'
-      + '<col style="width:19%;"/><col style="width:19%;"/></colgroup>';
+    return '<colgroup><col style="width:5%;"/><col style="width:33%;"/><col style="width:16%;"/>'
+      + '<col style="width:15%;"/><col style="width:16%;"/><col style="width:15%;"/></colgroup>';
   },
   _routeRowHtml(row) {
     const r = this._routing;
     const size = String(row.container_size_oz || row.case_size || '').trim();
+    /* ⛔ REMOVAL LIVES ON THE ROW (Kyle, chat 27). It replaces a bulk "Not a product"
+       button, and that is not only tidier: a control sitting on the row can only ever
+       act on a row the operator is looking at, by name. The bulk one took his entire
+       import because it reached past the screen. Ghost, and in `.row-actions`, which is
+       exactly how the product list below does its Edit and Delete. */
     return '<tr>'
       + '<td class="cb-left"><input type="checkbox" class="bc-check ip-rt-cb" value="' + esc(row._rid) + '"'
         + (r.checked[row._rid] ? ' checked' : '') + '/></td>'
@@ -2675,24 +2671,38 @@ S.InventoryProducts = {
       + '<td>' + esc(row.brand || '') + '</td>'
       + '<td>' + esc(size) + '</td>'
       + '<td>' + esc(row.sub_category || '') + '</td>'
+      + '<td><div class="row-actions"><button type="button" class="btn btn-ghost btn-sm ip-rt-rm"'
+        + ' data-rid="' + esc(row._rid) + '">Remove</button></div></td>'
       + '</tr>';
   },
-  /* The group name lives in the FIRST COLUMN HEADER, which is how every grouped table in
-     the app reads, and the standalone `.sh` above it is gone ([[form-table-standard]]).
-     `key` null means the always-open Not Sorted table. */
-  _routeTable(rows, title, key, isOpen, first) {
-    /* ⚠ `collapsed` goes on the CARD, not on the header row. `.card.collapsed .card-chevron`
-       is already in style.css and rotates it -90deg, so the chevron behaves like every other
-       one in the app with no new CSS. Putting the class on the thead would have needed a new
-       selector — which is a design change, and design changes get walked one at a time. */
-    const head = esc(title) + (key ? ' <span class="card-chevron">&#9662;</span>' : '');
-    return '<div class="card' + (key && !isOpen ? ' collapsed' : '') + '" style="overflow-x:auto;margin-top:' + (first ? '0' : '16') + 'px;">'
+  /* A section is the app's own STEP-CARD head (Kyle, chat 27, with the weekly-close
+     steps open beside this screen): the name in white, what the section holds on the
+     line under it, the chevron on the right, and no numbered circle. The table sits
+     INSIDE the card and only renders when the section is open.
+     `key` null means the always-open Not Sorted section, which gets the same head with
+     no chevron and no click.
+     ⚠ `collapsed` STAYS ON THE CARD. `.card.collapsed .card-chevron` already ships in
+     style.css; every other rotation selector there is a NAMED head (`.pf-step-head`,
+     `.c-step-head`, ...), so moving the class to the head would need a new selector, and
+     a new selector is a design change that gets walked on its own.
+     ⚠ `container-type:inline-size` is inline because `.card:has(> .row-list)` was giving
+     this card exactly that for free, and the table just moved a level down. Without it
+     the @container rule that stacks a row-list on a narrow screen never fires again. */
+  _routeSection(rows, title, sub, key, isOpen, first) {
+    const head = '<div' + (key ? ' class="ip-rt-head" data-cat="' + esc(key) + '"' : '')
+      + ' style="display:flex;align-items:center;gap:13px;padding:14px 16px;' + (key ? 'cursor:pointer;' : '') + '">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(title) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + esc(sub) + '</div></div>'
+      + (key ? '<span class="card-chevron" aria-hidden="true">&#9662;</span>' : '')
+      + '</div>';
+    const table = '<div style="padding:0 16px 16px;overflow-x:auto;">'
       + '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._routeColgroup()
-      + '<thead><tr' + (key ? ' class="ip-rt-head" data-cat="' + esc(key) + '" style="cursor:pointer;"' : '') + '>'
-      + '<th></th><th>' + head + '</th><th>Brand</th><th>Size</th><th>In Your File</th>'
-      + '</tr></thead>'
-      + (isOpen ? '<tbody>' + rows.map(row => this._routeRowHtml(row)).join('') + '</tbody>' : '')
-      + '</table></div>';
+      + '<thead><tr><th></th><th>Product</th><th>Brand</th><th>Size</th><th>In Your File</th><th></th></tr></thead>'
+      + '<tbody>' + rows.map(row => this._routeRowHtml(row)).join('') + '</tbody></table></div>';
+    return '<div class="card' + (key && !isOpen ? ' collapsed' : '')
+      + '" style="padding:0;container-type:inline-size;margin-top:' + (first ? '0' : '16') + 'px;">'
+      + head + (isOpen ? table : '') + '</div>';
   },
   routePanelHTML() {
     const r = this._routing;
@@ -2702,31 +2712,35 @@ S.InventoryProducts = {
     const sorted = {};
     rows.forEach(row => { const c = r.assignById[row._rid]; if (c) (sorted[c] = sorted[c] || []).push(row); });
     const order = cats.filter(c => sorted[c]);
-    const nChecked = rows.filter(row => r.checked[row._rid]).length;
+    // ⛔ VISIBLE checked rows, the same list `_routeCheckedIds` acts on, so the button
+    // can never offer to move something it will not move.
+    const nChecked = this._routeCheckedIds().length;
 
-    /* The toolbar is the whole interaction: check some, say where they go, Add. Same
-       gesture as Set Locations, which the operator has already done once. */
-    let body = '<div class="no-print" style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="ip-rt-all">Select All</button>'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="ip-rt-none">Clear</button>'
-      + '<div class="f" style="max-width:200px;margin-bottom:0;"><label>Put the checked ones in</label>'
-      + '<select class="form-input" id="ip-rt-cat"><option value="">Choose...</option>'
+    /* The toolbar is the whole batch interaction: check some rows, say where they go,
+       Move To. Select All and Clear are gone (Kyle, chat 27) and removal moved onto the
+       row itself, which is what makes the destructive control structurally incapable of
+       pointing at something off screen.
+       ⚠ NO LABEL over the selector, and the row centres rather than baseline-aligning,
+       so the button sits against the middle of the select instead of hanging off it. */
+    let body = '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<div class="f" style="max-width:220px;">'
+      + '<select class="form-input" id="ip-rt-cat"><option value="">Choose a category...</option>'
       + cats.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('')
       + '</select></div>'
-      + '<button type="button" class="btn btn-primary btn-sm" id="ip-rt-add"' + (nChecked ? '' : ' disabled') + '>Add</button>'
-      + '<button type="button" class="btn btn-ghost btn-sm" id="ip-rt-del"' + (nChecked ? '' : ' disabled')
-      + ' style="color:var(--red);margin-left:auto;">Not a product</button>'
+      + '<button type="button" class="btn btn-primary btn-sm" id="ip-rt-add"' + (nChecked ? '' : ' disabled') + '>Move To</button>'
       + '</div>';
 
-    /* Every section is a table in the app's own grouped-table shape, with the group name in
-       the first column header and the standalone `.sh` gone. Groups Bar Cop already worked
-       out are COLLAPSED (Kyle's call), so the only thing at eye level is what needs doing;
-       the count rides on the header, so a closed group still says what it holds. */
+    /* Groups Bar Cop already worked out are COLLAPSED (Kyle's call), so the only thing at
+       eye level is what needs doing; the count rides on the head, so a closed section
+       still says what it holds and where it is going. */
     if (unsorted.length) {
-      body += this._routeTable(unsorted, 'Not Sorted Yet (' + unsorted.length + ')', null, true, true);
+      body += this._routeSection(unsorted, 'Not Sorted Yet',
+        unsorted.length + ' row' + (unsorted.length === 1 ? '' : 's') + ' Bar Cop could not work out',
+        null, true, true);
     }
     order.forEach((c, i) => {
-      body += this._routeTable(sorted[c], 'Going Into ' + c + ' (' + sorted[c].length + ')',
+      body += this._routeSection(sorted[c], c,
+        sorted[c].length + ' product' + (sorted[c].length === 1 ? '' : 's') + ' moving into ' + c,
         c, !!r.open[c], !unsorted.length && i === 0);
     });
 
@@ -2746,11 +2760,31 @@ S.InventoryProducts = {
       const vendorRows = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
         .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       const known = vendorRows.some(v => v.name === r.vendor);
-      const n = rows.length;
-      vendorBlock = this._sectionHead('Who Supplies These?',
-        'Your file does not say. Pick who these came from and Bar Cop puts them on all '
-        + n + ' product' + (n === 1 ? '' : 's') + ', and adds that vendor to your list so you can order from them. You can skip this and set it later.')
-        + '<div class="form-row" style="margin-bottom:6px;">'
+      /* ⛔ THE COUNT IS WHAT WILL ACTUALLY BE CREATED, not the row count. It said "all 21
+         products" on a file whose 21 rows include six section dividers and a subtotal —
+         a promise about a number no operator would ever see land ([[output-honesty]]).
+         `_routeReadyCount` is the same figure the Add button prints, so the two sentences
+         on this screen cannot disagree; it moves as rows are sorted, which is correct,
+         because that is when more of them become products. */
+      const n = this._routeReadyCount();
+      /* ⛔ AND THE COUNT IS ONLY A CLAIM ABOUT RECIPIENTS WHEN THE FILE NAMES NOBODY.
+         `_needsVendor` is "SOME row has no supplier", and `_routeStamp` FILLS rather than
+         overwrites — so on a file with a partly-filled Supplier column, "all 13 products"
+         names rows that keep their own vendor and never see this one. The data was right
+         either way; the sentence was not. When the file has answered for some of them,
+         say what happens instead of counting it ([[the-loop]] #30: do not estimate a
+         number the screen cannot state truthfully). */
+      const noneNamed = rows.every(row => !String(row.vendor == null ? '' : row.vendor).trim());
+      const who = !noneNamed ? 'the ones your file does not already name'
+        : (n ? 'all ' + n + ' product' + (n === 1 ? '' : 's') : 'every product you add');
+      /* ⚠ ONE SENTENCE (Kyle, chat 27: "the who supplies these explainer text is too
+         long"). The old one also spent a clause telling them they could skip it, which
+         the dropdown's own "Skip for now" option already says. */
+      vendorBlock = '<div class="card" id="ip-route-vendor-card" style="margin-top:16px;">'
+        + this._sectionHead('Who Supplies These?',
+        'Your file does not name one for all of these. Pick who these came from and Bar Cop puts them on '
+        + who + ' and adds them to your vendor list.')
+        + '<div class="form-row" style="margin-bottom:0;">'
         + '<div class="f" style="max-width:260px;"><label>Supplier</label>'
         + '<select class="form-input" id="ip-route-vendor">'
         + '<option value=""' + (r.vendor || r.vendorNew ? '' : ' selected') + '>Skip for now</option>'
@@ -2759,22 +2793,26 @@ S.InventoryProducts = {
         + '</select></div>'
         + (r.vendorNew ? '<div class="f" style="max-width:260px;"><label>Their name</label>'
             + '<input class="form-input" id="ip-route-vendor-new" type="text" value="' + esc(known ? '' : (r.vendor || '')) + '" placeholder="Coastal Beverage"/></div>' : '')
-        + '</div>';
+        + '</div></div>';
     }
 
     const ready = this._routeReadyCount();
     const busy = !!this._routeWriting;
     const lead = unsorted.length
       ? 'Bar Cop has put ' + (rows.length - unsorted.length) + ' of these where it thinks they go. '
-        + 'Check the ' + unsorted.length + ' it could not work out, pick a category, and press Add.'
+        + 'Check the ' + unsorted.length + ' it could not work out, pick a category, and press Move To to place them, '
+        + 'or Remove the ones that are not products.'
       : 'Bar Cop has put all ' + rows.length + ' of these where it thinks they go. Open a group to check it.';
 
+    /* ⛔ "IMPORT N PRODUCTS" WAS UNTRUE WHERE IT STOOD (Kyle, chat 27): the file was
+       imported two screens ago, and a button offering to import it again reads as though
+       the work already happened. What this press does is ADD the products. */
     return this._sectionHead('Your ' + rows.length + ' Product' + (rows.length === 1 ? '' : 's'), lead)
       + body
-      + (vendorBlock ? '<div style="border-top:1px solid var(--b2);margin:26px 0 0;padding:20px 0 0;">' + vendorBlock + '</div>' : '')
+      + vendorBlock
       + '<div class="no-print" style="margin:22px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && !busy ? '' : ' disabled')
-      + '>' + (busy ? 'Importing...' : 'Import ' + ready + ' Product' + (ready === 1 ? '' : 's')) + '</button>'
+      + '>' + (busy ? 'Adding...' : 'Add ' + ready + ' Product' + (ready === 1 ? '' : 's')) + '</button>'
       + '<button type="button" class="btn btn-ghost" id="ip-route-back"' + (busy ? ' disabled' : '') + '>Start Over</button>'
       + '</div>'
       + '<div id="ip-csv-actions" class="no-print" style="margin:0 0 24px;"></div>';
