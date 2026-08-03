@@ -302,6 +302,28 @@ S.InventoryProducts = {
     return m ? App.parseNum(m[0]) : null;
   },
 
+  /* ⛔ A KEG VOLUME IS A FACT THE FILE CARRIES, NOT A GUESS ABOUT IT (Kyle, chat 27,
+     after a draft beer EXPORT landed 17 of 18 rows in Not Sorted Yet).
+     Beer STYLES are deliberately unreadable — an IPA is a keg or a case and the style
+     cannot say which — and that rule is what protects a mixed beer list. The cost of it
+     was that a file with NOTHING but styles sorted nothing at all. An order guide writes
+     "1/2 BBL", which the vocabulary already reads; an EXPORT writes the same fact as
+     `1984`, and that is the form nothing could see.
+     Nothing else in a bar comes in 661, 992 or 1984 ounces, so reading it is not
+     inference. ⚠ THE VOLUMES COME FROM `SIZES`, never a list typed here: a keg size
+     added to the app's own table is gained by this rule for free, and the dropdown can
+     never offer a size the importer refuses to recognise.
+     ⚠ `_sizeToOz` IS the validator, exactly as it is for the size fallback: it refuses
+     two-number cells and pack descriptors by design, so "12-PACK" and "24/12 oz CAN"
+     cannot reach a keg answer however they are spelled. */
+  _kegOzList() {
+    return (this.SIZES || []).filter(s => s.g === 'Draft Keg' && s.oz > 0).map(s => s.oz);
+  },
+  _isKegSize(raw) {
+    const oz = this._sizeToOz(raw);
+    return oz != null && this._kegOzList().indexOf(oz) > -1;
+  },
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   isPourable(cat) { return cat !== 'Food' && cat !== 'Misc'; },
 
@@ -416,9 +438,9 @@ S.InventoryProducts = {
       { h: 'Food and Misc: How You Track It', p: ['Food and Misc pick a Unit Type (how you buy it: the pound, case, bag, each, gallon, or your own word), then a Track By, which is the one thing that decides how Bar Cop counts and costs it. Three ways. By the unit: you weigh or count whole units, like ground beef by the pound (count 11.42 lb), and recipes pull pounds. By pieces: one unit breaks into pieces, like a bag of 45 wings or a pound sliced into 16 bacon slices; you count full units plus loose pieces and recipes pull pieces. By ounces: a liquid measured by the ounce, like oil or syrup; a gallon fills in 128 for you, your own units you type the ounces, and recipes pull ounces. The same unit can go either way, which is the point: buy bacon by the pound but Track By pieces. Pick it once and the count sheet, the cost, and the recipe all line up. Serving sizes and prices are the menu side and live in the Menu Builder.'] },
       { h: 'Sold On The Menu (Food and Misc)', p: ['Most Food and Misc products are things you cook or clean with, not sell straight. But some you do sell as-is: a bag of chips, a bottled soda, a canned non-alcoholic drink. For those, tick Non prep menu item in the Sold on the Menu section at the bottom of the form. That lists the product in the Menu Builder as a No Prep item, so you can add it to a menu section with its own price. Leave it off for raw ingredients and supplies so they stay out of the menu picker. Beer and wine are always available on the menu, so they carry no tick.'] },
       { h: 'Other Pour Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Pour Sizes Sold with its own price and Bar Cop shows that size its own pour cost. A thinner happy hour price reads its own honest margin instead of hiding inside the standard pour.'] },
-      { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. Starting from a category card just tells Bar Cop what to expect, so the columns it offers match that category. It is not locked to it. A file that turns out to hold more than one category is sorted out in the next step.'] },
+      { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. Starting from a category card just tells Bar Cop what to expect, so the columns it offers match that category. It is not locked to it. Every import then stops on one more screen, where you check where each product is going before anything is added.'] },
       { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Any row missing required data comes in as Incomplete so you can finish it later.'] },
-      { h: 'When One File Holds More Than One Category', p: ['A distributor order guide is one file with kegs and cases in it, and an export from another program is usually one file with everything in it. So once the columns are matched, Bar Cop lists every product it found and shows you where each one is going before anything is written. The ones it has already worked out sit in a closed section per category, with the count on the section, so you can open one and check it. Anything it could not work out sits at the top, open, and that is the only part you have to do.', 'Bar Cop fills in whatever the product name or a column in your file settles on its own. Bourbon, Vodka and Gin are Liquor, and it knows the common spirit and wine brands by name. It leaves a beer style alone on purpose, because an IPA can be a keg or a case and the file does not say which, and it would rather ask than put your product in the wrong place. Tick the ones it left, pick a category, and press Move To. Every row also has a Remove button, for the section headings and subtotal lines an order guide is full of.', 'If your file does not name a supplier, Bar Cop asks once and puts that vendor on every product it adds that does not already name one, and adds them to your vendor list so you can order from them. Nothing is written to your account until you press Add, and that button says exactly how many products are coming in.'] },
+      { h: 'Checking Where Everything Goes', p: ['A distributor order guide is one file with kegs and cases in it, and an export from another program is usually one file with everything in it. So once the columns are matched, every import stops here: Bar Cop lists every product it found and shows you where each one is going before anything is written. It is the same screen and the same press whether the file sorted itself perfectly or not, which is also your chance to drop anything you no longer carry. The ones it has already worked out sit in a closed section per category, with the count on the section, so you can open one and check it. Anything it could not work out sits at the top, open, and that is the only part you have to do.', 'Bar Cop fills in whatever the product name or a column in your file settles on its own. Bourbon, Vodka and Gin are Liquor, and it knows the common spirit and wine brands by name. It leaves a beer style alone on purpose, because an IPA can be a keg or a case and the file does not say which, and it would rather ask than put your product in the wrong place. Tick the ones it left, pick a category, and press Move To. Every row also has a Remove button, for the section headings and subtotal lines an order guide is full of.', 'If your file does not name a supplier, Bar Cop asks once and puts that vendor on every product it adds that does not already name one, and adds them to your vendor list so you can order from them. Nothing is written to your account until you press Add, and that button says exactly how many products are coming in.'] },
       { h: 'Bulk Edit Many At Once', p: ['After an upload you often need the same value across a whole category: a 1.5 oz pour on every liquor, one vendor or storage location across a list, the same par. Check the products you want, or use Select All on the category tab, then tap Bulk Edit. Turn on only the fields you want to change, set each value, and Apply. Bar Cop writes those fields to every selected product at once and leaves everything else untouched, then refigures pours per container, cost per pour, and pour cost percent for each one. Anything that was Incomplete and now has what it needs clears its flag.'] },
       { h: 'Hiding A Product', p: ['When you Edit a product, the status across from the title reads ACTIVE or INACTIVE. Hit Hide from operations to pull a seasonal pour or a discontinued item out of counts, orders, and the menu side without throwing away its history, then Update to commit. An inactive product moves to the Inactive tab after Misc, so your category lists stay clean; open it there and Make active brings it back.'] }
     ]);
@@ -2484,6 +2506,11 @@ S.InventoryProducts = {
       if (r.assignById[row._rid] !== undefined) return;
       if (this._isFurnitureRow(row)) return;
       let guess = this._guessCategory(String(row.name == null ? '' : row.name).trim());
+      /* ⛔ THE KEG VOLUME SITS BELOW THE NAME AND ABOVE THE COLUMN. Below the name
+         because a product that says what it is outranks its container, and if the two
+         ever disagree the name is the one a human wrote. Above the column because it is
+         a fact about THIS row, while a column reading is an inference about a group. */
+      if (!guess && this._isKegSize(row.container_size_oz)) guess = 'Draft Beer';
       if (!guess && best) {
         const v = String(row[best.key] == null ? '' : row[best.key]).trim();
         guess = this._guessCategory(v) || this._agreeAcross(r.rows, best.key, v, others);
@@ -2542,8 +2569,18 @@ S.InventoryProducts = {
       vendor: '', vendorNew: false
     };
     this._prefillAssign();
-    // Nothing to decide and nothing left behind: do not put a second confirm in the way.
-    if (!this._routeHasQuestion()) { const out = this._routeStamp(); this._routing = null; return this.runImport(out); }
+    /* ⛔ THE SCREEN ALWAYS OPENS (Kyle, chat 27): *"i would actually prefer the process
+       to be the same every time no matter what... let the user confirm everything is
+       correct before adding to the categories.. that way bar cop can never make a
+       mistake."*
+       It used to skip itself when the file sorted cleanly and named a vendor, on the
+       reasoning that a clean path should not collect a second confirm
+       ([[automate-obvious-step]]). That is overruled, and the reasons are better than
+       the one it replaces: an unvarying process is worth more than a saved click; the
+       Add press is what moves responsibility for what lands from Bar Cop to the
+       operator; and it is the only place they can drop products they no longer carry
+       before those become live records. A clean file is now a screen you scan and
+       accept, which costs one press and can never be wrong. */
     this.renderLanding();
     setTimeout(() => document.getElementById('ip-route-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   },
@@ -2634,17 +2671,13 @@ S.InventoryProducts = {
     const r = this._routing;
     return !!r && r.rows.some(row => !String(row.vendor == null ? '' : row.vendor).trim());
   },
-  /* Is there anything on this screen worth asking? A file that sorted itself completely,
-     loses nothing and names a supplier has no question on it, and showing it would be a
-     second confirm on top of the mapper's own ([[automate-obvious-step]]). */
-  _routeHasQuestion() {
-    const r = this._routing;
-    if (!r) return false;
-    const s = this._routeSummary();
-    if (s.missing.length || s.nameless || s.dup) return true;
-    if (s.cats.length > 1) return true;
-    return this._needsVendor();
-  },
+  /* ⛔ `_routeHasQuestion()` LIVED HERE AND IS GONE (chat 27). It decided whether the
+     screen was worth showing — no unplaced rows, one category, a supplier named, and it
+     skipped straight to the write. Kyle overruled the whole idea: the process is the same
+     every time, and the operator's Add is the confirmation. Deleted rather than left
+     unreferenced, because a helper nobody calls reads as live coverage to the next person
+     who greps it ([[the-loop]] #61). Its three conditions all still exist as things the
+     screen SHOWS; none of them is a reason to hide it. */
 
   // ── The screen ─────────────────────────────────────────────────────────────
   /* ⚠ ONE SHARED COLGROUP for every section on the screen. Percentage widths, not px,
