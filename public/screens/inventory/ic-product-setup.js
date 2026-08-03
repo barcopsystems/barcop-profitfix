@@ -2848,14 +2848,32 @@ S.InventoryProducts = {
        the section heads now SUM to the button and every row that is not in the total says
        why on itself. */
     const s = this._routeSummary();
+    /* ⛔ WHAT IS LANDING COMES FIRST, WHAT IS NOT SINKS (Kyle, chat 27): *"so all the
+       active products being added are listed together first and then any already listed
+       products after."* His beer guide interleaved them — two live rows, a grey one, two
+       live, a grey — so working out what you are actually getting meant reading past the
+       ones you are not. The header already gives the number; this makes the list the same
+       shape as the number.
+       ⚠ TWO BUCKETS, NOT A SORT. Pushing into `keep` and `later` preserves the file's own
+       order inside each block by construction, so stability is structural rather than a
+       property of whichever sort the engine ships. The file's order is the only order the
+       operator knows.
+       ⚠ AND IT ASKS THE SAME QUESTION THE DIM ASKS — `_ROUTE_ROW_NOTE[status]`, the one
+       used by `_routeRowHtml` — so a row can never sink without being marked, or be marked
+       without sinking. */
+    const sink = rows => {
+      const keep = [], later = [];
+      (rows || []).forEach(row => (this._ROUTE_ROW_NOTE[s.status[row._rid]] ? later : keep).push(row));
+      return keep.concat(later);
+    };
     if (unsorted.length) {
-      body += this._routeSection(unsorted, 'Not Sorted Yet',
+      body += this._routeSection(sink(unsorted), 'Not Sorted Yet',
         unsorted.length + ' row' + (unsorted.length === 1 ? '' : 's') + ' Bar Cop could not work out',
         null, true, true, s.status);
     }
     order.forEach((c, i) => {
       const n = s.by[c] || 0;
-      body += this._routeSection(sorted[c], c,
+      body += this._routeSection(sink(sorted[c]), c,
         n + ' product' + (n === 1 ? '' : 's') + ' moving into ' + c,
         c, !!r.open[c], !unsorted.length && i === 0, s.status);
     });
