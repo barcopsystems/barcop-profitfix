@@ -2466,6 +2466,20 @@ S.InventoryProducts = {
       // nonNeg here too: a `-750ml` credit line gave -25.4 oz, a NEGATIVE pour cost, and the row
       // still read Complete and rendered GREEN (the row-colour class keys off the sign).
       let oz     = nonNeg(this._sizeToOz(val(row, 'container_size_oz')));
+      /* ⛔ ON A BEER ORDER GUIDE THE KEG SIZE *IS* THE PACK COLUMN. The file has one
+         column reading "1/2 BBL" for a keg and "24/12 oz CAN" for a case, and those are
+         two different facts: a case size for one row and a container size for the other.
+         Bar Cop already reads both (`_packCount` and `_sizeToOz`), but only `case_size`
+         had a column to bind to, so every keg landed with no size and no pours per keg.
+         So a DRAFT row with no size of its own falls back to the pack cell.
+         ⚠ WHY THIS IS NOT A GUESS: `_sizeToOz` is the validator and it is strict by
+         design — it refuses two-number cells ("24/12 oz") and refuses pack descriptors
+         ("12-PACK"), with a comment above it explaining that a plausible wrong size is
+         worse than none. So this can only ever succeed on something that really is a
+         size. Scoped to Draft Beer, and only when the size is otherwise missing, because
+         `case_size` is read by nothing on a draft row ([[the-loop]] #48: a shared
+         fallback needs a discriminator, not an `||` chain). */
+      if (oz == null && cat === 'Draft Beer') oz = nonNeg(this._sizeToOz(val(row, 'case_size')));
       // Bottle beer has no oz field; store a fixed nominal size so the usage-variance
       // oz round-trip cancels (never shown or entered — matches the manual form).
       if (cat === 'Bottle Beer') oz = 12;
