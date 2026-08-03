@@ -2330,7 +2330,7 @@ S.InventoryProducts = {
       'liqueur','liqueurs','cordial','cordials','schnapps','amaro','amari','absinthe','anisette',
       'sambuca','ouzo','triple sec','curacao','irish cream','aperitif','apertif','digestif',
       'bitters','blanco','reposado','anejo','overproof','well','call','premium','top shelf'],
-    'Wine': ['wine','wines','red blend','white blend','red wine','white wine','rose','rosé','blush','sparkling','champagne',
+    'Wine': ['wine','wines','house red','house white','red blend','white blend','red wine','white wine','rose','rosé','blush','sparkling','champagne',
       'prosecco','cava','chardonnay','cabernet','sauvignon','merlot','pinot','noir','grigio','gris',
       'riesling','malbec','zinfandel','syrah','shiraz','moscato','muscat','tempranillo','sangiovese',
       'chianti','rioja','bordeaux','burgundy','barolo','nebbiolo','viognier','albarino','verdejo',
@@ -2661,6 +2661,16 @@ S.InventoryProducts = {
             ? ' and ' + (s.missing.length - shown.length) + ' more' : '') + '</span>. '
           + 'If any of them are real products, use Change What Goes Where below.</div>';
       }
+      /* The other two ways a row does not become a product. Without these the operator
+         reads "21 rows" at the top and 12 products at the bottom with nothing accounting
+         for the gap, which is the kind of silence that makes people distrust a number. */
+      const gap = [];
+      if (s.nameless) gap.push(s.nameless + ' row' + (s.nameless === 1 ? ' has' : 's have') + ' no product name');
+      if (s.dup) gap.push(s.dup + (s.dup === 1 ? ' is a name' : ' are names') + ' you already have');
+      if (gap.length) {
+        body += '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin-top:10px;">'
+          + gap.join(', and ') + ', so ' + (s.nameless + s.dup === 1 ? 'it is' : 'they are') + ' left out too.</div>';
+      }
       if (!placed) {
         body += '<div style="font-size:13.5px;color:var(--gold);line-height:1.55;margin-top:16px;">'
           + 'Bar Cop could not place any of these on its own. Open Change What Goes Where and tell it '
@@ -2795,18 +2805,28 @@ S.InventoryProducts = {
   /* What the current answers ADD UP TO. This is the screen the operator sees first now:
      the outcome, not the machinery. Ordered by the app's own category order so it reads
      the same way the tabs do. */
+  /* ⛔ IT COUNTS WHAT `runImport` WILL ACTUALLY WRITE, IN THE SAME ORDER IT DECIDES.
+     Kyle's messy-file walk: the table read 13, the button promised **14**, and **12**
+     landed. It was counting a row with no product name and a name the file repeats — both
+     of which runImport drops. A button that overstates the result is the plainest kind of
+     [[output-honesty]] failure, and it is the last number the operator reads before
+     pressing it. Same order as runImport: no name → no category → already taken. */
   _routeSummary() {
     const by = {}, missing = [];
-    let nameless = 0;
+    let nameless = 0, dup = 0;
+    const taken = new Set((this.products() || []).map(p => (p.name || '').trim().toLowerCase()));
     this._routeStamp().forEach(row => {
       const nm = String(row.name == null ? '' : row.name).trim();
-      if (!nm) { nameless++; return; }          // runImport reports these in its own bucket
-      if (row._category) by[row._category] = (by[row._category] || 0) + 1;
-      else missing.push(nm);
+      if (!nm) { nameless++; return; }
+      if (!row._category) { missing.push(nm); return; }
+      const key = nm.toLowerCase();
+      if (taken.has(key)) { dup++; return; }    // repeated in the file, or already on the list
+      taken.add(key);
+      by[row._category] = (by[row._category] || 0) + 1;
     });
     const order = App.IC_CATEGORIES || [];
     const cats = Object.keys(by).sort((a, b) => order.indexOf(a) - order.indexOf(b));
-    return { by: by, cats: cats, missing: missing, nameless: nameless };
+    return { by: by, cats: cats, missing: missing, nameless: nameless, dup: dup };
   },
 
   /* Is there anything on this screen worth asking? If the file is one category, every row
@@ -2836,10 +2856,12 @@ S.InventoryProducts = {
 
   // How many rows would actually import. Drives the button label AND the disabled state,
   // so "Import 0 Products" can never be a live button (S125's shape).
+  /* ONE SOURCE. This used to count the stamp directly and the summary counted it again
+     with different rules, so the button and the table above it disagreed by two. */
   _routeReadyCount() {
-    const r = this._routing;
-    if (!r) return 0;
-    return this._routeStamp().filter(row => row._category).length;
+    if (!this._routing) return 0;
+    const s = this._routeSummary();
+    return s.cats.reduce((n, c) => n + s.by[c], 0);
   },
   // The rows with `_category` resolved. runImport treats '' as unplaceable: not imported,
   // named in the result. That is the whole contract, and it is pinned.
