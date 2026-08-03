@@ -593,7 +593,7 @@ S.InventoryProducts = {
       // category inside, category shown per row" — you will not remember whether
       // something was Food or Misc, which is the whole reason the tab exists.
       const tables = App.subcatGroups(prods, onInactiveTab ? 'All' : this.activeCat).map((g, gi) => {
-        const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
+        const hdr = esc(g.label) + ' (' + g.items.length + ')';
         const groupRows = g.items.map(p => this._productRowHtml(p, pourable, target)).join('');
         return '<div class="card" style="overflow-x:auto;margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
           + '<table class="row-list" style="table-layout:fixed;width:100%;">' + colgroup + '<thead><tr>'

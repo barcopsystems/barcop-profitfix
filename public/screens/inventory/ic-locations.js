@@ -140,7 +140,7 @@ S.InventoryLocations = {
       + '<span style="font-size:10px;color:var(--t3);min-width:78px;text-align:right;">' + esc(p.category || '') + '</span></label>';
     // Sub-category sub-headers (sticky) so a long triage list scans by style.
     const inner = App.subcatGroups(prods, cat).map(g => {
-      const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
+      const hdr = esc(g.label) + ' (' + g.items.length + ')';
       return '<div style="position:sticky;top:0;background:var(--surface);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);padding:9px 2px 5px;border-bottom:1px solid var(--b1);">' + hdr + '</div>'
         + g.items.map(rowHtml).join('');
     }).join('');
@@ -349,7 +349,7 @@ S.InventoryLocations = {
       + '</tr>';
     const colgroup = '<colgroup><col style="width:40px;"/><col style="width:220px;"/><col/><col/><col/></colgroup>';
     return App.subcatGroups(prods, cat).map((g, gi) => {
-      const hdr = (g.key ? esc(g.key) : 'Uncategorized') + ' (' + g.items.length + ')';
+      const hdr = esc(g.label) + ' (' + g.items.length + ')';
       return '<div class="card" style="overflow-x:auto;margin-top:' + (gi === 0 ? '0' : '16') + 'px;">'
         + '<table class="row-list" style="table-layout:fixed;width:100%;">' + colgroup + '<thead><tr>'
         + '<th></th><th>' + hdr + '</th><th>Category</th><th>Size</th><th>Vendor</th>'
