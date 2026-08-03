@@ -615,7 +615,11 @@ S.InventoryOrderSheet = {
     if (jr) qty = 0;
     return '<tr class="os-line" data-product-id="' + esc(product.id || '') + '">'
       + '<td><div class="val">' + esc(product.name || '') + '</div>'
-      + '<div style="font-size:10px;color:var(--t3);">' + esc(product.category || '') + '</div></td>'
+      /* The vendor's own item number sits under the name, because the rep reading this
+         order works from their number, not from what you call the product. Rendered only
+         when there is one, so a bar that never fills it in sees no change at all. */
+      + '<div style="font-size:10px;color:var(--t3);">' + esc(product.category || '')
+      + (product.vendor_item_code ? ' &middot; #' + esc(product.vendor_item_code) : '') + '</div></td>'
       + '<td class="os-onhand">' + this.onHandText(product, onHand, unit) + recvNote + '</td>'
       + '<td class="os-par">' + this.parText(par, unit) + '</td>'
       + '<td><input type="number" class="os-qty form-input" data-cost="' + unitCost + '" data-product-id="' + esc(product.id || '') + '" min="0" step="1" '

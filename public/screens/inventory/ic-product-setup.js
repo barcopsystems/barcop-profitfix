@@ -843,6 +843,17 @@ S.InventoryProducts = {
 
     document.getElementById('ip-route-one')?.addEventListener('change', e => { r.one = e.target.value; redraw(); });
 
+    document.getElementById('ip-route-vendor')?.addEventListener('change', e => {
+      if (e.target.value === '__new') { r.vendorNew = true; r.vendor = ''; }
+      else { r.vendorNew = false; r.vendor = e.target.value; }
+      redraw();
+    });
+    /* ⚠ `input`, not `change`, and NO redraw. A redraw on every keystroke rebuilds the
+       input and takes the caret with it. The value is captured as it is typed so any
+       LATER re-render (a category select, the bulk setter) rebuilds the field from state
+       rather than from a DOM node that is about to be destroyed. */
+    document.getElementById('ip-route-vendor-new')?.addEventListener('input', e => { r.vendor = e.target.value.trim(); });
+
     // Bulk setter: fills only what is still on Skip, so it can never silently overwrite
     // a choice the operator already made row by row.
     document.getElementById('ip-route-bulk')?.addEventListener('change', e => {
@@ -981,6 +992,12 @@ S.InventoryProducts = {
       + subOrType
       + '<div class="f"><label>Primary Vendor</label>'
       + '<select id="ip-vendor">' + this.vendorOpts(p?.vendor) + '</select></div>'
+      /* The vendor's OWN code for this product. An order guide's whole point is that the
+         distributor identifies things by their number, and when the order goes back the
+         rep works from that number, not from your product name. It had nowhere to land,
+         so the most useful column on a guide was being thrown away on every import. */
+      + '<div class="f"><label>Vendor Item #</label>'
+      + '<input type="text" id="ip-vcode" value="' + esc(p?.vendor_item_code || '') + '" placeholder="Optional"/></div>'
       + '<div class="f"><label>Primary Location</label>'
       + '<select id="ip-loc1">' + this.locationOpts(p?.primary_location) + '</select></div>';
 
@@ -1649,6 +1666,7 @@ S.InventoryProducts = {
       sub_category:        this.getSubcat(),
       misc_type:           cat === 'Misc' ? (document.getElementById('ip-misctype')?.value || '') : '',
       vendor:              document.getElementById('ip-vendor')?.value.trim() || '',
+      vendor_item_code:    document.getElementById('ip-vcode')?.value.trim() || '',
       container_size_oz:   oz,
       container_size_label: sizeLabel,
       case_size:           caseSize,
@@ -2159,7 +2177,14 @@ S.InventoryProducts = {
     { key: 'unit_type',         label: 'Unit Type (lb / case / each / gallon / ...)' },
     { key: 'pack_size',         label: 'Pieces / Servings per Unit' },
     { key: 'serving_name',      label: 'Serving / Piece Name' },
-    { key: 'misc_type',         label: 'Misc Type' }
+    { key: 'misc_type',         label: 'Misc Type' },
+    /* ⚠ CARRIES ITS OWN ALIASES: no category's field list defines this key, so the merge
+       below finds nothing for it and CSVMapper would be left matching only the literal
+       key and label. These are the headings a real order guide uses. */
+    { key: 'vendor_item_code',  label: 'Vendor Item #', aliases: [
+      'item #', 'item number', 'item no', 'item code', 'itemnum', 'item id',
+      'sku', 'product code', 'product number', 'part number', 'part #',
+      'vendor item', 'vendor item #', 'vendor code', 'catalog #', 'catalog number', 'stock code'] }
   ],
   importFieldsForImport(cat) {
     const own = this.importFieldsForCategory(cat);
@@ -2176,7 +2201,8 @@ S.InventoryProducts = {
     };
     return own.concat(this.IMPORT_UNION_EXTRAS
       .filter(e => !have.has(e.key))
-      .map(e => ({ key: e.key, label: e.label, required: false, aliases: aliasesFor(e.key) })));
+      // Its own aliases where it has them (a key no category defines), else the merge.
+      .map(e => ({ key: e.key, label: e.label, required: false, aliases: e.aliases || aliasesFor(e.key) })));
   },
 
   // In-place import panel rendered in the landing's lower area. Two stages:
@@ -2287,7 +2313,9 @@ S.InventoryProducts = {
       mode: 'one',
       groupBy: groupable.length ? groupable[0].key : '',
       one: cardCat || '',
-      assign: {}
+      assign: {},
+      // Blank = leave whatever the file said. Only fills rows whose vendor cell is empty.
+      vendor: '', vendorNew: false
     };
     this._seedAssign();
     this.renderLanding();
@@ -2307,7 +2335,33 @@ S.InventoryProducts = {
       + cats.map(c => '<option value="' + esc(c) + '"' + (sel === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('')
       + '</select>';
 
+    /* ── WHO ARE THESE FROM? ───────────────────────────────────────────────
+       A vendor order guide is the file this feature exists for, and it has no vendor
+       column: the whole file is from one vendor, so nobody writes the name on every
+       row. Without this the products land with no vendor at all and the operator
+       bulk-edits it on, which is the chore Kyle raised.
+       ⛔ THIS DOES NOT CREATE A VENDOR RECORD, on purpose. `ic-vendors` already has a
+       deliberate pattern for exactly this — "Set Up From Your Products" lists a name
+       that is on products but not on the list, with a count and a Set Up button that
+       opens the add form prefilled so the rep, terms, minimums and delivery days get
+       filled in. Auto-creating a bare name-only record would SATISFY that list and the
+       operator would never be prompted for the details the Order Sheet needs. The name
+       on the product is the canonical link either way, so nothing has to relink. */
+    const vendorRows = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
+      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const known = vendorRows.some(v => v.name === r.vendor);
     let body = '';
+    body += '<div class="form-row" style="margin-bottom:20px;">'
+      + '<div class="f" style="max-width:260px;"><label>Who are these from</label>'
+      + '<select class="form-input" id="ip-route-vendor">'
+      + '<option value=""' + (r.vendor || r.vendorNew ? '' : ' selected') + '>Leave as in the file</option>'
+      + vendorRows.map(v => '<option value="' + esc(v.name) + '"' + (!r.vendorNew && r.vendor === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')
+      + '<option value="__new"' + (r.vendorNew ? ' selected' : '') + '>A vendor not on my list...</option>'
+      + '</select></div>'
+      + (r.vendorNew ? '<div class="f" style="max-width:260px;"><label>Vendor name</label>'
+          + '<input class="form-input" id="ip-route-vendor-new" type="text" value="' + esc(known ? '' : (r.vendor || '')) + '" placeholder="Coastal Beverage"/></div>' : '')
+      + '</div>';
+
     if (groupable.length) {
       body += '<div class="seg-toggle" style="margin-bottom:18px;">'
         + '<button type="button" class="btn btn-sm ' + (r.mode === 'one' ? 'btn-primary' : 'btn-ghost') + '" data-route-mode="one">All one category</button>'
@@ -2343,6 +2397,28 @@ S.InventoryProducts = {
     } else {
       body += '<div class="f" style="max-width:260px;"><label>These are all</label>'
         + catSel('ip-route-one', r.one, 'Choose...') + '</div>';
+      /* ⚠ THE MIXED-FILE WARNING. This mode is the default and it is pre-filled with the
+         card, so pressing Import without looking gives the exact outcome this whole change
+         exists to stop: a mixed file filed entirely under one category. The routing screen
+         being VISIBLE is not the same as being read.
+         So: if Bar Cop recognises values in the file belonging to some OTHER category,
+         it says how many rows, by name. It is a count of what was recognised, not a claim
+         about the file — a beer guide full of styles recognises nothing and stays quiet
+         rather than crying wolf, which is the honest failure direction here. */
+      const other = {};
+      if (r.groupBy) {
+        this._routeGroups(r.rows, r.groupBy).forEach(g => {
+          const guess = this._guessCategory(g.value);
+          if (guess && guess !== r.one) other[guess] = (other[guess] || 0) + g.count;
+        });
+      }
+      const names = Object.keys(other).sort((a, b) => other[b] - other[a]);
+      if (names.length) {
+        body += '<div style="margin-top:14px;font-size:12px;color:var(--gold);">'
+          // "1 look like Wine" is what the first version printed. The verb agrees with
+          // the ROW count, which is the only collection in this sentence.
+          + names.map(c => other[c] + (other[c] === 1 ? ' looks' : ' look') + ' like ' + esc(c)).join(', ') + '.</div>';
+      }
     }
 
     /* ⚠ THE WRITE STATE HAS TO SURVIVE A RE-RENDER. Every select on this panel re-renders
@@ -2386,7 +2462,13 @@ S.InventoryProducts = {
       const cat = (r.mode === 'column' && r.groupBy)
         ? (r.assign[String(row[r.groupBy] == null ? '' : row[r.groupBy]).trim()] || '')
         : (r.one || '');
-      return Object.assign({}, row, { _category: cat });
+      /* ⛔ FILL, NEVER OVERWRITE. The chosen vendor is the answer for a file that does not
+         name one, so it only applies where the row's own cell is empty. A file that DOES
+         carry a Supplier column has already told us, per row, and a broadline guide can
+         legitimately list more than one — overwriting that with a single answer would
+         throw away a fact the file actually contained. */
+      const vendor = String(row.vendor == null ? '' : row.vendor).trim() || (r.vendor || '');
+      return Object.assign({}, row, { _category: cat, vendor: vendor });
     });
   },
 
@@ -2526,6 +2608,7 @@ S.InventoryProducts = {
         sub_category:        cat === 'Misc' ? '' : val(row, 'sub_category'),
         misc_type:           miscType,
         vendor:              val(row, 'vendor'),
+        vendor_item_code:    val(row, 'vendor_item_code'),
         container_size_oz:   oz,
         case_size:           caseSize,
         pack_size:           packSize,
