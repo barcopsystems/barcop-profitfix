@@ -45,6 +45,51 @@ app.use((req, res, next) => {
   next();
 });
 
+/* ── SERVE JS WITHOUT THE COMMENTS ───────────────────────────────────────────
+   1,891kb of the 6,371kb this app serves is comments, 29.7% of every byte, and in
+   the files that cost the most to get right it is far worse: pos-ingest 70%,
+   sales-integrity 67%, cash-engine 56%. Those comments are not API docs, they are
+   which defect a guard exists for and why the obvious approach fails. That is years
+   of finding things out the hard way, readable by anyone with a browser tab. They
+   stay in the repo, in git and in every harness. They stop being served.
+
+   ⚠ FAIL-SAFE BY DESIGN. Any throw, any miss, and this calls next() so express.static
+   serves the original file exactly as before. A stripped file is an optimisation; the
+   original is the product. The worst case is today's behaviour, never a broken app.
+
+   ⚠ Cached in memory per path+mtime, so a deploy that rewrites a file invalidates it
+   without a restart, and no build step enters the push workflow. Kyle still edits
+   public/, bumps ?v=, and pushes one file ([[deploy-workflow]]).
+
+   Pinned by verify-strip-comments.js: all 144 shipped files parse after stripping,
+   no line number moves (so a customer's stack trace still points at the right line of
+   source), no URL is lost, and a naive regex stripper is proven to BREAK the same
+   files, which is what makes the green above mean anything. */
+const { stripComments } = require('./strip-comments');
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+const _stripCache = new Map();
+app.get(/\.js$/, (req, res, next) => {
+  try {
+    const rel = decodeURIComponent(req.path).replace(/^\/+/, '');
+    const full = path.resolve(PUBLIC_DIR, rel);
+    // never serve outside public/, whatever the path claims
+    if (full !== PUBLIC_DIR && !full.startsWith(PUBLIC_DIR + path.sep)) return next();
+    const st = fs.statSync(full);
+    if (!st.isFile()) return next();
+    const key = full + ':' + st.mtimeMs + ':' + st.size;
+    let body = _stripCache.get(key);
+    if (body === undefined) {
+      body = stripComments(fs.readFileSync(full, 'utf8'));
+      if (_stripCache.size > 400) _stripCache.clear();   // bounded; it is a cache, not a store
+      _stripCache.set(key, body);
+    }
+    res.type('application/javascript');
+    return res.send(body);
+  } catch (e) {
+    return next();          // ← the fail-safe: express.static serves the original
+  }
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // (Removed the /api/claude proxy — the app makes no Anthropic API calls anymore;
