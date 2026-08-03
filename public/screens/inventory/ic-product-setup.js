@@ -812,7 +812,9 @@ S.InventoryProducts = {
           dropTitle: 'Drop your ' + cat + ' product file here',
           dropSub: 'Needs a product name column; cost, size, price and par are optional.',
           confirmLabel: 'Import',
-          fields: this.importFieldsForCategory(cat).map(f => ({ key: f.key, label: f.label, required: f.required, match: f.aliases })),
+          // The UNION, not just this card's fields: the file may route into other
+          // categories, and a column with nowhere to bind is a column thrown away.
+          fields: this.importFieldsForImport(cat).map(f => ({ key: f.key, label: f.label, required: f.required, match: f.aliases })),
           onState: state => { const row = document.getElementById('ip-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : ''; },
           // The mapper no longer imports. It hands the rows to the routing question,
           // which is what resolves each row's category before anything is written.
@@ -2132,6 +2134,49 @@ S.InventoryProducts = {
     }
     // Food
     return COMMON.concat(tail);
+  },
+
+  /* ⛔ THE MAPPER MUST OFFER EVERY FIELD THE FILE COULD NEED, NOT JUST THE CARD'S.
+     Found by Kyle walking a real beer order guide, and no fixture of mine could have
+     found it: my harness handed rows straight to runImport, so it supplied fields the
+     card door never offers.
+     `importFieldsForCategory` is right about ONE category, and it was the whole story
+     while the category was locked. Now a file can route into several, so a beer guide
+     dropped on Bottle Beer offered 9 fields with no Pour Size and no Keg Size in them —
+     and the file's own `Std Pour` column, holding 16, bound to NOTHING. The 8 kegs
+     landed with no keg size and no pour, which is no pours per keg, no cost per pour,
+     no pour cost, and Incomplete in red. The routing worked and the data was thrown
+     away one step earlier ([[the-loop]] #38: the fact was in the column next to the
+     one being read).
+     So the card's own fields come FIRST, with the card's own labels, and anything the
+     other categories need is appended after. An unmatched field renders as (skip) and
+     costs nothing; runImport still gates every field on the ROW's category, so a pour
+     mapped on a bottle-beer row is read and correctly ignored. */
+  IMPORT_UNION_EXTRAS: [
+    { key: 'container_size_oz', label: 'Container / Keg Size (oz)' },
+    { key: 'pour_size_oz',      label: 'Pour Size (oz)' },
+    { key: 'case_size',         label: 'Case Size (bottles per case)' },
+    { key: 'unit_type',         label: 'Unit Type (lb / case / each / gallon / ...)' },
+    { key: 'pack_size',         label: 'Pieces / Servings per Unit' },
+    { key: 'serving_name',      label: 'Serving / Piece Name' },
+    { key: 'misc_type',         label: 'Misc Type' }
+  ],
+  importFieldsForImport(cat) {
+    const own = this.importFieldsForCategory(cat);
+    const have = new Set(own.map(f => f.key));
+    // Merge each extra's aliases across every category that defines it, so a column
+    // matches as well here as it would on its own card.
+    const aliasesFor = key => {
+      const out = new Set();
+      (App.IC_CATEGORIES || []).forEach(c => {
+        const f = this.importFieldsForCategory(c).find(x => x.key === key);
+        if (f) (f.aliases || []).forEach(a => out.add(a));
+      });
+      return [...out];
+    };
+    return own.concat(this.IMPORT_UNION_EXTRAS
+      .filter(e => !have.has(e.key))
+      .map(e => ({ key: e.key, label: e.label, required: false, aliases: aliasesFor(e.key) })));
   },
 
   // In-place import panel rendered in the landing's lower area. Two stages:
