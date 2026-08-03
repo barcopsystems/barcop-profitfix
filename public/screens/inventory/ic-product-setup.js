@@ -827,23 +827,53 @@ S.InventoryProducts = {
   wireRouting() {
     const r = this._routing;
     if (!r) return;
-    // Any change re-renders from state, so the button count and the disabled state are
-    // always computed from the same place the import will read (never from the DOM).
+    /* Every control writes to STATE and re-renders. The screen is therefore always drawn
+       from the same place the import reads, so the button count, the group counts and the
+       write can never disagree with each other or with the DOM. */
     const redraw = () => this.renderLanding();
+    const checkedIds = () => this._routeRows().filter(row => r.checked[row._rid]).map(row => row._rid);
 
-    // `modeTouched`: once the operator picks a mode themselves, opening the worksheet
-    // must never quietly move them off it.
-    this.container.querySelectorAll('[data-route-mode]').forEach(b =>
-      b.addEventListener('click', () => { r.mode = b.dataset.routeMode; r.modeTouched = true; redraw(); }));
+    this.container.querySelectorAll('.ip-rt-cb').forEach(cb =>
+      cb.addEventListener('change', () => {
+        if (cb.checked) r.checked[cb.value] = true; else delete r.checked[cb.value];
+        redraw();
+      }));
 
-    document.getElementById('ip-route-col')?.addEventListener('change', e => {
-      r.groupBy = e.target.value; r.assign = {}; this._seedAssign(); redraw();
+    /* ⚠ Select All means every row ON SCREEN, which is every row still in the import —
+       including the ones inside collapsed groups. A control that silently meant 'only the
+       ones you can see' would be the same class of lie the group worksheet told. */
+    document.getElementById('ip-rt-all')?.addEventListener('click', () => {
+      this._routeRows().forEach(row => { r.checked[row._rid] = true; }); redraw();
+    });
+    document.getElementById('ip-rt-none')?.addEventListener('click', () => { r.checked = {}; redraw(); });
+
+    document.getElementById('ip-rt-add')?.addEventListener('click', () => {
+      const cat = (document.getElementById('ip-rt-cat') || {}).value || '';
+      if (!cat) { this._routeNote('Pick a category first, then press Add.'); return; }
+      const ids = checkedIds();
+      if (!ids.length) return;
+      this._assignRows(ids, cat);
+      /* The checks clear and the group they went to OPENS, so the operator sees where
+         their batch landed instead of watching rows vanish. */
+      r.checked = {}; r.open[cat] = true;
+      redraw();
     });
 
-    this.container.querySelectorAll('[data-route-val]').forEach(sel =>
-      sel.addEventListener('change', () => { r.assign[sel.dataset.routeVal] = sel.value; redraw(); }));
+    document.getElementById('ip-rt-del')?.addEventListener('click', async () => {
+      const ids = checkedIds();
+      if (!ids.length) return;
+      const ok = await App.confirm({
+        title: 'Leave ' + ids.length + ' row' + (ids.length === 1 ? '' : 's') + ' out of this import?',
+        message: 'They will not be added as products. Nothing is deleted from your file, and you can drop it again.',
+        confirmText: 'Leave Them Out', cancelText: 'Cancel'
+      });
+      if (!ok) return;
+      this._removeRows(ids);
+      redraw();
+    });
 
-    document.getElementById('ip-route-one')?.addEventListener('change', e => { r.one = e.target.value; redraw(); });
+    this.container.querySelectorAll('.ip-rt-head').forEach(h =>
+      h.addEventListener('click', () => { const c = h.dataset.cat; r.open[c] = !r.open[c]; redraw(); }));
 
     document.getElementById('ip-route-vendor')?.addEventListener('change', e => {
       if (e.target.value === '__new') { r.vendorNew = true; r.vendor = ''; }
@@ -851,59 +881,33 @@ S.InventoryProducts = {
       redraw();
     });
     /* ⚠ `input`, not `change`, and NO redraw. A redraw on every keystroke rebuilds the
-       input and takes the caret with it. The value is captured as it is typed so any
-       LATER re-render (a category select, the bulk setter) rebuilds the field from state
-       rather than from a DOM node that is about to be destroyed. */
+       input and takes the caret with it. The value is captured as it is typed so any LATER
+       re-render rebuilds the field from state rather than from a node about to be destroyed. */
     document.getElementById('ip-route-vendor-new')?.addEventListener('input', e => { r.vendor = e.target.value.trim(); });
 
-    // Bulk setter: fills only what is still on Skip, so it can never silently overwrite
-    // a choice the operator already made row by row.
-    document.getElementById('ip-route-bulk')?.addEventListener('change', e => {
-      const v = e.target.value;
-      if (!v) return;
-      this._routeGroups(r.rows, r.groupBy).forEach(g => { if (!r.assign[g.value]) r.assign[g.value] = v; });
-      redraw();
-    });
-
-    document.getElementById('ip-route-detail')?.addEventListener('click', () => {
-      /* ⛔ OPENING THE WORKSHEET MUST SHOW THE GROUPS. On a file whose category column
-         Bar Cop cannot read, everything falls back to "all one category" — and then
-         Change What Goes Where opened on a single dropdown, with the DEPT-12 list hidden
-         behind a toggle labelled "Sorted by a column". That toggle is the jargon Kyle
-         called out, and it was the ONLY way to fix the one file that most needs fixing.
-         So the worksheet opens on the groups, unless the operator has deliberately
-         chosen all-one-category themselves. */
-      if (!r.detail && !r.modeTouched && r.groupBy && this._groupableColumns(r.rows).length) r.mode = 'column';
-      r.detail = !r.detail;
-      redraw();
-    });
-
     document.getElementById('ip-route-back')?.addEventListener('click', () => {
-      // Back to the drop zone, not out of the import. The file is re-dropped from scratch
-      // because a mapping belongs to the file it was made for.
+      // Back to the drop zone, not out of the import. A mapping belongs to the file it
+      // was made for, so the file is re-dropped from scratch.
       this._routing = null; this.renderLanding();
     });
 
     document.getElementById('ip-route-go')?.addEventListener('click', async () => {
       const btn = document.getElementById('ip-route-go');
       if (!btn || btn.disabled || this._routeWriting) return;
-      // One press, one import. A double-click on a button that survives to the next
-      // render is the shape that produced two concurrent writes elsewhere in the app.
+      // One press, one import. A button that survives a re-render is how a double-click
+      // became two concurrent writes elsewhere in this app.
       this._routeWriting = true;
+      const label = btn.textContent;
       btn.disabled = true; btn.textContent = 'Importing...';
       const rows = this._routeStamp();
-      const label = btn.textContent;
       try { await this.runImport(rows); }
       finally {
         this._routeWriting = false;
-        /* ⛔ ONLY CLEAR THE ROUTING ON SUCCESS, and `_import` is how we know: runImport
-           nulls it when the write lands. A failed save, or a run where everything was
-           skipped, keeps BOTH so the operator can fix a value and press Import again.
-           Clearing unconditionally sent them back to the drop zone to re-choose every
-           category, which is the one thing they had just finished doing.
-           ⚠ And do NOT re-render here. runImport's failure exits write into
-           #ip-csv-actions, and a re-render rebuilds innerHTML and destroys the message
-           explaining what went wrong. Restore the button in place instead. */
+        /* ⛔ ONLY CLEAR ON SUCCESS, and `_import` is how we know: runImport nulls it when
+           the write lands. A failed save keeps the whole screen so the operator can press
+           Import again without re-sorting anything.
+           ⚠ And do NOT re-render here — runImport's failure exits write into
+           #ip-csv-actions and a re-render would destroy the message. */
         if (!this._import) { this._routing = null; }
         else {
           const b = document.getElementById('ip-route-go');
@@ -911,6 +915,14 @@ S.InventoryProducts = {
         }
       }
     });
+  },
+
+  // A refusal has to say something, or the button reads as broken ([[the-loop]] #89).
+  _routeNote(msg) {
+    const a = document.getElementById('ip-csv-actions');
+    if (!a) return;
+    a.querySelectorAll('.ip-csv-note').forEach(n => n.remove());
+    a.insertAdjacentHTML('beforeend', '<span class="ip-csv-note" style="color:var(--red);font-size:12px;margin-left:10px;">' + esc(msg) + '</span>');
   },
 
   // ── Form ──────────────────────────────────────────────────────────────────
@@ -2465,30 +2477,44 @@ S.InventoryProducts = {
     return /^(sub total|subtotal|grand total)\b/.test(flat) || /\b(sub total|subtotal|grand total)$/.test(flat);
   },
 
-  _seedAssign() {
+  /* ⭐⭐ THE PRE-FILL. Everything the vocabulary, the brand list and the column reading
+     buy is spent HERE and nowhere else: it fills the list in before the operator sees it,
+     and then gets out of the way. It is a head start, never a decision — every row it
+     touches is on screen with its own checkbox and can be moved.
+     ⛔ NO FALLBACK TO THE CARD. A row nothing can place stays blank and sits at the TOP
+     of the screen as the work. That is only affordable because the operator can now SEE
+     it: the old design had to guess, because an unplaced row was a footnote.
+     ⛔ AND FURNITURE IS LEFT BLANK, NOT REMOVED. `*** SECTION ***` is almost certainly not
+     a product, but 'almost certainly' is not good enough to delete somebody's row for
+     them. It shows up unsorted and they remove it in the same sweep as everything else.
+     ([[the-loop]] #26 — a name-classifying vocabulary has eaten a real record three
+     times in this codebase; here it costs a checkbox instead of a product.) */
+  _prefillAssign() {
     const r = this._routing;
-    if (!r || !r.groupBy) return;
-    const others = this._groupableColumns(r.rows).filter(c => c.key !== r.groupBy);
-    /* ⚠ ONLY SET IT WHEN THERE IS AN ANSWER. `undefined` now means "nobody has decided
-       this yet", which is what lets a row fall through to its own NAME below; an explicit
-       `''` means the operator chose Skip and must be obeyed. Writing '' here made those
-       two states identical and there was no way to tell a guess-failure from a decision. */
-    this._routeGroups(r.rows, r.groupBy).forEach(g => {
-      if (r.assign[g.value] !== undefined) return;
-      const guess = this._guessCategory(g.value) || this._agreeAcross(r.rows, r.groupBy, g.value, others);
-      if (guess) r.assign[g.value] = guess;
+    if (!r) return;
+    const best = this._bestGrouping(r.rows);
+    const others = best ? this._groupableColumns(r.rows).filter(c => c.key !== best.key) : [];
+    r.rows.forEach(row => {
+      if (r.assignById[row._rid] !== undefined) return;
+      if (this._isFurnitureRow(row)) return;
+      let guess = this._guessCategory(String(row.name == null ? '' : row.name).trim());
+      if (!guess && best) {
+        const v = String(row[best.key] == null ? '' : row[best.key]).trim();
+        guess = this._guessCategory(v) || this._agreeAcross(r.rows, best.key, v, others);
+      }
+      if (guess) r.assignById[row._rid] = guess;
     });
   },
 
-  // Entry from CSVMapper. `cardCat` is the category card the operator came in through,
-  // which pre-answers the question for the six existing doors.
   /* Which column, if any, actually SORTS this file? Measured, not guessed: run the
      vocabulary over each candidate column's values and count the ROWS it can place.
-     The winner is the column that places the most. No threshold anywhere — the file
-     either has a column that resolves rows or it does not.
-     ⚠ This is what lets a beer guide sort itself: its Type column holds styles and
-     places NOTHING, while its Pack column holds 1/2 BBL and 24/12 oz CAN and places
-     nearly everything. Picking `groupable[0]` would have taken the useless one. */
+     ⚠ This is what lets a beer guide sort itself: its Type column holds styles and places
+     NOTHING, while its Pack column holds 1/2 BBL and 24/12 oz CAN and places nearly
+     everything. Picking `groupable[0]` would have taken the useless one.
+     ⛔ AND IT HAS TO NAME MOST OF THE FILE. Measured on a real-shaped guide: the only
+     candidate left was a PACK column that resolved 4 rows of 14, which cleared an older
+     'two or more categories' test — and 10 spirits and wines were left out. A column is
+     the category column only if it can name the category for MOST of the file. */
   _bestGrouping(rows) {
     let best = null;
     const cands = this._groupableColumns(rows);
@@ -2497,11 +2523,6 @@ S.InventoryProducts = {
       let placed = 0;
       const others = cands.filter(x => x.key !== c.key);
       this._routeGroups(rows, c.key).forEach(g => {
-        /* ⚠ RESOLVE A GROUP THE SAME WAY `_seedAssign` WILL, or this measurement is about
-           a different thing than the screen shows. It used to test the group VALUE only,
-           so a column of DEPT-12 codes measured as placing nothing — even though every
-           row under it is named Smirnoff Vodka, Jim Beam and so on and the names agree.
-           The column was judged useless and the whole file fell back to the card. */
         const guess = this._guessCategory(g.value) || this._agreeAcross(rows, c.key, g.value, others);
         if (guess) { placed += g.count; cats.add(guess); }
       });
@@ -2509,111 +2530,190 @@ S.InventoryProducts = {
         best = { key: c.key, placed: placed, cats: cats.size };
       }
     });
-    /* ⛔ AND IT HAS TO NAME MOST OF THE FILE, OR IT IS NOT THE CATEGORY COLUMN.
-       Measured on a real-shaped guide whose category column was unbound: the only
-       candidate left was the PACK column, which resolved the two keg rows and the two
-       can rows and nothing else. Four values across two categories cleared the old
-       "2 or more categories" test, so column mode won — and **4 of 14 products imported
-       while 10 spirits and wines were left out.** Dropping a liquor guide on the Liquor
-       card and getting four products is the worst outcome this screen can produce.
-       The discriminator in words: a column is the category column only if it can name the
-       category for MOST of the file. Anything less and the card the operator clicked is
-       the better answer, because it at least brings everything in. */
     if (best && best.placed * 2 <= (rows || []).length) return null;
     return best;
   },
 
+  /* ── THE PER-PRODUCT LIST ─────────────────────────────────────────────────
+     Kyle, 2026-08-03, after the group worksheet printed 'Light Lager -> Skip' while
+     three of its five products imported anyway: *"why can't the mapper just import every
+     product row listed in the file... the next screen is every product listed with the
+     select all green checkmarks and some category selector and add button"*.
+     ⭐ THE REASON IT IS RIGHT, and it is worth keeping: **a group is an abstraction, a
+     product is a thing.** Every confusing thing on the old screen came from asking the
+     operator to reason about buckets — and the worksheet had drifted into saying
+     something FALSE, because rows resolve one at a time while it still spoke in groups.
+     A list of product names cannot drift from the products. */
   _openRouting(rows, cardCat) {
-    const groupable = this._groupableColumns(rows);
-    /* ⛔ DO NOT ASK A QUESTION THAT HAS ONLY ONE ANSWER. The operator came in through a
-       category card, and if nothing in the file could possibly name a different category
-       there is nothing to decide: importing straight through is exactly today's behaviour
-       for a wine list off the Wine card, and adding a screen and a click to that path
-       would be a regression dressed as a feature. The question appears only when the file
-       actually carries something that could name a category. */
-    /* ⛔ THE EARLY RETURN USED TO LIVE HERE AND IT SKIPPED THE VENDOR QUESTION.
-       "No groupable column" was treated as "no question", but a file can have nothing to
-       sort AND still name no supplier — a plain name-and-cost list is exactly that, and
-       it is the commonest shape a first-time operator brings. Every product landed with
-       no vendor and they were never asked. Found by designing the bare-minimum test file,
-       which is the whole argument for building the rough one first.
-       The decision now belongs to `_routeHasQuestion()`, which already knows about all
-       three reasons to stop: mixed categories, rows left behind, and no supplier. */
-    /* ⛔ COLUMN MODE ONLY WHEN THE COLUMN SHOWS THE FILE REALLY SPANS CATEGORIES.
-       A wine list's varietal column resolves every row to Wine — one category — and
-       sorting by it would SKIP any varietal the vocabulary happens not to know, where
-       "all one category" brings every row in. So: two or more categories means mixed and
-       the column decides; one or none means the card already answered it. */
-    const best = this._bestGrouping(rows);
+    rows = (rows || []).map((row, i) => Object.assign({}, row, { _rid: 'r' + i }));
     this._routing = {
-      rows: rows || [],
+      rows: rows,
       cardCat: cardCat || '',
-      /* Default to "all one category" with the card's category filled in, NOT to the
-         column. A wine list has a dozen varietals in its type column, so defaulting to
-         the column would hand the operator twelve dropdowns to answer a question they
-         already answered by clicking Wine. Coming in through a card IS an answer; the
-         column mode is one click away for the file that really is mixed. */
-      mode: (best && best.cats >= 2) ? 'column' : 'one',
-      groupBy: best ? best.key : (groupable.length ? groupable[0].key : ''),
-      one: cardCat || '',
-      assign: {},
-      // Blank = leave whatever the file said. Only fills rows whose vendor cell is empty.
-      vendor: '', vendorNew: false,
-      detail: false,         // the outcome first; the worksheet is one click away
-      modeTouched: false     // has the operator chosen a mode themselves?
+      assignById: {},   // _rid -> category. The operator's answers AND the pre-fill.
+      removed: {},      // _rid -> true. Not a product; never written.
+      open: {},         // which category groups are expanded on screen
+      checked: {},      // _rid -> true, the current selection
+      vendor: '', vendorNew: false
     };
-    this._seedAssign();
+    this._prefillAssign();
     // Nothing to decide and nothing left behind: do not put a second confirm in the way.
-    if (!this._routeHasQuestion()) { const rows2 = this._routeStamp(); this._routing = null; return this.runImport(rows2); }
+    if (!this._routeHasQuestion()) { const out = this._routeStamp(); this._routing = null; return this.runImport(out); }
     this.renderLanding();
     setTimeout(() => document.getElementById('ip-route-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   },
 
+  // Every row still in the import. A removed row is gone from the list and the counts.
+  _routeRows() {
+    const r = this._routing;
+    return r ? r.rows.filter(row => !r.removed[row._rid]) : [];
+  },
+  _assignRows(ids, cat) {
+    const r = this._routing;
+    if (!r) return;
+    (ids || []).forEach(id => { if (cat) r.assignById[id] = cat; else delete r.assignById[id]; });
+  },
+  _removeRows(ids) {
+    const r = this._routing;
+    if (!r) return;
+    // ⚠ Also drop the selection and the assignment, so a row put back by Start Over
+    // does not come back carrying a category nobody can see any more.
+    (ids || []).forEach(id => { r.removed[id] = true; delete r.checked[id]; delete r.assignById[id]; });
+  },
+
+  /* The rows as they would be written. `_category` is only ever the operator's answer or
+     the pre-fill they left alone — there is no third source and no fallback. */
+  _routeStamp() {
+    const r = this._routing;
+    if (!r) return [];
+    return this._routeRows().map(row => {
+      /* ⛔ FILL, NEVER OVERWRITE. The chosen supplier is the answer for a file that does
+         not name one, so it only applies where the row's own cell is empty. A file that
+         DOES carry a Supplier column has already answered per row, and a broadline guide
+         can legitimately list several. */
+      const vendor = String(row.vendor == null ? '' : row.vendor).trim() || (r.vendor || '');
+      return Object.assign({}, row, { _category: r.assignById[row._rid] || '', vendor: vendor });
+    });
+  },
+
+  /* ⛔ COUNTS WHAT `runImport` WILL ACTUALLY WRITE, IN THE SAME ORDER IT DECIDES.
+     Measured on a messy file: the table read 13, the button promised 14, and 12 landed —
+     it was counting a row with no product name and a name the file repeats. That is the
+     last number an operator reads before pressing ([[output-honesty]]). */
+  _routeSummary() {
+    const by = {}, missing = [];
+    let nameless = 0, dup = 0;
+    const taken = new Set((this.products() || []).map(p => (p.name || '').trim().toLowerCase()));
+    this._routeStamp().forEach(row => {
+      const nm = String(row.name == null ? '' : row.name).trim();
+      if (!nm) { nameless++; return; }
+      if (!row._category) { missing.push(nm); return; }
+      const key = nm.toLowerCase();
+      if (taken.has(key)) { dup++; return; }
+      taken.add(key);
+      by[row._category] = (by[row._category] || 0) + 1;
+    });
+    const order = App.IC_CATEGORIES || [];
+    const cats = Object.keys(by).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    return { by: by, cats: cats, missing: missing, nameless: nameless, dup: dup };
+  },
+  // ONE SOURCE with the list above it, or the button and the screen disagree.
+  _routeReadyCount() {
+    if (!this._routing) return 0;
+    const s = this._routeSummary();
+    return s.cats.reduce((n, c) => n + s.by[c], 0);
+  },
+  // Does the file leave anybody without a supplier? If not there is no question to ask.
+  _needsVendor() {
+    const r = this._routing;
+    return !!r && r.rows.some(row => !String(row.vendor == null ? '' : row.vendor).trim());
+  },
+  /* Is there anything on this screen worth asking? A file that sorted itself completely,
+     loses nothing and names a supplier has no question on it, and showing it would be a
+     second confirm on top of the mapper's own ([[automate-obvious-step]]). */
+  _routeHasQuestion() {
+    const r = this._routing;
+    if (!r) return false;
+    const s = this._routeSummary();
+    if (s.missing.length || s.nameless || s.dup) return true;
+    if (s.cats.length > 1) return true;
+    return this._needsVendor();
+  },
+
+  // ── The screen ─────────────────────────────────────────────────────────────
+  _routeRowHtml(row, cat) {
+    const r = this._routing;
+    const size = String(row.container_size_oz || row.case_size || '').trim();
+    return '<tr>'
+      + '<td style="width:38px;"><input type="checkbox" class="bc-check ip-rt-cb" value="' + esc(row._rid) + '"'
+        + (r.checked[row._rid] ? ' checked' : '') + '/></td>'
+      + '<td>' + esc(row.name || '') + '</td>'
+      + '<td style="color:var(--t3);">' + esc(row.brand || '') + '</td>'
+      + '<td style="color:var(--t3);">' + esc(size) + '</td>'
+      + '<td style="color:var(--t3);">' + esc(row.sub_category || '') + '</td>'
+      + '</tr>';
+  },
+  _routeTable(rows, cat) {
+    return '<div class="card card-bleed data-card"><div class="card-bleed-tbl"><table class="tbl"><thead><tr>'
+      + '<th style="width:38px;"></th><th>Product</th><th>Brand</th><th>Size</th><th>In your file</th>'
+      + '</tr></thead><tbody>' + rows.map(row => this._routeRowHtml(row, cat)).join('') + '</tbody></table></div></div>';
+  },
+
   routePanelHTML() {
     const r = this._routing;
-    const groupable = this._groupableColumns(r.rows);
     const cats = App.IC_CATEGORIES || [];
-    /* ⚠ `attrs` rather than post-hoc string surgery, and the row selects are keyed by
-       INDEX not by the value itself: a value off a real order guide can hold quotes,
-       spaces and slashes ("1/2 BBL"), none of which belong in an element id. */
-    const catSel = (id, sel, skipLabel, attrs) => '<select class="form-input" id="' + id + '"'
-      + (attrs ? ' ' + attrs : '') + ' style="max-width:210px;">'
-      + '<option value=""' + (sel ? '' : ' selected') + '>' + (skipLabel || 'Skip') + '</option>'
-      + cats.map(c => '<option value="' + esc(c) + '"' + (sel === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('')
-      + '</select>';
+    const rows = this._routeRows();
+    const unsorted = rows.filter(row => !r.assignById[row._rid]);
+    const sorted = {};
+    rows.forEach(row => { const c = r.assignById[row._rid]; if (c) (sorted[c] = sorted[c] || []).push(row); });
+    const order = cats.filter(c => sorted[c]);
+    const nChecked = rows.filter(row => r.checked[row._rid]).length;
 
-    /* ── WHO ARE THESE FROM? ───────────────────────────────────────────────
-       A vendor order guide is the file this feature exists for, and it has no vendor
-       column: the whole file is from one vendor, so nobody writes the name on every
-       row. Without this the products land with no vendor at all and the operator
-       bulk-edits it on, which is the chore Kyle raised.
-       ⛔ THIS DOES NOT CREATE A VENDOR RECORD, on purpose. `ic-vendors` already has a
-       deliberate pattern for exactly this — "Set Up From Your Products" lists a name
-       that is on products but not on the list, with a count and a Set Up button that
-       opens the add form prefilled so the rep, terms, minimums and delivery days get
-       filled in. Auto-creating a bare name-only record would SATISFY that list and the
-       operator would never be prompted for the details the Order Sheet needs. The name
-       on the product is the canonical link either way, so nothing has to relink. */
-    const vendorRows = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
-      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const known = vendorRows.some(v => v.name === r.vendor);
-    let body = '';
-    /* ⛔ ONLY ASK WHEN THE FILE DOES NOT ANSWER. Half of what confused Kyle was a
-       control that should never have been on screen: his file names a supplier on every
-       row, so there was no question, and it still showed a dropdown reading "Leave as in
-       the file" — four unanswered questions in one control ("from what?", "what file?",
-       "what list?", and nothing saying a typed name becomes a vendor).
-       When the file DOES leave it blank, it is a real question and it says what happens. */
-    /* ⛔ BUILT INTO ITS OWN VARIABLE AND APPENDED LAST. It used to be assembled straight
-       into `body` FIRST, so the screen read: "check where they are going" · supplier
-       question · the table you were just told to check. Kyle: *"the thing in that first
-       section you are telling the user to check is at the bottom.. with the supplier step
-       in between them"*. An instruction separated from its subject by an unrelated
-       question is worse than no instruction. Each section is now whole. */
+    /* The toolbar is the whole interaction: check some, say where they go, Add. Same
+       gesture as Set Locations, which the operator has already done once. */
+    let body = '<div class="no-print" style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ip-rt-all">Select All</button>'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ip-rt-none">Clear</button>'
+      + '<div class="f" style="max-width:200px;margin-bottom:0;"><label>Put the checked ones in</label>'
+      + '<select class="form-input" id="ip-rt-cat"><option value="">Choose...</option>'
+      + cats.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('')
+      + '</select></div>'
+      + '<button type="button" class="btn btn-primary btn-sm" id="ip-rt-add"' + (nChecked ? '' : ' disabled') + '>Add</button>'
+      + '<button type="button" class="btn btn-ghost btn-sm" id="ip-rt-del"' + (nChecked ? '' : ' disabled')
+      + ' style="color:var(--red);margin-left:auto;">Not a product</button>'
+      + '</div>';
+
+    if (unsorted.length) {
+      body += '<div class="sh" style="margin-top:6px;">Not Sorted Yet (' + unsorted.length + ')</div>'
+        + this._routeTable(unsorted, '');
+    }
+    /* Groups Bar Cop already worked out are COLLAPSED (Kyle's call), so the only thing at
+       eye level is what still needs doing. The count is on the heading, so a collapsed
+       group still tells you what it holds. */
+    order.forEach(c => {
+      const isOpen = !!r.open[c];
+      body += '<div class="sh ip-rt-head" data-cat="' + esc(c) + '" style="margin-top:22px;cursor:pointer;display:flex;align-items:center;gap:8px;">'
+        + '<span>Going Into ' + esc(c) + ' (' + sorted[c].length + ')</span>'
+        + '<span style="font-size:11px;">' + (isOpen ? '&#9662;' : '&#9656;') + '</span></div>'
+        + (isOpen ? this._routeTable(sorted[c], c) : '');
+    });
+
+    const s = this._routeSummary();
+    const gap = [];
+    if (s.nameless) gap.push(s.nameless + ' row' + (s.nameless === 1 ? ' has' : 's have') + ' no product name');
+    if (s.dup) gap.push(s.dup + (s.dup === 1 ? ' is a name' : ' are names') + ' you already have');
+    if (gap.length) {
+      body += '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin-top:16px;">'
+        + gap.join(', and ') + ', so ' + (s.nameless + s.dup === 1 ? 'it is' : 'they are') + ' left out.</div>';
+    }
+
+    /* ⛔ ONLY ASK WHEN THE FILE DOES NOT ANSWER. A file that names a supplier on every row
+       has no question, and the control does not belong on screen at all. */
     let vendorBlock = '';
-    const needVendor = this._needsVendor();
-    if (needVendor) {
-      const n = r.rows.length;
+    if (this._needsVendor()) {
+      const vendorRows = ((App.inventoryData && App.inventoryData.ic_vendors) || [])
+        .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      const known = vendorRows.some(v => v.name === r.vendor);
+      const n = rows.length;
       vendorBlock = this._sectionHead('Who Supplies These?',
         'Your file does not say. Pick who these came from and Bar Cop puts them on all '
         + n + ' product' + (n === 1 ? '' : 's') + ', and adds that vendor to your list so you can order from them. You can skip this and set it later.')
@@ -2629,279 +2729,22 @@ S.InventoryProducts = {
         + '</div>';
     }
 
-    /* ── THE DEFAULT VIEW IS THE OUTCOME, NOT THE MACHINERY ──────────────────
-       The first build asked three questions before anything happened, and the middle
-       one ("which column names the category") is a sentence no operator standing in a
-       bar would ever say. Now Bar Cop decides with its own vocabulary and SHOWS the
-       result: a count per category and, by name, whatever it could not place. One
-       button. The worksheet is still there behind "Change what goes where" for the file
-       that needs it, and for a beer guide where the styles genuinely cannot answer. */
-    if (!r.detail) {
-      const s = this._routeSummary();
-      const placed = s.cats.reduce((n, c) => n + s.by[c], 0);
-      body = this._sectionHead('Check Where They Are Going',
-        'Bar Cop sorted your ' + r.rows.length + ' row' + (r.rows.length === 1 ? '' : 's')
-        + ' into categories on its own. Have a look, then import. Nothing is saved until you do.')
-        + body;
-      body += '<table class="tbl"><thead><tr>'
-        + '<th>Going into</th><th style="width:150px;">Products</th></tr></thead><tbody>'
-        + s.cats.map(c => '<tr><td>' + esc(c) + '</td><td>' + s.by[c] + '</td></tr>').join('')
-        + (s.missing.length ? '<tr><td style="color:var(--t3);">Not importing</td>'
-            + '<td style="color:var(--t3);">' + s.missing.length + '</td></tr>' : '')
-        + '</tbody></table>';
-      if (s.missing.length) {
-        // Named, not counted: the operator can act on a name and cannot act on a number.
-        // And SAY WHY, because "not importing" with no reason is the kind of dead end
-        // that makes somebody close the tab on their first day.
-        const shown = s.missing.slice(0, 6);
-        body += '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin-top:16px;">'
-          + 'Bar Cop could not tell what ' + (s.missing.length === 1 ? 'this one is' : 'these are')
-          + ', so ' + (s.missing.length === 1 ? 'it' : 'they') + ' will be left out: <span style="color:var(--t3);">'
-          + esc(shown.join(', ')) + (s.missing.length > shown.length
-            ? ' and ' + (s.missing.length - shown.length) + ' more' : '') + '</span>. '
-          + 'If any of them are real products, use Change What Goes Where below.</div>';
-      }
-      /* The other two ways a row does not become a product. Without these the operator
-         reads "21 rows" at the top and 12 products at the bottom with nothing accounting
-         for the gap, which is the kind of silence that makes people distrust a number. */
-      const gap = [];
-      if (s.nameless) gap.push(s.nameless + ' row' + (s.nameless === 1 ? ' has' : 's have') + ' no product name');
-      if (s.dup) gap.push(s.dup + (s.dup === 1 ? ' is a name' : ' are names') + ' you already have');
-      if (gap.length) {
-        body += '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin-top:10px;">'
-          + gap.join(', and ') + ', so ' + (s.nameless + s.dup === 1 ? 'it is' : 'they are') + ' left out too.</div>';
-      }
-      if (!placed) {
-        body += '<div style="font-size:13.5px;color:var(--gold);line-height:1.55;margin-top:16px;">'
-          + 'Bar Cop could not place any of these on its own. Open Change What Goes Where and tell it '
-          + 'which category each one belongs in.</div>';
-      }
-      /* ⛔ THE SILENT MIS-FILE, and it is the worst thing this screen can still do.
-         When the file's category column holds codes Bar Cop cannot read (DEPT-12,
-         Class 5), everything falls back to the card and the summary reads "Liquor 14"
-         with nothing suggesting that nine of them are wine, kegs and soda. The operator
-         presses one button and gets nine products in the wrong place.
-         So: if the file HAS a column that could be naming categories and Bar Cop got
-         nothing out of it, say so. This is a fact about the FILE (a column with N
-         different values in it), not a guess about the products. */
-      const unread = (r.mode === 'one' && r.groupBy)
-        ? this._routeGroups(r.rows, r.groupBy).filter(g => g.value && !this._guessCategory(g.value)) : [];
-      if (unread.length > 1 && placed) {
-        body += '<div style="font-size:13.5px;color:var(--gold);line-height:1.55;margin-top:16px;">'
-          + 'Heads up: your file has a column with ' + unread.length + ' different values in it ('
-          + esc(unread.slice(0, 3).map(g => g.value).join(', '))
-          + (unread.length > 3 ? ', ...' : '') + ') and Bar Cop does not recognise any of them, '
-          + 'so it is putting everything in ' + esc(r.one) + '. If those values say what each product '
-          + 'is, open Change What Goes Where and sort them there.</div>';
-      }
-    } else {
-
-    body = this._sectionHead('Sort Them Yourself',
-      'Bar Cop groups your rows by one of the columns in your file. Set what each group is, '
-      + 'and anything left on Skip will not be imported.') + body;
-
-    if (groupable.length) {
-      body += '<div class="seg-toggle" style="margin-bottom:18px;">'
-        /* Relabelled once the product NAME started resolving rows on its own: "all one
-           category" stopped being true the moment Bar Cop could tell a Chardonnay from a
-           vodka without being told. */
-        + '<button type="button" class="btn btn-sm ' + (r.mode === 'one' ? 'btn-primary' : 'btn-ghost') + '" data-route-mode="one">Let Bar Cop sort them</button>'
-        + '<button type="button" class="btn btn-sm ' + (r.mode === 'column' ? 'btn-primary' : 'btn-ghost') + '" data-route-mode="column">Sort by a column in my file</button>'
-        + '</div>';
-    }
-
-    if (r.mode === 'column' && groupable.length) {
-      if (groupable.length > 1) {
-        body += '<div class="f" style="max-width:260px;margin-bottom:16px;"><label>Which column names the category</label>'
-          + '<select class="form-input" id="ip-route-col">'
-          + groupable.map(c => '<option value="' + esc(c.key) + '"' + (r.groupBy === c.key ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('')
-          + '</select></div>';
-      }
-      const groups = this._routeGroups(r.rows, r.groupBy);
-      /* ⚠ COUNTED OFF THE STAMP, not off the assign map. A group with no assignment is no
-         longer the same as a row that will not import — the row's own NAME gets a go
-         first. Counting unassigned GROUPS would now overstate what is being left behind. */
-      const unset = this._routeStamp().filter(row => !row._category).length;
-      body += '<table class="tbl"><thead><tr>'
-        + '<th>In your file</th><th style="width:130px;">Products</th><th style="width:230px;">Goes into</th>'
-        + '</tr></thead><tbody>'
-        + groups.map((g, i) => '<tr><td>' + (g.value ? esc(g.value) : '<span style="color:var(--t3);">(blank)</span>') + '</td>'
-            + '<td>' + g.count + '</td>'
-            + '<td>' + catSel('ip-rt-' + i, r.assign[g.value] || '', 'Skip', 'data-route-val="' + esc(g.value) + '"') + '</td></tr>').join('')
-        + '</tbody></table>'
-        /* A real `.f` + `<label>`, not a dim sentence beside a control. D2's card-prose
-           ratchet flagged the sentence version and it was right: a field's own label is
-           the exception, a floating six-word instruction is not. This is a label. */
-        + '<div class="f" style="max-width:260px;margin-top:18px;"><label>Set remaining to</label>'
-        + catSel('ip-route-bulk', '', 'Choose...') + '</div>'
-        // ⚠ No `note-line` class: it does not exist in style.css. Inline, like its neighbours.
-        // A live count of what the current choices would leave behind, not an instruction.
-        + (unset ? '<div style="margin-top:14px;font-size:12px;color:var(--t3);">'
-            + unset + ' product' + (unset === 1 ? '' : 's') + ' still on Skip will not be imported.</div>' : '');
-    } else {
-      // ⚠ NOT "These are all". Bar Cop places what it recognises from the product name;
-      // this is only the answer for what is left over.
-      body += '<div class="f" style="max-width:300px;"><label>Anything it cannot work out goes in</label>'
-        + catSel('ip-route-one', r.one, 'Leave it out') + '</div>';
-      /* ⚠ THE MIXED-FILE WARNING. This mode is the default and it is pre-filled with the
-         card, so pressing Import without looking gives the exact outcome this whole change
-         exists to stop: a mixed file filed entirely under one category. The routing screen
-         being VISIBLE is not the same as being read.
-         So: if Bar Cop recognises values in the file belonging to some OTHER category,
-         it says how many rows, by name. It is a count of what was recognised, not a claim
-         about the file — a beer guide full of styles recognises nothing and stays quiet
-         rather than crying wolf, which is the honest failure direction here. */
-      /* ⚠ RESOLVE THE SAME WAY THE SUMMARY DOES, or this warning goes quiet exactly when
-         it is needed most. It read the group VALUE only, so on a file of DEPT codes it
-         said nothing — even though Bar Cop had already worked out from the product NAMES
-         that nine of the fourteen were wine, kegs, cases and soda. Switching to
-         "all one category" would have filed them all as Liquor in silence. */
-      const other = {};
-      if (r.groupBy) {
-        const others = this._groupableColumns(r.rows).filter(c => c.key !== r.groupBy);
-        this._routeGroups(r.rows, r.groupBy).forEach(g => {
-          const guess = this._guessCategory(g.value) || this._agreeAcross(r.rows, r.groupBy, g.value, others);
-          if (guess && guess !== r.one) other[guess] = (other[guess] || 0) + g.count;
-        });
-      }
-      const names = Object.keys(other).sort((a, b) => other[b] - other[a]);
-      if (names.length) {
-        body += '<div style="margin-top:14px;font-size:12px;color:var(--gold);">'
-          // "1 look like Wine" is what the first version printed. The verb agrees with
-          // the ROW count, which is the only collection in this sentence.
-          + names.map(c => other[c] + (other[c] === 1 ? ' looks' : ' look') + ' like ' + esc(c)).join(', ') + '.</div>';
-      }
-    }
-
-    }   // end of the detail view
-
-    /* ⚠ THE WRITE STATE HAS TO SURVIVE A RE-RENDER. Every select on this panel re-renders
-       the whole thing, and a re-render rebuilds the Import button ENABLED from the ready
-       count alone — handing back the second press the `_routeWriting` flag exists to stop.
-       So the render reads the flag too, and a refused second press is never silent
-       (a button that looks live and does nothing is the bug, not the fix). */
     const ready = this._routeReadyCount();
     const busy = !!this._routeWriting;
-    /* The step head IS the card title now, and it carries the row count in its own lead,
-       so the old separate title and status line would be a second heading in one card. */
-    /* Each section whole, in the order the operator needs them: what Bar Cop did with the
-       file, then the one thing it still needs from them. The supplier question sits under
-       a hairline so it reads as its own section rather than more of the one above. */
-    return '<div class="card form-card" id="ip-route-panel">'
+    const lead = unsorted.length
+      ? 'Bar Cop has put ' + (rows.length - unsorted.length) + ' of these where it thinks they go. '
+        + 'Check the ' + unsorted.length + ' it could not work out, pick a category, and press Add.'
+      : 'Bar Cop has put all ' + rows.length + ' of these where it thinks they go. Open a group to check it.';
+
+    return this._sectionHead('Your ' + rows.length + ' Product' + (rows.length === 1 ? '' : 's'), lead)
       + body
-      + (vendorBlock ? '<div style="border-top:1px solid var(--b2);margin:24px -20px 0;padding:20px 20px 0;">'
-          + vendorBlock + '</div>' : '')
-      + '</div>'
-      + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + (vendorBlock ? '<div style="border-top:1px solid var(--b2);margin:26px 0 0;padding:20px 0 0;">' + vendorBlock + '</div>' : '')
+      + '<div class="no-print" style="margin:22px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && !busy ? '' : ' disabled')
       + '>' + (busy ? 'Importing...' : 'Import ' + ready + ' Product' + (ready === 1 ? '' : 's')) + '</button>'
-      + '<button type="button" class="btn btn-ghost" id="ip-route-detail"' + (busy ? ' disabled' : '') + '>'
-      + (r.detail ? 'Back' : 'Change what goes where') + '</button>'
       + '<button type="button" class="btn btn-ghost" id="ip-route-back"' + (busy ? ' disabled' : '') + '>Start Over</button>'
       + '</div>'
       + '<div id="ip-csv-actions" class="no-print" style="margin:0 0 24px;"></div>';
-  },
-
-  /* What the current answers ADD UP TO. This is the screen the operator sees first now:
-     the outcome, not the machinery. Ordered by the app's own category order so it reads
-     the same way the tabs do. */
-  /* ⛔ IT COUNTS WHAT `runImport` WILL ACTUALLY WRITE, IN THE SAME ORDER IT DECIDES.
-     Kyle's messy-file walk: the table read 13, the button promised **14**, and **12**
-     landed. It was counting a row with no product name and a name the file repeats — both
-     of which runImport drops. A button that overstates the result is the plainest kind of
-     [[output-honesty]] failure, and it is the last number the operator reads before
-     pressing it. Same order as runImport: no name → no category → already taken. */
-  _routeSummary() {
-    const by = {}, missing = [];
-    let nameless = 0, dup = 0;
-    const taken = new Set((this.products() || []).map(p => (p.name || '').trim().toLowerCase()));
-    this._routeStamp().forEach(row => {
-      const nm = String(row.name == null ? '' : row.name).trim();
-      if (!nm) { nameless++; return; }
-      if (!row._category) { missing.push(nm); return; }
-      const key = nm.toLowerCase();
-      if (taken.has(key)) { dup++; return; }    // repeated in the file, or already on the list
-      taken.add(key);
-      by[row._category] = (by[row._category] || 0) + 1;
-    });
-    const order = App.IC_CATEGORIES || [];
-    const cats = Object.keys(by).sort((a, b) => order.indexOf(a) - order.indexOf(b));
-    return { by: by, cats: cats, missing: missing, nameless: nameless, dup: dup };
-  },
-
-  /* Is there anything on this screen worth asking? If the file is one category, every row
-     lands, and it already names a vendor, then the screen has no question on it and
-     showing it is a second confirm on top of the mapper's own ([[automate-obvious-step]]).
-     Kyle, 2026-08-03: "i have to follow your directions to get the specific right outcome". */
-  _routeHasQuestion() {
-    const r = this._routing;
-    if (!r) return false;
-    const s = this._routeSummary();
-    if (s.cats.length > 1 || s.missing.length) return true;
-    /* ⛔ A COLUMN BAR COP COULD NOT READ IS ITSELF A REASON TO STOP. Without this, a file
-       with DEPT-12 codes AND a vendor column has no "question" by any other test — one
-       category, nothing left behind, supplier known — so the screen was skipped entirely
-       and every product was filed under the card with the operator never seeing it.
-       That is the silent mis-file with the last thing that could catch it removed. */
-    if (r.mode === 'one' && r.groupBy
-        && this._routeGroups(r.rows, r.groupBy).filter(g => g.value && !this._guessCategory(g.value)).length > 1) return true;
-    return this._needsVendor();
-  },
-  // Does the file leave anybody without a supplier? If not there is no question to ask,
-  // and the control does not belong on screen at all.
-  _needsVendor() {
-    const r = this._routing;
-    return !!r && r.rows.some(row => !String(row.vendor == null ? '' : row.vendor).trim());
-  },
-
-  // How many rows would actually import. Drives the button label AND the disabled state,
-  // so "Import 0 Products" can never be a live button (S125's shape).
-  /* ONE SOURCE. This used to count the stamp directly and the summary counted it again
-     with different rules, so the button and the table above it disagreed by two. */
-  _routeReadyCount() {
-    if (!this._routing) return 0;
-    const s = this._routeSummary();
-    return s.cats.reduce((n, c) => n + s.by[c], 0);
-  },
-  // The rows with `_category` resolved. runImport treats '' as unplaceable: not imported,
-  // named in the result. That is the whole contract, and it is pinned.
-  _routeStamp() {
-    const r = this._routing;
-    if (!r) return [];
-    /* ⛔ THE PRODUCT NAME IS A PER-ROW FACT AND IT MUST NOT NEED A GROUPING COLUMN.
-       Kyle dropped a one-column list — Well Vodka, House Chardonnay, Domestic Draft,
-       Bottled Water — and all ten landed as Liquor. Bar Cop knew every one of those words
-       by then; it simply never looked, because name matching only ran through
-       `_agreeAcross`, which needs a column to group by. A file with one column has none,
-       so the whole mechanism sat idle on the file that needs it most.
-       Precedence, and each step is a real distinction:
-         1. the operator's own choice for this group (including an explicit Skip)
-         2. the row's NAME
-         3. whatever the operator said to do with the rest
-       So "these are all Liquor" is the answer for what Bar Cop cannot work out, not an
-       instruction to ignore what it can. */
-    const named = row => this._guessCategory(String(row.name == null ? '' : row.name).trim());
-    return r.rows.map(row => {
-      let cat;
-      /* ⛔ FURNITURE IS CHECKED FIRST AND CANNOT FALL BACK. Returning '' from the name
-         test was not enough: the leftover rule then handed it the card category, so
-         "*** LIQUOR SECTION ***" imported as a Liquor product anyway. A row that is the
-         file's own scaffolding is not a product under ANY answer the operator gives. */
-      if (this._isFurnitureRow(row)) cat = '';
-      else if (r.mode === 'column' && r.groupBy) {
-        const chosen = r.assign[String(row[r.groupBy] == null ? '' : row[r.groupBy]).trim()];
-        cat = chosen !== undefined ? chosen : (named(row) || '');
-      } else {
-        cat = named(row) || r.one || '';
-      }
-      /* ⛔ FILL, NEVER OVERWRITE. The chosen vendor is the answer for a file that does not
-         name one, so it only applies where the row's own cell is empty. A file that DOES
-         carry a Supplier column has already told us, per row, and a broadline guide can
-         legitimately list more than one — overwriting that with a single answer would
-         throw away a fact the file actually contained. */
-      const vendor = String(row.vendor == null ? '' : row.vendor).trim() || (r.vendor || '');
-      return Object.assign({}, row, { _category: cat, vendor: vendor });
-    });
   },
 
   // CSVMapper hands back rows already keyed by field (name, unit_cost, ...). Build
