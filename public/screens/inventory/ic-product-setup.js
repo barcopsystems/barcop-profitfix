@@ -863,6 +863,8 @@ S.InventoryProducts = {
       redraw();
     });
 
+    document.getElementById('ip-route-detail')?.addEventListener('click', () => { r.detail = !r.detail; redraw(); });
+
     document.getElementById('ip-route-back')?.addEventListener('click', () => {
       // Back to the drop zone, not out of the import. The file is re-dropped from scratch
       // because a mapping belongs to the file it was made for.
@@ -2267,21 +2269,71 @@ S.InventoryProducts = {
      STYLE does not, because an IPA is a keg or a case and the file does not say which.
      Guessing there would put product in the wrong category on the app's most common
      order guide, so those come back '' and the operator picks. */
+  /* ⛔ THE THIN WORD LIST IS WHAT FORCED THE COMPLICATED SCREEN (Kyle, 2026-08-03:
+     "this whole process is complicated as heck"). The first version matched the WHOLE
+     cell exactly, so it knew Chardonnay and Cabernet and did not know Pinot Noir or
+     Sauvignon Blanc — which are just as common. Most rows came back unset, and because
+     most rows came back unset the operator had to hand-classify a fourteen-row
+     worksheet. Bar Cop was making the operator do its job.
+     These are FINITE, WELL-KNOWN lists, not inference: spirit types, wine varietals, and
+     the pack formats a distributor writes. A whitelist can be wrong about a word; it
+     cannot be wrong about a rule it never made up.
+     ⚠ BEER STYLES ARE STILL ABSENT AND THAT IS DELIBERATE. An IPA is a keg or a case and
+     the file does not say which. Pinned as F3, and widening the vocabulary must not
+     quietly undo it. */
   _ROUTE_HINTS: {
-    'Liquor':  ['vodka','gin','rum','tequila','mezcal','whiskey','whisky','bourbon','rye','scotch','cognac','brandy','liqueur','cordial','schnapps','aperitif','bitters','spirit','spirits','liquor'],
-    'Wine':    ['wine','red wine','white wine','rose','rosé','sparkling','champagne','prosecco','chardonnay','cabernet','merlot','pinot','sauvignon','riesling','malbec','zinfandel','syrah','shiraz','moscato','sangria','port','sherry'],
-    'Draft Beer':  ['draft','draught','keg','kegs','on tap','tap'],
-    'Bottle Beer': ['bottle beer','bottled beer','can','cans','canned','package beer','packaged beer','six pack','sixpack'],
-    'Food':    ['food','produce','meat','poultry','seafood','dairy','bakery','bread','frozen','dry goods','grocery'],
-    'Misc':    ['na beverage','non alcoholic','non-alcoholic','soda','juice','mixer','mixers','garnish','garnishes','supply','supplies','paper','paper goods','chemical','chemicals','cleaning','glassware','smallwares']
+    'Liquor': ['liquor','spirit','spirits','vodka','gin','rum','rhum','cachaca','tequila','mezcal',
+      'whiskey','whisky','bourbon','rye','scotch','irish whiskey','single malt','blended whiskey',
+      'cognac','armagnac','brandy','calvados','grappa','pisco','soju','shochu','aquavit','akvavit',
+      'liqueur','liqueurs','cordial','cordials','schnapps','amaro','amari','absinthe','anisette',
+      'sambuca','ouzo','triple sec','curacao','irish cream','aperitif','apertif','digestif',
+      'bitters','blanco','reposado','anejo','overproof','well','call','premium','top shelf'],
+    'Wine': ['wine','wines','red wine','white wine','rose','rosé','blush','sparkling','champagne',
+      'prosecco','cava','chardonnay','cabernet','sauvignon','merlot','pinot','noir','grigio','gris',
+      'riesling','malbec','zinfandel','syrah','shiraz','moscato','muscat','tempranillo','sangiovese',
+      'chianti','rioja','bordeaux','burgundy','barolo','nebbiolo','viognier','albarino','verdejo',
+      'gewurztraminer','chenin','semillon','grenache','mourvedre','carmenere','primitivo',
+      'montepulciano','valpolicella','malvasia','torrontes','vinho','port','sherry','madeira',
+      'marsala','sangria','by the glass','btg'],
+    /* Pack formats, and they are the beer order guide's only honest discriminator. A
+       barrel is a keg and a can is a can, with no judgement involved.
+       ⚠ `btl` is deliberately ABSENT: a liquor guide writes "12/750ML BTL", so it would
+       file spirits as bottle beer. That group comes up unset and the operator sets it. */
+    'Draft Beer':  ['draft','draught','keg','kegs','bbl','barrel','half barrel','sixtel','on tap','tap'],
+    /* ⚠ `oz btl` / `oz bottle` as PHRASES, never a bare `btl`. Bare would have filed a
+       liquor guide's "12/750ML BTL" as bottle beer; with the ounce attached, "24/12 OZ
+       BTL" matches and the millilitre form cannot. Excluding `btl` outright was the safe
+       first move and it cost three real products (Corona, Bud Light Bottles, Michelob)
+       on the beer guide — measured, which is what showed the phrase was worth finding. */
+    'Bottle Beer': ['bottle beer','bottled beer','can','cans','canned','package beer','packaged beer',
+      'six pack','sixpack','6pk','12pk','24pk','oz btl','oz bottle','oz bottles'],
+    'Food': ['food','produce','meat','beef','pork','poultry','chicken','seafood','fish','shellfish',
+      'dairy','cheese','bakery','bread','frozen','grocery','dry goods','spice','spices','sauce',
+      'sauces','oil','oils','condiment','condiments','flour','sugar','baking'],
+    'Misc': ['na beverage','n/a beverage','non alcoholic','non-alcoholic','nonalcoholic','soda',
+      'sodas','cola','juice','juices','mixer','mixers','syrup','syrups','puree','garnish','garnishes',
+      'supply','supplies','paper','paper goods','disposable','disposables','chemical','chemicals',
+      'cleaning','glassware','smallwares','straws','napkins','co2','ice','tonic','seltzer','water',
+      'energy drink','coffee','tea']
   },
+  /* Matches the whole cell, a multi-word phrase inside it, or a single WHOLE TOKEN.
+     ⚠ TOKENS, NEVER SUBSTRINGS. "Ginger Beer" contains the letters g-i-n and a substring
+     match would file a mixer as liquor; as tokens it is [ginger, beer] and `gin` does not
+     appear. Same trap protects "Canadian Whisky" from the `can` in bottle beer.
+     ⛔ AND IF TWO CATEGORIES BOTH CLAIM THE VALUE, IT SETTLES NOTHING — return unset. A
+     "Bourbon Barrel Aged" line hits both Liquor and Draft Beer, and unset is the honest
+     answer there, not whichever category happened to be checked first. */
   _guessCategory(value) {
     const s = String(value || '').trim().toLowerCase();
     if (!s) return '';
+    const tokens = s.split(/[^a-z0-9]+/).filter(Boolean);
+    const hits = new Set();
     for (const cat of Object.keys(this._ROUTE_HINTS)) {
-      if (this._ROUTE_HINTS[cat].some(w => w === s)) return cat;
+      const hit = this._ROUTE_HINTS[cat].some(w =>
+        w === s || (w.indexOf(' ') > -1 ? s.indexOf(w) > -1 : tokens.indexOf(w) > -1));
+      if (hit) hits.add(cat);
     }
-    return '';
+    return hits.size === 1 ? [...hits][0] : '';
   },
   _seedAssign() {
     const r = this._routing;
@@ -2293,6 +2345,29 @@ S.InventoryProducts = {
 
   // Entry from CSVMapper. `cardCat` is the category card the operator came in through,
   // which pre-answers the question for the six existing doors.
+  /* Which column, if any, actually SORTS this file? Measured, not guessed: run the
+     vocabulary over each candidate column's values and count the ROWS it can place.
+     The winner is the column that places the most. No threshold anywhere — the file
+     either has a column that resolves rows or it does not.
+     ⚠ This is what lets a beer guide sort itself: its Type column holds styles and
+     places NOTHING, while its Pack column holds 1/2 BBL and 24/12 oz CAN and places
+     nearly everything. Picking `groupable[0]` would have taken the useless one. */
+  _bestGrouping(rows) {
+    let best = null;
+    this._groupableColumns(rows).forEach(c => {
+      const cats = new Set();
+      let placed = 0;
+      this._routeGroups(rows, c.key).forEach(g => {
+        const guess = this._guessCategory(g.value);
+        if (guess) { placed += g.count; cats.add(guess); }
+      });
+      if (!best || placed > best.placed || (placed === best.placed && cats.size > best.cats)) {
+        best = { key: c.key, placed: placed, cats: cats.size };
+      }
+    });
+    return best;
+  },
+
   _openRouting(rows, cardCat) {
     const groupable = this._groupableColumns(rows);
     /* ⛔ DO NOT ASK A QUESTION THAT HAS ONLY ONE ANSWER. The operator came in through a
@@ -2302,6 +2377,12 @@ S.InventoryProducts = {
        would be a regression dressed as a feature. The question appears only when the file
        actually carries something that could name a category. */
     if (!groupable.length && cardCat) { this._routing = null; return this.runImport(rows); }
+    /* ⛔ COLUMN MODE ONLY WHEN THE COLUMN SHOWS THE FILE REALLY SPANS CATEGORIES.
+       A wine list's varietal column resolves every row to Wine — one category — and
+       sorting by it would SKIP any varietal the vocabulary happens not to know, where
+       "all one category" brings every row in. So: two or more categories means mixed and
+       the column decides; one or none means the card already answered it. */
+    const best = this._bestGrouping(rows);
     this._routing = {
       rows: rows || [],
       cardCat: cardCat || '',
@@ -2310,14 +2391,17 @@ S.InventoryProducts = {
          the column would hand the operator twelve dropdowns to answer a question they
          already answered by clicking Wine. Coming in through a card IS an answer; the
          column mode is one click away for the file that really is mixed. */
-      mode: 'one',
-      groupBy: groupable.length ? groupable[0].key : '',
+      mode: (best && best.cats >= 2) ? 'column' : 'one',
+      groupBy: best ? best.key : (groupable.length ? groupable[0].key : ''),
       one: cardCat || '',
       assign: {},
       // Blank = leave whatever the file said. Only fills rows whose vendor cell is empty.
-      vendor: '', vendorNew: false
+      vendor: '', vendorNew: false,
+      detail: false          // the outcome first; the worksheet is one click away
     };
     this._seedAssign();
+    // Nothing to decide and nothing left behind: do not put a second confirm in the way.
+    if (!this._routeHasQuestion()) { const rows2 = this._routeStamp(); this._routing = null; return this.runImport(rows2); }
     this.renderLanding();
     setTimeout(() => document.getElementById('ip-route-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   },
@@ -2361,6 +2445,30 @@ S.InventoryProducts = {
       + (r.vendorNew ? '<div class="f" style="max-width:260px;"><label>Vendor name</label>'
           + '<input class="form-input" id="ip-route-vendor-new" type="text" value="' + esc(known ? '' : (r.vendor || '')) + '" placeholder="Coastal Beverage"/></div>' : '')
       + '</div>';
+
+    /* ── THE DEFAULT VIEW IS THE OUTCOME, NOT THE MACHINERY ──────────────────
+       The first build asked three questions before anything happened, and the middle
+       one ("which column names the category") is a sentence no operator standing in a
+       bar would ever say. Now Bar Cop decides with its own vocabulary and SHOWS the
+       result: a count per category and, by name, whatever it could not place. One
+       button. The worksheet is still there behind "Change what goes where" for the file
+       that needs it, and for a beer guide where the styles genuinely cannot answer. */
+    if (!r.detail) {
+      const s = this._routeSummary();
+      body += '<table class="tbl"><thead><tr>'
+        + '<th>Going into</th><th style="width:150px;">Products</th></tr></thead><tbody>'
+        + s.cats.map(c => '<tr><td>' + esc(c) + '</td><td>' + s.by[c] + '</td></tr>').join('')
+        + (s.missing.length ? '<tr><td style="color:var(--t3);">Not importing</td>'
+            + '<td style="color:var(--t3);">' + s.missing.length + '</td></tr>' : '')
+        + '</tbody></table>';
+      if (s.missing.length) {
+        // Named, not counted: the operator can act on a name and cannot act on a number.
+        const shown = s.missing.slice(0, 6);
+        body += '<div style="margin-top:14px;font-size:12px;color:var(--t3);">'
+          + esc(shown.join(', ')) + (s.missing.length > shown.length
+            ? ' and ' + (s.missing.length - shown.length) + ' more' : '') + '.</div>';
+      }
+    } else {
 
     if (groupable.length) {
       body += '<div class="seg-toggle" style="margin-bottom:18px;">'
@@ -2421,6 +2529,8 @@ S.InventoryProducts = {
       }
     }
 
+    }   // end of the detail view
+
     /* ⚠ THE WRITE STATE HAS TO SURVIVE A RE-RENDER. Every select on this panel re-renders
        the whole thing, and a re-render rebuilds the Import button ENABLED from the ready
        count alone — handing back the second press the `_routeWriting` flag exists to stop.
@@ -2441,9 +2551,40 @@ S.InventoryProducts = {
       + '<div class="no-print" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && !busy ? '' : ' disabled')
       + '>' + (busy ? 'Importing...' : 'Import ' + ready + ' Product' + (ready === 1 ? '' : 's')) + '</button>'
+      + '<button type="button" class="btn btn-ghost" id="ip-route-detail"' + (busy ? ' disabled' : '') + '>'
+      + (r.detail ? 'Back' : 'Change what goes where') + '</button>'
       + '<button type="button" class="btn btn-ghost" id="ip-route-back"' + (busy ? ' disabled' : '') + '>Start Over</button>'
       + '</div>'
       + '<div id="ip-csv-actions" class="no-print" style="margin:0 0 24px;"></div>';
+  },
+
+  /* What the current answers ADD UP TO. This is the screen the operator sees first now:
+     the outcome, not the machinery. Ordered by the app's own category order so it reads
+     the same way the tabs do. */
+  _routeSummary() {
+    const by = {}, missing = [];
+    let nameless = 0;
+    this._routeStamp().forEach(row => {
+      const nm = String(row.name == null ? '' : row.name).trim();
+      if (!nm) { nameless++; return; }          // runImport reports these in its own bucket
+      if (row._category) by[row._category] = (by[row._category] || 0) + 1;
+      else missing.push(nm);
+    });
+    const order = App.IC_CATEGORIES || [];
+    const cats = Object.keys(by).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    return { by: by, cats: cats, missing: missing, nameless: nameless };
+  },
+
+  /* Is there anything on this screen worth asking? If the file is one category, every row
+     lands, and it already names a vendor, then the screen has no question on it and
+     showing it is a second confirm on top of the mapper's own ([[automate-obvious-step]]).
+     Kyle, 2026-08-03: "i have to follow your directions to get the specific right outcome". */
+  _routeHasQuestion() {
+    const r = this._routing;
+    if (!r) return false;
+    const s = this._routeSummary();
+    if (s.cats.length > 1 || s.missing.length) return true;
+    return r.rows.some(row => !String(row.vendor == null ? '' : row.vendor).trim());
   },
 
   // How many rows would actually import. Drives the button label AND the disabled state,
