@@ -835,8 +835,10 @@ S.InventoryProducts = {
     // always computed from the same place the import will read (never from the DOM).
     const redraw = () => this.renderLanding();
 
+    // `modeTouched`: once the operator picks a mode themselves, opening the worksheet
+    // must never quietly move them off it.
     this.container.querySelectorAll('[data-route-mode]').forEach(b =>
-      b.addEventListener('click', () => { r.mode = b.dataset.routeMode; redraw(); }));
+      b.addEventListener('click', () => { r.mode = b.dataset.routeMode; r.modeTouched = true; redraw(); }));
 
     document.getElementById('ip-route-col')?.addEventListener('change', e => {
       r.groupBy = e.target.value; r.assign = {}; this._seedAssign(); redraw();
@@ -867,7 +869,18 @@ S.InventoryProducts = {
       redraw();
     });
 
-    document.getElementById('ip-route-detail')?.addEventListener('click', () => { r.detail = !r.detail; redraw(); });
+    document.getElementById('ip-route-detail')?.addEventListener('click', () => {
+      /* ⛔ OPENING THE WORKSHEET MUST SHOW THE GROUPS. On a file whose category column
+         Bar Cop cannot read, everything falls back to "all one category" — and then
+         Change What Goes Where opened on a single dropdown, with the DEPT-12 list hidden
+         behind a toggle labelled "Sorted by a column". That toggle is the jargon Kyle
+         called out, and it was the ONLY way to fix the one file that most needs fixing.
+         So the worksheet opens on the groups, unless the operator has deliberately
+         chosen all-one-category themselves. */
+      if (!r.detail && !r.modeTouched && r.groupBy && this._groupableColumns(r.rows).length) r.mode = 'column';
+      r.detail = !r.detail;
+      redraw();
+    });
 
     document.getElementById('ip-route-back')?.addEventListener('click', () => {
       // Back to the drop zone, not out of the import. The file is re-dropped from scratch
@@ -2474,7 +2487,8 @@ S.InventoryProducts = {
       assign: {},
       // Blank = leave whatever the file said. Only fills rows whose vendor cell is empty.
       vendor: '', vendorNew: false,
-      detail: false          // the outcome first; the worksheet is one click away
+      detail: false,         // the outcome first; the worksheet is one click away
+      modeTouched: false     // has the operator chosen a mode themselves?
     };
     this._seedAssign();
     // Nothing to decide and nothing left behind: do not put a second confirm in the way.
@@ -2572,6 +2586,24 @@ S.InventoryProducts = {
         body += '<div style="font-size:13.5px;color:var(--gold);line-height:1.55;margin-top:16px;">'
           + 'Bar Cop could not place any of these on its own. Open Change What Goes Where and tell it '
           + 'which category each one belongs in.</div>';
+      }
+      /* ⛔ THE SILENT MIS-FILE, and it is the worst thing this screen can still do.
+         When the file's category column holds codes Bar Cop cannot read (DEPT-12,
+         Class 5), everything falls back to the card and the summary reads "Liquor 14"
+         with nothing suggesting that nine of them are wine, kegs and soda. The operator
+         presses one button and gets nine products in the wrong place.
+         So: if the file HAS a column that could be naming categories and Bar Cop got
+         nothing out of it, say so. This is a fact about the FILE (a column with N
+         different values in it), not a guess about the products. */
+      const unread = (r.mode === 'one' && r.groupBy)
+        ? this._routeGroups(r.rows, r.groupBy).filter(g => g.value && !this._guessCategory(g.value)) : [];
+      if (unread.length > 1 && placed) {
+        body += '<div style="font-size:13.5px;color:var(--gold);line-height:1.55;margin-top:16px;">'
+          + 'Heads up: your file has a column with ' + unread.length + ' different values in it ('
+          + esc(unread.slice(0, 3).map(g => g.value).join(', '))
+          + (unread.length > 3 ? ', ...' : '') + ') and Bar Cop does not recognise any of them, '
+          + 'so it is putting everything in ' + esc(r.one) + '. If those values say what each product '
+          + 'is, open Change What Goes Where and sort them there.</div>';
       }
     } else {
 
@@ -2688,6 +2720,13 @@ S.InventoryProducts = {
     if (!r) return false;
     const s = this._routeSummary();
     if (s.cats.length > 1 || s.missing.length) return true;
+    /* ⛔ A COLUMN BAR COP COULD NOT READ IS ITSELF A REASON TO STOP. Without this, a file
+       with DEPT-12 codes AND a vendor column has no "question" by any other test — one
+       category, nothing left behind, supplier known — so the screen was skipped entirely
+       and every product was filed under the card with the operator never seeing it.
+       That is the silent mis-file with the last thing that could catch it removed. */
+    if (r.mode === 'one' && r.groupBy
+        && this._routeGroups(r.rows, r.groupBy).filter(g => g.value && !this._guessCategory(g.value)).length > 1) return true;
     return this._needsVendor();
   },
   // Does the file leave anybody without a supplier? If not there is no question to ask,
