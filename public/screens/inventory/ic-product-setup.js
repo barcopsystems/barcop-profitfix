@@ -2707,10 +2707,16 @@ S.InventoryProducts = {
          it says how many rows, by name. It is a count of what was recognised, not a claim
          about the file — a beer guide full of styles recognises nothing and stays quiet
          rather than crying wolf, which is the honest failure direction here. */
+      /* ⚠ RESOLVE THE SAME WAY THE SUMMARY DOES, or this warning goes quiet exactly when
+         it is needed most. It read the group VALUE only, so on a file of DEPT codes it
+         said nothing — even though Bar Cop had already worked out from the product NAMES
+         that nine of the fourteen were wine, kegs, cases and soda. Switching to
+         "all one category" would have filed them all as Liquor in silence. */
       const other = {};
       if (r.groupBy) {
+        const others = this._groupableColumns(r.rows).filter(c => c.key !== r.groupBy);
         this._routeGroups(r.rows, r.groupBy).forEach(g => {
-          const guess = this._guessCategory(g.value);
+          const guess = this._guessCategory(g.value) || this._agreeAcross(r.rows, r.groupBy, g.value, others);
           if (guess && guess !== r.one) other[guess] = (other[guess] || 0) + g.count;
         });
       }
