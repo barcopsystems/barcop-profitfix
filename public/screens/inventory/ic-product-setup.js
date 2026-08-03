@@ -440,7 +440,7 @@ S.InventoryProducts = {
       { h: 'Other Pour Sizes Sold', p: ['The standard serving and its menu price live up top. If a product also sells another way, a pitcher, a happy hour pour, a whole bottle of wine, add it under Other Pour Sizes Sold with its own price and Bar Cop shows that size its own pour cost. A thinner happy hour price reads its own honest margin instead of hiding inside the standard pour.'] },
       { h: 'Uploading A List', p: ['Each category card has an Upload option for bringing in a whole list at once from a CSV or Excel file: a POS export, a distributor order guide, or your own spreadsheet. The first row is your column headers, one product per row. Starting from a category card just tells Bar Cop what to expect, so the columns it offers match that category. It is not locked to it. Every import then stops on one more screen, where you check where each product is going before anything is added.'] },
       { h: 'Matching Your Columns', p: ['Only Product Name is required; everything else is optional and can be filled in after. Your headers do not need to match exactly. After you drop the file, Bar Cop shows the columns it found, auto-matched to each field, with a preview of your first rows so you can confirm it lined them up right. Fix any that are wrong, set ones you want to ignore to Skip, then Import. Any row missing required data comes in as Incomplete so you can finish it later.'] },
-      { h: 'Checking Where Everything Goes', p: ['A distributor order guide is one file with kegs and cases in it, and an export from another program is usually one file with everything in it. So once the columns are matched, every import stops here: Bar Cop lists every product it found and shows you where each one is going before anything is written. It is the same screen and the same press whether the file sorted itself perfectly or not, which is also your chance to drop anything you no longer carry. The ones it has already worked out sit in a closed section per category, with the count on the section, so you can open one and check it. Anything it could not work out sits at the top, open, and that is the only part you have to do.', 'Bar Cop fills in whatever the product name or a column in your file settles on its own. Bourbon, Vodka and Gin are Liquor, and it knows the common spirit and wine brands by name. It leaves a beer style alone on purpose, because an IPA can be a keg or a case and the file does not say which, and it would rather ask than put your product in the wrong place. Tick the ones it left, pick a category, and press Move To. Every row also has a Remove button, for the section headings and subtotal lines an order guide is full of.', 'If your file does not name a supplier, Bar Cop asks once and puts that vendor on every product it adds that does not already name one, and adds them to your vendor list so you can order from them. Nothing is written to your account until you press Add, and that button says exactly how many products are coming in.'] },
+      { h: 'Checking Where Everything Goes', p: ['A distributor order guide is one file with kegs and cases in it, and an export from another program is usually one file with everything in it. So once the columns are matched, every import stops here: Bar Cop lists every product it found and shows you where each one is going before anything is written. It is the same screen and the same press whether the file sorted itself perfectly or not, which is also your chance to drop anything you no longer carry. The ones it has already worked out sit in a closed section per category, with the count on the section, so you can open one and check it. Anything it could not work out sits at the top, open, and that is the only part you have to do.', 'Bar Cop fills in whatever the product name or a column in your file settles on its own. Bourbon, Vodka and Gin are Liquor, and it knows the common spirit and wine brands by name. It leaves a beer style alone on purpose, because an IPA can be a keg or a case and the file does not say which, and it would rather ask than put your product in the wrong place. Tick the ones it left, pick a category, and press Move To. Every row also has a Remove button, for the section headings and subtotal lines an order guide is full of.', 'If the file turns out to be all one category, like a draft list or a wine list, anything Bar Cop cannot read on its own goes to the card you started from, because that is the answer you already gave it. When the file holds several categories it never does that: what it cannot place stays at the top for you.', 'If your file does not name a supplier, Bar Cop asks once and puts that vendor on every product it adds that does not already name one, and adds them to your vendor list so you can order from them. Nothing is written to your account until you press Add, and that button says exactly how many products are coming in.'] },
       { h: 'Bulk Edit Many At Once', p: ['After an upload you often need the same value across a whole category: a 1.5 oz pour on every liquor, one vendor or storage location across a list, the same par. Check the products you want, or use Select All on the category tab, then tap Bulk Edit. Turn on only the fields you want to change, set each value, and Apply. Bar Cop writes those fields to every selected product at once and leaves everything else untouched, then refigures pours per container, cost per pour, and pour cost percent for each one. Anything that was Incomplete and now has what it needs clears its flag.'] },
       { h: 'Hiding A Product', p: ['When you Edit a product, the status across from the title reads ACTIVE or INACTIVE. Hit Hide from operations to pull a seasonal pour or a discontinued item out of counts, orders, and the menu side without throwing away its history, then Update to commit. An inactive product moves to the Inactive tab after Misc, so your category lists stay clean; open it there and Make active brings it back.'] }
     ]);
@@ -2516,6 +2516,41 @@ S.InventoryProducts = {
         guess = this._guessCategory(v) || this._agreeAcross(r.rows, best.key, v, others);
       }
       if (guess) r.assignById[row._rid] = guess;
+    });
+
+    /* ⛔⛔ THE CARD ANSWERS WHAT THE FILE COULD NOT — BUT ONLY ON A SINGLE-CATEGORY FILE.
+       Kyle, chat 27, after a bottle beer EXPORT sorted 1 of 10 on the Bottle Beer card.
+       Unlike the draft one there is no fact in that file to read: the Type column holds
+       STYLES (unreadable by design), the names are beer BRANDS (excluded for the same
+       reason a style is — Coors Light ships as a keg and as a case), and a Case Size of
+       24 is not distinctive, because a liquor file's 12-bottle case column binds to the
+       same field. The only thing left that can answer it is the card they clicked, which
+       is not a guess: it is the operator's own statement about the file.
+
+       THIS REVERSES CHAT 26'S "NO CARD FALLBACK", and what makes it safe now is the
+       change directly above: EVERY import stops at the confirm screen, so the card can no
+       longer file anything silently. The defect that rule was written against was 400 rows
+       landing as Liquor with nobody told; the same rows now arrive as a list you accept.
+
+       ⛔ GATED ON A MEASUREMENT, NOT A FEELING. How many distinct categories did the FILE
+       resolve out of itself? Measured across every file on disk: the six that already work
+       read 3 to 5, and both broken exports read exactly 1. The gap is 1 against 3, so this
+       threshold is not fitted to whichever fixture was in front of me ([[the-loop]] #28).
+       Two or more means the file is genuinely mixed, and the card stays out of it exactly
+       as it does today.
+       ⚠ COUNTED BEFORE A SINGLE ROW IS FILLED. Counting as we go would put the card's own
+       category into the set after the first fill, the file would read as mixed from row two
+       onward, and every remaining row would be left behind — a fallback that fires once.
+       ⚠ AND FURNITURE IS TESTED AGAIN HERE. This is a second pass, so the guard that keeps
+       `*** SECTION ***` and SUBTOTAL out of the products does not carry over from the loop
+       above. A section divider becoming a product is worse than one left unsorted
+       ([[the-loop]] #26). */
+    const fileCats = new Set(Object.values(r.assignById).filter(Boolean));
+    if (fileCats.size > 1 || !r.cardCat) return;
+    r.rows.forEach(row => {
+      if (r.assignById[row._rid] !== undefined) return;
+      if (this._isFurnitureRow(row)) return;
+      r.assignById[row._rid] = r.cardCat;
     });
   },
 
