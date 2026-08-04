@@ -345,6 +345,14 @@ S.LaborStaffRoster = {
     this.container.onclick = ev => {
       /* The confirm screen's two controls. Both write state and re-render, so the button's count,
          the rows and what gets written all read from the same place. */
+      // A section head opens or closes its own table. A closed section renders no rows at all, so
+      // this is what actually builds them.
+      const ssec = ev.target.closest('[data-confirm-section]');
+      if (ssec && this._staffReview) {
+        const k = ssec.dataset.confirmSection;
+        this._staffReview.open[k] = (k === 'needs') ? (this._staffReview.open[k] === false) : !this._staffReview.open[k];
+        this.renderList(); return;
+      }
       if (ev.target.closest('[data-staffreview-go]')) { this._runStaffReview(); return; }
       if (ev.target.closest('[data-staffreview-back]')) {
         // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
@@ -442,7 +450,7 @@ S.LaborStaffRoster = {
   },
 
   _openStaffReview(rows) {
-    this._staffReview = { rows: (rows || []).slice() };
+    this._staffReview = { rows: (rows || []).slice(), open: {} };
     this.renderList();
   },
 
@@ -518,6 +526,8 @@ S.LaborStaffRoster = {
       verb: 'Add', noun: 'Person', nounPlural: 'People',
       goAttr: 'data-staffreview-go', backAttr: 'data-staffreview-back', backLabel: 'Start Over',
       resultId: 'sr-imp-result',
+      // The door owns which sections are open; a closed one builds no table at all.
+      open: (this._staffReview || {}).open,
       busy: !!this._staffReviewWriting
     });
   },
