@@ -708,6 +708,12 @@ S.ShiftDashboard = {
       outcomeLabel: 'What Happens',
       rows: days.map(d => this._salesReviewRow(d)),
       verb: 'Add', noun: 'Day',
+      /* ⛔ FLAT, AND THIS IS THE ONE DOOR THAT SHOULD BE. Every other import is an unbounded list of
+         things and gets the shell's needs-a-look / collapsed split, because a 240-row first drop
+         buries both the work and the button. A sales week is SEVEN DAYS READ MONDAY TO SUNDAY: the
+         count is bounded by the calendar and the order is the whole point, so splitting it into two
+         sections would be worse, not better. A fact about this door, not a row-count threshold. */
+      flat: true,
       goAttr: 'data-salesreview-go', backAttr: 'data-salesreview-back', backLabel: 'Start Over',
       resultId: 'sc-ck-import-res',
       busy: busy
