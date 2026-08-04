@@ -1977,12 +1977,20 @@ S.HubBooks = {
   // categories fold into 'Other' so nothing gets dropped from the rollup.
   _opExSums(monthKey, ytd) {
     const out = {};
-    // One canonical category list, shared with the Operating Expenses log, so a
-    // category change there can never silently mis-bucket here.
-    const known = (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.CATEGORIES) || [
+    /* ⭐⭐ ONE CANONICAL LIST, AND IT IS NOW THE OPERATOR'S OWN (2026-08-04). The comment that used
+       to sit here claimed a category change in the log "can never silently mis-bucket here" — and it
+       could, because BOTH sides read the locked builtin enum and folded everything else into Other.
+       A category the operator ADDED through the list manager had its money reassigned on the Income
+       Statement exactly as it was on the log's By Category card. `categoryList()` is the shared
+       answer and `_catOf` is the shared bucketing rule, so the two screens cannot disagree about
+       where a dollar went. Pinned as an EQUALITY in verify-expense-category-rollup.js, because a
+       pin on either number passes happily while the other drifts ([[the-loop]] #54). */
+    const OEX = (window.S && S.HubOperatingExpenses) || null;
+    const known = (OEX && typeof OEX.categoryList === 'function') ? OEX.categoryList()
+      : ((OEX && OEX.CATEGORIES) || [
       'Occupancy (Rent, Property Tax)', 'Utilities', 'Insurance', 'Marketing and Advertising',
       'Professional Fees', 'Bank and Credit Card Fees', 'Licenses and Permits', 'Software and Subscriptions', 'Other'
-    ];
+    ]);
     known.forEach(k => { out[k] = 0; });
     const records = App.data?.operating_expenses || [];
     const year = monthKey.slice(0, 4);
@@ -1994,7 +2002,11 @@ S.HubBooks = {
       } else {
         if (mk !== monthKey) return;
       }
-      const cat = known.includes(r.category) ? r.category : 'Other';
+      /* Bucket by the record's OWN category; only a record with no category at all falls to Other,
+         which is what the entry form and the importer actually write. Delegated so the log and this
+         cannot drift; the inline fallback is for a session where the log screen has not loaded. */
+      const cat = (OEX && typeof OEX._catOf === 'function') ? OEX._catOf(r)
+        : (String((r && r.category) || '').trim() || 'Other');
       out[cat] = (out[cat] || 0) + (parseFloat(r.amount) || 0);
     });
     return out;

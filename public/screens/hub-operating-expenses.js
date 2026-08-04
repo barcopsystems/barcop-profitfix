@@ -122,25 +122,65 @@ S.HubOperatingExpenses = {
       return mk && mk.slice(0, 4) === year && mk <= monthKey;
     }).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
   },
+  /* ⭐⭐ THE CATEGORY ROLL-UP FOLLOWS THE OPERATOR'S OWN LIST (Kyle, 2026-08-04, found by using the
+     app): *"if i customize my category list in the operating expense form.. the by category does not
+     change with it."* Both roll-ups asked `CATEGORIES.includes(r.category) ? r.category : 'Other'`,
+     which does not merely fail to RENDER an added category, it SILENTLY REASSIGNS its money. Add
+     "Delivery App Fees" through the list manager, log $4,000 against it, and the card showed $0.00
+     on that line and $4,000 sitting in Other, while This Month and Year to Date directly above it
+     counted the same $4,000 correctly. Two figures on one screen disagreeing.
+     THE LIST IS: what the operator's own list offers, PLUS anything that actually has money on file.
+     The second half is the one that matters — a category they later HID, or a legacy value from an
+     old import, must never take its money off the card with it. `App.listOptions` already applies
+     hidden/added/`other` correctly, so this door does not re-implement any of that.
+     ⚠ ONE LIST, TWO SCREENS. `hub-books._opExSums` reads the same log for the Income Statement and
+     carried the identical fold, under a comment claiming a category change here "can never silently
+     mis-bucket" there. It now calls this ([[the-loop]] #54: pin the equality, not either number). */
+  categoryList() {
+    const out = [];
+    const push = c => {
+      const v = String(c == null ? '' : c).trim();
+      if (v && !out.some(x => x.toLowerCase() === v.toLowerCase())) out.push(v);
+    };
+    (App.listOptions ? (App.listOptions('expense_category') || []) : []).forEach(push);
+    // A blank list (the entry form has never rendered, so nothing registered the builtins yet)
+    // must still give a full card rather than an empty one.
+    if (!out.length) this.CATEGORIES.forEach(push);
+    // Anything with money on file, whatever the list says today.
+    this.records().forEach(r => { if (r && String(r.category || '').trim()) push(r.category); });
+    // 'Other' is where a record with no category at all lands, so it is always a row.
+    push('Other');
+    /* ⚠ AND IT IS ALWAYS THE LAST ROW. Other is the catch-all, the card has always ended with it,
+       and a real category printed underneath it reads like a subtotal line that is not one. Added
+       categories and revived hidden ones both append, so without this they land after it. Caught by
+       reading a passing assertion's `got=`, not by any assertion. */
+    const oi = out.findIndex(c => c.toLowerCase() === 'other');
+    if (oi >= 0 && oi !== out.length - 1) out.push(out.splice(oi, 1)[0]);
+    return out;
+  },
+  /* ⛔ BUCKET BY THE RECORD'S OWN CATEGORY. Only a record with NO category falls to Other — that is
+     the one thing Other is for, and it is what the importer's own fallback writes. */
+  _catOf(r) { return String((r && r.category) || '').trim() || 'Other'; },
   _sumMonthByCategory(monthKey) {
     const out = {};
-    this.CATEGORIES.forEach(c => { out[c] = 0; });
+    this.categoryList().forEach(c => { out[c] = 0; });
     this.records().filter(r => r && this._monthKey(r.date) === monthKey).forEach(r => {
-      const c = this.CATEGORIES.includes(r.category) ? r.category : 'Other';
+      const c = this._catOf(r);
       out[c] = (out[c] || 0) + (parseFloat(r.amount) || 0);
     });
     return out;
   },
+  // Same list and same bucketing rule as _sumMonthByCategory above, for the same reason.
   _sumYTDByCategory(monthKey) {
     const year = monthKey.slice(0, 4);
     const out = {};
-    this.CATEGORIES.forEach(c => { out[c] = 0; });
+    this.categoryList().forEach(c => { out[c] = 0; });
     this.records().filter(r => {
       if (!r) return false;
       const mk = this._monthKey(r.date);
       return mk && mk.slice(0, 4) === year && mk <= monthKey;
     }).forEach(r => {
-      const c = this.CATEGORIES.includes(r.category) ? r.category : 'Other';
+      const c = this._catOf(r);
       out[c] = (out[c] || 0) + (parseFloat(r.amount) || 0);
     });
     return out;
@@ -952,6 +992,17 @@ S.HubOperatingExpenses = {
         this._expenseReview.removed[b.dataset.confirmRemove] = true;
         this.renderMain();
       }));
+      /* The category picker. Keyed by vendor, so one change moves every row for that vendor and the
+         re-render shows it happening. `change`, not `input`: a native select fires change on commit. */
+      /* ⛔ THROUGH `_setExpenseCategory`, NOT INLINE. The first version wrote `picks` straight from
+         the handler, which left the method with no caller at all — the retired-code ratchet caught
+         it — and meant the pin was exercising a path the app never took ([[the-loop]] #103). One
+         implementation, and the control already carries the vendor key rather than a row id. */
+      this.container.querySelectorAll('[data-oexcat]').forEach(sel => sel.addEventListener('change', () => {
+        if (!this._expenseReview) return;
+        this._setExpenseCategory(sel.dataset.oexcat, sel.value);
+        this.renderMain();
+      }));
       this.container.querySelector('[data-oexreview-go]')?.addEventListener('click', () => this._runExpenseReview());
       this.container.querySelector('[data-oexreview-back]')?.addEventListener('click', () => {
         this._expenseReview = null; this.renderMain();
@@ -1157,6 +1208,81 @@ S.HubOperatingExpenses = {
      [[the-loop]] #47/#52 — a question asked over the caller's window instead of its own.
      So the verdict is taken at the DROP, held on the review, and handed to every later walk AND to
      the write, which is what makes the screen and the store agree. */
+  // One spelling of a vendor name, so "Ben E. Keith" and "BEN E KEITH" are one vendor.
+  _vendorKey(n) { return String(n == null ? '' : n).trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); },
+
+  /* ⭐⭐ THE CATEGORY THIS VENDOR WAS LAST LOGGED UNDER (Kyle, 2026-08-04): *"all defaulted to
+     other... a user would have to go in and manually edit all of those?"* Yes, and that was the
+     wrong answer. `_matchCat` only ever read the file's own category column, and a bank register has
+     no category column: Kyle's Chase file had `Type`, holding ACH_DEBIT and DEBIT_CARD.
+     THIS HALF DOES NO GUESSING AT ALL. It reads the operator's own log, so the answer is a decision
+     they already made, and a bank register is dropped every month with the same vendors: the second
+     drop onward, AUSTIN ENERGY already reads Utilities. The first drop is what the picker is for.
+     ⚠ NEWEST BY DATE, NEVER BY ARRAY POSITION ([[event-store-gotchas]]). And 'Other' is not an
+     answer, it is the absence of one, so it never teaches. */
+  _categoryForVendor(name) {
+    const k = this._vendorKey(name);
+    if (!k) return '';
+    const hits = this.records().filter(r => r && this._vendorKey(r.vendor) === k
+      && String(r.category || '').trim() && String(r.category).trim().toLowerCase() !== 'other');
+    if (!hits.length) return '';
+    hits.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    return String(hits[hits.length - 1].category).trim();
+  },
+
+  /* ⛔⛔ WHAT BAR COP CAN RECOGNISE AS BELONGING SOMEWHERE ELSE (Kyle, 2026-08-04, by using the app):
+     *"owner draw is going into operating expenses.... i thought that was a cash outflow?"* He is
+     right. `hub-cash-outflows` has Owner draw as a first-class TYPE, so Bar Cop already knows what
+     one is and where it goes, and this door booked it as an operating expense anyway. A draw is a
+     distribution of PROFIT, so it understates profit by its own amount on the Income Statement, and
+     it lands in This Month, Year to Date and By Category with it.
+
+     ⭐ EVERY TERM HAS AN APP-SIDE ANCHOR, NOT A LIST I INVENTED: the `hub-cash-outflows` types
+     (draw, loan, tax), Labor for payroll, the operator's OWN inventory vendor list for deliveries,
+     and the two exclusions this file's own header has always named (Repairs and Maintenance, which
+     live in sc_maintenance). A transfer between the operator's own accounts is not an expense at all.
+
+     ⛔ A MATCH NEVER DECIDES ANYTHING — the row still lands, with the note and Remove beside it.
+     On a confirm screen a guess is a suggestion, so a false positive costs one note and a false
+     negative costs what the operator was going to do anyway. That is the whole reason a vocabulary
+     is defensible here, and it inverts [[the-loop]] #30's risk: nothing is inferred into a stored
+     value, only into a sentence the operator can overrule by doing nothing.
+
+     ⚠ [[the-loop]] #26 — this class of vocabulary has eaten a real name three times, so every term
+     is phrase-anchored or word-bounded and pinned against a list of real businesses. The sharp one
+     is `\birs\b`: F-I-R-S-T contains the literal substring "irs", so an unbounded match would call
+     every FIRST NATIONAL a tax remittance. Also deliberately absent: a bare `tax` (Taxidermy, and
+     PROPERTY TAX is inside this door's OWN "Occupancy (Rent, Property Tax)" category), a bare
+     `capital` (Capital Grille, Capital City Beverage), a bare `draw` (Drawbridge Brewing) and a bare
+     `transfer` (Transferrin Labs). `payroll` is word-bounded so Payrolling Solutions stays quiet.
+     ⚠ The table is folded INTO this function on purpose: a data property sibling is invisible to
+     every slicer in the harness suite ([[the-loop]] #16). */
+  _belongsElsewhere(vendor) {
+    const t = ' ' + String(vendor == null ? '' : vendor).toLowerCase()
+      .replace(/'/g, '').replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+    if (t.trim() === '') return '';
+    const RULES = [
+      [/\bowners? draw\b|\bmember draw\b|\bpartner draw\b|\bshareholder distribution\b|\bdistribution to owner\b/,
+        'An owner draw belongs in Cash Outflows'],
+      [/\btransfer to\b|\btransfer from\b|\bonline transfer\b|\bacct xfer\b|\baccount transfer\b/,
+        'A transfer between your own accounts'],
+      [/\bloan (payment|pmt|repayment)\b|\bsba loan\b|\bprincipal payment\b|\bnote payment\b/,
+        'A loan payment belongs in Cash Outflows'],
+      [/\bpayroll taxe?s?\b|\bestimated taxe?s?\b|\bsales tax\b|\bfranchise tax\b|\b941\b|\birs\b/,
+        'A tax payment belongs in Cash Outflows'],
+      [/\bpayroll\b/, 'Payroll is tracked in Labor'],
+      [/\brepairs?\b|\bmaintenance\b/, 'Repairs go in Shift Control']
+    ];
+    for (let i = 0; i < RULES.length; i++) if (RULES[i][0].test(t)) return RULES[i][1];
+    /* The operator's OWN inventory vendor list. Not a guess at all: if they buy product from this
+       name, a debit to it is a delivery, and deliveries are COGS through Inventory. */
+    const vend = (App.inventoryData && Array.isArray(App.inventoryData.ic_vendors))
+      ? App.inventoryData.ic_vendors : [];
+    const k = this._vendorKey(vendor);
+    if (k && vend.some(v => v && this._vendorKey(v.name) === k)) return 'This vendor is on your Inventory list';
+    return '';
+  },
+
   _expenseVerdicts(rows) {
     const conv = (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
       ? PosIngest.dateConvention(rows, 'date') : { dayFirst: false, contradictory: false };
@@ -1177,7 +1303,7 @@ S.HubOperatingExpenses = {
      unreadable amount, then credit, then $0, then undated, then the file's own subtotal, then
      already-logged. Each one is a different sentence to the operator and they are not
      interchangeable — a $0 row is not a credit, and a dated TOTAL line is not a bill. */
-  _buildExpenseRows(rows, v) {
+  _buildExpenseRows(rows, v, picks) {
     v = v || this._expenseVerdicts(rows || []);
     /* ⚠⚠ DEDUP AGAINST A SNAPSHOT, WITH CONSUME-ONCE — AND BOTH ARE REBUILT PER CALL.
        The snapshot half: the old test ran against the LIVE log while the loop appended to it, so
@@ -1222,8 +1348,14 @@ S.HubOperatingExpenses = {
       // reported as one — it is simply nothing to log.
       if (amount === 0) { list.push({ raw: r, status: 'zero', date: date, amount: 0, fileAmount: _raw, notes: [] }); return; }
       if (!date)        { list.push({ raw: r, status: 'undated', amount: amount, fileAmount: _raw, notes: [] }); return; }
-      const named = this.CATEGORIES.includes(r.category) ? r.category : this._matchCat(r.category);
-      const category = named || 'Other';
+      const vendor = (r.vendor || '').trim();
+      /* ⭐ FOUR SOURCES, IN THIS ORDER, AND ONLY THE FIRST TWO ARE THE OPERATOR SPEAKING DIRECTLY:
+         what they picked on this screen, what the file itself said (matched against their list),
+         what this vendor was last logged under, and finally Other. */
+      const named  = this.CATEGORIES.includes(r.category) ? r.category : this._matchCat(r.category);
+      const picked = (picks && picks[this._vendorKey(vendor)]) || '';
+      const learned = (picked || named) ? '' : this._categoryForVendor(vendor);
+      const category = picked || named || learned || 'Other';
       /* ⚠ A CATEGORY THE FILE CARRIED AND BAR COP COULD NOT PLACE IS A NOTE ON A LANDING ROW.
          The row still imports — the operator wants the expense logged and will fix the category on
          the row below — but "Other" arriving silently is how a QuickBooks Desktop export once put
@@ -1231,7 +1363,6 @@ S.HubOperatingExpenses = {
          the By Category card, the YTD % column and Books' category lines. An ABSENT category cell is
          not a problem and must never be flagged, or every bank register reads broken. */
       const badCat = !!(String(r.category == null ? '' : r.category).trim() && !named);
-      const vendor = (r.vendor || '').trim();
       /* ⚠⚠ A DATED "TOTAL" ROW IS NOT AN EXPENSE — it is the file's own subtotal, and importing it
          makes the month read exactly double (S223). `isSummaryName` is the shared gate; it is
          verified against real vendor names ("Total Wine & More", "Grand Rapids Linen") in
@@ -1248,10 +1379,19 @@ S.HubOperatingExpenses = {
         return;
       }
       const rowNotes = [];
-      if (badCat) rowNotes.push('Category not on your list');
+      /* ⚠ THE NOTE IS ACTIONABLE NOW, because there is a picker on the row to act with. "Category
+         not on your list" described a problem and offered nothing; the operator's only remedy was
+         editing every row in Expense History afterwards, which is exactly what Kyle hit. A picked
+         category says nothing at all: they chose it, and telling them so is noise. */
+      if (picked) { /* their own choice needs no comment */ }
+      else if (learned) rowNotes.push('Category from your log');
+      else if (badCat) rowNotes.push('Category not on your list, pick one');
+      else rowNotes.push('Pick a category or it goes in as Other');
+      const elsewhere = this._belongsElsewhere(vendor);
+      if (elsewhere) rowNotes.push(elsewhere);
       list.push({
         raw: r, status: 'new', date: date, amount: amount, vendor: vendor, category: category,
-        badCat: badCat, notes: rowNotes,
+        badCat: badCat, elsewhere: elsewhere, notes: rowNotes,
         rec: { id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date: date, category: category,
                vendor: vendor, amount: amount, notes: notes, created_at: new Date().toISOString() }
       });
@@ -1266,9 +1406,30 @@ S.HubOperatingExpenses = {
       rows: (rows || []).map((r, i) => Object.assign({}, r, { _rid: 'r' + i })),
       // Taken from the WHOLE file, once. See _expenseVerdicts.
       verdicts: this._expenseVerdicts(rows || []),
+      // Categories the operator picks on the screen, keyed BY VENDOR. See _setExpenseCategory.
+      picks: {},
       open: {}, removed: {}
     };
     this.renderMain();
+  },
+
+  /* ⛔ THE PICK IS KEYED BY VENDOR, NOT BY ROW, AND THAT IS THE POINT. A bank register lists ALSCO
+     four times in a month and SYSCO four times; making the operator answer once per ROW is the
+     complaint restated, not answered. Measured on a real Chase month: 64 landing rows are 37
+     distinct vendors, 14 of which repeat. Keyed this way it is 37 decisions once, and zero from then
+     on, because `_categoryForVendor` reads them back out of the log on the next drop. */
+  _setExpenseCategory(vendor, cat) {
+    if (!this._expenseReview) return;
+    this._expenseReview.picks[this._vendorKey(vendor)] = cat;
+  },
+
+  // The per-row category control. Pre-selected to whatever the walk resolved, so a row that already
+  // knows its category needs no attention and one that does not is the only thing to answer.
+  _catPickerHtml(vendor, selected) {
+    const opts = this.categoryList().map(c => '<option value="' + esc(c) + '"'
+      + (c === selected ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    return '<select data-oexcat="' + esc(this._vendorKey(vendor)) + '"'
+      + ' style="margin-top:6px;width:100%;font-size:11px;padding:3px 4px;">' + opts + '</select>';
   },
 
   /* ONE WALK produces the rows the screen shows AND the number the button prints, because they come
@@ -1278,7 +1439,7 @@ S.HubOperatingExpenses = {
     if (!r) return { rows: [], count: 0 };
     // A removed row is gone from the list, the count and the write.
     const live = r.rows.filter(x => !r.removed[x._rid]);
-    const built = this._buildExpenseRows(live, r.verdicts);
+    const built = this._buildExpenseRows(live, r.verdicts, r.picks);
     // ⚠ Zipped by index: the build pushes exactly one entry per input row, in order.
     const rows = built.list.map((x, i) => this._expenseReviewRow(x, (live[i] || {})._rid));
     return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
@@ -1325,6 +1486,9 @@ S.HubOperatingExpenses = {
       key: rid,
       note: NOTE[x.status] || '',
       notes: x.notes || [],
+      // The category control, on the rows that will actually be written. A row that is not landing
+      // has no category to set.
+      decision: x.status === 'new' ? this._catPickerHtml(x.vendor, x.category) : '',
       lands: x.status === 'new'
     };
   },
@@ -1338,15 +1502,15 @@ S.HubOperatingExpenses = {
        will not land, and the button counts what will be written. Reading the nearest one is how a
        screen ends up contradicting itself. And the lead names the button's own verb — renaming the
        button has to rewrite this sentence with it. */
-    /* ⛔⛔ THE SECOND SENTENCE IS THE POPUP'S WHOLE REASON FOR EXISTING and it had to move here
-        before that popup could go. It is the only place in Bar Cop that says a bank debit is not
-        automatically an operating expense. Dropping a clause before moving its fact is losing
-        information, not repeating less. */
-    const lead = 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's') + ' out of this file. '
-      + (bad ? (bad === 1 ? 'One of them is not going in. ' : bad + ' of them are not going in. ') : '')
-      + 'Remove anything that is not an operating expense: food and liquor purchases, payroll and'
-      + ' card-processor fees are tracked elsewhere in Bar Cop, so importing them here counts them'
-      + ' twice. Nothing is saved until you press Add.'
+    /* ⛔ SHORT. Kyle on the first walk: *"explainer text under check your expenses is way too
+       long."* It was four sentences doing the work of one, and the fourth was a list of examples
+       that now belongs where the examples actually are: on the rows themselves, where the ones Bar
+       Cop can recognise say so by name. The double-count WARNING survives, because it is the only
+       place in the app that says a bank debit is not automatically an operating expense, and it is
+       the whole reason this door has a per-row control. The examples went; the fact did not. */
+    const lead = 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's') + ' out of this file'
+      + (bad ? ', ' + bad + ' of them not going in' : '')
+      + '. Remove anything tracked elsewhere in Bar Cop or it counts twice.'
       /* ⚠ THE TWO FILE-LEVEL CAVEATS BELONG ON THE SCREEN, NOT IN A SENTENCE PRINTED AFTERWARDS.
          They are facts about how EVERY row was read, so they cannot live on a row, and the operator
          needs them BEFORE they press Add rather than once the money is in. Only the case Bar Cop
@@ -1366,6 +1530,11 @@ S.HubOperatingExpenses = {
       outcomeLabel: 'What Happens',
       rows: s.rows,
       verb: 'Add', noun: 'Expense',
+      /* ⛔ THE HEAD NAMES THE JOB, because on this door the settled rows are not settled. See the
+         note in ImportConfirm._section: a bank register lists payroll, COGS, owner draws and
+         transfers beside the rent, and Bar Cop cannot tell them apart. This is the only sentence the
+         operator sees while the section is closed. */
+      settledSub: 'Bar Cop read fine. Open this to check nothing belongs elsewhere',
       removable: true,
       goAttr: 'data-oexreview-go', backAttr: 'data-oexreview-back', backLabel: 'Start Over',
       resultId: 'oex-imp-result',
@@ -1388,7 +1557,7 @@ S.HubOperatingExpenses = {
          surviving rows is the defect `_expenseVerdicts` exists to close, and it would show up only
          as a number that disagreed with the button. */
       await this._importRows(r.rows.filter(x => !r.removed[x._rid]),
-        { reviewed: true, verdicts: r.verdicts });
+        { reviewed: true, verdicts: r.verdicts, picks: r.picks });
     } finally {
       this._expenseReviewWriting = false;
       /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `_importRows` is what clears it — a refused write
@@ -1416,7 +1585,9 @@ S.HubOperatingExpenses = {
        the ones taken from the WHOLE file at the drop, so removing rows cannot re-read the
        survivors. A call with no screen in front of it takes its own. */
     const v = opts.verdicts || this._expenseVerdicts(rows || []);
-    const built = this._buildExpenseRows(rows, v);
+    // ⛔ THE SAME PICKS THE SCREEN DREW WITH, for the same reason as the verdicts: a category the
+    // operator chose and then did not see stored is the worst possible outcome of asking them.
+    const built = this._buildExpenseRows(rows, v, opts.picks);
     const countOf = f => built.list.filter(f).length;
     const toAdd       = built.list.filter(x => x.status === 'new').map(x => x.rec);
     const credits     = countOf(x => x.status === 'credit');
@@ -1551,7 +1722,8 @@ S.HubOperatingExpenses = {
     const pctMk      = (pctB && pctB.mk.slice(0, 4) === mk.slice(0, 4)) ? pctB.mk : '';
     const byCatPct   = pctMk ? this._sumYTDByCategory(pctMk) : null;
     const ytdRev     = pctMk ? pctB.ytdRev : 0;
-    const catRows = this.CATEGORIES.map(c => {
+    // The operator's own list, plus anything with money on file. See categoryList().
+    const catRows = this.categoryList().map(c => {
       const tm = byCatMonth[c] || 0, lm = byCatLast[c] || 0, ytd = byCatYTD[c] || 0;
       const ytdRevPct = (byCatPct && ytdRev > 0) ? ((byCatPct[c] || 0) / ytdRev) : null;
       const dim = (tm === 0 && lm === 0 && ytd === 0);
