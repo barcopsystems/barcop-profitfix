@@ -384,19 +384,37 @@ S.RevenueMenuItems = {
        heading under it named the same thing twice; and the paragraph explaining what inactive means
        was a sentence the operator reads once and then reads forever. What the tab was missing is the
        control every sibling tab has in that exact spot. */
+    /* ⛔ THE SAME TOOLBAR THE ACTIVE TABS HAVE (Kyle, 2026-08-04: *"make menu builder inactive
+       function/look just like add products inactive"*). Add Products' Inactive tab carries Select
+       All / Clear, bulk Make Active, bulk Delete and Export PDF; this one had none of it, so
+       restoring or clearing out a mis-imported batch was one click per row.
+       ⚠ BULK MAKE ACTIVE, NOT BULK EDIT. Add Products shut its bulk-edit door on this tab for a
+       measured reason — the list is deliberately cross-category, so no single form is right for it —
+       and the tab's real jobs are RESTORE and DELETE. Same two here. */
+    const selCount = this._selected ? this._selected.size : 0;
     const archivedSection = onInactive
-      ? '<div class="no-print" style="display:flex;align-items:center;gap:8px;margin:16px 0 10px;">'
-        + '<button class="btn btn-ghost btn-sm" id="mi-export" style="margin-left:auto;">Export PDF</button>'
-        + '</div>'
+      // ⚠ NO TOOLBAR ON AN EMPTY TAB, which is what Add Products does: Select All over nothing, and
+      // an Export of an empty list, are controls that cannot do anything.
+      ? (archivedItems.length
+          ? '<div class="no-print" style="display:flex;align-items:center;gap:8px;margin:16px 0 10px;flex-wrap:wrap;">'
+            + '<button class="btn btn-ghost btn-sm mi-sel-all">Select All</button>'
+            + '<button class="btn btn-ghost btn-sm mi-sel-clear">Clear</button>'
+            + (selCount > 0 ? '<button class="btn btn-ghost btn-sm mi-sel-activate">Make Active ' + selCount + ' Selected</button>' : '')
+            + (selCount > 0 ? '<button class="btn btn-danger btn-sm mi-sel-del">Delete ' + selCount + ' Selected</button>' : '')
+            + '<button class="btn btn-ghost btn-sm" id="mi-export" style="margin-left:auto;">Export PDF</button>'
+            + '</div>'
+          : '')
         // ⚠ THE EXPORT'S ROOT. `App.exportPDF` is handed `#mi-list-export`, and that element only
         // ever existed in the active-tab body — a button without it would hand the exporter a null
         // root and print nothing, which is the one outcome worse than no button.
         + '<div id="mi-list-export">'
         + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-        + '<th>Item</th><th>Category</th><th>Price</th><th></th>'
+        + '<th></th><th>Item</th><th>Category</th><th>Price</th><th></th>'
         + '</tr></thead><tbody>'
         + (archivedItems.length
           ? archivedItems.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(item => '<tr>'
+              + '<td class="cb-left" style="width:40px;text-align:center;"><input type="checkbox" class="bc-check mi-sel" data-id="' + esc(item.id) + '"'
+                + ((this._selected && this._selected.has(item.id)) ? ' checked' : '') + '/></td>'
               + '<td><div class="val">' + esc(item.name) + '</div></td>'
               + '<td>' + esc(item.category || '') + '</td>'
               + '<td>' + (item.price ? App.fmtCurrency(item.price) : '-') + '</td>'
@@ -406,9 +424,9 @@ S.RevenueMenuItems = {
               // along; this tab was the one that was wrong.
               + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm mi-restore" data-id="' + esc(item.id) + '">Make Active</button>'
               + '<button class="btn btn-ghost btn-sm mi-inactive-edit" data-id="' + esc(item.id) + '">Edit</button>'
-              + '<button class="btn btn-danger btn-sm mi-delperm" data-id="' + esc(item.id) + '">Delete Permanently</button></div></td>'
+              + '<button class="btn btn-danger btn-sm mi-delperm" data-id="' + esc(item.id) + '">Delete</button></div></td>'
             + '</tr>').join('')
-          : '<tr><td colspan="4" style="color:var(--t3);font-size:12px;padding:14px 12px;line-height:1.6;">'
+          : '<tr><td colspan="5" style="color:var(--t3);font-size:12px;padding:14px 12px;line-height:1.6;">'
             + esc(INACTIVE_EMPTY_MSG) + '</td></tr>')
         + '</tbody></table></div></div>'
       : '';
@@ -574,10 +592,33 @@ S.RevenueMenuItems = {
     // Dishes tab with 36 rows on screen the button read "Delete 64 Selected" and wiped every
     // cocktail and beer too. Select All must never select a row the operator cannot see.
     this.container.querySelectorAll('.mi-sel-all').forEach(b => b.addEventListener('click', () => {
-      const rows = this.items().filter(i => !i.archived && this.classifyItem(i) === this.activeTab);
+      /* ⛔ ONLY THE ROWS ON SCREEN. The comment above records what a whole-menu Select All cost: on
+         the Dishes tab it read "Delete 64 Selected" and would have wiped every cocktail and beer.
+         The Inactive tab is the same rule with a different filter — it lists archived items across
+         every type, so selecting by `classifyItem` there selected NOTHING and the button was inert. */
+      const rows = this.activeTab === this.INACTIVE_TAB
+        ? this.items().filter(i => i.archived)
+        : this.items().filter(i => !i.archived && this.classifyItem(i) === this.activeTab);
       this._selected = new Set(rows.map(i => i.id));
       this.renderLanding();
     }));
+
+    /* Bulk Make Active, the Inactive tab's other real job. Mirrors the single-row `mi-restore`
+       below, including its rollback: a live row cannot be reverted by `putRecord`, so a refused
+       restore has to put the item back or it reads as selling while the server keeps it archived. */
+    this.container.querySelector('.mi-sel-activate')?.addEventListener('click', async () => {
+      const ids = this._selected ? [...this._selected] : [];
+      if (!ids.length) return;
+      const items = this.items().filter(i => ids.indexOf(i.id) >= 0 && i.archived);
+      if (!items.length) return;
+      this._selected = new Set();
+      for (const item of items) {
+        const undo = App.snapshotRows([item]);
+        item.archived = false;
+        if (!(await App.putRecord('core', 'menu_item', item))) App.restoreRows(undo);
+      }
+      this.renderLanding();
+    });
     this.container.querySelectorAll('.mi-sel-clear').forEach(b => b.addEventListener('click', () => { this._selected = new Set(); this.renderLanding(); }));
     this.container.querySelectorAll('.mi-sel').forEach(cb => cb.addEventListener('change', () => {
       if (!this._selected) this._selected = new Set();
