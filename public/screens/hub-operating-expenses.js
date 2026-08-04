@@ -898,10 +898,15 @@ S.HubOperatingExpenses = {
         + '<button class="btn btn-ghost" id="oexa-clear">Start Over</button>'
         + '</div>';
     }
-    const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('oex-add', 'Add Expense')
-      + '<div class="collapse-body">' + bodyInner + '</div>'
-      + '</div>' + addButtons;
+    /* ⛔ THE CONFIRM SCREEN REPLACES THE WHOLE CARD, IT DOES NOT SIT INSIDE IT. The Add Expense card
+       is collapsible, and a collapsed card would hide the confirm screen and its Add button
+       completely — the operator would have dropped a file and landed on a page with nothing on it. */
+    const addCard = this._expenseReview
+      ? '<div style="margin:16px 0 24px;">' + this.expenseReviewHTML() + '</div>'
+      : '<div class="card form-card">'
+        + App.collapsibleCardTitle('oex-add', 'Add Expense')
+        + '<div class="collapse-body">' + bodyInner + '</div>'
+        + '</div>' + addButtons;
 
     // What the last import actually did. An expense import used to report NOTHING — not even a
     // count — so rows it skipped (a credit, an unreadable amount, a missing date) simply were not
@@ -925,7 +930,33 @@ S.HubOperatingExpenses = {
       const w = document.getElementById('oexa-term-wrap');
       if (w) w.style.display = e.target.checked ? '' : 'none';
     });
-    this.container.querySelectorAll('.oexa-mode').forEach(b => b.addEventListener('click', () => { this._entryMode = b.dataset.mode; this.renderMain(); }));
+    // Switching entry mode abandons a confirm screen, the same as Start Over does.
+    this.container.querySelectorAll('.oexa-mode').forEach(b => b.addEventListener('click', () => { this._expenseReview = null; this._entryMode = b.dataset.mode; this.renderMain(); }));
+    /* ⚠ WIRED ON THE FRESH CHILD NODES, NEVER ON `this.container`. `renderMain` replaces the
+       container's innerHTML but the container element itself is permanent, so a listener attached to
+       it would stack one copy per render and the Add button would fire N times on the Nth repaint.
+       Every node below is created by the render that is wiring it. */
+    if (this._expenseReview) {
+      this.container.querySelectorAll('[data-confirm-section]').forEach(h => h.addEventListener('click', () => {
+        if (!this._expenseReview) return;
+        const k = h.dataset.confirmSection;
+        // "Needs a look" defaults OPEN and "going in" defaults closed, so the needs toggle is the
+        // inverted one. The shell reads `open.needs !== false` and `!!open.settled`.
+        this._expenseReview.open[k] = (k === 'needs') ? (this._expenseReview.open[k] === false) : !this._expenseReview.open[k];
+        this.renderMain();
+      }));
+      /* ⛔ REMOVAL IS PER ROW, BY NAME. Add Products once had a BULK "not a product" button and it
+         took Kyle's entire import, because it reached past what was on screen. */
+      this.container.querySelectorAll('[data-confirm-remove]').forEach(b => b.addEventListener('click', () => {
+        if (!this._expenseReview) return;
+        this._expenseReview.removed[b.dataset.confirmRemove] = true;
+        this.renderMain();
+      }));
+      this.container.querySelector('[data-oexreview-go]')?.addEventListener('click', () => this._runExpenseReview());
+      this.container.querySelector('[data-oexreview-back]')?.addEventListener('click', () => {
+        this._expenseReview = null; this.renderMain();
+      });
+    }
     App.wireCustomSelects(this.container);
     this.container.querySelector('.card-collapse-head')?.addEventListener('click', (e) => App.toggleCollapse(e.currentTarget));
     App.applyCollapsed(this.container);
@@ -940,7 +971,9 @@ S.HubOperatingExpenses = {
         range: this._monthLabel(this._currentMonthKey()) });
     });
     this._wireRows(this.container);
-    if (this._entryMode === 'import') this._mountImporter();
+    // ⚠ NOT WHILE THE CONFIRM SCREEN IS UP: the drop zone is not on the page, so CSVMapper would be
+    // mounting into an element that no longer exists.
+    if (this._entryMode === 'import' && !this._expenseReview) this._mountImporter();
   },
 
   _mountImporter() {
@@ -1015,8 +1048,11 @@ S.HubOperatingExpenses = {
         { key: 'amount',   label: 'Amount',   required: true,  match: ['amount', 'total', 'cost', 'debit', 'amt', 'value', 'expense', 'payment', 'charge amount', 'charge total', 'invoice total', 'invoice amount', 'amount due', 'charges', 'charge', 'dollars', 'total amount', 'amount paid', 'extended price', 'withdrawals', 'withdrawal'] },
         { key: 'notes',    label: 'Notes',    required: false, match: ['notes', 'memo', 'note', 'comment', 'details', 'remark'] }
       ],
-      confirmLabel: 'Import Expenses',
-      onComplete: rows => this._importRows(rows)
+      /* ⚠ THE MAPPER NO LONGER COMMITS, so its button no longer says it will. It hands the file to
+         the confirm screen, which is where the operator presses Add. Same word as the reference
+         door and three of the four already converted. */
+      confirmLabel: 'Import',
+      onComplete: rows => this._openExpenseReview(rows)
     });
   },
 
@@ -1098,193 +1134,373 @@ S.HubOperatingExpenses = {
     return { negativeIsCharge: decisive && neg > pos, contradictory, negVotes: neg, posVotes: pos };
   },
 
-  async _importRows(rows) {
-    const arr = this.records();
-    const _added = [];   // rows appended here, so a failed write can take them back out
-    /* ⚠⚠ DEDUP AGAINST WHAT WAS ALREADY LOGGED — A SNAPSHOT — NOT AGAINST THE LIST THIS LOOP IS
-       APPENDING TO. The old test was `arr.some(...)` where `arr` is the LIVE log, and rows are
-       pushed into `arr` inside the same loop. So the second genuinely-separate expense that happened
-       to match the first COLLAPSED INTO IT: three $89 rows on one Saturday (two ice deliveries and a
-       linen drop — a card statement lists each) imported as ONE. **$89.00 banked against $267.00 in
-       the file**, and the result line said "2 already logged", which was false — they were in the
-       same file and had never been logged at all. Same-day repeats from one vendor for one amount
-       are ORDINARY in a bar: two ice runs, two kegs, the same delivery fee twice.
-       This log feeds the Books Income Statement's operating-expense lines, This Month, Year to Date,
-       By Category and breakeven, so the money went missing from all of them at once.
-       ⚠ THE CONSUME-ONCE SET IS THE HALF THAT KEEPS THE RE-DROP HONEST. Snapshot alone would let a
-       re-dropped file import everything twice; `_used` lets each already-logged row absorb exactly
-       ONE incoming row, so a genuine re-drop still dedupes in full while three-of-a-kind in one file
-       all land. Snapshotting WITHOUT consume-once, or consume-once against the LIVE array, each
-       still lose a row — both were tried and both are wrong.
-       `PosIngest._isDup` is the shared implementation every POS builder already uses for exactly
-       this; door 17 was the one place hand-rolling it. */
-    /* ⚠ READ THE DATE COLUMN ONCE, BEFORE ANY ROW (S199). A DD/MM/YYYY expense file used to land
-       its 1st-to-12th rows in the wrong MONTH while its 13th-to-31st rows read correctly, so a
-       month of rent and utilities scattered and the totals on this very screen disagreed with each
-       other. This door does not go through PosIngest.build, so it asks for the verdict itself. */
-    const _conv = (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
+  /* ── The confirm screen ──────────────────────────────────────────────────────
+     Door 6 of the rollout, and the only CONVERSION in it: this door already stopped before writing,
+     at `App.promptImportReview` — a "Pick what to import" popup with every candidate ticked. That
+     popup answered a question no other door has (a bank debit is not automatically an OPERATING
+     expense: COGS, payroll and card-processor settlements are tracked elsewhere in Bar Cop, so
+     importing them here counts them twice), and it is the only reason a per-row control exists here
+     at all. What it could NOT do is show the rows the door threw away — an unreadable amount, a $0
+     line, a date it could not read, the file's own subtotal, a row already logged. Those reached the
+     operator in a sentence printed AFTER the write, which is the shape this rollout exists to end.
+     ⛔ `App.promptImportReview` now has no callers. Left in app.js deliberately, out of scope here. */
+
+  /* ⭐⭐ THE THREE FILE-LEVEL VERDICTS, TAKEN ONCE, FROM THE WHOLE FILE.
+     This is the first door in the rollout whose reading of a row depends on the OTHER rows: which
+     day-and-month order the date column uses, which SIGN means money out, and whether the file
+     states Debit/Credit outright (which beats both). A confirm screen re-walks on every render, and
+     it re-walks the rows the operator has NOT removed — so deriving these inside the walk asks a
+     question about the FILE over whatever subset survives Remove.
+     MEASURED on a Chase register: removing four bills leaves 1 debit and 2 deposits, which no longer
+     votes negative-is-charge, so the fifth bill flips from "Adding this expense" to skipped while
+     the operator is looking at it, and the two deposits become expenses. Same shape as
+     [[the-loop]] #47/#52 — a question asked over the caller's window instead of its own.
+     So the verdict is taken at the DROP, held on the review, and handed to every later walk AND to
+     the write, which is what makes the screen and the store agree. */
+  _expenseVerdicts(rows) {
+    const conv = (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
       ? PosIngest.dateConvention(rows, 'date') : { dayFirst: false, contradictory: false };
-    // A self-contradicting file refuses its coin-toss rows rather than guessing; they land in the
-    // `undated` bucket this door already counts and names.
-    const _dopts = { dayFirst: _conv.dayFirst, dateAmbiguous: _conv.contradictory };
-    const _candidates = [];   // rows that pass every guard; the operator ticks which of these land
-    const _pre = arr.slice();
+    const sign = this._amountConvention(rows);
+    /* ⚠ A STATED FACT BEATS EVERY INFERENCE (S225). Where a Debit/Credit column is present and
+       populated, `sign` is not consulted at all. Asked over the whole file for the same reason as
+       the other two: a file HAS a direction column or it does not, and removing the rows that fill
+       it in must not turn a stated fact back into a guess. */
+    const hasDir = (rows || []).some(r => this._directionOf(r && r.direction));
+    return { conv: conv, sign: sign, hasDir: hasDir,
+      dopts: { dayFirst: conv.dayFirst, dateAmbiguous: conv.contradictory } };
+  },
+
+  /* ⛔ THE ONE WALK. The screen and `_importRows` must decide "does this row land" in the same
+     place, or the button and the write can disagree — the defect the reference screen was rebuilt to
+     close. PURE: no DOM, no writes, no mutation of the log, safe to call on every render.
+     ⚠ THE GUARD ORDER IS LOAD-BEARING and is unchanged from the version that wrote on the press:
+     unreadable amount, then credit, then $0, then undated, then the file's own subtotal, then
+     already-logged. Each one is a different sentence to the operator and they are not
+     interchangeable — a $0 row is not a credit, and a dated TOTAL line is not a bill. */
+  _buildExpenseRows(rows, v) {
+    v = v || this._expenseVerdicts(rows || []);
+    /* ⚠⚠ DEDUP AGAINST A SNAPSHOT, WITH CONSUME-ONCE — AND BOTH ARE REBUILT PER CALL.
+       The snapshot half: the old test ran against the LIVE log while the loop appended to it, so
+       three $89 rows on one Saturday (two ice deliveries and a linen drop, which a card statement
+       lists separately) imported as ONE — $89.00 banked against $267.00 in the file.
+       The consume-once half is what keeps a genuine RE-DROP honest: each already-logged row absorbs
+       exactly one incoming row.
+       ⛔ AND `_used` MUST BE LOCAL TO THIS CALL. The screen re-walks on every render; a Set that
+       survived between calls would mark the same logged row as spent, so the second repaint would
+       show it as new and the button would climb by one per render. */
+    const _pre = this.records().slice();
     const _used = new Set();
     const _dup = (date, amount, vendor, category) => {
       const pred = x => x.date === date && Math.abs((parseFloat(x.amount) || 0) - amount) < 0.005
         && (x.vendor || '') === vendor && (x.category || '') === category;
       if (typeof PosIngest !== 'undefined' && PosIngest._isDup) return PosIngest._isDup(_pre, _used, pred);
-      // Backstop with the same consume-once semantics, never the old any-match test.
       const hit = _pre.find(x => !_used.has(x.id) && pred(x));
       if (hit) { _used.add(hit.id); return true; }
       return false;
     };
-    /* ⚠⚠⚠ WHICH SIGN MEANS "MONEY OUT"? THE FILE DECIDES, NOT US (S225). Chase business checking —
-       named in this door's own date-field comment as an intended input — writes DEBITS NEGATIVE and
-       deposits positive, as do BofA, Wells Fargo and Chase credit cards. The old rule was a flat
-       `amount < 0 -> credit, skip`, so on those files it imported the DEPOSITS as expenses and threw
-       every real bill away.
-       MEASURED end to end, and reachability is total: the real CSVMapper._autoMap binds every
-       required field from Chase's real header row with NO operator input, and then 4 bills
-       ($17,340.55 of Sysco, Austin Energy, the lease, Texas Mutual) were discarded while 2 merchant
-       deposits ($16,364.85) were booked as operating expenses — under a banner reading "2 expenses
-       imported · 4 credits or refunds skipped", which is exactly inverted. Books took revenue as
-       expense while every real opex line read $0.
-       ⭐ SAME SHAPE AS `dateConvention`, which this door already calls three lines down for exactly
-       this reason: settle a FILE-LEVEL ambiguity once, from the file's own evidence, instead of
-       guessing per row. One flip below and every downstream guard is untouched. */
-    const _sign = this._amountConvention(rows);
-    /* ⚠⚠ AND IF THE FILE STATES THE DIRECTION, THAT BEATS EVERY INFERENCE ABOVE (S225). A stated
-       fact is not a heuristic: where a Debit/Credit column is present and populated, `_sign` is not
-       consulted at all — credits are money IN and skipped, everything else is money OUT and imported
-       at its magnitude, whatever sign the file wrote it with. Kyle's `-123.62` debit becomes
-       $123.62. This is the whole reason the middle case stopped needing a guess. */
-    const _hasDir = (rows || []).some(r => this._directionOf(r && r.direction));
-    let credits = 0, unreadable = 0, undated = 0, zeroed = 0, totalsLines = 0;
+    const list = [];
     (rows || []).forEach((r, i) => {
-      const date = this._normDate(r.date, _dopts);
-      // ⚠ App.parseNum, not a private parseFloat strip. This read a card export's refund row —
-      // "(125.00)" or "125.00-" — as +125 and BOOKED IT AS A $125 EXPENSE, while the same file's
-      // "-125.00" rows parsed to -125 and were dropped by the guard below. One file, two opposite
-      // wrong answers, $250 apart. Credits are still not imported (an operating-expense ledger of
-      // positive amounts is the existing model), but they are now COUNTED and reported rather than
-      // vanishing — a row the operator can see in their file and cannot find in Bar Cop is the
-      // thing that makes them stop trusting the total.
+      const date = this._normDate(r.date, v.dopts);
+      // App.parseNum, not a private parseFloat strip: a card export's refund row — "(125.00)" or
+      // "125.00-" — read as +125 and BOOKED AS A $125 EXPENSE while the same file's "-125.00" rows
+      // parsed to -125 and were dropped. One file, two opposite wrong answers, $250 apart.
       const _raw = App.parseNum(r.amount);
-      if (_raw == null) { unreadable++; return; }
-      /* ONE FLIP, DECIDED ONCE FOR THE WHOLE FILE. Under the negative-debit convention a charge is
-         -1240.55 and becomes +1240.55 (imports); a deposit is +8420.11 and becomes -8420.11, which
-         the existing credit guard below then skips. Every downstream test is unchanged. */
-      const amount = _hasDir
+      if (_raw == null) { list.push({ raw: r, status: 'unreadable', date: date, notes: [] }); return; }
+      // ONE FLIP, DECIDED ONCE FOR THE WHOLE FILE (see _expenseVerdicts). Under the negative-debit
+      // convention a charge is -1240.55 and becomes +1240.55; a deposit is +8420.11 and becomes
+      // -8420.11, which the credit test below then skips. Every downstream test is unchanged.
+      const amount = v.hasDir
         ? (this._directionOf(r.direction) === 'credit' ? -Math.abs(_raw) : Math.abs(_raw))
-        : (_sign.negativeIsCharge ? -_raw : _raw);
-      // A $0.00 line (a voided bill, a zero-dollar subscription row) is not a credit and must not
-      // be reported as one — it is simply nothing to log.
-      if (amount < 0)     { credits++;    return; }
-      if (amount === 0)   { zeroed++;     return; }
-      if (!date)          { undated++;    return; }
-      const category = this.CATEGORIES.includes(r.category) ? r.category : (this._matchCat(r.category) || 'Other');
+        : (v.sign.negativeIsCharge ? -_raw : _raw);
+      /* ⚠ `fileAmount` IS THE FIGURE THE FILE ACTUALLY WROTE, kept alongside the flipped one because
+         a row that will NOT land has one job: let the operator find it in their own file. Under the
+         negative-debit convention a $8,420.11 merchant deposit flips to -8420.11, and printing that
+         puts "$-8,420.11" on screen against a file cell reading 8,420.11 — a number they cannot
+         search for, with the sign inverted. See `_expenseReviewRow`. */
+      if (amount < 0)   { list.push({ raw: r, status: 'credit', date: date, amount: amount, fileAmount: _raw, notes: [] }); return; }
+      // A $0.00 line (a voided bill, a zero-dollar subscription row) is not a credit and must not be
+      // reported as one — it is simply nothing to log.
+      if (amount === 0) { list.push({ raw: r, status: 'zero', date: date, amount: 0, fileAmount: _raw, notes: [] }); return; }
+      if (!date)        { list.push({ raw: r, status: 'undated', amount: amount, fileAmount: _raw, notes: [] }); return; }
+      const named = this.CATEGORIES.includes(r.category) ? r.category : this._matchCat(r.category);
+      const category = named || 'Other';
+      /* ⚠ A CATEGORY THE FILE CARRIED AND BAR COP COULD NOT PLACE IS A NOTE ON A LANDING ROW.
+         The row still imports — the operator wants the expense logged and will fix the category on
+         the row below — but "Other" arriving silently is how a QuickBooks Desktop export once put
+         EVERY row into Other with the real expense account sitting unread one column over, blanking
+         the By Category card, the YTD % column and Books' category lines. An ABSENT category cell is
+         not a problem and must never be flagged, or every bank register reads broken. */
+      const badCat = !!(String(r.category == null ? '' : r.category).trim() && !named);
       const vendor = (r.vendor || '').trim();
-      /* ⚠⚠ A DATED "TOTAL" ROW IS NOT AN EXPENSE — IT IS THE FILE'S OWN SUBTOTAL, AND IMPORTING IT
-         MAKES THE MONTH READ EXACTLY DOUBLE (S223). Measured: Utilities $812.40 + Insurance
-         $1,450.00 + a TOTAL row dated 07/31 for $2,262.40 imported as three rows and **$4,524.80**,
-         with the banner reading "3 expenses imported" and flagging nothing. It feeds Books'
-         operating-expense lines, This Month, YTD, By Category and breakeven, so the whole set
-         doubles at once.
-         ⭐ THIS IS THE THIRD DOOR TO NEED THE SHARED GATE. `isSummaryName` lives in PosIngest and its
-         own comment says it belongs there "because the same summary line lands on doors 4, 11 and
-         12" — door 12 called it, door 11 was fixed to call it, door 17 never did.
-         ⚠ AN UNDATED total row was already caught (it lands in `undated`), so this only closes the
-         case where the export dates its total line — which QuickBooks and most bank exports do.
-         ⚠ VERIFIED AGAINST REAL VENDOR NAMES BEFORE SHIPPING ([[the-loop]] #26 — this vocabulary has
-         eaten a real name three times): "Total Wine & More", "Total Wine", "Total Beverage
-         Solutions", "Totally Bread Co", "Grand Rapids Linen" and "Summit Beverage" all come back
-         FALSE, while TOTAL / Total / Grand Total / Sub Total / Subtotal / TOTALS / Month Total /
-         Report Total all come back true. The qualifier machinery is what makes that safe. */
+      /* ⚠⚠ A DATED "TOTAL" ROW IS NOT AN EXPENSE — it is the file's own subtotal, and importing it
+         makes the month read exactly double (S223). `isSummaryName` is the shared gate; it is
+         verified against real vendor names ("Total Wine & More", "Grand Rapids Linen") in
+         pos-ingest's own pins, because this vocabulary has eaten a real name three times. */
       if (vendor && typeof PosIngest !== 'undefined' && PosIngest.isSummaryName
-          && PosIngest.isSummaryName(vendor)) { totalsLines++; return; }
-      const notes = (r.notes || '').trim();
-      // Skip a row ALREADY LOGGED (same date, amount, vendor, category) — see the snapshot note above.
-      if (_dup(date, amount, vendor, category)) return;
-      const row = { id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date, category, vendor, amount, notes, created_at: new Date().toISOString() };
-      _candidates.push(row);
-    });
-
-    /* ⚠⚠ THE OPERATOR PICKS, BECAUSE THE FILE CANNOT SAY (Kyle's call, 2026-07-27). Every debit on a
-       bank register is money out, but only some are OPERATING expenses — the rest are food and
-       liquor purchases, payroll runs, card-processor settlements, transfers and owner draws. Several
-       of those Bar Cop ALREADY tracks elsewhere (COGS through Inventory, wages through Labor), so
-       importing the lot double-counts them straight into the Books Income Statement. Nothing in the
-       file distinguishes them and no rule could.
-       ⚠ It runs AFTER every other guard, so the list shown is exactly what would have been written —
-       unreadable, zero, undated, totals and already-logged rows never reach it. Everything starts
-       ticked, so a clean card or bill export stays one click. */
-    let unticked = 0;
-    if (_candidates.length) {
-      const pick = await App.promptImportReview({
-        title: 'Pick what to import',
-        intro: 'These are the rows Bar Cop can log. Untick anything that is not an operating expense'
-             + ' — food and liquor purchases, payroll and card-processor fees are tracked elsewhere in'
-             + ' Bar Cop, so importing them here would count them twice.',
-        rowLabel: 'Description',
-        rows: _candidates.map(c => ({ key: c.id, date: c.date, label: c.vendor || '(no description)',
-          category: c.category, amount: App.fmtCurrency(c.amount) }))
-      });
-      if (!pick.confirmed) {
-        this._importMsg = 'Import cancelled. Nothing was changed.';
-        this._entryMode = 'manual';
-        if (this._catchUpStillCurrent()) { if (this._view !== 'current') this._rerender(); else this.renderMain(); }
+          && PosIngest.isSummaryName(vendor)) {
+        list.push({ raw: r, status: 'totals', date: date, amount: amount, fileAmount: _raw, vendor: vendor, notes: [] });
         return;
       }
-      const chosen = _candidates.filter(c => pick.keep.has(c.id));
-      unticked = _candidates.length - chosen.length;
-      chosen.forEach(row => { arr.push(row); _added.push(row); });
+      const notes = (r.notes || '').trim();
+      if (_dup(date, amount, vendor, category)) {
+        list.push({ raw: r, status: 'dup', date: date, amount: amount, vendor: vendor,
+          category: category, notes: [] });
+        return;
+      }
+      const rowNotes = [];
+      if (badCat) rowNotes.push('Category not on your list');
+      list.push({
+        raw: r, status: 'new', date: date, amount: amount, vendor: vendor, category: category,
+        badCat: badCat, notes: rowNotes,
+        rec: { id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date: date, category: category,
+               vendor: vendor, amount: amount, notes: notes, created_at: new Date().toISOString() }
+      });
+    });
+    return { list: list };
+  },
+
+  _openExpenseReview(rows) {
+    this._expenseReview = {
+      // A STABLE ID PER ROW, so Remove has something to remove BY. The build returns one verdict per
+      // input row in the file's own order, so index is a real identity here.
+      rows: (rows || []).map((r, i) => Object.assign({}, r, { _rid: 'r' + i })),
+      // Taken from the WHOLE file, once. See _expenseVerdicts.
+      verdicts: this._expenseVerdicts(rows || []),
+      open: {}, removed: {}
+    };
+    this.renderMain();
+  },
+
+  /* ONE WALK produces the rows the screen shows AND the number the button prints, because they come
+     out of the same `_buildExpenseRows` the write uses. */
+  _expenseReviewSummary() {
+    const r = this._expenseReview;
+    if (!r) return { rows: [], count: 0 };
+    // A removed row is gone from the list, the count and the write.
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    const built = this._buildExpenseRows(live, r.verdicts);
+    // ⚠ Zipped by index: the build pushes exactly one entry per input row, in order.
+    const rows = built.list.map((x, i) => this._expenseReviewRow(x, (live[i] || {})._rid));
+    return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
+  },
+  _expenseReviewCount() { return this._expenseReview ? this._expenseReviewSummary().count : 0; },
+
+  /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
+     are TEXT the shell escapes, and they are what the shell's one-line NOTE_BUDGET applies to. */
+  _expenseReviewRow(x, rid) {
+    const v = (this._expenseReview || {}).verdicts || {};
+    /* ⚠ THE CREDIT ROW'S WORDING FOLLOWS THE VERDICT, exactly as the result sentence already does.
+       Under the negative-debit convention the skipped rows are DEPOSITS, not refunds; saying
+       "credit or refund" about a Chase file describes the opposite of what happened and sends the
+       operator hunting for refunds that do not exist. */
+    const creditNote = v.hasDir ? 'Marked a credit in your file'
+      : v.sign && v.sign.negativeIsCharge ? 'A deposit, not an expense'
+      : 'A credit or refund, not an expense';
+    const NOTE = {
+      'new':      'Adding this expense',
+      dup:        'Already logged',
+      totals:     'Your file' + String.fromCharCode(8217) + 's own subtotal, not a bill',
+      zero:       'Zero dollars, nothing to log',
+      undated:    'Date could not be read',
+      unreadable: 'Amount could not be read',
+      credit:     creditNote
+    };
+    const raw = x.raw || {};
+    const cell = s => esc(String(s == null ? '' : s).trim()) || '&mdash;';
+    /* ⛔ A ROW THAT LANDS SHOWS WHAT WILL BE STORED. EVERY OTHER ROW SHOWS WHAT THE FILE SAID.
+       One sentence, and it is the whole rule. A landing row's amount is the point of the flip
+       (Kyle's -123.62 debit becomes the $123.62 that gets banked), and an already-logged row shows
+       the figure that is on file. But a row that will NOT land exists so the operator can find it in
+       their own file, and under the negative-debit convention the flipped figure is not in their
+       file at all: an $8,420.11 merchant deposit would have printed "$-8,420.11".
+       Same reasoning for the date: an unreadable cell prints as the file wrote it, because a dash
+       there would hide the only thing identifying the row. */
+    const dateCell   = x.date ? esc(x.date) : cell(raw.date);
+    const amountCell = (x.status === 'new' || x.status === 'dup')
+      ? esc(App.fmtCurrency(x.amount))
+      : (x.fileAmount != null ? esc(App.fmtCurrency(x.fileAmount)) : cell(raw.amount));
+    return {
+      cells: [dateCell, cell(x.vendor != null ? x.vendor : raw.vendor),
+              cell(x.category != null ? x.category : raw.category), amountCell],
+      key: rid,
+      note: NOTE[x.status] || '',
+      notes: x.notes || [],
+      lands: x.status === 'new'
+    };
+  },
+
+  expenseReviewHTML() {
+    const s = this._expenseReviewSummary();
+    const n = s.rows.length;
+    const bad = s.rows.filter(x => !x.lands).length;
+    const v = (this._expenseReview || {}).verdicts || {};
+    /* ⚠ EACH NUMBER NAMES ITS OWN COLLECTION: `n` is rows read out of the file, `bad` is rows that
+       will not land, and the button counts what will be written. Reading the nearest one is how a
+       screen ends up contradicting itself. And the lead names the button's own verb — renaming the
+       button has to rewrite this sentence with it. */
+    /* ⛔⛔ THE SECOND SENTENCE IS THE POPUP'S WHOLE REASON FOR EXISTING and it had to move here
+        before that popup could go. It is the only place in Bar Cop that says a bank debit is not
+        automatically an operating expense. Dropping a clause before moving its fact is losing
+        information, not repeating less. */
+    const lead = 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's') + ' out of this file. '
+      + (bad ? (bad === 1 ? 'One of them is not going in. ' : bad + ' of them are not going in. ') : '')
+      + 'Remove anything that is not an operating expense: food and liquor purchases, payroll and'
+      + ' card-processor fees are tracked elsewhere in Bar Cop, so importing them here counts them'
+      + ' twice. Nothing is saved until you press Add.'
+      /* ⚠ THE TWO FILE-LEVEL CAVEATS BELONG ON THE SCREEN, NOT IN A SENTENCE PRINTED AFTERWARDS.
+         They are facts about how EVERY row was read, so they cannot live on a row, and the operator
+         needs them BEFORE they press Add rather than once the money is in. Only the case Bar Cop
+         could not decide is worth saying: a file it read correctly needs no announcement. */
+      + (v.conv && v.conv.contradictory
+          ? ' Some dates read day-first and others month-first, so day-and-month order could not be'
+            + ' settled: check any date where both numbers are 12 or under.' : '')
+      + (v.sign && v.sign.contradictory && !v.hasDir
+          ? ' ' + v.sign.negVotes + ' amounts are negative and ' + v.sign.posVotes + ' positive, so'
+            + ' Bar Cop could not tell which sign means money out: it read the positive rows as'
+            + ' expenses. Check the amount column.' : '');
+    return ImportConfirm.panel({
+      label: 'Check your expenses',
+      lead: lead,
+      columns: [{ label: 'Date', width: 14 }, { label: 'Vendor', width: 24 },
+                { label: 'Category', width: 18 }, { label: 'Amount', width: 12 }],
+      outcomeLabel: 'What Happens',
+      rows: s.rows,
+      verb: 'Add', noun: 'Expense',
+      removable: true,
+      goAttr: 'data-oexreview-go', backAttr: 'data-oexreview-back', backLabel: 'Start Over',
+      resultId: 'oex-imp-result',
+      // The door owns which sections are open; a closed one builds no table at all.
+      open: (this._expenseReview || {}).open,
+      busy: !!this._expenseReviewWriting
+    });
+  },
+
+  /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
+     only thing a re-render cannot hand back. */
+  async _runExpenseReview() {
+    const r = this._expenseReview;
+    if (!r || this._expenseReviewWriting) return;
+    this._expenseReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-oexreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try {
+      /* ⛔ THE SAME VERDICTS THE SCREEN DREW WITH. Letting the write re-derive them from the
+         surviving rows is the defect `_expenseVerdicts` exists to close, and it would show up only
+         as a number that disagreed with the button. */
+      await this._importRows(r.rows.filter(x => !r.removed[x._rid]),
+        { reviewed: true, verdicts: r.verdicts });
+    } finally {
+      this._expenseReviewWriting = false;
+      /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `_importRows` is what clears it — a refused write
+         keeps the whole screen so the operator can press again without re-dropping the file. Do NOT
+         re-render here: the failure path writes into the result slot and a re-render destroys it. */
+      if (this._expenseReview) {
+        const b = this.container && this.container.querySelector('[data-oexreview-go]');
+        const n = this._expenseReviewCount();
+        if (b) { b.disabled = false; b.textContent = 'Add ' + n + ' Expense' + (n === 1 ? '' : 's'); }
+      }
     }
+  },
+
+  async _importRows(rows, opts) {
+    opts = opts || {};
+    const arr = this.records();
+    const _added = [];   // rows appended here, so a failed write can take them back out
+    /* ⛔ ONE WALK, SHARED WITH THE SCREEN. The row-by-row decision — unreadable amount, credit,
+       $0, undated, the file's own subtotal, already logged, or a real new expense — now lives in
+       `_buildExpenseRows`, which the confirm screen calls to draw itself and this calls to write.
+       Two copies of that decision is how a button ends up promising a number the write does not
+       honour, which is the defect the whole rollout exists to close. Everything below is REPORTING;
+       nothing below decides what lands. */
+    /* ⚠ THE VERDICTS COME FROM THE CALLER WHEN THERE IS A SCREEN. `_runExpenseReview` hands over
+       the ones taken from the WHOLE file at the drop, so removing rows cannot re-read the
+       survivors. A call with no screen in front of it takes its own. */
+    const v = opts.verdicts || this._expenseVerdicts(rows || []);
+    const built = this._buildExpenseRows(rows, v);
+    const countOf = f => built.list.filter(f).length;
+    const toAdd       = built.list.filter(x => x.status === 'new').map(x => x.rec);
+    const credits     = countOf(x => x.status === 'credit');
+    const undated     = countOf(x => x.status === 'undated');
+    const unreadable  = countOf(x => x.status === 'unreadable');
+    const zeroed      = countOf(x => x.status === 'zero');
+    const totalsLines = countOf(x => x.status === 'totals');
+    /* ⭐ `dupes` IS COUNTED NOW, NOT DERIVED. It used to be `rows.length` minus every other bucket,
+       under a comment warning that any new early return which forgot to subtract itself would
+       silently inflate it and tell the operator rows were already logged when they were skipped for
+       something else entirely. The walk gives every row a status, so the count is a filter. */
+    const dupes = countOf(x => x.status === 'dup');
+    toAdd.forEach(row => { arr.push(row); _added.push(row); });
 
     // Imported rows were pushed into the live list before the write, and a bulk write cannot revert
     // itself — take them back out rather than showing an import Books counts and the server lacks.
     /* ⚠ THE NEW ROWS, NOT THE WHOLE LEDGER (S226g). This wrote `this.records()` — every operating
        expense the account has ever had — on every import, where every peer door writes only what it
-       just added. The claimed chunk-boundary hazard does NOT reproduce (putEventsBulk queues the
-       whole list on a chunk error and the upsert is idempotent by id), so this is not a data-loss
-       fix; it removes a needless rewrite of untouched rows and, with it, the window where a stale
-       in-memory copy overwrites a newer row saved from another device.
-       An empty `_added` returns true from putRecordsBulk, so a file that was entirely duplicates or
-       entirely unticked still reports honestly instead of failing. */
-    const saved = await App.putRecordsBulk('core', 'operating_expense', _added);
+       just added. An empty `_added` returns true from putRecordsBulk, so a file that was entirely
+       duplicates still reports honestly instead of failing. */
+    /* ⛔⛔ A THROW IS A FAILED WRITE AND MUST TAKE THE SAME PATH AS A FALSE RETURN — and this became
+       load-bearing the day the confirm screen landed. Before it, a refused import dropped the
+       operator back to the manual form and the only way forward was re-dropping the file. Now the
+       screen STAYS UP and invites a second press, so a `putRecordsBulk` that REJECTS rather than
+       returning false would skip `dropRows` entirely, leave N unsaved rows sitting in
+       `App.data.operating_expenses` (counted by This Month, Year to Date, By Category, breakeven and
+       Books) and then bank a second copy of every one of them on the retry.
+       [[test-the-retry]]: a failed write is recoverable, the SECOND attempt is what makes it
+       permanent. Catching here rather than at the caller means the rollback, the message and the
+       kept screen are all the one existing path. */
+    let saved = false;
+    try {
+      saved = await App.putRecordsBulk('core', 'operating_expense', _added);
+    } catch (e) {
+      saved = false;
+    }
     if (!saved) App.dropRows(arr, _added);
+    /* ⛔ A REFUSED WRITE KEEPS THE CONFIRM SCREEN, and reports into the shell's own result slot so
+       the operator can press again without re-dropping the file. Returning here is what stops
+       `_entryMode` dropping them back to the manual form with the whole review gone. */
+    if (!saved && opts.reviewed) {
+      const el = document.getElementById('oex-imp-result');
+      if (el) el.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + 'Could not save the import. Nothing was changed, check your connection and try again.</div>';
+      return;
+    }
+    /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. The refusal returned above with
+       every row still up; this line is the only one that knows the write landed. */
+    this._expenseReview = null;
     this._entryMode = 'manual';
     /* ⚠ THE GUARD COMES BEFORE THE MESSAGE, NOT AFTER IT. Placed after, it stopped the repaint but
        left `_importMsg` banked — and nothing else consumes it, so the next time the operator opened
        Operating Expenses, days later, it greeted them with "1 expense imported." about an import
-       they had already navigated away from. The failure text was worse: an unprompted "Could not
-       save the import. Nothing was changed" on a page they just opened. If nobody is on the screen
-       there is nobody to tell; a failed write already raises its own alert at the time. */
+       they had already navigated away from. If nobody is on the screen there is nobody to tell; a
+       failed write already raises its own alert at the time. */
     /* ⚠ THE TOKEN ALONE IS NOT ENOUGH — CHECK `_view` TOO. Expense History mounts through this
        same object and re-stamps the SAME `_mountedAt` slot, so the token still matches and the
        repaint went ahead, painting Operating Expenses over the History page the operator had just
-       opened (sidebar still highlighting History). `_catchUpOnce` survives the identical race only
-       because it branches on `_view`; this did not. */
+       opened. */
     if (!this._catchUpStillCurrent()) return;
-    /* ⚠ EXPENSE HISTORY NEEDS THE NUMBERS REFRESHED, JUST NOT THE PAGE HIJACKED. It mounts through
-       this same object, so a bare `_view !== 'current'` return left it showing "Logged This Year"
-       and a log table built from rows that — on a FAILED write — had already been spliced back out
-       of memory a few lines above. Right answer for both: re-render whichever view is actually on
-       screen. `_rerender` is the function that already exists for this. */
+    // Expense History needs the numbers refreshed, just not the page hijacked.
     if (this._view !== 'current') { this._rerender(); return; }
-    // Say what happened, including what was NOT taken and why.
     if (!saved) {
       this._importMsg = 'Could not save the import. Nothing was changed — check your connection and try again.';
+    } else if (opts.reviewed) {
+      /* ⭐⭐ A REVIEWED IMPORT GETS THE HEADLINE ALONE. Every clause below was written when the drop
+         wrote straight through and this line was the operator's ONLY account of it. Now each one is
+         a row on the confirm screen, said once, where they read it and pressed Add — and repeating
+         it afterwards is the second telling. Kyle on the sales door: *"all that green text is very
+         hard to read and follow.. it is just repeating what the user just saw on screen."*
+         ⛔ PRECONDITION, and it is the whole rule: a clause may only be dropped once its FACT is on
+         the screen. Every bucket here is a row with its own note, the two file-level caveats are in
+         the lead, and the rows the operator took out went out by their own hand. */
+      this._importMsg = _added.length + ' expense' + (_added.length === 1 ? '' : 's') + ' imported.';
     } else {
+      /* The full account, for a call with no screen in front of it. This is the path a direct
+         `_importRows` takes, and it is the only reason these clauses still exist. */
       const bits = [_added.length + ' expense' + (_added.length === 1 ? '' : 's') + ' imported'];
       /* ⚠ THE SENTENCE FOLLOWS THE VERDICT. Under the negative-debit convention the skipped rows are
-         DEPOSITS, not refunds — saying "credits or refunds skipped (Bar Cop tracks expenses as
-         positive amounts)" about a Chase file was not merely unhelpful, it described the opposite of
-         what happened and would have sent the operator hunting for refunds that do not exist. */
-      if (credits)    bits.push(credits + (_hasDir
-        // The file SAID they were credits, so say that — no inference to explain.
+         DEPOSITS, not refunds — saying "credits or refunds skipped" about a Chase file describes the
+         opposite of what happened and sends the operator hunting for refunds that do not exist. */
+      if (credits)    bits.push(credits + (v.hasDir
         ? ' row' + (credits === 1 ? '' : 's') + ' skipped, marked as credits in your file (money in, not an expense)'
-        : _sign.negativeIsCharge
+        : v.sign.negativeIsCharge
           ? ' deposit' + (credits === 1 ? '' : 's') + ' or credit' + (credits === 1 ? '' : 's')
             + ' skipped (this file marks charges as negative, so Bar Cop imported the charges)'
           : ' credit' + (credits === 1 ? '' : 's') + ' or refund' + (credits === 1 ? '' : 's')
@@ -1295,30 +1511,14 @@ S.HubOperatingExpenses = {
       // The file's own subtotal line, named rather than silently dropped (S223).
       if (totalsLines) bits.push(totalsLines + ' totals row' + (totalsLines === 1 ? '' : 's')
         + ' skipped (your file' + String.fromCharCode(8217) + 's own subtotal, not an expense)');
-      /* ⚠ EVERY BUCKET MUST BE SUBTRACTED HERE OR `dupes` ABSORBS IT. This residual is how "already
-         logged" is derived — it is not counted directly — so a new early-return that is not
-         subtracted silently inflates it and the operator is told rows were already logged when they
-         were skipped for another reason entirely. */
-      // The rows the operator chose to leave out — their own decision, echoed back.
-      if (unticked) bits.push(unticked + ' row' + (unticked === 1 ? '' : 's') + ' left out');
-      // ⚠ `unticked` joins the subtraction for the same reason every other bucket does: this figure
-      // is DERIVED, so anything not subtracted is silently reported as "already logged".
-      const dupes = rows.length - _added.length - credits - undated - unreadable - zeroed - totalsLines - unticked;
       if (dupes > 0) bits.push(dupes + ' already logged');
       /* ⚠ ONLY THE CONTRADICTORY FILE IS WORTH SAYING OUT LOUD. A day-first file that Bar Cop read
-         correctly needs no announcement — it is simply right, and a US file can never trigger the
-         detection at all. What the operator DOES need is the case Bar Cop could not decide: some
-         rows in the file can only be day-first and others can only be month-first, so the rows where
-         both numbers are 12 or under are a coin toss. Those are read US-style and named here rather
-         than guessed at in silence. */
-      if (_conv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
-      /* ⚠ NAMED, NOT GUESSED (S225). A file too evenly split to call keeps the positive-charge rule
-         — the safe, unchanged behaviour — and says so with the counts, so the operator can settle in
-         one glance what Bar Cop could not. Same posture as the date verdict directly above. */
+         correctly needs no announcement. What the operator DOES need is the case Bar Cop could not
+         decide: the rows where both numbers are 12 or under are a coin toss. */
+      if (v.conv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
       // ⚠ ONLY WHEN THE SIGN WAS ACTUALLY CONSULTED. With a Debit/Credit column present nothing was
-      // inferred, so warning that Bar Cop "could not tell" would be describing a decision it never
-      // had to make — a false caveat is as misleading as a false figure.
-      if (_sign.contradictory && !_hasDir) bits.push(_sign.negVotes + ' amounts are negative and ' + _sign.posVotes
+      // inferred, so warning that Bar Cop "could not tell" would describe a decision it never made.
+      if (v.sign.contradictory && !v.hasDir) bits.push(v.sign.negVotes + ' amounts are negative and ' + v.sign.posVotes
         + ' positive, so Bar Cop could not tell which sign means money out — it read the positive rows as expenses; check the amount column');
       this._importMsg = bits.join(' · ') + '.';
     }
