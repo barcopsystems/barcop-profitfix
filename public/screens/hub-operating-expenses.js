@@ -994,15 +994,23 @@ S.HubOperatingExpenses = {
       }));
       /* The category picker. Keyed by vendor, so one change moves every row for that vendor and the
          re-render shows it happening. `change`, not `input`: a native select fires change on commit. */
-      /* ⛔ THROUGH `_setExpenseCategory`, NOT INLINE. The first version wrote `picks` straight from
-         the handler, which left the method with no caller at all — the retired-code ratchet caught
-         it — and meant the pin was exercising a path the app never took ([[the-loop]] #103). One
-         implementation, and the control already carries the vendor key rather than a row id. */
-      this.container.querySelectorAll('[data-oexcat]').forEach(sel => sel.addEventListener('change', () => {
+      /* ⛔ A TICK MUST NOT REPAINT THE PANEL. At 2000 rows a full re-render costs ~460ms per tick,
+         which is the one performance note left open on the reference door. The state is recorded and
+         only the Move To button's own label is refreshed in place. */
+      this.container.querySelectorAll('[data-confirm-check]').forEach(cb => cb.addEventListener('change', () => {
         if (!this._expenseReview) return;
-        this._setExpenseCategory(sel.dataset.oexcat, sel.value);
-        this.renderMain();
+        const k = cb.dataset.confirmCheck;
+        if (cb.checked) this._expenseReview.checked[k] = true; else delete this._expenseReview.checked[k];
+        const btn = this.container.querySelector('#oex-rt-move');
+        const n = this._expenseCheckedIds().length;
+        if (btn) { btn.disabled = !n; btn.textContent = 'Move To' + (n ? ' (' + n + ')' : ''); }
       }));
+      /* The chosen category lives on the review, not in the DOM, so a re-render cannot lose it —
+         and the operator can tick, move, tick again without re-choosing. */
+      this.container.querySelector('#oex-rt-cat')?.addEventListener('change', (e) => {
+        if (this._expenseReview) this._expenseReview.moveCat = e.target.value;
+      });
+      this.container.querySelector('#oex-rt-move')?.addEventListener('click', () => this._moveCheckedExpenses());
       this.container.querySelector('[data-oexreview-go]')?.addEventListener('click', () => this._runExpenseReview());
       this.container.querySelector('[data-oexreview-back]')?.addEventListener('click', () => {
         this._expenseReview = null; this.renderMain();
@@ -1353,9 +1361,16 @@ S.HubOperatingExpenses = {
          what they picked on this screen, what the file itself said (matched against their list),
          what this vendor was last logged under, and finally Other. */
       const named  = this.CATEGORIES.includes(r.category) ? r.category : this._matchCat(r.category);
-      const picked = (picks && picks[this._vendorKey(vendor)]) || '';
+      /* ⚠ THE OPERATOR'S ASSIGNMENT IS KEYED BY `_rid`, THE ROW THEY CHECKED. It was keyed by vendor
+         while the screen had a per-row dropdown; Move To acts on the rows they ticked, so the key is
+         the row. The durable per-vendor memory did not move: `_categoryForVendor` reads their own log
+         on the NEXT drop, which is the half that compounds. */
+      const picked = (picks && r && r._rid != null) ? (picks[r._rid] || '') : '';
       const learned = (picked || named) ? '' : this._categoryForVendor(vendor);
       const category = picked || named || learned || 'Other';
+      // Did anything actually place this row, or did it fall through to Other? That is the whole
+      // question "Not Sorted Yet" asks, so the walk answers it rather than the render guessing.
+      const placed = !!(picked || named || learned);
       /* ⚠ A CATEGORY THE FILE CARRIED AND BAR COP COULD NOT PLACE IS A NOTE ON A LANDING ROW.
          The row still imports — the operator wants the expense logged and will fix the category on
          the row below — but "Other" arriving silently is how a QuickBooks Desktop export once put
@@ -1378,20 +1393,17 @@ S.HubOperatingExpenses = {
           category: category, notes: [] });
         return;
       }
+      /* ⛔ THE SECTION IS THE CATEGORY, SO THE ROW DOES NOT REPEAT IT. Every "pick one" note is gone:
+         a row sitting in Not Sorted Yet IS that sentence, and one in a category section has already
+         been answered. The old screen said it three ways at once (a Category column, a dropdown and
+         a note) and none of them could agree. The only note left is the one the section cannot say:
+         that Bar Cop thinks this row belongs somewhere else in the app entirely. */
       const rowNotes = [];
-      /* ⚠ THE NOTE IS ACTIONABLE NOW, because there is a picker on the row to act with. "Category
-         not on your list" described a problem and offered nothing; the operator's only remedy was
-         editing every row in Expense History afterwards, which is exactly what Kyle hit. A picked
-         category says nothing at all: they chose it, and telling them so is noise. */
-      if (picked) { /* their own choice needs no comment */ }
-      else if (learned) rowNotes.push('Category from your log');
-      else if (badCat) rowNotes.push('Category not on your list, pick one');
-      else rowNotes.push('Pick a category or it goes in as Other');
       const elsewhere = this._belongsElsewhere(vendor);
       if (elsewhere) rowNotes.push(elsewhere);
       list.push({
         raw: r, status: 'new', date: date, amount: amount, vendor: vendor, category: category,
-        badCat: badCat, elsewhere: elsewhere, notes: rowNotes,
+        placed: placed, badCat: badCat, elsewhere: elsewhere, notes: rowNotes,
         rec: { id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date: date, category: category,
                vendor: vendor, amount: amount, notes: notes, created_at: new Date().toISOString() }
       });
@@ -1406,30 +1418,120 @@ S.HubOperatingExpenses = {
       rows: (rows || []).map((r, i) => Object.assign({}, r, { _rid: 'r' + i })),
       // Taken from the WHOLE file, once. See _expenseVerdicts.
       verdicts: this._expenseVerdicts(rows || []),
-      // Categories the operator picks on the screen, keyed BY VENDOR. See _setExpenseCategory.
-      picks: {},
+      // Categories the operator assigns with Move To, keyed by `_rid`. See _moveCheckedExpenses.
+      assign: {},
+      checked: {}, moveCat: '', moveNote: '',
       open: {}, removed: {}
     };
     this.renderMain();
   },
 
-  /* ⛔ THE PICK IS KEYED BY VENDOR, NOT BY ROW, AND THAT IS THE POINT. A bank register lists ALSCO
-     four times in a month and SYSCO four times; making the operator answer once per ROW is the
-     complaint restated, not answered. Measured on a real Chase month: 64 landing rows are 37
-     distinct vendors, 14 of which repeat. Keyed this way it is 37 decisions once, and zero from then
-     on, because `_categoryForVendor` reads them back out of the log on the next drop. */
-  _setExpenseCategory(vendor, cat) {
-    if (!this._expenseReview) return;
-    this._expenseReview.picks[this._vendorKey(vendor)] = cat;
+  /* ⛔⛔ ONLY WHAT IS ON SCREEN CAN BE MOVED. A collapsed section renders no rows at all, so a row
+     ticked and then hidden is still in `checked` — and acting on it would be a bulk verb reaching
+     past what the operator can see. Add Products once had exactly that, as a bulk "Not a product"
+     button, and it took Kyle's entire import. Scoping to the visible set is what makes the control
+     auditable: whatever moves, he was looking at. */
+  _expenseCheckedIds() {
+    const r = this._expenseReview;
+    if (!r) return [];
+    const visible = {};
+    this._expenseGroups().forEach(g => { if (g.open) (g.rows || []).forEach(row => { visible[row.key] = true; }); });
+    return Object.keys(r.checked).filter(k => r.checked[k] && visible[k]);
   },
 
-  // The per-row category control. Pre-selected to whatever the walk resolved, so a row that already
-  // knows its category needs no attention and one that does not is the only thing to answer.
-  _catPickerHtml(vendor, selected) {
+  /* Check some rows, choose a category, press Move To. The section for that category is created if
+     it does not exist and is OPENED, because Kyle's complaint about the old screen was that a row
+     he touched disappeared with no sign of where it went. */
+  _moveCheckedExpenses() {
+    const r = this._expenseReview;
+    if (!r) return;
+    if (!r.moveCat) { r.moveNote = 'Pick a category first, then press Move To.'; this.renderMain(); return; }
+    const ids = this._expenseCheckedIds();
+    if (!ids.length) { r.moveNote = 'Tick the rows you want to move first.'; this.renderMain(); return; }
+    ids.forEach(id => { r.assign[id] = r.moveCat; delete r.checked[id]; });
+    /* ⛔ THE SECTION JUST MOVED INTO OPENS, AND EVERY OTHER CATEGORY SECTION CLOSES.
+       Add Products opens the target and leaves the rest as they were, which is right when one small
+       batch is being placed. Measured on a real bank month it is not: eight passes left all eight
+       sections open and put all 64 rows back above the Add button, which is the exact
+       below-the-fold defect collapsing was introduced to fix. Kyle asked for the other extreme
+       (*"all new categories created are collapsed"*), but that reintroduces his FIRST complaint —
+       *"the row disappears and as a user i can't see that the row just added"*. Opening only the
+       latest target answers both: the move is always visible, and the screen never grows. */
+    Object.keys(r.open).forEach(k => { if (k !== 'unsorted' && k !== '__skip') delete r.open[k]; });
+    r.open[r.moveCat] = true;
+    r.moveNote = ids.length + ' row' + (ids.length === 1 ? '' : 's') + ' moved into ' + r.moveCat + '.';
+    this.renderMain();
+  },
+
+  /* ⭐ THE SECTIONS, AND THE ORDER IS THE JOB. What Bar Cop could not place sits at the top, open,
+     and is the only part the operator has to do. What it did place sits in a closed section per
+     category with the count on the head, so one can be opened and checked. What is not going in at
+     all sits at the bottom, closed, with every row still accounted for and costing no screen space
+     (Kyle: *"if we know it is a credit/deposit... why even list it and take up all screen space?"*).
+     ⛔ NOT DELETED, THOUGH. The one promise this screen makes is that every row in the file says what
+     happened to it; a row an operator can see in their file and cannot find in Bar Cop is what makes
+     them stop trusting the total. Collapsed answers the complaint and keeps the promise. */
+  _expenseGroups() {
+    const s = this._expenseReviewSummary();
+    const r = this._expenseReview || { open: {} };
+    const landing = s.rows.filter(x => x.lands);
+    const unsorted = landing.filter(x => !x.placed);
+    const skipped = s.rows.filter(x => !x.lands);
+    const groups = [];
+    if (unsorted.length) groups.push({ key: 'unsorted', title: 'Not Sorted Yet',
+      sub: unsorted.length + ' row' + (unsorted.length === 1 ? '' : 's') + ' Bar Cop could not work out',
+      rows: unsorted, open: r.open.unsorted !== false });
+    // Category order follows the operator's own list, so the sections read the way their card does.
+    this.categoryList().forEach(c => {
+      const rows = landing.filter(x => x.placed && x.cat === c);
+      if (!rows.length) return;
+      groups.push({ key: c, title: c,
+        sub: rows.length + ' expense' + (rows.length === 1 ? '' : 's') + ' going into ' + c,
+        rows: rows, open: !!r.open[c] });
+    });
+    if (skipped.length) {
+      /* The head carries the reasons, so a closed section still answers "what happened to the rest".
+         ⛔ BUILT FROM THE STATUS, NOT FROM THE ROW NOTE. My first version lowercased each row's full
+         sentence and comma-joined them, which produced "15 rows: 11 a deposit, not an expense, 1
+         zero dollars, nothing to log, 1 date could not be read" — a sentence fragment salad. A row
+         note is written to be read ON a row; a head needs a countable noun. */
+      const NOUN = { credit: ['deposit', 'deposits'], zero: ['zero-dollar row', 'zero-dollar rows'],
+        undated: ['with no date', 'with no date'], unreadable: ['with no amount', 'with no amount'],
+        totals: ['subtotal row', 'subtotal rows'], dup: ['already logged', 'already logged'] };
+      const by = {};
+      skipped.forEach(x => { by[x.status] = (by[x.status] || 0) + 1; });
+      const why = Object.keys(by).map(k => {
+        const n = by[k], w = NOUN[k] || ['row', 'rows'];
+        return n + ' ' + (n === 1 ? w[0] : w[1]);
+      }).join(', ');
+      /* ⛔ IT OPENS WHEN THERE IS NOTHING ELSE ON THE SCREEN. A file where NOT ONE row can be
+         imported — every amount unreadable, or a statement of nothing but deposits — otherwise
+         lands the operator on a single collapsed card and a dead button, with the reason one click
+         away and no sign that clicking is the answer. That is the whole screen refusing to say why.
+         Structural, not a threshold: no landing rows means this section IS the screen. */
+      groups.push({ key: '__skip', title: 'Not Going In',
+        sub: skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ': ' + why,
+        rows: skipped,
+        open: r.open.__skip === undefined ? landing.length === 0 : !!r.open.__skip });
+    }
+    return groups;
+  },
+
+  // Choose a category, then Move To. One control, above the sections it acts on.
+  _expenseToolbarHtml() {
+    const r = this._expenseReview || {};
+    const n = this._expenseCheckedIds().length;
     const opts = this.categoryList().map(c => '<option value="' + esc(c) + '"'
-      + (c === selected ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-    return '<select data-oexcat="' + esc(this._vendorKey(vendor)) + '"'
-      + ' style="margin-top:6px;width:100%;font-size:11px;padding:3px 4px;">' + opts + '</select>';
+      + (c === r.moveCat ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<select id="oex-rt-cat" style="max-width:230px;"><option value="">Choose a category...</option>'
+      + opts + '</select>'
+      /* ⚠ THE COUNT IS ON THE BUTTON, so a press can never move a number the operator did not see.
+         Disabled at zero for the same reason the Add button is. */
+      + '<button type="button" class="btn btn-primary btn-sm" id="oex-rt-move"'
+      + (n ? '' : ' disabled') + '>Move To' + (n ? ' (' + n + ')' : '') + '</button>'
+      + (r.moveNote ? '<span style="font-size:11px;color:var(--gold);">' + esc(r.moveNote) + '</span>' : '')
+      + '</div>';
   },
 
   /* ONE WALK produces the rows the screen shows AND the number the button prints, because they come
@@ -1439,7 +1541,7 @@ S.HubOperatingExpenses = {
     if (!r) return { rows: [], count: 0 };
     // A removed row is gone from the list, the count and the write.
     const live = r.rows.filter(x => !r.removed[x._rid]);
-    const built = this._buildExpenseRows(live, r.verdicts, r.picks);
+    const built = this._buildExpenseRows(live, r.verdicts, r.assign);
     // ⚠ Zipped by index: the build pushes exactly one entry per input row, in order.
     const rows = built.list.map((x, i) => this._expenseReviewRow(x, (live[i] || {})._rid));
     return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
@@ -1480,15 +1582,20 @@ S.HubOperatingExpenses = {
     const amountCell = (x.status === 'new' || x.status === 'dup')
       ? esc(App.fmtCurrency(x.amount))
       : (x.fileAmount != null ? esc(App.fmtCurrency(x.fileAmount)) : cell(raw.amount));
+    /* ⛔ NO CATEGORY COLUMN. The section the row sits in IS its category, so a column repeating it is
+       the duplication that made the old screen unreadable. `cat` and `placed` travel on the row for
+       the grouper, never for the render. */
     return {
-      cells: [dateCell, cell(x.vendor != null ? x.vendor : raw.vendor),
-              cell(x.category != null ? x.category : raw.category), amountCell],
+      cells: [dateCell, cell(x.vendor != null ? x.vendor : raw.vendor), amountCell],
       key: rid,
-      note: NOTE[x.status] || '',
+      cat: x.category || 'Other',
+      placed: !!x.placed,
+      // Carried for the grouper's head, which needs a countable noun rather than the row's sentence.
+      status: x.status,
+      /* ⚠ THE OUTCOME COLUMN IS QUIET UNLESS THERE IS SOMETHING TO SAY. "Adding this expense" on
+         every row of a section headed "9 expenses going into Utilities" is the section said twice. */
+      note: x.status === 'new' ? '' : (NOTE[x.status] || ''),
       notes: x.notes || [],
-      // The category control, on the rows that will actually be written. A row that is not landing
-      // has no category to set.
-      decision: x.status === 'new' ? this._catPickerHtml(x.vendor, x.category) : '',
       lands: x.status === 'new'
     };
   },
@@ -1525,16 +1632,15 @@ S.HubOperatingExpenses = {
     return ImportConfirm.panel({
       label: 'Check your expenses',
       lead: lead,
-      columns: [{ label: 'Date', width: 14 }, { label: 'Vendor', width: 24 },
-                { label: 'Category', width: 18 }, { label: 'Amount', width: 12 }],
+      columns: [{ label: 'Date', width: 16 }, { label: 'Vendor', width: 34 }, { label: 'Amount', width: 14 }],
       outcomeLabel: 'What Happens',
       rows: s.rows,
       verb: 'Add', noun: 'Expense',
-      /* ⛔ THE HEAD NAMES THE JOB, because on this door the settled rows are not settled. See the
-         note in ImportConfirm._section: a bank register lists payroll, COGS, owner draws and
-         transfers beside the rent, and Bar Cop cannot tell them apart. This is the only sentence the
-         operator sees while the section is closed. */
-      settledSub: 'Bar Cop read fine. Open this to check nothing belongs elsewhere',
+      // Grouped by where each row is going. See ImportConfirm.panel and _expenseGroups.
+      groups: this._expenseGroups(),
+      toolbar: this._expenseToolbarHtml(),
+      selectable: true,
+      checked: (this._expenseReview || {}).checked || {},
       removable: true,
       goAttr: 'data-oexreview-go', backAttr: 'data-oexreview-back', backLabel: 'Start Over',
       resultId: 'oex-imp-result',
@@ -1557,7 +1663,7 @@ S.HubOperatingExpenses = {
          surviving rows is the defect `_expenseVerdicts` exists to close, and it would show up only
          as a number that disagreed with the button. */
       await this._importRows(r.rows.filter(x => !r.removed[x._rid]),
-        { reviewed: true, verdicts: r.verdicts, picks: r.picks });
+        { reviewed: true, verdicts: r.verdicts, picks: r.assign });
     } finally {
       this._expenseReviewWriting = false;
       /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `_importRows` is what clears it — a refused write
