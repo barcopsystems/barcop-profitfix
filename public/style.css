@@ -1157,6 +1157,11 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .card-collapse-head{cursor:pointer;}
 .card-collapse-head:hover .card-chevron{color:var(--gold);}
 .card-chevron{display:inline-flex;align-items:center;justify-content:center;color:var(--t3);font-size:14px;line-height:1;flex-shrink:0;transition:transform 0.18s,color 0.12s;}
+/* The confirm-screen section heads (ImportConfirm._section) had no class, so none of the
+   hover rules above reached them and their chevrons stayed grey where every other collapsible
+   head in the app goes gold. Keyed on the attribute the shell already renders, so all five
+   converted import doors pick it up without a new class name. */
+[data-confirm-section]:hover .card-chevron{color:var(--gold);}
 .card.collapsed .card-chevron{transform:rotate(-90deg);}
 /* Weekly-cockpit step-row chevrons (Profit/Revenue/Cash/Inventory/Labor/Shift/Events/Books)
    match the Fix-system head chevron: down when open, rotate to point right when collapsed, gold on hover. */
