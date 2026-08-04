@@ -613,7 +613,21 @@ S.LaborStaffRoster = {
       const inactive = /inactive|term/i.test((r.status || '').trim());
       /* A cell the file HAD and Bar Cop could not use is reported; an ABSENT cell is not a problem
          and must never be counted as one, or every name-and-position list reads broken. */
+      /* ⛔⛔ AND THE LOUDEST ONE: THIS PERSON WILL LAND WITH NO PAY AT ALL. Every defect in this
+         door's history ends in exactly this state, and it is the one the operator cannot see
+         downstream — `wageForStaffPosition` returns 0, `salariedCost` skips them, and their shifts
+         cost $0.00 while labor cost, labor %, prime cost and RPLH all read low by their whole
+         payroll. Nothing about the roster row says "unpaid"; it just shows a dash.
+         ⚠ FOUND ON A LIVE WALK, NOT BY A PIN, and the pins could not have found it: every fixture
+         had positions in it, so the position default always rescued a missing wage. On a roster with
+         NO positions yet — which is what a first-time operator actually has when they drop their
+         staff list — a refused negative wage and a blank wage both land as nothing, and the screen
+         said "Adding this person" with no more comment than a dash in the Pay column. */
+      const finalWage = salaried ? null : (wageOk ? wageNum : posWage);
+      const finalSalary = salaried ? (salOk ? salNum : null) : null;
+      const noPay = finalWage == null && finalSalary == null;
       const notes = [];
+      if (noPay) notes.push('No pay set: their shifts will cost $0');
       if (posCell && !pos) notes.push('Position not on your list');
       else if (!posCell) notes.push('No position set');
       if (badPay) notes.push('Negative pay figure ignored');
@@ -621,13 +635,16 @@ S.LaborStaffRoster = {
       list.push({
         raw: r, name: name, status: 'new', notes: notes,
         badPay: badPay, noPos: !pos, badPos: !!(posCell && !pos), usedPosWage: usedPosWage,
+        noPay: noPay,
         rec: {
           id:            App.uid(),
           name,
           position_id:   pos ? pos.id : '',
           pay_type:      salaried ? 'Salary' : 'Hourly',
-          wage:          salaried ? null : (wageOk ? wageNum : posWage),
-          annual_salary: salaried ? (salOk ? salNum : null) : null,
+          // ⚠ ONE SOURCE with the `noPay` test above, or the row could say "no pay set" about a
+          // record that has some, or stay silent about one that has none.
+          wage:          finalWage,
+          annual_salary: finalSalary,
           wage_history:  [],
           status:        inactive ? 'Inactive' : 'Active',
           phone:         (r.phone || '').trim(),
