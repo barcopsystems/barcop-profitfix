@@ -310,8 +310,8 @@ app.get('/api/health', async (req, res) => {
 // .trim() so a stray leading/trailing space pasted into the env var can't produce
 // a "No such price: ' price_...'" error (a space in the pasted value is invisible
 // in most dashboards but Stripe searches for the literal, space-and-all).
-const STRIPE_PRICE_MONTHLY = (process.env.STRIPE_PRICE_MONTHLY || '').trim(); // $249/mo
-const STRIPE_PRICE_ANNUAL  = (process.env.STRIPE_PRICE_ANNUAL  || '').trim(); // $2,490/yr
+const STRIPE_PRICE_MONTHLY = (process.env.STRIPE_PRICE_MONTHLY || '').trim(); // $189/mo
+const STRIPE_PRICE_ANNUAL  = (process.env.STRIPE_PRICE_ANNUAL  || '').trim(); // $1,890/yr
 const ALL_MODULES     = ['profit', 'revenue'];
 // Stripe states that count as a LIVE subscription for a bar (do not let a second one be
 // created, and do not discard the account). Only terminal states (canceled,
@@ -2325,7 +2325,7 @@ app.post('/api/abandon-account', async (req, res) => {
     // poll gives up after ~12s and renders the new-signup gate with a "Start Over" link whose
     // confirm text reads "No payment was made." A customer who paid twelve seconds ago clicks it:
     // the account is deleted, the cascade takes the subscription row and their auth user, and the
-    // webhook then fails its foreign key. Stripe bills $249/mo forever with no row, no
+    // webhook then fails its foreign key. Stripe bills $189/mo forever with no row, no
     // stripe_customer_id anywhere in the app, no billing-portal route to it, and reconcile (which
     // walks our table) blind to it. Only a manual Stripe dashboard search would ever find it.
     // The checkout dup-guard already asks Stripe this way; this is the same question.
