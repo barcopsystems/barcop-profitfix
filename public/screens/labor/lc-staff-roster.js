@@ -337,10 +337,23 @@ S.LaborStaffRoster = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + addCard + below + '</div>';
+    /* ⛔ THE CONFIRM SCREEN TAKES THE ADD CARD'S SLOT, and the roster below stays — the same shape
+       the other converted doors use. Keeping the list visible is the point: "already on your roster"
+       is a verdict about that list, and the operator can see it from here. */
+    this.container.innerHTML = '<div class="screen">'
+      + (this._staffReview ? this.staffReviewHTML() : addCard) + below + '</div>';
     this.container.onclick = ev => {
+      /* The confirm screen's two controls. Both write state and re-render, so the button's count,
+         the rows and what gets written all read from the same place. */
+      if (ev.target.closest('[data-staffreview-go]')) { this._runStaffReview(); return; }
+      if (ev.target.closest('[data-staffreview-back]')) {
+        // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
+        // for, so the file is re-dropped from scratch. Nothing was written to undo.
+        this._staffReview = null; this.renderList(); return;
+      }
       const modeBtn = ev.target.closest('.sr-mode');
-      if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
+      // Switching mode abandons a confirm in progress, which is safe: nothing has been written.
+      if (modeBtn) { this._staffReview = null; this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       if (ev.target.closest('#sr-startover')) { this._draft = null; this.renderList(); return; }
@@ -353,6 +366,10 @@ S.LaborStaffRoster = {
       else if (edit)  { ev.stopPropagation(); const id = edit.dataset.id; App.pushView(() => this.renderUnified(id)); }
       else if (row)   { const id = row.dataset.id; App.pushView(() => this.renderUnified(id)); }
     };
+    /* ⚠ NOT WHILE THE CONFIRM SCREEN IS UP. Its markup replaces the add card, so `#sr-csv` is gone
+       and re-mounting would hand the operator a second file picker over a file they have not
+       finished confirming. */
+    if (this._staffReview) return;
     if (this.entryMode === 'import') this.mountImporter();
     else {
       // Restore an in-progress Add-Staff draft, then sync the pay label to the
@@ -402,7 +419,11 @@ S.LaborStaffRoster = {
         { key: 'email',         label: 'Email',         required: false, match: ['email', 'e-mail', 'email address', 'e mail', 'contact email', 'work email'] }
       ],
       confirmLabel: 'Import Staff',
-      onComplete: rows => this.importStaffRows(rows)
+      /* ⛔ THE FILE DOES NOT WRITE ITSELF ANY MORE. It goes to the confirm screen, which prints each
+         person's RESOLVED PAY beside their name. Every pay defect this door has shipped was a figure
+         that differed from what the operator believed they were importing, and none of them is
+         visible in a mapper preview. */
+      onComplete: rows => this._openStaffReview(rows)
     });
   },
 
@@ -420,80 +441,216 @@ S.LaborStaffRoster = {
     ]);
   },
 
-  async importStaffRows(rows) {
+  _openStaffReview(rows) {
+    this._staffReview = { rows: (rows || []).slice() };
+    this.renderList();
+  },
+
+  /* ONE WALK produces the rows the screen shows AND the number the button prints, because both come
+     out of the same `_buildStaffRows` the write uses. */
+  _staffReviewSummary() {
+    const r = this._staffReview;
+    if (!r) return { rows: [], count: 0 };
+    const built = this._buildStaffRows(r.rows);
+    const rows = built.list.map(x => this._staffReviewRow(x));
+    return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
+  },
+  _staffReviewCount() { return this._staffReview ? this._staffReviewSummary().count : 0; },
+
+  /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
+     are TEXT the shell escapes and budgets to one line.
+     ⛔ THE PAY CELL IS THE WHOLE REASON THIS SCREEN EXISTS ON THIS DOOR. Every defect it has shipped
+     was a pay figure that differed from what the operator believed they were importing, and none of
+     them is visible in a mapper preview. It prints the figure that is about to be STORED, resolved
+     the same way the write resolves it, because they come from the same walk. */
+  _staffReviewRow(x) {
+    const NOTE = {
+      'new':  'Adding this person',
+      dup:    'Already on your roster',
+      repeat: 'Repeated in this file',
+      blank:  'No name'
+    };
+    const rec = x.rec || {};
+    const raw = x.raw || {};
+    /* ⚠ FORMATTED EXACTLY AS THE ROSTER ROW BELOW FORMATS IT — `App.fmtCurrency(salary) + '/yr'`,
+       cents and all. `$52,000.00/yr` looks like it wants trimming, and trimming it here would make
+       this screen and the list it feeds print the same person's salary two different ways, which is
+       the "one quantity, two screens" trap. If the cents go, they go in both places at once. */
+    const money = v => App.fmtCurrency(v);
+    const pay = x.status !== 'new' ? '&mdash;'
+      : rec.pay_type === 'Salary'
+        ? (rec.annual_salary != null ? money(rec.annual_salary) + '/yr' : '&mdash;')
+        : (rec.wage != null ? money(rec.wage) + '/hr' : '&mdash;');
+    const positions = this.positions() || [];
+    const posName = rec.position_id
+      ? (positions.find(p => p.id === rec.position_id) || {}).name || ''
+      : String(raw.position || '').trim();
+    return {
+      cells: [x.name ? esc(x.name) : '&mdash;',
+              esc(posName) || '&mdash;',
+              pay,
+              esc(x.status === 'new' ? rec.status : String(raw.status || '').trim()) || '&mdash;'],
+      note: NOTE[x.status] || '',
+      notes: x.notes || [],
+      lands: x.status === 'new'
+    };
+  },
+
+  staffReviewHTML() {
+    const s = this._staffReviewSummary();
+    const n = s.rows.length;
+    const bad = s.rows.filter(x => !x.lands).length;
+    /* ⚠ EACH NUMBER NAMES ITS OWN COLLECTION: `n` is rows read out of the file, `bad` is rows that
+       will not land, and the button counts people who will be created. And the lead names the
+       button's own verb, so renaming the button rewrites this sentence with it. No em dashes. */
+    const lead = 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's') + ' out of this file. '
+      + (bad
+          ? (bad === 1 ? 'One of them is not going in. ' : bad + ' of them are not going in. ') + 'Check the pay on the rest, then add them. '
+          : 'Check the pay on each of them, then add them. ')
+      + 'Nothing is saved until you do.';
+    return ImportConfirm.panel({
+      label: 'Check your roster',
+      lead: lead,
+      columns: [{ label: 'Name', width: 22 }, { label: 'Position', width: 16 },
+                { label: 'Pay', width: 14 }, { label: 'Status', width: 11 }],
+      outcomeLabel: 'What Happens',
+      rows: s.rows,
+      verb: 'Add', noun: 'Person', nounPlural: 'People',
+      goAttr: 'data-staffreview-go', backAttr: 'data-staffreview-back', backLabel: 'Start Over',
+      resultId: 'sr-imp-result',
+      busy: !!this._staffReviewWriting
+    });
+  },
+
+  /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
+     only thing a re-render cannot hand back. */
+  async _runStaffReview() {
+    const r = this._staffReview;
+    if (!r || this._staffReviewWriting) return;
+    this._staffReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-staffreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try { await this.importStaffRows(r.rows, { reviewed: true }); }
+    finally {
+      this._staffReviewWriting = false;
+      /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `importStaffRows` is what clears it — a refused write
+         keeps every row so the operator presses again without re-dropping. Do NOT re-render here:
+         the failure path writes into the result slot and a re-render destroys it. */
+      if (this._staffReview) {
+        const b = this.container && this.container.querySelector('[data-staffreview-go]');
+        const n = this._staffReviewCount();
+        if (b) { b.disabled = false; b.textContent = 'Add ' + n + (n === 1 ? ' Person' : ' People'); }
+      }
+    }
+  },
+
+  /* ── The confirm screen ──────────────────────────────────────────────────────
+     Door 4 of the rollout. This door owns its columns and its build; `ImportConfirm` owns the
+     frame, the dim rule and the button's count, which it derives from the rows rather than taking
+     as an argument.
+
+     ⛔ THE ONE WALK. `importStaffRows` and the screen must decide "does this row land, and what
+     pay will it land with" in the same place. Two copies of that decision is how a button ends up
+     promising a number the write does not honour. Pure: no DOM, no writes, safe on every render. */
+  _buildStaffRows(rows) {
     const posByName = {};
     this.positions().forEach(p => { posByName[(p.name || '').trim().toLowerCase()] = p; });
-    const toAdd = [];
-    // Dedup by name against the roster AND within the file, so a re-drop after a mapping fix — or
-    // next month's payroll export — never mints a second Ana Ruiz. The vendor door beside this one
-    // has always done it; this one had NO duplicate handling at all, so two drops gave four people,
-    // every picker listed them twice, and the original's hours and tips stayed on the old id.
-    // ⚠ The set is built from the WHOLE roster including Inactive, or re-importing a terminated
-    // employee creates a second Active record and strands their history.
-    const taken = new Set(this.staff().map(s => (s.name || '').trim().toLowerCase()));
-    let blank = 0, dupes = 0, badPay = 0;
+    /* Dedup by name against the roster AND within the file, so a re-drop after a mapping fix — or
+       next month's payroll export — never mints a second Ana Ruiz.
+       ⚠ The set is built from the WHOLE roster including Inactive, or re-importing a terminated
+       employee creates a second Active record and strands their history.
+       ⛔ TWO REASONS, NOT ONE: a name already on your roster is a dead end; a name repeated inside
+       the file is about the file. They used to share a bucket. */
+    const mine = new Set(this.staff().map(s => (s.name || '').trim().toLowerCase()));
+    const seen = new Set();
+    const list = [];
     (rows || []).forEach(r => {
       const name = (r.name || '').trim();
-      if (!name) { blank++; return; }
-      if (taken.has(name.toLowerCase())) { dupes++; return; }
-      taken.add(name.toLowerCase());
-      const pos = posByName[(r.position || '').trim().toLowerCase()] || null;
+      if (!name) { list.push({ raw: r, name: '', status: 'blank', notes: [] }); return; }
+      const key = name.toLowerCase();
+      if (mine.has(key)) { list.push({ raw: r, name: name, status: 'dup', notes: [] }); return; }
+      if (seen.has(key)) { list.push({ raw: r, name: name, status: 'repeat', notes: [] }); return; }
+      seen.add(key);
+      const posCell = (r.position || '').trim();
+      const pos = posByName[posCell.toLowerCase()] || null;
       /* ⚠⚠ "NON-EXEMPT" IS THE FLSA WORD FOR *HOURLY*, AND THE OLD TEST READ IT AS SALARIED.
          `/salar|exempt/i` matches the "exempt" inside "Non-Exempt" — so an ADP/Paychex/Paylocity
          roster, whose Employment Type column this door's own `match` list asks for by name, made
          **every hourly employee salaried and then threw their wage away** (the salaried branch
-         stores `wage: null`). With no Annual Salary column either, they landed with no pay of any
-         kind: `wageForStaffPosition` returns 0, `salariedCost` skips them, and a $19.50/hr
-         bartender's 40-hour week cost **$0.00 instead of $780**. Labor cost, labor %, prime cost
-         and RPLH all read low by that person's entire payroll, on every screen that shows them. */
+         stores `wage: null`). A $19.50/hr bartender's 40-hour week cost **$0.00 instead of $780**,
+         and labor cost, labor %, prime cost and RPLH all read low by that person's entire payroll.
+         The Pay column on the confirm screen exists so this class is visible BEFORE the write. */
       const payTypeCell = (r.pay_type || '').trim();
       const salNum = App.parseNum(r.annual_salary);
-      // ⚠ Declared HERE, above `salaried`, because `salaried` now consults it. It used to sit below
-      // and a fix that referenced it died in the temporal dead zone.
+      // ⚠ Declared HERE, above `salaried`, because `salaried` consults it.
       const wageNum = App.parseNum(r.wage);
       const saysSalary = /salar/i.test(payTypeCell)
         || (/\bexempt\b/i.test(payTypeCell) && !/non[\s-]*exempt/i.test(payTypeCell));
-      /* ⚠ AND A SALARY FIGURE IS ITSELF THE CLASSIFICATION. The old code forced `annual_salary` to
-         null unless a SEPARATE Pay Type column agreed — so a Name/Title/Salary manager list (which
-         is how a three-person salaried list is actually written; nobody adds a Pay Type column to
-         it) imported everyone Hourly with no wage, and the weekly salaried cost was $0.00. */
-      /* ⚠⚠ A SALARY FIGURE ONLY CLASSIFIES WHEN IT IS A REAL FIGURE AND THERE IS NO WAGE.
-         `salNum != null` was true for **zero**, so a file writing `0` into an unused Annual Salary
-         column — which is most exports — made every hourly employee salaried and the salaried
-         branch then threw their wage away. That is the identical $0.00-a-shift failure the
-         Non-Exempt fix was written to kill, re-entered through a different door one round later.
-         It also fired when a wage AND an annualised-pay column were both populated. Now: a salary
-         classifies only if it is greater than zero and the row carries no usable wage. */
+      /* ⚠ AND A SALARY FIGURE IS ITSELF THE CLASSIFICATION. Forcing `annual_salary` to null unless a
+         SEPARATE Pay Type column agreed made a Name/Title/Salary manager list — which is how a
+         three-person salaried list is actually written — import everyone Hourly with no wage.
+         ⚠⚠ BUT ONLY WHEN IT IS A REAL FIGURE AND THERE IS NO WAGE. `salNum != null` was true for
+         **zero**, so a file writing `0` into an unused Annual Salary column made every hourly
+         employee salaried and threw the wage away — the identical $0.00-a-shift failure the
+         Non-Exempt fix was written to kill, re-entered one round later through another door. */
       const salaried = saysSalary || (!payTypeCell && salNum != null && salNum > 0 && wageNum == null);
-      // App.parseNum, not parseFloat: `parseFloat('52,000')` is 52 and `parseFloat('$19.50')` is
-      // NaN. XLSX is read with raw:false, so a Currency- or #,##0-formatted money column — the
-      // default for money — arrives as exactly those strings. A $52,000 salary imported as $52.
-      // (wageNum is declared above `salaried`, which consults it.)
-      // A negative wage is refused rather than stored: the manual form carries min="0", and a
-      // negative rate makes labor cost FALL when that person works.
+      /* App.parseNum, not parseFloat: `parseFloat('52,000')` is 52 and `parseFloat('$19.50')` is
+         NaN. XLSX is read with raw:false, so a Currency- or #,##0-formatted money column arrives as
+         exactly those strings. A $52,000 salary imported as $52.
+         A negative is refused rather than stored: the manual form carries min="0", and a negative
+         rate makes labor cost FALL when that person works. */
       const wageOk = wageNum != null && wageNum >= 0;
       const salOk = salNum != null && salNum >= 0;
-      if ((wageNum != null && wageNum < 0) || (salNum != null && salNum < 0)) badPay++;
-      // Fall back to the position's default wage, exactly as the manual form does the moment a
-      // position is picked — otherwise the same file typed by hand and imported gives two answers,
-      // and the import's answer costs every shift at $0.
+      const badPay = (wageNum != null && wageNum < 0) || (salNum != null && salNum < 0);
+      /* Fall back to the position's default wage, exactly as the manual form does the moment a
+         position is picked — otherwise the same file typed by hand and imported gives two answers,
+         and the import's answer costs every shift at $0.
+         ⛔ AND THAT FALLBACK IS AN ASSUMPTION, SO THE ROW SAYS SO. The figure did not come from
+         their file; it came from the position. Landing silently on a number the operator never
+         supplied is how a wrong wage survives an import nobody questioned. */
       const posWage = (pos && pos.default_wage != null) ? pos.default_wage : null;
+      const usedPosWage = !salaried && !wageOk && posWage != null;
       const inactive = /inactive|term/i.test((r.status || '').trim());
-      toAdd.push({
-        id:            App.uid(),
-        name,
-        position_id:   pos ? pos.id : '',
-        pay_type:      salaried ? 'Salary' : 'Hourly',
-        wage:          salaried ? null : (wageOk ? wageNum : posWage),
-        annual_salary: salaried ? (salOk ? salNum : null) : null,
-        wage_history:  [],
-        status:        inactive ? 'Inactive' : 'Active',
-        phone:         (r.phone || '').trim(),
-        email:         (r.email || '').trim(),
-        notes:         '',
-        created_at:    new Date().toISOString()
+      /* A cell the file HAD and Bar Cop could not use is reported; an ABSENT cell is not a problem
+         and must never be counted as one, or every name-and-position list reads broken. */
+      const notes = [];
+      if (posCell && !pos) notes.push('Position not on your list');
+      else if (!posCell) notes.push('No position set');
+      if (badPay) notes.push('Negative pay figure ignored');
+      if (usedPosWage) notes.push('Wage came from the position default');
+      list.push({
+        raw: r, name: name, status: 'new', notes: notes,
+        badPay: badPay, noPos: !pos, badPos: !!(posCell && !pos), usedPosWage: usedPosWage,
+        rec: {
+          id:            App.uid(),
+          name,
+          position_id:   pos ? pos.id : '',
+          pay_type:      salaried ? 'Salary' : 'Hourly',
+          wage:          salaried ? null : (wageOk ? wageNum : posWage),
+          annual_salary: salaried ? (salOk ? salNum : null) : null,
+          wage_history:  [],
+          status:        inactive ? 'Inactive' : 'Active',
+          phone:         (r.phone || '').trim(),
+          email:         (r.email || '').trim(),
+          notes:         '',
+          created_at:    new Date().toISOString()
+        }
       });
     });
+    return { list: list };
+  },
+
+  async importStaffRows(rows, opts) {
+    opts = opts || {};
+    /* ⛔ ONE WALK, SHARED WITH THE SCREEN. Everything below is REPORTING; nothing below decides
+       what lands or what pay it lands with. */
+    const built = this._buildStaffRows(rows);
+    const countOf = f => built.list.filter(f).length;
+    const toAdd    = built.list.filter(x => x.status === 'new').map(x => x.rec);
+    const dupes    = countOf(x => x.status === 'dup');
+    const repeated = countOf(x => x.status === 'repeat');
+    const blank    = countOf(x => x.status === 'blank');
+    const badPay   = countOf(x => x.badPay);
 
     const result = document.getElementById('sr-imp-result');
     /* ⚠ THE ZERO-ROW HEADLINE MUST NAME THE REASON THAT ACTUALLY APPLIES. "Each row needs a Name"
@@ -501,12 +658,14 @@ S.LaborStaffRoster = {
        the operator to fix a column that was correct. An absolute claim may only fire when the other
        buckets are empty; the mixed case asserts nothing and lets the counts speak. */
     if (toAdd.length === 0) {
-      const why = dupes && !blank ? 'Everyone in this file is already on your roster.'
-        : blank && !dupes ? 'No rows imported. Each row needs a Name.'
-        : dupes || blank ? 'No new staff imported.'
+      // ⚠ AN ABSOLUTE CLAIM NEEDS EVERY OTHER BUCKET EMPTY, `repeated` included now that it has one.
+      const why = dupes && !blank && !repeated ? 'Everyone in this file is already on your roster.'
+        : blank && !dupes && !repeated ? 'No rows imported. Each row needs a Name.'
+        : dupes || blank || repeated ? 'No new staff imported.'
         : 'No rows imported. Each row needs a Name.';
       const bits = [];
       if (dupes) bits.push(dupes + ' already on your roster');
+      if (repeated) bits.push(repeated + ' repeated in this file');
       if (blank) bits.push(blank + ' row' + (blank === 1 ? '' : 's') + ' skipped with no name');
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
         + why + (bits.length ? ' (' + bits.join(' · ') + ')' : '') + '</div>';
@@ -517,6 +676,10 @@ S.LaborStaffRoster = {
     if (ok) {
       App.markSetupDone('gs_lc_roster');
       const noPos = toAdd.filter(s => !s.position_id).length;
+      /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. A refused write returns through
+         the else branch below with the screen still up, so the operator presses again rather than
+         re-dropping. This is the only line that knows the write landed. */
+      this._staffReview = null;
       this.renderList();
       const res2 = document.getElementById('sr-imp-result');
       /* Every way a row can be dropped now reaches the operator. The only counter this door had was
@@ -524,11 +687,19 @@ S.LaborStaffRoster = {
          members." and said nothing about the other 20 — which is what hid every defect above. */
       const notes = [];
       if (dupes) notes.push(dupes + ' already on your roster');
+      if (repeated) notes.push(repeated + ' repeated in this file');
       if (blank) notes.push(blank + ' row' + (blank === 1 ? '' : 's') + ' skipped with no name');
       if (badPay) notes.push(badPay + ' negative pay figure' + (badPay === 1 ? '' : 's') + ' ignored');
       if (noPos > 0) notes.push(noPos + ' need a position set; open them on the roster below');
-      if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported ' + toAdd.length + ' staff member' + (toAdd.length === 1 ? '' : 's') + '.'
-        + (notes.length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes.join(' · ') + ')</span>' : '') + '</div>';
+      /* ⛔ THE CLAUSE LIST IS FOR AN IMPORT NOBODY WAS SHOWN. Every one of those clauses is now a row
+         on the confirm screen, said once, where the operator read it and pressed Add. Repeating it
+         afterwards is the second telling. The full account survives for a caller with no screen in
+         front of it.
+         ⚠ "Added", not "Imported": the file was imported two screens ago and the button they pressed
+         said Add. And "people", not "staff members", to match that button. */
+      if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Added '
+        + toAdd.length + (toAdd.length === 1 ? ' person' : ' people') + '.'
+        + (!opts.reviewed && notes.length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes.join(' · ') + ')</span>' : '') + '</div>';
     } else {
       const ids = new Set(toAdd.map(s => s.id));
       App.laborData.lc_staff = this.staff().filter(s => !ids.has(s.id));
