@@ -1038,6 +1038,10 @@ const PosIngest = {
        #23). `keptManualDates` needs no twin: `keptDates` already exists for the once-per-day guard
        and IS that list, so it is returned rather than rebuilt. */
     const replacedDates = [];
+    /* Same reason as `replacedDates`: `merged` is a count of extra ROWS folded into a day, and the
+       confirm screen has to say which DAY that happened to. A Set, because a day split three ways
+       increments the count twice and is still one day. */
+    const mergedDates = new Set();
     const cents = n => Math.round(n * 100) / 100;   // summing floats across services must not drift
     // A column "carries" a value only if the cell PARSES to a number. A junk cell ("N/A", "-", a
     // stray footer label) is non-blank but not a value — treating it as a carried 0 would raise a
@@ -1069,7 +1073,7 @@ const PosIngest = {
       // readable count can agree with another, so a blank cell contributes nothing here (P1c).
       if (numeric(r.covers)) { const seen = covSeen.get(date) || []; seen.push(covers); covSeen.set(date, seen); }
       const prior = byDate.get(date);
-      if (prior) { prior.bar = cents(prior.bar + bar); prior.food = cents(prior.food + food); prior.covers += covers; merged++; }
+      if (prior) { prior.bar = cents(prior.bar + bar); prior.food = cents(prior.food + food); prior.covers += covers; merged++; mergedDates.add(date); }
       else byDate.set(date, { bar, food, covers });
     });
     /* ⚠⚠ A GUEST COUNT REPEATED ON EVERY ROW OF A DAY IS ONE COUNT, NOT SEVERAL (P1c).
@@ -1336,7 +1340,7 @@ const PosIngest = {
     // `replacedDates` / `keptManualDates` are the same facts as `dupCount` / `keptManual` with the
     // day attached, for the confirm screen. Every other consumer keeps reading the counts.
     return { toAdd, skipped, zeroSkipped, unchanged, undated, dupCount, merged, keptManual, conflicts, colGaps, coversRepeated,
-             replacedDates, keptManualDates: Array.from(keptDates) };
+             replacedDates, keptManualDates: Array.from(keptDates), mergedDates: Array.from(mergedDates) };
   },
 
   // A row is one drawer's (or the day's) over/short. Resolves Register + Cashier
