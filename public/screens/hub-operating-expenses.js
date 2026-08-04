@@ -932,6 +932,8 @@ S.HubOperatingExpenses = {
         +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" id="oexa-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs until you stop it. Set this only for a bill that ends after a fixed number of months.</div></div></div>'
         + '</div>'
         + App.noteField({ id: 'oexa-notes', placeholder: 'Optional context for the bookkeeper' })
+        // Fires as they type the vendor. See _manualElsewhereNotice.
+        + '<div id="oexa-elsewhere"></div>'
         + '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>';
       addButtons = '<div data-collapse-group="oex-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary" id="oexa-save">Add Expense</button>'
@@ -1265,31 +1267,58 @@ S.HubOperatingExpenses = {
      `transfer` (Transferrin Labs). `payroll` is word-bounded so Payrolling Solutions stays quiet.
      ⚠ The table is folded INTO this function on purpose: a data property sibling is invisible to
      every slicer in the harness suite ([[the-loop]] #16). */
-  _belongsElsewhere(vendor) {
+  /* ⭐ ONE WALK, TWO CALLERS, AND IT CARRIES A DESTINATION. The import screen only ever needed the
+     sentence; the hand-typed form needs somewhere to send them, and deriving the destination from
+     the sentence would mean a reworded note silently breaks the route ([[the-loop]] #25). So the
+     table holds all three and `_belongsElsewhere` is the thin reader the import already uses —
+     two doors flagging different things is the drift this shape exists to prevent.
+     ⚠ `where` is prose and `screen` is an `App.openScreen` id. NOT every destination has one:
+     platform fees are entered in the Confirm the Week popup and a transfer between the operator's
+     own accounts is not tracked anywhere at all. Inventing an id for either would be a dead button
+     ([[the-loop]] #106), so those carry `where` and no `screen`. */
+  _elsewhereFor(vendor) {
     const t = ' ' + String(vendor == null ? '' : vendor).toLowerCase()
       .replace(/'/g, '').replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
-    if (t.trim() === '') return '';
+    if (t.trim() === '') return null;
     const RULES = [
       [/\bowners? draw\b|\bmember draw\b|\bpartner draw\b|\bshareholder distribution\b|\bdistribution to owner\b/,
-        'An owner draw belongs in Cash Outflows'],
+        'An owner draw belongs in Cash Outflows', 'Cash Outflows', 'cash-outflows'],
       [/\btransfer to\b|\btransfer from\b|\bonline transfer\b|\bacct xfer\b|\baccount transfer\b/,
-        'A transfer between your own accounts'],
+        'A transfer between your own accounts', 'nowhere: the money never left the business', ''],
       [/\bloan (payment|pmt|repayment)\b|\bsba loan\b|\bprincipal payment\b|\bnote payment\b/,
-        'A loan payment belongs in Cash Outflows'],
+        'A loan payment belongs in Cash Outflows', 'Cash Outflows', 'cash-outflows'],
       [/\bpayroll taxe?s?\b|\bestimated taxe?s?\b|\bsales tax\b|\bfranchise tax\b|\b941\b|\birs\b/,
-        'A tax payment belongs in Cash Outflows'],
-      [/\bpayroll\b/, 'Payroll is tracked in Labor'],
-      [/\brepairs?\b|\bmaintenance\b/, 'Repairs go in Shift Control']
+        'A tax payment belongs in Cash Outflows', 'Cash Outflows', 'cash-outflows'],
+      [/\bpayroll\b/, 'Payroll is tracked in Labor', 'Labor, under Log Hours', 'lc-log-hours'],
+      [/\brepairs?\b|\bmaintenance\b/, 'Repairs go in Shift Control', 'Shift Control, under Maintenance', 'sc-maintenance'],
+      /* ⛔ THE P&L LINE IS THE ANCHOR, NOT THE BRAND LIST. Books prints "3rd-party platform fees
+         (DoorDash, UberEats, etc.)" as its OWN line, fed from the weekly roll's `platform_fees` —
+         so a delivery commission booked here is counted twice on one statement, exactly like a
+         repair. I left this out on the reasoning that it needed a brand list with no app-side
+         anchor; the anchor was Books' own label the whole time, and the structural pin
+         (`verify-expense-import-review` block N) is what surfaced it.
+         ⚠ FOUR BRANDS, ALL UNAMBIGUOUS. Deliberately absent: `caviar` (a food a bar buys, and a
+         supplier could be Caviar House), `slice` (Slice of Life Pizza) and `seamless` (Seamless
+         Gutters) — every one of them a real business name before it is a platform. */
+      [/\bdoordash\b|\bgrubhub\b|\bubereats\b|\buber eats\b|\bpostmates\b|\bdelivery commission\b/,
+        'Delivery app fees have their own line', 'the weekly Confirm the Week figures', '']
     ];
-    for (let i = 0; i < RULES.length; i++) if (RULES[i][0].test(t)) return RULES[i][1];
+    for (let i = 0; i < RULES.length; i++) {
+      if (RULES[i][0].test(t)) return { note: RULES[i][1], where: RULES[i][2], screen: RULES[i][3] };
+    }
     /* The operator's OWN inventory vendor list. Not a guess at all: if they buy product from this
        name, a debit to it is a delivery, and deliveries are COGS through Inventory. */
     const vend = (App.inventoryData && Array.isArray(App.inventoryData.ic_vendors))
       ? App.inventoryData.ic_vendors : [];
     const k = this._vendorKey(vendor);
-    if (k && vend.some(v => v && this._vendorKey(v.name) === k)) return 'This vendor is on your Inventory list';
-    return '';
+    if (k && vend.some(v => v && this._vendorKey(v.name) === k)) {
+      return { note: 'This vendor is on your Inventory list',
+        where: 'Inventory, under Receive Delivery', screen: 'ic-receive-delivery' };
+    }
+    return null;
   },
+  // What the import screen reads. The sentence only; the destination is for the hand-typed form.
+  _belongsElsewhere(vendor) { const e = this._elsewhereFor(vendor); return e ? e.note : ''; },
 
   _expenseVerdicts(rows) {
     const conv = (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
@@ -1466,9 +1495,13 @@ S.HubOperatingExpenses = {
        (*"all new categories created are collapsed"*), but that reintroduces his FIRST complaint —
        *"the row disappears and as a user i can't see that the row just added"*. Opening only the
        latest target answers both: the move is always visible, and the screen never grows. */
-    Object.keys(r.open).forEach(k => { if (k !== 'unsorted' && k !== '__skip') delete r.open[k]; });
+    Object.keys(r.open).forEach(k => { if (k !== 'unsorted' && k !== '__skip' && k !== '__elsewhere') delete r.open[k]; });
     r.open[r.moveCat] = true;
     r.moveNote = ids.length + ' row' + (ids.length === 1 ? '' : 's') + ' moved into ' + r.moveCat + '.';
+    /* ⚠ THE SELECTOR RESETS (Kyle, 2026-08-04). Leaving the last category selected makes the NEXT
+       Move To a single click away from filing a different batch under it by accident, and it reads
+       as though that category is still "current" when the rows it holds are already placed. */
+    r.moveCat = '';
     this.renderMain();
   },
 
@@ -1664,7 +1697,11 @@ S.HubOperatingExpenses = {
     return ImportConfirm.panel({
       label: 'Check your expenses',
       lead: lead,
-      columns: [{ label: 'Date', width: 16 }, { label: 'Vendor', width: 34 }, { label: 'Amount', width: 14 }],
+      /* ⚠ NARROWER VENDOR PULLS AMOUNT LEFT (Kyle: *"too big of a gap from vendor to amount"*). A
+         34% vendor column against short bank descriptions left the figure stranded at the far right
+         of its own cell. Every section shares one colgroup, so the columns line up card to card by
+         construction; what was wrong was the split, not the alignment. */
+      columns: [{ label: 'Date', width: 13 }, { label: 'Vendor', width: 27 }, { label: 'Amount', width: 12 }],
       outcomeLabel: 'What Happens',
       rows: s.rows,
       verb: 'Add', noun: 'Expense',
@@ -1973,6 +2010,31 @@ S.HubOperatingExpenses = {
   },
 
   // ── Inline add form save / start over ────────────────────────────────────
+  /* ⛔ IT FIRES AS THEY TYPE THE VENDOR, WHICH IS THE MOMENT ITS INPUT EXISTS ([[the-loop]] #78: a
+     check that CAN run before the work MUST run before the work). Waiting for Add would mean they
+     had already picked a date, chosen a category and typed an amount before being told the row
+     belongs on a different screen entirely.
+     ⚠ AND IT OFFERS THE WAY THERE, because a notice that names a screen without opening it is a
+     chore. Only where a destination HAS a screen: platform fees live in the Confirm the Week popup
+     and a transfer between their own accounts is tracked nowhere, so those say so and offer no
+     button rather than a dead one. */
+  _manualElsewhereNotice() {
+    const host = document.getElementById('oexa-elsewhere');
+    if (!host) return;
+    const v = (document.getElementById('oexa-vendor') || {}).value || '';
+    const e = this._elsewhereFor(v);
+    if (!e) { host.innerHTML = ''; return; }
+    host.innerHTML = '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);'
+      + 'border-radius:6px;padding:10px 14px;margin-top:12px;font-size:12px;color:var(--t1);'
+      + 'line-height:1.6;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
+      + '<span style="flex:1;min-width:200px;">' + esc(e.note) + '. Logging it here as well would'
+      + ' count it twice. It belongs in ' + esc(e.where) + '.</span>'
+      + (e.screen ? '<button type="button" class="btn btn-ghost btn-sm" id="oexa-elsewhere-go">Go There</button>' : '')
+      + '</div>';
+    const go = document.getElementById('oexa-elsewhere-go');
+    if (go && e.screen) go.addEventListener('click', () => App.openScreen(e.screen));
+  },
+
   async _saveAdd() {
     const g = (id) => document.getElementById(id);
     const date     = g('oexa-date')?.value || '';
@@ -1987,6 +2049,24 @@ S.HubOperatingExpenses = {
     if (!category) { showErr('Pick a category.'); return; }
     if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
     if (recurring && g('oexa-term')?.value && (isNaN(term) || term < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
+    /* ⛔ ASK ONCE, DO NOT REFUSE. The import HOLDS a flagged row back because there the default —
+       doing nothing — booked it. Here nothing happens until this button is pressed, so refusing a
+       row the operator deliberately typed would be the app overruling them on a guess, and Bar Cop
+       can be wrong. What the confirm buys is that the override is a DECISION rather than an
+       accident: the notice already told them while they were typing the name.
+       ⚠ It cannot become a wall of skip — it only exists when a rule actually matched, which for an
+       ordinary expense is never. */
+    const _elsewhere = this._elsewhereFor(vendor);
+    if (_elsewhere) {
+      const goOn = await App.confirm({
+        title: 'This looks like it belongs somewhere else',
+        message: _elsewhere.note + '. Bar Cop already counts it from ' + _elsewhere.where
+          + ', so logging it here as well would count it twice on your Income Statement.'
+          + ' Add it to Operating Expenses anyway?',
+        confirmText: 'Add It Anyway', cancelText: 'Cancel'
+      });
+      if (!goOn) return;
+    }
     const rec = {
       id: App.uid ? App.uid() : ('oex-' + Date.now()),
       date, category, vendor, amount, notes,
