@@ -1258,8 +1258,8 @@ const App = {
       + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">' + bodyHtml + '</div>'
       + (showPicker
           ? '<div id="gate-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">'
-            +   planOpt('monthly', '<b>Monthly</b> &middot; $249/mo', '')
-            +   planOpt('annual',  '<b>Annual</b> &middot; $2,490/yr', 'save $498')
+            +   planOpt('monthly', '<b>Monthly</b> &middot; $189/mo', '')
+            +   planOpt('annual',  '<b>Annual</b> &middot; $1,890/yr', 'save $378')
             + '</div>'
             // In-app billing clause: the terms the operator agrees to by paying. Kept
             // in step with the website Refund Policy (recurring, per bar, auto-renews,
