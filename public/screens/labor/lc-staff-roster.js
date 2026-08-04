@@ -353,6 +353,13 @@ S.LaborStaffRoster = {
         this._staffReview.open[k] = (k === 'needs') ? (this._staffReview.open[k] === false) : !this._staffReview.open[k];
         this.renderList(); return;
       }
+      /* Remove takes a row out of the import. No confirm: nothing is written until Add, the row is
+         named right beside the button, and Start Over re-drops the file. */
+      const srm = ev.target.closest('[data-confirm-remove]');
+      if (srm && this._staffReview) {
+        this._staffReview.removed[srm.dataset.confirmRemove] = true;
+        this.renderList(); return;
+      }
       if (ev.target.closest('[data-staffreview-go]')) { this._runStaffReview(); return; }
       if (ev.target.closest('[data-staffreview-back]')) {
         // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
@@ -450,7 +457,12 @@ S.LaborStaffRoster = {
   },
 
   _openStaffReview(rows) {
-    this._staffReview = { rows: (rows || []).slice(), open: {} };
+    this._staffReview = {
+      // ⚠ A STABLE ID PER ROW, so Remove has something to remove BY. The build returns one
+      // verdict per input row in the file's own order, so index is a real identity here.
+      rows: (rows || []).map((r, i) => Object.assign({}, r, { _rid: 'r' + i })),
+      open: {}, removed: {}
+    };
     this.renderList();
   },
 
@@ -459,8 +471,11 @@ S.LaborStaffRoster = {
   _staffReviewSummary() {
     const r = this._staffReview;
     if (!r) return { rows: [], count: 0 };
-    const built = this._buildStaffRows(r.rows);
-    const rows = built.list.map(x => this._staffReviewRow(x));
+    // A removed row is gone from the list, the counts and the write.
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    const built = this._buildStaffRows(live);
+    // ⚠ Zipped by index: the build pushes exactly one entry per input row, in order.
+    const rows = built.list.map((x, i) => this._staffReviewRow(x, (live[i] || {})._rid));
     return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
   },
   _staffReviewCount() { return this._staffReview ? this._staffReviewSummary().count : 0; },
@@ -471,7 +486,7 @@ S.LaborStaffRoster = {
      was a pay figure that differed from what the operator believed they were importing, and none of
      them is visible in a mapper preview. It prints the figure that is about to be STORED, resolved
      the same way the write resolves it, because they come from the same walk. */
-  _staffReviewRow(x) {
+  _staffReviewRow(x, rid) {
     const NOTE = {
       'new':  'Adding this person',
       dup:    'Already on your roster',
@@ -498,6 +513,7 @@ S.LaborStaffRoster = {
               esc(posName) || '&mdash;',
               pay,
               esc(x.status === 'new' ? rec.status : String(raw.status || '').trim()) || '&mdash;'],
+      key: rid,
       note: NOTE[x.status] || '',
       notes: x.notes || [],
       lands: x.status === 'new'
@@ -524,6 +540,7 @@ S.LaborStaffRoster = {
       outcomeLabel: 'What Happens',
       rows: s.rows,
       verb: 'Add', noun: 'Person', nounPlural: 'People',
+      removable: true,
       goAttr: 'data-staffreview-go', backAttr: 'data-staffreview-back', backLabel: 'Start Over',
       resultId: 'sr-imp-result',
       // The door owns which sections are open; a closed one builds no table at all.
@@ -540,7 +557,7 @@ S.LaborStaffRoster = {
     this._staffReviewWriting = true;
     const btn = this.container && this.container.querySelector('[data-staffreview-go]');
     if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
-    try { await this.importStaffRows(r.rows, { reviewed: true }); }
+    try { await this.importStaffRows(r.rows.filter(x => !r.removed[x._rid]), { reviewed: true }); }
     finally {
       this._staffReviewWriting = false;
       /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `importStaffRows` is what clears it — a refused write
