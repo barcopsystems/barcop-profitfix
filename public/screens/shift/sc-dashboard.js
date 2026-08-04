@@ -586,14 +586,22 @@ S.ShiftDashboard = {
        IS landing, so they belong on that day's row rather than in a sentence after the fact. */
     const gaps = built.colGaps || {};
     const COLNAME = { bar: 'Bar sales', food: 'Food sales', covers: 'Covers' };
+    /* ⚠ "NO USABLE", NOT "UNREADABLE". One bucket covers BOTH a cell that is blank on this day and
+       one holding something Bar Cop refused (a negative, a date, a range) — `_doImportSales` carries
+       the same note about its own wording, because the two narrower phrasings were each false for
+       the other case. Shortening these must not quietly pick one of them. */
     ['bar', 'food', 'covers'].forEach(k => {
-      ((gaps.kept || {})[k] || []).forEach(d => { if (byDate[d]) byDate[d].notes.push(COLNAME[k] + ': no usable figure, kept what is saved'); });
-      ((gaps.zeroed || {})[k] || []).forEach(d => { if (byDate[d]) byDate[d].notes.push(COLNAME[k] + ': no usable figure, saved as zero'); });
+      const what = COLNAME[k].toLowerCase();
+      ((gaps.kept || {})[k] || []).forEach(d => { if (byDate[d]) byDate[d].notes.push('No usable ' + what + ', kept what is saved'); });
+      ((gaps.zeroed || {})[k] || []).forEach(d => { if (byDate[d]) byDate[d].notes.push('No usable ' + what + ', saved as zero'); });
     });
-    (built.coversRepeated || []).forEach(d => { if (byDate[d]) byDate[d].notes.push('Every row stated the same guest count, so it was counted once'); });
-    // A day your file splits across several rows (dayparts, revenue centres) is added up into one.
-    // The screen shows the total, so it has to say the total is a sum.
-    (built.mergedDates || []).forEach(d => { if (byDate[d]) byDate[d].notes.push('Several rows in your file added up into this day'); });
+    (built.coversRepeated || []).forEach(d => { if (byDate[d]) byDate[d].notes.push('Guest count taken once, not added up'); });
+    /* A day your file splits across several rows (dayparts, revenue centres) is added up into one.
+       The screen shows the total, so it has to say the total is a sum.
+       ⚠ SHORT ENOUGH FOR ONE LINE (Kyle, 2026-08-04). These notes sit under the Day cell, which is
+       22% of the table, and the first wording ran to a second line with the single word "day" on it.
+       ~43 characters is the budget at this size; anything longer orphans a word. */
+    (built.mergedDates || []).forEach(d => { if (byDate[d]) byDate[d].notes.push('Added up from several rows'); });
 
     // Monday to Sunday. The operator knows their week in date order and nothing else.
     days.sort((a, b) => String(a.date).localeCompare(String(b.date)));
