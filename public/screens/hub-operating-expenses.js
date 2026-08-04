@@ -967,6 +967,9 @@ S.HubOperatingExpenses = {
 
   _wireCurrent() {
     document.getElementById('oexa-save')?.addEventListener('click', () => this._saveAdd());
+    /* `input`, not `change`: `change` on a text field waits for blur, so an operator who types the
+       vendor and goes straight to the amount would not be told until they had left the field. */
+    document.getElementById('oexa-vendor')?.addEventListener('input', () => this._manualElsewhereNotice());
     document.getElementById('oexa-clear')?.addEventListener('click', () => this._clearAdd());
     document.getElementById('oexa-recurring')?.addEventListener('change', (e) => {
       const w = document.getElementById('oexa-term-wrap');
