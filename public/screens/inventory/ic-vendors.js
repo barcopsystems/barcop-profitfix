@@ -254,6 +254,14 @@ S.InventoryVendors = {
     this.container.onclick = ev => {
       /* The confirm screen's two controls. Both write state and re-render, so the button's count,
          the rows and what gets written all read from the same place. */
+      // A section head opens or closes its own table. A closed section renders no rows at all, so
+      // this is what actually builds them.
+      const vsec = ev.target.closest('[data-confirm-section]');
+      if (vsec && this._vendorReview) {
+        const k = vsec.dataset.confirmSection;
+        this._vendorReview.open[k] = (k === 'needs') ? (this._vendorReview.open[k] === false) : !this._vendorReview.open[k];
+        this.renderList(); return;
+      }
       if (ev.target.closest('[data-vendorreview-go]')) { this._runVendorReview(); return; }
       if (ev.target.closest('[data-vendorreview-back]')) {
         // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
@@ -503,7 +511,7 @@ S.InventoryVendors = {
   },
 
   _openVendorReview(rows) {
-    this._vendorReview = { rows: (rows || []).slice() };
+    this._vendorReview = { rows: (rows || []).slice(), open: {} };
     this.renderList();
   },
 
@@ -566,6 +574,8 @@ S.InventoryVendors = {
       verb: 'Add', noun: 'Vendor',
       goAttr: 'data-vendorreview-go', backAttr: 'data-vendorreview-back', backLabel: 'Start Over',
       resultId: 'iv-imp-result',
+      // The door owns which sections are open; a closed one builds no table at all.
+      open: (this._vendorReview || {}).open,
       busy: !!this._vendorReviewWriting
     });
   },
