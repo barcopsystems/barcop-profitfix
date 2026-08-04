@@ -169,7 +169,12 @@ S.InventoryVendors = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + this.addFormCard() + this.pendingSectionHTML() + listSection + '</div>';
+    /* ⛔ THE CONFIRM SCREEN TAKES THE ADD FORM'S SLOT, and the vendor list below stays — the same
+       shape the Add Products routing screen uses. Keeping the list visible is the point: "already on
+       your list" is a verdict about that list, and the operator can see it from here. */
+    this.container.innerHTML = '<div class="screen">'
+      + (this._vendorReview ? this.vendorReviewHTML() : this.addFormCard())
+      + this.pendingSectionHTML() + listSection + '</div>';
     this.wireList();
   },
 
@@ -247,8 +252,17 @@ S.InventoryVendors = {
 
   wireList() {
     this.container.onclick = ev => {
+      /* The confirm screen's two controls. Both write state and re-render, so the button's count,
+         the rows and what gets written all read from the same place. */
+      if (ev.target.closest('[data-vendorreview-go]')) { this._runVendorReview(); return; }
+      if (ev.target.closest('[data-vendorreview-back]')) {
+        // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
+        // for, so the file is re-dropped from scratch — nothing was written to undo.
+        this._vendorReview = null; this.renderList(); return;
+      }
       const mode = ev.target.closest('.iv-mode');
-      if (mode) { this.entryMode = mode.dataset.mode; this.renderList(); return; }
+      // Switching mode abandons a confirm in progress, which is safe: nothing has been written.
+      if (mode) { this._vendorReview = null; this.entryMode = mode.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
       const save  = ev.target.closest('#iv-save');
@@ -269,6 +283,10 @@ S.InventoryVendors = {
     App.applyCollapsed(this.container);
     App.wireCustomSelects(this.container);
     this.wireDeliveryChips(this.container);
+    /* ⚠ NOT WHILE THE CONFIRM SCREEN IS UP. Its markup replaces the add-form card, so `#iv-csv` is
+       gone and re-mounting would hand the operator a second file picker over a file they have not
+       finished confirming. */
+    if (this._vendorReview) return;
     if (this.entryMode === 'import') { this.mountImporter(); return; }
     // Manual mode: keep a half-typed vendor alive across re-renders and across
     // leaving the screen and coming back (in-memory; clears on Save, Start Over,
@@ -380,8 +398,198 @@ S.InventoryVendors = {
         { key: 'free_delivery_over', label: 'Free Delivery Over', required: false, match: ['free delivery over', 'free delivery', 'free shipping over', 'free freight over', 'free delivery threshold', 'free shipping', 'free delivery minimum'] }
       ],
       confirmLabel: 'Import',
-      onComplete: rows => this.importVendors(rows)
+      /* ⛔ THE FILE DOES NOT WRITE ITSELF ANY MORE. It goes to the confirm screen, and the Add press
+         there is what moves responsibility for what lands from Bar Cop to the operator. This door
+         earns that screen more than most: its own comments record a delivery-FEE column landing in
+         the delivery-DAYS field, a Vendor ID column binding as the vendor's NAME, and "$250 or 5
+         cases" storing a $2,505 minimum. None of those is visible in a mapper preview; all of them
+         are obvious in a list of what is about to be created. */
+      onComplete: rows => this._openVendorReview(rows)
     });
+  },
+
+  /* ── The confirm screen ──────────────────────────────────────────────────────
+     Door 3 of the rollout, and the first built ON `ImportConfirm` rather than beside it. This door
+     owns its columns and its build; the shell owns the frame, the dim rule and — the one that
+     matters — the button's count, which it derives from the rows rather than taking as an argument. */
+
+  /* ⛔ THE ONE WALK. `importVendors` and the screen must decide "does this row land" in the same
+     place, or the button and the write can disagree — the defect the reference screen was rebuilt
+     to close. Pure: no DOM, no writes, safe to call on every render. */
+  _buildVendorRows(rows) {
+    /* ⚠ THE SEED IS FLATTENED THE SAME WAY THE INCOMING KEY IS, or the dedup only works for
+       punctuation-free names. Distributor names carry periods and commas as a rule, products link
+       to vendors BY NAME, and `_vendorInfo` takes the FIRST match — so a second "Ben E. Keith"
+       means the Order Sheet keeps quoting the stale one. */
+    const vkey = n => String(n || '').trim().toLowerCase().replace(/[\s.,]+/g, ' ').trim();
+    const mine = new Set(this.vendors().map(v => vkey(v.name)));
+    const seen = new Set();
+    const list = [];
+    (rows || []).forEach(r => {
+      const name = (r.name || '').trim();
+      if (!name) { list.push({ raw: r, name: '', status: 'blank', notes: [] }); return; }
+      const key = vkey(name);
+      /* ⛔ TWO REASONS, NOT ONE. Both used to be a single `dup` count, and they are different
+         problems: a name you already own is a dead end, a name repeated inside the file is about
+         the file. The operator can act on one of them and not the other. */
+      if (mine.has(key)) { list.push({ raw: r, name: name, status: 'dup', notes: [] }); return; }
+      if (seen.has(key)) { list.push({ raw: r, name: name, status: 'repeat', notes: [] }); return; }
+      seen.add(key);
+      /* ⚠ A CELL HOLDING TWO NUMBERS IS REFUSED, not concatenated. `App.parseNum` joins digit runs,
+         so "$250 or 5 cases" stored a $2,505.00 minimum against a real $250 one. Refusing leaves the
+         field blank, which the Order Sheet shows as no minimum — visibly missing rather than
+         confidently wrong. */
+      const oneNum = v => ((String(v == null ? '' : v).match(/[\d][\d,]*(?:\.\d+)?/g) || []).length > 1 ? null : v);
+      const nonNeg = n => (n == null || n < 0) ? null : n;
+      /* A cell the file HAD and Bar Cop could not use is reported. An ABSENT cell is not a problem
+         and must never be counted as one, or every name-and-phone list reads broken.
+         ⛔ AND THESE ARE NOTES ON A LANDING ROW, NOT REFUSALS. The vendor still imports; it simply
+         arrives without that one field, and the row says so where the operator can still act on it.
+         The old screen reported them in a sentence after the write, which is too late. */
+      const days = this._normDeliveryDays(r.delivery_days);
+      const terms = this.normTerms(r.payment_terms);
+      /* ⚠ FLAGS, AND THE COPY IS DERIVED FROM THEM — never the other way round. The result line
+         counts these, and counting them by matching the note's own wording means a reworded note
+         silently zeroes the count ([[the-loop]] #25). */
+      const badDays = !!(String(r.delivery_days || '').trim() && !days);
+      const badTerms = !!(String(r.payment_terms || '').trim() && !terms);
+      /* ⛔ THE MONEY FIELDS ARE REFUSED SILENTLY, AND THEY ARE THE DANGEROUS ONES. This function
+         already refuses a two-number cell and a negative, for good reasons written above — but
+         nothing told the operator it had happened, so "$250 or 5 cases" and a -$10 fee simply
+         vanished and the vendor arrived with no minimum and no fee. Blank reads as "this vendor has
+         none", which is a different fact from "your file said something Bar Cop would not use".
+         Found by predicting a real file through the real door, not by any assertion: the days and
+         terms notes were there and these three were not, on the same row.
+         ⚠ Only when the file CARRIED something. An absent cell is not a problem and must never be
+         counted as one, or every name-and-phone list reads broken. */
+      const refused = (raw, stored) => !!(String(raw == null ? '' : raw).trim() && stored == null);
+      const badMin  = refused(r.order_minimum, nonNeg(App.parseNum(oneNum(r.order_minimum))));
+      const badFee  = refused(r.delivery_fee, nonNeg(App.parseNum(oneNum(r.delivery_fee))));
+      const badFree = refused(r.free_delivery_over, nonNeg(App.parseNum(oneNum(r.free_delivery_over))));
+      const notes = [];
+      if (badDays) notes.push('Delivery days could not be read');
+      if (badTerms) notes.push('Terms not on your Terms list');
+      if (badMin) notes.push('Order minimum could not be read');
+      if (badFee) notes.push('Delivery fee could not be read');
+      if (badFree) notes.push('Free delivery over could not be read');
+      list.push({
+        raw: r, name: name, status: 'new', notes: notes, badDays: badDays, badTerms: badTerms,
+        badMin: badMin, badFee: badFee, badFree: badFree,
+        rec: {
+          id:             App.uid(),
+          name,
+          rep:            (r.rep || '').trim(),
+          phone:          (r.phone || '').trim(),
+          email:          (r.email || '').trim(),
+          delivery_days:  days,
+          payment_terms:  terms,
+          account_number: (r.account_number || '').trim(),
+          /* ⚠ App.parseNum, NOT parseFloat. `parseFloat('$1,500')` is NaN and `parseFloat('2,500')`
+             is 2 — the Order Sheet printed "Meets the $2.00 minimum" on a $60 order against a real
+             $2,500 one. Excel's Currency and Comma formats emit exactly those strings. Negatives are
+             refused: `_vendorInfo` gates on `> 0` so a negative would be lost anyway, and storing a
+             number no screen will show is worse than not storing it. */
+          order_minimum:      nonNeg(App.parseNum(oneNum(r.order_minimum))),
+          order_minimum_unit: this._minUnitOf(r.order_minimum, '$'),
+          delivery_fee:       nonNeg(App.parseNum(oneNum(r.delivery_fee))),
+          free_delivery_over: nonNeg(App.parseNum(oneNum(r.free_delivery_over))),
+          notes:          '',
+          imported:       true,
+          created_at:     new Date().toISOString()
+        }
+      });
+    });
+    return { list: list };
+  },
+
+  _openVendorReview(rows) {
+    this._vendorReview = { rows: (rows || []).slice() };
+    this.renderList();
+  },
+
+  /* ONE WALK produces the rows the screen shows AND the number the button prints, because they come
+     out of the same `_buildVendorRows` the write uses. */
+  _vendorReviewSummary() {
+    const r = this._vendorReview;
+    if (!r) return { rows: [], count: 0 };
+    const built = this._buildVendorRows(r.rows);
+    const rows = built.list.map(x => this._vendorReviewRow(x));
+    return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
+  },
+  _vendorReviewCount() { return this._vendorReview ? this._vendorReviewSummary().count : 0; },
+
+  /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
+     are TEXT the shell escapes, and they are what the shell's one-line NOTE_BUDGET applies to. */
+  _VENDOR_ROW_NOTE: null,
+  _vendorReviewRow(x) {
+    const NOTE = {
+      'new':  'Adding this vendor',
+      dup:    'Already on your list',
+      repeat: 'Repeated in this file',
+      blank:  'No vendor name'
+    };
+    const rec = x.rec || {};
+    const cell = v => esc(String(v == null || v === '' ? '' : v)) || '&mdash;';
+    return {
+      cells: [x.name ? esc(x.name) : '&mdash;',
+              cell(x.status === 'new' ? rec.rep : (x.raw || {}).rep),
+              cell(x.status === 'new' ? rec.delivery_days : (x.raw || {}).delivery_days),
+              cell(x.status === 'new' ? rec.payment_terms : (x.raw || {}).payment_terms)],
+      note: NOTE[x.status] || '',
+      notes: x.notes || [],
+      lands: x.status === 'new'
+    };
+  },
+
+  vendorReviewHTML() {
+    const s = this._vendorReviewSummary();
+    const n = s.rows.length;
+    const bad = s.rows.filter(x => !x.lands).length;
+    /* ⚠ EACH NUMBER NAMES ITS OWN COLLECTION: `n` is rows read out of the file, `bad` is rows that
+       will not land, and the button counts what will be created. Reading the nearest one is how a
+       screen ends up contradicting itself. And the lead names the button's own verb — renaming the
+       button has to rewrite this sentence with it. */
+    // ⚠ NO EM DASHES IN OPERATOR COPY. The first version put two in this sentence and the design
+    // ratchet caught them on the same run, which is what that ratchet is for.
+    const lead = 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's') + ' out of this file. '
+      + (bad
+          ? (bad === 1 ? 'One of them is not going in. ' : bad + ' of them are not going in. ') + 'Check the rest, then add them. '
+          : 'Check them, then add them. ')
+      + 'Nothing is saved until you do.';
+    return ImportConfirm.panel({
+      label: 'Check your vendors',
+      lead: lead,
+      columns: [{ label: 'Vendor', width: 22 }, { label: 'Rep', width: 16 },
+                { label: 'Delivery Days', width: 14 }, { label: 'Terms', width: 11 }],
+      outcomeLabel: 'What Happens',
+      rows: s.rows,
+      verb: 'Add', noun: 'Vendor',
+      goAttr: 'data-vendorreview-go', backAttr: 'data-vendorreview-back', backLabel: 'Start Over',
+      resultId: 'iv-imp-result',
+      busy: !!this._vendorReviewWriting
+    });
+  },
+
+  /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
+     only thing a re-render cannot hand back. */
+  async _runVendorReview() {
+    const r = this._vendorReview;
+    if (!r || this._vendorReviewWriting) return;
+    this._vendorReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-vendorreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try { await this.importVendors(r.rows, { reviewed: true }); }
+    finally {
+      this._vendorReviewWriting = false;
+      /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `importVendors` is what clears it — a refused write
+         keeps the whole screen so the operator can press again without re-dropping the file. Do NOT
+         re-render here: the failure path writes into the result slot and a re-render destroys it. */
+      if (this._vendorReview) {
+        const b = this.container && this.container.querySelector('[data-vendorreview-go]');
+        const n = this._vendorReviewCount();
+        if (b) { b.disabled = false; b.textContent = 'Add ' + n + ' Vendor' + (n === 1 ? '' : 's'); }
+      }
+    }
   },
 
   // Map a free-text terms cell onto one of the known terms, else leave it blank
@@ -634,71 +842,24 @@ S.InventoryVendors = {
     return hit || fallback || '$';
   },
 
-  async importVendors(rows) {
+  async importVendors(rows, opts) {
+    opts = opts || {};
     const existing = this.vendors();
-    /* ⚠ THE SEED MUST BE FLATTENED THE SAME WAY THE INCOMING KEY IS, or the dedup only works for
-       punctuation-free names. It was seeded RAW while the incoming key stripped `[\s.,]`, so
-       "ben e. keith" never equalled "ben e keith" — and a re-drop, which is the exact case the
-       dedup was added for, minted a second "Ben E. Keith" and a second "Glazer's, Inc." Distributor
-       names carry periods and commas as a rule. Products link to vendors BY NAME and `_vendorInfo`
-       takes the FIRST match, so once the operator edits the second copy the Order Sheet keeps
-       quoting the stale first one. */
-    const vkey = n => String(n || '').trim().toLowerCase().replace(/[\s.,]+/g, ' ').trim();
-    // ⚠ `.map(v => vkey(v.name))`, not `.map(vkey)` — `existing` holds vendor OBJECTS, so passing
-    // them straight in stringifies every seed key to "[object Object]" and the dedup matches NOTHING.
-    const taken = new Set(existing.map(v => vkey(v.name)));
-    const toAdd = [];
-    let dup = 0, blank = 0, badDays = 0, badTerms = 0;
-    rows.forEach(r => {
-      const name = (r.name || '').trim();
-      if (!name) { blank++; return; }
-      // Flatten punctuation and runs of whitespace for the dedup key only — the STORED name keeps
-      // the operator's own spelling. `Sysco Foods.` and `Sysco  Foods` are one vendor, and products
-      // link to vendors BY NAME, so a near-duplicate record owns nothing and confuses the list.
-      const key = vkey(name);
-      // Skip a name already on the list (or repeated in the file) so a re-drop
-      // never creates duplicate vendors.
-      if (taken.has(key)) { dup++; return; }
-      taken.add(key);
-      /* ⚠ A CELL HOLDING TWO NUMBERS IS REFUSED, not concatenated. `App.parseNum` joins digit runs
-         (its own doc says it will not unpick a two-number cell), so "$250 or 5 cases" stored a
-         **$2,505.00** minimum against a real $250 one, and "5 cases ($250)" stored $5,250.00.
-         Refusing leaves the field blank, which the Order Sheet shows as no minimum — visibly
-         missing rather than confidently wrong. Same rule `_sizeToOz` uses at the product door. */
-      const oneNum = v => ((String(v == null ? '' : v).match(/[\d][\d,]*(?:\.\d+)?/g) || []).length > 1 ? null : v);
-      const nonNeg = n => (n == null || n < 0) ? null : n;
-      // Report a delivery-day or terms cell the file HAD and Bar Cop could not use. An ABSENT cell
-      // is not a problem and must never be counted as one, or every name-and-phone list reads broken.
-      const days = this._normDeliveryDays(r.delivery_days);
-      if (String(r.delivery_days || '').trim() && !days) badDays++;
-      const terms = this.normTerms(r.payment_terms);
-      if (String(r.payment_terms || '').trim() && !terms) badTerms++;
-      toAdd.push({
-        id:             App.uid(),
-        name,
-        rep:            (r.rep || '').trim(),
-        phone:          (r.phone || '').trim(),
-        email:          (r.email || '').trim(),
-        delivery_days:  days,
-        payment_terms:  terms,
-        account_number: (r.account_number || '').trim(),
-        /* ⚠ App.parseNum, NOT parseFloat. `parseFloat('$1,500')` is NaN — the minimum vanished
-           silently — and `parseFloat('2,500')` is **2**, so the Order Sheet printed "Meets the
-           $2.00 minimum" on a $60 order against a real $2,500 one, and a `2,500.00` free-delivery
-           threshold made every order over two dollars read "Free delivery". Excel's Currency and
-           Comma formats emit exactly those strings through `raw:false`. Negatives are refused: a
-           fee below zero is not a thing, and `_vendorInfo` gates on `> 0` so it would be lost
-           anyway — better to not store it than to store a number no screen will show. */
-        order_minimum:      nonNeg(App.parseNum(oneNum(r.order_minimum))),
-        order_minimum_unit: this._minUnitOf(r.order_minimum, '$'),
-        delivery_fee:       nonNeg(App.parseNum(oneNum(r.delivery_fee))),
-        free_delivery_over: nonNeg(App.parseNum(oneNum(r.free_delivery_over))),
-        notes:          '',
-        imported:       true,
-        created_at:     new Date().toISOString()
-      });
-    });
-
+    /* ⛔ ONE WALK, SHARED WITH THE SCREEN. The row-by-row decision — is this a new vendor, one
+       you already have, a repeat inside the file, or a nameless row — now lives in
+       `_buildVendorRows`, which the confirm screen calls to draw itself and this calls to write.
+       Two copies of that decision is how a button ends up promising a number the write does not
+       honour, which is the defect the whole rollout exists to close. Everything below is
+       REPORTING; nothing below decides what lands. */
+    const built = this._buildVendorRows(rows);
+    const countOf = f => built.list.filter(f).length;
+    const toAdd    = built.list.filter(x => x.status === 'new').map(x => x.rec);
+    const dup      = countOf(x => x.status === 'dup');
+    const repeated = countOf(x => x.status === 'repeat');
+    const blank    = countOf(x => x.status === 'blank');
+    const badDays  = countOf(x => x.badDays);
+    const badTerms = countOf(x => x.badTerms);
+    const badMoney = countOf(x => x.badMin || x.badFee || x.badFree);
     /* Every bucket reaches the operator now. `blank` was counted at the top of this function and
        NEVER read again, and the zero-row headline named only duplicates — so a file of 2 known
        vendors and 3 spacer rows said "2 names were already on your list" and accounted for nothing
@@ -706,17 +867,26 @@ S.InventoryVendors = {
     const notes = () => {
       const b = [];
       if (dup) b.push(dup + ' already on your list');
+      // A name repeated inside the FILE is a different problem from one you already own, and the
+      // operator can act on one and not the other. They used to share a bucket.
+      if (repeated) b.push(repeated + ' repeated in this file');
       if (blank) b.push(blank + ' row' + (blank === 1 ? '' : 's') + ' skipped with no vendor name');
       if (badDays) b.push(badDays + ' delivery-day cell' + (badDays === 1 ? '' : 's') + ' could not be read');
       if (badTerms) b.push(badTerms + ' terms value' + (badTerms === 1 ? '' : 's') + ' not on your Terms list');
+      // The money cells the file carried and Bar Cop would not use. One clause, because three
+      // separate ones would push this line past reading on a messy file.
+      if (badMoney) b.push(badMoney + ' order minimum, delivery fee or free-delivery figure' + (badMoney === 1 ? '' : 's') + ' could not be read');
       return b;
     };
     const result = document.getElementById('iv-imp-result');
     if (!toAdd.length) {
       const n = notes();
-      const head = dup && !blank ? 'No new vendors imported. Every name in this file is already on your list.'
-        : blank && !dup ? 'No vendors imported. No vendor names were found in the file.'
-        : dup || blank ? 'No new vendors imported.'
+      // ⚠ AN ABSOLUTE CLAIM NEEDS EVERY OTHER BUCKET EMPTY, `repeated` included now that it has its
+      // own. (It cannot actually be non-zero here — a repeat implies a first occurrence that landed
+      // — but a headline whose truth rests on that reasoning is one refactor from being false.)
+      const head = dup && !blank && !repeated ? 'No new vendors imported. Every name in this file is already on your list.'
+        : blank && !dup && !repeated ? 'No vendors imported. No vendor names were found in the file.'
+        : dup || blank || repeated ? 'No new vendors imported.'
         : 'No vendors imported. No vendor names were found in the file.';
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
         + head + (n.length ? ' (' + n.join(' · ') + ')' : '') + '</div>';
@@ -730,13 +900,25 @@ S.InventoryVendors = {
       if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>';
       return;
     }
+    /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. A refused write returns above
+       this line with the screen and every row still up, so the operator presses again rather than
+       re-dropping the file. Cleared here because this is the only line that knows the write landed. */
+    this._vendorReview = null;
     // Re-render so the new vendors show in the list below, then drop the summary
     // into the freshly-mounted import result slot (stays in import mode).
     this.renderList();
     const res2 = document.getElementById('iv-imp-result');
+    /* ⛔ THE CLAUSE LIST IS FOR AN IMPORT NOBODY WAS SHOWN. Every one of those clauses — already on
+       your list, repeated in this file, no vendor name, delivery days it could not read, terms not
+       on your list — is now a row on the confirm screen, said once, where the operator read it and
+       pressed Add. Repeating it afterwards is the second telling, and six parentheticals in gold is
+       the shape Kyle called *"very hard to read and follow"* on the sales door.
+       The full account survives for a caller with no screen in front of it.
+       ⚠ "Added", not "Imported": the file was imported two screens ago, and the button they just
+       pressed said Add. */
     if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
-      + 'Imported ' + toAdd.length + ' vendor' + (toAdd.length === 1 ? '' : 's') + '.'
-      + (notes().length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes().join(' · ') + ')</span>' : '')
+      + 'Added ' + toAdd.length + ' vendor' + (toAdd.length === 1 ? '' : 's') + '.'
+      + (!opts.reviewed && notes().length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes().join(' · ') + ')</span>' : '')
       + '</div>';
   },
 
