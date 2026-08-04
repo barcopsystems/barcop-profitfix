@@ -360,7 +360,10 @@ S.RevenueMenuItems = {
 
     // The visible list is this tab's items only. Inactive gets its own view below.
     const tabItems = onInactive ? [] : all.filter(i => this.classifyItem(i) === this.activeTab);
-    const lower = this._importOpen ? this.importPanelHTML()
+    /* ⛔ THE CONFIRM SCREEN TAKES THE UPLOAD PANEL'S SLOT. Nothing is written until its button, so
+       the operator can still see which prices a file is about to move before it moves them. */
+    const lower = this._menuReview ? this.menuReviewHTML()
+      : this._importOpen ? this.importPanelHTML()
       : (onInactive ? '' : this.listHTML(tabItems, this.activeTab));
 
     // Inactive items (a seasonal item made inactive here, or cut from a Dog Test), across all
@@ -582,7 +585,18 @@ S.RevenueMenuItems = {
       this.renderLanding();
     });
 
-    if (this._importOpen) {
+    /* The confirm screen's two controls. Both write state and re-render, so the button's count, the
+       rows and what gets written all read from the same place. */
+    this.container.querySelector('[data-menureview-go]')?.addEventListener('click', () => this._runMenuReview());
+    this.container.querySelector('[data-menureview-back]')?.addEventListener('click', () => {
+      // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
+      // for, so the file is re-dropped from scratch. Nothing was written to undo.
+      this._menuReview = null; this.renderLanding();
+    });
+    // ⚠ NOT WHILE THE CONFIRM SCREEN IS UP: its markup replaces the upload panel, so `#mi-csv` is
+    // gone and re-mounting would hand the operator a second file picker over a file they have not
+    // finished confirming.
+    if (this._importOpen && !this._menuReview) {
       this.mountImporter();
       this.container.querySelector('.mi-imp-cancel')?.addEventListener('click', () => this.closeImport());
     }
@@ -1450,14 +1464,136 @@ S.RevenueMenuItems = {
         { key: 'covers',   label: 'Weekly Units Sold',required: false, match: ['weekly units sold', 'weekly units', 'units sold', 'units per week', 'qty sold', 'quantity sold', 'sold qty', 'total sold', 'number sold', 'weekly covers', 'covers', 'cover', 'sales count', 'units', 'sold'] }
       ],
       confirmLabel: 'Import',
-      onComplete: rows => this.importItems(rows)
+      /* ⛔ THE FILE DOES NOT WRITE ITSELF ANY MORE. A menu import MOVES PRICES, and a price move
+         feeds the Pricing Review Log, Menu Engineering and Recovery. Until now the operator could
+         not see which prices a file would move, or by how much, until after it had moved them. */
+      onComplete: rows => this._openMenuReview(rows)
     });
   },
 
-  async importItems(rows) {
+  _openMenuReview(rows) {
+    this._menuReview = { rows: (rows || []).slice() };
+    this.renderLanding();
+  },
+
+  /* ONE WALK produces the rows the screen shows AND the number the button prints, because both come
+     out of the same `_planMenuImport` the write uses.
+     ⛔ POINTED AT A DEEP CLONE. Asking "what would this file do" must not BE the doing — the plan
+     mutates whatever array it is handed, so the screen hands it a throwaway copy and the live menu
+     is byte-identical afterwards. */
+  _menuReviewSummary() {
+    const r = this._menuReview;
+    if (!r) return { rows: [], count: 0 };
+    const plan = this._planMenuImport(r.rows, App.snapshotRows(this.items()));
+    const rows = (plan.perRow || []).map(x => this._menuReviewRow(x));
+    return { rows: rows, count: rows.filter(x => x.lands).length, plan: plan };
+  },
+  _menuReviewCount() { return this._menuReview ? this._menuReviewSummary().count : 0; },
+
+  /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
+     are TEXT the shell escapes and budgets to one line. */
+  _menuReviewRow(x) {
+    const NOTE = {
+      'new':   'Adding this item',
+      update:  'Updating what is on file',
+      inactive:'On your Inactive tab, not touched',
+      nocat:   'No section, not imported',
+      noname:  'No item name'
+    };
+    const it = x.item || {};
+    const money = v => (v == null ? '&mdash;' : App.fmtCurrency(v));
+    /* ⛔ THE OLD PRICE SITS UNDER THE NEW ONE. This is the whole reason this door gets a screen: a
+       menu import moves prices, and a price move feeds the Pricing Review Log, Menu Engineering and
+       Recovery. Shown only where it actually MOVES, or every row of a re-dropped export reads as a
+       price change. */
+    const priceCell = x.status === 'update' && x.wasPrice != null
+      ? money(x.price) + ImportConfirm.sub('was ' + money(x.wasPrice))
+      : money(x.status === 'nocat' || x.status === 'noname' ? null : (x.price != null ? x.price : it.price));
+    const notes = [];
+    if (x.status === 'update') {
+      if (x.wasPrice != null) notes.push('Price changes');
+      if (x.costChanged) notes.push('Cost changes');
+      if (x.coversChanged) notes.push('Units sold changes');
+    }
+    /* ⛔ A MATCHED ROW THAT CHANGES NOTHING MUST NOT SAY IT IS UPDATING SOMETHING. Re-dropping the
+       same export is the ordinary way to land here, and every row of it read "Updating what is on
+       file" over three identical figures. It IS still written — the branch stamps `type`, which is
+       the fix that stops legacy and seeded items carrying no type at all and duplicating on the next
+       drop — so it keeps counting toward the button. The note says what actually happens. */
+    const changes = notes.length > 0;
+    return {
+      cells: [x.name ? esc(x.name) : '&mdash;',
+              esc(it.category || '') || '&mdash;',
+              priceCell,
+              money(x.status === 'nocat' || x.status === 'noname' ? null : it.cost)],
+      note: (x.status === 'update' && !changes) ? 'Already on your menu, refreshed' : (NOTE[x.status] || ''),
+      notes: notes,
+      lands: x.status === 'new' || x.status === 'update'
+    };
+  },
+
+  menuReviewHTML() {
+    const s = this._menuReviewSummary();
+    const n = s.rows.length;
+    const moves = s.rows.filter(x => (x.notes || []).some(t => /^Price/.test(t))).length;
+    const bad = s.rows.filter(x => !x.lands).length;
+    /* ⚠ EACH NUMBER NAMES ITS OWN COLLECTION: `n` is rows read, `moves` is prices that change, `bad`
+       is rows that will not land, and the button counts items that will be written. And the lead
+       names the button's own verb. No em dashes. */
+    const lead = 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's') + ' out of this file. '
+      + (moves ? (moves === 1 ? 'One price changes. ' : moves + ' prices change. ') : '')
+      + (bad ? (bad === 1 ? 'One row is not going in. ' : bad + ' rows are not going in. ') : '')
+      + 'Check them, then add them. Nothing is saved until you do.';
+    return ImportConfirm.panel({
+      label: 'Check your menu',
+      lead: lead,
+      columns: [{ label: 'Item', width: 26 }, { label: 'Section', width: 15 },
+                { label: 'Price', width: 13 }, { label: 'Cost', width: 11 }],
+      outcomeLabel: 'What Happens',
+      rows: s.rows,
+      verb: 'Add', noun: 'Item',
+      goAttr: 'data-menureview-go', backAttr: 'data-menureview-back', backLabel: 'Start Over',
+      resultId: 'mi-imp-result',
+      busy: !!this._menuReviewWriting
+    });
+  },
+
+  /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
+     only thing a re-render cannot hand back. */
+  async _runMenuReview() {
+    const r = this._menuReview;
+    if (!r || this._menuReviewWriting) return;
+    this._menuReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-menureview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try { await this.importItems(r.rows, { reviewed: true }); }
+    finally {
+      this._menuReviewWriting = false;
+      /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `importItems` is what clears it — a refused write
+         keeps every row so the operator presses again without re-dropping. */
+      if (this._menuReview) {
+        const b = this.container && this.container.querySelector('[data-menureview-go]');
+        const c = this._menuReviewCount();
+        if (b) { b.disabled = false; b.textContent = 'Add ' + c + ' Item' + (c === 1 ? '' : 's'); }
+      }
+    }
+  },
+
+  /* ── The confirm screen ──────────────────────────────────────────────────────
+     Door 5 of the rollout, and the first one shaped as an UPSERT rather than a create. A
+     re-dropped export REFRESHES the items it matches instead of duplicating them, so there is no
+     `toAdd` list to hand a screen and "what would this file do" cannot be answered by reading the
+     code a second time.
+
+     ⛔ SO THE WALK TAKES ITS TARGET AS A PARAMETER. The screen points it at a DEEP CLONE and the
+     write points it at the live menu. One implementation, two targets, and the screen therefore
+     cannot describe an outcome the write will not produce.
+     ⚠ It mutates whatever array it is handed, on purpose — that is what the write needs. The
+     caller decides whether that array is live. `App.uid()` is consumed on a plan run too; the ids
+     it burns are meaningless and nothing may key on them across the two runs. */
+  _planMenuImport(rows, existing) {
     // App.parseNum is the ONE coercion (see app.js). 0 is this caller's own default for "no number".
     const num = v => App.parseNum(v) ?? 0;
-    const existing = this.items();
     /* ⚠ INTERNAL WHITESPACE IS COLLAPSED (I15). `trim()` alone left `"House  Salad"` — two spaces,
        which is what a spreadsheet holds the moment somebody lines a column up by hand — a DIFFERENT
        key from `"House Salad"`, so the row missed the item it names and minted a duplicate instead
@@ -1546,11 +1682,15 @@ S.RevenueMenuItems = {
     // bulk write below cannot revert itself, so without these a failed import left the new prices
     // and new items on screen while the server kept the old menu — and the repricing below would
     // log price changes to Recovery for prices the register never got.
-    const undoAll = App.snapshotRows(existing);
     const addedRecs = [];
+    /* ⛔ ONE VERDICT PER FILE ROW. The sets above are keyed by ITEM id, deliberately (a POS
+       export split by daypart names one item on several rows), so they can say how many items
+       moved and never which row did what. The confirm screen has to speak in rows, because
+       that is what the operator is looking at. Pushed from the same walk, at the same exits. */
+    const perRow = [];
     rows.forEach(r => {
       const name = (r.name || '').trim();
-      if (!name) { noName++; return; }
+      if (!name) { noName++; perRow.push({ status: 'noname', name: '' }); return; }
       // ⚠ `covers` ROUNDED here for the same reason as the form above: it is a unit COUNT, and this
       // was the third door writing the field under a third rule. Both use sites below (the refresh
       // branch and the insert) read this one local, so rounding once covers both.
@@ -1582,8 +1722,13 @@ S.RevenueMenuItems = {
       // ⚠ AN INACTIVE ITEM IS MATCHED BUT NOT TOUCHED. Matching it is what stops the import
       // creating a duplicate of something the operator retired; repricing it would put a price
       // change into the Pricing Review Log and Recovery for an item that is off the live menu.
-      if (cur && cur.archived) { skippedIds.add(cur.id); return; }
+      if (cur && cur.archived) { skippedIds.add(cur.id); perRow.push({ status: 'inactive', name: name, item: cur }); return; }
       if (cur) {
+        // ⚠ CAPTURED BEFORE THE OVERWRITES BELOW. The screen shows the price a file is
+        // REPLACING beside the one it is bringing, and after this branch runs the old figure
+        // is gone. `repriced` holds the same fact for the Pricing Review Log, but only for
+        // the first row of a repeated name, so it cannot answer "what does this row change".
+        const wasPrice = cur.price, wasCost = cur.cost, wasCovers = cur.weekly_covers;
         // Re-dropping an export REFRESHES the matching item instead of duplicating
         // it. Only overwrite a field the file actually carries, so a partial export
         // (e.g. no cost column) never wipes a good cost/price already on file.
@@ -1613,6 +1758,10 @@ S.RevenueMenuItems = {
         cur.type = this.activeType;
         cur.updated_at = new Date().toISOString();
         updatedIds.add(cur.id);
+        perRow.push({ status: 'update', name: name, item: cur,
+          price: price > 0 ? price : null, wasPrice: (price > 0 && price !== wasPrice) ? wasPrice : null,
+          costChanged: cost > 0 && cost !== wasCost,
+          coversChanged: coversGiven && covers !== wasCovers });
       } else {
         /* ⚠ NO SECTION, NO NEW ITEM (M5). Category is a required MAPPING now, but a mapped column can
            still hold a blank cell, and an item created with `category: ''` is a TRAP rather than a
@@ -1622,7 +1771,7 @@ S.RevenueMenuItems = {
            ⚠ The REFRESH branch above is deliberately untouched — an existing item whose cell is blank
            keeps the section it already has (`if (cat)`), which is the same only-overwrite-what-the-
            file-carries rule the price and cost fields follow. */
-        if (!cat) { noCat++; return; }
+        if (!cat) { noCat++; perRow.push({ status: 'nocat', name: name }); return; }
         const it = {
           id:                 App.uid(),
           type:               this.activeType,   // the tile the Upload was opened from sets the item type
@@ -1649,8 +1798,28 @@ S.RevenueMenuItems = {
         existing.push(it); addedRecs.push(it);
         byKey[k] = it;
         addedIds.add(it.id);
+        perRow.push({ status: 'new', name: name, item: it, price: it.price > 0 ? it.price : null });
       }
     });
+    return { perRow: perRow, addedIds: addedIds, updatedIds: updatedIds, skippedIds: skippedIds,
+             noCat: noCat, noName: noName, firstCat: firstCat, catClash: catClash,
+             repriced: repriced, coversMoved: coversMoved, addedRecs: addedRecs };
+  },
+
+  async importItems(rows, opts) {
+    opts = opts || {};
+    const existing = this.items();
+    /* Snapshot the whole menu before the import touches it, and track the rows it appends. The
+       bulk write below cannot revert itself, so without these a failed import left the new prices
+       and new items on screen while the server kept the old menu. */
+    const undoAll = App.snapshotRows(existing);
+    /* ⛔ ONE WALK, SHARED WITH THE SCREEN. Everything below is the WRITE and the REPORT; nothing
+       below decides what lands. */
+    const plan = this._planMenuImport(rows, existing);
+    const addedIds = plan.addedIds, updatedIds = plan.updatedIds, skippedIds = plan.skippedIds;
+    const noCat = plan.noCat, noName = plan.noName, catClash = plan.catClash;
+    const repriced = plan.repriced, coversMoved = plan.coversMoved, addedRecs = plan.addedRecs;
+
     /* ⚠ A PENDING MENU ENGINEERING PLAN IS CLEARED ON THE NET MOVE, NOT PER ROW.
        A live price the file supersedes must drop its planned reprice — left on the item, a stale
        plan makes Menu Engineering show a negative delta and its Mark Live button CUT the price, on
@@ -1759,27 +1928,39 @@ S.RevenueMenuItems = {
       await App.logPriceChange(rp.item, rp.from, rp.item.price, { reason: 'Menu list import', source: 'menu-items-import' });
     }
     App.markSetupDone('gs_r_menu');
+    /* ⛔ THE SKIP CLAUSES ARE FOR AN IMPORT NOBODY WAS SHOWN. Every one of them — inactive items,
+       rows with no section, rows with no name, a name arriving under two sections — is now a row on
+       the confirm screen, said once, where the operator read it and pressed Add. Repeating the whole
+       list afterwards is the second telling, and this door's version runs to five clauses plus two
+       instruction sentences.
+       ⚠ WHAT LANDED STILL GETS SAID, always: "imported N new and refreshed N existing" is the one
+       fact the screen could only PROMISE, and confirming a promise is not repeating it. The full
+       account survives for a caller with no screen in front of it. */
+    /* ⚠ GATED, NOT ZEROED. The first version reassigned `skippedInactive`/`noCat`/`noName` to 0,
+       and all three are `const` — "Assignment to constant variable", thrown only when that branch
+       actually runs, which `node --check` cannot see ([[the-loop]] #72). */
+    const quiet = !!opts.reviewed;
     const parts = [];
     if (added)   parts.push('imported ' + added + ' new item' + (added === 1 ? '' : 's'));
     if (updated) parts.push('refreshed ' + updated + ' existing');
     // A skipped row is not a silent drop — the operator must be told their file mentioned items
     // that are off the live menu, or the counts look wrong and they re-drop the file.
-    if (skippedInactive) parts.push('skipped ' + skippedInactive + ' inactive item' + (skippedInactive === 1 ? '' : 's'));
+    if (!quiet && skippedInactive) parts.push('skipped ' + skippedInactive + ' inactive item' + (skippedInactive === 1 ? '' : 's'));
     // ⚠ THE PARTIAL CASE (M5), and it is the one that matters: some rows imported and some did not.
     // A count that omits the dropped rows makes the file look fully imported, and the operator has
     // no reason to look at their spreadsheet again.
-    if (noCat)  parts.push('skipped ' + noCat + ' row' + (noCat === 1 ? '' : 's') + ' with no section');
+    if (!quiet && noCat)  parts.push('skipped ' + noCat + ' row' + (noCat === 1 ? '' : 's') + ' with no section');
     // Same rule for a row with no name in it (I15). It sat beside `noCat` and was the one drop
     // this door made in silence.
-    if (noName) parts.push('skipped ' + noName + ' row' + (noName === 1 ? '' : 's') + ' with no name');
-    const nClash = catClash.size;
+    if (!quiet && noName) parts.push('skipped ' + noName + ' row' + (noName === 1 ? '' : 's') + ' with no name');
+    const nClash = quiet ? 0 : catClash.size;
     /* ⚠ SET BEFORE renderLanding, WHICH IS WHAT RENDERS IT (I14). It used to be written into
        `#mi-imp-result` — a slot that lives inside the upload panel — which is exactly why the panel
        had to stay open to show it, and why the operator never saw their own menu afterwards. Same
        one-shot flash Add Products uses (`_importMsg`, ic-product-setup:615). */
     this._importFlash = parts.join(' and ').replace(/^./, c => c.toUpperCase())
       + '. Edit any item to set its price, cost, or recipe.'
-      + (noCat ? ' Bar Cop files every item under a section, so fill the Category cells in and drop the file again to add '
+      + (!quiet && noCat ? ' Bar Cop files every item under a section, so fill the Category cells in and drop the file again to add '
         + (noCat === 1 ? 'that row' : 'those rows') + '.' : '')
       // ⚠ "each" COUNTS THE NAMES, not the rows ([[the-loop]] #86). One clashing name folds into
       // one item; three clashing names fold into one item EACH, which is a different sentence.
