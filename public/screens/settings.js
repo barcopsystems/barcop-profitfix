@@ -1060,7 +1060,7 @@ S.HubSettings = {
     // 90-day window; Bar Cop fills in each elapsed month on load.
     const monthAnchor = (back, day) => App.ymdLocal(new Date(today.getFullYear(), today.getMonth() - back, day));
     operatingExpenses.push(
-      { id:uid(), date:monthAnchor(2, 5), category:'Software and Subscriptions', vendor:'Bar Cop', amount:249, notes:'Monthly software subscription.', recurring:true, recur_day:5, created_at:new Date().toISOString() },
+      { id:uid(), date:monthAnchor(2, 5), category:'Software and Subscriptions', vendor:'Bar Cop', amount:189, notes:'Monthly software subscription.', recurring:true, recur_day:5, created_at:new Date().toISOString() },
       { id:uid(), date:monthAnchor(2, 5), category:'Other',                      vendor:'Sonitrol', amount:89,  notes:'Alarm and security monitoring.', recurring:true, recur_day:5, created_at:new Date().toISOString() }
     );
     // The major fixed overhead as recurring vendor bills, anchored at the start of
