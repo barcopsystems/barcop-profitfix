@@ -262,6 +262,13 @@ S.InventoryVendors = {
         this._vendorReview.open[k] = (k === 'needs') ? (this._vendorReview.open[k] === false) : !this._vendorReview.open[k];
         this.renderList(); return;
       }
+      /* Remove takes a row out of the import. No confirm: nothing is written until Add, the row is
+         named right beside the button, and Start Over re-drops the file. */
+      const vrm = ev.target.closest('[data-confirm-remove]');
+      if (vrm && this._vendorReview) {
+        this._vendorReview.removed[vrm.dataset.confirmRemove] = true;
+        this.renderList(); return;
+      }
       if (ev.target.closest('[data-vendorreview-go]')) { this._runVendorReview(); return; }
       if (ev.target.closest('[data-vendorreview-back]')) {
         // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
@@ -511,7 +518,12 @@ S.InventoryVendors = {
   },
 
   _openVendorReview(rows) {
-    this._vendorReview = { rows: (rows || []).slice(), open: {} };
+    this._vendorReview = {
+      // ⚠ A STABLE ID PER ROW, so Remove has something to remove BY. The build returns one
+      // verdict per input row in the file's own order, so index is a real identity here.
+      rows: (rows || []).map((r, i) => Object.assign({}, r, { _rid: 'r' + i })),
+      open: {}, removed: {}
+    };
     this.renderList();
   },
 
@@ -520,8 +532,11 @@ S.InventoryVendors = {
   _vendorReviewSummary() {
     const r = this._vendorReview;
     if (!r) return { rows: [], count: 0 };
-    const built = this._buildVendorRows(r.rows);
-    const rows = built.list.map(x => this._vendorReviewRow(x));
+    // A removed row is gone from the list, the counts and the write.
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    const built = this._buildVendorRows(live);
+    // ⚠ Zipped by index: the build pushes exactly one entry per input row, in order.
+    const rows = built.list.map((x, i) => this._vendorReviewRow(x, (live[i] || {})._rid));
     return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
   },
   _vendorReviewCount() { return this._vendorReview ? this._vendorReviewSummary().count : 0; },
@@ -529,7 +544,7 @@ S.InventoryVendors = {
   /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
      are TEXT the shell escapes, and they are what the shell's one-line NOTE_BUDGET applies to. */
   _VENDOR_ROW_NOTE: null,
-  _vendorReviewRow(x) {
+  _vendorReviewRow(x, rid) {
     const NOTE = {
       'new':  'Adding this vendor',
       dup:    'Already on your list',
@@ -543,6 +558,7 @@ S.InventoryVendors = {
               cell(x.status === 'new' ? rec.rep : (x.raw || {}).rep),
               cell(x.status === 'new' ? rec.delivery_days : (x.raw || {}).delivery_days),
               cell(x.status === 'new' ? rec.payment_terms : (x.raw || {}).payment_terms)],
+      key: rid,
       note: NOTE[x.status] || '',
       notes: x.notes || [],
       lands: x.status === 'new'
@@ -572,6 +588,7 @@ S.InventoryVendors = {
       outcomeLabel: 'What Happens',
       rows: s.rows,
       verb: 'Add', noun: 'Vendor',
+      removable: true,
       goAttr: 'data-vendorreview-go', backAttr: 'data-vendorreview-back', backLabel: 'Start Over',
       resultId: 'iv-imp-result',
       // The door owns which sections are open; a closed one builds no table at all.
@@ -588,7 +605,7 @@ S.InventoryVendors = {
     this._vendorReviewWriting = true;
     const btn = this.container && this.container.querySelector('[data-vendorreview-go]');
     if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
-    try { await this.importVendors(r.rows, { reviewed: true }); }
+    try { await this.importVendors(r.rows.filter(x => !r.removed[x._rid]), { reviewed: true }); }
     finally {
       this._vendorReviewWriting = false;
       /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `importVendors` is what clears it — a refused write
