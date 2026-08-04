@@ -1516,15 +1516,26 @@ S.RevenueMenuItems = {
        menu import moves prices, and a price move feeds the Pricing Review Log, Menu Engineering and
        Recovery. Shown only where it actually MOVES, or every row of a re-dropped export reads as a
        price change. */
-    const priceCell = x.status === 'update' && x.wasPrice != null
+    /* ⛔ ONLY FOR AN ITEM THAT EXISTED BEFORE THIS FILE. A file naming one dish twice at two prices
+       CREATES it on the first row and then updates it on the second, so `wasPrice` there is the
+       price the first row set moments ago — a figure that was never live on anybody's menu. The
+       Pricing Review Log was rewritten for exactly this ("the second recording a change FROM a price
+       that was never live") and showing it here puts the same lie back on the screen. */
+    const repriced = x.status === 'update' && x.wasPrice != null && !x.bornHere;
+    const priceCell = repriced
       ? money(x.price) + ImportConfirm.sub('was ' + money(x.wasPrice))
       : money(x.status === 'nocat' || x.status === 'noname' ? null : (x.price != null ? x.price : it.price));
     const notes = [];
     if (x.status === 'update') {
-      if (x.wasPrice != null) notes.push('Price changes');
+      if (repriced) notes.push('Price changes');
       if (x.costChanged) notes.push('Cost changes');
       if (x.coversChanged) notes.push('Units sold changes');
     }
+    /* ⛔ AND THE NAME THAT ARRIVED UNDER TWO SECTIONS SAYS SO. Its rows fold into ONE item at the
+       last row's figures, which is correct behaviour and completely invisible otherwise — a two-row
+       file quietly becomes one item. The door counted this and only ever said it in the sentence
+       printed after the write, so cutting that sentence for a reviewed import lost it entirely. */
+    if (x.clash) notes.push('Listed under two sections, folded into one');
     /* ⛔ A MATCHED ROW THAT CHANGES NOTHING MUST NOT SAY IT IS UPDATING SOMETHING. Re-dropping the
        same export is the ordinary way to land here, and every row of it read "Updating what is on
        file" over three identical figures. It IS still written — the branch stamps `type`, which is
@@ -1812,6 +1823,19 @@ S.RevenueMenuItems = {
         addedIds.add(it.id);
         perRow.push({ status: 'new', name: name, item: it, price: it.price > 0 ? it.price : null });
       }
+    });
+    /* ⛔ STAMPED AFTER THE LOOP, because neither fact is known until the whole file has been read.
+       `clash` = this name arrived under more than one section, so its rows folded into ONE item at
+       the last row's figures. The door has always counted that; it was reported only in the sentence
+       printed afterwards, and cutting that sentence for a reviewed import left the fact said
+       NOWHERE. It belongs on the row it is about.
+       `bornHere` = the item did not exist before this file; the file created it and a later row in
+       the same file then changed it. A "was" price on such a row names a price that was never live,
+       which is the exact defect `repriced` was rewritten to keep out of the Pricing Review Log. */
+    perRow.forEach(x => {
+      if (!x.name) return;
+      x.clash = catClash.has(keyOf(this.activeType, x.name));
+      if (x.item) x.bornHere = addedIds.has(x.item.id);
     });
     return { perRow: perRow, addedIds: addedIds, updatedIds: updatedIds, skippedIds: skippedIds,
              noCat: noCat, noName: noName, firstCat: firstCat, catClash: catClash,
