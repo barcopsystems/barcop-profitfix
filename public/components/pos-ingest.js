@@ -1031,6 +1031,13 @@ const PosIngest = {
     const covSeen = new Map();         // date -> the covers values the rows for that day actually STATED (P1c)
     const skipped = []; const zeroSkipped = []; const unchanged = []; const undated = []; let dupCount = 0; let merged = 0; let keptManual = 0;
     const keptDates = new Set();       // a kept hand day reported once, not once per row
+    /* ⛔ THE DATES BEHIND `dupCount`, because a COUNT CANNOT BE PUT ON A ROW. The cockpit's confirm
+       screen lists every day in the file and each one has to say what will happen to it, so "1
+       replaced earlier figures" is not enough — the screen needs to know WHICH day. Pushed from the
+       same line that increments the count, so the two are one walk and cannot drift ([[the-loop]]
+       #23). `keptManualDates` needs no twin: `keptDates` already exists for the once-per-day guard
+       and IS that list, so it is returned rather than rebuilt. */
+    const replacedDates = [];
     const cents = n => Math.round(n * 100) / 100;   // summing floats across services must not drift
     // A column "carries" a value only if the cell PARSES to a number. A junk cell ("N/A", "-", a
     // stray footer label) is non-blank but not a value — treating it as a carried 0 would raise a
@@ -1318,7 +1325,7 @@ const PosIngest = {
       // user-vs-user conflict (replacing your own machine import), so no prompt.
       // (S189 is now checked ABOVE the manual branch so it covers a hand-closed prior too.)
       noteGaps(false);
-      dupCount++;
+      dupCount++; replacedDates.push(date);
       toAdd.push(useRec);
     });
     // `merged`, NOT dupCount — the same reasoning spelled out in buildPmix. dupCount means "rows
@@ -1326,7 +1333,10 @@ const PosIngest = {
     // rows FOLDED INTO a total are the opposite of that.
     // `coversRepeated` is P1c's outcome: dates where every row stated the SAME guest count, so it
     // was taken once instead of added up. An assumption the operator has to be able to see.
-    return { toAdd, skipped, zeroSkipped, unchanged, undated, dupCount, merged, keptManual, conflicts, colGaps, coversRepeated };
+    // `replacedDates` / `keptManualDates` are the same facts as `dupCount` / `keptManual` with the
+    // day attached, for the confirm screen. Every other consumer keeps reading the counts.
+    return { toAdd, skipped, zeroSkipped, unchanged, undated, dupCount, merged, keptManual, conflicts, colGaps, coversRepeated,
+             replacedDates, keptManualDates: Array.from(keptDates) };
   },
 
   // A row is one drawer's (or the day's) over/short. Resolves Register + Cashier
