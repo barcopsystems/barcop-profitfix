@@ -101,6 +101,10 @@ const ImportConfirm = {
     const busy = !!opts.busy;
     const verb = opts.verb || 'Add';
     const noun = opts.noun || 'Row';
+    /* ⚠ NOT EVERY NOUN TAKES AN `s`. "Add 4 Persons" is what a bare `+ 's'` produces on the staff
+       roster. A door whose plural is irregular passes it; the default stays the regular form so
+       nothing else has to change. */
+    const nounN = n === 1 ? noun : (opts.nounPlural || (noun + 's'));
     /* ⛔ THE LAST COLUMN TAKES WHAT IS LEFT, so the colgroup always sums to 100.
        A colgroup that does not silently rescales every column, and on a grouped
        screen the sections then stop lining up with each other. */
@@ -135,7 +139,7 @@ const ImportConfirm = {
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       +   '<button class="btn btn-primary btn-sm" ' + (opts.goAttr || 'data-confirm-go') + '="1"'
       +     (n && !busy ? '' : ' disabled') + '>'
-      +     (busy ? (opts.busyLabel || (verb + 'ing...')) : verb + ' ' + n + ' ' + noun + (n === 1 ? '' : 's'))
+      +     (busy ? (opts.busyLabel || (verb + 'ing...')) : verb + ' ' + n + ' ' + nounN)
       +   '</button>'
       /* ⚠ THE BACK BUTTON IS DISABLED MID-WRITE TOO. It restarts the import, and a
          restart during the write is how a screen ends up describing a record that
