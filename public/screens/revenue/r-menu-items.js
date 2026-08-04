@@ -597,6 +597,14 @@ S.RevenueMenuItems = {
         this._menuReview.open[k] = (k === 'needs') ? (this._menuReview.open[k] === false) : !this._menuReview.open[k];
         this.renderLanding();
       }));
+    /* Remove takes a row out of the import. No confirm: nothing is written until Add, the row is
+       named right beside the button, and Start Over re-drops the file. */
+    this.container.querySelectorAll('[data-confirm-remove]').forEach(b =>
+      b.addEventListener('click', () => {
+        if (!this._menuReview) return;
+        this._menuReview.removed[b.dataset.confirmRemove] = true;
+        this.renderLanding();
+      }));
     this.container.querySelector('[data-menureview-go]')?.addEventListener('click', () => this._runMenuReview());
     this.container.querySelector('[data-menureview-back]')?.addEventListener('click', () => {
       // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
@@ -1481,9 +1489,20 @@ S.RevenueMenuItems = {
     });
   },
 
+  /* ⚠ EVERY ROW GETS A STABLE ID so Remove has something to remove BY. The file's own order is the
+     only order the operator knows, and `_planMenuImport` returns one verdict per row in that same
+     order, so index is a real identity here rather than a guess. */
   _openMenuReview(rows) {
-    this._menuReview = { rows: (rows || []).slice(), open: {} };
+    this._menuReview = {
+      rows: (rows || []).map((r, i) => Object.assign({}, r, { _rid: 'r' + i })),
+      open: {}, removed: {}
+    };
     this.renderLanding();
+  },
+  // The rows still in the import. A removed row is gone from the list, the counts and the write.
+  _menuReviewLive() {
+    const r = this._menuReview;
+    return r ? r.rows.filter(x => !r.removed[x._rid]) : [];
   },
 
   /* ONE WALK produces the rows the screen shows AND the number the button prints, because both come
@@ -1494,15 +1513,18 @@ S.RevenueMenuItems = {
   _menuReviewSummary() {
     const r = this._menuReview;
     if (!r) return { rows: [], count: 0 };
-    const plan = this._planMenuImport(r.rows, App.snapshotRows(this.items()));
-    const rows = (plan.perRow || []).map(x => this._menuReviewRow(x));
+    const live = this._menuReviewLive();
+    const plan = this._planMenuImport(live, App.snapshotRows(this.items()));
+    /* ⚠ ZIPPED BY INDEX, and that is safe by construction: `_planMenuImport` pushes exactly one
+       verdict per input row, in order, at every exit. Pinned as `perRow.length === rows.length`. */
+    const rows = (plan.perRow || []).map((x, i) => this._menuReviewRow(x, (live[i] || {})._rid));
     return { rows: rows, count: rows.filter(x => x.lands).length, plan: plan };
   },
   _menuReviewCount() { return this._menuReview ? this._menuReviewSummary().count : 0; },
 
   /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
      are TEXT the shell escapes and budgets to one line. */
-  _menuReviewRow(x) {
+  _menuReviewRow(x, rid) {
     const NOTE = {
       'new':   'Adding this item',
       update:  'Updating what is on file',
@@ -1557,6 +1579,7 @@ S.RevenueMenuItems = {
               esc(it.category || '') || '&mdash;',
               priceCell,
               money(x.status === 'nocat' || x.status === 'noname' ? null : it.cost)],
+      key: rid,
       note: (x.status === 'update' && !changes) ? 'Already on your menu, refreshed' : (NOTE[x.status] || ''),
       notes: notes,
       lands: x.status === 'new' || x.status === 'update'
@@ -1582,7 +1605,7 @@ S.RevenueMenuItems = {
                 { label: 'Price', width: 13 }, { label: 'Cost', width: 11 }],
       outcomeLabel: 'What Happens',
       rows: s.rows,
-      verb: 'Add', noun: 'Item',
+      verb: 'Add', noun: 'Item', removable: true,
       goAttr: 'data-menureview-go', backAttr: 'data-menureview-back', backLabel: 'Start Over',
       resultId: 'mi-imp-result',
       // The door owns which sections are open; a closed one builds no table at all.
@@ -1599,7 +1622,7 @@ S.RevenueMenuItems = {
     this._menuReviewWriting = true;
     const btn = this.container && this.container.querySelector('[data-menureview-go]');
     if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
-    try { await this.importItems(r.rows, { reviewed: true }); }
+    try { await this.importItems(this._menuReviewLive(), { reviewed: true }); }
     finally {
       this._menuReviewWriting = false;
       /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `importItems` is what clears it — a refused write
