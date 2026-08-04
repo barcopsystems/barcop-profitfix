@@ -1536,6 +1536,16 @@ S.RevenueMenuItems = {
        file quietly becomes one item. The door counted this and only ever said it in the sentence
        printed after the write, so cutting that sentence for a reviewed import lost it entirely. */
     if (x.clash) notes.push('Listed under two sections, folded into one');
+    /* ⛔ A ROW LANDING ON A DIFFERENT TAB THAN THE ONE YOU DROPPED ON HAS TO SAY SO. It is the whole
+       point of resolving the type per row: an operator who drops their full menu on Dishes and gets
+       their cocktails filed as Mixed Drinks needs to see that happen, not discover it later on a
+       margin board. Silence here would be the old defect with the numbers merely corrected.
+       ⚠ Only when it DIFFERS from the tile, or every row of an ordinary single-type menu carries a
+       note and the signal is gone. */
+    if (x.rowType && x.rowType !== this.activeType) {
+      const t = (this.TYPES || []).find(y => y.key === x.rowType);
+      notes.push('Going in as ' + ((t && t.label) || x.rowType));
+    }
     /* ⛔ A MATCHED ROW THAT CHANGES NOTHING MUST NOT SAY IT IS UPDATING SOMETHING. Re-dropping the
        same export is the ordinary way to land here, and every row of it read "Updating what is on
        file" over three identical figures. It IS still written — the branch stamps `type`, which is
@@ -1645,19 +1655,56 @@ S.RevenueMenuItems = {
     // because removing a section pushes it into `hidden`, and without it here every later import
     // minted a fresh casing variant that menuGroupKey (exact-match) then treated as its own
     // comparison group of one, so Menu Engineering called each item best AND worst of its bunch.
-    const knownCats = App.menuCatOptions(this.activeType).slice();
-    const learn = v => {
-      v = String(v == null ? '' : v).trim();
-      if (v && !knownCats.some(k => k.toLowerCase() === v.toLowerCase())) knownCats.push(v);
+    /* ⛔⛔ THE SECTION LISTS ARE PER TYPE, SO THEY ARE ALSO THE TYPE RESOLVER (Kyle, 2026-08-04:
+       *"what happens if a user drops a file with both dishes and cocktails?"*). Measured before
+       this: every row was stored as the tile it was dropped on, so Old Fashioned and Bud Light
+       became DISHES. `type` decides the Menu Engineering comparison basis, the cost target (22% for
+       drinks against 32% for plates) and which tab the item lives on — and the refresh branch below
+       carries the note recording what that costs: a drink filed as a dish *"left the Cocktails tab,
+       its comparison basis moved ... its cost target flipped 22% to 32%, and the next re-drop of the
+       same file duplicated the whole drink menu."*
+       ⭐ NOT A VOCABULARY I INVENTED. Each type already owns its own section list
+       (plate = Appetizers/Entrees/Sides/Desserts, cocktail = Cocktails/Shots/Frozen,
+       inventory = Beer/Wine/NA Beverages/Snacks), operator additions included. A section on exactly
+       ONE of those lists names its type as a FACT.
+       ⚠ EXACTLY one. The operator can add any word to any list, so a section claimed by two types
+       is ambiguous and falls back to the tile — the same "two claimants means unset" rule Add
+       Products uses. So does a section on nobody's list: that is a section they are inventing, and
+       the tile they chose is the best evidence there is. The tile is the FALLBACK, never the answer. */
+    const MTYPES = ['plate', 'cocktail', 'inventory'];
+    const knownBy = {};
+    MTYPES.forEach(t => {
+      knownBy[t] = App.menuCatOptions(t).slice();
+      (App.listConfig(App.menuCatListKey(t)).hidden || []).forEach(v => {
+        v = String(v == null ? '' : v).trim();
+        if (v && !knownBy[t].some(k => k.toLowerCase() === v.toLowerCase())) knownBy[t].push(v);
+      });
+    });
+    // Sections already in use on this menu count too, or a section the operator created by hand
+    // reads as unknown and its own items fall back to the tile.
+    existing.forEach(it => {
+      const t = App.menuTypeOf(it);
+      const v = String(it && it.category == null ? '' : it.category).trim();
+      if (knownBy[t] && v && !knownBy[t].some(k => k.toLowerCase() === v.toLowerCase())) knownBy[t].push(v);
+    });
+    const typeForSection = raw => {
+      const v = String(raw == null ? '' : raw).trim().toLowerCase();
+      if (!v) return this.activeType;
+      const hits = MTYPES.filter(t => knownBy[t].some(k => k.toLowerCase() === v));
+      return hits.length === 1 ? hits[0] : this.activeType;
     };
-    (App.listConfig(App.menuCatListKey(this.activeType)).hidden || []).forEach(learn);
-    existing.forEach(it => { if (App.menuTypeOf(it) === this.activeType) learn(it.category); });
-    const canonCat = c => {
+    /* ⚠ CANONICALISED WITHIN ITS OWN TYPE'S LIST. A POS export reading "entrees" must land on the
+       operator's own "Entrees" spelling, because `App.menuGroupKey` matches exactly and a casing
+       variant becomes its own comparison group of one — Menu Engineering then calls that item both
+       the best and the worst margin of its "bunch". The list grows as the file is read, so a file
+       carrying both "brunch" and "Brunch" produces one section rather than two. */
+    const canonCatFor = (t, c) => {
       const v = String(c == null ? '' : c).trim();
       if (!v) return '';
-      const hit = knownCats.find(k => k.toLowerCase() === v.toLowerCase());
+      const list = knownBy[t] || (knownBy[t] = []);
+      const hit = list.find(k => k.toLowerCase() === v.toLowerCase());
       if (hit) return hit;
-      knownCats.push(v);   // first spelling in the file wins for the rest of the file
+      list.push(v);   // first spelling in the file wins for the rest of the file
       return v;
     };
     // ⚠ COUNT ITEMS, NOT ROWS. A file can name the same item on several rows (a POS export split
@@ -1733,8 +1780,10 @@ S.RevenueMenuItems = {
       const coversRaw = App.parseNum(r.covers);
       const covers = coversRaw == null ? 0 : Math.round(coversRaw);
       const coversGiven = coversRaw != null && covers >= 0;
-      const cat = canonCat(r.category);
-      const k = keyOf(this.activeType, name);
+      // ⛔ THE ROW'S OWN TYPE, resolved from its section. The tile is only the fallback.
+      const rowType = typeForSection(r.category);
+      const cat = canonCatFor(rowType, r.category);
+      const k = keyOf(rowType, name);
       // Which sections this name arrived under, for the clash report above. Blank cells are not a
       // disagreement — the refresh branch keeps the section the item already has.
       if (cat) {
@@ -1745,7 +1794,7 @@ S.RevenueMenuItems = {
       // ⚠ AN INACTIVE ITEM IS MATCHED BUT NOT TOUCHED. Matching it is what stops the import
       // creating a duplicate of something the operator retired; repricing it would put a price
       // change into the Pricing Review Log and Recovery for an item that is off the live menu.
-      if (cur && cur.archived) { skippedIds.add(cur.id); perRow.push({ status: 'inactive', name: name, item: cur }); return; }
+      if (cur && cur.archived) { skippedIds.add(cur.id); perRow.push({ status: 'inactive', name: name, item: cur, rowType: rowType, key: k }); return; }
       if (cur) {
         // ⚠ CAPTURED BEFORE THE OVERWRITES BELOW. The screen shows the price a file is
         // REPLACING beside the one it is bringing, and after this branch runs the old figure
@@ -1778,10 +1827,10 @@ S.RevenueMenuItems = {
         // pool to plate|Happy Hour, its cost target flipped 22% to 32%, and the next re-drop of
         // the same file duplicated the whole drink menu. The match key already proved the types
         // agree, so writing it is a no-op in meaning and a fix in effect.
-        cur.type = this.activeType;
+        cur.type = rowType;
         cur.updated_at = new Date().toISOString();
         updatedIds.add(cur.id);
-        perRow.push({ status: 'update', name: name, item: cur,
+        perRow.push({ status: 'update', name: name, item: cur, rowType: rowType, key: k,
           price: price > 0 ? price : null, wasPrice: (price > 0 && price !== wasPrice) ? wasPrice : null,
           costChanged: cost > 0 && cost !== wasCost,
           coversChanged: coversGiven && covers !== wasCovers });
@@ -1797,7 +1846,7 @@ S.RevenueMenuItems = {
         if (!cat) { noCat++; perRow.push({ status: 'nocat', name: name }); return; }
         const it = {
           id:                 App.uid(),
-          type:               this.activeType,   // the tile the Upload was opened from sets the item type
+          type:               rowType,   // resolved from the row's own section; the tile is the fallback
           name,
           category:           cat,
           // ⚠ NEGATIVES DO NOT BECOME A MENU ITEM. The refresh branch above guards every one of
@@ -1821,7 +1870,7 @@ S.RevenueMenuItems = {
         existing.push(it); addedRecs.push(it);
         byKey[k] = it;
         addedIds.add(it.id);
-        perRow.push({ status: 'new', name: name, item: it, price: it.price > 0 ? it.price : null });
+        perRow.push({ status: 'new', name: name, item: it, rowType: rowType, key: k, price: it.price > 0 ? it.price : null });
       }
     });
     /* ⛔ STAMPED AFTER THE LOOP, because neither fact is known until the whole file has been read.
@@ -1834,7 +1883,7 @@ S.RevenueMenuItems = {
        which is the exact defect `repriced` was rewritten to keep out of the Pricing Review Log. */
     perRow.forEach(x => {
       if (!x.name) return;
-      x.clash = catClash.has(keyOf(this.activeType, x.name));
+      x.clash = !!x.key && catClash.has(x.key);
       if (x.item) x.bornHere = addedIds.has(x.item.id);
     });
     return { perRow: perRow, addedIds: addedIds, updatedIds: updatedIds, skippedIds: skippedIds,
