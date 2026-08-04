@@ -537,9 +537,13 @@ S.ShiftDashboard = {
        the lifted body throws on its first row — which looks exactly like a real defect
        ([[the-loop]] #16). Nothing else needs it, so nothing has to lift a second name. */
     const NOTE = {
-      'new':   'Importing',
+      'new':   'Adding this day',
       replace: 'Replacing earlier figures',
-      zero:    'Came in at $0, not imported',
+      /* ⛔ THE REMEDY GOES ON THE ROW, not in the line printed afterwards. Everything the old
+         success sentence said now has to be on this screen, because that sentence is being cut back
+         to the headline — it was repeating, in six parenthetical clauses, what the operator had
+         just read row by row and approved. A fact that only lived in it has to move here first. */
+      zero:    'Came in at $0, not imported. Use Enter Manually to record a zero day',
       nofig:   'No sales figure Bar Cop could use',
       same:    'Already matches what is saved',
       kept:    'You entered this day by hand and the file agrees',
@@ -587,6 +591,9 @@ S.ShiftDashboard = {
       ((gaps.zeroed || {})[k] || []).forEach(d => { if (byDate[d]) byDate[d].notes.push(COLNAME[k] + ': no usable figure, saved as zero'); });
     });
     (built.coversRepeated || []).forEach(d => { if (byDate[d]) byDate[d].notes.push('Every row stated the same guest count, so it was counted once'); });
+    // A day your file splits across several rows (dayparts, revenue centres) is added up into one.
+    // The screen shows the total, so it has to say the total is a sum.
+    (built.mergedDates || []).forEach(d => { if (byDate[d]) byDate[d].notes.push('Several rows in your file added up into this day'); });
 
     // Monday to Sunday. The operator knows their week in date order and nothing else.
     days.sort((a, b) => String(a.date).localeCompare(String(b.date)));
@@ -617,25 +624,43 @@ S.ShiftDashboard = {
         + '<td>&mdash;</td><td>&mdash;</td><td>&mdash;</td>'
         + '<td>' + outcome(d.note) + '</td></tr>';
     }
-    // The figures shown are the FILE's, because that is what the press would write. On a conflict
-    // the operator's own figures sit under the choice, so both are on screen at once.
+    // The figures shown are the FILE's, because that is what the press would write.
     const src = d.status === 'conflict' ? d.theirs : (d.rec || {});
-    const bar = src.bar_revenue, food = src.floor_revenue, cov = src.covers;
+    const sub = html => '<div style="font-size:10px;color:var(--t3);letter-spacing:0.5px;margin-top:2px;">' + html + '</div>';
+    /* ⛔ THE COMPARISON GOES IN THE COLUMN IT IS ABOUT (Kyle, 2026-08-04: *"that layout looks bad"*).
+       It used to be one run-on sentence in the last cell — "You entered: $500.00 bar · $718.00 food
+       · 50 covers" — stacked above two buttons in a 37% column, so reading it meant matching three
+       figures in prose back against three columns an inch to the left. The row already HAS a Bar
+       column; the operator's own bar figure belongs under it.
+       ⚠ AND ONLY WHERE THEY DIFFER. A conflict is raised when ANY of the three disagree, so printing
+       "you entered 50" under a covers count of 50 is noise on the row that can least afford it. */
+    const cmp = (fileV, mineV, fmt) => {
+      const shown = fmt(fileV);
+      if (d.status !== 'conflict') return shown;
+      const yours = fmt(mineV);
+      return shown + (yours === shown ? '' : sub('you entered ' + yours));
+    };
     let last = outcome(d.note);
     if (d.status === 'conflict') {
-      const mineText = 'You entered: ' + money(d.mine.bar_revenue) + ' bar &middot; ' + money(d.mine.floor_revenue)
-        + ' food &middot; ' + (d.mine.covers || 0) + (d.mine.covers === 1 ? ' cover' : ' covers');
       const btn = (use, label, on) => '<button type="button" class="btn ' + (on ? 'btn-primary' : 'btn-ghost')
         + ' btn-sm" data-salesconf="' + esc(d.key) + '" data-use="' + use + '">' + label + '</button>';
-      last += '<div style="font-size:11px;color:var(--t3);margin-top:4px;">' + mineText + '</div>'
-        + '<div class="row-actions" style="margin-top:6px;">' + btn('mine', 'Keep Mine', !d.lands) + btn('file', 'Use The File', d.lands) + '</div>';
+      // ⚠ `.row-actions` right-aligns by default (it is built for Edit/Delete at the end of a row).
+      // Here the buttons answer the sentence directly above them, so they line up with it.
+      last += '<div class="row-actions" style="justify-content:flex-start;margin-top:6px;">'
+        + btn('mine', 'Keep Mine', !d.lands) + btn('file', 'Use The File', d.lands) + '</div>';
     }
-    const extra = (d.notes || []).map(n => '<div style="font-size:10px;color:var(--t3);letter-spacing:0.5px;margin-top:2px;">' + esc(n) + '</div>').join('');
-    return '<tr' + (d.lands ? '' : ' style="opacity:0.5;"') + '>'
+    const extra = (d.notes || []).map(n => sub(esc(n))).join('');
+    /* ⛔ A CONFLICT ROW IS NEVER DIMMED, ANSWERED OR NOT. Dim means "you can leave this alone", and
+       a day the file disagrees with is the ONLY row on this screen that needs the operator. Keying
+       the dim on `lands` alone greyed it out while it waited and un-greyed it once they answered —
+       loudest exactly when it stopped needing attention. The reference screen leaves an unplaced
+       product deliberately unmarked for the same reason: that row is the WORK. */
+    const dim = !d.lands && d.status !== 'conflict';
+    return '<tr' + (dim ? ' style="opacity:0.5;"' : '') + '>'
       + '<td>' + esc(dayLabel(d.date)) + extra + '</td>'
-      + '<td>' + money(bar) + '</td>'
-      + '<td>' + money(food) + '</td>'
-      + '<td>' + (cov == null ? '&mdash;' : cov) + '</td>'
+      + '<td>' + cmp(src.bar_revenue, (d.mine || {}).bar_revenue, money) + '</td>'
+      + '<td>' + cmp(src.floor_revenue, (d.mine || {}).floor_revenue, money) + '</td>'
+      + '<td>' + cmp(src.covers, (d.mine || {}).covers, v => (v == null ? '&mdash;' : String(v))) + '</td>'
       + '<td>' + last + '</td></tr>';
   },
 
@@ -648,25 +673,40 @@ S.ShiftDashboard = {
     /* ⚠ EACH PLURAL NAMES ITS OWN COLLECTION ([[the-loop]] #86): `nDays` is days read out of the
        file, `nConf` is days needing a call, and the button counts days that will be written. Three
        different numbers, and reading the nearest one is how a screen ends up contradicting itself. */
+    /* ⚠ THE LEAD NAMES THE BUTTON, SO RENAMING THE BUTTON REWRITES THE LEAD. Both sentences said
+       "press Import" and survived the rename to Add in silence — the screen would have pointed at a
+       button that is not on it ([[copy-matches-app]], and [[the-loop]] #107: a rename breaks the
+       pins that quote the old word and quietly satisfies the ones checking it is gone). Caught by
+       reading the render, not by any assertion, so there is one below now. */
     const lead = nConf
       ? 'Bar Cop read ' + nDays + ' day' + (nDays === 1 ? '' : 's') + ' out of this file. '
         + (nConf === 1 ? 'One of them you' : nConf + ' of them you') + ' entered by hand and the file disagrees, so pick which figures to keep. '
-        + 'Nothing is saved until you press Import.'
-      : 'Bar Cop read ' + nDays + ' day' + (nDays === 1 ? '' : 's') + ' out of this file. Check them and press Import. '
+        + 'Nothing is saved until you add them.'
+      : 'Bar Cop read ' + nDays + ' day' + (nDays === 1 ? '' : 's') + ' out of this file. Check them, then add them. '
         + 'Nothing is saved until you do.';
     return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">'
       +   '<span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Check your week</span>'
       + '</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(lead) + '</div>'
-      + '<div style="overflow-x:auto;">'
+      /* ⛔ THE TABLE LIVES IN A `.card`, WHICH IS THE WHOLE REASON THE ROWS READ. `.row-list tbody td`
+         is `#0D181E`, and a cockpit STEP WORKSPACE is `#0D181E` too — measured on the live build —
+         so a bare table renders its row fill invisibly against its own container and the rows read
+         as loose text. `.card` is `#08131A`, so inside one the fill lands exactly as it does on the
+         Inventory product list, which is the screen this is supposed to match. No `.row-list` had
+         ever been put inside a cockpit step before, which is why nothing else hit it. */
+      + '<div class="card" style="container-type:inline-size;">'
+      +   '<div style="overflow-x:auto;">'
       +   '<table class="row-list" style="table-layout:fixed;width:100%;">'
       +   '<colgroup><col style="width:22%;"/><col style="width:15%;"/><col style="width:15%;"/><col style="width:11%;"/><col style="width:37%;"/></colgroup>'
       +   '<thead><tr><th>Day</th><th>Bar</th><th>Food</th><th>Covers</th><th>What Happens</th></tr></thead>'
-      +   '<tbody>' + days.map(d => this._salesReviewRowHtml(d)).join('') + '</tbody></table></div>'
+      +   '<tbody>' + days.map(d => this._salesReviewRowHtml(d)).join('') + '</tbody></table></div></div>'
       + '<div id="sc-ck-import-res"></div>'
+      /* ⛔ "ADD", NOT "IMPORT" (Kyle, 2026-08-04, and it is the same call he made on Add Products).
+         The file was imported two screens ago; a button offering to import it again reads as though
+         the work has not happened yet. What this press does is add the days. */
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       +   '<button class="btn btn-primary btn-sm" data-salesreview-go="1"' + (s.count && !busy ? '' : ' disabled') + '>'
-      +     (busy ? 'Importing...' : 'Import ' + s.count + ' Day' + (s.count === 1 ? '' : 's')) + '</button>'
+      +     (busy ? 'Adding...' : 'Add ' + s.count + ' Day' + (s.count === 1 ? '' : 's')) + '</button>'
       +   '<button class="btn btn-ghost btn-sm" data-salesreview-back="1"' + (busy ? ' disabled' : '') + '>Start Over</button>'
       + '</div>';
   },
@@ -679,8 +719,12 @@ S.ShiftDashboard = {
     if (!r || this._salesReviewWriting) return;
     this._salesReviewWriting = true;
     const btn = this.container && this.container.querySelector('[data-salesreview-go]');
-    if (btn) { btn.disabled = true; btn.textContent = 'Importing...'; }
-    try { await this.importSales(r.rows, { useTheirs: r.useTheirs }); }
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    // `reviewed` says the operator has already been shown every outcome row by row and accepted it,
+    // which is what lets the success line drop back to a headline. An explicit flag, not the
+    // presence of `useTheirs` — a flag has to say what it means, and `useTheirs` is `{}` on a file
+    // with no conflicts in it.
+    try { await this.importSales(r.rows, { useTheirs: r.useTheirs, reviewed: true }); }
     finally {
       this._salesReviewWriting = false;
       /* ⛔ ONLY THE SUCCESS PATH CLEARS THE SCREEN, and `_doImportSales` is what clears it — a
@@ -693,7 +737,7 @@ S.ShiftDashboard = {
         // and, on anything less deterministic, lets the number and its own plural disagree
         // ([[harness-review-like-code]] #27).
         const n = this._salesReviewCount();
-        if (b) { b.disabled = false; b.textContent = 'Import ' + n + ' Day' + (n === 1 ? '' : 's'); }
+        if (b) { b.disabled = false; b.textContent = 'Add ' + n + ' Day' + (n === 1 ? '' : 's'); }
       }
     }
   },
@@ -977,9 +1021,21 @@ S.ShiftDashboard = {
         + '. Your confirmed figures are unchanged. Re-confirm ' + (cwEnds.length === 1 ? 'that week' : 'those weeks')
         + ' if you want them to pick this up.'
       : '';
+    /* ⛔ THE CLAUSE LIST IS FOR AN IMPORT NOBODY WAS SHOWN (Kyle, 2026-08-04, looking at six
+       parentheticals in green): *"all that green text is very hard to read and follow.. it is just
+       repeating what the user just saw on screen and confirmed by adding."* He is right, and the
+       reason is that every one of those clauses was written when the drop wrote straight through
+       and this line was the operator's ONLY account of what happened. It is now the second telling.
+       So the headline stands alone when the operator came through the confirm screen, and the full
+       account survives for the Enter Manually grid, which has no screen in front of it.
+       ⚠ THIS ONLY HOLDS BECAUSE EVERY CLAUSE IS ON THAT SCREEN. Two were not until this edit — the
+       row merge (now a per-row note) and the zero day's "use Enter Manually" remedy (now on the row
+       itself). Before dropping a clause from here, find it on the screen ([[the-loop]] #25).
+       ⚠ AND THE FAILURE LINE KEEPS EVERYTHING, deliberately. A refused write is when they read
+       hardest, and success/failure agreeing is pinned for the path that still prints both. */
     this._flash = allToAdd.length + ' day' + (allToAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
-      + salesOutcomes
-      + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + repNote + '.' + cwNote;
+      + (opts.reviewed ? '' : salesOutcomes)
+      + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + (opts.reviewed ? '' : repNote) + '.' + cwNote;
     this._openStep = 'cash';
     this.render(this.container, this.actions);
   },
