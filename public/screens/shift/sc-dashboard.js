@@ -618,58 +618,56 @@ S.ShiftDashboard = {
   // ONE SOURCE with the table above it, or the button and the screen disagree.
   _salesReviewCount() { return this._salesReview ? this._salesReviewSummary().count : 0; },
 
-  _salesReviewRowHtml(d) {
+  /* One day as an `ImportConfirm` row: the cells this door owns, plus the facts the shell needs to
+     decide the dim, the count and the button. It builds no markup of its own beyond the cells.
+     ⚠ `cells` is HTML and this door escapes it; `note` and `notes` are TEXT the shell escapes, and
+     they are the two the NOTE_BUDGET applies to. */
+  _salesReviewRow(d) {
     const money = v => (v == null ? '&mdash;' : App.fmtCurrency(v));
     const dayLabel = ymd => {
       const dt = new Date(ymd + 'T00:00:00');
       return isNaN(dt.getTime()) ? ymd : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     };
-    // ⚠ THE SAME TEXT TREATMENT AS EVERY OTHER ROW. Written bare it inherited the table's default
-    // size and colour, so the one row nobody can act on was the loudest line on the screen.
-    const outcome = t => '<div style="font-size:12px;color:var(--t2);">' + esc(t) + '</div>';
     if (d.status === 'undated') {
-      return '<tr style="opacity:0.5;"><td>' + esc(d.count + (d.count === 1 ? ' row' : ' rows')) + '</td>'
-        + '<td>&mdash;</td><td>&mdash;</td><td>&mdash;</td>'
-        + '<td>' + outcome(d.note) + '</td></tr>';
+      return { cells: [esc(d.count + (d.count === 1 ? ' row' : ' rows')), '&mdash;', '&mdash;', '&mdash;'],
+               note: d.note, notes: [], lands: false };
     }
     // The figures shown are the FILE's, because that is what the press would write.
     const src = d.status === 'conflict' ? d.theirs : (d.rec || {});
-    const sub = html => '<div style="font-size:10px;color:var(--t3);letter-spacing:0.5px;margin-top:2px;">' + html + '</div>';
+    const mine = d.mine || {};
     /* ⛔ THE COMPARISON GOES IN THE COLUMN IT IS ABOUT (Kyle, 2026-08-04: *"that layout looks bad"*).
        It used to be one run-on sentence in the last cell — "You entered: $500.00 bar · $718.00 food
        · 50 covers" — stacked above two buttons in a 37% column, so reading it meant matching three
        figures in prose back against three columns an inch to the left. The row already HAS a Bar
        column; the operator's own bar figure belongs under it.
-       ⚠ AND ONLY WHERE THEY DIFFER. A conflict is raised when ANY of the three disagree, so printing
-       "you entered 50" under a covers count of 50 is noise on the row that can least afford it. */
-    const cmp = (fileV, mineV, fmt) => {
-      const shown = fmt(fileV);
-      if (d.status !== 'conflict') return shown;
-      const yours = fmt(mineV);
-      return shown + (yours === shown ? '' : sub('you entered ' + yours));
-    };
-    let last = outcome(d.note);
+       ⚠ `ImportConfirm.compare` owns the "only where they differ" half, so every door gets it the
+       same way. A `null` second value means there is nothing to compare and must look exactly like
+       agreement — never "you entered &mdash;" — which is why the raw value is tested before it is
+       formatted. */
+    const cmp = (fileV, mineV, fmt) =>
+      (d.status !== 'conflict' ? fmt(fileV) : ImportConfirm.compare(fmt(fileV), mineV == null ? null : fmt(mineV)));
+    let decision = '';
     if (d.status === 'conflict') {
       const btn = (use, label, on) => '<button type="button" class="btn ' + (on ? 'btn-primary' : 'btn-ghost')
         + ' btn-sm" data-salesconf="' + esc(d.key) + '" data-use="' + use + '">' + label + '</button>';
       // ⚠ `.row-actions` right-aligns by default (it is built for Edit/Delete at the end of a row).
       // Here the buttons answer the sentence directly above them, so they line up with it.
-      last += '<div class="row-actions" style="justify-content:flex-start;margin-top:6px;">'
+      decision = '<div class="row-actions" style="justify-content:flex-start;margin-top:6px;">'
         + btn('mine', 'Keep Mine', !d.lands) + btn('file', 'Use The File', d.lands) + '</div>';
     }
-    const extra = (d.notes || []).map(n => sub(esc(n))).join('');
-    /* ⛔ A CONFLICT ROW IS NEVER DIMMED, ANSWERED OR NOT. Dim means "you can leave this alone", and
-       a day the file disagrees with is the ONLY row on this screen that needs the operator. Keying
-       the dim on `lands` alone greyed it out while it waited and un-greyed it once they answered —
-       loudest exactly when it stopped needing attention. The reference screen leaves an unplaced
-       product deliberately unmarked for the same reason: that row is the WORK. */
-    const dim = !d.lands && d.status !== 'conflict';
-    return '<tr' + (dim ? ' style="opacity:0.5;"' : '') + '>'
-      + '<td>' + esc(dayLabel(d.date)) + extra + '</td>'
-      + '<td>' + cmp(src.bar_revenue, (d.mine || {}).bar_revenue, money) + '</td>'
-      + '<td>' + cmp(src.floor_revenue, (d.mine || {}).floor_revenue, money) + '</td>'
-      + '<td>' + cmp(src.covers, (d.mine || {}).covers, v => (v == null ? '&mdash;' : String(v))) + '</td>'
-      + '<td>' + last + '</td></tr>';
+    return {
+      cells: [esc(dayLabel(d.date)),
+              cmp(src.bar_revenue, mine.bar_revenue, money),
+              cmp(src.floor_revenue, mine.floor_revenue, money),
+              cmp(src.covers, mine.covers, v => (v == null ? '&mdash;' : String(v)))],
+      note: d.note,
+      notes: d.notes || [],
+      lands: d.lands,
+      // ⛔ A day the file disagrees with is the only row on this screen that needs the operator, so
+      // it is never dimmed. The shell owns that rule now, for every door.
+      needsYou: d.status === 'conflict',
+      decision: decision
+    };
   },
 
   salesReviewHTML() {
@@ -692,31 +690,28 @@ S.ShiftDashboard = {
         + 'Nothing is saved until you add them.'
       : 'Bar Cop read ' + nDays + ' day' + (nDays === 1 ? '' : 's') + ' out of this file. Check them, then add them. '
         + 'Nothing is saved until you do.';
-    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">'
-      +   '<span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Check your week</span>'
-      + '</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(lead) + '</div>'
-      /* ⛔ THE TABLE LIVES IN A `.card`, WHICH IS THE WHOLE REASON THE ROWS READ. `.row-list tbody td`
-         is `#0D181E`, and a cockpit STEP WORKSPACE is `#0D181E` too — measured on the live build —
-         so a bare table renders its row fill invisibly against its own container and the rows read
-         as loose text. `.card` is `#08131A`, so inside one the fill lands exactly as it does on the
-         Inventory product list, which is the screen this is supposed to match. No `.row-list` had
-         ever been put inside a cockpit step before, which is why nothing else hit it. */
-      + '<div class="card" style="container-type:inline-size;">'
-      +   '<div style="overflow-x:auto;">'
-      +   '<table class="row-list" style="table-layout:fixed;width:100%;">'
-      +   '<colgroup><col style="width:22%;"/><col style="width:15%;"/><col style="width:15%;"/><col style="width:11%;"/><col style="width:37%;"/></colgroup>'
-      +   '<thead><tr><th>Day</th><th>Bar</th><th>Food</th><th>Covers</th><th>What Happens</th></tr></thead>'
-      +   '<tbody>' + days.map(d => this._salesReviewRowHtml(d)).join('') + '</tbody></table></div></div>'
-      + '<div id="sc-ck-import-res"></div>'
-      /* ⛔ "ADD", NOT "IMPORT" (Kyle, 2026-08-04, and it is the same call he made on Add Products).
-         The file was imported two screens ago; a button offering to import it again reads as though
-         the work has not happened yet. What this press does is add the days. */
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
-      +   '<button class="btn btn-primary btn-sm" data-salesreview-go="1"' + (s.count && !busy ? '' : ' disabled') + '>'
-      +     (busy ? 'Adding...' : 'Add ' + s.count + ' Day' + (s.count === 1 ? '' : 's')) + '</button>'
-      +   '<button class="btn btn-ghost btn-sm" data-salesreview-back="1"' + (busy ? ' disabled' : '') + '>Start Over</button>'
-      + '</div>';
+    /* ⛔ THE FRAME COMES FROM `ImportConfirm`, WHICH EVERY IMPORT DOOR WILL SHARE. This door owns
+       its columns, its per-row decision control and its build; the shell owns the card wrapper (the
+       rows are invisible without it), the colgroup, the dim rule, the result slot and — the one
+       that matters most — the BUTTON'S COUNT, which it derives from the rows it is handed rather
+       than taking as an argument. That is what makes "the button promises what lands" true by
+       construction here and at the thirteen doors still to convert, instead of a rule each one has
+       to remember. `s.count` is still the screen's own figure; nothing passes it in.
+       ⚠ "ADD", NOT "IMPORT" (Kyle, 2026-08-04, the same call he made on Add Products): the file was
+       imported two screens ago, and a button offering to import it again reads as though the work
+       has not happened yet. */
+    return ImportConfirm.panel({
+      label: 'Check your week',
+      lead: lead,
+      columns: [{ label: 'Day', width: 22 }, { label: 'Bar', width: 15 },
+                { label: 'Food', width: 15 }, { label: 'Covers', width: 11 }],
+      outcomeLabel: 'What Happens',
+      rows: days.map(d => this._salesReviewRow(d)),
+      verb: 'Add', noun: 'Day',
+      goAttr: 'data-salesreview-go', backAttr: 'data-salesreview-back', backLabel: 'Start Over',
+      resultId: 'sc-ck-import-res',
+      busy: busy
+    });
   },
 
   /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
