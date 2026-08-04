@@ -109,7 +109,7 @@ const ImportConfirm = {
       + '</div>';
   },
 
-  _rowHtml(row, removable) {
+  _rowHtml(row, removable, selectable, isChecked) {
     /* ⛔ DIM MEANS "YOU CAN LEAVE THIS ALONE", so a row waiting on the operator is
        never dimmed even though it will not land as things stand. Keyed on `lands`
        alone it greyed out the one row that needed them while it waited, and
@@ -133,8 +133,17 @@ const ImportConfirm = {
             + ' data-confirm-remove="' + esc(row.key) + '">Remove</button></div>'
           : '') + '</td>'
       : '';
+    /* ⛔ A ROW WITH NO KEY GETS NO CHECKBOX, for the same reason it gets no Remove: there would be
+       nothing for the door to act on BY, and a control that does nothing is worse than no control. */
+    const cb = selectable
+      ? '<td class="cb-left" style="text-align:center;">'
+        + (row.key != null && row.key !== ''
+            ? '<input type="checkbox" class="bc-check" data-confirm-check="' + esc(row.key) + '"'
+              + (isChecked ? ' checked' : '') + '/>'
+            : '') + '</td>'
+      : '';
     return '<tr' + (dim ? ' style="opacity:0.5;"' : '') + '>'
-      + cells
+      + cb + cells
       + '<td>' + this.outcome(row.note || '') + (row.decision || '') + '</td>'
       + rm + '</tr>';
   },
@@ -163,15 +172,20 @@ const ImportConfirm = {
     // The Remove column takes a fixed slice and the outcome column takes what is left, so the
     // colgroup sums to 100 whether or not the door asked for Remove.
     const removable = !!opts.removable;
+    const selectable = !!opts.selectable;
+    const checked = opts.checked || {};
     const rmW = removable ? 10 : 0;
+    const cbW = selectable ? 5 : 0;
     const used = cols.reduce((t, c) => t + (Number(c.width) || 0), 0);
-    const outW = Math.max(0, 100 - used - rmW);
+    const outW = Math.max(0, 100 - used - rmW - cbW);
     const colgroup = '<colgroup>'
+      + (selectable ? '<col style="width:' + cbW + '%;"/>' : '')
       + cols.map(c => '<col style="width:' + (Number(c.width) || 0) + '%;"/>').join('')
       + '<col style="width:' + outW + '%;"/>'
       + (removable ? '<col style="width:' + rmW + '%;"/>' : '') + '</colgroup>';
     // ⚠ The header gains a cell too, or every row below it is off by one.
     const head = '<thead><tr>'
+      + (selectable ? '<th></th>' : '')
       + cols.map(c => '<th>' + esc(c.label || '') + '</th>').join('')
       + '<th>' + esc(opts.outcomeLabel || 'What Happens') + '</th>'
       + (removable ? '<th></th>' : '') + '</tr></thead>';
@@ -187,8 +201,14 @@ const ImportConfirm = {
       ? rows.map(r => Object.assign({}, r, { notes: (r.notes || []).filter(x => universal.indexOf(x) < 0) }))
       : rows;
 
+    // A note every landing row shares is lifted above the table, so it is stripped wherever a row is
+    // drawn — the grouped path included, or the same sentence returns once per row inside a section.
+    const strip = r => universal.length
+      ? Object.assign({}, r, { notes: (r.notes || []).filter(x => universal.indexOf(x) < 0) }) : r;
     const table = list => '<table class="row-list" style="table-layout:fixed;width:100%;">'
-      + colgroup + head + '<tbody>' + list.map(r => this._rowHtml(r, removable)).join('') + '</tbody></table>';
+      + colgroup + head + '<tbody>'
+      + list.map(r => this._rowHtml(strip(r), removable, selectable, !!checked[r.key])).join('')
+      + '</tbody></table>';
 
     /* ⛔ WHAT NEEDS THE OPERATOR COMES FIRST AND STAYS OPEN; WHAT BAR COP WORKED OUT COLLAPSES.
        On a 240-row first drop the thirteen rows needing a look ran from row 33 to row 240, so
@@ -198,7 +218,23 @@ const ImportConfirm = {
        Monday to Sunday, and splitting it would be worse. That is a fact about the door, not a row
        count, so the door states it rather than the shell guessing a threshold. */
     let body;
-    if (opts.flat) {
+    /* ⛔⛔ GROUPED BY WHERE THE ROW IS GOING (Kyle, 2026-08-04, walking the operating-expense screen):
+       *"it's just clunky and not user friendly at all... seems like it might be better if it was
+       setup like add products.. choose a category and move to."* He is right, and the reason is
+       sharper than familiarity: THE SECTION IS THE CATEGORY, so the category lives in exactly ONE
+       place. The screen he was looking at had it in three — a Category column, a per-row dropdown and
+       a note telling him to pick one — and three copies of one fact cannot agree, which is why
+       changing the dropdown made the row vanish into a collapsed section he could not see.
+       Add Products has worked this way since before the rollout started and it was the pattern I
+       failed to carry over ([[test-the-first-drop]] rule 4: copy the REASON, not just the shape).
+       The door supplies the groups and the toolbar; this owns the frame, exactly as before. */
+    if (opts.groups) {
+      const gs = (opts.groups || []).filter(g => g && (g.rows || []).length);
+      body = gs.map((g, i) => this._section(g.title, g.sub,
+        g.open ? table(g.rows) : '', !!g.open, i === 0, g.key)).join('');
+      if (!body) body = '<div class="card" style="container-type:inline-size;">'
+        + '<div style="overflow-x:auto;">' + table(rows) + '</div></div>';
+    } else if (opts.flat) {
       body = '<div class="card" style="container-type:inline-size;">'
         + '<div style="overflow-x:auto;">' + table(shown) + '</div></div>';
     } else {
@@ -258,6 +294,9 @@ const ImportConfirm = {
           ? '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">All '
             + n + ' of these: ' + universal.map(esc).join(' &middot; ') + '</div>'
           : '')
+      // The door's own controls for the grouped mode (a category picker and Move To). HTML the door
+      // has already built and escaped, sitting above the sections it acts on.
+      + (opts.toolbar || '')
       + body
       /* ⛔ ALWAYS RENDER THE RESULT SLOT. A refused write reports into it, and a
          message with nowhere to render is the worst outcome an import has: the
