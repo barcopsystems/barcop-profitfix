@@ -189,7 +189,12 @@ S.RevenueMenuItems = {
         total++;
       }
     }
-    if (!total) h += '<option value="" disabled>No sellable products yet — mark a Food/Misc item "Sold on the menu" in Add Products, or add beer/wine.</option>';
+    /* ⛔ THE OPTION IS A LABEL, NOT AN INSTRUCTION (Kyle, 2026-08-04: *"the drop down on no prep is
+       way too long"*). A `<select>` is as wide as its widest option, so a whole sentence in here
+       stretched the control right across the modal and pushed the field beside it off its row. The
+       empty state still has to SAY what to do — that moved to a line under the field, where it wraps
+       like text instead of setting a control's width. */
+    if (!total) h += '<option value="" disabled>No sellable products yet</option>';
     return h;
   },
 
@@ -374,11 +379,19 @@ S.RevenueMenuItems = {
     // empty message in the body, so the tab keeps its shape and you can see what will appear here.
     const INACTIVE_EMPTY_MSG = 'No inactive menu items. Edit any item and use Make Inactive to pull a '
       + 'seasonal dish or drink off the live menu without deleting it.';
+    /* ⛔ NO HEADING, NO EXPLAINER, AND AN EXPORT WHERE EVERY OTHER TAB HAS ONE (Kyle, 2026-08-04).
+       The tab is already labelled "Inactive" in the tab strip directly above, so an "Inactive"
+       heading under it named the same thing twice; and the paragraph explaining what inactive means
+       was a sentence the operator reads once and then reads forever. What the tab was missing is the
+       control every sibling tab has in that exact spot. */
     const archivedSection = onInactive
-      ? '<div class="sh" style="margin:8px 0 10px;">Inactive</div>'
-        + (archivedItems.length
-          ? '<div style="font-size:12px;color:var(--t3);margin:0 0 10px;">These are off the live menu and out of Menu Engineering, but nothing is lost. Make active brings one straight back.</div>'
-          : '')
+      ? '<div class="no-print" style="display:flex;align-items:center;gap:8px;margin:16px 0 10px;">'
+        + '<button class="btn btn-ghost btn-sm" id="mi-export" style="margin-left:auto;">Export PDF</button>'
+        + '</div>'
+        // ⚠ THE EXPORT'S ROOT. `App.exportPDF` is handed `#mi-list-export`, and that element only
+        // ever existed in the active-tab body — a button without it would hand the exporter a null
+        // root and print nothing, which is the one outcome worse than no button.
+        + '<div id="mi-list-export">'
         + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th>Item</th><th>Category</th><th>Price</th><th></th>'
         + '</tr></thead><tbody>'
@@ -397,7 +410,7 @@ S.RevenueMenuItems = {
             + '</tr>').join('')
           : '<tr><td colspan="4" style="color:var(--t3);font-size:12px;padding:14px 12px;line-height:1.6;">'
             + esc(INACTIVE_EMPTY_MSG) + '</td></tr>')
-        + '</tbody></table></div>'
+        + '</tbody></table></div></div>'
       : '';
     // The upload panel REPLACES the list, so the tabs above it would be pointing at something that
     // is not on screen — and clicking one silently swaps what you are looking at mid-upload. Add
@@ -665,7 +678,11 @@ S.RevenueMenuItems = {
     // page said so.
     document.getElementById('mi-export')?.addEventListener('click', () => {
       const t = this.TYPES.find(x => x.key === this.activeTab);
-      App.exportPDF({ title: t ? 'Menu - ' + t.label : 'Menu', root: document.getElementById('mi-list-export') });
+      // ⚠ The Inactive tab is not in TYPES, so `t` is undefined there and the file was titled a bare
+      // "Menu" — the one export where saying WHICH list it is matters most.
+      App.exportPDF({ title: t ? 'Menu - ' + t.label
+        : (this.activeTab === this.INACTIVE_TAB ? 'Menu - Inactive' : 'Menu'),
+        root: document.getElementById('mi-list-export') });
     });
   },
 
@@ -901,8 +918,23 @@ S.RevenueMenuItems = {
     // Show every sellable product (grouped by kind) — the menu category is a free-
     // form section now, so it no longer filters the picker. The product itself
     // drives the cost model (pour vs portion vs whole).
+    /* ⚠ THE EMPTY-STATE INSTRUCTION SITS UNDER THE FIELD, NOT INSIDE THE SELECT. A `<select>` is as
+       wide as its widest option, so the sentence that used to be the disabled option stretched the
+       control across the modal. Rendered only when there is nothing to pick, so a populated form is
+       byte-identical to before. */
+    /* ⚠ ASKED OF THE RENDERED OPTIONS, not of a helper. My first version guarded on a
+       `sellableProducts()` that does not exist on this screen — so the guard was always true and the
+       note would have shown on every form, including ones with a full picker
+       ([[harness-review-like-code]] #34: check the object before trusting the property). The option
+       builder already decides this; reading its answer cannot drift from it. */
+    const optsHtml = this.inventoryProductOptions(linkedId);
+    const nothingToPick = optsHtml.indexOf('No sellable products yet') >= 0;
     return '<label>Inventory Product</label>'
-      + '<select class="form-input" id="ri-linked-prod">' + this.inventoryProductOptions(linkedId) + '</select>';
+      + '<select class="form-input" id="ri-linked-prod">' + optsHtml + '</select>'
+      + (nothingToPick
+          ? '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">Mark a Food or Misc item '
+            + '"Sold on the menu" in Add Products, or add beer and wine there, and they show up here.</div>'
+          : '');
   },
   // Everything below the top row for an inventory item: price, cost, covers,
   // pour/portion, other prices, notes.
@@ -1568,6 +1600,11 @@ S.RevenueMenuItems = {
       const t = (this.TYPES || []).find(y => y.key === x.rowType);
       notes.push('Going in as ' + ((t && t.label) || x.rowType));
     }
+    /* ⛔⛔ AND A FALLBACK IS NEVER SILENT. This is the defect Kyle actually saw: two draft beers
+       landed in Dishes with no comment, because the note above only fires when the type DIFFERS from
+       the tile — and a fallback IS the tile. A row Bar Cop could not place is precisely the row that
+       needs looking at, and saying nothing about it is estimating quietly ([[the-loop]] #30). */
+    else if (x.unplacedSection) notes.push('Section not on any list, using this tab');
     /* ⛔ A MATCHED ROW THAT CHANGES NOTHING MUST NOT SAY IT IS UPDATING SOMETHING. Re-dropping the
        same export is the ordinary way to land here, and every row of it read "Updating what is on
        file" over three identical figures. It IS still written — the branch stamps `type`, which is
@@ -1710,11 +1747,30 @@ S.RevenueMenuItems = {
       const v = String(it && it.category == null ? '' : it.category).trim();
       if (knownBy[t] && v && !knownBy[t].some(k => k.toLowerCase() === v.toLowerCase())) knownBy[t].push(v);
     });
+    /* ⛔⛔ A SECTION THAT NAMES A KNOWN ONE INSIDE IT IS NOT UNKNOWN (Kyle, 2026-08-04, looking at the
+       result): *"two draft beers got put in the dishes tab... the rest of the beer got put in no
+       prep."* Exact match alone put "Draft Beer" in Dishes, because the LIST says "Beer" — and no
+       operator writes their section headers to match a list they have never seen. Real menus say
+       Draft Beer, Bottled Beer, Red Wine, House Cocktails, Bar Snacks.
+       ⚠ WHOLE WORD OR PHRASE, NEVER SUBSTRING. That is the rule Add Products already had to learn:
+       "Ginger Beer" must not hit `gin`, and a substring match is exactly how it would.
+       ⚠ AND IT RETURNS WHETHER IT KNEW. A fallback that cannot be told apart from a real answer is
+       how the two draft beers landed in Dishes in silence; the caller notes an unresolved one. */
+    const hasWord = (hay, needle) => new RegExp('(^|[^a-z0-9])'
+      + String(needle).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)', 'i').test(hay);
     const typeForSection = raw => {
-      const v = String(raw == null ? '' : raw).trim().toLowerCase();
-      if (!v) return this.activeType;
-      const hits = MTYPES.filter(t => knownBy[t].some(k => k.toLowerCase() === v));
-      return hits.length === 1 ? hits[0] : this.activeType;
+      const v = String(raw == null ? '' : raw).trim();
+      // A blank section has its own handling below (no section, no new item), so it is not "unknown".
+      if (!v) return { type: this.activeType, resolved: true };
+      const lc = v.toLowerCase();
+      let hits = MTYPES.filter(t => knownBy[t].some(k => k.toLowerCase() === lc));
+      if (hits.length === 1) return { type: hits[0], resolved: true };
+      // ⛔ TWO LISTS CLAIMING IT IS NOT AN ANSWER. "Frozen Desserts" names a Mixed Drinks section and
+      // a Dishes section; picking one would be a guess with a 50% cost.
+      if (hits.length > 1) return { type: this.activeType, resolved: false };
+      hits = MTYPES.filter(t => knownBy[t].some(k => hasWord(v, k)));
+      if (hits.length === 1) return { type: hits[0], resolved: true };
+      return { type: this.activeType, resolved: false };
     };
     /* ⚠ CANONICALISED WITHIN ITS OWN TYPE'S LIST. A POS export reading "entrees" must land on the
        operator's own "Entrees" spelling, because `App.menuGroupKey` matches exactly and a casing
@@ -1804,7 +1860,8 @@ S.RevenueMenuItems = {
       const covers = coversRaw == null ? 0 : Math.round(coversRaw);
       const coversGiven = coversRaw != null && covers >= 0;
       // ⛔ THE ROW'S OWN TYPE, resolved from its section. The tile is only the fallback.
-      const rowType = typeForSection(r.category);
+      const sect = typeForSection(r.category);
+      const rowType = sect.type;
       const cat = canonCatFor(rowType, r.category);
       const k = keyOf(rowType, name);
       // Which sections this name arrived under, for the clash report above. Blank cells are not a
@@ -1853,7 +1910,7 @@ S.RevenueMenuItems = {
         cur.type = rowType;
         cur.updated_at = new Date().toISOString();
         updatedIds.add(cur.id);
-        perRow.push({ status: 'update', name: name, item: cur, rowType: rowType, key: k,
+        perRow.push({ status: 'update', name: name, item: cur, rowType: rowType, key: k, unplacedSection: !sect.resolved,
           price: price > 0 ? price : null, wasPrice: (price > 0 && price !== wasPrice) ? wasPrice : null,
           costChanged: cost > 0 && cost !== wasCost,
           coversChanged: coversGiven && covers !== wasCovers });
@@ -1893,7 +1950,7 @@ S.RevenueMenuItems = {
         existing.push(it); addedRecs.push(it);
         byKey[k] = it;
         addedIds.add(it.id);
-        perRow.push({ status: 'new', name: name, item: it, rowType: rowType, key: k, price: it.price > 0 ? it.price : null });
+        perRow.push({ status: 'new', name: name, item: it, rowType: rowType, key: k, unplacedSection: !sect.resolved, price: it.price > 0 ? it.price : null });
       }
     });
     /* ⛔ STAMPED AFTER THE LOOP, because neither fact is known until the whole file has been read.
