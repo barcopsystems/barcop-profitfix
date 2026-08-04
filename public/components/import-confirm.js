@@ -84,23 +84,28 @@ const ImportConfirm = {
          "Position not on your list", because a new operator has no positions yet.
      A section that is collapsed fixes the first two at once, which is why Add Products was built
      that way before any of this started and why the flat table only ever looked fine at six rows. */
-  _section(title, sub, tableHtml, collapsed, first) {
-    /* ⚠ NO NEW CSS. `.card.collapsed .collapse-body{display:none}` and `.card.collapsed
-       .card-chevron{transform:rotate(-90deg)}` both already ship, so putting `collapsed` on the CARD
-       gives the hide AND the chevron for free — the same reasoning that kept the Add Products
-       rebuild from needing a stylesheet change.
-       ⚠ The toggle is inline and touches no app state on purpose: a shell that held collapse state
-       would need every door to thread it through a re-render, and a collapse that resets when the
-       screen redraws is the correct behaviour anyway. */
-    return '<div class="card' + (collapsed ? ' collapsed' : '') + '" style="padding:0;container-type:inline-size;margin-top:'
+  /* ⛔⛔ A COLLAPSED SECTION RENDERS NOTHING AT ALL, which is why Add Products stays flat at 2000
+     rows and why this had to stop hiding them with CSS. Measured on the live build: 2000 rows put
+     2000 checkboxes in the DOM, a 98,942px page, and ~350ms per re-render — for rows nobody is
+     looking at. The reference door has always built it this way; my first version rendered the table
+     and hid it with `display:none`, which is the same page weight with none of the benefit.
+     ⚠ THE COST OF DOING IT RIGHT: the shell now needs collapse STATE, because a section that is not
+     in the DOM cannot be revealed by toggling a class. The door owns that state (it already owns a
+     review object and a re-render) and passes it in; the head carries `data-confirm-section` so the
+     door's existing click handler can flip it in one line. That is four lines per door, once. */
+  _section(title, sub, tableHtml, open, first, key) {
+    /* ⚠ NO NEW CSS. `.card.collapsed .card-chevron{transform:rotate(-90deg)}` already ships, so
+       putting `collapsed` on the CARD gives the chevron for free — the same reasoning that kept the
+       Add Products rebuild from needing a stylesheet change. */
+    return '<div class="card' + (open ? '' : ' collapsed') + '" style="padding:0;container-type:inline-size;margin-top:'
       + (first ? '0' : '16') + 'px;">'
-      + '<div onclick="this.parentNode.classList.toggle(\'collapsed\')" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      + '<div data-confirm-section="' + esc(key) + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
       +   '<div style="flex:1;min-width:0;">'
       +   '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(title) + '</div>'
       +   '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + esc(sub) + '</div></div>'
       +   '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
       + '</div>'
-      + '<div class="collapse-body"><div style="padding:0 16px 16px;overflow-x:auto;">' + tableHtml + '</div></div>'
+      + (open ? '<div style="padding:0 16px 16px;overflow-x:auto;">' + tableHtml + '</div>' : '')
       + '</div>';
   },
 
@@ -177,16 +182,22 @@ const ImportConfirm = {
     } else {
       const needs = shown.filter(r => !r.lands || (r.notes || []).length || r.needsYou);
       const settled = shown.filter(r => !(!r.lands || (r.notes || []).length || r.needsYou));
+      /* The door owns the state. "Needs a look" is open unless the operator closed it; "going in" is
+         closed unless they opened it. A section that is closed builds no table at all, so a 2000-row
+         group costs nothing until somebody asks for it. */
+      const openMap = opts.open || {};
+      const needsOpen = openMap.needs !== false;
+      const settledOpen = !!openMap.settled;
       body = '';
       if (needs.length) {
         body += this._section(opts.needsLabel || 'Needs A Look',
           needs.length + ' row' + (needs.length === 1 ? '' : 's') + ' to check before you add',
-          table(needs), false, true);
+          needsOpen ? table(needs) : '', needsOpen, true, 'needs');
       }
       if (settled.length) {
         body += this._section((verb === 'Add' ? 'Going In' : verb),
           settled.length + ' ' + (settled.length === 1 ? noun : (opts.nounPlural || noun + 's')) + ' Bar Cop worked out',
-          table(settled), true, !needs.length);
+          settledOpen ? table(settled) : '', settledOpen, !needs.length, 'settled');
       }
       // A file with nothing in it at all still needs a table, or the screen is a lead and a button.
       if (!body) body = '<div class="card" style="container-type:inline-size;">'
