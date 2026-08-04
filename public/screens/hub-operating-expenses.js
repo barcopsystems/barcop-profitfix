@@ -1396,14 +1396,23 @@ S.HubOperatingExpenses = {
       /* ⛔ THE SECTION IS THE CATEGORY, SO THE ROW DOES NOT REPEAT IT. Every "pick one" note is gone:
          a row sitting in Not Sorted Yet IS that sentence, and one in a category section has already
          been answered. The old screen said it three ways at once (a Category column, a dropdown and
-         a note) and none of them could agree. The only note left is the one the section cannot say:
-         that Bar Cop thinks this row belongs somewhere else in the app entirely. */
-      const rowNotes = [];
+         a note) and none of them could agree. */
       const elsewhere = this._belongsElsewhere(vendor);
-      if (elsewhere) rowNotes.push(elsewhere);
+      /* ⛔⛔⛔ A NOTE THAT DOES NOT CHANGE THE DEFAULT IS NOT A GUARD (Kyle, 2026-08-04, correcting a
+         call I argued for). The flag was a suggestion on the reasoning that a guess must never
+         delete a real expense. That was right about REMOVAL and wrong about the DEFAULT: doing
+         nothing BOOKED the row. *"even if the user sees the note and they don't add them to a
+         category and think they are good, they still get added to expenses as 'other'."* An owner
+         draw, a payroll run and a Sysco delivery landing here double-count straight into Books'
+         Income Statement, and the operator's most likely action — read it, agree, move on — was the
+         one that caused it.
+         THE FIX KEEPS BOTH PROPERTIES AND NEEDS NO NEW CONTROL: a flagged row does not land, and if
+         Bar Cop guessed wrong the operator moves it into a category, which is already how "this IS
+         an operating expense" is said. `picked` is exactly that overrule, so it clears the block. */
+      const excluded = !!elsewhere && !picked;
       list.push({
-        raw: r, status: 'new', date: date, amount: amount, vendor: vendor, category: category,
-        placed: placed, badCat: badCat, elsewhere: elsewhere, notes: rowNotes,
+        raw: r, status: 'new', excluded: excluded, date: date, amount: amount, vendor: vendor,
+        category: category, placed: placed, badCat: badCat, elsewhere: elsewhere, notes: [],
         rec: { id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date: date, category: category,
                vendor: vendor, amount: amount, notes: notes, created_at: new Date().toISOString() }
       });
@@ -1476,7 +1485,13 @@ S.HubOperatingExpenses = {
     const r = this._expenseReview || { open: {} };
     const landing = s.rows.filter(x => x.lands);
     const unsorted = landing.filter(x => !x.placed);
-    const skipped = s.rows.filter(x => !x.lands);
+    /* ⛔ TWO CARDS, NOT ONE, AND THE DIFFERENCE IS WHO GETS THE LAST WORD. "Not Going In" is Bar
+       Cop's CERTAINTY — a deposit is money in, a subtotal is not a bill, that amount could not be
+       read — and the operator cannot overrule any of it. This one is Bar Cop's JUDGEMENT about where
+       a row belongs in the app, and they overrule it by moving the row into a category. Folding them
+       together would tell the operator a decision they can change is one they cannot. */
+    const elsewhere = s.rows.filter(x => !x.lands && x.status === 'new');
+    const skipped = s.rows.filter(x => !x.lands && x.status !== 'new');
     const groups = [];
     if (unsorted.length) groups.push({ key: 'unsorted', title: 'Not Sorted Yet',
       sub: unsorted.length + ' row' + (unsorted.length === 1 ? '' : 's') + ' Bar Cop could not work out',
@@ -1489,6 +1504,13 @@ S.HubOperatingExpenses = {
         sub: rows.length + ' expense' + (rows.length === 1 ? '' : 's') + ' going into ' + c,
         rows: rows, open: !!r.open[c] });
     });
+    if (elsewhere.length) {
+      // The head says what to do, because unlike Not Going In this one is answerable.
+      groups.push({ key: '__elsewhere', title: 'Not Operating Expenses',
+        sub: elsewhere.length + ' row' + (elsewhere.length === 1 ? '' : 's')
+          + ' Bar Cop tracks elsewhere. Move any into a category to include it anyway',
+        rows: elsewhere, open: !!r.open.__elsewhere });
+    }
     if (skipped.length) {
       /* The head carries the reasons, so a closed section still answers "what happened to the rest".
          ⛔ BUILT FROM THE STATUS, NOT FROM THE ROW NOTE. My first version lowercased each row's full
@@ -1504,16 +1526,16 @@ S.HubOperatingExpenses = {
         const n = by[k], w = NOUN[k] || ['row', 'rows'];
         return n + ' ' + (n === 1 ? w[0] : w[1]);
       }).join(', ');
-      /* ⛔ IT OPENS WHEN THERE IS NOTHING ELSE ON THE SCREEN. A file where NOT ONE row can be
-         imported — every amount unreadable, or a statement of nothing but deposits — otherwise
-         lands the operator on a single collapsed card and a dead button, with the reason one click
-         away and no sign that clicking is the answer. That is the whole screen refusing to say why.
-         Structural, not a threshold: no landing rows means this section IS the screen. */
       groups.push({ key: '__skip', title: 'Not Going In',
         sub: skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ': ' + why,
-        rows: skipped,
-        open: r.open.__skip === undefined ? landing.length === 0 : !!r.open.__skip });
+        rows: skipped, open: !!r.open.__skip });
     }
+    /* ⛔ SOMETHING IS ALWAYS OPEN. A file where NOT ONE row can be imported — every amount
+       unreadable, or a statement of nothing but deposits — otherwise lands the operator on a single
+       collapsed card and a dead button, with the reason one click away and nothing saying so: the
+       whole screen refusing to explain itself. Structural, and it needs no per-card special case —
+       if nothing would be open, open the first card, whichever one that turns out to be. */
+    if (groups.length && !groups.some(g => g.open)) groups[0].open = true;
     return groups;
   },
 
@@ -1523,9 +1545,14 @@ S.HubOperatingExpenses = {
     const n = this._expenseCheckedIds().length;
     const opts = this.categoryList().map(c => '<option value="' + esc(c) + '"'
       + (c === r.moveCat ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
-    return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<select id="oex-rt-cat" style="max-width:230px;"><option value="">Choose a category...</option>'
-      + opts + '</select>'
+    /* ⚠ THE REFERENCE'S OWN MARKUP, down to the wrapper. Kyle: *"the drop down isn't styled
+       correctly."* A bare `<select>` misses `.form-input`, and without the `.f` wrapper it does not
+       sit against the middle of the button beside it. Copied from `ic-product-setup`'s route
+       toolbar, including `no-print` and the centre alignment its comment argues for. */
+    return '<div class="no-print" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<div class="f" style="max-width:220px;">'
+      + '<select class="form-input" id="oex-rt-cat"><option value="">Choose a category...</option>'
+      + opts + '</select></div>'
       /* ⚠ THE COUNT IS ON THE BUTTON, so a press can never move a number the operator did not see.
          Disabled at zero for the same reason the Add button is. */
       + '<button type="button" class="btn btn-primary btn-sm" id="oex-rt-move"'
@@ -1593,10 +1620,15 @@ S.HubOperatingExpenses = {
       // Carried for the grouper's head, which needs a countable noun rather than the row's sentence.
       status: x.status,
       /* ⚠ THE OUTCOME COLUMN IS QUIET UNLESS THERE IS SOMETHING TO SAY. "Adding this expense" on
-         every row of a section headed "9 expenses going into Utilities" is the section said twice. */
-      note: x.status === 'new' ? '' : (NOTE[x.status] || ''),
+         every row of a section headed "9 expenses going into Utilities" is the section said twice.
+         ⛔ AND IT IS WHERE THE ELSEWHERE REASON LIVES. Kyle: *"the column 'what happens', what is it
+         for now? it stays empty on everything except the not going in... at least put the 'tracked
+         in labor' or 'belongs in cash outflows' in the what happens column so it is used."* It was a
+         grey sub-note under the date, which is both the wrong place and the reason it read as
+         advisory rather than as what the screen is going to do. */
+      note: x.status === 'new' ? (x.excluded ? (x.elsewhere || '') : '') : (NOTE[x.status] || ''),
       notes: x.notes || [],
-      lands: x.status === 'new'
+      lands: x.status === 'new' && !x.excluded
     };
   },
 
@@ -1695,7 +1727,11 @@ S.HubOperatingExpenses = {
     // operator chose and then did not see stored is the worst possible outcome of asking them.
     const built = this._buildExpenseRows(rows, v, opts.picks);
     const countOf = f => built.list.filter(f).length;
-    const toAdd       = built.list.filter(x => x.status === 'new').map(x => x.rec);
+    /* ⛔ `excluded` IS PART OF "DOES THIS ROW LAND", so it is filtered here and not only on the
+       screen. A guard that lives in the render is a guard that a direct import walks straight past,
+       and this door's whole failure history is money reaching Books that should not have. */
+    const toAdd       = built.list.filter(x => x.status === 'new' && !x.excluded).map(x => x.rec);
+    const elsewhere   = countOf(x => x.status === 'new' && x.excluded);
     const credits     = countOf(x => x.status === 'credit');
     const undated     = countOf(x => x.status === 'undated');
     const unreadable  = countOf(x => x.status === 'unreadable');
@@ -1789,6 +1825,10 @@ S.HubOperatingExpenses = {
       if (totalsLines) bits.push(totalsLines + ' totals row' + (totalsLines === 1 ? '' : 's')
         + ' skipped (your file' + String.fromCharCode(8217) + 's own subtotal, not an expense)');
       if (dupes > 0) bits.push(dupes + ' already logged');
+      // Named, never silent: a row Bar Cop declined to book is a row the operator can see in their
+      // file and cannot find here, which is exactly what makes them stop trusting the total.
+      if (elsewhere) bits.push(elsewhere + ' row' + (elsewhere === 1 ? '' : 's')
+        + ' left out, tracked elsewhere in Bar Cop (payroll, deliveries, draws, transfers)');
       /* ⚠ ONLY THE CONTRADICTORY FILE IS WORTH SAYING OUT LOUD. A day-first file that Bar Cop read
          correctly needs no announcement. What the operator DOES need is the case Bar Cop could not
          decide: the rows where both numbers are 12 or under are a coin toss. */
