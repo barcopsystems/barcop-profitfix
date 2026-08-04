@@ -145,7 +145,10 @@ S.ShiftDashboard = {
       + this.outlierStrip()
       + '</div>';
 
-    if (this._openStep === 'import' && this._salesMode !== 'manual') {
+    // ⚠ NOT WHILE THE CONFIRM SCREEN IS UP. Its markup replaces the whole step, so #sc-ck-import is
+    // gone and re-mounting the dropzone would hand the operator a second file picker over a file
+    // they have not finished confirming.
+    if (this._openStep === 'import' && this._salesMode !== 'manual' && !this._salesReview) {
       this.mountImport();
       if (this._optOpen && this._optOpen.server) this.mountServer();
       if (this._optOpen && this._optOpen.pmix) this.mountPmix();
@@ -285,6 +288,10 @@ S.ShiftDashboard = {
   workspace(k, isDone) {
     this._isDone = isDone;
     if (k === 'import') {
+      /* The confirm screen takes the whole step. The Import / Enter Manually toggle and the two
+         optional POS drops go with it on purpose: an operator part-way through confirming a week's
+         sales is doing one job, and the reference screen behaves the same way. */
+      if (this._salesReview) return this.salesReviewHTML();
       const seg = this._salesSeg();
       if (this._salesMode === 'manual') {
         return seg + this._manualSalesGrid()
@@ -489,8 +496,206 @@ S.ShiftDashboard = {
       fields: PosIngest.FIELDS.sales,
       confirmLabel: 'Import',
       onState: st => this._toggleBtns('sc-ck-import-btns', st),
-      onComplete: rows => this.importSales(rows)
+      /* ⛔ THE FILE DOES NOT WRITE ITSELF ANY MORE. It goes to the confirm screen, exactly as Add
+         Products does, and the Import press there is what moves responsibility for what lands from
+         Bar Cop to the operator. This door was picked to prove the pattern BECAUSE it is the worst
+         fit: rows are dates, there is nothing to recognise and nothing to decide, and `buildSales`
+         reaches eleven different outcomes that used to be flattened into one sentence printed after
+         the write. */
+      onComplete: rows => this._openSalesReview(rows)
     });
+  },
+
+  // ── The confirm screen (Kyle, 2026-08-04) ────────────────────────────────────
+  /* Same contract as `ic-product-setup`'s routing screen: nothing is written until the button, the
+     button's number is what lands, every row says what will happen to it, and a row that will not
+     land is dimmed with the reason on it. What did NOT come across is the grouping — a sales file
+     has one destination, so there is one table — and the sink-to-the-bottom order, because a week
+     is read Monday to Sunday and moving Wednesday down for coming in at $0 is harder to read, not
+     easier. Both divergences are pinned in `verify-sales-import-review.js` rather than left to drift. */
+  _openSalesReview(rows) {
+    this._salesReview = { rows: (rows || []).slice(), useTheirs: {} };
+    this._openStep = 'import';
+    this.render(this.container, this.actions);
+  },
+
+  /* ⛔ ONE WALK PRODUCES THE ROWS, THEIR STATUS AND THE COUNT. This is the property `_routeSummary`
+     was rebuilt around after the button promised 14, the table said 13 and 12 landed: if the count
+     and the per-row verdict come from two passes they can disagree, and this is the last number an
+     operator reads before pressing ([[output-honesty]]).
+     ⚠ It rebuilds from `PosIngest.build` on every render rather than caching a result. A cached
+     `toAdd` goes stale the moment anything else touches the week; the build is pure and cheap. */
+  _salesReviewSummary() {
+    const r = this._salesReview;
+    if (!r) return { days: [], count: 0, built: null };
+    const built = PosIngest.build('sales', r.rows, {});
+    /* One label per outcome, and the ones on a row that will NOT land have to be distinct — a
+       single generic "not imported" is what this screen replaces. The conflict wording is computed
+       below instead, because it depends on the operator's own answer.
+       ⚠ INSIDE the function on purpose. Written as a sibling data property it is invisible to every
+       slicer in the harness suite (they all lift METHODS by name), so the stub reads `undefined` and
+       the lifted body throws on its first row — which looks exactly like a real defect
+       ([[the-loop]] #16). Nothing else needs it, so nothing has to lift a second name. */
+    const NOTE = {
+      'new':   'Importing',
+      replace: 'Replacing earlier figures',
+      zero:    'Came in at $0, not imported',
+      nofig:   'No sales figure Bar Cop could use',
+      same:    'Already matches what is saved',
+      kept:    'You entered this day by hand and the file agrees',
+      undated: 'No readable date'
+    };
+    const days = [];
+    const add = (date, status, lands, extra) => {
+      const row = Object.assign({ date: date, status: status, lands: !!lands, notes: [] }, extra || {});
+      row.note = NOTE[status] || '';
+      days.push(row);
+      return row;
+    };
+    const byDate = {};
+    const replaced = new Set(built.replacedDates || []);
+    // A conflict day never reaches `toAdd` (the builder returns before it), so these sets cannot
+    // overlap and no day can be listed twice.
+    (built.toAdd || []).forEach(rec => { byDate[rec.date] = add(rec.date, replaced.has(rec.date) ? 'replace' : 'new', true, { rec: rec }); });
+    (built.conflicts || []).forEach(c => {
+      const chosen = !!r.useTheirs[c.key];
+      const row = add(c.date, 'conflict', chosen, { key: c.key, mine: c.mine, theirs: c.theirs });
+      row.note = chosen ? 'Using the file' : 'Keeping the figures you entered';
+      byDate[c.date] = row;
+    });
+    (built.skipped     || []).forEach(d => { byDate[d] = add(d, 'nofig', false); });
+    (built.zeroSkipped || []).forEach(d => { byDate[d] = add(d, 'zero',  false); });
+    /* ⚠ THESE TWO ROWS SHOW THE FIGURES THAT ARE ALREADY SAVED, and that is not a second source —
+       it is what the row says about itself. "Already matches what is saved" and "the file agrees"
+       both mean the file's figures and the saved ones are the same number, so the saved record IS
+       the file's figures. Left empty they rendered three dashes on a day the file had real numbers
+       for, which tells the operator nothing about the day they are looking at. The other two
+       non-landing states genuinely have nothing to show: a $0 day says so in words, and a day with
+       no usable figure has none by definition. */
+    const saved = {};
+    (this.shifts() || []).forEach(s => { if (s && s.date != null) saved[String(s.date)] = s; });
+    (built.unchanged   || []).forEach(d => { byDate[d] = add(d, 'same', false, { rec: saved[d] }); });
+    (built.keptManualDates || []).forEach(d => { byDate[d] = add(d, 'kept', false, { rec: saved[d] }); });
+
+    /* The extra lines under a day: a column the file could not give a figure for, and a guest count
+       that was taken once instead of added up. Both are assumptions the import makes on a day that
+       IS landing, so they belong on that day's row rather than in a sentence after the fact. */
+    const gaps = built.colGaps || {};
+    const COLNAME = { bar: 'Bar sales', food: 'Food sales', covers: 'Covers' };
+    ['bar', 'food', 'covers'].forEach(k => {
+      ((gaps.kept || {})[k] || []).forEach(d => { if (byDate[d]) byDate[d].notes.push(COLNAME[k] + ': no usable figure, kept what is saved'); });
+      ((gaps.zeroed || {})[k] || []).forEach(d => { if (byDate[d]) byDate[d].notes.push(COLNAME[k] + ': no usable figure, saved as zero'); });
+    });
+    (built.coversRepeated || []).forEach(d => { if (byDate[d]) byDate[d].notes.push('Every row stated the same guest count, so it was counted once'); });
+
+    // Monday to Sunday. The operator knows their week in date order and nothing else.
+    days.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    /* Rows whose date could not be read never became a day, so they have no place in the list above
+       — and leaving them out entirely is how a file quietly imports less than it looks like it did.
+       They get one entry of their own at the end, carrying the count. */
+    const nUnd = (built.undated || []).length;
+    // ⚠ The count belongs in the Day cell, ONCE. Written into the reason as well it read
+    // "1 row | 1 row has no readable date" — the same fact twice on a four-word row.
+    if (nUnd) days.push({ date: '', status: 'undated', lands: false, notes: [], count: nUnd, note: NOTE.undated });
+
+    return { days: days, count: days.filter(d => d.lands).length, built: built };
+  },
+  // ONE SOURCE with the table above it, or the button and the screen disagree.
+  _salesReviewCount() { return this._salesReview ? this._salesReviewSummary().count : 0; },
+
+  _salesReviewRowHtml(d) {
+    const money = v => (v == null ? '&mdash;' : App.fmtCurrency(v));
+    const dayLabel = ymd => {
+      const dt = new Date(ymd + 'T00:00:00');
+      return isNaN(dt.getTime()) ? ymd : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    };
+    // ⚠ THE SAME TEXT TREATMENT AS EVERY OTHER ROW. Written bare it inherited the table's default
+    // size and colour, so the one row nobody can act on was the loudest line on the screen.
+    const outcome = t => '<div style="font-size:12px;color:var(--t2);">' + esc(t) + '</div>';
+    if (d.status === 'undated') {
+      return '<tr style="opacity:0.5;"><td>' + esc(d.count + (d.count === 1 ? ' row' : ' rows')) + '</td>'
+        + '<td>&mdash;</td><td>&mdash;</td><td>&mdash;</td>'
+        + '<td>' + outcome(d.note) + '</td></tr>';
+    }
+    // The figures shown are the FILE's, because that is what the press would write. On a conflict
+    // the operator's own figures sit under the choice, so both are on screen at once.
+    const src = d.status === 'conflict' ? d.theirs : (d.rec || {});
+    const bar = src.bar_revenue, food = src.floor_revenue, cov = src.covers;
+    let last = outcome(d.note);
+    if (d.status === 'conflict') {
+      const mineText = 'You entered: ' + money(d.mine.bar_revenue) + ' bar &middot; ' + money(d.mine.floor_revenue)
+        + ' food &middot; ' + (d.mine.covers || 0) + (d.mine.covers === 1 ? ' cover' : ' covers');
+      const btn = (use, label, on) => '<button type="button" class="btn ' + (on ? 'btn-primary' : 'btn-ghost')
+        + ' btn-sm" data-salesconf="' + esc(d.key) + '" data-use="' + use + '">' + label + '</button>';
+      last += '<div style="font-size:11px;color:var(--t3);margin-top:4px;">' + mineText + '</div>'
+        + '<div class="row-actions" style="margin-top:6px;">' + btn('mine', 'Keep Mine', !d.lands) + btn('file', 'Use The File', d.lands) + '</div>';
+    }
+    const extra = (d.notes || []).map(n => '<div style="font-size:10px;color:var(--t3);letter-spacing:0.5px;margin-top:2px;">' + esc(n) + '</div>').join('');
+    return '<tr' + (d.lands ? '' : ' style="opacity:0.5;"') + '>'
+      + '<td>' + esc(dayLabel(d.date)) + extra + '</td>'
+      + '<td>' + money(bar) + '</td>'
+      + '<td>' + money(food) + '</td>'
+      + '<td>' + (cov == null ? '&mdash;' : cov) + '</td>'
+      + '<td>' + last + '</td></tr>';
+  },
+
+  salesReviewHTML() {
+    const s = this._salesReviewSummary();
+    const days = s.days;
+    const nConf = days.filter(d => d.status === 'conflict').length;
+    const nDays = days.filter(d => d.status !== 'undated').length;
+    const busy = !!this._salesReviewWriting;
+    /* ⚠ EACH PLURAL NAMES ITS OWN COLLECTION ([[the-loop]] #86): `nDays` is days read out of the
+       file, `nConf` is days needing a call, and the button counts days that will be written. Three
+       different numbers, and reading the nearest one is how a screen ends up contradicting itself. */
+    const lead = nConf
+      ? 'Bar Cop read ' + nDays + ' day' + (nDays === 1 ? '' : 's') + ' out of this file. '
+        + (nConf === 1 ? 'One of them you' : nConf + ' of them you') + ' entered by hand and the file disagrees, so pick which figures to keep. '
+        + 'Nothing is saved until you press Import.'
+      : 'Bar Cop read ' + nDays + ' day' + (nDays === 1 ? '' : 's') + ' out of this file. Check them and press Import. '
+        + 'Nothing is saved until you do.';
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">'
+      +   '<span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Check your week</span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(lead) + '</div>'
+      + '<div style="overflow-x:auto;">'
+      +   '<table class="row-list" style="table-layout:fixed;width:100%;">'
+      +   '<colgroup><col style="width:22%;"/><col style="width:15%;"/><col style="width:15%;"/><col style="width:11%;"/><col style="width:37%;"/></colgroup>'
+      +   '<thead><tr><th>Day</th><th>Bar</th><th>Food</th><th>Covers</th><th>What Happens</th></tr></thead>'
+      +   '<tbody>' + days.map(d => this._salesReviewRowHtml(d)).join('') + '</tbody></table></div>'
+      + '<div id="sc-ck-import-res"></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
+      +   '<button class="btn btn-primary btn-sm" data-salesreview-go="1"' + (s.count && !busy ? '' : ' disabled') + '>'
+      +     (busy ? 'Importing...' : 'Import ' + s.count + ' Day' + (s.count === 1 ? '' : 's')) + '</button>'
+      +   '<button class="btn btn-ghost btn-sm" data-salesreview-back="1"' + (busy ? ' disabled' : '') + '>Start Over</button>'
+      + '</div>';
+  },
+
+  /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
+     only thing a re-render cannot hand back ([[the-loop]] #85). `importSales` holds its own re-entry
+     guard as well; this one exists so the button can SAY it is working. */
+  async _runSalesReview() {
+    const r = this._salesReview;
+    if (!r || this._salesReviewWriting) return;
+    this._salesReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-salesreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Importing...'; }
+    try { await this.importSales(r.rows, { useTheirs: r.useTheirs }); }
+    finally {
+      this._salesReviewWriting = false;
+      /* ⛔ ONLY THE SUCCESS PATH CLEARS THE SCREEN, and `_doImportSales` is what clears it — a
+         refused write keeps every answer so the operator can press again without re-dropping the
+         file. Do NOT re-render here: the failure path writes into #sc-ck-import-res and a re-render
+         would destroy the only message saying what happened. */
+      if (this._salesReview) {
+        const b = this.container && this.container.querySelector('[data-salesreview-go]');
+        // ⚠ Counted ONCE into a local. Calling it twice in one expression runs the whole build twice
+        // and, on anything less deterministic, lets the number and its own plural disagree
+        // ([[harness-review-like-code]] #27).
+        const n = this._salesReviewCount();
+        if (b) { b.disabled = false; b.textContent = 'Import ' + n + ' Day' + (n === 1 ? '' : 's'); }
+      }
+    }
   },
   // opts.manual = came from the Enter Manually grid, which has no file, so it must never be told to
   // go check the file's columns, and is an EDIT (never raises a conflict against itself).
@@ -600,36 +805,30 @@ S.ShiftDashboard = {
     const res = document.getElementById('sc-ck-import-res');
     const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
     const note = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">' + m + '</div>'; };
-    // A conflict: the file disagrees with days the operator entered BY HAND. Ask which wins before
-    // writing anything ([[user-chooses-conflicts]]). Never on the manual grid — that IS the choice.
+    /* A conflict: the file disagrees with days the operator entered BY HAND. The answer arrives in
+       `opts.useTheirs`, decided ON THE ROW of the confirm screen before this ran
+       ([[user-chooses-conflicts]]). Never on the manual grid — that grid IS the choice, and
+       `buildSales` raises no conflict for it.
+       ⛔ THE MODAL IS GONE FROM THIS DOOR, deliberately, rather than kept as a fallback. Two places
+       to answer one question is the drift this codebase has paid for four times, and a branch that
+       nothing can reach reads as live coverage to the next person who greps it ([[the-loop]] #61).
+       `App.promptImportConflicts` itself stays — the cash and per-server doors still use it, and
+       they are next in the rollout.
+       ⚠ NO ANSWER MEANS KEEP YOUR OWN, which is the same default the prompt had. That is the safe
+       direction: a caller that somehow reaches here without the screen can never overwrite an
+       operator's own figures without being asked. */
     const extra = []; let usedTheirs = 0;
     if (conflicts && conflicts.length) {
-      const money = v => v == null ? '—' : '$' + (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const dayLabel = d => { const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
-      const salesText = v => {
-        const parts = [];
-        if (v.bar_revenue != null) parts.push('Bar ' + money(v.bar_revenue));
-        if (v.floor_revenue != null) parts.push('Food ' + money(v.floor_revenue));
-        if (v.covers != null) parts.push(v.covers + (v.covers === 1 ? ' cover' : ' covers'));
-        return parts.join(' · ') || '—';
-      };
-      const r = await App.promptImportConflicts({
-        title: 'Some days were entered by hand',
-        intro: 'This file has different sales for ' + conflicts.length + ' day' + (conflicts.length === 1 ? '' : 's')
-             + ' you already entered by hand. Pick which figures to keep. Your own are kept unless you choose the file, and only the columns this file carries are changed.',
-        rowLabel: 'Day', colMine: 'You entered', colTheirs: 'This file',
-        rows: conflicts.map(c => ({ key: c.key, label: dayLabel(c.date), mineText: salesText(c.mine), theirsText: salesText(c.theirs) }))
-      });
-      if (!r.confirmed) { note('Import cancelled. Nothing was changed.'); return; }
-      conflicts.forEach(c => { if (r.useTheirs.has(c.key)) { extra.push(c.useRec); usedTheirs++; } });
+      const chosen = opts.useTheirs || {};
+      conflicts.forEach(c => { if (chosen[c.key]) { extra.push(c.useRec); usedTheirs++; } });
       /* ⚠ A CONFLICT DAY THE OPERATOR KEPT IS A DAY THE IMPORT DID NOT TOUCH, so its gap note reads
          as a second, separate event: "1 day kept as you entered it" AND "Food sales had no usable
          figure on 1 day, so that day kept the figures already saved" — both true, both about the
          same day, and together they sound like two things happened. The builder cannot know this;
-         only the answer to the prompt decides it. A day resolved as USE THE FILE keeps its note,
+         only the operator's answer decides it. A day resolved as USE THE FILE keeps its note,
          because there the unusable column really does stay at the prior figure and that is exactly
          what the operator needs to know about the choice they just made. */
-      conflicts.forEach(c => { if (!r.useTheirs.has(c.key)) keptConflictDates.add(c.date); });
+      conflicts.forEach(c => { if (!chosen[c.key]) keptConflictDates.add(c.date); });
     }
     ['bar', 'food', 'covers'].forEach(k => {
       const list = ((colGaps || {}).kept || {})[k];
@@ -756,6 +955,11 @@ S.ShiftDashboard = {
       return;
     }
     if (App.markSetupDone) App.markSetupDone('gs_sc_shift');
+    /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. A refused write returns above
+       this line with the screen and every answer still up, so the operator presses Import again
+       rather than re-dropping the file and re-making their choices. Cleared here rather than in the
+       caller because THIS is the only line that knows the write landed. */
+    this._salesReview = null;
     this.setDone('import', true);   // a cockpit import is a deliberate "the week is in" action
     /* ⚠⚠ SAY SO WHEN THIS LANDED INSIDE A WEEK ALREADY CONFIRMED (S281). Nothing here was blocked
        and nothing was lost — Confirm the Week stores its own figures on the `week` / `revenue_week`
@@ -1522,6 +1726,22 @@ S.ShiftDashboard = {
       const sm = ev.target.closest('[data-salesmode]');
       if (sm) { this._salesMode = sm.dataset.salesmode; this._openStep = 'import'; this.render(this.container, this.actions); return; }
       if (ev.target.closest('[data-savesales]')) { this.saveManualSales(); return; }
+      /* The one decision the sales confirm screen asks, answered ON THE ROW rather than in a modal
+         stacked on top of the write. Writes state and re-renders, so the button count, the row and
+         what gets written all read from the same place ([[user-chooses-conflicts]]). */
+      const sconf = ev.target.closest('[data-salesconf]');
+      if (sconf && this._salesReview) {
+        const key = sconf.dataset.salesconf;
+        if (sconf.dataset.use === 'file') this._salesReview.useTheirs[key] = true;
+        else delete this._salesReview.useTheirs[key];
+        this.render(this.container, this.actions); return;
+      }
+      if (ev.target.closest('[data-salesreview-go]')) { this._runSalesReview(); return; }
+      if (ev.target.closest('[data-salesreview-back]')) {
+        // Back to the drop zone, not out of the step. A mapping belongs to the file it was made
+        // for, so the file is re-dropped from scratch — nothing was written to undo.
+        this._salesReview = null; this.render(this.container, this.actions); return;
+      }
       const opt = ev.target.closest('[data-opt]');
       if (opt) { const key = opt.dataset.opt; this._optOpen = this._optOpen || {}; this._optOpen[key] = !this._optOpen[key]; this.render(this.container, this.actions); return; }
       const head = ev.target.closest('.sc-step-head');
