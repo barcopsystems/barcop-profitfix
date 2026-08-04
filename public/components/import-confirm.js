@@ -72,6 +72,38 @@ const ImportConfirm = {
     return shown + this.sub('you entered ' + yours);
   },
 
+  /* ⛔⛔ THE FIRST DROP IS THE CASE THAT MATTERS, AND IT IS BIG (Kyle, 2026-08-04): *"nobody is
+     dropping a file to add a couple of menu items... what has to work and be right on most all of
+     these is the initial first large drop."* Every screen here had been measured on six to nine rows
+     against SEEDED data. Measured properly — 240 menu items onto an EMPTY menu, 80 staff onto an
+     empty roster — a flat table failed three ways at once:
+       - the Add button sat under 240 rows of table, so the primary action was below the fold;
+       - the 13 rows needing a look were scattered from row 33 to row 240, so finding them meant
+         reading the whole file;
+       - and on a genuine first drop the notes became wallpaper: 77 of 80 staff rows carried
+         "Position not on your list", because a new operator has no positions yet.
+     A section that is collapsed fixes the first two at once, which is why Add Products was built
+     that way before any of this started and why the flat table only ever looked fine at six rows. */
+  _section(title, sub, tableHtml, collapsed, first) {
+    /* ⚠ NO NEW CSS. `.card.collapsed .collapse-body{display:none}` and `.card.collapsed
+       .card-chevron{transform:rotate(-90deg)}` both already ship, so putting `collapsed` on the CARD
+       gives the hide AND the chevron for free — the same reasoning that kept the Add Products
+       rebuild from needing a stylesheet change.
+       ⚠ The toggle is inline and touches no app state on purpose: a shell that held collapse state
+       would need every door to thread it through a re-render, and a collapse that resets when the
+       screen redraws is the correct behaviour anyway. */
+    return '<div class="card' + (collapsed ? ' collapsed' : '') + '" style="padding:0;container-type:inline-size;margin-top:'
+      + (first ? '0' : '16') + 'px;">'
+      + '<div onclick="this.parentNode.classList.toggle(\'collapsed\')" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      +   '<div style="flex:1;min-width:0;">'
+      +   '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(title) + '</div>'
+      +   '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + esc(sub) + '</div></div>'
+      +   '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
+      + '</div>'
+      + '<div class="collapse-body"><div style="padding:0 16px 16px;overflow-x:auto;">' + tableHtml + '</div></div>'
+      + '</div>';
+  },
+
   _rowHtml(row) {
     /* ⛔ DIM MEANS "YOU CAN LEAVE THIS ALONE", so a row waiting on the operator is
        never dimmed even though it will not land as things stand. Keyed on `lands`
@@ -117,6 +149,50 @@ const ImportConfirm = {
       + cols.map(c => '<th>' + esc(c.label || '') + '</th>').join('')
       + '<th>' + esc(opts.outcomeLabel || 'What Happens') + '</th></tr></thead>';
 
+    /* ⛔ LIFT THE NOTES EVERY LANDING ROW SHARES. See the render below for why. Computed off the
+       LANDING rows only: a note on the rows that will not land is about those rows, and there is no
+       "all of them" to speak of. */
+    const landing = rows.filter(r => r && r.lands);
+    const universal = landing.length > 1
+      ? (landing[0].notes || []).filter(note => landing.every(r => (r.notes || []).indexOf(note) >= 0))
+      : [];
+    const shown = universal.length
+      ? rows.map(r => Object.assign({}, r, { notes: (r.notes || []).filter(x => universal.indexOf(x) < 0) }))
+      : rows;
+
+    const table = list => '<table class="row-list" style="table-layout:fixed;width:100%;">'
+      + colgroup + head + '<tbody>' + list.map(r => this._rowHtml(r)).join('') + '</tbody></table>';
+
+    /* ⛔ WHAT NEEDS THE OPERATOR COMES FIRST AND STAYS OPEN; WHAT BAR COP WORKED OUT COLLAPSES.
+       On a 240-row first drop the thirteen rows needing a look ran from row 33 to row 240, so
+       finding them meant reading the whole file, and the Add button sat below all 240. Collapsing
+       the settled section fixes both, and it is what Add Products has always done.
+       ⚠ `flat` is for a door whose rows are BOUNDED and ORDERED — the sales week is seven days read
+       Monday to Sunday, and splitting it would be worse. That is a fact about the door, not a row
+       count, so the door states it rather than the shell guessing a threshold. */
+    let body;
+    if (opts.flat) {
+      body = '<div class="card" style="container-type:inline-size;">'
+        + '<div style="overflow-x:auto;">' + table(shown) + '</div></div>';
+    } else {
+      const needs = shown.filter(r => !r.lands || (r.notes || []).length || r.needsYou);
+      const settled = shown.filter(r => !(!r.lands || (r.notes || []).length || r.needsYou));
+      body = '';
+      if (needs.length) {
+        body += this._section(opts.needsLabel || 'Needs A Look',
+          needs.length + ' row' + (needs.length === 1 ? '' : 's') + ' to check before you add',
+          table(needs), false, true);
+      }
+      if (settled.length) {
+        body += this._section((verb === 'Add' ? 'Going In' : verb),
+          settled.length + ' ' + (settled.length === 1 ? noun : (opts.nounPlural || noun + 's')) + ' Bar Cop worked out',
+          table(settled), true, !needs.length);
+      }
+      // A file with nothing in it at all still needs a table, or the screen is a lead and a button.
+      if (!body) body = '<div class="card" style="container-type:inline-size;">'
+        + '<div style="overflow-x:auto;">' + table(shown) + '</div></div>';
+    }
+
     return (opts.label
         ? '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">'
           + '<span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">'
@@ -127,11 +203,17 @@ const ImportConfirm = {
          paints its row fill invisibly against its own container and the rows read
          as loose text. Measured on the live build. Inside a `.card` (#08131A) the
          fill lands exactly as it does on the Inventory product list. */
-      + '<div class="card" style="container-type:inline-size;">'
-      +   '<div style="overflow-x:auto;">'
-      +   '<table class="row-list" style="table-layout:fixed;width:100%;">'
-      +   colgroup + head
-      +   '<tbody>' + rows.map(r => this._rowHtml(r)).join('') + '</tbody></table></div></div>'
+      + (universal.length
+          /* ⛔ A NOTE CARRIED BY EVERY LANDING ROW IS A FACT ABOUT THE FILE, NOT ABOUT A ROW, and
+             repeating it once per row buries the notes that ARE exceptions. Measured on a real first
+             drop: 77 of 80 staff rows said "Position not on your list" because the operator had not
+             set up positions yet, and the eleven rows that also said "No pay set" were lost in it.
+             ⚠ EVERY, not "most". A threshold would be a number fitted to whichever file I happened
+             to be holding; "all of them" is structural and needs no number. */
+          ? '<div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:14px;">All '
+            + n + ' of these: ' + universal.map(esc).join(' &middot; ') + '</div>'
+          : '')
+      + body
       /* ⛔ ALWAYS RENDER THE RESULT SLOT. A refused write reports into it, and a
          message with nowhere to render is the worst outcome an import has: the
          operator sees a clean page and no error at all. */
