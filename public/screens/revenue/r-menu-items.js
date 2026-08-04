@@ -587,6 +587,16 @@ S.RevenueMenuItems = {
 
     /* The confirm screen's two controls. Both write state and re-render, so the button's count, the
        rows and what gets written all read from the same place. */
+    /* A section head opens or closes its own table. A closed section renders no rows at all, so this
+       is what actually builds them. Bound per head rather than delegated, matching how the rest of
+       this screen wires its controls. */
+    this.container.querySelectorAll('[data-confirm-section]').forEach(h =>
+      h.addEventListener('click', () => {
+        if (!this._menuReview) return;
+        const k = h.dataset.confirmSection;
+        this._menuReview.open[k] = (k === 'needs') ? (this._menuReview.open[k] === false) : !this._menuReview.open[k];
+        this.renderLanding();
+      }));
     this.container.querySelector('[data-menureview-go]')?.addEventListener('click', () => this._runMenuReview());
     this.container.querySelector('[data-menureview-back]')?.addEventListener('click', () => {
       // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
@@ -1472,7 +1482,7 @@ S.RevenueMenuItems = {
   },
 
   _openMenuReview(rows) {
-    this._menuReview = { rows: (rows || []).slice() };
+    this._menuReview = { rows: (rows || []).slice(), open: {} };
     this.renderLanding();
   },
 
@@ -1554,6 +1564,8 @@ S.RevenueMenuItems = {
       verb: 'Add', noun: 'Item',
       goAttr: 'data-menureview-go', backAttr: 'data-menureview-back', backLabel: 'Start Over',
       resultId: 'mi-imp-result',
+      // The door owns which sections are open; a closed one builds no table at all.
+      open: (this._menuReview || {}).open,
       busy: !!this._menuReviewWriting
     });
   },
