@@ -217,8 +217,20 @@ const ImportConfirm = {
           needsOpen ? table(needs) : '', needsOpen, true, 'needs');
       }
       if (settled.length) {
+        /* ⛔ "BAR COP WORKED OUT" IS A CLAIM, AND IT IS NOT TRUE ON EVERY DOOR. On operating
+           expenses the settled rows are the ones Bar Cop read perfectly and CANNOT tell you belong
+           here at all: a bank register lists payroll, COGS, owner draws and transfers beside the
+           rent, and that is the one fact the file does not carry. So the head said "64 Expenses Bar
+           Cop worked out" directly under a lead saying "remove anything tracked elsewhere" — two
+           things on screen disagreeing, with the 64 rows collapsed behind the one that says there is
+           nothing to do. Measured on a real month: pressing Add without opening it books $122,586.03
+           against a truth of $28,503.63.
+           The section stays COLLAPSED, because the button below 200 rows of table is a measured
+           defect of its own. What changes is that a door may say what is actually in there. */
         body += this._section((verb === 'Add' ? 'Going In' : verb),
-          settled.length + ' ' + (settled.length === 1 ? noun : (opts.nounPlural || noun + 's')) + ' Bar Cop worked out',
+          opts.settledSub
+            ? settled.length + ' ' + (settled.length === 1 ? noun : (opts.nounPlural || noun + 's')) + ' ' + opts.settledSub
+            : settled.length + ' ' + (settled.length === 1 ? noun : (opts.nounPlural || noun + 's')) + ' Bar Cop worked out',
           settledOpen ? table(settled) : '', settledOpen, !needs.length, 'settled');
       }
       // A file with nothing in it at all still needs a table, or the screen is a lead and a button.
