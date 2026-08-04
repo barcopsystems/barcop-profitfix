@@ -2013,6 +2013,15 @@ S.RevenueMenuItems = {
        ⚠ ONLY ON SUCCESS. Every failure exit above returns before this line, so a rolled-back write
        and a whole-file refusal both leave the panel open: that is where the operator fixes the file
        and drops it again, and closing it would read as "that worked". */
+    /* ⛔⛔ THE CONFIRM SCREEN CLOSES TOO, AND FORGETTING THIS LOCKED THE WHOLE PAGE (Kyle, one click).
+       `renderLanding` picks the review panel ahead of everything else, so leaving `_menuReview` set
+       after a successful write meant the items landed, the tab count went to 96, the tabs rendered —
+       and every one of them re-rendered the same import list. A screen with no way out.
+       ⚠ I added this clear to the vendor door and the staff door and missed it here. Same fix, same
+       line, third door: the pin below now asserts it on every door's success path.
+       ⚠ ONLY ON SUCCESS, like `_importOpen`: every failure exit returns above this line, and a
+       refused write has to keep the screen so the operator can press again. */
+    this._menuReview = null;
     this._importOpen = false;
     this.activeTab = this.activeType;
     this.renderLanding();
