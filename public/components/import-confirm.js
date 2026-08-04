@@ -274,11 +274,15 @@ const ImportConfirm = {
         + '<div style="overflow-x:auto;">' + table(shown) + '</div></div>';
     }
 
-    return (opts.label
-        ? '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">'
-          + '<span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">'
-          + esc(opts.label) + '</span></div>' : '')
-      + (opts.lead ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(opts.lead) + '</div>' : '')
+      /* ⚠ `card-title`, WHICH IS WHAT THE REFERENCE USES AND WHAT CARRIES THE RULE UNDER IT (Kyle,
+         2026-08-04: *"operating expenses still doesn't match add products... needs the divider
+         line"*). It was a hand-rolled span at a different size, weight and letter-spacing, so every
+         confirm screen in the rollout read as a near-miss of the door they were copied from.
+         ⚠ BLAST RADIUS, STATED: this is the shared shell, so vendors, staff, menu items and
+         sales-by-day all gain the same rule. That is the point of the shell — the alternative is one
+         door matching Add Products and four not. */
+    return (opts.label ? '<div class="card-title">' + esc(opts.label) + '</div>' : '')
+      + (opts.lead ? '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin:0 0 18px;">' + esc(opts.lead) + '</div>' : '')
       /* ⛔ THE CARD IS LOAD-BEARING, NOT DECORATION. `.row-list tbody td` is
          #0D181E and a cockpit step workspace is #0D181E too, so a bare table
          paints its row fill invisibly against its own container and the rows read
