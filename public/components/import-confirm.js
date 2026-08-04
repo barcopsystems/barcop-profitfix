@@ -109,7 +109,7 @@ const ImportConfirm = {
       + '</div>';
   },
 
-  _rowHtml(row) {
+  _rowHtml(row, removable) {
     /* ⛔ DIM MEANS "YOU CAN LEAVE THIS ALONE", so a row waiting on the operator is
        never dimmed even though it will not land as things stand. Keyed on `lands`
        alone it greyed out the one row that needed them while it waited, and
@@ -119,9 +119,24 @@ const ImportConfirm = {
     const notes = (row.notes || []).map(n => this.sub(esc(n))).join('');
     const cells = (row.cells || []).map((c, i) =>
       '<td>' + (c == null ? '&mdash;' : c) + (i === 0 ? notes : '') + '</td>').join('');
+    /* ⛔ REMOVAL LIVES ON THE ROW (Kyle, 2026-08-04: *"why doesn't this have the remove buttons like
+       add products?"*). Add Products used to have a BULK "Not a product" button and it took his
+       entire import, because it reached past what was on screen. A control rendered on the row can
+       only ever act on a row he is looking at, by name — the fix is structural, not a filter.
+       No confirm: nothing is written until the final button, the row is named right beside it, and
+       Start Over re-drops the file.
+       ⚠ A row with no `key` gets no button. There would be nothing for the door to remove BY, and a
+       control that does nothing is worse than no control ([[the-loop]] #106). */
+    const rm = removable
+      ? '<td>' + (row.key != null && row.key !== ''
+          ? '<div class="row-actions"><button type="button" class="btn btn-ghost btn-sm"'
+            + ' data-confirm-remove="' + esc(row.key) + '">Remove</button></div>'
+          : '') + '</td>'
+      : '';
     return '<tr' + (dim ? ' style="opacity:0.5;"' : '') + '>'
       + cells
-      + '<td>' + this.outcome(row.note || '') + (row.decision || '') + '</td></tr>';
+      + '<td>' + this.outcome(row.note || '') + (row.decision || '') + '</td>'
+      + rm + '</tr>';
   },
 
   panel(opts) {
@@ -145,14 +160,21 @@ const ImportConfirm = {
     /* ⛔ THE LAST COLUMN TAKES WHAT IS LEFT, so the colgroup always sums to 100.
        A colgroup that does not silently rescales every column, and on a grouped
        screen the sections then stop lining up with each other. */
+    // The Remove column takes a fixed slice and the outcome column takes what is left, so the
+    // colgroup sums to 100 whether or not the door asked for Remove.
+    const removable = !!opts.removable;
+    const rmW = removable ? 10 : 0;
     const used = cols.reduce((t, c) => t + (Number(c.width) || 0), 0);
-    const outW = Math.max(0, 100 - used);
+    const outW = Math.max(0, 100 - used - rmW);
     const colgroup = '<colgroup>'
       + cols.map(c => '<col style="width:' + (Number(c.width) || 0) + '%;"/>').join('')
-      + '<col style="width:' + outW + '%;"/></colgroup>';
+      + '<col style="width:' + outW + '%;"/>'
+      + (removable ? '<col style="width:' + rmW + '%;"/>' : '') + '</colgroup>';
+    // ⚠ The header gains a cell too, or every row below it is off by one.
     const head = '<thead><tr>'
       + cols.map(c => '<th>' + esc(c.label || '') + '</th>').join('')
-      + '<th>' + esc(opts.outcomeLabel || 'What Happens') + '</th></tr></thead>';
+      + '<th>' + esc(opts.outcomeLabel || 'What Happens') + '</th>'
+      + (removable ? '<th></th>' : '') + '</tr></thead>';
 
     /* ⛔ LIFT THE NOTES EVERY LANDING ROW SHARES. See the render below for why. Computed off the
        LANDING rows only: a note on the rows that will not land is about those rows, and there is no
@@ -166,7 +188,7 @@ const ImportConfirm = {
       : rows;
 
     const table = list => '<table class="row-list" style="table-layout:fixed;width:100%;">'
-      + colgroup + head + '<tbody>' + list.map(r => this._rowHtml(r)).join('') + '</tbody></table>';
+      + colgroup + head + '<tbody>' + list.map(r => this._rowHtml(r, removable)).join('') + '</tbody></table>';
 
     /* ⛔ WHAT NEEDS THE OPERATOR COMES FIRST AND STAYS OPEN; WHAT BAR COP WORKED OUT COLLAPSES.
        On a 240-row first drop the thirteen rows needing a look ran from row 33 to row 240, so
