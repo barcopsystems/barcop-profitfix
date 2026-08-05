@@ -118,6 +118,8 @@ S.HubBooks = {
     const netRevM = P.netRev, netRevY = PY.netRev;
     const grossM = P.gross, grossY = PY.gross;
     const opIncM = P.opInc, opIncY = PY.opInc;
+    // Money logged but not yet given a category. Kept off every line above; stated below the total.
+    const uncatM = this._uncategorizedTotal(monthKey, false), uncatY = this._uncategorizedTotal(monthKey, true);
 
     const sec = t => '<tr class="pnl-sec"><td colspan="3">' + t + '</td></tr>';
     const line = (label, m, y, o) => {
@@ -159,6 +161,15 @@ S.HubBooks = {
       + this._opExStatementLines(this._opExUnion(opexM, opexY)).map(l =>
           line(l.label, this._opExLineValue(l, opexM, M), this._opExLineValue(l, opexY, YTD), { sub: 1 })).join('')
       + line('Total Operating Expenses', totalOpExM, totalOpExY, { bold: 1, border: 1 })
+      /* ⭐⭐ WHAT IS NOT IN THAT TOTAL, SAID OUT LOUD (Phase 3 item 15). Money the operator logged
+         but has not given a category to is deliberately kept off every line above — Bar Cop cannot
+         name the deduction, so it does not take it. But an operator reconciling this statement
+         against their bank would find a gap and no explanation, and a silent gap reads as a bug in
+         Bar Cop. It prints BELOW the total and outside it, so nothing here can be mistaken for a
+         deduction, and it renders only when there is something to say. */
+      + (uncatM || uncatY
+        ? line('Uncategorized (not on this statement yet)', uncatM, uncatY, { sub: 1, col: 'var(--t3)' })
+        : '')
       + line('Operating Income (before taxes)', opIncM, opIncY, { bold: 1, border: 1, col: opIncCol })
       + sec('Key Cost Ratios')
       + line('Pour Cost %', M.barRev ? (M.barCogs / M.barRev) : null, YTD.barRev ? (YTD.barCogs / YTD.barRev) : null, { sub: 1, pct: 1 })
@@ -2091,6 +2102,26 @@ S.HubBooks = {
     }
     return out;
   },
+  /* ⭐⭐ WHAT THE STATEMENT IS NOT COUNTING, SO IT CAN SAY SO. The operator reconciles the P&L
+     against their bank; money that leaves the document without a word reads as a bug in Bar Cop,
+     which is the same honesty defect as counting it would be, pointing the other way.
+     ⚠ SAME PERIOD RULE AS `_opExSums` — year-to-date is year-only and capped at the month being
+     read, matching `_sumYTD` and the log's own YTD chip. A different rule here would print an
+     exclusion that does not match the statement it sits under. */
+  _uncategorizedTotal(monthKey, ytd) {
+    const OEX = (typeof window !== 'undefined' && window.S && S.HubOperatingExpenses) || null;
+    if (!OEX || typeof OEX.isUncategorizedRow !== 'function') return 0;
+    const year = String(monthKey || '').slice(0, 4);
+    return ((App.data && App.data.operating_expenses) || [])
+      .filter(r => OEX.isUncategorizedRow(r) && !OEX.isCashOnlyCategory(r && r.category))
+      .filter(r => {
+        const mk = String((r && r.date) || '').slice(0, 7);
+        if (!mk) return false;
+        return ytd ? (mk.slice(0, 4) === year && mk <= monthKey) : (mk === monthKey);
+      })
+      .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  },
+
   _opExSums(monthKey, ytd) {
     const out = {};
     /* ⭐⭐ ONE CANONICAL LIST, AND IT IS NOW THE OPERATOR'S OWN (2026-08-04). The comment that used
@@ -2107,14 +2138,38 @@ S.HubBooks = {
       'Occupancy (Rent, Property Tax)', 'Utilities', 'Insurance', 'Marketing and Advertising',
       'Professional Fees', 'Bank and Credit Card Fees', 'Licenses and Permits', 'Software and Subscriptions', 'Other'
     ]);
-    known.forEach(k => { out[k] = 0; });
+    /* ⛔ THE SEED IS THE OPERATOR'S CATEGORY LIST, AND THAT LIST NOW LEADS WITH "Uncategorized" when
+       any uncategorised money is on file — a DISPLAY bucket for the log's card, not a deductible
+       category. Seeding it here put a synthetic key into the map every P&L consumer reads. It was
+       worth $0 (the records are filtered below) and both downstream sweeps drop keys under half a
+       cent, so nothing was mis-deducted — but a synthetic bucket sitting in the P&L map held out
+       only by an epsilon filter is a landmine, and the next reader to sum the map by hand steps on
+       it. The key set here means "categories that can be deducted", so it says exactly that.
+       ⚠ The label is DERIVED from the one shared rule (`_catOf` of a row with no category), never
+       repeated as a literal, so the two cannot drift apart. */
+    const uncatLabel = (OEX && typeof OEX._catOf === 'function') ? OEX._catOf({}) : 'Uncategorized';
+    known.filter(k => k !== uncatLabel).forEach(k => { out[k] = 0; });
     /* ⛔ OPERATING expenses only. Since the one-ledger merge this array also holds owner draws,
        loan payments and tax remittances, and bucketing them by `_catOf` put keys like "Owner Draw"
        into this map. Nothing PRINTED them — `_opExStatementLines` filters and `_plParts` totals
        that same walk — so the containment was one careless `Object.values(opex)` away from putting
        an owner's draw on the P&L. Filter at the source, where the question is asked. */
+    /* ⛔⛔ AND UNCATEGORISED ROWS ARE FILTERED HERE TOO (Phase 3 item 15), for a DIFFERENT reason
+       than the cash-only rows beside them. A draw is not a cost of running the bar. An uncategorised
+       row might be any cost at all — Bar Cop simply does not know yet, and a deduction it cannot
+       name is not a deduction it should take on a document with IRS line numbers on it.
+       ⭐ FILTERING AT THE SOURCE IS WHAT MAKES THIS ONE EDIT. Every P&L consumer reads this map:
+       `_opExStatementLines` builds the lines from it, `_plParts.totalOpEx` sums that same walk so
+       operating income follows on all six routes, and every Schedule C line — including 27a, which
+       sweeps up any key it does not name by hand — reads `_opExSums` directly. A filter in any one
+       of those would have been the one-reader-at-a-time shape that cost three rounds last chat.
+       ⚠ THE EXPENSE SCREEN DELIBERATELY DOES NOT FILTER THEM. That is the third state: this money
+       is off the P&L but LOUD on the log, because somebody has to come back and sort it, and a row
+       nobody can see is a row nobody fixes. `_uncategorizedTotal` below is what keeps the gap
+       between the two figures stated rather than silent. */
     const records = (App.data?.operating_expenses || [])
-      .filter(r => !S.HubOperatingExpenses.isCashOnlyCategory(r && r.category));
+      .filter(r => !S.HubOperatingExpenses.isCashOnlyCategory(r && r.category))
+      .filter(r => !S.HubOperatingExpenses.isUncategorizedRow(r));
     const year = monthKey.slice(0, 4);
     records.forEach(r => {
       const mk = String(r.date || '').slice(0, 7);

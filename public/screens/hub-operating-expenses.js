@@ -457,6 +457,22 @@ S.HubOperatingExpenses = {
      ⛔ THE TEST IS ORDER-INDEPENDENT ON PURPOSE. A phantom child stays hidden by its own
      `recurring_parent`, whether or not `repairGeneratedCashRows` has managed to delete it yet — so a
      refused repair can never put phantom money on the P&L. */
+  /* ⭐⭐⭐ PHASE 3 ITEM 15. AN UNCATEGORISED EXPENSE IS A ROW WITH NO CATEGORY. Nothing is stored to
+     say so, and that is deliberate: the app already renders **"Uncategorized"** as a synthetic
+     heading for a record with no category (`App.groupByCategory`, app.js), so this follows a
+     convention rather than inventing a reserved name for an operator to collide with, and it needs
+     no migration.
+     ⛔ WHY IT EXISTS. The importer used to end `picked || named || learned || 'Other'`, and 'Other'
+     is ALSO the ninth category an operator deliberately picks, which Books prints as "Other
+     operating expenses" and Schedule C deducts on 27a. So a row Bar Cop could not place and a row
+     the operator filed under Other were the same record, and nothing downstream could tell them
+     apart. Unclassified money became a real deduction on the one document carrying IRS line numbers.
+     ⭐ IT IS A THIRD STATE, NOT A SECOND CASH-ONLY, and the difference is the whole design:
+       operating      counts on the P&L      shows on this screen
+       cash-only      no                     no, it belongs to Cash Outflows
+       uncategorised  NO                     YES, loudly, because somebody has to come back and fix it
+     A row nobody can see is a row nobody fixes ([[the-loop]] #115). */
+  isUncategorizedRow(r) { return !String((r && r.category) || '').trim(); },
   _isOperatingRow(r) {
     if (!r) return false;
     if (!this.isCashOnlyCategory(r.category)) return true;
@@ -529,7 +545,7 @@ S.HubOperatingExpenses = {
     this.records().forEach(r => {
       if (r && String(r.category || '').trim() && !this.isCashOnlyCategory(r.category)) push(r.category);
     });
-    // 'Other' is where a record with no category at all lands, so it is always a row.
+    // 'Other' is a real category the operator picks, and the card has always ended with it.
     push('Other');
     /* ⚠ AND IT IS ALWAYS THE LAST ROW. Other is the catch-all, the card has always ended with it,
        and a real category printed underneath it reads like a subtotal line that is not one. Added
@@ -537,11 +553,34 @@ S.HubOperatingExpenses = {
        reading a passing assertion's `got=`, not by any assertion. */
     const oi = out.findIndex(c => c.toLowerCase() === 'other');
     if (oi >= 0 && oi !== out.length - 1) out.push(out.splice(oi, 1)[0]);
+    /* ⛔⛔ AND UNCATEGORISED MONEY GETS A ROW, AT THE TOP, WHENEVER ANY EXISTS (Phase 3 item 15).
+       Found scanning this change: `_byCatCardHtml` builds its rows from THIS list, so a bucket that
+       is computed but not listed is money the card silently drops — and the card sits directly under
+       "This Month", which DOES count it. That is the same shape as "Logged This Year" reading
+       $108,820.04 against a $69,820.04 page: two figures on one screen covering different sets, with
+       nothing saying so ([[the-loop]] #109).
+       ⭐ FIRST, not last, because it is the only row on the card that is a JOB. Everything else is a
+       record of what happened; this one is a question waiting for an answer, and the confirm screen
+       already orders itself that way ("what Bar Cop could not place sits at the top").
+       ⚠ Only when some exists, so a tidy account never sees the row at all. */
+    if (this.records().some(r => this.isUncategorizedRow(r) && !this.isCashOnlyCategory(r && r.category))) {
+      out.unshift('Uncategorized');
+    }
     return out;
   },
   /* ⛔ BUCKET BY THE RECORD'S OWN CATEGORY. Only a record with NO category falls to Other — that is
      the one thing Other is for, and it is what the importer's own fallback writes. */
-  _catOf(r) { return String((r && r.category) || '').trim() || 'Other'; },
+  /* ⭐ THE DISPLAY BUCKET. A row with no category reads as **Uncategorized**, the same synthetic
+     heading `App.groupByCategory` already gives a record with no category everywhere else in the
+     app — never a stored value. It used to fall to 'Other', which is what let unclassified money
+     hide inside a real, deductible P&L line.
+     ⛔ ONE RULE, SHARED. Books' roll-up buckets through this same member, so the By Category card
+     and the Income Statement cannot disagree about where a dollar went.
+     ⚠ THE LABEL IS INSIDE THE FUNCTION, NOT A SIBLING CONSTANT (integrity #16). Every slicer in the
+     harness suite lifts METHODS by name, so a `UNCATEGORIZED_LABEL:` data property beside this one
+     would be invisible to all of them and kill the stub on correct code. Nothing else needs the
+     string: everything buckets through this member. */
+  _catOf(r) { return String((r && r.category) || '').trim() || 'Uncategorized'; },
   _sumMonthByCategory(monthKey) {
     const out = {};
     this.categoryList().forEach(c => { out[c] = 0; });
@@ -1943,7 +1982,14 @@ S.HubOperatingExpenses = {
          on the NEXT drop, which is the half that compounds. */
       const picked = (picks && r && r._rid != null) ? (picks[r._rid] || '') : '';
       const learned = (picked || named) ? '' : this._categoryForVendor(vendor);
-      const category = picked || named || learned || 'Other';
+      /* ⛔⛔ THE FALLBACK IS EMPTY, NOT 'Other' (Phase 3 item 15). 'Other' is a category the operator
+         deliberately picks, and Books prints it as "Other operating expenses" while Schedule C
+         deducts it on 27a — so filing an unplaceable row there made a row Bar Cop could not read
+         and a row the operator chose into the SAME RECORD. Press Add without sorting the Not Sorted
+         Yet section and unclassified money became a real deduction, silently. An empty category is
+         the honest answer: it says "we do not know" by the absence of a value, and
+         `isUncategorizedRow` is what keeps it off the P&L until somebody sorts it. */
+      const category = picked || named || learned || '';
       // Did anything actually place this row, or did it fall through to Other? That is the whole
       // question "Not Sorted Yet" asks, so the walk answers it rather than the render guessing.
       const placed = !!(picked || named || learned);
