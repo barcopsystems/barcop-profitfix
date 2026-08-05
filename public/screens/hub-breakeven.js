@@ -104,7 +104,18 @@ S.HubBreakEven = {
     const varLabor = hourlyLabor + catLabor;
     const varRate = netRev > 0 ? (cogs + varLabor) / netRev : null;
 
-    const opex = (App.data && App.data.operating_expenses) || [];
+    /* ⛔⛔ THE NUT IS OPERATING BILLS ONLY, AND A CASH-ONLY ROW IS NOT ONE (2026-08-04, my miss,
+       found by Kyle on the live app). The outflow migration put every cash outflow into this array
+       carrying its `recurring` fields, so a recurring owner draw, loan payment and tax remittance
+       all entered the nut. The loan payment entered it TWICE — once here, once through `debtAnnual`
+       below, which still reads the old `cash_outflows` store — so the break-even figure on the front
+       page moved the moment the migration ran.
+       ⚠ Same rule as `CashEngine.bills()`, deliberately: two screens, one definition of what counts
+       as a bill, which is what this file's own comment three lines down already demands. */
+    const _OEX = (window.S && S.HubOperatingExpenses) || null;
+    const _isCashOnly = r => !!(_OEX && typeof _OEX.isCashOnlyCategory === 'function'
+      && _OEX.isCashOnlyCategory(r && r.category));
+    const opex = ((App.data && App.data.operating_expenses) || []).filter(r => !_isCashOnly(r));
     // Match CashEngine.weeklyFixedCosts: drop a recurring bill that has been STOPPED or
     // whose fixed TERM is fully paid, so the break-even nut agrees with Cash Position's
     // reserve target instead of carrying a paid-off loan or canceled bill forever.
