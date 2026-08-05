@@ -69,13 +69,28 @@ S.HubBooksHome = {
     const doneCount = this.ORDER.filter(k => done[k]).length;
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
 
+    /* ⭐⭐⭐ THE IMPORT TAKES THE PAGE OVER, THE SAME WAY IT DOES ON ADD PRODUCTS.
+       `ic-product-setup` splits its screen into an upper cards block and a lower area, and while an
+       import is live the lower area becomes drop -> mapper -> routing panel in place of the product
+       list. Here the lower area is the four step rows plus As Needed, and they are what a live
+       Money Out import replaces. Where You Stand and the progress banner stay, so the operator
+       keeps the context of what they are closing and how far along they are.
+       ⛔ AS NEEDED GOES WITH THE STEPS. It is a row of buttons to other screens; leaving it sitting
+       under a takeover reads like the page half-changed, and every one of those buttons navigates
+       away from a file the operator is part-way through confirming.
+       ⚠ Tried inline in the step first (2026-08-05) and Kyle walked it: a bank month runs to
+       hundreds of rows across a dozen sections, and nesting that in an accordion buries the Add
+       button. The sales confirm on sc-dashboard stays in its step because a week is seven rows. */
+    const takeover = S.HubOperatingExpenses.moneyOutTakeover();
     mount.innerHTML = '<div class="screen">'
       + (gs.hasWeeks ? this.whereYouStand(st) : this.getStartedBox(gs))
       + this.banner(doneCount, this.ORDER.length)
-      + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
-      +   this.ORDER.map(k => this.stepRow(k, done, st)).join('')
-      + '</div>'
-      + this.asNeeded(st)
+      + (takeover
+        ? '<div style="margin-top:18px;" id="bk-moneyout"></div>'
+        : '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
+          +   this.ORDER.map(k => this.stepRow(k, done, st)).join('')
+          + '</div>'
+          + this.asNeeded(st))
       + '</div>';
     this._wire();
     /* ⛔⛔ RE-MOUNTED AFTER EVERY RENDER, and this is the whole reason the workspace resolves its
@@ -87,7 +102,13 @@ S.HubBooksHome = {
        ⚠ BARE CALL, deliberately ([[the-loop]] #40). `?.` here would mean "if the expense screen is
        missing, render an empty box quietly" — and `_bills()` above already calls into the same
        object bare, so guarding it here would be inconsistent as well as wrong. */
-    if (this._openStep === 'expenses') S.HubOperatingExpenses.renderMoneyOut('bk-moneyout');
+    if (takeover || this._openStep === 'expenses') S.HubOperatingExpenses.renderMoneyOut('bk-moneyout');
+    /* ⭐ AND SCROLL TO IT, exactly as `ic-product-setup._openRouting` does. The takeover renders
+       below Where You Stand and the banner, so on a short window the operator would press Import
+       File and see nothing move. Only while the takeover is up: on the way back OUT the steps are
+       what they want to see, and yanking the page down to them would be the wrong end. */
+    if (takeover) setTimeout(() => document.getElementById('bk-moneyout')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   },
 
   // ── Heavy compute, once per render ──────────────────────────────────────────

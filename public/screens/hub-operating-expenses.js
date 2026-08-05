@@ -1096,6 +1096,21 @@ S.HubOperatingExpenses = {
      guarded, and the null return is the honest answer to "the operator navigated away".
      ⚠ It does NOT touch the hub topbar the way renderMain does: this is a card inside somebody
      else's page, and clearing their actions would be reaching outside the mount. */
+  /* ⭐⭐⭐ THE QUESTION CLOSE THE BOOKS ASKS BEFORE IT DECIDES ITS LAYOUT: is a Money Out import in
+     progress? True means the drop / mapper / confirm replaces the four step rows; false means the
+     steps render with the manual form inside step 1.
+     ⛔ `_moTakeover` IS ITS OWN FLAG AND IT HAS TO BE. The obvious shortcut is to read `_entryMode`
+     — but that field is shared with the full Operating Expenses screen and it PERSISTS, so an
+     operator who left that screen in import mode would walk into Close The Books and find the page
+     already taken over by a drop zone they never asked for. The flag means "the operator opened
+     this from the step", which is the fact the layout actually depends on.
+     ⚠ `_expenseReview` holds it open too: a file already dropped and waiting to be confirmed must
+     not lose the page out from under it. */
+  _moTakeover: false,
+  moneyOutTakeover() {
+    return !!this._moTakeover && (this._entryMode === 'import' || !!this._expenseReview);
+  },
+
   renderMoneyOut(mountId) {
     if (mountId) { this._moMountId = mountId; this._mountedAt = App._mountSeq; }
     const el = document.getElementById(this._moMountId || '');
@@ -1107,7 +1122,8 @@ S.HubOperatingExpenses = {
     this.container = el;
     this._view = 'moneyout';
     this.catchUpRecurring();
-    el.innerHTML = this._addCardHtml({ inline: true });
+    // The step body and the takeover come out of the same builder; the flag picks which shape.
+    el.innerHTML = this._addCardHtml({ inline: true, stepBody: !this.moneyOutTakeover() });
     this._wireCurrent();
   },
 
@@ -1130,8 +1146,11 @@ S.HubOperatingExpenses = {
      Stand hero reads operating income, the progress bar counts done steps. Repainting only the card
      left the operator looking at a bill they had just logged, sitting directly under a sentence
      saying none was logged. Two things on screen disagreeing, and the wrong one is the headline.
-     ⚠ No loop: HubBooksHome.render() ends by calling renderMoneyOut(), which never calls back. */
-  _rerenderAfterWrite() {
+     ⚠ No loop: HubBooksHome.render() ends by calling renderMoneyOut(), which never calls back.
+     ⭐ IT ALSO SERVES A LAYOUT CHANGE, which is why it is named for the HOST rather than for the
+     write: opening or closing the import takeover swaps the four step rows for the drop panel, and
+     that decision belongs to the cockpit, so the cockpit has to re-render to make it. */
+  _rerenderHost() {
     const BH = S.HubBooksHome;
     if (this._view === 'moneyout' && BH && BH.container) return BH.render(BH.container);
     this._rerender();
@@ -1384,14 +1403,35 @@ S.HubOperatingExpenses = {
      drops with no card and no collapse. */
   _addCardHtml(opts) {
     const inline = !!(opts && opts.inline);
+    /* ⭐⭐ THREE SHAPES, ONE BUILDER.
+       - full screen (`{}`)                   card shell + collapse, mode swaps the card in place
+       - Close The Books STEP (`stepBody`)     manual form only; Import File opens the takeover
+       - Close The Books TAKEOVER (`inline`)   drop + mapper + review, in place of the four steps
+       ⛔ THE STEP NEVER RENDERS A DROP ZONE. Kyle walked the inline version and it does not work for
+       a bank month: the confirm panel runs to hundreds of rows across up to a dozen sections, and
+       nesting that inside an accordion inside a page buries the Add button under all of it. The
+       sales confirm on `sc-dashboard` DOES live in a step and is fine, because that file is a week
+       of days: seven rows, no sections. The difference is size, not principle.
+       ⚠ `_entryMode` is shared with the full screen and it persists. Forcing manual here is what
+       stops an operator who left that screen in import mode from arriving at Close The Books to
+       find a drop zone in step 1 they never asked for. */
+    const stepBody = !!(opts && opts.stepBody);
+    const importMode = !stepBody && this._entryMode === 'import';
     const segBtn = (mode, label) => '<button type="button" class="btn btn-sm oexa-mode" data-mode="' + mode + '" style="'
       + (this._entryMode === mode ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     const segToggle = '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>';
 
     let bodyInner, addButtons = '';
-    if (this._entryMode === 'import') {
-      bodyInner = segToggle + '<div id="oexa-csv"></div>';
-      addButtons = '<div id="oexa-imp-actions" style="margin:16px 0 ' + (inline ? '0' : '24px') + ';"></div>';
+    if (importMode) {
+      /* ⚠ NO SEG TOGGLE IN THE TAKEOVER, AND NO HEADING. The toggle lives on the page you came
+         from; here the way back is Cancel, exactly as `ic-product-setup.importPanelHTML` does it.
+         CSVMapper already prints its own "Drop your expenses file here" and its own column-mapping
+         heading, so anything we add over the top says the same thing twice. */
+      bodyInner = (inline ? '' : segToggle) + '<div id="oexa-csv"></div>';
+      addButtons = (inline
+          ? '<div class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost" id="oexa-imp-cancel">Cancel</button></div>'
+          : '')
+        + '<div id="oexa-imp-actions" style="margin:0 0 ' + (inline ? '0' : '24px') + ';"></div>';
     } else {
       bodyInner = segToggle
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
@@ -1424,10 +1464,13 @@ S.HubOperatingExpenses = {
        completely — the operator would have dropped a file and landed on a page with nothing on it. */
     const addCard = this._expenseReview
       ? '<div style="margin:' + (inline ? '0 0 4px' : '16px 0 24px') + ';">' + this.expenseReviewHTML() + '</div>'
-      // Inline the step IS the card and the step head IS the collapse control, so neither is drawn
-      // a second time. Same body, same ids, same wiring — only the shell differs.
+      // In the STEP the step IS the card and the step head IS the collapse control, so neither is
+      // drawn a second time. In the TAKEOVER the drop sits in its own card, matching
+      // `ic-product-setup.importPanelHTML`, because it is page content again rather than a step body.
+      // Same ids and same wiring in all three; only the shell differs.
       : inline
-        ? bodyInner + addButtons
+        ? (importMode ? '<div class="card form-card">' + bodyInner + '</div>' + addButtons
+                      : bodyInner + addButtons)
         : '<div class="card form-card">'
           + App.collapsibleCardTitle('oex-add', 'Add Expense')
           + '<div class="collapse-body">' + bodyInner + '</div>'
@@ -1457,7 +1500,20 @@ S.HubOperatingExpenses = {
       if (w) w.style.display = e.target.checked ? '' : 'none';
     });
     // Switching entry mode abandons a confirm screen, the same as Start Over does.
-    this.container.querySelectorAll('.oexa-mode').forEach(b => b.addEventListener('click', () => { this._expenseReview = null; this._entryMode = b.dataset.mode; this._rerender(); }));
+    this.container.querySelectorAll('.oexa-mode').forEach(b => b.addEventListener('click', () => {
+      this._expenseReview = null;
+      this._entryMode = b.dataset.mode;
+      /* ⭐ FROM THE STEP, "Import File" IS NOT A MODE SWITCH, IT IS A DOOR. It takes the page over
+         (drop -> mapper -> confirm in place of the four steps) and "Enter Manually" closes it
+         again. On the full Operating Expenses screen neither happens: the card swaps in place,
+         exactly as it always has. */
+      if (this._view === 'moneyout') { this._moTakeover = (b.dataset.mode === 'import'); return this._rerenderHost(); }
+      this._rerender();
+    }));
+    // The takeover's own way back, the same control ic-product-setup's import panel carries.
+    this.container.querySelector('#oexa-imp-cancel')?.addEventListener('click', () => {
+      this._expenseReview = null; this._entryMode = 'manual'; this._moTakeover = false; this._rerenderHost();
+    });
     /* ⚠ WIRED ON THE FRESH CHILD NODES, NEVER ON `this.container`. `renderMain` replaces the
        container's innerHTML but the container element itself is permanent, so a listener attached to
        it would stack one copy per render and the Add button would fire N times on the Nth repaint.
@@ -2308,6 +2364,10 @@ S.HubOperatingExpenses = {
        every row still up; this line is the only one that knows the write landed. */
     this._expenseReview = null;
     this._entryMode = 'manual';
+    // ⭐ AND THE TAKEOVER CLOSES ON A LANDED IMPORT, so the operator comes back to the four steps
+    // with step 1 now reading the bills that just went in, rather than being left on a spent drop
+    // zone. The import banner rides back with them; `_addCardHtml` consumes it on that render.
+    this._moTakeover = false;
     /* ⚠ THE GUARD COMES BEFORE THE MESSAGE, NOT AFTER IT. Placed after, it stopped the repaint but
        left `_importMsg` banked — and nothing else consumes it, so the next time the operator opened
        Operating Expenses, days later, it greeted them with "1 expense imported." about an import
@@ -2378,7 +2438,7 @@ S.HubOperatingExpenses = {
         + ' positive, so Bar Cop could not tell which sign means money out — it read the positive rows as expenses; check the amount column');
       this._importMsg = bits.join(' · ') + '.';
     }
-    this._rerenderAfterWrite();
+    this._rerenderHost();
   },
 
   // By Category row-list (current month, last month, YTD, YTD % of revenue).
@@ -2581,7 +2641,7 @@ S.HubOperatingExpenses = {
       rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1;
     }
     await App.putRecord('core', 'operating_expense', rec);
-    this._rerenderAfterWrite();
+    this._rerenderHost();
   },
 
   _clearAdd() {
