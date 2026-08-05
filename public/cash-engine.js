@@ -835,7 +835,29 @@ window.CashEngine = {
           anyway, and own-cover stopped settling) and was reverted rather than debugged at speed,
           because this function feeds Safe to Spend. The contract is written and seen RED in
           `pending-recurring-cutover.js`. */
-    bills.filter(b => b.recurring).forEach(p => {
+    /* ⚠ THE ENGINE PASSES ITS OWN ROWS.  is this file's reader of the same array,
+       already filtered for cash-only — handing it in keeps ONE path to the data instead of asking
+       a screen object what it can see. */
+    const _rb = S.HubOperatingExpenses.recurringBills(bills);
+    const DAY_STEP = { weekly: 7, fortnightly: 14 };
+    _rb.forEach(_b => {
+      const stepDays = DAY_STEP[_b.frequency];
+      if (!stepDays) return;
+      const amt = parseFloat(_b.amount) || 0;
+      if (!amt) return;
+      const anchor = new Date(String(_b.lastDate || '') + 'T00:00:00');
+      if (isNaN(anchor.getTime())) return;
+      const startD = new Date(startYmd + 'T00:00:00');
+      while (anchor < startD) anchor.setDate(anchor.getDate() + stepDays);
+      for (let guard = 0; guard < 400; guard++) {
+        const ymd = App.ymdLocal(anchor);
+        if (ymd > endYmd) break;
+        if (ymd >= startYmd) out.push({ date: ymd, amount: amt,
+          vendor: _b.vendor || _b.category || 'Bill', category: _b.category || '', recurring: true });
+        anchor.setDate(anchor.getDate() + stepDays);
+      }
+    });
+    _rb.filter(_b => !DAY_STEP[_b.frequency]).map(_b => _b.row || _b).forEach(p => {
       const amt = parseFloat(p.amount) || 0;
       const base = new Date((p.date || startYmd) + 'T00:00:00');
       if (isNaN(base.getTime())) return;
@@ -1074,11 +1096,16 @@ window.CashEngine = {
     const _hz = new Date(); _hz.setHours(0, 0, 0, 0); _hz.setDate(_hz.getDate() + (this.reserveWeeks() || 8) * 7);
     const horizonYm = App.ymdLocal(_hz).slice(0, 7);
     let annual = 0;
-    /* ▶ THE ITEM-16 CUTOVER BELONGS HERE TOO, and it moves with projectedBills above — the reserve
-       target and the forecast must not disagree about which bills exist. Still the manual checkbox,
-       so a drop-only operator's reserve is sized against ZERO fixed costs. */
-    this.bills().forEach(b => {
-      if (!b.recurring) return;   // recurring parents only (children carry recurring_parent, not recurring)
+    /* ⭐⭐⭐ THE CUTOVER (Phase 3 item 16). This swept `bills()` for the manual `recurring` checkbox,
+       which a drop-only operator never ticks — so the reserve target, and therefore Safe to Spend,
+       was sized against ZERO fixed costs on an account holding three clean months of them.
+       ⚠ ITS OWN ROWS GO IN, same as projectedBills: `bills()` is this file's reader of that array and
+       handing it over keeps one path to the data rather than asking a screen what it can see.
+       ⚠ The stop / term / not-started rules below still apply, and only to TYPED bills (`_b.row`),
+       because only they carry that history; a derived bill's evidence is the ledger itself and
+       `recurringBills` has already dropped anything that missed more than one full cycle. */
+    S.HubOperatingExpenses.recurringBills(this.bills()).forEach(_b => {
+      const b = _b.row || _b;
       // Skip a series that has ENDED (fixed term fully paid) or been STOPPED. The
       // forecast (projectedBills) already honors term/stop, so without this the
       // reserve target counted a paid-off loan or canceled bill forever — inflating
@@ -1109,7 +1136,7 @@ window.CashEngine = {
       // ⚠ Shared normalisation, so the day this reads derived bills a weekly one is not silently
       // counted as monthly. `recurringPerYear` gives the identical answer for the three cadences a
       // typed bill can carry, so this line is unchanged in behaviour today.
-      annual += (parseFloat(b.amount) || 0) * S.HubOperatingExpenses.recurringPerYear(b.frequency);
+      annual += (parseFloat(b.amount) || 0) * S.HubOperatingExpenses.recurringPerYear(_b.frequency);
     });
     /* ⚠⚠ DEBT SERVICE IS A FIXED COST AND THIS FUNCTION COULD NOT SEE IT (round 3, F3). It read only
        bills() — the operating-expense log — while loan and equipment payments live in the SEPARATE
