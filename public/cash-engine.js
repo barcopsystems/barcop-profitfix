@@ -1252,7 +1252,25 @@ window.CashEngine = {
   //    remittances). Their own store so they feed BOTH the forecast (scheduled
   //    cash out) and the bridge (where the profit went). Same forward-recurring
   //    projection as bills. ──────────────────────────────────────────────────
-  cashOutflows() { return (App.data && Array.isArray(App.data.cash_outflows)) ? App.data.cash_outflows : []; },
+  /* ⭐⭐⭐ THE CUTOVER. This reads the ONE LEDGER now, filtered to the rows that are money out.
+     `App.data.cash_outflows` is no longer the source of truth for anything: the Cash Outflows door
+     writes both stores, `reconcileCashOutflowLedger` guarantees the ledger is a pure function of the
+     old one on every load, and `repairGeneratedCashRows` has removed the child rows the old catch-up
+     generated. Phase 5 deletes the old store; until then it stays whole and readable.
+
+     ⛔ THE FILTER IS `migrated_from`, NOT THE CATEGORY NAME, AND THAT IS THE WHOLE POINT. The name is
+     a string the operator can type — an expense they filed under a category they called "Owner Draw"
+     is THEIR bill and belongs on the P&L, not in the cash forecast. Every genuine cash row carries
+     `migrated_from: 'cash_outflow'` because `migrateCashOutflowRow` stamps it and nothing else
+     writes one. `_isOperatingRow` splits the same three shapes the same way from the other side, so
+     a row is on exactly one of the two lists and can never be on both or neither.
+
+     ⚠ Proved identical to the old reader across eight figures from this engine plus break-even's
+     debt line, over the same records, by verify-outflow-migration-equality.js. */
+  cashOutflows() {
+    const rows = (App.data && Array.isArray(App.data.operating_expenses)) ? App.data.operating_expenses : [];
+    return rows.filter(r => r && r.migrated_from === 'cash_outflow');
+  },
   _outflowLabel(t) { return t === 'draw' ? 'Owner draw' : t === 'loan' ? 'Loan payment' : t === 'tax' ? 'Tax remittance' : t === 'capital' ? 'Capital / equipment' : 'Other'; },
   outflowsBetween(reqStart, reqEnd) {
     const _span = this._monthSpan(reqStart, reqEnd);   // see projectedBills — same reason

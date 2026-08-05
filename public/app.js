@@ -3078,6 +3078,14 @@ const App = {
        ledger write, a refused delete, a seeded account, or a login the migration skipped all leave
        the ledger one or more rows behind. This is additive-only and puts them back. It writes
        nothing when the two stores already agree, which is every login after the first. */
+    /* ⛔ THE REPAIR RUNS BEFORE THE RECONCILE, AND THE ORDER MATTERS. It removes the child rows the
+       old catch-up generated off migrated outflows — invisible today, a second copy of every
+       payment the moment the reader flips. Doing it first means the reconcile then sees a ledger
+       whose only cash rows are genuine twins, so its "is this in step with the old store?" question
+       has one honest answer. Both are no-ops on an account that was never damaged. */
+    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.repairGeneratedCashRows) {
+      await S.HubOperatingExpenses.repairGeneratedCashRows();
+    }
     if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.reconcileCashOutflowLedger) {
       await S.HubOperatingExpenses.reconcileCashOutflowLedger();
     }
@@ -7683,9 +7691,20 @@ const App = {
        Falling back to the record's own id makes a nameless row match ONLY itself — so nothing is
        suppressed, which over-projects rather than under-projects. Money that might not leave the
        bank is the safe way to be wrong here. */
-    const raw = (!r.category && r.type) ? String(r.notes || '') : String(r.vendor || '');
+    /* ⚠⚠⚠ AND THE CUTOVER BROKE THE DISCRIMINATOR ITSELF, BECAUSE A LEDGER TWIN HAS BOTH (2026-08-05).
+       The test was "no category AND a type" — true of a cash outflow in its own store, and FALSE of
+       the same outflow once it lives in the ledger, where `migrateCashOutflowRow` gives it a
+       category. So at the flip every cash row silently switched from the notes branch to the vendor
+       branch, and the twin keys `Owner Draw|#id|400000` where its source keyed `draw|march draw|400000`.
+       Nothing matched its own history any more: a payment the operator had logged themselves stopped
+       suppressing the projected occurrence, and the month was charged twice. Measured $3,700 against
+       a truth of $1,850 — the identical figure round 3 of this same function was written to fix.
+       `migrated_from` is the mark the mapping always stamps and nothing else writes, so a twin keys
+       EXACTLY as the outflow it came from, which is what makes the cutover invisible. */
+    const isCash = r.migrated_from === 'cash_outflow' || (!r.category && !!r.type);
+    const raw = isCash ? String(r.notes || '') : String(r.vendor || '');
     const who = raw.trim() ? raw.trim().toLowerCase() : ('#' + String(r.id || ''));
-    return String(r.category || r.type || '') + '|' + who
+    return String(isCash ? (r.type || '') : (r.category || r.type || '')) + '|' + who
       // ⚠ `this.parseNum`, NOT `App.parseNum` — same reason windowCutoff uses `this.ymdLocal`.
       // A helper lifted out of this file for a harness has no `App` in scope, so an absolute
       // reference throws the moment the lift is exercised. It broke 38 harnesses in one run.
