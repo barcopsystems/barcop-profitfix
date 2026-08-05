@@ -45,7 +45,7 @@ S.ShiftMaintenance = {
     App.showHelpModal('How the Maintenance Log Works', [
       { p: ['Equipment breaks and falls through the cracks between shifts. Log it here and it carries forward until someone fixes it. Open and urgent items show up as alerts on the Hub so the next manager sees them.'] },
       { h: 'Log an issue', p: ['Capture what broke, where, how urgent it is, and a short description. Assign it to a staff member or an outside vendor (an HVAC tech, a plumber), whoever is handling the fix.'] },
-      { h: 'Work it to closed', p: ['Move the status from Open to In Progress to Resolved as the repair happens. When you mark it Resolved, set the date it was fixed and the repair cost. Resolved drops to the bottom of the list so the open work stays up top.'] },
+      { h: 'Work it to closed', p: ['Move the status from Open to In Progress to Resolved as the repair happens. When you mark it Resolved, set the date it was fixed and the repair cost. That cost is logged as an operating expense under Repairs and Maintenance, so it reaches your income statement once and you never enter it twice. Resolved drops to the bottom of the list so the open work stays up top.'] },
       { h: 'Filter and Export', p: ['Use the range chips or a custom date range to narrow the list to this week or this month. Open work always sorts to the top, urgent first, with resolved issues below. Export PDF saves the filtered list, and Worksheet prints a blank sheet to mark issues by hand during the shift.'] }
     ]);
   },
@@ -88,7 +88,17 @@ S.ShiftMaintenance = {
 
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Resolved</label><input type="date" id="' + p + 'resolved" value="' + esc(r?.date_resolved || '') + '"/></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Repair Cost</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'cost" min="0" step="0.01" value="' + v(r?.cost) + '"/></div></div>'
+      /* ⭐⭐⭐ THE COST IS AN EXPENSE, AND THE SCREEN NOW SAYS SO. Kyle: *"i had no idea that the cost
+         entered there goes in separate as an expense.. and neither would the user."* It was true and
+         it was silent. The field has not moved and nothing got harder — it writes to the one ledger
+         under Repairs and Maintenance instead of hiding a number inside a status tracker, and the
+         line underneath tells the operator exactly where it lands. The value is read BACK from the
+         ledger (`_ledgerCost`), so re-opening a resolved ticket still shows what was spent. */
+      /* ⚠ THE LABEL CARRIES IT, NOT A NOTE UNDER THE FIELD. An explainer note on a form field is a
+         RULE 2a ratchet in `verify-design-code` — a count Kyle reduces and never grows, and a design
+         change he walks one at a time. The label says it at a glance and the help panel says it in
+         full, which are this app's two established homes for "how does this work". */
+      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Repair Cost (an operating expense)</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'cost" min="0" step="0.01" value="' + v(r ? this._ledgerCost(r.id) : '') + '"/></div></div>'
       + '</div>';
   },
 
@@ -163,7 +173,10 @@ S.ShiftMaintenance = {
       const open = all.filter(r => r.status !== 'Resolved');
       const urgent = open.filter(r => r.priority === 'Urgent');
       const resolved = all.filter(r => r.status === 'Resolved');
-      const totCost = filtered.reduce((t, r) => t + (r.cost || 0), 0);
+      // PHASE 2 ITEM 12: repair spend is READ BACK from the ledger, which is the rebuild's own rule --
+      // the tracker shows the number without owning it. This is also a better figure than it was: it
+      // reflects what is actually on the income statement, not a field only this screen could see.
+      const totCost = filtered.reduce((t, r) => t + (parseFloat(this._ledgerCost(r.id)) || 0), 0);
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Open</div><div class="calc-val lg">' + open.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Urgent</div><div class="calc-val lg ' + (urgent.length ? 'warn' : '') + '">' + urgent.length + '</div></div>'
@@ -185,7 +198,7 @@ S.ShiftMaintenance = {
           + '<td>' + this.priorityText(r.priority) + '</td>'
           + '<td>' + this.statusText(r.status) + '</td>'
           + '<td>' + esc(r.assigned_to || '-') + '</td>'
-          + '<td>' + (r.cost ? App.fmtCurrency(r.cost) : '<span style="color:var(--t4);">-</span>') + '</td>'
+          + '<td>' + ((c => c ? App.fmtCurrency(c) : '<span style="color:var(--t4);">-</span>')(parseFloat(this._ledgerCost(r.id)) || 0)) + '</td>'
           + '<td><div class="row-actions">'
           + (App.canEdit('sc-maintenance') ? '<button class="btn btn-ghost btn-sm mt-edit" data-id="' + r.id + '">Edit</button>' : '')
           + (App.canEdit('sc-maintenance') ? '<button class="btn btn-danger btn-sm mt-del" data-id="' + r.id + '">Delete</button>' : '')
@@ -309,11 +322,14 @@ S.ShiftMaintenance = {
     const btn = document.getElementById('mte-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'maintenance', rec);
-    if (ok) { await this._syncLedger(rec.id, rec); App.closeModal('mt-edit-modal'); if (typeof onDone === 'function') onDone(); }
+    if (ok) { await this._syncLedger(rec.id, rec, this._formCost('mte-')); App.closeModal('mt-edit-modal'); if (typeof onDone === 'function') onDone(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } const err = document.getElementById('mte-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
   // Collect the form (prefix p) into a record body, or null after an error.
+  // The Repair Cost the operator typed. Read straight off the form, because the record no longer
+  // holds one — it is an expense now, not a tracker field.
+  _formCost(p) { const v = parseFloat(document.getElementById(p + 'cost')?.value); return isNaN(v) ? null : v; },
   _collect(p) {
     const err = document.getElementById(p + 'err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
@@ -345,8 +361,10 @@ S.ShiftMaintenance = {
       // Assigned To stays free text — maintenance is often handed to an outside
       // vendor (HVAC, plumber) who is not on the staff roster.
       assigned_to:    document.getElementById(p + 'assigned')?.value.trim() || '',
-      date_resolved:  dateResolved,
-      cost:           isNaN(cost) ? null : cost
+      date_resolved:  dateResolved
+      /* PHASE 2 ITEM 12: NO MONEY FIELD. The repair cost is an operating expense and it lives in the
+         one ledger, under Repairs and Maintenance. The form still asks for it in the same place;
+         _syncLedger writes it there instead of here. See _formCost. */
     };
   },
 
@@ -359,7 +377,7 @@ S.ShiftMaintenance = {
     const btn = document.getElementById('mt-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'maintenance', rec);
-    if (ok) { await this._syncLedger(rec.id, rec); this._draft = null; this.renderList(); }
+    if (ok) { await this._syncLedger(rec.id, rec, this._formCost('mt-')); this._draft = null; this.renderList(); }
     else {
       const i = list.findIndex(x => x.id === rec.id); if (i > -1) list.splice(i, 1);
       if (btn) { btn.disabled = false; btn.textContent = 'Save Issue'; }
@@ -377,7 +395,7 @@ S.ShiftMaintenance = {
     const btn = document.getElementById('mte-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'maintenance', list[i]);
-    if (ok) { await this._syncLedger(list[i].id, list[i]); this.editId = null; App.closeModal('mt-edit-modal'); this.renderList(); }
+    if (ok) { await this._syncLedger(list[i].id, list[i], this._formCost('mte-')); this.editId = null; App.closeModal('mt-edit-modal'); this.renderList(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } const err = document.getElementById('mte-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
@@ -402,12 +420,23 @@ S.ShiftMaintenance = {
      `reconcileMaintenanceLedger` repairs exactly that on the next load.
      ⚠ A DELETE takes the ledger row too — an orphan would keep charging the P&L for a repair the
      operator removed, and the reconcile is additive so it would never take it out. */
-  async _syncLedger(id, rec) {
+  async _syncLedger(id, rec, cost) {
     const OEX = S.HubOperatingExpenses;
-    const led = rec ? OEX.migrateMaintenanceRow(rec) : null;
+    /* ⭐ THE COST COMES FROM THE FORM, NOT THE RECORD — the record does not carry money any more.
+       The ledger row keeps the maintenance id, so editing the ticket edits the same expense and a
+       re-save can never mint a second one. */
+    const led = (rec && cost != null) ? OEX.migrateMaintenanceRow(Object.assign({}, rec, { id: id, cost: cost })) : null;
     if (led) { await App.putRecord('core', 'operating_expense', led, { quiet: true }); return; }
-    // No cost (or deleted): there must be no expense row standing for it.
+    /* Cleared the cost, or deleted the ticket: there must be no expense standing for it. Scoped to
+       rows this door created, so an id collision can never take the operator's own bill. */
     const have = OEX.records().find(r => r && r.id === id) || null;
     if (have && have.migrated_from === 'maintenance') await App.removeRecord('core', 'operating_expense', id);
+  },
+
+  // What the form shows in the Repair Cost box: read BACK from the ledger, because that is where it
+  // lives now. Without this, editing a resolved ticket would show an empty box over a real expense.
+  _ledgerCost(id) {
+    const r = (S.HubOperatingExpenses.records() || []).find(x => x && x.id === id);
+    return (r && r.migrated_from === 'maintenance' && r.amount != null) ? r.amount : '';
   }
 };
