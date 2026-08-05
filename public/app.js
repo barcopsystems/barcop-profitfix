@@ -570,8 +570,8 @@ const App = {
        this would generate nothing and leave the bug looking fixed. The gate half was already
        handled — the _dataReady note above was written for exactly this catch-up refusing — but
        nothing ever called it. Pinned by verify-books-other-and-demo-catchup.js. */
-    try { if (S.HubOperatingExpenses && S.HubOperatingExpenses.catchUpRecurring) S.HubOperatingExpenses.catchUpRecurring(); }
-    catch (e) { console.error('demo recurring catch-up', e); }
+    // ⛔ The recurring catch-up ran here at boot and MINTED expense rows. Deleted with
+    // the generator (Phase 3 item 16) — a schedule is a forecast input, never a written record.
     /* ⛔ AND THE SAME GOES FOR THE FIX BASELINES — I MADE THE EXACT MISTAKE THE NOTE ABOVE
        DESCRIBES, ONE SESSION AFTER READING IT. `_startFixBaselines` was added to the account
        load routine so "recovered so far" stops depending on visiting the Fix screen. startDemo
@@ -778,7 +778,7 @@ const App = {
     this.updatePeriod();
     // Recurring operating expenses: fill in any elapsed months on load so Books
     // reflects them even if the operator never opens the Operating Expenses page.
-    try { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.catchUpRecurring) S.HubOperatingExpenses.catchUpRecurring(); } catch (e) { console.error('recurring catch-up', e); }
+    // ⛔ Second boot-time catch-up call, deleted with the generator (Phase 3 item 16).
     this._wireChrome();
     // Every member (Staff/Viewer included) lands on the real Hub. Sections a
     // member can't access are shown in place but blanked + gated with a friendly
