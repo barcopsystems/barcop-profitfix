@@ -1845,17 +1845,33 @@ S.HubOperatingExpenses = {
 
      ⛔ WHAT IT WILL NOT DO ([[the-loop]] #30 — a heuristic that infers a fact the file does not
      contain is wrong in BOTH directions, and its blast radius is everyone who is merely different).
-     One occurrence is not a pattern. An irregular gap is not a pattern. A cadence that is not
-     monthly, quarterly or annual is not one Bar Cop projects. Where the data cannot answer, this
-     returns nothing and the operator answers instead. Every proposal carries its occurrence count so
-     the screen can show what it is standing on, and the operator confirms before anything uses it.
+     One occurrence is not a pattern. An irregular gap is not a pattern. The five cadences Bar Cop
+     projects are weekly, fortnightly, monthly, quarterly and annual — anything else (a 3-day
+     delivery run, a bill on the 15th and the last day, a posting that drifts a day) is REFUSED
+     rather than rounded to the nearest one it knows. Where the data cannot answer, this returns
+     nothing and the operator answers instead. Every proposal carries its occurrence count so the
+     screen can show what it is standing on, and the operator confirms before anything uses it.
 
      ⚠ NO FITTED THRESHOLD ANYWHERE ([[the-loop]] #28: state the discriminator in words first).
      "Identical to the cent every time" is a fact about the data, not a magic number — that is the
      whole fixed-vs-varies test. A varying bill reports the AVERAGE of what was actually observed and
      says `varies: true`, so the forecast can be honest about the precision it has. */
   deriveRecurringBills() {
-    const FREQ = { 1: 'monthly', 3: 'quarterly', 12: 'annual' };
+    /* ⛔⛔ TWO DETECTORS, AND THEY CANNOT BE ONE. Found by running Kyle's real bank register rather
+       than any fixture ([[the-loop]] #32): the first version keyed on MONTH indices alone, which is
+       right for rent, insurance and subscriptions and structurally blind to everything shorter.
+       Measured on that file, after the shipped rules route payroll to Labor and draws and transfers
+       to Cash Outflows: 7 vendors on an exact 7-day cadence ($21,531.70) and 4 on an exact 14-day
+       one ($18,537.30) — 11 vendors, $40,069.00, **24.6% of everything that lands as an operating
+       expense**. Ads, linen, ice, disposal, pest control and first aid are as fixed as rent, and
+       every one of them has a month-gap of ZERO, so `MONTH_FREQ[0]` refused all of them forever.
+       A quarter of the recurring spend missing makes the forecast read LOW, which is the direction
+       nobody reports.
+       ⭐ WHY NOT ONE RULE: a monthly bill's DAY gaps are 28/30/31, unequal by nature — that is the
+       whole reason month indices exist. A weekly bill's MONTH gaps are 0. Each rule is blind to the
+       other's shape, so both run and the short cadence is asked first. */
+    const MONTH_FREQ = { 1: 'monthly', 3: 'quarterly', 12: 'annual' };
+    const DAY_FREQ = { 7: 'weekly', 14: 'fortnightly' };
     /* Cash-only rows are excluded: draws, loans and tax remittances are projected by the Cash
        Outflows side already, and deriving them here would double them in the forecast. */
     const groups = {};
@@ -1872,24 +1888,53 @@ S.HubOperatingExpenses = {
     Object.keys(groups).forEach(k => {
       const g = groups[k].slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
       if (g.length < 2) return;                       // one occurrence is not a pattern
-      const idx = g.map(r => (parseInt(String(r.date).slice(0, 4), 10) * 12)
+      const diffs = (a) => { const o = []; for (let i = 1; i < a.length; i++) o.push(a[i] - a[i - 1]); return o; };
+      const same = (a) => a.length > 0 && a.every(x => x === a[0]);
+      /* ⚠ REAL DAY NUMBERS, NOT DAY-OF-MONTH. A weekly bill on the 25th recurs on the 1st, and
+         day-of-month arithmetic goes NEGATIVE across that boundary. `Date.UTC` on the already-parsed
+         components is pure arithmetic — it never hands a string to the Date parser, so there is no
+         timezone or format behaviour to get wrong ([[local-date-convention]]). */
+      const dayNo = g.map(r => Date.UTC(parseInt(String(r.date).slice(0, 4), 10),
+        parseInt(String(r.date).slice(5, 7), 10) - 1, parseInt(String(r.date).slice(8, 10), 10)) / 86400000);
+      const monthIdx = g.map(r => (parseInt(String(r.date).slice(0, 4), 10) * 12)
         + parseInt(String(r.date).slice(5, 7), 10) - 1);
-      const gaps = [];
-      for (let i = 1; i < idx.length; i++) gaps.push(idx[i] - idx[i - 1]);
-      const step = gaps[0];
-      // Every gap identical, and a cadence Bar Cop actually projects. Two rows in one month give a
-      // gap of 0, which is not a schedule either.
-      if (!gaps.every(x => x === step) || !FREQ[step]) return;
+      const dayGaps = diffs(dayNo), monthGaps = diffs(monthIdx);
+
+      let frequency = '', day = null, weekday = null;
+      /* SHORT CADENCE ASKED FIRST. A weekly series would be refused by the month rule anyway (its
+         month gaps are 0), but asking in this order makes the two rules explicitly disjoint rather
+         than accidentally so.
+         ⛔ EXACTLY 7 OR EXACTLY 14, no tolerance ([[the-loop]] #28 — no threshold fitted to a
+         fixture). The real file posts on exact sevens. A posting that drifts a day is REFUSED, and
+         refusing is the safe direction: a refusal is visible on the confirm screen and a smoothed
+         guess is not. */
+      if (same(dayGaps) && DAY_FREQ[dayGaps[0]]) {
+        frequency = DAY_FREQ[dayGaps[0]];
+        /* It repeats on a WEEKDAY, and saying `day: 4` for a Saturday linen service would put it on
+           the 4th of every month in the forecast. Taken off the last occurrence, which is the one
+           the projector steps forward from. */
+        weekday = new Date(dayNo[dayNo.length - 1] * 86400000).getUTCDay();
+      } else if (same(monthGaps) && MONTH_FREQ[monthGaps[0]]) {
+        frequency = MONTH_FREQ[monthGaps[0]];
+      }
+      // Two rows in one month give a month gap of 0 and a day gap that is neither 7 nor 14, so an
+      // irregular vendor falls out of both rules rather than being forced into one.
+      if (!frequency) return;
       const amts = g.map(r => parseFloat(r.amount) || 0);
       const varies = !amts.every(a => Math.abs(a - amts[0]) < 0.005);
       const amount = varies
         ? Math.round((amts.reduce((s, a) => s + a, 0) / amts.length) * 100) / 100
         : amts[0];
-      // The day it usually lands. A debit pushed off a weekend moves a day or two, so the most
-      // common wins and the earliest breaks a tie rather than an arbitrary pick.
-      const tally = {};
-      g.forEach(r => { const d = parseInt(String(r.date).slice(8, 10), 10) || 1; tally[d] = (tally[d] || 0) + 1; });
-      const day = parseInt(Object.keys(tally).sort((a, b) => (tally[b] - tally[a]) || (a - b))[0], 10);
+      /* The day of the month it usually lands, for the MONTH-anchored cadences only. A debit pushed
+         off a weekend moves a day or two, so the most common wins and the earliest breaks a tie
+         rather than an arbitrary pick. A weekly bill has no meaningful day-of-month — it carries a
+         weekday instead — so this stays null there rather than reporting a number that would send
+         the projector to the 4th of every month. */
+      if (weekday === null) {
+        const tally = {};
+        g.forEach(r => { const d = parseInt(String(r.date).slice(8, 10), 10) || 1; tally[d] = (tally[d] || 0) + 1; });
+        day = parseInt(Object.keys(tally).sort((a, b) => (tally[b] - tally[a]) || (a - b))[0], 10);
+      }
       const last = g[g.length - 1];
       out.push({
         vendorKey: k,
@@ -1897,8 +1942,12 @@ S.HubOperatingExpenses = {
         // The operator's own decision, through the shared rule — so a confirmed proposal never
         // re-asks a category they have already answered.
         category: this._categoryForVendor(last.vendor) || '',
-        frequency: FREQ[step],
+        frequency: frequency,
+        /* EXACTLY ONE OF THESE IS SET, and which one says what the bill repeats ON: a day of the
+           month for monthly/quarterly/annual, a weekday for weekly/fortnightly. A projector that
+           read the wrong one would put a Saturday linen service on the 4th of every month. */
         day: day,
+        weekday: weekday,
         amount: amount,
         varies: varies,
         occurrences: g.length,
