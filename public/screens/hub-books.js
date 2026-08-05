@@ -120,6 +120,8 @@ S.HubBooks = {
     const opIncM = P.opInc, opIncY = PY.opInc;
     // Money logged but not yet given a category. Kept off every line above; stated below the total.
     const uncatM = this._uncategorizedTotal(monthKey, false), uncatY = this._uncategorizedTotal(monthKey, true);
+    // Recurring cost this month that has not been logged or imported yet. See _expectedNotLogged.
+    const expM = this._expectedNotLogged(monthKey);
 
     const sec = t => '<tr class="pnl-sec"><td colspan="3">' + t + '</td></tr>';
     const line = (label, m, y, o) => {
@@ -169,6 +171,13 @@ S.HubBooks = {
          deduction, and it renders only when there is something to say. */
       + (uncatM || uncatY
         ? line('Uncategorized (not on this statement yet)', uncatM, uncatY, { sub: 1, col: 'var(--t3)' })
+        : '')
+      /* ⭐⭐ AND WHAT HAS NOT BEEN PAID YET, for the same reason and in the same place. Bar Cop no
+         longer books a recurring bill just because the month arrived, so mid-month this statement is
+         genuinely lighter than the operator's head — this line is what closes that gap. Month column
+         only: a year-to-date "expected" figure would mix a forecast into a historical total. */
+      + (expM
+        ? line('Expected this month, not yet logged', expM, null, { sub: 1, col: 'var(--t3)' })
         : '')
       + line('Operating Income (before taxes)', opIncM, opIncY, { bold: 1, border: 1, col: opIncCol })
       + sec('Key Cost Ratios')
@@ -2120,6 +2129,29 @@ S.HubBooks = {
         return ytd ? (mk.slice(0, 4) === year && mk <= monthKey) : (mk === monthKey);
       })
       .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  },
+
+  /* ⭐⭐⭐ WHAT THIS MONTH IS EXPECTED TO COST THAT NOBODY HAS LOGGED YET (Phase 3 item 16).
+     Until the generator died, every recurring bill was BOOKED on day 1 of its month whether or not
+     it had been paid — measured on the seeded account at 5 August, $16,378.00 of expenses nobody had
+     touched. Deleting that is right; letting the money vanish from the statement without a word is
+     the same dishonesty pointing the other way, and the operator reconciling against their bank
+     would read it as Bar Cop losing their rent.
+     ⭐ IT ASKS THE SHIPPED PROJECTION RATHER THAN COUNTING OCCURRENCES AGAIN. `projectedBills` already
+     answers "which occurrences fall in this range and are NOT already covered by a row the operator
+     logged" — consume-once, and pinned across four rounds of defects. A second implementation of
+     that arithmetic in Books is exactly the drift this rebuild exists to end.
+     ⚠ ONLY THE MONTH BEING READ, and only forward-looking money: a closed month where everything was
+     logged returns 0 and the line does not render at all. */
+  _expectedNotLogged(monthKey) {
+    if (!monthKey || typeof CashEngine === 'undefined' || !CashEngine.projectedBills) return 0;
+    const first = monthKey + '-01';
+    const y = parseInt(monthKey.slice(0, 4), 10), m = parseInt(monthKey.slice(5, 7), 10);
+    const last = monthKey + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0');
+    try {
+      return (CashEngine.projectedBills(first, last) || [])
+        .reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+    } catch (e) { return 0; }
   },
 
   _opExSums(monthKey, ytd) {
