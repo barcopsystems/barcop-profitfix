@@ -1866,7 +1866,13 @@ S.HubOperatingExpenses = {
      "Identical to the cent every time" is a fact about the data, not a magic number — that is the
      whole fixed-vs-varies test. A varying bill reports the AVERAGE of what was actually observed and
      says `varies: true`, so the forecast can be honest about the precision it has. */
-  deriveRecurringBills() {
+  /* ⚠ `rows` IS OPTIONAL AND THE CALLER SHOULD PASS IT. Left to default, this reads the screen's own
+     `expenseRows()` — which means a CONSUMER asking this question gets the answer through a screen
+     object's view of the data rather than through its own reader. That is a second path to the same
+     array, and it is exactly what broke three assertions on the first cutover attempt: the cash
+     engine has `bills()`, its own filtered reader, and asking the screen instead made the answer
+     depend on which `App` the screen happened to close over. Pass the rows you already have. */
+  deriveRecurringBills(rows) {
     /* ⛔⛔ TWO DETECTORS, AND THEY CANNOT BE ONE. Found by running Kyle's real bank register rather
        than any fixture ([[the-loop]] #32): the first version keyed on MONTH indices alone, which is
        right for rent, insurance and subscriptions and structurally blind to everything shorter.
@@ -1885,7 +1891,7 @@ S.HubOperatingExpenses = {
     /* Cash-only rows are excluded: draws, loans and tax remittances are projected by the Cash
        Outflows side already, and deriving them here would double them in the forecast. */
     const groups = {};
-    this.expenseRows().forEach(r => {
+    (Array.isArray(rows) ? rows : this.expenseRows()).forEach(r => {
       if (!r || this.isCashOnlyCategory(r && r.category)) return;
       const k = this._vendorKey(r.vendor);
       if (!k) return;
@@ -2024,14 +2030,14 @@ S.HubOperatingExpenses = {
     return { weekly: 52, fortnightly: 26, monthly: 12, quarterly: 4, annual: 1 }[frequency] || 12;
   },
 
-  recurringBills() {
+  recurringBills(rows) {
     const CYCLE_DAYS = { weekly: 7, fortnightly: 14, monthly: 31, quarterly: 92, annual: 366 };
     const decisions = this.recurringDecisions();
     const today = (App.todayLocal ? App.todayLocal() : '') || '';
     const dayNo = (ymd) => Date.UTC(parseInt(String(ymd).slice(0, 4), 10),
       parseInt(String(ymd).slice(5, 7), 10) - 1, parseInt(String(ymd).slice(8, 10), 10)) / 86400000;
     const now = dayNo(today);
-    const derived = this.deriveRecurringBills().filter(b => {
+    const derived = this.deriveRecurringBills(rows).filter(b => {
       if (decisions[b.vendorKey] === 'no') return false;
       if (isNaN(now)) return true;    // no clock to compare against: never drop on a bad reading
       const span = CYCLE_DAYS[b.frequency] || 31;
@@ -2056,19 +2062,29 @@ S.HubOperatingExpenses = {
        has none of that history, so preferring it would quietly resurrect a stopped series.
        ⚠ `derived: false` is stamped explicitly, never left undefined — a consumer testing `!b.derived`
        would read a missing field as "typed" and the two cases would be indistinguishable. */
-    const typed = this.expenseRows().filter(r =>
+    const typed = (Array.isArray(rows) ? rows : this.expenseRows()).filter(r =>
       r && r.recurring && !r.recurring_parent && r.date && !this.isCashOnlyCategory(r.category));
+    /* ⛔⛔ TYPED BILLS ARE NEVER DEDUPED AGAINST EACH OTHER — ONLY AGAINST DERIVED ONES. Two bills
+       from one vendor are two bills: an equipment loan and a second equipment loan, a stopped series
+       and its replacement, three lines of fixed overhead a bar entered without vendors at all.
+       ⛔ MEASURED, and it is [[the-loop]] #50 in a new costume ("a discriminator that can be empty is
+       not a discriminator"). My first version skipped a typed bill whose key was already claimed,
+       and fell back to `'id:' + r.id` for a vendorless one — which is `'id:undefined'` for EVERY bill
+       that has neither. Three vendorless fixed costs collapsed into one and the weekly nut read
+       $12,000/month against a truth of $16,100: break-even, the reserve target and Safe to Spend all
+       low, silently, in the dangerous direction. `verify-reserve-weeks-floor` caught it.
+       ⭐ So `claimed` exists for ONE purpose: telling a derived bill that a typed one already speaks
+       for that vendor. It never gates a typed bill. */
     const claimed = {};
     const out = [];
-    typed.forEach(r => {
+    typed.forEach((r, i) => {
       const k = this._vendorKey(r.vendor);
-      // A typed bill with no vendor at all cannot collide with anything, and keying it on '' would
-      // make every such bill collide with every other. Key it on its own id instead.
-      const key = k || ('id:' + r.id);
-      if (claimed[key]) return;
-      claimed[key] = true;
+      if (k) claimed[k] = true;
       out.push({
-        vendorKey: key, vendor: r.vendor || r.category || 'Bill', category: r.category || '',
+        // Its own identity, unique per bill — never a shared fallback. A derived bill can only be
+        // suppressed by a vendor key, which a vendorless typed bill does not have and does not need.
+        vendorKey: k || ('typed:' + (r.id || i)),
+        vendor: r.vendor || r.category || 'Bill', category: r.category || '',
         frequency: r.frequency === 'quarterly' ? 'quarterly' : r.frequency === 'annual' ? 'annual' : 'monthly',
         day: parseInt(r.recur_day, 10) || parseInt(String(r.date).slice(8, 10), 10) || 1,
         weekday: null, amount: parseFloat(r.amount) || 0, varies: false,

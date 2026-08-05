@@ -120,15 +120,18 @@ S.HubBreakEven = {
     // whose fixed TERM is fully paid, so the break-even nut agrees with Cash Position's
     // reserve target instead of carrying a paid-off loan or canceled bill forever.
     const curYm = App.todayLocal().slice(0, 7);
-    /* ▶ THE ITEM-16 CUTOVER BELONGS HERE, and it must land in the same edit as the two cash-engine
-       consumers or the nut and the forecast disagree about which bills exist. This still reads the
-       manual `recurring` checkbox, which a drop-only operator never ticks — measured: three clean
-       months of statements holding $5,652.55/month of real fixed costs, and this read a $0.00 nut
-       and a NULL break-even. `S.HubOperatingExpenses.recurringBills()` is the replacement, built and
-       pinned; see `pending-recurring-cutover.js` for the contract and the two things that broke on
-       the first attempt. */
-    const recurring = opex.filter(r => {
-      if (!r || !r.recurring || r.recurring_parent) return false;
+    /* ⭐⭐⭐ THE CUTOVER (Phase 3 item 16). Was `opex.filter(r => r.recurring)` — the manual checkbox,
+       which a drop-only operator never ticks, so this read a $0.00 nut and a NULL break-even against
+       three clean months of statements holding $5,652.55/month of real fixed costs.
+       ⚠ ITS OWN ROWS GO IN. `opex` is this screen's already cash-only-filtered list; handing it over
+       keeps one path to the data. Asking the resolver to fetch its own is what broke three
+       assertions on the first attempt — the answer then depended on which `App` the screen object
+       had closed over rather than on the rows the caller was reasoning about.
+       ⚠ THE STOP / TERM / NOT-STARTED RULES STILL APPLY, and only to TYPED bills (`b.row`), because
+       only they carry that history. A derived bill's evidence is the ledger itself. */
+    const recurring = _OEX.recurringBills(opex).filter(b => {
+      const r = b.row;
+      if (!r) return true;                                          // derived: staleness already applied
       if (r.stopped_ym && r.stopped_ym <= curYm) return false;
       const endYm = (window.CashEngine && CashEngine.recurringEndYm) ? CashEngine.recurringEndYm(r) : null;
       if (endYm && endYm < curYm) return false;
