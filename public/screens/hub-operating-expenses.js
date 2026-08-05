@@ -230,6 +230,44 @@ S.HubOperatingExpenses = {
     return rows.length;
   },
 
+  /* ⭐⭐⭐ THE REPAIR — REMOVE THE ROWS THE APP ITSELF SHOULD NEVER HAVE WRITTEN.
+     `catchUpRecurring` used to adopt every migrated recurring outflow as a recurring BILL parent and
+     generate a real child row per elapsed month, on every login, forever. That is fixed at source,
+     but the rows already written are sitting in real accounts. They are invisible today (they carry
+     the parent's cash-only category) and they are POISON at the cutover: the moment
+     `CashEngine.cashOutflows()` reads the ledger, each one becomes a second copy of a payment the
+     engine already projects from the series. A $4,000 monthly draw migrated three months ago would
+     be charged four times.
+
+     ⛔ THE DISCRIMINATOR IS EXACT, WHICH IS THE ONLY REASON A DELETE IS ACCEPTABLE HERE. A generated
+     row has `recurring_parent` and NO `migrated_from`. Every genuine twin carries
+     `migrated_from: 'cash_outflow'`, because `migrateCashOutflowRow` always sets it and nothing else
+     writes one. And a row the OPERATOR typed under a cash-only category name has neither mark, so
+     this cannot reach their money — that case is handled by `_isOperatingRow`, which makes it
+     visible again rather than deleting it.
+
+     ⛔ IT DELETES NOTHING IT CANNOT NAME. No date range, no "everything cash-only", no count-based
+     heuristic: one predicate, three clauses, each provable from the row itself.
+     ⛔ NEVER OFF A CACHE-SERVED LOAD — a partial picture could make a real twin look parentless.
+     ⛔ A REFUSED DELETE LEAVES THE ROW IN MEMORY so the next login retries against the truth, and
+     `_isOperatingRow` keeps it hidden meanwhile, so a failed repair changes no figure. */
+  _isGeneratedCashRow(r) {
+    return !!r && this.isCashOnlyCategory(r.category) && !!r.recurring_parent && !r.migrated_from;
+  },
+  async repairGeneratedCashRows() {
+    if (typeof App === 'undefined' || !App.data) return 0;
+    if (typeof DB !== 'undefined' && DB._loadDegraded) return 0;
+    const arr = this.records();
+    const doomed = arr.filter(r => this._isGeneratedCashRow(r));
+    if (!doomed.length) return 0;
+    let removed = 0;
+    for (let i = 0; i < doomed.length; i++) {
+      // Awaited one at a time: a refusal must stop counting, not be swallowed by a bulk boolean.
+      if (await App.removeRecord('core', 'operating_expense', doomed[i].id)) removed++;
+    }
+    return removed;
+  },
+
   _tab:            'current',
   _entryMode:      'manual',   // manual | import (Add Expense form)
   _histShown:      0,          // History log window (0 = default to LIST_PAGE)
@@ -319,7 +357,25 @@ S.HubOperatingExpenses = {
      One rule, `isCashOnlyCategory`, applied everywhere the words "operating expenses" appear. When
      the screens merge and this page becomes Money Out, the stat gets a name that covers both and
      this exclusion is what makes that a labelling change rather than an arithmetic one. */
-  _isOperatingRow(r) { return !!r && !this.isCashOnlyCategory(r.category); },
+  /* ⭐⭐⭐ THREE THINGS CAN WEAR A CASH-ONLY CATEGORY, AND ONLY TWO OF THEM ARE MONEY OUT.
+     Keying purely on the NAME was wrong in one direction that cost the operator their own money:
+       · a MIGRATED TWIN     — cash-only name + `migrated_from` .......... money out, hide it
+       · a PHANTOM CHILD     — cash-only name + `recurring_parent` ....... damage, hide it
+       · an OPERATOR'S ROW   — cash-only name and NEITHER mark .......... THEIR EXPENSE, show it
+     The third exists because `isCashOnlyCategory` matches a string the operator could type into the
+     list manager. An expense filed under a category they named "Owner Draw" was excluded from the
+     month total, the year total AND the log, so it had no Edit and no Delete button on ANY screen —
+     while the By Category card printed "Owner Draw $0.00", which reads as *no draws* rather than
+     *$750 missing*. The name is refused now (App.listReservedWhy, both doors), but rows already
+     filed under one have to become reachable again, and deleting them was never an option.
+     ⛔ THE TEST IS ORDER-INDEPENDENT ON PURPOSE. A phantom child stays hidden by its own
+     `recurring_parent`, whether or not `repairGeneratedCashRows` has managed to delete it yet — so a
+     refused repair can never put phantom money on the P&L. */
+  _isOperatingRow(r) {
+    if (!r) return false;
+    if (!this.isCashOnlyCategory(r.category)) return true;
+    return !r.migrated_from && !r.recurring_parent;
+  },
   /* ⭐⭐⭐ THE ROWS THIS SCREEN IS ABOUT — USE THIS, NOT `records()`, IN EVERY READER.
      `records()` is the LIVE array and must stay that way: writers push into it, and the migration
      and the reconcile have to see every row including the cash-only ones. But since Phase 1 that

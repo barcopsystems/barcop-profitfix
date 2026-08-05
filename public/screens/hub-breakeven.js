@@ -149,7 +149,9 @@ S.HubBreakEven = {
        ⚠ SAME RULE AND SAME EXCLUSIONS AS CashEngine.weeklyFixedCosts, deliberately: tax is
        collected money passing through (the cash tax hold already reserves it) and a draw is not a
        cost of opening the doors. Two screens, one definition. */
-    const debtAnnual = ((App.data && App.data.cash_outflows) || []).reduce((s, o) => {
+    // ⭐ THE LEDGER, through the engine's own reader (the cutover). This figure and
+    // CashEngine.weeklyFixedCosts both count debt service, so they must read one set of records.
+    const debtAnnual = ((window.CashEngine && CashEngine.cashOutflows()) || []).reduce((s, o) => {
       if (!o || !o.recurring) return s;
       if (o.type !== 'loan' && o.type !== 'capital') return s;
       if (o.stopped_ym && o.stopped_ym <= curYm) return s;

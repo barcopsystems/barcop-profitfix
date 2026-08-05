@@ -153,7 +153,10 @@ S.HubBooks = {
       + line('Prime Cost (COGS + Labor)', M.totalCogs + M.totalLabor, YTD.totalCogs + YTD.totalLabor, { bold: 1, border: 1 })
       + sec('Operating Expenses')
       // Every operating-expense line comes from OPEX_LINES. See the note on that table.
-      + this._opExStatementLines(opexM).map(l =>
+      // ⛔ THE LINE LIST COVERS BOTH COLUMNS. Built from the MONTH map alone, a category with $0 this
+      // month and $4,000 year to date printed NO ROW while the YTD total counted it, so the lines
+      // did not sum to the total directly beneath them.
+      + this._opExStatementLines(this._opExUnion(opexM, opexY)).map(l =>
           line(l.label, this._opExLineValue(l, opexM, M), this._opExLineValue(l, opexY, YTD), { sub: 1 })).join('')
       + line('Total Operating Expenses', totalOpExM, totalOpExY, { bold: 1, border: 1 })
       + line('Operating Income (before taxes)', opIncM, opIncY, { bold: 1, border: 1, col: opIncCol })
@@ -1890,7 +1893,21 @@ S.HubBooks = {
     rows.push(['Line 23: Taxes and licenses', ov('Licenses and Permits'), 'Operating Expenses: Licenses and Permits', '']);
     rows.push(['Line 25: Utilities', ov('Utilities'), 'Operating Expenses: Utilities', '']);
     rows.push(['Line 26: Wages (less employment credits)', YTD.totalLabor, 'Sum of Labor Control wages for ' + year, '']);
-    rows.push(['Line 27a: Other expenses', ov('Software and Subscriptions') + ov('Other'), 'Operating Expenses: software / subscriptions + other', '']);
+    /* ⛔⛔ EVERY CATEGORY THE OPERATOR ADDED LANDS HERE, OR IT LEAVES THE TAX FORM ENTIRELY.
+       The lines above name nine categories by hand, and `_opExSums` stopped folding unknowns into
+       'Other' when the roll-up started following the operator's own list. So a category they added
+       ("Delivery App Fees") matched no line and no fallback: measured, deduction lines totalling
+       $6,300 against a $10,300 ledger, $4,000 of real deductions missing from the one document
+       carrying literal IRS line numbers. Schedule C's lines are fixed by the IRS, so an added
+       category cannot have its own row — 27a is where it belongs, and the note says which. */
+    const _named = ['Marketing and Advertising', 'Bank and Credit Card Fees', 'Insurance',
+      'Professional Fees', 'Occupancy (Rent, Property Tax)', 'Licenses and Permits', 'Utilities',
+      'Software and Subscriptions', 'Other'];
+    const _extraCats = Object.keys(opexY || {}).filter(c => _named.indexOf(c) < 0 && Math.abs(ov(c)) > 0.005);
+    const _extraSum = _extraCats.reduce((s, c) => s + ov(c), 0);
+    rows.push(['Line 27a: Other expenses', ov('Software and Subscriptions') + ov('Other') + _extraSum,
+      'Operating Expenses: software / subscriptions + other'
+        + (_extraCats.length ? ' + ' + _extraCats.join(' + ') : ''), '']);
     rows.push(blank());
 
     rows.push(['Part III: Cost of Goods Sold Detail', '', '', '']);
@@ -2043,6 +2060,24 @@ S.HubBooks = {
      following the operator's own list — a category they ADD gets its own key. The stale sentence is
      the one a reader hits first, and it is exactly the belief that made a hardcoded nine-name copy
      in hub-year-end look correct for months. */
+  /* ⭐⭐⭐ A REAL UNION OF CATEGORY MAPS, BECAUSE `Object.assign` IS NOT ONE HERE.
+     `_opExSums` returns a DENSE map: every `categoryList()` category seeded to 0 in every period.
+     So `Object.assign({}, a, b)` has all of a's keys present in b at 0, and degenerates to **b** —
+     last-wins, not a union. Two shipped "unions" were written that way and both were silently inert.
+     And `_opExStatementLines` only emits an added-category line when the value clears 0.005, so a
+     category with money in ONE period and zero in the other got no LINE while the TOTAL, computed
+     from a different map, still counted it. Measured: an Income Statement whose YTD lines summed
+     $6,300 under a YTD total of $10,300.
+     Summing is what makes it right: the union decides WHICH LINES PRINT, and the values are still
+     read per period, so a category with money anywhere clears the gate exactly once. */
+  _opExUnion() {
+    const out = {};
+    for (let i = 0; i < arguments.length; i++) {
+      const m = arguments[i] || {};
+      Object.keys(m).forEach(k => { out[k] = (out[k] || 0) + (parseFloat(m[k]) || 0); });
+    }
+    return out;
+  },
   _opExSums(monthKey, ytd) {
     const out = {};
     /* ⭐⭐ ONE CANONICAL LIST, AND IT IS NOW THE OPERATOR'S OWN (2026-08-04). The comment that used

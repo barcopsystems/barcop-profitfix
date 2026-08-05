@@ -701,7 +701,9 @@ S.WeekReview = {
     const opex = ((App.data && App.data.operating_expenses) || [])
       .filter(r => !S.HubOperatingExpenses.isCashOnlyCategory(r && r.category));
     const billsWk = opex.filter(r => r && this._inWeek(r.date)).length;
-    const outflowWk = ((App.data && App.data.cash_outflows) || []).filter(o => this._inWeek(o.date || o.created_at)).length;
+    // ⭐ THE LEDGER, through the engine's own reader, so this count and the forecast can never be
+    // counting two different sets of records (the cutover — see CashEngine.cashOutflows).
+    const outflowWk = (CashEngine.cashOutflows() || []).filter(o => this._inWeek(o.date || o.created_at)).length;
     const billsMonth = opex.filter(r => r && String(r.date || '').slice(0, 7) === st.curKey).length;
     const rawRun = key => { try { return localStorage.getItem(key); } catch (e) { return null; } };
     const pnlRun = rawRun('books_report_run_weeklypnl');

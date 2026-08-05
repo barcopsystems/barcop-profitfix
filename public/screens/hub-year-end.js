@@ -383,8 +383,12 @@ S.HubYearEnd = {
     const totalOpExP = _oxTotal(P.opex, P);
     rows.push(['Operating Expenses', '', '', '']);
     /* ⚠ THE UNION OF BOTH YEARS' CATEGORIES, so a category used only in the PRIOR year still gets
-       a row rather than vanishing from the comparison it exists to make. */
-    _oxLines(Object.assign({}, P.opex || {}, Y.opex || {})).forEach(l => {
+       a row rather than vanishing from the comparison it exists to make.
+       ⛔ AND IT HAS TO BE A REAL UNION. `Object.assign` over two DENSE maps is last-wins — it was
+       just `Y.opex` — so a category used in 2025 and dropped in 2026 got no row while the prior-year
+       TOTAL still counted it: lines $10,800 under a total of $14,800. The comment above was true of
+       the intent and false of the code. */
+    _oxLines(S.HubBooks._opExUnion(P.opex, Y.opex)).forEach(l => {
       row('  ' + l.label, _oxVal(l, Y.opex, Y), _oxVal(l, P.opex, P));
     });
     row('Total Operating Expenses', totalOpExY, totalOpExP);
@@ -508,7 +512,12 @@ S.HubYearEnd = {
     rows.push(['Operating Expenses', ...Array(13).fill('')]);
     /* ⚠ THE UNION ACROSS EVERY MONTH, so a category used in one month gets a row for the whole
        year rather than appearing only when the render happens to hit that month first. */
-    const _seriesOpex = (Y.months || []).reduce((a, M) => Object.assign(a, M.opex || {}), {});
+    /* ⛔⛔ `Object.assign` OVER DENSE MAPS IS LAST-WINS, NOT A UNION — this was DECEMBER's map.
+       Every month carries every category key (seeded to 0), so the reduce just overwrote its way to
+       the final month. Generate this workbook in any month before December and months 9-12 are all
+       zeros, so EVERY operator-added category lost its row for the whole sheet — while the Annual
+       Summary tab of the same workbook printed it. Two tabs of one file disagreeing. */
+    const _seriesOpex = S.HubBooks._opExUnion.apply(S.HubBooks, (Y.months || []).map(M => M.opex || {}));
     _oxLines(_seriesOpex).forEach(l => {
       seriesRow('  ' + l.label, M => _oxVal(l, M.opex, M));
     });
