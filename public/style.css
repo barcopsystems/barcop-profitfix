@@ -2,7 +2,7 @@
 
 :root {
   --bg:        #070E15;
-  --surface:   #08131A;
+  --surface:   #070E15;
   --input:     #070E15;
   --panel:     #08131A;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
   --zone:      #0B1722;                /* Un-box language: data ROW fill, just slightly lighter than --surface so rows lift off the header band. The header band uses --surface (the sidebar color) and row hover uses --nav-act (the sidebar's selected navy), so the three stay in one family. This is the only new tone; --bg and --surface remain the two mains. */
