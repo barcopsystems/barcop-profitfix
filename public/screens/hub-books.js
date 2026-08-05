@@ -153,17 +153,9 @@ S.HubBooks = {
       + line('Total Labor', M.totalLabor, YTD.totalLabor, { bold: 1, border: 1 })
       + line('Prime Cost (COGS + Labor)', M.totalCogs + M.totalLabor, YTD.totalCogs + YTD.totalLabor, { bold: 1, border: 1 })
       + sec('Operating Expenses')
-      + line('Occupancy (rent, property tax)', opexM['Occupancy (Rent, Property Tax)'] || 0, opexY['Occupancy (Rent, Property Tax)'] || 0, { sub: 1 })
-      + line('Utilities', opexM['Utilities'] || 0, opexY['Utilities'] || 0, { sub: 1 })
-      + line('Insurance', opexM['Insurance'] || 0, opexY['Insurance'] || 0, { sub: 1 })
-      + line('Marketing and advertising', opexM['Marketing and Advertising'] || 0, opexY['Marketing and Advertising'] || 0, { sub: 1 })
-      + line('Repairs and maintenance', M.maintenance, YTD.maintenance, { sub: 1 })
-      + line('3rd-party platform fees', M.platformFees, YTD.platformFees, { sub: 1 })
-      + line('Professional fees', opexM['Professional Fees'] || 0, opexY['Professional Fees'] || 0, { sub: 1 })
-      + line('Bank and credit card fees', opexM['Bank and Credit Card Fees'] || 0, opexY['Bank and Credit Card Fees'] || 0, { sub: 1 })
-      + line('Licenses and permits', opexM['Licenses and Permits'] || 0, opexY['Licenses and Permits'] || 0, { sub: 1 })
-      + line('Software and subscriptions', opexM['Software and Subscriptions'] || 0, opexY['Software and Subscriptions'] || 0, { sub: 1 })
-      + line('Other operating expenses', opexM['Other'] || 0, opexY['Other'] || 0, { sub: 1 })
+      // Every operating-expense line comes from OPEX_LINES. See the note on that table.
+      + this._opExStatementLines(opexM).map(l =>
+          line(l.label, this._opExLineValue(l, opexM, M), this._opExLineValue(l, opexY, YTD), { sub: 1 })).join('')
       + line('Total Operating Expenses', totalOpExM, totalOpExY, { bold: 1, border: 1 })
       + line('Operating Income (before taxes)', opIncM, opIncY, { bold: 1, border: 1, col: opIncCol })
       + sec('Key Cost Ratios')
@@ -457,11 +449,80 @@ S.HubBooks = {
      Returns the PARTS as well as the total, so a caller printing "Total Operating Expenses"
      beside "Operating Income" cannot sum the line one way and the total another.
      Pinned by verify-books-month-agrees.js. */
+  /* ⭐⭐ THE OPERATING-EXPENSE LINES, DECLARED ONCE (Phase 0 of the one-ledger rebuild, 2026-08-04).
+     Three places used to assemble this same list by hand — the on-screen statement, the export rows
+     and the total in `_plParts` — and they had already drifted: the platform-fees line was headed
+     "3rd-party platform fees" on screen and "3rd-party platform fees (DoorDash, UberEats, etc.)" in
+     the export. One line, two spellings, in one file, and nobody could see it because the list only
+     existed as repetition.
+
+     `cat` means the line reads the operating-expense LOG under that category name (exact match, so
+     do not rename one without the other). `from` means it reads a store that is NOT the log, and
+     that is the whole problem the rebuild exists to end: a repair typed in Maintenance AND on a card
+     statement lands on two lines of one statement, because the two numbers come from two places.
+
+     ⛔ THE COUNT OF `from` LINES IS RATCHETED at `verify-money-out-contract.js` block C. It is 2
+     today and it may only go down. When it reaches 0 there is one source for every line, and a
+     double count stops being something to guard against and becomes impossible.
+
+     ⚠ `exportLabel` exists so the accountant's workbook can keep the longer heading it has always
+     had. Unifying them silently would have been a copy change to a document that leaves the
+     building, made as a side effect of a refactor. */
+  OPEX_LINES: [
+    { label: 'Occupancy (rent, property tax)', cat: 'Occupancy (Rent, Property Tax)' },
+    { label: 'Utilities',                      cat: 'Utilities' },
+    { label: 'Insurance',                      cat: 'Insurance' },
+    { label: 'Marketing and advertising',      cat: 'Marketing and Advertising' },
+    { label: 'Repairs and maintenance',        from: 'maintenance' },
+    { label: '3rd-party platform fees',        from: 'platformFees',
+      exportLabel: '3rd-party platform fees (DoorDash, UberEats, etc.)' },
+    { label: 'Professional fees',              cat: 'Professional Fees' },
+    { label: 'Bank and credit card fees',      cat: 'Bank and Credit Card Fees' },
+    { label: 'Licenses and permits',           cat: 'Licenses and Permits' },
+    { label: 'Software and subscriptions',     cat: 'Software and Subscriptions' },
+    { label: 'Other operating expenses',       cat: 'Other' }
+  ],
+
+  /* One line's figure, from whichever source the table names. The ONLY place that decides where an
+     operating-expense number comes from, so the screen, the export and the total cannot disagree. */
+  _opExLineValue(line, opex, agg) {
+    if (!line) return 0;
+    return line.cat ? ((opex && opex[line.cat]) || 0) : ((agg && agg[line.from]) || 0);
+  },
+
+  /* ⛔⛔ THE DECLARED LINES PLUS ANYTHING THE OPERATOR ADDED, and this closes a hole opened earlier
+     the same day. `_opExSums` used to fold every unknown category into 'Other', so the nine builtin
+     lines covered everything. Once it started following the operator's OWN list (so a category they
+     added stopped having its money silently reassigned), `opex` gained keys no declared line claims
+     — and the total, which sums every key, then included money that appears on no line. The
+     statement's lines and its own total disagreed, quietly, by exactly that amount.
+     Appending them here is the same answer the By Category card already gives: the operator's list
+     drives the rows. It also makes "the lines sum to the total" true by construction rather than by
+     both happening to cover the same nine names. */
+  _opExStatementLines(opex) {
+    const claimed = {};
+    this.OPEX_LINES.forEach(l => { if (l.cat) claimed[l.cat] = true; });
+    const extra = Object.keys(opex || {})
+      .filter(c => !claimed[c] && Math.abs(opex[c] || 0) > 0.005)
+      .sort()
+      .map(c => ({ label: c, cat: c, added: true }));
+    /* Before 'Other operating expenses', which is the catch-all and has always been last. A real
+       category printed under the catch-all reads like a subtotal that it is not. */
+    const at = this.OPEX_LINES.findIndex(l => l.cat === 'Other');
+    if (!extra.length || at < 0) return this.OPEX_LINES.concat(extra);
+    return this.OPEX_LINES.slice(0, at).concat(extra, this.OPEX_LINES.slice(at));
+  },
+
   _plParts(monthKey, ytd) {
     const A = ytd ? this._aggregateYTD(monthKey) : this._aggregateMonth(monthKey);
     const opex = this._opExSums(monthKey, !!ytd);
-    const totalOpEx = Object.values(opex).reduce((s, v) => s + (v || 0), 0)
-      + (A.maintenance || 0) + (A.platformFees || 0);
+    /* ⛔ THE TOTAL SUMS THE DECLARED LINES, AND NAMES NO SOURCE OF ITS OWN. It used to read
+       `Object.values(opex).sum + A.maintenance + A.platformFees`, so adding a line to the statement
+       meant remembering to add a term here as well — and forgetting is silent, because a missing
+       term simply makes Operating Income read high. Summing the same table the statement prints
+       means the figure beside "Operating Income" cannot disagree with the lines above it. */
+    const totalOpEx = this._opExStatementLines(opex)
+      .reduce((s, l) => s + this._opExLineValue(l, opex, A), 0);
     const netRev = A.totalRev;
     const gross = netRev - A.totalCogs;
     return { A, opex, totalOpEx, netRev, gross, opInc: gross - A.totalLabor - totalOpEx };
@@ -621,17 +682,13 @@ S.HubBooks = {
     const operatingIncomeM = _P.opInc, operatingIncomeY = _PY.opInc;
 
     rows.push(['Operating Expenses', '', '']);
-    rows.push(r('  Occupancy (rent, property tax)',                 opexM['Occupancy (Rent, Property Tax)']    || 0, opexY['Occupancy (Rent, Property Tax)']    || 0));
-    rows.push(r('  Utilities',                                      opexM['Utilities']                         || 0, opexY['Utilities']                         || 0));
-    rows.push(r('  Insurance',                                      opexM['Insurance']                         || 0, opexY['Insurance']                         || 0));
-    rows.push(r('  Marketing and advertising',                      opexM['Marketing and Advertising']         || 0, opexY['Marketing and Advertising']         || 0));
-    rows.push(r('  Repairs and maintenance',                        M.maintenance,                                  YTD.maintenance));
-    rows.push(r('  3rd-party platform fees (DoorDash, UberEats, etc.)', M.platformFees,                              YTD.platformFees));
-    rows.push(r('  Professional fees',                              opexM['Professional Fees']                 || 0, opexY['Professional Fees']                 || 0));
-    rows.push(r('  Bank and credit card fees',                      opexM['Bank and Credit Card Fees']         || 0, opexY['Bank and Credit Card Fees']         || 0));
-    rows.push(r('  Licenses and permits',                           opexM['Licenses and Permits']              || 0, opexY['Licenses and Permits']              || 0));
-    rows.push(r('  Software and subscriptions',                     opexM['Software and Subscriptions']        || 0, opexY['Software and Subscriptions']        || 0));
-    rows.push(r('  Other operating expenses',                       opexM['Other']                             || 0, opexY['Other']                             || 0));
+    /* Same table as the on-screen statement, so the two cannot spell one line two ways again —
+       which they already did. `exportLabel` is where a line deliberately keeps a longer heading for
+       the accountant's workbook. */
+    this._opExStatementLines(opexM).forEach(l => {
+      rows.push(r('  ' + (l.exportLabel || l.label),
+        this._opExLineValue(l, opexM, M), this._opExLineValue(l, opexY, YTD)));
+    });
     rows.push(r('Total Operating Expenses', totalOpExM, totalOpExY));
     rows.push(blank());
 

@@ -364,25 +364,25 @@ S.HubYearEnd = {
     row('Prime Cost (COGS + Labor)', Y.totalCogs + Y.totalLabor, P.totalCogs + P.totalLabor);
     rows.push(blank());
 
-    // Operating Expenses — from the Operating Expenses log + Shift Control
-    // maintenance + weekly platform fees. Books and Year-End share the same
-    // category enum so the numbers tie back across both deliverables.
-    const totalOpExY = Object.values(Y.opex || {}).reduce((s, v) => s + (v || 0), 0)
-                      + (Y.maintenance || 0) + (Y.platformFees || 0);
-    const totalOpExP = Object.values(P.opex || {}).reduce((s, v) => s + (v || 0), 0)
-                      + (P.maintenance || 0) + (P.platformFees || 0);
+    /* ⭐ THE LINES COME FROM BOOKS' ONE DECLARED TABLE (Phase 0, 2026-08-04). Year-End used to
+       carry its own copy of the eleven operating-expense lines TWICE — here and in the 12-month
+       series below — plus three separate hand-assembled totals. Books had three more. Ten places
+       spelling out one list, which is why nobody could see that two of those lines are fed from a
+       store that is not the expense log, and why a category the operator ADDED appeared on no line
+       at all while still counting in every total.
+       `_opExStatementLines` is the declared table plus anything the operator added; summing the
+       same walk the rows print is what makes the total incapable of disagreeing with them. */
+    const _oxLines = (opex) => S.HubBooks._opExStatementLines(opex || {});
+    const _oxVal   = (line, opex, agg) => S.HubBooks._opExLineValue(line, opex || {}, agg || {});
+    const _oxTotal = (opex, agg) => _oxLines(opex).reduce((t, l) => t + _oxVal(l, opex, agg), 0);
+    const totalOpExY = _oxTotal(Y.opex, Y);
+    const totalOpExP = _oxTotal(P.opex, P);
     rows.push(['Operating Expenses', '', '', '']);
-    row('  Occupancy (rent, property tax)',           (Y.opex?.['Occupancy (Rent, Property Tax)'] || 0), (P.opex?.['Occupancy (Rent, Property Tax)'] || 0));
-    row('  Utilities',                                (Y.opex?.['Utilities']                      || 0), (P.opex?.['Utilities']                      || 0));
-    row('  Insurance',                                (Y.opex?.['Insurance']                      || 0), (P.opex?.['Insurance']                      || 0));
-    row('  Marketing and advertising',                (Y.opex?.['Marketing and Advertising']      || 0), (P.opex?.['Marketing and Advertising']      || 0));
-    row('  Repairs and maintenance',                  Y.maintenance,                                    P.maintenance);
-    row('  3rd-party platform fees',                  Y.platformFees,                                   P.platformFees);
-    row('  Professional fees',                        (Y.opex?.['Professional Fees']              || 0), (P.opex?.['Professional Fees']              || 0));
-    row('  Bank and credit card fees',                (Y.opex?.['Bank and Credit Card Fees']      || 0), (P.opex?.['Bank and Credit Card Fees']      || 0));
-    row('  Licenses and permits',                     (Y.opex?.['Licenses and Permits']           || 0), (P.opex?.['Licenses and Permits']           || 0));
-    row('  Software and subscriptions',               (Y.opex?.['Software and Subscriptions']     || 0), (P.opex?.['Software and Subscriptions']     || 0));
-    row('  Other operating expenses',                 (Y.opex?.['Other']                          || 0), (P.opex?.['Other']                          || 0));
+    /* ⚠ THE UNION OF BOTH YEARS' CATEGORIES, so a category used only in the PRIOR year still gets
+       a row rather than vanishing from the comparison it exists to make. */
+    _oxLines(Object.assign({}, P.opex || {}, Y.opex || {})).forEach(l => {
+      row('  ' + l.label, _oxVal(l, Y.opex, Y), _oxVal(l, P.opex, P));
+    });
     row('Total Operating Expenses', totalOpExY, totalOpExP);
     rows.push(blank());
 
@@ -502,28 +502,17 @@ S.HubYearEnd = {
     rows.push(blank());
 
     rows.push(['Operating Expenses', ...Array(13).fill('')]);
-    seriesRow('  Occupancy (rent, property tax)',   M => M.opex?.['Occupancy (Rent, Property Tax)'] || 0);
-    seriesRow('  Utilities',                        M => M.opex?.['Utilities']                      || 0);
-    seriesRow('  Insurance',                        M => M.opex?.['Insurance']                      || 0);
-    seriesRow('  Marketing and advertising',        M => M.opex?.['Marketing and Advertising']      || 0);
-    seriesRow('  Repairs and maintenance',          M => M.maintenance || 0);
-    seriesRow('  3rd-party platform fees',          M => M.platformFees || 0);
-    seriesRow('  Professional fees',                M => M.opex?.['Professional Fees']              || 0);
-    seriesRow('  Bank and credit card fees',        M => M.opex?.['Bank and Credit Card Fees']      || 0);
-    seriesRow('  Licenses and permits',             M => M.opex?.['Licenses and Permits']           || 0);
-    seriesRow('  Software and subscriptions',       M => M.opex?.['Software and Subscriptions']     || 0);
-    seriesRow('  Other operating expenses',         M => M.opex?.['Other']                          || 0);
-    seriesRow('Total Operating Expenses', M => {
-      const opexSum = Object.values(M.opex || {}).reduce((s, v) => s + (v || 0), 0);
-      return opexSum + (M.maintenance || 0) + (M.platformFees || 0);
+    /* ⚠ THE UNION ACROSS EVERY MONTH, so a category used in one month gets a row for the whole
+       year rather than appearing only when the render happens to hit that month first. */
+    const _seriesOpex = (Y.months || []).reduce((a, M) => Object.assign(a, M.opex || {}), {});
+    _oxLines(_seriesOpex).forEach(l => {
+      seriesRow('  ' + l.label, M => _oxVal(l, M.opex, M));
     });
+    seriesRow('Total Operating Expenses', M => _oxTotal(M.opex, M));
     rows.push(blank());
 
-    seriesRow('Operating Income', M => {
-      const opexSum = Object.values(M.opex || {}).reduce((s, v) => s + (v || 0), 0);
-      const totalOpEx = opexSum + (M.maintenance || 0) + (M.platformFees || 0);
-      return M.totalRev - M.totalCogs - M.totalLabor - totalOpEx;
-    });
+    seriesRow('Operating Income', M =>
+      M.totalRev - M.totalCogs - M.totalLabor - _oxTotal(M.opex, M));
     rows.push(blank());
 
     rows.push(['Key Cost Ratios', ...Array(13).fill('')]);
@@ -1179,7 +1168,11 @@ S.HubYearEnd = {
     // is already net sales (comps excluded by the POS), so do NOT re-subtract
     // comps or re-expense policy comps — that double-removed them and made this
     // PDF disagree with the Annual Summary tab of the same file.
-    const opExYpdf = Object.values(Y.opex || {}).reduce((s, v) => s + (v || 0), 0) + (Y.maintenance || 0) + (Y.platformFees || 0);
+    /* ⚠ THE SIXTH AND LAST HAND-ASSEMBLED COPY IN THIS FILE. Its own comment above records the PDF
+       once disagreeing with the Annual Summary tab of the same workbook, which is the failure mode
+       of assembling one total in six places. Summing the declared table is what stops it. */
+    const opExYpdf = S.HubBooks._opExStatementLines(Y.opex || {})
+      .reduce((t, l) => t + S.HubBooks._opExLineValue(l, Y.opex || {}, Y), 0);
     const opIncomeYpdf = Y.totalRev - Y.totalCogs - Y.totalLabor - opExYpdf;
     b.sectionTitle('The Year in Dollars');
     b.table(null, [
