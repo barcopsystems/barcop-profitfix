@@ -22,7 +22,15 @@ S.ProfitForecast = {
   MIN_OPEX_WEEKS: 4,  // need about a month of opex history before projecting lumpy bills
 
   weeks()   { return (App.data.weeks || []).filter(w => w.period_end); },
-  opexLog() { return (App.data.operating_expenses || []); },
+  /* ⛔ OPERATING expenses only. Since the one-ledger merge this array also holds owner draws, loan
+     payments, capital buys and tax remittances — money that leaves the bank but is NOT an operating
+     cost. Unfiltered, every one of them was averaged into `avgWeeklyOpex` in `runRates()` and
+     subtracted from both projection scenarios, so the projected Operating Profit was low by the
+     whole of an owner's draw. Same predicate the P&L, break-even and the cash engine use. */
+  opexLog() {
+    const rows = (App.data.operating_expenses || []);
+    return rows.filter(r => !S.HubOperatingExpenses.isCashOnlyCategory(r && r.category));
+  },
   targets() { return (App.data.settings.targets || {}); },
   horizonWeeks() { return (this.HORIZONS.find(h => h.v === this.horizon) || this.HORIZONS[2]).weeks; },
 

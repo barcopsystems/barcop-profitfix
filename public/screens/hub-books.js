@@ -107,7 +107,6 @@ S.HubBooks = {
     // contract, not fmtBal's.
     const f = v => (v == null || isNaN(v)) ? '-' : App.fmtBal(v);
     const pct = v => (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%';
-    const opexSum = o => Object.values(o).reduce((s, v) => s + (v || 0), 0);
     // Revenue entered from the POS is NET sales (comps/discounts already excluded),
     // so the P&L must NOT re-subtract comps from revenue or re-expense policy comps
     // — either one double-removed them. Comps stay tracked in Shift Control for
@@ -2038,9 +2037,12 @@ S.HubBooks = {
   // Operating Expenses by category. Reads App.data.operating_expenses (entered
   // by the operator in the Operating Expenses log under Accounting). When
   // ytd is true, sums the calendar year through monthKey; otherwise sums
-  // just monthKey. Returns an object keyed by category name (matches the
-  // locked enum in S.HubOperatingExpenses.CATEGORIES). Unknown / legacy
-  // categories fold into 'Other' so nothing gets dropped from the rollup.
+  // just monthKey. Returns an object keyed by category name.
+  /* ⚠ THIS HEADER USED TO SAY the keys "match the locked enum in CATEGORIES" and that unknown
+     categories "fold into 'Other'". BOTH ARE FALSE and have been since the roll-up started
+     following the operator's own list — a category they ADD gets its own key. The stale sentence is
+     the one a reader hits first, and it is exactly the belief that made a hardcoded nine-name copy
+     in hub-year-end look correct for months. */
   _opExSums(monthKey, ytd) {
     const out = {};
     /* ⭐⭐ ONE CANONICAL LIST, AND IT IS NOW THE OPERATOR'S OWN (2026-08-04). The comment that used
@@ -2058,7 +2060,13 @@ S.HubBooks = {
       'Professional Fees', 'Bank and Credit Card Fees', 'Licenses and Permits', 'Software and Subscriptions', 'Other'
     ]);
     known.forEach(k => { out[k] = 0; });
-    const records = App.data?.operating_expenses || [];
+    /* ⛔ OPERATING expenses only. Since the one-ledger merge this array also holds owner draws,
+       loan payments and tax remittances, and bucketing them by `_catOf` put keys like "Owner Draw"
+       into this map. Nothing PRINTED them — `_opExStatementLines` filters and `_plParts` totals
+       that same walk — so the containment was one careless `Object.values(opex)` away from putting
+       an owner's draw on the P&L. Filter at the source, where the question is asked. */
+    const records = (App.data?.operating_expenses || [])
+      .filter(r => !S.HubOperatingExpenses.isCashOnlyCategory(r && r.category));
     const year = monthKey.slice(0, 4);
     records.forEach(r => {
       const mk = String(r.date || '').slice(0, 7);

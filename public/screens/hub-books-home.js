@@ -25,6 +25,15 @@ S.HubBooksHome = {
   // rendered the SAME figure as "-$45,000.00" (hub-books _incomeStatementCard), on a
   // pair of screens whose own comment promises they always agree. App.fmtBal is the
   // canonical balance formatter; the null/NaN dash is this file's own contract.
+  /* ⛔ A DRAW IS NOT A BILL. Since the one-ledger merge `operating_expenses` also holds owner
+     draws, loan payments and tax remittances, and all three readers below counted them: the
+     briefing stopped saying "log this month's bills first", the step read "1 bill logged this
+     month" for a month with only a draw, and the day-one checklist ticked "Add your operating
+     expenses" off one. One accessor so a fourth reader cannot disagree with these three. */
+  _bills() {
+    return ((App.data && App.data.operating_expenses) || [])
+      .filter(r => !S.HubOperatingExpenses.isCashOnlyCategory(r && r.category));
+  },
   _money(v)  { return (v == null || isNaN(v)) ? '-' : App.fmtBal(Number(v)); },
   _pct(v)    { return (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%'; },
   _dateLbl(iso) { try { const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { return null; } },
@@ -157,7 +166,7 @@ S.HubBooksHome = {
 
     // 3 — the one move
     let move;
-    const billsMonth = ((App.data && App.data.operating_expenses) || []).filter(r => r && String(r.date || '').slice(0, 7) === st.curKey).length;
+    const billsMonth = this._bills().filter(r => r && String(r.date || '').slice(0, 7) === st.curKey).length;
     if (billsMonth === 0) move = 'Log this month\'s bills first, so the operating income above is complete before you close.';
     else if (st.dueCount > 0) move = 'Clear the ' + st.dueCount + ' permit or license item' + (st.dueCount === 1 ? '' : 's') + ' flagged' + (st.expiredCt > 0 ? ', ' + st.expiredCt + ' already expired' : '') + '.';
     else move = 'The numbers are current. Generate Month-End Books when you are ready to hand it to your accountant.';
@@ -207,7 +216,7 @@ S.HubBooksHome = {
 
   stepStatus(k, st) {
     if (k === 'expenses') {
-      const n = ((App.data && App.data.operating_expenses) || []).filter(r => r && r.date && String(r.date).slice(0, 7) === st.curKey).length;
+      const n = this._bills().filter(r => r && r.date && String(r.date).slice(0, 7) === st.curKey).length;
       return n ? n + ' bill' + (n === 1 ? '' : 's') + ' logged this month' : 'No bills logged yet this month';
     }
     if (k === 'pnl')      { const d = this._lastRun('books_report_run_weeklypnl'); return d ? 'Report last run ' + d : 'Not run yet'; }
@@ -257,7 +266,7 @@ S.HubBooksHome = {
   getStartedDone() {
     const has = (a) => Array.isArray(a) && a.length > 0;
     const hasWeeks   = has(App.data && App.data.weeks);
-    const hasOpex    = has(App.data && App.data.operating_expenses);
+    const hasOpex    = has(this._bills());
     const hasInv     = has(App.inventoryData && App.inventoryData.ic_products);
     const hasPermits = has(App.data && App.data.permits_compliance);
     return { hasWeeks, hasOpex, hasInv, hasPermits, all: hasWeeks && hasOpex && hasInv && hasPermits };

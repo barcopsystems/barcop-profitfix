@@ -146,7 +146,10 @@ S.HubOperatingExpenses = {
     if (!rows.length) { marks.cash_outflow_to_ledger = true; await App.saveKey('migrated_kinds'); return false; }
     arr.push.apply(arr, rows);
     let ok = false;
-    try { ok = await App.putRecordsBulk('core', 'operating_expense', rows); }
+    // quiet: this fires from a boot, never from something the operator did — the same policy the
+    // reconcile below states for the identical situation, and the catch-up above already uses.
+    // A red "save failed" toast at login, for a background job nobody asked for, is not actionable.
+    try { ok = await App.putRecordsBulk('core', 'operating_expense', rows, { quiet: true }); }
     catch (e) { ok = false; }
     // A refused write takes the rows back out of memory and leaves the marker unset, so the next
     // login tries again against a store that never saw them.
@@ -154,6 +157,77 @@ S.HubOperatingExpenses = {
     marks.cash_outflow_to_ledger = true;
     await App.saveKey('migrated_kinds');
     return true;
+  },
+
+  /* ⭐⭐⭐ THE RECONCILE — PHASE 1 STEP 7. THE LEDGER'S CASH ROWS ARE A PURE FUNCTION OF THE OLD
+     STORE, AND THIS IS WHAT KEEPS THEM THAT WAY.
+     The migration above is one-time and marked. This runs on EVERY load, right after it, and is the
+     repair for everything the one-time pass cannot cover:
+       · a live write whose ledger half was refused (the door writes the old store first on purpose)
+       · a delete whose old-store half was refused, which restores the twin
+       · outflows that arrived by a path the migration never saw — the sample-data seed, or an
+         account whose migration was skipped because that login was served from cache
+     Without it, "the ledger holds every dollar out" is true only until the first refused write, and
+     nothing would ever say so.
+
+     ⛔ ADDITIVE, AND THAT IS THE WHOLE SAFETY ARGUMENT. It only ever writes rows INTO the ledger —
+     it never deletes one. A pass that removed ledger rows with no matching outflow would be correct
+     on paper and catastrophic on a login where `cash_outflows` came back empty for any reason other
+     than the operator emptying it. The door's delete order is what makes a removal pass unnecessary:
+     the ledger row goes first, so an orphan is never created.
+
+     ⛔ NEVER OFF A CACHE-SERVED LOAD, for the same reason the migration refuses one: a partial
+     picture would rewrite ledger rows from outflows that are not all there.
+     ⚠ A row already in the ledger under a DIFFERENT origin is left alone. Only rows this mechanism
+     created (`migrated_from: 'cash_outflow'`) may be rewritten, so an id collision with a real
+     operating expense can never overwrite the operator's own bill.
+     ⚠ `created_at` is provenance, not money: the mapping mints one when the source has none, so
+     comparing it would make every load rewrite every row forever. The stored one is kept. */
+  async reconcileCashOutflowLedger() {
+    if (typeof App === 'undefined' || !App.data) return 0;
+    if (typeof DB !== 'undefined' && DB._loadDegraded) return 0;
+    const src = Array.isArray(App.data.cash_outflows) ? App.data.cash_outflows : [];
+    if (!src.length) return 0;
+    const arr = this.records();
+    const by = {};
+    arr.forEach(r => { if (r && r.id != null) by[r.id] = r; });
+    // Key-order-independent, so a row that came back from the server in a different order than the
+    // mapping builds it is not mistaken for a difference and rewritten on every single load.
+    /* Key-order-independent, so a row that came back from the server in a different order than the
+       mapping builds it is not mistaken for a difference and rewritten on every single load.
+       ⚠ AND UNDEFINED-BLIND, which is the other half. `JSON.stringify` DROPS an undefined value from
+       an object but renders it as `null` inside an array — so a source row missing `amount` or
+       `type` stores a payload with no such key, while the freshly mapped row carries
+       `["type",null]`. That compares unequal forever: a silent rewrite of the same bytes on every
+       login for the life of the account. Treating undefined as absent is what the storage does. */
+    const norm = (r) => JSON.stringify(Object.keys(r).filter(k => r[k] !== undefined).sort().map(k => [k, r[k]]));
+    const rows = [];
+    src.forEach(o => {
+      const want = this.migrateCashOutflowRow(o);
+      if (!want) return;
+      const have = by[want.id];
+      if (have && have.migrated_from !== 'cash_outflow') return;   // somebody else's row — never touch it
+      if (have) want.created_at = have.created_at || want.created_at;
+      if (have && norm(have) === norm(want)) return;               // already in step
+      rows.push(want);
+    });
+    if (!rows.length) return 0;
+    rows.forEach(w => { const i = arr.findIndex(r => r && r.id === w.id); if (i >= 0) arr[i] = w; else arr.push(w); });
+    let ok = false;
+    try { ok = await App.putRecordsBulk('core', 'operating_expense', rows, { quiet: true }); }
+    catch (e) { ok = false; }
+    /* A refused repair puts memory back exactly as putRecord does for a single row, and stays
+       silent — the operator did not ask for this and nothing they can see is wrong. The next login
+       tries again, against a ledger that never saw the rows. */
+    if (!ok) {
+      rows.forEach(w => {
+        const i = arr.findIndex(r => r && r.id === w.id);
+        if (i < 0) return;
+        if (by[w.id]) arr[i] = by[w.id]; else arr.splice(i, 1);
+      });
+      return 0;
+    }
+    return rows.length;
   },
 
   _tab:            'current',
@@ -246,6 +320,30 @@ S.HubOperatingExpenses = {
      the screens merge and this page becomes Money Out, the stat gets a name that covers both and
      this exclusion is what makes that a labelling change rather than an arithmetic one. */
   _isOperatingRow(r) { return !!r && !this.isCashOnlyCategory(r.category); },
+  /* ⭐⭐⭐ THE ROWS THIS SCREEN IS ABOUT — USE THIS, NOT `records()`, IN EVERY READER.
+     `records()` is the LIVE array and must stay that way: writers push into it, and the migration
+     and the reconcile have to see every row including the cash-only ones. But since Phase 1 that
+     array also holds owner draws, loan payments and tax remittances, and TEN readers on this screen
+     were still asking it "which rows are bills?" — `_catchUpOnce`, `_expectedRecurring`,
+     `_termWarning`, `_monthNotes`, `_monthCardHtml`, `_ownCover`, `_sumMonthByCategory`,
+     `_sumYTDByCategory`, `_categoryForVendor` and `_buildExpenseRows`. The first six were the
+     scan's; the last four the PIN found, which is the point of having one.
+
+     ⛔⛔ THE WORST OF THEM MINTED MONEY. `_catchUpOnce` adopted every migrated recurring outflow as
+     a recurring BILL parent and generated a real child row per elapsed month, on every login,
+     forever — because `recurring` means two different things in the two stores. Operating expenses
+     STORE their history as child rows; cash outflows PROJECT theirs from the parent and store
+     nothing. The migration copied the field verbatim across that boundary, which is exactly what
+     [[the-loop]] #51 says to check before copying a record shape to its twin. Stop did not stop it
+     either: `_owesMonth` never reads `stopped_ym`, and the outflow door's Stop deliberately keeps
+     `recurring: true`. The children were invisible — they inherit the cash-only category, so every
+     figure that filters excluded them — and at the cutover each one becomes a second copy of an
+     outflow the engine already projects.
+
+     ⚠ Fixing them one at a time is what produced three rounds last chat ([[the-loop]] #109). One
+     accessor, and `verify-expense-readers-one-set.js` fails the build if an eleventh reader appears
+     that asks `records()` a question about bills. */
+  expenseRows() { return this.records().filter(r => this._isOperatingRow(r)); },
   _sumMonth(monthKey) {
     return this.records().filter(r => this._isOperatingRow(r) && this._monthKey(r.date) === monthKey)
       .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
@@ -305,7 +403,7 @@ S.HubOperatingExpenses = {
   _sumMonthByCategory(monthKey) {
     const out = {};
     this.categoryList().forEach(c => { out[c] = 0; });
-    this.records().filter(r => r && this._monthKey(r.date) === monthKey).forEach(r => {
+    this.expenseRows().filter(r => r && this._monthKey(r.date) === monthKey).forEach(r => {
       const c = this._catOf(r);
       out[c] = (out[c] || 0) + (parseFloat(r.amount) || 0);
     });
@@ -316,7 +414,7 @@ S.HubOperatingExpenses = {
     const year = monthKey.slice(0, 4);
     const out = {};
     this.categoryList().forEach(c => { out[c] = 0; });
-    this.records().filter(r => {
+    this.expenseRows().filter(r => {
       if (!r) return false;
       const mk = this._monthKey(r.date);
       return mk && mk.slice(0, 4) === year && mk <= monthKey;
@@ -454,7 +552,7 @@ S.HubOperatingExpenses = {
     const rawDay = parseInt(p.recur_day, 10) || (isNaN(start.getTime()) ? 1 : start.getDate());
     const dueDay = Math.min(rawDay, this._daysInMonth(y, m0));
     const due = monthKey + '-' + String(dueDay).padStart(2, '0');
-    const hit = this.records().find(r => r && r.date && !r.recurring && !r.recurring_parent
+    const hit = this.expenseRows().find(r => r && r.date && !r.recurring && !r.recurring_parent
       && String(r.date).slice(0, 7) === monthKey && String(r.date).slice(0, 10) >= due
       && App.billIdentityKey(r) === key
       && !(used && used.has(r.id))) || null;
@@ -487,7 +585,7 @@ S.HubOperatingExpenses = {
      ([[the-loop]] #30). Stated here rather than guessed at. */
   _monthNotes() {
     const mk = this._currentMonthKey();
-    const arr = this.records();
+    const arr = this.expenseRows();
     const pool = arr.filter(r => r && r.date && !r.recurring && !r.recurring_parent
       && String(r.date).slice(0, 7) === mk);
     const used = new Set();
@@ -628,7 +726,11 @@ S.HubOperatingExpenses = {
     const arr = this.records();
     const now = new Date();
     const curIdx = now.getFullYear() * 12 + now.getMonth();
-    const parents = arr.filter(r => r && r.recurring && !r.recurring_parent && r.date);
+    /* ⛔⛔⛔ `expenseRows`, NOT `arr`. This filter had no category test, so every migrated cash
+       outflow with `recurring: true` became a recurring BILL parent and this loop generated a real
+       child row for it per elapsed month, on every login, forever — see the note on `expenseRows`.
+       `arr` stays the live array below because the children are PUSHED into it. */
+    const parents = this.expenseRows().filter(r => r && r.recurring && !r.recurring_parent && r.date);
     let added = false; const newRecs = [];
     // ⚠ ONE LOGGED BILL SUPPRESSES ONE SERIES, NOT EVERY SERIES IT MATCHES (S226 round 2). Two
     // identical parents both found the same hand-entered row and both stood down. Same consume-once
@@ -707,7 +809,7 @@ S.HubOperatingExpenses = {
     const curIdx = now.getFullYear() * 12 + now.getMonth();
     const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const lbl = (idx) => MON[idx % 12] + ' ' + Math.floor(idx / 12);
-    const ending = this.records().filter(r => r && r.recurring && !r.recurring_parent && r.date && parseInt(r.term_months, 10) > 0).map(p => {
+    const ending = this.expenseRows().filter(r => r && r.recurring && !r.recurring_parent && r.date && parseInt(r.term_months, 10) > 0).map(p => {
       const s = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
       if (isNaN(s.getTime())) return null;
       const endIdx = s.getFullYear() * 12 + s.getMonth() + parseInt(p.term_months, 10) - 1;
@@ -932,7 +1034,7 @@ S.HubOperatingExpenses = {
 
   // Expected (not-yet-booked) recurring rows for a future month: a forecast only.
   _expectedRecurring(monthKey) {
-    const arr = this.records();
+    const arr = this.expenseRows();
     const _usedNext = new Set();   // one logged bill stands down one series — see _ownCover
     const idx = parseInt(monthKey.slice(0, 4), 10) * 12 + (parseInt(monthKey.slice(5, 7), 10) - 1);
     const out = [];
@@ -966,7 +1068,11 @@ S.HubOperatingExpenses = {
   _monthCardHtml(monthKey, opts) {
     opts = opts || {};
     const fmt$ = (v) => App.fmtCurrency(v || 0);
-    const recs = this.records().filter(r => r && String(r.date || '').slice(0, 7) === monthKey);
+    // ⛔ `expenseRows`, not `records` — this card printed Owner Draw and Loan Payment rows with
+    // working Edit / Delete / Stop buttons, under a headline (`_sumMonth`) that correctly excluded
+    // them, so the list did not add up to its own total. Worse, those buttons write only the ledger
+    // half, and the reconcile silently reverted the operator's edit on the next login.
+    const recs = this.expenseRows().filter(r => r && String(r.date || '').slice(0, 7) === monthKey);
     /* ⚠ A TIEBREAK, because recurring bills all fall on the same day and the order was then whatever
        order the records happened to sit in — it visibly reshuffled after a re-seed. Biggest first
        within a day is what an operator scans for; category settles a true tie so the list is stable
@@ -1389,7 +1495,7 @@ S.HubOperatingExpenses = {
   _categoryForVendor(name) {
     const k = this._vendorKey(name);
     if (!k) return '';
-    const hits = this.records().filter(r => r && this._vendorKey(r.vendor) === k
+    const hits = this.expenseRows().filter(r => r && this._vendorKey(r.vendor) === k
       && String(r.category || '').trim() && String(r.category).trim().toLowerCase() !== 'other');
     if (!hits.length) return '';
     hits.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
@@ -1507,7 +1613,7 @@ S.HubOperatingExpenses = {
        ⛔ AND `_used` MUST BE LOCAL TO THIS CALL. The screen re-walks on every render; a Set that
        survived between calls would mark the same logged row as spent, so the second repaint would
        show it as new and the button would climb by one per render. */
-    const _pre = this.records().slice();
+    const _pre = this.expenseRows();
     const _used = new Set();
     const _dup = (date, amount, vendor, category) => {
       const pred = x => x.date === date && Math.abs((parseFloat(x.amount) || 0) - amount) < 0.005

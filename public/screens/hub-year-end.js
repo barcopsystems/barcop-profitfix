@@ -208,19 +208,17 @@ S.HubYearEnd = {
     // is the canonical store; Books and Year-End both read from it via the
     // shared _opExSums helper. Repairs/Maintenance + Platform Fees come from
     // sc_maintenance + weekly platform_fees instead to avoid double-counting.
-    const opexCategories = [
-      'Occupancy (Rent, Property Tax)',
-      'Utilities',
-      'Insurance',
-      'Marketing and Advertising',
-      'Professional Fees',
-      'Bank and Credit Card Fees',
-      'Licenses and Permits',
-      'Software and Subscriptions',
-      'Other'
-    ];
+    /* ⛔⛔ THE TENTH SITE, AND IT WAS 165 LINES ABOVE THE COMMENT SAYING THIS WAS FIXED. This spelled
+       out its own copy of the nine builtin categories and accumulated ONLY those keys, while
+       `_opExSums` follows `categoryList()` — the operator's own list. So a category the operator
+       ADDED summed to zero here: measured on a $6,000 year with $4,000 under "Delivery App Fees",
+       the Annual Summary read Total Operating Expenses $2,000 and Operating Income $4,000 HIGH,
+       while the P&L by Month sheet in the SAME WORKBOOK summed $6,000. The Year-End PDF reads this
+       one. The category got no line either, because `_oxLines` never saw the key.
+       ⭐ Seeded from the shared list and then accumulated from the MONTHS' OWN KEYS, so the twelve
+       make the one by construction and there is no list left here to keep in step with anything. */
     const opex = {};
-    opexCategories.forEach(c => { opex[c] = 0; });
+    (S.HubOperatingExpenses.categoryList() || []).forEach(c => { opex[c] = 0; });
     for (let m = 1; m <= 12; m++) {
       const monthKey = year + '-' + String(m).padStart(2, '0');
       const M = S.HubBooks._aggregateMonth(monthKey);
@@ -245,7 +243,7 @@ S.HubYearEnd = {
       agg.compsPolicy   += M.compsPolicy   || 0;
       agg.maintenance   += M.maintenance   || 0;
       agg.platformFees  += M.platformFees  || 0;
-      opexCategories.forEach(c => { opex[c] += monthOpex[c] || 0; });
+      Object.keys(monthOpex || {}).forEach(c => { opex[c] = (opex[c] || 0) + (monthOpex[c] || 0); });
     }
     return { months, ...agg, opex };
   },
@@ -275,7 +273,13 @@ S.HubYearEnd = {
     rows.push(['Vendor', 'Total Paid', 'Payments']);
 
     const byVendor = {};
-    (App.data?.operating_expenses || []).forEach(r => {
+    /* ⛔ A DRAW IS NOT A 1099 PAYEE. Safe only by accident today — `migrateCashOutflowRow` hardcodes
+       `vendor: ''` and the loop below skips blanks — and the accident ends the moment a cash outflow
+       carries a payee. An owner's draw on a 1099-NEC worksheet is a tax document naming the wrong
+       kind of payment, so this is filtered on purpose rather than left to a blank field. */
+    (App.data?.operating_expenses || [])
+      .filter(r => !S.HubOperatingExpenses.isCashOnlyCategory(r && r.category))
+      .forEach(r => {
       if (String(r.date || '').slice(0, 4) !== String(year)) return;
       const v = (r.vendor || '').trim(); if (!v) return;
       if (!byVendor[v]) byVendor[v] = { total: 0, count: 0 };

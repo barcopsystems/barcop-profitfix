@@ -693,7 +693,13 @@ S.WeekReview = {
       doneCount = BH.ORDER.filter(k => done[k]).length;
     } catch (e) { return null; }
 
-    const opex = (App.data && App.data.operating_expenses) || [];
+    /* ⛔ BILLS ARE NOT OUTFLOWS, AND THIS COUNTED ONE DRAW AS BOTH. Since the one-ledger merge
+       `operating_expenses` also holds the cash outflows, so an owner draw incremented "Bills
+       Logged" here AND "Outflows Logged" on the line below it, side by side on the same card and
+       in the PDF. It also suppressed the "no bills logged this month yet" prompt for a month whose
+       only row was a draw. */
+    const opex = ((App.data && App.data.operating_expenses) || [])
+      .filter(r => !S.HubOperatingExpenses.isCashOnlyCategory(r && r.category));
     const billsWk = opex.filter(r => r && this._inWeek(r.date)).length;
     const outflowWk = ((App.data && App.data.cash_outflows) || []).filter(o => this._inWeek(o.date || o.created_at)).length;
     const billsMonth = opex.filter(r => r && String(r.date || '').slice(0, 7) === st.curKey).length;

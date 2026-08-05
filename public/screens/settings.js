@@ -1091,6 +1091,21 @@ S.HubSettings = {
       { id:uid(), date:monthAnchor(1, 20), type:'tax', amount:6850, notes:'Sales tax remittance', created_at:new Date().toISOString() },
       { id:uid(), date:monthAnchor(0, 20), type:'tax', amount:6800, notes:'Sales tax remittance', created_at:new Date().toISOString() }
     ];
+    /* ⭐ THE SEED IS A WRITE PATH TOO — PHASE 1 STEP 7 OF THE ONE-LEDGER REBUILD. Every dollar out
+       belongs in the ledger, and these five arrive by a door the one-time migration cannot see: it
+       marks itself done on the first login, so a LATER re-seed would mint five fresh outflow ids
+       that never reach `operating_expenses` and simply vanish at the cutover. Built with the SAME
+       mapping every other door uses, and pushed before `seedEventStores('core')` below so they
+       persist with everything else.
+       ⚠ Guarded like the Bar Cop Audit block above rather than called bare, because there IS a
+       backstop here: `reconcileCashOutflowLedger` runs on the next load and adds anything missing.
+       Doing it inline as well is what makes the DEMO right, which never reloads. */
+    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.migrateCashOutflowRow) {
+      App.data.cash_outflows.forEach(o => {
+        const led = S.HubOperatingExpenses.migrateCashOutflowRow(o);
+        if (led) App.data.operating_expenses.push(led);
+      });
+    }
 
     // Pre-stamp the Fix view-tracking so the Cash Fix systems read on track from
     // the first look, the way a bar that has run Bar Cop for 90 days would: the
