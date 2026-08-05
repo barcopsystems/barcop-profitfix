@@ -16,6 +16,14 @@
   --gold-bg:   rgba(219,171,70,0.10);
   --gold-tint: #0D181E;                    /* selection / panel fill (heads-up boxes, banners, playbook + profit-fix active boxes). Opaque so it reads identically on any background. */
   --gold-tint-bord: var(--b-edge);         /* selection border = the standard card border. */
+  /* THE OPEN COCKPIT STEP, and it is its OWN token on purpose. Every one of the eight cockpit step
+     rows used to read --gold-tint, which is shared with sixty other panel fills (heads-up boxes,
+     banners, playbook boxes, Cash Control register tiles, the profit-fix active box). Repointing
+     the shared token to change the step look would have repainted all sixty silently, which is a
+     blanket design change nobody asked for. This is the one line to edit to change it back.
+     ⚠ At #070E15 an OPEN step and a DONE step (--input, same value) carry the same fill, so the
+     open state is told by the border and the chevron rather than by a lift off the page. */
+  --step-open: #070E15;                    /* open cockpit step background. Was var(--gold-tint) #0D181E. */
   --sel-active-bg: #1E2B34;                /* active selector pill / chip background (filter chips, date-range pills, segmented toggles, week selector). A touch lighter than the panel fill so the active choice pops. */
   --red:       #C03828;
   --red-bg:    rgba(192,56,40,0.13);
