@@ -3600,7 +3600,20 @@ const App = {
   listReservedWhy(key, val) {
     if (key !== 'expense_category') return '';
     const v = String(val == null ? '' : val).trim();
-    if (!v || !S.HubOperatingExpenses.isCashOnlyCategory(v)) return '';
+    if (!v) return '';
+    /* ⛔ "Uncategorized" IS A HEADING, NOT A CATEGORY (Phase 3 item 15). Bar Cop renders it over any
+       expense with no category yet, and those are deliberately kept off the Income Statement until
+       somebody sorts them. A real category by that name would print in the same bucket while
+       COUNTING on the P&L, so the card would show one figure and mean two things.
+       ⚠ app.js already carries the scar this prevents: a synthetic "Uncategorized" heading in the
+       menu domain was once ADOPTED as a stored value after a degraded load. Refused at both doors,
+       same as the cash-only names, and the refusal says why ([[the-loop]] #53 — a silent `return
+       false` reads as a broken Add button). */
+    if (v.toLowerCase() === 'uncategorized') {
+      return '"' + v + '" is how Bar Cop labels an expense that has no category yet, so it cannot '
+        + 'also be a category. Give those rows a real category instead, or pick a different name.';
+    }
+    if (!S.HubOperatingExpenses.isCashOnlyCategory(v)) return '';
     return '"' + v + '" is how Bar Cop labels money that leaves the bank but is not an operating '
       + 'cost. Log those on Cash Outflows instead, or pick a different name.';
   },
