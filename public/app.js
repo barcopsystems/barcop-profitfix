@@ -3063,6 +3063,16 @@ const App = {
     if (_migCountBefore !== Object.keys(this.data.migrated_kinds || {}).length) {
       await this.saveKey('migrated_kinds');
     }
+    /* ⭐ PHASE 1 OF THE ONE-LEDGER REBUILD: cash outflows become ledger rows. Runs here because
+       this is the point where `core` is fully loaded and the backstop flags above are accurate,
+       which is the same reason the location stamping below sits here. It refuses to run off a
+       cache-served load, marks itself done only after the write lands, and preserves ids so a
+       retry cannot duplicate — all of that lives in the function, with the reasoning.
+       ⚠ It changes NO figure anywhere in the app: nothing reads the new rows as outflows yet.
+       Proved across eight numbers by verify-outflow-migration-equality.js. */
+    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.migrateCashOutflowsOnce) {
+      await S.HubOperatingExpenses.migrateCashOutflowsOnce();
+    }
     // PERSIST the sort_order stamps assigned above. In-memory-only stamping did not fix the
     // count-sheet order, it displaced the bug by one login: _nextLocSeq reads the in-memory max,
     // so a location added this session got a number ABOVE the un-stamped rows, and on the next
