@@ -368,7 +368,7 @@ S.HubOperatingExpenses = {
   // ── Entry ───────────────────────────────────────────────────────────────
   // Is this page still the one on screen? See the note in App._mountSeq — the Hub content host is
   // permanent, so isConnected can never answer this.
-  _catchUpStillCurrent() { return this._mountedAt === App._mountSeq; },
+  _mountStillCurrent() { return this._mountedAt === App._mountSeq; },
 
   open() {
     /* ⚠ THE BOOKS-AREA GATE, which the three sibling Books pages already carry
@@ -883,106 +883,7 @@ S.HubOperatingExpenses = {
   // CHAINING, not dropping the second call: an operator who adds a back-dated bill while the boot
   // pass is still in flight must still get that bill's months. Each pass reads `arr` only after the
   // previous one has pushed into it, so overlap is impossible and nothing is skipped.
-  catchUpRecurring() {
-    const run = () => this._catchUpOnce();
-    const chain = this._catchUpChain ? this._catchUpChain.then(run) : run();
-    // A rejected pass must not become an unhandledrejection: App.boot() (app.js:682) fires this
-    // without awaiting or catching, and a call with nothing chained after it has no other handler.
-    // Swallow+log at the tail; the caught promise is what the next call chains onto, so a failed
-    // pass still lets a later back-dated bill catch up, and passes stay serialized (never overlap).
-    this._catchUpChain = chain.catch(e => { try { DB.logClientError('opex_catchup', (e && e.message) || String(e), (e && e.stack) || '', 'hub-operating-expenses'); } catch (e2) {} });
-    return this._catchUpChain;
-  },
-  _catchUpChain: null,
 
-  async _catchUpOnce() {
-    // Never generate derived rows from a picture the app admits is incomplete. Its peers already
-    // refuse to (profit-fix.js:101 and r-fix.js open with the same _dataReady test, and
-    // App._maybeAutoBackup bails on _loadDegraded); this one checked neither. A degraded load is
-    // served from a cache that can be months stale and is missing the children, so the dedupe cannot
-    // see them and would mint new ids for months that already exist — the same double-booking by a
-    // different door. Nothing is lost by waiting: these rows are derived and regenerate from the
-    // parent on any later clean load.
-    if (!App.data || !DB._dataReady || DB._loadDegraded) return false;
-    const arr = this.records();
-    const now = new Date();
-    const curIdx = now.getFullYear() * 12 + now.getMonth();
-    /* ⛔⛔⛔ `expenseRows`, NOT `arr`. This filter had no category test, so every migrated cash
-       outflow with `recurring: true` became a recurring BILL parent and this loop generated a real
-       child row for it per elapsed month, on every login, forever — see the note on `expenseRows`.
-       `arr` stays the live array below because the children are PUSHED into it. */
-    const parents = this.expenseRows().filter(r => r && r.recurring && !r.recurring_parent && r.date);
-    let added = false; const newRecs = [];
-    // ⚠ ONE LOGGED BILL SUPPRESSES ONE SERIES, NOT EVERY SERIES IT MATCHES (S226 round 2). Two
-    // identical parents both found the same hand-entered row and both stood down. Same consume-once
-    // shape the importer's dedup uses.
-    const usedOwn = new Set();
-    parents.forEach(p => {
-      const start = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
-      if (isNaN(start.getTime())) return;
-      const startIdx = start.getFullYear() * 12 + start.getMonth();
-      const term = parseInt(p.term_months, 10);
-      const recurDay = p.recur_day || start.getDate();
-      // Recurrence interval in months: monthly (1), quarterly (3), annual (12).
-      const step = p.frequency === 'quarterly' ? 3 : p.frequency === 'annual' ? 12 : 1;
-      // Ongoing (no term) fills through the current month; a fixed term stops at its end.
-      const lastIdx = term > 0 ? Math.min(curIdx, startIdx + term - 1) : curIdx;
-      const have = new Set([start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0')]);
-      /* ⚠⚠ A DELETED MONTH IS A DECISION, AND IT HAS TO BE RECORDED SOMEWHERE THE CATCH-UP CAN SEE
-         (S226a). The dedupe was built ONLY from the months this parent's own children occupy, so
-         removing a child removed the very evidence that stopped it being re-created: _delete ->
-         _rerender -> renderMain -> catchUpRecurring re-minted it with a fresh id in the same breath.
-         Measured: a July rent row deleted and back, id gen3 -> gen4, total unmoved at $16,800. The
-         Delete button on a generated row did nothing at all, permanently, and the only escape was
-         Stop — which drops the bill out of break-even and the cash forecast. */
-      /* ⚠⚠ THE MONTH A CHILD SATISFIES IS A FACT ABOUT THE SCHEDULE, NOT ABOUT THE DATE TYPED IN IT
-         (S226b). Keying on the date's month meant that moving a generated row's due date across a
-         month boundary FREED ITS SLOT, and the next catch-up minted a replacement: measured 4 rows /
-         $16,800 -> 5 rows / $21,000, in BOTH directions (forward to next month, and backward onto a
-         month that already had a child). Rescheduling when a bill is paid is not ordering another
-         one. `recurring_month` is stamped at generation below; children written before this fall back to
-         the date, which is what they were keyed on anyway.
-         Same shape as [[the-loop]] #37: if a field means "how did this row get here", ask what an
-         EDIT does to it. */
-      arr.forEach(r => { if (r && r.recurring_parent === p.id && r.date) have.add(String(r.recurring_month || String(r.date).slice(0, 7))); });
-      for (let idx = startIdx + step; idx <= lastIdx; idx += step) {
-        const yy = Math.floor(idx / 12), mm = idx % 12;
-        const mk = yy + '-' + String(mm + 1).padStart(2, '0');
-        // Schedule + the months the operator deleted, in ONE place both this and the note read.
-        if (!this._owesMonth(p, mk)) continue;
-        if (have.has(mk)) continue;
-        // The operator already logged this month's bill themselves — see _ownCover.
-        if (this._ownCover(p, mk, usedOwn)) continue;
-        const dd = Math.min(recurDay, this._daysInMonth(yy, mm));
-        const child = {
-          id: App.uid ? App.uid() : ('oex-' + idx + '-' + p.id),
-          date: mk + '-' + String(dd).padStart(2, '0'),
-          category: p.category, vendor: p.vendor, amount: p.amount, notes: p.notes,
-          recurring_parent: p.id,
-          recurring_month: mk,   // the month this child SATISFIES — see the dedupe note above (S226b)
-          created_at: new Date().toISOString()
-        };
-        newRecs.push(child);   // NOT pushed into arr yet — see the note on this function
-        have.add(mk);
-        added = true;
-      }
-    });
-    if (!newRecs.length) return false;
-    // quiet: this fires from a boot and from a render, never from something the operator did.
-    if (!(await App.putRecordsBulk('core', 'operating_expense', newRecs, { quiet: true }))) return false;
-    arr.push(...newRecs);
-    // Re-render once, and only on success, so the screen picks up the caught-up months. Cannot
-    // loop: the dedupe above finds them already present next time and generates nothing.
-    // ⚠ This USED to ask `this.container.isConnected`, which can never be false: `.hub-app .content`
-    // is a permanent host that navigation merely empties and refills. So a catch-up that landed
-    // after the operator clicked Permits repainted Operating Expenses over it, with the sidebar
-    // still highlighting Permits. App._mountSeq is bumped on every mount, so a changed value means
-    // this page is no longer the one on screen.
-    if (this._catchUpStillCurrent()) {
-      this._rerender();
-    }
-    return added;
-  },
 
   // Banner for recurring terms within ~2 months of ending or already ended.
   _termWarning() {
@@ -1072,7 +973,6 @@ S.HubOperatingExpenses = {
 
   // ── Main render ────────────────────────────────────────────────────────
   renderMain() {
-    this.catchUpRecurring();   // fill in any elapsed months for recurring bills
     this._view = 'current';
     this.container.innerHTML = '<div class="screen">' + this._renderCurrent() + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
@@ -1084,7 +984,7 @@ S.HubOperatingExpenses = {
     // ⚠ A `mount` argument means this is a FRESH mount (openHubFullPage has just
     // bumped App._mountSeq), so the token is stamped HERE, exactly as open() does at
     // :52. S.HubExpenseHistory.open() delegated straight into this function without
-    // stamping, so `_mountedAt` was permanently stale and `_catchUpStillCurrent()`
+    // stamping, so `_mountedAt` was permanently stale and `_mountStillCurrent()`
     // could only ever be FALSE — the catch-up repaint below was refused 100% of the
     // time. The operator opened Expense History on the first login of a new month,
     // this month's rent was written to the server and pushed into memory, and the
@@ -1094,7 +994,6 @@ S.HubOperatingExpenses = {
     // (It also un-deadened `:230`'s history branch, which was unreachable because
     // `_view` only becomes 'history' by way of this never-stamped mount.)
     if (mount) { this.container = mount; this._mountedAt = App._mountSeq; }
-    this.catchUpRecurring();
     this._view = 'history';
     this.container.innerHTML = '<div class="screen">' + this._historyStats() + this._renderHistory() + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
@@ -1160,7 +1059,6 @@ S.HubOperatingExpenses = {
        correctness depends on that fact staying true, and it is free not to. */
     this.container = el;
     this._view = 'moneyout';
-    this.catchUpRecurring();
     // The step body and the takeover come out of the same builder; the flag picks which shape.
     el.innerHTML = this._addCardHtml({ inline: true, stepBody: !this.moneyOutTakeover() });
     this._wireCurrent();
@@ -2030,6 +1928,24 @@ S.HubOperatingExpenses = {
     return { weekly: 52, fortnightly: 26, monthly: 12, quarterly: 4, annual: 1 }[frequency] || 12;
   },
 
+  /* ⛔⛔⛔ THE GENERATOR IS GONE (Phase 3 item 16, 2026-08-05). `catchUpRecurring` /
+     `_catchUpOnce` ran at every boot and every render and MINTED A REAL EXPENSE ROW per elapsed
+     month, the current one included, in full, on day 1. Those rows were indistinguishable from a
+     bill the operator had actually paid — Books counted them, Schedule C deducted them.
+     ⭐ KYLE'S FRAMING IS WHAT KILLED IT: *"they drop in their expenses and a recurring expense is
+     either there or it isn't."* The drop is the record. A schedule is a forecast input, and
+     `recurringBills()` is where it lives now — break-even and the cash forecast read it, and the
+     Income Statement STATES what is expected and not yet logged rather than booking it.
+     ⭐ MEASURED AT THE CUT, seeded shape at 5 August: it was carrying **$16,378.00** of expenses
+     nobody had paid. Every cent is still named on the statement, just not deducted.
+     ⚠ IT WAS THE SINGLE LARGEST SOURCE OF DEFECTS IN THIS FILE. Deleted with it: a deleted month
+     re-minting on the next render, a re-dated row freeing its slot and double-booking, Stop not
+     stopping, a resumed quarterly bill re-billing monthly from the series start, a refused save
+     being persisted by the catch-up, and migrated cash outflows becoming bill parents forever.
+     ⚠ `_ownCover` went with it — it existed only to decide whether to MINT. `projectedBills`
+     keeps its own own-cover, which suppresses a PROJECTION rather than a write.
+     ⛔ Children already written stay on the account: they are history, and deleting them would
+     restate closed months. That is a separate, destructive call. */
   recurringBills(rows) {
     const CYCLE_DAYS = { weekly: 7, fortnightly: 14, monthly: 31, quarterly: 92, annual: 366 };
     const decisions = this.recurringDecisions();
@@ -2766,7 +2682,7 @@ S.HubOperatingExpenses = {
        same object and re-stamps the SAME `_mountedAt` slot, so the token still matches and the
        repaint went ahead, painting Operating Expenses over the History page the operator had just
        opened. */
-    if (!this._catchUpStillCurrent()) return;
+    if (!this._mountStillCurrent()) return;
     /* ⛔⛔ NAMES THE ONE VIEW THAT SUPPRESSES THE MESSAGE, RATHER THAN "anything but current".
        This read `_view !== 'current'`, which was correct while Expense History was the only other
        view — a read-only log is no place for an import banner. Adding the Money Out card made
