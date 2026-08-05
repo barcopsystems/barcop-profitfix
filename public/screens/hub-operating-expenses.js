@@ -518,6 +518,42 @@ S.HubOperatingExpenses = {
     if (kind === 'all') return true;
     return kind === 'cash' ? !this._isOperatingRow(r) : this._isOperatingRow(r);
   },
+  /* ⭐ THE INVERSE OF `CASH_ONLY_CATEGORIES`, and the ONLY place a category name becomes a type.
+     `migrateCashOutflowRow` maps type → name; this maps name → type, so a row edited or added from
+     the Money Out screen can be written back as the outflow it is. Two hand-rolled directions of
+     one mapping is how they drift, which is why this reads the same table rather than repeating it.
+     Returns '' for anything that is not a cash-only category, so the callers can just ask. */
+  _typeForCashCategory(name) {
+    const t = String(name == null ? '' : name).trim().toLowerCase();
+    if (!t) return '';
+    const hit = this.CASH_ONLY_CATEGORIES.find(x => x.name.toLowerCase() === t);
+    return hit ? hit.type : '';
+  },
+
+  /* ⛔⛔ EDITING A CASH ROW GOES TO THE OPERATOR'S OWN RECORD, NOT TO THE LEDGER TWIN. Same defect
+     as the delete above and found the same way: the twin is DERIVED, so `reconcileCashOutflowLedger`
+     rewrites it from `cash_outflows` on the next load and the edit silently reverts. The edit has to
+     land on the source; the twin follows.
+     ⚠ `_writePair` writes the operator's store FIRST and the ledger best-effort, so a refused save
+     is reported on the store they can see, and a refused TWIN write leaves the ledger lagging where
+     the reconcile repairs it. Returning its boolean means the caller can keep the form open on a
+     refusal instead of claiming a save that did not happen ([[test-the-retry]]). */
+  async _editCashRow(id, patch) {
+    const src = (App.data && Array.isArray(App.data.cash_outflows)) ? App.data.cash_outflows : [];
+    const cur = src.find(o => o && o.id === id);
+    if (!cur) return false;
+    const next = Object.assign({}, cur);
+    if (patch.date != null)   next.date = patch.date;
+    if (patch.amount != null) next.amount = patch.amount;
+    if (patch.notes != null)  next.notes = patch.notes;
+    // A category change is a TYPE change on this store — the twin's category is derived from it.
+    if (patch.category != null) {
+      const t = this._typeForCashCategory(patch.category);
+      if (t) next.type = t;
+    }
+    return await S.HubCashOutflows._writePair(next);
+  },
+
   /* What the exported PDF is called. It must name the SET the export contains, because the chip
      that chose it is in a `no-print` row and never reaches the file. Derived from the chip's own
      label so the two cannot drift apart, with the operating case keeping the name the accountant
@@ -3101,7 +3137,17 @@ S.HubOperatingExpenses = {
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f"><label>Date Submitted</label><input type="date" value="' + esc((rec.created_at || '').slice(0, 10) || rec.date || App.todayLocal()) + '" disabled/></div>'
       +   '<div class="f"><label>Due Date</label><input type="date" id="oex-f-date" value="' + esc(rec.date) + '"/></div>'
-      +   '<div class="f"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oex-f-cat', key: 'expense_category', builtin: this.CATEGORIES, selected: rec.category, blank: true, blankLabel: 'Select category...' }) + '</div>'
+      /* ⛔ A CASH ROW'S EDITOR OFFERS THE CASH KINDS, AND ONLY A CASH ROW'S. Its category is not in
+         `CATEGORIES` (deliberately — `_matchCat` reads that list, and an IMPORT must never bind one:
+         an imported cash-only row would carry no `migrated_from`, so `_isOperatingRow` would count
+         it as a BILL and the forecast would never see it). Without this the edit form showed a draw
+         under whatever the picker defaulted to — the row was safe, because `_typeForCashCategory`
+         returns '' for an unknown name and `_editCashRow` then leaves the type alone, but the form
+         was telling the operator something untrue about their own record.
+         ⚠ SCOPED TO `rec`, NOT ADDED GLOBALLY: offering these on an ORDINARY bill would let one be
+         re-filed as a draw down a save path that writes only the ledger, producing exactly the
+         orphan shape ([[the-loop]] #115) this screen has spent two phases removing. */
+      +   '<div class="f"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oex-f-cat', key: 'expense_category', builtin: this.CATEGORIES.concat(rec.migrated_from === 'cash_outflow' ? this.CASH_ONLY_CATEGORIES.map(c => c.name) : []), selected: rec.category, blank: true, blankLabel: 'Select category...' }) + '</div>'
       +   '<div class="f"><label>Vendor</label><input type="text" id="oex-f-vendor" value="' + esc(rec.vendor) + '" placeholder="Who did you pay"/></div>'
       +   '<div class="f"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div></div>'
       + '</div>'
@@ -3131,6 +3177,24 @@ S.HubOperatingExpenses = {
       if (!category) { showErr('Pick a category.'); return; }
       if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
       const updates = { date, category, vendor, amount, notes };
+      /* ⛔⛔ A CASH ROW IS EDITED AT ITS SOURCE, AND THE REST OF THIS HANDLER MUST NOT RUN ON ONE.
+         The ledger row is DERIVED: `reconcileCashOutflowLedger` rewrites it from `cash_outflows` on
+         every load, so writing the edit here would look right and silently revert on the next
+         login. It also has no series machinery — a draw has no recurring parent, no term, no skip
+         months — so every branch below is about a shape this row does not have.
+         ⚠ THE REFUSAL IS REPORTED, NOT SWALLOWED: `_writePair` returns false when the operator's own
+         store refuses, and keeping the form open with the message is what makes the retry safe
+         ([[test-the-retry]] — the second attempt is where a half-save becomes permanent).
+         Pinned by verify-money-out-write-doors.js section B. */
+      if (isEdit && rec && rec.migrated_from === 'cash_outflow') {
+        if (!(await this._editCashRow(rec.id, { date, amount, notes, category }))) {
+          showErr('Could not save. Check your connection and try again.');
+          return;
+        }
+        App.closeModal();
+        this._rerender();
+        return;
+      }
       const recChecked = !!document.getElementById('oex-f-recurring')?.checked;
       const freqV = document.getElementById('oex-f-frequency')?.value || 'monthly';
       const termV = parseInt(document.getElementById('oex-f-term')?.value, 10);
@@ -3340,6 +3404,22 @@ S.HubOperatingExpenses = {
     const s = this._delExpenseSummary(rec);
     const ok = await App.confirm({ title: s.title, message: s.message, confirmText: 'Delete', maxWidth: 460 });
     if (!ok) return;
+    /* ⛔⛔ A CASH ROW IS NOT OURS TO DELETE ALONE, AND STAGE 1 IS WHAT MADE THIS REACHABLE. The
+       Money Out chip put owner draws, loan payments and tax remittances in this log, and every row
+       here renders Edit and Delete. Removing only the ledger row leaves the operator's own record
+       in `cash_outflows`, and `reconcileCashOutflowLedger` runs on EVERY load and is additive — so
+       MEASURED end to end: the row came straight back on the next login. The Delete button did
+       nothing, permanently, which is S226a's exact defect in a new costume.
+       `_deletePair` is the sanctioned path and carries the order contract (ledger first, so a
+       refused old-store delete leaves the ledger LAGGING and the reconcile repairs it). Bare call,
+       not guarded: a guard here would mean "if the outflow screen has not loaded, delete half a
+       record", which is the silent-wrong-state trade this codebase gets wrong most often
+       ([[the-loop]] #40). Pinned by verify-money-out-write-doors.js section A. */
+    if (rec.migrated_from === 'cash_outflow') {
+      await S.HubCashOutflows._deletePair(id);
+      this._rerender();
+      return;
+    }
     /* ⚠⚠ DELETING A GENERATED MONTH HAS TO BE RECORDED, OR IT IS NOT A DELETE (S226a). These rows
        are DERIVED — the catch-up regenerates them from the parent on any later load — so removing
        the row alone left no trace of the decision and _rerender re-minted it in the same breath.
