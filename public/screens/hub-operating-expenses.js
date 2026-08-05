@@ -478,6 +478,77 @@ S.HubOperatingExpenses = {
     if (!this.isCashOnlyCategory(r.category)) return true;
     return !r.migrated_from && !r.recurring_parent;
   },
+
+  /* ══ PHASE 4 ITEM 19, STAGE 1 — ONE SCREEN FOR MONEY OUT ════════════════════════════════════
+     Cash Outflows, Operating Expenses and Expense History were three sidebar rows over ONE store:
+     Phase 1 migrated every outflow into `operating_expenses` under a cash-only category, and
+     `_isOperatingRow` was the only thing keeping them apart on screen. This is the chip that
+     un-keeps them. `_filteredRecords`' own comment has named this fold since Phase 1.
+
+     ⛔⛔ THE SEAM IS DELIBERATELY NARROW, AND THE NARROWNESS IS THE SAFETY ARGUMENT. Exactly THREE
+     things follow the chip: the headline totals, the By Category card and the log. `expenseRows()`
+     goes on meaning "the bills" and every bill-specific reader is untouched — the recurring notes,
+     the Expected list, the terms banner, `recurringBills`. A draw is not a bill and must never
+     become one because a chip is lit, or the screen starts telling the operator their owner draw is
+     already logged and the forecast projects it as a fixed cost.
+
+     ⛔ AND NOTHING OUTSIDE THIS SCREEN READS ANY OF IT. Measured tree-wide before building:
+     `_sumMonth`, `_sumYTD`, `_filteredRecords`, `_sumMonthByCategory`, `_sumYTDByCategory` and
+     `expenseRows` have ZERO callers in any other file. Books reads its own `_opExSums`, break-even
+     reads `recurringBills`, the cash engine reads `bills()`. So no chip can move a number on
+     another screen. `verify-money-out-kind.js` section C proves the DEFAULT changes nothing at all.
+
+     ⚠ `categoryList()` DELIBERATELY DOES NOT FOLLOW THE CHIP. `hub-books._opExSums` reads it to
+     build the Income Statement's lines, and the Add form reads it for the category picker — so
+     making it chip-aware would let a display filter on this screen change the P&L on another. The
+     CARD gets its own list instead (`_cardCategoryList`). */
+  _filterKind: 'operating',   // operating | cash | all — the default is what the screen showed before
+
+  _kindChipOpts() {
+    return [
+      { v: 'all',       label: 'All Money Out' },
+      { v: 'operating', label: 'Bills' },
+      { v: 'cash',      label: 'Cash Outflows' }
+    ];
+  },
+  /* Written as a PARTITION, not as two independent tests: `cash` is exactly "not operating", so no
+     row can fall in both buckets or in neither, whatever shapes arrive later. */
+  _kindMatches(r, kind) {
+    if (!r) return false;
+    if (kind === 'all') return true;
+    return kind === 'cash' ? !this._isOperatingRow(r) : this._isOperatingRow(r);
+  },
+  /* What the exported PDF is called. It must name the SET the export contains, because the chip
+     that chose it is in a `no-print` row and never reaches the file. Derived from the chip's own
+     label so the two cannot drift apart, with the operating case keeping the name the accountant
+     has always seen on it. */
+  _kindExportTitle() {
+    const kind = this._filterKind || 'operating';
+    if (kind === 'operating') return 'Operating Expenses';
+    const hit = this._kindChipOpts().find(o => o.v === kind);
+    return hit ? hit.label : 'Money Out';
+  },
+  // The rows this screen is SHOWING. The log, the headline and the By Category card, and nothing else.
+  moneyOutRows() {
+    const kind = this._filterKind || 'operating';
+    return this.records().filter(r => this._kindMatches(r, kind));
+  },
+  /* The By Category card's OWN row list. Money bucketed into a category the card never draws is
+     money nobody can see — the exact defect item 15 fixed, where rows summing to $712.55 were
+     computed and never rendered. So when the chip admits cash-only rows, their categories get rows.
+     'Other' stays last, same rule as `categoryList()`. */
+  _cardCategoryList() {
+    const out = this.categoryList().slice();
+    if ((this._filterKind || 'operating') !== 'operating') {
+      this.moneyOutRows().forEach(r => {
+        const c = String((r && r.category) || '').trim();
+        if (c && !out.some(x => x.toLowerCase() === c.toLowerCase())) out.push(c);
+      });
+      const oi = out.findIndex(c => c.toLowerCase() === 'other');
+      if (oi >= 0 && oi !== out.length - 1) out.push(out.splice(oi, 1)[0]);
+    }
+    return out;
+  },
   /* ⭐⭐⭐ THE ROWS THIS SCREEN IS ABOUT — USE THIS, NOT `records()`, IN EVERY READER.
      `records()` is the LIVE array and must stay that way: writers push into it, and the migration
      and the reconcile have to see every row including the cash-only ones. But since Phase 1 that
@@ -502,14 +573,24 @@ S.HubOperatingExpenses = {
      accessor, and `verify-expense-readers-one-set.js` fails the build if an eleventh reader appears
      that asks `records()` a question about bills. */
   expenseRows() { return this.records().filter(r => this._isOperatingRow(r)); },
+  /* ⛔⛔ THESE TWO DELIBERATELY DO **NOT** FOLLOW THE MONEY OUT CHIP, and my first version of item 19
+     had them doing so. Two things broke, both found by reading the diff rather than by any pin:
+       · they feed the CURRENT tab's headline, and the chip only renders on the HISTORY tab — so a
+         chip set on one tab silently moved the other tab's numbers with nothing on screen to
+         explain it;
+       · they feed the OpEx % of Revenue ratio, a named accounting measure that an owner draw has no
+         business in ([[output-honesty]]).
+     The Current tab is about BILLS by construction — it carries the Add form, the recurring notes,
+     the Expected list and the terms banner, every one of them a bill concept. The chip belongs to
+     the History tab, and exactly three readers there follow it: `_historyStats`, the By Category
+     roll-ups and `_filteredRecords`. */
   _sumMonth(monthKey) {
-    return this.records().filter(r => this._isOperatingRow(r) && this._monthKey(r.date) === monthKey)
+    return this.expenseRows().filter(r => this._monthKey(r.date) === monthKey)
       .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
   },
   _sumYTD(monthKey) {
     const year = monthKey.slice(0, 4);
-    return this.records().filter(r => {
-      if (!this._isOperatingRow(r)) return false;
+    return this.expenseRows().filter(r => {
       const mk = this._monthKey(r.date);
       return mk && mk.slice(0, 4) === year && mk <= monthKey;
     }).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
@@ -581,10 +662,12 @@ S.HubOperatingExpenses = {
      would be invisible to all of them and kill the stub on correct code. Nothing else needs the
      string: everything buckets through this member. */
   _catOf(r) { return String((r && r.category) || '').trim() || 'Uncategorized'; },
+  // ⚠ CARD-LOCAL, and it follows the chip (item 19). `_cardCategoryList` seeds the rows so money
+  // admitted by the chip always has a row to land in — see the note there.
   _sumMonthByCategory(monthKey) {
     const out = {};
-    this.categoryList().forEach(c => { out[c] = 0; });
-    this.expenseRows().filter(r => r && this._monthKey(r.date) === monthKey).forEach(r => {
+    this._cardCategoryList().forEach(c => { out[c] = 0; });
+    this.moneyOutRows().filter(r => r && this._monthKey(r.date) === monthKey).forEach(r => {
       const c = this._catOf(r);
       out[c] = (out[c] || 0) + (parseFloat(r.amount) || 0);
     });
@@ -594,8 +677,8 @@ S.HubOperatingExpenses = {
   _sumYTDByCategory(monthKey) {
     const year = monthKey.slice(0, 4);
     const out = {};
-    this.categoryList().forEach(c => { out[c] = 0; });
-    this.expenseRows().filter(r => {
+    this._cardCategoryList().forEach(c => { out[c] = 0; });
+    this.moneyOutRows().filter(r => {
       if (!r) return false;
       const mk = this._monthKey(r.date);
       return mk && mk.slice(0, 4) === year && mk <= monthKey;
@@ -920,10 +1003,11 @@ S.HubOperatingExpenses = {
        log all have to cover the SAME rows, or the page contradicts itself — which it did the moment
        the outflow migration landed: By Category grew rows for Owner Draw, Loan Payment and Tax
        Remittance, and "Logged This Year" grew by $39,000 to match, on a page headed Expense History.
-       Until Cash Outflows folds in and this page becomes Money Out, a cash-only row belongs to the
-       Cash Outflows screen, which still shows every one of them unchanged. Nothing is hidden; it is
-       just shown in one place instead of two. */
-    let recs = this.records().filter(r => this._isOperatingRow(r));
+       ✅ ITEM 19 STAGE 1: THE FOLD HAS HAPPENED. The kind chip decides which rows this page is
+       about, and `moneyOutRows()` is the one place that answers it — so the headline, the By
+       Category card and this log cannot disagree about the set they cover, whichever chip is lit.
+       With the default chip this is byte-identical to the `_isOperatingRow` filter it replaces. */
+    let recs = this.moneyOutRows();
     if (this._filterCategory && this._filterCategory !== 'all') {
       recs = recs.filter(r => r.category === this._filterCategory);
     }
@@ -1005,8 +1089,12 @@ S.HubOperatingExpenses = {
        the outflow migration, "Logged This Year" read $108,820.04, which is exactly the By Category
        column INCLUDING $39,000 of draws, loan payments and tax remittances. The honest figure for a
        page headed Expense History is $69,820.04. `Entries` was counting them too.
-       See `_filteredRecords` for why this is the right set until the screens merge. */
-    const recs = this.records().filter(r => this._isOperatingRow(r));
+       ✅ ITEM 19 STAGE 1: this stat box, the By Category card and the log are the THREE readers on
+       this tab, and all three now go through `moneyOutRows()` — so the chip cannot move one without
+       moving the other two. My first version of item 19 left this line on the bills-only filter
+       while the card and the log followed the chip, which is the identical defect above wearing the
+       fix's own name. With the default chip this is byte-identical to what it replaced. */
+    const recs = this.moneyOutRows();
     const yr = String(new Date().getFullYear());
     const total = recs.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
     // ⚠ YEAR-ONLY, matching `_sumYTD` and `hub-books._opExSums` (S224). I briefly day-bounded this
@@ -1278,6 +1366,8 @@ S.HubOperatingExpenses = {
        (hub-books._availableMonths). The label now says which month it is. */
     const pctB       = this._pctBasis();
     const pctMk      = pctB ? pctB.mk : '';
+    // ⛔ BILLS ONLY, ALWAYS. `_sumMonth` is bills-only by construction and stays that way — see the
+    // note on it. This is a named accounting ratio and an owner draw is not an operating expense.
     const monthOpExPct = pctB ? (this._sumMonth(pctB.mk) / pctB.monthRev) : null;
     const fmt$ = (v) => App.fmtCurrency(v || 0);
     const fmtPct = (v) => v == null ? '—' : (v * 100).toFixed(1) + '%';
@@ -2772,8 +2862,9 @@ S.HubOperatingExpenses = {
     const pctMk      = (pctB && pctB.mk.slice(0, 4) === mk.slice(0, 4)) ? pctB.mk : '';
     const byCatPct   = pctMk ? this._sumYTDByCategory(pctMk) : null;
     const ytdRev     = pctMk ? pctB.ytdRev : 0;
-    // The operator's own list, plus anything with money on file. See categoryList().
-    const catRows = this.categoryList().map(c => {
+    // The operator's own list, plus anything with money on file, plus the cash-only categories
+    // when the chip admits them. See _cardCategoryList().
+    const catRows = this._cardCategoryList().map(c => {
       const tm = byCatMonth[c] || 0, lm = byCatLast[c] || 0, ytd = byCatYTD[c] || 0;
       const ytdRevPct = (byCatPct && ytdRev > 0) ? ((byCatPct[c] || 0) / ytdRev) : null;
       const dim = (tm === 0 && lm === 0 && ytd === 0);
@@ -2812,10 +2903,17 @@ S.HubOperatingExpenses = {
     const PAGE = App.LIST_PAGE || 50;
     if (!this._histShown) this._histShown = PAGE;
     const rangeChips = App.filterChips(this._filterRange, this._rangeChipOpts());
+    /* ⭐ ITEM 19 STAGE 1 — THE KIND CHIPS. Two chip rows, two questions: WHICH MONEY (kind) and
+       WHEN (range). They get their own class so the two wirings cannot cross — one shared
+       `.fc-chip` handler would have set `_filterRange` to 'all' when the operator clicked the
+       All Money Out chip, because both vocabularies contain 'all' ([[the-loop]] #50: a key that
+       two different things can produce is not a key). */
+    const kindChips = App.filterChips(this._filterKind, this._kindChipOpts(), 'mo-chip');
     const recs = this._filteredRecords();
     const shown = recs.slice(0, this._histShown);
 
-    const filterRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 10px;">' + rangeChips + '</div>';
+    const filterRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 10px;">' + kindChips + '</div>'
+      + '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;">' + rangeChips + '</div>';
     const byCatHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;">'
       + '<div class="sh" style="margin:0;">By Category</div>'
       + '<button class="btn btn-ghost btn-sm no-print" id="oex-export">Export PDF</button>'
@@ -2855,9 +2953,20 @@ S.HubOperatingExpenses = {
          contained them, so the accountant-facing expense history had no way to say whether it
          was one month or all time. The "This Month" card export above needs none: its own
          heading prints "This Month - July 2026" inside the exported root. */
-      Promise.resolve(App.exportPDF({ title: 'Operating Expenses', root: node,
+      /* ⛔⛔ THE TITLE FOLLOWS THE KIND CHIP (item 19). This exports `_filteredRecords()`, which the
+         chip now drives — so a fixed title of "Operating Expenses" would send the accountant a PDF
+         of owner draws and loan payments under a heading that says they are operating expenses.
+         The range already followed its chip for the same reason; the kind has to as well.
+         [[the-loop]] step 0.6: the PDF is the artefact that actually leaves the building, and a
+         caveat that goes on the screen and not on the export is half a fix. */
+      Promise.resolve(App.exportPDF({ title: this._kindExportTitle(), root: node,
         range: App.chipRangeLabel(this._rangeChipOpts(), this._filterRange) }))
         .finally(() => node.remove());
+    });
+    // ⭐ ITEM 19: the kind chips are wired SEPARATELY, on their own class — see the note at the
+    // render. Both vocabularies contain 'all', so one shared handler would cross the two filters.
+    this.container.querySelectorAll('.mo-chip').forEach(chip => {
+      chip.addEventListener('click', () => { this._filterKind = chip.dataset.v; this._histShown = PAGE; this._rerender(); });
     });
     this.container.querySelectorAll('.fc-chip').forEach(chip => {
       chip.addEventListener('click', () => { this._filterRange = chip.dataset.v; this._histShown = PAGE; this._rerender(); });
