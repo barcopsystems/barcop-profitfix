@@ -1502,7 +1502,8 @@ S.HubOperatingExpenses = {
        is collapsible, and a collapsed card would hide the confirm screen and its Add button
        completely — the operator would have dropped a file and landed on a page with nothing on it. */
     const addCard = this._expenseReview
-      ? '<div style="margin:' + (inline ? '0 0 4px' : '16px 0 24px') + ';">' + this.expenseReviewHTML() + '</div>'
+      ? '<div style="margin:' + (inline ? '0 0 4px' : '16px 0 24px') + ';">'
+        + this._recurringProposalsHtml() + this.expenseReviewHTML() + '</div>'
       // In the STEP the step IS the card and the step head IS the collapse control, so neither is
       // drawn a second time. In the TAKEOVER the drop sits in its own card, matching
       // `ic-product-setup.importPanelHTML`, because it is page content again rather than a step body.
@@ -1591,6 +1592,15 @@ S.HubOperatingExpenses = {
       this.container.querySelector('#oex-rt-cat')?.addEventListener('change', (e) => {
         if (this._expenseReview) this._expenseReview.moveCat = e.target.value;
       });
+      /* ⛔ A TICK RECORDS STATE AND REPAINTS NOTHING. The same rule as the row checkboxes above: a
+         full re-render on every tick costs ~460ms at 2000 rows, and the proposals card sits on the
+         same screen. State lives on the review, so a later repaint renders the ticks as they were. */
+      this.container.querySelectorAll('.oex-rec-tick').forEach(cb => cb.addEventListener('change', () => {
+        const r = this._expenseReview;
+        if (!r || !r.recurring) return;
+        const k = cb.dataset.veno;
+        if (cb.checked) delete r.recurring.off[k]; else r.recurring.off[k] = true;
+      }));
       this.container.querySelector('#oex-rt-move')?.addEventListener('click', () => this._moveCheckedExpenses());
       this.container.querySelector('[data-oexreview-go]')?.addEventListener('click', () => this._runExpenseReview());
       this.container.querySelector('[data-oexreview-back]')?.addEventListener('click', () => {
@@ -1957,6 +1967,66 @@ S.HubOperatingExpenses = {
     return out;
   },
 
+  /* ── The operator's answer to a proposal, per vendor ────────────────────────
+     ⭐ ACCOUNT CONFIG, NOT A RECORD. This holds no money and describes no event; it is one word per
+     vendor about a decision, so it belongs in `account_state` beside the cockpit's done-stamps
+     rather than in a store of its own ([[storage-architecture]] — config stays in the blob).
+     ⚠ KEYED ON `_vendorKey`, the same normalised key the derivation and the category learning use.
+     A bank writes the same vendor three ways across three months; anything else and the answer stops
+     applying the moment the spelling moves. */
+  /* ⚠ THE KEY IS A LITERAL IN BOTH MEMBERS, NOT A SIBLING CONSTANT (integrity #16, and I made this
+     exact slip twice in one session). Every slicer in the harness suite lifts METHODS by name, so a
+     `RECURRING_DECISIONS_KEY:` data property beside these is invisible to all of them — the lifted
+     object read `undefined` and wrote the whole decision map under the key "undefined". It failed
+     loudly here; on a screen it would have been a setting that silently never loaded. */
+  recurringDecisions() { return App.acctGet('recurring_decisions', {}) || {}; },
+  /* Takes one vendor key, or a whole `{ vendorKey: keep }` map for the confirm screen — which
+     answers a dozen at once and must not queue a dozen separate account writes. One save either
+     way, and one place that knows the storage key. */
+  setRecurringDecision(vendorKey, keep) {
+    const m = Object.assign({}, this.recurringDecisions());
+    if (vendorKey && typeof vendorKey === 'object') {
+      Object.keys(vendorKey).forEach(k => { if (String(k).trim()) m[k] = vendorKey[k] ? 'yes' : 'no'; });
+    } else {
+      const k = String(vendorKey || '').trim();
+      if (!k) return Promise.resolve(false);
+      m[k] = keep ? 'yes' : 'no';
+    }
+    return App.acctSet('recurring_decisions', m);
+  },
+
+  /* ⭐⭐⭐ WHAT BREAK-EVEN AND THE FORECAST ARE ALLOWED TO COUNT. `deriveRecurringBills` PROPOSES;
+     this decides. Two things stand between a proposal and a fixed cost:
+
+     1. THE OPERATOR'S ANSWER, and the default is COUNT. Leaving proposals off until somebody opts
+        in recreates the exact defect this item exists to close — a drop-only operator ignores the
+        section and break-even reads $0.00 again. These are facts out of their own ledger, not
+        guesses, and Add Products set the precedent: every row ticked, unticking is how you say no.
+
+     2. ⛔⛔ STALENESS, WHICH IS NOT OPTIONAL. `operating_expense` is in `NONWINDOWED_KINDS`, so the
+        ledger holds every row ever written — a gym membership cancelled in March goes on deriving
+        from those three old rows forever, and break-even quietly carries a cost the operator does
+        not pay. THE RULE, IN WORDS FIRST ([[the-loop]] #28): a bill that has missed MORE THAN ONE
+        FULL CYCLE is not current. One missed cycle is a late payment; two is a bill that stopped.
+        The window is the cadence's own length twice over, so no number is fitted to anything.
+
+     ⚠ THE CLOCK IS READ THROUGH `App.todayLocal()`, never `new Date()` ([[local-date-convention]]),
+     which is also what lets a harness pin the clock instead of anchoring to a literal day. */
+  recurringBills() {
+    const CYCLE_DAYS = { weekly: 7, fortnightly: 14, monthly: 31, quarterly: 92, annual: 366 };
+    const decisions = this.recurringDecisions();
+    const today = (App.todayLocal ? App.todayLocal() : '') || '';
+    const dayNo = (ymd) => Date.UTC(parseInt(String(ymd).slice(0, 4), 10),
+      parseInt(String(ymd).slice(5, 7), 10) - 1, parseInt(String(ymd).slice(8, 10), 10)) / 86400000;
+    const now = dayNo(today);
+    return this.deriveRecurringBills().filter(b => {
+      if (decisions[b.vendorKey] === 'no') return false;
+      if (isNaN(now)) return true;    // no clock to compare against: never drop on a bad reading
+      const span = CYCLE_DAYS[b.frequency] || 31;
+      return (now - dayNo(b.lastDate)) <= span * 2;
+    });
+  },
+
   /* ⛔⛔ WHAT BAR COP CAN RECOGNISE AS BELONGING SOMEWHERE ELSE (Kyle, 2026-08-04, by using the app):
      *"owner draw is going into operating expenses.... i thought that was a cash outflow?"* He is
      right. `hub-cash-outflows` has Owner draw as a first-class TYPE, so Bar Cop already knows what
@@ -2190,7 +2260,17 @@ S.HubOperatingExpenses = {
       // Categories the operator assigns with Move To, keyed by `_rid`. See _moveCheckedExpenses.
       assign: {},
       checked: {}, moveCat: '', moveNote: '',
-      open: {}, removed: {}
+      open: {}, removed: {},
+      /* ⭐ TAKEN ONCE, WHEN THE REVIEW OPENS, not on every repaint. The proposals are derived from
+         the ledger as it stands BEFORE this file lands, which is the honest basis for "these are
+         bills you already pay" — and it also means a Move To or a section toggle cannot make the
+         list shift under the operator mid-decision.
+         ⚠ Already-answered vendors are dropped: an answer is asked once and remembered, so a
+         confirmed linen service does not come back for re-ticking every month. */
+      recurring: (() => {
+        const answered = this.recurringDecisions();
+        return { proposals: this.deriveRecurringBills().filter(p => !answered[p.vendorKey]), off: {} };
+      })()
     };
     this._rerender();
   },
@@ -2396,6 +2476,47 @@ S.HubOperatingExpenses = {
     };
   },
 
+  /* ⭐⭐⭐ THE PROPOSALS, IN THE SAME REVIEW (Kyle: *"same review"*). A second screen after the one
+     they just finished is the one they stop reading, so this sits ABOVE the row table and the single
+     Add button at the bottom commits both: the rows AND the answers about what recurs.
+     ⛔ TICKED BY DEFAULT, and that is the whole design. Off-by-default recreates the defect the item
+     exists to close — a drop-only operator ignores the section and break-even reads $0.00 again.
+     These are facts out of their own ledger. Unticking is how they say no, exactly as Add Products
+     works, and the answer is remembered per vendor so it is asked once and never again.
+     ⚠ RENDERS NOTHING WHEN THERE IS NOTHING TO SAY. On a first drop with no repeats there are no
+     proposals, and an empty card headed "recurring bills" would just be noise on the busiest screen
+     in the app. */
+  _recurringProposalsHtml() {
+    const r = this._expenseReview;
+    if (!r || !r.recurring || !r.recurring.proposals.length) return '';
+    const off = r.recurring.off || {};
+    const EVERY = { weekly: 'every week', fortnightly: 'every 2 weeks', monthly: 'every month',
+                    quarterly: 'every 3 months', annual: 'once a year' };
+    const rows = r.recurring.proposals.map(p => {
+      const on = !off[p.vendorKey];
+      /* ⚠ SAY WHAT IT IS STANDING ON. Two occurrences is the minimum this can act on, and an
+         operator deciding whether to trust a line needs to know it is two and not twelve. */
+      const basis = p.occurrences + ' time' + (p.occurrences === 1 ? '' : 's') + ' on file'
+        + (p.varies ? ', amount varies so this is the average' : '');
+      return '<tr>'
+        + '<td style="width:34px;"><input type="checkbox" class="bc-check oex-rec-tick" data-veno="'
+        +   esc(p.vendorKey) + '"' + (on ? ' checked' : '') + '/></td>'
+        + '<td style="color:var(--t1);">' + esc(p.vendor)
+        +   '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + esc(basis) + '</div></td>'
+        + '<td style="color:var(--t2);">' + esc(EVERY[p.frequency] || p.frequency) + '</td>'
+        + '<td style="font-weight:700;color:var(--t1);">' + App.fmtCurrency(p.amount) + '</td>'
+        + '</tr>';
+    }).join('');
+    const n = r.recurring.proposals.length;
+    return '<div class="card" style="margin-bottom:16px;">'
+      + '<div class="card-title">Bills that look like they repeat</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">'
+      +   'Bar Cop found ' + n + ' cost' + (n === 1 ? '' : 's') + ' you pay on a regular cycle. '
+      +   'These feed your break-even and your cash forecast, so they are not on your income '
+      +   'statement twice. Untick anything that is not a standing cost.</div>'
+      + '<table class="row-list"><tbody>' + rows + '</tbody></table></div>';
+  },
+
   expenseReviewHTML() {
     const s = this._expenseReviewSummary();
     const n = s.rows.length;
@@ -2458,6 +2579,8 @@ S.HubOperatingExpenses = {
     this._expenseReviewWriting = true;
     const btn = this.container && this.container.querySelector('[data-oexreview-go]');
     if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    // Captured BEFORE the write, because a successful `_importRows` clears the whole review.
+    const rec = r.recurring;
     try {
       /* ⛔ THE SAME VERDICTS THE SCREEN DREW WITH. Letting the write re-derive them from the
          surviving rows is the defect `_expenseVerdicts` exists to close, and it would show up only
@@ -2466,6 +2589,17 @@ S.HubOperatingExpenses = {
         { reviewed: true, verdicts: r.verdicts, picks: r.assign });
     } finally {
       this._expenseReviewWriting = false;
+      /* ⛔⛔ THE ANSWERS ARE RECORDED ONLY ON SUCCESS, and `this._expenseReview` having been cleared
+         is what says the write landed. A refused import that answered the proposals anyway would be
+         the worst of both: the rows did not go in, and the questions never come back — the operator
+         re-drops the file and the recurring section is silently empty. Same rule as every other exit
+         on this handler ([[the-loop]] #49: a refusal must leave nothing behind).
+         ⚠ ONE account write for the whole set, not one per proposal. */
+      if (!this._expenseReview && rec && rec.proposals.length) {
+        const answers = {};
+        rec.proposals.forEach(p => { answers[p.vendorKey] = !rec.off[p.vendorKey]; });
+        this.setRecurringDecision(answers);
+      }
       /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `_importRows` is what clears it — a refused write
          keeps the whole screen so the operator can press again without re-dropping the file. Do NOT
          re-render here: the failure path writes into the result slot and a re-render destroys it. */
