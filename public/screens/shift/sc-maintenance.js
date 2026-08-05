@@ -309,7 +309,7 @@ S.ShiftMaintenance = {
     const btn = document.getElementById('mte-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'maintenance', rec);
-    if (ok) { App.closeModal('mt-edit-modal'); if (typeof onDone === 'function') onDone(); }
+    if (ok) { await this._syncLedger(rec.id, rec); App.closeModal('mt-edit-modal'); if (typeof onDone === 'function') onDone(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } const err = document.getElementById('mte-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
@@ -359,7 +359,7 @@ S.ShiftMaintenance = {
     const btn = document.getElementById('mt-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'maintenance', rec);
-    if (ok) { this._draft = null; this.renderList(); }
+    if (ok) { await this._syncLedger(rec.id, rec); this._draft = null; this.renderList(); }
     else {
       const i = list.findIndex(x => x.id === rec.id); if (i > -1) list.splice(i, 1);
       if (btn) { btn.disabled = false; btn.textContent = 'Save Issue'; }
@@ -377,7 +377,7 @@ S.ShiftMaintenance = {
     const btn = document.getElementById('mte-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'maintenance', list[i]);
-    if (ok) { this.editId = null; App.closeModal('mt-edit-modal'); this.renderList(); }
+    if (ok) { await this._syncLedger(list[i].id, list[i]); this.editId = null; App.closeModal('mt-edit-modal'); this.renderList(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } const err = document.getElementById('mte-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
@@ -385,6 +385,29 @@ S.ShiftMaintenance = {
     const ok = await App.confirmDelete();
     if (!ok) return;
     await App.removeRecord('sc', 'maintenance', id);
+    await this._syncLedger(id, null);
     this.renderList();
+  },
+
+  /* ⭐⭐⭐ PHASE 2 OF THE ONE-LEDGER REBUILD — THE REPAIR COST IS AN EXPENSE, SO IT LIVES IN THE
+     LEDGER. Kyle, looking at this screen: *"i had no idea that the cost entered there goes in
+     separate as an expense.. and neither would the user."* It was true: this cost was summed onto
+     the Income Statement's Repairs and maintenance line and Schedule C Line 21, while the Operating
+     Expenses screen told anyone typing a repair to come here instead.
+
+     Same contract as the Cash Outflows door, for the same reasons — the tracker is written FIRST so
+     what the operator sees is decided by their own save, and the ledger write is best effort and
+     QUIET (their ticket really did save; "save failed" would be a lie about a store they have never
+     heard of). Every failure therefore leaves the ledger BEHIND, never ahead, and
+     `reconcileMaintenanceLedger` repairs exactly that on the next load.
+     ⚠ A DELETE takes the ledger row too — an orphan would keep charging the P&L for a repair the
+     operator removed, and the reconcile is additive so it would never take it out. */
+  async _syncLedger(id, rec) {
+    const OEX = S.HubOperatingExpenses;
+    const led = rec ? OEX.migrateMaintenanceRow(rec) : null;
+    if (led) { await App.putRecord('core', 'operating_expense', led, { quiet: true }); return; }
+    // No cost (or deleted): there must be no expense row standing for it.
+    const have = OEX.records().find(r => r && r.id === id) || null;
+    if (have && have.migrated_from === 'maintenance') await App.removeRecord('core', 'operating_expense', id);
   }
 };
