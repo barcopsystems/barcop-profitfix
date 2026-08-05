@@ -48,7 +48,7 @@ S.ShiftIncidents = {
     App.showHelpModal('How the Incident Log Works', [
       { p: ['When something happens on the floor that you would want a record of later, log it here while it is fresh. A written account with the date, who was involved, who saw it, and what you did is what protects you if it ever becomes a claim, a lawsuit, or an insurance question. This is a record-keeping aid, not legal advice.'] },
       { h: 'What to log', p: ['An injury or slip, a fight or an ejection, a guest you cut off or refused service (your dram-shop record), theft or a break-in, property damage, a customer complaint or illness claim, or any time police or EMS were called. When in doubt, write it down. The details you capture in the moment are the ones you will wish you had.'] },
-      { h: 'Log it', p: ['Set the date and time it happened, pick the type and how serious it was, and write what happened in plain language: who was involved, who witnessed it, and exactly what was said or done. Record the action you took, like cutting someone off, calling a cab, giving first aid, or calling police. Note an estimated cost for theft or damage.'] },
+      { h: 'Log it', p: ['Set the date and time it happened, pick the type and how serious it was, and write what happened in plain language: who was involved, who witnessed it, and exactly what was said or done. Record the action you took, like cutting someone off, calling a cab, giving first aid, or calling police.'] },
       { h: 'Open vs Resolved', p: ['Leave an incident Open while it still needs follow-up, like an injury claim or an insurance call, so it stays at the top of the list. Mark it Resolved with the date once it is closed out. Resolved incidents drop to the bottom but stay on the permanent record.'] },
       { h: 'Filter and Export', p: ['Narrow the list with the range chips or a custom date range. Export PDF saves the filtered log for your binder, your insurer, or your attorney. Worksheet prints a blank incident sheet to fill out by hand in the moment, then enter here after.'] }
     ]);
@@ -95,20 +95,11 @@ S.ShiftIncidents = {
       + '<textarea id="' + p + 'action" class="notes-ta" rows="2" placeholder="Cut off, called a cab, first aid, called police, etc.">' + esc(r?.action_taken || '') + '</textarea></div></div>'
 
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Resolved</label><input type="date" id="' + p + 'resolved" value="' + esc(r?.date_resolved || '') + '"/></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Estimated Cost <span style="color:var(--t4);font-weight:400;">(optional)</span></label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'cost" min="0" step="0.01" value="' + v(r?.cost) + '"/></div></div>'
       + '</div>';
   },
 
-  // Flipping status to Resolved auto-fills today's resolution date if blank.
-  wireResolvedAutofill(p) {
-    document.getElementById(p + 'status')?.addEventListener('change', e => {
-      if (e.target.value === 'Resolved') {
-        const resEl = document.getElementById(p + 'resolved');
-        if (resEl && !resEl.value) resEl.value = App.todayLocal();
-      }
-    });
-  },
+  // Nothing to autofill: Resolved is a status, not a status plus a date.
+  wireResolvedAutofill() {},
 
   effectiveRange() {
     if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
@@ -169,12 +160,10 @@ S.ShiftIncidents = {
       const open = all.filter(r => r.status !== 'Resolved');
       const high = open.filter(r => r.severity === 'High');
       const resolved = all.filter(r => r.status === 'Resolved');
-      const totCost = filtered.reduce((t, r) => t + (r.cost || 0), 0);
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Open</div><div class="calc-val lg">' + open.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">High Severity</div><div class="calc-val lg ' + (high.length ? 'warn' : '') + '">' + high.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Resolved</div><div class="calc-val lg">' + resolved.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Logged Cost</div><div class="calc-val lg">' + App.fmtCurrency(totCost) + '</div></div>'
         + '</div></div>';
 
       let listHtml;
@@ -303,12 +292,6 @@ S.ShiftIncidents = {
     const description = document.getElementById(p + 'desc')?.value.trim();
     if (!description) { fail('Write what happened before saving.'); return null; }
     const status = document.getElementById(p + 'status')?.value || 'Open';
-    const dateResolved = document.getElementById(p + 'resolved')?.value || '';
-    if (status === 'Resolved' && !dateResolved) { fail('Resolved incidents need a resolution date. Set Date Resolved or change the status.'); return null; }
-    const cost = parseFloat(document.getElementById(p + 'cost')?.value);
-    // ⚠ The twin of sc-maintenance's guard, and it failed the same way (SH5): -125 saved silently
-    // and Logged Cost read $450 -> $325. Blank stays optional; an explicit 0 is a real answer.
-    if (!isNaN(cost) && cost < 0) { fail('Estimated cost cannot be negative.'); return null; }
     const byId = document.getElementById(p + 'by')?.value || '';
     const confirmId = document.getElementById(p + 'confirm')?.value || '';
     return {
@@ -326,8 +309,9 @@ S.ShiftIncidents = {
       witnesses:      document.getElementById(p + 'witnesses')?.value.trim() || '',
       description,
       action_taken:   document.getElementById(p + 'action')?.value.trim() || '',
-      date_resolved:  dateResolved,
-      cost:           isNaN(cost) ? null : cost
+      /* ⛔ NO MONEY AND NO RESOLUTION DATE (Kyle, 2026-08-05, same call as the maintenance log).
+         An incident record is WHAT HAPPENED and whether it is closed. The status carries the second
+         half of that on its own, and a cost on a tracker is how the one-ledger defect started. */
     };
   },
 
