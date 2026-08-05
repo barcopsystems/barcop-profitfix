@@ -282,8 +282,13 @@ S.HubOperatingExpenses = {
     // A blank list (the entry form has never rendered, so nothing registered the builtins yet)
     // must still give a full card rather than an empty one.
     if (!out.length) this.CATEGORIES.forEach(push);
-    // Anything with money on file, whatever the list says today.
-    this.records().forEach(r => { if (r && String(r.category || '').trim()) push(r.category); });
+    /* Anything with money on file, whatever the list says today — EXCEPT a cash-only category.
+       ⛔ Those are what the migration wrote, and a row for Owner Draw on a card headed By Category,
+       on a page headed Operating Expenses, is the migration changing something an operator reads.
+       They are fully visible on Cash Outflows, which still shows every one unchanged. */
+    this.records().forEach(r => {
+      if (r && String(r.category || '').trim() && !this.isCashOnlyCategory(r.category)) push(r.category);
+    });
     // 'Other' is where a record with no category at all lands, so it is always a row.
     push('Other');
     /* ⚠ AND IT IS ALWAYS THE LAST ROW. Other is the catch-all, the card has always ended with it,
@@ -727,7 +732,14 @@ S.HubOperatingExpenses = {
 
   // ── Filter ─────────────────────────────────────────────────────────────
   _filteredRecords() {
-    let recs = this.records().slice();
+    /* ⛔ ONE SET OF RECORDS DRIVES THIS WHOLE SCREEN. The headline, the By Category card and this
+       log all have to cover the SAME rows, or the page contradicts itself — which it did the moment
+       the outflow migration landed: By Category grew rows for Owner Draw, Loan Payment and Tax
+       Remittance, and "Logged This Year" grew by $39,000 to match, on a page headed Expense History.
+       Until Cash Outflows folds in and this page becomes Money Out, a cash-only row belongs to the
+       Cash Outflows screen, which still shows every one of them unchanged. Nothing is hidden; it is
+       just shown in one place instead of two. */
+    let recs = this.records().filter(r => this._isOperatingRow(r));
     if (this._filterCategory && this._filterCategory !== 'all') {
       recs = recs.filter(r => r.category === this._filterCategory);
     }
@@ -807,7 +819,12 @@ S.HubOperatingExpenses = {
   },
   _historyStats() {
     const fmt$ = (v) => App.fmtCurrency(v || 0);
-    const recs = this.records();
+    /* ⛔ SAME SET AS THE CARD AND THE LOG BELOW IT. Kyle caught this from the screen itself: after
+       the outflow migration, "Logged This Year" read $108,820.04, which is exactly the By Category
+       column INCLUDING $39,000 of draws, loan payments and tax remittances. The honest figure for a
+       page headed Expense History is $69,820.04. `Entries` was counting them too.
+       See `_filteredRecords` for why this is the right set until the screens merge. */
+    const recs = this.records().filter(r => this._isOperatingRow(r));
     const yr = String(new Date().getFullYear());
     const total = recs.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
     // ⚠ YEAR-ONLY, matching `_sumYTD` and `hub-books._opExSums` (S224). I briefly day-bounded this
