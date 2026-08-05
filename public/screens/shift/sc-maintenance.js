@@ -2,7 +2,8 @@
 
 /* ── Shift Control — Maintenance Log (writes sc_maintenance) ──────────────────
    A status tracker for equipment and facility issues: what broke, priority,
-   status (Open → In Progress → Resolved), repair cost. Open and urgent items
+   status (Open → In Progress → Resolved). It holds NO money: repair spend is READ back from the
+   one expense ledger and entered once, with everything else, on Close The Books. Open and urgent items
    feed the Hub alert strip so nothing gets lost between shifts. Same page shape
    as the other Shift logs: inline collapsible form on the landing, filter card
    with a status filter, bare list, the issue form again in a focused pop-up to
@@ -45,7 +46,7 @@ S.ShiftMaintenance = {
     App.showHelpModal('How the Maintenance Log Works', [
       { p: ['Equipment breaks and falls through the cracks between shifts. Log it here and it carries forward until someone fixes it. Open and urgent items show up as alerts on the Hub so the next manager sees them.'] },
       { h: 'Log an issue', p: ['Capture what broke, where, how urgent it is, and a short description. Assign it to a staff member or an outside vendor (an HVAC tech, a plumber), whoever is handling the fix.'] },
-      { h: 'Work it to closed', p: ['Move the status from Open to In Progress to Resolved as the repair happens. When you mark it Resolved, set the date it was fixed and the repair cost. That cost is logged as an operating expense under Repairs and Maintenance, so it reaches your income statement once and you never enter it twice. Resolved drops to the bottom of the list so the open work stays up top.'] },
+      { h: 'Work it to closed', p: ['Move the status from Open to In Progress to Resolved as the repair happens. When you mark it Resolved, set the date it was fixed. Resolved drops to the bottom of the list so the open work stays up top. What the repair cost is not asked for here: money out is entered in one place, on Close The Books, and this log shows you the spend it reads back from there.'] },
       { h: 'Filter and Export', p: ['Use the range chips or a custom date range to narrow the list to this week or this month. Open work always sorts to the top, urgent first, with resolved issues below. Export PDF saves the filtered list, and Worksheet prints a blank sheet to mark issues by hand during the shift.'] }
     ]);
   },
@@ -88,17 +89,16 @@ S.ShiftMaintenance = {
 
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
       + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Resolved</label><input type="date" id="' + p + 'resolved" value="' + esc(r?.date_resolved || '') + '"/></div>'
-      /* ⭐⭐⭐ THE COST IS AN EXPENSE, AND THE SCREEN NOW SAYS SO. Kyle: *"i had no idea that the cost
-         entered there goes in separate as an expense.. and neither would the user."* It was true and
-         it was silent. The field has not moved and nothing got harder — it writes to the one ledger
-         under Repairs and Maintenance instead of hiding a number inside a status tracker, and the
-         line underneath tells the operator exactly where it lands. The value is read BACK from the
-         ledger (`_ledgerCost`), so re-opening a resolved ticket still shows what was spent. */
-      /* ⚠ THE LABEL CARRIES IT, NOT A NOTE UNDER THE FIELD. An explainer note on a form field is a
-         RULE 2a ratchet in `verify-design-code` — a count Kyle reduces and never grows, and a design
-         change he walks one at a time. The label says it at a glance and the help panel says it in
-         full, which are this app's two established homes for "how does this work". */
-      + '<div class="f" style="width:180px;flex-shrink:0;"><label>Repair Cost (an operating expense)</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'cost" min="0" step="0.01" value="' + v(r ? this._ledgerCost(r.id) : '') + '"/></div></div>'
+      /* ⛔⛔⛔ THE REPAIR COST BOX IS GONE — PHASE 2 ITEM 12, AS THE PLAN ACTUALLY WROTE IT.
+         *"Trackers track and hold ZERO money fields."* I first kept the box and pointed it at the
+         ledger, reasoning that removing it would take away a one-step way to record a fix. That was
+         wrong on its own terms: the expense log is that way, and consolidating money entry into ONE
+         place is the entire point of the rebuild. Kyle, looking at the result: *"that is the complete
+         opposite of what i asked for."* He was right.
+         This screen tracks WHAT BROKE and WHETHER IT IS FIXED. It SHOWS repair spend by reading the
+         ledger (see `_ledgerCost` and the total above the list), which is a better number than the
+         old field ever was because it includes repairs nobody opened a ticket for. The money is
+         entered once, with the rest of it, on Close The Books. */
       + '</div>';
   },
 
@@ -322,14 +322,11 @@ S.ShiftMaintenance = {
     const btn = document.getElementById('mte-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'maintenance', rec);
-    if (ok) { await this._syncLedger(rec.id, rec, this._formCost('mte-')); App.closeModal('mt-edit-modal'); if (typeof onDone === 'function') onDone(); }
+    if (ok) { App.closeModal('mt-edit-modal'); if (typeof onDone === 'function') onDone(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } const err = document.getElementById('mte-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
   // Collect the form (prefix p) into a record body, or null after an error.
-  // The Repair Cost the operator typed. Read straight off the form, because the record no longer
-  // holds one — it is an expense now, not a tracker field.
-  _formCost(p) { const v = parseFloat(document.getElementById(p + 'cost')?.value); return isNaN(v) ? null : v; },
   _collect(p) {
     const err = document.getElementById(p + 'err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
@@ -340,14 +337,6 @@ S.ShiftMaintenance = {
     const status = document.getElementById(p + 'status')?.value || 'Open';
     const dateResolved = document.getElementById(p + 'resolved')?.value || '';
     if (status === 'Resolved' && !dateResolved) { fail('Resolved issues need a resolution date. Set Date Resolved or change the status.'); return null; }
-    const cost = parseFloat(document.getElementById(p + 'cost')?.value);
-    /* ⚠ A NEGATIVE REPAIR COST SUBTRACTS FROM WHAT THE BAR HAS SPENT (SH5). This stored -50 in
-       silence and the Repair Cost tile read $755 -> $705, so the screen UNDER-reported the spend
-       with nothing on it saying why. `min="0"` on the input does not stop it: a number input still
-       hands back "-50" and nothing calls checkValidity. Blank stays optional and an explicit 0 is a
-       real answer (a warranty call), so only a genuine negative is refused. Add Registers in this
-       same section already words it this way. */
-    if (!isNaN(cost) && cost < 0) { fail('Repair cost cannot be negative.'); return null; }
     const byId = document.getElementById(p + 'by')?.value || '';
     return {
       date_reported: date,
@@ -377,7 +366,7 @@ S.ShiftMaintenance = {
     const btn = document.getElementById('mt-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'maintenance', rec);
-    if (ok) { await this._syncLedger(rec.id, rec, this._formCost('mt-')); this._draft = null; this.renderList(); }
+    if (ok) { this._draft = null; this.renderList(); }
     else {
       const i = list.findIndex(x => x.id === rec.id); if (i > -1) list.splice(i, 1);
       if (btn) { btn.disabled = false; btn.textContent = 'Save Issue'; }
@@ -395,7 +384,7 @@ S.ShiftMaintenance = {
     const btn = document.getElementById('mte-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const ok = await App.putRecord('sc', 'maintenance', list[i]);
-    if (ok) { await this._syncLedger(list[i].id, list[i], this._formCost('mte-')); this.editId = null; App.closeModal('mt-edit-modal'); this.renderList(); }
+    if (ok) { this.editId = null; App.closeModal('mt-edit-modal'); this.renderList(); }
     else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } const err = document.getElementById('mte-err'); if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
