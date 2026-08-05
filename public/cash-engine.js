@@ -16,7 +16,23 @@ window.CashEngine = {
   counts()      { return ((App.inventoryData && App.inventoryData.ic_counts) || []); },
   deliveries()  { return ((App.inventoryData && App.inventoryData.ic_deliveries) || []); },
   vendors()     { return ((App.inventoryData && App.inventoryData.ic_vendors) || []); },
-  bills()       { return (App.data && Array.isArray(App.data.operating_expenses)) ? App.data.operating_expenses : []; },
+  /* ⛔⛔ BILLS ARE OPERATING BILLS. A CASH-ONLY ROW IS NOT ONE (2026-08-04, found by Kyle on the
+     live app within minutes of the outflow migration landing, and it was my miss).
+     Phase 1 moved every cash outflow into `operating_expenses` as a ledger row, carrying its
+     `recurring` fields so the forecast would not lose a series. This function reads that array
+     whole — so a recurring owner draw, loan payment and tax remittance immediately became BILLS:
+     they entered `weeklyFixedCosts`, moved the reserve target, and moved Safe to Spend. A loan
+     payment was worse, counted here AND through break-even's own debt figure off the old store.
+     The migration was supposed to change no number and it changed two on the front page.
+     ⚠ THE REAL LESSON IS ABOUT THE HARNESS, NOT THE CODE: the equality pin stubbed `bills()` to
+     `[]`, so it could never see this. A stub more forgiving than the real dependency certifies the
+     bug (integrity #6), and it did, in the one place that mattered. It now runs the REAL reader. */
+  bills() {
+    const rows = (App.data && Array.isArray(App.data.operating_expenses)) ? App.data.operating_expenses : [];
+    const OEX = (typeof window !== 'undefined' && window.S && S.HubOperatingExpenses) || null;
+    if (!OEX || typeof OEX.isCashOnlyCategory !== 'function') return rows;
+    return rows.filter(r => !OEX.isCashOnlyCategory(r && r.category));
+  },
 
   countsAsc() {
     return [...this.counts()].sort(App.cmpOldest);
