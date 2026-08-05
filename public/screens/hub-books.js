@@ -482,7 +482,10 @@ S.HubBooks = {
        display; `reconcileMaintenanceLedger` keeps the ledger a pure function of it, and Phase 2's
        last step removes the input entirely. */
     { label: 'Repairs and maintenance',        cat: 'Repairs and Maintenance' },
-    { label: '3rd-party platform fees',        from: 'platformFees',
+    /* PHASE 2 ITEM 9: reads the LEDGER CATEGORY now, not the weekly roll. It was the last P&L line
+       fed from outside the expense log. The fee is still TYPED in Confirm the Week (it is net-settled,
+       so it never appears on a statement) and the ledger mirrors it. */
+    { label: '3rd-party platform fees',        cat: '3rd-Party Platform Fees',
       exportLabel: '3rd-party platform fees (DoorDash, UberEats, etc.)' },
     { label: 'Professional fees',              cat: 'Professional Fees' },
     { label: 'Bank and credit card fees',      cat: 'Bank and Credit Card Fees' },
@@ -1891,7 +1894,7 @@ S.HubBooks = {
     const opexY = (this._opExSums ? this._opExSums(year + '-12', true) : {}) || {};
     const ov = k => opexY[k] || 0;
     rows.push(['Line 8: Advertising', ov('Marketing and Advertising'), 'Operating Expenses: Marketing and Advertising', '']);
-    rows.push(['Line 10: Commissions and fees', ov('Bank and Credit Card Fees') + (YTD.platformFees || 0), 'Operating Expenses: bank / credit card fees + 3rd-party platform fees', '']);
+    rows.push(['Line 10: Commissions and fees', ov('Bank and Credit Card Fees') + ov('3rd-Party Platform Fees'), 'Operating Expenses: bank / credit card fees + 3rd-party platform fees', '']);
     rows.push(['Line 15: Insurance (other than health)', ov('Insurance'), 'Operating Expenses: Insurance', '']);
     rows.push(['Line 17: Legal and professional services', ov('Professional Fees'), 'Operating Expenses: Professional Fees', '']);
     rows.push(['Line 20b: Rent or lease (other business property)', ov('Occupancy (Rent, Property Tax)'), 'Operating Expenses: Occupancy (rent, property tax)', '']);
@@ -1910,6 +1913,8 @@ S.HubBooks = {
       'Professional Fees', 'Occupancy (Rent, Property Tax)', 'Licenses and Permits', 'Utilities',
       // ⛔ Line 21 claims this one, so 27a must NOT sweep it up as well or a repair is deducted twice.
       'Repairs and Maintenance',
+      // Line 10 claims this one, so 27a must not sweep it up as well.
+      '3rd-Party Platform Fees',
       'Software and Subscriptions', 'Other'];
     const _extraCats = Object.keys(opexY || {}).filter(c => _named.indexOf(c) < 0 && Math.abs(ov(c)) > 0.005);
     const _extraSum = _extraCats.reduce((s, c) => s + ov(c), 0);

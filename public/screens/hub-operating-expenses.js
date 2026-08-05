@@ -36,6 +36,14 @@ S.HubOperatingExpenses = {
        said the number they typed was an expense. Now it is one category, on one ledger, and the
        maintenance log reads its repair spend back from here instead of storing it. */
     'Repairs and Maintenance',
+    /* ⭐⭐⭐ PHASE 2 ITEM 9 — THE LAST P&L LINE FED FROM OUTSIDE THE LEDGER.
+       Delivery commissions are NET-SETTLED: DoorDash deposits sales minus its cut, so the fee never
+       leaves the bank as its own debit and can never be read off a statement. That makes it one of
+       the very few figures an operator legitimately has to TYPE — and that exempts it from "never
+       type what Bar Cop can read", not from "one ledger for money out". It is an operating expense
+       and it belongs here. It is NOT a cash outflow: no money left the bank.
+       The weekly roll stays the place it is typed; the ledger mirrors it. */
+    '3rd-Party Platform Fees',
     'Other'
   ],
 
@@ -114,6 +122,28 @@ S.HubOperatingExpenses = {
       notes:      m.issue || '',
       created_at: m.created_at || new Date().toISOString(),
       migrated_from: 'maintenance'
+    };
+  },
+
+  /* ⭐⭐ PHASE 2 ITEM 9 — A WEEK'S DELIVERY COMMISSION BECOMES A LEDGER ROW. PURE.
+     ⛔ DATED AT `period_end`, so it lands in the month the week closed — which is the month Books
+     has always counted it in. Any other date restates a closed period.
+     ⛔ NO FEE, NO ROW. A bar that did not run delivery this week has nothing to expense, and a $0
+     row per week would bury the expense log in noise. (Maintenance differs on purpose: a ZERO-cost
+     repair is a fact the operator recorded deliberately. Here a zero means "no delivery".) */
+  migratePlatformFeesRow(w) {
+    if (!w || w.id == null) return null;
+    const fee = parseFloat(w.platform_fees);
+    if (!(fee > 0)) return null;
+    return {
+      id:         w.id,
+      date:       w.period_end || '',
+      category:   '3rd-Party Platform Fees',
+      vendor:     '',
+      amount:     fee,
+      notes:      'Delivery and pickup commissions for the week',
+      created_at: w.created_at || new Date().toISOString(),
+      migrated_from: 'platform_fees'
     };
   },
 
@@ -226,6 +256,13 @@ S.HubOperatingExpenses = {
   async reconcileMaintenanceLedger() {
     return this._reconcileLedgerFrom(App.shiftData && App.shiftData.sc_maintenance,
       this.migrateMaintenanceRow, 'maintenance');
+  },
+  /* ⭐ PHASE 2 ITEM 9. The weekly roll is where a delivery commission is typed; the ledger mirrors
+     it, so Books reads one place and `cash-engine.weeklyProfit` / `profit-forecast` go on reading
+     the weekly field untouched. */
+  async reconcilePlatformFeesLedger() {
+    return this._reconcileLedgerFrom(App.data && App.data.weeks,
+      this.migratePlatformFeesRow, 'platform_fees');
   },
 
   /* ⭐⭐ ONE RECONCILE, TWO SOURCES. Phase 2 needs the identical job for the maintenance log, and a
