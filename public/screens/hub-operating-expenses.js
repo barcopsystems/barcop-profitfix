@@ -63,6 +63,99 @@ S.HubOperatingExpenses = {
     return !!t && this.CASH_ONLY_CATEGORIES.some(x => x.name.toLowerCase() === t);
   },
 
+  /* ⭐⭐ ONE CASH OUTFLOW AS A LEDGER ROW. PURE — it converts a record, it never writes one, which
+     is what lets the whole migration be rehearsed and proved before it touches a real account
+     (`verify-outflow-migration-equality.js`).
+
+     ⛔ `type` IS CARRIED THROUGH, AND THAT IS THE WHOLE REASON THIS IS SAFE. Every consumer of an
+     outflow branches on it: the reserve wants loan and capital, the tax projection wants tax,
+     break-even's debt figure wants loan and capital, the labels want all five. Keeping the field
+     means nothing downstream has to learn anything in this phase — Books excludes by CATEGORY, the
+     engine still reads TYPE, and the two are the same record. `type` comes out in Phase 5, once
+     every consumer has been converted and the equality harness has watched each one move. A
+     migration that also rewrites its consumers is two changes wearing one name and neither can be
+     proved.
+
+     ⛔ THE ID IS PRESERVED. `putRecordsBulk` upserts by id, so a migration that minted new ids would
+     double every outflow the second time it ran — and the second run is exactly what happens when a
+     marker write fails ([[test-the-retry]]).
+
+     ⚠ An unknown type falls to `Other Cash Outflow` rather than to the expense category `Other`,
+     which is the collision block B of the category pin exists to stop. Falling to a real operating
+     expense would put it on the Income Statement. */
+  migrateCashOutflowRow(o) {
+    if (!o || o.id == null) return null;
+    const hit = this.CASH_ONLY_CATEGORIES.find(c => c.type === o.type);
+    const row = {
+      id:         o.id,
+      date:       o.date || '',
+      category:   (hit || this.CASH_ONLY_CATEGORIES.find(c => c.type === 'other')).name,
+      vendor:     '',
+      amount:     o.amount,
+      notes:      o.notes || '',
+      type:       o.type,
+      created_at: o.created_at || new Date().toISOString(),
+      // Where it came from, so Phase 5 can find these rows again without guessing.
+      migrated_from: 'cash_outflow'
+    };
+    /* ⚠ THE RECURRING FIELDS TRAVEL OR A SERIES STOPS PROJECTING. `recurring`, `frequency`,
+       `recur_day`, `term_months` and `stopped_ym` are what the forecast reads to know a loan is
+       still being paid; losing any one of them silently empties months of the 13-week projection.
+       Copied only when present, so a one-off never gains a recurring flag it did not have. */
+    ['recurring', 'frequency', 'recur_day', 'term_months', 'stopped_ym', 'skip_months', 'recurring_parent']
+      .forEach(k => { if (o[k] !== undefined) row[k] = o[k]; });
+    return row;
+  },
+
+  /* ⭐⭐⭐ THE MIGRATION — PHASE 1, AND IT IS DELIBERATELY INVISIBLE.
+     Every cash outflow becomes a ledger row. Nothing reads those rows as outflows yet: the engine
+     still reads `App.data.cash_outflows`, Books excludes their categories from the Income
+     Statement, and `_sumMonth`/`_sumYTD` exclude them from anything headed "operating expenses".
+     So a successful run changes not one figure anywhere in the app, which is exactly what
+     `verify-outflow-migration-equality.js` proves across eight numbers from the cash engine and
+     break-even. The CUTOVER — pointing `CashEngine.cashOutflows()` at the ledger — is a separate
+     one-line change made only after this has run and been looked at.
+
+     ⛔ ADDITIVE. `App.data.cash_outflows` is not touched, not emptied and not deleted. The old
+     store stays readable for as long as it takes to trust this, and Phase 5 removes it.
+
+     ⛔ RE-RUNNABLE WITHOUT DAMAGE, WHICH IS THE PROPERTY THAT MATTERS MOST. The marker is written
+     only AFTER the write lands, so a refused write leaves it unset and the whole thing retries on
+     the next login — and that retry is the dangerous moment ([[test-the-retry]]). Two things make it
+     safe: ids are preserved, so `putRecordsBulk` upserts rather than duplicating, and any row whose
+     id is already in the ledger is skipped outright. A migration that minted new ids would double
+     every outflow on the second attempt.
+
+     ⛔ NEVER OFF A CACHE-SERVED LOAD. `DB._loadDegraded` is set whenever any array this login came
+     from the offline cache, and app.js's own comment explains why that must block a permanent
+     marker: a cached read is indistinguishable from a real one, so migrating off a partial picture
+     would mark the job done having converted only the records the cache happened to hold. */
+  async migrateCashOutflowsOnce() {
+    if (typeof App === 'undefined' || !App.data) return false;
+    const marks = App.data.migrated_kinds = App.data.migrated_kinds || {};
+    if (marks.cash_outflow_to_ledger) return false;
+    if (typeof DB !== 'undefined' && DB._loadDegraded) return false;
+    const src = Array.isArray(App.data.cash_outflows) ? App.data.cash_outflows : [];
+    const arr = this.records();
+    const have = {};
+    arr.forEach(r => { if (r && r.id != null) have[r.id] = true; });
+    const rows = src.map(o => this.migrateCashOutflowRow(o)).filter(r => r && !have[r.id]);
+    /* Nothing to move is a real, successful outcome — a bar that never logged an outflow, or a
+       second login after the first run. Marking it done is what stops this walking the store on
+       every load forever. */
+    if (!rows.length) { marks.cash_outflow_to_ledger = true; await App.saveKey('migrated_kinds'); return false; }
+    arr.push.apply(arr, rows);
+    let ok = false;
+    try { ok = await App.putRecordsBulk('core', 'operating_expense', rows); }
+    catch (e) { ok = false; }
+    // A refused write takes the rows back out of memory and leaves the marker unset, so the next
+    // login tries again against a store that never saw them.
+    if (!ok) { App.dropRows(arr, rows); return false; }
+    marks.cash_outflow_to_ledger = true;
+    await App.saveKey('migrated_kinds');
+    return true;
+  },
+
   _tab:            'current',
   _entryMode:      'manual',   // manual | import (Add Expense form)
   _histShown:      0,          // History log window (0 = default to LIST_PAGE)
@@ -143,14 +236,24 @@ S.HubOperatingExpenses = {
   // ── Aggregation ────────────────────────────────────────────────────────
   // ⚠ r && to match _catchUpOnce and the note builders, which already carry it. Nothing writes a
   // null into this array today; three functions guarding and three not is how that stops being true.
+  /* ⛔⛔ THESE TWO SAY "OPERATING EXPENSES", SO A CASH-ONLY ROW IS NOT IN THEM. Without this the
+     outflow migration would not be invisible: the moment a draw became a ledger row, the stat
+     headed "This Month" on a screen headed Operating Expenses would jump by every draw, loan
+     payment and tax remittance in the month — while Books, which excludes them, kept the old
+     figure. Two screens disagreeing about one quantity, caused by a migration that was supposed to
+     change nothing anyone could see.
+     One rule, `isCashOnlyCategory`, applied everywhere the words "operating expenses" appear. When
+     the screens merge and this page becomes Money Out, the stat gets a name that covers both and
+     this exclusion is what makes that a labelling change rather than an arithmetic one. */
+  _isOperatingRow(r) { return !!r && !this.isCashOnlyCategory(r.category); },
   _sumMonth(monthKey) {
-    return this.records().filter(r => r && this._monthKey(r.date) === monthKey)
+    return this.records().filter(r => this._isOperatingRow(r) && this._monthKey(r.date) === monthKey)
       .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
   },
   _sumYTD(monthKey) {
     const year = monthKey.slice(0, 4);
     return this.records().filter(r => {
-      if (!r) return false;
+      if (!this._isOperatingRow(r)) return false;
       const mk = this._monthKey(r.date);
       return mk && mk.slice(0, 4) === year && mk <= monthKey;
     }).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
