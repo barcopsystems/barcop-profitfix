@@ -2,8 +2,8 @@
 
 /* ── Shift Control — Maintenance Log (writes sc_maintenance) ──────────────────
    A status tracker for equipment and facility issues: what broke, priority,
-   status (Open → In Progress → Resolved). It holds NO money: repair spend is READ back from the
-   one expense ledger and entered once, with everything else, on Close The Books. Open and urgent items
+   status (Open → In Progress → Resolved), and NOTHING else. It holds no money and no resolution
+   date: a repair cost is entered once with the rest of the money out, on Close The Books. Open and urgent items
    feed the Hub alert strip so nothing gets lost between shifts. Same page shape
    as the other Shift logs: inline collapsible form on the landing, filter card
    with a status filter, bare list, the issue form again in a focused pop-up to
@@ -46,7 +46,7 @@ S.ShiftMaintenance = {
     App.showHelpModal('How the Maintenance Log Works', [
       { p: ['Equipment breaks and falls through the cracks between shifts. Log it here and it carries forward until someone fixes it. Open and urgent items show up as alerts on the Hub so the next manager sees them.'] },
       { h: 'Log an issue', p: ['Capture what broke, where, how urgent it is, and a short description. Assign it to a staff member or an outside vendor (an HVAC tech, a plumber), whoever is handling the fix.'] },
-      { h: 'Work it to closed', p: ['Move the status from Open to In Progress to Resolved as the repair happens. When you mark it Resolved, set the date it was fixed. Resolved drops to the bottom of the list so the open work stays up top. What the repair cost is not asked for here: money out is entered in one place, on Close The Books, and this log shows you the spend it reads back from there.'] },
+      { h: 'Work it to closed', p: ['Move the status from Open to In Progress to Resolved as the repair happens. Mark it Resolved when it is fixed and it drops to the bottom of the list, so the open work stays up top. That status is the whole record: there is no second date to keep in step. What a repair COST is entered once, with the rest of your money out, on Close The Books.'] },
       { h: 'Filter and Export', p: ['Use the range chips or a custom date range to narrow the list to this week or this month. Open work always sorts to the top, urgent first, with resolved issues below. Export PDF saves the filtered list, and Worksheet prints a blank sheet to mark issues by hand during the shift.'] }
     ]);
   },
@@ -87,8 +87,6 @@ S.ShiftMaintenance = {
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Issue</label>'
       + '<textarea id="' + p + 'issue" class="notes-ta" rows="2" placeholder="Describe the problem">' + esc(r?.issue || '') + '</textarea></div></div>'
 
-      + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Resolved</label><input type="date" id="' + p + 'resolved" value="' + esc(r?.date_resolved || '') + '"/></div>'
       /* ⛔⛔⛔ THE REPAIR COST BOX IS GONE — PHASE 2 ITEM 12, AS THE PLAN ACTUALLY WROTE IT.
          *"Trackers track and hold ZERO money fields."* I first kept the box and pointed it at the
          ledger, reasoning that removing it would take away a one-step way to record a fix. That was
@@ -96,21 +94,15 @@ S.ShiftMaintenance = {
          place is the entire point of the rebuild. Kyle, looking at the result: *"that is the complete
          opposite of what i asked for."* He was right.
          This screen tracks WHAT BROKE and WHETHER IT IS FIXED. It SHOWS repair spend by reading the
-         ledger (see `_ledgerCost` and the total above the list), which is a better number than the
-         old field ever was because it includes repairs nobody opened a ticket for. The money is
-         entered once, with the rest of it, on Close The Books. */
-      + '</div>';
+         one expense ledger. The money is entered once, with the rest of it, on Close The Books.
+         ⚠ Kyle then took the Repair Cost STAT and COLUMN off this page too, and Date Resolved with
+         them: a tracker shows what broke and whether it is fixed. The status is the whole record of
+         that, and a second date to keep in step was one more thing to maintain for no answer. */
+      + '';
   },
 
-  // Flipping status to Resolved auto-fills today's resolution date if blank.
-  wireResolvedAutofill(p) {
-    document.getElementById(p + 'status')?.addEventListener('change', e => {
-      if (e.target.value === 'Resolved') {
-        const resEl = document.getElementById(p + 'resolved');
-        if (resEl && !resEl.value) resEl.value = App.todayLocal();
-      }
-    });
-  },
+  // Nothing to autofill any more: Resolved is a status, not a status plus a date.
+  wireResolvedAutofill() {},
 
   effectiveRange() {
     if (this.filterPreset === 'custom') return { from: this.filterFrom, to: this.filterTo };
@@ -167,8 +159,8 @@ S.ShiftMaintenance = {
     let below;
     if (all.length === 0) {
       below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
-        + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
-        + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No maintenance issues logged yet. Use the form above to log the first one.</td></tr></tbody></table></div>';
+        + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No maintenance issues logged yet. Use the form above to log the first one.</td></tr></tbody></table></div>';
     } else {
       const open = all.filter(r => r.status !== 'Resolved');
       const urgent = open.filter(r => r.priority === 'Urgent');
@@ -176,19 +168,17 @@ S.ShiftMaintenance = {
       // PHASE 2 ITEM 12: repair spend is READ BACK from the ledger, which is the rebuild's own rule --
       // the tracker shows the number without owning it. This is also a better figure than it was: it
       // reflects what is actually on the income statement, not a field only this screen could see.
-      const totCost = filtered.reduce((t, r) => t + (parseFloat(this._ledgerCost(r.id)) || 0), 0);
       const statsCard = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
         + '<div class="calc-item"><div class="calc-label">Open</div><div class="calc-val lg">' + open.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Urgent</div><div class="calc-val lg ' + (urgent.length ? 'warn' : '') + '">' + urgent.length + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Resolved</div><div class="calc-val lg">' + resolved.length + '</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Repair Cost</div><div class="calc-val lg">' + App.fmtCurrency(totCost) + '</div></div>'
         + '</div></div>';
 
       let listHtml;
       if (!filtered.length) {
         listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-          + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
-          + '</tr></thead><tbody><tr><td colspan="8" style="color:var(--t3);">No issues in this range. Pick a wider range above.</td></tr></tbody></table></div>';
+          + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th></th>'
+          + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No issues in this range. Pick a wider range above.</td></tr></tbody></table></div>';
       } else {
         const rows = filtered.slice(0, App.listLimit('sc', 'maintenance')).map(r => '<tr class="mt-row" data-id="' + r.id + '" style="cursor:pointer;">'
           + '<td><div class="val">' + this.fmtDate(r.date_reported) + '</div></td>'
@@ -198,13 +188,12 @@ S.ShiftMaintenance = {
           + '<td>' + this.priorityText(r.priority) + '</td>'
           + '<td>' + this.statusText(r.status) + '</td>'
           + '<td>' + esc(r.assigned_to || '-') + '</td>'
-          + '<td>' + ((c => c ? App.fmtCurrency(c) : '<span style="color:var(--t4);">-</span>')(parseFloat(this._ledgerCost(r.id)) || 0)) + '</td>'
           + '<td><div class="row-actions">'
           + (App.canEdit('sc-maintenance') ? '<button class="btn btn-ghost btn-sm mt-edit" data-id="' + r.id + '">Edit</button>' : '')
           + (App.canEdit('sc-maintenance') ? '<button class="btn btn-danger btn-sm mt-del" data-id="' + r.id + '">Delete</button>' : '')
           + '</div></td></tr>').join('');
         listHtml = '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-          + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Cost</th><th></th>'
+          + '<th>Reported</th><th>Equipment</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned To</th><th></th>'
           + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('sc', 'maintenance', filtered, this.filterPreset !== 'all');
       }
@@ -335,8 +324,6 @@ S.ShiftMaintenance = {
     const equipment = document.getElementById(p + 'equip')?.value.trim();
     if (!equipment) { fail('Equipment / item is required.'); return null; }
     const status = document.getElementById(p + 'status')?.value || 'Open';
-    const dateResolved = document.getElementById(p + 'resolved')?.value || '';
-    if (status === 'Resolved' && !dateResolved) { fail('Resolved issues need a resolution date. Set Date Resolved or change the status.'); return null; }
     const byId = document.getElementById(p + 'by')?.value || '';
     return {
       date_reported: date,
@@ -350,7 +337,7 @@ S.ShiftMaintenance = {
       // Assigned To stays free text — maintenance is often handed to an outside
       // vendor (HVAC, plumber) who is not on the staff roster.
       assigned_to:    document.getElementById(p + 'assigned')?.value.trim() || '',
-      date_resolved:  dateResolved
+      status_only:    true   // the tracker stores no date beyond when it was reported
       /* PHASE 2 ITEM 12: NO MONEY FIELD. The repair cost is an operating expense and it lives in the
          one ledger, under Repairs and Maintenance. The form still asks for it in the same place;
          _syncLedger writes it there instead of here. See _formCost. */
@@ -392,7 +379,7 @@ S.ShiftMaintenance = {
     const ok = await App.confirmDelete();
     if (!ok) return;
     await App.removeRecord('sc', 'maintenance', id);
-    await this._syncLedger(id, null);
+    await this._removeLedgerRow(id);
     this.renderList();
   },
 
@@ -409,23 +396,16 @@ S.ShiftMaintenance = {
      `reconcileMaintenanceLedger` repairs exactly that on the next load.
      ⚠ A DELETE takes the ledger row too — an orphan would keep charging the P&L for a repair the
      operator removed, and the reconcile is additive so it would never take it out. */
-  async _syncLedger(id, rec, cost) {
-    const OEX = S.HubOperatingExpenses;
-    /* ⭐ THE COST COMES FROM THE FORM, NOT THE RECORD — the record does not carry money any more.
-       The ledger row keeps the maintenance id, so editing the ticket edits the same expense and a
-       re-save can never mint a second one. */
-    const led = (rec && cost != null) ? OEX.migrateMaintenanceRow(Object.assign({}, rec, { id: id, cost: cost })) : null;
-    if (led) { await App.putRecord('core', 'operating_expense', led, { quiet: true }); return; }
-    /* Cleared the cost, or deleted the ticket: there must be no expense standing for it. Scoped to
-       rows this door created, so an id collision can never take the operator's own bill. */
-    const have = OEX.records().find(r => r && r.id === id) || null;
+  /* ⚠ THIS ONLY DELETES NOW, AND THE NAME SAYS SO. It used to write a ledger row from a cost typed
+     on this form; that field is gone, so nothing here creates money any more and the write branch
+     would have been dead code reachable only by a caller that no longer exists.
+     What is still needed: an account migrated BEFORE the field was removed has expense rows stamped
+     `migrated_from: 'maintenance'` carrying the id of their ticket. Deleting the ticket has to take
+     that expense with it, or the P&L keeps charging for a repair the operator removed — and the
+     reconcile is additive by design, so it would never take it out. Scoped to rows this mechanism
+     created, so an id collision can never delete the operator's own bill. */
+  async _removeLedgerRow(id) {
+    const have = S.HubOperatingExpenses.records().find(r => r && r.id === id) || null;
     if (have && have.migrated_from === 'maintenance') await App.removeRecord('core', 'operating_expense', id);
-  },
-
-  // What the form shows in the Repair Cost box: read BACK from the ledger, because that is where it
-  // lives now. Without this, editing a resolved ticket would show an empty box over a real expense.
-  _ledgerCost(id) {
-    const r = (S.HubOperatingExpenses.records() || []).find(x => x && x.id === id);
-    return (r && r.migrated_from === 'maintenance' && r.amount != null) ? r.amount : '';
   }
 };
