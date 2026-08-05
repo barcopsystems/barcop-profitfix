@@ -3089,6 +3089,12 @@ const App = {
     if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.reconcileCashOutflowLedger) {
       await S.HubOperatingExpenses.reconcileCashOutflowLedger();
     }
+    /* ⭐ PHASE 2: the maintenance log's repair costs become ledger rows the same way. Additive and
+       invisible until Books' Repairs line is pointed at the category — the tracker still holds the
+       cost, and nothing reads these rows yet. */
+    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.reconcileMaintenanceLedger) {
+      await S.HubOperatingExpenses.reconcileMaintenanceLedger();
+    }
     // PERSIST the sort_order stamps assigned above. In-memory-only stamping did not fix the
     // count-sheet order, it displaced the bug by one login: _nextLocSeq reads the in-memory max,
     // so a location added this session got a number ABOVE the un-stamped rows, and on the next
