@@ -27,6 +27,15 @@ S.HubOperatingExpenses = {
     'Bank and Credit Card Fees',
     'Licenses and Permits',
     'Software and Subscriptions',
+    /* ⭐⭐⭐ PHASE 2: THE TRACKER LOSES ITS MONEY, SO THIS BECOMES A CATEGORY AN OPERATOR CAN PICK.
+       Kyle, on the maintenance screen: *"i had no idea that the cost entered there goes in separate
+       as an expense.. and neither would the user."* He was right. `sc_maintenance.cost` was summed
+       straight onto the Income Statement's Repairs and maintenance line and onto Schedule C Line 21
+       — while THIS screen actively routed repairs away ("Repairs go in Shift Control"). The money
+       was on the P&L, the operator was told not to log it where the P&L is, and nothing anywhere
+       said the number they typed was an expense. Now it is one category, on one ledger, and the
+       maintenance log reads its repair spend back from here instead of storing it. */
+    'Repairs and Maintenance',
     'Other'
   ],
 
@@ -83,6 +92,31 @@ S.HubOperatingExpenses = {
      ⚠ An unknown type falls to `Other Cash Outflow` rather than to the expense category `Other`,
      which is the collision block B of the category pin exists to stop. Falling to a real operating
      expense would put it on the Income Statement. */
+  /* ⭐⭐⭐ PHASE 2 — A REPAIR BECOMES A LEDGER ROW. PURE, like its cash-outflow sibling.
+     ⛔ THE DATE IS `date_reported`, AND THAT IS NOT AN ACCIDENT. Books has always booked a repair by
+     `date_reported || date` — when it was REPORTED, not when it was resolved or paid. Dating the
+     ledger row any other way moves money between months, and months that are already closed would
+     silently restate. Equality means the same dollar in the same month; if that convention should
+     change, it changes ONCE, visibly, as its own decision.
+     ⛔ NO COST YET IS NOT AN EXPENSE. An open ticket with a null cost makes no row at all — the
+     tracker goes on tracking it. A ZERO cost DOES make a row (a warranty repair really did cost
+     nothing, and the operator recorded that on purpose). */
+  migrateMaintenanceRow(m) {
+    if (!m || m.id == null) return null;
+    const cost = parseFloat(m.cost != null ? m.cost : m.amount);
+    if (isNaN(cost)) return null;
+    return {
+      id:         m.id,
+      date:       m.date_reported || m.date || '',
+      category:   'Repairs and Maintenance',
+      vendor:     m.assigned_to || '',
+      amount:     cost,
+      notes:      m.issue || '',
+      created_at: m.created_at || new Date().toISOString(),
+      migrated_from: 'maintenance'
+    };
+  },
+
   migrateCashOutflowRow(o) {
     if (!o || o.id == null) return null;
     const hit = this.CASH_ONLY_CATEGORIES.find(c => c.type === o.type);
@@ -184,9 +218,24 @@ S.HubOperatingExpenses = {
      ⚠ `created_at` is provenance, not money: the mapping mints one when the source has none, so
      comparing it would make every load rewrite every row forever. The stored one is kept. */
   async reconcileCashOutflowLedger() {
+    return this._reconcileLedgerFrom(App.data && App.data.cash_outflows,
+      this.migrateCashOutflowRow, 'cash_outflow');
+  },
+  /* ⭐ PHASE 2, the same job for the maintenance log. `App.shiftData`, not `App.data` — the
+     maintenance tracker lives in the Shift Control module, which is a different store entirely. */
+  async reconcileMaintenanceLedger() {
+    return this._reconcileLedgerFrom(App.shiftData && App.shiftData.sc_maintenance,
+      this.migrateMaintenanceRow, 'maintenance');
+  },
+
+  /* ⭐⭐ ONE RECONCILE, TWO SOURCES. Phase 2 needs the identical job for the maintenance log, and a
+     second near-identical copy is exactly the drift this rebuild exists to end — the two would agree
+     today and diverge the first time either is touched. `origin` is both the stamp the mapping
+     writes and the guard that stops this rewriting a row it did not create. */
+  async _reconcileLedgerFrom(source, mapFn, origin) {
     if (typeof App === 'undefined' || !App.data) return 0;
     if (typeof DB !== 'undefined' && DB._loadDegraded) return 0;
-    const src = Array.isArray(App.data.cash_outflows) ? App.data.cash_outflows : [];
+    const src = Array.isArray(source) ? source : [];
     if (!src.length) return 0;
     const arr = this.records();
     const by = {};
@@ -203,10 +252,10 @@ S.HubOperatingExpenses = {
     const norm = (r) => JSON.stringify(Object.keys(r).filter(k => r[k] !== undefined).sort().map(k => [k, r[k]]));
     const rows = [];
     src.forEach(o => {
-      const want = this.migrateCashOutflowRow(o);
+      const want = mapFn.call(this, o);
       if (!want) return;
       const have = by[want.id];
-      if (have && have.migrated_from !== 'cash_outflow') return;   // somebody else's row — never touch it
+      if (have && have.migrated_from !== origin) return;   // somebody else's row — never touch it
       if (have) want.created_at = have.created_at || want.created_at;
       if (have && norm(have) === norm(want)) return;               // already in step
       rows.push(want);

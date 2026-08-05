@@ -475,7 +475,13 @@ S.HubBooks = {
     { label: 'Utilities',                      cat: 'Utilities' },
     { label: 'Insurance',                      cat: 'Insurance' },
     { label: 'Marketing and advertising',      cat: 'Marketing and Advertising' },
-    { label: 'Repairs and maintenance',        from: 'maintenance' },
+    /* ⭐⭐⭐ PHASE 2: THIS LINE READS THE LEDGER NOW, not the Shift Control tracker. It was the first
+       of the two P&L lines fed from a store that is not the expense log, and it is why an operator
+       could type a repair cost into a screen that looks like a status tracker and silently move
+       their Income Statement. `sc_maintenance.cost` still exists and still feeds the tracker's own
+       display; `reconcileMaintenanceLedger` keeps the ledger a pure function of it, and Phase 2's
+       last step removes the input entirely. */
+    { label: 'Repairs and maintenance',        cat: 'Repairs and Maintenance' },
     { label: '3rd-party platform fees',        from: 'platformFees',
       exportLabel: '3rd-party platform fees (DoorDash, UberEats, etc.)' },
     { label: 'Professional fees',              cat: 'Professional Fees' },
@@ -1889,7 +1895,7 @@ S.HubBooks = {
     rows.push(['Line 15: Insurance (other than health)', ov('Insurance'), 'Operating Expenses: Insurance', '']);
     rows.push(['Line 17: Legal and professional services', ov('Professional Fees'), 'Operating Expenses: Professional Fees', '']);
     rows.push(['Line 20b: Rent or lease (other business property)', ov('Occupancy (Rent, Property Tax)'), 'Operating Expenses: Occupancy (rent, property tax)', '']);
-    rows.push(['Line 21: Repairs and maintenance', YTD.maintenance, 'Sum of Shift Control maintenance log for ' + year, '']);
+    rows.push(['Line 21: Repairs and maintenance', ov('Repairs and Maintenance'), 'Operating Expenses: Repairs and Maintenance', '']);
     rows.push(['Line 23: Taxes and licenses', ov('Licenses and Permits'), 'Operating Expenses: Licenses and Permits', '']);
     rows.push(['Line 25: Utilities', ov('Utilities'), 'Operating Expenses: Utilities', '']);
     rows.push(['Line 26: Wages (less employment credits)', YTD.totalLabor, 'Sum of Labor Control wages for ' + year, '']);
@@ -1902,6 +1908,8 @@ S.HubBooks = {
        category cannot have its own row — 27a is where it belongs, and the note says which. */
     const _named = ['Marketing and Advertising', 'Bank and Credit Card Fees', 'Insurance',
       'Professional Fees', 'Occupancy (Rent, Property Tax)', 'Licenses and Permits', 'Utilities',
+      // ⛔ Line 21 claims this one, so 27a must NOT sweep it up as well or a repair is deducted twice.
+      'Repairs and Maintenance',
       'Software and Subscriptions', 'Other'];
     const _extraCats = Object.keys(opexY || {}).filter(c => _named.indexOf(c) < 0 && Math.abs(ov(c)) > 0.005);
     const _extraSum = _extraCats.reduce((s, c) => s + ov(c), 0);
