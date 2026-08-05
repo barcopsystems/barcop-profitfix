@@ -3095,6 +3095,11 @@ const App = {
     if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.reconcileMaintenanceLedger) {
       await S.HubOperatingExpenses.reconcileMaintenanceLedger();
     }
+    // ⭐ PHASE 2 ITEM 9: the weekly roll's delivery commissions, the last P&L line fed from outside
+    // the expense log. Same shared body, same additive contract.
+    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.reconcilePlatformFeesLedger) {
+      await S.HubOperatingExpenses.reconcilePlatformFeesLedger();
+    }
     // PERSIST the sort_order stamps assigned above. In-memory-only stamping did not fix the
     // count-sheet order, it displaced the bug by one login: _nextLocSeq reads the in-memory max,
     // so a location added this session got a number ABOVE the un-stamped rows, and on the next
