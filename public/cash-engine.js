@@ -824,6 +824,17 @@ window.CashEngine = {
       }
       if (d >= startYmd && d <= endYmd) out.push({ date: d, amount: parseFloat(b.amount) || 0, vendor: b.vendor || b.category || 'Bill', category: b.category || '', recurring: !!b.recurring });
     });
+    /* ▶ THE ITEM-16 CUTOVER BELONGS HERE AND IS NOT DONE. This still reads the manual `recurring`
+       checkbox, which a drop-only operator never ticks, so their 13-week forecast projects NO bills
+       at all — optimistic, and it feeds the ending balance, the low-point week, the runway and Safe
+       to Spend. `S.HubOperatingExpenses.recurringBills()` is the replacement and is built and pinned.
+       ⛔ TWO THINGS THE CUTOVER MUST CARRY, both measured before it was attempted:
+       1. this loop steps `m += step` in whole MONTHS, so a weekly bill is unreachable by it however
+          the frequency is spelled — day-anchored bills need their own pass;
+       2. a first attempt broke `verify-opex-recurring` C12/R2/R5 (a `skip_months` month projected
+          anyway, and own-cover stopped settling) and was reverted rather than debugged at speed,
+          because this function feeds Safe to Spend. The contract is written and seen RED in
+          `pending-recurring-cutover.js`. */
     bills.filter(b => b.recurring).forEach(p => {
       const amt = parseFloat(p.amount) || 0;
       const base = new Date((p.date || startYmd) + 'T00:00:00');
@@ -1063,6 +1074,9 @@ window.CashEngine = {
     const _hz = new Date(); _hz.setHours(0, 0, 0, 0); _hz.setDate(_hz.getDate() + (this.reserveWeeks() || 8) * 7);
     const horizonYm = App.ymdLocal(_hz).slice(0, 7);
     let annual = 0;
+    /* ▶ THE ITEM-16 CUTOVER BELONGS HERE TOO, and it moves with projectedBills above — the reserve
+       target and the forecast must not disagree about which bills exist. Still the manual checkbox,
+       so a drop-only operator's reserve is sized against ZERO fixed costs. */
     this.bills().forEach(b => {
       if (!b.recurring) return;   // recurring parents only (children carry recurring_parent, not recurring)
       // Skip a series that has ENDED (fixed term fully paid) or been STOPPED. The
@@ -1092,9 +1106,10 @@ window.CashEngine = {
          what a typical week costs, and letting it lower the reserve permanently would be wrong in
          the dangerous direction. Stopped and fully-paid series ARE dropped, two lines above,
          because those change the ongoing rate. */
-      const amt = parseFloat(b.amount) || 0;
-      const perYear = b.frequency === 'quarterly' ? 4 : b.frequency === 'annual' ? 1 : 12;
-      annual += amt * perYear;
+      // ⚠ Shared normalisation, so the day this reads derived bills a weekly one is not silently
+      // counted as monthly. `recurringPerYear` gives the identical answer for the three cadences a
+      // typed bill can carry, so this line is unchanged in behaviour today.
+      annual += (parseFloat(b.amount) || 0) * S.HubOperatingExpenses.recurringPerYear(b.frequency);
     });
     /* ⚠⚠ DEBT SERVICE IS A FIXED COST AND THIS FUNCTION COULD NOT SEE IT (round 3, F3). It read only
        bills() — the operating-expense log — while loan and equipment payments live in the SEPARATE
@@ -1126,6 +1141,9 @@ window.CashEngine = {
       const endYm = this.recurringEndYm(o);
       if (endYm && endYm < cur) return;
       if (String(o.date || '').slice(0, 7) > horizonYm) return;   // see the bills half
+      // ⚠ THE CASH-OUTFLOW SIDE KEEPS ITS OWN LITERAL, matching its twin in hub-breakeven — that
+      // form offers only monthly / quarterly / annual, and the cutover did not need this line.
+      // Exempted by name in verify-recurring-cutover's sweep, with the reason, so it stays visible.
       const amt = parseFloat(o.amount) || 0;
       const perYear = o.frequency === 'quarterly' ? 4 : o.frequency === 'annual' ? 1 : 12;
       annual += amt * perYear;
