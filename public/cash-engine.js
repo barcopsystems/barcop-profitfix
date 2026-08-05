@@ -28,10 +28,15 @@ window.CashEngine = {
      `[]`, so it could never see this. A stub more forgiving than the real dependency certifies the
      bug (integrity #6), and it did, in the one place that mattered. It now runs the REAL reader. */
   bills() {
+    /* ⛔ BARE, AND THE GUARD IT REPLACED WAS THE DANGEROUS KIND ([[the-loop]] #40). This used to read
+       `if (!OEX || typeof OEX.isCashOnlyCategory !== 'function') return rows;` — which means "if the
+       expense screen has not loaded, go back to counting every owner draw and loan payment as a
+       BILL, quietly." That is precisely the defect that reached Kyle when the migration shipped: the
+       reserve, Safe to Spend and the break-even nut all moved on the front page. A fallback to the
+       unfiltered array converts a loud failure into a silently wrong number, and this file loads
+       AFTER hub-operating-expenses.js in index.html, so there is nothing to be defensive about. */
     const rows = (App.data && Array.isArray(App.data.operating_expenses)) ? App.data.operating_expenses : [];
-    const OEX = (typeof window !== 'undefined' && window.S && S.HubOperatingExpenses) || null;
-    if (!OEX || typeof OEX.isCashOnlyCategory !== 'function') return rows;
-    return rows.filter(r => !OEX.isCashOnlyCategory(r && r.category));
+    return rows.filter(r => !S.HubOperatingExpenses.isCashOnlyCategory(r && r.category));
   },
 
   countsAsc() {

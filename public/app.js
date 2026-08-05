@@ -3073,6 +3073,14 @@ const App = {
     if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.migrateCashOutflowsOnce) {
       await S.HubOperatingExpenses.migrateCashOutflowsOnce();
     }
+    /* ⭐ STEP 7's REPAIR, and it runs AFTER the one-time migration on every load. The Cash Outflows
+       door now writes both stores, but two stores cannot be written in one request — so a refused
+       ledger write, a refused delete, a seeded account, or a login the migration skipped all leave
+       the ledger one or more rows behind. This is additive-only and puts them back. It writes
+       nothing when the two stores already agree, which is every login after the first. */
+    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.reconcileCashOutflowLedger) {
+      await S.HubOperatingExpenses.reconcileCashOutflowLedger();
+    }
     // PERSIST the sort_order stamps assigned above. In-memory-only stamping did not fix the
     // count-sheet order, it displaced the bug by one login: _nextLocSeq reads the in-memory max,
     // so a location added this session got a number ABOVE the un-stamped rows, and on the next
@@ -3538,6 +3546,15 @@ const App = {
       const lc = v.toLowerCase();
       if (!v) return;
       if (lc === 'other' && !declaresOther) return;
+      /* ⛔ AND AT READ TIME, NOT ONLY AT ADD TIME — the add guard alone was half a fix and I knew it.
+         An account that typed "Owner Draw" into the list manager BEFORE that guard shipped kept the
+         whole defect: the dropdown still offered the name, the By Category card still listed it, and
+         an expense filed under it was excluded from every total and from the log, so it had no Edit
+         and no Delete button on any screen. Refusing the name here takes it out of the picker and
+         off the card for those accounts too, so no new row can land on it.
+         ⚠ Rows ALREADY filed under such a name stay unreachable until the Phase 5 cleanup — that is
+         a data repair, not a code fix, and it is listed with the phantom catch-up children. */
+      if (this.listReservedWhy(key, v)) return;
       if (hid.includes(lc) || out.some(x => x.toLowerCase() === lc)) return;
       out.push(v);
     };
@@ -3547,6 +3564,27 @@ const App = {
   },
   // Add an option to a key (from the inline "+ Add your own" or the Manage editor).
   // A brand-new value goes into added; a hidden built-in just gets un-hidden.
+  /* ⛔⛔ A NAME THE APP ALREADY USES FOR A DIFFERENT KIND OF ROW, AND THE COLLISION LOSES MONEY.
+     The one-ledger merge put owner draws, loan payments, capital buys and tax remittances into
+     `operating_expenses` under five reserved category names, and every reader on the expense side
+     excludes rows by CATEGORY NAME. Nothing stopped the operator adding a category called exactly
+     "Owner Draw" through the list manager: an expense logged under it was then filtered out of the
+     month total, the year total, the history log — so it had no Edit and no Delete button anywhere
+     — while the By Category card printed "Owner Draw $0.00", which reads as "no draws" rather than
+     "$4,000 missing". Measured on a $8,100 ledger: This Month $4,100, operating income $4,000 high.
+     It also let a re-dropped bank file write a real duplicate, because the import dedup compares
+     against the same filtered set.
+     ⚠ The names come from the screen that OWNS them, never a second copy here — a hardcoded list
+     would drift the moment a sixth category is added, which is the whole disease this rebuild
+     treats. Returns the REASON, not a boolean: a refusal the operator cannot explain reads as a
+     broken Add button, which is exactly what [[the-loop]] #53 was about. */
+  listReservedWhy(key, val) {
+    if (key !== 'expense_category') return '';
+    const v = String(val == null ? '' : val).trim();
+    if (!v || !S.HubOperatingExpenses.isCashOnlyCategory(v)) return '';
+    return '"' + v + '" is how Bar Cop labels money that leaves the bank but is not an operating '
+      + 'cost. Log those on Cash Outflows instead, or pick a different name.';
+  },
   listAddOption(key, val) {
     val = (val == null ? '' : String(val)).trim();
     if (!val) return false;
@@ -3558,6 +3596,7 @@ const App = {
        Departments, Permit Types) must accept it: re-adding un-hides the built-in, which is exactly
        what every other built-in does. Silently returning was the part that read as a bug. */
     if (lc === 'other' && !(this._listBuiltins[key] || []).some(b => String(b == null ? '' : b).trim().toLowerCase() === 'other')) return false;
+    if (this.listReservedWhy(key, val)) return false;
     const c = this.listConfig(key);
     c.hidden = c.hidden.filter(h => String(h).toLowerCase() !== lc);
     const isBuiltin = (this._listBuiltins[key] || []).some(b => String(b).toLowerCase() === lc);
@@ -3813,7 +3852,9 @@ const App = {
              the editor re-rendered unchanged, and the operator was left typing it again. */
           if (this.listAddOption(key, v) === false) {
             const err = root.querySelector('#ll-add-err');
-            if (err) { err.textContent = '"' + v + '" cannot be added to this list.'; err.style.display = 'inline'; }
+            // A reserved name says WHY; everything else keeps the generic line.
+            const why = this.listReservedWhy(key, v);
+            if (err) { err.textContent = why || ('"' + v + '" cannot be added to this list.'); err.style.display = 'inline'; }
             return;
           }
         }
