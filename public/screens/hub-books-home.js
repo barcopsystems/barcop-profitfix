@@ -50,12 +50,17 @@ S.HubBooksHome = {
   doneMap()  { return App.acctGet(this._doneKey(), {}); },
   setDone(step, val) { const m = { ...this.doneMap() }; m[step] = val; App.acctSet(this._doneKey(), m); },
 
-  ORDER: ['expenses', 'pnl', 'review', 'generate'],
+  /* ⚠ THE POSITION IS THE NUMBER. `_META` carried `n: 1..4` as literals, so inserting a step meant
+     hand-renumbering every one below it — the kind of edit that ships a "3" sitting in position 4.
+     `stepRow` derives it from ORDER now, and verify-books-weeks-in.js refuses a hardcoded `n:`. */
+  ORDER: ['expenses', 'weeks', 'pnl', 'review', 'generate'],
   _META: {
-    expenses: { n: 1, title: 'Log this month\'s operating expenses', act: 'operating-expenses' },
-    pnl:      { n: 2, title: 'Generate your weekly P&L brief',        act: 'weekly-pnl' },
-    review:   { n: 3, title: 'Review your income statement',          act: 'books' },
-    generate: { n: 4, title: 'Generate Month-End Books',              act: 'books' }
+    expenses: { title: 'Log this month\'s operating expenses', act: 'operating-expenses' },
+    // Revenue on the income statement IS the confirmed weeks. See hub-books._weeksComplete.
+    weeks:    { title: 'Make sure the weeks are all in',       act: 'this-week' },
+    pnl:      { title: 'Generate your weekly P&L brief',       act: 'weekly-pnl' },
+    review:   { title: 'Review your income statement',         act: 'books' },
+    generate: { title: 'Generate Month-End Books',             act: 'books' }
   },
   stepDone() { const dm = this.doneMap(); const r = {}; this.ORDER.forEach(k => { r[k] = !!dm[k]; }); return r; },
 
@@ -230,9 +235,10 @@ S.HubBooksHome = {
   // ── Expandable step (Cash stepRow pattern) ──────────────────────────────────
   stepRow(k, done, st) {
     const m = this._META[k], isDone = done[k], isOpen = this._openStep === k;
+    const num = this.ORDER.indexOf(k) + 1;   // the position IS the number — see _META
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
-      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + m.n + '</span>';
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + num + '</span>';
     const bg = isOpen ? 'var(--step-open)' : (isDone ? 'var(--input)' : 'var(--surface)');
     let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
       + '<div class="bk-step-head' + (isOpen ? '' : ' collapsed') + '" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
@@ -249,6 +255,23 @@ S.HubBooksHome = {
     if (k === 'expenses') {
       const n = this._bills().filter(r => r && r.date && String(r.date).slice(0, 7) === st.curKey).length;
       return n ? n + ' bill' + (n === 1 ? '' : 's') + ' logged this month' : 'No bills logged yet this month';
+    }
+    /* ⛔ THE MONTH BEING CLOSED, NEVER THE ONE YOU ARE STANDING IN. Step 3 shipped that defect once
+       (it read the month-to-date figure and said "July 2026 operating income $9,982.19" while the
+       button under it opened JUNE) so this gets the pin on day one instead of after a walk-through.
+       ⚠ NO `st.curKey` FALLBACK, deliberately, and it differs from the `review` branch below for a
+       reason: falling back to the current month means "if HubBooks has not loaded, talk confidently
+       about the WRONG MONTH", which is that same defect wearing a guard ([[the-loop]] #40). With no
+       closing month there is no true sentence to print, so it prints none. */
+    if (k === 'weeks') {
+      const HB = S.HubBooks;
+      if (!HB || !HB._closingMonthKey || !HB._weeksComplete) return '';
+      const key = HB._closingMonthKey();
+      const W = HB._weeksComplete(key);
+      const name = HB._monthLabel ? HB._monthLabel(key) : key;
+      if (!W.count) return 'No weeks confirmed yet for ' + esc(name);
+      const said = W.count + ' week' + (W.count === 1 ? '' : 's') + ' confirmed for ' + esc(name);
+      return W.complete ? said : said + ', ' + W.missing + ' still to confirm';
     }
     if (k === 'pnl')      { const d = this._lastRun('books_report_run_weeklypnl'); return d ? 'Report last run ' + d : 'Not run yet'; }
     /* ⛔ QUOTE THE MONTH THE BUTTON OPENS. This read the month-to-date figure (`st.mInc`), so in
@@ -283,6 +306,28 @@ S.HubBooksHome = {
       return explain('Drop your bank or card statement and Bar Cop reads the bills off it, or enter one by hand. Every expense you log here is what your income statement reads from.')
         + '<div id="bk-moneyout"></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">' + markBtn + '</div>';
+    }
+    /* ⭐ NAMING THE DEPENDENCY IS THE WHOLE POINT OF THIS STEP. Revenue on the income statement is
+       the weeks you confirmed; the bills beside it come off a statement covering the whole month. A
+       month short a week reads 20% light on revenue and the same dollars light on operating income,
+       in the flattering direction, with nothing on screen saying so.
+       ⚠ NO NEW VISUAL ELEMENT. The count and the shortfall go in the STATUS LINE, which is where
+       every other step already speaks, and the body is the same `explain` + buttons shape. A warning
+       box here would be a design change, and those get walked one at a time. */
+    if (k === 'weeks') {
+      const HB = S.HubBooks;
+      const key = (HB && HB._closingMonthKey) ? HB._closingMonthKey() : '';
+      const name = (key && HB && HB._monthLabel) ? HB._monthLabel(key) : 'the month you are closing';
+      /* ⚠ THE COPY CLAIMS ONLY WHAT IS CERTAIN. An earlier draft said "while the bills you dropped
+         cover the whole month" — which assumes they dropped a statement AND that it was complete,
+         neither of which this screen knows ([[output-honesty]]). What IS certain is the direction:
+         revenue missing means operating income reads low. */
+      return explain('Revenue on your income statement is the weeks you confirmed. Any week of '
+          + esc(name) + ' you have not confirmed is revenue Bar Cop cannot see, so operating income '
+          + 'reads low until they are all in.')
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-ghost btn-sm" data-act="this-week">Confirm the Week</button>'
+        + markBtn + '</div>';
     }
     const M = {
       pnl:      ['A one-page profit and loss for any week range, the brief you keep for yourself or hand to your bookkeeper.', '<button class="btn btn-ghost btn-sm" data-act="weekly-pnl">Weekly P&amp;L Brief</button>'],

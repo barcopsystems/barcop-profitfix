@@ -462,6 +462,74 @@ S.HubBooks = {
     return months.find(m => m !== this._currentMonthKey()) || months[0] || this._currentMonthKey();
   },
 
+  /* ⛔⛔ HAS EVERY WEEK THAT *ENDS* IN THIS MONTH BEEN CONFIRMED? The Income Statement's revenue is
+     the sum of those weeks (_aggregateMonth), while the expenses beside it come off a dropped bank
+     statement covering the WHOLE month. So a bar behind on Confirm the Week closes a month with
+     PARTIAL revenue against WHOLE costs, and Close The Books said nothing about it.
+     ⭐ MEASURED on a five-week month at $14,000 a week: one missing week understates revenue by
+     $14,000 — 20.0% of the month — and operating income by the same dollars, flatteringly.
+
+     ⛔⛔ THIS IS *NOT* `hub-operating-expenses._monthRevenueComplete`, AND MUST NEVER BE MERGED WITH
+     IT. That one counts DAYS COVERED, which is the right test for the OpEx % ratio because that
+     ratio divides one month's money by one month's revenue day for day. Books does not slice by
+     day — it books a week WHOLE to the month its period_end falls in. Measured on the same fixture:
+     dropping the STRADDLING week (the one ending in the next month) leaves this month's revenue
+     completely unchanged at $70,000 while the day-counting helper goes false. Wiring the cockpit to
+     that helper would nag every operator, every month, about a week that belongs to the NEXT month's
+     books. Two questions, two answers ([[the-loop]] #51). verify-books-weeks-in.js section E is the
+     control that keeps them apart, and it asserts they DISAGREE on that input.
+
+     ⚠ A WEEK ENDING ON DAY d IMPLIES ONE ENDING ON d-7. That is the whole rule — it needs no model
+     of the operator's cadence beyond "a week is seven days", which is what a week record is. Every
+     period_end here is inside one month, so plain day arithmetic cannot cross a boundary.
+
+     ⚠⚠ AND THE HEAD IS EXCUSED FOR A BAR THAT HAD NOT STARTED YET. Without this, an operator who
+     signed up on the 18th is told two weeks are missing from their first month and goes hunting for
+     records that never existed — a guard that refuses real data is a defect with a support call
+     attached ([[the-loop]]: a guard is a change, sweep BOTH directions). Weeks before their first
+     ever confirmed week are not missing, they are before the beginning. Gaps AFTER it still count. */
+  _weeksComplete(monthKey) {
+    // Same refusal shape as _monthRevenueComplete, the sibling question one screen over.
+    if (!monthKey || String(monthKey).length < 7) return { monthKey: monthKey, count: 0, missing: 0, complete: false, firstMonth: false };
+    const all = (App.data?.weeks || [])
+      .map(w => (w && w.period_end) ? String(w.period_end).slice(0, 10) : '')
+      .filter(pe => pe.length === 10).sort();
+    const ends = all.filter(pe => pe.slice(0, 7) === monthKey);
+    const out = { monthKey: monthKey, count: ends.length, missing: 0, complete: false, firstMonth: false };
+    if (!ends.length) return out;
+    const y = parseInt(monthKey.slice(0, 4), 10), m0 = parseInt(monthKey.slice(5, 7), 10) - 1;
+    const dim = new Date(y, m0 + 1, 0).getDate();
+    const dayOf = (pe) => parseInt(pe.slice(8, 10), 10);
+    // The head: a week ending on the first in-month day implies earlier ones, unless the bar's
+    // records simply start here.
+    out.firstMonth = all.length > 0 && all[0].slice(0, 7) === monthKey;
+    const first = dayOf(ends[0]);
+    if (!out.firstMonth && first > 7) out.missing += Math.ceil((first - 7) / 7);
+    // The middle: any gap wider than a week is that many weeks nobody confirmed.
+    for (let i = 1; i < ends.length; i++) {
+      const gap = dayOf(ends[i]) - dayOf(ends[i - 1]);
+      if (gap > 7) out.missing += Math.round(gap / 7) - 1;
+    }
+    /* The tail: if another week would still END inside this month, it is owed.
+       ⛔⛔ BUT A WEEK THAT HAS NOT HAPPENED YET IS NOT MISSING, and the current month is reachable
+       here: `_closingMonthKey()` falls back to the month you are standing in for a bar in its FIRST
+       month (`months.find(m => m !== current) || months[0]`). Measuring to the end of a month that is
+       not over told a brand-new operator on the 5th that four weeks were "still to confirm", naming
+       weeks that have not occurred — day one is exactly who sees that. Measure to TODAY while the
+       month is still running, and to the month end once it has ended.
+       ⚠ Only the TAIL needs the cap. The head and the middle sit between two confirmed weeks, so
+       they are in the past by construction. */
+    /* ⚠ BARE, not `App.todayLocal && ...`. Guarding it would mean "if the date helper is missing,
+       go quietly back to measuring a running month to its end" — the exact defect this line fixes,
+       restored silently ([[the-loop]] #40). Measured convention: 182 bare call sites app-wide. */
+    const today = String(App.todayLocal());
+    const capDay = (today.slice(0, 7) === monthKey) ? parseInt(today.slice(8, 10), 10) : dim;
+    const lastD = dayOf(ends[ends.length - 1]);
+    if (capDay - lastD >= 7) out.missing += Math.floor((capDay - lastD) / 7);
+    out.complete = out.missing === 0;
+    return out;
+  },
+
   /* ⛔ THE P&L, COMPUTED ONCE. Four places built this same arithmetic by hand — the on-screen
      Income Statement, the Income Statement SHEET in the workbook, the Books landing's hero, and
      (as of the fix that added this) the cockpit's review step. They agreed today; four copies of
