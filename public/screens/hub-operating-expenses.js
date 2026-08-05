@@ -1812,11 +1812,100 @@ S.HubOperatingExpenses = {
   _categoryForVendor(name) {
     const k = this._vendorKey(name);
     if (!k) return '';
+    /* ⭐⭐ 'Other' TEACHES NOW, AND ITEM 15 IS WHAT CHANGED THAT (2026-08-05). This used to exclude it,
+       with the reason *"'Other' is not an answer, it is the absence of one, so it never teaches"* —
+       correct at the time, because 'Other' was the IMPORTER'S OWN FALLBACK. A row saying Other meant
+       "Bar Cop could not tell", and learning from it would have cemented Bar Cop's guess as the
+       operator's decision. Item 15 made the fallback EMPTY, so a stored 'Other' can now only have
+       come from the operator picking it. It is an answer.
+       ⛔ MEASURED COST OF LEAVING IT: on a second drop of a real bank month, 5 of 8 vendors
+       auto-placed and the 3 that did not were the distributor, filed under Other — the highest
+       frequency vendor a bar has. It came back unsorted every month, forever, on rows that carry an
+       IRS line number, so the one month somebody skips it a real deduction drops off the tax sheet.
+       ⚠ THE EMPTY TEST STAYS, and it is doing the original job now: a row with NO category really is
+       the absence of an answer, and it must never teach. */
     const hits = this.expenseRows().filter(r => r && this._vendorKey(r.vendor) === k
-      && String(r.category || '').trim() && String(r.category).trim().toLowerCase() !== 'other');
+      && String(r.category || '').trim());
     if (!hits.length) return '';
     hits.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
     return String(hits[hits.length - 1].category).trim();
+  },
+
+  /* ⭐⭐⭐ PHASE 3 ITEM 16a — THE FORWARD NUMBERS READ THE LEDGER, NOT A CHECKBOX.
+     Kyle: *"they drop in their expenses and a recurring expense is either there or it isn't."* That
+     is rule 3 of the rebuild — you never type a number Bar Cop can compute — and rent hitting the
+     1st for $4,200 three months running IS in the dropped data.
+
+     ⛔⛔ THE LIVE DEFECT IT CLOSES, MEASURED on a drop-only operator with three clean months on file
+     and $5,652.55/month of real fixed costs: break-even found 0 recurring bills, a $0.00 weekly nut
+     and a NULL break-even, and the forecast projected NO bills at all. The importer's record is
+     `{id,date,category,vendor,amount,notes,created_at}` — it has never carried `recurring`, so every
+     forward-looking number was fed only by a checkbox the primary flow never touches. It failed
+     OPTIMISTIC, which is the direction nobody reports.
+
+     ⛔ WHAT IT WILL NOT DO ([[the-loop]] #30 — a heuristic that infers a fact the file does not
+     contain is wrong in BOTH directions, and its blast radius is everyone who is merely different).
+     One occurrence is not a pattern. An irregular gap is not a pattern. A cadence that is not
+     monthly, quarterly or annual is not one Bar Cop projects. Where the data cannot answer, this
+     returns nothing and the operator answers instead. Every proposal carries its occurrence count so
+     the screen can show what it is standing on, and the operator confirms before anything uses it.
+
+     ⚠ NO FITTED THRESHOLD ANYWHERE ([[the-loop]] #28: state the discriminator in words first).
+     "Identical to the cent every time" is a fact about the data, not a magic number — that is the
+     whole fixed-vs-varies test. A varying bill reports the AVERAGE of what was actually observed and
+     says `varies: true`, so the forecast can be honest about the precision it has. */
+  deriveRecurringBills() {
+    const FREQ = { 1: 'monthly', 3: 'quarterly', 12: 'annual' };
+    /* Cash-only rows are excluded: draws, loans and tax remittances are projected by the Cash
+       Outflows side already, and deriving them here would double them in the forecast. */
+    const groups = {};
+    this.expenseRows().forEach(r => {
+      if (!r || this.isCashOnlyCategory(r && r.category)) return;
+      const k = this._vendorKey(r.vendor);
+      if (!k) return;
+      const d = String(r.date || '');
+      // An unreadable date is skipped, never repaired into a guess — a wrong month invents a gap.
+      if (!/^\d{4}-\d{2}-\d{2}/.test(d)) return;
+      (groups[k] = groups[k] || []).push(r);
+    });
+    const out = [];
+    Object.keys(groups).forEach(k => {
+      const g = groups[k].slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      if (g.length < 2) return;                       // one occurrence is not a pattern
+      const idx = g.map(r => (parseInt(String(r.date).slice(0, 4), 10) * 12)
+        + parseInt(String(r.date).slice(5, 7), 10) - 1);
+      const gaps = [];
+      for (let i = 1; i < idx.length; i++) gaps.push(idx[i] - idx[i - 1]);
+      const step = gaps[0];
+      // Every gap identical, and a cadence Bar Cop actually projects. Two rows in one month give a
+      // gap of 0, which is not a schedule either.
+      if (!gaps.every(x => x === step) || !FREQ[step]) return;
+      const amts = g.map(r => parseFloat(r.amount) || 0);
+      const varies = !amts.every(a => Math.abs(a - amts[0]) < 0.005);
+      const amount = varies
+        ? Math.round((amts.reduce((s, a) => s + a, 0) / amts.length) * 100) / 100
+        : amts[0];
+      // The day it usually lands. A debit pushed off a weekend moves a day or two, so the most
+      // common wins and the earliest breaks a tie rather than an arbitrary pick.
+      const tally = {};
+      g.forEach(r => { const d = parseInt(String(r.date).slice(8, 10), 10) || 1; tally[d] = (tally[d] || 0) + 1; });
+      const day = parseInt(Object.keys(tally).sort((a, b) => (tally[b] - tally[a]) || (a - b))[0], 10);
+      const last = g[g.length - 1];
+      out.push({
+        vendorKey: k,
+        vendor: last.vendor || '',
+        // The operator's own decision, through the shared rule — so a confirmed proposal never
+        // re-asks a category they have already answered.
+        category: this._categoryForVendor(last.vendor) || '',
+        frequency: FREQ[step],
+        day: day,
+        amount: amount,
+        varies: varies,
+        occurrences: g.length,
+        lastDate: String(last.date).slice(0, 10)
+      });
+    });
+    return out;
   },
 
   /* ⛔⛔ WHAT BAR COP CAN RECOGNISE AS BELONGING SOMEWHERE ELSE (Kyle, 2026-08-04, by using the app):
