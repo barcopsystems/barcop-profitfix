@@ -2012,6 +2012,18 @@ S.HubOperatingExpenses = {
 
      ⚠ THE CLOCK IS READ THROUGH `App.todayLocal()`, never `new Date()` ([[local-date-convention]]),
      which is also what lets a harness pin the clock instead of anchoring to a literal day. */
+  /* ⭐⭐ HOW MANY TIMES A YEAR EACH CADENCE HAPPENS, DEFINED ONCE. There were already two copies of
+     `quarterly ? 4 : annual ? 1 : 12` in `hub-breakeven` alone (the nut and the by-category table)
+     and a third in `cash-engine.weeklyFixedCosts` — and the moment `weekly` and `fortnightly` became
+     possible, every one of them silently counted a weekly bill as monthly: **4.3x low** on the
+     number break-even exists to give ([[the-loop]] #24 — after a vocabulary gains cases, every
+     counter derived from it is pointing at the wrong set).
+     ⚠ The default is 12, so an unknown or missing cadence behaves exactly as it did before rather
+     than collapsing to zero and quietly removing a bill from the nut. */
+  recurringPerYear(frequency) {
+    return { weekly: 52, fortnightly: 26, monthly: 12, quarterly: 4, annual: 1 }[frequency] || 12;
+  },
+
   recurringBills() {
     const CYCLE_DAYS = { weekly: 7, fortnightly: 14, monthly: 31, quarterly: 92, annual: 366 };
     const decisions = this.recurringDecisions();
@@ -2019,12 +2031,55 @@ S.HubOperatingExpenses = {
     const dayNo = (ymd) => Date.UTC(parseInt(String(ymd).slice(0, 4), 10),
       parseInt(String(ymd).slice(5, 7), 10) - 1, parseInt(String(ymd).slice(8, 10), 10)) / 86400000;
     const now = dayNo(today);
-    return this.deriveRecurringBills().filter(b => {
+    const derived = this.deriveRecurringBills().filter(b => {
       if (decisions[b.vendorKey] === 'no') return false;
       if (isNaN(now)) return true;    // no clock to compare against: never drop on a bad reading
       const span = CYCLE_DAYS[b.frequency] || 31;
       return (now - dayNo(b.lastDate)) <= span * 2;
     });
+
+    /* ⭐⭐⭐ AND THE BILLS THE OPERATOR TYPED, WHICH THE DERIVATION CANNOT ALWAYS SEE.
+       ⛔ WHY THIS IS NOT REDUNDANT, and the measurement that settles it: the derivation groups a
+       typed parent together with its OWN generated children — same vendor key — so on an account
+       that has been running a while it already returns one bill per vendor and the typed record adds
+       nothing. THE GAP IS THE OPPOSITE ONE. Two occurrences is the derivation's minimum, so a bill
+       entered TODAY, or one whose series was stopped and restarted, or any cadence outside the five,
+       has a single row and derives to NOTHING. Cutting over to derived-only would silently drop a
+       real fixed cost out of break-even, the reserve target and Safe to Spend — the quiet direction
+       nobody reports.
+       ⛔⛔ THE DEDUPE IS THE WHOLE CONTRACT. Where BOTH can see a bill, the typed record wins and the
+       derived one is dropped: measured on the seeded account, a naive union reads $32,756.00 against
+       a truth of $16,378.00 — every bill twice. Keyed on `_vendorKey`, the same normalised key the
+       derivation and the category learning already share.
+       ⭐ TYPED WINS RATHER THAN DERIVED because the typed record carries the operator's own term,
+       `stopped_ym` and `skip_months`, and the consumers apply those rules to it. A derived stand-in
+       has none of that history, so preferring it would quietly resurrect a stopped series.
+       ⚠ `derived: false` is stamped explicitly, never left undefined — a consumer testing `!b.derived`
+       would read a missing field as "typed" and the two cases would be indistinguishable. */
+    const typed = this.expenseRows().filter(r =>
+      r && r.recurring && !r.recurring_parent && r.date && !this.isCashOnlyCategory(r.category));
+    const claimed = {};
+    const out = [];
+    typed.forEach(r => {
+      const k = this._vendorKey(r.vendor);
+      // A typed bill with no vendor at all cannot collide with anything, and keying it on '' would
+      // make every such bill collide with every other. Key it on its own id instead.
+      const key = k || ('id:' + r.id);
+      if (claimed[key]) return;
+      claimed[key] = true;
+      out.push({
+        vendorKey: key, vendor: r.vendor || r.category || 'Bill', category: r.category || '',
+        frequency: r.frequency === 'quarterly' ? 'quarterly' : r.frequency === 'annual' ? 'annual' : 'monthly',
+        day: parseInt(r.recur_day, 10) || parseInt(String(r.date).slice(8, 10), 10) || 1,
+        weekday: null, amount: parseFloat(r.amount) || 0, varies: false,
+        occurrences: null, lastDate: String(r.date).slice(0, 10), derived: false, row: r
+      });
+    });
+    derived.forEach(b => {
+      if (claimed[b.vendorKey]) return;
+      out.push(Object.assign({}, b, { derived: true, row: null }));
+    });
+    return out;
   },
 
   /* ⛔⛔ WHAT BAR COP CAN RECOGNISE AS BELONGING SOMEWHERE ELSE (Kyle, 2026-08-04, by using the app):

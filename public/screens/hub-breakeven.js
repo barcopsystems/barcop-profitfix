@@ -120,6 +120,13 @@ S.HubBreakEven = {
     // whose fixed TERM is fully paid, so the break-even nut agrees with Cash Position's
     // reserve target instead of carrying a paid-off loan or canceled bill forever.
     const curYm = App.todayLocal().slice(0, 7);
+    /* ▶ THE ITEM-16 CUTOVER BELONGS HERE, and it must land in the same edit as the two cash-engine
+       consumers or the nut and the forecast disagree about which bills exist. This still reads the
+       manual `recurring` checkbox, which a drop-only operator never ticks — measured: three clean
+       months of statements holding $5,652.55/month of real fixed costs, and this read a $0.00 nut
+       and a NULL break-even. `S.HubOperatingExpenses.recurringBills()` is the replacement, built and
+       pinned; see `pending-recurring-cutover.js` for the contract and the two things that broke on
+       the first attempt. */
     const recurring = opex.filter(r => {
       if (!r || !r.recurring || r.recurring_parent) return false;
       if (r.stopped_ym && r.stopped_ym <= curYm) return false;
@@ -130,11 +137,10 @@ S.HubBreakEven = {
     });
     // Normalize each recurring bill by its frequency (monthly/quarterly/annual) so
     // the weekly nut isn't over-weighted by a quarterly or annual bill.
-    let annualOpex = recurring.reduce((s, r) => {
-      const amt = parseFloat(r.amount) || 0;
-      const perYear = r.frequency === 'quarterly' ? 4 : r.frequency === 'annual' ? 1 : 12;
-      return s + amt * perYear;
-    }, 0);
+    // ⚠ ONE definition of how often each cadence happens, shared with the by-category table below and
+    // with the cash engine — see HubOperatingExpenses.recurringPerYear.
+    let annualOpex = recurring.reduce((s, r) =>
+      s + (parseFloat(r.amount) || 0) * _OEX.recurringPerYear(r.frequency), 0);
     /* ⚠⚠ DEBT SERVICE BELONGS IN THE NUT, AND THIS FILE COULD NOT SEE IT (round 4, F3). It built its
        whole fixed-cost figure from the operating-expense log, while loan and equipment payments live
        in the SEPARATE cash_outflows store — and the comment directly above claims this nut "agrees
@@ -158,6 +164,13 @@ S.HubBreakEven = {
       const endYm = (window.CashEngine && CashEngine.recurringEndYm) ? CashEngine.recurringEndYm(o) : null;
       if (endYm && endYm < curYm) return s;
       if (String(o.date || '').slice(0, 7) > curYm) return s;   // not started yet — same as the engine
+      /* ⚠ THE CASH-OUTFLOW SIDE KEEPS ITS OWN LITERAL, DELIBERATELY. I pointed this at the shared
+         `recurringPerYear` and had to put it back: `verify-outflow-migration-equality` slices this
+         `debtAnnual` expression out as a TEXT FRAGMENT and runs it standalone, so a reference to the
+         screen-scoped `_OEX` is undefined there and the harness died with no summary. The outflow
+         form offers only monthly / quarterly / annual, so the two never disagree — and the cutover
+         did not need this line. Exempted BY NAME in verify-recurring-cutover's sweep, with this
+         reason, rather than the sweep being narrowed to hide it ([[the-loop]] #21). */
       const perYear = o.frequency === 'quarterly' ? 4 : o.frequency === 'annual' ? 1 : 12;
       return s + (parseFloat(o.amount) || 0) * perYear;
     }, 0);
@@ -297,10 +310,14 @@ S.HubBreakEven = {
     // read as a $12k monthly bill), and the rows then visibly did not add up to their own
     // Total, which was frequency-correct all along.
     const byCat = {};
+    // ⚠ THE SECOND COPY OF THE SAME NORMALISATION, and the reason it is now a shared helper: the
+    // moment weekly and fortnightly became possible, this one would have counted a weekly linen
+    // service as monthly while the Total above counted it correctly — rows that do not add up to
+    // their own total, which is the exact defect the two comments above record being fixed twice.
+    const _OEXb = window.S && S.HubOperatingExpenses;
     c.recurring.forEach(r => {
       const k = r.category || 'Other';
-      const perYear = r.frequency === 'quarterly' ? 4 : r.frequency === 'annual' ? 1 : 12;
-      byCat[k] = (byCat[k] || 0) + ((parseFloat(r.amount) || 0) * perYear / 12);
+      byCat[k] = (byCat[k] || 0) + ((parseFloat(r.amount) || 0) * _OEXb.recurringPerYear(r.frequency) / 12);
     });
     const salRow = c.weeklySalaried > 0
       ? '<tr><td><div class="val">Salaried Labor</div></td><td>' + f2(c.salariedMonthly) + '</td><td class="val">' + f2(c.weeklySalaried) + '</td><td></td></tr>'
