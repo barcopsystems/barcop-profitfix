@@ -3061,34 +3061,44 @@ S.HubSettings = {
     // rows carry a resolution date and the repair cost so the cost rollup is
     // honest. The open Walk-in Cooler ties to the same equipment as the temp
     // checklist item and the cooler running warm.
+    /* ⭐ THE REPAIR MONEY LIVES IN THE LEDGER, NOT ON THE TICKETS (Kyle, 2026-08-05). The
+       maintenance log is a pure tracker now, so seeding a `cost` on it would seed a field the app
+       no longer has and the demo would show repairs the Income Statement could not explain. These
+       are ordinary expense rows, exactly what a live operator produces on Close The Books, which
+       keeps the seed honest to the round-trip rule. Dates match the tickets they pay for. */
+    [[10, 310, 'Dish Machine - sanitizing temp'], [10, 220, 'Walk-in Cooler - door gasket'],
+     [16, 140, 'POS Terminal 2 - card reader'], [21, 85, 'Mens Restroom - faucet']]
+      .forEach(([back, amt, what]) => App.data.operating_expenses.push({
+        id: uid(), date: dateStr(back), category: 'Repairs and Maintenance', vendor: '',
+        amount: amt, notes: what, created_at: new Date().toISOString() }));
     App.shiftData.sc_maintenance = [
       { id:uid(), date_reported:dateStr(3),  equipment:'Walk-in Cooler', location:'Kitchen',
         issue:'Temperature running 4 degrees high', priority:'High', status:'Open',
-        reported_by:'Luis V.', assigned_to:'CoolTech Repair', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
+        reported_by:'Luis V.', assigned_to:'CoolTech Repair',  notes:'', created_at:new Date().toISOString() },
       { id:uid(), date_reported:dateStr(6),  equipment:'Beer Tap 3', location:'Main Bar',
         issue:'Foaming, needs line cleaning and FOB check', priority:'Normal', status:'Open',
-        reported_by:'Jake T.', assigned_to:'', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
+        reported_by:'Jake T.', assigned_to:'',  notes:'', created_at:new Date().toISOString() },
       { id:uid(), date_reported:dateStr(8),  equipment:'Ice Machine', location:'Main Bar',
         issue:'Slow ice production', priority:'Normal', status:'In Progress',
-        reported_by:'Maria G.', assigned_to:'CoolTech Repair', date_resolved:'', cost:null, notes:'Tech scheduled', created_at:new Date().toISOString() },
+        reported_by:'Maria G.', assigned_to:'CoolTech Repair',  notes:'Tech scheduled', created_at:new Date().toISOString() },
       { id:uid(), date_reported:dateStr(11), equipment:'Dish Machine', location:'Kitchen',
         issue:'Not reaching sanitizing temp', priority:'Urgent', status:'Resolved',
-        reported_by:'Luis V.', assigned_to:'Ecolab', date_resolved:dateStr(10), cost:310, notes:'', created_at:new Date().toISOString() },
+        reported_by:'Luis V.', assigned_to:'Ecolab',  notes:'', created_at:new Date().toISOString() },
       { id:uid(), date_reported:dateStr(14), equipment:'Walk-in Cooler', location:'Kitchen',
         issue:'Door gasket torn, not sealing', priority:'High', status:'Resolved',
-        reported_by:'Hector M.', assigned_to:'CoolTech Repair', date_resolved:dateStr(10), cost:220, notes:'', created_at:new Date().toISOString() },
+        reported_by:'Hector M.', assigned_to:'CoolTech Repair',  notes:'', created_at:new Date().toISOString() },
       { id:uid(), date_reported:dateStr(18), equipment:'Glass Washer', location:'Main Bar',
         issue:'Leaving spots, rinse aid line', priority:'Low', status:'Resolved',
-        reported_by:'Ashley B.', assigned_to:'', date_resolved:dateStr(17), cost:null, notes:'Adjusted rinse aid in-house', created_at:new Date().toISOString() },
+        reported_by:'Ashley B.', assigned_to:'',  notes:'Adjusted rinse aid in-house', created_at:new Date().toISOString() },
       { id:uid(), date_reported:dateStr(20), equipment:'POS Terminal 2', location:'Front of House',
         issue:'Card reader intermittent', priority:'Normal', status:'Resolved',
-        reported_by:'Jessica M.', assigned_to:'POS Vendor', date_resolved:dateStr(16), cost:140, notes:'', created_at:new Date().toISOString() },
+        reported_by:'Jessica M.', assigned_to:'POS Vendor',  notes:'', created_at:new Date().toISOString() },
       { id:uid(), date_reported:dateStr(25), equipment:'Mens Restroom', location:'Front of House',
         issue:'Faucet leaking at the base', priority:'Low', status:'Resolved',
-        reported_by:'Owen L.', assigned_to:'Handyman', date_resolved:dateStr(21), cost:85, notes:'', created_at:new Date().toISOString() },
+        reported_by:'Owen L.', assigned_to:'Handyman',  notes:'', created_at:new Date().toISOString() },
       { id:uid(), date_reported:dateStr(30), equipment:'HVAC', location:'Dining Room',
         issue:'Dining room runs warm on busy Saturdays', priority:'Normal', status:'Open',
-        reported_by:'Carlos P.', assigned_to:'CoolTech Repair', date_resolved:'', cost:null, notes:'', created_at:new Date().toISOString() },
+        reported_by:'Carlos P.', assigned_to:'CoolTech Repair',  notes:'', created_at:new Date().toISOString() },
     ];
 
     // ── Fix Layer — logged fixes feeding the Recovery Scoreboard ──
