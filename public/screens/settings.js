@@ -3536,28 +3536,28 @@ S.HubSettings = {
         people_involved:'Unknown, after close', witnesses:'',
         description:'Front glass door found cracked at open. Possible attempted break-in overnight; nothing taken, register and safe untouched.',
         action_taken:'Filed a police report, called a glazier for a quote, notified insurance. Awaiting repair.',
-        date_resolved:'', cost:450, created_at:new Date().toISOString() },
+         created_at:new Date().toISOString() },
       { id:uid(), date:dateStr(9), time:'23:15', type:'Refused / Cut Off Service', severity:'High', status:'Resolved',
         location:'Main Bar', reported_by_id:_incRep(1).id||'', reported_by:_incRep(1).name||'',
         confirmed_by_id:_incMgr.id||'', confirmed_by:_incMgr.name||'',
         people_involved:'Male guest, 40s, tab 142', witnesses:'On-duty bartender',
         description:'Guest visibly intoxicated and slurring, asked for another round. Cut off per house policy.',
         action_taken:'Refused further service, comped a water and an app, arranged a rideshare home. Guest left without incident.',
-        date_resolved:dateStr(9), cost:null, created_at:new Date().toISOString() },
+         created_at:new Date().toISOString() },
       { id:uid(), date:dateStr(16), time:'19:40', type:'Injury', severity:'Medium', status:'Resolved',
         location:'Near host stand', reported_by_id:_incRep(2).id||'', reported_by:_incRep(2).name||'',
         confirmed_by_id:_incMgr.id||'', confirmed_by:_incMgr.name||'',
         people_involved:'Female guest, party of 4', witnesses:'Host on duty',
         description:'Guest slipped on water tracked in from the patio door. Caught herself on a chair, no fall to the floor.',
         action_taken:'Offered first aid, guest declined. Dried the area and set out a wet-floor sign. Manager checked on her twice; she was fine.',
-        date_resolved:dateStr(16), cost:null, created_at:new Date().toISOString() },
+         created_at:new Date().toISOString() },
       { id:uid(), date:dateStr(27), time:'00:20', type:'Altercation / Fight', severity:'Medium', status:'Resolved',
         location:'Patio', reported_by_id:_incRep(3).id||'', reported_by:_incRep(3).name||'',
         confirmed_by_id:_incMgr.id||'', confirmed_by:_incMgr.name||'',
         people_involved:'Two male guests', witnesses:'Two servers',
         description:'Verbal argument between two guests escalated to shoving. No punches landed.',
         action_taken:'Separated both parties, ejected the instigator, walked the other to a rideshare. No police called.',
-        date_resolved:dateStr(27), cost:null, created_at:new Date().toISOString() }
+         created_at:new Date().toISOString() }
     ];
 
     // Phase 4: patch staff_id + shift_id onto every revenue_server_checks
