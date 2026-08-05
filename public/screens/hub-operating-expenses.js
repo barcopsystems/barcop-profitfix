@@ -1694,7 +1694,14 @@ S.HubOperatingExpenses = {
       [/\bpayroll taxe?s?\b|\bestimated taxe?s?\b|\bsales tax\b|\bfranchise tax\b|\b941\b|\birs\b/,
         'A tax payment belongs in Cash Outflows', 'Cash Outflows', 'cash-outflows'],
       [/\bpayroll\b/, 'Payroll is tracked in Labor', 'Labor, under Log Hours', 'lc-log-hours'],
-      [/\brepairs?\b|\bmaintenance\b/, 'Repairs go in Shift Control', 'Shift Control, under Maintenance', 'sc-maintenance'],
+      /* ⛔ THE REPAIRS RULE IS GONE, AND IT HAD TO GO WITH ITS SOURCE (Phase 2 item 12). It excluded a
+         repair on a bank statement by default and sent the operator to Shift Control, which was
+         correct for as long as the tracker owned the money. It does not any more: the Maintenance
+         log writes its cost straight into THIS ledger under Repairs and Maintenance. Leaving the
+         rule would send them to a screen that no longer stores it and keep a real deduction off the
+         books — a routing rule outlives its usefulness the moment the store it routes to stops
+         holding a dollar. ⚠ The DELIVERY-FEE rule below stays: that figure is still typed weekly in
+         Confirm the Week, so importing it as well really would double it. */
       /* ⛔ THE P&L LINE IS THE ANCHOR, NOT THE BRAND LIST. Books prints "3rd-party platform fees
          (DoorDash, UberEats, etc.)" as its OWN line, fed from the weekly roll's `platform_fees` —
          so a delivery commission booked here is counted twice on one statement, exactly like a
