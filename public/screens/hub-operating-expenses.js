@@ -30,6 +30,39 @@ S.HubOperatingExpenses = {
     'Other'
   ],
 
+  /* ⭐⭐ THE CASH-ONLY CATEGORIES — PHASE 1 OF THE ONE-LEDGER REBUILD (2026-08-04).
+     Money that genuinely left the bank but is NOT a cost of running the bar: an owner draw is a
+     distribution of profit, a loan payment is principal, a tax remittance is money passing through,
+     a transfer never left the business at all. They belong in the same ledger as every other dollar
+     out — one place to look, one place to type — and Books excludes them from the Income Statement
+     by name rather than by living in a separate store nobody could see the boundary of.
+
+     ⛔ DECLARED NOW, EXPOSED TO NOBODY YET. These are deliberately NOT in `CATEGORIES`, so the entry
+     form does not offer them and `_matchCat` cannot bind an imported row to one. Adding them to the
+     picker before the screens merge would let an operator file a draw as an operating expense, which
+     is the exact defect this rebuild exists to close, introduced by the fix for it. They start being
+     offered when Cash Outflows folds in; until then they exist so that Books already knows to
+     exclude them when the migration writes the first one.
+
+     ⛔⛔ AND THE `other` COLLISION IS THE REASON THIS IS A MAPPING AND NOT A LIST.
+     `hub-cash-outflows.TYPES` ends with `['other', 'Other']` and this log's ninth category is also
+     `Other`. Mapping type `other` onto category `Other` would turn every miscellaneous cash outflow
+     into an operating expense on the Income Statement the moment the migration ran — silently,
+     because both names are correct inside their own screen. `Other Cash Outflow` is a name of its
+     own, and `verify-cash-only-categories.js` block B pins that none of the five can ever collide. */
+  CASH_ONLY_CATEGORIES: [
+    { type: 'draw',     name: 'Owner Draw' },
+    { type: 'loan',     name: 'Loan Payment' },
+    { type: 'capital',  name: 'Capital and Equipment' },
+    { type: 'tax',      name: 'Tax Remittance' },
+    { type: 'other',    name: 'Other Cash Outflow' }
+  ],
+  // Is this category money out that is NOT an operating cost? Read by Books, which gives it no line.
+  isCashOnlyCategory(c) {
+    const t = String(c == null ? '' : c).trim().toLowerCase();
+    return !!t && this.CASH_ONLY_CATEGORIES.some(x => x.name.toLowerCase() === t);
+  },
+
   _tab:            'current',
   _entryMode:      'manual',   // manual | import (Add Expense form)
   _histShown:      0,          // History log window (0 = default to LIST_PAGE)

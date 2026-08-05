@@ -502,8 +502,17 @@ S.HubBooks = {
   _opExStatementLines(opex) {
     const claimed = {};
     this.OPEX_LINES.forEach(l => { if (l.cat) claimed[l.cat] = true; });
+    /* ⛔ CASH-ONLY CATEGORIES GET NO LINE HERE (Phase 1). An owner draw, a loan payment, a tax
+       remittance and a transfer are real money out of the bank and belong in the same ledger as
+       every other dollar — but none of them is a cost of running the bar, so none of them belongs
+       on the Income Statement. Excluded by NAME, from the list the expense screen declares, which
+       is what lets the two stores merge without a draw quietly becoming an expense.
+       ⚠ Excluded from the LINES, which is also what keeps them out of the total: `_plParts` sums
+       this same walk, so there is no second place to remember. */
+    const OEX = (typeof window !== 'undefined' && window.S && S.HubOperatingExpenses) || null;
+    const cashOnly = c => !!(OEX && typeof OEX.isCashOnlyCategory === 'function' && OEX.isCashOnlyCategory(c));
     const extra = Object.keys(opex || {})
-      .filter(c => !claimed[c] && Math.abs(opex[c] || 0) > 0.005)
+      .filter(c => !claimed[c] && !cashOnly(c) && Math.abs(opex[c] || 0) > 0.005)
       .sort()
       .map(c => ({ label: c, cat: c, added: true }));
     /* Before 'Other operating expenses', which is the catch-all and has always been last. A real
