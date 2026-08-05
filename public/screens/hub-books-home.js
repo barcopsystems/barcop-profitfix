@@ -78,6 +78,16 @@ S.HubBooksHome = {
       + this.asNeeded(st)
       + '</div>';
     this._wire();
+    /* ⛔⛔ RE-MOUNTED AFTER EVERY RENDER, and this is the whole reason the workspace resolves its
+       mount by id. The line above replaces this page's innerHTML, so the div the expense screen was
+       holding is now DETACHED — a repaint into it produces no output and no error, which reads on
+       screen as a dead workspace. Toggling any step re-runs this, so the mount is fresh every time.
+       ⭐ An in-progress review survives it: `_expenseReview` lives on the screen OBJECT, not in the
+       DOM, so a file already dropped is still there after a toggle.
+       ⚠ BARE CALL, deliberately ([[the-loop]] #40). `?.` here would mean "if the expense screen is
+       missing, render an empty box quietly" — and `_bills()` above already calls into the same
+       object bare, so guarding it here would be inconsistent as well as wrong. */
+    if (this._openStep === 'expenses') S.HubOperatingExpenses.renderMoneyOut('bk-moneyout');
   },
 
   // ── Heavy compute, once per render ──────────────────────────────────────────
@@ -202,7 +212,7 @@ S.HubBooksHome = {
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
       : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + m.n + '</span>';
-    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
+    const bg = isOpen ? 'var(--step-open)' : (isDone ? 'var(--input)' : 'var(--surface)');
     let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
       + '<div class="bk-step-head' + (isOpen ? '' : ' collapsed') + '" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
       +   circle
@@ -241,8 +251,19 @@ S.HubBooksHome = {
     const markBtn = isDone
       ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
       : '<button class="btn btn-primary btn-sm" data-done="' + k + '">Mark Done</button>';
+    /* ⭐⭐⭐ STEP 1 IS THE WORK, NOT A LINK TO IT. Every other step opens a REPORT, which is a page;
+       this one is data entry, and Kyle's objection was exactly that it sent you somewhere else to
+       do it: *"one place.. that is the only place the user has to go to drop or enter an expense."*
+       The card that renders into this mount is the SHIPPED Add Expense card from
+       hub-operating-expenses (`_addCardHtml`), drop zone and manual form and the confirm/review
+       screen included — not a copy of it. HubBooksHome.render() mounts it after every render; see
+       the note there for why it has to be re-mounted rather than mounted once. */
+    if (k === 'expenses') {
+      return explain('Drop your bank or card statement and Bar Cop reads the bills off it, or enter one by hand. Every expense you log here is what your income statement reads from.')
+        + '<div id="bk-moneyout"></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">' + markBtn + '</div>';
+    }
     const M = {
-      expenses: ['Your recurring bills auto-fill each month. Add this month\'s variable ones so your operating income is complete.', '<button class="btn btn-ghost btn-sm" data-act="operating-expenses">Operating Expenses</button>'],
       pnl:      ['A one-page profit and loss for any week range, the brief you keep for yourself or hand to your bookkeeper.', '<button class="btn btn-ghost btn-sm" data-act="weekly-pnl">Weekly P&amp;L Brief</button>'],
       review:   ['Open the income statement and make sure revenue, costs, and operating income read right before anything goes out.', '<button class="btn btn-ghost btn-sm" data-act="books">Income Statement</button>'],
       generate: ['Build the full workbook and one-page summary for your accountant. Nothing to re-type, it pulls from everything you logged.', '<button class="btn btn-ghost btn-sm" data-act="books">Month-End Books</button>']

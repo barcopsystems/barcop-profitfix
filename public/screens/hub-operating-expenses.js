@@ -940,7 +940,7 @@ S.HubOperatingExpenses = {
     // still highlighting Permits. App._mountSeq is bumped on every mount, so a changed value means
     // this page is no longer the one on screen.
     if (this._catchUpStillCurrent()) {
-      if (this._view === 'history') this.renderHistory(); else this.renderMain();
+      this._rerender();
     }
     return added;
   },
@@ -1083,9 +1083,59 @@ S.HubOperatingExpenses = {
       + stat('Logged This Year', fmt$(ytd)) + stat('Logged All Time', fmt$(total)) + stat('Entries', String(recs.length))
       + '</div></div>';
   },
-  // Re-render whichever view is active (Operating Expenses or Expense History),
-  // so an edit / delete / stop redraws the page the operator is actually on.
-  _rerender() { if (this._view === 'history') this.renderHistory(); else this.renderMain(); },
+  /* ── Money Out: the same entry card, mounted INSIDE the Close The Books step ──
+     ⭐ THE THIRD VIEW, built on `renderHistory`'s shape rather than invented: take a mount, stamp
+     the mount sequence, set `_view`, share the wiring. Kyle: *"one place.. that is the only place
+     the user has to go to drop or enter an expense."* Step 1 used to be a button that navigated
+     here; now the card renders there and this screen keeps the month cards and the history.
+
+     ⛔⛔ RESOLVED BY ID ON EVERY PAINT, NEVER FROM A HELD NODE. `hub-books-home.render()` rewrites
+     its own innerHTML every time a step is toggled, so a node captured at mount time is DETACHED by
+     the next toggle — and a repaint into a detached node produces no output and no error, which on
+     screen is a dead workspace. Looking the id up each time makes that unreachable rather than
+     guarded, and the null return is the honest answer to "the operator navigated away".
+     ⚠ It does NOT touch the hub topbar the way renderMain does: this is a card inside somebody
+     else's page, and clearing their actions would be reaching outside the mount. */
+  renderMoneyOut(mountId) {
+    if (mountId) { this._moMountId = mountId; this._mountedAt = App._mountSeq; }
+    const el = document.getElementById(this._moMountId || '');
+    if (!el) return;
+    /* ⚠ VIEW AND CONTAINER SET BEFORE THE CATCH-UP, NOT AFTER. The catch-up repaints through
+       `_rerender`, which reads `_view` to decide where to paint. It resolves on a later microtask
+       so today's order could not actually race — but leaving the two lines below the call means the
+       correctness depends on that fact staying true, and it is free not to. */
+    this.container = el;
+    this._view = 'moneyout';
+    this.catchUpRecurring();
+    el.innerHTML = this._addCardHtml({ inline: true });
+    this._wireCurrent();
+  },
+
+  // Re-render whichever view is active (Operating Expenses, Expense History, or the Money Out card
+  // on Close The Books), so an edit / delete / stop / import redraws the page the operator is
+  // actually on. ⛔ EVERY operator-facing repaint goes through here — a bare renderMain() from a
+  // review action would paint the WHOLE expense screen, stats and month cards and all, into a
+  // cockpit accordion. verify-money-out-step.js block B sweeps every call site for that.
+  _rerender() {
+    if (this._view === 'moneyout') return this.renderMoneyOut();
+    if (this._view === 'history') return this.renderHistory();
+    this.renderMain();
+  },
+
+  /* ⛔⛔ A WRITE FROM INSIDE THE STEP CHANGES THE PAGE AROUND THE STEP, AND ONLY THE STEP REPAINTED.
+     `_rerender` above repaints the card and nothing else, which is right for a Move To or a section
+     toggle — they change no data and a full cockpit repaint would cost the ~460ms-per-tick this
+     screen already fights. But an ADD or an IMPORT does change data, and everything the cockpit
+     prints is derived from it: the step head reads "No bills logged yet this month", the Where You
+     Stand hero reads operating income, the progress bar counts done steps. Repainting only the card
+     left the operator looking at a bill they had just logged, sitting directly under a sentence
+     saying none was logged. Two things on screen disagreeing, and the wrong one is the headline.
+     ⚠ No loop: HubBooksHome.render() ends by calling renderMoneyOut(), which never calls back. */
+  _rerenderAfterWrite() {
+    const BH = S.HubBooksHome;
+    if (this._view === 'moneyout' && BH && BH.container) return BH.render(BH.container);
+    this._rerender();
+  },
 
   _nextMonthKey(mk) {
     const y = parseInt(mk.slice(0, 4), 10);
@@ -1308,7 +1358,32 @@ S.HubOperatingExpenses = {
         + '. One came from your recurring bill and one you entered. Check which is real before it counts twice.')
       : '');
 
-    const catOpts = this.CATEGORIES.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
+    return statsCard + warnBanner + coveredNote + this._addCardHtml()
+      + this._monthCardHtml(mk, { next: false, exportId: 'oex-export-this', wrapId: 'oex-thismonth' })
+      + this._monthCardHtml(this._nextMonthKey(mk), { next: true });
+  },
+
+  /* ⭐ THE ADD CARD IS ITS OWN MEMBER, because it now has TWO homes: this screen and the Money Out
+     step on Close The Books. ONE implementation, so the two doors cannot drift apart — the entire
+     point of putting the drop on the cockpit is that there is one place to enter money out, and two
+     copies of the entry card is precisely the shape this rebuild exists to end.
+     ⚠ A dead `catOpts` was declared here and read nowhere ([[the-loop]] #25 — a value computed and
+     never consumed). The manual form builds its picker through App.customSelect. Dropped rather
+     than carried into the new member.
+
+     ⛔⛔ `opts.inline` DROPS THE CARD SHELL AND THE COLLAPSE, AND THAT IS NOT COSMETIC. The full
+     screen wraps this in a `.card` with a collapsible "Add Expense" header, and the collapse state
+     is remembered in localStorage under `barcop_collapse_oex-add`, per device, forever. Mounted
+     inside a cockpit step that state travels with it: an operator who had ever collapsed Add
+     Expense on the Operating Expenses screen would open the Money Out step and find **an empty
+     box** — `applyCollapsed` hides the `.collapse-body` AND the `data-collapse-group="oex-add"`
+     button row, so the drop zone, the form and the Add Expense button all go at once, silently, on
+     the one screen whose entire job is being the place you enter money out. A step is already an
+     accordion; a second chevron inside it does the same job twice and can only disagree.
+     ⚠ Flat is also the house pattern for a cockpit step — `sc-dashboard.workspace` renders its five
+     drops with no card and no collapse. */
+  _addCardHtml(opts) {
+    const inline = !!(opts && opts.inline);
     const segBtn = (mode, label) => '<button type="button" class="btn btn-sm oexa-mode" data-mode="' + mode + '" style="'
       + (this._entryMode === mode ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     const segToggle = '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>';
@@ -1316,7 +1391,7 @@ S.HubOperatingExpenses = {
     let bodyInner, addButtons = '';
     if (this._entryMode === 'import') {
       bodyInner = segToggle + '<div id="oexa-csv"></div>';
-      addButtons = '<div id="oexa-imp-actions" style="margin:16px 0 24px;"></div>';
+      addButtons = '<div id="oexa-imp-actions" style="margin:16px 0 ' + (inline ? '0' : '24px') + ';"></div>';
     } else {
       bodyInner = segToggle
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
@@ -1336,7 +1411,10 @@ S.HubOperatingExpenses = {
         // Fires as they type the vendor. See _manualElsewhereNotice.
         + '<div id="oexa-elsewhere"></div>'
         + '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>';
-      addButtons = '<div data-collapse-group="oex-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      // ⛔ NO data-collapse-group WHEN INLINE — that attribute is what applyCollapsed uses to hide
+      // this row, and inline there is no header to un-hide it with. See the note on _addCardHtml.
+      addButtons = '<div ' + (inline ? '' : 'data-collapse-group="oex-add" ')
+        + 'style="margin:16px 0 ' + (inline ? '0' : '24px') + ';display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary" id="oexa-save">Add Expense</button>'
         + '<button class="btn btn-ghost" id="oexa-clear">Start Over</button>'
         + '</div>';
@@ -1345,11 +1423,15 @@ S.HubOperatingExpenses = {
        is collapsible, and a collapsed card would hide the confirm screen and its Add button
        completely — the operator would have dropped a file and landed on a page with nothing on it. */
     const addCard = this._expenseReview
-      ? '<div style="margin:16px 0 24px;">' + this.expenseReviewHTML() + '</div>'
-      : '<div class="card form-card">'
-        + App.collapsibleCardTitle('oex-add', 'Add Expense')
-        + '<div class="collapse-body">' + bodyInner + '</div>'
-        + '</div>' + addButtons;
+      ? '<div style="margin:' + (inline ? '0 0 4px' : '16px 0 24px') + ';">' + this.expenseReviewHTML() + '</div>'
+      // Inline the step IS the card and the step head IS the collapse control, so neither is drawn
+      // a second time. Same body, same ids, same wiring — only the shell differs.
+      : inline
+        ? bodyInner + addButtons
+        : '<div class="card form-card">'
+          + App.collapsibleCardTitle('oex-add', 'Add Expense')
+          + '<div class="collapse-body">' + bodyInner + '</div>'
+          + '</div>' + addButtons;
 
     // What the last import actually did. An expense import used to report NOTHING — not even a
     // count — so rows it skipped (a credit, an unreadable amount, a missing date) simply were not
@@ -1361,9 +1443,7 @@ S.HubOperatingExpenses = {
       ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin:16px 0;font-size:12px;color:var(--t1);line-height:1.6;">'
         + esc(imp) + '</div>'
       : '';
-    return statsCard + warnBanner + coveredNote + importBanner + addCard
-      + this._monthCardHtml(mk, { next: false, exportId: 'oex-export-this', wrapId: 'oex-thismonth' })
-      + this._monthCardHtml(this._nextMonthKey(mk), { next: true });
+    return importBanner + addCard;
   },
 
   _wireCurrent() {
@@ -1377,7 +1457,7 @@ S.HubOperatingExpenses = {
       if (w) w.style.display = e.target.checked ? '' : 'none';
     });
     // Switching entry mode abandons a confirm screen, the same as Start Over does.
-    this.container.querySelectorAll('.oexa-mode').forEach(b => b.addEventListener('click', () => { this._expenseReview = null; this._entryMode = b.dataset.mode; this.renderMain(); }));
+    this.container.querySelectorAll('.oexa-mode').forEach(b => b.addEventListener('click', () => { this._expenseReview = null; this._entryMode = b.dataset.mode; this._rerender(); }));
     /* ⚠ WIRED ON THE FRESH CHILD NODES, NEVER ON `this.container`. `renderMain` replaces the
        container's innerHTML but the container element itself is permanent, so a listener attached to
        it would stack one copy per render and the Add button would fire N times on the Nth repaint.
@@ -1389,14 +1469,14 @@ S.HubOperatingExpenses = {
         // "Needs a look" defaults OPEN and "going in" defaults closed, so the needs toggle is the
         // inverted one. The shell reads `open.needs !== false` and `!!open.settled`.
         this._expenseReview.open[k] = (k === 'needs') ? (this._expenseReview.open[k] === false) : !this._expenseReview.open[k];
-        this.renderMain();
+        this._rerender();
       }));
       /* ⛔ REMOVAL IS PER ROW, BY NAME. Add Products once had a BULK "not a product" button and it
          took Kyle's entire import, because it reached past what was on screen. */
       this.container.querySelectorAll('[data-confirm-remove]').forEach(b => b.addEventListener('click', () => {
         if (!this._expenseReview) return;
         this._expenseReview.removed[b.dataset.confirmRemove] = true;
-        this.renderMain();
+        this._rerender();
       }));
       /* The category picker. Keyed by vendor, so one change moves every row for that vendor and the
          re-render shows it happening. `change`, not `input`: a native select fires change on commit. */
@@ -1419,7 +1499,7 @@ S.HubOperatingExpenses = {
       this.container.querySelector('#oex-rt-move')?.addEventListener('click', () => this._moveCheckedExpenses());
       this.container.querySelector('[data-oexreview-go]')?.addEventListener('click', () => this._runExpenseReview());
       this.container.querySelector('[data-oexreview-back]')?.addEventListener('click', () => {
-        this._expenseReview = null; this.renderMain();
+        this._expenseReview = null; this._rerender();
       });
     }
     App.wireCustomSelects(this.container);
@@ -1872,7 +1952,7 @@ S.HubOperatingExpenses = {
       checked: {}, moveCat: '', moveNote: '',
       open: {}, removed: {}
     };
-    this.renderMain();
+    this._rerender();
   },
 
   /* ⛔⛔ ONLY WHAT IS ON SCREEN CAN BE MOVED. A collapsed section renders no rows at all, so a row
@@ -1894,9 +1974,9 @@ S.HubOperatingExpenses = {
   _moveCheckedExpenses() {
     const r = this._expenseReview;
     if (!r) return;
-    if (!r.moveCat) { r.moveNote = 'Pick a category first, then press Move To.'; this.renderMain(); return; }
+    if (!r.moveCat) { r.moveNote = 'Pick a category first, then press Move To.'; this._rerender(); return; }
     const ids = this._expenseCheckedIds();
-    if (!ids.length) { r.moveNote = 'Tick the rows you want to move first.'; this.renderMain(); return; }
+    if (!ids.length) { r.moveNote = 'Tick the rows you want to move first.'; this._rerender(); return; }
     ids.forEach(id => { r.assign[id] = r.moveCat; delete r.checked[id]; });
     /* ⛔ THE SECTION JUST MOVED INTO OPENS, AND EVERY OTHER CATEGORY SECTION CLOSES.
        Add Products opens the target and leaves the rest as they were, which is right when one small
@@ -1913,7 +1993,7 @@ S.HubOperatingExpenses = {
        Move To a single click away from filing a different batch under it by accident, and it reads
        as though that category is still "current" when the rows it holds are already placed. */
     r.moveCat = '';
-    this.renderMain();
+    this._rerender();
   },
 
   /* ⭐ THE SECTIONS, AND THE ORDER IS THE JOB. What Bar Cop could not place sits at the top, open,
@@ -2238,8 +2318,19 @@ S.HubOperatingExpenses = {
        repaint went ahead, painting Operating Expenses over the History page the operator had just
        opened. */
     if (!this._catchUpStillCurrent()) return;
-    // Expense History needs the numbers refreshed, just not the page hijacked.
-    if (this._view !== 'current') { this._rerender(); return; }
+    /* ⛔⛔ NAMES THE ONE VIEW THAT SUPPRESSES THE MESSAGE, RATHER THAN "anything but current".
+       This read `_view !== 'current'`, which was correct while Expense History was the only other
+       view — a read-only log is no place for an import banner. Adding the Money Out card made
+       `moneyout` a third value, and it fell straight into the same branch: an import dropped on
+       Close The Books would have repainted and said NOTHING about what happened to the file. That
+       is the defect the comment on `_importMsg` was written about — *"a row the operator can see in
+       their own file and cannot find in Bar Cop is what makes them stop trusting the total"* — and
+       it would have hit on the one screen built to be where you drop the statement.
+       ⚠ The page-hijack worry the old guard also carried is gone: `_rerender` now paints whichever
+       view is actually open, so it cannot draw one screen over another. History is the only
+       exclusion left, so it is the only one named. [[the-loop]] #24 — after a value gains a third
+       possibility, every test written against two is now pointing at the wrong set. */
+    if (this._view === 'history') { this._rerender(); return; }
     if (!saved) {
       this._importMsg = 'Could not save the import. Nothing was changed — check your connection and try again.';
     } else if (opts.reviewed) {
@@ -2287,7 +2378,7 @@ S.HubOperatingExpenses = {
         + ' positive, so Bar Cop could not tell which sign means money out — it read the positive rows as expenses; check the amount column');
       this._importMsg = bits.join(' · ') + '.';
     }
-    this.renderMain();
+    this._rerenderAfterWrite();
   },
 
   // By Category row-list (current month, last month, YTD, YTD % of revenue).
@@ -2490,7 +2581,7 @@ S.HubOperatingExpenses = {
       rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1;
     }
     await App.putRecord('core', 'operating_expense', rec);
-    this.renderMain();
+    this._rerenderAfterWrite();
   },
 
   _clearAdd() {
