@@ -53,12 +53,16 @@ S.HubBooksHome = {
   /* ⚠ THE POSITION IS THE NUMBER. `_META` carried `n: 1..4` as literals, so inserting a step meant
      hand-renumbering every one below it — the kind of edit that ships a "3" sitting in position 4.
      `stepRow` derives it from ORDER now, and verify-books-weeks-in.js refuses a hardcoded `n:`. */
-  ORDER: ['expenses', 'weeks', 'pnl', 'review', 'generate'],
+  /* ⭐ FOUR STEPS. Kyle: *"remove the Generate your weekly P&L step.. so it is back to 4 steps..
+     that step no longer fits."* He is right about the fit: the other four are the monthly CLOSE, in
+     order, each one a thing that must be true before the next. The weekly brief is a between-closes
+     export for a bookkeeper — useful, and not a step in closing a month. It stays reachable as its
+     own As Needed button, which is what that row is for. */
+  ORDER: ['expenses', 'weeks', 'review', 'generate'],
   _META: {
     expenses: { title: 'Log this month\'s operating expenses', act: 'operating-expenses' },
     // Revenue on the income statement IS the confirmed weeks. See hub-books._weeksComplete.
     weeks:    { title: 'Make sure the weeks are all in',       act: 'this-week' },
-    pnl:      { title: 'Generate your weekly P&L brief',       act: 'weekly-pnl' },
     review:   { title: 'Review your income statement',         act: 'books' },
     generate: { title: 'Generate Month-End Books',             act: 'books' }
   },
@@ -273,7 +277,11 @@ S.HubBooksHome = {
       const said = W.count + ' week' + (W.count === 1 ? '' : 's') + ' confirmed for ' + esc(name);
       return W.complete ? said : said + ', ' + W.missing + ' still to confirm';
     }
-    if (k === 'pnl')      { const d = this._lastRun('books_report_run_weeklypnl'); return d ? 'Report last run ' + d : 'Not run yet'; }
+    /* ⛔ THE `pnl` BRANCH WENT WITH ITS STEP. `ORDER` no longer contains it, and this helper is only
+       ever called with a key FROM `ORDER` — so the branch was reachable by nothing, which is the
+       shape that reads as live to every later scan ([[the-loop]] #63, dead by fixpoint). The stamp
+       it read (`books_report_run_weeklypnl`) is still written by the report itself; nothing here
+       needs to print it now that the brief is an As Needed button rather than a tracked step. */
     /* ⛔ QUOTE THE MONTH THE BUTTON OPENS. This read the month-to-date figure (`st.mInc`), so in
        July it said "July 2026 operating income $9,982.19" and the Income Statement button under
        it opened JUNE at $7,837.90. Month-End Books defaults to the month being CLOSED, which is
@@ -330,7 +338,6 @@ S.HubBooksHome = {
         + markBtn + '</div>';
     }
     const M = {
-      pnl:      ['A one-page profit and loss for any week range, the brief you keep for yourself or hand to your bookkeeper.', '<button class="btn btn-ghost btn-sm" data-act="weekly-pnl">Weekly P&amp;L Brief</button>'],
       review:   ['Open the income statement and make sure revenue, costs, and operating income read right before anything goes out.', '<button class="btn btn-ghost btn-sm" data-act="books">Income Statement</button>'],
       generate: ['Build the full workbook and one-page summary for your accountant. Nothing to re-type, it pulls from everything you logged.', '<button class="btn btn-ghost btn-sm" data-act="books">Month-End Books</button>']
     };
@@ -338,11 +345,21 @@ S.HubBooksHome = {
     return explain(cfg[0]) + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + cfg[1] + markBtn + '</div>';
   },
 
-  asNeeded(st) {
-    const dueLabel = st.dueCount ? 'Licensing (' + st.dueCount + ' due)' : 'Licensing';
+  /* ⭐ AS NEEDED, AFTER BUILD PIECE 5. Licensing left Books with its page — Kyle: *"the as needed
+     under the steps has 'licensing' button .. change that to 'Break-Even' ghost button"* — and
+     Break-Even is the right occupant: it is the other Books screen an operator opens BETWEEN closes
+     rather than during one, which is exactly what this row is for.
+     ⭐ THE WEEKLY P&L BRIEF LANDS HERE TOO, and that is where the removed step went. Kyle took it out
+     of the close sequence because it does not fit there; it is still a real deliverable, so it keeps
+     a door rather than disappearing.
+     ⚠ THE PERMIT DUE-COUNT DID NOT LEAVE THIS FILE. `_state` still counts them and the "clear the N
+     flagged" next-move line still names them; only this button changed. The tracker lives in Shift
+     Control now and the Hub's three alert rows are its door. */
+  asNeeded() {
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
-      + '<button class="btn btn-ghost btn-sm" data-act="permits">' + dueLabel + '</button>'
+      + '<button class="btn btn-ghost btn-sm" data-act="breakeven">Break-Even</button>'
+      + '<button class="btn btn-ghost btn-sm" data-act="weekly-pnl">Weekly P&amp;L Brief</button>'
       + '<button class="btn btn-ghost btn-sm" data-act="year-end">Annual Review</button>'
       + '</div>';
   },
@@ -376,6 +393,13 @@ S.HubBooksHome = {
       else if (act === 'weekly-pnl')         S.Reports?._openQboModal?.();
       else if (act === 'year-end')           S.HubYearEnd?.open?.();
       else if (act === 'operating-expenses') S.HubOperatingExpenses?.open?.();
+      /* ⛔ `breakeven` IS NEW AND I ALMOST SHIPPED IT DEAD. The As Needed row got a Break-Even button
+         and this dispatcher has NO FALLBACK, so the click would have done nothing at all — the
+         identical defect Kyle had just reported on the Licensing rows, in the same hour.
+         `verify-action-key-wired` caught it: it compares every rendered `data-act` against what the
+         dispatcher handles, which is the one check a source-text pin cannot fake. */
+      else if (act === 'breakeven')          S.HubBreakEven?.open?.();
+      // Still reached from the day-one get-started step, which points at the tracker in Shift Control.
       else if (act === 'permits')            S.HubPermits?.open?.();
       // 'this-week' is the CANONICAL id for "confirm the week": App.openScreen special-cases
       // it (app.js) to land the Profit dashboard AND pop the Confirm the Week modal, which is

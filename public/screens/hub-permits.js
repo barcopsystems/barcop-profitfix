@@ -55,8 +55,19 @@ S.HubPermits = {
      renaming it would mean changing five callers to gain nothing. Kyle asked for exactly this —
      *"make sure any needs attention rows on the hub point to the new location"* — and the cheapest
      way to be sure is that every door still calls the same one function. */
+  /* ⛔⛔⛔ `App.openScreen`, NOT `App.navigate` — AND I SHIPPED THE WRONG ONE, WHICH KYLE FOUND IN
+     ONE CLICK. `navigate` is MODULE-INTERNAL: it branches on `this._activeModule` and only consults
+     the shift screen map when shift is already the active module. Every caller of this reaches it
+     from the HUB, where `_activeModule` is 'profit' — so the shift block was never entered, the id
+     fell through to the profit branch, and all three Needs Attention rows landed on "Coming soon."
+     `openScreen` is the app's cross-module door: `_moduleOf('sc-licensing')` → shift, it switches
+     the shell, THEN navigates.
+     ⭐ THE ANSWER WAS ALREADY IN THE TREE AND I DID NOT GREP FOR IT. `confirm-week.js`'s own Fix
+     buttons deep-link to `sc-dashboard`, `ic-take-inventory` and `lc-log-hours` from inside a modal,
+     and every one of them calls `App.openScreen`. [[the-loop]] #95/#102: grep the DESTINATION for
+     how anything else deep-links into it — the existing callers are the spec. */
   open() {
-    App.navigate('sc-licensing');
+    App.openScreen('sc-licensing');
   },
   /* The Shift Control mount, same signature every screen in that module uses. `open()` above routes
      here; `App.navigate` sets the container and calls this. */
@@ -224,10 +235,11 @@ S.HubPermits = {
         + '</div>';
     }
 
-    /* ⭐ KYLE'S ORDER: *"on the licensing page.. move the [Add Permit card] below the needs attention
-       card and above the chip selectors."* The alert comes before the form — what is about to lapse
-       is the reason an operator opened this page, and the form is what they do second. */
-    this.container.innerHTML = '<div class="screen">' + statsCard + alertsCard + addCard + addButtons + '<div style="margin-top:24px;"></div>' + '<div id="hp-list-region"></div>' + '</div>';
+    /* ⭐ KYLE'S ORDER, SECOND PASS AND THIS IS THE ONE: *"i wanted the form on permits at the top..
+       so move the form to the top of the page.. then stats then needs attention then chips/history."*
+       The form leads, which matches the form-landing pattern the rest of the app uses — the add card
+       sits at the top of the landing and the read-back is below it. */
+    this.container.innerHTML = '<div class="screen">' + addCard + addButtons + statsCard + alertsCard + '<div style="margin-top:24px;"></div>' + '<div id="hp-list-region"></div>' + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
     // Wire the static parts (form + the Needs Attention renew buttons). The
