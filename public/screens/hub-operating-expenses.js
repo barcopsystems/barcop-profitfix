@@ -3137,17 +3137,25 @@ S.HubOperatingExpenses = {
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f"><label>Date Submitted</label><input type="date" value="' + esc((rec.created_at || '').slice(0, 10) || rec.date || App.todayLocal()) + '" disabled/></div>'
       +   '<div class="f"><label>Due Date</label><input type="date" id="oex-f-date" value="' + esc(rec.date) + '"/></div>'
-      /* ⛔ A CASH ROW'S EDITOR OFFERS THE CASH KINDS, AND ONLY A CASH ROW'S. Its category is not in
-         `CATEGORIES` (deliberately — `_matchCat` reads that list, and an IMPORT must never bind one:
-         an imported cash-only row would carry no `migrated_from`, so `_isOperatingRow` would count
-         it as a BILL and the forecast would never see it). Without this the edit form showed a draw
-         under whatever the picker defaulted to — the row was safe, because `_typeForCashCategory`
-         returns '' for an unknown name and `_editCashRow` then leaves the type alone, but the form
-         was telling the operator something untrue about their own record.
-         ⚠ SCOPED TO `rec`, NOT ADDED GLOBALLY: offering these on an ORDINARY bill would let one be
-         re-filed as a draw down a save path that writes only the ledger, producing exactly the
-         orphan shape ([[the-loop]] #115) this screen has spent two phases removing. */
-      +   '<div class="f"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oex-f-cat', key: 'expense_category', builtin: this.CATEGORIES.concat(rec.migrated_from === 'cash_outflow' ? this.CASH_ONLY_CATEGORIES.map(c => c.name) : []), selected: rec.category, blank: true, blankLabel: 'Select category...' }) + '</div>'
+      /* ⛔⛔ A CASH ROW GETS AN UNKEYED PICKER HOLDING EXACTLY THE FIVE CASH KINDS, AND THE REASON IS
+         MEASURED. A KEYED select pulls its options through `App.listOptions`, which REFUSES the
+         cash-only names at read time — a deliberate guard, so an account that once typed "Owner
+         Draw" into the list manager cannot file a bill under it. So passing them as `builtin` on a
+         keyed control does nothing: only the row's CURRENT category survives, via `push(sel)`.
+         Measured on the real `customSelect`: keyed offered NONE of the five, unkeyed offered all.
+         That left the editor accepting a category change it then threw away — `_typeForCashCategory`
+         returns '' for a bill category and `_editCashRow` leaves the type alone, so picking
+         "Utilities" on a draw looked like it saved and changed nothing. A form must not accept a
+         change it discards.
+         ⚠ UNKEYED ALSO KEEPS IT OUT OF `App._listBuiltins`, which a keyed call writes GLOBALLY under
+         the key — and `_matchCat` and `categoryList()` both read that family. `categoryList()` is
+         what `hub-books` uses to build the Income Statement's lines, so a leak there would put
+         "Owner Draw" on the P&L.
+         ⚠ NO MANAGE LINK on this branch: the five are a fixed vocabulary tied to the outflow TYPE,
+         not a list the operator curates. */
+      +   (rec.migrated_from === 'cash_outflow'
+        ? '<div class="f"><label>Kind</label>' + App.customSelect({ id: 'oex-f-cat', builtin: this.CASH_ONLY_CATEGORIES.map(c => c.name), selected: rec.category, blank: false }) + '</div>'
+        : '<div class="f"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oex-f-cat', key: 'expense_category', builtin: this.CATEGORIES, selected: rec.category, blank: true, blankLabel: 'Select category...' }) + '</div>')
       +   '<div class="f"><label>Vendor</label><input type="text" id="oex-f-vendor" value="' + esc(rec.vendor) + '" placeholder="Who did you pay"/></div>'
       +   '<div class="f"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div></div>'
       + '</div>'
