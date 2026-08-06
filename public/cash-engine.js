@@ -1642,17 +1642,30 @@ window.CashEngine = {
   // ── The Cash Bridge: profit to cash. You earned a profit; here is where it
   //    went instead of into the account, so the "profitable but broke" gap
   //    becomes a list you can see. ───────────────────────────────────────────
+  /* ⛔⛔⛔ THE `fees` TERM WAS SUBTRACTING THE SAME DOLLAR A SECOND TIME, AND IT WAS LIVE.
+     Phase 2 item 9 made the ledger MIRROR `week.platform_fees` into a `3rd-Party Platform Fees`
+     expense row, written by a reconcile that ran at every login. `bills()` excludes only CASH-ONLY
+     categories, so that row is overhead — and this function went on subtracting the weekly field
+     beside it. MEASURED on the deployed build, Jun-Aug of the seeded account, by running what a
+     login runs: profit $35,831.59 -> $33,003.49 and Cash You Kept -$3,168.41 -> -$5,996.51, a gap
+     of exactly $2,828.10, which is the period's commission to the cent. It reached the Cash Bridge
+     headline and a Cash Audit finding whose score flips on `cashKept < 0`.
+     ⚠ AND NOTHING IN 419 HARNESSES COULD SEE IT: the one file that touched this function stubbed it
+     as `profitForPeriod: () => ({ profit: 18000 })`. Integrity #6 in its worst form — a stub of the
+     exact consumer the change was about ([[the-loop]] #108, the `bills = () => []` shape).
+     ✅ Build piece 2 leaves ONE source. The commission is an ordinary expense row and arrives here
+     through `overhead`, once. `fees` is not returned either: a term nobody reads is a term the next
+     reader re-adds ([[the-loop]] #25), and no caller ever read it. */
   profitForPeriod(s, e) {
     const weeks = (App.data && App.data.weeks) || [];
-    let rev = 0, cogs = 0, labor = 0, fees = 0, any = false;
+    let rev = 0, cogs = 0, labor = 0, any = false;
     weeks.forEach(w => {
       const pe = String(w.period_end || '').slice(0, 10); if (!pe || pe < s || pe > e) return;
       any = true;
       ['bar', 'food', 'catering', 'other'].forEach(k => { const d = w[k]; if (d) { rev += (parseFloat(d.revenue) || 0); cogs += (parseFloat(d.cogs) || 0); labor += (parseFloat(d.labor) || 0); } });
-      fees += (parseFloat(w.platform_fees) || 0);
     });
     const overhead = this.billsDue(s, e).total;
-    return { profit: rev - cogs - labor - fees - overhead, rev, cogs, labor, fees, overhead, hasData: any };
+    return { profit: rev - cogs - labor - overhead, rev, cogs, labor, overhead, hasData: any };
   },
   inventoryChange(s, e) {
     const asc = this.countsAsc();

@@ -2260,16 +2260,37 @@ const App = {
     'operating-expenses': { title: 'How Operating Expenses Work', sections: [
       { h: 'What this page is', p: ['Where you log the bills that are not COGS or labor (wages and salaries both live in Labor Control, not here): rent, utilities, insurance, marketing, professional fees, software, and the rest. These roll into the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
       { h: 'This month and next', p: ['The page shows this month and next month, each split into Recurring (a bill that repeats, monthly, quarterly, or annually) and Variable (the ones that change). Next month lists your recurring bills as Expected before they post. The full back-record lives on Expense History, its own page in the sidebar.'] },
-      { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing and the recurring schedule run from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
-      { h: 'Recurring bills', p: ['Check Recurring on a bill that repeats, then pick How Often, monthly, quarterly, or annually, and set the Due Date to when it is next actually due (a quarterly insurance bill on its real next due date). Bar Cop then logs it automatically on that schedule and projects it onto your Cash Forecast. By default it recurs until you stop it. Only fill in "Ends after" when a bill stops after a fixed number of months. To cancel one, hit Stop on the bill or on its Expected next-month row: past months stay on your books and it drops off going forward, including the Forecast. For a bill that moves around each month, like a utility, leave it Variable and use Repeat to copy last month forward and set the new amount.'] },
+      { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing runs from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
+      /* ⚠ THIS SECTION USED TO DESCRIBE A CHECKBOX, a How Often picker, an "Ends after" field and a
+         Stop button. Build order C removed every one of them from the bill form — a bill recurs
+         because it keeps happening, derived off the ledger — so the whole paragraph was instructions
+         for controls that are not on the screen. Rewritten to what the app does, in the same words
+         `hub-help.js` already uses ([[the-loop]] #61: retiring a feature is three greps, and the
+         help text is the one nobody does). */
+      { h: 'Recurring bills', p: ['Nothing to tick and no schedule to fill in. Bar Cop works out which bills recur by watching what you actually log: drop two months of statements and it picks up rent, insurance and your subscriptions on its own, and projects them onto your Cash Forecast. A bill that stops showing up stops being projected, so cancelling a service needs no extra step. For a bill that moves around each month, like a utility, use Repeat to copy last month forward and set the new amount.'] },
       { h: 'Importing', p: ['Switch the Add form to Import File and drop a CSV or Excel export. Map the columns once (date and amount are required), and the rows import; anything already logged is skipped.'] },
-      { h: 'Good to know', p: ['Do not enter repairs and maintenance or 3rd-party platform fees here, those are tracked in Shift Control and the weekly P&L so Books does not count them twice.'] }
+      /* ⚠ AND THIS ONE WAS FALSE ON BOTH HALVES. Repairs stopped living in Shift Control at Phase 2
+         item 12 and platform fees stopped living in the weekly numbers at build piece 2. It told the
+         operator to keep two real deductions OFF the log that Books reads. */
+      { h: 'Good to know', p: ['Every dollar that leaves the business is logged here, including repairs and 3rd-party platform fees. One log, one place to look, nothing counted twice.'] }
     ] },
     'cash-outflows': { title: 'How Cash Outflows Work', sections: [
       { h: 'What this page is', p: ['Where you log the money that leaves the bank but never lands on your P&L as a cost: owner draws, loan principal, capital and equipment buys, tax you remit, and an Other catch-all for anything that fits none of those. These eat profit without showing up as an expense, which is why a profitable month can still leave the account tight. Put the specifics (which loan, which draw) in the Note.'] },
       { h: 'Where it shows up', p: ['Bar Cop reads these into the Cash Bridge, under Cash then Cash Bridge, which takes your profit for a period and shows exactly where it went instead of into the bank. They also post to the Survival Forecast as scheduled cash out. The bridge reads this store, so you enter here and read there.'] },
       { h: 'Two dates on the form', p: ['Date Submitted is just when you logged it and always stays on today. Due Date is when the money actually goes out, and it is what the forecast timing and the recurring schedule run from. Set the Due Date to the real date, not today.'] },
-      { h: 'Recurring and one-time', p: ['Check Recurring for a draw, loan, or tax that repeats, pick How Often, monthly, quarterly, or annually, and set the Due Date to when it is next due so the schedule tracks the real cycle. Bar Cop carries it on that schedule until you stop it; set Ends after only for a fixed term like a loan payoff. One-time outflows land in the Logged Outflows list for the period you pick, with Repeat to copy one forward.'] },
+      /* ⚠⚠ THIS SECTION WAS STALE AND MY FIRST CORRECTION OVERSHOT — WORTH RECORDING, because the
+         two doors genuinely disagree. It read "Check Recurring for a draw, loan, or tax that
+         repeats, pick How Often... set Ends after", which is false at the door an operator meets
+         first: build order C2 stopped the Money Out ADD form writing any schedule at all. I then
+         rewrote it as "nothing to tick" — also false, because the Cash Outflows screen's own EDIT
+         modal still renders Recurring, How often and Ends after AND persists them (`cb-f-recur`,
+         `cb-f-frequency`, `cb-f-term`). Measured, not assumed: I had scoped the check to the add
+         form's file and concluded the controls did not exist ([[the-loop]] #21 — a detector's file
+         list is an assumption, and every narrowing of it is a place the answer hides).
+         ⚠ THE TWO DOORS ARE A REAL OPEN QUESTION, NOT A COPY PROBLEM (item T4): adding writes no
+         schedule and editing writes a full one. This copy states what each door does rather than
+         pretending they agree. */
+      { h: 'Recurring and one-time', p: ['You do not have to declare anything. Log each draw, loan payment or tax remittance as it happens and Bar Cop picks up the ones that repeat, then carries them onto your Cash Forecast. To declare one up front instead, like a loan with a fixed payoff, open it on the Cash Outflows screen and hit Edit: Recurring, How often and Ends after are there. Stop ends a series early and leaves every payment it already made on your books. One-time outflows land in the Logged Outflows list for the period you pick, with Repeat to copy one forward.'] },
       { h: 'Not operating bills', p: ['Rent, utilities, insurance, and the rest are operating expenses, not outflows. Log those in Operating Expenses so they stay on the P&L and Bar Cop does not count them twice.'] }
     ] },
     'settings-profile': { title: 'How the Business Profile Works', sections: [
@@ -3079,10 +3100,23 @@ const App = {
     if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.reconcileMaintenanceLedger) {
       await S.HubOperatingExpenses.reconcileMaintenanceLedger();
     }
-    // ⭐ PHASE 2 ITEM 9: the weekly roll's delivery commissions, the last P&L line fed from outside
-    // the expense log. Same shared body, same additive contract.
-    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.reconcilePlatformFeesLedger) {
-      await S.HubOperatingExpenses.reconcilePlatformFeesLedger();
+    /* ⭐⭐⭐ BUILD PIECE 2: the weekly roll's delivery commissions come ACROSS, once, and the weekly
+       field stops being a source. This was `reconcilePlatformFeesLedger` and it ran here on EVERY
+       load, keeping a ledger row in step with `week.platform_fees` — two homes for one dollar, and
+       measured on the deployed build it was already being subtracted twice (the Cash Bridge read
+       one full period of commission low, the Profit Forecast added it on top of the opex average).
+       ⛔ IT IS A MIGRATION RATHER THAN A DELETION because an account that has not logged in since
+       the mirror shipped (2026-08-05) has no rows yet, and deleting the reconcile outright would
+       drop its whole history's commission off the Income Statement silently. It is additive,
+       id-preserving, skips anything already on file, and marks itself done.
+       ⚠ IT SAVES ITS OWN MARKER. The `migrated_kinds` persist above runs EARLIER in this routine, so
+       a marker set here would never survive the session and this would re-run for ever.
+       ⚠ THE DEMO NEEDS NO CALL HERE and that is a claim about the SEED, not an omission: `startDemo`
+       skips `boot()` entirely, and the seed writes its commission rows straight into the ledger.
+       Both paths are pinned BY NAME in `verify-platform-fees-one-source.js` block F, because a pin
+       asserting "it is called somewhere" is exactly what let the fix-baselines miss through. */
+    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.migratePlatformFeesOnce) {
+      await S.HubOperatingExpenses.migratePlatformFeesOnce();
     }
     // PERSIST the sort_order stamps assigned above. In-memory-only stamping did not fix the
     // count-sheet order, it displaced the bug by one login: _nextLocSeq reads the in-memory max,
