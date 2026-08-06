@@ -9442,7 +9442,25 @@ const App = {
           + (altText ? '<button class="btn btn-ghost" data-act="alt">' + esc(altText) + '</button>' : '')
           + '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + '" data-act="confirm">' + esc(confirmText) + '</button>'
         + '</div></div>';
+      /* ⛔⛔⛔ THE DIALOG TAKES FOCUS, AND THAT IS NOT A POLISH ITEM (2026-08-06, found on the live
+         app). The overlay is `position:fixed; inset:0; z-index:9500+`, so a second MOUSE click
+         cannot reach the button that opened it — but an overlay is POINTER HIT-TESTING AND NOTHING
+         ELSE ([[the-loop]] #92). It does not blur the focused element and it does not leave the tab
+         order. MEASURED on the deployed build: with a delete confirm open, `document.activeElement`
+         was still the Delete button — so Enter fired it again and the dialogs stacked, Tab walked
+         the page behind the dialog, and a screen-reader user was never taken into it.
+         ⭐⭐ FOCUS GOES TO THE **SAFE** CONTROL, and that is the whole decision. Focusing the confirm
+         button would stop the stacking and arm a DESTRUCTIVE action under a held Enter — strictly
+         worse than the defect it fixes. Cancel takes it when there is one; a one-button notice has
+         only a safe choice, so that gets it.
+         ⚠ ~65 call sites share this dialog, so the change is deliberately confined to FOCUS: no
+         button, no resolve value and no Esc behaviour moves. `verify-confirm-takes-focus.js` block C
+         proves that inertness rather than assuming it ([[the-loop]] #65). */
+      const prevFocus = document.activeElement;
       document.body.appendChild(overlay);
+      const safeBtn = overlay.querySelector('[data-act="cancel"]')
+        || overlay.querySelector('[data-act="confirm"]');
+      if (safeBtn && safeBtn.focus) safeBtn.focus();
       /* ⚠⚠ CLEANUP HAS TO TAKE THE KEY LISTENER WITH IT (found scanning S331; PRE-EXISTING, not
          introduced by it). Only the Esc path removed the listener, so every dialog closed by a
          BUTTON left its `keydown` handler on `document` forever, holding a detached overlay in the
@@ -9455,6 +9473,15 @@ const App = {
       const cleanup = (val) => {
         document.removeEventListener('keydown', onKey);
         document.body.removeChild(overlay);
+        /* ⛔ GIVE FOCUS BACK, BEFORE RESOLVING. Without this it falls to <body> and Tab restarts
+           from the top of the page — the corollary [[the-loop]] #92 records: ask what happens to
+           FOCUS when you take it off the thing that had it.
+           ⚠ BEFORE `resolve`, deliberately: a caller that focuses something of its own after the
+           await then wins, instead of racing this.
+           ⚠ `isConnected !== false` because the launcher may be GONE — the row it sat in is often
+           re-rendered by the very action being confirmed, and focusing a detached node throws in
+           some browsers and silently does nothing in others. */
+        if (prevFocus && prevFocus.focus && prevFocus.isConnected !== false) prevFocus.focus();
         resolve(val);
       };
       overlay.addEventListener('click', e => {
