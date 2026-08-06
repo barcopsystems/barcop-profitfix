@@ -1825,6 +1825,7 @@ const App = {
     { group:'void-comp',           label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
     { group:'waste',               label:'Waste / Spill Log',        module:'shift',     screen:'sc-waste',             moduleName:'Shift Control' },
     { group:'maintenance',         label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' },
+    { group:'maintenance',         label:'Licensing',                module:'shift',     screen:'sc-licensing',         moduleName:'Shift Control' },
     { group:'incident',            label:'Incident Log',             module:'shift',     screen:'sc-incidents',         moduleName:'Shift Control' },
     // Recovery
     { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'dashboard',            moduleName:'Profit Recovery' },
@@ -2170,12 +2171,12 @@ const App = {
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'cash-outflows': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'cash-outflows': 'books', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'cash-outflows': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'cash-outflows': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -2252,9 +2253,12 @@ const App = {
       { h: 'What If', p: ['The what-if is a sandbox. Move your weekly sales, cut the nut, or trim the variable rate and watch break-even and your profit move, so you can see what a price change or a rent cut actually buys you before you commit. Hit Reset to snap back to your real numbers.'] }
     ] },
     'permits': { title: 'How Licensing Works', sections: [
-      { h: 'What this page is', p: ['Tracks your permits and licenses by renewal date so none of them lapse. Add each one with its type, next renewal date, recurrence, and last cost, and Bar Cop watches the calendar for you.'] },
+      { h: 'What this page is', p: ['Tracks your permits and licenses by renewal date so none of them lapse. Add each one with its type, next renewal date and recurrence, and Bar Cop watches the calendar for you. Find it in Shift Control, under Incidents and Maintenance.'] },
       { h: 'How the statuses work', p: ['A renewal more than 30 days out is On Track. Within 30 days is due soon and within 14 is more urgent, both flagged amber; once the date passes it is Expired, in red. Anything due soon or expired shows under Needs Attention here and under Coming Due on the Books overview. Use the chips to filter the list by status.'] },
-      { h: 'Marking one renewed', p: ['When you renew a permit, click Mark Renewed and enter the cost paid and the next renewal date (Bar Cop suggests it from the recurrence). That advances the renewal date and logs the cost to Operating Expenses under Licenses and Permits, so your bookkeeper does not enter it twice.'] },
+      /* ⚠ THIS PROMISED THE RENEWAL WOULD LOG THE COST "so your bookkeeper does not enter it twice",
+         and it was doing the opposite: the row it wrote carried the permit's TYPE as its vendor, so
+         the same fee off a bank statement imported as a second row. Build piece 5 closed that door. */
+      { h: 'Marking one renewed', p: ['When you renew a permit, click Mark Renewed and set the next renewal date (Bar Cop suggests it from the recurrence). That is all this page does. What the renewal cost is a bill like any other: it comes in with your statement on Close The Books, or you type it there once, and it lands on the Licenses and Permits line of your P&L.'] },
       { h: 'Good to know', p: ['Bar Cop tracks the dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements and deadlines with your issuing agency.'] }
     ] },
     'operating-expenses': { title: 'How Operating Expenses Work', sections: [
@@ -2360,7 +2364,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'week-history', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-dashboard', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
+  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'week-history', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-dashboard', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -8401,6 +8405,7 @@ const App = {
         'sc-waste':              ['Waste / Spill Log', 'Shift Control'],
         'sc-maintenance':        ['Maintenance Log', 'Shift Control'],
         'sc-incidents':          ['Incidents', 'Shift Control'],
+        'sc-licensing':          ['Licensing', 'Shift Control'],
         'sc-walked-tabs':        ['Walked Tabs', 'Shift Control'],
         'sc-checklists':         ['Run Checklists', 'Shift Control'],        'sc-checklist-templates':['Build Checklists', 'Shift Control'],
         'sc-preshift':           ['Pre-Shift Briefing', 'Shift Control'],
@@ -8415,6 +8420,10 @@ const App = {
         'sc-waste': S.ShiftWaste,
         'sc-maintenance': S.ShiftMaintenance,
         'sc-incidents': S.ShiftIncidents,
+        // ⭐ build piece 5: the permits tracker moved out of the Books shell into Shift Control.
+        // The OBJECT keeps its name (`S.HubPermits`) because five callers reach it by that name;
+        // only where it MOUNTS changed.
+        'sc-licensing': S.HubPermits,
         'sc-walked-tabs': S.ShiftWalkedTabs,
         'sc-checklists': S.ShiftChecklists,        'sc-checklist-templates': S.ShiftChecklistTemplates,
         'sc-preshift': S.ShiftPreShift,

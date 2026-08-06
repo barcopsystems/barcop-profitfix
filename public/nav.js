@@ -431,13 +431,26 @@ const Shift = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 5h11M5 5l1 9h5l1-9M7 3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Waste and Spills</span>
       </div>
+      <!-- ⭐⭐ THE TRACKERS THAT HOLD NO MONEY, IN KYLE'S ORDER, BEHIND THEIR OWN DIVIDER.
+           He asked for it exactly: "after waste and spills put another divider line... then have
+           put links in this order Incidents then Maintenance... then Licensing."
+           Licensing moved here from Books at build piece 5. His reasoning: "it kinda made sense
+           being in books when it was under enter cash outflows and operating expenses.. but now
+           sitting under money out.. it doesn't really seem to fit in books.. it has nothing to do
+           with books really." Once it holds no money nothing in Books reads a permit record —
+           its only consumers are the Hub's alert panel and the Audit's operational exposures. -->
+      <div class="nav-section"></div>
+      <div class="nav-item" data-screen="sc-incidents" id="nav-sc-incidents">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M7.4 3.2 1.9 12.8a1.25 1.25 0 0 0 1.1 1.9h11a1.25 1.25 0 0 0 1.1-1.9L9.6 3.2a1.25 1.25 0 0 0-2.2 0z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v2.8M8.5 11.8v.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Incidents</span>
+      </div>
       <div class="nav-item" data-screen="sc-maintenance" id="nav-sc-maintenance">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M10.8 2.5a3 3 0 0 0-4 4l-4.3 4.3 2 2L8.8 8.5a3 3 0 0 0 4-4l-2 2-2-2 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
         <span class="nav-label">Maintenance</span>
       </div>
-      <div class="nav-item" data-screen="sc-incidents" id="nav-sc-incidents">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M7.4 3.2 1.9 12.8a1.25 1.25 0 0 0 1.1 1.9h11a1.25 1.25 0 0 0 1.1-1.9L9.6 3.2a1.25 1.25 0 0 0-2.2 0z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v2.8M8.5 11.8v.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Incidents</span>
+      <div class="nav-item" data-screen="sc-licensing" id="nav-sc-licensing">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2.2 3 4.4v4.1c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V4.4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.3 8.4l1.7 1.7 3-3.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Licensing</span>
       </div>
       <div class="nav-section">Checklists</div>
       <div class="nav-item" data-screen="sc-checklists" id="nav-sc-checklists">
