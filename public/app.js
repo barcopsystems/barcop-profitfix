@@ -3431,11 +3431,18 @@ const App = {
     const keyAttr = key ? ' data-cs-key="' + esc(key) + '"' : '';
     const styleAttr = opts.style ? ' style="' + opts.style + '"' : '';
     const cls = opts.selectClass || 'form-input';
-    // Keyed lists do all add/remove through the Edit editor — no inline
-    // "+ Add your own" option or text field. Non-keyed selects keep the old
-    // inline-add behaviour.
-    const addHtml = key ? '' : '<option value="__addcustom__">' + esc(opts.addLabel || '+ Add your own...') + '</option>';
-    const inputHtml = key ? '' : '<input type="text" class="cs-newval form-input" placeholder="' + esc(opts.newPlaceholder || 'Type it, then Enter') + '" style="display:none;width:100%;"/>';
+    /* Keyed lists do all add/remove through the Edit editor — no inline
+       "+ Add your own" option or text field. Non-keyed selects keep the old
+       inline-add behaviour.
+       ⛔ UNLESS THE VOCABULARY IS FIXED. `addCustom: false` is for an unkeyed list whose values are
+       not free text but a CLOSED SET the code maps to something else — Money Out's Kind picker maps
+       its five names to a stored outflow `type`. Measured on the live app before this existed:
+       typing "Equipment Lease" there saved `type: ''` and the row came back as "Other Cash
+       Outflow", so the name the operator typed was gone and the record carried an empty type. A
+       control must not accept a value it discards. Default stays TRUE, so nothing else moves. */
+    const allowAdd = opts.addCustom !== false;
+    const addHtml = (key || !allowAdd) ? '' : '<option value="__addcustom__">' + esc(opts.addLabel || '+ Add your own...') + '</option>';
+    const inputHtml = (key || !allowAdd) ? '' : '<input type="text" class="cs-newval form-input" placeholder="' + esc(opts.newPlaceholder || 'Type it, then Enter') + '" style="display:none;width:100%;"/>';
     return '<span class="cs-wrap" style="display:block;">'
       + '<select' + idAttr + keyAttr + ' class="cs-select ' + cls + '"' + styleAttr + '>'
       +   optionsHtml
