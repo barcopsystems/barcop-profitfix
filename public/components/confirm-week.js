@@ -73,7 +73,9 @@ const ConfirmWeek = {
       covers: rw ? n(rw.covers) : (sales.any ? String(sales.covers) : ''),
       catering: cat,
       other:  { revenue: pw ? n(pw.other && pw.other.revenue) : '', cogs: pw ? n(pw.other && pw.other.cogs) : '' },
-      platform_fees: pw ? n(pw.platform_fees) : '',
+      /* ⛔ `platform_fees` WAS READ BACK HERE AND IT IS GONE (build piece 2). Delivery commission is
+         an operating expense on the one ledger now, typed at the Money Out door like every other
+         bill. Reading it back would re-seed a cell this form no longer has. */
       notes: pw ? (pw.notes || '') : (rw ? (rw.notes || '') : ''),
       // readiness
       ready: {
@@ -134,12 +136,21 @@ const ConfirmWeek = {
       +   '<div style="min-height:36px;display:flex;align-items:center;font-size:13px;color:var(--t2);">' + (evRev > 0 ? money(evRev) + ' from bookings' : 'None this week') + '</div></div>'
       + '</div>';
 
+    /* ⛔⛔ THE "Platform / Operating Fees" CELL WAS THE THIRD FIELD IN THIS ROW AND IT IS GONE
+       (build piece 2). It was the last place in the app that typed a dollar of money out anywhere
+       but the one ledger, and keeping it meant the same figure had two homes: the reconcile mirrored
+       it into an expense row, `CashEngine.bills()` counted that row as overhead, and
+       `profitForPeriod` went on subtracting the weekly field beside it — measured live, the Cash
+       Bridge read exactly one commission low. Delivery commission is an ordinary
+       `3rd-Party Platform Fees` expense now, entered where every other bill is entered.
+       ⚠ THE DIV COUNT MOVED WITH IT. Removing a wrapped field means removing its closer in the same
+       keystroke, or the row swallows what follows it and a later show/hide takes the lot
+       ([[the-loop]] #136 — an unclosed div is valid JavaScript and renders without error). */
     const manual = '<div style="border-top:1px solid var(--b2);margin:2px 0 16px;"></div>'
       + '<div class="sh" style="margin:0 0 10px;">Optional</div>'
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;margin-bottom:6px;">'
       + '<div class="f" style="width:180px;"><label>Ancillary Revenue</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-anc-rev"/></div></div>'
       + '<div class="f" style="width:180px;"><label>Ancillary Cost</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-anc-cogs"/></div></div>'
-      + '<div class="f" style="width:200px;"><label>Platform / Operating Fees</label><div class="fw"><span class="pre">$</span><input class="pre cw-in" type="number" step="0.01" id="cw-fees"/></div></div>'
       + '</div>'
       + App.noteField({ id: 'cw-notes', value: m.notes, mt: 10 });
 
@@ -159,7 +170,7 @@ const ConfirmWeek = {
     set('cw-bar-rev', m.bar.revenue);   set('cw-bar-cogs', m.bar.cogs);   set('cw-bar-lab', m.bar.labor);
     set('cw-food-rev', m.food.revenue); set('cw-food-cogs', m.food.cogs); set('cw-food-lab', m.food.labor);
     set('cw-covers', m.covers);
-    set('cw-anc-rev', m.other.revenue); set('cw-anc-cogs', m.other.cogs); set('cw-fees', m.platform_fees);
+    set('cw-anc-rev', m.other.revenue); set('cw-anc-cogs', m.other.cogs);
     this._hours = m.hours;
     this._catering = m.catering;
 
@@ -172,8 +183,7 @@ const ConfirmWeek = {
     this._recalc();
   },
 
-  // For cells where zero is a real answer (most weeks book no ancillary revenue
-  // and no platform fees).
+  // For cells where zero is a real answer (most weeks book no ancillary revenue).
   _val(id) { return parseFloat(document.getElementById(id)?.value) || 0; },
 
   // For cells where blank means "not measured yet", which is not the same number
@@ -204,7 +214,7 @@ const ConfirmWeek = {
       bRev: this._valOrNull('cw-bar-rev'),  bCogs: this._valOrNull('cw-bar-cogs'),  bLab: this._valOrNull('cw-bar-lab'),
       fRev: this._valOrNull('cw-food-rev'), fCogs: this._valOrNull('cw-food-cogs'), fLab: this._valOrNull('cw-food-lab'),
       covers: this._valOrNull('cw-covers'),
-      oRev: this._val('cw-anc-rev'), oCogs: this._val('cw-anc-cogs'), fees: this._val('cw-fees'),
+      oRev: this._val('cw-anc-rev'), oCogs: this._val('cw-anc-cogs'),
       cRev: parseFloat(cat.revenue) || 0, cCogs: parseFloat(cat.cogs) || 0, cLab: parseFloat(cat.labor) || 0,
       hours: this._hours || 0,
       periodEnd: this._weekEnd
@@ -218,7 +228,7 @@ const ConfirmWeek = {
     const bRev = r.bRev, bCogs = r.bCogs, bLab = r.bLab;
     const fRev = r.fRev, fCogs = r.fCogs, fLab = r.fLab;
     const covers = r.covers;
-    const oRev = r.oRev || 0, oCogs = r.oCogs || 0, fees = r.fees || 0;
+    const oRev = r.oRev || 0, oCogs = r.oCogs || 0;
     const cRev = r.cRev || 0, cCogs = r.cCogs || 0, cLab = r.cLab || 0;
     const hours = r.hours || 0;
 
@@ -249,7 +259,7 @@ const ConfirmWeek = {
     const hourlyLabor = Math.max(0, (nz(bLab) + nz(fLab)) - salaried);
 
     return {
-      bRev, bCogs, bLab, fRev, fCogs, fLab, cRev, cCogs, cLab, oRev, oCogs, fees, covers, hours,
+      bRev, bCogs, bLab, fRev, fCogs, fLab, cRev, cCogs, cLab, oRev, oCogs, covers, hours,
       totRev, totSales, primeCost, laborCost, hourlyLabor,
       // ⚠ S334: these two are RETURNED so the record writer can gate on the SAME fact the
       // percentages below already gate on. Before this, `_save` wrote total_labor_cost and
@@ -287,7 +297,12 @@ const ConfirmWeek = {
               vs_target_dollar: f.foodPct != null ? ((f.foodPct - fTgt) / 100) * f.fRev : null },
       catering: { revenue: f.cRev, cogs: f.cCogs, labor: f.cLab, cost_pct: f.cRev > 0 ? f.cCogs / f.cRev * 100 : 0, labor_pct: f.cRev > 0 ? f.cLab / f.cRev * 100 : 0 },
       other: { revenue: f.oRev, cogs: f.oCogs },
-      platform_fees: f.fees,
+      /* ⛔ `platform_fees` CAME OFF THE RECORD HERE (build piece 2). The week is no longer a store
+         that can hold a dollar of money out, which is what drops `STORES_MAX` to 2.
+         ⚠ AN EXISTING WEEK'S VALUE IS NOT DESTROYED BY THIS. `migratePlatformFeesOnce` copies every
+         typed figure on file into the ledger at the account's next login, before any screen can
+         run — so by the time a re-confirm rebuilds this record without the field, the money is
+         already an expense row and the Income Statement never moves. */
       prime_cost_pct: f.primePct
     };
   },
@@ -309,7 +324,7 @@ const ConfirmWeek = {
 
   // Force the Control-sourced cells back to the live auto-fill, overwriting any
   // manual edits (this is what "Refresh from Control" promises). Leaves the
-  // manual optional fields (ancillary, fees, notes) alone and does not re-render.
+  // manual optional fields (ancillary, notes) alone and does not re-render.
   _refresh() {
     const pe = this._weekEnd;
     const sales   = this.salesRollup(pe);
@@ -395,6 +410,20 @@ const ConfirmWeek = {
       period_end: pe,
       saved_at: new Date().toISOString()
     }, this._weekShape(f), { notes: notes });
+    /* ⛔⛔ A LEGACY `platform_fees` IS CARRIED FORWARD, AND NOT CREATED. Found by scanning my own
+       diff, not by any pin. This builder does NOT spread `pw` — it starts from four identity fields
+       — so once `_weekShape` stopped returning the field, re-confirming an old week silently
+       stripped it. That is free once `migratePlatformFeesOnce` has copied the figure into the
+       ledger, and it is PERMANENT LOSS before then: the migration refuses on a cache-served load
+       (`DB._loadDegraded`) and on a refused write, neither of which stops the operator re-confirming
+       a week in that same session, and the migration reads the WEEK — so the moment the field is
+       gone from the record there is nothing left to migrate. Money out of both places at once.
+       ⭐ IT CANNOT REINTRODUCE THE STORE. There is no input, no fallback and no new value: an
+       existing figure survives, a week that never had one never gains one, and the count-edit
+       updater at the bottom of this file was already safe because it spreads the whole record.
+       ⚠ THE COUNTERPART IS THE SIBLING PATH AT `record: Object.assign({}, w, ...)` — same rule,
+       reached differently. Two writers, one question ([[the-loop]] step 0.5). */
+    if (pw && pw.platform_fees != null) week.platform_fees = pw.platform_fees;
 
     // ── Revenue `revenue_week` record ──
     const rw = (App.data.revenue_weeks || []).find(w => (w.period_end || '').slice(0, 10) === pe) || null;
@@ -555,7 +584,6 @@ const ConfirmWeek = {
         fRev: num(w.food, 'revenue'), fCogs: nextFood, fLab: num(w.food, 'labor'),
         covers: null, hours: 0,
         oRev: num(w.other, 'revenue') || 0, oCogs: num(w.other, 'cogs') || 0,
-        fees: w.platform_fees || 0,
         cRev: num(w.catering, 'revenue') || 0,
         cCogs: num(w.catering, 'cogs') || 0,
         cLab: num(w.catering, 'labor') || 0,
