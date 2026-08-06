@@ -1341,7 +1341,23 @@ window.CashEngine = {
       }
       if (d >= startYmd && d <= endYmd) out.push({ date: d, amount: parseFloat(o.amount) || 0, type: o.type || 'capital', label: o.notes || this._outflowLabel(o.type) });
     });
-    recs.filter(o => o.recurring).forEach(p => {
+    /* ⭐⭐⭐ THE RESOLVER, NOT THE RAW FLAG. This read `recs.filter(o => o.recurring)`, so a commitment
+       only reached the forecast if somebody ticked a box. MEASURED on one bar: the operator who logs
+       every draw by hand and never ticks it is told they end the quarter **+$8,358** when the truth
+       is **-$10,242**, because $18,600 of their own draws and loan payments are simply absent.
+       ⛔ THE SYNTHETIC RECORD IS THE MERGE OF THE TWO HALVES: the schedule comes from the series
+       (`frequency`, `day`, `amount`), and everything the loop below reads about STOPPING — `id`,
+       `stopped_ym`, `term_months`, `skip_months`, `notes`, `type` — comes from the underlying row.
+       A derived series' row is its LAST occurrence, which carries none of those, so those checks
+       pass and it simply projects. A declared one keeps every rule the operator set.
+       ⚠ `date` IS THE SERIES' LAST OCCURRENCE FOR A DERIVED ONE, so the projection steps forward
+       from the most recent payment rather than from whichever row happened to be first. */
+    this.recurringOutflowSeries(recs).forEach(s => {
+      const p = Object.assign({}, s.row || {}, {
+        frequency: s.frequency, amount: s.amount,
+        recur_day: s.day || (s.row && s.row.recur_day) || null,
+        date: s.derived ? s.lastDate : ((s.row && s.row.date) || s.lastDate)
+      });
       const amt = parseFloat(p.amount) || 0;
       const base = new Date((p.date || startYmd) + 'T00:00:00'); if (isNaN(base.getTime())) return;
       const day = parseInt(p.recur_day, 10) || base.getDate();
@@ -1374,6 +1390,162 @@ window.CashEngine = {
   },
   // Active recurring outflow series (the parents you can stop or edit).
   recurringOutflows() { return this.cashOutflows().filter(o => o.recurring && o.id); },
+
+  /* ⭐⭐⭐ A CASH OUTFLOW THAT KEEPS HAPPENING IS A COMMITMENT, WITHOUT ANYONE TICKING A BOX. This is
+     what the bills side already has (`deriveRecurringBills`), pointed at the cash half.
+
+     ⛔⛔ THE DEFECT IT CLOSES, MEASURED ON ONE BAR: same account, same money out the door, the only
+     variable being whether the operator ever ticked "recurring".
+         never ticked it   13-week outflows  $6,200   ending balance  +$8,358
+         ticked it once    13-week outflows $24,800   ending balance -$10,242
+     $18,600 a quarter, exactly the $4,000 draw and $2,200 loan they take every month. And the one
+     who never ticked it is the DANGEROUS case, not the safe one: opening cash set, weeks confirmed,
+     bills dropping, so every guard on the forecast screen passes and it prints a runway, a low point
+     and an End of Quarter of +$8,358 with total confidence. They finish $10,242 down. Optimistic,
+     which is the direction nobody reports.
+     ⭐ Kyle: *"is the checkmark worth the hassle? ... any expense entered also takes 2-3 months to
+     pattern the same expense."* He is right and it is the same delay we accepted for bills an hour
+     earlier. A control that only helps when remembered, and silently misleads when forgotten, is
+     worse than no control.
+
+     ⛔⛔⛔ THE KEY IS `type + amount`, AND THAT IS THE IDENTICAL-AMOUNT RULE MADE STRUCTURAL RATHER
+     THAN CHECKED. A loan payment is set by a contract and is the same number every month; a draw
+     never is. Because the amount is part of the key, a series whose amounts differ CANNOT form, so
+     there is no averaging step and no threshold anybody invented. Measured on the bills side, the
+     averaging path turns draws of $12,000 / $3,000 / $6,000 into "monthly $7,000, forever" — a
+     fiction stated as a schedule, on the screen that decides whether the operator can afford
+     something. Here that is unreachable by construction.
+     ⚠ AND IT KEEPS TWO REAL LOANS APART. Two different payments at two different amounts are two
+     series, never one merged one — the collapsed-keyspace defect that once read a $12,000 weekly nut
+     against a truth of $16,100.
+
+     ⚠ CADENCE RULES ARE THE BILLS SIDE'S, DELIBERATELY: exact 7s and 14s for the day-anchored ones,
+     month gaps of 1 / 3 / 12 for the rest, no tolerance. A refusal is visible; a smoothed guess is
+     not. */
+  deriveRecurringOutflows(rows) {
+    const MONTH_FREQ = { 1: 'monthly', 3: 'quarterly', 12: 'annual' };
+    const DAY_FREQ = { 7: 'weekly', 14: 'fortnightly' };
+    const groups = {};
+    (Array.isArray(rows) ? rows : this.cashOutflows()).forEach(o => {
+      if (!o) return;
+      const amt = parseFloat(o.amount);
+      if (!(amt > 0)) return;
+      const d = String(o.date || '');
+      // An unreadable date is skipped, never repaired into a guess — a wrong month invents a gap.
+      if (!/^\d{4}-\d{2}-\d{2}/.test(d)) return;
+      const k = (o.type || 'other') + '|' + Math.round(amt * 100);
+      (groups[k] = groups[k] || []).push(o);
+    });
+    const out = [];
+    Object.keys(groups).forEach(k => {
+      const g = groups[k].slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      if (g.length < 2) return;                       // one occurrence is not a pattern
+      const dayNo = g.map(r => Date.UTC(parseInt(String(r.date).slice(0, 4), 10),
+        parseInt(String(r.date).slice(5, 7), 10) - 1, parseInt(String(r.date).slice(8, 10), 10)) / 86400000);
+      const monthIdx = g.map(r => (parseInt(String(r.date).slice(0, 4), 10) * 12)
+        + parseInt(String(r.date).slice(5, 7), 10) - 1);
+      const diffs = (a) => { const o2 = []; for (let i = 1; i < a.length; i++) o2.push(a[i] - a[i - 1]); return o2; };
+      const same = (a) => a.length > 0 && a.every(x => x === a[0]);
+      const dayGaps = diffs(dayNo), monthGaps = diffs(monthIdx);
+      let frequency = '', weekday = null;
+      // Short cadence asked first, so the two rules are explicitly disjoint rather than accidentally so.
+      if (same(dayGaps) && DAY_FREQ[dayGaps[0]]) {
+        frequency = DAY_FREQ[dayGaps[0]];
+        weekday = new Date(dayNo[dayNo.length - 1] * 86400000).getUTCDay();
+      } else if (same(monthGaps) && MONTH_FREQ[monthGaps[0]]) {
+        frequency = MONTH_FREQ[monthGaps[0]];
+      }
+      if (!frequency) return;
+      /* ⛔⛔ MONTH-ANCHORED ONLY, AND REFUSING IS THE SAFE DIRECTION. `outflowsBetween`'s projection
+         loop steps in whole MONTHS (`step = quarterly ? 3 : annual ? 12 : 1`) — it has no day-anchored
+         path, unlike `projectedBills`, which was given one during the bills cutover. Handing it a
+         weekly series would project one payment a month instead of four, i.e. **4.3x LOW**, and low
+         on money leaving the bank is the optimistic direction nobody reports ([[the-loop]] #24 — the
+         vocabulary has to move in the same edit as the rule that uses it).
+         ⚠ SO A WEEKLY OR FORTNIGHTLY CASH SERIES IS NOT DERIVED YET. The detector above finds it and
+         this line drops it, deliberately, until the projector can step in days. That is a stated gap
+         rather than a wrong number, and `weekday` is carried on the shape so wiring it later needs
+         no second detector. */
+      if (weekday != null) return;
+      const last = g[g.length - 1];
+      out.push({
+        key: k, type: last.type || 'other', amount: parseFloat(last.amount) || 0,
+        frequency: frequency,
+        // The day it lands on, for the month-anchored cadences. A weekly series carries a weekday
+        // instead — saying `day: 4` for a Saturday would put it on the 4th of every month.
+        day: weekday == null ? (parseInt(String(last.date).slice(8, 10), 10) || 1) : null,
+        weekday: weekday,
+        occurrences: g.length, lastDate: String(last.date).slice(0, 10),
+        derived: true, row: last
+      });
+    });
+    return out;
+  },
+
+  /* ⭐⭐ THE ONE ANSWER TO "WHAT CASH IS COMMITTED", merging what the operator declared with what the
+     ledger shows. Mirrors `HubOperatingExpenses.recurringBills()` line for line, including the two
+     rules that took the bills side three rounds to get right:
+       · THE DECLARED RECORD WINS where both can see a series, or every commitment counts twice.
+         Live accounts still carry `recurring: true` outflows — the checkbox is going, the stored
+         data is not — and the typed row is the one carrying the operator's own term and `stopped_ym`.
+       · A DECLARED SERIES IS NEVER DEDUPED AGAINST ANOTHER DECLARED ONE. Two equipment loans at the
+         same payment are two loans.
+     ⛔ STALENESS IS JUDGED AGAINST THE LEDGER'S OWN LAST ACTIVITY, NEVER THE CLOCK — the same rule
+     and the same reason as the bills side. "This stopped being paid" and "this operator stopped
+     logging anything" are the same picture against a calendar and opposite facts, and dropping a
+     live commitment out of Safe to Spend is the silent direction. */
+  recurringOutflowSeries(rows) {
+    const CYCLE_DAYS = { weekly: 7, fortnightly: 14, monthly: 31, quarterly: 92, annual: 366 };
+    const recs = Array.isArray(rows) ? rows : this.cashOutflows();
+    const dayNo = (ymd) => Date.UTC(parseInt(String(ymd).slice(0, 4), 10),
+      parseInt(String(ymd).slice(5, 7), 10) - 1, parseInt(String(ymd).slice(8, 10), 10)) / 86400000;
+    const now = dayNo(App.todayLocal ? App.todayLocal() : '');
+    /* The ledger's own clock. `App.data.operating_expenses` is the whole money-out ledger, so a bill
+       dropped today is evidence the operator is still logging even when no outflow has been. */
+    const ledger = (App.data && Array.isArray(App.data.operating_expenses)) ? App.data.operating_expenses : [];
+    let last = -Infinity;
+    ledger.concat(recs).forEach(r => {
+      if (!r || !r.date) return;
+      const d = dayNo(String(r.date).slice(0, 10));
+      if (!isNaN(d) && d > last) last = d;
+    });
+    if (!isFinite(last)) last = now;
+    // Capped at today, or one future-dated row drags the reference forward and makes everything
+    // else look a cycle stale at once.
+    const ref = isNaN(now) ? last : Math.min(last, now);
+    const current = (lastDate, frequency) => {
+      if (isNaN(ref)) return true;    // no readable clock at all: never drop on a bad reading
+      return (ref - dayNo(lastDate)) <= (CYCLE_DAYS[frequency] || 31) * 2;
+    };
+    const out = [];
+    const claimed = {};
+    /* ⛔⛔⛔ A DECLARED CASH SERIES IS NEVER STALE-CHECKED, AND COPYING THE BILLS RULE HERE WOULD HAVE
+       DELETED EVERY ONE OF THEM ON EVERY LIVE ACCOUNT. I wrote that copy and `verify-forecast-loops`
+       P3 caught it.
+       [[the-loop]] #51, which is about this exact pair of stores: OPERATING EXPENSES store their
+       history as child rows, so a typed bill's series really does leave a trail and asking "when did
+       it last happen" is a fair question. A CASH OUTFLOW PROJECTS ITS HISTORY AND STORES NOTHING —
+       the parent is the only row that will ever exist, forever. So its "last occurrence" is always
+       its own start date, and two cycles later it goes stale and vanishes, taking a real loan
+       payment out of the forecast, the reserve and Safe to Spend with it.
+       ⭐ Staleness belongs to the DERIVED half only, where repeated rows genuinely exist and their
+       absence is genuinely evidence. A declared series ends when the operator ends it, exactly as
+       it does today — this step changes nothing for them. */
+    recs.filter(o => o && o.recurring && o.id && !o.recurring_parent).forEach(o => {
+      claimed[(o.type || 'other') + '|' + Math.round((parseFloat(o.amount) || 0) * 100)] = true;
+      out.push({ key: 'typed:' + o.id, type: o.type || 'other', amount: parseFloat(o.amount) || 0,
+        frequency: o.frequency || 'monthly',
+        day: parseInt(o.recur_day, 10) || parseInt(String(o.date).slice(8, 10), 10) || 1,
+        weekday: null, occurrences: null, lastDate: String(o.date || '').slice(0, 10),
+        derived: false, row: o });
+    });
+    this.deriveRecurringOutflows(recs).forEach(b => {
+      if (claimed[b.key]) return;
+      if (!current(b.lastDate, b.frequency)) return;
+      out.push(b);
+    });
+    return out;
+  },
   // The last month a fixed-term recurring series pays out, or null if it is ongoing.
   recurringEndYm(o) {
     const term = parseInt(o.term_months, 10) || 0;
