@@ -71,9 +71,19 @@ S.Hub = {
       + '<div class="nav-section"></div>'
       + row('breakeven', 'Break-Even', 'breakeven')
       + '<div class="nav-section">Operations</div>'
-      + row('cash-outflows', 'Cash Outflows', 'cashout')
-      + row('operating-expenses', 'Operating Expenses', 'expense')
-      + row('expense-history', 'Expense History', 'history')
+      /* ⭐⭐⭐ BUILD ORDER D — THREE ROWS OVER ONE STORE BECOME ONE. Phase 1 migrated every cash
+         outflow into the expense ledger, item 19 stage 1 gave the log a kind chip that shows bills
+         and cash together, and B made this screen read-only history with one entry point on Close
+         The Books. Three sidebar rows for one list was the last thing left.
+         ⛔ THE ACTION ID IS UNCHANGED ON PURPOSE. `operating-expenses` is referenced by
+         `_GLOBAL_OF_ACTION`, `_HUB_SIDEBAR_OF_ACTION` and the help topics; renaming the route to
+         match the label would be three more places to keep in step for no gain. The LABEL is what
+         the operator reads.
+         ⚠ AND THE CASH OUTFLOWS SCREEN OBJECT IS NOT AFFECTED BY LOSING ITS ROW — a nav row is not
+         what loads a screen. All four Money Out doors still call `S.HubCashOutflows._writePair` /
+         `._deletePair`, and a legacy declared series is still stoppable from the merged log under
+         the Cash Outflows chip (measured before this row was removed). */
+      + row('operating-expenses', 'Money Out', 'expense')
       + row('permits', 'Licensing', 'shield')
       + '<div class="nav-section">Accounting</div>'
       + row('weekly-pnl', 'Weekly P&L Brief', 'report')

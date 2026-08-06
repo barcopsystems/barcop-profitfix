@@ -1097,7 +1097,19 @@ S.HubOperatingExpenses = {
   // ── Main render ────────────────────────────────────────────────────────
   renderMain() {
     this._view = 'current';
-    this.container.innerHTML = '<div class="screen">' + this._renderCurrent() + '</div>';
+    /* ⭐⭐⭐ BUILD ORDER D — ONE PAGE FOR MONEY OUT. Expense History was a second sidebar row over
+       the same store, and Cash Outflows a third; the log's kind chip already shows bills and cash
+       together, so the only thing keeping them apart was the nav.
+       ⛔ THE HEADLINE STATS STAY BILLS-ONLY AND `_historyStats` IS DELIBERATELY NOT DRAWN HERE. Two
+       stat boxes on one page — one that follows the kind chip and one that cannot — is two figures
+       for one quantity, which is the exact shape that put $108,820.04 under a page reading
+       $69,820.04 ([[the-loop]] #109). `_sumMonth` and `_sumYTD` feed the OpEx % of Revenue ratio, a
+       named accounting measure an owner draw has no place in, so they must NOT follow the chip; the
+       chip governs the By Category card and the log below it, where it belongs.
+       ⚠ OPEN QUESTION FOR KYLE, FLAGGED RATHER THAN GUESSED: the stat box says "This Month" on a
+       page now headed Money Out, and it counts bills only. The label may need to say so. That is a
+       copy change on a design-ratcheted surface, so it is his call and not mine. */
+    this.container.innerHTML = '<div class="screen">' + this._renderCurrent() + this._renderHistory() + '</div>';
     /* ⭐⭐ BUILD ORDER B — THE WAY TO THE ONE DOOR. This screen no longer takes an entry, so without
        a control it is a page the operator has always used to log a bill with nothing on it: the
        feature would read as LOST rather than moved ([[the-loop]] #106 — a control that tells the
@@ -1113,6 +1125,9 @@ S.HubOperatingExpenses = {
       document.getElementById('oex-go-enter')?.addEventListener('click', () => this._goEnterMoneyOut());
     }
     this._wireCurrent();
+    // ⛔ BOTH, or every control the history half draws — the kind chips, the range chips, Show
+    // Older, Export — is on screen and dead. One page means one wiring pass over all of it.
+    this._wireHistory();
   },
 
   /* ⛔ IT NAMES THE STEP. `hub-books-home._openStep` defaults to "the first step not done", so a bar
