@@ -1917,7 +1917,9 @@ const DB = {
       revenue_weeks: [],
       revenue_audits: [],
       cash_audits: [],
-      cash_outflows: [],
+      // ⛔ `cash_outflows: []` was removed here (build order E). The store is unregistered in
+      // EVENT_STORES, so scaffolding an empty array would only give `_configBlob` an array it no
+      // longer strips — i.e. it would quietly fold a dead store back into the config blob.
       revenue_server_checks: [],
       menu_dog_tests: [],
       revenue_price_log: [],

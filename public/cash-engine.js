@@ -1139,8 +1139,10 @@ window.CashEngine = {
       annual += (parseFloat(b.amount) || 0) * S.HubOperatingExpenses.recurringPerYear(_b.frequency);
     });
     /* ⚠⚠ DEBT SERVICE IS A FIXED COST AND THIS FUNCTION COULD NOT SEE IT (round 3, F3). It read only
-       bills() — the operating-expense log — while loan and equipment payments live in the SEPARATE
-       cash_outflows store, and the operating-expense category list has no debt-service line at all,
+       bills() — the operating-expense log — while loan and equipment payments lived at the time in
+       the SEPARATE cash_outflows store (dropped by build order E; they are stamped ledger rows now,
+       which is why the fix below still finds them), and the operating-expense category list has no
+       debt-service line at all,
        so there was no way to enter one where this would find it. Its own doc comment already
        promised "rent, utilities, insurance, LOAN". Measured: an $1,850/mo loan left the weekly nut
        at $1,057.69 instead of $1,484.62, the 8-week reserve target $8,461 instead of $11,877, and
@@ -1297,11 +1299,14 @@ window.CashEngine = {
   //    remittances). Their own store so they feed BOTH the forecast (scheduled
   //    cash out) and the bridge (where the profit went). Same forward-recurring
   //    projection as bills. ──────────────────────────────────────────────────
-  /* ⭐⭐⭐ THE CUTOVER. This reads the ONE LEDGER now, filtered to the rows that are money out.
-     `App.data.cash_outflows` is no longer the source of truth for anything: the Cash Outflows door
-     writes both stores, `reconcileCashOutflowLedger` guarantees the ledger is a pure function of the
-     old one on every load, and `repairGeneratedCashRows` has removed the child rows the old catch-up
-     generated. Phase 5 deletes the old store; until then it stays whole and readable.
+  /* ⭐⭐⭐ THE CUTOVER. This reads the ONE LEDGER, filtered to the rows that are money out.
+     ⚠ THE SECOND STORE IS GONE (build order E). This comment used to say the door wrote BOTH stores
+     and a boot reconcile kept the ledger a pure function of the old one — true until 2026-08-06,
+     false afterwards, which is the kind of sentence that tells the next reader not to check. There
+     is one store: `cash_outflow` is no longer a registered kind, nothing writes or reads it, and the
+     rows already on the server are orphaned rather than deleted. `repairGeneratedCashRows` still
+     runs at boot and is a DIFFERENT job — it removes the child rows the retired recurring catch-up
+     generated.
 
      ⛔ THE FILTER IS `migrated_from`, NOT THE CATEGORY NAME, AND THAT IS THE WHOLE POINT. The name is
      a string the operator can type — an expense they filed under a category they called "Owner Draw"

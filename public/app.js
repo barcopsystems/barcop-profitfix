@@ -3063,31 +3063,21 @@ const App = {
     if (_migCountBefore !== Object.keys(this.data.migrated_kinds || {}).length) {
       await this.saveKey('migrated_kinds');
     }
-    /* ⭐ PHASE 1 OF THE ONE-LEDGER REBUILD: cash outflows become ledger rows. Runs here because
-       this is the point where `core` is fully loaded and the backstop flags above are accurate,
-       which is the same reason the location stamping below sits here. It refuses to run off a
-       cache-served load, marks itself done only after the write lands, and preserves ids so a
-       retry cannot duplicate — all of that lives in the function, with the reasoning.
-       ⚠ It changes NO figure anywhere in the app: nothing reads the new rows as outflows yet.
-       Proved across eight numbers by verify-outflow-migration-equality.js. */
-    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.migrateCashOutflowsOnce) {
-      await S.HubOperatingExpenses.migrateCashOutflowsOnce();
-    }
-    /* ⭐ STEP 7's REPAIR, and it runs AFTER the one-time migration on every load. The Cash Outflows
-       door now writes both stores, but two stores cannot be written in one request — so a refused
-       ledger write, a refused delete, a seeded account, or a login the migration skipped all leave
-       the ledger one or more rows behind. This is additive-only and puts them back. It writes
-       nothing when the two stores already agree, which is every login after the first. */
-    /* ⛔ THE REPAIR RUNS BEFORE THE RECONCILE, AND THE ORDER MATTERS. It removes the child rows the
-       old catch-up generated off migrated outflows — invisible today, a second copy of every
-       payment the moment the reader flips. Doing it first means the reconcile then sees a ledger
-       whose only cash rows are genuine twins, so its "is this in step with the old store?" question
-       has one honest answer. Both are no-ops on an account that was never damaged. */
+    /* ⛔ THE CASH-OUTFLOW MIGRATION AND ITS RECONCILE WERE REMOVED FROM THIS BLOCK (build order E).
+       Both kept the legacy `cash_outflow` store and the ledger in step; E drops that store, so a
+       cash row is written once and there is nothing left to migrate or repair. `repairGeneratedCashRows`
+       below is a DIFFERENT job and stays.
+       ⚠ The one-time marker (`migrated_kinds.cash_outflow_to_ledger`) is left where it is on live
+       accounts: nothing reads it, and clearing it would be a write to every operator's data for no
+       benefit. The `_migCountBefore` check above is unaffected — it counts keys, and this one simply
+       stops changing. */
+    /* ⭐ THIS REPAIR IS NOT PART OF E. It removes the child rows the retired recurring catch-up
+       generated off migrated outflows: they carry a cash-only category and a `recurring_parent` but
+       no `migrated_from`, so every filtering figure hides them while the engine counts each one as a
+       second copy of a payment it already projects. Keyed on a three-clause predicate that can name
+       every row it deletes, and a no-op on an account that was never damaged. */
     if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.repairGeneratedCashRows) {
       await S.HubOperatingExpenses.repairGeneratedCashRows();
-    }
-    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.reconcileCashOutflowLedger) {
-      await S.HubOperatingExpenses.reconcileCashOutflowLedger();
     }
     /* ⭐ PHASE 2: the maintenance log's repair costs become ledger rows the same way. Additive and
        invisible until Books' Repairs line is pointed at the category — the tracker still holds the
@@ -7332,7 +7322,17 @@ const App = {
         week: 'weeks',
         variance_investigation: 'variance_investigations',
         sales_review: 'sales_reviews',
-        vendor_discrepancy: 'vendor_discrepancies', audit: 'audits', cash_audit: 'cash_audits', cash_outflow: 'cash_outflows',
+        vendor_discrepancy: 'vendor_discrepancies', audit: 'audits', cash_audit: 'cash_audits',
+        /* ⛔ `cash_outflow: 'cash_outflows'` WAS REMOVED HERE (build order E). Unregistering the kind
+           is what actually drops the store: it stops loading at login, `putRecord('core',
+           'cash_outflow', …)` has nowhere to land, and `_configBlob` has no such array to strip —
+           `App.data.cash_outflows` simply never exists. Every dollar out is an `operating_expense`
+           row now, stamped `migrated_from: 'cash_outflow'` so the cash engine can still tell a draw
+           from a bill. The WORD survives as that stamp; the STORE does not.
+           ⚠ The rows already written under this kind are left on the server, untouched and unread.
+           The first RESTORE clears them for good, because seedEventStores clears the table and then
+           reseeds only registered kinds — harmless, because their money is in the ledger, but worth
+           knowing rather than discovering. */
         // Revenue pass — revenue_rate_cards stays in the blob (reusable pricing
         // templates / config); fix_log moves in its own shared pass.
         revenue_week: 'revenue_weeks', revenue_audit: 'revenue_audits',
