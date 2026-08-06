@@ -337,14 +337,21 @@ const ImportConfirm = {
          operator sees a clean page and no error at all. */
       + '<div id="' + esc(opts.resultId || 'import-confirm-res') + '"></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
-      +   '<button class="btn btn-primary btn-sm" ' + (opts.goAttr || 'data-confirm-go') + '="1"'
+      /* ⚠ NORMAL-HEIGHT BUTTONS, NOT `btn-sm` (Kyle, 2026-08-06, walking the import review): *"the
+         'Add expenses' and start over button are not the normal button height.. so they need to
+         have a little more height."* `btn-sm` is 5px/10px against `.btn`'s 8px/11px, so the one
+         press that commits an import read as a secondary control.
+         ⛔ BLAST RADIUS, STATED: this is the shared shell, so it moves the confirm pair on ALL SIX
+         import doors. That is the intent — they were never meant to differ from each other or from
+         every other primary action in the app. */
+      +   '<button class="btn btn-primary" ' + (opts.goAttr || 'data-confirm-go') + '="1"'
       +     (n && !busy ? '' : ' disabled') + '>'
       +     (busy ? (opts.busyLabel || (verb + 'ing...')) : this.goLabel(opts))
       +   '</button>'
       /* ⚠ THE BACK BUTTON IS DISABLED MID-WRITE TOO. It restarts the import, and a
          restart during the write is how a screen ends up describing a record that
          is no longer the one being written. */
-      +   '<button class="btn btn-ghost btn-sm" ' + (opts.backAttr || 'data-confirm-back') + '="1"'
+      +   '<button class="btn btn-ghost" ' + (opts.backAttr || 'data-confirm-back') + '="1"'
       +     (busy ? ' disabled' : '') + '>' + esc(opts.backLabel || 'Start Over') + '</button>'
       + '</div>';
   }
