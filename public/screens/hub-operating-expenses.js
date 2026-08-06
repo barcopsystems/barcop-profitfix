@@ -1082,52 +1082,18 @@ S.HubOperatingExpenses = {
     BH.open();
   },
 
-  // ── Expense History (its own Books page; the read-only log of past months) ──
-  renderHistory(mount) {
-    // ⚠ A `mount` argument means this is a FRESH mount (openHubFullPage has just
-    // bumped App._mountSeq), so the token is stamped HERE, exactly as open() does at
-    // :52. S.HubExpenseHistory.open() delegated straight into this function without
-    // stamping, so `_mountedAt` was permanently stale and `_mountStillCurrent()`
-    // could only ever be FALSE — the catch-up repaint below was refused 100% of the
-    // time. The operator opened Expense History on the first login of a new month,
-    // this month's rent was written to the server and pushed into memory, and the
-    // page they were looking at never showed it. Adding it by hand then double-booked
-    // it into Books, the P&L, breakeven and prime cost. Stamping at the mount entry
-    // point rather than in the caller covers any future door into this page.
-    // (It also un-deadened `:230`'s history branch, which was unreachable because
-    // `_view` only becomes 'history' by way of this never-stamped mount.)
-    if (mount) { this.container = mount; this._mountedAt = App._mountSeq; }
-    this._view = 'history';
-    this.container.innerHTML = '<div class="screen">' + this._historyStats() + this._renderHistory() + '</div>';
-    if (App.setHubTopbarActions) App.setHubTopbarActions('');
-    this._wireHistory();
-  },
-  _historyStats() {
-    const fmt$ = (v) => App.fmtCurrency(v || 0);
-    /* ⛔ SAME SET AS THE CARD AND THE LOG BELOW IT. Kyle caught this from the screen itself: after
-       the outflow migration, "Logged This Year" read $108,820.04, which is exactly the By Category
-       column INCLUDING $39,000 of draws, loan payments and tax remittances. The honest figure for a
-       page headed Expense History is $69,820.04. `Entries` was counting them too.
-       ✅ ITEM 19 STAGE 1: this stat box, the By Category card and the log are the THREE readers on
-       this tab, and all three now go through `moneyOutRows()` — so the chip cannot move one without
-       moving the other two. My first version of item 19 left this line on the bills-only filter
-       while the card and the log followed the chip, which is the identical defect above wearing the
-       fix's own name. With the default chip this is byte-identical to what it replaced. */
-    const recs = this.moneyOutRows();
-    const yr = String(new Date().getFullYear());
-    const total = recs.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
-    // ⚠ YEAR-ONLY, matching `_sumYTD` and `hub-books._opExSums` (S224). I briefly day-bounded this
-    // and it put $1,200 directly under a By Category card reading $2,180 for the same period — a
-    // recurring bill due on the 28th is "future" for most of every month, so it fired monthly.
-    // Operating expenses are carried on a MONTH basis app-wide; this figure follows that.
-    const mkNow = this._currentMonthKey();
-    const ytd = recs.filter(r => { const mk = this._monthKey(r.date); return mk && mk.slice(0, 4) === yr && mk <= mkNow; })
-      .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
-    const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
-    return '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + stat('Logged This Year', fmt$(ytd)) + stat('Logged All Time', fmt$(total)) + stat('Entries', String(recs.length))
-      + '</div></div>';
-  },
+  /* ⛔ `renderHistory(mount)` AND `_historyStats()` WERE DELETED HERE, with the Expense History
+     route (2026-08-06). Build order D merged this screen's three sidebar rows into one Money Out
+     page, which left that page reachable by nothing: no nav row emits its action, and BOTH dispatch
+     tables are fed from the rendered sidebar, so removing the row removed the only source of the
+     action. `S.HubExpenseHistory`, the help topic and both action-map entries went at the same time.
+     ⭐ `_historyStats` was not on the item's list — it was orphaned by the deletion. Its only call
+     site was inside `renderHistory`, and D had already ruled it OFF the merged page deliberately:
+     two stat boxes for one quantity is the $108,820.04-under-$69,820.04 shape. The bills-only
+     figures it printed are still computed by `_sumMonth` / `_sumYTD`, which the merged page draws.
+     ⛔ NOT TO BE CONFUSED WITH `_renderHistory` (underscore), one character apart and very much
+     alive — it draws the log on the merged page. `verify-expense-history-route-gone.js` block D is
+     the tripwire that stops a sweep for "renderHistory" taking both. */
   /* ── Money Out: the same entry card, mounted INSIDE the Close The Books step ──
      ⭐ THE THIRD VIEW, built on `renderHistory`'s shape rather than invented: take a mount, stamp
      the mount sequence, set `_view`, share the wiring. Kyle: *"one place.. that is the only place
@@ -1176,9 +1142,12 @@ S.HubOperatingExpenses = {
   // actually on. ⛔ EVERY operator-facing repaint goes through here — a bare renderMain() from a
   // review action would paint the WHOLE expense screen, stats and month cards and all, into a
   // cockpit accordion. verify-money-out-step.js block B sweeps every call site for that.
+  /* ⚠ THE `history` BRANCH WAS DELETED HERE with the Expense History route. It looked like a live
+     caller of `renderHistory` and it never was: the ONLY writer of `_view = 'history'` sat inside
+     `renderHistory` itself, so the branch could only be reached by code that was already dead — a
+     fixpoint, not a single pass ([[the-loop]] #63). Two views remain and both are live. */
   _rerender() {
     if (this._view === 'moneyout') return this.renderMoneyOut();
-    if (this._view === 'history') return this.renderHistory();
     this.renderMain();
   },
 
@@ -3314,10 +3283,13 @@ S.HubOperatingExpenses = {
        their own file and cannot find in Bar Cop is what makes them stop trusting the total"* — and
        it would have hit on the one screen built to be where you drop the statement.
        ⚠ The page-hijack worry the old guard also carried is gone: `_rerender` now paints whichever
-       view is actually open, so it cannot draw one screen over another. History is the only
-       exclusion left, so it is the only one named. [[the-loop]] #24 — after a value gains a third
-       possibility, every test written against two is now pointing at the wrong set. */
-    if (this._view === 'history') { this._rerender(); return; }
+       view is actually open, so it cannot draw one screen over another. [[the-loop]] #24 — after a
+       value gains a third possibility, every test written against two is now pointing at the wrong
+       set.
+       ⚠ THE `history` EXCLUSION WAS DELETED HERE with the Expense History route (2026-08-06). It
+       existed because that page had no import surface, so a drop finishing while it was open had
+       nothing to say to it. There is no such view any longer; the two that remain both host the
+       import, so neither is excluded. */
     if (!saved) {
       this._importMsg = 'Could not save the import. Nothing was changed — check your connection and try again.';
     } else if (opts.reviewed) {
@@ -4080,12 +4052,10 @@ S.HubOperatingExpenses = {
   }
 };
 
-/* ── Expense History — the Books "Expense History" page ──────────────────────
-   A thin screen that opens its own Hub full-page and delegates rendering to
-   S.HubOperatingExpenses.renderHistory (the read-only-ish log of past months,
-   with its own stat box). Lives here so it shares all the same row helpers. */
-S.HubExpenseHistory = {
-  open() {
-    App.openHubFullPage('Expense History', (mount) => { S.HubOperatingExpenses.renderHistory(mount); }, 'expense-history');
-  }
-};
+/* ⛔ `S.HubExpenseHistory` WAS DELETED HERE (2026-08-06). It was a thin screen that opened its own
+   Hub full page and delegated to `renderHistory`. Build order D merged the three Money Out sidebar
+   rows into one, and that removed the only thing that could reach it: the sidebar handler dispatches
+   on `item.dataset.hubAction` (set by `row(action, …)`), and app.js's `routePage` table is built by
+   PARSING THE RENDERED SIDEBAR for `.nav-item` elements — so both dispatch entries were fed from the
+   row D deleted, and nothing called `open()` directly. The log those months lived in is on the
+   merged Money Out page now, with the same chips and the same Show Older. */

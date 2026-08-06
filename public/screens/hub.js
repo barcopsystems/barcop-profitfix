@@ -1355,7 +1355,6 @@ S.Hub = {
       else if (action === 'year-end')           S.HubYearEnd.open();
       else if (action === 'operating-expenses') S.HubOperatingExpenses?.open?.();
       else if (action === 'cash-outflows')      S.HubCashOutflows?.open?.();
-      else if (action === 'expense-history')    S.HubExpenseHistory?.open?.();
       else if (action === 'permits')            S.HubPermits?.open?.();
       else if (action === 'report-bug')         (S.HubReportBug.openModal || S.HubReportBug.open).call(S.HubReportBug);
       else if (action === 'contact-support')    (S.HubSupport.openModal || S.HubSupport.open).call(S.HubSupport);
