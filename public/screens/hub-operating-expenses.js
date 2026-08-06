@@ -755,17 +755,11 @@ S.HubOperatingExpenses = {
   // Months this series must not bill: ones the operator deleted, and ones it was paused for.
   _skips(p) { return (p && Array.isArray(p.skip_months)) ? p.skip_months : []; },
 
-  // Every month from `from` up to but NOT including the current month. The resume month itself bills
-  // normally — turning a bill back on means you are paying it again from now.
-  _monthsBetween(from, toExclusive) {
-    const idx = (mk) => parseInt(mk.slice(0, 4), 10) * 12 + (parseInt(mk.slice(5, 7), 10) - 1);
-    const out = [];
-    if (!from || !toExclusive) return out;
-    for (let i = idx(from); i < idx(toExclusive); i++) {
-      out.push(Math.floor(i / 12) + '-' + String((i % 12) + 1).padStart(2, '0'));
-    }
-    return out;
-  },
+  /* ⛔ `_monthsBetween` WAS DELETED HERE (2026-08-06). Its only caller was the edit modal's RESUME
+     branch: turning a paused series back on, it converted every month the bill had been switched off
+     into `skip_months` so the catch-up would not back-fill them. There is no checkbox to pause with,
+     no resume, and no catch-up, so it had nothing left to answer. `verify-no-retired-code` is what
+     found it — the fixpoint working, not a judgement call. */
 
   /* ⚠⚠ A BILL THE OPERATOR LOGGED THEMSELVES ALREADY COVERS THAT MONTH (S226c). The catch-up only
      ever recognised its OWN generated children, so an operator who set up a recurring rent bill AND
@@ -3499,11 +3493,18 @@ S.HubOperatingExpenses = {
      because `App.openModal` REPLACES its modal while `App.confirm` APPENDS, so the damage shows on
      the confirm doors: Delete and Stop.
      ⭐ THE FLAG, NOT "CALL IT ONCE". Removing one of the two calls is the obvious fix and it breaks
-     a path: `renderMoneyOut` calls `_wireCurrent()` ALONE for the Close The Books takeover, so
-     whichever call was deleted would leave one of the two entry points with unwired rows. Marking
-     the element makes this idempotent however many wiring passes run, which is the property rather
-     than the case ([[the-loop]] #52). A re-render replaces the markup, so fresh buttons arrive
-     unmarked and are wired normally. */
+     half the page: MEASURED on the live build, `_renderCurrent()` emits 6 Edit and 6 Delete buttons
+     and `_renderHistory()` emits 6 more of each — BOTH halves carry row actions — so whichever
+     `_wireRows` call was deleted would leave one half's rows dead on click. Marking the element
+     makes this idempotent however many wiring passes run, which is the property rather than the
+     case ([[the-loop]] #52). A re-render replaces the markup, so fresh buttons arrive unmarked and
+     are wired normally.
+     ⚠ THIS COMMENT FIRST GAVE THE WRONG REASON — it said the Close The Books takeover would lose
+     its rows, because `renderMoneyOut` calls `_wireCurrent()` alone. Measured on the deployed build:
+     the takeover renders `_addCardHtml` and NOTHING ELSE — no rows at all, so `_wireRows` is a no-op
+     there and that argument was worthless. The fix was right and the justification was false, which
+     is the shape [[harness-review-like-code]] #35 records: a justification is a claim, so measure it
+     before writing it down. */
   _wireRows(scope) {
     const openEdit = (b) => { const r = this.records().find(x => x.id === b.dataset.id); if (r) this._openModal(r); };
     const once = (b) => { if (b._oexRowWired) return false; b._oexRowWired = 1; return true; };
@@ -3674,15 +3675,16 @@ S.HubOperatingExpenses = {
     const id = 'oex-modal';
     // The recurring rule lives on the series parent, but it can be managed from
     // ANY entry in the series (no hunting for the original 12-month-old row).
-    const parent = rec.recurring_parent ? (arr.find(r => r.id === rec.recurring_parent) || rec) : rec;
-    const seriesOn = !!parent.recurring;
-    const freqOpt = (v, lbl) => '<option value="' + v + '"' + (parent.frequency === v || (!parent.frequency && v === 'monthly') ? ' selected' : '') + '>' + lbl + '</option>';
-    const recurHtml = '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oex-f-recurring"' + (seriesOn ? ' checked' : '') + '/> Recurring bill (same cost each time)</label></div>'
-      + '<div id="oex-f-term-wrap" style="margin-top:12px;' + (seriesOn ? '' : 'display:none;') + '">'
-      +   '<div style="font-size:11px;color:var(--gold);margin-bottom:12px;max-width:540px;line-height:1.5;">Set the <b>Due Date</b> above to when this bill is next due. The schedule repeats from that date.</div>'
-      +   '<div class="f" style="max-width:540px;"><label>How often</label><select id="oex-f-frequency" style="width:200px;">' + freqOpt('monthly', 'Monthly') + freqOpt('quarterly', 'Quarterly (every 3 months)') + freqOpt('annual', 'Annually (once a year)') + '</select></div>'
-      +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><input type="number" id="oex-f-term" min="1" step="1" value="' + esc(parent.term_months || '') + '" placeholder="Ongoing" style="width:170px;"/></div>'
-      + '</div>';
+    /* ⛔ THE RECURRING CHECKBOX, FREQUENCY AND TERM WERE REMOVED FROM THIS MODAL (2026-08-06).
+       Build order C established that a bill recurs because it KEEPS HAPPENING, and removed the
+       control from both ADD forms — but the EDIT door was still writing a typed schedule, so a
+       bill could still be declared recurring by ticking a box. Kyle spotted it on the live build.
+       ⛔⛔ THE SAVE BRANCH WENT WITH IT, AND THAT IS THE LOAD-BEARING HALF. Removing only the
+       control would leave `recChecked` permanently false, so the save's ELSE branch would stamp
+       `recurring: false` + `stopped_ym` on the series parent — and the first vendor-typo fix would
+       stop EVERY declared series on the account, silently, taking it out of the forecast, the
+       reserve and Safe to Spend. This form now neither SETS nor CLEARS a schedule; it edits the
+       row in front of it and leaves the series alone. Stop is the only thing that ends one. */
 
     const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">' + (isEdit ? 'Edit Expense' : 'Add Expense') + '</div>'
@@ -3711,7 +3713,6 @@ S.HubOperatingExpenses = {
       +   '<div class="f"><label>Vendor</label><input type="text" id="oex-f-vendor" value="' + esc(rec.vendor) + '" placeholder="Who did you pay"/></div>'
       +   '<div class="f"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div></div>'
       + '</div>'
-      + recurHtml
       + App.noteField({ id: 'oex-f-notes', value: rec.notes, placeholder: 'Optional context for the bookkeeper' })
       + '<div class="card-actions">'
       +   '<button class="btn btn-primary" id="oex-save">' + (isEdit ? 'Save Changes' : 'Add Expense') + '</button>'
@@ -3723,10 +3724,6 @@ S.HubOperatingExpenses = {
     const showErr = (m) => { const e = document.getElementById('oex-f-err'); if (e) { e.textContent = m; e.style.display = 'inline'; } };
 
     if (isEdit) document.getElementById('oex-modal-del')?.addEventListener('click', async () => { App.closeModal(id); await this._delete(rec.id); });
-    document.getElementById('oex-f-recurring')?.addEventListener('change', (e) => {
-      const w = document.getElementById('oex-f-term-wrap');
-      if (w) w.style.display = e.target.checked ? '' : 'none';
-    });
     document.getElementById('oex-save')?.addEventListener('click', async () => {
       const date     = document.getElementById('oex-f-date')?.value || '';
       const category = document.getElementById('oex-f-cat')?.value || '';
@@ -3757,10 +3754,6 @@ S.HubOperatingExpenses = {
         this._rerender();
         return;
       }
-      const recChecked = !!document.getElementById('oex-f-recurring')?.checked;
-      const freqV = document.getElementById('oex-f-frequency')?.value || 'monthly';
-      const termV = parseInt(document.getElementById('oex-f-term')?.value, 10);
-      if (recChecked && document.getElementById('oex-f-term')?.value && (isNaN(termV) || termV < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
       const touched = [];
       // ⚠ This branch REPLACES array slots (arr[idx] = Object.assign({}, ...)) rather than mutating
       // the records, so snapshotting the record objects would capture the new ones. Snapshot the
@@ -3770,90 +3763,9 @@ S.HubOperatingExpenses = {
       if (isEdit) {
         const idx = arr.findIndex(r => r.id === rec.id);
         if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], updates);
-        // Recurring on/off + frequency + term are series-level, so they always land
-        // on the series parent no matter which entry you edited.
-        const parentId = rec.recurring_parent || rec.id;
-        const pIdx = arr.findIndex(r => r.id === parentId);
-        if (pIdx >= 0) {
-          if (recChecked) {
-            /* ⚠ TURNING A PAUSED BILL BACK ON MUST NOT INVENT THE PAUSE (S226 round 2, F2). The
-               catch-up fills from the series START, so without this it generated every month the
-               bill was switched off. The months between the stop and today become skipped months —
-               the same list a deleted month uses, so there is one mechanism, not two. The resume
-               month itself bills normally: turning it back on means you are paying it again now. */
-            const wasStopped = arr[pIdx].stopped_ym;
-            const skips = this._skips(arr[pIdx]).slice();
-            if (wasStopped) {
-              this._monthsBetween(String(wasStopped), this._currentMonthKey())
-                .forEach(m => { if (skips.indexOf(m) < 0) skips.push(m); });
-            }
-            /* ⚠⚠ A RESUME THAT CANNOT GENERATE ANYTHING MUST SAY SO (round 4). Round 3 made the
-               term survive a pause — right — but the term is measured from the series' ORIGINAL
-               start, so a term that ran out DURING the pause makes Resume a silent no-op: the row
-               keeps its "recurring" tag and its Stop button, generates nothing, and contributes $0
-               to Books, Break-Even and the forecast. The one message that would explain it is the
-               Terms Ending banner, and its +/-2 month floor (S226e) means it is silent too.
-               Refusing with a sentence is the honest answer: the operator can extend the term or
-               move the Due Date, and either is a decision only they can make. */
-            /* ⚠⚠⚠ A REFUSAL MUST PUT MEMORY BACK. This returned without restoring undoArr, and the
-               slots above had ALREADY been overwritten — so a refused save left the operator's edit
-               live in memory, and catchUpRecurring then read the amount off that dirty parent and
-               WROTE the generated months at it. Measured: a refused save persisted $300 of a raise
-               the app had just declined, and on a series with months still to generate it scaled —
-               $58,500 booked against a truth of $54,600. The two OTHER exits from this handler both
-               restore; this one was added later and did not.
-               ⚠⚠ AND IT ONLY FIRES ON A RESUME (round 5, F2). Sitting inside if (recChecked) it
-               fired on EVERY edit to EVERY row of a finished-term series — measured, 10 of 10 rows
-               refused a plain vendor-typo fix — and the advice it gave ("change the Due Date") is
-               inert from a child row, because the term lives on the parent. The only case that
-               genuinely needs refusing is the one it was written for: turning a PAUSED series back
-               on when its term has already run out, where the save would otherwise do nothing at
-               all, silently. A series that is already recurring is not being restarted. */
-            const _wasPaused = !arr[pIdx].recurring;
-            const _startIdx = (() => {
-              const s0 = new Date(String(arr[pIdx].date).length <= 10 ? arr[pIdx].date + 'T00:00:00' : arr[pIdx].date);
-              return isNaN(s0.getTime()) ? null : s0.getFullYear() * 12 + s0.getMonth();
-            })();
-            const _nowIdx = (new Date()).getFullYear() * 12 + (new Date()).getMonth();
-            if (_wasPaused && termV && termV > 0 && _startIdx != null && _startIdx + termV - 1 < _nowIdx) {
-              arr.length = 0; arr.push(...undoArr);
-              showErr('That fixed term has already finished. Change the Due Date to when it next starts, or clear "Ends after" to keep it going.');
-              return;
-            }
-            arr[pIdx] = Object.assign({}, arr[pIdx], { recurring: true, frequency: freqV,
-              term_months: (termV && termV > 0) ? termV : null,
-              /* ⚠ THE SCHEDULE FOLLOWS THE DUE DATE, BECAUSE THE FORM SAYS IT DOES. This read
-                 `arr[pIdx].recur_day || …`, and every creation path sets recur_day — so the `||`
-                 fallback could only fire when the field was missing and the edit form could never
-                 change the day at all. Directly under a line of its own help text reading "Set the
-                 Due Date above to when this bill is next due. The schedule repeats from that date."
-                 ⚠ Only when the row BEING EDITED is the series parent: changing one generated
-                 month's date reschedules that month, not the series. */
-              recur_day: (pIdx === idx ? (parseInt(String(date).slice(8, 10), 10) || arr[pIdx].recur_day || 1)
-                                       : (arr[pIdx].recur_day || (parseInt(String(arr[pIdx].date).slice(8, 10), 10) || 1))),
-              skip_months: skips, stopped_ym: null });
-          } else {
-            /* ⚠⚠ A PAUSE MUST NOT DESTROY WHAT THE SERIES IS (round 3, F1/F2). This used to clear
-               frequency and term_months, which was harmless while turning a bill off was TERMINAL —
-               and round 2 made it reversible, so the same two lines became a money defect. The
-               re-opened form falls back to "Monthly" and blank when those fields are missing, so
-               resuming a QUARTERLY bill re-billed it every month retroactively from the series
-               start: measured 5 rows / $12,000 becoming 12 / $28,800, and an ANNUAL one 3 / $3,300
-               becoming 24 / $26,400. Both also reach hub-breakeven and the cash forecast, which read
-               frequency directly, so the fixed-cost nut carried a quarterly bill at 4x.
-               And a cleared term made the bill recur FOREVER, with both things built to catch that —
-               the Terms Ending banner and the Renew button — going silent because there was no term
-               left to read. Frequency and term describe the SERIES; pausing it changes neither. */
-            arr[pIdx] = Object.assign({}, arr[pIdx], { recurring: false },
-              // Only a row that WAS recurring gets a stop stamp; a plain expense never had a series.
-              arr[pIdx].recurring ? { stopped_ym: arr[pIdx].stopped_ym || this._currentMonthKey() } : {});
-          }
-        }
         if (idx >= 0) touched.push(arr[idx]);
-        if (pIdx >= 0 && pIdx !== idx) touched.push(arr[pIdx]);
       } else {
         const newRec = Object.assign({ id: App.uid ? App.uid() : ('oex-' + Date.now()), created_at: new Date().toISOString() }, updates);
-        if (recChecked) { newRec.recurring = true; newRec.frequency = freqV; newRec.term_months = (termV && termV > 0) ? termV : null; newRec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; }
         arr.push(newRec);
         touched.push(newRec);
       }
