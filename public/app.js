@@ -3586,6 +3586,22 @@ const App = {
     };
     (this._listBuiltins[key] || []).forEach(push);
     c.added.forEach(push);
+    /* ⛔⛔⛔ OTHER IS THE CATCH-ALL, SO IT IS ALWAYS THE LAST OPTION (Kyle, 2026-08-06, on the live
+       app: *"when you add a custom category it is placed under other in the list.. that is weird..
+       other should always be last in the list"*). Builtins are pushed first and `added` after, so
+       every category an operator adds landed UNDERNEATH Other — which reads like a subtotal line
+       that is not one, in every keyed picker in the app.
+       ⭐⭐ AND THIS EXACT DEFECT WAS ALREADY FOUND AND FIXED ONCE, IN ONE CALLER.
+       `hub-operating-expenses.categoryList()` carries the identical three lines with a comment
+       explaining them — written when the By Category card showed it — and the SHARED reader every
+       picker pulls through kept the bug. MEASURED on the live demo: `listOptions` returned
+       *"… Other, Bar Supplies"* while `categoryList()` returned *"… Bar Supplies, Other"*, so one
+       screen disagreed with itself one list away. [[the-loop]]: when you fix a shared thing, grep
+       for the second IMPLEMENTATION, not for callers — and pin the rule where the rule lives.
+       ⚠ A list that does not DECLARE Other never gains one: `push` has already refused it above, so
+       this can only move a value that was legitimately there. */
+    const oi = out.findIndex(v => v.toLowerCase() === 'other');
+    if (oi >= 0 && oi !== out.length - 1) out.push(out.splice(oi, 1)[0]);
     return out;
   },
   // Add an option to a key (from the inline "+ Add your own" or the Manage editor).
