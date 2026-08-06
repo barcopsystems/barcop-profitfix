@@ -499,11 +499,15 @@ S.HubOperatingExpenses = {
      CARD gets its own list instead (`_cardCategoryList`). */
   _filterKind: 'operating',   // operating | cash | all — the default is what the screen showed before
 
+  /* ⭐ THE TAB ORDER IS KYLE'S, AND IT IS THE ORDER HE NAMED THEM IN: *"Three tabs: Bills · Cash
+     Outflows · All Money Out."* It was All-first while these were CHIPS, where the widest set
+     reasonably leads. As tabs the first one is the DEFAULT the page opens on, and that is Bills —
+     the set this screen has always opened on. */
   _kindChipOpts() {
     return [
-      { v: 'all',       label: 'All Money Out' },
       { v: 'operating', label: 'Bills' },
-      { v: 'cash',      label: 'Cash Outflows' }
+      { v: 'cash',      label: 'Cash Outflows' },
+      { v: 'all',       label: 'All Money Out' }
     ];
   },
   /* Written as a PARTITION, not as two independent tests: `cash` is exactly "not operating", so no
@@ -1093,19 +1097,35 @@ S.HubOperatingExpenses = {
   // ── Main render ────────────────────────────────────────────────────────
   renderMain() {
     this._view = 'current';
-    /* ⭐⭐⭐ BUILD ORDER D — ONE PAGE FOR MONEY OUT. Expense History was a second sidebar row over
-       the same store, and Cash Outflows a third; the log's kind chip already shows bills and cash
-       together, so the only thing keeping them apart was the nav.
-       ⛔ THE HEADLINE STATS STAY BILLS-ONLY AND `_historyStats` IS DELIBERATELY NOT DRAWN HERE. Two
-       stat boxes on one page — one that follows the kind chip and one that cannot — is two figures
-       for one quantity, which is the exact shape that put $108,820.04 under a page reading
-       $69,820.04 ([[the-loop]] #109). `_sumMonth` and `_sumYTD` feed the OpEx % of Revenue ratio, a
-       named accounting measure an owner draw has no place in, so they must NOT follow the chip; the
-       chip governs the By Category card and the log below it, where it belongs.
-       ⚠ OPEN QUESTION FOR KYLE, FLAGGED RATHER THAN GUESSED: the stat box says "This Month" on a
-       page now headed Money Out, and it counts bills only. The label may need to say so. That is a
-       copy change on a design-ratcheted surface, so it is his call and not mine. */
-    this.container.innerHTML = '<div class="screen">' + this._renderCurrent() + this._renderHistory() + '</div>';
+    /* ⭐⭐⭐ BUILD PIECES 3 + 4 — THE PAGE KYLE SPECIFIED. He rejected what build order D produced:
+       *"we aren't using chips stacked on chips to sort this down in the middle of the page... the
+       entire money out page is a big mess."* What replaced it, in his words:
+         · STANDARD TABS like the rest of the app — Bills · Cash Outflows · All Money Out
+         · *"the stat box is basically a summary total of each of the by category cards"*
+         · *"add Last month total to stat card"*
+         · *"neither moves with chips"* — the stat card and By Category follow the TAB
+         · *"keep chips as they are above the history card and export pdf same row as chips aligned
+           rightside"*, and *"export only exports what the history chips is selected on"*
+         · *"the history card columns need to be aligned with the category card columns"*
+         · *"no repeat... no recurring"* — the operator drops a file or types it in
+
+       ⛔⛔ THE STAT BOX NOW FOLLOWS THE TAB, AND THE COMMENT THAT USED TO FORBID THAT WAS RIGHT AT
+       THE TIME. It read: *"they feed the CURRENT tab's headline, and the chip only renders on the
+       HISTORY tab — so a chip set on one tab silently moved the other tab's numbers."* That whole
+       argument rested on there being two tabs with one chip between them. There is one page with
+       one tab bar now, so the tab IS the page's context and a stat box that ignores it is the
+       contradiction: measured on the deployed build, the Cash Outflows chip showed $5,455.83 of
+       BILLS above a By Category card of draws and loans. A reason that expires has to be re-derived,
+       not inherited ([[the-loop]] #137/#138).
+       ⭐ AND THE OPEN COPY QUESTION IT CARRIED IS ANSWERED BY THE SAME CHANGE. "This Month" on a page
+       headed Money Out was ambiguous because the figure was bills-only whatever the page said. Each
+       tab's stat card now means that tab's money, so the label is true on all three.
+
+       ⛔ THE FIGURES ARE THE BY CATEGORY CARD'S COLUMN TOTALS, not a second computation of the same
+       quantity. `_byCatRows()` is the one walk; the card renders it and the stat card sums it. Two
+       computations of one number is the $108,820.04-under-$69,820.04 shape, and pinning either
+       figure instead of the EQUALITY is what let it happen ([[the-loop]] #54/#109). */
+    this.container.innerHTML = '<div class="screen">' + this._tabBarHtml() + this._renderCurrent() + this._renderHistory() + '</div>';
     /* ⭐⭐ BUILD ORDER B — THE WAY TO THE ONE DOOR. This screen no longer takes an entry, so without
        a control it is a page the operator has always used to log a bill with nothing on it: the
        feature would read as LOST rather than moved ([[the-loop]] #106 — a control that tells the
@@ -1120,10 +1140,45 @@ S.HubOperatingExpenses = {
       App.setHubTopbarActions('<button class="btn btn-ghost btn-sm" id="oex-go-enter">Enter Money Out</button>');
       document.getElementById('oex-go-enter')?.addEventListener('click', () => this._goEnterMoneyOut());
     }
+    this._wireTabs();
     this._wireCurrent();
-    // ⛔ BOTH, or every control the history half draws — the kind chips, the range chips, Show
-    // Older, Export — is on screen and dead. One page means one wiring pass over all of it.
+    // ⛔ BOTH, or every control the history half draws — the range chips, Show Older, Export — is on
+    // screen and dead. One page means one wiring pass over all of it.
     this._wireHistory();
+  },
+
+  /* ⭐ THE TAB BAR. The app's own `ch-tabs` / `ch-tab` markup, which is what vendor-tracker's three
+     tabs use and what Kyle named as the reference. The labels come from `_kindChipOpts()` so the bar
+     and every other reader of that list cannot drift apart. */
+  _tabBarHtml() {
+    return '<div class="ch-tabs no-print">'
+      + this._kindChipOpts().map(o => '<button class="ch-tab' + (this._filterKind === o.v ? ' on' : '')
+          + '" data-motab="' + esc(o.v) + '">' + esc(o.label) + '</button>').join('')
+      + '</div>';
+  },
+  _wireTabs() {
+    this.container.querySelectorAll('.ch-tab[data-motab]').forEach(b =>
+      b.addEventListener('click', () => {
+        this._filterKind = b.dataset.motab;
+        /* ⚠ THE HISTORY WINDOW RESETS ITS PAGE, NOT ITS RANGE. vendor-tracker's own rule is that the
+           window carries across tabs, so an operator who set "Last 12 Months" keeps it. What must
+           NOT carry is the Show Older count: 200 rows of All Money Out then one click to Bills left
+           a page size belonging to a set that no longer exists. */
+        this._histShown = 0;
+        this._rerender();
+      }));
+  },
+
+  /* ⭐⭐ ONE COLUMN GEOMETRY FOR BOTH TABLES. Kyle: *"the history card columns need to be aligned
+     with the category card columns.. so vendor column aligns under last month and amount column
+     aligns under YTD."* They already had five columns each and DIFFERENT widths
+     (22/19.5/19.5/19.5/19.5 against 22/26/18/18/16), so nothing lined up.
+     ⛔ A METHOD, NOT A SIBLING CONSTANT. Two members need it, so it cannot be folded into either —
+     and a data property is invisible to every slicer in the harness suite, which this file has paid
+     for twice ([[the-loop]] #16/#120). `_rangeChipOpts` is a method for the identical reason. */
+  _colGroupHtml() {
+    return '<colgroup><col style="width:22%"><col style="width:19.5%"><col style="width:19.5%">'
+      + '<col style="width:19.5%"><col style="width:19.5%"></colgroup>';
   },
 
   /* ⛔ IT NAMES THE STEP. `hub-books-home._openStep` defaults to "the first step not done", so a bar
@@ -1406,35 +1461,19 @@ S.HubOperatingExpenses = {
     return heading + '<div' + wrap + '>' + sectionCard('Recurring', recRows) + sectionCard('Variable', varRows) + '</div>';
   },
 
-  // ── Current tab: stats + add form + This Month / Next Month cards ─────────
+  // ── The top of the page: the import banner, the tab's stat card, and the two month notes ──
   _renderCurrent() {
     const mk = this._currentMonthKey();
-    const monthTotal = this._sumMonth(mk);
-    const ytdTotal   = this._sumYTD(mk);
-    /* ⚠⚠ A RATIO NEEDS ONE PERIOD ON BOTH SIDES, AND THIS ONE HAD TWO (S226d). It divided the
-       month's WHOLE booked nut — recurring bills are generated in full the day the month arrives,
-       and a bill dated the 28th is booked from the 1st — by revenue from the weeks CONFIRMED SO FAR.
-       Measured on one month: 35.0% in week one against 8.7% for the same completed month, under a
-       label with no period on it at all, sitting beside two stats that genuinely are "this month".
-       Roughly 4x every time, always in the alarming direction, and it corrected itself as the month
-       filled up — which is worse than being steadily wrong, because it looks like a trend.
-       THE BASIS IS BOOKS' OWN: the most recent fully-completed month, today's month excluded
-       (hub-books._availableMonths). The label now says which month it is. */
-    const pctB       = this._pctBasis();
-    const pctMk      = pctB ? pctB.mk : '';
-    // ⛔ BILLS ONLY, ALWAYS. `_sumMonth` is bills-only by construction and stays that way — see the
-    // note on it. This is a named accounting ratio and an owner draw is not an operating expense.
-    const monthOpExPct = pctB ? (this._sumMonth(pctB.mk) / pctB.monthRev) : null;
-    const fmt$ = (v) => App.fmtCurrency(v || 0);
-    const fmtPct = (v) => v == null ? '—' : (v * 100).toFixed(1) + '%';
-
-    const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg">' + val + '</div></div>';
-    const statsCard = '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + stat('This Month', fmt$(monthTotal)) + stat('Year to Date', fmt$(ytdTotal))
-      + stat('OpEx % of Revenue' + (pctMk ? ' &middot; ' + esc(this._monthLabel(pctMk)) : ''), fmtPct(monthOpExPct))
-      + '</div></div>';
-
-    const warnBanner = this._termWarning();
+    /* ⭐⭐ THE STAT CARD IS BUILT FROM THE BY CATEGORY WALK, NOT FROM A SECOND COMPUTATION. It used to
+       be assembled here out of `_sumMonth` / `_sumYTD` and a MONTH-basis ratio, which meant two
+       independent answers to "what did this page's money add up to" — one of them bills-only for
+       ever, whatever tab the operator was on. See `_statCardHtml`.
+       ⚠ THE S226d LESSON SURVIVES THE MOVE, and it is worth restating because the old note lived
+       here: a ratio needs one period on BOTH sides. The figure divided a whole booked month by the
+       weeks confirmed so far and read 35.0% against a truth of 8.7%. Its replacement is the % column
+       total, and that column stops at the last COMPLETE month on both sides — so the fix is
+       inherited rather than re-made. */
+    const statsCard = this._statCardHtml();
 
     /* ⚠ NEVER SILENTLY. _ownCover stops a recurring month being generated on top of a bill the
        operator logged themselves (S226c) — which is right, and is exactly the kind of thing that
@@ -1472,9 +1511,21 @@ S.HubOperatingExpenses = {
        Delete on every row. Read-only means no ENTRY POINT, never no correction path — a record an
        operator cannot re-open is a defect whether or not anything is arithmetically wrong.
        ⚠ THE WAY TO THE DOOR IS IN THE TOPBAR, NOT IN A SENTENCE HERE. See `renderMain`. */
-    return this._importBannerHtml() + statsCard + warnBanner + coveredNote
-      + this._monthCardHtml(mk, { next: false, exportId: 'oex-export-this', wrapId: 'oex-thismonth' })
-      + this._monthCardHtml(this._nextMonthKey(mk), { next: true });
+    /* ⛔⛔⛔ BOTH MONTH CARDS ARE GONE, AND SO IS EVERYTHING THAT ONLY EXISTED TO FILL THEM.
+       Kyle: *"no repeat... the user drop files or manually enters .. no repeat.. no recuring.."*
+       They were generator-era furniture: This Month / Next Month, split Recurring against Variable,
+       with an "Expected" list of rows Bar Cop was about to mint. Nothing mints a row any more
+       (Phase 3), so a card promising next month's bills is a forecast wearing a ledger's clothes —
+       the same reasoning that killed the Expected CARD, applied to the cards that fed it.
+       ⚠ MEASURED ON THE DEPLOYED BUILD BEFORE THE CUT, and it is why he called the page a mess:
+       under EVERY chip, identically, 7 Repeat buttons · 5 Expected rows · 2 Variable tables · 8 uses
+       of "recurring" · 2 export buttons. None of it followed the chip, so choosing Cash Outflows
+       showed seven Repeat buttons belonging to bills.
+       ⭐ WHAT SURVIVES, AND IT IS THE PART THAT WAS DOING WORK: the import banner, the stat card and
+       the two notes. `_monthNotes` still answers "already logged" and "looks logged twice" — those
+       are about money ALREADY ON FILE, not about a schedule, and they are the operator's only
+       warning that one bill is on the books twice. */
+    return this._importBannerHtml() + statsCard + coveredNote;
   },
 
   /* ⭐ THE ADD CARD IS ITS OWN MEMBER, because it now has TWO homes: this screen and the Money Out
@@ -1740,16 +1791,13 @@ S.HubOperatingExpenses = {
     App.wireCustomSelects(this.container);
     this.container.querySelector('.card-collapse-head')?.addEventListener('click', (e) => App.toggleCollapse(e.currentTarget));
     App.applyCollapsed(this.container);
-    document.getElementById('oex-export-this')?.addEventListener('click', () => {
-      const el = document.getElementById('oex-thismonth');
-      /* ⚠ THE MONTH GOES IN THE PERIOD SLOT, IN WORDS (B7). Putting it in `fileTag` left the
-         PERIOD slot empty, which pdfFileName fills with today — so this saved as
-         "Operating Expenses 2026-07 - 2026-07-31.pdf": two dates, one of them a machine key,
-         against a convention of `<Bar> - <What> - <Period>.pdf`. The History export below
-         already passes `range` for exactly this reason. */
-      if (el) App.exportPDF({ title: 'Operating Expenses', root: el,
-        range: this._monthLabel(this._currentMonthKey()) });
-    });
+    /* ⛔ THE SECOND EXPORT WENT WITH THE MONTH CARD IT BELONGED TO (pieces 3+4). Kyle: *"no two
+       export buttons.. one export above the category that exports category and history."* This one
+       exported the This Month card; there is one Export on the chip row now and it carries both
+       cards. ⭐ ITS ONE LESSON MOVED RATHER THAN DYING WITH IT: the period goes in the PERIOD slot
+       in words, not in `fileTag`, or `pdfFileName` fills the slot with today and the file saves as
+       "Operating Expenses 2026-07 - 2026-07-31.pdf". The surviving export passes `range` for
+       exactly that reason. */
     this._wireRows(this.container);
     // ⚠ NOT WHILE THE CONFIRM SCREEN IS UP: the drop zone is not on the page, so CSVMapper would be
     // mounting into an element that no longer exists.
@@ -3421,14 +3469,72 @@ S.HubOperatingExpenses = {
   },
 
   // By Category row-list (current month, last month, YTD, YTD % of revenue).
-  _byCatCardHtml() {
-    const fmt$ = (v) => App.fmtCurrency(v || 0);
-    const fmtPct = (v) => v == null ? '—' : (v * 100).toFixed(1) + '%';
+  /* ⭐⭐⭐ THE ONE WALK BEHIND BOTH CARDS. Kyle: *"the stat box is basically a summary total of each
+     of the by category cards."* That is an EQUALITY, and the cheapest way to guarantee an equality
+     is one implementation — the card renders these rows and the stat card sums them, so a fourth
+     reader cannot quietly disagree with the other three ([[the-loop]] #54/#109, which cost three
+     rounds when it was learned the other way round).
+     ⛔ IT FOLLOWS THE TAB AND NEVER THE RANGE CHIPS. Its periods are fixed by name — this month,
+     last month, year to date — so a chip reading "Last 12 Months" cannot move a column headed
+     "This Month". The chips govern the History card, and only that.
+     ⛔ ONLY CATEGORIES WITH MONEY IN THIS TAB'S SET. Measured on the deployed build before this
+     changed: the Cash Outflows chip drew FOURTEEN rows of which ELEVEN were bill categories reading
+     $0.00 / $0.00 / $0.00 — a card whose job is showing where the money went, padded with eleven
+     lines saying it went nowhere. `_cardCategoryList()` is still what ORDERS them, so the operator's
+     own list and the Uncategorized-first rule both survive; this only drops the empties.
+     ⚠ AND UNCATEGORISED STAYS EVEN AT ZERO, because a row nobody can see is a row nobody fixes
+     ([[the-loop]] #115) — it is the one bucket whose presence is the message. */
+  _byCatRows() {
     const mk = this._currentMonthKey();
     const prevMk = this._priorMonthKey(mk);
     const byCatMonth = this._sumMonthByCategory(mk);
     const byCatLast  = this._sumMonthByCategory(prevMk);
     const byCatYTD   = this._sumYTDByCategory(mk);
+    const pctB       = this._pctBasis();
+    const pctMk      = (pctB && pctB.mk.slice(0, 4) === mk.slice(0, 4)) ? pctB.mk : '';
+    const byCatPct   = pctMk ? this._sumYTDByCategory(pctMk) : null;
+    const ytdRev     = pctMk ? pctB.ytdRev : 0;
+    const uncat      = this._catOf({});
+    const rows = [];
+    this._cardCategoryList().forEach(c => {
+      const tm = byCatMonth[c] || 0, lm = byCatLast[c] || 0, ytd = byCatYTD[c] || 0;
+      if (tm === 0 && lm === 0 && ytd === 0 && c !== uncat) return;
+      rows.push({
+        cat: c, month: tm, last: lm, ytd: ytd,
+        pctBase: (byCatPct && ytdRev > 0) ? (byCatPct[c] || 0) : null
+      });
+    });
+    return { rows, pctMk, ytdRev };
+  },
+
+  /* ⭐⭐ THE STAT CARD, WHICH IS THE COLUMN TOTALS AND NOTHING ELSE. Four figures, because Kyle asked
+     for Last Month beside the other two: *"add Last month total to stat card."*
+     ⛔ THE % IS THE YTD RATIO, MATCHING THE COLUMN IT SUMMARISES. It used to be a MONTH ratio
+     (that month's opex over that month's revenue) sitting above a column headed "% of Revenue, YTD
+     thru July" — two different quantities under one word. Summing the column makes them one, and it
+     inherits the S226d fix rather than reopening it: both sides stop at the last COMPLETE month, so
+     it is still one period on both sides. The basis moves onto THIS label, which is what lets the
+     column header be short — his other complaint, solved by the same edit. */
+  _statCardHtml() {
+    const { rows, pctMk, ytdRev } = this._byCatRows();
+    const fmt$ = (v) => App.fmtCurrency(v || 0);
+    const sum = (k) => rows.reduce((t, r) => t + (r[k] || 0), 0);
+    const pctBaseTotal = rows.reduce((t, r) => t + (r.pctBase || 0), 0);
+    const pct = (pctMk && ytdRev > 0) ? (pctBaseTotal / ytdRev) : null;
+    const stat = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div>'
+      + '<div class="calc-val lg">' + val + '</div></div>';
+    return '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+      + stat('This Month', fmt$(sum('month')))
+      + stat('Last Month', fmt$(sum('last')))
+      + stat('Year to Date', fmt$(sum('ytd')))
+      + stat('% of Revenue' + (pctMk ? ' &middot; YTD thru ' + esc(this._monthLabel(pctMk)) : ''),
+             pct == null ? '—' : (pct * 100).toFixed(1) + '%')
+      + '</div></div>';
+  },
+
+  _byCatCardHtml() {
+    const fmt$ = (v) => App.fmtCurrency(v || 0);
+    const fmtPct = (v) => v == null ? '—' : (v * 100).toFixed(1) + '%';
     /* ⚠ THE SECOND CONSUMER OF THE SAME MIXED BASIS ([[the-loop]] step 0.6, S226d/i). This column's
        numerator ran through the CURRENT month (mk <= monthKey, so a whole month of rent) while
        _revenueYTD counted only the weeks confirmed so far — the same whole-over-part shape as the
@@ -3442,30 +3548,29 @@ S.HubOperatingExpenses = {
        Guaranteed annually for every account, and self-correcting on Feb 1, which is exactly the kind
        of defect nobody ever reports. No complete month in the current year means there is no
        year-to-date ratio yet, and a dash says that honestly. */
-    const pctB       = this._pctBasis();
-    const pctMk      = (pctB && pctB.mk.slice(0, 4) === mk.slice(0, 4)) ? pctB.mk : '';
-    const byCatPct   = pctMk ? this._sumYTDByCategory(pctMk) : null;
-    const ytdRev     = pctMk ? pctB.ytdRev : 0;
-    // The operator's own list, plus anything with money on file, plus the cash-only categories
-    // when the chip admits them. See _cardCategoryList().
-    const catRows = this._cardCategoryList().map(c => {
-      const tm = byCatMonth[c] || 0, lm = byCatLast[c] || 0, ytd = byCatYTD[c] || 0;
-      const ytdRevPct = (byCatPct && ytdRev > 0) ? ((byCatPct[c] || 0) / ytdRev) : null;
-      const dim = (tm === 0 && lm === 0 && ytd === 0);
-      return '<tr style="' + (dim ? 'opacity:0.55;' : '') + '">'
-        + '<td style="color:var(--t1);">' + esc(c) + '</td>'
-        + '<td style="font-weight:700;color:var(--t1);">' + fmt$(tm) + '</td>'
-        + '<td style="color:var(--t3);">' + fmt$(lm) + '</td>'
-        + '<td style="color:var(--t2);">' + fmt$(ytd) + '</td>'
+    const { rows, pctMk, ytdRev } = this._byCatRows();
+    /* ⭐ THE HEADER IS SHORT NOW, AND THE BASIS DID NOT VANISH — IT MOVED. Kyle: *"short the last
+       column '% of revenue, ytd thru...' that is way too long for a column header."* It was 31
+       characters. The month it stops at is a fact about the whole column, so it belongs on the stat
+       card's own label where it is stated once, not repeated in a table heading. */
+    const catRows = rows.map(r => {
+      const ytdRevPct = (r.pctBase != null && ytdRev > 0) ? (r.pctBase / ytdRev) : null;
+      return '<tr>'
+        + '<td style="color:var(--t1);">' + esc(r.cat) + '</td>'
+        + '<td style="font-weight:700;color:var(--t1);">' + fmt$(r.month) + '</td>'
+        + '<td style="color:var(--t3);">' + fmt$(r.last) + '</td>'
+        + '<td style="color:var(--t2);">' + fmt$(r.ytd) + '</td>'
         + '<td style="color:var(--t3);text-align:left;">' + fmtPct(ytdRevPct) + '</td>'
         + '</tr>';
     }).join('');
+    const empty = '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--t3);font-size:12px;">'
+      + 'Nothing logged yet for ' + esc(this._kindExportTitle().toLowerCase()) + '.</td></tr>';
     return '<div class="card" style="overflow-x:auto;">'
       + '<table class="row-list">'
-      +   '<colgroup><col style="width:22%"><col style="width:19.5%"><col style="width:19.5%"><col style="width:19.5%"><col style="width:19.5%"></colgroup>'
-      +   '<thead><tr><th>Category</th><th>This Month</th><th>Last Month</th><th>YTD</th><th>'
-      +     (pctMk && ytdRev > 0 ? '% of Revenue, YTD thru ' + esc(this._monthLabel(pctMk)) : '% of Revenue') + '</th></tr></thead>'
-      +   '<tbody>' + catRows + '</tbody>'
+      +   this._colGroupHtml()
+      +   '<thead><tr><th>Category</th><th>This Month</th><th>Last Month</th><th>YTD</th>'
+      +     '<th>% of Revenue</th></tr></thead>'
+      +   '<tbody>' + (catRows || empty) + '</tbody>'
       + '</table></div>';
   },
 
@@ -3476,7 +3581,10 @@ S.HubOperatingExpenses = {
       : recs.map(r => this._logRowHtml(r, { minimal: true })).join('');
     return '<div class="card"' + (id ? ' id="' + id + '"' : '') + ' style="overflow-x:auto;">'
       + '<table class="row-list">'
-      +   '<colgroup><col style="width:22%"><col style="width:26%"><col style="width:18%"><col style="width:18%"><col style="width:16%"></colgroup>'
+      /* ⭐ THE SAME GEOMETRY AS THE BY CATEGORY CARD, so Vendor sits under Last Month and Amount
+         under YTD, which is what Kyle asked for. It carried its own widths (22/26/18/18/16) and
+         nothing lined up. */
+      +   this._colGroupHtml()
       +   '<thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
       +   '<tbody>' + logRows + '</tbody>'
       + '</table></div>';
@@ -3487,21 +3595,28 @@ S.HubOperatingExpenses = {
     const PAGE = App.LIST_PAGE || 50;
     if (!this._histShown) this._histShown = PAGE;
     const rangeChips = App.filterChips(this._filterRange, this._rangeChipOpts());
-    /* ⭐ ITEM 19 STAGE 1 — THE KIND CHIPS. Two chip rows, two questions: WHICH MONEY (kind) and
-       WHEN (range). They get their own class so the two wirings cannot cross — one shared
-       `.fc-chip` handler would have set `_filterRange` to 'all' when the operator clicked the
-       All Money Out chip, because both vocabularies contain 'all' ([[the-loop]] #50: a key that
-       two different things can produce is not a key). */
-    const kindChips = App.filterChips(this._filterKind, this._kindChipOpts(), 'mo-chip');
+    /* ⛔ THE KIND CHIPS WERE BUILT HERE AND THEY ARE THE TAB BAR NOW (`_tabBarHtml`). They carried
+       their own `mo-chip` class so the two chip wirings could not cross — a single `.fc-chip`
+       handler would have set the RANGE to 'all' when the operator clicked All Money Out, because
+       both vocabularies contain that word ([[the-loop]] #50). The hazard goes with them: one chip
+       row on the page now, and the tabs dispatch on `data-motab`. */
     const recs = this._filteredRecords();
     const shown = recs.slice(0, this._histShown);
 
-    const filterRow = '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 10px;">' + kindChips + '</div>'
-      + '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;">' + rangeChips + '</div>';
-    const byCatHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;">'
-      + '<div class="sh" style="margin:0;">By Category</div>'
-      + '<button class="btn btn-ghost btn-sm no-print" id="oex-export">Export PDF</button>'
+    /* ⭐⭐ ONE CONTROL ROW: CHIPS LEFT, ONE EXPORT RIGHT. Kyle: *"keep chips as they are above the
+       history card and export pdf same row as chips aligned rightside"*, and *"no two export
+       buttons"*. The page carried two, one on the This Month card and one on the By Category
+       heading, and BOTH exported bills whatever the chip said.
+       ⭐ IT IS ALSO THE SHAPE HIS REFERENCE ALREADY USES: `vendor-tracker.rangeFilterRow(exportId)`
+       is chips-left / one-Export-right, shared across all three of its tabs.
+       ⛔ THE KIND CHIPS ARE GONE FROM HERE — they are the TAB BAR at the top of the page now. Two
+       chip rows asking two different questions, stacked in the middle of the page, is the thing he
+       rejected by name. */
+    const filterRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + rangeChips + '</div>'
+      + '<button class="btn btn-ghost btn-sm" id="oex-export">Export PDF</button>'
       + '</div>';
+    const byCatHeading = '<div class="sh" style="margin:0 0 10px;">By Category</div>';
     const olderBar = recs.length > this._histShown
       ? '<div class="no-print" style="text-align:center;padding:14px 0 4px;"><button class="btn btn-ghost btn-sm" id="oex-older">Show older (' + (recs.length - this._histShown) + ' more)</button></div>'
       : '';
@@ -3547,11 +3662,12 @@ S.HubOperatingExpenses = {
         range: App.chipRangeLabel(this._rangeChipOpts(), this._filterRange) }))
         .finally(() => node.remove());
     });
-    // ⭐ ITEM 19: the kind chips are wired SEPARATELY, on their own class — see the note at the
-    // render. Both vocabularies contain 'all', so one shared handler would cross the two filters.
-    this.container.querySelectorAll('.mo-chip').forEach(chip => {
-      chip.addEventListener('click', () => { this._filterKind = chip.dataset.v; this._histShown = PAGE; this._rerender(); });
-    });
+    /* ⛔ THE `.mo-chip` WIRING WENT WITH THE KIND CHIPS (pieces 3+4). It set `_filterKind` from a
+       second chip row; that job belongs to `_wireTabs` now, dispatching on `data-motab`. The reason
+       the two were kept on separate classes still holds and is why the tabs got an attribute of
+       their own rather than joining `.fc-chip`: both vocabularies contain the word 'all', so one
+       shared handler would set the RANGE to all-time when the operator picked All Money Out
+       ([[the-loop]] #50 — a key two different things can produce is not a key). */
     this.container.querySelectorAll('.fc-chip').forEach(chip => {
       chip.addEventListener('click', () => { this._filterRange = chip.dataset.v; this._histShown = PAGE; this._rerender(); });
     });
