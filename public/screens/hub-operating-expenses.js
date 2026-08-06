@@ -3487,14 +3487,31 @@ S.HubOperatingExpenses = {
     this._wireRows(this.container);
   },
 
-  // Shared row-action wiring for both tabs.
+  /* Shared row-action wiring for both halves of the page.
+     ⛔⛔⛔ IT BINDS EACH BUTTON ONCE, AND THAT GUARD IS LOAD-BEARING — BUILD ORDER D MADE IT SO.
+     D merged the three sidebar rows into one page, so `renderMain` draws `_renderCurrent()` +
+     `_renderHistory()` and wires BOTH — and each of those wirings ends by calling this with
+     `this.container`, the WHOLE screen, not its own half. Before D they were separate SCREENS and
+     each wired only what it had drawn, so scoping to the container was free.
+     MEASURED ON THE DEPLOYED BUILD: every row button carried TWO listeners, `_delete` ran twice on
+     one click, and one press of Delete opened TWO confirm dialogs — confirm one and the second sits
+     there asking about a record that is already gone. Edit and Repeat double too; they survive only
+     because `App.openModal` REPLACES its modal while `App.confirm` APPENDS, so the damage shows on
+     the confirm doors: Delete and Stop.
+     ⭐ THE FLAG, NOT "CALL IT ONCE". Removing one of the two calls is the obvious fix and it breaks
+     a path: `renderMoneyOut` calls `_wireCurrent()` ALONE for the Close The Books takeover, so
+     whichever call was deleted would leave one of the two entry points with unwired rows. Marking
+     the element makes this idempotent however many wiring passes run, which is the property rather
+     than the case ([[the-loop]] #52). A re-render replaces the markup, so fresh buttons arrive
+     unmarked and are wired normally. */
   _wireRows(scope) {
     const openEdit = (b) => { const r = this.records().find(x => x.id === b.dataset.id); if (r) this._openModal(r); };
-    scope.querySelectorAll('.oex-edit').forEach(b => b.addEventListener('click', () => openEdit(b)));
-    scope.querySelectorAll('.oex-renew').forEach(b => b.addEventListener('click', () => openEdit(b)));
-    scope.querySelectorAll('.oex-dup').forEach(b => b.addEventListener('click', () => this._duplicate(b.dataset.id)));
-    scope.querySelectorAll('.oex-del').forEach(b => b.addEventListener('click', () => this._delete(b.dataset.id)));
-    scope.querySelectorAll('.oex-stop').forEach(b => b.addEventListener('click', () => this._stopRecurring(b.dataset.id)));
+    const once = (b) => { if (b._oexRowWired) return false; b._oexRowWired = 1; return true; };
+    scope.querySelectorAll('.oex-edit').forEach(b => { if (once(b)) b.addEventListener('click', () => openEdit(b)); });
+    scope.querySelectorAll('.oex-renew').forEach(b => { if (once(b)) b.addEventListener('click', () => openEdit(b)); });
+    scope.querySelectorAll('.oex-dup').forEach(b => { if (once(b)) b.addEventListener('click', () => this._duplicate(b.dataset.id)); });
+    scope.querySelectorAll('.oex-del').forEach(b => { if (once(b)) b.addEventListener('click', () => this._delete(b.dataset.id)); });
+    scope.querySelectorAll('.oex-stop').forEach(b => { if (once(b)) b.addEventListener('click', () => this._stopRecurring(b.dataset.id)); });
   },
 
   // ── Inline add form save / start over ────────────────────────────────────
