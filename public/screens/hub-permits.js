@@ -49,11 +49,21 @@ S.HubPermits = {
   },
 
   // ── Entry ───────────────────────────────────────────────────────────────
+  /* ⭐⭐ IT IS A SHIFT CONTROL SCREEN NOW (build piece 5), so this navigates instead of opening a
+     Hub full page. `open()` KEPT ITS NAME AND ITS CONTRACT deliberately: the Hub's three Needs
+     Attention rows, the Books landing's Licensing button and its get-started step all call it, and
+     renaming it would mean changing five callers to gain nothing. Kyle asked for exactly this —
+     *"make sure any needs attention rows on the hub point to the new location"* — and the cheapest
+     way to be sure is that every door still calls the same one function. */
   open() {
-    App.openHubFullPage('Licensing', (mount) => {
-      this.container = mount;
-      this.renderMain();
-    }, 'permits');
+    App.navigate('sc-licensing');
+  },
+  /* The Shift Control mount, same signature every screen in that module uses. `open()` above routes
+     here; `App.navigate` sets the container and calls this. */
+  render(container, actions) {
+    this.container = container;
+    if (actions) actions.innerHTML = '';
+    this.renderMain();
   },
 
   // ── Status helpers ─────────────────────────────────────────────────────
@@ -142,7 +152,6 @@ S.HubPermits = {
     const activeCt   = statuses.filter(s => s.key === 'active').length;
     const dueSoonCt  = criticalCt + warnCt;
 
-    const fmt$ = (v) => App.fmtCurrency(v || 0, 0);
 
     // Stats strip — plain card + flex calc-items (calc-val lg), color = meaning.
     const stat = (label, val, color) =>
@@ -173,7 +182,11 @@ S.HubPermits = {
       +   '<div class="f" style="width:120px;"><label>Recurrence</label><select id="hpa-recurrence">' + recurOpts + '</select></div>'
       +   '<div class="f" style="width:150px;"><label>Next Renewal Date</label><input type="date" id="hpa-renewal"/></div>'
       +   '<div class="f" style="width:150px;"><label>Last Renewed</label><input type="date" id="hpa-last"/></div>'
-      +   '<div class="f" style="width:110px;"><label>Last Cost</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hpa-cost" step="0.01" min="0" placeholder="0.00"/></div></div>'
+      /* ⛔⛔ THE LAST COST BOX WAS HERE AND IT IS GONE (build piece 5). This tracker holds no money,
+         same as `sc-maintenance` and `sc-incidents`: the status is the whole record. A permit fee is
+         an ordinary operating expense logged at the one Money Out door and it reaches the P&L's
+         Licenses and Permits line from there — a better number than this field ever was, because it
+         includes the permits nobody thought to track. */
       + '</div>'
       + App.noteField({ id: 'hpa-notes', placeholder: 'Issuing agency, account number, contact' })
       + '<div id="hpa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
@@ -198,7 +211,9 @@ S.HubPermits = {
           + '<div style="width:8px;height:8px;border-radius:50%;background:' + s.color + ';flex-shrink:0;"></div>'
           + '<div style="flex:1;min-width:0;">'
           +   '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px;">' + esc(r.name || '(unnamed)') + '</div>'
-          +   '<div style="font-size:11px;color:var(--t3);">' + esc(r.type || '') + (r.type ? ' · ' : '') + esc(s.label) + (r.cost ? ' · Last paid ' + fmt$(r.cost) : '') + '</div>'
+          /* ⛔ "· Last paid $X" CAME OFF THIS LINE (build piece 5). What a permit cost is on the
+             expense log now, not on the permit. */
+          +   '<div style="font-size:11px;color:var(--t3);">' + esc(r.type || '') + (r.type ? ' · ' : '') + esc(s.label) + '</div>'
           + '</div>'
           + '<button class="btn btn-ghost btn-sm hp-renew" data-id="' + esc(r.id) + '" style="flex-shrink:0;">Mark Renewed</button>'
           + '</div>';
@@ -209,7 +224,10 @@ S.HubPermits = {
         + '</div>';
     }
 
-    this.container.innerHTML = '<div class="screen">' + statsCard + addCard + addButtons + alertsCard + '<div style="margin-top:24px;"></div>' + '<div id="hp-list-region"></div>' + '</div>';
+    /* ⭐ KYLE'S ORDER: *"on the licensing page.. move the [Add Permit card] below the needs attention
+       card and above the chip selectors."* The alert comes before the form — what is about to lapse
+       is the reason an operator opened this page, and the form is what they do second. */
+    this.container.innerHTML = '<div class="screen">' + statsCard + alertsCard + addCard + addButtons + '<div style="margin-top:24px;"></div>' + '<div id="hp-list-region"></div>' + '</div>';
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
 
     // Wire the static parts (form + the Needs Attention renew buttons). The
@@ -241,7 +259,6 @@ S.HubPermits = {
     const expiredCt = statuses.filter(s => s.key === 'expired').length;
     const activeCt  = statuses.filter(s => s.key === 'active').length;
     const dueSoonCt = statuses.filter(s => s.key === 'critical' || s.key === 'warn').length;
-    const fmt$ = (v) => App.fmtCurrency(v || 0, 0);
 
     const chipOpts = [
       { v: 'all',     label: 'All (' + all.length + ')' },
@@ -263,7 +280,7 @@ S.HubPermits = {
             + '<td data-label="Type" style="color:var(--t2);">' + esc(r.type || '') + '</td>'
             + '<td data-label="Renewal Date" style="white-space:nowrap;">' + this._fmtDate(r.renewal_date) + '</td>'
             + '<td data-label="Recurrence" style="color:var(--t2);">' + esc(r.recurrence || '') + '</td>'
-            + '<td data-label="Last Cost">' + (r.cost ? fmt$(r.cost) : '—') + '</td>'
+            // ⛔ the Last Cost column went with the field (build piece 5)
             + '<td data-label="Status" style="font-weight:700;color:' + s.color + ';white-space:nowrap;">' + esc(s.label) + '</td>'
             + '<td class="no-print" data-label="">'
             +   '<div class="row-actions" style="flex-wrap:wrap;">'
@@ -285,7 +302,6 @@ S.HubPermits = {
       + '<table class="row-list">'
       +   '<thead><tr>'
       +     '<th>Name</th><th>Type</th><th>Renewal Date</th><th>Recurrence</th>'
-      +     '<th>Last Cost</th>'
       +     '<th>Status</th><th class="no-print"></th>'
       +   '</tr></thead>'
       +   '<tbody>' + logRows + '</tbody>'
@@ -328,23 +344,23 @@ S.HubPermits = {
     const recurrence   = g('hpa-recurrence')?.value || 'Annual';
     const renewal_date = g('hpa-renewal')?.value || '';
     const last_renewed = g('hpa-last')?.value || '';
-    const costRaw      = g('hpa-cost')?.value;
-    const cost         = (costRaw === '' || costRaw == null) ? null : parseFloat(costRaw);
     const notes        = (g('hpa-notes')?.value || '').trim();
     const showErr = (m) => { const e = g('hpa-err'); if (e) { e.textContent = m; e.style.display = 'block'; } };
     if (!name) { showErr('Give the permit a name.'); return; }
     if (!type) { showErr('Pick a type.'); return; }
-    if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
+    /* ⛔ THE NEGATIVE-COST REFUSAL WENT WITH THE FIELD, and that is the right direction: there is no
+       number left to refuse. `verify-negative-input-guards` lost its maintenance entry the same way
+       when item 12 took the Repair Cost box off that tracker. */
     await App.putRecord('core', 'permit', {
       id: App.uid ? App.uid() : ('prm-' + Date.now()),
-      name, type, renewal_date, recurrence, cost, last_renewed, notes,
+      name, type, renewal_date, recurrence, last_renewed, notes,
       created_at: new Date().toISOString()
     });
     this.renderMain();
   },
 
   _clearAdd() {
-    ['hpa-name', 'hpa-renewal', 'hpa-last', 'hpa-cost', 'hpa-notes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['hpa-name', 'hpa-renewal', 'hpa-last', 'hpa-notes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const t = document.getElementById('hpa-type');       if (t) t.selectedIndex = 0;
     const r = document.getElementById('hpa-recurrence'); if (r) r.value = 'Annual';
     const e = document.getElementById('hpa-err');        if (e) e.style.display = 'none';
@@ -359,7 +375,6 @@ S.HubPermits = {
       type: this.TYPES[0],
       renewal_date: '',
       recurrence: 'Annual',
-      cost: '',
       last_renewed: '',
       notes: ''
     };
@@ -375,7 +390,6 @@ S.HubPermits = {
       +   '<div class="f"><label>Recurrence</label><select id="hp-f-recurrence">' + recurOpts + '</select></div>'
       +   '<div class="f"><label>Next Renewal Date</label><input type="date" id="hp-f-renewal" value="' + esc(rec.renewal_date || '') + '"/></div>'
       +   '<div class="f"><label>Last Renewed</label><input type="date" id="hp-f-last" value="' + esc(rec.last_renewed || '') + '"/></div>'
-      +   '<div class="f"><label>Last Cost</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hp-f-cost" step="0.01" min="0" value="' + esc(rec.cost === '' ? '' : String(rec.cost || '')) + '" placeholder="0.00"/></div></div>'
       + '</div>'
       + App.noteField({ id: 'hp-f-notes', value: rec.notes, placeholder: 'Issuing agency, account number, contact' })
       + '<div class="card-actions">'
@@ -393,20 +407,17 @@ S.HubPermits = {
       const type         = document.getElementById('hp-f-type')?.value || '';
       const renewal_date = document.getElementById('hp-f-renewal')?.value || '';
       const recurrence   = document.getElementById('hp-f-recurrence')?.value || 'Annual';
-      const costRaw      = document.getElementById('hp-f-cost')?.value;
-      const cost         = (costRaw === '' || costRaw == null) ? null : parseFloat(costRaw);
       const last_renewed = document.getElementById('hp-f-last')?.value || '';
       const notes        = (document.getElementById('hp-f-notes')?.value || '').trim();
       if (!name) { showErr('Give the permit a name.'); return; }
       if (!type) { showErr('Pick a type.'); return; }
-      if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
       if (isEdit) {
         const cur = this.records().find(r => r.id === rec.id) || rec;
-        await App.putRecord('core', 'permit', Object.assign({}, cur, { name, type, renewal_date, recurrence, cost, last_renewed, notes }));
+        await App.putRecord('core', 'permit', Object.assign({}, cur, { name, type, renewal_date, recurrence, last_renewed, notes }));
       } else {
         await App.putRecord('core', 'permit', {
           id:         App.uid ? App.uid() : ('prm-' + Date.now()),
-          name, type, renewal_date, recurrence, cost, last_renewed, notes,
+          name, type, renewal_date, recurrence, last_renewed, notes,
           created_at: new Date().toISOString()
         });
       }
@@ -426,10 +437,9 @@ S.HubPermits = {
 
     const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">Mark Renewed</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(rec.name || '(unnamed permit)') + '. This advances the renewal date and logs the cost paid as an Operating Expenses entry under Licenses and Permits.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(rec.name || '(unnamed permit)') + '. This advances the renewal date and advances the renewal date. Log what you paid with the rest of your money out, on Close The Books.</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f"><label>Renewed On</label><input type="date" id="hp-r-renewed" value="' + today + '"/></div>'
-      +   '<div class="f"><label>Cost Paid</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="hp-r-cost" step="0.01" min="0" value="' + esc(rec.cost == null ? '' : String(rec.cost)) + '" placeholder="0.00"/></div></div>'
       +   '<div class="f"><label>Next Renewal Date</label><input type="date" id="hp-r-next" value="' + esc(suggestedNext) + '"/></div>'
       + '</div>'
       + '<div class="card-actions">'
@@ -442,31 +452,24 @@ S.HubPermits = {
     document.getElementById('hp-r-go')?.addEventListener('click', async () => {
       const renewedOn = document.getElementById('hp-r-renewed')?.value || '';
       const nextRen   = document.getElementById('hp-r-next')?.value || '';
-      const costRaw   = document.getElementById('hp-r-cost')?.value;
-      const cost      = (costRaw === '' || costRaw == null) ? null : parseFloat(costRaw);
       if (!renewedOn) { showErr('Pick the renewed-on date.'); return; }
-      if (cost != null && (isNaN(cost) || cost < 0)) { showErr('Cost must be a number at or above zero.'); return; }
       // 1. Update the permit
       const cur = this.records().find(r => r.id === rec.id);
       if (cur) {
         await App.putRecord('core', 'permit', Object.assign({}, cur, {
           last_renewed: renewedOn,
-          renewal_date: nextRen || cur.renewal_date,
-          cost: cost != null ? cost : cur.cost
+          renewal_date: nextRen || cur.renewal_date
         }));
       }
-      // 2. Auto-create the Operating Expenses entry if a cost was paid
-      if (cost != null && cost > 0) {
-        await App.putRecord('core', 'operating_expense', {
-          id:         App.uid ? App.uid() : ('oex-' + Date.now()),
-          date:       renewedOn,
-          category:   'Licenses and Permits',
-          vendor:     rec.type || '',
-          amount:     cost,
-          notes:      'From Licensing: ' + (rec.name || 'permit') + ' renewal',
-          created_at: new Date().toISOString()
-        });
-      }
+      /* ⛔⛔⛔ THE SECOND WRITE DOOR INTO THE EXPENSE LOG WAS HERE, AND IT WAS DOUBLE-COUNTING.
+         It wrote a `Licenses and Permits` row with `vendor: rec.type` — "Liquor License". A bank
+         statement writes the agency's name. MEASURED on the deployed build with this row already on
+         file: a `TEXAS ALCOHOLIC BEV COMM` line for the same amount on the same day imported as NEW,
+         so the fee landed on the books twice; only an operator who happened to type the bank's exact
+         spelling ever got a dedup. It arrived uncategorised, so the P&L stayed clean until they
+         sorted it into Licenses and Permits — and then it doubled, silently.
+         ⭐ A permit fee is an ordinary bill. It is logged at the one Money Out door like every other
+         one, and it reaches the P&L from there. Mark Renewed has ONE job now: the date. */
       App.closeModal(id);
       this.renderMain();
     });

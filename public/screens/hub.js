@@ -67,10 +67,13 @@ S.Hub = {
       '<div class="nav-item" data-hub-action="' + action + '">'
         + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + ic[iconKey] + '</svg>'
         + '<span class="nav-label">' + name + '</span></div>';
+    /* ⭐⭐ KYLE'S ORDER (build piece 5): *"licensing goes away and move 'Money Out' right above
+       'Break Even' so it is Money Out .. the Break-Even then divider then the three books links."*
+       Money Out and Break-Even are one pair now — where the money went, and what it takes to cover
+       it — and the divider below them opens the Accounting group. The "Operations" heading went with
+       Licensing: a group of one is not a group. */
     return ''
       + '<div class="nav-section"></div>'
-      + row('breakeven', 'Break-Even', 'breakeven')
-      + '<div class="nav-section">Operations</div>'
       /* ⭐⭐⭐ BUILD ORDER D — THREE ROWS OVER ONE STORE BECOME ONE. Phase 1 migrated every cash
          outflow into the expense ledger, item 19 stage 1 gave the log a kind chip that shows bills
          and cash together, and B made this screen read-only history with one entry point on Close
@@ -87,7 +90,14 @@ S.Hub = {
          store as well. `verify-money-out-one-row.js` C2/C4 pin that they exist and are still reached
          from here, so this note cannot go stale again without the gate saying so. */
       + row('operating-expenses', 'Money Out', 'expense')
-      + row('permits', 'Licensing', 'shield')
+      + row('breakeven', 'Break-Even', 'breakeven')
+      /* ⛔ LICENSING LEFT THIS SIDEBAR (build piece 5). It is a Shift Control screen now — see
+         `nav.js`. Kyle: *"it has nothing to do with books really."* Correct once it holds no money:
+         nothing in Books reads a permit record, and its two real consumers are the Hub's alert panel
+         and the Audit's operational exposures.
+         ⚠ THE BOOKS LANDING KEEPS EVERY PERMIT LINK IT HAD — the due count, the "clear the N flagged"
+         next move, the Licensing button and the get-started step. A quick link crossing sections is
+         normal here; the Audit sidebar jump-links into Recovery the same way. */
       + '<div class="nav-section">Accounting</div>'
       + row('weekly-pnl', 'Weekly P&L Brief', 'report')
       + row('books', 'Month-End Books', 'books')
@@ -1620,21 +1630,21 @@ S.Hub = {
           sev: 'bad',
           label: (p.name || 'Permit'), value: 'expired ' + Math.abs(days) + 'd ago',
           text: (p.name || 'Permit') + ' expired ' + Math.abs(days) + ' day' + (Math.abs(days)===1?'':'s') + ' ago. Review and renew right away.',
-          screen: 'permits', mod: 'hub', go: "S.Hub._enterPermits('expired')"
+          screen: 'sc-licensing', mod: 'shift', go: "S.Hub._enterPermits('expired')"
         });
       } else if (days <= 14) {
         out.push({
           sev: 'bad',
           label: (p.name || 'Permit'), value: 'renew in ' + days + 'd',
-          text: (p.name || 'Permit') + ' renewal due in ' + days + ' day' + (days===1?'':'s') + '. Mark Renewed once paid so Books picks up the cost.',
-          screen: 'permits', mod: 'hub', go: "S.Hub._enterPermits('due')"
+          text: (p.name || 'Permit') + ' renewal due in ' + days + ' day' + (days===1?'':'s') + '. Mark Renewed once paid, and log what it cost with the rest of your money out.',
+          screen: 'sc-licensing', mod: 'shift', go: "S.Hub._enterPermits('due')"
         });
       } else if (days <= 30) {
         out.push({
           sev: 'warn',
           label: (p.name || 'Permit'), value: 'due in ' + days + 'd',
           text: (p.name || 'Permit') + ' renewal due in ' + days + ' days. Get the check or card ready.',
-          screen: 'permits', mod: 'hub', go: "S.Hub._enterPermits('due')"
+          screen: 'sc-licensing', mod: 'shift', go: "S.Hub._enterPermits('due')"
         });
       }
     });
