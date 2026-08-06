@@ -1500,8 +1500,29 @@ S.HubOperatingExpenses = {
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         +   '<div class="f" style="width:150px;"><label>Date Submitted</label><input type="date" value="' + App.todayLocal() + '" disabled title="When you logged this. Always today."/></div>'
         +   '<div class="f" style="width:150px;"><label>Due Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
-        +   '<div class="f" style="width:230px;"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oexa-cat', key: 'expense_category', builtin: this.CATEGORIES, blank: true, blankLabel: 'Select category...' }) + '</div>'
-        +   '<div class="f" style="width:240px;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
+        /* ⭐⭐ ITEM 19 STAGE 2 — LOG TYPE DECIDES WHICH STORE THIS ROW GOES TO, AND THE OPERATOR SAYS
+           SO INSTEAD OF BAR COP GUESSING. Until now "is this a cash outflow?" was worked out by
+           READING THE CATEGORY NAME, which is the collision that produced the worst defect on this
+           screen: nothing stopped someone typing a category called "Owner Draw", and a row filed
+           under it was excluded from every total AND from the log, so it had no Edit and no Delete
+           anywhere ([[the-loop]] #115). This control IS the `type` field on the record.
+           ⛔ AND IT KEEPS THE TWO VOCABULARIES APART, which is what lets the cash kinds be offered
+           at all. They must never enter `listOptions` — `_matchCat` reads it (an imported cash row
+           would carry no `migrated_from` and count as a BILL) and `categoryList()` reads it to build
+           the Income Statement's LINES. The cash branch is its own UNKEYED control holding only the
+           five, so nothing of it can reach the shared list.
+           ⚠ SHOW/HIDE, NOT A RE-RENDER. Nothing typed can be lost if nothing is rebuilt, which is
+           simpler and safer than capturing and restoring a draft on every change of type. */
+        +   '<div class="f" style="width:190px;"><label>Log Type</label><select id="oexa-logtype" class="form-input">'
+        +     '<option value="">Select Type...</option>'
+        +     '<option value="expense">Operating Expense</option>'
+        +     '<option value="cash">Cash Outflow</option>'
+        +   '</select></div>'
+        +   '<div class="f" id="oexa-cat-wrap" style="width:230px;display:none;"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oexa-cat', key: 'expense_category', builtin: this.CATEGORIES, blank: true, blankLabel: 'Select category...' }) + '</div>'
+        +   '<div class="f" id="oexa-kind-wrap" style="width:230px;display:none;"><label>Kind</label>' + App.customSelect({ id: 'oexa-kind', builtin: this.CASH_ONLY_CATEGORIES.map(c => c.name), blank: true, blankLabel: 'Select kind...' }) + '</div>'
+        // ⚠ VENDOR IS AN EXPENSE FIELD. A draw has no vendor, and leaving the box on the cash branch
+        // would collect something the outflow record has nowhere to put — silent loss on save.
+        +   '<div class="f" id="oexa-vendor-wrap" style="width:240px;display:none;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
         +   '<div class="f" style="width:140px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div></div>'
         + '</div>'
         + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oexa-recurring"/> Recurring bill (same cost each time)</label></div>'
@@ -1563,6 +1584,9 @@ S.HubOperatingExpenses = {
       const w = document.getElementById('oexa-term-wrap');
       if (w) w.style.display = e.target.checked ? '' : 'none';
     });
+    // ⭐ ITEM 19 STAGE 2: Log Type reveals the selector that matches it. One place decides, so the
+    // two branches cannot both be on screen (which would leave the save reading a stale one).
+    document.getElementById('oexa-logtype')?.addEventListener('change', () => this._applyLogType());
     // Switching entry mode abandons a confirm screen, the same as Start Over does.
     this.container.querySelectorAll('.oexa-mode').forEach(b => b.addEventListener('click', () => {
       this._expenseReview = null;
@@ -3057,6 +3081,44 @@ S.HubOperatingExpenses = {
     const recurring = !!g('oexa-recurring')?.checked;
     const term      = parseInt(g('oexa-term')?.value, 10);
     const showErr = (m) => { const e = g('oexa-err'); if (e) { e.textContent = m; e.style.display = 'block'; } };
+    /* ⭐⭐ ITEM 19 STAGE 2 — THE CASH BRANCH, AND IT GOES FIRST SO THE EXPENSE PATH BELOW IS
+       UNTOUCHED. The operator declared the type, so nothing is inferred from a category name here.
+       ⛔ IT WRITES THROUGH `_writePair`, WHICH IS THE ONLY SANCTIONED PATH. A plain
+       `putRecord('operating_expense', ...)` would create a cash-only row with no `migrated_from`,
+       which `_isOperatingRow` counts as a BILL and `CashEngine.cashOutflows` cannot see — the
+       orphan shape ([[the-loop]] #115). `_writePair` writes the operator's store first and the
+       ledger twin after, so a refused half leaves the ledger LAGGING, which the boot reconcile
+       repairs. Bare call, not guarded: a guard would mean "if the outflow screen has not loaded,
+       write half a record" ([[the-loop]] #40).
+       ⚠ THE REFUSAL IS REPORTED. `_writePair` returns false when the operator's own store refuses,
+       and saying so keeps the typed values on screen instead of claiming a save that did not
+       happen ([[test-the-retry]] — the retry is where a half-save becomes permanent). */
+    const logType = g('oexa-logtype')?.value || '';
+    if (!logType) { showErr('Pick a log type.'); return; }
+    if (logType === 'cash') {
+      const kind = g('oexa-kind')?.value || '';
+      if (!date) { showErr('Pick a date.'); return; }
+      if (!kind) { showErr('Pick a kind.'); return; }
+      if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
+      if (recurring && g('oexa-term')?.value && (isNaN(term) || term < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
+      const out = {
+        id: App.uid ? App.uid() : ('cof-' + Date.now()),
+        date: date, type: this._typeForCashCategory(kind), amount: amount, notes: notes,
+        created_at: new Date().toISOString()
+      };
+      if (recurring) {
+        out.recurring = true;
+        out.frequency = g('oexa-frequency')?.value || 'monthly';
+        out.term_months = (term && term > 0) ? term : null;
+        out.recur_day = parseInt(String(date).slice(8, 10), 10) || 1;
+      }
+      if (!(await S.HubCashOutflows._writePair(out))) {
+        showErr('Could not save. Check your connection and try again.');
+        return;
+      }
+      this._rerenderHost();
+      return;
+    }
     if (!date) { showErr('Pick a date.'); return; }
     if (!category) { showErr('Pick a category.'); return; }
     if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
@@ -3094,6 +3156,27 @@ S.HubOperatingExpenses = {
     this._rerenderHost();
   },
 
+  /* ⭐ ONE PLACE DECIDES WHAT THE FORM IS SHOWING. Called on every change of Log Type and by
+     `_clearAdd`, so the revealed selector always matches the type — and, just as important, the
+     branch that is NOT in play is HIDDEN AND CLEARED. Leaving a stale value in the hidden control
+     is how a save reads a category the operator cannot see: pick Operating Expense, choose
+     Utilities, switch to Cash Outflow, save — without the clear, `oexa-cat` still says Utilities.
+     ⚠ Vendor rides with the expense branch: an outflow record has nowhere to put one, so
+     collecting it there would be silent loss on save. */
+  _applyLogType() {
+    const t = document.getElementById('oexa-logtype')?.value || '';
+    const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+    const clear = (id) => { const el = document.getElementById(id); if (el) el.value = ''; };
+    show('oexa-cat-wrap', t === 'expense');
+    show('oexa-vendor-wrap', t === 'expense');
+    show('oexa-kind-wrap', t === 'cash');
+    if (t !== 'expense') { clear('oexa-cat'); clear('oexa-vendor'); }
+    if (t !== 'cash') clear('oexa-kind');
+    // The "looks like it belongs elsewhere" notice is keyed off the vendor, which only the expense
+    // branch has. Clear it too, or it outlives the branch that raised it.
+    const el = document.getElementById('oexa-elsewhere'); if (el && t !== 'expense') el.innerHTML = '';
+  },
+
   _clearAdd() {
     const d = document.getElementById('oexa-date'); if (d) d.value = App.todayLocal();
     const c = document.getElementById('oexa-cat');  if (c) c.selectedIndex = 0;
@@ -3102,6 +3185,8 @@ S.HubOperatingExpenses = {
     const fq = document.getElementById('oexa-frequency'); if (fq) fq.selectedIndex = 0;
     const tw = document.getElementById('oexa-term-wrap'); if (tw) tw.style.display = 'none';
     const e = document.getElementById('oexa-err');  if (e) e.style.display = 'none';
+    const lt = document.getElementById('oexa-logtype'); if (lt) lt.value = '';
+    this._applyLogType();
   },
 
   // ── Add (from Duplicate) / Edit modal ────────────────────────────────────
