@@ -354,8 +354,11 @@ S.HubOperatingExpenses = {
     return removed;
   },
 
-  _tab:            'current',
-  _entryMode:      'manual',   // manual | import (Add Expense form)
+  /* ⛔ `_tab: 'current'` WAS DELETED HERE (build order B). It was the last vestige of a tab UI this
+     screen has not had for a long time: declared, and read in exactly zero places tree-wide. A field
+     that is written and never read is a fix that never shipped, or in this case a feature that never
+     left ([[the-loop]] #25). No slicer can see a data property, so nothing would ever have told us. */
+  _entryMode:      'manual',   // manual | import — the Close The Books Money Out step's two modes
   _histShown:      0,          // History log window (0 = default to LIST_PAGE)
   _filterCategory: 'all',
   _filterRange:    'this-month',
@@ -1095,8 +1098,33 @@ S.HubOperatingExpenses = {
   renderMain() {
     this._view = 'current';
     this.container.innerHTML = '<div class="screen">' + this._renderCurrent() + '</div>';
-    if (App.setHubTopbarActions) App.setHubTopbarActions('');
+    /* ⭐⭐ BUILD ORDER B — THE WAY TO THE ONE DOOR. This screen no longer takes an entry, so without
+       a control it is a page the operator has always used to log a bill with nothing on it: the
+       feature would read as LOST rather than moved ([[the-loop]] #106 — a control that tells the
+       user nothing is worse than no control, and a screen with no way forward is its worst case).
+       ⛔ A BUTTON, NOT A SENTENCE, AND THAT IS NOT A STYLE CHOICE. `verify-design-code` ratchets
+       RULE 2b card prose and it only ever goes DOWN, so an explainer paragraph here is a design
+       change Kyle walks one at a time. The hub topbar actions slot already exists for exactly this
+       and this line was already calling it with an empty string.
+       ⚠ WIRED AGAINST `document`, NOT `this.container` — the topbar is the hub's, outside our mount.
+       `hub-bar-cop-audit` does the same thing the same way. */
+    if (App.setHubTopbarActions) {
+      App.setHubTopbarActions('<button class="btn btn-ghost btn-sm" id="oex-go-enter">Enter Money Out</button>');
+      document.getElementById('oex-go-enter')?.addEventListener('click', () => this._goEnterMoneyOut());
+    }
     this._wireCurrent();
+  },
+
+  /* ⛔ IT NAMES THE STEP. `hub-books-home._openStep` defaults to "the first step not done", so a bar
+     that has already ticked Money Out would be dropped on Weeks or the P&L — the operator presses
+     "Enter Money Out" and lands somewhere else, which is the shape S330b's guard-loop was made of.
+     Setting it before `open()` is the destination's own contract: the field is only defaulted when
+     it is null ([[the-loop]] #102 — read the contract, the existing callers are the spec). */
+  _goEnterMoneyOut() {
+    const BH = S.HubBooksHome;
+    if (!BH) return;
+    BH._openStep = 'expenses';
+    BH.open();
   },
 
   // ── Expense History (its own Books page; the read-only log of past months) ──
@@ -1440,7 +1468,19 @@ S.HubOperatingExpenses = {
         + '. One came from your recurring bill and one you entered. Check which is real before it counts twice.')
       : '');
 
-    return statsCard + warnBanner + coveredNote + this._addCardHtml()
+    /* ⛔⛔⛔ BUILD ORDER B — THE ENTRY CARD IS GONE FROM THIS SCREEN. THERE IS ONE PLACE TO ENTER
+       MONEY OUT AND IT IS THE CLOSE THE BOOKS STEP. Kyle, seeing what had been built: *"why does
+       money out have a form or drop? ... isn't that what we built on the #1 spot in close the
+       books? ... we aren't having two drop places for the same thing a click away from each other."*
+       The plan said one door from the start; `_addCardHtml` shipped in two places because the card
+       was already here and keeping it felt like losing nothing. That sentence is the tell, and
+       [[one-ledger-rebuild]] records the identical slip on the maintenance Repair Cost box one
+       phase earlier.
+       ⭐ WHAT THIS SCREEN IS NOW: read-only history for every kind of money out, with Edit and
+       Delete on every row. Read-only means no ENTRY POINT, never no correction path — a record an
+       operator cannot re-open is a defect whether or not anything is arithmetically wrong.
+       ⚠ THE WAY TO THE DOOR IS IN THE TOPBAR, NOT IN A SENTENCE HERE. See `renderMain`. */
+    return this._importBannerHtml() + statsCard + warnBanner + coveredNote
       + this._monthCardHtml(mk, { next: false, exportId: 'oex-export-this', wrapId: 'oex-thismonth' })
       + this._monthCardHtml(this._nextMonthKey(mk), { next: true });
   },
@@ -1565,17 +1605,29 @@ S.HubOperatingExpenses = {
           + '<div class="collapse-body">' + bodyInner + '</div>'
           + '</div>' + addButtons;
 
-    // What the last import actually did. An expense import used to report NOTHING — not even a
-    // count — so rows it skipped (a credit, an unreadable amount, a missing date) simply were not
-    // there afterwards. A row the operator can see in their own file and cannot find in Bar Cop is
-    // what makes them stop trusting the total.
+    return this._importBannerHtml() + addCard;
+  },
+
+  /* What the last import actually did. An expense import used to report NOTHING — not even a count —
+     so rows it skipped (a credit, an unreadable amount, a missing date) simply were not there
+     afterwards. A row the operator can see in their own file and cannot find in Bar Cop is what
+     makes them stop trusting the total.
+
+     ⛔⛔ ITS OWN MEMBER SINCE BUILD ORDER B, AND THE PIN IS WHAT FOUND WHY. This lived inside
+     `_addCardHtml`, which was the only thing that consumed `_importMsg` — so the moment B took the
+     entry card off this screen, an import finishing with `_view === 'current'` had nowhere to
+     report. `_importRows` still writes a FULL account there for a call with no screen in front of
+     it, and that account would have been computed and thrown away ([[the-loop]] #25).
+     ⚠ ONE RENDER ONLY, and the clear stays here with the read: a message that survives a navigation
+     is how the screen once greeted an operator days later with "1 expense imported." about a file
+     they had already walked away from. */
+  _importBannerHtml() {
     const imp = this._importMsg;
-    this._importMsg = null;   // one render only; it must not survive a navigation
-    const importBanner = imp
+    this._importMsg = null;
+    return imp
       ? '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:11px 16px;margin:16px 0;font-size:12px;color:var(--t1);line-height:1.6;">'
         + esc(imp) + '</div>'
       : '';
-    return importBanner + addCard;
   },
 
   _wireCurrent() {
@@ -2798,16 +2850,24 @@ S.HubOperatingExpenses = {
       /* ⚠ THE COUNT IS ON THE BUTTON, so a press can never move a number the operator did not see.
          Disabled at zero for the same reason the Add button is.
          ⭐ THE `.f` + SPACER LABEL IS THE APP'S OWN CONVENTION for a button standing in a labelled
-         form row (`ic-report-variance`'s Reset), not something invented here — and the explicit
-         height is what puts its centre on the same line as the picker beside it. Kyle, walking the
+         form row (`ic-report-variance`'s Reset), not something invented here. Kyle, walking the
          pushed build: *"the 'move to' button needs vertically centered with the drop down cell."*
-         The row is bottom-aligned, so a 22px button against a 34px input is flush at the bottom and
-         6px low through the middle. 34px is `.form-input`'s own box — 7px padding top and bottom,
-         1px border each side, an 18px line box at 13px Barlow. If that padding ever changes, this
-         is the line that has to follow it, and G7b is what will say so. */
+         The row is bottom-aligned, so a 22px button against a 34px picker is flush at the bottom and
+         exactly (34−22)/2 = 6px low through the middle.
+         ⛔⛔ THE BOX IS 34px, THE BUTTON IS NOT — and that distinction is the whole correction. My
+         first version fixed the alignment by GROWING the button to 34px, which centred it and made
+         it a different button. Kyle: *"change the move to button back to the smaller height size
+         that it was.. that button size was right it just needed to be vertically centered."* He is
+         right: `btn-sm` is correct here because Move To is a step INSIDE the review, not the press
+         that commits it — and the two must not read as equals. So the WRAPPER matches the picker's
+         box and centres a small button in it.
+         ⚠ 34px is `.form-input`'s own box: 7px padding top and bottom, 1px border each side, an 18px
+         line box at 13px Barlow. If that padding ever changes this line has to follow it, and G7b
+         is what will say so. */
       + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
-      +   '<button type="button" class="btn btn-primary" id="oex-rt-move" style="height:34px;"'
-      +   (n ? '' : ' disabled') + '>Move To' + (n ? ' (' + n + ')' : '') + '</button></div>'
+      +   '<div style="height:34px;display:flex;align-items:center;">'
+      +   '<button type="button" class="btn btn-primary btn-sm" id="oex-rt-move"'
+      +   (n ? '' : ' disabled') + '>Move To' + (n ? ' (' + n + ')' : '') + '</button></div></div>'
       + (r.moveNote ? '<span style="font-size:11px;color:var(--gold);align-self:center;">' + esc(r.moveNote) + '</span>' : '')
       + '</div>';
   },
