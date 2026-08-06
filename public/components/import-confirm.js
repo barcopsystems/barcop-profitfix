@@ -148,6 +148,27 @@ const ImportConfirm = {
       + rm + '</tr>';
   },
 
+  /* ⭐⭐ THE GO BUTTON'S LABEL, IN ONE PLACE, because two places printing one string is how they
+     drift ([[the-loop]] #54). The expense door rebuilds this button IN PLACE after a refused write —
+     a re-render there would destroy the result slot holding the error — and its hand-built version
+     said `'Add ' + n + ' Expense'`, which was true until A1 and A6 gave the label a NOUN that
+     follows what is going in and a "(N with no type)" tail. So a refused import relabelled the
+     button to something the shell would never render, on the screen where the operator is deciding
+     whether to press it again. Both callers ask this now. */
+  goLabel(opts) {
+    opts = opts || {};
+    const rows = opts.rows || [];
+    const n = rows.filter(r => r && r.lands).length;
+    const verb = opts.verb || 'Add';
+    const noun = opts.noun || 'Row';
+    /* ⚠ NOT EVERY NOUN TAKES AN `s`. "Add 4 Persons" is what a bare `+ 's'` produces on the staff
+       roster. A door whose plural is irregular passes it; the default stays the regular form so
+       nothing else has to change. */
+    const nounN = n === 1 ? noun : (opts.nounPlural || (noun + 's'));
+    const unset = opts.unsetNoun ? rows.filter(r => r && r.lands && r.unset).length : 0;
+    return verb + ' ' + n + ' ' + nounN + (unset ? ' (' + unset + ' ' + opts.unsetNoun + ')' : '');
+  },
+
   panel(opts) {
     opts = opts || {};
     const cols = opts.columns || [];
@@ -162,10 +183,19 @@ const ImportConfirm = {
     const busy = !!opts.busy;
     const verb = opts.verb || 'Add';
     const noun = opts.noun || 'Row';
-    /* ⚠ NOT EVERY NOUN TAKES AN `s`. "Add 4 Persons" is what a bare `+ 's'` produces on the staff
-       roster. A door whose plural is irregular passes it; the default stays the regular form so
-       nothing else has to change. */
-    const nounN = n === 1 ? noun : (opts.nounPlural || (noun + 's'));
+    /* ⭐⭐ HOW MANY OF THE ROWS GOING IN ARE NOT FULLY ANSWERED (build order A6). Kyle, after
+       pressing ADD 5 EXPENSES with all five still unsorted: $7,201.83 went in with an EMPTY
+       category and the button said nothing. The BOOKS were right — the Income Statement prints
+       "Uncategorized (not on this statement yet)" below the total — but the button read as if the
+       rows were fully filed, and reading it and agreeing was the action that caused it.
+       ⛔ DERIVED, LIKE `n`, AND FOR THE SAME REASON. A door that passed a number could print one
+       that disagrees with its own table. The door supplies only the WORDS, because "with no type"
+       is expense vocabulary and the next door's will differ.
+       ⚠ OPT-IN ON BOTH SIDES: no `unsetNoun` and no `unset` on any row means the label is
+       byte-for-byte what every other door has always rendered.
+       ⚠ And it disappears at zero. "(0 with no type)" on every clean import is the noise that makes
+       an operator stop reading the button at all. All of that lives in `goLabel` above, because the
+       expense door rebuilds this button in place after a refused write. */
     /* ⛔ THE LAST COLUMN TAKES WHAT IS LEFT, so the colgroup always sums to 100.
        A colgroup that does not silently rescales every column, and on a grouped
        screen the sections then stop lining up with each other. */
@@ -309,7 +339,7 @@ const ImportConfirm = {
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
       +   '<button class="btn btn-primary btn-sm" ' + (opts.goAttr || 'data-confirm-go') + '="1"'
       +     (n && !busy ? '' : ' disabled') + '>'
-      +     (busy ? (opts.busyLabel || (verb + 'ing...')) : verb + ' ' + n + ' ' + nounN)
+      +     (busy ? (opts.busyLabel || (verb + 'ing...')) : this.goLabel(opts))
       +   '</button>'
       /* ⚠ THE BACK BUTTON IS DISABLED MID-WRITE TOO. It restarts the import, and a
          restart during the write is how a screen ends up describing a record that
