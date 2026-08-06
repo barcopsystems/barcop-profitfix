@@ -1519,7 +1519,11 @@ S.HubOperatingExpenses = {
         +     '<option value="cash">Cash Outflow</option>'
         +   '</select></div>'
         +   '<div class="f" id="oexa-cat-wrap" style="width:230px;display:none;"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oexa-cat', key: 'expense_category', builtin: this.CATEGORIES, blank: true, blankLabel: 'Select category...' }) + '</div>'
-        +   '<div class="f" id="oexa-kind-wrap" style="width:230px;display:none;"><label>Kind</label>' + App.customSelect({ id: 'oexa-kind', builtin: this.CASH_ONLY_CATEGORIES.map(c => c.name), blank: true, blankLabel: 'Select kind...' }) + '</div>'
+        /* ⛔ `addCustom: false` — THE FIVE ARE A CLOSED SET, NOT A LIST TO EXTEND. They map to the
+           stored outflow `type`, so a typed-in kind has no type to become. Measured on the live app
+           before this flag existed: "Equipment Lease" saved `type: ''` and came back as "Other Cash
+           Outflow" — the name gone, the record degraded. */
+        +   '<div class="f" id="oexa-kind-wrap" style="width:230px;display:none;"><label>Kind</label>' + App.customSelect({ id: 'oexa-kind', builtin: this.CASH_ONLY_CATEGORIES.map(c => c.name), blank: true, blankLabel: 'Select kind...', addCustom: false }) + '</div>'
         // ⚠ VENDOR IS AN EXPENSE FIELD. A draw has no vendor, and leaving the box on the cash branch
         // would collect something the outflow record has nowhere to put — silent loss on save.
         +   '<div class="f" id="oexa-vendor-wrap" style="width:240px;display:none;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
@@ -3239,7 +3243,7 @@ S.HubOperatingExpenses = {
          ⚠ NO MANAGE LINK on this branch: the five are a fixed vocabulary tied to the outflow TYPE,
          not a list the operator curates. */
       +   (rec.migrated_from === 'cash_outflow'
-        ? '<div class="f"><label>Kind</label>' + App.customSelect({ id: 'oex-f-cat', builtin: this.CASH_ONLY_CATEGORIES.map(c => c.name), selected: rec.category, blank: false }) + '</div>'
+        ? '<div class="f"><label>Kind</label>' + App.customSelect({ id: 'oex-f-cat', builtin: this.CASH_ONLY_CATEGORIES.map(c => c.name), selected: rec.category, blank: false, addCustom: false }) + '</div>'
         : '<div class="f"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oex-f-cat', key: 'expense_category', builtin: this.CATEGORIES, selected: rec.category, blank: true, blankLabel: 'Select category...' }) + '</div>')
       +   '<div class="f"><label>Vendor</label><input type="text" id="oex-f-vendor" value="' + esc(rec.vendor) + '" placeholder="Who did you pay"/></div>'
       +   '<div class="f"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oex-f-amount" step="0.01" min="0" value="' + esc(rec.amount === '' ? '' : String(rec.amount)) + '" placeholder="0.00"/></div></div>'
