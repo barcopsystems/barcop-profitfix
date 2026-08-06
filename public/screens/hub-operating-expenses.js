@@ -1090,7 +1090,22 @@ S.HubOperatingExpenses = {
       recs = recs.filter(r => r.date && r.date <= todayStr && new Date(r.date + 'T00:00:00') >= cutoff);
     }
     // Newest first.
-    recs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    /* ⛔⛔⛔ THE SAME-DAY TIEBREAK, AND THE HISTORY LOG NEVER HAD IT UNTIL NOW.
+       This sorted by DATE ALONE, so rows sharing a day came out in whatever order the records
+       happened to sit in — and that visibly reshuffled after a re-seed. The month cards fixed
+       exactly this and kept the fix to themselves; when item T5 deleted `_monthCardHtml` the log
+       became the only renderer and inherited the original defect.
+       ⭐ FOUND BY A HARNESS THROWING, NOT BY READING THE DIFF: `verify-opex-series-chrome` W5-W7
+       lifted the month card to prove "biggest first within a day, stable however the records are
+       stored". Chasing that throw is what showed the property had no home left — which is [[the-loop]]
+       #123's whole point, that a retirement drops coverage unless every assertion is checked for
+       something that survives.
+       ⚠ THE COMPARATOR IS THE SHIPPED ONE, lifted from the deleted card rather than re-invented, so
+       the order an operator already knows does not change: newest day first, then biggest amount,
+       then category to settle a true tie. */
+    recs.sort((a, b) => (b.date || '').localeCompare(a.date || '')
+      || ((parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0))
+      || String(a.category || '').localeCompare(String(b.category || '')));
     return recs;
   },
 
@@ -1280,12 +1295,9 @@ S.HubOperatingExpenses = {
     this._rerender();
   },
 
-  _nextMonthKey(mk) {
-    const y = parseInt(mk.slice(0, 4), 10);
-    let m = parseInt(mk.slice(5, 7), 10) + 1, ny = y;
-    if (m > 12) { m = 1; ny = y + 1; }
-    return ny + '-' + String(m).padStart(2, '0');
-  },
+  /* ⛔ THE NEXT-MONTH KEY HELPER WAS DELETED HERE (item T5). Its only caller built the Next Month
+     card, which Kyle removed at build pieces 3+4 — generator-era furniture for a generator that no
+     longer exists. Dead by fixpoint, exactly like the card builder above it. */
 
   // True when this entry's recurring series ends within ~2 months (or has ended).
   _isSeriesEnding(r) {
@@ -1408,58 +1420,9 @@ S.HubOperatingExpenses = {
   // section name is the first column header (no separate header row), so the
   // header reads "Recurring | Category | Vendor | Amount". opts.next = the
   // next-month card (recurring shows as Expected, not booked).
-  _monthCardHtml(monthKey, opts) {
-    opts = opts || {};
-    const fmt$ = (v) => App.fmtCurrency(v || 0);
-    // ⛔ `expenseRows`, not `records` — this card printed Owner Draw and Loan Payment rows with
-    // working Edit / Delete / Stop buttons, under a headline (`_sumMonth`) that correctly excluded
-    // them, so the list did not add up to its own total. Worse, those buttons write only the ledger
-    // half, and the reconcile silently reverted the operator's edit on the next login.
-    const recs = this.expenseRows().filter(r => r && String(r.date || '').slice(0, 7) === monthKey);
-    /* ⚠ A TIEBREAK, because recurring bills all fall on the same day and the order was then whatever
-       order the records happened to sit in — it visibly reshuffled after a re-seed. Biggest first
-       within a day is what an operator scans for; category settles a true tie so the list is stable
-       between renders. */
-    const byDate = (a, b) => String(a.date || '').localeCompare(String(b.date || ''))
-      || ((parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0))
-      || String(a.category || '').localeCompare(String(b.category || ''));
-    const recurring = recs.filter(r => r.recurring || r.recurring_parent).sort(byDate);
-    const variable  = recs.filter(r => !(r.recurring || r.recurring_parent)).sort(byDate);
-    const expected  = opts.next ? this._expectedRecurring(monthKey) : [];
-
-    const emptyRow = (txt) => '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">' + txt + '</td></tr>';
-    const expectedRow = (p) => '<tr style="opacity:0.6;">'
-      + '<td data-label="Date" style="color:var(--t3);white-space:nowrap;">Expected</td>'
-      + '<td style="color:var(--t2);">' + esc(p.category || '') + this._recurTag(p) + '</td>'
-      + '<td style="color:var(--t2);">' + esc(p.vendor || '') + '</td>'
-      + '<td style="color:var(--t2);">' + fmt$(p.amount) + '</td>'
-      /* ⭐ BUILD ORDER C — THE EXPECTED ROW IS INFORMATION, NOT A CONTROL. It carried a Stop button
-         because a typed series had to be told to end; a series now ends by not happening, and
-         `recurringBills` drops it after one missed cycle. A button that restates what the data
-         already decides is chrome the operator has to keep true by hand. */
-      + '<td class="no-print"></td></tr>';
-    // The first column header carries the section name; the rest are the columns.
-    const sectionCard = (name, rowsHtml) => '<div class="card" style="margin-bottom:14px;overflow-x:auto;">'
-      + '<table class="row-list">'
-      +   '<colgroup><col style="width:13%"><col style="width:27%"><col style="width:24%"><col style="width:14%"><col style="width:22%"></colgroup>'
-      +   '<thead><tr><th>' + name + '</th><th>Category</th><th>Vendor</th><th>Amount</th><th class="no-print"></th></tr></thead>'
-      +   '<tbody>' + rowsHtml + '</tbody>'
-      + '</table></div>';
-
-    const recRows = (recurring.length || expected.length)
-      ? recurring.map(r => this._logRowHtml(r)).join('') + expected.map(expectedRow).join('')
-      : emptyRow('No recurring bills ' + (opts.next ? 'expected next month.' : 'this month.'));
-    const varRows = variable.length
-      ? variable.map(r => this._logRowHtml(r)).join('')
-      : emptyRow(opts.next ? 'Nothing logged for next month yet.' : 'No variable expenses logged this month yet.');
-
-    const heading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
-      + '<div class="sh" style="margin:0;">' + (opts.next ? 'Next Month' : 'This Month') + ' · ' + esc(this._monthLabel(monthKey)) + '</div>'
-      + (opts.exportId ? '<button class="btn btn-ghost btn-sm no-print" id="' + opts.exportId + '">Export PDF</button>' : '')
-      + '</div>';
-    const wrap = opts.wrapId ? ' id="' + opts.wrapId + '"' : '';
-    return heading + '<div' + wrap + '>' + sectionCard('Recurring', recRows) + sectionCard('Variable', varRows) + '</div>';
-  },
+  /* ⛔ `_monthCardHtml` WAS DELETED HERE (item T5). It built the This Month / Next Month
+     cards, and Kyle removed those at build pieces 3+4 — generator-era furniture for a generator
+     that no longer exists. Nothing else ever called it, so it went with its own render. */
 
   // ── The top of the page: the import banner, the tab's stat card, and the two month notes ──
   _renderCurrent() {

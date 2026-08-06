@@ -710,12 +710,29 @@ S.WeekReview = {
     const meRun  = rawRun('books_report_run_monthend');
     const reportsWk = (pnlRun && this._inWeek(String(pnlRun).slice(0, 10)) ? 1 : 0) + (meRun && this._inWeek(String(meRun).slice(0, 10)) ? 1 : 0);
 
-    const STEPS = [
-      { key: 'expenses', label: 'Logged the month\'s expenses' },
-      { key: 'pnl',      label: 'Generated the P&L brief' },
-      { key: 'review',   label: 'Reviewed the income statement' },
-      { key: 'generate', label: 'Generated Month-End Books' }
-    ];
+    /* ⛔⛔ THE STEP SET COMES FROM THE COCKPIT NOW. IT WAS HAND-COPIED AND IT HAD ALREADY DRIFTED
+       TWICE — Kyle spotted the second one: *"the week review 4 steps don't match books now."*
+       ⚠ THE SHARPEST PART, AND IT WAS LIVE BEFORE THIS PIECE: `doneCount` on the line above ALREADY
+       reads `BH.ORDER`, so the header counted one set ("0 of 4") while the rows below it listed a
+       DIFFERENT four. Item 18 added "the weeks are all in" to the cockpit and this list never
+       learned it; build piece 5 removed the weekly-P&L step and this list still showed it. So the
+       card could say 0 of 4 with a tick against a step that is not one of the four.
+       ⭐ THE SET IS THE COCKPIT'S, THE WORDS ARE THIS SCREEN'S. The two voices are deliberately
+       different — the cockpit INSTRUCTS ("Log this month's operating expenses"), the week review
+       REPORTS ("Logged the month's expenses") — so the labels stay here and only the membership is
+       shared. `_META`'s own title is the fallback, which means a step added to the cockpit shows up
+       here immediately rather than silently vanishing from the review ([[the-loop]] #45: one fact,
+       every reader). */
+    const PAST = {
+      expenses: 'Logged the month\'s expenses',
+      weeks:    'Confirmed the month\'s weeks',
+      review:   'Reviewed the income statement',
+      generate: 'Generated Month-End Books'
+    };
+    const STEPS = (BH.ORDER || []).map(k => ({
+      key: k,
+      label: PAST[k] || ((BH._META && BH._META[k] && BH._META[k].title) || k)
+    }));
 
     const activity = this._actRow([
       this._act(billsWk, 'Bills Logged'), this._act(outflowWk, 'Outflows Logged'), this._act(reportsWk, 'Reports Run')
