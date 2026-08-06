@@ -2796,9 +2796,18 @@ S.HubOperatingExpenses = {
             addCustom: false })
       + '</div>'
       /* ⚠ THE COUNT IS ON THE BUTTON, so a press can never move a number the operator did not see.
-         Disabled at zero for the same reason the Add button is. */
-      + '<div><button type="button" class="btn btn-primary btn-sm" id="oex-rt-move"'
-      + (n ? '' : ' disabled') + '>Move To' + (n ? ' (' + n + ')' : '') + '</button></div>'
+         Disabled at zero for the same reason the Add button is.
+         ⭐ THE `.f` + SPACER LABEL IS THE APP'S OWN CONVENTION for a button standing in a labelled
+         form row (`ic-report-variance`'s Reset), not something invented here — and the explicit
+         height is what puts its centre on the same line as the picker beside it. Kyle, walking the
+         pushed build: *"the 'move to' button needs vertically centered with the drop down cell."*
+         The row is bottom-aligned, so a 22px button against a 34px input is flush at the bottom and
+         6px low through the middle. 34px is `.form-input`'s own box — 7px padding top and bottom,
+         1px border each side, an 18px line box at 13px Barlow. If that padding ever changes, this
+         is the line that has to follow it, and G7b is what will say so. */
+      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label>'
+      +   '<button type="button" class="btn btn-primary" id="oex-rt-move" style="height:34px;"'
+      +   (n ? '' : ' disabled') + '>Move To' + (n ? ' (' + n + ')' : '') + '</button></div>'
       + (r.moveNote ? '<span style="font-size:11px;color:var(--gold);align-self:center;">' + esc(r.moveNote) + '</span>' : '')
       + '</div>';
   },
@@ -2866,14 +2875,27 @@ S.HubOperatingExpenses = {
       placed: !!x.placed,
       // Carried for the grouper's head, which needs a countable noun rather than the row's sentence.
       status: x.status,
-      /* ⚠ THE OUTCOME COLUMN IS QUIET UNLESS THERE IS SOMETHING TO SAY. "Adding this expense" on
-         every row of a section headed "9 expenses going into Utilities" is the section said twice.
-         ⛔ AND IT IS WHERE THE ELSEWHERE REASON LIVES. Kyle: *"the column 'what happens', what is it
-         for now? it stays empty on everything except the not going in... at least put the 'tracked
-         in labor' or 'belongs in cash outflows' in the what happens column so it is used."* It was a
-         grey sub-note under the date, which is both the wrong place and the reason it read as
-         advisory rather than as what the screen is going to do. */
-      note: x.status === 'new' ? (x.excluded ? (x.elsewhere || '') : '') : (NOTE[x.status] || ''),
+      /* ⭐⭐⭐ THE COLUMN SAYS WHAT HAPPENS TO **THIS** ROW (Kyle, 2026-08-06, walking the pushed
+         build): *"the 'what happens' column is blank for almost everything.. so either get rid of it
+         or make it actually useful... saying 'what happens' on a column header and then it tells the
+         user nothing.. makes no sense."*
+         ⛔ HE IS OVERRULING THIS FUNCTION'S OWN PREVIOUS REASONING, AND HE IS RIGHT. It said the
+         column should stay QUIET on a landing row because "the section head already names the
+         category, and saying it again is the section said twice." That argument assumes the section
+         head is on screen — and every category section renders COLLAPSED, so the head is one line
+         above a card the operator has to open, while the column header sits over every row of every
+         card promising to tell them something.
+         ⛔⛔ AND THE UNPLACED WORDING IS NOT "logs as Other". Kyle offered that spelling and it is
+         FALSE: item 15 made the unplaceable fallback EMPTY on purpose, precisely so a row Bar Cop
+         could not read and a row the operator chose stop being one record on Schedule C line 27a.
+         The row really does go in, really does carry no category, and really is held off the P&L
+         until somebody sorts it — so the note says untyped, and says what to do about it.
+         ⚠ THE HELD-BACK AND NOT-GOING-IN SENTENCES ARE UNCHANGED. Those were already the useful
+         half of this column and they are the reason it exists at all. */
+      note: x.status !== 'new' ? (NOTE[x.status] || '')
+        : x.excluded ? (x.elsewhere || '')
+        : x.placed ? ('Logs to ' + x.category)
+        : 'Logs untyped, pick a type',
       notes: x.notes || [],
       lands: x.status === 'new' && !x.excluded,
       /* ⭐ A6 — GOING IN, BUT NOT ANSWERED. The shell counts these onto the button so a press can
