@@ -171,86 +171,16 @@ S.HubOperatingExpenses = {
     return row;
   },
 
-  /* ⭐⭐⭐ THE MIGRATION — PHASE 1, AND IT IS DELIBERATELY INVISIBLE.
-     Every cash outflow becomes a ledger row. Nothing reads those rows as outflows yet: the engine
-     still reads `App.data.cash_outflows`, Books excludes their categories from the Income
-     Statement, and `_sumMonth`/`_sumYTD` exclude them from anything headed "operating expenses".
-     So a successful run changes not one figure anywhere in the app, which is exactly what
-     `verify-outflow-migration-equality.js` proves across eight numbers from the cash engine and
-     break-even. The CUTOVER — pointing `CashEngine.cashOutflows()` at the ledger — is a separate
-     one-line change made only after this has run and been looked at.
-
-     ⛔ ADDITIVE. `App.data.cash_outflows` is not touched, not emptied and not deleted. The old
-     store stays readable for as long as it takes to trust this, and Phase 5 removes it.
-
-     ⛔ RE-RUNNABLE WITHOUT DAMAGE, WHICH IS THE PROPERTY THAT MATTERS MOST. The marker is written
-     only AFTER the write lands, so a refused write leaves it unset and the whole thing retries on
-     the next login — and that retry is the dangerous moment ([[test-the-retry]]). Two things make it
-     safe: ids are preserved, so `putRecordsBulk` upserts rather than duplicating, and any row whose
-     id is already in the ledger is skipped outright. A migration that minted new ids would double
-     every outflow on the second attempt.
-
-     ⛔ NEVER OFF A CACHE-SERVED LOAD. `DB._loadDegraded` is set whenever any array this login came
-     from the offline cache, and app.js's own comment explains why that must block a permanent
-     marker: a cached read is indistinguishable from a real one, so migrating off a partial picture
-     would mark the job done having converted only the records the cache happened to hold. */
-  async migrateCashOutflowsOnce() {
-    if (typeof App === 'undefined' || !App.data) return false;
-    const marks = App.data.migrated_kinds = App.data.migrated_kinds || {};
-    if (marks.cash_outflow_to_ledger) return false;
-    if (typeof DB !== 'undefined' && DB._loadDegraded) return false;
-    const src = Array.isArray(App.data.cash_outflows) ? App.data.cash_outflows : [];
-    const arr = this.records();
-    const have = {};
-    arr.forEach(r => { if (r && r.id != null) have[r.id] = true; });
-    const rows = src.map(o => this.migrateCashOutflowRow(o)).filter(r => r && !have[r.id]);
-    /* Nothing to move is a real, successful outcome — a bar that never logged an outflow, or a
-       second login after the first run. Marking it done is what stops this walking the store on
-       every load forever. */
-    if (!rows.length) { marks.cash_outflow_to_ledger = true; await App.saveKey('migrated_kinds'); return false; }
-    arr.push.apply(arr, rows);
-    let ok = false;
-    // quiet: this fires from a boot, never from something the operator did — the same policy the
-    // reconcile below states for the identical situation, and the catch-up above already uses.
-    // A red "save failed" toast at login, for a background job nobody asked for, is not actionable.
-    try { ok = await App.putRecordsBulk('core', 'operating_expense', rows, { quiet: true }); }
-    catch (e) { ok = false; }
-    // A refused write takes the rows back out of memory and leaves the marker unset, so the next
-    // login tries again against a store that never saw them.
-    if (!ok) { App.dropRows(arr, rows); return false; }
-    marks.cash_outflow_to_ledger = true;
-    await App.saveKey('migrated_kinds');
-    return true;
-  },
-
-  /* ⭐⭐⭐ THE RECONCILE — PHASE 1 STEP 7. THE LEDGER'S CASH ROWS ARE A PURE FUNCTION OF THE OLD
-     STORE, AND THIS IS WHAT KEEPS THEM THAT WAY.
-     The migration above is one-time and marked. This runs on EVERY load, right after it, and is the
-     repair for everything the one-time pass cannot cover:
-       · a live write whose ledger half was refused (the door writes the old store first on purpose)
-       · a delete whose old-store half was refused, which restores the twin
-       · outflows that arrived by a path the migration never saw — the sample-data seed, or an
-         account whose migration was skipped because that login was served from cache
-     Without it, "the ledger holds every dollar out" is true only until the first refused write, and
-     nothing would ever say so.
-
-     ⛔ ADDITIVE, AND THAT IS THE WHOLE SAFETY ARGUMENT. It only ever writes rows INTO the ledger —
-     it never deletes one. A pass that removed ledger rows with no matching outflow would be correct
-     on paper and catastrophic on a login where `cash_outflows` came back empty for any reason other
-     than the operator emptying it. The door's delete order is what makes a removal pass unnecessary:
-     the ledger row goes first, so an orphan is never created.
-
-     ⛔ NEVER OFF A CACHE-SERVED LOAD, for the same reason the migration refuses one: a partial
-     picture would rewrite ledger rows from outflows that are not all there.
-     ⚠ A row already in the ledger under a DIFFERENT origin is left alone. Only rows this mechanism
-     created (`migrated_from: 'cash_outflow'`) may be rewritten, so an id collision with a real
-     operating expense can never overwrite the operator's own bill.
-     ⚠ `created_at` is provenance, not money: the mapping mints one when the source has none, so
-     comparing it would make every load rewrite every row forever. The stored one is kept. */
-  async reconcileCashOutflowLedger() {
-    return this._reconcileLedgerFrom(App.data && App.data.cash_outflows,
-      this.migrateCashOutflowRow, 'cash_outflow');
-  },
+  /* ⛔ `migrateCashOutflowsOnce` AND `reconcileCashOutflowLedger` WERE DELETED HERE (build order E).
+     Both existed to keep the legacy `cash_outflow` store and the ledger honest with each other: the
+     one-time pass copied every outflow across, and the reconcile ran on every load to repair a
+     refused half-write. E drops the old store, so there is no second store to reconcile with and
+     nothing left to migrate — every cash row now IS the ledger row, written once.
+     ⭐ THE MAPPING ITSELF STAYS, right above: the door and the seed both build their rows with it,
+     and it is what keeps `category` derived from `type` in one place.
+     ⚠ THE MARKER WENT TOO (`migrated_kinds.cash_outflow_to_ledger`). It is still sitting in the
+     `migrated_kinds` map on every live account, harmlessly — nothing reads it, and clearing it would
+     be a write to every operator's data for no benefit. */
   /* ⭐ PHASE 2, the same job for the maintenance log. `App.shiftData`, not `App.data` — the
      maintenance tracker lives in the Shift Control module, which is a different store entirely. */
   async reconcileMaintenanceLedger() {
@@ -533,28 +463,38 @@ S.HubOperatingExpenses = {
     return hit ? hit.type : '';
   },
 
-  /* ⛔⛔ EDITING A CASH ROW GOES TO THE OPERATOR'S OWN RECORD, NOT TO THE LEDGER TWIN. Same defect
-     as the delete above and found the same way: the twin is DERIVED, so `reconcileCashOutflowLedger`
-     rewrites it from `cash_outflows` on the next load and the edit silently reverts. The edit has to
-     land on the source; the twin follows.
-     ⚠ `_writePair` writes the operator's store FIRST and the ledger best-effort, so a refused save
-     is reported on the store they can see, and a refused TWIN write leaves the ledger lagging where
-     the reconcile repairs it. Returning its boolean means the caller can keep the form open on a
-     refusal instead of claiming a save that did not happen ([[test-the-retry]]). */
+  /* ⛔⛔ THE EDIT READS THE LEDGER NOW (build order E). It used to look the record up in
+     `App.data.cash_outflows`, because that store was the source and the ledger row was DERIVED from
+     it — editing the twin directly meant the boot reconcile rewrote it and the edit silently
+     reverted. With one store the source IS the ledger row, and reading it from anywhere else is the
+     drift this rebuild exists to end.
+     ⭐⭐ AND IT CLOSED A REAL HOLE, which is why the change is worth more than a tidy-up.
+     `operating_expense` is NONWINDOWED and `cash_outflow` never was (db.js), so the ledger loads in
+     full forever while the old store loaded 24 months. This screen lists LEDGER rows — so a cash row
+     older than the window rendered with an Edit button, and the lookup above found nothing and
+     returned false. A live button that silently did nothing. Nothing has aged out yet (outflows only
+     reached the ledger on 2026-08-04), so it was a hole rather than a live defect. Pinned as block F
+     of `verify-cash-doors-equality.js`, which reproduces the old refusal and proves the new reach.
+     ⛔ THE STAMP IS THE FILTER, NOT THE CATEGORY. An expense the operator filed under a category
+     they named "Owner Draw" is THEIR bill; editing it as a cash row would restate their P&L
+     ([[the-loop]] #115). Same discriminator the engine's reader uses.
+     ⚠ It still writes through `_writeCashRow`, so the row goes back through the ONE mapping and
+     `category` cannot drift away from `type`. Returning its boolean is what lets the caller keep the
+     form open on a refusal instead of claiming a save that did not happen ([[test-the-retry]]). */
   async _editCashRow(id, patch) {
-    const src = (App.data && Array.isArray(App.data.cash_outflows)) ? App.data.cash_outflows : [];
-    const cur = src.find(o => o && o.id === id);
+    const cur = this.records().find(r => r && r.id === id && r.migrated_from === 'cash_outflow');
     if (!cur) return false;
     const next = Object.assign({}, cur);
     if (patch.date != null)   next.date = patch.date;
     if (patch.amount != null) next.amount = patch.amount;
     if (patch.notes != null)  next.notes = patch.notes;
-    // A category change is a TYPE change on this store — the twin's category is derived from it.
+    // A category change is a TYPE change: the mapping derives the category back from it, so the two
+    // can never disagree. `_typeForCashCategory` returns '' for a bill category, leaving type alone.
     if (patch.category != null) {
       const t = this._typeForCashCategory(patch.category);
       if (t) next.type = t;
     }
-    return await S.HubCashOutflows._writePair(next);
+    return await S.HubCashOutflows._writeCashRow(next);
   },
 
   /* What the exported PDF is called. It must name the SET the export contains, because the chip
@@ -2567,7 +2507,7 @@ S.HubOperatingExpenses = {
   /* ⭐⭐ A1 — ONE IMPORTED ROW AS THE OPERATOR'S OWN CASH-OUTFLOW RECORD. PURE, like every other
      mapping in this rebuild, so the whole write can be rehearsed and pinned before it touches an
      account. Returns null for anything that is not a cash-only category, so the caller can just ask.
-     ⛔ THE ID IS THE LEDGER ROW'S. `_writePair` builds the twin with `migrateCashOutflowRow`, which
+     ⛔ THE ID IS THE LEDGER ROW'S. `_writeCashRow` builds the twin with `migrateCashOutflowRow`, which
      preserves the id — so the outflow and its ledger row are one record with one identity, exactly
      as a hand-typed one is. A fresh id here would mint a second copy the reconcile could never
      match up. */
@@ -3261,7 +3201,7 @@ S.HubOperatingExpenses = {
        `CashEngine.cashOutflows()` cannot see at all — so the draw would sit on the Money Out screen
        as a fixed cost and never reach the forecast. The orphan shape ([[the-loop]] #115), and E4 of
        `verify-money-out-write-doors` has been pinning that constraint since the day cash rows became
-       reachable. The answer is not a new path, it is the EXISTING one: `_writePair`. */
+       reachable. The answer is not a new path, it is the EXISTING one: `_writeCashRow`. */
     const _landing    = built.list.filter(x => x.status === 'new' && !x.excluded);
     const _cashPicks  = _landing.filter(x => this.isCashOnlyCategory(x.rec.category));
     const toAdd       = _landing.filter(x => !this.isCashOnlyCategory(x.rec.category)).map(x => x.rec);
@@ -3310,14 +3250,20 @@ S.HubOperatingExpenses = {
         + 'Could not save the import. Nothing was changed, check your connection and try again.</div>';
       return;
     }
-    /* ⭐⭐⭐ THE CASH ROWS, AFTER THE BILLS AND ONLY IF THE BILLS LANDED, THROUGH `_writePair`.
-       ⛔ THE ORDER IS THE DESIGN, and it is the same argument as `_writePair`'s own: two stores
-       cannot be written in one request, so pick the order that makes every failure land somewhere
-       repairable. Bills first means a refused bulk aborts before a single outflow exists — nothing
-       to duplicate on the retry. Cash after means a refused pair leaves the bills in, and the retry
-       finds them ALREADY LOGGED because `_dup` now reads the whole ledger, so pressing Add again
-       re-attempts only what failed. [[test-the-retry]]: a failed write is recoverable, the SECOND
-       attempt is what makes damage permanent.
+    /* ⭐⭐⭐ THE CASH ROWS, AFTER THE BILLS AND ONLY IF THE BILLS LANDED, THROUGH `_writeCashRow`.
+       ⛔ THE ORDER IS THE DESIGN: pick the order that makes every failure land somewhere repairable.
+       Bills first means a refused bulk aborts before a single cash row exists — nothing to duplicate
+       on the retry. Cash after means a refused cash write leaves the bills in, and the retry finds
+       them ALREADY LOGGED because `_dup` reads the whole ledger, so pressing Add again re-attempts
+       only what failed. [[test-the-retry]]: a failed write is recoverable, the SECOND attempt is what
+       makes damage permanent.
+       ⚠ THE ORIGINAL REASON WAS "two stores cannot be written in one request" — true until build
+       order E dropped the second store. The order still matters for the retry argument above, which
+       never depended on there being two.
+       ⭐ AND E MADE `cashFailed` HONEST. `_writePair` returned TRUE as soon as the operator's own
+       store took the row, so a refused LEDGER write counted as SAVED — the operator was told the row
+       landed while the forecast could not see it until the next boot reconcile repaired it. One
+       store means the count below is what actually reached the server.
        ⛔ BARE CALL, NOT GUARDED. A guard would mean "if the outflow screen has not loaded, write
        half a record" ([[the-loop]] #40) — and the screen object is always loaded, which is exactly
        why item 19 stage 2 wrote that constraint down. The manual form's cash branch calls it the
@@ -3327,7 +3273,7 @@ S.HubOperatingExpenses = {
       const out = this._outflowFromLedgerRow(_cashPicks[i].rec);
       if (!out) { cashFailed++; continue; }
       let landed = false;
-      try { landed = await S.HubCashOutflows._writePair(out); } catch (e) { landed = false; }
+      try { landed = await S.HubCashOutflows._writeCashRow(out); } catch (e) { landed = false; }
       if (landed) cashSaved++; else cashFailed++;
     }
     /* ⛔ A REFUSED CASH WRITE KEEPS THE SCREEN, exactly as a refused bulk does. The bills that DID
@@ -3615,14 +3561,14 @@ S.HubOperatingExpenses = {
     const showErr = (m) => { const e = g('oexa-err'); if (e) { e.textContent = m; e.style.display = 'block'; } };
     /* ⭐⭐ ITEM 19 STAGE 2 — THE CASH BRANCH, AND IT GOES FIRST SO THE EXPENSE PATH BELOW IS
        UNTOUCHED. The operator declared the type, so nothing is inferred from a category name here.
-       ⛔ IT WRITES THROUGH `_writePair`, WHICH IS THE ONLY SANCTIONED PATH. A plain
+       ⛔ IT WRITES THROUGH `_writeCashRow`, WHICH IS THE ONLY SANCTIONED PATH. A plain
        `putRecord('operating_expense', ...)` would create a cash-only row with no `migrated_from`,
        which `_isOperatingRow` counts as a BILL and `CashEngine.cashOutflows` cannot see — the
-       orphan shape ([[the-loop]] #115). `_writePair` writes the operator's store first and the
+       orphan shape ([[the-loop]] #115). `_writeCashRow` writes the operator's store first and the
        ledger twin after, so a refused half leaves the ledger LAGGING, which the boot reconcile
        repairs. Bare call, not guarded: a guard would mean "if the outflow screen has not loaded,
        write half a record" ([[the-loop]] #40).
-       ⚠ THE REFUSAL IS REPORTED. `_writePair` returns false when the operator's own store refuses,
+       ⚠ THE REFUSAL IS REPORTED. `_writeCashRow` returns false when the operator's own store refuses,
        and saying so keeps the typed values on screen instead of claiming a save that did not
        happen ([[test-the-retry]] — the retry is where a half-save becomes permanent). */
     const logType = g('oexa-logtype')?.value || '';
@@ -3640,7 +3586,7 @@ S.HubOperatingExpenses = {
       /* ⛔ NO SCHEDULE IS WRITTEN ONTO A NEW OUTFLOW (build order C2). A stored `recurring` flag is
          an instruction to every forward reader and outranks the ledger for as long as it sits there.
          `CashEngine.deriveRecurringOutflows` recognises a commitment from what actually happened. */
-      if (!(await S.HubCashOutflows._writePair(out))) {
+      if (!(await S.HubCashOutflows._writeCashRow(out))) {
         showErr('Could not save. Check your connection and try again.');
         return;
       }
@@ -3803,11 +3749,13 @@ S.HubOperatingExpenses = {
       if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
       const updates = { date, category, vendor, amount, notes };
       /* ⛔⛔ A CASH ROW IS EDITED AT ITS SOURCE, AND THE REST OF THIS HANDLER MUST NOT RUN ON ONE.
-         The ledger row is DERIVED: `reconcileCashOutflowLedger` rewrites it from `cash_outflows` on
-         every load, so writing the edit here would look right and silently revert on the next
-         login. It also has no series machinery — a draw has no recurring parent, no term, no skip
+         It used to be that the ledger row was DERIVED — a boot reconcile rewrote it from the
+         separate `cash_outflows` store on every load, so writing the edit here looked right and
+         silently reverted on the next login. Build order E dropped that store, so the reason has
+         changed but the rule has not: `_editCashRow` re-derives the row through the ONE mapping, so
+         `category` cannot drift away from `type`. It also has no series machinery — a draw has no recurring parent, no term, no skip
          months — so every branch below is about a shape this row does not have.
-         ⚠ THE REFUSAL IS REPORTED, NOT SWALLOWED: `_writePair` returns false when the operator's own
+         ⚠ THE REFUSAL IS REPORTED, NOT SWALLOWED: `_writeCashRow` returns false when the operator's own
          store refuses, and keeping the form open with the message is what makes the retry safe
          ([[test-the-retry]] — the second attempt is where a half-save becomes permanent).
          Pinned by verify-money-out-write-doors.js section B. */
@@ -3942,8 +3890,10 @@ S.HubOperatingExpenses = {
        A migrated recurring outflow's twin carries `recurring: true` — the migration copies it on
        purpose, or the forecast stops projecting the loan — so `_seriesOf` calls it a live series and
        this row renders **Stop**. Stopping it here wrote `stopped_ym` to the LEDGER TWIN only; the
-       operator's record in `cash_outflows` never heard, and the boot reconcile rewrites the twin
-       from it. Stop appeared to work and undid itself on the next login.
+       operator's record in the separate `cash_outflows` store never heard, and the boot reconcile
+       rewrote the twin from it, so Stop appeared to work and undid itself on the next login.
+       ⚠ Build order E dropped that store, so THAT failure is no longer the reason to delegate. The
+       reason below is, and it is the bigger one.
        ⛔ DELEGATED, NOT REIMPLEMENTED. `HubCashOutflows.stop` carries two measured decisions this
        function must not second-guess: `stopped_ym` ALONE (clearing `recurring` on a store that
        PROJECTS its history deleted every payment the series ever made — YTD $12,950 → $0.00), and
@@ -3999,7 +3949,7 @@ S.HubOperatingExpenses = {
        been written as a plain expense under a cash-only category with NO `migrated_from`: counted as
        a bill by `_isOperatingRow`, invisible to the forecast, absent from the Cash Outflows screen.
        That is the orphan shape ([[the-loop]] #115) this rebuild exists to remove.
-       Delegated so the copy goes down the same `_writePair` path as the original. Pinned as H6. */
+       Delegated so the copy goes down the same `_writeCashRow` path as the original. Pinned as H6. */
     if (src.migrated_from === 'cash_outflow') return S.HubCashOutflows.repeat(id);
     let date = App.todayLocal();
     const d = new Date(String(src.date).length <= 10 ? src.date + 'T00:00:00' : src.date);
@@ -4057,17 +4007,18 @@ S.HubOperatingExpenses = {
     if (!ok) return;
     /* ⛔⛔ A CASH ROW IS NOT OURS TO DELETE ALONE, AND STAGE 1 IS WHAT MADE THIS REACHABLE. The
        Money Out chip put owner draws, loan payments and tax remittances in this log, and every row
-       here renders Edit and Delete. Removing only the ledger row leaves the operator's own record
-       in `cash_outflows`, and `reconcileCashOutflowLedger` runs on EVERY load and is additive — so
-       MEASURED end to end: the row came straight back on the next login. The Delete button did
-       nothing, permanently, which is S226a's exact defect in a new costume.
-       `_deletePair` is the sanctioned path and carries the order contract (ledger first, so a
-       refused old-store delete leaves the ledger LAGGING and the reconcile repairs it). Bare call,
+       here renders Edit and Delete. When a cash row lived in a second store, removing only the
+       ledger row left the operator's own record behind and the additive boot reconcile put the
+       ledger row straight back — MEASURED end to end: the Delete button did nothing, permanently,
+       which is S226a's exact defect in a new costume.
+       ⚠ Build order E dropped that store, so a delete cannot half-happen any more. What `_deleteCashRow`
+       still carries is the guard that matters MORE now than it did: the ledger holds the operator's
+       real BILLS alongside these, so a delete keyed on the id alone would take one. Bare call,
        not guarded: a guard here would mean "if the outflow screen has not loaded, delete half a
        record", which is the silent-wrong-state trade this codebase gets wrong most often
        ([[the-loop]] #40). Pinned by verify-money-out-write-doors.js section A. */
     if (rec.migrated_from === 'cash_outflow') {
-      await S.HubCashOutflows._deletePair(id);
+      await S.HubCashOutflows._deleteCashRow(id);
       this._rerender();
       return;
     }

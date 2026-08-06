@@ -107,9 +107,11 @@ S.HubBreakEven = {
     /* ⛔⛔ THE NUT IS OPERATING BILLS ONLY, AND A CASH-ONLY ROW IS NOT ONE (2026-08-04, my miss,
        found by Kyle on the live app). The outflow migration put every cash outflow into this array
        carrying its `recurring` fields, so a recurring owner draw, loan payment and tax remittance
-       all entered the nut. The loan payment entered it TWICE — once here, once through `debtAnnual`
-       below, which still reads the old `cash_outflows` store — so the break-even figure on the front
-       page moved the moment the migration ran.
+       all entered the nut. The loan payment entered it TWICE — once here, and once through
+       `debtAnnual` below, which at the time read the separate `cash_outflows` store — so the
+       break-even figure on the front page moved the moment the migration ran.
+       ⚠ That store was dropped by build order E; `debtAnnual` reads stamped ledger rows now. The
+       DOUBLE-COUNT this guard prevents is unchanged, because both figures come off one array.
        ⚠ Same rule as `CashEngine.bills()`, deliberately: two screens, one definition of what counts
        as a bill, which is what this file's own comment three lines down already demands. */
     const _OEX = (window.S && S.HubOperatingExpenses) || null;
@@ -145,8 +147,9 @@ S.HubBreakEven = {
     let annualOpex = recurring.reduce((s, r) =>
       s + (parseFloat(r.amount) || 0) * _OEX.recurringPerYear(r.frequency), 0);
     /* ⚠⚠ DEBT SERVICE BELONGS IN THE NUT, AND THIS FILE COULD NOT SEE IT (round 4, F3). It built its
-       whole fixed-cost figure from the operating-expense log, while loan and equipment payments live
-       in the SEPARATE cash_outflows store — and the comment directly above claims this nut "agrees
+       whole fixed-cost figure from the operating-expense log, while loan and equipment payments
+       lived at the time in the SEPARATE cash_outflows store (dropped by build order E; they are
+       stamped ledger rows now) — and the comment directly above claims this nut "agrees
        with Cash Position's reserve target", which round 3 taught to include them. Measured on the
        Anchor Bar's own data: Cash Position sized its reserve off $4,301.08/wk while this screen's
        Nut read $3,793.38 — the gap is the equipment loan exactly — and BREAK-EVEN SALES, the

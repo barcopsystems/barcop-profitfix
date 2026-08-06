@@ -683,6 +683,16 @@ S.HubSettings = {
     const _prevEvents = (DB._eventQueue && DB._setEventQueue) ? DB._eventQueue().slice() : null;
     try {
       if (hasData(backup.data)) App.data = backup.data;
+      /* ⛔ DROP RETIRED EVENT ARRAYS OUT OF A RESTORED BACKUP (build order E). `App.data` here is the
+         backup's own object, and a snapshot taken BEFORE a store was retired still carries its
+         array. That matters because `_configBlob` strips an array only while its kind is REGISTERED
+         — once the kind goes, the array stops being stripped, so the next config save would fold a
+         dead store full of money records into the user_data blob and keep it there forever.
+         ⚠ The records are not lost by this: every cash outflow became an `operating_expense` row at
+         the Phase 1 migration, and that array is in the same backup and is restored normally. This
+         drops a duplicate nothing reads, not a source.
+         ⚠ Add to this list when a kind is retired, or the same thing happens again quietly. */
+      ['cash_outflows'].forEach(k => { if (App.data && k in App.data) delete App.data[k]; });
       if (hasData(backup.inventoryData)) App.inventoryData = backup.inventoryData;
       if (hasData(backup.laborData))     App.laborData     = backup.laborData;
       if (hasData(backup.shiftData))     App.shiftData     = backup.shiftData;
@@ -1081,7 +1091,18 @@ S.HubSettings = {
     //    Recurring and anchored two months back so the Bridge reads recent history
     //    and the forecast projects them forward. The tax remittance is the classic
     //    killer: real money leaving on the 20th that was never yours to keep. ────
-    App.data.cash_outflows = [
+    /* ⭐ THE SEED IS A WRITE PATH TOO, AND AFTER BUILD ORDER E IT WRITES THE LEDGER DIRECTLY. These
+       five used to be assigned to `App.data.cash_outflows` and then copied across; the old store is
+       gone, so they are built in outflow shape purely as INPUT to the one mapping and land straight
+       in `operating_expenses`, before `seedEventStores('core')` below persists everything.
+       ⛔ THE MAPPING IS CALLED BARE, AND THE GUARD THAT USED TO WRAP IT WAS REMOVED DELIBERATELY.
+       It read `if (window.S && S.HubOperatingExpenses && …)`, which was defensible while
+       `reconcileCashOutflowLedger` ran on the next load and added anything missing. There is no
+       backstop now, so that guard would mean "if the expense screen has not loaded, seed a bar with
+       no draws, no loan and no tax remittances, quietly" — a demo whose Cash Bridge and 13-week
+       forecast are simply wrong, with nothing on screen saying so. A helper required for CORRECTNESS
+       gets a bare call ([[the-loop]] #40). */
+    [
       { id:uid(), date:monthAnchor(2, 1),  type:'draw', amount:4000, notes:'Owner draw',     recurring:true, recur_day:1,  created_at:new Date().toISOString() },
       { id:uid(), date:monthAnchor(2, 12), type:'loan', amount:2200, notes:'Equipment loan', recurring:true, term_months:24, recur_day:12, created_at:new Date().toISOString() },
       // Past tax remittances feed the Cash Bridge (where the profit went). The
@@ -1090,22 +1111,10 @@ S.HubSettings = {
       { id:uid(), date:monthAnchor(2, 20), type:'tax', amount:6750, notes:'Sales tax remittance', created_at:new Date().toISOString() },
       { id:uid(), date:monthAnchor(1, 20), type:'tax', amount:6850, notes:'Sales tax remittance', created_at:new Date().toISOString() },
       { id:uid(), date:monthAnchor(0, 20), type:'tax', amount:6800, notes:'Sales tax remittance', created_at:new Date().toISOString() }
-    ];
-    /* ⭐ THE SEED IS A WRITE PATH TOO — PHASE 1 STEP 7 OF THE ONE-LEDGER REBUILD. Every dollar out
-       belongs in the ledger, and these five arrive by a door the one-time migration cannot see: it
-       marks itself done on the first login, so a LATER re-seed would mint five fresh outflow ids
-       that never reach `operating_expenses` and simply vanish at the cutover. Built with the SAME
-       mapping every other door uses, and pushed before `seedEventStores('core')` below so they
-       persist with everything else.
-       ⚠ Guarded like the Bar Cop Audit block above rather than called bare, because there IS a
-       backstop here: `reconcileCashOutflowLedger` runs on the next load and adds anything missing.
-       Doing it inline as well is what makes the DEMO right, which never reloads. */
-    if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.migrateCashOutflowRow) {
-      App.data.cash_outflows.forEach(o => {
-        const led = S.HubOperatingExpenses.migrateCashOutflowRow(o);
-        if (led) App.data.operating_expenses.push(led);
-      });
-    }
+    ].forEach(o => {
+      const led = S.HubOperatingExpenses.migrateCashOutflowRow(o);
+      if (led) App.data.operating_expenses.push(led);
+    });
 
     // Pre-stamp the Fix view-tracking so the Cash Fix systems read on track from
     // the first look, the way a bar that has run Bar Cop for 90 days would: the

@@ -80,9 +80,12 @@ S.Hub = {
          match the label would be three more places to keep in step for no gain. The LABEL is what
          the operator reads.
          ⚠ AND THE CASH OUTFLOWS SCREEN OBJECT IS NOT AFFECTED BY LOSING ITS ROW — a nav row is not
-         what loads a screen. All four Money Out doors still call `S.HubCashOutflows._writePair` /
-         `._deletePair`, and a legacy declared series is still stoppable from the merged log under
-         the Cash Outflows chip (measured before this row was removed). */
+         what loads a screen. All four Money Out doors still call `S.HubCashOutflows._writeCashRow` /
+         `._deleteCashRow`, and a legacy declared series is still stoppable from the merged log under
+         the Cash Outflows chip (measured before this row was removed).
+         ⚠ Those two were `_writePair` / `_deletePair` until build order E, when they wrote a second
+         store as well. `verify-money-out-one-row.js` C2/C4 pin that they exist and are still reached
+         from here, so this note cannot go stale again without the gate saying so. */
       + row('operating-expenses', 'Money Out', 'expense')
       + row('permits', 'Licensing', 'shield')
       + '<div class="nav-section">Accounting</div>'

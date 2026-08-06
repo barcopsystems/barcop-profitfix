@@ -222,51 +222,43 @@ S.HubCashOutflows = {
       + '<tbody>' + rows + '</tbody></table></div>';
   },
 
-  /* ── ⭐⭐⭐ THE ONE WRITE PATH — PHASE 1 STEP 7 OF THE ONE-LEDGER REBUILD ──────────────────────
-     Every dollar that leaves the bank belongs in ONE ledger. Phase 1 copied the existing outflows
-     into `operating_expenses` under the five cash-only categories; these two helpers are what stop
-     the store drifting apart again, by making every door on this screen write BOTH places.
+  /* ── ⭐⭐⭐ THE ONE WRITE PATH — BUILD ORDER E, AND IT IS NOW LITERALLY ONE ──────────────────────
+     Every dollar that leaves the bank belongs in ONE ledger, and after E there is only one place it
+     can go. These two helpers are the whole write surface of this screen: Add, the modal save, Stop,
+     Repeat and Delete all come through here, and the census in `verify-outflow-write-path.js` is
+     what stops a sixth door being added beside them.
 
-     ⛔ WHY THE WRITE MOVES BEFORE THE READ, and it is the opposite of what the plan said. Pointing
-     `CashEngine.cashOutflows()` at the ledger first would mean every outflow logged afterwards is
-     written HERE, to the old store, and read from nowhere — it vanishes from the Cash Bridge, the
-     13-week forecast and Safe to Spend, silently, with the screen still showing it. So the write
-     moves first: the reader stays on `cash_outflows`, nothing on screen changes, and the ledger
-     quietly becomes complete. The reader flips afterwards, against a ledger that is already whole.
+     ⭐ WHAT E ACTUALLY REMOVED, so the history is not re-litigated. Phase 1 step 7 made every door
+     write BOTH stores, in a deliberate order, because two stores cannot be written in one request:
+     a WRITE did the old store first and a DELETE did the ledger first, so every possible refusal
+     left the ledger LAGGING rather than leading, and `reconcileCashOutflowLedger` repaired exactly
+     that on the next load. All of that machinery existed to keep two stores honest with each other.
+     With one store there is nothing to keep honest: a refusal is just a refusal, `putRecord` reverts
+     memory itself, and the operator is told. The order, the reconcile, the one-time migration and
+     its marker are gone because the problem they solved is gone — not because they were wrong.
 
-     ⛔ ONE MAPPING, NEVER TWO. The ledger row is built by `migrateCashOutflowRow` — the same pure
-     function the migration uses. A second hand-rolled shape here would agree with it today and
+     ⛔ ONE MAPPING, NEVER TWO. The ledger row is still built by `migrateCashOutflowRow`, the same
+     pure function the seed uses. A second hand-rolled shape here would agree with it today and
      diverge the first time either is touched, which is the exact drift this rebuild exists to end.
 
-     ⛔⛔⛔ THE ORDER IS CHOSEN SO THERE IS ONLY EVER ONE DIRECTION OF DRIFT, AND MY FIRST VERSION
-     GOT THIS WRONG. Two stores cannot be written in one request, so a refusal between the two
-     halves is always reachable. The obvious answer — write the ledger first and roll it back if the
-     old store refuses — DOES NOT WORK, because the rollback is a write to the same connection that
-     just refused one: it fails exactly when it is needed. Pinned and measured: a refused EDIT left
-     the ledger holding $9,999 while the old store kept $1,000, so a save the operator was TOLD had
-     failed would have quietly become real at the cutover.
-
-     So neither half rolls back. The order makes the residue harmless instead:
-       · a WRITE does the old store FIRST — a refused ledger write leaves the ledger MISSING a row
-       · a DELETE does the ledger FIRST — so a refused old-store delete also leaves the ledger
-         MISSING a row, never holding one the operator deleted
-     Every failure lands in the same state: the ledger is behind the old store, never ahead of it
-     and never disagreeing in a direction that invents money. `reconcileCashOutflowLedger` repairs
-     exactly that, additively, on the next load. Nothing has to undo anything.
-
-     ⚠ A union read ("both stores, deduped by id") was considered instead and it RESURRECTS DELETED
-     RECORDS — the delete removes the ledger row and the old-store row is picked straight back up.
-     Maintaining both until the old store is dropped in Phase 5 is the only shape without that hole. */
-  async _writePair(rec) {
-    // The operator's record first, so what they see on screen is exactly what it was before this
-    // step existed. Their save succeeds or fails on its own merits, never on the ledger's.
-    if (!(await App.putRecord('core', 'cash_outflow', rec))) return false;   // it reported why
-    /* Best effort, and QUIET on purpose: their outflow IS saved, so "save failed" would be a lie
-       about a store they have never heard of. A refused write here leaves the ledger one row light
-       and the reconcile puts it back on the next load. */
-    await App.putRecord('core', 'operating_expense',
-      S.HubOperatingExpenses.migrateCashOutflowRow(rec), { quiet: true });
-    return true;
+     ⚠ THE LEGACY ROWS ARE NOT DELETED, THEY ARE ORPHANED. `cash_outflow` is no longer a registered
+     kind, so the store stops loading and nothing can write it; the rows already on the server are
+     left exactly where they are. Their money is in the ledger — that is what the Phase 1 migration
+     and every boot reconcile since have guaranteed — so nothing is lost by ignoring them. The first
+     RESTORE after E does clear them for good, because `seedEventStores` clears the table and then
+     reseeds only registered kinds. Stated rather than discovered later. */
+  async _writeCashRow(rec) {
+    /* ⛔ THE MAPPING IS IDEMPOTENT OVER ITS OWN OUTPUT, WHICH IS WHY THIS TAKES EITHER SHAPE. Every
+       caller here reads `records()` — `CashEngine.cashOutflows()`, i.e. LEDGER rows — so `stop` and
+       the modal save were already handing ledger rows to this mapping before E. It reads
+       id/date/type/amount/notes/created_at plus the recurring fields and sets `category` and
+       `migrated_from` FRESH every time, so a row fed back through comes out unchanged. Measured,
+       not assumed: block A of `verify-cash-doors-equality.js`.
+       ⭐ AND IT MUST STAY THE ONE MAPPING. Patching the ledger row in place is the obvious shortcut
+       and it drifts — `category` is DERIVED from `type`, so the two stop agreeing the first time
+       either is edited, and a draw ends up printed on the Income Statement. */
+    return App.putRecord('core', 'operating_expense',
+      S.HubOperatingExpenses.migrateCashOutflowRow(rec));
   },
   /* The mirror image, and the order is reversed for the same reason. Taking the ledger row out
      first means a refused old-store delete leaves the record whole in both places — the operator is
@@ -275,16 +267,17 @@ S.HubCashOutflows = {
      an outflow the operator deleted. A row whose ledger twin was never created (a bar whose
      migration has not run — it refuses to run off a cache-served load) still deletes cleanly,
      because removing a row that is not there is a successful delete. */
-  async _deletePair(id) {
-    // Never delete somebody else's row on an id collision. `reconcileCashOutflowLedger` refuses to
-    // REWRITE a row it did not create for the same reason, and the two should not disagree. A
-    // missing twin is not an error: removing a row that is not there is a successful delete, which
-    // is what a bar whose migration has not run depends on.
+  async _deleteCashRow(id) {
+    /* ⛔ NEVER DELETE SOMEBODY ELSE'S ROW ON AN ID COLLISION, and this guard matters MORE now than it
+       did with two stores: the ledger holds the operator's real bills alongside these, so an id that
+       is not a cash row belongs to a bill they typed. The stamp is the only safe discriminator — the
+       CATEGORY is a name they can type, so an expense they filed under a category called "Owner
+       Draw" is their bill and must survive this. Same predicate the engine's reader uses, from the
+       other side, so a row is on exactly one of the two lists.
+       ⚠ A row that is not there at all is not an error: removing nothing is a successful delete. */
     const led = S.HubOperatingExpenses.records().find(r => r && r.id === id) || null;
-    if (!led || led.migrated_from === 'cash_outflow') {
-      if (!(await App.removeRecord('core', 'operating_expense', id))) return false;
-    }
-    return App.removeRecord('core', 'cash_outflow', id);
+    if (led && led.migrated_from !== 'cash_outflow') return false;
+    return App.removeRecord('core', 'operating_expense', id);
   },
 
   // ── Add / edit / repeat ──────────────────────────────────────────────────────
@@ -309,7 +302,7 @@ S.HubCashOutflows = {
     const rec = { id: App.uid(), date, type, amount, notes: note, created_at: new Date().toISOString() };
     // A refused save leaves the form exactly as typed — no redraw — so the retry is one press, not
     // a re-entry. putRecord has already said why.
-    if (!(await this._writePair(rec))) return;
+    if (!(await this._writeCashRow(rec))) return;
     this._setPeriodFor(date);
     this.draw();
   },
@@ -447,7 +440,7 @@ S.HubCashOutflows = {
       }
       // The modal stays OPEN on a refusal, or the edit the operator just typed is gone and the only
       // record of it is a failure message over the old values.
-      if (!(await this._writePair(out))) return;
+      if (!(await this._writeCashRow(out))) return;
       if (!recChecked) this._setPeriodFor(date);
       App.closeModal(id);
       this.draw();
@@ -512,13 +505,13 @@ S.HubCashOutflows = {
     const _stopYm = _dueAlready ? App.ymdLocal(_nextD).slice(0, 7) : _cur;
     // A refused stop must not redraw as though it worked — the confirm dialog has just promised the
     // series is stopped. putRecord has already said why; the table still shows it active, correctly.
-    if (!(await this._writePair(Object.assign({}, rec, { stopped_ym: _stopYm })))) return;
+    if (!(await this._writeCashRow(Object.assign({}, rec, { stopped_ym: _stopYm })))) return;
     this.draw();
   },
   async del(id) {
     const rec = this.records().find(o => o.id === id); if (!rec) return;
     if (!(await App.confirmDelete())) return;
-    await this._deletePair(id);
+    await this._deleteCashRow(id);
     this.draw();
   },
 
