@@ -3410,6 +3410,24 @@ S.HubOperatingExpenses = {
     const arr = this.records();
     const r = arr.find(x => x.id === id);
     if (!r) return;
+    /* ⛔⛔ THE THIRD DOOR WITH THE SAME HALF-WRITE, and the Money Out chip is what made it reachable.
+       A migrated recurring outflow's twin carries `recurring: true` — the migration copies it on
+       purpose, or the forecast stops projecting the loan — so `_seriesOf` calls it a live series and
+       this row renders **Stop**. Stopping it here wrote `stopped_ym` to the LEDGER TWIN only; the
+       operator's record in `cash_outflows` never heard, and the boot reconcile rewrites the twin
+       from it. Stop appeared to work and undid itself on the next login.
+       ⛔ DELEGATED, NOT REIMPLEMENTED. `HubCashOutflows.stop` carries two measured decisions this
+       function must not second-guess: `stopped_ym` ALONE (clearing `recurring` on a store that
+       PROJECTS its history deleted every payment the series ever made — YTD $12,950 → $0.00), and
+       the stamp taken from the NEXT payment rather than this month (stamping the current month
+       erased a payment already due — YTD $39,000 → $36,800). It runs its own confirm, so this
+       returns before ours rather than asking twice.
+       Pinned by verify-money-out-write-doors.js section H. */
+    if (r.migrated_from === 'cash_outflow') {
+      await S.HubCashOutflows.stop(id);
+      this._rerender();
+      return;
+    }
     const parentId = r.recurring_parent || r.id;
     const pIdx = arr.findIndex(x => x.id === parentId);
     if (pIdx < 0) return;
@@ -3447,6 +3465,14 @@ S.HubOperatingExpenses = {
   _duplicate(id) {
     const src = this.records().find(r => r.id === id);
     if (!src) return;
+    /* ⛔ THE FOURTH DOOR, and the last one the Money Out chip exposed. `oex-dup` renders on a row
+       with no LIVE series, so a one-off draw gets Repeat. This opens the expense ADD modal, whose
+       save only routes cash rows when `isEdit` — a duplicate is not an edit — so the copy would have
+       been written as a plain expense under a cash-only category with NO `migrated_from`: counted as
+       a bill by `_isOperatingRow`, invisible to the forecast, absent from the Cash Outflows screen.
+       That is the orphan shape ([[the-loop]] #115) this rebuild exists to remove.
+       Delegated so the copy goes down the same `_writePair` path as the original. Pinned as H6. */
+    if (src.migrated_from === 'cash_outflow') return S.HubCashOutflows.repeat(id);
     let date = App.todayLocal();
     const d = new Date(String(src.date).length <= 10 ? src.date + 'T00:00:00' : src.date);
     if (!isNaN(d.getTime())) {
