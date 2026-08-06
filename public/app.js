@@ -2170,12 +2170,12 @@ const App = {
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'cash-outflows': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'cash-outflows': 'books', 'permits': 'books', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'expense-history': 'books', 'cash-outflows': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'cash-outflows': 'books', 'permits': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -2271,11 +2271,6 @@ const App = {
       { h: 'Two dates on the form', p: ['Date Submitted is just when you logged it and always stays on today. Due Date is when the money actually goes out, and it is what the forecast timing and the recurring schedule run from. Set the Due Date to the real date, not today.'] },
       { h: 'Recurring and one-time', p: ['Check Recurring for a draw, loan, or tax that repeats, pick How Often, monthly, quarterly, or annually, and set the Due Date to when it is next due so the schedule tracks the real cycle. Bar Cop carries it on that schedule until you stop it; set Ends after only for a fixed term like a loan payoff. One-time outflows land in the Logged Outflows list for the period you pick, with Repeat to copy one forward.'] },
       { h: 'Not operating bills', p: ['Rent, utilities, insurance, and the rest are operating expenses, not outflows. Log those in Operating Expenses so they stay on the P&L and Bar Cop does not count them twice.'] }
-    ] },
-    'expense-history': { title: 'How Expense History Works', sections: [
-      { h: 'What this page is', p: ['The full record of every operating expense you have logged. Operating Expenses only shows this month and next so the close stays focused; the long view back across the year lives here. The by-category breakdown sits on top, the dated log below.'] },
-      { h: 'One shared ledger', p: ['This is the same record as Operating Expenses, just the back catalog. An expense you edit or delete here changes that one record everywhere it shows, including the Month-End income statement and your year-to-date totals, so you fix a miskeyed bill once and it is right everywhere.'] },
-      { h: 'Filter and export', p: ['The range chips, This Month, Last Month, Year to Date, Last 12 Months, or All Time, scope both the log and the category totals. Export PDF saves the full filtered list. You can edit or delete any past entry right from its row.'] }
     ] },
     'settings-profile': { title: 'How the Business Profile Works', sections: [
       { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your taxes and wage settings, and the service periods you run. One-time setup you revisit when something changes. Save it all with the one Save Data button below the card.'] },
@@ -2485,7 +2480,6 @@ const App = {
         'permits':            () => S2.HubPermits && S2.HubPermits.open(),
         'operating-expenses': () => S2.HubOperatingExpenses && S2.HubOperatingExpenses.open(),
         'cash-outflows':      () => S2.HubCashOutflows && S2.HubCashOutflows.open(),
-        'expense-history':    () => S2.HubExpenseHistory && S2.HubExpenseHistory.open(),
         'books-help':         () => S2.HubBooksHelp && S2.HubBooksHelp.open(),
         'settings-profile':   () => S2.HubSettings && S2.HubSettings.open('business-profile'),
         'settings-targets':   () => S2.HubSettings && S2.HubSettings.open('recovery-targets'),
