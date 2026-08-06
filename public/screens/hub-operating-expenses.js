@@ -1318,7 +1318,15 @@ S.HubOperatingExpenses = {
       actions = edit + del;
     } else if (isRec) {
       if (this._isSeriesEnding(r)) actions += '<button class="btn btn-ghost btn-sm oex-renew" data-id="' + esc(r.id) + '" style="color:var(--gold);">Renew</button>';
-      actions += '<button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(r.id) + '">Stop</button>' + edit + del;
+      /* ⭐⭐ BUILD ORDER C — STOP IS A CASH CONTROL NOW. A bill that stops being paid stops appearing
+         in the ledger, and `recurringBills` drops it once the series has missed more than one full
+         cycle — so there is nothing left for a button to do, and one that only restates what the
+         data already says is a control the operator has to keep true by hand.
+         ⛔ CASH KEEPS IT, because nothing derives a cash outflow: a recurring draw is projected from
+         its own parent forever and Stop is the ONLY thing that ends it. `_isOperatingRow` is the
+         same partition the kind chip uses, so a row is on exactly one side of this. */
+      if (!this._isOperatingRow(r)) actions += '<button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(r.id) + '">Stop</button>';
+      actions += edit + del;
     } else {
       actions += '<button class="btn btn-ghost btn-sm oex-dup" data-id="' + esc(r.id) + '">Repeat</button>' + edit + del;
     }
@@ -1390,7 +1398,11 @@ S.HubOperatingExpenses = {
       + '<td style="color:var(--t2);">' + esc(p.category || '') + this._recurTag(p) + '</td>'
       + '<td style="color:var(--t2);">' + esc(p.vendor || '') + '</td>'
       + '<td style="color:var(--t2);">' + fmt$(p.amount) + '</td>'
-      + '<td class="no-print" style="text-align:right;white-space:nowrap;"><button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(p.id) + '">Stop</button></td></tr>';
+      /* ⭐ BUILD ORDER C — THE EXPECTED ROW IS INFORMATION, NOT A CONTROL. It carried a Stop button
+         because a typed series had to be told to end; a series now ends by not happening, and
+         `recurringBills` drops it after one missed cycle. A button that restates what the data
+         already decides is chrome the operator has to keep true by hand. */
+      + '<td class="no-print"></td></tr>';
     // The first column header carries the section name; the rest are the columns.
     const sectionCard = (name, rowsHtml) => '<div class="card" style="margin-bottom:14px;overflow-x:auto;">'
       + '<table class="row-list">'
@@ -1569,9 +1581,23 @@ S.HubOperatingExpenses = {
         +   '<div class="f" id="oexa-vendor-wrap" style="width:240px;display:none;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
         +   '<div class="f" style="width:140px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div></div>'
         + '</div>'
-        + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oexa-recurring"/> Recurring bill (same cost each time)</label></div>'
+        /* ⭐⭐⭐ BUILD ORDER C — RECURRING IS A CASH-OUTFLOW CONTROL NOW, AND ONLY THAT. A BILL is
+           recurring because it keeps happening: `deriveRecurringBills` reads it off the ledger and
+           `recurringBills` stale-checks it, so a checkbox is a second source claiming the same fact
+           and the operator has to keep it true by hand forever.
+           ⛔⛔ IT IS GATED, NOT DELETED, AND THAT IS FORCED BY THE DATA. `deriveRecurringBills`
+           reads `expenseRows()`, which excludes every cash row by construction — a recurring owner
+           draw or loan payment is projected from its own parent and stores NOTHING
+           ([[the-loop]] #51: `recurring` means two different things in the two stores). Deleting
+           this for cash as well would empty months of the 13-week forecast with nothing replacing
+           it, which is the silent direction. Bills lose it; cash keeps it.
+           ⚠ THE WRAPPER IS WHAT `_applyLogType` GOVERNS, and it CLEARS on the way out — a bill that
+           inherited a ticked box the operator could not see is the exact defect that function was
+           written to prevent for the category picker. */
+        + '<div id="oexa-recur-wrap" style="display:none;">'
+        + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oexa-recurring"/> Repeats on a schedule (same amount each time)</label></div>'
         + '<div id="oexa-term-wrap" style="margin-top:12px;display:none;">'
-        +   '<div style="font-size:11px;color:var(--gold);margin-bottom:12px;max-width:540px;line-height:1.5;">Set the <b>Due Date</b> above to when this bill is next actually due. The schedule repeats from that date, not from today.</div>'
+        +   '<div style="font-size:11px;color:var(--gold);margin-bottom:12px;max-width:540px;line-height:1.5;">Set the <b>Due Date</b> above to when this is next actually due. The schedule repeats from that date, not from today.</div>'
         +   '<div class="f" style="max-width:540px;"><label>How often</label><select id="oexa-frequency" style="width:200px;"><option value="monthly">Monthly</option><option value="quarterly">Quarterly (every 3 months)</option><option value="annual">Annually (once a year)</option></select></div>'
         +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" id="oexa-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs until you stop it. Set this only for a bill that ends after a fixed number of months.</div></div></div>'
         + '</div>'
@@ -2290,6 +2316,31 @@ S.HubOperatingExpenses = {
      keeps its own own-cover, which suppresses a PROJECTION rather than a write.
      ⛔ Children already written stay on the account: they are history, and deleting them would
      restate closed months. That is a separate, destructive call. */
+  /* ⭐⭐ WHEN DID THIS SERIES LAST ACTUALLY HAPPEN? Not "when was it set up", which is what the
+     parent row's own date says. A series shows up in the ledger three ways and all three count:
+     the parent itself, the children the old generator minted under `recurring_parent`, and any row
+     for the same vendor that arrived by import or by hand. The newest of those is the answer.
+     ⛔ A VENDORLESS TYPED BILL FALLS BACK TO ITS OWN LINE, never to a shared key. Three lines of
+     fixed overhead entered with no vendor would otherwise all match each other and each other's
+     dates — the collapsed-keyspace defect [[the-loop]] #50 records, which once read a $12,000 nut
+     against a truth of $16,100. */
+  _seriesLastDate(parent, rows) {
+    if (!parent) return '';
+    const own = String(parent.date || '').slice(0, 10);
+    const all = Array.isArray(rows) ? rows : this.expenseRows();
+    const k = this._vendorKey(parent.vendor);
+    let best = own;
+    all.forEach(r => {
+      if (!r || !r.date) return;
+      const mine = (r.id === parent.id) || (r.recurring_parent === parent.id)
+        || (!!k && this._vendorKey(r.vendor) === k);
+      if (!mine) return;
+      const d = String(r.date).slice(0, 10);
+      if (d > best) best = d;
+    });
+    return best;
+  },
+
   recurringBills(rows) {
     const CYCLE_DAYS = { weekly: 7, fortnightly: 14, monthly: 31, quarterly: 92, annual: 366 };
     const decisions = this.recurringDecisions();
@@ -2297,11 +2348,39 @@ S.HubOperatingExpenses = {
     const dayNo = (ymd) => Date.UTC(parseInt(String(ymd).slice(0, 4), 10),
       parseInt(String(ymd).slice(5, 7), 10) - 1, parseInt(String(ymd).slice(8, 10), 10)) / 86400000;
     const now = dayNo(today);
+    /* ⭐⭐⭐ THE CLOCK FOR STALENESS IS THE LEDGER, NOT TODAY — AND A HARNESS FIXTURE IS WHAT FOUND
+       THAT (build order C). "This bill has not been paid for two cycles" and "this operator has not
+       logged ANYTHING for two months" look identical against the wall clock, and they mean opposite
+       things. Judged against today, an operator who types their rent and then goes quiet loses that
+       rent out of break-even, the reserve target and Safe to Spend — the silent under-statement the
+       typed branch exists to prevent, reintroduced by the very rule meant to tidy it up.
+       ⭐ THE DISCRIMINATOR IS MEASURABLE AND HAS NO NUMBER IN IT ([[the-loop]] #28/#30 — state what
+       the data can actually distinguish): a series is stale when the operator KEPT LOGGING and this
+       bill stopped appearing. If the whole ledger is quiet, Bar Cop has no evidence either way and
+       the safe reading is to keep what it was told.
+       ⚠ ONE TEST FOR BOTH LISTS. Derived bills were judged against `today` and typed ones would have
+       needed the same question answered a second way — two answers to one question is the drift this
+       rebuild exists to end. It also takes the wall clock out of the comparison entirely, which ends
+       a whole class of fixture shelf-life ([[the-loop]] #39/#100).
+       ⚠ Capped at today so a bill dated into the FUTURE cannot push the reference past now and make
+       everything else look stale. */
+    const _rowsForClock = Array.isArray(rows) ? rows : this.expenseRows();
+    let _ledgerLast = -Infinity;
+    _rowsForClock.forEach(r => {
+      if (!r || !r.date) return;
+      const d = dayNo(String(r.date).slice(0, 10));
+      if (!isNaN(d) && d > _ledgerLast) _ledgerLast = d;
+    });
+    if (!isFinite(_ledgerLast)) _ledgerLast = now;
+    const ref = isNaN(now) ? _ledgerLast : Math.min(_ledgerLast, now);
+    const _current = (lastDate, frequency) => {
+      if (isNaN(ref)) return true;    // no readable clock at all: never drop on a bad reading
+      const span = CYCLE_DAYS[frequency] || 31;
+      return (ref - dayNo(lastDate)) <= span * 2;
+    };
     const derived = this.deriveRecurringBills(rows).filter(b => {
       if (decisions[b.vendorKey] === 'no') return false;
-      if (isNaN(now)) return true;    // no clock to compare against: never drop on a bad reading
-      const span = CYCLE_DAYS[b.frequency] || 31;
-      return (now - dayNo(b.lastDate)) <= span * 2;
+      return _current(b.lastDate, b.frequency);
     });
 
     /* ⭐⭐⭐ AND THE BILLS THE OPERATOR TYPED, WHICH THE DERIVATION CANNOT ALWAYS SEE.
@@ -2322,8 +2401,22 @@ S.HubOperatingExpenses = {
        has none of that history, so preferring it would quietly resurrect a stopped series.
        ⚠ `derived: false` is stamped explicitly, never left undefined — a consumer testing `!b.derived`
        would read a missing field as "typed" and the two cases would be indistinguishable. */
-    const typed = (Array.isArray(rows) ? rows : this.expenseRows()).filter(r =>
+    /* ⭐⭐⭐ BUILD ORDER C — A TYPED SERIES IS STALE ON THE SAME TERMS AS A DERIVED ONE, AND THIS IS
+       WHAT LETS THE STOP BUTTON GO. Until now staleness was applied to DERIVED bills only, so a
+       typed parent projected forever unless `stopped_ym` was set — and the only thing that set it
+       was Stop. Take the button away without this and every typed series on every live account runs
+       to the end of time with no way to end it.
+       ⛔⛔ IT READS THE SERIES, NOT THE RECORD, AND THAT DISTINCTION IS THE WHOLE THING. A typed
+       parent's own `date` is the day the series was SET UP — the children carry the later dates and
+       the filter above excludes them. Measured: rent paid through this month has a parent row six
+       months old, so a staleness test on the record's own date kills live rent. `_seriesLastDate`
+       asks when the series last actually happened.
+       ⭐ MEASURED ON ONE REALISTIC ACCOUNT: today $6,336.19/month, which carries a $189 subscription
+       last paid seven months ago that nobody pressed Stop on. Derived-only would read $5,042.19 and
+       drop a $1,105 bill entered today — the quiet direction. This reads $6,147.19. */
+    const typedAll = (Array.isArray(rows) ? rows : this.expenseRows()).filter(r =>
       r && r.recurring && !r.recurring_parent && r.date && !this.isCashOnlyCategory(r.category));
+    const typed = typedAll.filter(r => _current(this._seriesLastDate(r, rows), r.frequency));
     /* ⛔⛔ TYPED BILLS ARE NEVER DEDUPED AGAINST EACH OTHER — ONLY AGAINST DERIVED ONES. Two bills
        from one vendor are two bills: an equipment loan and a second equipment loan, a stopped series
        and its replacement, three lines of fixed overhead a bar entered without vendors at all.
@@ -3571,12 +3664,14 @@ S.HubOperatingExpenses = {
       date, category, vendor, amount, notes,
       created_at: new Date().toISOString()
     };
-    if (recurring) {
-      rec.recurring = true;
-      rec.frequency = document.getElementById('oexa-frequency')?.value || 'monthly';
-      rec.term_months = (term && term > 0) ? term : null;
-      rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1;
-    }
+    /* ⛔⛔⛔ BUILD ORDER C — A BILL IS WRITTEN WITH NO SCHEDULE ON IT. `recurring`, `frequency`,
+       `term_months` and `recur_day` are gone from this record: a stored flag is an INSTRUCTION to
+       every forward reader, and the whole point of C is that a bill recurs because it keeps
+       happening. `deriveRecurringBills` reads that off the ledger and `recurringBills` stale-checks
+       it, so a second source claiming the same fact is the drift this rebuild exists to end.
+       ⚠ THE STATED COST, and Kyle accepted it: a brand-new fixed cost needs TWO occurrences before
+       the derivation sees it, so it reaches break-even a month or two late and then self-corrects.
+       ⚠ THE CASH BRANCH ABOVE STILL WRITES THEM, and must. Nothing derives a cash outflow. */
     await App.putRecord('core', 'operating_expense', rec);
     this._rerenderHost();
   },
@@ -3595,6 +3690,20 @@ S.HubOperatingExpenses = {
     show('oexa-cat-wrap', t === 'expense');
     show('oexa-vendor-wrap', t === 'expense');
     show('oexa-kind-wrap', t === 'cash');
+    /* ⭐⭐ BUILD ORDER C — RECURRING IS A CASH CONTROL. A bill recurs because it keeps happening, so
+       the ledger answers that question; a cash outflow has no derivation behind it and still needs
+       to be told ([[the-loop]] #51). See `_addCardHtml`.
+       ⛔ CLEARED AND COLLAPSED ON THE WAY OUT, both of them. A hidden checkbox that stays ticked is
+       how a bill gets written with a schedule the operator cannot see — the same reason the category
+       and vendor are cleared two lines up. */
+    show('oexa-recur-wrap', t === 'cash');
+    if (t !== 'cash') {
+      const rc = document.getElementById('oexa-recurring');
+      if (rc) rc.checked = false;
+      clear('oexa-term');
+      const tw = document.getElementById('oexa-term-wrap');
+      if (tw) tw.style.display = 'none';
+    }
     if (t !== 'expense') { clear('oexa-cat'); clear('oexa-vendor'); }
     if (t !== 'cash') clear('oexa-kind');
     // The "looks like it belongs elsewhere" notice is keyed off the vendor, which only the expense
