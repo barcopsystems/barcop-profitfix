@@ -1639,9 +1639,28 @@ S.HubOperatingExpenses = {
         const n = this._expenseCheckedIds().length;
         if (btn) { btn.disabled = !n; btn.textContent = 'Move To' + (n ? ' (' + n + ')' : ''); }
       }));
-      /* The chosen category lives on the review, not in the DOM, so a re-render cannot lose it —
-         and the operator can tick, move, tick again without re-choosing. */
+      /* The chosen type and name live on the review, not in the DOM, so a re-render cannot lose
+         them — and the operator can tick, move, tick again without re-choosing.
+         ⛔ ONE PLACE DECIDES WHICH BRANCH IS SHOWING, and the branch that is NOT in play is HIDDEN
+         AND CLEARED — the same rule as `_applyLogType` on the manual form, for the same reason: a
+         stale value left in a hidden control is how a Move To files a batch under a category the
+         operator cannot see. */
+      this.container.querySelector('#oex-rt-logtype')?.addEventListener('change', (e) => {
+        const r = this._expenseReview;
+        if (!r) return;
+        r.moveType = e.target.value;
+        r.moveCat = '';
+        r.moveNote = '';
+        const show = (id, on) => { const el = this.container.querySelector(id); if (el) el.style.display = on ? '' : 'none'; };
+        const clear = (id) => { const el = this.container.querySelector(id); if (el) el.value = ''; };
+        show('#oex-rt-cat-wrap', r.moveType === 'expense');
+        show('#oex-rt-kind-wrap', r.moveType === 'cash');
+        clear('#oex-rt-cat'); clear('#oex-rt-kind');
+      });
       this.container.querySelector('#oex-rt-cat')?.addEventListener('change', (e) => {
+        if (this._expenseReview) this._expenseReview.moveCat = e.target.value;
+      });
+      this.container.querySelector('#oex-rt-kind')?.addEventListener('change', (e) => {
         if (this._expenseReview) this._expenseReview.moveCat = e.target.value;
       });
       /* ⛔ A TICK RECORDS STATE AND REPAINTS NOTHING. The same rule as the row checkboxes above: a
@@ -1683,7 +1702,13 @@ S.HubOperatingExpenses = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your expenses file here',
-      dropSub: 'Needs columns for date and amount; category, vendor, and notes come in if your file has them. Categories that do not match yours import as Other.',
+      /* ⛔ A7 — THE "import as Other" SENTENCE IS GONE, AND IT HAD BEEN FALSE SINCE ITEM 15. That
+         fallback was deleted on purpose: 'Other' is a category the operator PICKS, which Books
+         prints and Schedule C deducts on 27a, so a row Bar Cop could not read and a row they chose
+         were the same record. An unplaceable row now carries NO category and is held off the P&L
+         until somebody sorts it. Copy outliving the feature it describes ([[the-loop]] #61) — and
+         this one was worse than stale, because it told the operator not to bother looking. */
+      dropSub: 'Needs columns for date and amount; category, vendor, and notes come in if your file has them.',
       actionsEl: '#oexa-imp-actions',
       fields: [
         /* ⚠ REQUIRED, so a missing candidate REFUSES THE WHOLE IMPORT. Chase business checking — the
@@ -1862,6 +1887,111 @@ S.HubOperatingExpenses = {
   // One spelling of a vendor name, so "Ben E. Keith" and "BEN E KEITH" are one vendor.
   _vendorKey(n) { return String(n == null ? '' : n).trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); },
 
+  /* ⭐⭐⭐ A4 — THE BANK SUFFIX, AND IT IS THE OPEN `_vendorKey` QUESTION ANSWERED BY A REAL FILE.
+     Measured on a Chase export dropped on the live demo: the seed knows `Austin Energy`, the bank
+     writes `AUSTIN ENERGY UTILITY PMT`, and `_vendorKey` compares them as strings, so NOTHING
+     matched. Same for ALSCO, SYSCO and TEXAS MUTUAL — five of five expense rows landed unsorted on
+     a file whose vendors the operator had already categorised. It is not a trailing store number,
+     it is a SUFFIX, and an equality test cannot see past one.
+
+     ⛔ THE PLURAL IS THE OTHER HALF AND CONTAINMENT ALONE DOES NOT REACH IT. The operator's vendor
+     list says `Sysco Foods`; the bank says `SYSCO FOOD SERVICES`. Neither string contains the
+     other and neither token set contains the other — {sysco, foods} is not inside
+     {sysco, food, services}. Only singularising both sides puts them together.
+     ⚠ SO THE TWO RULES SHIP TOGETHER, and V7 is the assertion that says so: half of this is not a
+     fix, it is a fix for Austin Energy that still misses the distributor. */
+  _singular(w) {
+    const s = String(w == null ? '' : w);
+    // "utilities" -> "utility", "supplies" -> "supply". The rule that makes UTILITY meet Utilities.
+    if (/ies$/.test(s) && s.length > 4) return s.slice(0, -3) + 'y';
+    // ⛔ "business" and "express" are ordinary words in a vendor name, not plurals.
+    if (/ss$/.test(s)) return s;
+    /* ⛔ AND NOTHING SHORTER THAN FOUR IS TOUCHED. `gas` must not become `ga`: Kyle named GAS, ADS
+       and INS as real business words, and a stemmer that chews them is a fragment match arriving
+       through the back door ([[the-loop]] #26). */
+    if (/s$/.test(s) && s.length > 3) return s.slice(0, -1);
+    return s;
+  },
+  // One vendor name as comparable whole words. Punctuation is not the question; "Ben E. Keith Co."
+  // and "BEN E KEITH CO" are the same four tokens.
+  _vendorTokens(n) {
+    return String(n == null ? '' : n).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+      .split(' ').filter(Boolean).map(t => this._singular(t));
+  },
+  /* ⭐ ONE NAME CONTAINS THE OTHER, AS WHOLE TOKENS, IN EITHER DIRECTION.
+     ⛔ TOKENS, NEVER SUBSTRINGS. `indexOf` would match KEITHLEY against Keith and SYSCOM against
+     Sysco — the fragment class this codebase has been bitten by three times.
+     ⛔ AND THE SHORTER NAME NEEDS FOUR LETTERS OF ITS OWN. A vendor the operator saved as "A" would
+     otherwise be inside every name in the file, which is worse than no match at all: it files real
+     money under a stranger's category. */
+  _vendorMatches(a, b) {
+    const A = this._vendorTokens(a), B = this._vendorTokens(b);
+    if (!A.length || !B.length) return false;
+    const small = A.length <= B.length ? A : B, big = A.length <= B.length ? B : A;
+    if (small.join('').length < 4) return false;
+    const have = {};
+    big.forEach(t => { have[t] = true; });
+    return small.every(t => !!have[t]);
+  },
+
+  /* ⭐⭐⭐ A3 — READ A CATEGORY WORD OUT OF THE VENDOR NAME (Kyle: *"if the name has a category word
+     in it.. shouldn't we be able to sort that automatically?"*). `AUSTIN ENERGY UTILITY PMT`
+     contains UTILITY. This is the DAY-ONE half: A4 needs a history to learn from, and a bar
+     dropping its first statement has none.
+
+     ⛔⛔ WHOLE WORDS ONLY, AND EVERY WORD CHECKED AGAINST "COULD THIS BE SOMEBODY'S ACTUAL NAME"
+     ([[the-loop]] #26 — a name vocabulary has eaten a real person three times). INSURANCE yes;
+     INS no (Instacart, Insight, Installation). GAS no (gastropub). ADS no. RENT no (Rent-A-Center).
+     ⭐ THE FLOOR DOES THAT WORK STRUCTURALLY RATHER THAN BY MY JUDGEMENT: a derived word must be at
+     least FIVE letters, which removes ins / gas / ads / rent / tax / bank / card / fee / 3rd on its
+     own, from any category the operator adds later as well as from the eleven built in. A hand-kept
+     ban list would only ever hold the words I thought of.
+     ⛔ AND A STOP LIST FOR THE LONG ONES THAT ARE STILL NOT ABOUT THE CATEGORY: `other` is a
+     category the operator PICKS and guessing it is the exact defect item 15 closed; `party` comes
+     out of "3rd-Party" and a bar buys from Party City; `credit` would call a card payoff a bank
+     fee; `service` would type ALSCO LINEN SERVICE off a category named "Professional Services".
+
+     ⭐ IT IS A SUGGESTION IN A REVIEW, NOT A VERDICT, which is what makes it safe at all: the
+     operator sees the section it landed in and moves it before a row is written. A wrong guess
+     costs one dropdown; no guess costs sorting a whole bank month by hand.
+     ⚠ AND IT IS THE WEAKEST OF THE FOUR SOURCES — see `_buildExpenseRows`. Anything the operator
+     said themselves outranks it. */
+  _categoryWordIndex() {
+    /* ⚠ FOLDED IN, NOT A SIBLING CONSTANT. A data property beside a method is invisible to every
+       slicer in the harness suite and this file has already paid for that twice
+       ([[the-loop]] #16/#120). */
+    /* ⭐⭐ `supply` AND `platform` WERE ADDED BY THE REAL-NAMES CONTROL, BEFORE THIS SHIPPED, and
+       both are the same shape: a word that reads like a category and is a TRADE word first. Supply
+       is what a bar's food and smallwares vendors are called — Restaurant Supply, Chef Supply,
+       Gastropub Supply — and almost never a cleaning company. Platform is a brewery before it is a
+       delivery app, and a real delivery commission is already held back by BRAND in `_elsewhereFor`,
+       so the word bought nothing and risked typing a beer invoice as a platform fee. That leaves
+       "3rd-Party Platform Fees" contributing no words at all, which is correct. */
+    const STOP = {
+      other: 1, party: 1, credit: 1, service: 1, general: 1, expense: 1, payment: 1, charge: 1,
+      monthly: 1, weekly: 1, annual: 1, total: 1, business: 1, company: 1, group: 1, center: 1,
+      store: 1, account: 1, thing: 1, miscellaneou: 1, misc: 1, supply: 1, platform: 1
+    };
+    const idx = {};
+    this.categoryList().forEach(c => {
+      String(c).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean)
+        .forEach(raw => {
+          const w = this._singular(raw);
+          if (w.length < 5 || STOP[w]) return;
+          // First category to claim a word keeps it, so the answer cannot depend on iteration luck
+          // the day two categories share one.
+          if (idx[w] === undefined) idx[w] = c;
+        });
+    });
+    return idx;
+  },
+  _categoryFromVendorWords(name) {
+    const idx = this._categoryWordIndex();
+    const toks = this._vendorTokens(name);
+    for (let i = 0; i < toks.length; i++) { if (idx[toks[i]] !== undefined) return idx[toks[i]]; }
+    return '';
+  },
+
   /* ⭐⭐ THE CATEGORY THIS VENDOR WAS LAST LOGGED UNDER (Kyle, 2026-08-04): *"all defaulted to
      other... a user would have to go in and manually edit all of those?"* Yes, and that was the
      wrong answer. `_matchCat` only ever read the file's own category column, and a bank register has
@@ -1886,11 +2016,19 @@ S.HubOperatingExpenses = {
        IRS line number, so the one month somebody skips it a real deduction drops off the tax sheet.
        ⚠ THE EMPTY TEST STAYS, and it is doing the original job now: a row with NO category really is
        the absence of an answer, and it must never teach. */
-    const hits = this.expenseRows().filter(r => r && this._vendorKey(r.vendor) === k
-      && String(r.category || '').trim());
-    if (!hits.length) return '';
-    hits.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
-    return String(hits[hits.length - 1].category).trim();
+    const answered = this.expenseRows().filter(r => r && String(r.category || '').trim());
+    const newest = (list) => {
+      if (!list.length) return '';
+      const s = list.slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+      return String(s[s.length - 1].category).trim();
+    };
+    /* ⭐⭐ EXACT FIRST, THEN CONTAINMENT (A4). The two passes are not interchangeable and the order
+       is the decision: with three logged vendors all containing `SYSCO FOOD SERVICES`, one of them
+       IS that name. Merging the passes and taking newest-by-date across both lets a stale near
+       match overrule the answer the operator gave about this exact spelling. */
+    const exact = answered.filter(r => this._vendorKey(r.vendor) === k);
+    if (exact.length) return newest(exact);
+    return newest(answered.filter(r => this._vendorMatches(r.vendor, name)));
   },
 
   /* ⭐⭐⭐ PHASE 3 ITEM 16a — THE FORWARD NUMBERS READ THE LEDGER, NOT A CHECKBOX.
@@ -2242,11 +2380,21 @@ S.HubOperatingExpenses = {
       if (RULES[i][0].test(t)) return { note: RULES[i][1], where: RULES[i][2], screen: RULES[i][3] };
     }
     /* The operator's OWN inventory vendor list. Not a guess at all: if they buy product from this
-       name, a debit to it is a delivery, and deliveries are COGS through Inventory. */
+       name, a debit to it is a delivery, and deliveries are COGS through Inventory.
+       ⛔⛔ A5 — AND IT COMPARED THE TWO NAMES AS STRINGS, WHICH IS WHY THE RULE HAS NEVER FIRED ON A
+       REAL FILE. Measured on the live demo: `Sysco Foods` is on the vendor list, the bank writes
+       `SYSCO FOOD SERVICES`, `_vendorKey` says they are different vendors, and a $3,120.88
+       distributor invoice imported as an OPERATING EXPENSE while COGS was already coming from
+       counts — a double deduction on the Income Statement.
+       ⭐ THE HARNESS COULD NOT SEE IT because block N of `verify-expense-import-review` writes the
+       list entry and the file row with the IDENTICAL spelling, so the equality passed. [[the-loop]]
+       #32: a fixture only ever contains the shapes somebody thought of. `_vendorMatches` is the same
+       comparison the learned category uses, so the two doors cannot drift apart on "is this the same
+       vendor". */
     const vend = (App.inventoryData && Array.isArray(App.inventoryData.ic_vendors))
       ? App.inventoryData.ic_vendors : [];
     const k = this._vendorKey(vendor);
-    if (k && vend.some(v => v && this._vendorKey(v.name) === k)) {
+    if (k && vend.some(v => v && this._vendorMatches(v.name, vendor))) {
       return { note: 'This vendor is on your Inventory list',
         where: 'Inventory, under Receive Delivery', screen: 'ic-receive-delivery' };
     }
@@ -2254,6 +2402,23 @@ S.HubOperatingExpenses = {
   },
   // What the import screen reads. The sentence only; the destination is for the hand-typed form.
   _belongsElsewhere(vendor) { const e = this._elsewhereFor(vendor); return e ? e.note : ''; },
+
+  /* ⭐⭐ A1 — ONE IMPORTED ROW AS THE OPERATOR'S OWN CASH-OUTFLOW RECORD. PURE, like every other
+     mapping in this rebuild, so the whole write can be rehearsed and pinned before it touches an
+     account. Returns null for anything that is not a cash-only category, so the caller can just ask.
+     ⛔ THE ID IS THE LEDGER ROW'S. `_writePair` builds the twin with `migrateCashOutflowRow`, which
+     preserves the id — so the outflow and its ledger row are one record with one identity, exactly
+     as a hand-typed one is. A fresh id here would mint a second copy the reconcile could never
+     match up. */
+  _outflowFromLedgerRow(rec) {
+    if (!rec) return null;
+    const type = this._typeForCashCategory(rec.category);
+    if (!type) return null;
+    return {
+      id: rec.id, date: rec.date, type: type, amount: rec.amount,
+      notes: rec.notes || '', created_at: rec.created_at || new Date().toISOString()
+    };
+  },
 
   _expenseVerdicts(rows) {
     const conv = (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
@@ -2286,7 +2451,12 @@ S.HubOperatingExpenses = {
        ⛔ AND `_used` MUST BE LOCAL TO THIS CALL. The screen re-walks on every render; a Set that
        survived between calls would mark the same logged row as spent, so the second repaint would
        show it as new and the button would climb by one per render. */
-    const _pre = this.expenseRows();
+    /* ⛔⛔ THE WHOLE LEDGER, NOT `expenseRows()`. That accessor means THE BILLS and excludes every
+       cash row by construction — so the moment the operator can type a row as a draw, a re-drop of
+       the same bank month banks it again, invisibly, straight into the cash forecast. Widening it
+       cannot cross-match: the predicate compares the CATEGORY too, and a bill's category is never a
+       cash-only name (`listReservedWhy` refuses those at both the add and the read door). */
+    const _pre = this.records();
     const _used = new Set();
     const _dup = (date, amount, vendor, category) => {
       const pred = x => x.date === date && Math.abs((parseFloat(x.amount) || 0) - amount) < 0.005
@@ -2331,6 +2501,12 @@ S.HubOperatingExpenses = {
          on the NEXT drop, which is the half that compounds. */
       const picked = (picks && r && r._rid != null) ? (picks[r._rid] || '') : '';
       const learned = (picked || named) ? '' : this._categoryForVendor(vendor);
+      /* ⭐ A3 — THE FOURTH SOURCE, AND IT IS DELIBERATELY LAST. A category word inside the vendor
+         name is Bar Cop reading a hint off a string; the three above it are the operator speaking.
+         A bar dropping its FIRST statement has no history at all, so without this every row on
+         their first file sorts by hand — and with it, a decision they later make about that vendor
+         overrules the hint from the next drop onward. */
+      const worded = (picked || named || learned) ? '' : this._categoryFromVendorWords(vendor);
       /* ⛔⛔ THE FALLBACK IS EMPTY, NOT 'Other' (Phase 3 item 15). 'Other' is a category the operator
          deliberately picks, and Books prints it as "Other operating expenses" while Schedule C
          deducts it on 27a — so filing an unplaceable row there made a row Bar Cop could not read
@@ -2338,10 +2514,10 @@ S.HubOperatingExpenses = {
          Yet section and unclassified money became a real deduction, silently. An empty category is
          the honest answer: it says "we do not know" by the absence of a value, and
          `isUncategorizedRow` is what keeps it off the P&L until somebody sorts it. */
-      const category = picked || named || learned || '';
-      // Did anything actually place this row, or did it fall through to Other? That is the whole
-      // question "Not Sorted Yet" asks, so the walk answers it rather than the render guessing.
-      const placed = !!(picked || named || learned);
+      const category = picked || named || learned || worded || '';
+      // Did anything actually place this row? That is the whole question "Need a Type" asks, so the
+      // walk answers it rather than the render guessing.
+      const placed = !!(picked || named || learned || worded);
       /* ⚠ A CATEGORY THE FILE CARRIED AND BAR COP COULD NOT PLACE IS A NOTE ON A LANDING ROW.
          The row still imports — the operator wants the expense logged and will fix the category on
          the row below — but "Other" arriving silently is how a QuickBooks Desktop export once put
@@ -2359,7 +2535,20 @@ S.HubOperatingExpenses = {
         return;
       }
       const notes = (r.notes || '').trim();
-      if (_dup(date, amount, vendor, category)) {
+      /* ⭐⭐⭐ A CASH ROW IS STORED IN THE SHAPE THE OUTFLOW MAPPING WILL REBUILD, OR IT IS SILENTLY
+         REWRITTEN AT THE NEXT LOGIN. `migrateCashOutflowRow` sets `vendor: ''` unconditionally — an
+         outflow record has no vendor field — and `_reconcileLedgerFrom` REWRITES any twin that
+         differs from what the mapping produces. So a bank descriptor kept in `vendor` survives
+         exactly until the operator next logs in, and then vanishes with nothing on screen saying so.
+         Folding it into the NOTE is the only place it lives, and the note is what Cash Outflows
+         shows. The review table still prints the descriptor in its Vendor column, because that
+         reads the FILE's row, not the record.
+         ⛔ AND THE DEDUP HAS TO ASK THE SAME QUESTION THE WRITE ANSWERS, or a re-drop of the same
+         statement banks the draw a second time. */
+      const _cash = this.isCashOnlyCategory(category);
+      const storeVendor = _cash ? '' : vendor;
+      const storeNotes = _cash ? [vendor, notes].filter(Boolean).join(' · ') : notes;
+      if (_dup(date, amount, storeVendor, category)) {
         list.push({ raw: r, status: 'dup', date: date, amount: amount, vendor: vendor,
           category: category, notes: [] });
         return;
@@ -2385,7 +2574,7 @@ S.HubOperatingExpenses = {
         raw: r, status: 'new', excluded: excluded, date: date, amount: amount, vendor: vendor,
         category: category, placed: placed, badCat: badCat, elsewhere: elsewhere, notes: [],
         rec: { id: App.uid ? App.uid() : ('oex-' + Date.now() + '-' + i), date: date, category: category,
-               vendor: vendor, amount: amount, notes: notes, created_at: new Date().toISOString() }
+               vendor: storeVendor, amount: amount, notes: storeNotes, created_at: new Date().toISOString() }
       });
     });
     return { list: list };
@@ -2435,7 +2624,14 @@ S.HubOperatingExpenses = {
   _moveCheckedExpenses() {
     const r = this._expenseReview;
     if (!r) return;
-    if (!r.moveCat) { r.moveNote = 'Pick a category first, then press Move To.'; this._rerender(); return; }
+    /* ⚠ THE REFUSAL NAMES THE STEP THEY ARE ACTUALLY ON. With a two-step control, "pick a category"
+       is wrong advice for somebody who has not chosen a Log Type yet — and a refusal that describes
+       the wrong control reads as a broken button ([[the-loop]] #53). */
+    if (!r.moveType) { r.moveNote = 'Pick a log type first, then press Move To.'; this._rerender(); return; }
+    if (!r.moveCat) {
+      r.moveNote = (r.moveType === 'cash' ? 'Pick a kind first' : 'Pick a category first') + ', then press Move To.';
+      this._rerender(); return;
+    }
     const ids = this._expenseCheckedIds();
     if (!ids.length) { r.moveNote = 'Tick the rows you want to move first.'; this._rerender(); return; }
     ids.forEach(id => { r.assign[id] = r.moveCat; delete r.checked[id]; });
@@ -2452,7 +2648,12 @@ S.HubOperatingExpenses = {
     r.moveNote = ids.length + ' row' + (ids.length === 1 ? '' : 's') + ' moved into ' + r.moveCat + '.';
     /* ⚠ THE SELECTOR RESETS (Kyle, 2026-08-04). Leaving the last category selected makes the NEXT
        Move To a single click away from filing a different batch under it by accident, and it reads
-       as though that category is still "current" when the rows it holds are already placed. */
+       as though that category is still "current" when the rows it holds are already placed.
+       ⚠ THE LOG TYPE DOES NOT RESET WITH IT, and that is the difference between the two controls. A
+       bank month is sorted in batches of the SAME type — eight passes of Operating Expense, then
+       perhaps one draw — so clearing the type would make them re-answer the same question eight
+       times. The NAME is what could file money by accident; the type only decides which picker is
+       on screen, and it is visible while they do it. */
     r.moveCat = '';
     this._rerender();
   },
@@ -2478,7 +2679,10 @@ S.HubOperatingExpenses = {
     const elsewhere = s.rows.filter(x => !x.lands && x.status === 'new');
     const skipped = s.rows.filter(x => !x.lands && x.status !== 'new');
     const groups = [];
-    if (unsorted.length) groups.push({ key: 'unsorted', title: 'Not Sorted Yet',
+    /* ⭐ A2 — "NEED A TYPE", NOT "NOT SORTED YET" (Kyle). With a two-step control the TYPE is what is
+       missing first: until the operator says Operating Expense or Cash Outflow, there is no list of
+       categories to be unsorted within. The old title named the second question. */
+    if (unsorted.length) groups.push({ key: 'unsorted', title: 'Need a Type',
       sub: unsorted.length + ' row' + (unsorted.length === 1 ? '' : 's') + ' Bar Cop could not work out',
       rows: unsorted, open: r.open.unsorted !== false });
     // Category order follows the operator's own list, so the sections read the way their card does.
@@ -2488,6 +2692,21 @@ S.HubOperatingExpenses = {
       groups.push({ key: c, title: c,
         sub: rows.length + ' expense' + (rows.length === 1 ? '' : 's') + ' going into ' + c,
         rows: rows, open: !!r.open[c] });
+    });
+    /* ⭐⭐ A1 — THE CASH KINDS GET SECTIONS TOO, AND WITHOUT THIS THE FEATURE IS A TRAPDOOR. The loop
+       above walks `categoryList()`, which deliberately contains NO cash-only name — so a row the
+       operator moved into "Owner Draw" would be `placed`, would be counted by the button, would be
+       written on Add, and would match NO section: it disappears off the screen between the press
+       and the write. Exactly the complaint Move To's open-the-target rule exists to answer.
+       ⚠ AND THE HEAD SAYS "cash outflow", not "expense". A draw is not a cost of running the bar,
+       it never reaches the Income Statement, and a section promising otherwise on the screen where
+       they are deciding is the wrong sentence in the one place it matters. */
+    this.CASH_ONLY_CATEGORIES.forEach(k => {
+      const rows = landing.filter(x => x.placed && x.cat === k.name);
+      if (!rows.length) return;
+      groups.push({ key: k.name, title: k.name,
+        sub: rows.length + ' cash outflow' + (rows.length === 1 ? '' : 's') + ' going into ' + k.name,
+        rows: rows, open: !!r.open[k.name] });
     });
     if (elsewhere.length) {
       // The head says what to do, because unlike Not Going In this one is answerable.
@@ -2524,25 +2743,63 @@ S.HubOperatingExpenses = {
     return groups;
   },
 
-  // Choose a category, then Move To. One control, above the sections it acts on.
+  /* ⭐⭐⭐ A1 — THE SAME `Log Type -> Category | Kind` PAIR THE MANUAL FORM HAS (Kyle, 2026-08-05:
+     *"wouldn't having the same steps on the manual form replace the choose the category selector
+     work?"*). One control, two screens, and it closes four findings at once:
+       · a DRAW can finally be filed from an import. "Owner Draw" is not a bank word — a statement
+         says `ONLINE TRANSFER TO CHK ...4471`, `CHECK #1042`, `ATM WITHDRAWAL` — so no amount of
+         name-reading will ever place one. Only the operator knows, and now they can say.
+       · the excluded TRANSFER gets a home instead of vanishing. `_elsewhereFor` correctly holds a
+         self-transfer back ("the money never left the business") and that is WRONG for a draw, which
+         did leave. Nothing in the descriptor separates them. A Kind is the answer.
+       · "+ Add your own" comes along free on the category branch, so an operator who never opens the
+         manual form can still add a category.
+       · the section above renames to "Need a Type", which is truer than "Need a Category".
+
+     ⛔ REUSE THE EXACT CONTROLS, and the two branches are deliberately DIFFERENT KINDS of control.
+     The category branch is KEYED, so it pulls through `App.listOptions` and inherits its refusal of
+     the five reserved cash names ([[the-loop]] #115). The Kind branch is UNKEYED with the five and
+     `addCustom: false` — keyed would offer NONE of them, measured on the real control when v101
+     tried it, precisely because `listOptions` refuses reserved names at READ time. A typed-in kind
+     has no `type` to become, so the set is closed.
+     ⚠ SHOW/HIDE, NOT A RE-RENDER, same as `_applyLogType` on the form: nothing chosen can be lost if
+     nothing is rebuilt, and at 2,000 rows a repaint of this panel costs ~460ms. */
   _expenseToolbarHtml() {
     const r = this._expenseReview || {};
+    const t = r.moveType || '';
+    /* ⚠ ASKED ONCE. `_expenseCheckedIds` walks `_expenseGroups`, which walks the whole file through
+       `_buildExpenseRows` — so reading it three times in one label is three full walks per render,
+       and this panel already carries a ~460ms-at-2,000-rows note. Found scanning my own diff: the
+       version this replaced took it once into a `const` and I inlined it. */
     const n = this._expenseCheckedIds().length;
-    const opts = this.categoryList().map(c => '<option value="' + esc(c) + '"'
-      + (c === r.moveCat ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    const hide = on => on ? '' : 'display:none;';
     /* ⚠ THE REFERENCE'S OWN MARKUP, down to the wrapper. Kyle: *"the drop down isn't styled
        correctly."* A bare `<select>` misses `.form-input`, and without the `.f` wrapper it does not
        sit against the middle of the button beside it. Copied from `ic-product-setup`'s route
        toolbar, including `no-print` and the centre alignment its comment argues for. */
-    return '<div class="no-print" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">'
-      + '<div class="f" style="max-width:220px;">'
-      + '<select class="form-input" id="oex-rt-cat"><option value="">Choose a category...</option>'
-      + opts + '</select></div>'
+    return '<div class="no-print" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<div class="f" style="width:180px;"><label>Log Type</label>'
+      +   '<select class="form-input" id="oex-rt-logtype">'
+      +     '<option value=""' + (t ? '' : ' selected') + '>Select Type...</option>'
+      +     '<option value="expense"' + (t === 'expense' ? ' selected' : '') + '>Operating Expense</option>'
+      +     '<option value="cash"' + (t === 'cash' ? ' selected' : '') + '>Cash Outflow</option>'
+      +   '</select></div>'
+      + '<div class="f" id="oex-rt-cat-wrap" style="width:230px;' + hide(t === 'expense') + '">'
+      +   '<label>Category' + App.manageListLink('expense_category') + '</label>'
+      +   App.customSelect({ id: 'oex-rt-cat', key: 'expense_category', builtin: this.CATEGORIES,
+            selected: t === 'expense' ? (r.moveCat || '') : '', blank: true, blankLabel: 'Select category...' })
+      + '</div>'
+      + '<div class="f" id="oex-rt-kind-wrap" style="width:230px;' + hide(t === 'cash') + '">'
+      +   '<label>Kind</label>'
+      +   App.customSelect({ id: 'oex-rt-kind', builtin: this.CASH_ONLY_CATEGORIES.map(c => c.name),
+            selected: t === 'cash' ? (r.moveCat || '') : '', blank: true, blankLabel: 'Select kind...',
+            addCustom: false })
+      + '</div>'
       /* ⚠ THE COUNT IS ON THE BUTTON, so a press can never move a number the operator did not see.
          Disabled at zero for the same reason the Add button is. */
-      + '<button type="button" class="btn btn-primary btn-sm" id="oex-rt-move"'
-      + (n ? '' : ' disabled') + '>Move To' + (n ? ' (' + n + ')' : '') + '</button>'
-      + (r.moveNote ? '<span style="font-size:11px;color:var(--gold);">' + esc(r.moveNote) + '</span>' : '')
+      + '<div><button type="button" class="btn btn-primary btn-sm" id="oex-rt-move"'
+      + (n ? '' : ' disabled') + '>Move To' + (n ? ' (' + n + ')' : '') + '</button></div>'
+      + (r.moveNote ? '<span style="font-size:11px;color:var(--gold);align-self:center;">' + esc(r.moveNote) + '</span>' : '')
       + '</div>';
   },
 
@@ -2558,7 +2815,12 @@ S.HubOperatingExpenses = {
     const rows = built.list.map((x, i) => this._expenseReviewRow(x, (live[i] || {})._rid));
     return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
   },
-  _expenseReviewCount() { return this._expenseReview ? this._expenseReviewSummary().count : 0; },
+  /* ⛔ `_expenseReviewCount()` WAS DELETED HERE, 2026-08-06, and the retired-code ratchet is what
+     found it. It read `this._expenseReview ? this._expenseReviewSummary().count : 0` and its one
+     app caller was the refused-write relabel, which now asks `ImportConfirm.goLabel` so the two
+     copies of the label rule cannot drift. That left it with zero app callers and nine HARNESS
+     callers — a wrapper kept alive by its own tests ([[the-loop]] #66). Those assertions read the
+     number off the rendered button now, which is what they always claimed to measure. */
 
   /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
      are TEXT the shell escapes, and they are what the shell's one-line NOTE_BUDGET applies to. */
@@ -2613,7 +2875,11 @@ S.HubOperatingExpenses = {
          advisory rather than as what the screen is going to do. */
       note: x.status === 'new' ? (x.excluded ? (x.elsewhere || '') : '') : (NOTE[x.status] || ''),
       notes: x.notes || [],
-      lands: x.status === 'new' && !x.excluded
+      lands: x.status === 'new' && !x.excluded,
+      /* ⭐ A6 — GOING IN, BUT NOT ANSWERED. The shell counts these onto the button so a press can
+         never bank money into limbo silently. `placed` is the walk's own answer to "did anything
+         file this row", so nothing new is being decided here — it is being SAID. */
+      unset: !x.placed
     };
   },
 
@@ -2687,7 +2953,15 @@ S.HubOperatingExpenses = {
           ? ' ' + v.sign.negVotes + ' amounts are negative and ' + v.sign.posVotes + ' positive, so'
             + ' Bar Cop could not tell which sign means money out: it read the positive rows as'
             + ' expenses. Check the amount column.' : '');
-    return ImportConfirm.panel({
+    /* ⚠ ONE OPTIONS OBJECT, TWO CALLERS. `_runExpenseReview` rebuilds the go button IN PLACE after a
+       refused write (a re-render there would destroy the result slot holding the error), and it used
+       to hand-build the label. Once A1 gave the noun a condition and A6 gave it a tail, that copy
+       started printing something the shell would never render. Both ask `ImportConfirm.goLabel` off
+       THIS object now, so they cannot disagree ([[the-loop]] #54). */
+    return ImportConfirm.panel(this._expensePanelOpts(s, lead));
+  },
+  _expensePanelOpts(s, lead) {
+    return {
       label: 'Check your expenses',
       lead: lead,
       /* ⚠ NARROWER VENDOR PULLS AMOUNT LEFT (Kyle: *"too big of a gap from vendor to amount"*). A
@@ -2697,7 +2971,17 @@ S.HubOperatingExpenses = {
       columns: [{ label: 'Date', width: 13 }, { label: 'Vendor', width: 27 }, { label: 'Amount', width: 12 }],
       outcomeLabel: 'What Happens',
       rows: s.rows,
-      verb: 'Add', noun: 'Expense',
+      /* ⚠ THE NOUN FOLLOWS WHAT IS ACTUALLY GOING IN, AND A1 IS WHAT MADE THAT NECESSARY. Before
+         the Log Type pair, every row this button wrote was an operating expense and "Add 5
+         Expenses" was simply true. Now a draw can be among them — and the section head above it
+         says "cash outflow", the result line afterwards says "3 expenses and 2 cash outflows", and
+         the button in between would still have claimed five expenses. A gap I walked into building
+         A1, not one that was here before.
+         ⭐ "Rows" is this screen's own word, not a new one: the lead already reads "Bar Cop read 6
+         rows out of this file". The common case — a file with no cash in it — is unchanged. */
+      verb: 'Add', noun: s.rows.some(x => x.lands && this.isCashOnlyCategory(x.cat)) ? 'Row' : 'Expense',
+      // A6. The shell counts the rows; this door supplies the words. See ImportConfirm.panel.
+      unsetNoun: 'with no type',
       // Grouped by where each row is going. See ImportConfirm.panel and _expenseGroups.
       groups: this._expenseGroups(),
       toolbar: this._expenseToolbarHtml(),
@@ -2709,7 +2993,7 @@ S.HubOperatingExpenses = {
       // The door owns which sections are open; a closed one builds no table at all.
       open: (this._expenseReview || {}).open,
       busy: !!this._expenseReviewWriting
-    });
+    };
   },
 
   /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
@@ -2744,10 +3028,17 @@ S.HubOperatingExpenses = {
       /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `_importRows` is what clears it — a refused write
          keeps the whole screen so the operator can press again without re-dropping the file. Do NOT
          re-render here: the failure path writes into the result slot and a re-render destroys it. */
+      /* ⛔ THE LABEL COMES FROM THE SHELL, NOT FROM A SECOND COPY OF ITS RULE. This read
+         `'Add ' + n + ' Expense'`, which was true until A1 gave the noun a condition (a draw is not
+         an expense) and A6 gave it a "(N with no type)" tail — so a refused write relabelled the
+         button to something `ImportConfirm.panel` would never render, on the screen where the
+         operator is deciding whether to press it again. */
       if (this._expenseReview) {
         const b = this.container && this.container.querySelector('[data-oexreview-go]');
-        const n = this._expenseReviewCount();
-        if (b) { b.disabled = false; b.textContent = 'Add ' + n + ' Expense' + (n === 1 ? '' : 's'); }
+        if (b) {
+          b.disabled = false;
+          b.textContent = ImportConfirm.goLabel(this._expensePanelOpts(this._expenseReviewSummary(), ''));
+        }
       }
     }
   },
@@ -2773,7 +3064,16 @@ S.HubOperatingExpenses = {
     /* ⛔ `excluded` IS PART OF "DOES THIS ROW LAND", so it is filtered here and not only on the
        screen. A guard that lives in the render is a guard that a direct import walks straight past,
        and this door's whole failure history is money reaching Books that should not have. */
-    const toAdd       = built.list.filter(x => x.status === 'new' && !x.excluded).map(x => x.rec);
+    /* ⭐⭐⭐ A1 — THE LANDING ROWS SPLIT BY WHAT THE OPERATOR TYPED THEM AS, and the two halves take
+       DIFFERENT WRITE PATHS. A cash-only row cannot go through the bulk expense write: it would land
+       in the ledger with no `migrated_from`, which `_isOperatingRow` reads as a BILL and
+       `CashEngine.cashOutflows()` cannot see at all — so the draw would sit on the Money Out screen
+       as a fixed cost and never reach the forecast. The orphan shape ([[the-loop]] #115), and E4 of
+       `verify-money-out-write-doors` has been pinning that constraint since the day cash rows became
+       reachable. The answer is not a new path, it is the EXISTING one: `_writePair`. */
+    const _landing    = built.list.filter(x => x.status === 'new' && !x.excluded);
+    const _cashPicks  = _landing.filter(x => this.isCashOnlyCategory(x.rec.category));
+    const toAdd       = _landing.filter(x => !this.isCashOnlyCategory(x.rec.category)).map(x => x.rec);
     const elsewhere   = countOf(x => x.status === 'new' && x.excluded);
     const credits     = countOf(x => x.status === 'credit');
     const undated     = countOf(x => x.status === 'undated');
@@ -2819,6 +3119,37 @@ S.HubOperatingExpenses = {
         + 'Could not save the import. Nothing was changed, check your connection and try again.</div>';
       return;
     }
+    /* ⭐⭐⭐ THE CASH ROWS, AFTER THE BILLS AND ONLY IF THE BILLS LANDED, THROUGH `_writePair`.
+       ⛔ THE ORDER IS THE DESIGN, and it is the same argument as `_writePair`'s own: two stores
+       cannot be written in one request, so pick the order that makes every failure land somewhere
+       repairable. Bills first means a refused bulk aborts before a single outflow exists — nothing
+       to duplicate on the retry. Cash after means a refused pair leaves the bills in, and the retry
+       finds them ALREADY LOGGED because `_dup` now reads the whole ledger, so pressing Add again
+       re-attempts only what failed. [[test-the-retry]]: a failed write is recoverable, the SECOND
+       attempt is what makes damage permanent.
+       ⛔ BARE CALL, NOT GUARDED. A guard would mean "if the outflow screen has not loaded, write
+       half a record" ([[the-loop]] #40) — and the screen object is always loaded, which is exactly
+       why item 19 stage 2 wrote that constraint down. The manual form's cash branch calls it the
+       same way. */
+    let cashSaved = 0, cashFailed = 0;
+    for (let i = 0; i < _cashPicks.length; i++) {
+      const out = this._outflowFromLedgerRow(_cashPicks[i].rec);
+      if (!out) { cashFailed++; continue; }
+      let landed = false;
+      try { landed = await S.HubCashOutflows._writePair(out); } catch (e) { landed = false; }
+      if (landed) cashSaved++; else cashFailed++;
+    }
+    /* ⛔ A REFUSED CASH WRITE KEEPS THE SCREEN, exactly as a refused bulk does. The bills that DID
+       land re-read as "Already logged" on the next walk, so the operator can press Add again and
+       only the refused rows are attempted. Clearing the screen here would leave them with no way
+       back except re-dropping the file — and no account of which rows are missing. */
+    if (cashFailed && opts.reviewed) {
+      const el = document.getElementById('oex-imp-result');
+      if (el) el.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + 'Could not save ' + cashFailed + ' cash outflow' + (cashFailed === 1 ? '' : 's')
+        + '. Everything else went in. Check your connection and press Add again.</div>';
+      return;
+    }
     /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. The refusal returned above with
        every row still up; this line is the only one that knows the write landed. */
     this._expenseReview = null;
@@ -2861,7 +3192,15 @@ S.HubOperatingExpenses = {
          ⛔ PRECONDITION, and it is the whole rule: a clause may only be dropped once its FACT is on
          the screen. Every bucket here is a row with its own note, the two file-level caveats are in
          the lead, and the rows the operator took out went out by their own hand. */
-      this._importMsg = _added.length + ' expense' + (_added.length === 1 ? '' : 's') + ' imported.';
+      /* ⚠ TWO COLLECTIONS, SO TWO COUNTS ([[the-loop]] #86 — every plural names a collection; say
+         which one). A draw is not an expense: calling three bills and two draws "5 expenses
+         imported" would be the screen contradicting the sections the operator just sorted them
+         into, on the one line that reports what happened. */
+      const _n = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+      this._importMsg = (_added.length ? _n(_added.length, 'expense') : '')
+        + (_added.length && cashSaved ? ' and ' : '')
+        + (cashSaved ? _n(cashSaved, 'cash outflow') : '')
+        + ((_added.length || cashSaved) ? ' imported.' : 'Nothing new to import.');
     } else {
       /* The full account, for a call with no screen in front of it. This is the path a direct
          `_importRows` takes, and it is the only reason these clauses still exist. */
