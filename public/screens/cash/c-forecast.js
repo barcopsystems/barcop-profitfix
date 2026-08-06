@@ -79,7 +79,18 @@ S.CashForecast = {
          neither one interrupting the document. */
       + '<div class="no-print" style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin:0 0 16px;">'
         + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+        /* ⭐⭐⭐ WHAT IT CAN AND CANNOT SEE, IN THE BOX THAT IS ALREADY THERE (Kyle, 2026-08-06:
+           *"the forecast has the heads up box.. just add to that statement what it can and cannot
+           see"*). No new element, so no design ratchet moves, and it sits where the operator is
+           already being told to check the figures.
+           ⛔ THE SENTENCE THAT MATTERS IS THE SECOND ONE. Sales and labor both fall back to your own
+           history when nothing is declared — `revenueForWeek` replays your recent weeks and
+           `laborForWeek` returns a trailing average. Bills and cash outflows have NO such fallback:
+           they are a schedule of commitments, and a commitment Bar Cop has not seen happen twice
+           contributes exactly zero. That asymmetry is invisible on screen and it is the whole reason
+           an operator can read a confident forecast that is missing their own rent. */
         + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop builds this forecast from what you log and from assumptions about your own averages. It is a software tool, not a CPA, accountant, or lender. This is a worksheet, not an audited financial statement, and a projection rather than a guarantee, so your actual results will vary. Review and verify every figure before you hand it to a bank.</div>'
+        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;margin-top:8px;">Sales and payroll carry forward from your own recent weeks even if you tell Bar Cop nothing else. Bills and cash outflows do not: they are counted only once Bar Cop has seen the same one happen at least twice, so anything new to you takes a month or two to appear here. Until then it is not in these numbers.</div>'
       + '</div>'
       + this.forecastCard(fc, opening)
       + this.billsCard()
