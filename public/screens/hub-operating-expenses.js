@@ -1594,13 +1594,18 @@ S.HubOperatingExpenses = {
            ⚠ THE WRAPPER IS WHAT `_applyLogType` GOVERNS, and it CLEARS on the way out — a bill that
            inherited a ticked box the operator could not see is the exact defect that function was
            written to prevent for the category picker. */
-        + '<div id="oexa-recur-wrap" style="display:none;">'
-        + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="oexa-recurring"/> Repeats on a schedule (same amount each time)</label></div>'
-        + '<div id="oexa-term-wrap" style="margin-top:12px;display:none;">'
-        +   '<div style="font-size:11px;color:var(--gold);margin-bottom:12px;max-width:540px;line-height:1.5;">Set the <b>Due Date</b> above to when this is next actually due. The schedule repeats from that date, not from today.</div>'
-        +   '<div class="f" style="max-width:540px;"><label>How often</label><select id="oexa-frequency" style="width:200px;"><option value="monthly">Monthly</option><option value="quarterly">Quarterly (every 3 months)</option><option value="annual">Annually (once a year)</option></select></div>'
-        +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" id="oexa-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs until you stop it. Set this only for a bill that ends after a fixed number of months.</div></div></div>'
-        + '</div>'
+        /* ⛔⛔⛔ BUILD ORDER C2 — THE RECURRING BLOCK IS GONE FROM THIS FORM TOO. C removed it for
+           BILLS on the argument that the ledger answers the question; `deriveRecurringOutflows`
+           is what makes that true for cash as well, so the last reason to keep it here is gone.
+           ⭐ Kyle's own argument closed it: the two-occurrence delay applies to bills identically,
+           so keeping a cash checkbox for that reason was two standards. The full note and the
+           $18,600 measurement are on `hub-cash-outflows`' add form.
+           ⛔⛔ AND REMOVING IT FIXES A LIVE BREAK I SHIPPED IN C. The wrapper this block sat in was
+           opened and never closed — one `</div>` for two divs — so it swallowed the notes field,
+           the elsewhere notice, the error slot AND the Add Expense button. `_applyLogType` hides
+           that wrapper whenever Log Type is Operating Expense, so on v109 picking Operating
+           Expense made the Add button disappear. Measured, not reasoned. Block E of
+           `verify-no-new-typed-series` is the structural pin that makes it unrepeatable. */
         + App.noteField({ id: 'oexa-notes', placeholder: 'Optional context for the bookkeeper' })
         // Fires as they type the vendor. See _manualElsewhereNotice.
         + '<div id="oexa-elsewhere"></div>'
@@ -1662,10 +1667,6 @@ S.HubOperatingExpenses = {
        vendor and goes straight to the amount would not be told until they had left the field. */
     document.getElementById('oexa-vendor')?.addEventListener('input', () => this._manualElsewhereNotice());
     document.getElementById('oexa-clear')?.addEventListener('click', () => this._clearAdd());
-    document.getElementById('oexa-recurring')?.addEventListener('change', (e) => {
-      const w = document.getElementById('oexa-term-wrap');
-      if (w) w.style.display = e.target.checked ? '' : 'none';
-    });
     // ⭐ ITEM 19 STAGE 2: Log Type reveals the selector that matches it. One place decides, so the
     // two branches cannot both be on screen (which would leave the save reading a stale one).
     document.getElementById('oexa-logtype')?.addEventListener('change', () => this._applyLogType());
@@ -3596,8 +3597,6 @@ S.HubOperatingExpenses = {
     const vendor   = (g('oexa-vendor')?.value || '').trim();
     const amount   = parseFloat(g('oexa-amount')?.value || '');
     const notes    = (g('oexa-notes')?.value || '').trim();
-    const recurring = !!g('oexa-recurring')?.checked;
-    const term      = parseInt(g('oexa-term')?.value, 10);
     const showErr = (m) => { const e = g('oexa-err'); if (e) { e.textContent = m; e.style.display = 'block'; } };
     /* ⭐⭐ ITEM 19 STAGE 2 — THE CASH BRANCH, AND IT GOES FIRST SO THE EXPENSE PATH BELOW IS
        UNTOUCHED. The operator declared the type, so nothing is inferred from a category name here.
@@ -3618,18 +3617,14 @@ S.HubOperatingExpenses = {
       if (!date) { showErr('Pick a date.'); return; }
       if (!kind) { showErr('Pick a kind.'); return; }
       if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
-      if (recurring && g('oexa-term')?.value && (isNaN(term) || term < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
       const out = {
         id: App.uid ? App.uid() : ('cof-' + Date.now()),
         date: date, type: this._typeForCashCategory(kind), amount: amount, notes: notes,
         created_at: new Date().toISOString()
       };
-      if (recurring) {
-        out.recurring = true;
-        out.frequency = g('oexa-frequency')?.value || 'monthly';
-        out.term_months = (term && term > 0) ? term : null;
-        out.recur_day = parseInt(String(date).slice(8, 10), 10) || 1;
-      }
+      /* ⛔ NO SCHEDULE IS WRITTEN ONTO A NEW OUTFLOW (build order C2). A stored `recurring` flag is
+         an instruction to every forward reader and outranks the ledger for as long as it sits there.
+         `CashEngine.deriveRecurringOutflows` recognises a commitment from what actually happened. */
       if (!(await S.HubCashOutflows._writePair(out))) {
         showErr('Could not save. Check your connection and try again.');
         return;
@@ -3640,7 +3635,6 @@ S.HubOperatingExpenses = {
     if (!date) { showErr('Pick a date.'); return; }
     if (!category) { showErr('Pick a category.'); return; }
     if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
-    if (recurring && g('oexa-term')?.value && (isNaN(term) || term < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
     /* ⛔ ASK ONCE, DO NOT REFUSE. The import HOLDS a flagged row back because there the default —
        doing nothing — booked it. Here nothing happens until this button is pressed, so refusing a
        row the operator deliberately typed would be the app overruling them on a guess, and Bar Cop
@@ -3690,20 +3684,12 @@ S.HubOperatingExpenses = {
     show('oexa-cat-wrap', t === 'expense');
     show('oexa-vendor-wrap', t === 'expense');
     show('oexa-kind-wrap', t === 'cash');
-    /* ⭐⭐ BUILD ORDER C — RECURRING IS A CASH CONTROL. A bill recurs because it keeps happening, so
-       the ledger answers that question; a cash outflow has no derivation behind it and still needs
-       to be told ([[the-loop]] #51). See `_addCardHtml`.
-       ⛔ CLEARED AND COLLAPSED ON THE WAY OUT, both of them. A hidden checkbox that stays ticked is
-       how a bill gets written with a schedule the operator cannot see — the same reason the category
-       and vendor are cleared two lines up. */
-    show('oexa-recur-wrap', t === 'cash');
-    if (t !== 'cash') {
-      const rc = document.getElementById('oexa-recurring');
-      if (rc) rc.checked = false;
-      clear('oexa-term');
-      const tw = document.getElementById('oexa-term-wrap');
-      if (tw) tw.style.display = 'none';
-    }
+    /* ⛔ C GAVE CASH ITS OWN RECURRING WRAPPER HERE AND C2 DELETED IT. There is no schedule control
+       on either branch now: `CashEngine.deriveRecurringOutflows` reads a commitment off the ledger
+       for cash exactly as `deriveRecurringBills` does for bills, so nothing is left to show or hide.
+       ⚠ AND THE WRAPPER WAS A LIVE BREAK WHILE IT EXISTED — it was opened and never closed, so
+       hiding it took the notes field, the error slot and the Add Expense button with it whenever
+       Log Type was Operating Expense. See the note where the block used to be. */
     if (t !== 'expense') { clear('oexa-cat'); clear('oexa-vendor'); }
     if (t !== 'cash') clear('oexa-kind');
     // The "looks like it belongs elsewhere" notice is keyed off the vendor, which only the expense
@@ -3714,10 +3700,7 @@ S.HubOperatingExpenses = {
   _clearAdd() {
     const d = document.getElementById('oexa-date'); if (d) d.value = App.todayLocal();
     const c = document.getElementById('oexa-cat');  if (c) c.selectedIndex = 0;
-    ['oexa-vendor', 'oexa-amount', 'oexa-notes', 'oexa-term'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-    const rc = document.getElementById('oexa-recurring'); if (rc) rc.checked = false;
-    const fq = document.getElementById('oexa-frequency'); if (fq) fq.selectedIndex = 0;
-    const tw = document.getElementById('oexa-term-wrap'); if (tw) tw.style.display = 'none';
+    ['oexa-vendor', 'oexa-amount', 'oexa-notes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const e = document.getElementById('oexa-err');  if (e) e.style.display = 'none';
     const lt = document.getElementById('oexa-logtype'); if (lt) lt.value = '';
     this._applyLogType();

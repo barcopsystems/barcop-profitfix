@@ -103,12 +103,22 @@ S.HubCashOutflows = {
       +   '<div class="f" style="width:200px;"><label>Type</label><select class="form-input" id="cb-type">' + this.typeOptions('draw') + '</select></div>'
       +   '<div class="f" style="width:160px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="cb-amt" step="0.01" min="0" placeholder="0.00"/></div></div>'
       + '</div>'
-      + '<div style="margin-top:14px;"><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--t1);cursor:pointer;"><input type="checkbox" class="bc-check" id="cb-recur"/> Recurring (same amount each time)</label></div>'
-      + '<div id="cb-term-wrap" style="margin-top:12px;display:none;">'
-      +   '<div style="font-size:11px;color:var(--gold);margin-bottom:12px;max-width:540px;line-height:1.5;">Set the <b>Due Date</b> above to when this is next actually due. The schedule repeats from that date, not from today.</div>'
-      +   '<div class="f" style="max-width:540px;"><label>How often</label><select id="cb-frequency" style="width:200px;"><option value="monthly">Monthly</option><option value="quarterly">Quarterly (every 3 months)</option><option value="annual">Annually (once a year)</option></select></div>'
-      +   '<div class="f" style="max-width:540px;margin-top:12px;"><label>Ends after (months)</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><input type="number" class="suf" id="cb-term" min="1" step="1" placeholder="Ongoing" style="width:170px;flex:0 0 170px;"/><div style="font-size:11px;color:var(--t3);line-height:1.5;flex:1 1 200px;min-width:180px;">Leave blank and it recurs until you stop it. Set this only for one with a fixed payoff, like a loan.</div></div></div>'
-      + '</div>'
+      /* ⛔⛔⛔ BUILD ORDER C2 — THE RECURRING CHECKBOX AND ITS SCHEDULE BLOCK ARE GONE FROM THIS FORM.
+         `CashEngine.deriveRecurringOutflows` reads a repeating commitment off the ledger now, on the
+         same terms bills got: the same type at the same amount on an exact cadence, twice.
+         ⭐ KYLE, AND THE MEASUREMENT IS HIS: *"is the checkmark worth the hassle? ... any expense
+         entered also takes 2-3 months to pattern the same expense."* Its only advantage was getting
+         a new commitment in about two occurrences early, and we accepted that delay for bills. What
+         it cost was $18,600 a quarter for anyone who forgot it — with opening cash set and weeks
+         confirmed, so every guard passed and the forecast read +$8,358 against a truth of -$10,242.
+         A control that only helps when remembered, and silently misleads when forgotten, is worse
+         than no control.
+         ⛔ EXISTING DECLARED SERIES ARE UNTOUCHED, AND THAT IS NOT TIMIDITY. A declared cash series
+         is ONE ROW — this store projects its history rather than writing it ([[the-loop]] #51) — so
+         the derivation, which needs two occurrences, can never see it. Ignoring the stored flag
+         would delete every one of them from the forecast, the reserve and Safe to Spend on every
+         live account including the demo. So nothing NEW can become a series, everything that manages
+         an existing one stays, and the surface empties itself as those series end. */
       + App.noteField({ id: 'cb-note', placeholder: 'e.g. SBA loan, March draw' })
       + '<div id="cb-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
       + '</div>';
@@ -284,8 +294,6 @@ S.HubCashOutflows = {
     const type = g('cb-type')?.value || 'draw';
     const amount = parseFloat(g('cb-amt')?.value || '');
     const note = (g('cb-note')?.value || '').trim();
-    const recur = !!g('cb-recur')?.checked;
-    const term = parseInt(g('cb-term')?.value, 10);
     const showErr = (m) => { const e = g('cb-err'); if (e) { e.textContent = m; e.style.display = 'block'; } };
     /* ⚠ CLEAR IT FIRST. A refused save now returns without redrawing (so the typed values survive
        the retry), and nothing else hid this line — so the previous attempt's "Pick a date." sat on
@@ -294,22 +302,21 @@ S.HubCashOutflows = {
     const errEl = g('cb-err'); if (errEl) errEl.style.display = 'none';
     if (!date) { showErr('Pick a date.'); return; }
     if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
-    if (recur && g('cb-term')?.value && (isNaN(term) || term < 1)) { showErr('A fixed term must be 1 month or more, or leave it blank to recur until you stop it.'); return; }
+    /* ⛔ NO SCHEDULE IS WRITTEN ONTO A NEW OUTFLOW (build order C2). A stored `recurring` flag is an
+       INSTRUCTION to every forward reader and it outranks the ledger for as long as it sits there;
+       the whole point is that a commitment is recognised from what actually happened. The term
+       refusal went with it — there is no term to be wrong about any more. */
     const rec = { id: App.uid(), date, type, amount, notes: note, created_at: new Date().toISOString() };
-    if (recur) { rec.recurring = true; rec.frequency = g('cb-frequency')?.value || 'monthly'; rec.recur_day = parseInt(String(date).slice(8, 10), 10) || 1; if (term && term > 0) rec.term_months = term; }
     // A refused save leaves the form exactly as typed — no redraw — so the retry is one press, not
     // a re-entry. putRecord has already said why.
     if (!(await this._writePair(rec))) return;
-    if (!recur) this._setPeriodFor(date);
+    this._setPeriodFor(date);
     this.draw();
   },
   clearAdd() {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-    set('cb-date', App.todayLocal()); set('cb-amt', ''); set('cb-note', ''); set('cb-term', '');
+    set('cb-date', App.todayLocal()); set('cb-amt', ''); set('cb-note', '');
     const t = document.getElementById('cb-type'); if (t) t.selectedIndex = 0;
-    const fq = document.getElementById('cb-frequency'); if (fq) fq.selectedIndex = 0;
-    const r = document.getElementById('cb-recur'); if (r) r.checked = false;
-    const w = document.getElementById('cb-term-wrap'); if (w) w.style.display = 'none';
     const e = document.getElementById('cb-err'); if (e) e.style.display = 'none';
   },
 
@@ -518,7 +525,6 @@ S.HubCashOutflows = {
   wire() {
     document.getElementById('cb-save')?.addEventListener('click', () => this.saveAdd());
     document.getElementById('cb-clear')?.addEventListener('click', () => this.clearAdd());
-    document.getElementById('cb-recur')?.addEventListener('change', (e) => { const w = document.getElementById('cb-term-wrap'); if (w) w.style.display = e.target.checked ? '' : 'none'; });
     this.container.querySelector('.card-collapse-head')?.addEventListener('click', (e) => App.toggleCollapse(e.currentTarget));
     App.applyCollapsed(this.container);
     this.container.onclick = async ev => {
