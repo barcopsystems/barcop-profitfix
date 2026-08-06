@@ -1045,7 +1045,13 @@ S.HubSettings = {
                labor_pct:a.food_labor/a.food_rev*100, vs_target_pct:a.food_cost_pct-32, vs_target_dollar:((a.food_cost_pct-32)/100)*a.food_rev },
         catering: { revenue:0, cogs:0, labor:0, cost_pct:0, labor_pct:0 },
         other:{ revenue:othRev, cogs:+(othRev*0.45).toFixed(2) },
-        platform_fees:+(a.food_rev*0.045).toFixed(2),
+        /* ⛔ `platform_fees` CAME OFF THE SEEDED WEEK (build piece 2). The week is not a money store
+           any more; the commission is seeded as a real ledger row below, which is also what fixes a
+           defect this seed was carrying: `startDemo` skips `boot()`, so the demo never ran the
+           mirror reconcile and Books' "3rd-party platform fees" line read $0.00 while every seeded
+           week carried a fee. Measured live on the deployed build: $0.00 against $323.14 for
+           2026-08. Seeded data has to behave like operator-entered data, and an operator enters
+           this at the Money Out door. */
         prime_cost_pct:a.prime_cost_pct, notes:'' };
     });
     App.data.weeks = weeks;
@@ -1064,6 +1070,22 @@ S.HubSettings = {
       opexMonthly.forEach(([cat, amt]) => {
         operatingExpenses.push({ id:uid(), date:mk + '-05', category:cat, amount:+(amt * (0.95 + rnd() * 0.1)).toFixed(2), vendor:'', notes:'' });
       });
+    });
+    /* ⭐⭐ DELIVERY COMMISSION, ONE ROW PER WEEK, ON THE ONE LEDGER (build piece 2). It used to be
+       typed onto the week itself and mirrored across by a reconcile that only a LOGIN ran — so the
+       demo, which skips `boot()`, showed a P&L line reading $0.00 against real weekly fees.
+       ⭐ PER WEEK, DATED AT `period_end`, AND AT THE SAME 4.5% OF FOOD REVENUE, so the monthly and
+       annual totals are identical to the cent to what a live account already has — the migration
+       produces exactly this shape from the weeks on file, which is what makes the demo and a real
+       account behave the same ([[seed-roundtrip-verification]]).
+       ⚠ A week with no delivery sales gets no row, matching the mapping: a $0 line per week would
+       bury the log in noise. */
+    weeks.forEach(w => {
+      const fee = +(((w.food && w.food.revenue) || 0) * 0.045).toFixed(2);
+      if (!(fee > 0)) return;
+      operatingExpenses.push({ id:uid(), date:w.period_end, category:'3rd-Party Platform Fees',
+        vendor:'', amount:fee, notes:'Delivery and pickup commissions for the week',
+        created_at:new Date().toISOString() });
     });
     // Two ongoing recurring bills (recur every month until cancelled, no fixed
     // term). Both were entered when the operator set up Books at the start of the

@@ -40,7 +40,13 @@ S.ProfitForecast = {
       .sort((a, b) => (b.period_end || '').localeCompare(a.period_end || ''))
       .slice(0, this.RUN_WEEKS);
     const nW = recent.length;
-    let sumRev = 0, sumCogs = 0, sumLabor = 0, sumPF = 0;
+    /* ⛔⛔ `sumPF` / `avgWeeklyPF` CAME OUT HERE (build piece 2), AND THEY WERE A LIVE DOUBLE COUNT.
+       The weekly `platform_fees` field was mirrored into the ledger as a `3rd-Party Platform Fees`
+       expense row, and `opexLog()` excludes only cash-only categories — so the commission was
+       already inside `avgWeeklyOpex` while `opexTot` added `avgWeeklyPF` on top of it. Measured on
+       the deployed build: avg weekly opex $2,846.59 -> $3,147.16 the moment a login's reconcile
+       ran, with avgWeeklyPF unchanged at $308.98 beside it. One source now: the ledger. */
+    let sumRev = 0, sumCogs = 0, sumLabor = 0;
     // Every line Books' income statement carries: bar + food + catering + ancillary,
     // matching hub-books' totalRev / totalCogs / totalLabor exactly. This summed bar+food
     // ONLY while comparing the result against prime_cost_pct, which is a TOTAL-SALES
@@ -54,11 +60,9 @@ S.ProfitForecast = {
       sumRev   += (w.bar?.revenue || 0) + (w.food?.revenue || 0) + (w.catering?.revenue || 0) + (w.other?.revenue || 0);
       sumCogs  += (w.bar?.cogs   || 0) + (w.food?.cogs   || 0) + (w.catering?.cogs   || 0) + (w.other?.cogs || 0);
       sumLabor += (w.bar?.labor  || 0) + (w.food?.labor  || 0) + (w.catering?.labor  || 0);
-      sumPF    += parseFloat(w.platform_fees) || 0;
     });
     const avgWeeklyRev    = nW ? sumRev / nW : 0;
     const primePctCurrent = sumRev ? (sumCogs + sumLabor) / sumRev : 0;   // 0..1
-    const avgWeeklyPF     = nW ? sumPF / nW : 0;
 
     // Operating expenses: average per week across the span you have logged them
     // (trailing 12 months). Lumpy bills (rent monthly, insurance annual) smooth
@@ -79,7 +83,7 @@ S.ProfitForecast = {
       if (spanWeeks >= this.MIN_OPEX_WEEKS) { avgWeeklyOpex = sumOx / spanWeeks; opexLogged = true; }
       else opexShort = true;
     }
-    return { nW, avgWeeklyRev, primePctCurrent, avgWeeklyPF, avgWeeklyOpex, opexLogged, opexShort };
+    return { nW, avgWeeklyRev, primePctCurrent, avgWeeklyOpex, opexLogged, opexShort };
   },
 
   render(container, actions) {
@@ -108,7 +112,9 @@ S.ProfitForecast = {
     const hw       = this.horizonWeeks();
     const targetP  = (this.targets().prime_cost_pct ?? 60) / 100;
     const sales    = rr.avgWeeklyRev * hw;
-    const opexTot  = (rr.avgWeeklyOpex + rr.avgWeeklyPF) * hw;
+    // ONE operating-cost term. It used to read `(rr.avgWeeklyOpex + rr.avgWeeklyPF)`, and the
+    // commission was already inside the first — see `runRates` above.
+    const opexTot  = rr.avgWeeklyOpex * hw;
     const primeCur = sales * rr.primePctCurrent;
     const primeTgt = sales * targetP;
     const profitCur = sales - primeCur - opexTot;
@@ -164,7 +170,7 @@ S.ProfitForecast = {
       : rr.opexShort ? ' You have under a month of operating costs logged, not enough history to project them honestly yet, so this shows profit before operating costs. It fills in as more bills land under Accounting, Operating Expenses.'
       : ' No operating costs are logged yet, so this shows profit before operating costs; add rent, utilities, and the like under Accounting, Operating Expenses, for a true net profit.';
     const assumeTxt = 'Projected from your last ' + rr.nW + ' week' + (rr.nW === 1 ? '' : 's') + ': about ' + money(rr.avgWeeklyRev) + ' a week in sales at a ' + pctTxt(rr.primePctCurrent) + ' prime cost'
-      + (rr.opexLogged ? ', plus about ' + money(rr.avgWeeklyOpex + rr.avgWeeklyPF) + ' a week in operating costs.' : '.')
+      + (rr.opexLogged ? ', plus about ' + money(rr.avgWeeklyOpex) + ' a week in operating costs.' : '.')
       + opexNote
       + ' These are projections in whole dollars built from your own averages, an estimate to plan against, not a guarantee or financial advice.';
     const headsUp = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:16px;">'

@@ -169,7 +169,13 @@ S.HubCashOutflows = {
             + '<td class="no-print" style="text-align:right;white-space:nowrap;"><button class="btn btn-ghost btn-sm cb-stop" data-id="' + esc(o.id) + '">Stop</button> <button class="btn btn-ghost btn-sm cb-edit" data-id="' + esc(o.id) + '">Edit</button> <button class="btn btn-danger btn-sm cb-del" data-id="' + esc(o.id) + '">Delete</button></td>'
             + '</tr>';
         }).join('')
-      : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No recurring outflows. Check Recurring when you log a draw or loan that repeats.</td></tr>';
+      /* ⚠ THIS EMPTY STATE SAID "Check Recurring when you log a draw or loan that repeats", and the
+         door it points at does not have that box: build order C2 stopped the Money Out ADD form
+         writing any schedule, so logging an outflow never offers it. The checkbox lives on THIS
+         screen's own Edit modal, which is a different action from logging one — so the instruction
+         named a real control at the wrong moment. It now says what actually happens when you just
+         keep logging, which is the path C2 made the default ([[the-loop]] #61). */
+      : '<tr><td colspan="5" style="padding:12px;color:var(--t3);font-size:12px;text-align:center;">No recurring outflows yet. Log each draw, loan payment or tax remittance as it happens and Bar Cop picks up the ones that repeat. To declare one up front, log it and hit Edit.</td></tr>';
     const chip = ([k, label]) => '<button class="btn btn-ghost btn-sm cb-period" data-p="' + k + '" style="' + this.onSel(this._period === k) + '">' + label + '</button>';
     const controlRow = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + this.PERIODS.map(chip).join('') + '</div>'

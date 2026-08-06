@@ -7,10 +7,11 @@
    to fill the Income Statement Operating Expenses placeholder lines so the
    operator's accountant does not have to type them in by hand.
 
-   Two-doors call: Repairs and Maintenance lives in Shift Control's
-   sc_maintenance log. 3rd-Party Platform Fees live in the weekly P&L roll.
-   Operating Expenses Log does NOT include those categories to avoid
-   double-counting in Books.
+   ⭐ THE TWO-DOORS NOTE THAT USED TO SIT HERE IS DEAD, AND SAYING SO IS THE POINT. It read
+   "Repairs and Maintenance lives in Shift Control's sc_maintenance log; 3rd-Party Platform Fees
+   live in the weekly P&L roll; this log does NOT include those categories." Both are ordinary
+   categories on this one ledger now (Phase 2 item 12, and build piece 2), so this log is every
+   dollar of money out and nothing is counted anywhere else.
 
    Sample data deferred per the pre-launch sample-data overhaul. */
 
@@ -42,7 +43,10 @@ S.HubOperatingExpenses = {
        the very few figures an operator legitimately has to TYPE — and that exempts it from "never
        type what Bar Cop can read", not from "one ledger for money out". It is an operating expense
        and it belongs here. It is NOT a cash outflow: no money left the bank.
-       The weekly roll stays the place it is typed; the ledger mirrors it. */
+       ⭐⭐ BUILD PIECE 2 FINISHED THE JOB: the weekly roll no longer holds it. Item 9 left the week
+       as the source with the ledger MIRRORING it, and a mirror is a second source — measured, it
+       was already being subtracted twice on the Cash Bridge and in the Profit Forecast. It is typed
+       here now, at the one Money Out door, like every other bill. */
     '3rd-Party Platform Fees',
     'Other'
   ],
@@ -125,7 +129,12 @@ S.HubOperatingExpenses = {
     };
   },
 
-  /* ⭐⭐ PHASE 2 ITEM 9 — A WEEK'S DELIVERY COMMISSION BECOMES A LEDGER ROW. PURE.
+  /* ⭐⭐ A WEEK'S TYPED DELIVERY COMMISSION BECOMES A LEDGER ROW. PURE.
+     ⚠ THIS IS HISTORY'S DOOR, NOT A LIVE ONE. Nothing types `week.platform_fees` any more (build
+     piece 2); this exists so `migratePlatformFeesOnce` can carry the figures already on file across
+     to the ledger, once, on the account's next login. It is the ONLY thing left in the tree that
+     reads the retired field, which `verify-platform-fees-one-source.js` A5 pins deliberately — or
+     A4 could one day be satisfied by deleting the migration and losing the history with it.
      ⛔ DATED AT `period_end`, so it lands in the month the week closed — which is the month Books
      has always counted it in. Any other date restates a closed period.
      ⛔ NO FEE, NO ROW. A bar that did not run delivery this week has nothing to expense, and a $0
@@ -187,12 +196,65 @@ S.HubOperatingExpenses = {
     return this._reconcileLedgerFrom(App.shiftData && App.shiftData.sc_maintenance,
       this.migrateMaintenanceRow, 'maintenance');
   },
-  /* ⭐ PHASE 2 ITEM 9. The weekly roll is where a delivery commission is typed; the ledger mirrors
-     it, so Books reads one place and `cash-engine.weeklyProfit` / `profit-forecast` go on reading
-     the weekly field untouched. */
-  async reconcilePlatformFeesLedger() {
-    return this._reconcileLedgerFrom(App.data && App.data.weeks,
-      this.migratePlatformFeesRow, 'platform_fees');
+  /* ⭐⭐⭐ BUILD PIECE 2 — THE MIRROR BECOMES A ONE-TIME MIGRATION, AND THE LEDGER IS THE SOURCE.
+     `reconcilePlatformFeesLedger` lived here and ran on EVERY load, keeping the ledger a pure
+     function of `week.platform_fees`. Two sources for one dollar is exactly what the rebuild exists
+     to end, and it had already cost real money: `CashEngine.bills()` excludes only CASH-ONLY
+     categories, so `billsDue` picked the mirror row up as overhead while `profitForPeriod` went on
+     subtracting the weekly field beside it. MEASURED on the deployed build over Jun-Aug, by running
+     what a login runs: Cash Bridge profit $35,831.59 -> $33,003.49 and Cash You Kept
+     -$3,168.41 -> -$5,996.51, a gap of exactly $2,828.10, which is the period's commission. The
+     Profit Forecast had the same shape at `opexTot = (avgWeeklyOpex + avgWeeklyPF) * hw`.
+
+     ⛔ IT IS A MIGRATION, NOT A DELETION, AND THAT IS THE SAFETY ARGUMENT. Deleting the reconcile
+     outright is safe only for an account that logged in between 2026-08-05 (when the mirror
+     shipped) and this push. One that did not would have every week of typed commission dropped off
+     its Income Statement for good, silently. So this runs once, writes the rows the reconcile would
+     have written, and marks itself done.
+
+     ⛔ IT NEVER REWRITES A ROW ALREADY ON FILE. The reconcile did — it existed to keep a mirror in
+     step — and that was right while the week was the source. It is wrong now: once the ledger owns
+     the figure, an operator may correct it, and a migration that "repairs" their correction back to
+     the retired weekly field would be the two-doors defect wearing a helpful hat.
+
+     ⛔ THE MARKER IS WRITTEN AND PERSISTED ONLY AFTER THE ROWS LAND. app.js persists
+     `migrated_kinds` earlier in the load than this runs, so this saves its own key or the marker
+     never survives the session and the migration re-runs for ever ([[test-the-retry]] — the retry
+     is where a failed migration becomes permanent damage; here it is id-preserving and skips what
+     it finds, so a retry writes nothing).
+     ⛔ NEVER OFF A CACHE-SERVED READ: a partial ledger would make a migrated week look unmigrated. */
+  async migratePlatformFeesOnce() {
+    if (typeof App === 'undefined' || !App.data) return 0;
+    if (typeof DB !== 'undefined' && DB._loadDegraded) return 0;
+    if (!App.data.migrated_kinds || typeof App.data.migrated_kinds !== 'object') App.data.migrated_kinds = {};
+    const marks = App.data.migrated_kinds;
+    if (marks.platform_fees_to_ledger) return 0;
+    const weeks = Array.isArray(App.data && App.data.weeks) ? App.data.weeks : [];
+    const arr = this.records();
+    const have = {};
+    arr.forEach(r => { if (r && r.id != null) have[r.id] = r; });
+    const rows = [];
+    weeks.forEach(w => {
+      const row = this.migratePlatformFeesRow(w);
+      if (!row || have[row.id]) return;      // no fee, or the row is already on file — leave it alone
+      rows.push(row);
+    });
+    if (rows.length) {
+      rows.forEach(r => arr.push(r));
+      let ok = false;
+      try { ok = await App.putRecordsBulk('core', 'operating_expense', rows, { quiet: true }); }
+      catch (e) { ok = false; }
+      /* A refused write puts memory back and leaves NO marker, so the next login tries again
+         against a ledger that never saw the rows. Silent: the operator did not ask for this and
+         nothing they can see is wrong. */
+      if (!ok) {
+        rows.forEach(r => { const i = arr.indexOf(r); if (i >= 0) arr.splice(i, 1); });
+        return 0;
+      }
+    }
+    marks.platform_fees_to_ledger = new Date().toISOString();
+    try { if (App.saveKey) await App.saveKey('migrated_kinds'); } catch (e) { /* retried next login */ }
+    return rows.length;
   },
 
   /* ⭐⭐ ONE RECONCILE, TWO SOURCES. Phase 2 needs the identical job for the maintenance log, and a
@@ -1983,6 +2045,21 @@ S.HubOperatingExpenses = {
     return idx;
   },
   _categoryFromVendorWords(name) {
+    /* ⭐⭐ THE FOUR DELIVERY BRANDS, TYPED RATHER THAN HELD BACK (build piece 2). `_elsewhereFor`
+       used to excuse these rows from the import because the commission was typed weekly in Confirm
+       the Week and importing it would have doubled it. It is not typed there any more, so the rule
+       died with its source — and the brands moved HERE, where they place the row on the line Books
+       already prints instead of leaving it blank for the operator to sort by hand.
+       ⚠ THE SAME FOUR NAMES, NOT A WIDER LIST. Deliberately absent, exactly as before: `caviar` (a
+       food a bar buys, and Caviar House is a supplier), `slice` (Slice of Life Pizza) and `seamless`
+       (Seamless Gutters) — each a real business name before it is a platform ([[the-loop]] #26: a
+       vocabulary that classifies a name has eaten a real one three times in this codebase).
+       ⚠ IT SITS ABOVE THE WORD INDEX AND BELOW EVERYTHING ELSE. This is still the WEAKEST of the
+       four sources in `_buildExpenseRows` — anything the operator said themselves outranks it — so
+       a bar that files DoorDash somewhere else keeps its own answer from the next drop onward. */
+    const t = ' ' + String(name == null ? '' : name).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+    if (/ doordash | grubhub | ubereats | uber eats | postmates | delivery commission /.test(t)
+        && this.categoryList().indexOf('3rd-Party Platform Fees') >= 0) return '3rd-Party Platform Fees';
     const idx = this._categoryWordIndex();
     const toks = this._vendorTokens(name);
     for (let i = 0; i < toks.length; i++) { if (idx[toks[i]] !== undefined) return idx[toks[i]]; }
@@ -2402,10 +2479,12 @@ S.HubOperatingExpenses = {
      the sentence would mean a reworded note silently breaks the route ([[the-loop]] #25). So the
      table holds all three and `_belongsElsewhere` is the thin reader the import already uses —
      two doors flagging different things is the drift this shape exists to prevent.
-     ⚠ `where` is prose and `screen` is an `App.openScreen` id. NOT every destination has one:
-     platform fees are entered in the Confirm the Week popup and a transfer between the operator's
-     own accounts is not tracked anywhere at all. Inventing an id for either would be a dead button
-     ([[the-loop]] #106), so those carry `where` and no `screen`. */
+     ⚠ `where` is prose and `screen` is an `App.openScreen` id. NOT every destination has one: a
+     transfer between the operator's own accounts is not tracked anywhere at all. Inventing an id
+     for it would be a dead button ([[the-loop]] #106), so it carries `where` and no `screen`.
+     ⚠ THIS NOTE USED TO NAME PLATFORM FEES AS THE OTHER EXAMPLE ("entered in the Confirm the Week
+     popup"). That rule and that cell both went at build piece 2; the transfer is the only one left,
+     and `verify-expense-import-review` P1e now proves the property on it. */
   _elsewhereFor(vendor) {
     const t = ' ' + String(vendor == null ? '' : vendor).toLowerCase()
       .replace(/'/g, '').replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
@@ -2426,19 +2505,18 @@ S.HubOperatingExpenses = {
          log writes its cost straight into THIS ledger under Repairs and Maintenance. Leaving the
          rule would send them to a screen that no longer stores it and keep a real deduction off the
          books — a routing rule outlives its usefulness the moment the store it routes to stops
-         holding a dollar. ⚠ The DELIVERY-FEE rule below stays: that figure is still typed weekly in
-         Confirm the Week, so importing it as well really would double it. */
-      /* ⛔ THE P&L LINE IS THE ANCHOR, NOT THE BRAND LIST. Books prints "3rd-party platform fees
-         (DoorDash, UberEats, etc.)" as its OWN line, fed from the weekly roll's `platform_fees` —
-         so a delivery commission booked here is counted twice on one statement, exactly like a
-         repair. I left this out on the reasoning that it needed a brand list with no app-side
-         anchor; the anchor was Books' own label the whole time, and the structural pin
-         (`verify-expense-import-review` block N) is what surfaced it.
-         ⚠ FOUR BRANDS, ALL UNAMBIGUOUS. Deliberately absent: `caviar` (a food a bar buys, and a
-         supplier could be Caviar House), `slice` (Slice of Life Pizza) and `seamless` (Seamless
-         Gutters) — every one of them a real business name before it is a platform. */
-      [/\bdoordash\b|\bgrubhub\b|\bubereats\b|\buber eats\b|\bpostmates\b|\bdelivery commission\b/,
-        'Delivery app fees have their own line', 'the weekly Confirm the Week figures', '']
+         holding a dollar.
+         ⛔⛔ AND THE DELIVERY-FEE RULE HAS NOW GONE THE SAME WAY, FOR THE SAME REASON (build piece 2).
+         It read "Delivery app fees have their own line" and sent the operator to *"the weekly
+         Confirm the Week figures"*. That cell no longer exists — the commission is an ordinary
+         `3rd-Party Platform Fees` row on this ledger — so the rule had become a sentence pointing at
+         a deleted field, which is precisely the state the repairs rule was deleted for. Its whole
+         justification was "that figure is still typed weekly, so importing it would double it", and
+         the second half of that sentence stopped being true with the first.
+         ⭐ THE BRANDS DID NOT GO, THEY MOVED: `_categoryFromVendorWords` now TYPES those four names
+         as 3rd-Party Platform Fees instead of holding their rows back, so a DoorDash debit lands on
+         the right line rather than landing blank. Same move item 12 made for repairs — the row goes
+         from ELSEWHERE to BELONGS HERE, and the old assertion becomes its own control. */
     ];
     for (let i = 0; i < RULES.length; i++) {
       if (RULES[i][0].test(t)) return { note: RULES[i][1], where: RULES[i][2], screen: RULES[i][3] };

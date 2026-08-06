@@ -202,12 +202,26 @@ S.HubYearEnd = {
       barRev: 0, foodRev: 0, cateringRev: 0, otherRev: 0, totalRev: 0,
       barCogs: 0, foodCogs: 0, cateringCogs: 0, otherCogs: 0, totalCogs: 0,
       barLabor: 0, foodLabor: 0, cateringLabor: 0, totalLabor: 0,
-      comps: 0, compsLoss: 0, compsPolicy: 0, maintenance: 0, platformFees: 0
+      comps: 0, compsLoss: 0, compsPolicy: 0, maintenance: 0
     };
     // Annual OpEx by category. Operating Expenses log (App.data.operating_expenses)
     // is the canonical store; Books and Year-End both read from it via the
-    // shared _opExSums helper. Repairs/Maintenance + Platform Fees come from
-    // sc_maintenance + weekly platform_fees instead to avoid double-counting.
+    // shared _opExSums helper.
+    /* ⛔ THE SENTENCE THAT USED TO FINISH THIS PARAGRAPH IS DEAD, and so is the accumulator it
+       described: "Repairs/Maintenance + Platform Fees come from sc_maintenance + weekly
+       platform_fees instead to avoid double-counting." Both are ordinary ledger categories now
+       (Phase 2 item 12, and build piece 2), so `_opExSums` already carries them and the separate
+       `agg.platformFees` roll-up was summed into nothing — twelve months of a figure no sheet ever
+       printed ([[the-loop]] #25).
+       ⚠⚠ AND `agg.maintenance` BESIDE IT IS THE SAME DEAD FIELD, LEFT IN DELIBERATELY. Measured:
+       it is WRITTEN in three places (`hub-books` 2080 and 2101, and the accumulator below) and READ
+       in none, orphaned by Phase 2 item 8 exactly as platformFees was by item 9 — along with
+       `_sumMaintenance`, whose only caller is one of those writes ([[the-loop]] #63, dead by
+       fixpoint). It is NOT part of this piece and removing it here would be a second change wearing
+       one name. Carried as item `T2` so it is placed rather than parked.
+       ⚠ I nearly wrote "agg.maintenance stays, the Year-End sheets read it" into this very comment
+       without checking. They do not. A justification is a claim; grep it before writing it down
+       ([[harness-review-like-code]] #35). */
     /* ⛔⛔ THE TENTH SITE, AND IT WAS 165 LINES ABOVE THE COMMENT SAYING THIS WAS FIXED. This spelled
        out its own copy of the nine builtin categories and accumulated ONLY those keys, while
        `_opExSums` follows `categoryList()` — the operator's own list. So a category the operator
@@ -241,8 +255,7 @@ S.HubYearEnd = {
       agg.comps         += M.comps         || 0;
       agg.compsLoss     += M.compsLoss     || 0;
       agg.compsPolicy   += M.compsPolicy   || 0;
-      agg.maintenance   += M.maintenance   || 0;
-      agg.platformFees  += M.platformFees  || 0;
+      agg.maintenance   += M.maintenance   || 0;   // ⚠ dead, and item T2 above says why it is still here
       Object.keys(monthOpex || {}).forEach(c => { opex[c] = (opex[c] || 0) + (monthOpex[c] || 0); });
     }
     return { months, ...agg, opex };

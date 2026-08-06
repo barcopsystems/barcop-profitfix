@@ -2106,7 +2106,12 @@ S.HubBooks = {
     let barRev = 0, foodRev = 0, cateringRev = 0, otherRev = 0;
     let barCogs = 0, foodCogs = 0, cateringCogs = 0, otherCogs = 0;
     let barLabor = 0, foodLabor = 0, cateringLabor = 0;
-    let platformFees = 0;
+    /* ⛔ `platformFees` WAS ACCUMULATED HERE AND READ BY NOTHING (build piece 2). `_plParts` sums
+       `_opExStatementLines`, and every OPEX_LINES entry names a `cat:`, so `_opExLineValue`'s
+       `agg[line.from]` branch has had no line to serve since the 3rd-party fees line moved onto the
+       ledger category. A field that is computed, carried and never read is a fix that never shipped
+       ([[the-loop]] #25) — and this one was worse than inert: it was the retired source keeping a
+       foothold in the aggregate every P&L consumer passes through. */
     weeks.forEach(w => {
       barRev      += parseFloat(w.bar?.revenue)       || 0;
       foodRev     += parseFloat(w.food?.revenue)      || 0;
@@ -2119,7 +2124,6 @@ S.HubBooks = {
       barLabor    += parseFloat(w.bar?.labor)         || 0;
       foodLabor   += parseFloat(w.food?.labor)        || 0;
       cateringLabor += parseFloat(w.catering?.labor)  || 0;
-      platformFees+= parseFloat(w.platform_fees)      || 0;
     });
     return {
       barRev, foodRev, cateringRev, otherRev,
@@ -2127,8 +2131,7 @@ S.HubBooks = {
       barCogs, foodCogs, cateringCogs, otherCogs,
       totalCogs: barCogs + foodCogs + cateringCogs + otherCogs,
       barLabor, foodLabor, cateringLabor,
-      totalLabor: barLabor + foodLabor + cateringLabor,
-      platformFees
+      totalLabor: barLabor + foodLabor + cateringLabor
     };
   },
 
