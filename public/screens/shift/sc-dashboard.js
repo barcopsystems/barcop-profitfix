@@ -135,6 +135,33 @@ S.ShiftDashboard = {
     const flash = this._flash; this._flash = null;
     const wys = this._wys();
 
+    /* ⛔ THE IMPORT OWNS THE PAGE. Nothing under it: not the other three drop zones, not the
+       remaining steps, not Where You Stand. The operator dropped a file and is doing one job.
+       ⚠ The carried mapper is re-attached, never re-mounted — see `_onMapState`. Once the mapper has
+       handed its rows over, `_salesReview` is what holds the page and the carried node is spent. */
+    /* ⛔ A FINISHED IMPORT GIVES THE PAGE BACK, and `_flash` is the one signal every lane already
+       sets the moment it lands — sales, per-server, product mix and cash all set it and re-render.
+       Reading it here is one release path instead of four, and it cannot drift from what the lanes
+       do because it IS what they do. A flash set by something other than an import finds no
+       takeover to clear, so this is a no-op there. */
+    if (flash && !this._salesReview) this._clearTakeover();
+
+    if (this.ckTakeover()) {
+      container.innerHTML = '<div class="screen">'
+        + '<div class="card-title">' + esc(this.CK_TITLE[this._ckTakeover] || 'Check your import') + '</div>'
+        + (this._salesReview
+            ? this.salesReviewHTML()
+            : '<div id="sc-ck-takeover"></div>'
+              + '<div style="margin-top:16px;"><button class="btn btn-ghost" data-ck-cancel="1">Cancel</button></div>')
+        + '</div>';
+      if (!this._salesReview && this._ckCarry) {
+        const slot = document.getElementById('sc-ck-takeover');
+        if (slot) slot.appendChild(this._ckCarry);
+      }
+      this.wire();
+      return;
+    }
+
     container.innerHTML = '<div class="screen">'
       + (wys.hasSales ? this.whereYouStand(wys) : this.getStartedBox())
       + this.banner(doneCount, this.ORDER.length)
@@ -254,7 +281,7 @@ S.ShiftDashboard = {
     // Active box uses the panel-fill token (--gold-tint) with the standard card
     // border, so the white title and gold number read true, not washed by a
     // translucent tint.
-    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
+    const bg = isOpen ? 'var(--step-open)' : (isDone ? 'var(--input)' : 'var(--surface)');
     const bord = 'var(--b-edge)';
     let html = '<div style="border:1px solid ' + bord + ';border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
       + '<div class="sc-step-head' + (isOpen ? '' : ' collapsed') + '" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
@@ -285,6 +312,60 @@ S.ShiftDashboard = {
       + '<span class="sc-opt-link" data-opt="' + key + '" id="' + key + '-optlink" style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);cursor:pointer;">' + (open ? '+ Close POS Report' : '+ Add POS Report') + '</span>'
       + '<div id="' + id + '" style="margin-top:10px;' + (open ? '' : 'display:none;') + '"></div><div id="' + id + '-res"></div></div>';
   },
+  /* ⛔⛔ A FILE DROPPED ON A COCKPIT STEP TAKES THE PAGE (Kyle, 2026-08-07, looking at the sales step
+     mid-map): *"once a file is dropped that mapping takes over the page and there is nothing under
+     it that becomes distracting.. here it is now with file dropped inline.. so you have everything
+     below it... including the other two drop file links in the same card and then the reconcile cash
+     section below that."* Close The Books already does exactly this for the Money Out step.
+
+     ⛔ THE FLAG NAMES A ZONE, NOT A BOOLEAN, AND THAT IS THE DIFFERENCE FROM MONEY OUT. That step has
+     ONE drop zone; this page has FOUR, three of them inside the sales card. A boolean cannot tell
+     the re-render whose mapper to put back.
+     ⚠ ONE AT A TIME: once a zone owns the page, a second `map` is ignored. The other zones are not
+     even on screen at that point, so this is a guard against a stray event rather than a UI state —
+     but it is the difference between "put the file back" and "put SOMETHING back". */
+  CK_ZONE: { import: 'sc-ck-import', server: 'sc-ck-server', pmix: 'sc-ck-pmix', cash: 'sc-ck-cash' },
+  CK_TITLE: { import: 'Import this week\'s sales', server: 'Import per-server sales',
+              pmix: 'Import your product mix', cash: 'Import your cash report' },
+  _ckTakeover: null,   // which zone owns the page
+  _ckCarry: null,      // its live mapper node, carried across the re-render
+
+  /* The question `render` asks before it decides its layout. The confirm screen holds it open too: a
+     file already dropped and waiting to be confirmed must not lose the page out from under it. */
+  ckTakeover() { return this._ckTakeover != null || !!this._salesReview; },
+  _clearTakeover() { this._ckTakeover = null; this._ckCarry = null; },
+
+  /* ⛔⛔⛔ THE HANDOVER, AND THE ONE THING IT MUST NOT DO IS REBUILD THE MAPPER.
+     `CSVMapper.mount()` opens with `container.innerHTML = <drop zone>`, so escalating by re-rendering
+     and re-mounting would throw the operator's parsed file away and put them back on an empty drop
+     zone — work lost, silently, which is the expensive class of defect here. The live node is
+     DETACHED and carried, and `render` re-attaches that same element with its listeners and parsed
+     rows intact.
+     ⚠ ONE NODE IS THE WHOLE CARRY **ONLY BECAUSE NO ZONE HERE USES `actionsEl`** — the Import button
+     renders inside the mapper's own container. Money Out had to carry two, and the version that
+     carried only the mapper left the operator with a parsed file and nothing but Cancel. Pinned by
+     `verify-cockpit-drop-takeover.js` block E, so a zone that gains an actionsEl fails loudly instead
+     of silently losing its button. */
+  _onMapState(key, st) {
+    /* ⛔ THE MAPPER'S OWN CANCEL GIVES THE PAGE BACK, and it does it through the same hook: CSVMapper
+       emits exactly two states, and going back to `drop` means the operator abandoned the file.
+       Handling it here rather than only on a button of ours means there is ONE release path, so the
+       page cannot be left taken over by a mapper that is showing an empty drop zone.
+       ⚠ `drop` also fires when a mapper first MOUNTS, which is why this is gated on the zone already
+       owning the page — at mount time nothing does, so it is a no-op. */
+    if (st === 'drop') {
+      if (this._ckTakeover === key) { this._clearTakeover(); this.render(this.container, this.actions); }
+      return;
+    }
+    if (st !== 'map' || this._ckTakeover != null) return;
+    const node = document.getElementById(this.CK_ZONE[key] || '');
+    if (!node) return;
+    this._ckCarry = node;
+    node.remove();
+    this._ckTakeover = key;
+    this.render(this.container, this.actions);
+  },
+
   workspace(k, isDone) {
     this._isDone = isDone;
     if (k === 'import') {
@@ -495,7 +576,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs a Date column plus your sales (bar and/or food). Covers optional. One row per day.',
       fields: PosIngest.FIELDS.sales,
       confirmLabel: 'Import',
-      onState: st => this._toggleBtns('sc-ck-import-btns', st),
+      onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._onMapState('import', st); },
       /* ⛔ THE FILE DOES NOT WRITE ITSELF ANY MORE. It goes to the confirm screen, exactly as Add
          Products does, and the Import press there is what moves responsibility for what lands from
          Bar Cop to the operator. This door was picked to prove the pattern BECAUSE it is the worst
@@ -1278,7 +1359,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs a Server, Date, Covers, and Total Sales column. One row per server, per day.',
       fields: PosIngest.FIELDS.server,
       confirmLabel: 'Import',
-      onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('server', st); },
+      onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('server', st); this._onMapState('server', st); },
       onComplete: rows => this.importServer(rows)
     });
   },
@@ -1430,7 +1511,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs an Item Name and Units Sold column. One row per menu item for the week.',
       fields: PosIngest.FIELDS.pmix,
       confirmLabel: 'Import',
-      onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('pmix', st); },
+      onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('pmix', st); this._onMapState('pmix', st); },
       onComplete: rows => this.importPmix(rows)
     });
   },
@@ -1514,7 +1595,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs a Date column plus Over/Short, or Expected and Counted cash. Register and cashier matched if present.',
       fields: PosIngest.FIELDS.cash,
       confirmLabel: 'Import',
-      onState: st => this._toggleBtns('sc-ck-cash-btns', st),
+      onState: st => { this._toggleBtns('sc-ck-cash-btns', st); this._onMapState('cash', st); },
       onComplete: rows => this.importCash(rows)
     });
   },
@@ -1805,7 +1886,14 @@ S.ShiftDashboard = {
       if (ev.target.closest('[data-salesreview-back]')) {
         // Back to the drop zone, not out of the step. A mapping belongs to the file it was made
         // for, so the file is re-dropped from scratch — nothing was written to undo.
-        this._salesReview = null; this.render(this.container, this.actions); return;
+        // ⚠ AND THE PAGE COMES BACK WITH IT. The carried mapper is spent once its rows have gone to
+        // the confirm screen, so leaving the takeover set would re-attach a dead node over the step.
+        this._salesReview = null; this._clearTakeover(); this.render(this.container, this.actions); return;
+      }
+      // The takeover's own Cancel. The mapper's Cancel comes through `_onMapState('drop')` instead;
+      // this is the escape for an operator who wants the page back without touching the mapper.
+      if (ev.target.closest('[data-ck-cancel]')) {
+        this._clearTakeover(); this.render(this.container, this.actions); return;
       }
       const opt = ev.target.closest('[data-opt]');
       if (opt) { const key = opt.dataset.opt; this._optOpen = this._optOpen || {}; this._optOpen[key] = !this._optOpen[key]; this.render(this.container, this.actions); return; }
