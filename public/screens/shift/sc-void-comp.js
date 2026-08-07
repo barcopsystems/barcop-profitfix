@@ -288,16 +288,52 @@ S.ShiftVoidComp = {
       below = statsCard + this.filterRow() + listHtml;
     }
 
-    this.container.innerHTML = '<div class="screen">' + formCard + below + '</div>';
+    /* ⛔ THE CONFIRM SCREEN TAKES THE WHOLE PAGE. Its one promise is "Nothing is saved until you do",
+       and the log below it carries EDIT and DELETE, which write on the press — two opposite write
+       models on one page with the destructive one under the reassuring sentence. The stats card goes
+       too: it reads void % and comp % off the log, and those numbers are about to change. */
+    this.container.innerHTML = '<div class="screen">'
+      + (this._voidReview ? this.voidReviewHTML() : (formCard + below)) + '</div>';
     App.applyCollapsed(this.container);
     this.wireList();
-    if (this.entryMode === 'import') this.mountImporter('vc-csv');
+    // ⚠ NOT WHILE THE CONFIRM SCREEN IS UP: its markup replaces the card, so `#vc-csv` is gone and
+    // re-mounting would hand the operator a second file picker over a file they have not confirmed.
+    if (this.entryMode === 'import' && !this._voidReview) this.mountImporter('vc-csv');
   },
 
   wireList() {
     this.container.onclick = ev => {
+      /* ── The confirm screen's controls. Every one writes state and re-renders, so the button's
+         count, the rows on screen and what actually gets written all read from the same place. ── */
+      // A section head opens or closes its own table. A closed section renders no rows at all.
+      const vsec = ev.target.closest('[data-confirm-section]');
+      if (vsec && this._voidReview) {
+        const k = vsec.dataset.confirmSection;
+        this._voidReview.open[k] = (k === 'needs') ? (this._voidReview.open[k] === false) : !this._voidReview.open[k];
+        this.renderList(); return;
+      }
+      /* Remove takes a row out of the import. No confirm: nothing is written until Add, the row is
+         named right beside the button, and it lands in the Removed section rather than vanishing. */
+      const vrm = ev.target.closest('[data-confirm-remove]');
+      if (vrm && this._voidReview) {
+        this._voidReview.removed[vrm.dataset.confirmRemove] = true;
+        this.renderList(); return;
+      }
+      // Put Back. The exact inverse, and the reason Remove is safe to press at all.
+      const vpb = ev.target.closest('[data-confirm-restore]');
+      if (vpb && this._voidReview) {
+        delete this._voidReview.removed[vpb.dataset.confirmRestore];
+        this.renderList(); return;
+      }
+      if (ev.target.closest('[data-voidreview-go]')) { this._runVoidReview(); return; }
+      if (ev.target.closest('[data-voidreview-back]')) {
+        // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
+        // for, so the file is re-dropped from scratch — nothing was written, so nothing to undo.
+        this._voidReview = null; this.renderList(); return;
+      }
       const modeBtn = ev.target.closest('.vc-mode');
-      if (modeBtn) { this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
+      // Switching mode abandons a confirm in progress, which is safe: nothing has been written.
+      if (modeBtn) { this._voidReview = null; this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       const chip = ev.target.closest('.vc-range-chip');
@@ -716,10 +752,154 @@ S.ShiftVoidComp = {
       actionsEl: elId === 'vc-csv' ? '#vc-imp-actions' : undefined,
       fields: PosIngest.FIELDS.voids,
       confirmLabel: 'Import',
-      onComplete: rows => this.importRows(rows, resultId, after)
+      /* ⛔ THE FILE STOPS HERE NOW (door 8 of the rollout). It used to go straight to `importRows`,
+         which built and WROTE in one press and then flattened the result into one line afterwards.
+         ⚠ The modal mount (`vc-csv-m`) keeps the old straight-through call: `openLogModal` has ZERO
+         references anywhere in `public/`, so that path is unreachable and building a confirm screen
+         into a modal nobody can open would be new surface with no operator behind it. Flagged
+         separately rather than wired blind. */
+      onComplete: rows => (elId === 'vc-csv-m'
+        ? this.importRows(rows, resultId, after)
+        : this._openVoidReview(rows))
     });
   },
-  async importRows(rows, resultId, after) {
+
+  /* ── The confirm screen ──────────────────────────────────────────────────────
+     Door 8, and the FIRST POS lane. `PosIngest.build('voids', rows)` was already pure and already
+     the one walk; what it lacked was a verdict per INPUT row, so the screen could name WHICH row was
+     already logged rather than only how many were. `perRow` is that, added to the shared builder
+     additively — the other eight lanes inherit the shape when they convert. */
+  _openVoidReview(rows) {
+    this._voidReview = {
+      // ⚠ A STABLE ID PER ROW, so Remove has something to remove BY. The build returns one verdict
+      // per input row in the file's own order, so index is a real identity here.
+      rows: (rows || []).map((r, i) => Object.assign({}, r, { _rid: 'r' + i })),
+      open: {}, removed: {}
+    };
+    this.renderList();
+  },
+
+  /* ONE WALK produces the rows the screen shows AND the number the button prints, because both come
+     out of the same `PosIngest.build` the write uses. */
+  _voidReviewSummary() {
+    const r = this._voidReview;
+    if (!r) return { rows: [], count: 0 };
+    // A removed row is gone from the list, from the count and from the write.
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    const built = PosIngest.build('voids', live);
+    // ⚠ Zipped by index: the build returns exactly one verdict per input row, in order.
+    const rows = (built.perRow || []).map((x, i) => this._voidReviewRow(x, (live[i] || {})._rid));
+    return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
+  },
+
+  /* The rows the operator took out. Built through the SAME walk and the SAME row mapper, so a removed
+     row looks exactly as it did when they removed it — which is what makes Put Back legible.
+     ⚠ A SEPARATE WALK, so a removed row stops taking part in the live one (a removed duplicate stops
+     blocking the row behind it). Its verdicts are therefore never read, only its cells. */
+  _voidReviewRemoved() {
+    const r = this._voidReview;
+    if (!r) return [];
+    const gone = r.rows.filter(x => r.removed[x._rid]);
+    if (!gone.length) return [];
+    const built = PosIngest.build('voids', gone);
+    return (built.perRow || []).map((x, i) => Object.assign(
+      this._voidReviewRow(x, (gone[i] || {})._rid),
+      { note: 'Taken out of this import', notes: [], lands: false }));
+  },
+
+  /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
+     are TEXT the shell escapes and budgets to one line. */
+  _VOID_ROW_NOTE: {
+    'new':    'Adding this row',
+    noAmount: 'No amount Bar Cop could use',
+    undated:  'The date could not be read',
+    dup:      'Already in your log'
+  },
+  _voidReviewRow(x, rid) {
+    const rec = x.rec || {};
+    const raw = x.raw || {};
+    const cell = v => (v == null || v === '') ? null : esc(String(v));
+    /* ⚠ FORMATTED THE WAY THE LOG BELOW FORMATS THE SAME FIELD — `fmtDate` and `fmtCurrency`, the
+       two the log's own rows use. One quantity with two spellings two inches apart is how a screen
+       stops being checkable.
+       ⚠ A row that did not land shows what the FILE said, because there is no record to show. That
+       is the point of the row: the operator is looking at the cell Bar Cop could not use. */
+    const notes = [];
+    /* ⛔ S218 ON THE SCREEN: a repeated line LANDS and says so. At the hours, tips and cash doors the
+       hand form refuses a second record with the same identity, so a repeat there is data the
+       operator could not have entered and collapsing it is safe. Nothing in the Void/Comp form says
+       that — two $75 order errors on the same item in one night is an ordinary evening, and dropping
+       the second deletes real money. So it is an ANNOTATION on a landing row, never an exclusion. */
+    if (x.repeat) notes.push('Same line twice in your file');
+    return {
+      cells: [
+        rec.date ? esc(this.fmtDate(rec.date)) : cell(raw.date),
+        rec.type ? esc(rec.type) : cell(raw.type),
+        cell(rec.item || raw.item),
+        cell(rec.server || raw.server),
+        rec.amount != null ? esc(App.fmtCurrency(rec.amount)) : cell(raw.amount)
+      ],
+      key: rid,
+      note: this._VOID_ROW_NOTE[x.status] || '',
+      notes: notes,
+      lands: x.status === 'new'
+    };
+  },
+
+  voidReviewHTML() {
+    const s = this._voidReviewSummary();
+    const n = s.rows.length;
+    const bad = s.rows.filter(x => !x.lands).length;
+    /* ⚠ EACH NUMBER NAMES ITS OWN COLLECTION: `n` is rows read out of the file, `bad` is rows that
+       will not land, and the button counts what will be written. And the lead names the button's own
+       verb, so renaming the button has to rewrite this sentence with it. */
+    const lead = 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's') + ' out of this file. '
+      + (bad
+          ? (bad === 1 ? 'One of them is not going in. ' : bad + ' of them are not going in. ') + 'Check the rest, then add them. '
+          : 'Check them, then add them. ')
+      + 'Nothing is saved until you do.';
+    return ImportConfirm.panel({
+      label: 'Check your voids and comps',
+      lead: lead,
+      columns: [{ label: 'Date', width: 13 }, { label: 'Type', width: 10 },
+                { label: 'Item', width: 20 }, { label: 'Server', width: 15 },
+                { label: 'Amount', width: 12 }],
+      outcomeLabel: 'What Happens',
+      rows: s.rows,
+      verb: 'Add', noun: 'Row',
+      removable: true,
+      removedRows: this._voidReviewRemoved(),
+      goAttr: 'data-voidreview-go', backAttr: 'data-voidreview-back', backLabel: 'Start Over',
+      resultId: 'vc-imp-result',
+      open: (this._voidReview || {}).open,
+      busy: !!this._voidReviewWriting
+    });
+  },
+
+  /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
+     only thing a re-render cannot hand back. */
+  async _runVoidReview() {
+    const r = this._voidReview;
+    if (!r || this._voidReviewWriting) return;
+    this._voidReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-voidreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try { await this.importRows(r.rows.filter(x => !r.removed[x._rid]), 'vc-imp-result', null, { reviewed: true }); }
+    finally {
+      this._voidReviewWriting = false;
+      /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `importRows` is what clears it — a refused write keeps
+         the whole screen so the operator can press again without re-dropping the file. Do NOT
+         re-render here: the failure path writes into the result slot and a re-render destroys it. */
+      if (this._voidReview) {
+        const b = this.container && this.container.querySelector('[data-voidreview-go]');
+        // ⚠ The shell's own label builder, never a second copy of the string ([[the-loop]] #54).
+        if (b) { b.disabled = false; b.textContent = ImportConfirm.goLabel({ rows: this._voidReviewSummary().rows, verb: 'Add', noun: 'Row' }); }
+      }
+    }
+  },
+
+  async importRows(rows, resultId, after, opts) {
+    opts = opts || {};
     // Match / dedup / build / save live in the shared PosIngest (dedup added so a
     // re-dropped voids/comps export never double-counts). UI message stays here.
     const { toAdd, skipped, undated, dupCount, fileRepeats } = PosIngest.build('voids', rows);
@@ -783,8 +963,23 @@ S.ShiftVoidComp = {
        So: redraw first, then write into a FRESHLY QUERIED slot. The popup's own slot is gone by
        then, so its report goes to the inline one — which is the screen the operator is looking at
        the moment the modal closes. */
+    /* ⛔ ONCE A DOOR HAS A CONFIRM SCREEN, ITS SUCCESS LINE IS THE HEADLINE ALONE. Every clause in
+       `outcomes` — no amount, no readable date, already logged, the same line twice — is a row on the
+       screen the operator just read and pressed Add on. Repeating it afterwards is the second
+       telling, and a string of parentheticals is the shape Kyle called *"very hard to read and
+       follow"* on the sales door.
+       ⚠ PRECONDITION, PAID FOR TWICE ALREADY: every clause must FIRST be on the screen. All four are
+       (`_VOID_ROW_NOTE` carries three, the repeat is a row note), which is what makes the cut a
+       removal of repetition rather than a loss of information.
+       The full account survives for a caller with no screen in front of it — the modal path. */
     const msg = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported '
-      + toAdd.length + ' record' + (toAdd.length === 1 ? '' : 's') + '.' + outcomes + '</div>';
+      + toAdd.length + ' record' + (toAdd.length === 1 ? '' : 's') + '.' + (opts.reviewed ? '' : outcomes) + '</div>';
+    /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. Both refusal paths return above
+       this line with the screen and every row still up, so the operator presses again rather than
+       re-dropping the file. Cleared here because this is the only line that knows the write landed —
+       forgetting it locks the page: the rows land, the list re-renders, and every re-render puts the
+       import screen straight back. */
+    this._voidReview = null;
     if (typeof after === 'function') after();   // popup: close + re-render the shift underneath
     else this.renderList();
     const slot = document.getElementById('vc-imp-result');
