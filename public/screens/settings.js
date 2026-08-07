@@ -1087,24 +1087,47 @@ S.HubSettings = {
         vendor:'', amount:fee, notes:'Delivery and pickup commissions for the week',
         created_at:new Date().toISOString() });
     });
-    // Two ongoing recurring bills (recur every month until cancelled, no fixed
-    // term). Both were entered when the operator set up Books at the start of the
-    // 90-day window; Bar Cop fills in each elapsed month on load.
     const monthAnchor = (back, day) => App.ymdLocal(new Date(today.getFullYear(), today.getMonth() - back, day));
-    operatingExpenses.push(
-      { id:uid(), date:monthAnchor(2, 5), category:'Software and Subscriptions', vendor:'Bar Cop', amount:189, notes:'Monthly software subscription.', recurring:true, recur_day:5, created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(2, 5), category:'Other',                      vendor:'Sonitrol', amount:89,  notes:'Alarm and security monitoring.', recurring:true, recur_day:5, created_at:new Date().toISOString() }
-    );
-    // The major fixed overhead as recurring vendor bills, anchored at the start of
-    // the window like the Bar Cop and Sonitrol bills above. catchUpRecurring fills
-    // each elapsed month (so Books and the P&L read them) and the survival forecast
-    // projects them forward and sizes the reserve off the real nut. These ARE the
-    // Occupancy/Utilities/Insurance lines, with no anonymous variable duplicate.
-    operatingExpenses.push(
-      { id:uid(), date:monthAnchor(2, 5), category:'Occupancy (Rent, Property Tax)', vendor:'Barton Springs Holdings', amount:12000, notes:'Monthly lease.',          recurring:true, recur_day:5, created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(2, 5), category:'Utilities',                       vendor:'Austin Energy',           amount:2600,  notes:'Power, gas, water.',     recurring:true, recur_day:5, created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(2, 5), category:'Insurance',                       vendor:'Texas Mutual',            amount:1500,  notes:'Liability and property.', recurring:true, recur_day:5, created_at:new Date().toISOString() }
-    );
+    /* ⭐⭐⭐ THE SEED WRITES REAL REPEATED HISTORY, NOT A FLAG THAT PRETENDS TO (2026-08-06).
+       Every bill below used to be ONE row anchored two months back carrying `recurring:true` +
+       `recur_day`, on the comment "catchUpRecurring fills each elapsed month". The one-ledger
+       rebuild DELETED that generator — nothing writes an expense row the operator did not enter or
+       import — and nobody came back to the seed. MEASURED on the deployed demo before this change:
+       rent, utilities, insurance, the owner draw and the loan payment each had exactly ONE row, all
+       dated 2026-06, so Books showed a bar that paid its rent once and the By Category card read
+       Occupancy $0.00 this month, $0.00 last month, $12,000 all year.
+       ⛔ THE FORECAST HID IT, which is why it survived: the stored `recurring` flag made
+       `outflowsBetween` project the money forward, so the 13-week view looked right while the P&L
+       behind it was missing two months of every fixed cost.
+       ⭐ Kyle, 2026-08-06: *"the biggest problem with this app is you constantly try to build around
+       the seed data and not build the seed data around the app."* This is that fix. A real bar pays
+       rent every month, so the seed writes a row every month — the same shape the tax remittances
+       below have always had — and the recurrence is DERIVED off that history by
+       `CashEngine.deriveRecurringOutflows`, exactly as it is for a real operator who drops their
+       statements in. No flag, no schedule, nothing for an operator to stop.
+       ⚠ ONLY MONTHS THAT HAVE ALREADY HAPPENED. The date is compared to today rather than assuming
+       the anchor day has passed, so a seed run on the 3rd does not post this month's rent as
+       history and a run on the 20th does ([[the-loop]] #39: never anchor a fixture to a literal
+       day-of-month). */
+    const monthlyBack = (day, months) => {
+      const out = [];
+      for (let b = months; b >= 0; b--) {
+        const ymd = monthAnchor(b, day);
+        if (ymd <= App.todayLocal()) out.push(ymd);
+      }
+      return out;
+    };
+    const monthlyBill = (day, months, row) => monthlyBack(day, months)
+      .forEach(d => operatingExpenses.push(Object.assign({ id:uid(), date:d, created_at:new Date().toISOString() }, row)));
+
+    // The subscriptions, and the major fixed overhead: Occupancy / Utilities / Insurance. One row
+    // per elapsed month across the 90-day window, so Books, the P&L and the By Category card all
+    // read a bar that actually pays its bills, and the forecast derives the commitment from them.
+    monthlyBill(5, 2, { category:'Software and Subscriptions', vendor:'Bar Cop', amount:189, notes:'Monthly software subscription.' });
+    monthlyBill(5, 2, { category:'Other', vendor:'Sonitrol', amount:89, notes:'Alarm and security monitoring.' });
+    monthlyBill(5, 2, { category:'Occupancy (Rent, Property Tax)', vendor:'Barton Springs Holdings', amount:12000, notes:'Monthly lease.' });
+    monthlyBill(5, 2, { category:'Utilities', vendor:'Austin Energy', amount:2600, notes:'Power, gas, water.' });
+    monthlyBill(5, 2, { category:'Insurance', vendor:'Texas Mutual', amount:1500, notes:'Liability and property.' });
     App.data.operating_expenses = operatingExpenses;
 
     // ── Cash outflows (the new store): owner draw, equipment loan, and the sales
@@ -1125,8 +1148,13 @@ S.HubSettings = {
        forecast are simply wrong, with nothing on screen saying so. A helper required for CORRECTNESS
        gets a bare call ([[the-loop]] #40). */
     [
-      { id:uid(), date:monthAnchor(2, 1),  type:'draw', amount:4000, notes:'Owner draw',     recurring:true, recur_day:1,  created_at:new Date().toISOString() },
-      { id:uid(), date:monthAnchor(2, 12), type:'loan', amount:2200, notes:'Equipment loan', recurring:true, term_months:24, recur_day:12, created_at:new Date().toISOString() },
+      /* ⭐ REAL MONTHLY HISTORY, same reason as the bills above: the draw and the loan payment were
+         ONE row each carrying `recurring:true` (+ `recur_day`, `term_months`), so the Cash Bridge
+         showed a bar that took one draw and made one loan payment all year while the forecast
+         projected both off the flag. `deriveRecurringOutflows` groups by type+amount and needs the
+         same thing to have happened at least twice, which is what these now give it. */
+      ...monthlyBack(1, 2).map(d => ({ id:uid(), date:d, type:'draw', amount:4000, notes:'Owner draw', created_at:new Date().toISOString() })),
+      ...monthlyBack(12, 2).map(d => ({ id:uid(), date:d, type:'loan', amount:2200, notes:'Equipment loan', created_at:new Date().toISOString() })),
       // Past tax remittances feed the Cash Bridge (where the profit went). The
       // FORECAST projects the upcoming remittances automatically off the tax rate
       // and due date, so these stay non-recurring history, not a forward series.

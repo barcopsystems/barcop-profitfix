@@ -1601,8 +1601,16 @@ S.HubOperatingExpenses = {
            Expense made the Add button disappear. Measured, not reasoned. Block E of
            `verify-no-new-typed-series` is the structural pin that makes it unrepeatable. */
         + App.noteField({ id: 'oexa-notes', placeholder: 'Optional context for the bookkeeper' })
-        // Fires as they type the vendor. See _manualElsewhereNotice.
-        + '<div id="oexa-elsewhere"></div>'
+        /* ⛔ NO "THIS BELONGS SOMEWHERE ELSE" NOTICE. There used to be an `oexa-elsewhere` slot here
+           that watched the vendor as they typed and told them an owner draw, a loan payment or a
+           tax payment belonged on the Cash Outflows screen, with a Go There button to it.
+           Kyle, 2026-08-06: *"they are manually choosing the log type between operating expense or
+           cash outflow from the same form... that is their choice to log what they want, where they
+           want... that entire prompt needs to be deleted."* He is right, and the notice had outlived
+           its premise anyway: there IS no other place to send them. Cash Outflows is a TAB on this
+           page over the same ledger, and Log Type on this very form is how the operator says which
+           one it is. A prompt that second-guesses a choice the form just asked them to make is
+           noise, and its button opened a screen that no longer should exist. */
         + '<div id="oexa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>';
       // ⛔ NO data-collapse-group WHEN INLINE — that attribute is what applyCollapsed uses to hide
       // this row, and inline there is no header to un-hide it with. See the note on _addCardHtml.
@@ -1659,7 +1667,6 @@ S.HubOperatingExpenses = {
     document.getElementById('oexa-save')?.addEventListener('click', () => this._saveAdd());
     /* `input`, not `change`: `change` on a text field waits for blur, so an operator who types the
        vendor and goes straight to the amount would not be told until they had left the field. */
-    document.getElementById('oexa-vendor')?.addEventListener('input', () => this._manualElsewhereNotice());
     document.getElementById('oexa-clear')?.addEventListener('click', () => this._clearAdd());
     // ⭐ ITEM 19 STAGE 2: Log Type reveals the selector that matches it. One place decides, so the
     // two branches cannot both be on screen (which would leave the save reading a stale one).
@@ -3673,30 +3680,11 @@ S.HubOperatingExpenses = {
   },
 
   // ── Inline add form save / start over ────────────────────────────────────
-  /* ⛔ IT FIRES AS THEY TYPE THE VENDOR, WHICH IS THE MOMENT ITS INPUT EXISTS ([[the-loop]] #78: a
-     check that CAN run before the work MUST run before the work). Waiting for Add would mean they
-     had already picked a date, chosen a category and typed an amount before being told the row
-     belongs on a different screen entirely.
-     ⚠ AND IT OFFERS THE WAY THERE, because a notice that names a screen without opening it is a
-     chore. Only where a destination HAS a screen: platform fees live in the Confirm the Week popup
-     and a transfer between their own accounts is tracked nowhere, so those say so and offer no
-     button rather than a dead one. */
-  _manualElsewhereNotice() {
-    const host = document.getElementById('oexa-elsewhere');
-    if (!host) return;
-    const v = (document.getElementById('oexa-vendor') || {}).value || '';
-    const e = this._elsewhereFor(v);
-    if (!e) { host.innerHTML = ''; return; }
-    host.innerHTML = '<div style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);'
-      + 'border-radius:6px;padding:10px 14px;margin-top:12px;font-size:12px;color:var(--t1);'
-      + 'line-height:1.6;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
-      + '<span style="flex:1;min-width:200px;">' + esc(e.note) + '. Logging it here as well would'
-      + ' count it twice. It belongs in ' + esc(e.where) + '.</span>'
-      + (e.screen ? '<button type="button" class="btn btn-ghost btn-sm" id="oexa-elsewhere-go">Go There</button>' : '')
-      + '</div>';
-    const go = document.getElementById('oexa-elsewhere-go');
-    if (go && e.screen) go.addEventListener('click', () => App.openScreen(e.screen));
-  },
+  /* ⛔ `_manualElsewhereNotice` WAS DELETED HERE (2026-08-06). It watched the vendor as the operator
+     typed and raised a gold notice saying the row belonged on the Cash Outflows screen, with a
+     Go There button that opened it. Both are gone, along with the screen. The operator picks Log
+     Type on this form; that IS the answer the notice was trying to give them. See the note where
+     the `oexa-elsewhere` slot used to be, in the form builder above. */
 
   async _saveAdd() {
     const g = (id) => document.getElementById(id);
@@ -3743,24 +3731,16 @@ S.HubOperatingExpenses = {
     if (!date) { showErr('Pick a date.'); return; }
     if (!category) { showErr('Pick a category.'); return; }
     if (isNaN(amount) || amount <= 0) { showErr('Enter an amount above zero.'); return; }
-    /* ⛔ ASK ONCE, DO NOT REFUSE. The import HOLDS a flagged row back because there the default —
-       doing nothing — booked it. Here nothing happens until this button is pressed, so refusing a
-       row the operator deliberately typed would be the app overruling them on a guess, and Bar Cop
-       can be wrong. What the confirm buys is that the override is a DECISION rather than an
-       accident: the notice already told them while they were typing the name.
-       ⚠ It cannot become a wall of skip — it only exists when a rule actually matched, which for an
-       ordinary expense is never. */
-    const _elsewhere = this._elsewhereFor(vendor);
-    if (_elsewhere) {
-      const goOn = await App.confirm({
-        title: 'This looks like it belongs somewhere else',
-        message: _elsewhere.note + '. Bar Cop already counts it from ' + _elsewhere.where
-          + ', so logging it here as well would count it twice on your Income Statement.'
-          + ' Add it to Operating Expenses anyway?',
-        confirmText: 'Add It Anyway', cancelText: 'Cancel'
-      });
-      if (!goOn) return;
-    }
+    /* ⛔ NO "THIS LOOKS LIKE IT BELONGS SOMEWHERE ELSE" CONFIRM (deleted 2026-08-06). This asked
+       "Add it to Operating Expenses anyway?" whenever the vendor matched a draw / loan / tax /
+       payroll rule, on the reasoning that the override should be a decision rather than an accident.
+       That reasoning assumed the operator had not already been asked. They have: Log Type on this
+       form is where they choose Operating Expense or Cash Outflow, so the confirm was second-
+       guessing the answer to a question the form itself puts in front of them
+       (Kyle, 2026-08-06: *"that is their choice to log what they want, where they want"*).
+       ⚠ THIS IS THE MANUAL DOOR ONLY. The IMPORT still holds a flagged row back, and for a reason
+       that does not apply here: on an import nobody picks a type row by row, and the default there
+       is that doing nothing BOOKS it. */
     const rec = {
       id: App.uid ? App.uid() : ('oex-' + Date.now()),
       date, category, vendor, amount, notes,
@@ -3800,9 +3780,7 @@ S.HubOperatingExpenses = {
        Log Type was Operating Expense. See the note where the block used to be. */
     if (t !== 'expense') { clear('oexa-cat'); clear('oexa-vendor'); }
     if (t !== 'cash') clear('oexa-kind');
-    // The "looks like it belongs elsewhere" notice is keyed off the vendor, which only the expense
-    // branch has. Clear it too, or it outlives the branch that raised it.
-    const el = document.getElementById('oexa-elsewhere'); if (el && t !== 'expense') el.innerHTML = '';
+    // (There used to be an "it belongs elsewhere" notice to clear here. It is gone with the prompt.)
   },
 
   _clearAdd() {
