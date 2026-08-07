@@ -2364,7 +2364,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'this-week', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'week-history', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-dashboard', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
+  _CONVERTED: new Set(['dashboard', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'week-history', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-dashboard', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
@@ -4630,8 +4630,9 @@ const App = {
   OT_APPROACHING: 35,
 
   // Canonical product category groups. Replaces the duplicated BAR_CATS /
-  // KITCHEN_CATS arrays in this-week.js, bar-products.js, kitchen-products.js,
-  // and the inline isBar() check below.
+  // KITCHEN_CATS arrays in bar-products.js, kitchen-products.js, and the inline
+  // isBar() check below. (this-week.js used to hold delegating getters for these;
+  // T1 retired them with the grid, and its one live reader passes App.BAR_CATS in.)
   BAR_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],
   KITCHEN_CATS: ['Food', 'Misc'],
 
@@ -8488,7 +8489,9 @@ const App = {
     const titles = {
       'hub':           ['Recovery Hub', ''],
       'dashboard':     ['Close The Week', 'Profit Recovery'],
-      'this-week':     ['This Week', 'Weekly Entry'],
+      // T1: no 'this-week' entry. The interception above returns before this map is
+      // ever read for that id, and the grid it titled is gone. The interception STAYS —
+      // three callers still openScreen('this-week') to reach Confirm the Week.
       'week-history':  ['Week History', 'Weekly Recovery'],
       'profit-forecast':['Profit Forecast', ''],
       'recipe-cost-analysis':['Recipe Summary', ''],
@@ -8509,7 +8512,6 @@ const App = {
     const screens = {
       'hub':           S.Hub,
       'dashboard':     S.Dashboard,
-      'this-week':     S.ThisWeek,
       'week-history':  S.WeekHistory,
       'profit-forecast':S.ProfitForecast,
       'recipe-cost-analysis':S.RecipeCostAnalysis,
@@ -9667,9 +9669,16 @@ const App = {
      opts: { title, points:[{label,value}], target (optional), suffix (optional) }
      Returns a chart-card. Needs 2+ non-null values or shows a prompt.        */
 
-  // SUPERSEDED by weekNumFor/renumberWeekStore below. Left only because the retired
-  // this-week.js still references it; nothing live calls it. Do not reach for it: a
-  // running max+1 is the bug those two helpers exist to fix.
+  // SUPERSEDED by weekNumFor/renumberWeekStore below. Do not reach for it: a running
+  // max+1 is the bug those two helpers exist to fix.
+  // ⚠ THE REASON IT SURVIVES CHANGED AT T1, so do not act on the old one. It used to read
+  // "left only because the retired this-week.js still references it" — that reference was
+  // this-week's saveWeek, and T1 deleted it, so NOTHING in the app calls this now. It is
+  // NOT therefore free to delete: verify-week-num.js LIFTS AND RUNS it as the control that
+  // proves the old shape hands a back-filled earliest week the highest number. Deleting it
+  // would quietly take that control with it ([[the-loop]] #66/#72).
+  // ⚠ And it is invisible to verify-no-retired-code: revenue/r-this-week.js has its own
+  // nextWeekNum, and a qualified `.nextWeekNum` anywhere in the corpus reads as a reference.
   nextWeekNum() {
     const weeks = this.data?.weeks || [];
     if (weeks.length === 0) return 1;
