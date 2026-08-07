@@ -857,11 +857,32 @@ window.CashEngine = {
         anchor.setDate(anchor.getDate() + stepDays);
       }
     });
-    _rb.filter(_b => !DAY_STEP[_b.frequency]).map(_b => _b.row || _b).forEach(p => {
+    /* ⛔⛔⛔ A DERIVED SERIES HAS NO `id`, AND THAT SILENTLY DELETED FOUR BILLS OUT OF FIVE.
+       This read `.map(_b => _b.row || _b)`. A TYPED series carries `row` (the parent record) and is
+       fine. A DERIVED one carries `row: null` — the ledger never had a parent, that is the whole
+       point of deriving — so `p` fell through to the descriptor, which has no `id` and no `date`.
+       Every derived series then keyed as `undefined@YYYY-MM`, so the FIRST one projected claimed the
+       month and `covered.has(key)` threw away all the rest.
+       MEASURED on the deployed demo: `recurringBills` correctly returned all five as monthly
+       (Barton Springs $12,000 · Austin Energy $2,600 · Texas Mutual $1,500 · Bar Cop $189 ·
+       Sonitrol $89) and `projectedBills` returned ONE. About $16,189 a month of fixed overhead
+       missing from the ending balance, the low-point week, the runway and Safe to Spend, in the
+       optimistic direction, with nothing on screen saying a bill was gone.
+       ⚠ IT WAS INVISIBLE BECAUSE THE SEED CARRIED THE OLD `recurring` FLAG. The typed path filled
+       the gap for the demo only; a drop-only operator — every real one — has never had those bills
+       projected at all. The source comment above this block predicted exactly that and the seed was
+       hiding it. Pinned by `verify-recurring-cutover.js` E3, which RUNS this function over a
+       flag-free ledger; E1/E2 only ever matched its source text and stayed green throughout. */
+    _rb.filter(_b => !DAY_STEP[_b.frequency]).forEach(_b => {
+      const p = _b.row || _b;
+      // Stable per-series identity: the parent's id when typed, the vendor key when derived.
+      const seriesId = p.id || _b.vendorKey
+        || ('derived|' + (_b.vendor || _b.category || '') + '|' + _b.amount);
       const amt = parseFloat(p.amount) || 0;
-      const base = new Date((p.date || startYmd) + 'T00:00:00');
+      // A derived series is anchored on when it LAST happened, since it has no parent row date.
+      const base = new Date((p.date || _b.lastDate || startYmd) + 'T00:00:00');
       if (isNaN(base.getTime())) return;
-      const day = parseInt(p.recur_day, 10) || base.getDate();
+      const day = parseInt(p.recur_day, 10) || parseInt(_b.day, 10) || base.getDate();
       const term = parseInt(p.term_months, 10) || 0;        // 0 = ongoing until stopped
       const stop = p.stopped_ym || null;                     // YYYY-MM; no occurrence in or after this month
       const step = p.frequency === 'quarterly' ? 3 : p.frequency === 'annual' ? 12 : 1;   // recurrence interval in months
@@ -892,7 +913,7 @@ window.CashEngine = {
            BEFORE "is there already a generated row for it?", while hub-operating-expenses asks them
            the other way round — so a month already covered by a child still spent the logged row's
            token and left a second series unsuppressed. Two screens, same data, $500 apart. */
-        const key = p.id + '@' + ym;
+        const key = seriesId + '@' + ym;
         if (covered.has(key)) continue;
         const _ok = App.billIdentityKey(p) + '@' + ym;
         const _on = ownCovered.get(_ok) || 0;
