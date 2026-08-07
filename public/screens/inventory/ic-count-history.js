@@ -216,10 +216,14 @@ S.InventoryCountHistory = {
              reads the two counts either side of a period, so dropping one silently re-pairs the week
              against an older count, and there is no "->" to display. Different question, its own
              decision, still open on THE LIST.
-             ⚠ Known consequence, unchanged: `countLockedByWeek` locks a record once ANY confirmed
-             week ends on or after its date, and no reachable screen can un-confirm a week
-             (`removeRecord('core','week')` exists only in the retired this-week.js, which
-             navigate() intercepts). A booked count is still permanently undeletable. */
+             ⚠ Known consequence, and T1 made it STRONGER rather than changing it:
+             `countLockedByWeek` locks a record once ANY confirmed week ends on or after its date,
+             and nothing can un-confirm a week. This used to read "`removeRecord('core','week')`
+             exists only in the retired this-week.js, which navigate() intercepts" — that call is
+             now DELETED WITH THE GRID, so there is no week-remover anywhere in the app, reachable
+             or not. Week History offers Edit and Confirm, never Delete. Pinned by
+             verify-booked-row-locks-both-actions.js. A booked count is still permanently
+             undeletable. */
           + '<td><div class="row-actions"><button class="btn btn-ghost btn-sm ch-view" data-id="' + c.id + '">View</button>'
           + (App.canEdit('ic-count-history')
               ? '<button class="btn btn-ghost btn-sm ch-edit" data-id="' + c.id + '">Edit</button>' : '')
