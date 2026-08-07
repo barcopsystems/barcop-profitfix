@@ -1580,7 +1580,11 @@ S.HubOperatingExpenses = {
          operator on a drop zone with no way to reach Enter Manually. Caught by
          `verify-money-out-one-door` H3 before it shipped. `stepBody` is what separates the two. */
       bodyInner = (inline && !stepBody ? '' : segToggle) + '<div id="oexa-csv"></div>';
-      addButtons = (inline
+      /* ⛔ NO CANCEL IN THE STEP (Kyle, 2026-08-07). Cancel is the way OUT of the takeover, which is
+         the only place there is anything to back out of. In the step the chips are the way out, and
+         a Cancel under an inline drop zone asks the operator to cancel something they have not
+         started. `sc-dashboard`'s sales step has no Cancel either. */
+      addButtons = (inline && !stepBody
           ? '<div class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost" id="oexa-imp-cancel">Cancel</button></div>'
           : '')
         + '<div id="oexa-imp-actions" style="margin:0 0 ' + (inline ? '0' : '24px') + ';"></div>';
@@ -1674,7 +1678,16 @@ S.HubOperatingExpenses = {
       // `ic-product-setup.importPanelHTML`, because it is page content again rather than a step body.
       // Same ids and same wiring in all three; only the shell differs.
       : inline
-        ? (importMode ? '<div class="card form-card">' + bodyInner + '</div>' + addButtons
+        /* ⛔⛔⛔ NO CARD AROUND THE STEP'S DROP ZONE (Kyle, 2026-08-07): *"you have the drop file box
+           and chips in a card inside the step 1 card... they should be directly on the step 1
+           background."* He is right, and the manual branch beside this one was ALREADY flat — only
+           import wrapped itself, so the two modes of the same step sat on different backgrounds.
+           ⭐ COPIED FROM THE STEP HE NAMED, not invented: `sc-dashboard.workspace('import')` returns
+           `seg + text + drop mount`, no card and no shell. A cockpit step IS the card; a second one
+           inside it is a box inside a box.
+           ⚠ THE TAKEOVER KEEPS ITS CARD — there it is the whole page, not a step body. `stepBody` is
+           the same distinction that decides the toggle and the Cancel. */
+        ? (importMode && !stepBody ? '<div class="card form-card">' + bodyInner + '</div>' + addButtons
                       : bodyInner + addButtons)
         : '<div class="card form-card">'
           + App.collapsibleCardTitle('oex-add', 'Add Expense')
