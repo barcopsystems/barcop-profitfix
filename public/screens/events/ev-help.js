@@ -56,7 +56,7 @@ S.EventsHelp = {
       { q: 'What is the Regulars book for?',
         a: 'Your guests by name, by drink, by date. Log a regular\'s contact, birthday, anniversary, drink preferences, and last visit, and mark your VIPs. The screen surfaces who has a birthday or anniversary this month and who has gone quiet, so you have a monthly reach-out list and a win-back list. Open any regular in the list to edit them.' },
       { q: 'Can I import a list?',
-        a: 'Yes. Switch the add card to Import File and drop a CSV or Excel file. Only Name is required; phone, email, birthday, anniversary, and drink preferences come in if your file has them. Map the columns once and Bar Cop remembers it.' }
+        a: 'Yes. Switch the add card to Import File and drop a CSV or Excel file. Only Name is required; phone, email, birthday, anniversary, drink preferences, and last visit come in if your file has them. Map the columns once and Bar Cop remembers it. Then Bar Cop lists every row in the file and what will happen to it, so nothing is saved until you press Add on that screen.' }
     ]},
     { t: 'Connections', qa: [
       { q: 'What does Events feed into the rest of Bar Cop?',

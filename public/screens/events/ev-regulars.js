@@ -403,10 +403,29 @@ S.EventsRegulars = {
        else is 11 digits starting with 1. A 10-digit number and any genuine international number
        are left exactly as they are. */
     const phoneKey = v => { const d = String(v || '').replace(/\D/g, ''); return (d.length === 11 && d[0] === '1') ? d.slice(1) : d; };
-    const key = r => [(r.name || '').trim().toLowerCase(),
-      phoneKey(r.contact_phone),
-      (r.contact_email || '').trim().toLowerCase()].join('|');
-    const hasContact = r => !!(phoneKey(r.contact_phone) || (r.contact_email || '').trim());
+    /* ⛔⛔ A NAME PLUS **EITHER** STRONG IDENTIFIER IS THE SAME PERSON. This was one key,
+       `name|phone|email` joined into a single string, so a blank in any one of the three produced a
+       different key and the same guest imported again.
+       ⛔ MEASURED LIVE (2026-08-07) against a book holding
+       `Carla Mendez / 512-555-0211 / carla.m@example.com`:
+           a file row `Carla Mendez / 512-555-0211`        -> a SECOND Carla, under "1 regular imported"
+           a file row `Carla Mendez / carla.m@example.com` -> a second one
+           a file row carrying all three                    -> correctly "already in your book"
+       A POS export carries phone numbers and a CRM export carries email addresses, so an operator
+       who drops both gets their whole book twice. It is worse under a confirm screen than it was
+       without one: the row reads "Adding this regular" beside somebody already in the book, on a
+       screen whose whole promise is that every row tells the truth about itself.
+       ⛔ AND IT IS NAME **AND** (PHONE **OR** EMAIL), NEVER A PHONE ON ITS OWN. Keying on the number
+       alone would merge two different names sharing one line, which is the ordinary case rather than
+       the edge one — the seeded demo carries `Tom & Ana Briggs` on a single phone. Block N's control
+       is that case and it must not be weakened to make the dedup easier.
+       ⚠ A row matching on EITHER identifier is skipped, never merged: a guest whose number changed
+       keeps the number already on file. Same rule the door has always had for an exact match. */
+    const nameKey = r => (r.name || '').trim().toLowerCase();
+    const phoneOf = r => { const d = phoneKey(r.contact_phone); return d ? nameKey(r) + '|p|' + d : ''; };
+    const emailOf = r => { const e = (r.contact_email || '').trim().toLowerCase(); return e ? nameKey(r) + '|e|' + e : ''; };
+    const keysOf = r => [phoneOf(r), emailOf(r)].filter(Boolean);
+    const hasContact = r => keysOf(r).length > 0;
     /* ⚠⚠ TWO DEDUP RULES, BECAUSE A NAME IS NOT AN IDENTITY. The first version used one seen-set on
        name+phone+email, and for a NAME-ONLY list the key degrades to the name — the exact case its
        own comment claimed to avoid. Measured: a six-row bartender's list
@@ -423,7 +442,8 @@ S.EventsRegulars = {
        reason — the question there is also "have I already got THIS ONE", not "have I got one like
        it". Where the two doors differ is the contact case: an expense is an EVENT and can honestly
        repeat, a fully-identified person cannot. */
-    const seen = new Set(this.regulars().filter(hasContact).map(key));
+    const seen = new Set();
+    this.regulars().forEach(r => keysOf(r).forEach(k => seen.add(k)));
     // Frozen snapshot of what was in the book BEFORE this file, so "already in your book" and
     // "twice in this file" stay tellable apart once `seen` starts growing.
     const BOOK_KEYS = new Set(seen);
@@ -447,15 +467,19 @@ S.EventsRegulars = {
       /* `dup` = already in the book. `inFile` = the same row twice in THIS file. They are different
          facts and saying "already in your book" about the second one was false: on an empty book,
          two identical rows reported "1 already in your book" about someone who had never been there. */
-      if (hasContact(rec)) {
-        const k = key(rec);
-        if (seen.has(k)) {
-          const inBook = BOOK_KEYS.has(k);
+      const ks = keysOf(rec);
+      if (ks.length) {
+        if (ks.some(k => seen.has(k))) {
+          /* ⚠ ANY key in the frozen book snapshot means "already in your book", not just the first
+             one that happened to match. A row can match the book on its email and an earlier row of
+             this same file on its phone, and of those two facts the book one is the one the operator
+             needs. Reading the first hit would have made that answer depend on field order. */
+          const inBook = ks.some(k => BOOK_KEYS.has(k));
           list.push({ raw: r, name: name, rec: rec, status: inBook ? 'dup' : 'inFile', lands: false,
             note: inBook ? 'Already in your book' : 'Repeated in this file', notes: [] });
           return;
         }
-        seen.add(k);
+        ks.forEach(k => seen.add(k));
       } else {
         const n = name.toLowerCase();
         const at = bare.indexOf(n);
@@ -709,7 +733,7 @@ S.EventsRegulars = {
       { h: 'Gone Quiet', p: ['A regular whose last visit was more than ' + this.QUIET_DAYS + ' days ago flags as quiet. Work that chip as your win-back list, and log a last visit when they come in to keep it honest.',
         'No Visit Logged is a separate count, and it is different work: those are regulars you have never logged a visit for, so Bar Cop cannot say whether they have gone quiet or were in last night. Open them and set a last visit, and they start counting properly.'] },
       { h: 'Importing', p: ['Drop a CSV or Excel file and map the columns once. Only Name is required; phone, email, birthday, anniversary, drink preferences, and last visit come in if your file has them, and anything missing imports blank to fill later.',
-        'Bar Cop tells you what it could not read: rows with no name, dates it could not make sense of, and anyone already in your book.'] }
+        'Then Bar Cop lists every row in the file and what will happen to it: who is going in, who is already in your book, rows repeated in the file, and any birthday, anniversary or last visit it could not read. Nothing is saved until you press Add on that screen, and you can take any row out before you do.'] }
     ]);
   }
 };
