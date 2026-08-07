@@ -65,6 +65,58 @@ S.HubBooksHome = {
   },
   atCurrentMonth() { return this._curKey() === this._nowKey(); },
 
+  /* ⛔⛔⛔ THE MONTH THIS PAGE REPORTS ON, WHICH IS NOT ALWAYS THE MONTH YOU ARE STANDING IN.
+     Measured on a clean demo, 7 August: the strip read REVENUE $19,150.00 · PRIME COST 55.4% ·
+     OPERATING INCOME **-$13,284.83**. The arithmetic was right and the number was a lie about the
+     business: a FULL month of fixed bills is dated the 5th (rent $12,000, utilities $2,600,
+     insurance $1,500 and the rest, ~$21.8k) while revenue accrues week by week, so until roughly
+     the 20th every month reads as a heavy loss. Every operator, every month, on the landing page
+     that tells them how the business is doing ([[output-honesty]]).
+     ⭐ THE FIX IS A DECISION KYLE ALREADY MADE ELSEWHERE, NOT A NEW ONE. `_pctBasis` on the Money
+     Out screen exists for exactly this: a partial month makes a ratio lie, so it reports the newest
+     COMPLETE month and NAMES it. This is the same rule on the same problem, using the same
+     ⛔ BUT NOT THE SAME COMPLETENESS TEST, AND THAT DISTINCTION IS THE WHOLE OF `_basisKey`'s note
+     below. `_pctBasis` uses the DAY-COUNTING one because its ratio divides a month's money by that
+     month's revenue day for day. Books books a week WHOLE to the month its `period_end` lands in, so
+     it asks `_weeksComplete`. Same idea, two questions, two answers.
+     ⚠ THE CEILING IS THE SELECTED MONTH, NOT THE CLOCK. `HubBooks._lastCompleteMonthKey` anchors
+     itself to `_currentMonthKey()`, so it cannot answer "complete as of July" when the selector is
+     on July. Hence a local one that takes the ceiling.
+     ⚠ AND IT MAY RETURN THE CEILING ITSELF: a bar with no complete month yet (new, or weeks not
+     confirmed) still has to see a page. `basisComplete` below is how the render says so rather than
+     printing a part-month as if it were settled. */
+  /* ⛔⛔⛔ `_weeksComplete`, NEVER `_monthRevenueComplete`, AND THE SOURCE SAID SO BEFORE I DID.
+     `hub-books.js:472` carries the warning in bold: *"THIS IS NOT `hub-operating-expenses.
+     _monthRevenueComplete`, AND MUST NEVER BE MERGED WITH IT."* That one counts DAYS COVERED, which
+     is right for the OpEx ratio because that ratio divides one month's money by one month's revenue
+     day for day. **Books does not slice by day** — it books a week WHOLE to the month its
+     `period_end` falls in. Wiring this cockpit to the day-counter would nag every operator, every
+     month, about a week that belongs to the NEXT month's books.
+     ⚠ I RECOMMENDED THE FORBIDDEN ONE AND BUILT IT, and two things caught it: `_monthRevenueComplete`
+     is not on `S.HubBooks` at all, so the guard fell through and the whole feature was a SILENT
+     NO-OP; and the live check showed it. A source-text pin stayed green over all of it. */
+  _basisKey(ceil) {
+    const HB = S.HubBooks;
+    if (!HB || !HB._weeksComplete) return ceil;
+    /* ⛔⛔⛔ TWO CONDITIONS, AND MEASURING IS THE ONLY REASON I KNOW THAT. `_weeksComplete('2026-08')`
+       returned TRUE on 7 August — correctly. It answers *"are any weeks MISSING from this month's
+       books"*, and none are missing from August yet because the month has not got to them. It is a
+       GAP test, not an is-it-over test, so on its own it left the basis on August and the whole fix
+       did nothing.
+       ⭐ A MONTH IS SETTLED WHEN IT HAS ENDED **AND** HAS NO HOLES. The first half is the calendar
+       (`mk < nowKey`); the second is `_weeksComplete`, used for exactly what it is for — a past month
+       missing a week understates its revenue and its operating income by that week, which is the
+       defect `hub-books` already warns about at `_weeksComplete`. Either alone is wrong: the calendar
+       alone reports a month with a hole in it as settled, the gap test alone reports today as settled. */
+    const done = (mk) => mk < this._nowKey() && !!(HB._weeksComplete(mk) || {}).complete;
+    if (done(ceil)) return ceil;
+    const keys = Array.from(new Set(((App.data && App.data.weeks) || [])
+      .map(w => String((w && w.period_end) || '').slice(0, 7))))
+      .filter(mk => /^\d{4}-\d{2}$/.test(mk) && mk < ceil && done(mk))
+      .sort();
+    return keys.length ? keys[keys.length - 1] : ceil;
+  },
+
   /* THE FLOOR: the first month this bar has anything in. Stepping back past it lands on empty pages
      forever, which reads as a broken button rather than as the end of the data. Both stores are
      asked because either one can be the earliest — a bar that logged bills before confirming a week,
@@ -196,9 +248,16 @@ S.HubBooksHome = {
   _computeState() {
     const HB = S.HubBooks;
     const curKey = this._curKey();
-    const curM   = (HB && HB._aggregateMonth) ? HB._aggregateMonth(curKey) : null;
-    const monthName = (HB && HB._monthLabel) ? HB._monthLabel(curKey) : curKey;
-    const YTD    = (HB && HB._aggregateYTD)  ? HB._aggregateYTD(curKey) : null;
+    /* ⭐ ONE SUBSTITUTION, AND IT MOVES THE WHOLE PAGE. Every figure below already took `curKey` as
+       an argument, so pointing them at the BASIS month is the entire change — the strip, the YTD
+       hero and its margin all move together and cannot disagree about which month they are about. */
+    const basisKey = this._basisKey(curKey);
+    // Settled = over AND no missing weeks. Same two conditions `_basisKey` uses; see its note.
+    const basisComplete = !!(HB && HB._weeksComplete && basisKey < this._nowKey()
+      && (HB._weeksComplete(basisKey) || {}).complete);
+    const curM   = (HB && HB._aggregateMonth) ? HB._aggregateMonth(basisKey) : null;
+    const monthName = (HB && HB._monthLabel) ? HB._monthLabel(basisKey) : basisKey;
+    const YTD    = (HB && HB._aggregateYTD)  ? HB._aggregateYTD(basisKey) : null;
 
     // Revenue is already net sales (comps excluded by the POS), so do NOT
     // re-subtract comps or re-expense policy comps — that double-removed them and
@@ -207,8 +266,8 @@ S.HubBooksHome = {
     // ⭐ ONE FORMULA, shared with the Income Statement and the workbook sheet (HB._plParts).
     // This landing used to build the same arithmetic by hand, which is what let it disagree
     // with the statement it links to.
-    const P  = (HB && HB._plParts) ? HB._plParts(curKey, false) : null;
-    const PY = (HB && HB._plParts) ? HB._plParts(curKey, true)  : null;
+    const P  = (HB && HB._plParts) ? HB._plParts(basisKey, false) : null;
+    const PY = (HB && HB._plParts) ? HB._plParts(basisKey, true)  : null;
     const cmRev   = P ? P.netRev : 0;
     const cmCogs  = curM ? curM.totalCogs : 0;
     const cmLabor = curM ? curM.totalLabor : 0;
@@ -225,7 +284,7 @@ S.HubBooksHome = {
     if (HP && HP._status) {
       permits.forEach(r => { const s = HP._status(r); if (s.key === 'expired' || s.key === 'critical' || s.key === 'warn') { dueCount++; if (s.key === 'expired') expiredCt++; } });
     }
-    return { curKey, monthName, cmRev, cmPrimePct, mInc, ytdInc, ytdNet, ytdMargin, dueCount, expiredCt };
+    return { curKey, basisKey, basisComplete, monthName, cmRev, cmPrimePct, mInc, ytdInc, ytdNet, ytdMargin, dueCount, expiredCt };
   },
 
   // ── Where You Stand (hero + secondary, Cash-style) ──────────────────────────
@@ -242,13 +301,22 @@ S.HubBooksHome = {
     const mini = (label, val, col) => '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:3px;">' + label + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:600;line-height:1;color:' + (col || 'var(--t1)') + ';">' + val + '</div></div>';
+    /* ⚠ THE LABEL FOLLOWS THE FACT. A settled month is named plainly; an incomplete one says so, in
+       the words that describe the actual mismatch rather than the vague "so far" that let a
+       full month of bills sit against one week of revenue without comment. */
+    const stripNote = st.basisComplete
+      ? ''
+      : '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:8px;">'
+        + 'No month is fully confirmed yet, so this is ' + esc(st.monthName) + ' to date: the bills are in full and the revenue is only the weeks you have confirmed.'
+        + '</div>';
     const secondary = '<div style="margin-top:12px;padding-top:14px;border-top:1px solid var(--b2);">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + esc(st.monthName) + ' So Far</div>'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;">' + esc(st.monthName) + (st.basisComplete ? '' : ' So Far') + '</div>'
       + '<div style="display:flex;align-items:flex-start;flex-wrap:wrap;">'
       +   mini('Revenue', this._money(st.cmRev)) + vdiv
       +   mini('Prime Cost', this._pct(st.cmPrimePct)) + vdiv
       +   mini('Operating Income', this._money(st.mInc), st.mInc < 0 ? 'var(--red)' : 'var(--t1)')
       + '</div>'
+      + stripNote
       + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-act="books">Income Statement</button></div></div>';
 
     return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>'
