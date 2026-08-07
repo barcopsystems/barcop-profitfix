@@ -1786,6 +1786,13 @@ S.HubOperatingExpenses = {
         this._expenseReview.removed[b.dataset.confirmRemove] = true;
         this._rerender();
       }));
+      // Put Back, from the Removed section. The exact inverse, and the reason Remove is safe to
+      // press at all: nothing on this screen destroys anything until the button at the bottom.
+      this.container.querySelectorAll('[data-confirm-restore]').forEach(b => b.addEventListener('click', () => {
+        if (!this._expenseReview) return;
+        delete this._expenseReview.removed[b.dataset.confirmRestore];
+        this._rerender();
+      }));
       /* The category picker. Keyed by vendor, so one change moves every row for that vendor and the
          re-render shows it happening. `change`, not `input`: a native select fires change on commit. */
       /* ⛔ A TICK MUST NOT REPAINT THE PANEL. At 2000 rows a full re-render costs ~460ms per tick,
@@ -3097,6 +3104,25 @@ S.HubOperatingExpenses = {
     const rows = built.list.map((x, i) => this._expenseReviewRow(x, (live[i] || {})._rid));
     return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
   },
+
+  /* The rows the operator took out. Built through the SAME walk and the SAME row mapper as the rest,
+     so a removed row looks exactly as it did when they removed it — which is what makes Put Back
+     legible; a row rendering as a blank line is one nobody can decide about.
+     ⛔ HANDED THE SAME `verdicts` THE SCREEN WAS DRAWN WITH. They are settled from the WHOLE file at
+     the drop — date order, which sign means money out, whether a Debit/Credit column exists — so
+     re-deriving them over the removed subset would answer a question about the FILE using four rows,
+     and a bank register's remaining debits can flip that verdict outright.
+     ⚠ A SEPARATE WALK, so a removed row stops taking part in the live one; its verdicts are
+     therefore never read, only its cells. */
+  _expenseReviewRemoved() {
+    const r = this._expenseReview;
+    if (!r) return [];
+    const gone = r.rows.filter(x => r.removed[x._rid]);
+    if (!gone.length) return [];
+    return this._buildExpenseRows(gone, r.verdicts, r.assign).list.map((x, i) => Object.assign(
+      this._expenseReviewRow(x, (gone[i] || {})._rid),
+      { note: 'Taken out of this import', notes: [], lands: false }));
+  },
   /* ⛔ `_expenseReviewCount()` WAS DELETED HERE, 2026-08-06, and the retired-code ratchet is what
      found it. It read `this._expenseReview ? this._expenseReviewSummary().count : 0` and its one
      app caller was the refused-write relabel, which now asks `ImportConfirm.goLabel` so the two
@@ -3283,6 +3309,9 @@ S.HubOperatingExpenses = {
       selectable: true,
       checked: (this._expenseReview || {}).checked || {},
       removable: true,
+      // Removed rows are never part of `rows`, which is what keeps them out of the count, out of
+      // the needs/settled split and out of the "All N of these" lift with no special case anywhere.
+      removedRows: this._expenseReviewRemoved(),
       goAttr: 'data-oexreview-go', backAttr: 'data-oexreview-back', backLabel: 'Start Over',
       resultId: 'oex-imp-result',
       // The door owns which sections are open; a closed one builds no table at all.
