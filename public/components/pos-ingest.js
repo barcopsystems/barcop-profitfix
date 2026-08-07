@@ -918,12 +918,23 @@ const PosIngest = {
     const toAdd = []; const skipped = []; const undated = []; let dupCount = 0; const used = new Set();
     // S218: repeats here are COUNTED, not dropped — see the guard below for why this door differs.
     const fileSeen = new Set(); let fileRepeats = 0;
+    /* ⛔⛔ ONE VERDICT PER INPUT ROW, IN THE FILE'S OWN ORDER — the shape a confirm screen needs, and
+       the first POS lane to have one (door 8, 2026-08-07). Everything else this function returns is a
+       COUNT or a VALUE-LIST: `skipped` is the literal string `'(no amount)'`, `undated` is the raw
+       cell, and `dupCount`/`fileRepeats` are numbers. None of them can answer "WHICH row was already
+       logged", which is the confirm screen's whole contract — every row listed, and ONE walk
+       producing the status AND the count.
+       ⚠ ADDITIVE ON PURPOSE. Eight other POS lanes and this door's own 95 existing assertions read
+       the fields above, so every one of them keeps its exact meaning; `perRow` is a second view of
+       the same walk, never a second walk. A landing verdict carries the SAME record object that is
+       in `toAdd`, not a copy that could drift from it. */
+    const perRow = [];
     (rows || []).forEach(r => {
       // A void/comp is a LOSS magnitude. POS exports show it as a negative ("-15")
       // or accounting parens ("(15)") to signal it reduces sales; both are a $15
       // loss. Take the absolute value so those rows import instead of being dropped.
       const amount = Math.abs(this._num(r.amount));
-      if (!(amount > 0)) { skipped.push('(no amount)'); return; }
+      if (!(amount > 0)) { skipped.push('(no amount)'); perRow.push({ raw: r, status: 'noAmount' }); return; }
       const t = (r.type || '').trim().toLowerCase();
       /* ⚠ A DISCOUNT IS NOT A VOID. This asked only whether the cell contained "comp", so anything
          else — Discount, Promo, Coupon, Courtesy — became a Void. Bar Cop's own model disagrees:
@@ -967,7 +978,7 @@ const PosIngest = {
          read it; inventing today is the one answer that is certainly wrong. */
       const rawDate = String(r.date == null ? '' : r.date).trim();
       const parsed = this.normDate(rawDate, opts);
-      if (rawDate && !parsed) { undated.push(rawDate); return; }
+      if (rawDate && !parsed) { undated.push(rawDate); perRow.push({ raw: r, status: 'undated' }); return; }
       const recDate = parsed || today;
       // Skip an exact re-import (same date + amount + server + item) so re-dropping
       // a voids/comps export never double-counts loss.
@@ -980,12 +991,15 @@ const PosIngest = {
          different hat ([[the-loop]] #30: do not infer a fact the file does not carry).
          So Bar Cop says what it saw and the operator decides. Counted, never returned early. */
       const fileKey = recDate + '|' + server + '|' + item + '|' + type + '|' + amount.toFixed(2);
-      if (fileSeen.has(fileKey)) fileRepeats++; else fileSeen.add(fileKey);
+      // ⚠ CAPTURED, not just counted: the confirm screen marks the SECOND occurrence on the row, so
+      // it has to know which one it is looking at rather than only how many there were.
+      const isRepeat = fileSeen.has(fileKey);
+      if (isRepeat) fileRepeats++; else fileSeen.add(fileKey);
       if (this._isDup(existing, used, x => x.date === recDate && Math.abs((x.amount || 0) - amount) < 0.001
             && (x.server || '') === server && (x.item || '') === item)) {
-        dupCount++; return;
+        dupCount++; perRow.push({ raw: r, status: 'dup' }); return;
       }
-      toAdd.push({
+      const rec = {
         id: App.uid(), date: recDate, type, shift_type: '',
         item, amount,
         product_id: '', product_name: '', menu_item_id: '', units: null,
@@ -993,13 +1007,17 @@ const PosIngest = {
         authorized_by_id: '', authorized_by: '', check_number: '',
         reason: (r.reason || '').trim(), notes: '',
         created_at: new Date().toISOString()
-      });
+      };
+      toAdd.push(rec);
+      // The SAME object, never a copy: a screen describing a record the write will not produce is
+      // the defect this whole rollout exists to close.
+      perRow.push({ raw: r, status: 'new', rec: rec, repeat: isRepeat });
     });
     // `skipped` is rows with no usable AMOUNT; `undated` is rows whose date the file gave and Bar
     // Cop could not read. Two different problems with two different fixes — never one list.
     // `fileRepeats` here means "the file repeated a line" — NOT that anything was dropped. Both rows
     // are in `toAdd`. The door words it as something to look at, never as a collapse.
-    return { toAdd, skipped, undated, dupCount, fileRepeats };
+    return { toAdd, skipped, undated, dupCount, fileRepeats, perRow };
   },
 
   // rows -> one per-day sc_shifts record. `opts.manual` = the Enter-Manually grid (a hand entry,
