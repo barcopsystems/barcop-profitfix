@@ -1602,10 +1602,12 @@ S.HubOperatingExpenses = {
          the only place there is anything to back out of. In the step the chips are the way out, and
          a Cancel under an inline drop zone asks the operator to cancel something they have not
          started. `sc-dashboard`'s sales step has no Cancel either. */
-      addButtons = (inline && !stepBody
-          ? '<div class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost" id="oexa-imp-cancel">Cancel</button></div>'
-          : '')
-        + '<div id="oexa-imp-actions" style="margin:0 0 ' + (inline ? '0' : '24px') + ';"></div>';
+      /* ⛔⛔ ONE CANCEL, AND IT LIVES BESIDE IMPORT (Kyle, 2026-08-07): *"don't need two cancel
+         buttons... should be import button and right next to it the cancel button."* Ours used to
+         render as a lone button ABOVE the mapper while CSVMapper drew its own beside Import — two
+         Cancels, doing different things. The mapper's is now the only one, and `onCancel` below
+         gives it OUR meaning: leave the takeover, do not just reset the file. */
+      addButtons = '<div id="oexa-imp-actions" style="margin:0 0 ' + (inline ? '0' : '24px') + ';"></div>';
     } else {
       bodyInner = segToggle
         + (stepBody ? intro('No statement to drop? Key it in by hand. Pick the log type first: an operating expense lands on your income statement, a cash outflow does not. Then the amount, and save.') : '')
@@ -1761,12 +1763,9 @@ S.HubOperatingExpenses = {
       this._rerender();
     }));
     // The takeover's own way back, the same control ic-product-setup's import panel carries.
-    this.container.querySelector('#oexa-imp-cancel')?.addEventListener('click', () => {
-      /* ⚠ `_stepMode` back to null (the drop zone) and the carried node dropped, or a cancelled
-         import would re-attach a stale mapper on the next render. */
-      this._expenseReview = null; this._stepMode = null; this._carryCsv = null; this._carryActs = null;
-      this._entryMode = 'manual'; this._moTakeover = false; this._rerenderHost();
-    });
+    /* ⚠ THE `#oexa-imp-cancel` HANDLER WENT WITH ITS BUTTON (2026-08-07). It was the second of two
+       Cancels; the mapper's own is the only one now and `_mountImporter`'s `onCancel` carries this
+       exact reset. A handler kept for an element nothing renders is dead code that reads as live. */
     /* ⚠ WIRED ON THE FRESH CHILD NODES, NEVER ON `this.container`. `renderMain` replaces the
        container's innerHTML but the container element itself is permanent, so a listener attached to
        it would stack one copy per render and the Add button would fire N times on the Nth repaint.
@@ -1954,6 +1953,14 @@ S.HubOperatingExpenses = {
          door and three of the four already converted. */
       confirmLabel: 'Import',
       onState: st => this._onImportState(st),
+      /* Cancel LEAVES the takeover. Same reset the old `#oexa-imp-cancel` did, in the one place
+         the operator now sees a Cancel at all. */
+      onCancel: () => {
+        this._expenseReview = null; this._stepMode = null;
+        this._carryCsv = null; this._carryActs = null;
+        this._entryMode = 'manual'; this._moTakeover = false;
+        this._rerenderHost();
+      },
       onComplete: rows => this._openExpenseReview(rows)
     });
   },
@@ -3493,11 +3500,25 @@ S.HubOperatingExpenses = {
          which one). A draw is not an expense: calling three bills and two draws "5 expenses
          imported" would be the screen contradicting the sections the operator just sorted them
          into, on the one line that reports what happened. */
+      /* ⛔⛔⛔ NAME THE MONTH THE ROWS LANDED IN (Kyle, 2026-08-07, found on the live build).
+         He dropped a JULY statement while the step was closing AUGUST, 53 rows imported cleanly,
+         and the step still read "12 bills logged this month" — correctly, because it counts the
+         month being CLOSED. Nothing on screen said where the 53 went, so a successful import looked
+         like nothing had happened.
+         ⭐ THE COUNT STAYS ON THE CLOSING MONTH (Kyle's call). Re-pointing it at whatever file was
+         last dropped would make that number mean something different every time, on the one step
+         whose job is closing a specific month. The MESSAGE carries the fact instead. */
       const _n = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+      const _months = Array.from(new Set((_added || []).map(r => String((r && r.date) || '').slice(0, 7))
+        .filter(m => m.length === 7))).sort();
+      const _where = _months.length === 1
+        ? ' into ' + this._monthLabel(_months[0])
+        : (_months.length > 1 ? ' across ' + _months.length + ' months, ' + this._monthLabel(_months[0])
+            + ' to ' + this._monthLabel(_months[_months.length - 1]) : '');
       this._importMsg = (_added.length ? _n(_added.length, 'expense') : '')
         + (_added.length && cashSaved ? ' and ' : '')
         + (cashSaved ? _n(cashSaved, 'cash outflow') : '')
-        + ((_added.length || cashSaved) ? ' imported.' : 'Nothing new to import.');
+        + ((_added.length || cashSaved) ? ' imported' + _where + '.' : 'Nothing new to import.');
     } else {
       /* The full account, for a call with no screen in front of it. This is the path a direct
          `_importRows` takes, and it is the only reason these clauses still exist. */
