@@ -1355,32 +1355,24 @@ S.HubOperatingExpenses = {
   _logRowHtml(r, opts) {
     opts = opts || {};
     const fmt$ = (v) => App.fmtCurrency(v || 0);
-    const isRec = !!this._seriesOf(r);   // an orphan is not a series — see _seriesOf (S226h)
-    // Came from a series that has since been stopped: keep the tag, mark it, keep the plain buttons.
-    const wasRec = !isRec && !!this._seriesAny(r);
+    /* ⛔⛔ NO RECURRING CHROME ON A LEDGER ROW (2026-08-06). This member had three action branches:
+       `minimal` (Edit + Delete), a series branch (Renew + Stop + Edit + Delete) and an else branch
+       (Repeat + Edit + Delete) — plus a "recurring" tag in the category cell. Its ONLY caller has
+       always passed `{minimal: true}`, so Renew, Stop and Repeat were never rendered by anything;
+       walked live across 57 Bills rows, 5 real series and a planted legacy cash row, and every one
+       showed Edit and Delete alone. The tag was the only part an operator ever saw, and it described
+       a stored flag nothing writes any more.
+       Kyle, 2026-08-06: *"no recurring tracking, no stopping recurring... get rid of everything that
+       was part of the old process."* Recurrence is DERIVED off the ledger now
+       (`recurringBills` / `deriveRecurringOutflows`); there is nothing on a row for an operator to
+       manage, so there is nothing to render. The branches and the tag are gone, and with them the
+       last callers of `S.HubCashOutflows.stop` and `.repeat`. */
     const edit = '<button class="btn btn-ghost btn-sm oex-edit" data-id="' + esc(r.id) + '">Edit</button>';
     const del  = '<button class="btn btn-danger btn-sm oex-del" data-id="' + esc(r.id) + '">Delete</button>';
-    let actions = '';
-    if (opts.minimal) {
-      actions = edit + del;
-    } else if (isRec) {
-      if (this._isSeriesEnding(r)) actions += '<button class="btn btn-ghost btn-sm oex-renew" data-id="' + esc(r.id) + '" style="color:var(--gold);">Renew</button>';
-      /* ⭐⭐ BUILD ORDER C — STOP IS A CASH CONTROL NOW. A bill that stops being paid stops appearing
-         in the ledger, and `recurringBills` drops it once the series has missed more than one full
-         cycle — so there is nothing left for a button to do, and one that only restates what the
-         data already says is a control the operator has to keep true by hand.
-         ⛔ CASH KEEPS IT, because nothing derives a cash outflow: a recurring draw is projected from
-         its own parent forever and Stop is the ONLY thing that ends it. `_isOperatingRow` is the
-         same partition the kind chip uses, so a row is on exactly one side of this. */
-      if (!this._isOperatingRow(r)) actions += '<button class="btn btn-ghost btn-sm oex-stop" data-id="' + esc(r.id) + '">Stop</button>';
-      actions += edit + del;
-    } else {
-      actions += '<button class="btn btn-ghost btn-sm oex-dup" data-id="' + esc(r.id) + '">Repeat</button>' + edit + del;
-    }
+    const actions = edit + del;
     return '<tr>'
       + '<td data-label="Date" style="color:var(--t1);white-space:nowrap;">' + esc(r.date || '') + '</td>'
-      + '<td style="color:var(--t2);">' + esc(r.category || '')
-      + (isRec ? this._recurTag(r) : wasRec ? this._recurTag(r, true) : '') + '</td>'
+      + '<td style="color:var(--t2);">' + esc(r.category || '') + '</td>'
       + '<td style="color:var(--t2);">' + esc(r.vendor || '') + '</td>'
       + '<td style="font-weight:700;color:var(--t1);">' + fmt$(r.amount) + '</td>'
       + '<td class="no-print" style="text-align:right;white-space:nowrap;">' + actions + '</td>'
@@ -3672,11 +3664,12 @@ S.HubOperatingExpenses = {
   _wireRows(scope) {
     const openEdit = (b) => { const r = this.records().find(x => x.id === b.dataset.id); if (r) this._openModal(r); };
     const once = (b) => { if (b._oexRowWired) return false; b._oexRowWired = 1; return true; };
+    /* Edit and Delete are the only row actions. The `.oex-renew`, `.oex-dup` and `.oex-stop`
+       listeners were removed with the branches that rendered those buttons: nothing has emitted one
+       since the log moved to `{minimal: true}`, and recurrence is derived now, so there is no series
+       for an operator to renew, repeat or stop. */
     scope.querySelectorAll('.oex-edit').forEach(b => { if (once(b)) b.addEventListener('click', () => openEdit(b)); });
-    scope.querySelectorAll('.oex-renew').forEach(b => { if (once(b)) b.addEventListener('click', () => openEdit(b)); });
-    scope.querySelectorAll('.oex-dup').forEach(b => { if (once(b)) b.addEventListener('click', () => this._duplicate(b.dataset.id)); });
     scope.querySelectorAll('.oex-del').forEach(b => { if (once(b)) b.addEventListener('click', () => this._delete(b.dataset.id)); });
-    scope.querySelectorAll('.oex-stop').forEach(b => { if (once(b)) b.addEventListener('click', () => this._stopRecurring(b.dataset.id)); });
   },
 
   // ── Inline add form save / start over ────────────────────────────────────
