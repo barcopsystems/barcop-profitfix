@@ -55,7 +55,7 @@ S.InventoryVendors = {
       { h: 'Add A Vendor', p: ['Fill in the vendor name and whatever you have: rep, phone, email, account number, payment terms. Only the name is required. Save and the vendor is ready to attach to products.'] },
       { h: 'Delivery Days Set Your Pars', p: ['Tap the Delivery Days chips for the days this vendor delivers, or Pickup if you go get it yourself. This is not just a note: Dynamic Pars reads these days to size a tighter reorder par for everything you buy from this vendor, so a vendor who comes twice a week gives a smaller, sharper par than a once-a-week one. Leave them blank and those products fall back to your Default Delivery Cycle. Using the chips instead of typing means the days are always read correctly.'] },
       { h: 'Order Minimums And Fees', p: ['Set the Order Minimum and pick its unit: the dollar sign for a dollar minimum, or cases, kegs, or any unit you add with Edit for a count minimum. Add a delivery fee and a free-delivery-over amount if the vendor has them. On the Order Sheet, each vendor card shows your running order against that minimum and warns when it is short, so you can add more of that vendor’s items and clear the bar in one delivery instead of two. You are always warned, never blocked, so you can still place a short order when you mean to.'] },
-      { h: 'Upload A Vendor List', p: ['Already have your vendors in a spreadsheet or a distributor list? Switch the Add a Vendor card to Import File and drop in a CSV or Excel file. The first row is your column headers, one vendor per row. Only the vendor name is required; rep, phone, email, delivery days, terms, account number, order minimum, delivery fee, and free-delivery-over all come in too if your file has them. Bar Cop shows the columns it found, auto-matched, with a preview so you can confirm before importing. A name already on your list is skipped so you never get a duplicate.'] },
+      { h: 'Upload A Vendor List', p: ['Already have your vendors in a spreadsheet or a distributor list? Switch the Add a Vendor card to Import File and drop in a CSV or Excel file. The first row is your column headers, one vendor per row. Only the vendor name is required; rep, phone, email, delivery days, terms, account number, order minimum, delivery fee, and free-delivery-over all come in too if your file has them. Bar Cop shows the columns it found, auto-matched, with a preview of the first rows. Then it lists every vendor in the file and what will happen to each one, with anything that is not going in at the top. Nothing is saved until you press Add on that screen. A name already on your list is skipped so you never get a duplicate.'] },
       { h: 'Vendors From Your Products', p: ['When you add or import products, a vendor name on a product that is not on your list yet shows up under Set Up From Your Products, along with how many products use it. Tap Set Up to open the add form with that name already filled in, add the rep, terms, and contact details, and Save. The vendor moves into your list and every product already pointing at that name is connected automatically, so you never have to relink anything. If a name is a typo or a vendor you do not actually order from, tap Delete to clear it off those products and drop it from the list.'] },
       { h: 'Edit A Vendor', p: ['Open a vendor to update its details and see two things at a glance: every product you buy from them, and the most recent cost changes on those products. Rename a vendor and every product pointing at the old name follows automatically.'] },
       { h: 'Pricing Feeds Profit Recovery', p: ['Each time you apply a cost change in Receive Delivery, Bar Cop logs it against the vendor. That same history feeds the Vendor Tracker in Profit Recovery, so a vendor quietly raising prices shows up before it eats your margin.'] }
@@ -169,12 +169,20 @@ S.InventoryVendors = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    /* ⛔ THE CONFIRM SCREEN TAKES THE ADD FORM'S SLOT, and the vendor list below stays — the same
-       shape the Add Products routing screen uses. Keeping the list visible is the point: "already on
-       your list" is a verdict about that list, and the operator can see it from here. */
+    /* ⛔⛔ THE CONFIRM SCREEN TAKES THE WHOLE PAGE. It used to take the add form's slot only, and the
+       vendor list stayed below it, on the reasoning that *"already on your list is a verdict about
+       that list, so the operator can see it from here"*. Kyle killed that on the regulars door
+       (2026-08-07) and he is right, because the argument only ever covered the dup rows and the
+       price was much higher than a glance: this screen promises **"Nothing is saved until you do"**,
+       and the list below it carries DELETE and EDIT, which write on the press. Two opposite write
+       models on one page with the destructive one under the reassuring sentence. The pending section
+       is the same problem again: **Set Up** promotes a name to a real vendor record.
+       The confirm screen already names every dup by name, which is the part that was actually needed.
+       Pinned by `verify-confirm-screen-owns-page.js`, which RENDERS this door rather than reading it. */
     this.container.innerHTML = '<div class="screen">'
-      + (this._vendorReview ? this.vendorReviewHTML() : this.addFormCard())
-      + this.pendingSectionHTML() + listSection + '</div>';
+      + (this._vendorReview
+          ? this.vendorReviewHTML()
+          : this.addFormCard() + this.pendingSectionHTML() + listSection) + '</div>';
     this.wireList();
   },
 
