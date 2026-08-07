@@ -2263,7 +2263,24 @@ const App = {
     ] },
     'operating-expenses': { title: 'How Operating Expenses Work', sections: [
       { h: 'What this page is', p: ['Where you log the bills that are not COGS or labor (wages and salaries both live in Labor Control, not here): rent, utilities, insurance, marketing, professional fees, software, and the rest. These roll into the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
-      { h: 'This month and next', p: ['The page shows this month and next month, each split into Recurring (a bill that repeats, monthly, quarterly, or annually) and Variable (the ones that change). Next month lists your recurring bills as Expected before they post. The full back-record lives on Expense History, its own page in the sidebar.'] },
+      /* ⚠ THIS SECTION DESCRIBED A PAGE THAT NO LONGER EXISTS, in four separate claims. It promised
+         month cards for "this month and next", a Recurring/Variable split inside each, next month's
+         recurring bills listed as Expected before they post, and Expense History as its own sidebar
+         row. Build pieces 3+4 replaced all of it with three tabs over one ledger, T5 deleted the
+         month cards, and the Expense History route went with them.
+         ⚠ MEASURED ON THE DEPLOYED BUILD BEFORE REWRITING, not written from the plan: the sidebar
+         is Close The Books / Money Out / Break-Even / Weekly P&L Brief / Month-End Books / Annual
+         Review / Help, and the words "expected", "next month" and "upcoming" appear NOWHERE on the
+         page. Nothing on it is forward-looking, so "Expected" had no referent at all.
+         ⭐ The two facts worth having that no plan mentioned, both measured: the stat strip, the By
+         Category table AND the log all follow the tab (Bills $5,455.83 + Cash Outflows $6,800.00 =
+         All Money Out $12,255.83 to the cent), while the range chips move the LOG ONLY (7 -> 46 ->
+         14 rows with the figures above unmoved). An operator reading a chip as a page-wide filter
+         would misread every number on the screen. */
+      { h: 'The three tabs', p: [
+        'Money Out opens on Bills: the money that comes in on a statement or an invoice, which is what rolls into your income statement. Cash Outflows is money that genuinely left the bank but is not a cost of running the bar, so Books keeps it off that statement: owner draws, loan payments, capital and equipment, tax remittances. All Money Out is the two added together. Everything follows the tab you are on, so the numbers up top, the By Category table and the log all describe that one kind of money.',
+        'Up top you get this month, last month, year to date, and what it comes to as a share of revenue. By Category breaks those same periods out line by line so you can see which one moved. The log underneath is the whole back-record, newest first, with Edit and Delete on every row, so there is no separate history page to go to. The range chips sit above the log and filter the log only: the figures higher up keep their own periods whatever chip you pick.'
+      ] },
       { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing runs from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
       /* ⚠ THIS SECTION USED TO DESCRIBE A CHECKBOX, a How Often picker, an "Ends after" field and a
          Stop button. Build order C removed every one of them from the bill form — a bill recurs
