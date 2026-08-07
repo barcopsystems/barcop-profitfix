@@ -159,7 +159,19 @@ S.EventsRegulars = {
         + App.showOlderBar('core', 'event_regular', list, !!this.filter)
         + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + statStrip + topCard + listSection + '</div>';
+    /* ⛔⛔ THE CONFIRM SCREEN OWNS THE PAGE. Kyle, walking the shipped screen: *"the regulars current
+       list and chips shouldn't still be on the page."* He is right, and the reason is sharper than
+       tidiness: this screen's one promise is **"Nothing is saved until you do"**, and the book
+       underneath it carries DELETE and EDIT buttons that write on the press. Two opposite write
+       models on one page, four inches apart, with the destructive one sitting below the reassuring
+       sentence. The chips and Export PDF are the same error more quietly: they act on a list that
+       has nothing to do with the file being confirmed, and Export hands out a book about to change.
+       ⚠ I built it the other way on purpose, copying the vendor door ("already in your book is a
+       verdict about that list, so keep the list visible"). That argument only ever covered the dup
+       rows, and it bought them a glance at the price of putting Delete under an unconfirmed import.
+       The screen already names every dup by name and contact, which is the part that was needed. */
+    this.container.innerHTML = '<div class="screen">' + statStrip + topCard
+      + (this._regularsReview ? '' : listSection) + '</div>';
     this.wire();
     /* ⚠ NOT WHILE THE CONFIRM SCREEN IS UP. Its markup replaces the add card, so `#rg-csv` is gone,
        and re-mounting would hand the operator a second file picker over a file they have not
