@@ -107,6 +107,10 @@ S.EventsRegulars = {
     const imHtml = im ? '<div style="margin-top:10px;font-size:12px;color:' + (im.bad ? 'var(--red)' : 'var(--t2)') + ';">' + esc(im.text) + '</div>' : '';
     const addCard = '<div class="card form-card">' + App.collapsibleCardTitle('rg-add', 'Add a Regular')
       + '<div class="collapse-body">' + body + imHtml + '</div></div>' + belowButtons;
+    /* ⛔ THE CONFIRM SCREEN TAKES THE ADD CARD'S SLOT, and the book below stays on screen — the same
+       shape every door in the rollout uses. Keeping the list visible is the point: "already in your
+       book" is a verdict about that list, and the operator can check it from where they are told it. */
+    const topCard = this._regularsReview ? this.regularsReviewHTML() : addCard;
 
     const chips = App.filterChips(this.filter, [
       { v: '', label: 'All' }, { v: 'bday', label: 'Birthdays' }, { v: 'anniv', label: 'Anniversaries' },
@@ -155,9 +159,12 @@ S.EventsRegulars = {
         + App.showOlderBar('core', 'event_regular', list, !!this.filter)
         + '</div>';
 
-    this.container.innerHTML = '<div class="screen">' + statStrip + addCard + listSection + '</div>';
+    this.container.innerHTML = '<div class="screen">' + statStrip + topCard + listSection + '</div>';
     this.wire();
-    if (this.entryMode === 'import') this.mountImporter();
+    /* ⚠ NOT WHILE THE CONFIRM SCREEN IS UP. Its markup replaces the add card, so `#rg-csv` is gone,
+       and re-mounting would hand the operator a second file picker over a file they have not
+       finished confirming. */
+    if (this.entryMode === 'import' && !this._regularsReview) this.mountImporter();
   },
 
   // The active chip, in words, for the PDF header. '' when nothing is narrowing the list.
@@ -185,7 +192,31 @@ S.EventsRegulars = {
         footer: 'Contains guest contact details. Store and share it accordingly.',
         lists: [['core', 'event_regular']], reRender: () => this.renderList() });
     });
-    this.container.querySelectorAll('.rg-mode').forEach(b => b.addEventListener('click', () => { this.entryMode = b.dataset.mode; this.renderList(); }));
+    /* ── The confirm screen's controls. Every one writes state and re-renders, so the button's
+       count, the rows on screen and what actually gets written all read from the same place. ──── */
+    // A section head opens or closes its own table. A closed section renders no rows at all, so this
+    // is what actually builds them.
+    this.container.querySelectorAll('[data-confirm-section]').forEach(h => h.addEventListener('click', () => {
+      const r = this._regularsReview; if (!r) return;
+      const k = h.dataset.confirmSection;
+      r.open[k] = (k === 'needs') ? (r.open[k] === false) : !r.open[k];
+      this.renderList();
+    }));
+    /* Remove takes a row out of the import. No confirm: nothing is written until Add, the row is
+       named right beside the button, and Start Over re-drops the file. */
+    this.container.querySelectorAll('[data-confirm-remove]').forEach(b => b.addEventListener('click', () => {
+      if (!this._regularsReview) return;
+      this._regularsReview.removed[b.dataset.confirmRemove] = true;
+      this.renderList();
+    }));
+    this.container.querySelector('[data-regreview-go]')?.addEventListener('click', () => this._runRegularsReview());
+    this.container.querySelector('[data-regreview-back]')?.addEventListener('click', () => {
+      // Back to the drop zone, not out of the import. A mapping belongs to the file it was made for,
+      // so the file is re-dropped from scratch — nothing was written, so there is nothing to undo.
+      this._regularsReview = null; this.renderList();
+    });
+    // Switching mode abandons a confirm in progress, which is safe: nothing has been written.
+    this.container.querySelectorAll('.rg-mode').forEach(b => b.addEventListener('click', () => { this._regularsReview = null; this.entryMode = b.dataset.mode; this.renderList(); }));
     this.container.querySelectorAll('.rg-fchip').forEach(b => b.addEventListener('click', () => { this.filter = b.dataset.v; this.renderList(); }));
     this.container.querySelectorAll('[data-show-older]').forEach(b => b.addEventListener('click', () => App.handleShowOlder(b, () => this.renderList())));
     document.getElementById('rg-add')?.addEventListener('click', () => this.add());
@@ -283,57 +314,73 @@ S.EventsRegulars = {
         { key: 'last_visit', label: 'Last Visit', required: false, match: ['last visit', 'last visited', 'last seen', 'last order', 'last order date', 'last purchase', 'most recent visit', 'last transaction', 'visit date'] }
       ],
       confirmLabel: 'Import Regulars',
-      onComplete: rows => this.importRows(rows)
+      /* ⛔ THE FILE STOPS HERE NOW. It used to go straight to `importRows`, which classified and
+         WROTE in one pass and then flattened the whole result into one sentence AFTER the write —
+         the shape this rollout exists to end. The mapper now hands its rows to the confirm screen;
+         nothing is written until the operator presses Add on it. */
+      onComplete: rows => this._openRegularsReview(rows)
     });
   },
 
-  async importRows(rows) {
-    /* ⚠⚠ ONE DATE READER FOR THE WHOLE APP. This was a private copy ending in `new Date(str)` — the
-       exact line six scan rounds were spent removing from PosIngest.normDate — so every failure that
-       was eliminated there was still live here: a missing year invented as 2001, an impossible date
-       rolled into the next month, a UTC marker losing a day (which for a BIRTHDAY buckets 1 March
-       into February and drops the regular off that month's outreach list, the precise harm the old
-       comment here said it was avoiding), and a day-first cell transposed.
-       ⚠ minYear 1900, and this is the only caller that needs it: a birthday is legitimately decades
-       before any business date, while every other door imports something that happened this year.
-       Before adding a date format here, add it to PosIngest.normDate. */
-    /* ⚠ `yearOptional` (S200) IS THE WHOLE REASON THIS DOOR HAS ITS OWN OPTS. A birthday is the one
-       date in Bar Cop where the YEAR IS NOT DATA: the list column renders month and day, the stat
-       tile and both filter chips read the month, and nothing anywhere prints the year. So refusing
-       "1-Jul" did not protect anything, it emptied the feature — "Birthdays This Month" read 0 on a
-       file full of birthdays. Year-less cells now store with an explicit 1900, which reads as "no
-       year given" and can never be mistaken for a real birth year.
-       ⚠ And the date column is read ONCE for its day-first verdict (S199), separately for birthdays
-       and anniversaries, because a file can carry one column from a CRM and the other typed by hand. */
-    /* ⚠ THE PROBE OPTS MUST MATCH THE READ OPTS, or the column votes on a question it is not being
-       asked. dateConvention decides whether a cell may vote by asking normDate to parse it — so
-       without `yearOptional` here, every cell in a YEAR-LESS birthday column came back unreadable,
-       cast no vote, and the numeric branch silently fell back to month-first. Measured: a day-first
-       column ["25/12","01/07","03/11","06/09","30/06"] stored 3 of 5 in the WRONG MONTH under a
-       message saying "5 regulars imported." That is the S199 defect reproduced inside the S200 fix,
-       which is exactly what a scan round over one's own work is for. */
-    /* ⚠⚠ `yearOptional` IS A BIRTHDAY RULE AND IT MUST NOT REACH LAST VISIT. One shared opts object
-       served all three date columns, so the S200 sentinel — an explicit 1900 meaning "no year was
-       given", which is honest for a birthday because nothing ever prints a birth year — became a
-       REAL CLAIM about when a guest was last in. Measured on the shipped reader: a year-less cell
-       "3/15" (or "15-Mar", or "Mar 15") stored as 1904-03-15, the Last Visit column printed
-       "Mar 15, 1904" as fact, daysSince returned 44,695, and the regular moved OFF the "log a visit
-       for these" list onto the win-back list under a date that never happened.
-       A last visit is the one date on this screen where the year IS the data, so it takes the app's
-       ordinary rules: no yearOptional, and the DEFAULT minYear (1990) rather than 1900, which also
-       refuses a fat-fingered "1915" instead of banking it as a real visit.
-       ⚠ AND THE PROBE OPTS FOLLOW THE READ OPTS, per the note below — conv() is now passed the same
-       object the column is read with, or the column would vote on a question it is not being asked. */
+  /* ── The confirm screen ──────────────────────────────────────────────────────
+     Door 7 of the rollout. The DOOR owns its columns and its build; `ImportConfirm` owns the frame,
+     the dim rule, and the one that matters — the button's count, which the shell DERIVES from the
+     rows rather than taking as an argument, so this screen cannot print a number that disagrees
+     with its own table. */
+
+  /* ⛔⛔ THE DATE VERDICTS BELONG TO THE FILE, AND THEY ARE SETTLED AT THE DROP.
+     `PosIngest.dateConvention` votes over every row to decide whether a date column is day-first.
+     A confirm screen re-walks on EVERY render over the rows NOT removed, so asking that question
+     inside the walk asks it of whatever subset survived Remove.
+     ⛔ MEASURED ON THE SHIPPED DOOR (2026-08-07), before this screen existed: the five-row birthday
+     column 25/12, 01/07, 03/11, 06/09, 30/06 reads correctly as a day-first column; take out the two
+     rows carrying the >12 evidence and the three survivors flip to 1985-01-07, 1990-03-11 and
+     1975-06-09 — three birthdays into a different month, while the operator is looking at them.
+     The operating-expense door hit the same shape on a bank register. Taken once here, held on the
+     review, handed to the write.
+     ⚠ THE PROBE OPTS MUST MATCH THE READ OPTS, or the column votes on a question it is not being
+     asked. dateConvention decides whether a cell may vote by asking normDate to parse it — so
+     without `yearOptional` here, every cell in a YEAR-LESS birthday column came back unreadable,
+     cast no vote, and the numeric branch silently fell back to month-first. Measured: a day-first
+     column ["25/12","01/07","03/11","06/09","30/06"] stored 3 of 5 in the WRONG MONTH under a
+     message saying "5 regulars imported."
+     ⚠ And each date column is read ONCE for its own day-first verdict (S199), separately for
+     birthdays and anniversaries, because a file can carry one column from a CRM and the other typed
+     by hand.
+     ⚠⚠ `yearOptional` IS A BIRTHDAY RULE AND IT MUST NOT REACH LAST VISIT. One shared opts object
+     served all three columns, so the S200 sentinel — an explicit 1904 meaning "no year was given",
+     which is honest for a birthday because nothing ever prints a birth year — became a REAL CLAIM
+     about when a guest was last in. Measured on the shipped reader: a year-less "3/15" stored as
+     1904-03-15, the Last Visit column printed "Mar 15, 1904" as fact, daysSince returned 44,695, and
+     the regular moved OFF the "log a visit for these" list onto the win-back list under a date that
+     never happened. A last visit is the one date on this screen where the year IS the data, so it
+     takes the app's ordinary rules: no yearOptional, and the DEFAULT minYear (1990) rather than
+     1900, which also refuses a fat-fingered "1915" instead of banking it as a real visit. */
+  _regularsDateConv(rows) {
     const RD = { minYear: 1900, yearOptional: true };   // birthday + anniversary
     const VD = {};                                      // last visit: an ordinary business date
     const conv = (k, o) => (typeof PosIngest !== 'undefined' && PosIngest.dateConvention)
       ? PosIngest.dateConvention(rows, k, o) : { dayFirst: false, contradictory: false };
     const bConv = conv('birthday', RD), aConv = conv('anniversary', RD), lvConv = conv('last_visit', VD);
+    return { RD: RD, VD: VD, bConv: bConv, aConv: aConv, lvConv: lvConv };
+  },
+
+  /* ⛔ THE ONE WALK. `importRows` and the confirm screen must decide "does this row land" in the
+     same place, or the button and the write can disagree — the defect the whole rollout exists to
+     close. PURE: no DOM, no writes, safe to call on every render. Returns one verdict per input row,
+     IN THE FILE'S OWN ORDER, so the screen can zip its rows to it by index.
+     ⚠⚠ ONE DATE READER FOR THE WHOLE APP. This was a private copy ending in `new Date(str)` — the
+     exact line six scan rounds were spent removing from PosIngest.normDate — so every failure that
+     was eliminated there was still live here: a missing year invented as 2001, an impossible date
+     rolled into the next month, a UTC marker losing a day (which for a BIRTHDAY buckets 1 March into
+     February and drops the regular off that month's outreach list), and a day-first cell transposed.
+     Before adding a date format here, add it to PosIngest.normDate. */
+  _buildRegularRows(rows, convs) {
+    const C = convs || this._regularsDateConv(rows || []);
+    const RD = C.RD, VD = C.VD;
     const mk = (o, c) => Object.assign({}, o, { dayFirst: c.dayFirst, dateAmbiguous: c.contradictory });
     const parseDate = (s, c, o) => (typeof PosIngest !== 'undefined' && PosIngest.normDate)
       ? PosIngest.normDate(s, mk(o, c)) : '';
-    const added = [];
-    let noName = 0, dupes = 0, inFile = 0, badBday = 0, badAnniv = 0, badVisit = 0;
     /* Phone is compared on DIGITS ONLY: "555-0100" and "(555) 0100" are one person, and email is
        already lowercased, so formatting alone must not mint a second record.
        ⚠ AND THE COUNTRY CODE COUNTS AS FORMATTING. Digits alone left "+1 555-0100" as 15550100
@@ -370,45 +417,211 @@ S.EventsRegulars = {
     const BOOK_KEYS = new Set(seen);
     const bare = [];
     this.regulars().forEach(r => { if (!hasContact(r)) bare.push((r.name || '').trim().toLowerCase()); });
+    const list = [];
     (rows || []).forEach(r => {
       const name = (r.name || '').trim();
-      if (!name) { noName++; return; }
+      if (!name) { list.push({ raw: r, name: '', status: 'noName', lands: false, note: 'No name', notes: [] }); return; }
       const rec = {
         id: App.uid(), name,
         contact_phone: (r.phone || '').trim(), contact_email: (r.email || '').trim(),
-        birthday: parseDate(r.birthday, bConv, RD), anniversary: parseDate(r.anniversary, aConv, RD),
+        birthday: parseDate(r.birthday, C.bConv, RD), anniversary: parseDate(r.anniversary, C.aConv, RD),
         drink_prefs: (r.drink_prefs || '').trim(),
         // ⚠ Through the SAME shared date reader as birthday/anniversary above, so a last-visit
         // column gets the day-first / two-digit-year handling every other import door has. An
         // unreadable or absent value still lands blank, which reads as "no visit logged".
-        last_visit: parseDate(r.last_visit, lvConv, VD), vip: false, notes: '',
+        last_visit: parseDate(r.last_visit, C.lvConv, VD), vip: false, notes: '',
         created_at: new Date().toISOString()
       };
-      /* `dupes` = already in the book. `inFile` = the same row twice in THIS file. They are different
+      /* `dup` = already in the book. `inFile` = the same row twice in THIS file. They are different
          facts and saying "already in your book" about the second one was false: on an empty book,
          two identical rows reported "1 already in your book" about someone who had never been there. */
       if (hasContact(rec)) {
         const k = key(rec);
-        if (seen.has(k)) { (BOOK_KEYS.has(k) ? dupes++ : inFile++); return; }
+        if (seen.has(k)) {
+          const inBook = BOOK_KEYS.has(k);
+          list.push({ raw: r, name: name, rec: rec, status: inBook ? 'dup' : 'inFile', lands: false,
+            note: inBook ? 'Already in your book' : 'Repeated in this file', notes: [] });
+          return;
+        }
         seen.add(k);
       } else {
         const n = name.toLowerCase();
         const at = bare.indexOf(n);
-        if (at > -1) { bare.splice(at, 1); dupes++; return; }   // consume ONE banked namesake
+        if (at > -1) {   // consume ONE banked namesake
+          bare.splice(at, 1);
+          list.push({ raw: r, name: name, rec: rec, status: 'dup', lands: false,
+            note: 'Already in your book', notes: [] });
+          return;
+        }
       }
-      // A cell the file HAD and Bar Cop could not read is reported. A cell the file simply lacks is
-      // not a problem and must never be counted as one, or every phone-only list reads as broken.
-      if (String(r.birthday || '').trim() && !rec.birthday) badBday++;
-      if (String(r.anniversary || '').trim() && !rec.anniversary) badAnniv++;
-      // ⚠ AND THE THIRD COLUMN, which the sentence above claimed all along and did not do. The
-      // Last Visit column was added without a counter, so an unreadable one imported blank in
-      // silence — reading on screen as "never logged", which is a DIFFERENT fact and the one the
-      // quiet tile was split apart to stop the app confusing. That is S201's own defect, live
-      // again inside the field S201's fix introduced.
-      if (String(r.last_visit || '').trim() && !rec.last_visit) badVisit++;
-      this.regulars().push(rec);
-      added.push(rec);
+      /* ⛔ KYLE'S CALL, 2026-08-07, AND IT IS A DELIBERATE EXCEPTION TO THE ROLLOUT'S RULE 4 ("a row
+         that will not land is dimmed with the reason on the row"). A row whose birthday, anniversary
+         or last visit could not be read STILL LANDS, with that field blank and the reason on the row.
+         Rule 4 and *"a note that does not change the default is not a guard"* were both written about
+         a default that BOOKED MONEY the operator would then double-count. Here doing nothing loses a
+         BIRTHDAY, not a dollar — and holding a real regular out of the book over one unparseable
+         cell costs more than it saves. The test is what the default DESTROYS, not whether a note is
+         present. So these are ANNOTATIONS on a landing row; only noName / dup / inFile are exclusions.
+         ⚠ A cell the file HAD and Bar Cop could not read is reported. A cell the file simply lacks is
+         not a problem and must never be counted as one, or every phone-only list reads as broken —
+         and on a first drop that puts a note on every row, which is the wallpaper that makes an
+         operator stop reading notes at all.
+         ⚠ FLAGS, AND THE COPY IS DERIVED FROM THEM, never the other way round: the result line counts
+         these, and counting them by matching the note's own wording means a reworded note silently
+         zeroes the count. */
+      const badBday  = !!(String(r.birthday || '').trim() && !rec.birthday);
+      const badAnniv = !!(String(r.anniversary || '').trim() && !rec.anniversary);
+      // ⚠ AND THE THIRD COLUMN, which the sentence above claimed all along and did not do. The Last
+      // Visit column was added without a counter, so an unreadable one imported blank in silence —
+      // reading on screen as "never logged", which is a DIFFERENT fact and the one the quiet tile was
+      // split apart to stop the app confusing.
+      const badVisit = !!(String(r.last_visit || '').trim() && !rec.last_visit);
+      const notes = [];
+      if (badBday)  notes.push('Birthday could not be read');
+      if (badAnniv) notes.push('Anniversary could not be read');
+      if (badVisit) notes.push('Last visit could not be read');
+      list.push({ raw: r, name: name, rec: rec, status: 'new', lands: true, note: 'Adding this regular',
+        notes: notes, badBday: badBday, badAnniv: badAnniv, badVisit: badVisit });
     });
+    return { list: list, convs: C };
+  },
+
+  _openRegularsReview(rows) {
+    this._regularsReview = {
+      // ⚠ A STABLE ID PER ROW, so Remove has something to remove BY. The build returns one verdict
+      // per input row in the file's own order, so index is a real identity here.
+      rows: (rows || []).map((r, i) => Object.assign({}, r, { _rid: 'r' + i })),
+      // ⛔ TAKEN AT THE DROP, OVER THE WHOLE FILE, AND NEVER RE-DERIVED. See `_regularsDateConv`.
+      convs: this._regularsDateConv(rows || []),
+      open: {}, removed: {}
+    };
+    this.renderList();
+  },
+
+  /* ONE WALK produces the rows the screen shows AND the number the button prints, because they come
+     out of the same `_buildRegularRows` the write uses. */
+  _regularsReviewSummary() {
+    const r = this._regularsReview;
+    if (!r) return { rows: [], count: 0 };
+    // A removed row is gone from the list, from the count and from the write.
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    const built = this._buildRegularRows(live, r.convs);
+    // ⚠ Zipped by index: the build returns exactly one entry per input row, in order.
+    const rows = built.list.map((x, i) => this._regularsReviewRow(x, (live[i] || {})._rid));
+    return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
+  },
+
+  /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
+     are TEXT the shell escapes, and they are what the shell's one-line NOTE_BUDGET applies to. */
+  _regularsReviewRow(x, rid) {
+    const rec = x.rec || {};
+    /* ⚠ FORMATTED THE WAY THE BOOK DIRECTLY BELOW FORMATS THE SAME FIELD. Birthday and anniversary
+       render month and day (the list column, both tiles and both chips read the month, and nothing
+       anywhere prints a birth year); a last visit renders in full, because there the year IS the
+       fact. Giving one quantity two spellings two inches apart is how a screen stops being checkable.
+       ⚠ A null cell renders as an em dash from the shell, which is what "the file did not say"
+       should look like — different from a value Bar Cop refused, which carries a note. */
+    const contact = rec.contact_phone || rec.contact_email || '';
+    return {
+      cells: [
+        (x.name ? esc(x.name) : '&mdash;') + (contact ? ImportConfirm.sub(esc(contact)) : ''),
+        rec.birthday ? esc(this.fmtMD(rec.birthday)) : null,
+        rec.anniversary ? esc(this.fmtMD(rec.anniversary)) : null,
+        rec.last_visit ? esc(this.fmtDate(rec.last_visit)) : null
+      ],
+      key: rid,
+      note: x.note || '',
+      notes: x.notes || [],
+      lands: !!x.lands
+    };
+  },
+
+  regularsReviewHTML() {
+    const s = this._regularsReviewSummary();
+    const n = s.rows.length;
+    const bad = s.rows.filter(x => !x.lands).length;
+    const c = (this._regularsReview || {}).convs || {};
+    const unsettled = !!((c.bConv && c.bConv.contradictory) || (c.aConv && c.aConv.contradictory)
+      || (c.lvConv && c.lvConv.contradictory));
+    /* ⚠ EACH NUMBER NAMES ITS OWN COLLECTION: `n` is rows read out of the file, `bad` is rows that
+       will not land, and the button counts what will be created. Reading the nearest one is how a
+       screen ends up contradicting itself. And the lead names the button's own verb — renaming the
+       button has to rewrite this sentence with it.
+       ⛔ THE DAY-FIRST WARNING IS THE ONE FACT HERE THAT IS ABOUT THE FILE AND NOT ABOUT A ROW: when
+       a column's order cannot be settled, no single row can carry it, because the whole column is in
+       doubt. It used to be printed AFTER the write, which is the one moment it cannot be acted on. */
+    const lead = 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's') + ' out of this file. '
+      + (bad
+          ? (bad === 1 ? 'One of them is not going in. ' : bad + ' of them are not going in. ') + 'Check the rest, then add them. '
+          : 'Check them, then add them. ')
+      + 'Nothing is saved until you do.'
+      + (unsettled ? ' Some dates read day-first and others month-first, so day-and-month order could not be settled. Check any date where both numbers are 12 or under.' : '');
+    return ImportConfirm.panel({
+      label: 'Check your regulars',
+      lead: lead,
+      columns: [{ label: 'Name', width: 26 }, { label: 'Birthday', width: 15 },
+                { label: 'Anniversary', width: 15 }, { label: 'Last Visit', width: 16 }],
+      outcomeLabel: 'What Happens',
+      rows: s.rows,
+      verb: 'Add', noun: 'Regular',
+      removable: true,
+      goAttr: 'data-regreview-go', backAttr: 'data-regreview-back', backLabel: 'Start Over',
+      resultId: 'rg-imp-result',
+      // The door owns which sections are open; a closed one builds no table at all.
+      open: (this._regularsReview || {}).open,
+      busy: !!this._regularsReviewWriting
+    });
+  },
+
+  /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
+     only thing a re-render cannot hand back. */
+  async _runRegularsReview() {
+    const r = this._regularsReview;
+    if (!r || this._regularsReviewWriting) return;
+    this._regularsReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-regreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try {
+      // ⛔ THE VERDICTS TRAVEL WITH THE ROWS. The write reads the day-first answer the SCREEN showed,
+      // never a fresh one derived over whatever survived Remove.
+      await this.importRows(r.rows.filter(x => !r.removed[x._rid]), { reviewed: true, convs: r.convs });
+    } finally {
+      this._regularsReviewWriting = false;
+      /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `importRows` is what clears it — a refused write keeps
+         the whole screen so the operator can press again without re-dropping the file. Do NOT
+         re-render here: the failure path writes into the result slot and a re-render destroys it. */
+      if (this._regularsReview) {
+        const b = this.container && this.container.querySelector('[data-regreview-go]');
+        // ⚠ The shell's own label builder, never a second copy of the string ([[the-loop]] #54).
+        if (b) { b.disabled = false; b.textContent = ImportConfirm.goLabel({ rows: this._regularsReviewSummary().rows, verb: 'Add', noun: 'Regular' }); }
+      }
+    }
+  },
+
+  async importRows(rows, opts) {
+    opts = opts || {};
+    /* ⛔ ONE WALK, SHARED WITH THE CONFIRM SCREEN. The row-by-row decision — is this a new regular,
+       one already in the book, a repeat inside the file, or a nameless row, and which of its dates
+       could not be read — lives in `_buildRegularRows`, which the screen calls to draw itself and
+       this calls to write. Two copies of that decision is how a button ends up promising a number
+       the write does not honour, which is the defect the whole rollout exists to close.
+       EVERYTHING BELOW IS REPORTING AND WRITING; nothing below decides what lands.
+       ⛔ `opts.convs` CARRIES THE FILE-LEVEL DATE VERDICTS the screen was drawn with. Without it the
+       write would re-derive day-first over whatever survived Remove and could store a different
+       month from the one the operator just approved. See `_regularsDateConv`. */
+    const built = this._buildRegularRows(rows, opts.convs);
+    const bConv = built.convs.bConv, aConv = built.convs.aConv, lvConv = built.convs.lvConv;
+    const countOf = f => built.list.filter(f).length;
+    const added    = built.list.filter(x => x.lands).map(x => x.rec);
+    const noName   = countOf(x => x.status === 'noName');
+    const dupes    = countOf(x => x.status === 'dup');
+    const inFile   = countOf(x => x.status === 'inFile');
+    const badBday  = countOf(x => x.badBday);
+    const badAnniv = countOf(x => x.badAnniv);
+    const badVisit = countOf(x => x.badVisit);
+    // Pushed into the live list before the write, exactly as before the split, so the screen below
+    // shows them immediately and `dropRows` has something to take back out if the write is refused.
+    added.forEach(rec => this.regulars().push(rec));
     // Row-per-record: persist just the imported regulars in one bulk upsert. They were pushed into
     // the live list before the write, and a bulk write cannot revert itself — so on failure take
     // them back out rather than showing an import the server never received.
@@ -420,8 +633,24 @@ S.EventsRegulars = {
        message is built here and rendered BY renderList, not written into the DOM after it:
        renderList reassigns innerHTML, so anything written first is destroyed on the spot. */
     if (!saved) {
-      this.importMsg = { bad: true, text: 'Could not save the import. Nothing was changed — check your connection and try again.' };
+      const failed = 'Could not save the import. Nothing was changed — check your connection and try again.';
+      /* ⛔ A REFUSED WRITE ON THE CONFIRM SCREEN REPORTS INTO THE SHELL'S RESULT SLOT, AND THE SCREEN
+         IS NOT RE-RENDERED. The screen stays up with every row still on it, so the operator presses
+         Add again rather than re-dropping the file and re-mapping its columns — and a re-render here
+         would destroy the slot holding the error, which is the worst outcome an import has: a clean
+         page and no message anywhere. The shell always renders that slot for exactly this. */
+      if (opts.reviewed) {
+        const slot = document.getElementById('rg-imp-result');
+        if (slot) slot.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + esc(failed) + '</div>';
+        return;
+      }
+      this.importMsg = { bad: true, text: failed };
     } else {
+      /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. A refused write returns above
+         this line with the screen and every row still up. Cleared here because this is the only
+         line that knows the write landed — forgetting it locks the page: the records land, the list
+         re-renders, and every re-render puts the import screen straight back. */
+      this._regularsReview = null;
       const bits = [added.length + ' regular' + (added.length === 1 ? '' : 's') + ' imported'];
       if (dupes)    bits.push(dupes + ' already in your book');
       if (inFile)   bits.push(inFile + ' repeated row' + (inFile === 1 ? '' : 's') + ' in the file');
@@ -436,7 +665,18 @@ S.EventsRegulars = {
       // not in this test — so an ambiguous visit column imported silently mis-monthed (S199's
       // defect, live in the new column).
       if (bConv.contradictory || aConv.contradictory || lvConv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
-      this.importMsg = { bad: added.length === 0, text: bits.join(' · ') + '.' };
+      /* ⛔ ONCE A DOOR HAS A CONFIRM SCREEN, ITS SUCCESS LINE IS THE HEADLINE ALONE. Every clause
+         below it — already in your book, repeated in the file, no name, the three dates Bar Cop
+         could not read, and the day-first warning — is a row or a sentence on the screen the
+         operator just read and pressed Add on. Repeating it afterwards is the second telling, and a
+         string of parentheticals is the shape Kyle called *"very hard to read and follow"* on the
+         sales door.
+         ⚠ PRECONDITION, AND IT HAS BEEN PAID FOR TWICE: every clause must FIRST be on the screen.
+         Dropping one before moving its fact is losing information, not repeating less. The
+         day-first warning is the one that is about the FILE rather than a row, so it lives in the
+         lead sentence of `regularsReviewHTML`.
+         The full account survives for a caller with no screen in front of it. */
+      this.importMsg = { bad: added.length === 0, text: (opts.reviewed ? bits[0] : bits.join(' · ')) + '.' };
     }
     /* ⚠ ONLY LEAVE IMPORT MODE ON SUCCESS. This switched unconditionally, so the FAILURE path told
        the operator to "check your connection and try again" and then destroyed the thing they would
