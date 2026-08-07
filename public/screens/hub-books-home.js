@@ -298,12 +298,16 @@ S.HubBooksHome = {
       : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + dc + '</span> of ' + total
           + (this.atCurrentMonth() ? ' done this month' : ' done') + '</span>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
-      + '<div style="padding:11px 22px 14px;">' + this.monthSelector() + '</div>'
       + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Books</div>'
       + '</div>'
+      /* ⚠ THE SELECTOR IS THE FIRST THING IN THE BODY, UNDER THE HEADER — not above the card's own
+         title. Same position `dashboard.banner` puts the week selector in, because these two cards
+         are the same control doing the same job in a different unit. My first attempt put it above
+         "CLOSE OUT YOUR BOOKS", which read as a stray control floating over the card. */
       + '<div style="padding:18px 22px;">'
-      +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
+      +   this.monthSelector()
+      +   '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;">'
       +     '<div style="flex:1;min-width:160px;height:6px;background:var(--input);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>'
       +     '<div style="font-size:12px;">' + doneLine + '</div>'
       +   '</div>'
