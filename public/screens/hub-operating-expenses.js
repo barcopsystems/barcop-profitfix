@@ -16,6 +16,13 @@
    Sample data deferred per the pre-launch sample-data overhaul. */
 
 S.HubOperatingExpenses = {
+  /* !! FIVE RECURRING MEMBERS WERE DELETED HERE (2026-08-06): _duplicate, _isSeriesEnding,
+     _seriesAny, _seriesOf and _stopRecurring. They were the handlers behind the Renew, Stop and
+     Repeat row buttons and the 'recurring' row tag, all of which came off _logRowHtml when
+     recurrence became something DERIVED off the ledger rather than a flag an operator manages.
+     They were a closed cluster: _seriesOf's only caller was _isSeriesEnding, itself unreached.
+     Deleting them also removed the last callers of S.HubCashOutflows.stop and .repeat, which is
+     what lets that retired screen's whole render tree close out by fixpoint. */
 
   // Locked category enum. Dropdown-only on the entry form. Books pulls from
   // these names by exact match — do not rename without updating Books too.
@@ -1300,44 +1307,17 @@ S.HubOperatingExpenses = {
      longer exists. Dead by fixpoint, exactly like the card builder above it. */
 
   // True when this entry's recurring series ends within ~2 months (or has ended).
-  _isSeriesEnding(r) {
-    const arr = this.records();
-    const p = this._seriesOf(r);
-    if (!p || !p.recurring || !(parseInt(p.term_months, 10) > 0) || !p.date) return false;
-    const s = new Date(String(p.date).length <= 10 ? p.date + 'T00:00:00' : p.date);
-    if (isNaN(s.getTime())) return false;
-    const now = new Date();
-    const endIdx = s.getFullYear() * 12 + s.getMonth() + parseInt(p.term_months, 10) - 1;
-    // Same window as _termWarning's banner, both ends (S226e) — the Renew button and the banner that
-    // tells you to press it must appear and disappear together.
-    const rem = endIdx - (now.getFullYear() * 12 + now.getMonth());
-    return rem <= 2 && rem >= -2;
-  },
 
   /* The series a row belongs to, or null. An orphaned child — one whose parent was deleted before
      _delete learned to detach them (S226h) — is not part of any series, and treating it as one is
      what put a Stop button on it that returns before it even asks for confirmation. Existing
      accounts can already hold these rows, so the display has to answer this too, not just the
      delete path that stops new ones being made. */
-  _seriesOf(r) {
-    if (!r) return null;
-    if (!r.recurring_parent) return r.recurring ? r : null;
-    // ⚠ A LIVE series only. A stopped parent correctly renders Repeat/Edit/Delete, but its children
-    // went on rendering the "recurring" tag and a Stop button for a series that is already stopped —
-    // one row disagreeing with another about the same bill, on the same card.
-    const p = this.records().find(x => x && x.id === r.recurring_parent) || null;
-    return (p && p.recurring) ? p : null;
-  },
 
   /* The series a row came from, whether or not it is still running. _seriesOf answers the narrower
      question ("is there a LIVE series here"), because that is what decides the row's buttons — this
      one answers "did this row come from a recurring bill at all", which is what its LABEL has to say.
      A row with neither flag nor parent was never part of a series. */
-  _seriesAny(r) {
-    if (!r) return null;
-    if (r.recurring_parent) return this.records().find(x => x && x.id === r.recurring_parent) || null;
-    return (r.recurring || r.stopped_ym || r.frequency) ? r : null;
-  },
 
   /* ⚠ A STOPPED SERIES' MONTHS SAY SO (S229). After Stop, a generated month kept sitting under the
      "Recurring" header with no tag at all and a Repeat button — the section and the row telling the
@@ -3911,84 +3891,11 @@ S.HubOperatingExpenses = {
   // Turns recurring off on the series parent: past months stay on the books, but
   // it stops projecting into next month and the Cash Forecast. This is the "until
   // you cancel" end for an ongoing bill (or an early stop on a fixed-term one).
-  async _stopRecurring(id) {
-    const arr = this.records();
-    const r = arr.find(x => x.id === id);
-    if (!r) return;
-    /* ⛔⛔ THE THIRD DOOR WITH THE SAME HALF-WRITE, and the Money Out chip is what made it reachable.
-       A migrated recurring outflow's twin carries `recurring: true` — the migration copies it on
-       purpose, or the forecast stops projecting the loan — so `_seriesOf` calls it a live series and
-       this row renders **Stop**. Stopping it here wrote `stopped_ym` to the LEDGER TWIN only; the
-       operator's record in the separate `cash_outflows` store never heard, and the boot reconcile
-       rewrote the twin from it, so Stop appeared to work and undid itself on the next login.
-       ⚠ Build order E dropped that store, so THAT failure is no longer the reason to delegate. The
-       reason below is, and it is the bigger one.
-       ⛔ DELEGATED, NOT REIMPLEMENTED. `HubCashOutflows.stop` carries two measured decisions this
-       function must not second-guess: `stopped_ym` ALONE (clearing `recurring` on a store that
-       PROJECTS its history deleted every payment the series ever made — YTD $12,950 → $0.00), and
-       the stamp taken from the NEXT payment rather than this month (stamping the current month
-       erased a payment already due — YTD $39,000 → $36,800). It runs its own confirm, so this
-       returns before ours rather than asking twice.
-       Pinned by verify-money-out-write-doors.js section H. */
-    if (r.migrated_from === 'cash_outflow') {
-      await S.HubCashOutflows.stop(id);
-      this._rerender();
-      return;
-    }
-    const parentId = r.recurring_parent || r.id;
-    const pIdx = arr.findIndex(x => x.id === parentId);
-    if (pIdx < 0) return;
-    const p = arr[pIdx];
-    const who = p.vendor || p.category || 'This bill';
-    const ok = await App.confirm({
-      title: 'Stop this recurring bill?',
-      message: who + ' will stop recurring. Past months stay on your books, and it drops off next month and the Cash Forecast.',
-      confirmText: 'Stop Recurring', cancelText: 'Keep It'
-    });
-    if (!ok) return;
-    /* ⚠⚠ RECORD *WHEN* IT STOPPED, NOT JUST THAT IT DID (S226 round 2, F2). Nothing wrote
-       `stopped_ym` — and CashEngine.projectedBills and hub-breakeven have both READ it all along, so
-       this is a field two other systems already expected and never received. Without it a paused
-       bill has no memory of the pause: re-ticking Recurring in the edit form sent the catch-up back
-       to the series START and it invented every month the operator did not pay. Measured on a $289
-       subscription paused four months: $1,156 of phantom expense appearing at once in Books,
-       breakeven and the P&L. The resume in _openModal turns this into skipped months.
-       ⚠ AND THE WRITE IS CHECKED NOW. This was the only writer in the family that ignored its
-       result — _delete and the edit form both roll back. A failed stop left the row showing Repeat
-       instead of Stop, dropped the Expected line and the forecast entry, and then came back
-       generating on the next login, because the server still had recurring:true. */
-    // ⚠ term_months SURVIVES THE STOP (round 3, F2). Clearing it made a paused fixed-term contract
-    // recur forever once resumed, and silenced the banner and the Renew button that exist to catch
-    // exactly that. It is inert while paused — every reader tests recurring first.
-    arr[pIdx] = Object.assign({}, p, { recurring: false, stopped_ym: this._currentMonthKey() });
-    if (!(await App.putRecord('core', 'operating_expense', arr[pIdx]))) { arr[pIdx] = p; return; }
-    this._rerender();
-  },
 
   // ── Duplicate ──────────────────────────────────────────────────────────
   // Opens the form pre-filled from the row, dated next month, as a NEW entry.
   // Nothing is booked until the operator reviews the amount and saves, so an
   // accidental click can never log an unconfirmed expense ([[output-honesty]]).
-  _duplicate(id) {
-    const src = this.records().find(r => r.id === id);
-    if (!src) return;
-    /* ⛔ THE FOURTH DOOR, and the last one the Money Out chip exposed. `oex-dup` renders on a row
-       with no LIVE series, so a one-off draw gets Repeat. This opens the expense ADD modal, whose
-       save only routes cash rows when `isEdit` — a duplicate is not an edit — so the copy would have
-       been written as a plain expense under a cash-only category with NO `migrated_from`: counted as
-       a bill by `_isOperatingRow`, invisible to the forecast, absent from the Cash Outflows screen.
-       That is the orphan shape ([[the-loop]] #115) this rebuild exists to remove.
-       Delegated so the copy goes down the same `_writeCashRow` path as the original. Pinned as H6. */
-    if (src.migrated_from === 'cash_outflow') return S.HubCashOutflows.repeat(id);
-    let date = App.todayLocal();
-    const d = new Date(String(src.date).length <= 10 ? src.date + 'T00:00:00' : src.date);
-    if (!isNaN(d.getTime())) {
-      const base = new Date(d.getFullYear(), d.getMonth() + 1, 1);   // first of next month
-      const dim = this._daysInMonth(base.getFullYear(), base.getMonth());
-      date = App.ymdLocal(new Date(base.getFullYear(), base.getMonth(), Math.min(d.getDate(), dim)));
-    }
-    this._openModal(null, { date, category: src.category, vendor: src.vendor, amount: src.amount, notes: src.notes });
-  },
 
   // ── Delete ─────────────────────────────────────────────────────────────
   /* ⛔ NAME THE BILL, AND SAY WHAT ELSE GOES WITH IT (B6).
