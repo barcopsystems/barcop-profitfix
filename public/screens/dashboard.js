@@ -6,8 +6,11 @@
    week-stepper and the week's profit steps top to bottom, the open step expanding
    as a live workspace. The steps are the real last-night profit routine: log the
    week, see where margin slipped, work the biggest leak, and run the deep audit
-   when it comes due. Reuses FixPanel (the Scoreboard + leak board) and S.ThisWeek
-   for the week math (App.data.weeks, period_end). */
+   when it comes due. Reuses FixPanel (the Scoreboard + leak board) and reads the week
+   math straight off App.data.weeks / period_end.
+   ⚠ This used to say "and S.ThisWeek for the week math". It never did: weeks(), weekEnd()
+   and weekStart() below go to App directly. Corrected at T1, when S.ThisWeek was cut back
+   to a feed, so nobody goes looking for this screen's week math in a file that has none. */
 
 S.Dashboard = {
   _weekEnd: null,    // Sunday (period_end) of the selected week
@@ -290,7 +293,7 @@ S.Dashboard = {
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
       : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + m.n + '</span>';
-    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
+    const bg = isOpen ? 'var(--step-open)' : (isDone ? 'var(--input)' : 'var(--surface)');
     let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
       + '<div class="pf-step-head' + (isOpen ? '' : ' collapsed') + '" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
       +   circle
