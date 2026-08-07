@@ -833,7 +833,14 @@ S.ShiftVoidComp = {
     if (x.repeat) notes.push('Same line twice in your file');
     return {
       cells: [
-        rec.date ? esc(this.fmtDate(rec.date)) : cell(raw.date),
+        /* ⚠ ONE QUANTITY, ONE SPELLING. A refused row has no record, so this printed the RAW cell —
+           `2026-08-05` sitting in the same column as `Aug 5, 2026` two rows above it. The row whose
+           AMOUNT was missing still gave a perfectly readable date and there is no reason for it to
+           be spelled differently from every other date on the screen.
+           `fmtDate` handles both ends: it formats what it can parse and returns the file's own text
+           (escaped) when it cannot, which is exactly right for the one row whose DATE is the
+           problem — that is the cell the operator has to go and fix. */
+        (rec.date || raw.date) ? this.fmtDate(rec.date || raw.date) : null,
         rec.type ? esc(rec.type) : cell(raw.type),
         cell(rec.item || raw.item),
         cell(rec.server || raw.server),
