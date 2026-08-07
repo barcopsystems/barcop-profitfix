@@ -109,13 +109,16 @@ const ImportConfirm = {
       + '</div>';
   },
 
-  _rowHtml(row, removable, selectable, isChecked) {
+  _rowHtml(row, removable, selectable, isChecked, restorable) {
     /* ⛔ DIM MEANS "YOU CAN LEAVE THIS ALONE", so a row waiting on the operator is
        never dimmed even though it will not land as things stand. Keyed on `lands`
        alone it greyed out the one row that needed them while it waited, and
        un-greyed it once they answered — loudest exactly when it stopped needing
-       attention. Found on the live screen, not by any assertion. */
-    const dim = !row.lands && !row.needsYou;
+       attention. Found on the live screen, not by any assertion.
+       ⛔ A REMOVED ROW EARNS THE SAME EXCEPTION. It will not land, so the bare rule would grey it —
+       and the one control it carries is Put Back, the thing that undoes the mistake that put it
+       there. Kyle on the sales door: *"buttons dimmed makes the hard to see."* */
+    const dim = !row.lands && !row.needsYou && !restorable;
     const notes = (row.notes || []).map(n => this.sub(esc(n))).join('');
     const cells = (row.cells || []).map((c, i) =>
       '<td>' + (c == null ? '&mdash;' : c) + (i === 0 ? notes : '') + '</td>').join('');
@@ -127,10 +130,17 @@ const ImportConfirm = {
        Start Over re-drops the file.
        ⚠ A row with no `key` gets no button. There would be nothing for the door to remove BY, and a
        control that does nothing is worse than no control ([[the-loop]] #106). */
+    /* ⛔ IN THE REMOVED SECTION THE SAME COLUMN CARRIES **PUT BACK**, NOT A SECOND REMOVE. Two
+       controls acting on one row, one of which is a no-op, is the shape [[the-loop]] #106 is about,
+       and the verb has to say what it does. Same column, same width, so the colgroup still lines up
+       across all three sections. */
     const rm = removable
       ? '<td>' + (row.key != null && row.key !== ''
           ? '<div class="row-actions"><button type="button" class="btn btn-ghost btn-sm"'
-            + ' data-confirm-remove="' + esc(row.key) + '">Remove</button></div>'
+            + (restorable
+                ? ' data-confirm-restore="' + esc(row.key) + '">Put Back'
+                : ' data-confirm-remove="' + esc(row.key) + '">Remove')
+            + '</button></div>'
           : '') + '</td>'
       : '';
     /* ⛔ A ROW WITH NO KEY GETS NO CHECKBOX, for the same reason it gets no Remove: there would be
@@ -202,6 +212,19 @@ const ImportConfirm = {
     // The Remove column takes a fixed slice and the outcome column takes what is left, so the
     // colgroup sums to 100 whether or not the door asked for Remove.
     const removable = !!opts.removable;
+    /* ⛔⛔ REMOVE PUTS A ROW IN A SECTION; IT DOES NOT DESTROY IT (Kyle, 2026-08-07). Every control on
+       this screen is reversible right up to the button, under a sentence reading "Nothing is saved
+       until you do" — except Remove, which destroyed within the session. The only way back was Start
+       Over, which drops the review and remounts the drop zone: the column mapping survives (saved per
+       header signature, account-synced) but the FILE is gone, so one wrong click on row 90 of a
+       122-row import meant re-dropping and redoing every removal already made.
+       ⚠ THE DOOR OWNS THE ROWS, as with everything else here: it holds `removed{}` already, so it
+       builds these the same way it builds the rest and passes them in. They are NEVER part of
+       `rows`, which is what keeps them out of the count, out of the needs/settled split and out of
+       the "All N of these" lift without a single special case anywhere else in this function.
+       ⚠ REQUIRES `removable`. The section reuses the Remove column for Put Back, so a door that
+       never offered Remove has no column to put it in — and has no way to have removed anything. */
+    const removedRows = removable ? (opts.removedRows || []) : [];
     const selectable = !!opts.selectable;
     const checked = opts.checked || {};
     const rmW = removable ? 10 : 0;
@@ -235,9 +258,9 @@ const ImportConfirm = {
     // drawn — the grouped path included, or the same sentence returns once per row inside a section.
     const strip = r => universal.length
       ? Object.assign({}, r, { notes: (r.notes || []).filter(x => universal.indexOf(x) < 0) }) : r;
-    const table = list => '<table class="row-list" style="table-layout:fixed;width:100%;">'
+    const table = (list, restorable) => '<table class="row-list" style="table-layout:fixed;width:100%;">'
       + colgroup + head + '<tbody>'
-      + list.map(r => this._rowHtml(strip(r), removable, selectable, !!checked[r.key])).join('')
+      + list.map(r => this._rowHtml(strip(r), removable, selectable, !!checked[r.key], restorable)).join('')
       + '</tbody></table>';
 
     /* ⛔ WHAT NEEDS THE OPERATOR COMES FIRST AND STAYS OPEN; WHAT BAR COP WORKED OUT COLLAPSES.
@@ -302,6 +325,18 @@ const ImportConfirm = {
       // A file with nothing in it at all still needs a table, or the screen is a lead and a button.
       if (!body) body = '<div class="card" style="container-type:inline-size;">'
         + '<div style="overflow-x:auto;">' + table(shown) + '</div></div>';
+    }
+
+    /* ⛔ LAST ON THE PAGE, AND COLLAPSED. It is the least important thing on a screen whose first
+       drop already runs three screens tall, and every row in it is one the operator has already
+       decided about. Putting it above the button would push the primary action further down for
+       rows nobody is looking at — the measured defect the collapse exists to prevent, reintroduced
+       from the other end. Collapsed, it costs one line when unused and nothing at all when empty. */
+    if (removedRows.length) {
+      const removedOpen = !!(opts.open || {}).removed;
+      body += this._section('Removed',
+        removedRows.length + ' row' + (removedRows.length === 1 ? '' : 's') + ' you took out',
+        removedOpen ? table(removedRows, true) : '', removedOpen, false, 'removed');
     }
 
       /* ⚠ `card-title`, WHICH IS WHAT THE REFERENCE USES AND WHAT CARRIES THE RULE UNDER IT (Kyle,
