@@ -902,6 +902,9 @@ S.InventoryProducts = {
        button, and Start Over re-drops the file. */
     this.container.querySelectorAll('.ip-rt-rm').forEach(b =>
       b.addEventListener('click', () => { this._removeRows([b.dataset.rid]); redraw(); }));
+    // Put Back, from the Removed section. The exact inverse, and the reason Remove is safe to press.
+    this.container.querySelectorAll('.ip-rt-pb').forEach(b =>
+      b.addEventListener('click', () => { this._restoreRows([b.dataset.rid]); redraw(); }));
 
     this.container.querySelectorAll('.ip-rt-head').forEach(h =>
       h.addEventListener('click', () => { const c = h.dataset.cat; r.open[c] = !r.open[c]; redraw(); }));
@@ -2674,12 +2677,31 @@ S.InventoryProducts = {
     if (!r) return;
     (ids || []).forEach(id => { if (cat) r.assignById[id] = cat; else delete r.assignById[id]; });
   },
+  /* ⛔⛔ REMOVE PUTS THE ROW IN A SECTION; IT DOES NOT DESTROY IT (Kyle, 2026-08-07). Every other
+     control on this screen is reversible right up to Add, and Remove was the one that was not — the
+     only way back was Start Over, which re-drops the file.
+     ⚠ THE ASSIGNMENT NOW SURVIVES, and the comment that used to be here was wrong about why it did
+     not: it said *"so a row put back by Start Over does not come back carrying a category nobody can
+     see any more"*, but Start Over sets `_routing = null` outright, so no row has ever been put back
+     by it. The deletion could only ever cost the operator their own answer on the way to Put Back.
+     ⚠ THE TICK IS STILL DROPPED, deliberately and for a real reason: a row returning pre-ticked
+     would sit inside the next bulk verb without the operator ticking it, which is precisely the
+     hazard `_routeVisibleRows`' "only what is on screen" rule exists for. */
   _removeRows(ids) {
     const r = this._routing;
     if (!r) return;
-    // ⚠ Also drop the selection and the assignment, so a row put back by Start Over
-    // does not come back carrying a category nobody can see any more.
-    (ids || []).forEach(id => { r.removed[id] = true; delete r.checked[id]; delete r.assignById[id]; });
+    (ids || []).forEach(id => { r.removed[id] = true; delete r.checked[id]; });
+  },
+  // Put Back. The exact inverse, and the reason Remove is safe to press at all.
+  _restoreRows(ids) {
+    const r = this._routing;
+    if (!r) return;
+    (ids || []).forEach(id => { delete r.removed[id]; });
+  },
+  // The rows the operator took out. Still in the import object, just not in the import.
+  _routeRemovedRows() {
+    const r = this._routing;
+    return r ? r.rows.filter(row => r.removed[row._rid]) : [];
   },
 
   /* The rows as they would be written. `_category` is only ever the operator's answer or
@@ -2782,11 +2804,14 @@ S.InventoryProducts = {
     repeat:      'Repeated in this file',
     nameless:    'No product name'
   },
-  _routeRowHtml(row, status) {
+  _routeRowHtml(row, status, restorable) {
     const r = this._routing;
     const size = String(row.container_size_oz || row.case_size || '').trim();
     // 'unplaced' is deliberately unmarked: that row is the WORK, not a row to leave alone.
-    const note = this._ROUTE_ROW_NOTE[status] || '';
+    // ⛔ AND A ROW IN THE REMOVED SECTION IS NEVER MARKED OR DIMMED. Dim means "you can leave this
+    // alone", and the one control it carries is Put Back, the thing that undoes the mistake that put
+    // it there. Same exception the shell makes for the same reason.
+    const note = restorable ? '' : (this._ROUTE_ROW_NOTE[status] || '');
     /* ⛔ REMOVAL LIVES ON THE ROW (Kyle, chat 27). It replaces a bulk "Not a product"
        button, and that is not only tidier: a control sitting on the row can only ever
        act on a row the operator is looking at, by name. The bulk one took his entire
@@ -2801,8 +2826,9 @@ S.InventoryProducts = {
       + '<td>' + esc(row.brand || '') + '</td>'
       + '<td>' + esc(size) + '</td>'
       + '<td>' + esc(row.sub_category || '') + '</td>'
-      + '<td><div class="row-actions"><button type="button" class="btn btn-ghost btn-sm ip-rt-rm"'
-        + ' data-rid="' + esc(row._rid) + '">Remove</button></div></td>'
+      + '<td><div class="row-actions"><button type="button" class="btn btn-ghost btn-sm '
+        + (restorable ? 'ip-rt-pb' : 'ip-rt-rm')
+        + '" data-rid="' + esc(row._rid) + '">' + (restorable ? 'Put Back' : 'Remove') + '</button></div></td>'
       + '</tr>';
   },
   /* A section is the app's own STEP-CARD head (Kyle, chat 27, with the weekly-close
@@ -2818,7 +2844,7 @@ S.InventoryProducts = {
      ⚠ `container-type:inline-size` is inline because `.card:has(> .row-list)` was giving
      this card exactly that for free, and the table just moved a level down. Without it
      the @container rule that stacks a row-list on a narrow screen never fires again. */
-  _routeSection(rows, title, sub, key, isOpen, first, status) {
+  _routeSection(rows, title, sub, key, isOpen, first, status, restorable) {
     const head = '<div' + (key ? ' class="ip-rt-head" data-cat="' + esc(key) + '"' : '')
       + ' style="display:flex;align-items:center;gap:13px;padding:14px 16px;' + (key ? 'cursor:pointer;' : '') + '">'
       + '<div style="flex:1;min-width:0;">'
@@ -2829,7 +2855,7 @@ S.InventoryProducts = {
     const table = '<div style="padding:0 16px 16px;overflow-x:auto;">'
       + '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._routeColgroup()
       + '<thead><tr><th></th><th>Product</th><th>Brand</th><th>Size</th><th>In Your File</th><th></th></tr></thead>'
-      + '<tbody>' + rows.map(row => this._routeRowHtml(row, (status || {})[row._rid])).join('') + '</tbody></table></div>';
+      + '<tbody>' + rows.map(row => this._routeRowHtml(row, (status || {})[row._rid], restorable)).join('') + '</tbody></table></div>';
     return '<div class="card' + (key && !isOpen ? ' collapsed' : '')
       + '" style="padding:0;container-type:inline-size;margin-top:' + (first ? '0' : '16') + 'px;">'
       + head + (isOpen ? table : '') + '</div>';
@@ -2900,6 +2926,19 @@ S.InventoryProducts = {
         n + ' product' + (n === 1 ? '' : 's') + ' moving into ' + c,
         c, !!r.open[c], !unsorted.length && i === 0, s.status);
     });
+
+    /* ⛔ LAST ON THE PAGE, AND COLLAPSED. Every row in it is one the operator has already decided
+       about, and this screen's Add button already sits under every category section — putting a
+       Removed section above it would push the primary action further down for rows nobody is
+       looking at. Collapsed, it costs one line when used and nothing at all when empty.
+       ⚠ `__removed` as the open-state key: it cannot collide with a category name, and it means the
+       existing `.ip-rt-head` handler toggles it with no second mechanism. */
+    const gone = this._routeRemovedRows();
+    if (gone.length) {
+      body += this._routeSection(gone, 'Removed',
+        gone.length + ' row' + (gone.length === 1 ? '' : 's') + ' you took out',
+        '__removed', !!r.open.__removed, false, s.status, true);
+    }
 
     /* ⛔ THE GAP LINE IS GONE (Kyle, chat 27, looking at his own re-drop): *"i have no
        idea what '7 are names you already have, so they are left out' means... it just
