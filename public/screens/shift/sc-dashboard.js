@@ -133,6 +133,7 @@ S.ShiftDashboard = {
     const doneCount = this.ORDER.filter(k => done[k]).length;
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
+    const flashZone = this._flashZone; this._flashZone = null;
     const wys = this._wys();
 
     /* ⛔ THE IMPORT OWNS THE PAGE. Nothing under it: not the other three drop zones, not the
@@ -175,14 +176,26 @@ S.ShiftDashboard = {
       container.innerHTML = '<div class="screen">'
         + (wys.hasSales ? this.whereYouStand(wys) : this.getStartedBox())
         + this.banner(doneCount, this.ORDER.length)
-        + '<div class="card" style="margin-top:18px;">'
-        +   '<div class="card-title">' + esc(this.CK_TITLE[this._ckTakeover] || 'Check your import') + '</div>'
-        +   (this._salesReview ? this.salesReviewHTML() : '<div id="sc-ck-takeover"></div>')
-        + '</div>'
+        /* ⛔ TWO SHAPES, AND KYLE WALKED BOTH.
+           MAPPER: a card holding the drop zone and the column mapper, then the Import / Cancel row
+           OUTSIDE it — *"the import/cancel buttons go outside the card"*. That is exactly how Books
+           renders `<div class="card form-card">…</div>` followed by its actions slot.
+           CONFIRM: the shell's panel and nothing else. It already brings its own heading, its own
+           card around the table and its own buttons below it, so wrapping it in a second card gave
+           *"a card inside another card"* and a duplicate title. */
+        + (this._salesReview
+            ? '<div style="margin-top:18px;">' + this.salesReviewHTML() + '</div>'
+            : '<div class="card form-card" style="margin-top:18px;">'
+              +   '<div class="card-title">' + esc(this.CK_TITLE[this._ckTakeover] || 'Check your import') + '</div>'
+              +   '<div id="sc-ck-takeover"></div>'
+              + '</div>'
+              + '<div id="sc-ck-takeover-actions" style="margin-top:14px;"></div>')
         + '</div>';
       if (!this._salesReview && this._ckCarry) {
         const slot = document.getElementById('sc-ck-takeover');
         if (slot) slot.appendChild(this._ckCarry);
+        const aslot = document.getElementById('sc-ck-takeover-actions');
+        if (aslot && this._ckCarryActs) aslot.appendChild(this._ckCarryActs);
       }
       this.wire();
       /* ⭐ AND SCROLL TO IT, exactly as Close The Books does and for the same measured reason: the
@@ -197,7 +210,16 @@ S.ShiftDashboard = {
     container.innerHTML = '<div class="screen">'
       + (wys.hasSales ? this.whereYouStand(wys) : this.getStartedBox())
       + this.banner(doneCount, this.ORDER.length)
-      + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
+      /* ⛔ THE RESULT LANDS UNDER THE DROP BOX IT CAME FROM, IN GOLD (Kyle, 2026-08-07): *"still had
+         the green text should be gold that lands under the drop file box between the box and the two
+         buttons."* It used to print in GREEN at the top of the page — the loudest and least
+         consistent of the five success-line treatments across the import doors, and nowhere near the
+         zone the operator just used. A lane that names its zone puts it in that zone's own `-res`
+         slot, which already sits between the drop box and the step's button row; only a flash with
+         no zone (a manual clear-to-zero, a week change) still has nowhere better than here. */
+      + (flash && !flashZone
+          ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>'
+          : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
       +   this.ORDER.map(k => this.stepRow(k, done)).join('')
       + '</div>'
@@ -213,6 +235,14 @@ S.ShiftDashboard = {
       if (this._optOpen && this._optOpen.pmix) this.mountPmix();
     }
     if (this._openStep === 'cash') this.mountCashImport();
+    /* The result, written into the slot that already sits between that zone's drop box and the
+       step's button row. Written AFTER the mounts, because `CSVMapper.mount` repaints its own
+       container and a message put there first would be gone. */
+    if (flash && flashZone) {
+      const slot = document.getElementById((this.CK_ZONE[flashZone] || '') + '-res');
+      if (slot) slot.innerHTML = '<div style="font-size:12px;color:var(--gold);font-weight:700;margin:12px 2px 0;">'
+        + '&#10003; ' + esc(flash) + '</div>';
+    }
     this.wire();
   },
 
@@ -342,7 +372,8 @@ S.ShiftDashboard = {
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">' + title + ' <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; optional</span></span>' + App.freqTag('Weekly') + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + sub + '</div>'
       + '<span class="sc-opt-link" data-opt="' + key + '" id="' + key + '-optlink" style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);cursor:pointer;">' + (open ? '+ Close POS Report' : '+ Add POS Report') + '</span>'
-      + '<div id="' + id + '" style="margin-top:10px;' + (open ? '' : 'display:none;') + '"></div><div id="' + id + '-res"></div></div>';
+      + '<div id="' + id + '" style="margin-top:10px;' + (open ? '' : 'display:none;') + '"></div>'
+      + '<div id="' + id + '-actions"></div><div id="' + id + '-res"></div></div>';
   },
   /* ⛔⛔ A FILE DROPPED ON A COCKPIT STEP TAKES THE PAGE (Kyle, 2026-08-07, looking at the sales step
      mid-map): *"once a file is dropped that mapping takes over the page and there is nothing under
@@ -365,7 +396,8 @@ S.ShiftDashboard = {
   /* The question `render` asks before it decides its layout. The confirm screen holds it open too: a
      file already dropped and waiting to be confirmed must not lose the page out from under it. */
   ckTakeover() { return this._ckTakeover != null || !!this._salesReview; },
-  _clearTakeover() { this._ckTakeover = null; this._ckCarry = null; },
+  _ckCarryActs: null,  // the mapper's Import/Cancel row, which lives in its own element
+  _clearTakeover() { this._ckTakeover = null; this._ckCarry = null; this._ckCarryActs = null; },
 
   /* ⛔⛔⛔ THE HANDOVER, AND THE ONE THING IT MUST NOT DO IS REBUILD THE MAPPER.
      `CSVMapper.mount()` opens with `container.innerHTML = <drop zone>`, so escalating by re-rendering
@@ -392,8 +424,18 @@ S.ShiftDashboard = {
     if (st !== 'map' || this._ckTakeover != null) return;
     const node = document.getElementById(this.CK_ZONE[key] || '');
     if (!node) return;
+    /* ⛔⛔⛔ CARRY THE ACTIONS SLOT TOO, OR THE IMPORT BUTTON IS GONE AND THE FILE IS A DEAD END.
+       CSVMapper renders its confirm button into a SEPARATE element — `actionsEl` — not into the
+       mapper's own container. Money Out's first handover carried only the mapper, so the re-render
+       destroyed the node holding Import and painted a fresh empty one: the operator dropped a file,
+       got the column mapper, and had nothing but Cancel. Kyle found that on the live build.
+       ⚠ THE LESSON, WRITTEN AT THE LINE: when you move state across a rebuild, enumerate EVERY node
+       the component owns, not the one you were thinking about. */
+    const acts = document.getElementById(this.CK_ZONE[key] + '-actions');
     this._ckCarry = node;
+    this._ckCarryActs = acts || null;
     node.remove();
+    if (acts) acts.remove();
     this._ckTakeover = key;
     this.render(this.container, this.actions);
   },
@@ -414,7 +456,7 @@ S.ShiftDashboard = {
       return seg
         + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS and drop it below. Re-importing replaces the days already in. Mark this done once the week is in.</div>'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Daily sales <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; required</span></span>' + App.freqTag('Weekly') + '</div>'
-        + '<div id="sc-ck-import"></div><div id="sc-ck-import-res"></div>'
+        + '<div id="sc-ck-import"></div><div id="sc-ck-import-actions"></div><div id="sc-ck-import-res"></div>'
         + this.optDrop('sc-ck-server', 'Per-server sales', 'One row per server with covers and sales. Feeds your Server Check scorecard.', 'server')
         + this.optDrop('sc-ck-pmix', 'Product mix', 'One row per item with units sold. Feeds Menu Engineering.', 'pmix')
         + '<div id="sc-ck-import-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">' + this.markBtn('import', 'Mark Done') + '</div>';
@@ -422,7 +464,7 @@ S.ShiftDashboard = {
     if (k === 'cash') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s cash over/short in. If your POS makes a cash or drawer report, drop it here. No report? Reconcile your drawers in Cash Control. Mark this done once it is handled, or if you do not track cash over/short.</div>'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Cash report</span>' + App.freqTag('Weekly') + '</div>'
-        + '<div id="sc-ck-cash"></div><div id="sc-ck-cash-res"></div>'
+        + '<div id="sc-ck-cash"></div><div id="sc-ck-cash-actions"></div><div id="sc-ck-cash-res"></div>'
         + '<div id="sc-ck-cash-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
         + '<button class="btn btn-ghost btn-sm" data-go="sc-cash-control">Reconcile by Hand</button>'
         + this.markBtn('cash', 'Mark Done') + '</div>';
@@ -608,6 +650,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs a Date column plus your sales (bar and/or food). Covers optional. One row per day.',
       fields: PosIngest.FIELDS.sales,
       confirmLabel: 'Import',
+      actionsEl: '#sc-ck-import-actions',
       onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._onMapState('import', st); },
       /* ⛔ THE FILE DOES NOT WRITE ITSELF ANY MORE. It goes to the confirm screen, exactly as Add
          Products does, and the Import press there is what moves responsibility for what lands from
@@ -1155,6 +1198,7 @@ S.ShiftDashboard = {
        itself). Before dropping a clause from here, find it on the screen ([[the-loop]] #25).
        ⚠ AND THE FAILURE LINE KEEPS EVERYTHING, deliberately. A refused write is when they read
        hardest, and success/failure agreeing is pinned for the path that still prints both. */
+    this._flashZone = 'import';
     this._flash = allToAdd.length + ' day' + (allToAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
       + (opts.reviewed ? '' : salesOutcomes)
       + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + (opts.reviewed ? '' : repNote) + '.' + cwNote;
@@ -1391,6 +1435,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs a Server, Date, Covers, and Total Sales column. One row per server, per day.',
       fields: PosIngest.FIELDS.server,
       confirmLabel: 'Import',
+      actionsEl: '#sc-ck-server-actions',
       onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('server', st); this._onMapState('server', st); },
       onComplete: rows => this.importServer(rows)
     });
@@ -1522,6 +1567,7 @@ S.ShiftDashboard = {
     // prompt REPLACED an existing check — it is not a new import, and merging the two hides the
     // decision they just made.
     const freshCount = toAdd.length - serverExtra.length;
+    this._flashZone = 'server';
     this._flash = (freshCount ? freshCount + ' server check' + (freshCount === 1 ? '' : 's') + ' imported' : '')
       + (serverExtra.length ? (freshCount ? ', ' : '') + serverExtra.length + ' replaced with the file'
                               + String.fromCharCode(8217) + 's figures' : '')
@@ -1543,6 +1589,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs an Item Name and Units Sold column. One row per menu item for the week.',
       fields: PosIngest.FIELDS.pmix,
       confirmLabel: 'Import',
+      actionsEl: '#sc-ck-pmix-actions',
       onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('pmix', st); this._onMapState('pmix', st); },
       onComplete: rows => this.importPmix(rows)
     });
@@ -1602,6 +1649,7 @@ S.ShiftDashboard = {
     // units netted negative was dropped with NO mention at all, so it silently kept last week's
     // figure and presented it as this week's mix.
     const inc = incomplete || [], neg = netNegative || [];
+    this._flashZone = 'pmix';
     this._flash = toAdd.length + ' menu item' + (toAdd.length === 1 ? '' : 's') + ' updated from sales mix'
       + (merged ? ' (' + merged + ' extra row' + (merged === 1 ? '' : 's') + ' combined into item totals)' : '')
       + (skipped.length ? ' (' + skipped.length + ' name' + (skipped.length === 1 ? '' : 's') + ' not matched)' : '')
@@ -1627,6 +1675,7 @@ S.ShiftDashboard = {
       dropSub: 'Needs a Date column plus Over/Short, or Expected and Counted cash. Register and cashier matched if present.',
       fields: PosIngest.FIELDS.cash,
       confirmLabel: 'Import',
+      actionsEl: '#sc-ck-cash-actions',
       onState: st => { this._toggleBtns('sc-ck-cash-btns', st); this._onMapState('cash', st); },
       onComplete: rows => this.importCash(rows)
     });
@@ -1884,6 +1933,7 @@ S.ShiftDashboard = {
     if (!ok) { fail(App.partialSaveNote(App.landedOf(allToAdd, App.shiftData && App.shiftData.sc_variances),
                                       allToAdd.length, 'reconcile', 'reconciles') + cashOutcomes); return; }
     this._pendingCashRows = null;
+    this._flashZone = 'cash';
     this._flash = allToAdd.length + ' reconcile' + (allToAdd.length === 1 ? '' : 's') + ' imported'
       + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
       + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand count)' : '')
