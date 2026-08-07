@@ -40,11 +40,79 @@ S.HubBooksHome = {
   _lastRun(key) { try { const v = localStorage.getItem(key); return v ? this._dateLbl(v) : null; } catch (e) { return null; } },
 
   // ── Per-month "done" stamps (operator-controlled, local to the device) ──────
-  _curKey() {
+  /* ⭐⭐⭐ THE MONTH THE WHOLE PAGE IS ABOUT (Kyle, 2026-08-07). Every figure on this landing already
+     descends from this ONE call — `_aggregateMonth`, `_aggregateYTD`, `_plParts`, `_monthLabel`, the
+     bill count, `stepStatus` and `_doneKey` all take it as an argument — so a selector here moves the
+     entire page and cannot move half of it.
+     ⛔ THAT IS THE POINT, NOT A CONVENIENCE. The Money Out screen shipped the other shape: range chips
+     that moved the LOG while the stat strip followed the tab, so an operator reading a chip as a
+     page-wide filter misread every number on screen. Here the danger is worse — ticking off July's
+     steps while reading August's income — and it is avoided by construction, because there is only
+     one month on this page and this is it. `verify-books-month-selector` pins exactly that.
+     ⚠ WHY A SELECTOR AT ALL: the done-map is keyed `books_close_done_<month>`, so at 00:00 on the 1st
+     the steps went blank while the operator was still closing LAST month. The ticks were never lost —
+     they sit under the old key — there was simply no door to them. Six weekly cockpits have that
+     door; this was the one that needed it most, because you close July during August. */
+  _curKey() { return this._monthKey || this._nowKey(); },
+
+  // The wall-calendar month, ignoring the selector. `_curKey` falls back to it; `atCurrentMonth`
+  // compares against it; nothing else should need it.
+  _nowKey() {
     const HB = S.HubBooks;
     if (HB && HB._currentMonthKey) return HB._currentMonthKey();
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  },
+  atCurrentMonth() { return this._curKey() === this._nowKey(); },
+
+  /* THE FLOOR: the first month this bar has anything in. Stepping back past it lands on empty pages
+     forever, which reads as a broken button rather than as the end of the data. Both stores are
+     asked because either one can be the earliest — a bar that logged bills before confirming a week,
+     or the other way round. */
+  _firstKey() {
+    const mk = (v) => String(v || '').slice(0, 7);
+    /* ⛔ `_bills()`, NOT THE RAW LEDGER. `verify-expense-readers-one-set` B2 caught this within a
+       minute: every reader outside the owning screen must exclude the cash-only rows, or a draw
+       starts counting as a bill somewhere. It is also the consistent answer — `stepStatus` and the
+       banner count bills, so the floor of the selector should be the first month with a BILL. */
+    const all = this._bills().map(r => mk(r && r.date))
+      .concat(((App.data && App.data.weeks) || []).map(w => mk(w && w.period_end)))
+      .filter(m => /^\d{4}-\d{2}$/.test(m));
+    return all.length ? all.sort()[0] : this._nowKey();
+  },
+
+  // n months from the selected one, clamped to [first month with data, this month].
+  _stepMonth(n) {
+    const cur = this._curKey();
+    const d = new Date(cur + '-01T00:00:00');
+    if (isNaN(d.getTime())) return;
+    d.setMonth(d.getMonth() + n);
+    const next = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const floor = this._firstKey(), ceil = this._nowKey();
+    if (next < floor || next > ceil) return;
+    this._monthKey = (next === ceil) ? null : next;   // null keeps "now" following the clock
+    this._openStep = null;
+    this.render(this.container, this.actions);
+  },
+
+  /* The weekly cockpits' selector, in months. Same markup and same class names so the two read as
+     one control; only the unit differs. */
+  monthSelector() {
+    const isCur = this.atCurrentMonth();
+    const atFloor = this._curKey() <= this._firstKey();
+    const HB = S.HubBooks;
+    const label = (HB && HB._monthLabel) ? HB._monthLabel(this._curKey()) : this._curKey();
+    const nowBadge = isCur ? ' <span style="color:var(--gold);font-weight:800;font-size:11px;letter-spacing:0.5px;margin-left:6px;">NOW</span>' : '';
+    const prevBtn = atFloor
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&lsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm bk-mo-prev" aria-label="Previous month" style="margin:0;padding:3px 9px;">&lsaquo;</button>';
+    const nextBtn = isCur
+      ? '<span style="padding:3px 9px;color:var(--t4);font-size:15px;line-height:1;">&rsaquo;</span>'
+      : '<button class="btn btn-ghost btn-sm bk-mo-next" aria-label="Next month" style="margin:0;padding:3px 9px;">&rsaquo;</button>';
+    const pillBase = 'display:inline-flex;align-items:center;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;white-space:nowrap;';
+    const pill = '<span style="' + pillBase + 'border:1px solid var(--b-edge);background:var(--sel-active-bg);color:var(--t1);">' + esc(String(label).toUpperCase()) + nowBadge + '</span>';
+    const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm bk-mo-now" style="margin-left:4px;">This Month</button>';
+    return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>';
   },
   _doneKey() { return 'books_close_done_' + this._curKey(); },   // account-synced (App.data), follows the user across devices; no per-browser suffix
   doneMap()  { return App.acctGet(this._doneKey(), {}); },
@@ -225,8 +293,12 @@ S.HubBooksHome = {
     const pct = total ? Math.round(dc / total * 100) : 0;
     const doneLine = allDone
       ? '<span style="color:var(--green);font-weight:700;">&#10003; Your books are caught up</span>'
-      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + dc + '</span> of ' + total + ' done this month</span>';
+      /* ⚠ "this month" IS ONLY TRUE ON THE CURRENT ONE. With the selector back on July it would be
+         the page telling the operator the wrong month while showing July's ticks. */
+      : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + dc + '</span> of ' + total
+          + (this.atCurrentMonth() ? ' done this month' : ' done') + '</span>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
+      + '<div style="padding:11px 22px 14px;">' + this.monthSelector() + '</div>'
       + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Books</div>'
       + '</div>'
@@ -421,6 +493,13 @@ S.HubBooksHome = {
       else if (act === 'this-week')          App.openScreen('this-week');
       else if (act === 'ic-dashboard')       App.openScreen('ic-dashboard');
     };
+    /* The month arrows, wired per element like everything else on this page. `_stepMonth` does the
+       clamping, so neither arrow can walk off the end of the data. */
+    this.container.querySelectorAll('.bk-mo-prev').forEach(b => b.addEventListener('click', () => this._stepMonth(-1)));
+    this.container.querySelectorAll('.bk-mo-next').forEach(b => b.addEventListener('click', () => this._stepMonth(1)));
+    this.container.querySelectorAll('.bk-mo-now').forEach(b => b.addEventListener('click', () => {
+      this._monthKey = null; this._openStep = null; this.render(this.container, this.actions);
+    }));
     this.container.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', () => go(el.dataset.act)));
     this.container.querySelectorAll('.db-go').forEach(el => el.addEventListener('click', () => go(el.dataset.go)));
     this.container.querySelectorAll('.bk-step-head').forEach(h => h.addEventListener('click', () => {
