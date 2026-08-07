@@ -879,7 +879,16 @@ const CSVMapper = {
 
     // Cancel discards this file and returns to the drop zone to pick another.
     const cancelBtn = scope.querySelector('.csvm-cancel');
-    if (cancelBtn) cancelBtn.addEventListener('click', () => this.mount(container, opts));
+    /* ⭐ `onCancel` IS OPT-IN AND THE DEFAULT IS UNTOUCHED (2026-08-07). Cancel here has always
+       meant "start this file again" — re-mount, back to the drop zone — which is right for the five
+       screens that show the mapper INSIDE a page they never left. The Money Out step is different:
+       dropping a file TAKES THE PAGE OVER, so the operator needs a way back OUT, and it had one
+       sitting above as a SECOND Cancel button. Two Cancels a few pixels apart doing different
+       things is worse than either. A caller that owns the whole surface says what Cancel means. */
+    if (cancelBtn) cancelBtn.addEventListener('click', () => {
+      if (typeof opts.onCancel === 'function') return opts.onCancel();
+      this.mount(container, opts);
+    });
 
     const goBtn = scope.querySelector('.csvm-go');
     goBtn.addEventListener('click', async () => {
