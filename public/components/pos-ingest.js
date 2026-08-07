@@ -910,6 +910,56 @@ const PosIngest = {
   COMP_WORDS: ['comp', 'discount', 'promo', 'coupon', 'goodwill', 'courtesy', 'on the house',
                'staff meal', 'shift drink', 'employee meal', 'giveaway', 'marketing'],
 
+  /* ⛔⛔ ONE WRITE, NOT ONE PER ROW — and the fallback is what keeps the old promise.
+     Kyle, walking door 8 (2026-08-07): *"it stayed 'adding...' for at least 20 seconds.. i actually
+     thought the screen froze."* MEASURED on the live build: a 105-row import made **105 `putRecord`
+     calls and 0 bulk calls**, because `commit`'s generic path writes one record at a time in an
+     awaited loop. In the demo that is 8ms (writes are no-ops); on a real account it is 105 network
+     round trips at ~190ms each, which is his twenty seconds almost exactly. Every other converted
+     import door does one bulk write, which is why they all felt instant and this one did not.
+
+     ⛔ THE ROW-BY-ROW LOOP IS DELIBERATE AND MUST SURVIVE, which is why this is a new path rather
+     than a change to the generic one. `sc-dashboard.js` states it in full: the loop does not stop at
+     the first refusal, so one rejected row in a twelve-row file still leaves eleven SAVED,
+     `App.putRecord` reverts only the slots actually rejected, and the door then reports "saved 11 of
+     12" rather than "save failed" — which an operator answers by keying twelve checks in by hand.
+     So: bulk for the happy path, and on ANY refusal fall straight back to that walk, unchanged.
+
+     ⛔⛔ AND WHY THIS IS SCOPED TO `voids` ALONE. Measured per builder: `buildHours`, `buildTips`,
+     `buildServer` and `buildPmix` all put records carrying an **EXISTING id** into `toAdd` — an
+     upsert — and `App.putRecord` REPLACES by id while an array push APPENDS. A bulk push would
+     duplicate the row instead of replacing it on four of the five lanes. `buildVoids` is the only
+     pure-append builder: a fresh `App.uid()` on every row, no id reuse anywhere.
+     ⚠ AND THAT IS CHECKED HERE RATHER THAN ASSUMED, because it is a property of a builder somebody
+     could change later without ever reading this: anything that is not a pure append takes the safe
+     old path. The guard costs one Set and removes the whole class. */
+  async _commitVoids(toAdd) {
+    const t = this.TYPES.voids;
+    const rows = (toAdd || []).filter(r => r && r.id != null);
+    if (!rows.length) return true;
+    const store = App.EVENT_STORES && App.EVENT_STORES[t.module];
+    const dataObj = store && store.data();
+    const key = store && store.kinds[t.kind];
+    const arr = (dataObj && key)
+      ? (Array.isArray(dataObj[key]) ? dataObj[key] : (dataObj[key] = []))
+      : null;
+    if (arr && rows.length === (toAdd || []).length) {
+      const known = new Set(arr.map(x => x && x.id));
+      if (!rows.some(r => known.has(r.id))) {
+        /* The caller of a bulk write owns the in-memory rows by contract, so they go in first and
+           come back out if the batch is refused — the same shape every other converted door uses. */
+        arr.push(...rows);
+        if (await App.putRecordsBulk(t.module, t.kind, rows, { quiet: true })) return true;
+        App.dropRows(arr, rows);
+      }
+    }
+    let ok = true;
+    try {
+      for (const rec of rows) { ok = (await App.putRecord(t.module, t.kind, rec)) && ok; }
+    } catch (e) { return false; }
+    return ok;
+  },
+
   buildVoids(rows, opts) {
     const COMP_WORDS = this.COMP_WORDS;
     const byName = this._staffByName();
@@ -1861,6 +1911,7 @@ const PosIngest = {
     if (type === 'sales') return this._commitSales(toAdd);
     if (type === 'pmix')  return this._commitPmix(toAdd);
     if (type === 'cash')  return this._commitCashRows(toAdd);
+    if (type === 'voids') return this._commitVoids(toAdd);
     const t = this.TYPES[type];
     if (!t) return false;
     let ok = true;
