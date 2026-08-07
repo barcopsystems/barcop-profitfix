@@ -60,7 +60,11 @@ S.HubBooksHome = {
      own As Needed button, which is what that row is for. */
   ORDER: ['expenses', 'weeks', 'review', 'generate'],
   _META: {
-    expenses: { title: 'Log this month\'s operating expenses', act: 'operating-expenses' },
+    /* ⚠ "operating expenses" WAS HALF THE DOOR (Kyle, 2026-08-07). This step logs everything that
+       leaves the bank: bills AND cash outflows (owner draws, loan payments, tax, capital). The Log
+       Type picker on the form is the whole point, and a title naming one of the two reads as if
+       the other belongs somewhere else — which is the confusion the one-ledger rebuild removed. */
+    expenses: { title: 'Log this month\'s money out', act: 'operating-expenses' },
     // Revenue on the income statement IS the confirmed weeks. See hub-books._weeksComplete.
     weeks:    { title: 'Make sure the weeks are all in',       act: 'this-week' },
     review:   { title: 'Review your income statement',         act: 'books' },
@@ -311,8 +315,16 @@ S.HubBooksHome = {
        screen included — not a copy of it. HubBooksHome.render() mounts it after every render; see
        the note there for why it has to be re-mounted rather than mounted once. */
     if (k === 'expenses') {
-      return explain('Drop your bank or card statement and Bar Cop reads the bills off it, or enter one by hand. Every expense you log here is what your income statement reads from.')
-        + '<div id="bk-moneyout"></div>'
+      /* ⛔⛔ THE TEXT MOVED INTO THE CARD (2026-08-07), and it had to. Kyle wants it UNDER the
+         chips and CHANGING with the mode — and only `_addCardHtml` knows the mode. This is how
+         `sc-dashboard.workspace('import')` has always done it: `seg + text + drop mount`, one
+         builder, the line chosen per mode.
+         ⚠ THE OLD LINE IS KEPT HERE AS THE RECORD OF WHAT WAS WRONG WITH IT: *"Bar Cop reads the
+         BILLS off it"* and *"every EXPENSE you log here is what your INCOME STATEMENT reads from"*.
+         Both are half-true. A draw or a loan payment logged at this same door gets NO income
+         statement line by design — that is what cash-only categories are — so the sentence promised
+         something the app deliberately does not do. */
+      return '<div id="bk-moneyout"></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">' + markBtn + '</div>';
     }
     /* ⭐ NAMING THE DEPENDENCY IS THE WHOLE POINT OF THIS STEP. Revenue on the income statement is

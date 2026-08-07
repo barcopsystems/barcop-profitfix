@@ -1282,8 +1282,19 @@ S.HubOperatingExpenses = {
     if (this._view !== 'moneyout' || this.moneyOutTakeover()) return;
     const node = document.getElementById('oexa-csv');
     if (!node) return;
+    /* ⛔⛔⛔ CARRY THE ACTIONS SLOT TOO, OR THE IMPORT BUTTON IS GONE AND THE FILE IS A DEAD END.
+       CSVMapper renders its confirm button into a SEPARATE element — `actionsEl: '#oexa-imp-actions'`
+       — not into `#oexa-csv`. The first version of this handover carried only the mapper, so the
+       re-render destroyed the node holding Import and painted a fresh empty one: the operator
+       dropped a file, got the column mapper, and had nothing but Cancel. Found by Kyle on the live
+       build; H4/H5 pinned the mapper node and never asked about the button beside it.
+       ⚠ THE LESSON, and it is the same one twice in two days: when you move state across a rebuild,
+       enumerate EVERY node the component owns, not the one you were thinking about. */
+    const acts = document.getElementById('oexa-imp-actions');
     this._carryCsv = node;
+    this._carryActs = acts || null;
     node.remove();
+    if (acts) acts.remove();
     this._moTakeover = true;
     this._rerenderHost();
   },
@@ -1551,6 +1562,8 @@ S.HubOperatingExpenses = {
        Caught by `verify-money-out-step` I0b/I2 before it shipped. */
     const mode = inline ? (stepBody ? this._entryModeFor(true) : 'import') : this._entryMode;
     const importMode = mode === 'import';
+    /* Same shape sc-dashboard uses for its step lines, so the two steps read as one product. */
+    const intro = (t) => '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin:12px 0;">' + t + '</div>';
     const curMode = mode;
     const segBtn = (mode, label) => '<button type="button" class="btn btn-sm oexa-mode" data-mode="' + mode + '" style="'
       + (curMode === mode ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
@@ -1579,7 +1592,12 @@ S.HubOperatingExpenses = {
          STEP is inline too and renders the drop zone, so that test hid both chips and left the
          operator on a drop zone with no way to reach Enter Manually. Caught by
          `verify-money-out-one-door` H3 before it shipped. `stepBody` is what separates the two. */
-      bodyInner = (inline && !stepBody ? '' : segToggle) + '<div id="oexa-csv"></div>';
+      /* ⭐ CHIPS → TEXT → DROP, copied from `sc-dashboard.workspace('import')`. The line sits UNDER
+         the chips and belongs to the MODE, so switching to Enter Manually swaps it for one about
+         typing rather than dropping. */
+      bodyInner = (inline && !stepBody ? '' : segToggle)
+        + (stepBody ? intro('One file, the whole month. Drop your bank or card statement and Bar Cop reads every line off it: bills and cash outflows both. Re-importing replaces rows already in.') : '')
+        + '<div id="oexa-csv"></div>';
       /* ⛔ NO CANCEL IN THE STEP (Kyle, 2026-08-07). Cancel is the way OUT of the takeover, which is
          the only place there is anything to back out of. In the step the chips are the way out, and
          a Cancel under an inline drop zone asks the operator to cancel something they have not
@@ -1590,6 +1608,7 @@ S.HubOperatingExpenses = {
         + '<div id="oexa-imp-actions" style="margin:0 0 ' + (inline ? '0' : '24px') + ';"></div>';
     } else {
       bodyInner = segToggle
+        + (stepBody ? intro('No statement to drop? Key it in by hand. Pick the log type first: an operating expense lands on your income statement, a cash outflow does not. Then the amount, and save.') : '')
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         +   '<div class="f" style="width:150px;"><label>Date Submitted</label><input type="date" value="' + App.todayLocal() + '" disabled title="When you logged this. Always today."/></div>'
         +   '<div class="f" style="width:150px;"><label>Due Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
@@ -1745,7 +1764,7 @@ S.HubOperatingExpenses = {
     this.container.querySelector('#oexa-imp-cancel')?.addEventListener('click', () => {
       /* ⚠ `_stepMode` back to null (the drop zone) and the carried node dropped, or a cancelled
          import would re-attach a stale mapper on the next render. */
-      this._expenseReview = null; this._stepMode = null; this._carryCsv = null;
+      this._expenseReview = null; this._stepMode = null; this._carryCsv = null; this._carryActs = null;
       this._entryMode = 'manual'; this._moTakeover = false; this._rerenderHost();
     });
     /* ⚠ WIRED ON THE FRESH CHILD NODES, NEVER ON `this.container`. `renderMain` replaces the
@@ -1837,9 +1856,15 @@ S.HubOperatingExpenses = {
        put THAT element back — calling `_mountImporter()` here would reset it to an empty drop zone
        and lose the operator's file, which is the whole hazard this path exists to avoid. */
     if (this._carryCsv) {
-      const slot = this.container.querySelector('#oexa-csv');
-      if (slot && slot.parentNode) slot.parentNode.replaceChild(this._carryCsv, slot);
-      this._carryCsv = null;
+      /* ⛔ BOTH NODES, OR THE IMPORT BUTTON DOES NOT COME ACROSS. `#oexa-csv` holds the mapper;
+         `#oexa-imp-actions` holds the button that commits it. Carrying one and rebuilding the other
+         is what left a dropped file with nothing but Cancel. See `_onImportState`. */
+      const put = (live, sel) => { if (!live) return;
+        const slot = this.container.querySelector(sel);
+        if (slot && slot.parentNode) slot.parentNode.replaceChild(live, slot); };
+      put(this._carryCsv, '#oexa-csv');
+      put(this._carryActs, '#oexa-imp-actions');
+      this._carryCsv = null; this._carryActs = null;
     } else if (this._entryModeFor(this._view === 'moneyout') === 'import' && !this._expenseReview) {
       this._mountImporter();
     }
@@ -1849,7 +1874,8 @@ S.HubOperatingExpenses = {
     const el = document.getElementById('oexa-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
-      dropTitle: 'Drop your expenses file here',
+      // ⚠ "expenses" named half of what this door takes; a bank statement carries both.
+      dropTitle: 'Drop your bank or card statement here',
       /* ⛔ A7 — THE "import as Other" SENTENCE IS GONE, AND IT HAD BEEN FALSE SINCE ITEM 15. That
          fallback was deleted on purpose: 'Other' is a category the operator PICKS, which Books
          prints and Schedule C deducts on 27a, so a row Bar Cop could not read and a row they chose
