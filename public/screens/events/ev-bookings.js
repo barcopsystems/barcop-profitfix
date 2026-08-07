@@ -1275,7 +1275,7 @@ S.EventsBookings = {
     document.getElementById('eb-staff')?.addEventListener('click', () => { App._eventStaffTag = b.event_name || this.title(b); App._eventStaffDate = b.event_date || ''; App.openScreen('lc-build-schedule'); });
     this.container.querySelectorAll('.eb-runsheet-open').forEach(el => el.addEventListener('click', () => this.runSheet(id)));
     this.container.querySelectorAll('.eb-runsheet-print').forEach(el => el.addEventListener('click', () => this.printRunSheet(this.bookings().find(x => x.id === id))));
-    // Event P&L. � actual_revenue does NOT reach the cash forecast  _eventTotal collects the
+    // Event P&L. ⚠ actual_revenue does NOT reach the cash forecast - _eventTotal collects the
     // AGREED figure (quoteTotal); that change was tried and reverted. It IS posted to This Week's
     // Events revenue line, net of tax (S235), so a mistyped negative here is still money.
     document.getElementById('eb-pl-save')?.addEventListener('click', () => {
