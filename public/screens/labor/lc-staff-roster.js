@@ -368,6 +368,13 @@ S.LaborStaffRoster = {
         this._staffReview.removed[srm.dataset.confirmRemove] = true;
         this.renderList(); return;
       }
+      // Put Back, from the Removed section. The exact inverse, and the reason Remove is safe to
+      // press at all: nothing on this screen destroys anything until the button at the bottom.
+      const spb = ev.target.closest('[data-confirm-restore]');
+      if (spb && this._staffReview) {
+        delete this._staffReview.removed[spb.dataset.confirmRestore];
+        this.renderList(); return;
+      }
       if (ev.target.closest('[data-staffreview-go]')) { this._runStaffReview(); return; }
       if (ev.target.closest('[data-staffreview-back]')) {
         // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
@@ -488,6 +495,22 @@ S.LaborStaffRoster = {
   },
   _staffReviewCount() { return this._staffReview ? this._staffReviewSummary().count : 0; },
 
+  /* The rows the operator took out. Built through the SAME walk and the SAME row mapper as the rest,
+     so a removed row looks exactly as it did when they removed it — which is what makes Put Back
+     legible; a row rendering as a blank line is one nobody can decide about.
+     ⚠ A SEPARATE WALK, ON PURPOSE. Removed rows are gone from the live build, so a removed duplicate
+     stops blocking the row behind it. That is what makes Remove mean "take this out of the import"
+     rather than "hide it" — and it is why the verdicts from THIS walk are never read. */
+  _staffReviewRemoved() {
+    const r = this._staffReview;
+    if (!r) return [];
+    const gone = r.rows.filter(x => r.removed[x._rid]);
+    if (!gone.length) return [];
+    return this._buildStaffRows(gone).list.map((x, i) => Object.assign(
+      this._staffReviewRow(x, (gone[i] || {})._rid),
+      { note: 'Taken out of this import', notes: [], lands: false }));
+  },
+
   /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
      are TEXT the shell escapes and budgets to one line.
      ⛔ THE PAY CELL IS THE WHOLE REASON THIS SCREEN EXISTS ON THIS DOOR. Every defect it has shipped
@@ -549,6 +572,9 @@ S.LaborStaffRoster = {
       rows: s.rows,
       verb: 'Add', noun: 'Person', nounPlural: 'People',
       removable: true,
+      // Removed rows are never part of `rows`, which is what keeps them out of the count, out of
+      // the needs/settled split and out of the "All N of these" lift with no special case anywhere.
+      removedRows: this._staffReviewRemoved(),
       goAttr: 'data-staffreview-go', backAttr: 'data-staffreview-back', backLabel: 'Start Over',
       resultId: 'sr-imp-result',
       // The door owns which sections are open; a closed one builds no table at all.
