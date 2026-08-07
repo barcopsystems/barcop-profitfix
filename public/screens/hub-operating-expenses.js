@@ -1500,7 +1500,18 @@ S.HubOperatingExpenses = {
     const importMode = !stepBody && this._entryMode === 'import';
     const segBtn = (mode, label) => '<button type="button" class="btn btn-sm oexa-mode" data-mode="' + mode + '" style="'
       + (this._entryMode === mode ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    const segToggle = '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>';
+    /* ⭐ IMPORT FILE FIRST (Kyle, 2026-08-07): *"step 1 needs import file to become the 1st option
+       and enter manually the second option.. basically like the import pos weeks sales in shift is
+       setup."* The reference is `sc-dashboard._salesSeg`, which renders `import` then `manual`, and
+       the two are pinned AGAINST EACH OTHER by `verify-money-out-one-door` G4 — so if the sales step
+       is ever reordered, this one is asked the same question rather than quietly drifting.
+       ⚠ ORDER ONLY. Which button is LIT still follows `_entryMode`, and on the Close The Books step
+       the body stays the manual form because there Import File is a DOOR to a takeover, not an
+       inline mode (see the note above and at the `oexa-mode` handler). The sales step toggles two
+       inline bodies; this one does not, and that difference is deliberate.
+       ⚠ THIS RENDERS ON BOTH SURFACES the add card appears on — the cockpit step AND the Money Out
+       full-screen add form. One card, one order; they are the same control and must not disagree. */
+    const segToggle = '<div class="seg-toggle">' + segBtn('import', 'Import File') + segBtn('manual', 'Enter Manually') + '</div>';
 
     let bodyInner, addButtons = '';
     if (importMode) {
