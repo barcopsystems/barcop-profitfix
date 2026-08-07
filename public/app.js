@@ -2171,12 +2171,12 @@ const App = {
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'cash-outflows': 'books', 'flowmap': 'flowmap' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'cash-outflows': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -2295,25 +2295,12 @@ const App = {
          operator to keep two real deductions OFF the log that Books reads. */
       { h: 'Good to know', p: ['Every dollar that leaves the business is logged here, including repairs and 3rd-party platform fees. One log, one place to look, nothing counted twice.'] }
     ] },
-    'cash-outflows': { title: 'How Cash Outflows Work', sections: [
-      { h: 'What this page is', p: ['Where you log the money that leaves the bank but never lands on your P&L as a cost: owner draws, loan principal, capital and equipment buys, tax you remit, and an Other catch-all for anything that fits none of those. These eat profit without showing up as an expense, which is why a profitable month can still leave the account tight. Put the specifics (which loan, which draw) in the Note.'] },
-      { h: 'Where it shows up', p: ['Bar Cop reads these into the Cash Bridge, under Cash then Cash Bridge, which takes your profit for a period and shows exactly where it went instead of into the bank. They also post to the Survival Forecast as scheduled cash out. The bridge reads this store, so you enter here and read there.'] },
-      { h: 'Two dates on the form', p: ['Date Submitted is just when you logged it and always stays on today. Due Date is when the money actually goes out, and it is what the forecast timing and the recurring schedule run from. Set the Due Date to the real date, not today.'] },
-      /* ⚠⚠ THIS SECTION WAS STALE AND MY FIRST CORRECTION OVERSHOT — WORTH RECORDING, because the
-         two doors genuinely disagree. It read "Check Recurring for a draw, loan, or tax that
-         repeats, pick How Often... set Ends after", which is false at the door an operator meets
-         first: build order C2 stopped the Money Out ADD form writing any schedule at all. I then
-         rewrote it as "nothing to tick" — also false, because the Cash Outflows screen's own EDIT
-         modal still renders Recurring, How often and Ends after AND persists them (`cb-f-recur`,
-         `cb-f-frequency`, `cb-f-term`). Measured, not assumed: I had scoped the check to the add
-         form's file and concluded the controls did not exist ([[the-loop]] #21 — a detector's file
-         list is an assumption, and every narrowing of it is a place the answer hides).
-         ⚠ THE TWO DOORS ARE A REAL OPEN QUESTION, NOT A COPY PROBLEM (item T4): adding writes no
-         schedule and editing writes a full one. This copy states what each door does rather than
-         pretending they agree. */
-      { h: 'Recurring and one-time', p: ['You do not have to declare anything. Log each draw, loan payment or tax remittance as it happens and Bar Cop picks up the ones that repeat, then carries them onto your Cash Forecast. To declare one up front instead, like a loan with a fixed payoff, open it on the Cash Outflows screen and hit Edit: Recurring, How often and Ends after are there. Stop ends a series early and leaves every payment it already made on your books. One-time outflows land in the Logged Outflows list for the period you pick, with Repeat to copy one forward.'] },
-      { h: 'Not operating bills', p: ['Rent, utilities, insurance, and the rest are operating expenses, not outflows. Log those in Operating Expenses so they stay on the P&L and Bar Cop does not count them twice.'] }
-    ] },
+    /* !! THE 'cash-outflows' HELP TOPIC WAS DELETED HERE (2026-08-06). It was the info-button
+       topic for the retired standalone Cash Outflows page and it died with the page. Cash
+       Outflows is a TAB on Money Out now, and 'operating-expenses' above is the topic that
+       describes it: its 'The three tabs' section covers Bills, Cash Outflows and All Money Out.
+       Nothing routes to a 'cash-outflows' screen any more, so a topic keyed to one could only
+       ever be opened by code that no longer exists. */
     'settings-profile': { title: 'How the Business Profile Works', sections: [
       { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your taxes and wage settings, and the service periods you run. One-time setup you revisit when something changes. Save it all with the one Save Data button below the card.'] },
       { h: 'Taxes and payroll', p: ['Set your sales tax rate, how often you file (monthly or quarterly), and your payroll tax percentage once here. Cash, Books, and Events all read them, so you enter them in one place: the Month-End Sales Tax worksheet uses your rate, and Cash Position uses them to size the money you have collected but already owe.'] },
@@ -2521,7 +2508,6 @@ const App = {
         'year-end':           () => S2.HubYearEnd && S2.HubYearEnd.open(),
         'permits':            () => S2.HubPermits && S2.HubPermits.open(),
         'operating-expenses': () => S2.HubOperatingExpenses && S2.HubOperatingExpenses.open(),
-        'cash-outflows':      () => S2.HubCashOutflows && S2.HubCashOutflows.open(),
         'books-help':         () => S2.HubBooksHelp && S2.HubBooksHelp.open(),
         'settings-profile':   () => S2.HubSettings && S2.HubSettings.open('business-profile'),
         'settings-targets':   () => S2.HubSettings && S2.HubSettings.open('recovery-targets'),
@@ -2774,7 +2760,14 @@ const App = {
        branch, so the section had one label, two destinations, and only one of them right.
        Routing both by id here means there is ONE door, not two spellings of the job. */
     if (id === 'operating-expenses') { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.open) S.HubOperatingExpenses.open(); return; }
-    if (id === 'cash-outflows') { if (window.S && S.HubCashOutflows && S.HubCashOutflows.open) S.HubCashOutflows.open(); return; }
+    /* ⛔ NO 'cash-outflows' ROUTE. The standalone Cash Outflows page was the pre-rebuild screen; Cash
+       Outflows is a TAB on Money Out now, over the same ledger. Its last door was the "Go There"
+       button on the Money Out add form, deleted with that prompt, and the page it opened disagreed
+       with the tab it duplicated: its stat card summed `outflowsBetween(start, today)` — a
+       projection — under labels identical to the tab's ledger totals, reading $4,000 / $30,000
+       against $6,800 / $26,600 on the same data. Kyle, 2026-08-06: *"the old cash outflows page
+       should never be seen and deleted too."* `S.HubCashOutflows` itself stays: Money Out delegates
+       its real writes to `_writeCashRow` / `_deleteCashRow`. */
     // Gate before swapping the shell so a locked screen shows the notice and
     // leaves the member where they were (mobile drawer routes through here).
     if (!this.canAccess(id)) { this.showNoAccess(); return; }
