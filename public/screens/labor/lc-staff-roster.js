@@ -337,11 +337,19 @@ S.LaborStaffRoster = {
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    /* ⛔ THE CONFIRM SCREEN TAKES THE ADD CARD'S SLOT, and the roster below stays — the same shape
-       the other converted doors use. Keeping the list visible is the point: "already on your roster"
-       is a verdict about that list, and the operator can see it from here. */
+    /* ⛔⛔ THE CONFIRM SCREEN TAKES THE WHOLE PAGE. It used to take the add card's slot only, and the
+       roster stayed below it, on the reasoning that *"already on your roster is a verdict about that
+       list, so the operator can see it from here"*. Kyle killed that on the regulars door
+       (2026-08-07) and he is right, because the argument only ever covered the dup rows and the
+       price was much higher than a glance: this screen promises **"Nothing is saved until you do"**,
+       and the roster below it carries DELETE and EDIT, which write on the press. Two opposite write
+       models on one page with the destructive one under the reassuring sentence, plus an Export PDF
+       handing out a roster that is about to change.
+       ⚠ The `noPos` clause still says *"open them on the roster below"*, and that stays true: it is
+       printed AFTER a successful write, at which point the review is cleared and the roster is back.
+       Pinned by `verify-confirm-screen-owns-page.js`, which RENDERS this door rather than reading it. */
     this.container.innerHTML = '<div class="screen">'
-      + (this._staffReview ? this.staffReviewHTML() : addCard) + below + '</div>';
+      + (this._staffReview ? this.staffReviewHTML() : addCard + below) + '</div>';
     this.container.onclick = ev => {
       /* The confirm screen's two controls. Both write state and re-render, so the button's count,
          the rows and what gets written all read from the same place. */
@@ -448,7 +456,7 @@ S.LaborStaffRoster = {
       { h: 'Adding Someone', p: ['Pick Enter Manually, fill the row, and click Add Staff. The position sets the default pay type and figure, an hourly wage or a salary, which you can override per person. Wage changes are tracked with history, so past hours always cost out at the wage in effect on that day, not today\'s rate. Check Shift Lead on anyone who can run shifts and authorize like a manager even when they are hourly; Management already counts as a supervisor without it. If someone works a second role at a different rate, like a server who picks up bar shifts, set a Secondary Role and its wage; logging hours in that role then costs at the secondary rate, and a Role picker shows up on Log Hours for them.'] },
       { h: 'Fixing A Wage Change', p: ['Open a person and a Wage History table shows every raise and cut with the date it took effect. If a change landed on the wrong day, those shifts cost out at the wrong rate, so Edit the change to correct its effective date, or Delete one entered in error. To change the current wage, edit the profile up top; that records a fresh change here on its own.'] },
       { h: 'Regular Days Off', p: ['Tap the weekday chips to mark a standing day someone never works, like a server who is always off Sundays. Build Schedule blocks every one of those weekdays automatically, so you do not have to remember it each week. For a one-time request (a vacation week, a day off), use Time Off instead.'] },
-      { h: 'Importing A Staff List', p: ['Switch to Import File and drop a CSV or Excel file. Map the columns once and Bar Cop remembers it. Only Name is required; Position, Pay Type, Wage, Annual Salary, Status, Phone, and Email are matched if your file has them, and anything missing imports blank to fill in later. Each person\'s position matches your existing positions by name (set those up first for the cleanest import); an unmatched or blank position still imports, just open the person and pick one.'] },
+      { h: 'Importing A Staff List', p: ['Switch to Import File and drop a CSV or Excel file. Map the columns once and Bar Cop remembers it. Only Name is required; Position, Pay Type, Wage, Annual Salary, Status, Phone, and Email are matched if your file has them, and anything missing imports blank to fill in later. Each person\'s position matches your existing positions by name (set those up first for the cleanest import); an unmatched or blank position still imports, just open the person and pick one.', 'Before anything is written, Bar Cop lists every person in the file beside the pay it worked out for them, and puts whatever it could not read at the top. Nothing is saved until you press Add on that screen. Read the pay column: a wage Bar Cop could not use is the one mistake that quietly costs you money on every labor number.'] },
       { h: 'Hourly or Salaried', p: ['Set Pay Type to Salary for an exempt manager or any fixed-salary role, then enter the annual salary. Bar Cop spreads that salary evenly across the year (salary divided by 52 each week) as a fixed labor cost, and salaried staff never show overtime. You can still log their hours so they count toward coverage and revenue per labor hour, but those hours never add an hourly cost. If a salaried employee is overtime eligible (non-exempt), set them to Hourly instead. How you classify staff under wage and hour law is your call. Bar Cop is a tool, not legal or payroll advice.'] },
       { h: 'Certifications and Coaching', p: ['Click any staff member to open their page. That is where you add certifications (TABC, food handler, ServSafe, and the rest, with expiration dates Bar Cop flags before they lapse) and the coaching log (praise, coaching, concern, and warning notes that protect you if a tough HR moment ever lands).'] },
       { h: 'Training', p: ['Each person\'s page also has a Training section. Use Assign Training to load an onboarding template onto them, check the steps off as they finish, and pick who signed off. Build the templates themselves on the Training screen, which also shows where every staff member stands at a glance.'] },
