@@ -146,19 +146,51 @@ S.ShiftDashboard = {
        takeover to clear, so this is a no-op there. */
     if (flash && !this._salesReview) this._clearTakeover();
 
+    /* ⛔⛔ A TAKEOVER WITH NO MAPPER LEFT IS A LIE ABOUT THE STATE, AND IT STRANDS THE OPERATOR.
+       Kyle found it on Close The Books (2026-08-07): *"if you drop a file and it takes over page...
+       and then you click and go to another page and come back.. the drop file has no cancel button
+       so the only way to get back to the full page is to refresh it."* The flag lives on this object
+       and outlives the DOM, so on the way back in it can still say "an import is in progress" over a
+       mapper that did not survive — a bare drop zone with the steps gone and no control that returns
+       the page.
+       ⛔ THE FIX IS NOT A CANCEL BUTTON, IT IS NOT CLAIMING THE STATE. If the carried mapper is gone
+       the parsed rows went with it, so there is no import in progress and the page belongs back to
+       the operator. A Cancel would be a control for a state that should not exist — and this screen
+       just had a second Cancel removed for being one control too many.
+       ⚠ THE CONFIRM SCREEN IS THE EXCEPTION AND IT IS WHY THE GUARD READS BOTH: `_salesReview` lives
+       on the OBJECT, not in the DOM, so a file that got that far genuinely IS still in progress and
+       has to survive the round trip untouched. */
+    if (this._ckTakeover != null && !this._ckCarry && !this._salesReview) this._clearTakeover();
+
+    /* ⛔⛔ BUILT TO MATCH CLOSE THE BOOKS, which is the one that shipped and was walked. Kyle,
+       comparing them side by side: *"books is on the right... yours is image on the left.. you did it
+       completely different.. make it like books."* Books' own comment says what it keeps and why —
+       *"keeps the context of what they are closing and how far along they are"* — so Where You Stand
+       and the progress banner STAY, and only the steps and the row of navigate-away buttons go.
+       My first version stripped the page to a bare small-caps title, which is a different screen.
+       ⛔ ONE CANCEL. CSVMapper already renders its own beside Import, and it releases the page
+       through `_onMapState('drop')`. A second one under it is two controls for one job and the
+       operator cannot tell which abandons what. */
     if (this.ckTakeover()) {
       container.innerHTML = '<div class="screen">'
-        + '<div class="card-title">' + esc(this.CK_TITLE[this._ckTakeover] || 'Check your import') + '</div>'
-        + (this._salesReview
-            ? this.salesReviewHTML()
-            : '<div id="sc-ck-takeover"></div>'
-              + '<div style="margin-top:16px;"><button class="btn btn-ghost" data-ck-cancel="1">Cancel</button></div>')
+        + (wys.hasSales ? this.whereYouStand(wys) : this.getStartedBox())
+        + this.banner(doneCount, this.ORDER.length)
+        + '<div class="card" style="margin-top:18px;">'
+        +   '<div class="card-title">' + esc(this.CK_TITLE[this._ckTakeover] || 'Check your import') + '</div>'
+        +   (this._salesReview ? this.salesReviewHTML() : '<div id="sc-ck-takeover"></div>')
+        + '</div>'
         + '</div>';
       if (!this._salesReview && this._ckCarry) {
         const slot = document.getElementById('sc-ck-takeover');
         if (slot) slot.appendChild(this._ckCarry);
       }
       this.wire();
+      /* ⭐ AND SCROLL TO IT, exactly as Close The Books does and for the same measured reason: the
+         takeover renders BELOW Where You Stand and the banner, so on a short window the operator
+         drops a file and sees nothing move. Only on the way in — on the way back out the steps are
+         what they want to see, and yanking the page down to them would be the wrong end. */
+      setTimeout(() => document.getElementById('sc-ck-takeover')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
       return;
     }
 
@@ -1890,11 +1922,10 @@ S.ShiftDashboard = {
         // the confirm screen, so leaving the takeover set would re-attach a dead node over the step.
         this._salesReview = null; this._clearTakeover(); this.render(this.container, this.actions); return;
       }
-      // The takeover's own Cancel. The mapper's Cancel comes through `_onMapState('drop')` instead;
-      // this is the escape for an operator who wants the page back without touching the mapper.
-      if (ev.target.closest('[data-ck-cancel]')) {
-        this._clearTakeover(); this.render(this.container, this.actions); return;
-      }
+      /* ⚠ NO SECOND CANCEL HERE, DELIBERATELY. I rendered one under the mapper and Kyle caught it on
+         the first walk: CSVMapper already draws its own beside Import, so the page had two. The
+         mapper's own is the one that stays, and it releases the page through `_onMapState('drop')`
+         — the same single path a completed import uses. */
       const opt = ev.target.closest('[data-opt]');
       if (opt) { const key = opt.dataset.opt; this._optOpen = this._optOpen || {}; this._optOpen[key] = !this._optOpen[key]; this.render(this.container, this.actions); return; }
       const head = ev.target.closest('.sc-step-head');
