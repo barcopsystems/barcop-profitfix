@@ -357,7 +357,16 @@ S.HubOperatingExpenses = {
      screen has not had for a long time: declared, and read in exactly zero places tree-wide. A field
      that is written and never read is a fix that never shipped, or in this case a feature that never
      left ([[the-loop]] #25). No slicer can see a data property, so nothing would ever have told us. */
-  _entryMode:      'manual',   // manual | import — the Close The Books Money Out step's two modes
+  _entryMode:      'manual',   // manual | import — the FULL Money Out screen's add form
+  /* ⭐⭐ THE STEP HAS ITS OWN MODE, AND IT DEFAULTS TO IMPORT (Kyle, 2026-08-07).
+     `null`/'import' = the drop zone, 'manual' = the typed form. Deliberately a SECOND field rather
+     than a new default on `_entryMode`: that one is the full screen's, and flipping it would open
+     the Money Out page on a drop zone nobody asked for. Two surfaces, two answers, one resolver.
+     ⭐ THE SHAPE IS COPIED FROM THE SCREEN KYLE NAMED: `sc-dashboard._salesMode` is `null` and its
+     `on()` treats anything that is not 'manual' as import, so the step lands on the drop zone with
+     the Import File chip lit. `verify-money-out-one-door` G4 pins the two together. */
+  _stepMode:       null,       // null|'import' = drop zone inline · 'manual' = the typed form
+  _carryCsv:       null,       // the LIVE mapper node, held across the handover (see _onImportState)
   _histShown:      0,          // History log window (0 = default to LIST_PAGE)
   _filterCategory: 'all',
   _filterRange:    'this-month',
@@ -1251,8 +1260,40 @@ S.HubOperatingExpenses = {
      ⚠ `_expenseReview` holds it open too: a file already dropped and waiting to be confirmed must
      not lose the page out from under it. */
   _moTakeover: false,
+  /* Which mode a given surface is in. The STEP (inline) defaults to import; the full screen keeps
+     its own `_entryMode`. Every reader goes through here so the two can never drift. */
+  _entryModeFor(inline) {
+    if (!inline) return this._entryMode;
+    return this._stepMode === 'manual' ? 'manual' : 'import';
+  },
+
+  /* ⛔⛔⛔ THE HANDOVER, AND THE ONE THING IT MUST NOT DO IS REBUILD THE MAPPER.
+     `CSVMapper.mount()` opens with `container.innerHTML = <drop zone>`. So escalating by
+     re-rendering and re-mounting would throw the operator's parsed file away and put them back on
+     an empty drop zone — work lost, silently, which is the expensive class of defect here.
+     ⭐ SO THE LIVE NODE IS DETACHED AND CARRIED. `_wireCurrent` re-attaches that same element into
+     the takeover's slot, listeners and parsed rows intact, and deliberately does NOT re-mount.
+     Pinned by `verify-money-out-one-door` H4/H5.
+     ⚠ `onState('map')` is CSVMapper's existing hook — it fires the moment a file is parsed and the
+     mapper replaces the drop zone. No new hook was needed; four other screens already use it. */
+  _onImportState(state) {
+    if (state !== 'map') return;
+    // Only from the STEP, and only while it is still inline — never re-enter once taken over.
+    if (this._view !== 'moneyout' || this.moneyOutTakeover()) return;
+    const node = document.getElementById('oexa-csv');
+    if (!node) return;
+    this._carryCsv = node;
+    node.remove();
+    this._moTakeover = true;
+    this._rerenderHost();
+  },
+
   moneyOutTakeover() {
-    return !!this._moTakeover && (this._entryMode === 'import' || !!this._expenseReview);
+    /* ⚠ READS THE FIELD, NOT THE RESOLVER. Calling `_entryModeFor` here broke three hand-built stubs
+       at once with "not a function" — integrity #13, and a throw prints no summary at all. The
+       question is the same either way (is the step still in import?) and `_stepMode` answers it
+       without adding a dependency to every fixture that lifts this one member. */
+    return !!this._moTakeover && (this._stepMode !== 'manual' || !!this._expenseReview);
   },
 
   renderMoneyOut(mountId) {
@@ -1497,9 +1538,22 @@ S.HubOperatingExpenses = {
        stops an operator who left that screen in import mode from arriving at Close The Books to
        find a drop zone in step 1 they never asked for. */
     const stepBody = !!(opts && opts.stepBody);
-    const importMode = !stepBody && this._entryMode === 'import';
+    /* ⚠ THE NOTE ABOVE USED TO SAY THE STEP FORCES MANUAL, and that was right until 2026-08-07:
+       it stopped an operator who left the FULL screen in import mode arriving at Close The Books to
+       a drop zone they never asked for. The step has its own mode now, so nothing carries over — and
+       Kyle's call is that the drop zone IS what step 1 should open on. */
+    /* ⛔ THREE SURFACES, THREE ANSWERS, AND THE TAKEOVER IS NOT THE STEP. My first version asked the
+       resolver for all of them, so a step left in MANUAL made the takeover render the typed form —
+       and the takeover only exists because a file was already dropped. It is import by definition.
+         · step        (inline + stepBody) — its own mode, default import
+         · takeover    (inline, no stepBody) — always import; `_expenseReview` handles the confirm
+         · full screen (not inline) — its own `_entryMode`, untouched by any of this
+       Caught by `verify-money-out-step` I0b/I2 before it shipped. */
+    const mode = inline ? (stepBody ? this._entryModeFor(true) : 'import') : this._entryMode;
+    const importMode = mode === 'import';
+    const curMode = mode;
     const segBtn = (mode, label) => '<button type="button" class="btn btn-sm oexa-mode" data-mode="' + mode + '" style="'
-      + (this._entryMode === mode ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+      + (curMode === mode ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     /* ⭐ IMPORT FILE FIRST (Kyle, 2026-08-07): *"step 1 needs import file to become the 1st option
        and enter manually the second option.. basically like the import pos weeks sales in shift is
        setup."* The reference is `sc-dashboard._salesSeg`, which renders `import` then `manual`, and
@@ -1519,7 +1573,13 @@ S.HubOperatingExpenses = {
          from; here the way back is Cancel, exactly as `ic-product-setup.importPanelHTML` does it.
          CSVMapper already prints its own "Drop your expenses file here" and its own column-mapping
          heading, so anything we add over the top says the same thing twice. */
-      bodyInner = (inline ? '' : segToggle) + '<div id="oexa-csv"></div>';
+      /* ⛔⛔ THE STEP KEEPS ITS TOGGLE; ONLY THE TAKEOVER DROPS IT (2026-08-07).
+         This read `inline ? '' : segToggle`, which was right when `inline` meant "the takeover" —
+         there the way back is Cancel, exactly as `ic-product-setup.importPanelHTML` does it. Now the
+         STEP is inline too and renders the drop zone, so that test hid both chips and left the
+         operator on a drop zone with no way to reach Enter Manually. Caught by
+         `verify-money-out-one-door` H3 before it shipped. `stepBody` is what separates the two. */
+      bodyInner = (inline && !stepBody ? '' : segToggle) + '<div id="oexa-csv"></div>';
       addButtons = (inline
           ? '<div class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost" id="oexa-imp-cancel">Cancel</button></div>'
           : '')
@@ -1662,12 +1722,18 @@ S.HubOperatingExpenses = {
          (drop -> mapper -> confirm in place of the four steps) and "Enter Manually" closes it
          again. On the full Operating Expenses screen neither happens: the card swaps in place,
          exactly as it always has. */
-      if (this._view === 'moneyout') { this._moTakeover = (b.dataset.mode === 'import'); return this._rerenderHost(); }
+      /* ⛔ FROM THE STEP THIS IS A MODE, NOT A DOOR (2026-08-07). It used to set `_moTakeover` and
+         jump straight to the full-page importer. Now Import File shows the DROP ZONE in the step and
+         the takeover waits until a file is actually parsed (`_onImportState`). */
+      if (this._view === 'moneyout') { this._stepMode = b.dataset.mode; this._moTakeover = false; return this._rerenderHost(); }
       this._rerender();
     }));
     // The takeover's own way back, the same control ic-product-setup's import panel carries.
     this.container.querySelector('#oexa-imp-cancel')?.addEventListener('click', () => {
-      this._expenseReview = null; this._entryMode = 'manual'; this._moTakeover = false; this._rerenderHost();
+      /* ⚠ `_stepMode` back to null (the drop zone) and the carried node dropped, or a cancelled
+         import would re-attach a stale mapper on the next render. */
+      this._expenseReview = null; this._stepMode = null; this._carryCsv = null;
+      this._entryMode = 'manual'; this._moTakeover = false; this._rerenderHost();
     });
     /* ⚠ WIRED ON THE FRESH CHILD NODES, NEVER ON `this.container`. `renderMain` replaces the
        container's innerHTML but the container element itself is permanent, so a listener attached to
@@ -1754,7 +1820,16 @@ S.HubOperatingExpenses = {
     this._wireRows(this.container);
     // ⚠ NOT WHILE THE CONFIRM SCREEN IS UP: the drop zone is not on the page, so CSVMapper would be
     // mounting into an element that no longer exists.
-    if (this._entryMode === 'import' && !this._expenseReview) this._mountImporter();
+    /* ⛔⛔ THE CARRIED NODE WINS OVER A FRESH MOUNT. If `_onImportState` handed us the live mapper,
+       put THAT element back — calling `_mountImporter()` here would reset it to an empty drop zone
+       and lose the operator's file, which is the whole hazard this path exists to avoid. */
+    if (this._carryCsv) {
+      const slot = this.container.querySelector('#oexa-csv');
+      if (slot && slot.parentNode) slot.parentNode.replaceChild(this._carryCsv, slot);
+      this._carryCsv = null;
+    } else if (this._entryModeFor(this._view === 'moneyout') === 'import' && !this._expenseReview) {
+      this._mountImporter();
+    }
   },
 
   _mountImporter() {
@@ -1839,6 +1914,7 @@ S.HubOperatingExpenses = {
          the confirm screen, which is where the operator presses Add. Same word as the reference
          door and three of the four already converted. */
       confirmLabel: 'Import',
+      onState: st => this._onImportState(st),
       onComplete: rows => this._openExpenseReview(rows)
     });
   },
