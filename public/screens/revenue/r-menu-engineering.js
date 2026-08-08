@@ -916,40 +916,74 @@ S.RevenueMenuEngineering = {
     const items = (App.data && App.data.menu_items) || [];
     const byId = {}; items.forEach(it => { if (it) byId[it.id] = it; });
     const rows = [];
-    /* ⚠ THE FIRST ROW OF A MERGED SET CARRIES THE COUNT. `built.toAdd` holds ONE entry per dish, so the
-       shell must see exactly one landing row per dish or its derived number doubles. The first row for
-       an entry lands; the rest say they were summed into it and do not count again. */
-    const counted = new Set();
+    /* ⛔⛔⛔ ONE ROW PER DISH, NOT ONE PER FILE ROW — and the first live walk is what settled it.
+       A daypart-split PMIX is the ORDINARY shape of this file, so folding rows into a dish is the
+       normal case and not an edge one. Emitting a row per file row put TWENTY rows that needed no
+       attention whatsoever into "Needs A Look", dimmed, under a head reading "32 rows to check" when
+       twelve actually wanted one — the merged rows crowded out the rows that mattered.
+       ⛔ AND THE SHELL HAS NO THIRD STATE FOR IT. It derives the button from `rows.filter(lands)` and
+       dims on `!lands && !needsYou`, so a per-row screen could either double the button (2 rows, 1
+       write) or dim a row whose units ARE going in. Neither is true. One row per dish is.
+       ⚠ THE TRADE, STATED: this is "every row is ACCOUNTED FOR" rather than "every row is LISTED".
+       A dish fed by several rows says so on its own line, so nothing in the operator’s file is
+       unexplained — the same trade door 5 made when it keyed on item id.
+       ⚠ A row that never reached an item (a totals line, an unmatched name, unreadable units) is
+       still ITS OWN ROW, because there is no dish to fold it into and it is exactly the row the
+       operator has to act on. */
+    const seen = new Map();          // entry -> the shell row that represents its dish
+    const fedBy = new Map();         // entry -> how many file rows fed it
     (built.perRow || []).forEach((v, i) => {
-      const key = (v.raw && v.raw._rid != null) ? v.raw._rid : i;
+      const raw = v.raw || {};
+      /* The key is what Remove acts on. A dish is keyed by its ITEM, so taking it out takes every
+         file row that fed it; a standalone row keeps its own `_rid`. */
+      const key = v.entry ? ('item:' + v.entry.item_id) : (raw._rid != null ? raw._rid : i);
       if (removed[key]) return;
+      if (v.entry) {
+        fedBy.set(v.entry, (fedBy.get(v.entry) || 0) + 1);
+        if (seen.has(v.entry)) return;   // already represented by its dish row
+      }
       const it = v.entry ? byId[v.entry.item_id] : null;
-      const units = v.entry ? v.entry.covers : App.parseNum((v.raw || {}).units);
-      /* ⚠ `Number.isFinite`, NOT `!= null`, AND THE REASON IS NOT COSMETIC. `weekly_covers != null` is
-         how `_measured` asks "is this item RANKABLE", and `verify-menu-zero-seller` D3 pins that the
-         rule is written in exactly one place — so reusing the spelling here made a second copy of a
-         rule this screen has already been bitten by. The question on THIS row is different: is there a
-         previous figure to show the operator as `was`. `isFinite` says that precisely and also rejects
-         a NaN, which `!= null` would have let through into the comparison cell. */
+      const units = v.entry ? v.entry.covers : App.parseNum(raw.units);
       const was = it && Number.isFinite(it.weekly_covers) ? it.weekly_covers : null;
       const shown = (units == null || isNaN(units)) ? '\u2014' : String(Math.round(units));
-      /* ⛔⛔ "was 95", NOT "you entered 95". `ImportConfirm.compare` writes *"you entered X"*, which is
-         exactly right on the sales and per-server doors — there the second figure IS a number the
-         operator typed by hand, and the row is asking which one wins. Here it is the item's PREVIOUS
-         weekly units, set by the last import or the seed. Measured on the first walk: "49 you entered
-         95" about a figure nobody entered. Same helper, wrong sentence, because the two doors are
-         asking different questions — so this one builds its own sub-line and leaves `compare` alone
-         for the doors whose words it fits. */
+      /* ⛔ "was 95", NOT "you entered 95". `ImportConfirm.compare` writes *"you entered X"*, which is
+         right on the sales and per-server doors — there the second figure IS one the operator typed
+         and the row asks which wins. Here it is the item’s PREVIOUS weekly units, set by the last
+         import or the seed. Measured on the first walk: "49 you entered 95" about a figure nobody
+         entered. This door builds its own sub-line and leaves `compare` alone for the doors it fits. */
       const cell = (v.lands && was != null && Math.round(was) !== Math.round(units))
         ? esc(shown) + ImportConfirm.sub('was ' + Math.round(was))
         : esc(shown);
-      let lands = !!v.lands;
-      if (lands) { if (counted.has(v.entry)) lands = false; else counted.add(v.entry); }
-      rows.push({
+      const row = {
         cells: [esc(v.name || '(no name)'), cell],
         note: this.PMIX_NOTES[v.status] || '',
-        notes: [], lands: lands, needsYou: false, key: key
-      });
+        notes: [], lands: !!v.lands, needsYou: false, key: key
+      };
+      rows.push(row);
+      if (v.entry) seen.set(v.entry, row);
+    });
+    /* ⭐ AND EVERY FOLDED DISH SAYS HOW MANY OF THE OPERATOR’S ROWS WENT INTO IT. Without this the
+       screen shows a number bigger than any single row in their file with no reason given, which is
+       the silent-merge this door’s flash already explains after the fact. `notes` is the shell’s own
+       home for it — its example is literally "Added up from several rows". */
+    fedBy.forEach((n, entry) => {
+      if (n < 2) return;
+      const row = seen.get(entry);
+      if (!row) return;
+      /* ⛔⛔ IT GOES IN `note`, NOT `notes`, AND THAT IS NOT A STYLE CHOICE. The shell files a row into
+         "Needs A Look" when it carries ANY `notes` — `!r.lands || r.notes.length || r.needsYou` — which
+         is right for the other ten doors, where an extra line on a landing row genuinely is something
+         to look at. Here a daypart split is the ORDINARY shape of the file, so putting the merge line
+         in `notes` marched every folded dish straight back into the section the fold was built to get
+         them out of. Measured: it undid the fix completely.
+         ⚠ AND IT REPLACES the generic sentence rather than joining it — `NOTE_BUDGET` is 43 characters
+         and the two together run past it, so joining them would truncate the half that matters. This
+         line is the more specific true thing about the row, and the section head already says the dish
+         is going in. Same shape as door 8's "Same line twice in your file" on a landing row.
+         ⛔ A HELD-BACK DISH KEEPS ITS OWN REASON. "Summed from 3 rows" over a dish that is NOT going in
+         would replace the one sentence the operator needs — that returns took the week negative. */
+      if (row.lands) row.note = 'Summed from ' + n + ' rows in your file';
+      else row.notes = ['Summed from ' + n + ' rows in your file'];
     });
     return { rows: rows, count: rows.filter(r => r.lands).length };
   },
@@ -963,16 +997,28 @@ S.RevenueMenuEngineering = {
      answers: taking out the row that carried the returns can lift a dish out of net-negative and back
      into going in. That is right — it is the operator’s decision — and it is why the walk is the one
      place the outcome is decided rather than being cached at the drop. */
+  /* ⛔ REMOVE NOW ACTS ON A DISH, so working out which file rows survive needs the walk that maps
+     rows to dishes. One full walk to get the keys, then a rebuild over what is left — the second
+     walk is what keeps the screen and the write reading the same decision. */
+  _pmixRowKeys() {
+    const r = this._pmixReview;
+    const full = PosIngest.build('pmix', r.rows);
+    return (full.perRow || []).map((v, i) => v.entry
+      ? ('item:' + v.entry.item_id)
+      : (r.rows[i] && r.rows[i]._rid != null ? r.rows[i]._rid : i));
+  },
   _pmixReviewSummary() {
     const r = this._pmixReview;
     if (!r) return { rows: [], count: 0 };
-    const live = r.rows.filter(x => !r.removed[x._rid]);
+    const keys = this._pmixRowKeys();
+    const live = r.rows.filter((x, i) => !r.removed[keys[i]]);
     return this.pmixReviewRows(PosIngest.build('pmix', live), { removed: {} });
   },
   _pmixReviewRemoved() {
     const r = this._pmixReview;
     if (!r) return [];
-    const gone = r.rows.filter(x => r.removed[x._rid]);
+    const keys = this._pmixRowKeys();
+    const gone = r.rows.filter((x, i) => r.removed[keys[i]]);
     if (!gone.length) return [];
     return this.pmixReviewRows(PosIngest.build('pmix', gone), { removed: {} }).rows;
   },
@@ -1027,7 +1073,11 @@ S.RevenueMenuEngineering = {
     const btn = this.container && this.container.querySelector('[data-pmreview-go]');
     if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
     try {
-      await this.applyCoversImport(r.rows.filter(x => !r.removed[x._rid]), { reviewed: true });
+      /* ⛔ THE WRITE DROPS EXACTLY WHAT THE SCREEN DROPPED, through the same key map. Filtering on
+         `_rid` here while the screen removes by DISH is how a button ends up promising a number the
+         write does not honour — the defect the whole rollout exists to close. */
+      const keys = this._pmixRowKeys();
+      await this.applyCoversImport(r.rows.filter((x, i) => !r.removed[keys[i]]), { reviewed: true });
     } finally {
       this._pmixReviewWriting = false;
       if (this._pmixReview) {
