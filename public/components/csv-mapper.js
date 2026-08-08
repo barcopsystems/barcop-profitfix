@@ -772,8 +772,12 @@ const CSVMapper = {
     // the drop zone, a section heading, the field grid, then the action row).
     let html = '<div class="divider"></div>'
       + '<div class="sh" style="margin:0 0 12px;">Map Your Columns</div>'
+      /* ⚠ ONE ROW IS "row". Found on the live build 2026-08-07: a one-row file read *"Found 1 rows."*
+         over a button reading *"Import 1 Rows"*, on all 18 doors, because this component is shared.
+         The convention was already here — the unread-columns sentence below guards its singular, and
+         so do six other counts in this file. These two were simply missed. */
       + '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;">Found <strong style="color:var(--w);">'
-      + rows.length + ' rows</strong>. Match each field to a column from your file. '
+      + rows.length + (rows.length === 1 ? ' row' : ' rows') + '</strong>. Match each field to a column from your file. '
       + 'Detected columns are pre-selected and this mapping is remembered for next time.</div>'
       // Ragged rows = a data row with a different column count than the header,
       // almost always an unquoted comma in a number cell (like 1,234) that split
@@ -826,7 +830,7 @@ const CSVMapper = {
         + '</tbody></table></div></div>';
     }
     const actionRow = '<div style="display:flex;gap:8px;align-items:center;margin-top:18px;"><button class="btn btn-primary csvm-go">'
-      + esc(opts.confirmLabel || 'Import') + ' ' + rows.length + ' Rows</button>'
+      + esc(opts.confirmLabel || 'Import') + ' ' + rows.length + (rows.length === 1 ? ' Row' : ' Rows') + '</button>'
       + '<button type="button" class="btn btn-ghost csvm-cancel">Cancel</button></div>';
     const extEl = this._actionsEl(opts);
     html += '<div class="csvm-err" style="font-size:12px;color:var(--red);margin-top:10px;display:none;"></div>'
