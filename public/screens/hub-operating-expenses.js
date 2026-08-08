@@ -366,7 +366,11 @@ S.HubOperatingExpenses = {
      `on()` treats anything that is not 'manual' as import, so the step lands on the drop zone with
      the Import File chip lit. `verify-money-out-one-door` G4 pins the two together. */
   _stepMode:       null,       // null|'import' = drop zone inline · 'manual' = the typed form
-  _carryCsv:       null,       // the LIVE mapper node, held across the handover (see _onImportState)
+  /* The LIVE mapper node. Set at the handover (`_onImportState`) and held for the LIFE of the
+     takeover, not just across the one re-render that opens it — that is what lets an operator leave
+     Close The Books mid-map and come back to their file instead of a fresh drop zone. Released by
+     every path that ends a takeover: Cancel, Start Over, and a landed import. */
+  _carryCsv:       null,
   _histShown:      0,          // History log window (0 = default to LIST_PAGE)
   _filterCategory: 'all',
   _filterRange:    'this-month',
@@ -1841,9 +1845,7 @@ S.HubOperatingExpenses = {
       }));
       this.container.querySelector('#oex-rt-move')?.addEventListener('click', () => this._moveCheckedExpenses());
       this.container.querySelector('[data-oexreview-go]')?.addEventListener('click', () => this._runExpenseReview());
-      this.container.querySelector('[data-oexreview-back]')?.addEventListener('click', () => {
-        this._expenseReview = null; this._rerender();
-      });
+      this.container.querySelector('[data-oexreview-back]')?.addEventListener('click', () => this._backFromExpenseReview());
     }
     App.wireCustomSelects(this.container);
     this.container.querySelector('.card-collapse-head')?.addEventListener('click', (e) => App.toggleCollapse(e.currentTarget));
@@ -1861,7 +1863,28 @@ S.HubOperatingExpenses = {
     /* ⛔⛔ THE CARRIED NODE WINS OVER A FRESH MOUNT. If `_onImportState` handed us the live mapper,
        put THAT element back — calling `_mountImporter()` here would reset it to an empty drop zone
        and lose the operator's file, which is the whole hazard this path exists to avoid. */
-    if (this._carryCsv) {
+    /* ⛔⛔⛔ THE CARRY LIVES FOR AS LONG AS THE TAKEOVER DOES — IT IS NOT CONSUMED BY ONE RE-ATTACH.
+       This used to null both nodes the moment it put them back, which is fine for the ONE render the
+       handover triggers and wrong for every render after it. Kyle found what that costs
+       (2026-08-07): *"if you drop a file and it takes over page... and then you click and go to
+       another page and come back.. the drop file has no cancel button so the only way to get back to
+       the full page is to refresh it."* On the way back in there was nothing left to put back, so the
+       `else` below mounted a FRESH drop zone under a page still claimed by the import — steps gone,
+       and `#oexa-imp-actions` empty, because CSVMapper draws no buttons at all in its drop state.
+       ⭐ MEASURED ON THE SHIPPED COCKPIT BEFORE COPYING IT: `sc-dashboard`'s `_ckCarry` is never
+       nulled, which is why a round trip there comes back with "Found 7 rows", the column mapper and
+       Import/Cancel all intact. Holding the reference is what makes the file survive; releasing the
+       page was only ever the fallback for having lost it.
+       ⚠ SCOPED TO THE VIEW IT BELONGS TO. `_wireCurrent` also serves the full Operating Expenses
+       screen, and a held node would otherwise be moved into THAT screen's drop zone the next time it
+       painted in import mode — a file dropped on Close The Books turning up on a different page.
+       ⚠ AND THE VIEW TEST IS THE ONLY ONE NEEDED. My first version also asked `moneyOutTakeover()`,
+       which reads as prudence and is unreachable: every path that ends a takeover drops both nodes in
+       the same breath, so a held carry already implies a live takeover. A mutation removing it broke
+       nothing, which is the fixture saying the condition does no work ([[the-loop]] #20 — when a fix
+       makes a state unreachable, assert the unreachability rather than guarding it twice). Block F
+       is that assertion. */
+    if (this._carryCsv && this._view === 'moneyout') {
       /* ⛔ BOTH NODES, OR THE IMPORT BUTTON DOES NOT COME ACROSS. `#oexa-csv` holds the mapper;
          `#oexa-imp-actions` holds the button that commits it. Carrying one and rebuilding the other
          is what left a dropped file with nothing but Cancel. See `_onImportState`. */
@@ -1870,7 +1893,10 @@ S.HubOperatingExpenses = {
         if (slot && slot.parentNode) slot.parentNode.replaceChild(live, slot); };
       put(this._carryCsv, '#oexa-csv');
       put(this._carryActs, '#oexa-imp-actions');
-      this._carryCsv = null; this._carryActs = null;
+      /* ⚠ NOT CLEARED HERE. Every path that ENDS the takeover drops them together with the flag —
+         Cancel, Start Over and a landed import — so "taken over with nothing to put back" is
+         unreachable rather than guarded. `verify-money-out-takeover.js` block F walks every exit and
+         asserts it, which is the honest shape when a fix makes a state impossible ([[the-loop]] #20). */
     } else if (this._entryModeFor(this._view === 'moneyout') === 'import' && !this._expenseReview) {
       this._mountImporter();
     }
@@ -3320,6 +3346,27 @@ S.HubOperatingExpenses = {
     };
   },
 
+  /* ⛔⛔ START OVER GIVES THE PAGE BACK, NOT JUST THE SCREEN (2026-08-07).
+     It read `this._expenseReview = null; this._rerender();`, which drops the confirm screen and
+     leaves `_moTakeover` set — and the mapper that fed it was spent two renders earlier. Measured on
+     the live build: the operator lands on a bare drop zone with the four steps gone and no control
+     that returns the page. **That is the same dead state Kyle found by navigating away, reached in
+     one press, on a button Bar Cop draws itself.**
+     ⭐ `sc-dashboard` already answers this at its own Start Over — *"the carried mapper is spent once
+     its rows have gone to the confirm screen, so leaving the takeover set would re-attach a dead node
+     over the step"* — and it clears the takeover with the review. Same call here.
+     ⚠ ONE PATH FOR BOTH SURFACES. On the full Operating Expenses screen there is no takeover to end,
+     `_moTakeover` is already false, and `_rerenderHost` falls through to `_rerender()` — so this is
+     byte-identical to the old behaviour there. On the step it repaints the HOST, which is what brings
+     the four steps back; `_rerender()` alone would repaint the card inside a page that no longer has
+     one. */
+  _backFromExpenseReview() {
+    this._expenseReview = null;
+    this._moTakeover = false;
+    this._carryCsv = null; this._carryActs = null;
+    this._rerenderHost();
+  },
+
   /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
      only thing a re-render cannot hand back. */
   async _runExpenseReview() {
@@ -3488,6 +3535,11 @@ S.HubOperatingExpenses = {
     // with step 1 now reading the bills that just went in, rather than being left on a spent drop
     // zone. The import banner rides back with them; `_addCardHtml` consumes it on that render.
     this._moTakeover = false;
+    /* ⛔ AND THE CARRIED NODES GO WITH IT. They are held for the LIFE of the takeover now (see
+       `_wireCurrent`), so every path that ends one has to drop them in the same breath — a reference
+       to a mapper whose file has already been written is a dead node waiting to be re-attached over
+       a fresh drop zone. Enumerate the teardown, not just the new code ([[the-loop]] #44). */
+    this._carryCsv = null; this._carryActs = null;
     /* ⚠ THE GUARD COMES BEFORE THE MESSAGE, NOT AFTER IT. Placed after, it stopped the repaint but
        left `_importMsg` banked — and nothing else consumes it, so the next time the operator opened
        Operating Expenses, days later, it greeted them with "1 expense imported." about an import
