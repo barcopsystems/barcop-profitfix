@@ -1963,23 +1963,47 @@ const PosIngest = {
     // that was already correct. buildServer split exactly this into skipped vs incomplete for
     // exactly this reason; PMIX never got the split.
     const skipped = []; const incomplete = []; const dupCount = 0; let merged = 0;
+    /* ⛔⛔⛔ ONE VERDICT PER INPUT ROW, IN ORDER — ADDITIVE, as `buildVoids` and `buildServer` gained
+       it. Everything else here is a COUNT or a list of NAMES, and no confirm screen can be built on
+       that: a dish named on four rows produces ONE entry, so a count can never say which row did what.
+       ⛔⛔ AND THIS LANE HAS A SHAPE THE OTHER TWO DO NOT, which is the whole reason for the stamp at
+       the end. The landing decision is NOT made in this loop: rows fold into `byItem` keyed by MENU
+       ITEM, and only the second pass asks whether each item's summed units came out negative. So a
+       row can be ordinary positive sales and still not land, because a LATER row for the same dish
+       carried returns that took the total under zero. */
+    const perRow = [];
     (rows || []).forEach(r => {
       const nm = (r.name || '').trim().toLowerCase();
       const units = this._count(r.units);   // signed: a "-3" return REDUCES the week's units; NaN (junk) is skipped below
-      if (!nm) { skipped.push(r.name || '(blank)'); return; }
+      /* ⚠ THE VERDICT CARRIES THE RAW NAME, NOT `'(blank)'`. `skipped` substitutes that literal so a
+         count has something to hold; the screen needs to know the CELL was empty, because "add this to
+         your menu" is the wrong advice about a subtotal or section line. */
+      if (!nm) { skipped.push(r.name || '(blank)');
+        perRow.push({ raw: r, name: String(r.name || ''), status: 'noName', lands: false }); return; }
       const bucket = byName[nm];
-      if (!bucket) { skipped.push(r.name); return; }
+      if (!bucket) { skipped.push(r.name);
+        perRow.push({ raw: r, name: r.name, status: 'noMatch', lands: false }); return; }
       /* ⚠ THE NAME PROBLEM IS REPORTED BEFORE THE CELL PROBLEM, because it is the blocking one: the
          units cell does not matter until the row knows which item it belongs to. */
-      if (bucket.live.length > 1) { ambiguousSet.add(bucket.live[0].name); return; }
+      if (bucket.live.length > 1) { ambiguousSet.add(bucket.live[0].name);
+        perRow.push({ raw: r, name: bucket.live[0].name, status: 'ambiguous', lands: false }); return; }
       const it = bucket.live[0];
       // Matched, but every copy of this name is retired. Writing it puts the units on a row that is
       // filtered out of every board — an update the operator is told about and can never see.
-      if (!it) { retiredSet.add((bucket.archived[0] && bucket.archived[0].name) || r.name); return; }
-      if (isNaN(units)) { incomplete.push(r.name); return; }
+      if (!it) { const nmA = (bucket.archived[0] && bucket.archived[0].name) || r.name;
+        retiredSet.add(nmA);
+        perRow.push({ raw: r, name: nmA, status: 'retired', lands: false }); return; }
+      if (isNaN(units)) { incomplete.push(r.name);
+        perRow.push({ raw: r, name: it.name, status: 'incomplete', lands: false }); return; }
       const prior = byItem.get(it.id);
-      if (prior) { prior.covers += units; merged++; }
-      else byItem.set(it.id, { item_id: it.id, name: it.name, covers: units });
+      /* ⛔ THE VERDICT HOLDS THE SAME ENTRY OBJECT THAT WILL BE IN `toAdd`, never a copy — so the row
+         can show the SUMMED figure the write will actually use, and the second pass below can reach
+         every row that fed this dish through it. */
+      if (prior) { prior.covers += units; merged++;
+        perRow.push({ raw: r, name: it.name, status: 'merged', lands: true, entry: prior }); }
+      else { const u = { item_id: it.id, name: it.name, covers: units };
+        byItem.set(it.id, u);
+        perRow.push({ raw: r, name: it.name, status: 'new', lands: true, entry: u }); }
     });
     // Drop an item whose NET units come out NEGATIVE (returns exceeded sales in this file, or a
     // returns-only export dropped by mistake). _commitPmix REPLACES weekly_covers, so writing a
@@ -1998,6 +2022,13 @@ const PosIngest = {
     const toAdd = [];
     const netNegative = [];
     byItem.forEach(u => { if (u.covers >= 0) toAdd.push(u); else netNegative.push(u.name || u.item_id); });
+    /* ⛔⛔ THE SECOND PASS STAMPS THE ITEM'S FATE ONTO EVERY ROW THAT FED IT. A dish whose summed
+       units came out negative is left at its previous figure, so NONE of its rows lands — including
+       the ones that were ordinary positive sales before a later row's returns pulled the total under.
+       Without this the screen would show those rows as going in and the write would skip them, which
+       is the precise defect the rollout exists to close. */
+    const dead = new Set(); byItem.forEach(u => { if (u.covers < 0) dead.add(u); });
+    perRow.forEach(v => { if (v.entry && dead.has(v.entry)) { v.status = 'netNegative'; v.lands = false; } });
     // `merged`, NOT dupCount. In every other builder in this file dupCount means rows SKIPPED
     // because they were already logged, and every screen renders it as "N already logged" — the
     // opposite of what happened here, where N rows were FOLDED INTO a total. Reusing the name
@@ -2005,7 +2036,7 @@ const PosIngest = {
     // so the shared build() contract documented at the top of this file still holds.
     // `retired` / `ambiguous` are I4's two new outcomes — both are rows the file matched and this
     // builder deliberately refused, so both must reach the operator or they are silent drops.
-    return { toAdd, skipped, incomplete, netNegative, retired: [...retiredSet], ambiguous: [...ambiguousSet], dupCount, merged };
+    return { toAdd, skipped, incomplete, netNegative, retired: [...retiredSet], ambiguous: [...ambiguousSet], dupCount, merged, perRow };
   },
 
   // ── Persist ──────────────────────────────────────────────────────────────
