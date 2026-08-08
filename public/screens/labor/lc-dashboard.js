@@ -110,6 +110,19 @@ S.LaborDashboard = {
     const flash = this._flash; this._flash = null;
     const wys = this._wys();
 
+    /* ⛔⛔⛔ A FINISHED IMPORT GIVES THE PAGE BACK, and this is the line I left out of the copy.
+       Kyle, 2026-08-08: *"click add hours.. logs the hours but takes you back to the mapping screen
+       with the import hours button.. click import again and it takes you to the needs a look screen
+       saying already logged."* The write clears `_laborReview`, but the takeover flag and the CARRIED
+       MAPPER NODE were still set, so the render re-attached a spent mapper and offered the file back
+       for a second import that then correctly read as already logged.
+       ⭐ `_flash` is the one signal every lane already sets the moment it lands, so reading it here is
+       ONE release path that cannot drift from what the lanes do, because it IS what they do. A flash
+       set by something other than an import finds no takeover to clear, so it is a no-op there.
+       ⚠ AND IT MUST NOT FIRE WHILE A CONFIRM SCREEN IS UP: a refused write sets a message and KEEPS
+       the screen, and tearing the page away there would lose every row the operator is looking at. */
+    if (flash && !this._anyLaborReview()) this._clearLbTakeover();
+
     /* ⛔⛔ THE STRANDED PAGE. The takeover FLAG lives on the screen object and outlives the DOM, so
        navigating away and back would leave it claiming an import over a mapper that did not survive:
        a bare drop zone, steps gone, no way out but a refresh. Kyle found exactly this on Books.
@@ -786,10 +799,21 @@ S.LaborDashboard = {
       delete r.removed[b.dataset.confirmRestore]; this.render(this.container, this.actions);
     }));
     c.querySelector('[data-lbreview-go]')?.addEventListener('click', () => this._runLaborReview());
-    c.querySelector('[data-lbreview-back]')?.addEventListener('click', () => {
-      this._laborReview = null; this.render(this.container, this.actions);
-    });
+    c.querySelector('[data-lbreview-back]')?.addEventListener('click', () => this._backFromLaborReview());
   },
+  /* ⛔⛔ START OVER GIVES THE PAGE BACK, NOT JUST THE SCREEN. It was
+     `this._laborReview = null; this.render(...)`, which drops the confirm screen and leaves the
+     takeover set over a mapper that was spent the moment its rows reached that screen — so the
+     operator lands on a bare drop zone with the steps gone and nothing that returns the page. The
+     same dead state Kyle found by navigating away, reached in one press on a button Bar Cop draws
+     itself. Books hit this exact shape at its own Start Over and its comment says so; found here by
+     checking whether the other takeover screens shared the release bug above. They did not. */
+  _backFromLaborReview() {
+    this._laborReview = null;
+    this._clearLbTakeover();
+    this.render(this.container, this.actions);
+  },
+
   // ⛔ ONE PRESS, ONE IMPORT. The button is rebuilt by every redraw, so a flag on the screen object is
   // the only thing a redraw cannot hand back.
   async _runLaborReview() {
