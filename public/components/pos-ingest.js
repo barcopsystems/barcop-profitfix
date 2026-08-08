@@ -1033,11 +1033,19 @@ const PosIngest = {
     }
     let ok = true;
     if (fresh.length) {
-      arr.push(...fresh);
-      if (!(await App.putRecordsBulk(t.module, t.kind, fresh, { quiet: true }))) {
-        // The batch was refused. Take the staged rows back out and write them one at a time, so a
-        // row the server rejects individually is the only one missing.
-        App.dropRows(arr, fresh);
+      /* ⛔⛔⛔ STAGE ONLY AFTER THE WRITE SUCCEEDS — the same correction `_commitCashRows` and
+         `_commitAppend` took. Pushing first and calling `dropRows` on refusal assumes both methods
+         exist; `verify-import-partial-failure`'s fixture has NEITHER, which is exactly the write
+         layer a bulk path has to degrade into, and the throw escaped this function without even
+         returning `false`. Two checks were left in memory looking saved, so the door reported memory
+         as what landed. Writing first removes the window instead of guarding it. */
+      let bulkOk = false;
+      try { bulkOk = await App.putRecordsBulk(t.module, t.kind, fresh, { quiet: true }); }
+      catch (e) { bulkOk = false; }
+      if (bulkOk) arr.push(...fresh);
+      else {
+        // Refused, or no bulk available at all: write them one at a time, so a row the server
+        // rejects individually is the only one missing.
         try {
           for (const rec of fresh) { ok = (await App.putRecord(t.module, t.kind, rec)) && ok; }
         } catch (e) { return false; }
@@ -1076,11 +1084,22 @@ const PosIngest = {
     if (arr && rows.length === (toAdd || []).length) {
       const known = new Set(arr.map(x => x && x.id));
       if (!rows.some(r => known.has(r.id))) {
-        /* The caller of a bulk write owns the in-memory rows by contract, so they go in first and
-           come back out if the batch is refused — the same shape every other converted door uses. */
-        arr.push(...rows);
-        if (await App.putRecordsBulk(t.module, t.kind, rows, { quiet: true })) return true;
-        App.dropRows(arr, rows);
+        /* ⛔⛔⛔ STAGE ONLY AFTER THE WRITE SUCCEEDS. This used to push first and take the rows back
+           out with `dropRows` on refusal, and `verify-import-partial-failure` measured what that
+           costs when anything is unavailable: its fixture models a write layer with NO
+           `putRecordsBulk` and NO `dropRows` — which is precisely what a bulk path must degrade
+           safely into — so the bulk THREW, the throw escaped the function entirely, and two rows sat
+           in memory looking saved with nothing behind them. The caller never even received a
+           `false`, so its "did it save" check never ran and the screen reported memory as truth.
+           That is the -124-against--68 defect `_commitCashRows` was fixed for, on three more lanes.
+           ⭐ WRITE FIRST, STAGE AFTER REMOVES THE FAILURE MODE RATHER THAN GUARDING IT. No drop is
+           needed and there is no window in which rows look saved and nothing landed. It satisfies
+           the bulk contract either way: `App.putRecordsBulk` never reads the in-memory array (read
+           out of app.js, not assumed — it goes straight to `DB.putEventsBulk`). */
+        let bulkOk = false;
+        try { bulkOk = await App.putRecordsBulk(t.module, t.kind, rows, { quiet: true }); }
+        catch (e) { bulkOk = false; }
+        if (bulkOk) { arr.push(...rows); return true; }
       }
     }
     let ok = true;
