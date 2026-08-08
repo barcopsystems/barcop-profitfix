@@ -813,7 +813,11 @@ S.ShiftVoidComp = {
     'new':    'Adding this row',
     noAmount: 'No amount Bar Cop could use',
     undated:  'The date could not be read',
-    dup:      'Already in your log'
+    dup:      'Already in your log',
+    /* ⛔ "not a loss", because this lane carries voids AND comps and the row could be either. Before
+       this, a footer imported as a real one: a 3-row file holding one $12.00 void imported $2,052.00
+       and stored "TOTAL" as the server. */
+    summary:  'Your file\'s own totals line, not a loss'
   },
   _voidReviewRow(x, rid) {
     const rec = x.rec || {};
@@ -909,7 +913,7 @@ S.ShiftVoidComp = {
     opts = opts || {};
     // Match / dedup / build / save live in the shared PosIngest (dedup added so a
     // re-dropped voids/comps export never double-counts). UI message stays here.
-    const { toAdd, skipped, undated, dupCount, fileRepeats } = PosIngest.build('voids', rows);
+    const { toAdd, skipped, undated, dupCount, fileRepeats, summaryRows } = PosIngest.build('voids', rows);
     const setResult = html => { const r = resultId && document.getElementById(resultId); if (r) r.innerHTML = html; };
     const nUnd = (undated || []).length;
     /* Everything this import found besides the rows it wrote, built ONCE and appended to every
@@ -929,7 +933,14 @@ S.ShiftVoidComp = {
          in one night is an ordinary evening, and dropping the second would delete real money. So
          Bar Cop reports what it saw and leaves the decision where it belongs. */
       + ((fileRepeats || 0) ? dim(fileRepeats + ' repeated line' + (fileRepeats === 1 ? '' : 's')
-          + ' in your file, both imported. Delete one if it is a duplicate.') : '');
+          + ' in your file, both imported. Delete one if it is a duplicate.') : '')
+      /* ⚠ THE EXPORT'S OWN TOTALS LINES, WHICH USED TO IMPORT AS REAL LOSSES. Measured before the
+         fix: a 3-row file holding one $12.00 void imported $2,052.00. They are held back now, and a
+         row held back must never be held back in SILENCE — the rule this door already follows for
+         every other bucket above. On the reviewed path each one is on the confirm screen with its
+         own sentence, so `opts.reviewed` drops this clause with the rest. */
+      + ((summaryRows || []).length ? dim(summaryRows.length + ' totals row'
+          + (summaryRows.length === 1 ? '' : 's') + ' from your report, not imported.') : '');
     if (!toAdd.length) {
       // ⚠ NAME THE REAL REASON. One sentence used to cover every zero-row outcome, so a file whose
       // dates could not be read was told "Every row was missing a valid amount" — about amounts that
