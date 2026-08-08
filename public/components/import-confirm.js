@@ -295,8 +295,17 @@ const ImportConfirm = {
        The door supplies the groups and the toolbar; this owns the frame, exactly as before. */
     if (opts.groups) {
       const gs = (opts.groups || []).filter(g => g && (g.rows || []).length);
+      /* ⛔ A GROUP MAY SAY IT IS A REPORT, and then it drops the Remove BUTTON exactly as the
+         automatic "Not Going In" section does. Money Out builds its own cards, so the split above
+         never reaches it — but two of them hold rows that do not land ("Not Operating Expenses",
+         "Not Going In") while the panel passes `removable: true` for the category groups, so both
+         were offering the control that changes nothing. Kyle: *"the only action is to Remove them..
+         but you don't need to do that because they don't get added."*
+         ⚠ THE CELL STAYS AND SO DOES THE TICK BOX. The cell because the colgroup is built once for
+         the table; the tick box because Move To is how a "Not Operating Expenses" row gets answered,
+         and dropping it would take the one real control on that card. */
       body = gs.map((g, i) => this._section(g.title, g.sub,
-        g.open ? table(g.rows) : '', !!g.open, i === 0, g.key)).join('');
+        g.open ? table(g.rows, false, g.report === true) : '', !!g.open, i === 0, g.key)).join('');
       if (!body) body = '<div class="card" style="container-type:inline-size;">'
         + '<div style="overflow-x:auto;">' + table(rows) + '</div></div>';
     } else if (opts.flat) {
