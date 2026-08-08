@@ -1846,6 +1846,7 @@ const PosIngest = {
     return { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, fileRepeats, summaryRows, notService, perRow };
   },
 
+
   // A POS product-mix report: one row per item with units sold. Matches the item
   // to the menu by name; toAdd carries { item_id, covers } updates (not records),
   // applied in _commitPmix. Unmatched item names are skipped and surfaced.
