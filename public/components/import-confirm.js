@@ -109,7 +109,9 @@ const ImportConfirm = {
       + '</div>';
   },
 
-  _rowHtml(row, removable, selectable, isChecked, restorable) {
+  /* `hideActions` keeps the Remove column's CELL and leaves it empty. See the note at `table` for why
+     the cell cannot go with the button. */
+  _rowHtml(row, removable, selectable, isChecked, restorable, hideActions) {
     /* ⛔ DIM MEANS "YOU CAN LEAVE THIS ALONE", so a row waiting on the operator is
        never dimmed even though it will not land as things stand. Keyed on `lands`
        alone it greyed out the one row that needed them while it waited, and
@@ -135,7 +137,7 @@ const ImportConfirm = {
        and the verb has to say what it does. Same column, same width, so the colgroup still lines up
        across all three sections. */
     const rm = removable
-      ? '<td>' + (row.key != null && row.key !== ''
+      ? '<td>' + (!hideActions && row.key != null && row.key !== ''
           ? '<div class="row-actions"><button type="button" class="btn btn-ghost btn-sm"'
             + (restorable
                 ? ' data-confirm-restore="' + esc(row.key) + '">Put Back'
@@ -258,12 +260,19 @@ const ImportConfirm = {
     // drawn — the grouped path included, or the same sentence returns once per row inside a section.
     const strip = r => universal.length
       ? Object.assign({}, r, { notes: (r.notes || []).filter(x => universal.indexOf(x) < 0) }) : r;
-    /* `canRemove` lets ONE section opt out of the Remove column. Nothing else uses it: a section that
-       cannot be acted on must not offer the one control that does nothing there. */
-    const table = (list, restorable, canRemove) => '<table class="row-list" style="table-layout:fixed;width:100%;">'
+    /* `hideActions` lets ONE section drop the Remove BUTTON: a section that cannot be acted on must
+       not offer the one control that does nothing there.
+       ⛔⛔ IT DROPS THE BUTTON, NEVER THE CELL. The first version passed `removable: false` into the
+       row, which removed the whole `<td>` — while the colgroup and the header still declared that
+       column, because those are built once for the table. Every row in the section then ran one cell
+       short and its background stopped 96px before the right edge. Kyle saw it immediately:
+       *"you took away the remove button and now the row background does not still go full width."*
+       The rule was already written above the colgroup — *"the header gains a cell too, or every row
+       below it is off by one"* — and this broke it from the other end. */
+    const table = (list, restorable, hideActions) => '<table class="row-list" style="table-layout:fixed;width:100%;">'
       + colgroup + head + '<tbody>'
-      + list.map(r => this._rowHtml(strip(r), canRemove === false ? false : removable,
-          selectable, !!checked[r.key], restorable)).join('')
+      + list.map(r => this._rowHtml(strip(r), removable,
+          selectable, !!checked[r.key], restorable, hideActions === true)).join('')
       + '</tbody></table>';
 
     /* ⛔ WHAT NEEDS THE OPERATOR COMES FIRST AND STAYS OPEN; WHAT BAR COP WORKED OUT COLLAPSES.
@@ -367,7 +376,7 @@ const ImportConfirm = {
         const ngOpen = !!openMap.notgoing;
         body += this._section('Not Going In',
           notGoing.length + ' row' + (notGoing.length === 1 ? '' : 's') + ' Bar Cop left out, and why',
-          ngOpen ? table(notGoing, false, false) : '', ngOpen, !needs.length && !settled.length, 'notgoing');
+          ngOpen ? table(notGoing, false, true) : '', ngOpen, !needs.length && !settled.length, 'notgoing');
       }
       // A file with nothing in it at all still needs a table, or the screen is a lead and a button.
       if (!body) body = '<div class="card" style="container-type:inline-size;">'
