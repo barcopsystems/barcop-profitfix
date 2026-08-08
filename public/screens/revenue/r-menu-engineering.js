@@ -1067,6 +1067,21 @@ S.RevenueMenuEngineering = {
       ambiguous: (ambiguous || []).filter(Boolean),
       nRetired: (retired || []).length,
       nAmbiguous: (ambiguous || []).length };
+    /* ⛔⛔⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS, AND ONLY ON SUCCESS — and leaving this out is what
+       Kyle hit on the first walk: *"the button says updating.. for a second and then goes back to the
+       update button and you stay on the import rows page."* The write landed every time; `draw()`
+       simply re-rendered the confirm screen, because `_pmixReview` was still set and `draw()` reads it
+       first. A straight omission — `r-server-check` has this exact line and I did not copy it.
+       ⛔ AND A REFUSED WRITE KEEPS THE SCREEN, reporting into the shell's own result slot rather than
+       redrawing: every row stays up so the operator can press again without re-dropping the file, and
+       a redraw would destroy the slot holding the error. */
+    if (opts.reviewed && failed) {
+      const slot = document.getElementById('me-cov-result');
+      if (slot) slot.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + 'Could not save. Nothing was changed. Check your connection and press Update again.</div>';
+      return;
+    }
+    if (opts.reviewed) this._pmixReview = null;
     this.draw();
   },
 
