@@ -258,9 +258,12 @@ const ImportConfirm = {
     // drawn — the grouped path included, or the same sentence returns once per row inside a section.
     const strip = r => universal.length
       ? Object.assign({}, r, { notes: (r.notes || []).filter(x => universal.indexOf(x) < 0) }) : r;
-    const table = (list, restorable) => '<table class="row-list" style="table-layout:fixed;width:100%;">'
+    /* `canRemove` lets ONE section opt out of the Remove column. Nothing else uses it: a section that
+       cannot be acted on must not offer the one control that does nothing there. */
+    const table = (list, restorable, canRemove) => '<table class="row-list" style="table-layout:fixed;width:100%;">'
       + colgroup + head + '<tbody>'
-      + list.map(r => this._rowHtml(strip(r), removable, selectable, !!checked[r.key], restorable)).join('')
+      + list.map(r => this._rowHtml(strip(r), canRemove === false ? false : removable,
+          selectable, !!checked[r.key], restorable)).join('')
       + '</tbody></table>';
 
     /* ⛔ WHAT NEEDS THE OPERATOR COMES FIRST AND STAYS OPEN; WHAT BAR COP WORKED OUT COLLAPSES.
@@ -291,8 +294,29 @@ const ImportConfirm = {
       body = '<div class="card" style="container-type:inline-size;">'
         + '<div style="overflow-x:auto;">' + table(shown) + '</div></div>';
     } else {
-      const needs = shown.filter(r => !r.lands || (r.notes || []).length || r.needsYou);
-      const settled = shown.filter(r => !(!r.lands || (r.notes || []).length || r.needsYou));
+      /* ⛔⛔⛔ THE SPLIT IS BY WHETHER THERE IS SOMETHING TO DO, NOT BY WHETHER THE ROW LANDS.
+         Kyle, 2026-08-08: *"what exactly is the point of the 'Needs a look' card? there is no action
+         there other than 'remove'.. but the Needs a look are not included in the going in group
+         anyway.. the 'need a type' or 'need to sort' groups make sense because you actually do
+         something with those."* He is right, and the count backs it: measured across all ten
+         converted screens, SIX have no decision control at all, so that section was 100% rows the
+         operator could not act on.
+         THE OLD RULE PUT THREE DIFFERENT THINGS UNDER ONE HEADING that says "check before you add":
+           1. will not land, nothing to decide  -> no action exists. Remove is a no-op on it.
+           2. IS going in, carrying a caution   -> worth reading before pressing ("No pay set: their
+              shifts will cost $0" on a staff row that is about to import).
+           3. a real decision                    -> Keep Mine / Use The File, Keep N / Use 0.
+         Only 2 and 3 are a task. 1 is a REPORT, and it now looks like one.
+         ⛔ THE ROWS STAY. A file of 83 lines that imports 72 has to account for the other 11 or the
+         numbers stop reconciling, which is what makes an operator distrust the total. What changes is
+         the heading it sits under and the control it no longer offers.
+         ⚠ `decision` COUNTS AS AN ACTION EVEN THOUGH THE ROW DOES NOT LAND — a conflict awaiting an
+         answer is the row that most needs the operator, which is why it is also the row the dim rule
+         already exempts. */
+      const actionable = r => !!(r.needsYou || r.decision) || (r.lands && (r.notes || []).length);
+      const needs = shown.filter(r => actionable(r));
+      const notGoing = shown.filter(r => !actionable(r) && !r.lands);
+      const settled = shown.filter(r => !actionable(r) && r.lands);
       /* The door owns the state. "Needs a look" is open unless the operator closed it; "going in" is
          closed unless they opened it. A section that is closed builds no table at all, so a 2000-row
          group costs nothing until somebody asks for it. */
@@ -332,6 +356,18 @@ const ImportConfirm = {
             ? settled.length + ' ' + (settled.length === 1 ? noun : (opts.nounPlural || noun + 's')) + ' ' + opts.settledSub
             : settled.length + ' ' + (settled.length === 1 ? noun : (opts.nounPlural || noun + 's')) + ' Bar Cop worked out',
           settledOpen ? table(settled) : '', settledOpen, !needs.length, 'settled');
+      }
+      /* ⛔ THE REPORT. Collapsed, after what IS going in, and carrying NO Remove — offering the one
+         control that changes nothing is what made the old section read as a chore. Every row here
+         already says why it was left out in its own What Happens cell, which is the whole content.
+         ⚠ AFTER `settled`, NOT BEFORE: the button's number is about what is going in, so the section
+         that explains it sits next to it, and the one that explains what is NOT comes after. Removed
+         stays last, because those are rows the operator has already decided about. */
+      if (notGoing.length) {
+        const ngOpen = !!openMap.notgoing;
+        body += this._section('Not Going In',
+          notGoing.length + ' row' + (notGoing.length === 1 ? '' : 's') + ' Bar Cop left out, and why',
+          ngOpen ? table(notGoing, false, false) : '', ngOpen, !needs.length && !settled.length, 'notgoing');
       }
       // A file with nothing in it at all still needs a table, or the screen is a lead and a button.
       if (!body) body = '<div class="card" style="container-type:inline-size;">'
