@@ -1098,6 +1098,9 @@ const PosIngest = {
     const toAdd = []; const skipped = []; const undated = []; let dupCount = 0; const used = new Set();
     // S218: repeats here are COUNTED, not dropped — see the guard below for why this door differs.
     const fileSeen = new Set(); let fileRepeats = 0;
+    // `summaryRows` = lines that NAME themselves a total, in the Employee or the Menu Item cell.
+    // ADDITIVE, like `perRow`: every existing field keeps its exact meaning and its exact count.
+    const summaryRows = [];
     /* ⛔⛔ ONE VERDICT PER INPUT ROW, IN THE FILE'S OWN ORDER — the shape a confirm screen needs, and
        the first POS lane to have one (door 8, 2026-08-07). Everything else this function returns is a
        COUNT or a VALUE-LIST: `skipped` is the literal string `'(no amount)'`, `undated` is the raw
@@ -1110,6 +1113,27 @@ const PosIngest = {
        in `toAdd`, not a copy that could drift from it. */
     const perRow = [];
     (rows || []).forEach(r => {
+      /* ⛔⛔⛔ THE EXPORT'S OWN TOTALS LINE IS NOT A LOSS, AND THIS LANE WAS THE LAST ONE THAT DID NOT
+         KNOW IT. Found by sweeping outward from Kyle's register finding on the cash door, and
+         measured rather than reasoned: a 3-row file holding ONE real $12.00 void imported
+         **$2,052.00** of voids and comps, with "TOTAL" and "Grand Total" stored as the SERVER on two
+         of them. That figure is not cosmetic — it feeds the Voids stat on the Hub shift card and the
+         cockpit strip, Comp Total and Given Away, and Server Check's per-server comp% signal, which
+         is a THEFT signal and would have been attributing it to a server called TOTAL.
+         ⛔ IT HAS TO BE ASKED BEFORE THE AMOUNT TEST. A totals line's whole content is an amount, so
+         every later guard passes it straight through — the same ordering `buildCash` needs.
+         ⛔ BOTH NAME CELLS, because a voids export writes its footer under the Employee column or
+         the Menu Item column depending on the POS. Measured against 20 real menu items and 9 real
+         surnames the vocabulary has eaten before (Grand Summers, Tom Means, Avery Nettles, Crew
+         Jackson, Total Wine Bar): not one is refused. `verify-summary-line-never-a-record.js` holds
+         both ends.
+         ⚠ A BLANK NAME IS NOT A TOTALS LINE. A void with no server named is ordinary and the form
+         allows it, so only a cell that NAMES itself a total is refused. */
+      if (this.isSummaryName(r.server) || this.isSummaryName(r.item)) {
+        const nmS = String(r.server || r.item || '').trim();
+        summaryRows.push(nmS);
+        perRow.push({ raw: r, name: nmS, status: 'summary' }); return;
+      }
       // A void/comp is a LOSS magnitude. POS exports show it as a negative ("-15")
       // or accounting parens ("(15)") to signal it reduces sales; both are a $15
       // loss. Take the absolute value so those rows import instead of being dropped.
@@ -1197,7 +1221,7 @@ const PosIngest = {
     // Cop could not read. Two different problems with two different fixes — never one list.
     // `fileRepeats` here means "the file repeated a line" — NOT that anything was dropped. Both rows
     // are in `toAdd`. The door words it as something to look at, never as a collapse.
-    return { toAdd, skipped, undated, dupCount, fileRepeats, perRow };
+    return { toAdd, skipped, undated, dupCount, fileRepeats, summaryRows, perRow };
   },
 
   // rows -> one per-day sc_shifts record. `opts.manual` = the Enter-Manually grid (a hand entry,
