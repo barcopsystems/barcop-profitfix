@@ -861,6 +861,9 @@ S.RevenueMenuEngineering = {
         // A dropped item is a MEASUREMENT THAT WENT MISSING. It keeps last week's units, and this
         // screen presents those as this week's mix — so silence here is a wrong Star/Dog call.
         + (fl.netNegative && fl.netNegative.length ? note('Left at the previous figure: ' + list(fl.netNegative) + '. Returns exceeded sales in this file, so the units came out negative and were not written.') : '')
+        // The dishes the operator answered. Their own sentence, because "left alone" is now false of them.
+        + ((fl.zeroed || []).length ? note('Recorded at 0 units: ' + list(fl.zeroed)
+            + '. Returns beat sales in this file, and you chose to book the week at zero.') : '')
         // The rows with no name to print — a nameless PMIX line is usually a subtotal or a section
         // header. Reported as a count so the operator's totals reconcile.
         + ((nSkip - (fl.unmatched || []).length) > 0
@@ -918,6 +921,16 @@ S.RevenueMenuEngineering = {
        drop the one fact the operator cannot get anywhere else: a row of their file was not read. */
     incompleteFed: 'Units unreadable, other rows still count',
     netNegative: 'Returns came to more than the sales, so this item keeps its previous figure',
+    /* ⛔⛔ THE SAME DISH ONCE THE OPERATOR ANSWERS. Kyle's walk found that a held-back dish had NO
+       action: its only control was Remove, which produces the same outcome as leaving it alone, so
+       the row that most needed him had nothing to press and was dimmed as well. The choice is between
+       the two things that are true, and `buildPmix`'s own comment settles which second option to
+       offer: *"a zero-seller is exactly what the Dog Test exists to surface, so hiding it behind a
+       stale figure is the worse lie."* Keeping last week's number presents STALE units as this week's
+       mix and drives the Star/Dog call off them.
+       ⚠ NOT "drop the returns rows and bank the positives" — that stores a number the file does not
+       contain, and reaching one row inside a folded dish needs the per-row list the fold ended. */
+    netNegativeZero: 'Going in at 0 units for this week',
     merged:      'Summed with the other rows for this item',
     'new':       'Updating this item\'s units sold',
     /* ⛔⛔ THE TOTALS ROWS WENT OUT SILENT ON THE FIRST WALK. `buildPmix` gained the `summary` status
@@ -953,6 +966,10 @@ S.RevenueMenuEngineering = {
        is exact — comparing the file's own cell text would miss a dish whose export spells it in a
        different case. Re-derived on every render, so removing the dish puts its unreadable row back
        to the plain reason without a second code path. */
+    // Which held-back dishes the operator has chosen to book at zero. Held on the review object and
+    // handed to the WRITE by the same list, so the screen and the write cannot disagree.
+    const zeroSet = opts.zeroItems instanceof Set
+      ? opts.zeroItems : new Set(opts.zeroItems || []);
     const landedNames = new Set((built.perRow || [])
       .filter(v => v.lands && v.entry).map(v => v.entry.name));
     const noteKey = v => (v.status === 'incomplete' && landedNames.has(v.name))
@@ -968,8 +985,9 @@ S.RevenueMenuEngineering = {
         if (seen.has(v.entry)) return;   // already represented by its dish row
       }
       const it = v.entry ? byId[v.entry.item_id] : null;
-      const units = v.entry ? v.entry.covers : App.parseNum(raw.units);
       const was = it && Number.isFinite(it.weekly_covers) ? it.weekly_covers : null;
+      const units = (!v.lands && v.entry && was != null && zeroSet.has(v.entry.item_id))
+        ? 0 : (v.entry ? v.entry.covers : App.parseNum(raw.units));
       const shown = (units == null || isNaN(units)) ? '\u2014' : String(Math.round(units));
       /* ⛔ "was 95", NOT "you entered 95". `ImportConfirm.compare` writes *"you entered X"*, which is
          right on the sales and per-server doors — there the second figure IS one the operator typed
@@ -986,16 +1004,29 @@ S.RevenueMenuEngineering = {
          describe a record holding something else. A row with no entry (a totals line, an unmatched
          name, an unreadable row) has no item and still shows nothing, which is right — there is no
          previous figure to keep. */
-      const keepsPrev = !v.lands && v.entry && was != null;
-      const cell = (v.lands && was != null && Math.round(was) !== Math.round(units))
+      /* A held-back dish that HAS a previous figure is the only row on this screen that can be
+         answered, so it is the only one that gets a decision. A totals line, an unmatched name and an
+         unreadable row all have no item, so there is nothing to choose between. */
+      const canZero = !v.lands && !!v.entry && was != null;
+      const useZero = canZero && zeroSet.has(v.entry.item_id);
+      const lands = !!v.lands || useZero;
+      const keepsPrev = canZero && !useZero;
+      const cell = (lands && was != null && Math.round(was) !== Math.round(units))
         ? esc(shown) + ImportConfirm.sub('was ' + Math.round(was))
         : keepsPrev
           ? esc(shown) + ImportConfirm.sub('keeps ' + Math.round(was))
           : esc(shown);
       const row = {
         cells: [esc(v.name || '(no name)'), cell],
-        note: this.PMIX_NOTES[noteKey(v)] || '',
-        notes: [], lands: !!v.lands, needsYou: false, key: key
+        note: this.PMIX_NOTES[useZero ? 'netNegativeZero' : noteKey(v)] || '',
+        /* ⛔ `needsYou` IS WHAT KEEPS IT UNDIMMED AND IN PLACE. The shell dims on `!lands &&
+           !needsYou`, so before the decision existed the one row carrying the only choice on the
+           screen rendered at half opacity — what Kyle killed on the sales door ("buttons dimmed makes
+           the hard to see"). It stays true AFTER the answer too, so the row does not vanish into a
+           collapsed section the moment it is pressed. */
+        notes: [], lands: lands, needsYou: canZero,
+        decision: canZero ? this._pmixNegHTML(v.entry.item_id, useZero, was) : '',
+        key: key
       };
       rows.push(row);
       if (v.entry) seen.set(v.entry, row);
@@ -1020,15 +1051,37 @@ S.RevenueMenuEngineering = {
          is going in. Same shape as door 8's "Same line twice in your file" on a landing row.
          ⛔ A HELD-BACK DISH KEEPS ITS OWN REASON. "Summed from 3 rows" over a dish that is NOT going in
          would replace the one sentence the operator needs — that returns took the week negative. */
-      if (row.lands) row.note = 'Summed from ' + n + ' rows in your file';
+      /* ⛔ THE TEST IS `needsYou`, NOT `lands`, and it was `lands` until the decision landed. A dish
+         booked at zero DOES land, so the old test overwrote "Going in at 0 units for this week" with
+         the merge line and the operator lost the one sentence describing their own answer. A row
+         carrying a decision keeps its own reason in the outcome column, exactly as a held-back one
+         does; everything else takes the merge line there. */
+      if (row.lands && !row.needsYou) row.note = 'Summed from ' + n + ' rows in your file';
       else row.notes = ['Summed from ' + n + ' rows in your file'];
     });
     return { rows: rows, count: rows.filter(r => r.lands).length };
   },
 
+  /* The two true answers for a dish whose returns beat its sales, on the row, in the shape door 9
+     already uses for Keep Mine / Use The File. The default is what happens with no press at all, so
+     it renders selected and the operator can see the choice was made for them. */
+  _pmixNegHTML(itemId, useZero, was) {
+    const k = esc(String(itemId));
+    const btn = (val, label, on) => '<button type="button" class="btn btn-sm" data-pmzero="' + k
+      + '" data-z="' + val + '" style="'
+      + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+            : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">'
+      + btn('keep', 'Keep ' + Math.round(was), !useZero) + btn('zero', 'Use 0', useZero) + '</div>';
+  },
+  _pmixZeroIds() {
+    const r = this._pmixReview;
+    return r ? Object.keys(r.useZero || {}) : [];
+  },
+
   _openPmixReview(rows) {
     (rows || []).forEach((r, i) => { if (r && r._rid == null) r._rid = 'pm' + i; });
-    this._pmixReview = { rows: rows || [], open: {}, removed: {} };
+    this._pmixReview = { rows: rows || [], open: {}, removed: {}, useZero: {} };
     this.draw();
   },
   /* ⚠ RE-WALKED ON EVERY RENDER OVER THE ROWS NOT REMOVED, so the outcome is decided here rather than
@@ -1060,7 +1113,7 @@ S.RevenueMenuEngineering = {
     if (!r) return { rows: [], count: 0 };
     const keys = this._pmixRowKeys();
     const live = r.rows.filter((x, i) => !r.removed[keys[i]]);
-    return this.pmixReviewRows(PosIngest.build('pmix', live), { removed: {} });
+    return this.pmixReviewRows(PosIngest.build('pmix', live), { removed: {}, zeroItems: this._pmixZeroIds() });
   },
   _pmixReviewRemoved() {
     const r = this._pmixReview;
@@ -1068,7 +1121,7 @@ S.RevenueMenuEngineering = {
     const keys = this._pmixRowKeys();
     const gone = r.rows.filter((x, i) => r.removed[keys[i]]);
     if (!gone.length) return [];
-    return this.pmixReviewRows(PosIngest.build('pmix', gone), { removed: {} }).rows;
+    return this.pmixReviewRows(PosIngest.build('pmix', gone), { removed: {}, zeroItems: this._pmixZeroIds() }).rows;
   },
   _pmixPanelOpts() {
     const s = this._pmixReviewSummary();
@@ -1117,6 +1170,12 @@ S.RevenueMenuEngineering = {
     c.querySelectorAll('[data-confirm-restore]').forEach(b => b.addEventListener('click', () => {
       delete r.removed[b.dataset.confirmRestore]; this.draw();
     }));
+    c.querySelectorAll('[data-pmzero]').forEach(b => b.addEventListener('click', () => {
+      if (!r.useZero) r.useZero = {};
+      if (b.dataset.z === 'zero') r.useZero[b.dataset.pmzero] = true;
+      else delete r.useZero[b.dataset.pmzero];
+      this.draw();
+    }));
     c.querySelector('[data-pmreview-go]')?.addEventListener('click', () => this._runPmixReview());
     c.querySelector('[data-pmreview-back]')?.addEventListener('click', () => {
       this._pmixReview = null; this.draw();
@@ -1135,7 +1194,8 @@ S.RevenueMenuEngineering = {
          `_rid` here while the screen removes by DISH is how a button ends up promising a number the
          write does not honour — the defect the whole rollout exists to close. */
       const keys = this._pmixRowKeys();
-      await this.applyCoversImport(r.rows.filter((x, i) => !r.removed[keys[i]]), { reviewed: true });
+      await this.applyCoversImport(r.rows.filter((x, i) => !r.removed[keys[i]]),
+        { reviewed: true, zeroItems: this._pmixZeroIds() });
     } finally {
       this._pmixReviewWriting = false;
       if (this._pmixReview) {
@@ -1170,6 +1230,25 @@ S.RevenueMenuEngineering = {
     const _incRows = _pr.filter(v => v.status === 'incomplete' && v.name && v.name !== '(blank)');
     const _incSkipped = [...new Set(_incRows.filter(v => !_landed.has(v.name)).map(v => v.name))];
     const _incPartial = [...new Set(_incRows.filter(v => _landed.has(v.name)).map(v => v.name))];
+    /* ⛔⛔ THE OPERATOR'S ANSWER ON A NET-NEGATIVE DISH, APPLIED HERE AND NOWHERE ELSE. `buildPmix`
+       is untouched: it is right that a negative must never overwrite a real figure, and six other
+       lanes read the same builder. What the operator chose is that the WEEK was zero, so the door
+       adds a plain 0 record for exactly the dishes they answered. One entry per item, taken off the
+       same `perRow` the screen counted, so the button's number and the write cannot disagree. */
+    const _zero = new Set(opts.zeroItems || []);
+    const _zeroEntries = new Map();
+    if (_zero.size) _pr.forEach(v => {
+      if (!v.lands && v.entry && _zero.has(v.entry.item_id)) _zeroEntries.set(v.entry.item_id, v.entry);
+    });
+    /* ⛔ THE SENTENCE IS BUILT FROM WHAT WAS ACTUALLY PUSHED, not from the same map a second time. A
+       mutation deleting the push left `_zeroNames` intact, so the line still read "Recorded at 0
+       units" over a dish the write never touched — the flash and the write reading two sources for
+       one fact, which is what this whole rollout exists to end. Now one loop owns both. */
+    const _zeroNames = [];
+    _zeroEntries.forEach((e, id) => {
+      toAdd.push({ item_id: id, name: e.name, covers: 0 });
+      if (e.name && _zeroNames.indexOf(e.name) < 0) _zeroNames.push(e.name);
+    });
     let updated = 0, failed = false;
     if (toAdd.length) {
       // Honor the commit result: discarding it reported "Updated units sold on N items" after a
@@ -1198,7 +1277,9 @@ S.RevenueMenuEngineering = {
       // because the headline branches ask "was anything wrong with the units?" about the file.
       incomplete: _incSkipped,
       incompletePartial: _incPartial,
-      netNegative: (netNegative || []).filter(Boolean),
+      // A dish the operator booked at zero is no longer "left at the previous figure": it was written.
+      netNegative: (netNegative || []).filter(n => n && _zeroNames.indexOf(n) < 0),
+      zeroed: _zeroNames,
       // ⚠ RAW COUNTS drive the headline; the lists above only supply names. A PMIX row with an empty
       // Item Name cell lands in `skipped` as '(blank)', gets filtered out here, and then the headline
       // said "The item names matched" about a file that had a nameless row — which was itself

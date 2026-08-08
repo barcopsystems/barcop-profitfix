@@ -707,6 +707,11 @@ S.RevenueServerCheck = {
     return '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + ((fl.added && !fl.failed) ? 'var(--gold)' : (fl.dupCount && !fl.failed) ? 'var(--t2)' : 'var(--red)') + ';">' + head + '</div>'
       + (fl.unmatched && fl.unmatched.length ? note('Not matched to your roster: ' + list(fl.unmatched) + '. Add them in the Staff Roster or rename to match.') : '')
       + (fl.incomplete && fl.incomplete.length ? note('Skipped, no covers or sales rung: ' + list(fl.incomplete) + '. These are on your roster, nothing to fix.') : '')
+      /* The other half of the same fact. These servers DID import, from their other shifts, so naming
+         them beside the ones who imported nothing would be wrong about who was skipped. */
+      + ((fl.incompletePartial || []).length
+          ? note('Some shifts rang no covers and no sales: ' + list(fl.incompletePartial)
+                 + '. These servers still imported from their other shifts.') : '')
       /* Two buckets the builder now separates, and both used to land in 'Not matched to your
          roster' — which told the operator to ADD A POS TOTALS LINE as a staff member, and to add
          a line cook who is already on the roster. Neither is a roster fix, so neither says so. */
@@ -866,7 +871,7 @@ S.RevenueServerCheck = {
 
   async applyServerImport(rows, opts) {
     opts = opts || {};
-    const { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, fileRepeats, summaryRows, notService } = PosIngest.build('server', rows);
+    const { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, fileRepeats, summaryRows, notService, perRow } = PosIngest.build('server', rows);
     /* The file disagrees with checks entered or corrected BY HAND. Ask which wins before writing
        anything ([[user-chooses-conflicts]]) — the same prompt the Shift close uses for sales, cash
        and now server rows, so all three lanes behave the same way.
@@ -899,6 +904,25 @@ S.RevenueServerCheck = {
     }
     const keptByHand = (conflicts ? conflicts.length : 0) - extra.length;
     extra.forEach(rec => toAdd.push(rec));
+    /* ⛔⛔ `incomplete` IS PER **ROW** AND LANDING IS PER **SERVER + DATE**, so one empty Tuesday puts a
+       server who imported perfectly on Monday into the "Skipped" sentence. Measured: Ana on two nights
+       (one real, one at 0/0) plus Ben on one empty night gave `incomplete = ['Ana Reyes','Ben Cole']`
+       while `toAdd` held Ana's Monday. Same defect class as door 11, milder only because this sentence
+       ends "nothing to fix" rather than sending the operator to their export.
+       ⛔ IT SITS **AFTER** THE CONFLICT ROWS JOIN `toAdd`, and that is not a style choice: a server who
+       resolved a conflict to the file lands through `extra`, so deriving this at the build would have
+       called them skipped for the one shift they left empty.
+       ⚠ AND BOTH SIDES USE THE **ROSTER'S** SPELLING. `incomplete` collects the FILE's cell text while
+       the verdicts carry `staff.name`; the match is case-insensitive, so comparing the two directly
+       would miss "ana reyes" against "Ana Reyes". Reading both off `perRow` makes them agree by
+       construction, and it is the spelling the rest of this flash already prints. */
+    const _idName = {};
+    (perRow || []).forEach(v => { if (v.staff) _idName[v.staff.id] = v.staff.name; });
+    const _landedNames = new Set((toAdd || []).map(r => _idName[r.staff_id]).filter(Boolean));
+    const _incNames = [...new Set((perRow || [])
+      .filter(v => v.status === 'incomplete' && v.staff && v.staff.name).map(v => v.staff.name))];
+    const _incSkipped = _incNames.filter(n => !_landedNames.has(n));
+    const _incPartial = _incNames.filter(n => _landedNames.has(n));
     let added = 0, failed = false, landed = 0;
     if (toAdd.length) {
       // Honor the commit result. Discarding it reported "N server checks imported" in
@@ -930,7 +954,10 @@ S.RevenueServerCheck = {
       // how many they kept. Neither may be folded into the plain "imported" count.
       replaced: replaced || 0, keptByHand, usedFile: extra.length, fileRepeats: fileRepeats || 0,
       unmatched: (skipped || []).filter(s => s && s !== '(blank)'),
-      incomplete: (incomplete || []).filter(s => s && s !== '(blank)'),
+      // Only the servers who landed NOWHERE. `nIncomplete` below still counts every empty ROW,
+      // because the headline asks whether anything was wrong with the file.
+      incomplete: _incSkipped,
+      incompletePartial: _incPartial,
       undated: (undated || []).filter(s => s && s !== '(blank)'),
       /* ⚠ RAW COUNTS FOR THE HEADLINE — the display lists above strip '(blank)' rows, and the
          headline must never assert something those lists cannot see. A subtotal or section line
