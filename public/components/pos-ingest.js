@@ -933,6 +933,66 @@ const PosIngest = {
      ⚠ AND THAT IS CHECKED HERE RATHER THAN ASSUMED, because it is a property of a builder somebody
      could change later without ever reading this: anything that is not a pure append takes the safe
      old path. The guard costs one Set and removes the whole class. */
+  /* ⛔⛔⛔ THE PER-SERVER LANE'S OWN COMMIT, AND IT IS NOT `_commitVoids` WITH A DIFFERENT TYPE.
+     Kyle, walking door 9 live (2026-08-07): *"the same issue that voids had where it took like 20
+     seconds to complete after clicking the add button."* Same cause: the generic path below writes ONE
+     RECORD AT A TIME in an awaited loop, so 111 rows are 111 network round trips. In the demo that is
+     milliseconds because writes are no-ops, which is exactly why it only shows up on a real account.
+     ⛔⛔ WHY DOOR 8'S VERSION CANNOT BE PASTED HERE. `buildVoids` is a pure append — a fresh
+     `App.uid()` on every row — so its guard can be "if ANY id is already in the log, take the slow
+     path", and that condition never fires. `buildServer` UPSERTS: the replaced branch sets
+     `rec.id = prior.id` so the write REPLACES a shift already on the scorecard. That guard here would
+     send every re-drop that replaces even one row down the 111-round-trip path, which is the case an
+     operator hits every month, and a bare bulk PUSH would append the row it meant to replace — a
+     second record for the same server, date and service period, which is the double-count this door's
+     whole dedup history is made of.
+     ⭐ SO THE BATCH IS SPLIT BY WHAT EACH ROW ACTUALLY DOES, which is knowable from its id alone:
+       · id NOT in the log  -> an APPEND. All of them go in ONE bulk write.
+       · id already in the log -> a REPLACE. Through `putRecord`, which replaces by id.
+     A first drop is one round trip. A re-drop that replaces four rows is one bulk plus four.
+     ⚠ PARTIAL-SAVE HONESTY IS UNTOUCHED, and it is the reason the fallback exists rather than a retry:
+     `putRecord` reverts its own slot on a genuine refusal, so what is in memory IS what landed, and
+     `applyServerImport` counts `landed` by identity. A refused BULK drops its staged rows first
+     (`dropRows`) and then walks them one at a time, so "saved N of M" stays true either way. */
+  async _commitServer(toAdd) {
+    const t = this.TYPES.server;
+    const rows = (toAdd || []).filter(r => r && r.id != null);
+    if (!rows.length) return true;
+    const store = App.EVENT_STORES && App.EVENT_STORES[t.module];
+    const dataObj = store && store.data();
+    const key = store && store.kinds[t.kind];
+    const arr = (dataObj && key)
+      ? (Array.isArray(dataObj[key]) ? dataObj[key] : (dataObj[key] = []))
+      : null;
+    /* ⚠ THE SPLIT IS TAKEN ONCE, BEFORE ANYTHING IS WRITTEN. Reading `known` again after the bulk
+       staged its rows would classify every appended row as an existing one on the next pass. */
+    let fresh = rows, upserts = [];
+    if (arr && rows.length === (toAdd || []).length) {
+      const known = new Set(arr.map(x => x && x.id));
+      fresh = rows.filter(r => !known.has(r.id));
+      upserts = rows.filter(r => known.has(r.id));
+    } else {
+      fresh = [];
+      upserts = rows;   // no store to read: every row takes the safe path
+    }
+    let ok = true;
+    if (fresh.length) {
+      arr.push(...fresh);
+      if (!(await App.putRecordsBulk(t.module, t.kind, fresh, { quiet: true }))) {
+        // The batch was refused. Take the staged rows back out and write them one at a time, so a
+        // row the server rejects individually is the only one missing.
+        App.dropRows(arr, fresh);
+        try {
+          for (const rec of fresh) { ok = (await App.putRecord(t.module, t.kind, rec)) && ok; }
+        } catch (e) { return false; }
+      }
+    }
+    try {
+      for (const rec of upserts) { ok = (await App.putRecord(t.module, t.kind, rec)) && ok; }
+    } catch (e) { return false; }
+    return ok;
+  },
+
   async _commitVoids(toAdd) {
     const t = this.TYPES.voids;
     const rows = (toAdd || []).filter(r => r && r.id != null);
@@ -1954,6 +2014,7 @@ const PosIngest = {
     if (type === 'pmix')  return this._commitPmix(toAdd);
     if (type === 'cash')  return this._commitCashRows(toAdd);
     if (type === 'voids') return this._commitVoids(toAdd);
+    if (type === 'server') return this._commitServer(toAdd);
     const t = this.TYPES[type];
     if (!t) return false;
     let ok = true;
