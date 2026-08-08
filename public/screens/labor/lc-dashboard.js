@@ -120,9 +120,15 @@ S.LaborDashboard = {
       + this.outlierStrip()
       + '</div>';
 
-    if (this._openStep === 'hours') this.mountHoursImport();
-    if (this._openStep === 'tips') this.mountTipsImport();
+    /* ⚠ THE MAPPER IS NOT RE-MOUNTED UNDER A CONFIRM SCREEN. `CSVMapper.mount` opens by resetting its
+       container, and while a review is up that container is not on the page at all — mounting into a
+       node the step no longer renders is how a drop zone comes back to life underneath a screen that
+       promises nothing is saved. The review's own wiring goes on instead. */
+    const rev = this._laborReview;
+    if (this._openStep === 'hours' && !(rev && rev.type === 'hours')) this.mountHoursImport();
+    if (this._openStep === 'tips' && !(rev && rev.type === 'tips')) this.mountTipsImport();
     this.wire();
+    if (rev) this._wireLaborReview();
   },
 
   // ── Get Started: setup steps above the cockpit until all four are done ───────
@@ -230,6 +236,12 @@ S.LaborDashboard = {
   },
   workspace(k, isDone) {
     this._isDone = isDone;
+    /* ⛔ THE CONFIRM SCREEN TAKES THE WHOLE STEP, drop zone and buttons with it — the same shape the
+       sales cockpit uses, and for the reason written at that line: an operator part-way through
+       confirming a week's hours is doing ONE job. Leaving the drop zone under it would offer a second
+       file while the first is unconfirmed, and leaving Mark Done under it would let them tick the step
+       complete over an import that has not been pressed. */
+    if (this._laborReview && this._laborReview.type === k) return this.laborReviewHTML();
     if (k === 'hours') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export and Bar Cop matches each row to your roster and rates. Re-dropping will not double-count. No export? Log hours from your posted schedule in Log Hours.</div>'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Timeclock hours</span>' + App.freqTag('Weekly') + '</div>'
@@ -502,7 +514,9 @@ S.LaborDashboard = {
       fields: PosIngest.FIELDS.hours,
       confirmLabel: 'Import',
       onState: st => this._toggleBtns('lc-ck-hours-btns', st),
-      onComplete: rows => this.importLane('hours', rows, 'lc-ck-hours-res', 'tips')
+      /* ⛔ THE MAPPER NO LONGER COMMITS. It hands the file to the confirm screen, which is where the
+         operator presses the button. Same shape as every other converted door. */
+      onComplete: rows => this._openLaborReview('hours', rows)
     });
   },
   // ── Inline tips import (step 2) ──────────────────────────────────────────────
@@ -515,12 +529,198 @@ S.LaborDashboard = {
       fields: PosIngest.FIELDS.tips,
       confirmLabel: 'Import',
       onState: st => this._toggleBtns('lc-ck-tips-btns', st),
-      onComplete: rows => this.importLane('tips', rows, 'lc-ck-tips-res', 'schedule')
+      onComplete: rows => this._openLaborReview('tips', rows)
     });
   },
+  /* ── DOORS 12 AND 13: THE LABOR CONFIRM SCREEN ─────────────────────────────────────────────────
+     ONE SCREEN, TWO LANES. Hours and tips already run through `importLane` parameterised by `type`
+     end to end, so a second screen would be a second implementation of one decision. Everything that
+     differs between them is a lookup on `type`: the columns, the figure, and the pay-period lock.
+     ⛔⛔ THE CLOSED PAY PERIOD IS THIS DOOR'S OWN SHAPE, and it is why the screen could not simply be
+     bolted on. `importLane` splices those rows out of `toAdd` AFTER the build — measured on a real
+     83-row timeclock file, 74 built and 72 written. A confirm screen cannot stand on a list that
+     changes after it is shown, so the screen applies the SAME test through the same helper. Both
+     sides read `App.payPeriodClosedFor`, so the button's number and what the write keeps agree by
+     construction rather than by two copies of a rule.
+     ⚠ HOURS ONLY, deliberately: the lock is a property of logged hours, the Log Tips form has no
+     such check, and `importLane`'s own note says so. Do not "fix" tips to match. */
+  LABOR_NOTES: {
+    summary:  'Your file\'s own totals line, not a person',
+    noName:   'No name on this row',
+    noMatch:  'This name is not on your roster',
+    undated:  'Could not read the date on this row',
+    repeat:   'Same line twice in your file, counted once',
+    dup:      'Already logged',
+    locked:   'That week\'s pay period is closed'
+  },
+  /* The two notes that read differently per lane. A `--` cell is "no hours to log", not "no tips". */
+  _laborNote(type, status) {
+    if (status === 'incomplete') return type === 'hours' ? 'No hours to log on this row' : 'No tips to log on this row';
+    if (status === 'new')        return type === 'hours' ? 'Adding these hours' : 'Adding these tips';
+    return this.LABOR_NOTES[status] || '';
+  },
+  // ⛔ ONE TEST, READ BY THE SCREEN AND BY THE WRITE. See the block comment above.
+  _laborLocked(type, date) {
+    return type === 'hours' && !!date && !!(App.payPeriodClosedFor && App.payPeriodClosedFor(date));
+  },
+  /* The file's own figure, read the way the builder reads it, so a row that does not land still shows
+     what its line said. Blank when the cell genuinely carries no number — that row's whole problem. */
+  _hoursCell(v) {
+    const n = PosIngest._hours(v);
+    return (n == null || isNaN(n) || n <= 0) ? '' : String(n);
+  },
+  _tipsCell(cash, card) {
+    const t = PosIngest._num(cash) + PosIngest._num(card);
+    return t > 0 ? App.fmtCurrency(t) : '';
+  },
+  _laborCols(type) {
+    return [{ label: 'Staff', width: 26 }, { label: 'Date', width: 16 }, { label: 'Shift', width: 14 },
+            { label: type === 'hours' ? 'Hours' : 'Tips', width: 12 }];
+  },
+  /* One shell row per FILE row. **No fold on this lane**, and that is not an oversight: a split shift
+     is two records for one person on one day BY DESIGN, so collapsing by person would hide exactly the
+     rows the operator is checking. The pmix fold exists because its write is per DISH; here the write
+     is per row. */
+  laborReviewRows(type, built, opts) {
+    opts = opts || {};
+    const removed = opts.removed || {};
+    const rows = [];
+    (built.perRow || []).forEach((v, i) => {
+      const raw = v.raw || {};
+      const key = raw._rid != null ? raw._rid : i;
+      if (removed[key]) return;
+      const rec = v.rec || null;
+      /* A row the builder would write, on a week that is closed. It is not a builder concern — the
+         builder knows nothing about pay periods — so the verdict is stamped here and the write drops
+         the same rows through the same helper. */
+      const locked = !!v.lands && !!rec && this._laborLocked(type, rec.date);
+      const lands = !!v.lands && !locked;
+      /* ⛔ ONE QUANTITY, ONE SPELLING, EVEN ON A ROW THAT DOES NOT LAND. Building the cell from the
+         RECORD alone printed "Aug 4, 2026" on a landing row and "2026-08-04" on the repeat directly
+         above it — the same column, two formats, found by reading the render over the real file.
+         ⚠ AND THE EXCEPTION IS THE POINT: `fmtDate` answers '-' for a date it cannot parse, which
+         would delete the one piece of evidence the operator needs on the one row whose DATE is the
+         problem. So the raw text stands exactly where it is the subject. */
+      /* ⛔⛔ THE READABILITY TEST IS THE BUILDER'S, NOT `fmtDate`'S, and getting that wrong invented a
+         date on the one row that must not have one. `fmtDate` only answers '-' when `new Date` gives
+         NaN — and `new Date('Week of 8/3')` does not: JS finds the 8/3 and returns **August 3, 2001**.
+         So the row whose whole problem is an unreadable date rendered a confident wrong year, which
+         is worse than the two-spellings bug this block was fixing. `normDate` is the same call that
+         decided the row is `undated`, so the cell and the verdict now agree by construction. */
+      const rawDate = String(raw.date || '').trim();
+      const norm = rawDate ? PosIngest.normDate(rawDate) : '';
+      const dateTxt = rec ? this.fmtDate(rec.date) : (norm ? this.fmtDate(norm) : rawDate);
+      const shiftTxt = rec ? (rec.shift_type || '') : String(raw.shift || '').trim();
+      /* ⛔ AND A ROW THAT DOES NOT LAND STILL CARRIED A FIGURE. The repeated line and the off-roster
+         row both printed "—" over a file that plainly says 7.50 and 6.00, which reads as "there was
+         no figure" when the real reason is sitting in the next column. Where the file's own cell is
+         genuinely unreadable it still shows nothing, because there is nothing to show. */
+      const rawFig = type === 'hours' ? this._hoursCell(raw.hours)
+                                      : this._tipsCell(raw.cash_tips, raw.card_tips);
+      const figure = rec
+        ? (type === 'hours' ? String(rec.hours) : App.fmtCurrency(rec.total_tips || 0))
+        : rawFig;
+      rows.push({
+        cells: [esc(v.name || '(no name)'), esc(dateTxt || '—'),
+                esc(shiftTxt || '—'), esc(figure || '—')],
+        note: locked ? this.LABOR_NOTES.locked : this._laborNote(type, v.status),
+        notes: [], lands: lands, needsYou: false, key: key
+      });
+    });
+    return { rows: rows, count: rows.filter(r => r.lands).length };
+  },
+
+  _openLaborReview(type, rows) {
+    (rows || []).forEach((r, i) => { if (r && r._rid == null) r._rid = 'lb' + i; });
+    this._laborReview = { type: type, rows: rows || [], open: {}, removed: {} };
+    this.render(this.container, this.actions);
+  },
+  _laborReviewSummary() {
+    const r = this._laborReview;
+    if (!r) return { rows: [], count: 0 };
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    return this.laborReviewRows(r.type, PosIngest.build(r.type, live), { removed: {} });
+  },
+  /* Built by a SEPARATE walk over only the removed rows, so a removed duplicate stops blocking the
+     row behind it — its verdicts are meaningless here and only its cells are read. */
+  _laborReviewRemoved() {
+    const r = this._laborReview;
+    if (!r) return [];
+    const gone = r.rows.filter(x => r.removed[x._rid]);
+    if (!gone.length) return [];
+    return this.laborReviewRows(r.type, PosIngest.build(r.type, gone), { removed: {} }).rows;
+  },
+  _laborPanelOpts() {
+    const r = this._laborReview || { type: 'hours' };
+    const s = this._laborReviewSummary();
+    /* ⛔ THE BUTTON AND THE SUCCESS LINE USE THE SAME WORDS. The button read "Add 72 Hours Rows" over
+       a line saying "72 hour records imported" — one quantity, two names, on one screen. `importLane`
+       has called them hour/tip records since long before this door existed, so the button follows it. */
+    return { rows: s.rows, verb: 'Add', noun: r.type === 'hours' ? 'Hour Record' : 'Tip Record',
+             nounPlural: r.type === 'hours' ? 'Hour Records' : 'Tip Records' };
+  },
+  laborReviewHTML() {
+    const r = this._laborReview || { open: {}, type: 'hours' };
+    return ImportConfirm.panel(Object.assign(this._laborPanelOpts(), {
+      label: 'Check this file before it goes in',
+      lead: 'Nothing is saved until you press the button below. Every row from your file is here with '
+          + 'what Bar Cop worked out. Take out anything you do not want.',
+      columns: this._laborCols(r.type),
+      outcomeLabel: 'What happens',
+      removedRows: this._laborReviewRemoved(),
+      removable: true,
+      open: r.open,
+      settledLabel: 'Going In',
+      goAttr: 'data-lbreview-go', backAttr: 'data-lbreview-back', backLabel: 'Start Over',
+      resultId: r.type === 'hours' ? 'lc-ck-hours-res' : 'lc-ck-tips-res',
+      busy: !!this._laborReviewWriting
+    }));
+  },
+  _wireLaborReview() {
+    const c = this.container, r = this._laborReview;
+    if (!c || !r) return;
+    c.querySelectorAll('[data-confirm-section]').forEach(h => h.addEventListener('click', () => {
+      const k = h.dataset.confirmSection;
+      r.open[k] = (k === 'needs') ? (r.open[k] === false) : !r.open[k];
+      this.render(this.container, this.actions);
+    }));
+    c.querySelectorAll('[data-confirm-remove]').forEach(b => b.addEventListener('click', () => {
+      r.removed[b.dataset.confirmRemove] = true; this.render(this.container, this.actions);
+    }));
+    c.querySelectorAll('[data-confirm-restore]').forEach(b => b.addEventListener('click', () => {
+      delete r.removed[b.dataset.confirmRestore]; this.render(this.container, this.actions);
+    }));
+    c.querySelector('[data-lbreview-go]')?.addEventListener('click', () => this._runLaborReview());
+    c.querySelector('[data-lbreview-back]')?.addEventListener('click', () => {
+      this._laborReview = null; this.render(this.container, this.actions);
+    });
+  },
+  // ⛔ ONE PRESS, ONE IMPORT. The button is rebuilt by every redraw, so a flag on the screen object is
+  // the only thing a redraw cannot hand back.
+  async _runLaborReview() {
+    const r = this._laborReview;
+    if (!r || this._laborReviewWriting) return;
+    this._laborReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-lbreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try {
+      const live = r.rows.filter(x => !r.removed[x._rid]);
+      await this.importLane(r.type, live,
+        r.type === 'hours' ? 'lc-ck-hours-res' : 'lc-ck-tips-res',
+        r.type === 'hours' ? 'tips' : 'schedule', { reviewed: true });
+    } finally {
+      this._laborReviewWriting = false;
+      if (this._laborReview) {
+        const b = this.container && this.container.querySelector('[data-lbreview-go]');
+        if (b) { b.disabled = false; b.textContent = ImportConfirm.goLabel(this._laborPanelOpts()); }
+      }
+    }
+  },
+
   // Shared import path: match/dedup/build/save live in PosIngest so the cockpit
   // and the per-page lanes never drift. label = 'hours' | 'tips'.
-  async importLane(type, rows, resultId, nextStep) {
+  async importLane(type, rows, resultId, nextStep, opts) {
+    opts = opts || {};
     /* ⚠ `fileRepeats` JOINS THE DESTRUCTURE FOR THE SAME REASON AS `incomplete` DID (S218). A line
        the file repeated verbatim is now counted ONCE — at this door that is hours into gross pay and
        tips into Form 8027, so it was the most expensive place the bug lived. A bucket no door reads
@@ -602,6 +802,13 @@ S.LaborDashboard = {
     // in one set of words — and the undated count cannot be reported on two paths and dropped on the third.
     this._flash = toAdd.length + ' ' + noun + ' record' + (toAdd.length === 1 ? '' : 's') + ' imported'
       + outcomes + '.';
+    /* ⛔⛔⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS, AND ONLY ON SUCCESS. Leaving this out is what door 11
+       shipped with: the write landed every time and the render put the same screen straight back,
+       because `workspace` reads the review first. The two early returns above and the refusal branch
+       all keep the screen up on purpose — every row stays listed so the operator can press again
+       without re-dropping the file, and `setRes` writes into the shell's OWN result slot, so nothing
+       re-renders over the message. */
+    if (opts.reviewed) this._laborReview = null;
     this._openStep = nextStep;
     this.render(this.container, this.actions);
   },
