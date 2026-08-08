@@ -1694,6 +1694,19 @@ const PosIngest = {
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
     const summaryRows = []; const notService = []; const conflicts = []; let replaced = 0;
     const fileSeen = new Set(); let fileRepeats = 0;   // exact repeats WITHIN this one file
+    /* ⛔⛔⛔ ONE VERDICT PER INPUT ROW, IN ORDER — ADDITIVE, exactly as `buildVoids` gained it at
+       door 8. Everything else this function returns is a COUNT or a list of NAMES, and measured on
+       the live build against a real file that is not enough for a confirm screen: two failing rows
+       for the same server are two identical strings, so the screen cannot say WHICH row was already
+       logged. The contract it has to serve is "every row is listed, and ONE walk produces the status
+       AND the count".
+       ⛔ A LANDING VERDICT CARRIES THE SAME RECORD OBJECT THAT IS IN `toAdd`, NEVER A COPY. A copy is
+       how a screen ends up describing an outcome the write will not produce, which is the whole
+       defect the rollout exists to close. `verify-server-import-review.js` block B pins it by
+       identity, and the conflict verdict holds the same conflict object for the same reason.
+       ⚠ EVERY EXISTING FIELD KEEPS ITS EXACT MEANING. Seven lanes still read them, so block D
+       asserts not one bucket moved. */
+    const perRow = [];
     (rows || []).forEach(r => {
       /* ⚠⚠ A POS TOTALS LINE IS NOT A PERSON, AND TELLING THE OPERATOR TO ADD IT TO THE ROSTER IS
          THE WORST ADVICE THIS DOOR COULD GIVE. `isSummaryName` was never called here, so
@@ -1705,7 +1718,8 @@ const PosIngest = {
          it totals. `isSummaryName` lives in this file and its own comment says it belongs here
          rather than privately at one door, "because the same summary line lands on doors 4, 11 and
          12". Door 12 calls it; this one did not. */
-      if (this.isSummaryName(r.name)) { summaryRows.push(String(r.name || '').trim()); return; }
+      if (this.isSummaryName(r.name)) { const nm = String(r.name || '').trim();
+        summaryRows.push(nm); perRow.push({ raw: r, name: nm, status: 'summary' }); return; }
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       // ⚠ Math.max(0, ...): the coercion now reads a sign, and a server cannot ring NEGATIVE
       // covers. Left signed, "(12)" stored -12, which r-server-check prints and sums into the
@@ -1717,7 +1731,12 @@ const PosIngest = {
       // nothing to log. Lumping them sent the operator to "add them in the Staff Roster"
       // for someone already on it, so they added a duplicate that fixed nothing and
       // corrupted the roster.
-      if (!staff) { skipped.push(r.name || '(blank)'); return; }
+      /* ⚠ THE VERDICT CARRIES THE RAW NAME, NOT `'(blank)'`. `skipped` substitutes that literal so a
+         count has something to hold; the SCREEN needs to know the cell was empty, because "no server
+         name on this row" and "this name is not on your roster" are different sentences, and both
+         doors already report them separately in their flashes. */
+      if (!staff) { skipped.push(r.name || '(blank)');
+        perRow.push({ raw: r, name: String(r.name || ''), status: 'noMatch' }); return; }
       /* ⚠⚠ AND THE IMPORT WROTE SERVER CHECKS FOR PEOPLE THE MANUAL FORM WILL NOT EVEN OFFER. The
          form builds its picker from `App.staffOptions(..., {audience:'service'})` — active staff in
          Bar or Front of House. This matched the WHOLE roster, with no status and no department test.
@@ -1725,8 +1744,15 @@ const PosIngest = {
          written for them, and one kitchen row at 5 covers / $40 dragged the Team Average tile from
          $40.00 to $36.44. Two doors writing one record on two different rules is the defect, and the
          form's rule is the right one, so this reads the same predicate. */
-      if (staff.status === 'Inactive' || (App.isService && !App.isService(staff))) { notService.push(staff.name); return; }
-      if (!covers || !(sales > 0)) { incomplete.push(r.name || '(blank)'); return; }
+      /* ⚠ TWO REASONS, AND THE SCREEN MUST NOT MERGE THEM. "They are not on the schedule any more"
+         and "their department does not take covers" are different sentences to the operator, and one
+         of them is a roster fix while the other is not. The count cannot tell them apart; the verdict
+         can, so it says which. */
+      if (staff.status === 'Inactive' || (App.isService && !App.isService(staff))) { notService.push(staff.name);
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'notService',
+          reason: staff.status === 'Inactive' ? 'inactive' : 'department' }); return; }
+      if (!covers || !(sales > 0)) { incomplete.push(r.name || '(blank)');
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'incomplete' }); return; }
       const recDate = this.normDate(r.date, opts);
       /* ⚠ A ROW WITH NO READABLE DATE IS NOT AN IMPORT, IT IS A SKIP. This wrote the record with
          `date: ''` and counted it as imported. Every consumer of a server check filters by date
@@ -1737,7 +1763,8 @@ const PosIngest = {
          The two sibling doors already refuse this: buildSales says "No days imported. Check that
          the file has a Date column", buildCash says "Each row needs a date". Only server accepted
          it. A per-server export with a date cell like "Jul 24" or "7/24" (no year) hits this. */
-      if (!recDate) { undated.push(r.name || '(blank)'); return; }
+      if (!recDate) { undated.push(r.name || '(blank)');
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'undated' }); return; }
       /* ⚠⚠ THE DEDUP KEY INCLUDED THE FIGURES, SO CORRECTING A ROW DESTROYED ITS OWN IDENTITY.
          The key was staff + date + covers + sales — so a row the operator FIXED BY HAND no longer
          matched the file it came from, and re-dropping the same export wrote it a second time.
@@ -1769,7 +1796,8 @@ const PosIngest = {
          tips, voids and cash double the same way, but a repeated 4-hour line is just as likely a
          genuine split shift, and dropping it is the payroll version of this bug. See S218. */
       const fileKey = staff.id + '|' + recDate + '|' + shiftName + '|' + covers + '|' + sales.toFixed(2);
-      if (fileSeen.has(fileKey)) { fileRepeats++; return; }
+      if (fileSeen.has(fileKey)) { fileRepeats++;
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'repeat' }); return; }
       fileSeen.add(fileKey);
       const rec = {
         id: App.uid(), date: recDate, shift: shiftName, shift_id: '',
@@ -1780,7 +1808,8 @@ const PosIngest = {
             && (x.shift || '').trim() === shiftName);
       if (prior) {
         // Identical row: already logged, exactly as before.
-        if ((prior.covers || 0) === covers && Math.abs((prior.sales || 0) - sales) < 0.001) { dupCount++; return; }
+        if ((prior.covers || 0) === covers && Math.abs((prior.sales || 0) - sales) < 0.001) { dupCount++;
+          perRow.push({ raw: r, name: staff.name, staff: staff, status: 'dup', prior: prior }); return; }
         /* ⚠ PROVENANCE DECIDES, AND `imported` ALONE IS NOT IT — S140's exact trap. `saveEdit`
            spreads the prior record, so a HAND CORRECTION to an imported row keeps `imported:true`;
            testing that flag would silently overwrite the very correction this fix exists to
@@ -1789,20 +1818,32 @@ const PosIngest = {
            — including the seed, which stamps no provenance — as the operator's own. */
         const mine = prior.source === 'manual'
           || (prior.source == null && prior.imported !== true);
-        if (!mine) { rec.id = prior.id; replaced++; toAdd.push(rec); return; }   // replacing our own earlier import
-        conflicts.push({
+        /* ⛔ THIS IS THE UPSERT, AND IT IS WHY THIS LANE CANNOT TAKE DOOR 8'S BULK COMMIT AS-IS.
+           `rec` goes into `toAdd` carrying the PRIOR record's id, so the write means to REPLACE.
+           `putRecord` replaces by id; a bulk push appends. `buildVoids` is the only pure-append
+           builder, which is the whole reason `_commitVoids` was safe there and is not here. */
+        if (!mine) { rec.id = prior.id; replaced++; toAdd.push(rec);
+          perRow.push({ raw: r, name: staff.name, staff: staff, status: 'replaced', rec: rec, prior: prior });
+          return; }   // replacing our own earlier import
+        /* ⚠ HELD IN A LOCAL SO THE VERDICT CAN CARRY THE SAME OBJECT. Pushing the literal and then
+           building a second one for `perRow` would give the screen a copy, and a copy is how a screen
+           describes a decision the write does not honour. */
+        const clash = {
           key: prior.id, date: recDate, shift: shiftName, name: staff.name,
           mine:   { covers: prior.covers || 0, sales: prior.sales || 0 },
           theirs: { covers, sales },
           useRec: Object.assign({}, rec, { id: prior.id })
-        });
+        };
+        conflicts.push(clash);
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'conflict', conflict: clash, prior: prior });
         return;
       }
       toAdd.push(rec);
+      perRow.push({ raw: r, name: staff.name, staff: staff, status: 'new', rec: rec });
     });
     // `replaced` is NOT `dupCount`: this door renders dupCount as "already logged", which is false
     // of a row whose figures we just overwrote. Different events, different words.
-    return { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, fileRepeats, summaryRows, notService };
+    return { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, fileRepeats, summaryRows, notService, perRow };
   },
 
   // A POS product-mix report: one row per item with units sold. Matches the item
