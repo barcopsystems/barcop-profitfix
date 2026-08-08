@@ -314,8 +314,8 @@ const CSVMapper = {
       // the operator looking at the wrong thing — name the other sheets so they can move the tab.
       const others = (wb.SheetNames || []).slice(1);
       const emptyMsg = others.length
-        ? 'The first sheet ("' + wb.SheetNames[0] + '") has no rows. Bar Cop reads the first sheet only — '
-          + 'this file also has: ' + others.join(', ') + '. Move your data to the first sheet and try again.'
+        ? 'The first sheet ("' + wb.SheetNames[0] + '") has no rows. Bar Cop reads the first sheet only. '
+          + 'This file also has: ' + others.join(', ') + '. Move your data to the first sheet and try again.'
         : 'File appears empty.';
       if (data.length < 2) { this._msg(container, emptyMsg, 'var(--red)'); return; }
       /* ⚠ THE SAME HEADER DETECTION AS THE CSV PATH (I3). This carried the identical `data[0]`
@@ -935,7 +935,7 @@ const CSVMapper = {
         // happened" — and the natural next move is to click Import again.
         const err = area.querySelector('.csvm-err');
         if (err) {
-          err.textContent = 'The import could not be saved. Nothing was changed — check your connection and try again.';
+          err.textContent = 'The import could not be saved. Nothing was changed. Check your connection and try again.';
           err.style.display = 'block';
         }
         // DB.logClientError, not App — it lives on DB (db.js:1195). Guarded, never-throws, and
