@@ -519,10 +519,13 @@ S.LaborStaffRoster = {
      the same way the write resolves it, because they come from the same walk. */
   _staffReviewRow(x, rid) {
     const NOTE = {
-      'new':  'Adding this person',
-      dup:    'Already on your roster',
-      repeat: 'Repeated in this file',
-      blank:  'No name'
+      'new':   'Adding this person',
+      dup:     'Already on your roster',
+      repeat:  'Repeated in this file',
+      blank:   'No name',
+      // Same sentence shape every converted door uses for this row: name what it IS, then what it
+      // is not, so the operator is never told to fix a roster spelling that is a footer.
+      summary: 'Your file\'s own totals line, not a person'
     };
     const rec = x.rec || {};
     const raw = x.raw || {};
@@ -628,6 +631,18 @@ S.LaborStaffRoster = {
     (rows || []).forEach(r => {
       const name = (r.name || '').trim();
       if (!name) { list.push({ raw: r, name: '', status: 'blank', notes: [] }); return; }
+      /* ⛔⛔ THE EXPORT'S OWN TOTALS LINE IS NOT A PERSON. A payroll or timeclock export ends in
+         "TOTAL" / "Grand Total" / "Team Average", and this walk read every one of them as a name to
+         hire: measured, a file with twelve footer spellings created twelve staff records, who then
+         appear in every staff picker, on the schedule and across the labor screens, and pick up a
+         wage from the position default.
+         ⛔ THE SAME SHARED TEST THE POS BUILDERS USE, never a word list of this door's own. It is
+         what makes "Grand Summers", "Tom Means", "Avery Nettles" and "Crew Jackson" real people
+         rather than footers — a vocabulary whitelist has deleted a real person from a theft report
+         three times ([[the-loop]] #26), so the control matters as much as the guard.
+         ⚠ ABOVE the dedup checks on purpose: a footer that happens to match a name already on the
+         roster must still read as a footer, not as "already on your roster". */
+      if (PosIngest.isSummaryName(name)) { list.push({ raw: r, name: name, status: 'summary', notes: [] }); return; }
       const key = name.toLowerCase();
       if (mine.has(key)) { list.push({ raw: r, name: name, status: 'dup', notes: [] }); return; }
       if (seen.has(key)) { list.push({ raw: r, name: name, status: 'repeat', notes: [] }); return; }
