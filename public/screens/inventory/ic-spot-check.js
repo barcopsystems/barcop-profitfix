@@ -733,8 +733,8 @@ S.InventorySpotCheck = {
     });
   },
   applyPosImport(rows) {
-    const byName = {};
-    this.products().forEach(p => { byName[(p.name || '').trim().toLowerCase()] = p; });
+    const byName = {}, nameById = {};
+    this.products().forEach(p => { byName[(p.name || '').trim().toLowerCase()] = p; nameById[p.id] = p.name; });
     const onScreen = {};
     this.container.querySelectorAll('.sp-line').forEach(line => { onScreen[line.dataset.pid] = line; });
     /* ⚠⚠ A PRODUCT LISTED TWICE MUST BE SUMMED, NOT OVERWRITTEN. This did `inp.value = sold`, so the
@@ -746,16 +746,40 @@ S.InventorySpotCheck = {
        A 43-row per-sale export ends at sold = 1. The sibling door in this same section
        (`posByProduct.addProduct` in ic-report-variance) already sums; this one never did. */
     const totals = {};      // product id -> summed sold
-    let noMatch = 0, offCheck = 0, unreadable = 0, negative = 0;
+    /* ⛔⛔ EVERY DROPPED ROW IS NAMED, NOT COUNTED (contract rule 8: the result names what was left
+       out, BY NAME). All four of these used to be bare tallies — *"1 name not matched to a product"*
+       and never which one — so the operator was told something in their file had been ignored and
+       given no way to find it short of reading the file against their product list by hand. On the
+       one door whose whole job is a POUR VARIANCE, an unnamed dropped row is a hole in the divisor.
+       ⚠ AND `noMatch` COUNTED **ROWS** UNDER A SENTENCE THAT SAYS "NAMES". One product on three
+       unmatched rows read "3 names not matched" against one name — the per-row-versus-per-thing
+       defect, in a sentence that names its own unit out loud. It counts distinct names now, so the
+       number and the list it introduces can never disagree.
+       ⚠ THE OFF-CHECK AND UNREADABLE COUNTS STAY PER **ROW**, because their sentences say "rows" —
+       a product on three off-check rows is three rows and one name, and both are true. */
+    let offCheck = 0, unreadable = 0;
+    const offNames = [], noNames = [], unreadNames = [], negNames = [];
+    const seenNoMatch = new Set();
+    const add = (list, nm) => { if (nm && list.indexOf(nm) < 0) list.push(nm); };
     rows.forEach(r => {
-      const p = byName[(r.product || '').trim().toLowerCase()];
-      if (!p) { noMatch++; return; }
-      if (!onScreen[p.id]) { offCheck++; return; }
+      const rawName = String(r.product == null ? '' : r.product).trim();
+      const p = byName[rawName.toLowerCase()];
+      if (!p) {
+        /* ⚠ A BLANK PRODUCT CELL HAS NO NAME TO PRINT, and "1 name not matched: " with nothing after
+           it is worse than the count was. Same `(blank)` treatment `buildServer` gives it. */
+        const label = rawName || '(blank)';
+        const k = label.toLowerCase();
+        if (!seenNoMatch.has(k)) { seenNoMatch.add(k); noNames.push(label); }
+        return;
+      }
+      // ⚠ THE PRODUCT'S OWN SPELLING, not the file's. The match is case-insensitive, so printing the
+      // file's text would show the operator a name that is not the one on their list.
+      if (!onScreen[p.id]) { offCheck++; add(offNames, p.name); return; }
       // App.parseNum, not parseFloat: `parseFloat('1,200')` is 1 and `parseFloat('$45')` is NaN,
       // which silently DROPPED the row. Every other numeric read in this section uses the one
       // coercion; this door had a private copy that disagreed with it on four shapes.
       const sold = App.parseNum(r.sold);
-      if (sold == null) { unreadable++; return; }
+      if (sold == null) { unreadable++; add(unreadNames, p.name); return; }
       /* ⚠ A NEGATIVE ROW IS NETTED, NOT DROPPED. Refusing it per row fought the summing directly
          above: a POS export that prints returns on their own line ("Tito's 60", "Tito's -4") had
          the refund THROWN AWAY and filled 60 instead of 56 — 4 phantom pours of "sold", which is
@@ -768,7 +792,7 @@ S.InventorySpotCheck = {
       /* Only a net-negative TOTAL is refused. The typed field is `<input type="number" min="0">`,
          so the operator cannot enter one; a file whose refunds exceed its sales for a product is
          not a quantity the check can use, and writing it produced phantom theft. */
-      if (totals[pid] < 0) { negative++; return; }
+      if (totals[pid] < 0) { add(negNames, nameById[pid]); return; }
       const inp = onScreen[pid].querySelector('.sp-sold');
       if (inp) { inp.value = totals[pid]; this.recalcLine(onScreen[pid]); filled++; }
     });
@@ -779,11 +803,20 @@ S.InventorySpotCheck = {
       /* `filled` counts PRODUCTS now. It used to increment inside the row loop, so a two-row file
          for one product reported "Filled POS sold for 2 products" — the reading that hid the
          overwrite above. And every way a row could be dropped was silent. */
+      /* ⛔ ESCAPED, AND THAT IS NEW BECAUSE THE CONTENT IS NEW. This line printed only integers, so
+         it needed nothing; it now carries a PRODUCT NAME the operator typed and a CELL out of the
+         dropped file, straight into `innerHTML`.
+         ⚠ CAPPED AT FOUR AND IT SAYS HOW MANY IT DID NOT PRINT — the convention `csv-mapper` already
+         uses for unread columns. A first drop is big, and naming 200 rows in a status line is the
+         same failure as naming none. */
+      const listOf = names => names.slice(0, 4).map(esc).join(', ')
+        + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '');
+      const noMatch = noNames.length, negative = negNames.length;
       const notes = [];
-      if (offCheck)   notes.push(offCheck + ' row' + (offCheck === 1 ? '' : 's') + ' for products not on this check');
-      if (noMatch)    notes.push(noMatch + ' name' + (noMatch === 1 ? '' : 's') + ' not matched to a product');
-      if (unreadable) notes.push(unreadable + ' row' + (unreadable === 1 ? '' : 's') + ' with no readable sold figure');
-      if (negative)   notes.push(negative + ' negative sold figure' + (negative === 1 ? '' : 's') + ' ignored');
+      if (offCheck)   notes.push(offCheck + ' row' + (offCheck === 1 ? '' : 's') + ' for products not on this check: ' + listOf(offNames));
+      if (noMatch)    notes.push(noMatch + ' name' + (noMatch === 1 ? '' : 's') + ' not matched to a product: ' + listOf(noNames));
+      if (unreadable) notes.push(unreadable + ' row' + (unreadable === 1 ? '' : 's') + ' with no readable sold figure: ' + listOf(unreadNames));
+      if (negative)   notes.push(negative + ' negative sold figure' + (negative === 1 ? '' : 's') + ' ignored: ' + listOf(negNames));
       const tail = notes.length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes.join(' · ') + ')</span>' : '';
       res.innerHTML = filled > 0
         ? '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Filled POS sold for ' + filled + ' product' + (filled === 1 ? '' : 's') + '. Review the variance below, then save.' + tail + '</div>'
