@@ -211,7 +211,7 @@ S.LaborDashboard = {
     const circle = isDone
       ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
       : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + m.n + '</span>';
-    const bg = isOpen ? 'var(--gold-tint)' : (isDone ? 'var(--input)' : 'var(--surface)');
+    const bg = isOpen ? 'var(--step-open)' : (isDone ? 'var(--input)' : 'var(--surface)');
     let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;">'
       + '<div class="lc-step-head' + (isOpen ? '' : ' collapsed') + '" data-step="' + k + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
       +   circle
@@ -581,9 +581,9 @@ S.LaborDashboard = {
         return;
       }
       setRes('<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + (nUnd && !skipped.length && !nInc && !dupCount ? 'No rows imported. Bar Cop could not read a date on ' + (nUnd === 1 ? 'the row' : 'any row') + ' — check the date column in your export.'
+        + (nUnd && !skipped.length && !nInc && !dupCount ? 'No rows imported. Bar Cop could not read a date on ' + (nUnd === 1 ? 'the row' : 'any row') + '. Check the date column in your export.'
          : nInc && !skipped.length && !nUnd && !dupCount ? 'No rows imported. Every name matched your roster, but no row had ' + (type === 'hours' ? 'usable hours.' : 'a tip amount above zero.')
-         : skipped.length && !nInc && !nUnd && !dupCount ? 'No rows imported. Not one name in the file matched your staff roster — check the spellings, or add them in Staff Roster.'
+         : skipped.length && !nInc && !nUnd && !dupCount ? 'No rows imported. Not one name in the file matched your staff roster. Check the spellings, or add them in Staff Roster.'
          : 'No new rows imported.') + outcomes + '</div>');
       return;
     }
