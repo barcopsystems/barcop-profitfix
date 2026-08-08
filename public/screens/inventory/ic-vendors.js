@@ -458,6 +458,16 @@ S.InventoryVendors = {
     (rows || []).forEach(r => {
       const name = (r.name || '').trim();
       if (!name) { list.push({ raw: r, name: '', status: 'blank', notes: [] }); return; }
+      /* ⛔⛔ THE FILE'S OWN TOTALS LINE IS NOT A VENDOR. A distributor statement or a spend report
+         ends in "TOTAL" / "Grand Total" / "Sub Total", and this walk read each one as a supplier to
+         add: measured, twelve footer spellings created twelve vendors, which then show up in the
+         Order Sheet, on every product's vendor picker and in the vendor tracker.
+         ⛔ THE SAME SHARED TEST THE POS BUILDERS USE, never a word list of this door's own — which
+         is what keeps "Total Wine & More" and "Grand Summers Produce" real suppliers. Their names
+         are exactly the shape a narrower guard would eat.
+         ⚠ ABOVE the dedup checks on purpose: a footer must read as a footer, not as "already on
+         your list". */
+      if (PosIngest.isSummaryName(name)) { list.push({ raw: r, name: name, status: 'summary', notes: [] }); return; }
       const key = vkey(name);
       /* ⛔ TWO REASONS, NOT ONE. Both used to be a single `dup` count, and they are different
          problems: a name you already own is a dead end, a name repeated inside the file is about
@@ -577,10 +587,11 @@ S.InventoryVendors = {
   _VENDOR_ROW_NOTE: null,
   _vendorReviewRow(x, rid) {
     const NOTE = {
-      'new':  'Adding this vendor',
-      dup:    'Already on your list',
-      repeat: 'Repeated in this file',
-      blank:  'No vendor name'
+      'new':   'Adding this vendor',
+      dup:     'Already on your list',
+      repeat:  'Repeated in this file',
+      blank:   'No vendor name',
+      summary: 'Your file\'s own totals line, not a vendor'
     };
     const rec = x.rec || {};
     const cell = v => esc(String(v == null || v === '' ? '' : v)) || '&mdash;';
