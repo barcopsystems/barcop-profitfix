@@ -18,6 +18,11 @@ S.RevenueServerCheck = {
   _form: null,
   _impFlash: null,   // one-shot result line for the per-server import
   _entryMode: 'manual',   // New Shift Check card: 'manual' form or 'import' drop
+  /* The confirm screen's state, and it lives HERE rather than in the DOM so a redraw cannot lose the
+     operator's file: `{ rows, open, removed, useFile }`. Null means no import is being confirmed, and
+     `draw()` reads it to decide whether the page is the cockpit or the check screen. */
+  _serverReview: null,
+  _serverReviewWriting: false,
   _window: '30',
   WINDOW_CHIPS: [
     { v: '7', label: 'Last 7 Days' },
@@ -466,6 +471,24 @@ S.RevenueServerCheck = {
       .filter(c => (c.date || '') >= cutoffStr)
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
+    /* ⛔⛔⛔ THE CONFIRM SCREEN OWNS THE PAGE. Kyle found the alternative on `ev-regulars` and it is
+       not a layout note: the list underneath carries EDIT and DELETE, which write on the press, four
+       inches below a sentence promising nothing is saved until a different press. Two opposite write
+       models on one page, with the destructive one under the reassuring line. The scorecard and
+       Export are the same error more quietly — they describe a board the import is about to change.
+       ⚠ THE STAT STRIP STAYS, exactly as Close The Books keeps Where You Stand: it is the context of
+       what is being imported into, and it carries no write control.
+       ⚠ `_serverReview` LIVES ON THE SCREEN OBJECT, not in the DOM, so it survives a redraw — which
+       is what lets Remove, Put Back and a conflict answer re-render without losing the file. */
+    if (this._serverReview) {
+      this.container.innerHTML = '<div class="screen">'
+        + this.statStrip(scorecard, targetCA)
+        + '<div style="margin-top:18px;">' + this.serverReviewHTML() + '</div>'
+        + '</div>';
+      this.wire();
+      return;
+    }
+
     this.container.innerHTML = '<div class="screen">'
       + this.statStrip(scorecard, targetCA)
       + this.renderForm(targetCA)
@@ -475,6 +498,105 @@ S.RevenueServerCheck = {
 
     this.wire();
     this.calc();
+  },
+
+  /* ── THE FIVE PIECES EVERY CONVERTED DOOR HAS, in the order the rollout settled on ─────────────
+     1 the pure walk        `PosIngest.build('server', rows)` + `serverReviewRows` (both above)
+     2 open the review      stamps `_rid` per row so Remove has a stable key
+     3 the summary          filters removed, re-walks, maps to shell rows
+     4 the panel            `ImportConfirm.panel`, whose lead names the BUTTON'S OWN verb
+     5 the press            one guard, then the existing write with `{ reviewed: true }` */
+
+  /* ⛔ `_rid` IS STAMPED ON THE RAW ROW, and the mapper reads it back. Without a stable key, Remove is
+     keyed on array position — and position moves the moment a row is removed, so the second Remove
+     takes a different row than the one clicked. */
+  _openServerReview(rows) {
+    (rows || []).forEach((r, i) => { if (r && r._rid == null) r._rid = 'sr' + i; });
+    this._serverReview = { rows: rows || [], open: {}, removed: {}, useFile: {} };
+    this.draw();
+  },
+
+  /* ⛔⛔ RE-WALKED ON EVERY RENDER OVER THE ROWS NOT REMOVED, and that is deliberate: the walk is the
+     ONE place a row's outcome is decided, so the screen and the write cannot disagree. The
+     file-level verdicts other doors have to freeze (door 6's sign convention, door 7's day-first
+     reading) do not arise here — `buildServer` settles every row on its own staff, date and figures,
+     with nothing derived from the file as a whole. Checked rather than assumed: the only cross-row
+     state in that walk is `fileSeen`, which is order-dependent inside one pass, and `used`, which is
+     per-pass too. Removing a row can therefore only change the row that was removed.
+     ⚠ EXCEPT ONE, AND IT IS WORTH NAMING: removing the FIRST of two identical lines promotes the
+     second from `repeat` to `new`, which is exactly right — the operator took out the duplicate. */
+  _serverReviewSummary() {
+    const r = this._serverReview;
+    if (!r) return { rows: [], count: 0 };
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    const built = PosIngest.build('server', live);
+    return this.serverReviewRows(built, { removed: {}, useFile: r.useFile });
+  },
+  /* The rows the operator took out, built by a SEPARATE walk over only those rows — so a removed
+     duplicate stops blocking the row behind it. Their verdicts are meaningless and are never read;
+     only their cells are, which is what the "Removed" section shows. */
+  _serverReviewRemoved() {
+    const r = this._serverReview;
+    if (!r) return [];
+    const gone = r.rows.filter(x => r.removed[x._rid]);
+    if (!gone.length) return [];
+    return this.serverReviewRows(PosIngest.build('server', gone), { removed: {}, useFile: {} }).rows;
+  },
+
+  serverReviewHTML() {
+    const r = this._serverReview || { open: {} };
+    const s = this._serverReviewSummary();
+    /* ⚠ THE LEAD NAMES THE BUTTON'S OWN VERB, never a hardcoded word. Both lead sentences on the sales
+       door still said "press Import" after Kyle renamed that button to Add, and survived the rename in
+       silence ([[import-confirm-rollout]] door 2, correction 1). */
+    return ImportConfirm.panel({
+      label: 'Check this file before it goes in',
+      lead: 'Nothing is saved until you press the button below. Every row from your file is here with '
+          + 'what Bar Cop worked out. Take out anything you do not want.',
+      columns: [
+        { label: 'Server', width: 22 }, { label: 'Date', width: 14 }, { label: 'Shift', width: 12 },
+        { label: 'Covers', width: 9 }, { label: 'Sales', width: 13 }
+      ],
+      outcomeLabel: 'What happens',
+      rows: s.rows,
+      removedRows: this._serverReviewRemoved(),
+      removable: true,
+      verb: 'Add', noun: 'Check', nounPlural: 'Checks',
+      open: r.open,
+      goAttr: 'data-svreview-go', backAttr: 'data-svreview-back', backLabel: 'Start Over',
+      resultId: 'rsc-imp-result',
+      busy: !!this._serverReviewWriting
+    });
+  },
+
+  /* ⛔ ONE PRESS, ONE IMPORT. The button is rebuilt by every re-render, so a flag on the screen object
+     is the only thing a re-render cannot hand back. */
+  async _runServerReview() {
+    const r = this._serverReview;
+    if (!r || this._serverReviewWriting) return;
+    this._serverReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-svreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try {
+      await this.applyServerImport(r.rows.filter(x => !r.removed[x._rid]),
+        { reviewed: true, useFile: r.useFile });
+    } finally {
+      this._serverReviewWriting = false;
+      /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `applyServerImport` is what clears it — a refused write
+         keeps every row up so the operator can press again without re-dropping the file, and the
+         error goes into the shell's own result slot. Do NOT redraw here: the failure path writes into
+         that slot and a redraw destroys it. */
+      if (this._serverReview) {
+        const b = this.container && this.container.querySelector('[data-svreview-go]');
+        if (b) { b.disabled = false; b.textContent = ImportConfirm.goLabel(this._serverPanelOpts()); }
+      }
+    }
+  },
+  // The label comes from the SHELL, not from a second copy of its rule — the reference door once
+  // relabelled its own button to something `ImportConfirm.panel` would never render.
+  _serverPanelOpts() {
+    const s = this._serverReviewSummary();
+    return { rows: s.rows, verb: 'Add', noun: 'Check', nounPlural: 'Checks' };
   },
 
   // Only reads fields that are actually on screen. In Import mode the rsc-* inputs are
@@ -619,10 +741,122 @@ S.RevenueServerCheck = {
       actionsEl: '#rsc-imp-actions',
       fields: PosIngest.FIELDS.server,
       confirmLabel: 'Import',
-      onComplete: rows => this.applyServerImport(rows)
+      /* ⛔ THE MAPPER NO LONGER COMMITS. It hands the file to the confirm screen, which is where the
+         operator presses Add — the same shape as every other converted door. */
+      onComplete: rows => this._openServerReview(rows)
     });
   },
-  async applyServerImport(rows) {
+  /* ⭐⭐⭐ ONE VERDICT-TO-ROW MAPPING, SHARED WITH THE SHIFT COCKPIT'S PER-SERVER ZONE.
+     `sc-dashboard`'s per-server drop and this screen read the identical `PosIngest.build('server')`
+     and show the identical columns, so the verdict-to-row mapping is the one part that must not
+     drift — two copies of a decision is exactly how a screen ends up promising a number the write
+     does not honour. The FRAME stays per-door (`ImportConfirm.panel` with its own ids, lead and
+     verb): the shell owns the frame, the door owns its columns. Here both doors' columns are the
+     same, so they come from one function instead of two.
+     ⛔⛔ IT LIVES HERE AND NOT ON `PosIngest`, AND THE REASON WAS MEASURED. That component's charter
+     is parse / match / dedup / commit; this is display. Putting it there gave the intake component a
+     dependency on `esc` and on `ImportConfirm` — which loads AFTER it in index.html — and 60
+     harnesses load pos-ingest, 20+ of them with no global `esc`. The precedent for the shape it has
+     instead is `hub-books-home` calling `S.HubOperatingExpenses.renderMoneyOut()`: the screen that
+     owns the job owns the code, and the other door calls in.
+     ⛔ THE FORMATS ARE THIS SCREEN'S OWN LOG FORMATS, measured off `_buildRows` below: the date is
+     the raw `slice(0,10)` ISO string, covers are `Math.round`, sales go through `App.fmtCurrency`.
+     The log does NOT print a friendly date, so neither does this — one quantity must not get two
+     spellings on one page. It also means a refused row and a landing row cannot disagree about date
+     format, which door 8 left open as a cosmetic note.
+     ⛔ A CONFLICT ROW DOES NOT LAND BY DEFAULT and is never dimmed. Keeping your own figures means
+     no write, and dim means "you can leave this alone" — false of the one row that needs the
+     operator ([[user-chooses-conflicts]]).
+     ⚠ `cells` is HTML and is escaped here; `note`/`notes` are TEXT the shell escapes and budgets. */
+  SERVER_NOTES: {
+    // Ten outcomes, ten sentences. Merging any two is how an operator gets sent to fix a roster
+    // spelling that does not exist, or told a subtotal line needs adding to the Staff Roster.
+    summary:    'Your file\'s own totals line, not a server',
+    noMatch:    'This name is not on your staff roster',
+    noName:     'No server name on this row',
+    inactive:   'No longer active on your roster',
+    department: 'Their department does not take covers',
+    incomplete: 'Rang no covers and no sales',
+    undated:    'Could not read the date on this row',
+    repeat:     'Same line twice in your file',
+    dup:        'Already logged, and the figures match',
+    replaced:   'Replacing the figures already imported for this shift'
+  },
+  serverReviewRows(built, opts) {
+    opts = opts || {};
+    const useFile = opts.useFile || {};      // conflict key -> the operator chose the file
+    const removed = opts.removed || {};      // row key -> taken out of this import
+    const rows = [];
+    (built.perRow || []).forEach((v, i) => {
+      const key = (v.raw && v.raw._rid != null) ? v.raw._rid : i;
+      if (removed[key]) return;
+      const st = v.status;
+      const cov = n => String(Math.round(Number(n) || 0));
+      const money = n => App.fmtCurrency(Number(n) || 0);
+      /* The file's own date text, unparsed. `normDate` has already refused anything it could not
+         read, so an `undated` row is the one place this is all there is to show — and it is the row
+         whose DATE is the problem, so showing the operator's own cell is the honest answer. */
+      const dateCell = (v.rec && v.rec.date) ? String(v.rec.date).slice(0, 10)
+                     : String((v.raw && v.raw.date) || '');
+      const shiftCell = String((v.rec && v.rec.shift) || (v.raw && v.raw.shift) || '');
+      const nameCell = v.name || (v.raw && v.raw.name) || '';
+      let covCell, salesCell;
+      if (st === 'conflict') {
+        /* ⛔ THE COMPARISON GOES IN THE COLUMN IT IS ABOUT, and ONLY where it differs. A conflict fires
+           when covers OR sales disagree, so "you entered 20" printed under an identical 20 is noise on
+           the row that can least afford it. `ImportConfirm.compare` is the shell's one implementation
+           of that rule. */
+        const c = v.conflict || {}, mine = c.mine || {}, theirs = c.theirs || {};
+        covCell = ImportConfirm.compare(cov(theirs.covers), cov(mine.covers));
+        salesCell = ImportConfirm.compare(money(theirs.sales), money(mine.sales));
+      } else if (st === 'summary' || st === 'noMatch' || st === 'undated' || st === 'incomplete'
+                 || st === 'notService' || st === 'repeat') {
+        covCell = cov((v.raw || {}).covers);
+        salesCell = money(App.parseNum((v.raw || {}).sales));
+      } else if (st === 'dup') {
+        // The SAVED figures, because the note says they match what is saved — so showing what is
+        // saved is the row telling the truth about itself (door 2's rule for `same`/`kept` rows).
+        covCell = cov((v.prior || {}).covers);
+        salesCell = money((v.prior || {}).sales);
+      } else {
+        covCell = cov((v.rec || {}).covers);
+        salesCell = money((v.rec || {}).sales);
+      }
+      const N = this.SERVER_NOTES;
+      let note = '';
+      if (st === 'summary') note = N.summary;
+      else if (st === 'noMatch') note = nameCell === '' ? N.noName : N.noMatch;
+      else if (st === 'notService') note = v.reason === 'inactive' ? N.inactive : N.department;
+      else if (st === 'incomplete') note = N.incomplete;
+      else if (st === 'undated') note = N.undated;
+      else if (st === 'repeat') note = N.repeat;
+      else if (st === 'dup') note = N.dup;
+      else if (st === 'replaced') note = N.replaced;
+      const needsYou = st === 'conflict';
+      const lands = st === 'new' || st === 'replaced' || (needsYou && !!useFile[(v.conflict || {}).key]);
+      rows.push({
+        cells: [esc(nameCell === '' ? '(no name)' : nameCell), esc(dateCell), esc(shiftCell), covCell, salesCell],
+        note: note, notes: [], lands: lands, needsYou: needsYou, key: key,
+        decision: needsYou ? this._serverConflictHTML(v, !!useFile[(v.conflict || {}).key]) : ''
+      });
+    });
+    return { rows: rows, count: rows.filter(r => r.lands).length };
+  },
+  /* Keep Mine / Use The File, on the row. The modal this replaces is still `App.promptImportConflicts`
+     and three doors still use it; these two do not any more. Default is KEEP YOUR OWN, unchanged —
+     the operator has to choose the file, never the other way round. */
+  _serverConflictHTML(v, useFile) {
+    const k = esc(String((v.conflict || {}).key || ''));
+    const btn = (val, label, on) => '<button type="button" class="btn btn-sm" data-svconf="' + k
+      + '" data-use="' + val + '" style="'
+      + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+            : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    return '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+      + btn('mine', 'Keep Mine', !useFile) + btn('file', 'Use The File', useFile) + '</div>';
+  },
+
+  async applyServerImport(rows, opts) {
+    opts = opts || {};
     const { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, fileRepeats, summaryRows, notService } = PosIngest.build('server', rows);
     /* The file disagrees with checks entered or corrected BY HAND. Ask which wins before writing
        anything ([[user-chooses-conflicts]]) — the same prompt the Shift close uses for sales, cash
@@ -631,7 +865,15 @@ S.RevenueServerCheck = {
        empty `toAdd`, and the zero-row branch would otherwise blame the file for rows Bar Cop read
        perfectly well. */
     const extra = [];
-    if (conflicts && conflicts.length) {
+    /* ⛔⛔ ON THE REVIEWED PATH THE ANSWER IS ALREADY ON THE ROW, so the modal must not fire. Asking
+       twice for one decision is the shape door 2 removed from this app: the confirm screen shows both
+       sets of figures with Keep Mine / Use The File, and `opts.useFile` is what the operator chose.
+       ⚠ `App.promptImportConflicts` STAYS for the doors that still write on the press — the cockpit's
+       per-server zone is one of them until it converts — so the helper is not retired here. */
+    if (opts.reviewed) {
+      const chose = opts.useFile || {};
+      (conflicts || []).forEach(c => { if (chose[c.key]) extra.push(c.useRec); });
+    } else if (conflicts && conflicts.length) {
       const figs = v => v.covers + (v.covers === 1 ? ' cover' : ' covers') + ' · ' + App.fmtCurrency(v.sales || 0);
       const label = c => { const dt = new Date(c.date + 'T00:00:00');
         return c.name + ' · ' + (isNaN(dt.getTime()) ? c.date : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
@@ -694,12 +936,72 @@ S.RevenueServerCheck = {
       nIncomplete: (incomplete || []).length,
       nUndated: (undated || []).length
     };
+    /* ⛔⛔⛔ A REFUSED REVIEWED WRITE KEEPS THE SCREEN AND REPORTS INTO THE SHELL'S OWN SLOT.
+       `draw()` reassigns the container's innerHTML, so writing the error first and drawing after
+       destroys it on the spot — a clean page and no message anywhere, which is the worst outcome an
+       import has. Keeping every row up is also what lets the operator press Add again without
+       re-dropping the file and re-mapping its columns; the rows that DID land come back as "already
+       logged" on the next walk, so the retry attempts only what is missing.
+       ⚠ AND THE RETRY IS THE PART THAT MAKES DAMAGE PERMANENT ([[test-the-retry]]) — the second
+       attempt is why this path returns instead of redrawing.
+       ⛔ THE SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. `_serverReview` surviving a failure is what
+       says the write did not land; clearing it here unconditionally would leave the operator with a
+       page that looks finished over rows that never saved. */
+    if (opts.reviewed && failed) {
+      const slot = document.getElementById('rsc-imp-result');
+      if (slot) slot.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + esc(App.partialSaveNote
+                ? App.partialSaveNote(landed, toAdd.length, 'check', 'checks')
+                : 'Could not save ' + (toAdd.length - landed) + ' of ' + toAdd.length + ' checks.')
+        + ' Check your connection and press Add again.</div>';
+      return;
+    }
+    if (opts.reviewed) this._serverReview = null;
     this.draw();
   },
 
   // ── Wiring (re-run each draw; per-element listeners, no container stacking) ───
   wire() {
     const c = this.container;
+    /* ⛔⛔ THE CONFIRM SCREEN'S OWN WIRING, AND IT RETURNS BEFORE THE PAGE'S. None of the controls
+       below is on screen while the review is up — the form, the chips, the log and the scorecard are
+       all gone — and `mountServerImport` in particular would mount a second file picker over a file
+       the operator has not finished confirming.
+       ⚠ WIRED ON THE FRESH CHILD NODES, never on the container: the container element is permanent, so
+       a listener on it stacks one copy per redraw and Add would fire N times on the Nth press. */
+    if (this._serverReview) {
+      const r = this._serverReview;
+      c.querySelectorAll('[data-confirm-section]').forEach(h => h.addEventListener('click', () => {
+        const k = h.dataset.confirmSection;
+        // `needs` defaults OPEN, so its toggle is inverted — the shell's own convention.
+        r.open[k] = (k === 'needs') ? (r.open[k] === false) : !r.open[k];
+        this.draw();
+      }));
+      c.querySelectorAll('[data-confirm-remove]').forEach(b => b.addEventListener('click', () => {
+        r.removed[b.dataset.confirmRemove] = true; this.draw();
+      }));
+      /* ⛔ REMOVE IS REVERSIBLE. Every other control on a confirm screen is, right up to the button,
+         under a sentence reading "nothing is saved until you press" — Remove was the one that
+         destroyed, and the only way back was Start Over, which drops the file. */
+      c.querySelectorAll('[data-confirm-restore]').forEach(b => b.addEventListener('click', () => {
+        delete r.removed[b.dataset.confirmRestore]; this.draw();
+      }));
+      /* The row's own conflict answer, replacing `App.promptImportConflicts` at this door. Default is
+         KEEP MINE and it stays that way unless the operator picks the file — the answer is stored, not
+         applied, so nothing is written until Add. */
+      c.querySelectorAll('[data-svconf]').forEach(b => b.addEventListener('click', () => {
+        const k = b.dataset.svconf;
+        if (b.dataset.use === 'file') r.useFile[k] = true; else delete r.useFile[k];
+        this.draw();
+      }));
+      c.querySelector('[data-svreview-go]')?.addEventListener('click', () => this._runServerReview());
+      /* Start Over drops the review and returns the page. The mapping survives (CSVMapper saves it per
+         header signature) but the FILE does not, which is why Remove had to become reversible. */
+      c.querySelector('[data-svreview-back]')?.addEventListener('click', () => {
+        this._serverReview = null; this.draw();
+      });
+      return;
+    }
     const collapseHead = c.querySelector('.card-collapse-head');
     if (collapseHead) collapseHead.addEventListener('click', () => App.toggleCollapse(collapseHead));
     App.applyCollapsed(c);
