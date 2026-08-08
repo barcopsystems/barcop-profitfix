@@ -3008,7 +3008,9 @@ S.HubOperatingExpenses = {
     });
     if (elsewhere.length) {
       // The head says what to do, because unlike Not Going In this one is answerable.
-      groups.push({ key: '__elsewhere', title: 'Not Operating Expenses',
+      // ⛔ A REPORT: these rows do not land, so Remove changes nothing on them. The way to answer this
+      // card is Move To, which is why the tick box stays and only the button goes.
+      groups.push({ report: true, key: '__elsewhere', title: 'Not Operating Expenses',
         sub: elsewhere.length + ' row' + (elsewhere.length === 1 ? '' : 's')
           + ' Bar Cop tracks elsewhere. Move any into a category to include it anyway',
         rows: elsewhere, open: !!r.open.__elsewhere });
@@ -3028,7 +3030,9 @@ S.HubOperatingExpenses = {
         const n = by[k], w = NOUN[k] || ['row', 'rows'];
         return n + ' ' + (n === 1 ? w[0] : w[1]);
       }).join(', ');
-      groups.push({ key: '__skip', title: 'Not Going In',
+      // ⛔ A REPORT, and the one the operator cannot overrule at all: Bar Cop's certainty. Nothing to
+      // press, so nothing is offered.
+      groups.push({ report: true, key: '__skip', title: 'Not Going In',
         sub: skipped.length + ' row' + (skipped.length === 1 ? '' : 's') + ': ' + why,
         rows: skipped, open: !!r.open.__skip });
     }
