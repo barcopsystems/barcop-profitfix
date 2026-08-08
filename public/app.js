@@ -1426,7 +1426,7 @@ const App = {
         const resp = await fetch('/api/abandon-account', { method: 'POST', headers, body: JSON.stringify({ accountId }) });
         if (!resp.ok) refused = await this._abandonError(resp);
       }
-    } catch (e) { refused = 'Could not reach the server. Nothing was changed — please try again.'; }
+    } catch (e) { refused = 'Could not reach the server. Nothing was changed. Please try again.'; }
     if (refused) {
       const reload = await this.confirm({
         title: 'This account is still active',
@@ -7886,7 +7886,7 @@ const App = {
     }
     return landed
       ? landed + ' of ' + total + ' ' + many + (landed === 1 ? ' was' : ' were') + ' saved before the save was refused. '
-        + 'Run it again to finish — Bar Cop will not double anything that already saved.'
+        + 'Run it again to finish. Bar Cop will not double anything that already saved.'
       : 'Save failed. ' + (total === 1 ? 'The ' + one + ' was not saved.'
                                        : 'None of the ' + total + ' ' + many + ' were saved.') + ' Try again.';
   },
@@ -10026,7 +10026,7 @@ function wireAuth() {
         const resp = await fetch('/api/abandon-account', { method: 'POST', headers, body: JSON.stringify({ accountId }) });
         if (!resp.ok) refused = await App._abandonError(resp);
       }
-    } catch (e) { refused = 'Could not reach the server. Nothing was changed — please try again.'; }
+    } catch (e) { refused = 'Could not reach the server. Nothing was changed. Please try again.'; }
     if (refused) {
       const reload = await App.confirm({
         title: 'This account is still active',
