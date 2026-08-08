@@ -185,7 +185,12 @@ S.ShiftDashboard = {
            *"a card inside another card"* and a duplicate title. */
         + (this._anyReview()
             ? '<div style="margin-top:18px;">'
-              + (this._salesReview ? this.salesReviewHTML() : this.serverReviewHTML()) + '</div>'
+              /* ⚠ ONE CONFIRM SCREEN ON THIS PAGE AGAIN. Door 10 made this a two-way pick between the
+                 sales panel and a per-server one; the per-server drop is a signpost now and its member
+                 went with it, so the second branch was a call to something that no longer exists —
+                 unreachable only because `_anyReview()` happens to read one field. `verify-method-refs`
+                 is what found it, which is the whole reason that sweep exists. */
+              + this.salesReviewHTML() + '</div>'
             : '<div class="card form-card" style="margin-top:18px;">'
               +   '<div class="card-title">' + esc(this.CK_TITLE[this._ckTakeover] || 'Check your import') + '</div>'
               +   '<div id="sc-ck-takeover"></div>'
@@ -232,8 +237,6 @@ S.ShiftDashboard = {
     // they have not finished confirming.
     if (this._openStep === 'import' && this._salesMode !== 'manual' && !this._anyReview()) {
       this.mountImport();
-      if (this._optOpen && this._optOpen.server) this.mountServer();
-      if (this._optOpen && this._optOpen.pmix) this.mountPmix();
     }
     if (this._openStep === 'cash') this.mountCashImport();
     /* The result, written into the slot that already sits between that zone's drop box and the
@@ -363,18 +366,31 @@ S.ShiftDashboard = {
       ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
       : '<button class="btn btn-primary btn-sm" data-done="' + k + '">' + label + '</button>';
   },
-  // Step-1 optional sales cut (per-server / product mix): collapsed to a gold
-  // "+ Add POS Report" link under its title. Clicking opens its dropzone (link
-  // flips to "+ Close POS Report"); once a file is dropped the mapping takes over
-  // with its own Cancel and the link hides (see _toggleOptLink via onState).
-  optDrop(id, title, sub, key) {
-    const open = !!(this._optOpen && this._optOpen[key]);
+  /* ⭐⭐⭐ A SIGNPOST, NOT A DROP ZONE — Kyle, after actually using it (2026-08-07): *"maybe it doesn't
+     make sense having the per-server sales and product mix here on the cockpit.. because you drop the
+     file and it functions fine.. but then you are still on the cockpit.. so you don't visually get the
+     immediate results and then you still have to go to the server check anyway to see it."*
+     ⛔ MEASURED BEFORE AGREEING, AND THE CODE SAID IT THREE WAYS: `revenue_pmix` had **zero**
+     references anywhere on this screen, `revenue_server_checks` had exactly ONE and it was inside the
+     import's own failure message, and neither lane touched `stepDone()` — which reads only the
+     operator's manual done-map. So both zones wrote data this page cannot show and could not advance
+     the step they sat in. Their own copy already said where the result lives.
+     ⭐ THE LINE THIS SETTLES, and it is worth more than the two zones: **the drop belongs where the
+     result shows.** Sales by day feeds Confirm the Week and moves this page's hero and step head; the
+     cash report feeds Reconcile Cash and moves Over / Short. Those two stay. These two never did.
+     ⛔ AND THE FEATURE IS SIGNPOSTED, NOT DELETED. `verify-money-out-one-door.js` block C exists for
+     exactly this: a screen that loses an entry point has to still SHOW THE WAY, or a feature that was
+     MOVED reads as one that was LOST. The heading, the "optional" tag, the Weekly tag and the sentence
+     naming the destination all stay; only the drop zone goes, and the gold link becomes a button that
+     takes the operator to the page that will show them the result. */
+  /* ⚠ RENAMED FROM `optDrop`, AND THE TWO DEAD ARGUMENTS WENT WITH IT. A member called `optDrop` that
+     renders no drop zone is copy outliving the feature it describes, and it still took the mount `id`
+     and the `_optOpen` `key` that nothing reads any more. */
+  optSignpost(title, sub, go, goLabel) {
     return '<div style="margin-top:16px;border-top:1px solid var(--b2);padding-top:14px;">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">' + title + ' <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; optional</span></span>' + App.freqTag('Weekly') + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">' + sub + '</div>'
-      + '<span class="sc-opt-link" data-opt="' + key + '" id="' + key + '-optlink" style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);cursor:pointer;">' + (open ? '+ Close POS Report' : '+ Add POS Report') + '</span>'
-      + '<div id="' + id + '" style="margin-top:10px;' + (open ? '' : 'display:none;') + '"></div>'
-      + '<div id="' + id + '-actions"></div><div id="' + id + '-res"></div></div>';
+      + '<button class="btn btn-ghost btn-sm" data-go="' + esc(go) + '">' + esc(goLabel) + '</button></div>';
   },
   /* ⛔⛔ A FILE DROPPED ON A COCKPIT STEP TAKES THE PAGE (Kyle, 2026-08-07, looking at the sales step
      mid-map): *"once a file is dropped that mapping takes over the page and there is nothing under
@@ -388,9 +404,12 @@ S.ShiftDashboard = {
      ⚠ ONE AT A TIME: once a zone owns the page, a second `map` is ignored. The other zones are not
      even on screen at that point, so this is a guard against a stray event rather than a UI state —
      but it is the difference between "put the file back" and "put SOMETHING back". */
-  CK_ZONE: { import: 'sc-ck-import', server: 'sc-ck-server', pmix: 'sc-ck-pmix', cash: 'sc-ck-cash' },
-  CK_TITLE: { import: 'Import this week\'s sales', server: 'Import per-server sales',
-              pmix: 'Import your product mix', cash: 'Import your cash report' },
+  /* ⚠ TWO ZONES SINCE 2026-08-07, and the flag still NAMES the zone rather than reverting to a
+     boolean: sales and cash sit in DIFFERENT steps, so the re-render still has to know whose mapper
+     to put back. Per-server and product mix became signposts to the pages that show their results
+     (see `optSignpost`), so this page no longer takes those two files at all. */
+  CK_ZONE: { import: 'sc-ck-import', cash: 'sc-ck-cash' },
+  CK_TITLE: { import: 'Import this week\'s sales', cash: 'Import your cash report' },
   _ckTakeover: null,   // which zone owns the page
   _ckCarry: null,      // its live mapper node, carried across the re-render
 
@@ -400,7 +419,7 @@ S.ShiftDashboard = {
      guard, the mapper re-attach, the drop-zone mount and `ckTakeover` — and each one was written
      against `_salesReview` when sales was the only converted lane. One accessor means a third lane
      joins by adding its field here, not by finding five call sites. */
-  _anyReview() { return this._salesReview || this._serverReview; },
+  _anyReview() { return this._salesReview; },
   ckTakeover() { return this._ckTakeover != null || !!this._anyReview(); },
   _ckCarryActs: null,  // the mapper's Import/Cancel row, which lives in its own element
   _clearTakeover() { this._ckTakeover = null; this._ckCarry = null; this._ckCarryActs = null; },
@@ -463,8 +482,10 @@ S.ShiftDashboard = {
         + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">One file, the whole week. Pull your sales-by-day report from your POS and drop it below. Re-importing replaces the days already in. Mark this done once the week is in.</div>'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Daily sales <span style="color:var(--t4);font-weight:600;text-transform:none;letter-spacing:0;">&middot; required</span></span>' + App.freqTag('Weekly') + '</div>'
         + '<div id="sc-ck-import"></div><div id="sc-ck-import-actions"></div><div id="sc-ck-import-res"></div>'
-        + this.optDrop('sc-ck-server', 'Per-server sales', 'One row per server with covers and sales. Feeds your Server Check scorecard.', 'server')
-        + this.optDrop('sc-ck-pmix', 'Product mix', 'One row per item with units sold. Feeds Menu Engineering.', 'pmix')
+        /* ⚠ THE SENTENCE ALREADY NAMED THE DESTINATION — *"Feeds your Server Check scorecard"* — which
+           is why the button label can be the plain instruction rather than repeating it. */
+        + this.optSignpost('Per-server sales', 'One row per server with covers and sales. Feeds your Server Check scorecard.', 'r-server-check', 'Drop It On Server Check')
+        + this.optSignpost('Product mix', 'One row per item with units sold. Feeds Menu Engineering.', 'r-menu-engineering', 'Drop It On Menu Engineering')
         + '<div id="sc-ck-import-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">' + this.markBtn('import', 'Mark Done') + '</div>';
     }
     if (k === 'cash') {
@@ -645,7 +666,6 @@ S.ShiftDashboard = {
   _toggleBtns(id, st) { const b = document.getElementById(id); if (b) b.style.display = (st === 'map') ? 'none' : 'flex'; },
   // Hide the "+ Close POS Report" link once a file is dropped and the mapping (with
   // its own Cancel) takes over; show it again when the mapper returns to the drop zone.
-  _toggleOptLink(key, st) { const l = document.getElementById(key + '-optlink'); if (l) l.style.display = (st === 'map') ? 'none' : ''; },
 
   // ── Inline sales import (step 1) ─────────────────────────────────────────────
   mountImport() {
@@ -1433,328 +1453,12 @@ S.ShiftDashboard = {
   // ── Inline per-server sales import (step 1 optional) ─────────────────────────
   // Feeds Server Check + Sales Integrity off the same weekly sitting. Matches each
   // server to the roster by name; unmatched rows are skipped and surfaced.
-  mountServer() {
-    const el = document.getElementById('sc-ck-server');
-    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
-    CSVMapper.mount(el, {
-      dropTitle: 'Drop your POS per-server sales report here',
-      dropSub: 'Needs a Server, Date, Covers, and Total Sales column. One row per server, per day.',
-      fields: PosIngest.FIELDS.server,
-      confirmLabel: 'Import',
-      actionsEl: '#sc-ck-server-actions',
-      onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('server', st); this._onMapState('server', st); },
-      // ⛔ THE MAPPER NO LONGER COMMITS on this lane either. Same shape as the sales zone beside it.
-      onComplete: rows => this._openServerReview(rows)
-    });
-  },
-  /* ── DOOR 10: the per-server confirm screen, and it is the SAME screen `r-server-check` renders ──
-     Both zones read the identical `PosIngest.build('server')` and show the identical columns, so the
-     verdict-to-row mapping comes from ONE function. It lives on `S.RevenueServerCheck` because that is
-     the screen that owns the per-server job; this zone is a shortcut to the same work, and it calls in
-     exactly as `hub-books-home` calls `S.HubOperatingExpenses.renderMoneyOut()`.
-     ⛔ NOT A SECOND COPY OF THE MAPPING. Two copies of a decision is how a button ends up promising a
-     number the write does not honour, which is the whole defect this rollout exists to close.
-     `verify-server-import-review.js` block G is the census that keeps it that way. */
-  _openServerReview(rows) {
-    (rows || []).forEach((r, i) => { if (r && r._rid == null) r._rid = 'sr' + i; });
-    this._serverReview = { rows: rows || [], open: {}, removed: {}, useFile: {} };
-    this.render(this.container, this.actions);
-  },
-  _serverReviewSummary() {
-    const r = this._serverReview;
-    if (!r) return { rows: [], count: 0 };
-    const live = r.rows.filter(x => !r.removed[x._rid]);
-    return S.RevenueServerCheck.serverReviewRows(
-      PosIngest.build('server', live), { removed: {}, useFile: r.useFile });
-  },
-  _serverReviewRemoved() {
-    const r = this._serverReview;
-    if (!r) return [];
-    const gone = r.rows.filter(x => r.removed[x._rid]);
-    if (!gone.length) return [];
-    return S.RevenueServerCheck.serverReviewRows(
-      PosIngest.build('server', gone), { removed: {}, useFile: {} }).rows;
-  },
-  serverReviewHTML() {
-    const r = this._serverReview || { open: {} };
-    return ImportConfirm.panel(Object.assign(this._serverPanelOpts(), {
-      label: 'Check this file before it goes in',
-      lead: 'Nothing is saved until you press the button below. Every row from your file is here with '
-          + 'what Bar Cop worked out. Take out anything you do not want.',
-      columns: [
-        { label: 'Server', width: 22 }, { label: 'Date', width: 14 }, { label: 'Shift', width: 12 },
-        { label: 'Covers', width: 9 }, { label: 'Sales', width: 13 }
-      ],
-      outcomeLabel: 'What happens',
-      removedRows: this._serverReviewRemoved(),
-      removable: true,
-      open: r.open,
-      goAttr: 'data-svreview-go', backAttr: 'data-svreview-back', backLabel: 'Start Over',
-      resultId: 'sc-ck-server-res',
-      busy: !!this._serverReviewWriting
-    }));
-  },
   // The label comes from the SHELL, not a second copy of its rule.
-  _serverPanelOpts() {
-    const s = this._serverReviewSummary();
-    return { rows: s.rows, verb: 'Add', noun: 'Check', nounPlural: 'Checks' };
-  },
-  async _runServerReview() {
-    const r = this._serverReview;
-    if (!r || this._serverReviewWriting) return;
-    this._serverReviewWriting = true;
-    const btn = this.container && this.container.querySelector('[data-svreview-go]');
-    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
-    try {
-      await this.importServer(r.rows.filter(x => !r.removed[x._rid]),
-        { reviewed: true, useFile: r.useFile });
-    } finally {
-      this._serverReviewWriting = false;
-      /* ⛔ ONLY SUCCESS CLEARS THE SCREEN. A refused write keeps every row up so the operator can press
-         again without re-dropping the file, and the error goes into the zone's own result slot — the
-         same slot the flash uses, which already sits under that drop box. */
-      if (this._serverReview) {
-        const b = this.container && this.container.querySelector('[data-svreview-go]');
-        if (b) { b.disabled = false; b.textContent = ImportConfirm.goLabel(this._serverPanelOpts()); }
-      }
-    }
-  },
 
-  async importServer(rows, opts) {
-    opts = opts || {};
-    // `incomplete` (on the roster, rang no covers/sales) is split out of `skipped` (name
-    // not matched) by buildServer. Destructure BOTH or those rows vanish with no mention:
-    // they used to be counted in the skipped total. Server Check's door reports both.
-    /* ⚠⚠ AND `conflicts` / `replaced` JOIN THE LIST FOR THE SAME REASON (S215f, 2026-07-27). When
-       buildServer stopped keying on the figures, a row that DISAGREES with a hand-entered check
-       became a conflict instead of a silent second record. A door that does not destructure it
-       drops that row on the floor: not in `toAdd`, not in any count, no message — which is worse
-       than the double-count it replaced. This is the same lesson the comment above records about
-       `incomplete`, one field later. */
-    const { toAdd, skipped, incomplete, undated, dupCount, replaced, conflicts, fileRepeats } = PosIngest.build('server', rows);
-    const res = document.getElementById('sc-ck-server-res');
-    const inc = (incomplete || []).length, und = (undated || []).length;
-    /* Everything this import found besides the rows it wrote. Built ONCE and appended to every
-       outcome — the zero-row message, the failure message and the success flash — because a refused
-       write is exactly when the operator reads hardest, and the failure path used to replace all of
-       this with a bare "Save failed". The twin door renders its notes under a failed headline, so
-       the two were telling different stories about the same file.
-       ⚠ A ROW WITH NO NAME TO PRINT IS NOT "a name not matched". buildServer pushes '(blank)' for a
-       row whose Server cell is empty — a subtotal or section line, which CSVMapper keeps because not
-       every cell is empty — and calling that "1 name not matched" sends the operator hunting for a
-       roster spelling that does not exist. Counted separately, the way both revenue doors do it. */
-    const nameless = (skipped || []).filter(s => !s || s === '(blank)').length;
-    const named = skipped.length - nameless;
-    let serverOutcomes = (named ? ' (' + named + ' name' + (named === 1 ? '' : 's') + ' not matched)' : '')
-      + (nameless ? ' (' + nameless + ' row' + (nameless === 1 ? '' : 's') + ' had no server name)' : '')
-      + (inc ? ' (' + inc + ' row' + (inc === 1 ? '' : 's') + ' rang no covers or sales)' : '')
-      + (und ? ' (' + und + ' row' + (und === 1 ? '' : 's') + ' had no readable date)' : '')
-      // Same collapse as the twin door, reported the same way. Silence here would leave the
-      // operator's row count and Bar Cop's disagreeing with no explanation.
-      + ((fileRepeats || 0) ? ' (' + fileRepeats + ' repeated line' + (fileRepeats === 1 ? '' : 's') + ' counted once)' : '');
-    /* The file disagrees with checks the operator entered BY HAND. Ask before writing anything
-       ([[user-chooses-conflicts]]) — the same prompt this screen already uses for sales and cash,
-       so the three import lanes behave identically. ⚠ This runs ABOVE the zero-row branch: a file
-       whose every row is a conflict has an EMPTY toAdd, and falling into "no server rows imported.
-       Each row needs a server name…" would blame the file for rows Bar Cop understood perfectly. */
-    const serverExtra = [];
-    /* ⛔⛔ ON THE REVIEWED PATH THE ANSWER IS ALREADY ON THE ROW, so the modal must not fire. Asking
-       twice for one decision is what door 2 removed from this screen for the sales lane; the confirm
-       screen shows both sets of figures with Keep Mine / Use The File and `opts.useFile` is the answer.
-       ⚠ `App.promptImportConflicts` STAYS for the lanes that still write on the press. */
-    if (opts.reviewed) {
-      const chose = opts.useFile || {};
-      (conflicts || []).forEach(c => { if (chose[c.key]) serverExtra.push(c.useRec); });
-    } else if (conflicts && conflicts.length) {
-      const figs = v => v.covers + (v.covers === 1 ? ' cover' : ' covers') + ' · $'
-        + (Math.round((v.sales || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const rowLabel = c => { const dt = new Date(c.date + 'T00:00:00');
-        return c.name + ' · ' + (isNaN(dt.getTime()) ? c.date : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
-          + (c.shift ? ' · ' + c.shift : ''); };
-      const r = await App.promptImportConflicts({
-        title: 'Some checks were entered by hand',
-        intro: 'This file has different figures for ' + conflicts.length + ' check'
-             + (conflicts.length === 1 ? '' : 's') + ' you already entered or corrected by hand. Pick which to keep. Your own are kept unless you choose the file.',
-        rowLabel: 'Check', colMine: 'You entered', colTheirs: 'This file',
-        rows: conflicts.map(c => ({ key: c.key, label: rowLabel(c), mineText: figs(c.mine), theirsText: figs(c.theirs) }))
-      });
-      if (!r.confirmed) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">Import cancelled. Nothing was changed.</div>'; return; }
-      conflicts.forEach(c => { if (r.useTheirs.has(c.key)) serverExtra.push(c.useRec); });
-    }
-    const keptByHand = (conflicts ? conflicts.length : 0) - serverExtra.length;
-    // Both outcomes are REPORTED, on every branch below, because `serverOutcomes` is appended to
-    // the zero-row message, the failure message and the success flash alike. A row we overwrote and
-    // a row the operator chose to keep are things that happened to their data; neither is "already
-    // logged", and neither may be silent.
-    serverOutcomes += ((replaced || 0) ? ' (' + replaced + ' earlier import' + (replaced === 1 ? '' : 's') + ' updated)' : '')
-      + (keptByHand ? ' (' + keptByHand + ' kept as you entered ' + (keptByHand === 1 ? 'it' : 'them') + ')' : '');
-    serverExtra.forEach(rec => toAdd.push(rec));
-    if (!toAdd.length) {
-      /* ⚠ THE BREAKDOWN WAS ONLY REACHABLE WHEN SOMETHING IMPORTED. `undated` and `incomplete` were
-         rendered on the success flash alone, so the case where they matter MOST — nothing came in at
-         all — printed one generic line naming four requirements. A per-server export dated "Jul 24"
-         (no year) on every row told the operator to check the server names, the covers and the sales
-         and never mentioned the date; a file where everyone rang zero sent them to the Staff Roster
-         to add people already on it. _commitCash already reports its skips on this path, so this was
-         an asymmetry rather than a decision. */
-      /* ⚠ A HEADLINE PER COMBINATION, not per single bucket. Each branch below used to demand that
-         the OTHER two lists be empty, so a file with some undated rows AND some that rang nothing
-         fell straight through to "Each row needs a server name Bar Cop can match" — with the notes
-         under it naming only dates and covers, and no unmatched-name note at all. And "All N rows
-         were already logged" was claimed whenever dupCount was non-zero, even with rows dropped for
-         other reasons alongside it. Only ever say "All" when nothing else was dropped. */
-      /* ⚠ Step 0.5, and the twin needed BOTH halves of the same fix (2026-07-27). `otherDrops` knew
-         nothing about a repeated line counted once or a conflict kept by hand, so this door would
-         have printed "All N rows were already logged" over a file where a 9th row was collapsed —
-         the very "All" claim the comment above exists to prevent. And "the rest could not be used"
-         is false of a repeat, which WAS used. Rows that could not be USED and rows handled some
-         other way are separate counts now, exactly as at the twin. */
-      const otherDrops = skipped.length + inc + und;
-      const otherHandled = (fileRepeats || 0) + (keptByHand || 0);
-      // ⚠ RED IS FOR A PROBLEM. Re-dropping the same report is a NORMAL thing to do and nothing is
-      // wrong with the file, but this block was hard-coded red, so "All 12 rows were already logged"
-      // read as a failure. The twin door (r-server-check) renders the identical outcome neutral and
-      // _doImportSales treats its equivalent as a success. Only colour it red when something is
-      // actually wrong. (Round 2 rewrote this very expression and left the colour behind it.)
-      // Benign (neutral, not red) whenever nothing was actually WRONG with the file — a repeat
-      // collapsed or a hand entry kept is not a problem, but it does stop the word "All".
-      const benign = dupCount && !otherDrops;
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--' + (benign ? 't2' : 'red') + ');margin-top:12px;">'
-        + (benign && !otherHandled ? 'No new server rows imported. All ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
-         : (dupCount && !otherDrops) ? 'No new server rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
-         : dupCount ? 'No new server rows imported. ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged, ' + otherDrops + ' could not be used.'
-         : (und && !skipped.length && !inc) ? 'No server rows imported. Bar Cop could not read a date on any row — check the date column in your export.'
-         : (inc && !skipped.length && !und) ? 'No server rows imported. Every name matched your roster, but no row had both covers and sales.'
-         : (!skipped.length && (und || inc)) ? 'No server rows imported. Every name matched your roster — see below for what stopped each row.'
-         : 'No server rows imported. Each row needs a server name Bar Cop can match, a date, covers, and sales.')
-        + serverOutcomes
-        + '</div>';
-      return;
-    }
-    const ok = await PosIngest.commit('server', toAdd);
-    if (!ok) {
-      /* ⚠ SAY HOW MANY ACTUALLY LANDED. PosIngest.commit's generic path writes ROW BY ROW and
-         accumulates ONE boolean, and it does not stop at the first refusal — so a single rejected
-         row in the middle of a twelve-row file reported the WHOLE import as failed while eleven
-         checks were saved. "Save failed" reads as "nothing was imported", and the operator's next
-         move is to key those checks in by hand, which is how the server ends up holding each one
-         twice. (_commitSales and _commitCashRows both track what landed; the generic path never did.)
-         App.putRecord REVERTS the array slot on a genuine refusal — for a fresh id that is a splice
-         straight back out — so what is STILL IN MEMORY is exactly what landed. Re-running the import
-         is safe either way: buildServer dedupes on staff + date + SHIFT, so the rows that did save
-         come back as "already logged" rather than doubling. (The key stopped including the figures
-         on 2026-07-27 — with them in it, a hand-corrected row no longer matched its own file.) */
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + App.partialSaveNote(App.landedOf(toAdd, App.data && App.data.revenue_server_checks),
-                            toAdd.length, 'server check', 'server checks')
-        + serverOutcomes   // the failure does not cancel what else the import found
-        + '</div>';
-      return;
-    }
-    // Step 0.5: same split as the twin. A row the operator handed to the file at the conflict
-    // prompt REPLACED an existing check — it is not a new import, and merging the two hides the
-    // decision they just made.
-    const freshCount = toAdd.length - serverExtra.length;
-    this._flashZone = 'server';
-    this._flash = (freshCount ? freshCount + ' server check' + (freshCount === 1 ? '' : 's') + ' imported' : '')
-      + (serverExtra.length ? (freshCount ? ', ' : '') + serverExtra.length + ' replaced with the file'
-                              + String.fromCharCode(8217) + 's figures' : '')
-      + (dupCount ? ' (' + dupCount + ' already logged)' : '')
-      + serverOutcomes + '.';
-    if (this._optOpen) this._optOpen.server = false;   // collapse back to the link
-    this._openStep = 'import';
-    /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. Every refusal above returns with the
-       screen and every row still up, having written into this zone's own `-res` slot — so reaching
-       this line IS what says the write landed. Clearing it here also releases the takeover, because
-       `ckTakeover()` reads `_anyReview()`, and the flash then lands under the drop box it came from. */
-    this._serverReview = null;
-    this.render(this.container, this.actions);
-  },
 
   // ── Inline product-mix (PMIX) import (step 1 optional) ───────────────────────
   // Feeds Menu Engineering covers. Matches each item to the menu by name and
   // updates weekly_covers in place; unmatched item names are skipped and surfaced.
-  mountPmix() {
-    const el = document.getElementById('sc-ck-pmix');
-    if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
-    CSVMapper.mount(el, {
-      dropTitle: 'Drop your POS product-mix (PMIX) report here',
-      dropSub: 'Needs an Item Name and Units Sold column. One row per menu item for the week.',
-      fields: PosIngest.FIELDS.pmix,
-      confirmLabel: 'Import',
-      actionsEl: '#sc-ck-pmix-actions',
-      onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('pmix', st); this._onMapState('pmix', st); },
-      onComplete: rows => this.importPmix(rows)
-    });
-  },
-  async importPmix(rows) {
-    // ⚠ `retired` and `ambiguous` are I4's two refused outcomes and they are read HERE and in
-    // r-menu-engineering's twin door. A bucket the consumer never destructures is a fix that never
-    // shipped ([[the-loop]] #25), and reaching one of two doors is the half-migration shape (#42).
-    const { toAdd, skipped, incomplete, netNegative, retired, ambiguous, merged } = PosIngest.build('pmix', rows);
-    const nRet = (retired || []).length, nAmb = (ambiguous || []).length;
-    // One sentence per outcome, built once, so the zero-row path and the success line cannot drift.
-    const scopeNote = (nRet ? ' (' + nRet + ' item' + (nRet === 1 ? '' : 's') + ' in your file '
-        + (nRet === 1 ? 'is' : 'are') + ' no longer on your live menu, so ' + (nRet === 1 ? 'it was' : 'they were')
-        + ' left alone: ' + (retired || []).join(', ') + ')' : '')
-      + (nAmb ? ' (' + nAmb + ' name' + (nAmb === 1 ? '' : 's') + ' in your file match'
-        + (nAmb === 1 ? 'es' : '') + ' more than one menu item, so Bar Cop could not tell which one rang and left '
-        + (nAmb === 1 ? 'it' : 'them') + ' alone: ' + (ambiguous || []).join(', ')
-        + '. Rename one of each pair and drop the file again.)' : '');
-    const res = document.getElementById('sc-ck-pmix-res');
-    if (!toAdd.length) {
-      /* ⚠ THE ZERO-ROW PATH DROPPED ALL THREE LISTS AND THEN GUESSED WRONG. It said "Each row needs
-         an item name Bar Cop can match on your menu and a units-sold number" whatever had happened,
-         so a PMIX whose items ALL netted negative after returns — names matched, units present —
-         sent the operator off to rename a menu that was already right, and the real outcome (every
-         item left at last week's figure, which this cockpit then presents as this week's mix) was
-         never mentioned at all. Same rule as the success path below: three outcomes, three
-         sentences. Anything involving a genuinely unmatched name still gets the name message. */
-      const nSkip = skipped.length, nInc = (incomplete || []).length, nNeg = (netNegative || []).length;
-      /* ⚠ THE HEADLINE'S "the item names matched" BRANCHES ARE GATED ON `!nSkip` ALONE, so I4's two
-         new outcomes have to join that gate or the sentence claims a clean match over a file whose
-         names were the whole problem ([[the-loop]] #24: after splitting a predicate, every counter
-         derived from the old one is now pointing at the wrong set). `otherName` is "something about
-         a NAME went wrong", which is what that branch was really asking. */
-      const otherName = nSkip + nRet + nAmb;
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">No items updated.'
-        + (!otherName && nInc && !nNeg ? ' The item names matched, but Bar Cop could not read a units-sold figure for any of them.'
-         : !otherName && nNeg && !nInc ? ' Every item came out at negative units after returns, so the previous figures were left alone.'
-         // ⚠ NOT "no row carried a usable units figure" — a net-negative item DID carry one; it went
-         // negative after returns. That sentence denied what the note printed under it stated.
-         : !otherName && (nInc || nNeg) ? ' The item names matched — see below for what happened to each row.'
-         : (nRet || nAmb) && !nSkip ? ' Bar Cop found every name on your menu but could not use them. See below.'
-         : ' Each row needs an item name Bar Cop can match on your menu and a units-sold number.')
-        + (nSkip ? ' (' + nSkip + ' name' + (nSkip === 1 ? '' : 's') + ' not matched)' : '')
-        + (nInc ? ' (' + nInc + ' row' + (nInc === 1 ? '' : 's') + ' had no readable units figure)' : '')
-        + (nNeg ? ' (' + nNeg + ' item' + (nNeg === 1 ? '' : 's') + ' came out at negative units after returns)' : '')
-        + scopeNote
-        + '</div>';
-      return;
-    }
-    const ok = await PosIngest.commit('pmix', toAdd);
-    if (!ok) { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try the import again.</div>'; return; }
-    // Say when rows were combined. A daypart-split export legitimately lists an item several
-    // times and we sum them, so the operator should see why the total is bigger than any one row.
-    // ⚠ THREE DIFFERENT OUTCOMES, THREE DIFFERENT SENTENCES. This used to report one `skipped`
-    // list as "N names not matched", which sent the operator to rename a menu item that was
-    // already correct when the real problem was an unreadable Units cell — and an item whose
-    // units netted negative was dropped with NO mention at all, so it silently kept last week's
-    // figure and presented it as this week's mix.
-    const inc = incomplete || [], neg = netNegative || [];
-    this._flashZone = 'pmix';
-    this._flash = toAdd.length + ' menu item' + (toAdd.length === 1 ? '' : 's') + ' updated from sales mix'
-      + (merged ? ' (' + merged + ' extra row' + (merged === 1 ? '' : 's') + ' combined into item totals)' : '')
-      + (skipped.length ? ' (' + skipped.length + ' name' + (skipped.length === 1 ? '' : 's') + ' not matched)' : '')
-      + (inc.length ? ' (' + inc.length + ' row' + (inc.length === 1 ? '' : 's') + ' had no readable units figure)' : '')
-      + (neg.length ? ' (' + neg.length + ' item' + (neg.length === 1 ? '' : 's')
-          + ' came out at negative units after returns and ' + (neg.length === 1 ? 'was' : 'were')
-          + ' left at the previous figure)' : '')
-      + scopeNote + '.';
-    if (this._optOpen) this._optOpen.pmix = false;   // collapse back to the link
-    this._openStep = 'import';
-    this.render(this.container, this.actions);
-  },
 
   // ── Inline cash-report import (step 2) ───────────────────────────────────────
   // The POS blind close already computed over/short; drop that report and the
@@ -2058,33 +1762,6 @@ S.ShiftDashboard = {
         this.render(this.container, this.actions); return;
       }
       if (ev.target.closest('[data-salesreview-go]')) { this._runSalesReview(); return; }
-      /* ── The per-server confirm screen's controls (door 10) ─────────────────────────────────────
-         Same delegated handler the sales lane uses, so neither can stack listeners on a redraw. */
-      if (this._serverReview) {
-        const r = this._serverReview;
-        const sec = ev.target.closest('[data-confirm-section]');
-        if (sec) { const k = sec.dataset.confirmSection;
-          // `needs` defaults OPEN, so its toggle is inverted — the shell's own convention.
-          r.open[k] = (k === 'needs') ? (r.open[k] === false) : !r.open[k];
-          this.render(this.container, this.actions); return; }
-        const rm = ev.target.closest('[data-confirm-remove]');
-        if (rm) { r.removed[rm.dataset.confirmRemove] = true; this.render(this.container, this.actions); return; }
-        // Remove is reversible right up to the button, like every other control on this screen.
-        const put = ev.target.closest('[data-confirm-restore]');
-        if (put) { delete r.removed[put.dataset.confirmRestore]; this.render(this.container, this.actions); return; }
-        const cf = ev.target.closest('[data-svconf]');
-        if (cf) { const k = cf.dataset.svconf;
-          if (cf.dataset.use === 'file') r.useFile[k] = true; else delete r.useFile[k];
-          this.render(this.container, this.actions); return; }
-        if (ev.target.closest('[data-svreview-go]')) { this._runServerReview(); return; }
-        if (ev.target.closest('[data-svreview-back]')) {
-          /* Back to the drop zone, not out of the step, and the page comes back with it: the carried
-             mapper is spent once its rows have gone to the confirm screen, so leaving the takeover set
-             would re-attach a dead node over the step. Same call the sales lane's Start Over makes. */
-          this._serverReview = null; this._clearTakeover();
-          this.render(this.container, this.actions); return;
-        }
-      }
       if (ev.target.closest('[data-salesreview-back]')) {
         // Back to the drop zone, not out of the step. A mapping belongs to the file it was made
         // for, so the file is re-dropped from scratch — nothing was written to undo.
@@ -2097,7 +1774,6 @@ S.ShiftDashboard = {
          mapper's own is the one that stays, and it releases the page through `_onMapState('drop')`
          — the same single path a completed import uses. */
       const opt = ev.target.closest('[data-opt]');
-      if (opt) { const key = opt.dataset.opt; this._optOpen = this._optOpen || {}; this._optOpen[key] = !this._optOpen[key]; this.render(this.container, this.actions); return; }
       const head = ev.target.closest('.sc-step-head');
       if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
       const dn = ev.target.closest('[data-done]');
