@@ -1655,6 +1655,14 @@ const PosIngest = {
     });
     const toAdd = []; const skipped = []; const undated = []; const conflicts = []; let dupCount = 0; let keptManual = 0; let extraDropped = 0; let totalsLines = 0; const used = new Set();
     const fileSeen = new Set(); let fileRepeats = 0;   // exact repeats WITHIN this one file (S218)
+    const summaryRows = [];
+    /* ⛔⛔⛔ ONE VERDICT PER INPUT ROW, IN ORDER — ADDITIVE, the shape `buildVoids`, `buildServer`,
+       `buildPmix`, `buildHours` and `buildTips` already gained. Everything else here is a COUNT or a
+       list of DATES, and no confirm screen can be built on that: `skipped` holds a date, `undated`
+       holds a register NAME, and `dupCount` is a number, so nothing can say WHICH row was replaced.
+       ⚠ SEVENTEEN HARNESSES LIFT THIS BUILDER, which is why every existing field keeps its exact
+       meaning and its exact count. */
+    const perRow = [];
     (rows || []).forEach(r => {
       const date = this.normDate(r.date, opts);
       /* ⚠ AN UNREADABLE DATE IS ITS OWN OUTCOME, NOT "no over/short figure". Both skips went into
@@ -1663,7 +1671,30 @@ const PosIngest = {
          the operator to stare at an Over/Short column that was perfectly fine. The two sibling
          doors already split this: buildServer has its own `undated`, buildSales says "no usable
          date or sales figure". Cash was the only one that named the wrong column. */
-      if (!date) { undated.push((r.drawer || '').trim() || '(no date)'); return; }
+      /* ⛔⛔ THE EXPORT'S OWN TOTALS LINE, AND IT HAS TO BE ASKED BEFORE THE DATE. Measured on a real
+         30-row drawer export: a final line reading `,TOTAL,,"9,850.00",…` has no date, so it fell
+         through to `undated` and the door reported it as a row whose DATE could not be read — sending
+         the operator to fix a date column that was never going to be used. That is the exact
+         mis-naming the `undated` split directly below was written to stop, per its own comment.
+         `isSummaryName` already answers TRUE for TOTAL / Total / Grand Total / TOTALS and FALSE for
+         "Main Bar Register", and it lives in this file; this walk simply never asked.
+         ⚠ IT IS NOT THE SAME AS THE WHOLE-DAY GUARD BELOW. That one catches a BLANK register on a
+         date that also has named rows, which is a legitimate day-level subtotal inside the data. This
+         is a line that NAMES itself a total, usually with no date at all. Two shapes, two tests. */
+      if (this.isSummaryName(r.drawer) || this.isSummaryName(r.cashier)) {
+        const nmS = String(r.drawer || r.cashier || '').trim();
+        summaryRows.push(nmS);
+        perRow.push({ raw: r, drawer: nmS, date: '', status: 'summary', lands: false }); return;
+      }
+      /* ⛔ THE VERDICT CARRIES THE DATE THIS WALK DECIDED. Four outcomes below (`dayTotal`,
+         `incomplete`, `repeat`, `extraDropped`) sit past this check and carry no record, so a screen
+         showing them would have to call `normDate` a SECOND time — a second copy of a decision this
+         walk already made, which is the one thing the confirm pattern forbids. The labor lanes shipped
+         exactly that and printed two spellings of one date in one column.
+         ⚠ EMPTY where there genuinely is none (`summary`, `undated`), so the door shows the file's
+         own text on the one row whose DATE is the problem. */
+      if (!date) { undated.push((r.drawer || '').trim() || '(no date)');
+        perRow.push({ raw: r, drawer: (r.drawer || '').trim(), date: '', status: 'undated', lands: false }); return; }
       const dName = (r.drawer || '').trim();
       /* ⚠ SKIP A WHOLE-DAY TOTALS LINE (S142 + S190). A column-less row on a date that ALSO has
          per-register rows is the day's TOTALS line; filing it beside the per-register rows
@@ -1677,7 +1708,8 @@ const PosIngest = {
          cockpit printed "1 row skipped, no over/short figure" — sending the operator to a column
          that was never going to be used, which is the same mis-naming the `undated` split directly
          above was just written to stop. What the row IS does not depend on what its cells say. */
-      if (!dName && namedDates.has(date)) { totalsLines++; return; }
+      if (!dName && namedDates.has(date)) { totalsLines++;
+        perRow.push({ raw: r, drawer: '', date: date, status: 'dayTotal', lands: false }); return; }
       const exp = this._num(r.expected), cnt = this._num(r.counted), os = this._num(r.over_short);
       let expected_cash = null, counted_cash = null, variance;
       // ⚠ THE POS'S OWN OVER/SHORT IS AUTHORITATIVE (S144). When the file carries it, use it —
@@ -1692,7 +1724,8 @@ const PosIngest = {
         if (has(r.counted)) { counted_cash = cnt; expected_cash = cents(cnt - os); }
       } else if (has(r.expected) && has(r.counted)) {
         expected_cash = exp; counted_cash = cnt; variance = cents(cnt - exp);
-      } else { skipped.push(date); return; }            // no over/short derivable
+      } else { skipped.push(date);                      // no over/short derivable
+        perRow.push({ raw: r, drawer: (r.drawer || '').trim(), date: date, status: 'incomplete', lands: false }); return; }
       const dRec = dName ? drawerByName[dName.toLowerCase()] : soleDrawer;
       const drawer = dRec ? dRec.name : dName;
       const drawerId = dRec ? dRec.id : '';
@@ -1750,7 +1783,12 @@ const PosIngest = {
          found both. */
       const fileKey = date + '|' + (drawerId || 'name:' + drawer.toLowerCase())
         + '|' + (expected_cash == null ? '' : expected_cash) + '|' + counted_cash + '|' + variance;
-      if (fileSeen.has(fileKey)) { fileRepeats++; return; }
+      /* ⚠ AND IT CARRIES THE RECORD IT DUPLICATES. The row is built above, so the screen can show
+         the figures the file actually holds — "Same line twice in your file" printed over three
+         dashes reads as "there was no figure", which is the finding the labor lanes paid for. The
+         record is never written; only its cells are read. */
+      if (fileSeen.has(fileKey)) { fileRepeats++;
+        perRow.push({ raw: r, drawer: drawer, date: date, status: 'repeat', lands: false, rec: rec }); return; }
       fileSeen.add(fileKey);
       const manual = manualByKey.get(dayKey);
       if (manual) {
@@ -1762,8 +1800,10 @@ const PosIngest = {
         // scope is deliberate (S99/S103) — but it must NOT be dropped in SILENCE (S141): a shift-
         // split cash file lists a register-day more than once, and the operator has to know a row
         // was not imported. Count it so the cockpit can say so.
-        if (conflictKeys.has(dayKey) || keptKeys.has(dayKey)) { extraDropped++; return; }
-        if (this._sameVariance(manual, rec)) { keptKeys.add(dayKey); keptManual++; return; }
+        if (conflictKeys.has(dayKey) || keptKeys.has(dayKey)) { extraDropped++;
+          perRow.push({ raw: r, drawer: drawer, date: date, status: 'extraDropped', lands: false, rec: rec }); return; }
+        if (this._sameVariance(manual, rec)) { keptKeys.add(dayKey); keptManual++;
+          perRow.push({ raw: r, drawer: drawer, date: date, status: 'kept', lands: false, prior: manual }); return; }
         conflictKeys.add(dayKey);
         rec.id = manual.id;   // "use the file" replaces the hand count IN PLACE (idempotent retry, S147)
         carryPrior(rec, manual, !!cName);   // SH2 — the figures are the choice; the note is not
@@ -1775,6 +1815,11 @@ const PosIngest = {
           theirs: { variance: variance, expected_cash: expected_cash, counted_cash: counted_cash },
           useRec: rec
         });
+        /* ⛔ A CONFLICT DOES NOT LAND UNTIL THE OPERATOR ANSWERS IT. The verdict carries the whole
+           conflict object so the row can show both figures and both buttons, the way the sales and
+           per-server doors already do ([[user-chooses-conflicts]]). */
+        perRow.push({ raw: r, drawer: drawer, date: date, status: 'conflict', lands: false,
+                      conflict: conflicts[conflicts.length - 1], prior: manual, rec: rec });
         return;
       }
       // ⚠ REPLACE a prior IMPORT so a CORRECTED drawer report actually lands (this used to `return`
@@ -1790,6 +1835,11 @@ const PosIngest = {
       // EXTRA prior for the key (a re-import with fewer rows than before) as the backstop.
       if (prior) { dupCount++; rec.id = prior.id; carryPrior(rec, prior, !!cName); }   // SH2
       toAdd.push(rec);
+      /* ⛔ `replaced`, NOT `dup`. On the hours and tips lanes a duplicate is SKIPPED; here it is an
+         UPSERT that lands, carrying the superseded row's own id. Calling both "already logged" on a
+         screen would tell the operator a corrected drawer report was ignored when it was written. */
+      perRow.push({ raw: r, drawer: drawer, date: date, status: prior ? 'replaced' : 'new', lands: true,
+                    rec: rec, prior: prior || null });
     });
     // `dupCount` means REPLACED (an earlier import), `keptManual` counts register-days the file
     // matched a hand count on, `conflicts` are register-days the operator must choose on,
@@ -1798,7 +1848,9 @@ const PosIngest = {
     // is rows with NO over/short derivable, and `undated` is rows whose DATE could not be read.
     // The last two are different problems with different fixes and must never be reported as one.
     // `fileRepeats` = register-days this file listed twice with identical figures; counted once.
-    return { toAdd, skipped, undated, dupCount, keptManual, conflicts, extraDropped, totalsLines, fileRepeats };
+    // `summaryRows` = lines that NAME themselves a total (distinct from `totalsLines`, which counts
+    // column-less whole-day rows); `perRow` = one verdict per input row, in order. Both ADDITIVE.
+    return { toAdd, skipped, undated, dupCount, keptManual, conflicts, extraDropped, totalsLines, fileRepeats, summaryRows, perRow };
   },
 
   // Two drawer figures are "the same" for conflict purposes when their over/short agrees to the
@@ -2191,18 +2243,67 @@ const PosIngest = {
   // hand count becomes a conflict the operator resolves, a matching one is kept — neither reaches
   // here), so the only 'manual' row this can retire is one the operator EXPLICITLY chose to
   // overwrite with the file (its resolved row is in toAdd). Retiring it is exactly that choice.
+  /* ⭐⭐ ONE ROUND TRIP FOR THE APPENDS, `putRecord` FOR THE REPLACES. Measured on a real 30-row
+     drawer export before this: **26 per-row writes and 0 bulk**, plus a second loop of removals. In
+     the demo that is milliseconds because writes are no-ops; on a real account it is the 20-second
+     freeze Kyle hit on voids and per-server.
+     ⛔ IT CANNOT TAKE THE SHARED `_commitAppend`. `buildCash` UPSERTS: a register-day already on file
+     comes back carrying that record's own id so the write REPLACES it, and a bulk push APPENDS —
+     those rows would become duplicate money records. This is `_commitServer`'s shape, and it is here
+     rather than shared because the stale retirement below belongs to this lane alone.
+     ⚠ THE SPLIT IS TAKEN ONCE, BEFORE ANYTHING IS WRITTEN. Reading the known-id set again after the
+     bulk has staged its rows would classify every appended row as an existing one on the next pass. */
   async _commitCashRows(toAdd) {
-    const keys = new Set((toAdd || []).map(r => r.date + '|' + (r.drawer_id || '')));
-    const fresh = new Set((toAdd || []).map(r => r.id));
-    const stale = (((App.shiftData && App.shiftData.sc_variances) || []))
-      .filter(v => v && !fresh.has(v.id)
+    const rows = (toAdd || []).filter(r => r && r.id != null);
+    const keys = new Set(rows.map(r => r.date + '|' + (r.drawer_id || '')));
+    const fresh = new Set(rows.map(r => r.id));
+    /* ⚠ THE LIVE ARRAY, not a fresh `|| []`. The bulk path stages its rows in memory by contract, so
+       pushing into a throwaway copy would stage nothing and leave the screen describing a write that
+       never reached the store. */
+    const sd = (App.shiftData = App.shiftData || {});
+    const arr = Array.isArray(sd.sc_variances) ? sd.sc_variances : (sd.sc_variances = []);
+    // ⚠ `stale` is computed BEFORE any insert: the writes push into this same array and share the key.
+    const stale = arr.filter(v => v && !fresh.has(v.id)
         && keys.has(v.date + '|' + (v.drawer_id || '')));
+    const known = new Set(arr.map(x => x && x.id));
+    const appends = rows.filter(r => !known.has(r.id));
+    const upserts = rows.filter(r => known.has(r.id));
     let ok = true;
     const landed = new Set();
+    const mark = rec => landed.add(rec.date + '|' + (rec.drawer_id || ''));
     try {
-      for (const rec of (toAdd || [])) {
+      if (appends.length) {
+        /* ⛔⛔⛔ STAGE ONLY AFTER THE WRITE SUCCEEDS, which is why there is no `dropRows` here and no
+           window in which rows sit in memory looking saved. The first version copied the sibling
+           commits — push, write, and take them back out on refusal — and `verify-import-partial-
+           failure` caught what that costs when anything goes wrong: its fixture has no
+           `putRecordsBulk` and no `dropRows`, so the bulk threw, the drop threw, and the appended
+           rows were stranded in memory with the superseded rows never retired. The register-day then
+           held BOTH figures and Drawer Net read -124 against a truth of -68.
+           ⭐ THAT FIXTURE IS NOT AN ODD ONE OUT — it models a write layer with no bulk at all, which
+           is the exact environment a bulk path must degrade safely into. Writing first and staging
+           after removes the failure mode rather than guarding it, and it satisfies the bulk
+           contract either way: `putRecordsBulk` never reads the in-memory array. */
+        let bulkOk = false;
+        try { bulkOk = await App.putRecordsBulk('sc', 'variance', appends, { quiet: true }); }
+        catch (e) { bulkOk = false; }
+        if (bulkOk) {
+          arr.push(...appends);
+          appends.forEach(mark);
+        } else {
+          // Refused, or no bulk available at all: write them one at a time, so a row the server
+          // rejects individually is the only one missing and `landed` stays true per register-day —
+          // which is what the retirement below is keyed on.
+          for (const rec of appends) {
+            const good = await App.putRecord('sc', 'variance', rec);
+            if (good) mark(rec);
+            ok = good && ok;
+          }
+        }
+      }
+      for (const rec of upserts) {
         const good = await App.putRecord('sc', 'variance', rec);
-        if (good) landed.add(rec.date + '|' + (rec.drawer_id || ''));
+        if (good) mark(rec);
         ok = good && ok;
       }
       // ⚠ RETIRE PER REGISTER-DAY, not all-or-nothing (S102) — the same correction as _commitSales
