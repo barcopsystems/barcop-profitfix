@@ -134,6 +134,19 @@ S.ShiftDashboard = {
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
     const flashZone = this._flashZone; this._flashZone = null;
+    /* ⛔⛔⛔ A LANDED IMPORT HAS TO BE REPORTED SOMEWHERE, AND IT WAS NOT BEING. A zone's `-res` slot
+       lives inside `workspace(zone)`, which `stepRow` renders ONLY while that step is open — and
+       every lane advances the step in the same breath as it sets the flash (`_doImportSales` moves
+       to 'cash', `_commitCash` to 'exc'). So the message was written into an element this same
+       render had just taken off the page, and dropped. Measured on v106 with a DOM that resolves
+       only ids the render emitted: BOTH lanes, no line anywhere, on the press that saves the week.
+       ⭐ THE ZONE SLOT IS A PLACEMENT, NOT A REQUIREMENT. Kyle's *"gold, under the drop file box,
+       between the box and the two buttons"* still holds whenever that box is on the page; when it is
+       not, the line goes back to the top of the page — which is where a zone-less flash has always
+       gone — rather than nowhere.
+       ⚠ DERIVED, NEVER PROBED: the slot is on the page exactly when its zone is the open step, and
+       that is knowable before a byte of markup is built. */
+    const flashInZone = !!(flash && flashZone && this._openStep === flashZone);
     const wys = this._wys();
 
     /* ⛔ THE IMPORT OWNS THE PAGE. Nothing under it: not the other three drop zones, not the
@@ -190,12 +203,22 @@ S.ShiftDashboard = {
                  went with it, so the second branch was a call to something that no longer exists —
                  unreachable only because `_anyReview()` happens to read one field. `verify-method-refs`
                  is what found it, which is the whole reason that sweep exists. */
-              + this.salesReviewHTML() + '</div>'
+              + this._reviewHTML() + '</div>'
             : '<div class="card form-card" style="margin-top:18px;">'
               +   '<div class="card-title">' + esc(this.CK_TITLE[this._ckTakeover] || 'Check your import') + '</div>'
               +   '<div id="sc-ck-takeover"></div>'
               + '</div>'
-              + '<div id="sc-ck-takeover-actions" style="margin-top:14px;"></div>')
+              + '<div id="sc-ck-takeover-actions" style="margin-top:14px;"></div>'
+              /* ⛔⛔ A MESSAGE RAISED WHILE A FILE OWNS THE PAGE HAD NOWHERE TO GO, AND ONE OF THEM
+                 WAS A CONTROL THE OPERATOR HAS TO ANSWER. `_showCashMap` renders the register
+                 map-or-add prompt into `#sc-ck-cash-res`, which lives inside the STEP's workspace —
+                 and by the time Import fires `onComplete` the file has already taken the page, so
+                 that id is gone and the function returned in silence. Measured on v106: the press
+                 created no register, wrote no row and rendered no prompt. NOTHING HAPPENED AT ALL,
+                 for every bar whose POS names its registers differently — the ordinary case once
+                 the registers are set up. Live since the takeover shipped (2026-08-07).
+                 ⚠ The confirm stage needs none of this: the shell brings its own result slot. */
+              + '<div id="sc-ck-takeover-res"></div>')
         + '</div>';
       if (!this._anyReview() && this._ckCarry) {
         const slot = document.getElementById('sc-ck-takeover');
@@ -223,7 +246,7 @@ S.ShiftDashboard = {
          zone the operator just used. A lane that names its zone puts it in that zone's own `-res`
          slot, which already sits between the drop box and the step's button row; only a flash with
          no zone (a manual clear-to-zero, a week change) still has nowhere better than here. */
-      + (flash && !flashZone
+      + (flash && !flashInZone
           ? '<div style="font-size:12px;color:var(--gold);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>'
           : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -242,7 +265,7 @@ S.ShiftDashboard = {
     /* The result, written into the slot that already sits between that zone's drop box and the
        step's button row. Written AFTER the mounts, because `CSVMapper.mount` repaints its own
        container and a message put there first would be gone. */
-    if (flash && flashZone) {
+    if (flashInZone) {
       const slot = document.getElementById((this.CK_ZONE[flashZone] || '') + '-res');
       if (slot) slot.innerHTML = '<div style="font-size:12px;color:var(--gold);font-weight:700;margin:12px 2px 0;">'
         + '&#10003; ' + esc(flash) + '</div>';
@@ -419,7 +442,11 @@ S.ShiftDashboard = {
      guard, the mapper re-attach, the drop-zone mount and `ckTakeover` — and each one was written
      against `_salesReview` when sales was the only converted lane. One accessor means a third lane
      joins by adding its field here, not by finding five call sites. */
-  _anyReview() { return this._salesReview; },
+  _anyReview() { return this._salesReview || this._cashReview; },
+  /* WHICH lane's confirm screen is up. `_anyReview` says one of them is; this says which. Both read
+     the same two fields, so they cannot disagree — and the door-10 note above records what happens
+     when a branch here outlives the lane it was written for. */
+  _reviewHTML() { return this._salesReview ? this.salesReviewHTML() : this.cashReviewHTML(); },
   ckTakeover() { return this._ckTakeover != null || !!this._anyReview(); },
   _ckCarryActs: null,  // the mapper's Import/Cancel row, which lives in its own element
   _clearTakeover() { this._ckTakeover = null; this._ckCarry = null; this._ckCarryActs = null; },
@@ -1504,7 +1531,7 @@ S.ShiftDashboard = {
          and Import" button that would commit file B's rows (`_pendingCashRows` is overwritten one
          line down) against file A's mappings. The panel is re-rendered below whenever it is still
          wanted, so clearing it here costs nothing. */
-      const cashRes = document.getElementById('sc-ck-cash-res');
+      const cashRes = this._cashPanelSlot();
       if (cashRes && cashRes.innerHTML.indexOf('sc-cm-sel') !== -1) cashRes.innerHTML = '';
       this._pendingCashRows = rows;
       // ⚠ EVERY register, archived ones included (S104). Matching only active registers made an
@@ -1545,10 +1572,10 @@ S.ShiftDashboard = {
             confirmText: 'OK', cancelText: '', danger: false
           });
         }
-        return await this._commitCash(rows);
+        return this._openCashReview(rows);
       }
       if (unmatched.length) { this._showCashMap(unmatched); return; }   // map or add
-      return await this._commitCash(rows);
+      return this._openCashReview(rows);
     } finally {
       this._importingCash = false;
     }
@@ -1560,8 +1587,21 @@ S.ShiftDashboard = {
     App.shiftData.sc_drawers.push(rec);
     return rec;   // caller persists it (putRecord/putRecordsBulk) — row-per-record
   },
+  /* ⛔⛔ WHERE A CASH MESSAGE CAN LAND, IN ONE PLACE, BECAUSE THE PAGE HAS THREE SHAPES AND ONE OF
+     THEM HAD NO SLOT AT ALL:
+       `#sc-ck-cash-res`      the step's own slot — open step, or the confirm screen (the shell
+                              renders it as its `resultId`, so a refused reviewed write reports there);
+       `#sc-ck-takeover-res`  while a dropped file owns the page and the step flow is gone.
+     ⛔ THE SECOND ONE IS WHY THIS EXISTS. `_showCashMap` opened `if (!res) return;` against the
+     first — and a file always owns the page by the time Import fires, so the register map-or-add
+     prompt could not render and the press did nothing at all. Not a message going missing: a
+     CONTROL the operator has to answer, for every bar whose POS names its registers differently. */
+  _cashPanelSlot() {
+    return document.getElementById('sc-ck-cash-res')
+        || document.getElementById('sc-ck-takeover-res');
+  },
   _showCashMap(unmatched) {
-    const res = document.getElementById('sc-ck-cash-res');
+    const res = this._cashPanelSlot();
     if (!res) return;
     // ⚠ EVERY register, archived ones LABELLED (S104). An archived register was unreachable here,
     // so a POS name that belonged to one could only be mapped to the wrong register or added as a
@@ -1644,14 +1684,263 @@ S.ShiftDashboard = {
         else { const res = document.getElementById('sc-ck-cash-res'); if (res) res.innerHTML = msg; }
         return;
       }
-      return await this._commitCash(this._pendingCashRows);
+      /* ⛔ THE REGISTERS ARE SAVED; THE FIGURES ARE NOT. Setting a register up is the operator's own
+         deliberate answer to a question Bar Cop asked, and `buildCash` resolves `drawer_id` off
+         `sc_drawers` — so the confirm screen cannot describe a truthful outcome until they exist
+         (door 5's rule, from the other end). Only the over/short figures wait for the button, which
+         is exactly what this door's own cancel message has said for months. */
+      return this._openCashReview(this._pendingCashRows);
     } finally {
       this._applyingCashMap = false;
       const b = document.getElementById('sc-cm-go');
       if (b) b.disabled = false;
     }
   },
-  async _commitCash(rows) {
+  // ── The cash confirm screen — DOOR 14 (2026-08-08) ──────────────────────────
+  /* THE SAME FIVE PIECES EVERY CONVERTED DOOR HAS:
+       1 the pure walk    `PosIngest.build('cash', rows)` + `cashReviewRows`
+       2 open the review  stamps `_rid` per row, so Remove has a key that survives a removal
+       3 the summary      filters removed, re-walks, maps to shell rows
+       4 the panel        `ImportConfirm.panel`, whose lead names the BUTTON'S OWN verb
+       5 the press        one guard, then `_commitCash` with `{ reviewed: true }`
+
+     ⛔ THE REGISTER STEP STAYS IN FRONT OF THIS SCREEN, AND THAT IS NOT AN OVERSIGHT. `buildCash`
+     resolves `drawer_id` off `sc_drawers`, and every verdict here hangs off it: the dedupe key, the
+     hand-count match, the whole-day totals guard. A walk run before the registers exist would
+     describe an outcome the write will not produce. So the map-or-add prompt is answered first and
+     its registers are saved; only the OVER/SHORT FIGURES wait for the button.
+
+     ⛔ SECTIONED, NOT `flat`, WHICH IS THE OPPOSITE ANSWER TO THE SALES SCREEN ONE STEP ABOVE — same
+     rule, different door. Sales opts out because a week is SEVEN DAYS read Monday to Sunday, a bound
+     the calendar sets. A cash report is one row per register per day, so its length is the bar's own
+     register count times seven and nothing bounds it: four registers is 28 rows, eight is 56, and
+     the button then sits under all of them. Measured on the real 30-row first drop: 26 going in,
+     4 left out, and the operator sees two counted heads and a button instead of three screens of
+     table. */
+  cashReviewRows(built, opts) {
+    opts = opts || {};
+    const useFile = opts.useFile || {};      // conflict key -> the operator chose the file
+    const removed = opts.removed || {};      // row key -> taken out of this import
+    /* Ten outcomes, ten sentences. Merging any two is how an operator reads "already logged" over a
+       corrected drawer report that WAS written, or is sent to fix a date column on a line that is
+       the file's own total. `replaced` is the one this lane needed of its own: on the hours and tips
+       lanes a duplicate is SKIPPED, here it is an upsert that LANDS carrying the superseded row's id.
+       ⚠ INSIDE the function, like the sales door's `NOTE` and for the same reason: written as a
+       sibling data property it is invisible to every slicer in the harness suite (they all lift
+       METHODS by name), so a stub reads `undefined` and the lifted body throws on its first row —
+       which looks exactly like a real defect ([[the-loop]] #16). */
+    const NOTE = {
+      summary:      'Your file\'s own totals line, not a register',
+      undated:      'Could not read the date on this row',
+      incomplete:   'No over/short figure Bar Cop could use',
+      dayTotal:     'Whole-day total, the register rows cover it',
+      repeat:       'Same line twice in your file',
+      kept:         'Counted by hand, and the file agrees',
+      extraDropped: 'Already counted from an earlier row',
+      replaced:     'Replacing the figures already imported',
+      'new':        'Adding this drawer count'
+    };
+    /* ⛔ THE SPELLINGS ARE THE VARIANCE LOG'S OWN, read off `sc-cash-history`: the date is
+       "Aug 10, 2026", expected and counted go through `App.fmtCurrency`, a figure Bar Cop does not
+       have is a DASH (never $0.00 — that reads as an empty drawer for a register that took $900),
+       and the over/short carries its sign OUTSIDE the dollar sign through `App.fmtBal`. These
+       records land in that log; one quantity must not get two spellings between the screen that adds
+       it and the screen that shows it.
+       ⚠ THE READABILITY TEST IS THE BUILDER'S, NOT `new Date`'s. `v.date` is what the walk decided,
+       and only a row it could read gets formatted — `new Date('Week of 8/10')` does NOT return NaN,
+       so formatting the raw cell would turn an unreadable date into a confident wrong one. That
+       exact trap cost the labor lanes a round. */
+    const money = v => (v == null ? '&mdash;' : App.fmtCurrency(v));
+    const overShort = v => (v == null ? '&mdash;'
+      : (App.fmtSigned(v, 2).sign > 0 ? '+' : '') + App.fmtBal(v));
+    const dayLabel = ymd => {
+      const d = new Date(String(ymd).length <= 10 ? ymd + 'T00:00:00' : ymd);
+      return isNaN(d.getTime()) ? String(ymd)
+        : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    const rows = [];
+    (built.perRow || []).forEach((v, i) => {
+      const key = (v.raw && v.raw._rid != null) ? v.raw._rid : i;
+      if (removed[key]) return;
+      const st = v.status, raw = v.raw || {}, conf = v.conflict || {};
+      const needsYou = st === 'conflict';
+      const chose = needsYou && !!useFile[conf.key];
+      const lands = st === 'new' || st === 'replaced' || chose;
+      /* WHICH FIGURES THE ROW SHOWS, and every branch is the row telling the truth about itself:
+           conflict  the FILE's, with the operator's own underneath ONLY where they differ;
+           kept      the SAVED figures — the note says the file agrees with them, so the saved
+                     record IS the file's figures (door 2's rule for `same` / `kept`);
+           has a rec the record's, because that is what a press would store — and for a `repeat` or
+                     an `extraDropped`, the record it duplicates, which is what the file holds;
+           the rest  the file's own cells, parsed and never re-derived. A non-landing row printed
+                     over three dashes reads as "there was no figure", which is the finding the
+                     labor lanes paid for over a file that plainly said 7.50. */
+      let expC, cntC, osC;
+      if (needsYou) {
+        const mine = conf.mine || {}, theirs = conf.theirs || {};
+        expC = ImportConfirm.compare(money(theirs.expected_cash),
+          mine.expected_cash == null ? null : money(mine.expected_cash));
+        cntC = ImportConfirm.compare(money(theirs.counted_cash),
+          mine.counted_cash == null ? null : money(mine.counted_cash));
+        osC = ImportConfirm.compare(overShort(theirs.variance),
+          mine.variance == null ? null : overShort(mine.variance));
+      } else {
+        const src = st === 'kept' ? (v.prior || null) : (v.rec || null);
+        if (src) {
+          expC = money(src.expected_cash == null ? null : Number(src.expected_cash));
+          cntC = money(src.counted_cash == null ? null : Number(src.counted_cash));
+          osC = overShort(src.variance == null ? null : Number(src.variance));
+        } else {
+          expC = money(App.parseNum(raw.expected));
+          cntC = money(App.parseNum(raw.counted));
+          osC = overShort(App.parseNum(raw.over_short));
+        }
+      }
+      rows.push({
+        cells: [
+          v.drawer ? esc(v.drawer) : '&mdash;',
+          v.date ? esc(dayLabel(v.date)) : (raw.date ? esc(String(raw.date)) : '&mdash;'),
+          expC, cntC, osC
+        ],
+        note: needsYou ? (chose ? 'Using the file' : 'Keeping the count you entered') : (NOTE[st] || ''),
+        notes: [],
+        lands: lands,
+        // ⛔ A register-day the file disagrees with is the only row here that needs the operator, so
+        // it is never dimmed. The shell owns that rule, for every door.
+        needsYou: needsYou,
+        key: key,
+        decision: needsYou ? this._cashConflictHTML(v, chose) : ''
+      });
+    });
+    return { rows: rows, count: rows.filter(r => r.lands).length };
+  },
+  /* Keep Mine / Use The File, on the row — the control the sales door and `r-server-check` already
+     use, for the reason in [[user-chooses-conflicts]]: Bar Cop never picks between two figures the
+     operator entered themselves. Default is KEEP YOUR OWN, and the answer is STORED, not applied,
+     so nothing is written until Add. */
+  _cashConflictHTML(v, useFile) {
+    const k = esc(String((v.conflict || {}).key || ''));
+    const btn = (val, label, on) => '<button type="button" class="btn ' + (on ? 'btn-primary' : 'btn-ghost')
+      + ' btn-sm" data-cashconf="' + k + '" data-use="' + val + '">' + label + '</button>';
+    // ⚠ `.row-actions` right-aligns by default. These answer the sentence directly above them, so
+    // they line up with it — the same correction the sales row needed.
+    return '<div class="row-actions" style="justify-content:flex-start;margin-top:6px;">'
+      + btn('mine', 'Keep Mine', !useFile) + btn('file', 'Use The File', useFile) + '</div>';
+  },
+
+  /* ⛔ `_rid` IS STAMPED ON THE RAW ROW and read back by the mapper. Without a stable key, Remove is
+     keyed on array position — and position moves the moment a row is removed, so the second Remove
+     takes a different row than the one clicked. */
+  _openCashReview(rows) {
+    (rows || []).forEach((r, i) => { if (r && r._rid == null) r._rid = 'cr' + i; });
+    this._cashReview = { rows: (rows || []).slice(), open: {}, removed: {}, useFile: {} };
+    this._openStep = 'cash';
+    this.render(this.container, this.actions);
+  },
+
+  /* ⛔⛔ RE-WALKED ON EVERY RENDER OVER THE ROWS NOT REMOVED, and that is deliberate: the walk is the
+     ONE place a row's outcome is decided, so the screen and the write cannot disagree. Doors 6 and 7
+     both had to FREEZE a file-level verdict for exactly this. MEASURED here rather than assumed —
+     removing each row of the real 30-row file in turn moves only two things, and both follow the
+     operator's own action:
+       - removing the FIRST of two identical lines promotes the second from `repeat` to `new`, which
+         is right: they took out the duplicate;
+       - removing every NAMED row on a date promotes that date's blank-register line from `dayTotal`
+         to the day's only count — which is that guard's whole purpose (never double-count a day the
+         per-register rows already cover), and the day totals the same money either way.
+     Block M of `verify-cash-import-review.js` pins both, and pins that nothing else moves. */
+  _cashReviewSummary() {
+    const r = this._cashReview;
+    if (!r) return { rows: [], count: 0 };
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    return this.cashReviewRows(PosIngest.build('cash', live), { removed: {}, useFile: r.useFile });
+  },
+  /* The rows the operator took out, built by a SEPARATE walk over only those rows — so a removed
+     duplicate stops blocking the row behind it. Their verdicts are meaningless and are never read;
+     only their cells are, which is all the "Removed" section shows. */
+  _cashReviewRemoved() {
+    const r = this._cashReview;
+    if (!r) return [];
+    const gone = r.rows.filter(x => r.removed[x._rid]);
+    if (!gone.length) return [];
+    return this.cashReviewRows(PosIngest.build('cash', gone), { removed: {}, useFile: {} }).rows;
+  },
+
+  cashReviewHTML() {
+    const r = this._cashReview || { open: {} };
+    const s = this._cashReviewSummary();
+    const n = s.rows.length;
+    const nConf = s.rows.filter(x => x.needsYou).length;
+    /* ⚠ THE LEAD NAMES THE BUTTON'S OWN VERB, never a hardcoded word. Both lead sentences on the
+       sales door still said "press Import" after Kyle renamed that button to Add, and survived the
+       rename in silence — the screen would have pointed at a button that is not on it.
+       ⚠ EACH PLURAL NAMES ITS OWN COLLECTION: `n` is rows read out of the file, `nConf` is
+       register-days needing a call, and the button counts what will be written. Three numbers. */
+    const lead = nConf
+      ? 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's') + ' out of this file. '
+        + (nConf === 1 ? 'One register-day you' : nConf + ' register-days you')
+        + ' counted by hand and the file disagrees, so pick which figures to keep. '
+        + 'Nothing is saved until you add them.'
+      /* ⛔ NO CLAIM ABOUT WHAT THE ROWS ARE. This read *"out of this file, one per register per day"*
+         — a description of what a cash report is SUPPOSED to be, printed over a screen that is at
+         that moment showing a repeated line, a whole-day total and the file's own TOTAL row. Door 11
+         shipped the same shape (*"Every row from your file is here"* on the one door that folds) and
+         Kyle caught it on the walk. The Register column and the rows say what each one is; the lead
+         does not need to promise it. */
+      : 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's')
+        + ' out of this file. Check them, then add them. '
+        + 'Nothing is saved until you do.';
+    return ImportConfirm.panel({
+      label: 'Check your cash report',
+      lead: lead,
+      columns: [{ label: 'Register', width: 20 }, { label: 'Date', width: 14 },
+                { label: 'Expected', width: 12 }, { label: 'Counted', width: 12 },
+                { label: 'Over / Short', width: 13 }],
+      outcomeLabel: 'What Happens',
+      rows: s.rows,
+      removedRows: this._cashReviewRemoved(),
+      removable: true,
+      verb: 'Add', noun: 'Reconcile', nounPlural: 'Reconciles',
+      open: r.open,
+      goAttr: 'data-cashreview-go', backAttr: 'data-cashreview-back', backLabel: 'Start Over',
+      resultId: 'sc-ck-cash-res',
+      busy: !!this._cashReviewWriting
+    });
+  },
+
+  /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen object
+     is the only thing a re-render cannot hand back ([[the-loop]] #85). */
+  async _runCashReview() {
+    const r = this._cashReview;
+    if (!r || this._cashReviewWriting) return;
+    this._cashReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-cashreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try {
+      await this._commitCash(r.rows.filter(x => !r.removed[x._rid]),
+        { reviewed: true, useFile: r.useFile });
+    } finally {
+      this._cashReviewWriting = false;
+      /* ⛔ ONLY THE SUCCESS PATH CLEARS THE SCREEN, and `_commitCash` is what clears it — a refused
+         write keeps every answer so the operator can press again without re-dropping the file. Do
+         NOT re-render here: the failure path writes into the shell's result slot and a re-render
+         would destroy the only message saying what happened. */
+      if (this._cashReview) {
+        const b = this.container && this.container.querySelector('[data-cashreview-go]');
+        if (b) { b.disabled = false; b.textContent = ImportConfirm.goLabel(this._cashPanelOpts()); }
+      }
+    }
+  },
+  // The label comes from the SHELL, never a second copy of its rule — the reference door once
+  // relabelled its own button in place to something `ImportConfirm.panel` would never render.
+  _cashPanelOpts() {
+    return { rows: this._cashReviewSummary().rows, verb: 'Add', noun: 'Reconcile', nounPlural: 'Reconciles' };
+  },
+
+  // opts.reviewed = the operator has already seen every outcome row by row and accepted it, so the
+  // conflict answers come off the rows and the success line drops back to its headline.
+  async _commitCash(rows, opts) {
+    opts = opts || {};
     const built = PosIngest.build('cash', rows);
     const { toAdd, skipped, undated, dupCount, keptManual, conflicts, extraDropped, totalsLines, fileRepeats } = built;
     // ⚠ THE MESSAGE GOES IN THE DEDICATED SLOT WHENEVER THE REGISTER-MAPPING PANEL IS UP — this is
@@ -1662,14 +1951,22 @@ S.ShiftDashboard = {
     // a refused save, which is exactly when a retry is the thing they need. _applyCashMap built
     // #sc-cm-err for precisely this and _commitCash never used it. The slot only exists while the
     // panel is up, so the ordinary import path still resolves to #sc-ck-cash-res unchanged.
-    const slot = () => document.getElementById('sc-cm-err') || document.getElementById('sc-ck-cash-res');
+    const slot = () => document.getElementById('sc-cm-err') || this._cashPanelSlot();
     const fail = m => { const el = slot(); if (el) el.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
     const note = m => { const el = slot(); if (el) el.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">' + m + '</div>'; };
     // A conflict: the file disagrees with a drawer the operator counted BY HAND. Ask which wins
     // before writing ([[user-chooses-conflicts]]) — Bar Cop never picks between two figures the
     // operator entered themselves. A file that MATCHES the hand count is kept silently (keptManual).
     const extra = []; let usedTheirs = 0;
-    if (conflicts && conflicts.length) {
+    /* ⛔⛔ ON THE REVIEWED PATH THE ANSWER IS ALREADY ON THE ROW, SO THE MODAL MUST NOT FIRE. Asking
+       twice for one decision is the shape door 2 removed from this app: the confirm screen shows both
+       sets of figures with Keep Mine / Use The File, and `opts.useFile` is what the operator chose.
+       ⚠ `App.promptImportConflicts` STAYS — `_commitCash` is called directly by seven harnesses and
+       the per-server door still uses the helper, so this is a branch, not a retirement. */
+    if (opts.reviewed) {
+      const chose = opts.useFile || {};
+      (conflicts || []).forEach(c => { if (chose[c.key]) { extra.push(c.useRec); usedTheirs++; } });
+    } else if (conflicts && conflicts.length) {
       const money = v => v == null ? '—' : '$' + (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const dayLabel = d => { const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
       const cashText = v => {
@@ -1733,16 +2030,33 @@ S.ShiftDashboard = {
     if (!ok) { fail(App.partialSaveNote(App.landedOf(allToAdd, App.shiftData && App.shiftData.sc_variances),
                                       allToAdd.length, 'reconcile', 'reconciles') + cashOutcomes); return; }
     this._pendingCashRows = null;
+    /* ⛔ THE SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. `_cashReview` surviving a refusal is what
+       says the write did not land — it keeps every conflict answer and every Remove so the operator
+       can press again without re-dropping the file. Clearing it unconditionally would hand them a
+       page that looks finished over rows that never saved. */
+    if (opts.reviewed) this._cashReview = null;
     this._flashZone = 'cash';
+    /* ⛔ ONCE A DOOR HAS A CONFIRM SCREEN, ITS SUCCESS LINE IS THE HEADLINE ALONE. Every clause below
+       was written when the drop wrote straight through and this sentence was the operator's ONLY
+       account of it; they have now read all of it row by row and pressed Add. Kyle, on the sales
+       door: *"all that green text is very hard to read and follow.. it is just repeating what the
+       user just saw on screen and confirmed by adding."*
+       ⛔ THE PRECONDITION IS THAT EVERY CLAUSE IS ALREADY ON THE SCREEN, and it was checked one at a
+       time: replaced, used-the-file, kept, an extra row for a counted register-day, a whole-day
+       totals line, no over/short, an unreadable date, a repeated line — and the file's own TOTAL
+       row, which had no home anywhere until this screen. Dropping a clause before its fact is on
+       the screen is losing information, not repeating less. */
+    const outcomes = opts.reviewed ? ''
+      : ((dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
+        + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand count)' : '')
+        + (kept ? ' (' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept)' : '')
+        + extraNote + totalsNote
+        // ⚠ A skipped cash row is a register-day with NO over/short at all (S105). Silence let the
+        // operator read "4 reconciles imported" off a 6-row file and believe the week was counted.
+        + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
+            + ' skipped, no over/short figure)' : '') + undatedNote);
     this._flash = allToAdd.length + ' reconcile' + (allToAdd.length === 1 ? '' : 's') + ' imported'
-      + (dupCount ? ' (' + dupCount + ' replaced earlier figures)' : '')
-      + (usedTheirs ? ' (' + usedTheirs + ' used the file over your hand count)' : '')
-      + (kept ? ' (' + kept + ' hand count' + (kept === 1 ? '' : 's') + ' kept)' : '')
-      + extraNote + totalsNote
-      // ⚠ A skipped cash row is a register-day with NO over/short at all (S105). Silence let the
-      // operator read "4 reconciles imported" off a 6-row file and believe the week was counted.
-      + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
-          + ' skipped, no over/short figure)' : '') + undatedNote + '.';
+      + outcomes + '.';
     this._openStep = 'exc';
     this.render(this.container, this.actions);
   },
@@ -1765,6 +2079,45 @@ S.ShiftDashboard = {
         this.render(this.container, this.actions); return;
       }
       if (ev.target.closest('[data-salesreview-go]')) { this._runSalesReview(); return; }
+      /* ── The cash confirm screen's own controls. They come BEFORE the step handlers because none
+         of those is on screen while a review is up, and the section heads share the shell's
+         `data-confirm-section` hook with every other converted door. */
+      if (this._cashReview) {
+        const sec = ev.target.closest('[data-confirm-section]');
+        if (sec) {
+          const k = sec.dataset.confirmSection;
+          // `needs` defaults OPEN, so its toggle is inverted — the shell's own convention, written
+          // generically so a new section key (`notgoing`, `removed`) needs no line here.
+          this._cashReview.open[k] = (k === 'needs') ? (this._cashReview.open[k] === false) : !this._cashReview.open[k];
+          this.render(this.container, this.actions); return;
+        }
+        const rm = ev.target.closest('[data-confirm-remove]');
+        if (rm) { this._cashReview.removed[rm.dataset.confirmRemove] = true; this.render(this.container, this.actions); return; }
+        /* ⛔ REMOVE IS REVERSIBLE. Every other control here is, right up to the button, under a
+           sentence reading "Nothing is saved until you do" — Remove was the one that destroyed, and
+           the only way back was Start Over, which drops the file. */
+        const rs = ev.target.closest('[data-confirm-restore]');
+        if (rs) { delete this._cashReview.removed[rs.dataset.confirmRestore]; this.render(this.container, this.actions); return; }
+        /* The row's own conflict answer. Default is KEEP MINE and it stays that way unless the
+           operator picks the file — the answer is STORED, not applied, so nothing is written until
+           Add, and the button's count, the row and the write all read from this one place. */
+        const cc = ev.target.closest('[data-cashconf]');
+        if (cc) {
+          const key = cc.dataset.cashconf;
+          if (cc.dataset.use === 'file') this._cashReview.useFile[key] = true;
+          else delete this._cashReview.useFile[key];
+          this.render(this.container, this.actions); return;
+        }
+      }
+      if (ev.target.closest('[data-cashreview-go]')) { this._runCashReview(); return; }
+      if (ev.target.closest('[data-cashreview-back]')) {
+        // Back to the drop zone, not out of the step. A mapping belongs to the file it was made for,
+        // so the file is re-dropped from scratch — nothing was written to undo.
+        // ⚠ AND THE PAGE COMES BACK WITH IT. The carried mapper is spent once its rows have gone to
+        // the confirm screen, so leaving the takeover set would re-attach a dead node over the step.
+        this._cashReview = null; this._pendingCashRows = null;
+        this._clearTakeover(); this.render(this.container, this.actions); return;
+      }
       if (ev.target.closest('[data-salesreview-back]')) {
         // Back to the drop zone, not out of the step. A mapping belongs to the file it was made
         // for, so the file is re-dropped from scratch — nothing was written to undo.
