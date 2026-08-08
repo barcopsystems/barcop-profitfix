@@ -780,7 +780,15 @@ S.RevenueServerCheck = {
     undated:    'Could not read the date on this row',
     repeat:     'Same line twice in your file',
     dup:        'Already logged, and the figures match',
-    replaced:   'Replacing the figures already imported for this shift'
+    replaced:   'Replacing the figures already imported for this shift',
+    /* ⛔⛔ A LANDING ROW SAYS WHAT HAPPENS TOO — Kyle, walking this door live (2026-08-07): *"the
+       'what happens' column on the going in card is blank.. we decided awhile back that what happens
+       always says what happens in every section."* Right, and it was a straight omission: the held-back
+       rows all had a reason and the rows that actually GO IN went out silent, under a column header
+       that is a promise. Every other converted door already had this line — `sc-void-comp` says
+       "Adding this row", `ic-vendors` "Adding this vendor", `ev-regulars` "Adding this regular" — so I
+       copied the shape of those doors without copying the line that matters most. */
+    'new':      'Adding this check'
   },
   serverReviewRows(built, opts) {
     opts = opts || {};
@@ -832,6 +840,7 @@ S.RevenueServerCheck = {
       else if (st === 'repeat') note = N.repeat;
       else if (st === 'dup') note = N.dup;
       else if (st === 'replaced') note = N.replaced;
+      else if (st === 'new') note = N['new'];
       const needsYou = st === 'conflict';
       const lands = st === 'new' || st === 'replaced' || (needsYou && !!useFile[(v.conflict || {}).key]);
       rows.push({
