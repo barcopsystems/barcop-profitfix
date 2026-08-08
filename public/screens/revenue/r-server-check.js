@@ -958,11 +958,18 @@ S.RevenueServerCheck = {
        page that looks finished over rows that never saved. */
     if (opts.reviewed && failed) {
       const slot = document.getElementById('rsc-imp-result');
+      /* ⚠ ONE PIECE OF ADVICE, NOT TWO. My first version appended "Check your connection and press Add
+         again." to `App.partialSaveNote`, which already ends with "Try again." — walked live and the
+         line read *"Save failed. None of the 115 checks were saved. Try again. Check your connection
+         and press Add again."* Two sentences telling the operator the same thing, on the screen where
+         they are reading hardest. The shared helper owns the wording; the fallback below carries the
+         advice only because it has none of its own. */
       if (slot) slot.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
         + esc(App.partialSaveNote
                 ? App.partialSaveNote(landed, toAdd.length, 'check', 'checks')
-                : 'Could not save ' + (toAdd.length - landed) + ' of ' + toAdd.length + ' checks.')
-        + ' Check your connection and press Add again.</div>';
+                : 'Could not save ' + (toAdd.length - landed) + ' of ' + toAdd.length
+                  + ' checks. Check your connection and press Add again.')
+        + '</div>';
       return;
     }
     if (opts.reviewed) this._serverReview = null;
