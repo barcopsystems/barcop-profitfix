@@ -3193,7 +3193,7 @@ S.InventoryProducts = {
     const buckets = () => {
       const b = [];
       if (dup) b.push(dup + ' duplicate name' + (dup === 1 ? '' : 's') + ' skipped');
-      if (dupArchived) b.push(dupArchived + ' already exist' + (dupArchived === 1 ? 's' : '') + ' but ' + (dupArchived === 1 ? 'is' : 'are') + ' hidden — see the Inactive tab');
+      if (dupArchived) b.push(dupArchived + ' already exist' + (dupArchived === 1 ? 's' : '') + ' but ' + (dupArchived === 1 ? 'is' : 'are') + ' hidden (see the Inactive tab)');
       if (nameless) b.push(nameless + ' row' + (nameless === 1 ? '' : 's') + ' skipped with no product name');
       /* ⚠ NAMED, not counted. Every other bucket here is a count because the operator can
          find those rows again in their own file. An unplaceable row is different: it was
