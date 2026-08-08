@@ -1035,7 +1035,7 @@ S.ShiftDashboard = {
     // to Enter Manually — the sanctioned zeroing path — rather than told "no usable sales figure".
     const zeroNote = (zeroSkipped && zeroSkipped.length)
       ? ' (' + zeroSkipped.length + ' day' + (zeroSkipped.length === 1 ? '' : 's') + ' came in at $0 and '
-        + (zeroSkipped.length === 1 ? 'was' : 'were') + ' skipped — use Enter Manually to record a zero day)'
+        + (zeroSkipped.length === 1 ? 'was' : 'were') + ' skipped: use Enter Manually to record a zero day)'
       : '';
     const res = document.getElementById('sc-ck-import-res');
     const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
@@ -1129,7 +1129,7 @@ S.ShiftDashboard = {
         else if (nZero && !skipped.length && !nUnd) fail((nZero === 1 ? 'That day' : 'Those ' + nZero + ' days')
                      + ' came in at $0, so nothing was imported. Use Enter Manually to record a zero day.' + rest);
         else if (nUnd && !skipped.length && !nZero) fail('No days imported. Bar Cop could not read a date on '
-                     + (nUnd === 1 ? 'a row' : 'any row') + ' — check the date column in your export.' + tail);
+                     + (nUnd === 1 ? 'a row' : 'any row') + '. Check the date column in your export.' + tail);
         else if (skipped.length && !nUnd && !nZero) fail('No days imported. No day in this file carried a sales figure Bar Cop could read.' + tail);
         else {
           /* Mixed: assert nothing about ALL days, and name ONLY the columns that were actually a
@@ -1360,7 +1360,10 @@ S.ShiftDashboard = {
       fail(coversOnly.length
         ? 'Nothing saved. ' + (coversOnly.length === 1 ? 'That day has' : 'Those days have')
           + ' covers but no sales. Enter bar or food sales for ' + coversOnlyLabels.join(', ')
-          + ' — or 0 in both sales cells if the bar was closed. Clearing the covers instead leaves'
+          // ⚠ PARENTHESES, NOT A COMMA. The label list directly in front of this is comma-joined, so
+          // ", or 0 in both sales cells" read as one more day in that list. The em dash was carrying
+          // real work here; a comma was the one replacement that could not do it.
+          + ' (or 0 in both sales cells if the bar was closed). Clearing the covers instead leaves'
           + ' whatever is already saved for that day exactly as it is.'
         : 'Enter at least one day\'s sales before saving.');
       return;
@@ -1430,7 +1433,7 @@ S.ShiftDashboard = {
     // as "nothing happened" over a week that has already lost a record.
     if (broke) {
       fail('Could not clear ' + (cleared
-            ? 'every day — ' + cleared + ' of ' + attempted + ' were cleared before the save was refused. Try the save again to finish.'
+            ? 'every day. ' + cleared + ' of ' + attempted + ' were cleared before the save was refused. Try the save again to finish.'
             // ...and say how many were being cleared, rather than "the day" over a batch of three.
             : (attempted === 1 ? 'the day' : 'those ' + attempted + ' days') + '. Try the save again.') + coTail);
       return;

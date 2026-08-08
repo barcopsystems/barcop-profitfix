@@ -929,7 +929,7 @@ S.ShiftVoidComp = {
          in one night is an ordinary evening, and dropping the second would delete real money. So
          Bar Cop reports what it saw and leaves the decision where it belongs. */
       + ((fileRepeats || 0) ? dim(fileRepeats + ' repeated line' + (fileRepeats === 1 ? '' : 's')
-          + ' in your file — both imported, delete one if it is a duplicate.') : '');
+          + ' in your file, both imported. Delete one if it is a duplicate.') : '');
     if (!toAdd.length) {
       // ⚠ NAME THE REAL REASON. One sentence used to cover every zero-row outcome, so a file whose
       // dates could not be read was told "Every row was missing a valid amount" — about amounts that
@@ -940,7 +940,7 @@ S.ShiftVoidComp = {
       // contradicted by its own clause, one line down. Same trap the sales door hit twice.
       setResult('<div style="font-size:13px;color:var(--red);margin-top:12px;">'
         + (dupCount && !skipped.length && !nUnd ? 'No new rows imported. All ' + dupCount + ' row' + (dupCount === 1 ? ' was' : 's were') + ' already logged.'
-         : nUnd && !skipped.length && !dupCount ? 'No rows imported. Bar Cop could not read a date on ' + (nUnd === 1 ? 'the row' : 'any row') + ' — check the date column in your export.'
+         : nUnd && !skipped.length && !dupCount ? 'No rows imported. Bar Cop could not read a date on ' + (nUnd === 1 ? 'the row' : 'any row') + '. Check the date column in your export.'
          : skipped.length && !nUnd && !dupCount ? 'No rows imported. Every row was missing a valid amount.'
          : 'No new rows imported.')
         + outcomes + '</div>');
