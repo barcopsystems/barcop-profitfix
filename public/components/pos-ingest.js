@@ -791,7 +791,26 @@ const PosIngest = {
     const existing = (App.laborData && App.laborData.lc_actuals) || [];
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
     const fileSeen = new Set(); let fileRepeats = 0;   // exact repeats WITHIN this one file (S218)
+    const summaryRows = [];
+    /* ⛔⛔⛔ ONE VERDICT PER INPUT ROW, IN ORDER — ADDITIVE, the same shape `buildVoids`, `buildServer`
+       and `buildPmix` gained. Everything else here is a COUNT or a list of NAMES, and no confirm
+       screen can be built on that: it cannot say WHICH row was already logged, which was the repeat,
+       or which person the unreadable cell belonged to. Every existing field keeps its exact meaning
+       so the unconverted lanes are untouched. */
+    const perRow = [];
     (rows || []).forEach(r => {
+      /* ⛔⛔ THE EXPORT'S OWN TOTALS LINE IS NOT A PERSON, and until now this walk never asked.
+         Measured on a real 83-row timeclock file: "Grand Total" and "Team Average" fell through to
+         `skipped`, which this door renders as *"skipped, name not on your roster"* — so an operator
+         who follows that advice adds Grand Total to the staff roster, and a 512-hour phantom then
+         lands in gross pay, labor %, prime cost and the payroll export. `buildServer` and `buildPmix`
+         were both fixed for exactly this, and `isSummaryName`'s own comment says the same summary line
+         reaches these doors too. It gets its own bucket rather than being dropped silently, because a
+         row the operator can see in their file and cannot find in Bar Cop is what stops them trusting
+         the total. */
+      if (this.isSummaryName(r.name)) { const nmS = String(r.name || '').trim();
+        summaryRows.push(nmS);
+        perRow.push({ raw: r, name: nmS, status: 'summary', lands: false }); return; }
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const hours = this._hours(r.hours);
       /* ⚠ TWO PROBLEMS, TWO LISTS — the same split buildServer and buildPmix already have, and for
@@ -800,8 +819,15 @@ const PosIngest = {
          off), which sends the operator to add a staff member who already exists — "they added a
          duplicate that fixed nothing and corrupted the roster". An unmatched NAME is a roster fix;
          an unusable FIGURE is a file fix. */
-      if (!staff) { skipped.push(r.name || '(blank)'); return; }
-      if (isNaN(hours) || hours <= 0) { incomplete.push(r.name || '(blank)'); return; }
+      /* ⚠ ONE BUCKET, TWO VERDICTS. `skipped` keeps its exact meaning and its exact count; the row
+         verdict is what tells the screen whether the CELL was empty or the NAME was unknown, because
+         "no name on this row" and "this name is not on your roster" are different sentences and only
+         one of them is a roster fix. */
+      if (!staff) { skipped.push(r.name || '(blank)');
+        perRow.push({ raw: r, name: String(r.name || ''),
+          status: String(r.name || '').trim() ? 'noMatch' : 'noName', lands: false }); return; }
+      if (isNaN(hours) || hours <= 0) { incomplete.push(r.name || '(blank)');
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'incomplete', lands: false }); return; }
       const recDate = this.normDate(r.date, opts);
       /* ⚠⚠ A TIMECLOCK ROW WITH NO READABLE DATE IS A SKIP, NOT A BLANK-DATED RECORD. This wrote
          `date: ''` and counted it as imported — and because the dedup key is staff + date + hours,
@@ -812,7 +838,8 @@ const PosIngest = {
          The four dated builders (sales, cash, per-server, voids) all refuse an unreadable date;
          these two were the last writing blanks. Pay is the worst place for it: gross pay, labour %,
          RPLH, overtime and the payroll export all read these rows, and all of them window by date. */
-      if (!recDate) { undated.push(r.name || '(blank)'); return; }
+      if (!recDate) { undated.push(r.name || '(blank)');
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'undated', lands: false }); return; }
       const shiftType = (r.shift || '').trim();
       /* ⚠⚠ A LINE REPEATED INSIDE ONE FILE (S218). `_isDup` only searches what is ALREADY SAVED, so
          on a FIRST import there is nothing to dedup against and a byte-identical repeat was written
@@ -828,26 +855,34 @@ const PosIngest = {
          denominator, short-paid that person and over-paid everyone else.
          ⚠ Reported, never silent, so an operator whose export really does repeat a line can see it. */
       const fileKey = staff.id + '|' + recDate + '|' + shiftType + '|' + hours.toFixed(3);
-      if (fileSeen.has(fileKey)) { fileRepeats++; return; }
+      if (fileSeen.has(fileKey)) { fileRepeats++;
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'repeat', lands: false }); return; }
       fileSeen.add(fileKey);
       // Skip an exact re-import (same staff + date + hours) so re-dropping a
       // timeclock file never double-counts hours into gross pay.
       if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate && Math.abs((x.hours || 0) - hours) < 0.001)) {
-        dupCount++; return;
+        dupCount++;
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'dup', lands: false }); return;
       }
       const sal = App.isSalaried(staff);
       const wage = sal ? null : (App.wageForStaffOn ? App.wageForStaffOn(staff.id, recDate) : (staff.wage || 0));
-      toAdd.push({
+      /* ⛔ THE VERDICT HOLDS THE SAME RECORD OBJECT THAT IS IN `toAdd`, never a copy, so the row can
+         show the figures the write will actually store and the two can never drift. */
+      const rec = {
         id: App.uid(), date: recDate, staff_id: staff.id, name: staff.name,
         position_id: staff.position_id || '', shift_type: shiftType,
         hours, wage, cost: sal ? 0 : hours * (wage || 0),
         notes: '', imported: true, created_at: new Date().toISOString()
-      });
+      };
+      toAdd.push(rec);
+      perRow.push({ raw: r, name: staff.name, staff: staff, status: 'new', lands: true, rec: rec });
     });
     // `undated` = the file gave a date this row could not be read from; `skipped` = no staff
     // match or no usable figure. Different problems, different fixes, never one list.
     // `fileRepeats` = lines this file repeated verbatim; counted once, and REPORTED by the door.
-    return { toAdd, skipped, incomplete, undated, dupCount, fileRepeats };
+    // `summaryRows` = the export's own totals lines, which are not people. `perRow` = one verdict per
+    // input row, in order. Both ADDITIVE: nothing above them changed meaning or count.
+    return { toAdd, skipped, incomplete, undated, dupCount, fileRepeats, summaryRows, perRow };
   },
 
   buildTips(rows, opts) {
@@ -855,20 +890,32 @@ const PosIngest = {
     const existing = (App.laborData && App.laborData.lc_tips) || [];
     const toAdd = []; const skipped = []; const incomplete = []; const undated = []; let dupCount = 0; const used = new Set();
     const fileSeen = new Set(); let fileRepeats = 0;   // exact repeats WITHIN this one file (S218)
+    // The twins of buildHours' two new lists, added in the same edit and for the same reasons.
+    const summaryRows = [];
+    const perRow = [];
     (rows || []).forEach(r => {
+      // ⛔ THE TWIN OF buildHours' TOTALS-LINE GUARD. Measured on a real 40-row POS tips export:
+      // "Grand Total" came back in `skipped`, which the door renders as "name not on your roster".
+      if (this.isSummaryName(r.name)) { const nmS = String(r.name || '').trim();
+        summaryRows.push(nmS);
+        perRow.push({ raw: r, name: nmS, status: 'summary', lands: false }); return; }
       const staff = staffByName[(r.name || '').trim().toLowerCase()];
       const cash = this._num(r.cash_tips);
       const card = this._num(r.card_tips);
       // ⚠ The twin of buildHours' split. A $0.00 tips row is an ORDINARY line in a POS tips export
       // (barbacks, kitchen, someone's day off) — telling the operator those people are not on the
       // roster is both false and an instruction to corrupt the roster.
-      if (!staff) { skipped.push(r.name || '(blank)'); return; }
-      if ((cash + card) <= 0) { incomplete.push(r.name || '(blank)'); return; }
+      if (!staff) { skipped.push(r.name || '(blank)');
+        perRow.push({ raw: r, name: String(r.name || ''),
+          status: String(r.name || '').trim() ? 'noMatch' : 'noName', lands: false }); return; }
+      if ((cash + card) <= 0) { incomplete.push(r.name || '(blank)');
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'incomplete', lands: false }); return; }
       const recDate = this.normDate(r.date, opts);
       // ⚠ The twin of buildHours' guard above, and it fails the same way: the dedup key is
       // staff + date + amounts, so undated rows all share one key and a second week deduped away
       // in full. Tips feed Form 8027, the tip-out basis and the payroll export, all date-windowed.
-      if (!recDate) { undated.push(r.name || '(blank)'); return; }
+      if (!recDate) { undated.push(r.name || '(blank)');
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'undated', lands: false }); return; }
       const tipShift = (r.shift || '').trim();
       /* ⚠⚠ THE TWIN OF buildHours' FILE-REPEAT GUARD (S218), and the same reasoning applies without
          change: nothing compared a file row against the rows beside it, so a byte-identical repeat
@@ -878,27 +925,34 @@ const PosIngest = {
          on those PLUS both tip figures describe a record the operator could not enter by hand.
          Two service periods on one day still both import — tips are logged per period. */
       const fileKey = staff.id + '|' + recDate + '|' + tipShift + '|' + cash.toFixed(2) + '|' + card.toFixed(2);
-      if (fileSeen.has(fileKey)) { fileRepeats++; return; }
+      if (fileSeen.has(fileKey)) { fileRepeats++;
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'repeat', lands: false }); return; }
       fileSeen.add(fileKey);
       // Skip an exact re-import (same staff + date + the same cash and card tips)
       // so re-dropping a tips export never double-counts tip income.
       if (this._isDup(existing, used, x => x.staff_id === staff.id && x.date === recDate
             && Math.abs((x.cash_tips || 0) - cash) < 0.001
             && Math.abs((x.card_tips || 0) - card) < 0.001)) {
-        dupCount++; return;
+        dupCount++;
+        perRow.push({ raw: r, name: staff.name, staff: staff, status: 'dup', lands: false }); return;
       }
-      toAdd.push({
+      // The same record object reaches `toAdd` and the verdict, so the row shows what gets written.
+      const rec = {
         id: App.uid(), shift_id: '', manager_id: '', date: recDate,
         staff_id: staff.id, name: staff.name, position_id: staff.position_id || '',
         shift_type: tipShift,
         cash_tips: cash, card_tips: card, total_tips: cash + card,
         hours: null, notes: '', imported: true, created_at: new Date().toISOString()
-      });
+      };
+      toAdd.push(rec);
+      perRow.push({ raw: r, name: staff.name, staff: staff, status: 'new', lands: true, rec: rec });
     });
     // `undated` = the file gave a date this row could not be read from; `skipped` = no staff
     // match or no usable figure. Different problems, different fixes, never one list.
     // `fileRepeats` = lines this file repeated verbatim; counted once, and REPORTED by the door.
-    return { toAdd, skipped, incomplete, undated, dupCount, fileRepeats };
+    // `summaryRows` = the export's own totals lines, which are not people. `perRow` = one verdict per
+    // input row, in order. Both ADDITIVE: nothing above them changed meaning or count.
+    return { toAdd, skipped, incomplete, undated, dupCount, fileRepeats, summaryRows, perRow };
   },
 
   /* What a POS calls a comp. Anything here in the Type cell means revenue GIVEN AWAY, which is a
@@ -933,7 +987,9 @@ const PosIngest = {
      ⚠ AND THAT IS CHECKED HERE RATHER THAN ASSUMED, because it is a property of a builder somebody
      could change later without ever reading this: anything that is not a pure append takes the safe
      old path. The guard costs one Set and removes the whole class. */
-  /* ⛔⛔⛔ THE PER-SERVER LANE'S OWN COMMIT, AND IT IS NOT `_commitVoids` WITH A DIFFERENT TYPE.
+  /* ⛔⛔⛔ THE PER-SERVER LANE'S OWN COMMIT, AND IT IS NOT `_commitAppend` WITH A DIFFERENT TYPE.
+     (That helper was `_commitVoids` until 2026-08-08, when hours and tips joined it; the argument
+     below is about the SHAPE of the builder, so it did not change with the name.)
      Kyle, walking door 9 live (2026-08-07): *"the same issue that voids had where it took like 20
      seconds to complete after clicking the add button."* Same cause: the generic path below writes ONE
      RECORD AT A TIME in an awaited loop, so 111 rows are 111 network round trips. In the demo that is
@@ -993,8 +1049,22 @@ const PosIngest = {
     return ok;
   },
 
-  async _commitVoids(toAdd) {
-    const t = this.TYPES.voids;
+  /* ⭐⭐ ONE BULK COMMIT FOR EVERY PURE-APPEND LANE. This was `_commitVoids`, and it was generic in
+     everything but its first line — so hours and tips get it by extraction rather than by a third
+     copy of the same thirty lines (integrity #42: the second paste is the signal).
+     ⛔⛔ AND IT IS ONLY SAFE FOR A BUILDER THAT APPENDS. `buildCash` and `buildServer` both hand back
+     a record whose id is ALREADY in the log, and pushing those in bulk would duplicate money rows, so
+     both keep their own commit. Measured before this was shared: hours and tips mint a fresh
+     `App.uid()` on every row and `_isDup` SKIPS an existing match instead of replacing it.
+     ⛔ THE ID GUARD BELOW IS WHAT KEEPS THAT TRUE. It is not a nicety: if any incoming id is already
+     in the log the commit takes the old row-by-row path, so a future builder that starts upserting
+     cannot silently grow duplicates through this door. E3 pins it.
+     ⚠ THE ROW WALK IS DELIBERATE AND STAYS. It does not stop at the first refusal, so one rejected
+     row in a twelve-row file still leaves eleven saved and `App.partialSaveNote` can report "saved 11
+     of 12" — which is the difference between an operator fixing one row and re-keying twelve. */
+  async _commitAppend(type, toAdd) {
+    const t = this.TYPES[type];
+    if (!t) return false;
     const rows = (toAdd || []).filter(r => r && r.id != null);
     if (!rows.length) return true;
     const store = App.EVENT_STORES && App.EVENT_STORES[t.module];
@@ -1878,10 +1948,12 @@ const PosIngest = {
            — including the seed, which stamps no provenance — as the operator's own. */
         const mine = prior.source === 'manual'
           || (prior.source == null && prior.imported !== true);
-        /* ⛔ THIS IS THE UPSERT, AND IT IS WHY THIS LANE CANNOT TAKE DOOR 8'S BULK COMMIT AS-IS.
+        /* ⛔ THIS IS THE UPSERT, AND IT IS WHY THIS LANE CANNOT TAKE THE SHARED BULK COMMIT.
            `rec` goes into `toAdd` carrying the PRIOR record's id, so the write means to REPLACE.
-           `putRecord` replaces by id; a bulk push appends. `buildVoids` is the only pure-append
-           builder, which is the whole reason `_commitVoids` was safe there and is not here. */
+           `putRecord` replaces by id; a bulk push appends. `_commitAppend` serves the three builders
+           that mint a fresh id for every row (voids, hours, tips) — measured, not assumed — and this
+           one does not qualify. Its own id guard would catch it anyway; this comment is why the
+           routing never sends it there in the first place. */
         if (!mine) { rec.id = prior.id; replaced++; toAdd.push(rec);
           perRow.push({ raw: r, name: staff.name, staff: staff, status: 'replaced', rec: rec, prior: prior });
           return; }   // replacing our own earlier import
@@ -2057,8 +2129,11 @@ const PosIngest = {
     if (type === 'sales') return this._commitSales(toAdd);
     if (type === 'pmix')  return this._commitPmix(toAdd);
     if (type === 'cash')  return this._commitCashRows(toAdd);
-    if (type === 'voids') return this._commitVoids(toAdd);
     if (type === 'server') return this._commitServer(toAdd);
+    /* ⛔ THE PURE-APPEND LANES SHARE ONE BULK COMMIT. Cash, server, pmix and sales are all above this
+       line because each of them REPLACES something, and a bulk append of a record that already exists
+       duplicates it. Adding a lane here is a claim that its builder mints a fresh id for every row. */
+    if (type === 'voids' || type === 'hours' || type === 'tips') return this._commitAppend(type, toAdd);
     const t = this.TYPES[type];
     if (!t) return false;
     let ok = true;
