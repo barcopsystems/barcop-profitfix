@@ -354,14 +354,16 @@ S.SalesIntegrity = {
     if (!missing.length) return 'Every column Bar Cop can read is already mapped here, so this file simply does not carry enough separate signals to judge anyone on. ';
     const list = missing.length === 1 ? missing[0]
       : missing.slice(0, -1).join(', ') + ' and ' + missing[missing.length - 1];
-    // ⚠ The dashes are a MATCHED PAIR in the multi-column branch; the singular branch used to
-    // inherit only the closing one ("Map the Checks column — and re-run it.").
+    // ⚠ The multi-column branch BRACKETS the list, and the singular branch used to inherit only the
+    // closing half of that bracket ("Map the Checks column and re-run it." lost its opener). It was
+    // a matched pair of em dashes until the copy pass; parentheses do the same job and are one of
+    // the replacements [[writing-style]] names, so the pairing still has to stay balanced.
     const dateNote = (k.unreadableDates > 0)
-      ? 'Bar Cop could not read the dates in this file, so it could not match the report to the drawer shortages and walked tabs already on file — check the date format. ' : '';
+      ? 'Bar Cop could not read the dates in this file, so it could not match the report to the drawer shortages and walked tabs already on file. Check the date format. ' : '';
     if (!missing.length) return dateNote || 'Every column Bar Cop can read is already mapped here, so this file simply does not carry enough separate signals to judge anyone on. ';
     return dateNote + (missing.length === 1
       ? 'Map the ' + list + ' column and re-run it. '
-      : 'Map more columns — ' + list + ' — and re-run it. ');
+      : 'Map more columns (' + list + ') and re-run it. ');
   },
   MIN_EVENTS: 2,   // captured shorts/walkouts below this are the cost of doing business
 
@@ -1499,7 +1501,7 @@ S.SalesIntegrity = {
     const ok = await App.putRecord('core', 'sales_review', review);
     if (!ok) {
       const res = document.getElementById('si-imp-result');
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the review. Nothing was changed — check your connection and try again.</div>';
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the review. Nothing was changed. Check your connection and try again.</div>';
       return;
     }
     // ⚠ The intake note now renders INSIDE the review card (see `renderReport`), so it survives a
@@ -1561,12 +1563,17 @@ S.SalesIntegrity = {
        exist. Two constraints at once: true when somebody WAS listed on the signal, and silent about
        where the figure came from. */
     if (k.unjudged.length) bits.push(k.unjudged.join(', ').toLowerCase()
-      + ' could not be compared across the whole floor — too few servers to measure '
+      + ' could not be compared across the whole floor: too few servers to measure '
       + (k.unjudged.length === 1 ? 'it' : 'them') + ' against');
     /* ⚠ ONLY THE CONTRADICTORY FILE IS WORTH SAYING OUT LOUD (S199). A day-first file Bar Cop read
        correctly needs no announcement — it is simply right — and a US file can never trigger the
        detection at all. What the operator does need is the case Bar Cop could not settle. */
-    if (k.ambiguous) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
+    /* ⚠ ONE SENTENCE, ONE SPELLING. `ev-regulars` has shipped this same warning as a standalone line
+       for months, ending "could not be settled. Check any date where both numbers are 12 or under."
+       The em dash pass nearly gave the three joined copies a parenthetical instead, which is one
+       quantity in two spellings across four sites (the staff-roster lesson). Matched to the one that
+       was already live. */
+    if (k.ambiguous) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled. Check any date where both numbers are 12 or under');
     return bits.join(' · ') + '.';
   },
 

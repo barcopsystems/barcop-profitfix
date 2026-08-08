@@ -3487,7 +3487,7 @@ S.HubOperatingExpenses = {
     if (!saved && opts.reviewed) {
       const el = document.getElementById('oex-imp-result');
       if (el) el.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-        + 'Could not save the import. Nothing was changed, check your connection and try again.</div>';
+        + 'Could not save the import. Nothing was changed. Check your connection and try again.</div>';
       return;
     }
     /* ⭐⭐⭐ THE CASH ROWS, AFTER THE BILLS AND ONLY IF THE BILLS LANDED, THROUGH `_writeCashRow`.
@@ -3567,7 +3567,7 @@ S.HubOperatingExpenses = {
        nothing to say to it. There is no such view any longer; the two that remain both host the
        import, so neither is excluded. */
     if (!saved) {
-      this._importMsg = 'Could not save the import. Nothing was changed — check your connection and try again.';
+      this._importMsg = 'Could not save the import. Nothing was changed. Check your connection and try again.';
     } else if (opts.reviewed) {
       /* ⭐⭐ A REVIEWED IMPORT GETS THE HEADLINE ALONE. Every clause below was written when the drop
          wrote straight through and this line was the operator's ONLY account of it. Now each one is
@@ -3628,11 +3628,11 @@ S.HubOperatingExpenses = {
       /* ⚠ ONLY THE CONTRADICTORY FILE IS WORTH SAYING OUT LOUD. A day-first file that Bar Cop read
          correctly needs no announcement. What the operator DOES need is the case Bar Cop could not
          decide: the rows where both numbers are 12 or under are a coin toss. */
-      if (v.conv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
+      if (v.conv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled. Check any date where both numbers are 12 or under');
       // ⚠ ONLY WHEN THE SIGN WAS ACTUALLY CONSULTED. With a Debit/Credit column present nothing was
       // inferred, so warning that Bar Cop "could not tell" would describe a decision it never made.
       if (v.sign.contradictory && !v.hasDir) bits.push(v.sign.negVotes + ' amounts are negative and ' + v.sign.posVotes
-        + ' positive, so Bar Cop could not tell which sign means money out — it read the positive rows as expenses; check the amount column');
+        + ' positive, so Bar Cop could not tell which sign means money out (it read the positive rows as expenses; check the amount column)');
       this._importMsg = bits.join(' · ') + '.';
     }
     this._rerenderHost();
@@ -4107,7 +4107,7 @@ S.HubOperatingExpenses = {
       }
       if (!(await App.putRecordsBulk('core', 'operating_expense', touched))) {
         arr.length = 0; arr.push(...undoArr);
-        showErr('Could not save. Nothing was changed — check your connection and try again.');
+        showErr('Could not save. Nothing was changed. Check your connection and try again.');
         return;
       }
       App.closeModal(id);
