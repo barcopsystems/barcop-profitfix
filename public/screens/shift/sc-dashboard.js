@@ -1553,6 +1553,25 @@ S.ShiftDashboard = {
       (rows || []).forEach(r => {
         const raw = String(r.drawer || '').trim();
         if (!raw) return;
+        /* ⛔⛔⛔ THE FILE'S OWN TOTALS LINE IS NOT A REGISTER, AND THIS WALK WAS THE LAST PLACE THAT
+           DID NOT KNOW IT. Kyle, walking the shipped screen: *"why is 'TOTAL' there as a register
+           option.. on a first drop with no data in app it automatically adds 'TOTAL' as an active
+           register on the cash control screen and in add registers."* Reproduced, all four halves:
+           a first drop minted a register literally named TOTAL; a bar that already had registers was
+           asked to file the totals line as one, with no way to answer "that is not a register"; and
+           mapping it onto a real one wrote TOTAL as a permanent `pos_alias` — which then puts "total"
+           into `known`, so the prompt stops firing and the operator hides the symptom by polluting
+           their own setup.
+           ⛔ `buildCash` HAS KNOWN SINCE STAGE 1 and files no row against it. The rule was taught to
+           the BUILDER and stopped there; this walk asks a different question about the same rows
+           ("which register names do I not know") and never asked. Whenever a builder learns a rule,
+           find every other walk over the same rows.
+           ⭐ THE TEST IS THE BUILDER'S OWN, both cells, so the two cannot drift apart: a row the
+           builder will skip cannot justify creating a register. It is deliberately not a word list
+           of my own — `isSummaryName` already answers for TOTAL / Totals / Grand Total / Team
+           Average and, just as importantly, answers FALSE for a real register called "Total Wine
+           Bar". */
+        if (PosIngest.isSummaryName(raw) || PosIngest.isSummaryName(r.cashier)) return;
         const k = key(raw);
         if (known.has(k) || seenKeys.has(k)) return;
         seenKeys.add(k);
@@ -1613,9 +1632,19 @@ S.ShiftDashboard = {
       '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0;">'
       + '<span style="font-size:13px;font-weight:700;color:var(--t1);min-width:130px;">' + esc(n) + '</span>'
       + '<span style="color:var(--t3);font-size:12px;">&rarr;</span>'
-      + '<select class="sc-cm-sel" data-name="' + esc(n) + '" style="height:34px;min-width:200px;">'
-      +   '<option value="__add">Add as a new register</option>' + opts
-      + '</select></div>').join('');
+      /* ⛔ `.f`, WHICH IS WHERE THE GREY CHEVRON LIVES (Kyle: *"the drop down is not styled
+         correctly.. should be like the drop downs in the mapping part.. with the grey drop down
+         arrow"*). `.f select` in style.css sets `appearance:none` and paints the chevron itself; a
+         bare select outside a `.f` gets none of it and falls back to the browser's own arrow, at a
+         different height. The column mapper two inches above renders exactly this wrapper, which is
+         why the two read as different controls for the same job.
+         ⚠ AND THE INLINE HEIGHT GOES WITH IT. `height:34px` fought `.f select`'s own padding, so
+         even wrapped it would have stayed a different size from the mapper's. */
+      + '<div class="f" style="min-width:220px;">'
+      +   '<select class="sc-cm-sel" data-name="' + esc(n) + '">'
+      +     '<option value="__add">Add as a new register</option>' + opts
+      +   '</select>'
+      + '</div></div>').join('');
     res.innerHTML = '<div style="margin-top:14px;border:1px solid var(--b-edge);border-radius:var(--r);background:var(--bg);padding:14px 16px;">'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;">Your report has registers Bar Cop does not recognize. Match each to one of yours, or add it new. Bar Cop remembers your choice.</div>'
       + rows
