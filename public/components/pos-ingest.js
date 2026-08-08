@@ -1963,6 +1963,7 @@ const PosIngest = {
     // that was already correct. buildServer split exactly this into skipped vs incomplete for
     // exactly this reason; PMIX never got the split.
     const skipped = []; const incomplete = []; const dupCount = 0; let merged = 0;
+    const summaryRows = [];
     /* ⛔⛔⛔ ONE VERDICT PER INPUT ROW, IN ORDER — ADDITIVE, as `buildVoids` and `buildServer` gained
        it. Everything else here is a COUNT or a list of NAMES, and no confirm screen can be built on
        that: a dish named on four rows produces ONE entry, so a count can never say which row did what.
@@ -1978,6 +1979,18 @@ const PosIngest = {
       /* ⚠ THE VERDICT CARRIES THE RAW NAME, NOT `'(blank)'`. `skipped` substitutes that literal so a
          count has something to hold; the screen needs to know the CELL was empty, because "add this to
          your menu" is the wrong advice about a subtotal or section line. */
+      /* ⛔⛔ A POS EXPORT'S OWN TOTALS LINE IS NOT A MENU ITEM — and until 2026-08-07 this walk never
+         asked. "Grand Total" fell through to `skipped`, which both this door and its confirm screen
+         render as "this name is not on your menu": an operator who follows that advice ADDS the
+         subtotal as a dish, and a 4,812-unit phantom then outranks every real item on the Menu
+         Engineering board this feeds. `buildServer` was fixed for exactly this, and `isSummaryName`'s
+         own comment says it belongs here — "the same summary line lands on doors 4, 11 and 12". This
+         is door 11, and it never asked.
+         ⚠ IT GETS ITS OWN BUCKET rather than being dropped silently, because a row the operator can
+         see in their file and cannot find in Bar Cop is what makes them stop trusting the total. */
+      if (this.isSummaryName(r.name)) { const nmS = String(r.name || '').trim();
+        summaryRows.push(nmS);
+        perRow.push({ raw: r, name: nmS, status: 'summary', lands: false }); return; }
       if (!nm) { skipped.push(r.name || '(blank)');
         perRow.push({ raw: r, name: String(r.name || ''), status: 'noName', lands: false }); return; }
       const bucket = byName[nm];
@@ -2036,7 +2049,7 @@ const PosIngest = {
     // so the shared build() contract documented at the top of this file still holds.
     // `retired` / `ambiguous` are I4's two new outcomes — both are rows the file matched and this
     // builder deliberately refused, so both must reach the operator or they are silent drops.
-    return { toAdd, skipped, incomplete, netNegative, retired: [...retiredSet], ambiguous: [...ambiguousSet], dupCount, merged, perRow };
+    return { toAdd, skipped, incomplete, netNegative, retired: [...retiredSet], ambiguous: [...ambiguousSet], dupCount, merged, summaryRows, perRow };
   },
 
   // ── Persist ──────────────────────────────────────────────────────────────
