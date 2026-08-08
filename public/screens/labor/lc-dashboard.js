@@ -110,6 +110,44 @@ S.LaborDashboard = {
     const flash = this._flash; this._flash = null;
     const wys = this._wys();
 
+    /* ⛔⛔ THE STRANDED PAGE. The takeover FLAG lives on the screen object and outlives the DOM, so
+       navigating away and back would leave it claiming an import over a mapper that did not survive:
+       a bare drop zone, steps gone, no way out but a refresh. Kyle found exactly this on Books.
+       ⛔ THE FIX IS NOT A CANCEL BUTTON, IT IS NOT CLAIMING THE STATE. If the carried mapper is gone
+       the parsed rows went with it, so the page belongs back to the operator.
+       ⚠ THE CONFIRM SCREEN IS THE EXCEPTION AND IT IS WHY THE GUARD READS BOTH: `_laborReview` lives
+       on the OBJECT, not in the DOM, so a file that got that far genuinely IS still in progress. */
+    if (this._lbTakeover != null && !this._lbCarry && !this._anyLaborReview()) this._clearLbTakeover();
+
+    if (this.lbTakeover()) {
+      container.innerHTML = '<div class="screen">'
+        + (wys.hasHours ? this.whereYouStand(wys) : this.getStartedBox())
+        + this.banner(doneCount, this.ORDER.length)
+        + (this._anyLaborReview()
+            ? '<div style="margin-top:18px;">' + this.laborReviewHTML() + '</div>'
+            : '<div class="card form-card" style="margin-top:18px;">'
+              +   '<div class="card-title">' + esc(this.LC_TITLE[this._lbTakeover] || 'Check your import') + '</div>'
+              +   '<div id="lc-ck-takeover"></div>'
+              + '</div>'
+              + '<div id="lc-ck-takeover-actions" style="margin-top:14px;"></div>')
+        + '</div>';
+      if (!this._anyLaborReview() && this._lbCarry) {
+        const slot = document.getElementById('lc-ck-takeover');
+        if (slot) slot.appendChild(this._lbCarry);
+        const aslot = document.getElementById('lc-ck-takeover-actions');
+        if (aslot && this._lbCarryActs) aslot.appendChild(this._lbCarryActs);
+      }
+      this.wire();
+      if (this._anyLaborReview()) this._wireLaborReview();
+      /* ⭐ AND SCROLL TO IT, exactly as Close The Books does and for the same measured reason: the
+         takeover renders BELOW Where You Stand and the banner, so on a short window the operator
+         drops a file and sees nothing move. Only on the way IN — on the way back out the steps are
+         what they want to see. */
+      setTimeout(() => document.getElementById('lc-ck-takeover')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+      return;
+    }
+
     container.innerHTML = '<div class="screen">'
       + (wys.hasHours ? this.whereYouStand(wys) : this.getStartedBox())
       + this.banner(doneCount, this.ORDER.length)
@@ -120,15 +158,10 @@ S.LaborDashboard = {
       + this.outlierStrip()
       + '</div>';
 
-    /* ⚠ THE MAPPER IS NOT RE-MOUNTED UNDER A CONFIRM SCREEN. `CSVMapper.mount` opens by resetting its
-       container, and while a review is up that container is not on the page at all — mounting into a
-       node the step no longer renders is how a drop zone comes back to life underneath a screen that
-       promises nothing is saved. The review's own wiring goes on instead. */
-    const rev = this._laborReview;
-    if (this._openStep === 'hours' && !(rev && rev.type === 'hours')) this.mountHoursImport();
-    if (this._openStep === 'tips' && !(rev && rev.type === 'tips')) this.mountTipsImport();
+    /* Only reached when nothing owns the page: the takeover branch above returns before this. */
+    if (this._openStep === 'hours') this.mountHoursImport();
+    if (this._openStep === 'tips') this.mountTipsImport();
     this.wire();
-    if (rev) this._wireLaborReview();
   },
 
   // ── Get Started: setup steps above the cockpit until all four are done ───────
@@ -245,13 +278,13 @@ S.LaborDashboard = {
     if (k === 'hours') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop your weekly timeclock export and Bar Cop matches each row to your roster and rates. Re-dropping will not double-count. No export? Log hours from your posted schedule in Log Hours.</div>'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Timeclock hours</span>' + App.freqTag('Weekly') + '</div>'
-        + '<div id="lc-ck-hours"></div><div id="lc-ck-hours-res"></div>'
+        + '<div id="lc-ck-hours"></div><div id="lc-ck-hours-actions"></div><div id="lc-ck-hours-res"></div>'
         + '<div id="lc-ck-hours-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="lc-log-hours">Enter in Log Hours</button>' + this.markBtn('hours', 'Mark Done') + '</div>';
     }
     if (k === 'tips') {
       return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Get this week\'s tips in. If your POS makes a tips export, drop it here. No export? Enter them in Tip Tracking. Mark this done once it is handled, or if there are no tips to log.</div>'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--t3);">Tips export</span>' + App.freqTag('Weekly') + '</div>'
-        + '<div id="lc-ck-tips"></div><div id="lc-ck-tips-res"></div>'
+        + '<div id="lc-ck-tips"></div><div id="lc-ck-tips-actions"></div><div id="lc-ck-tips-res"></div>'
         + '<div id="lc-ck-tips-btns" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
         + '<button class="btn btn-ghost btn-sm" data-go="lc-tip-log">Enter in Tip Tracking</button>'
         + this.markBtn('tips', 'Mark Done') + '</div>';
@@ -504,6 +537,64 @@ S.LaborDashboard = {
   // stack under the mapper's Import/Cancel row; show them again on cancel.
   _toggleBtns(id, st) { const b = document.getElementById(id); if (b) b.style.display = (st === 'map') ? 'none' : 'flex'; },
 
+  /* ⛔⛔⛔ A FILE DROPPED ON A STEP TAKES THE PAGE. Built by copying `sc-dashboard`, which is the one
+     that shipped and that Kyle walked, which in turn was built to match Close The Books. Kyle,
+     2026-08-08, on the first version of this door: *"mapping inline, not taking over the page.. need
+     to be exactly like all the other ones."* He was right and I had invented a step-level gate
+     instead of reading the reference.
+     WHAT THE REFERENCE KEEPS AND WHY, in its own words: *"keeps the context of what they are closing
+     and how far along they are"* — so Where You Stand and the progress banner STAY, and only the
+     steps and the row of navigate-away buttons go.
+     TWO SHAPES, and Kyle walked both on the shift cockpit:
+       MAPPER  a card holding the drop zone and the column mapper, then the Import / Cancel row
+               OUTSIDE it, which is exactly how Books renders its `card form-card` then its actions.
+       CONFIRM the shell's panel and nothing else — it already brings its own heading, its own card
+               and its own buttons, so wrapping it gives a card inside a card and a duplicate title.
+     ⛔ ONE CANCEL. CSVMapper renders its own beside Import and releases the page through
+     `_onMapState('drop')`. A second one is two controls for one job. */
+  LC_ZONE:  { hours: 'lc-ck-hours', tips: 'lc-ck-tips' },
+  LC_TITLE: { hours: 'Import your timeclock hours', tips: 'Import your tips' },
+  _lbTakeover: null,    // which zone owns the page
+  _lbCarry: null,       // its live mapper node, carried across the re-render
+  _lbCarryActs: null,   // the mapper's Import/Cancel row, which lives in its own element
+  /* One accessor, so a third lane joins by adding a field here rather than by finding five call
+     sites. The confirm screen holds the takeover open too: a file already dropped and waiting to be
+     confirmed must not lose the page out from under it. */
+  _anyLaborReview() { return this._laborReview; },
+  lbTakeover() { return this._lbTakeover != null || !!this._anyLaborReview(); },
+  _clearLbTakeover() { this._lbTakeover = null; this._lbCarry = null; this._lbCarryActs = null; },
+
+  /* ⛔⛔⛔ THE HANDOVER, AND THE ONE THING IT MUST NOT DO IS REBUILD THE MAPPER.
+     `CSVMapper.mount()` opens with `container.innerHTML = <drop zone>`, so escalating by re-mounting
+     would throw the operator's parsed file away and put them back on an empty drop zone — work lost,
+     silently. The live node is DETACHED and carried, and `render` re-attaches that same element with
+     its listeners and parsed rows intact.
+     ⛔⛔ AND THE ACTIONS SLOT IS CARRIED TOO, OR THE IMPORT BUTTON IS GONE AND THE FILE IS A DEAD END.
+     Both zones here pass `actionsEl`, so CSVMapper renders its confirm button into a SEPARATE
+     element. Money Out's first handover carried only the mapper, and Kyle found the result on the
+     live build: a parsed file, the column mapper, and nothing but Cancel. */
+  _onMapState(key, st) {
+    /* ⛔ THE MAPPER'S OWN CANCEL GIVES THE PAGE BACK, through this same hook — CSVMapper emits
+       exactly two states and going back to `drop` means the file was abandoned. One release path, so
+       the page cannot be left taken over by a mapper showing an empty drop zone.
+       ⚠ `drop` also fires when a mapper first MOUNTS, which is why this is gated on the zone already
+       owning the page: at mount time nothing does, so it is a no-op. */
+    if (st === 'drop') {
+      if (this._lbTakeover === key) { this._clearLbTakeover(); this.render(this.container, this.actions); }
+      return;
+    }
+    if (st !== 'map' || this._lbTakeover != null) return;
+    const node = document.getElementById(this.LC_ZONE[key] || '');
+    if (!node) return;
+    const acts = document.getElementById(this.LC_ZONE[key] + '-actions');
+    this._lbCarry = node;
+    this._lbCarryActs = acts || null;
+    node.remove();
+    if (acts) acts.remove();
+    this._lbTakeover = key;
+    this.render(this.container, this.actions);
+  },
+
   // ── Inline hours import (step 1) ─────────────────────────────────────────────
   mountHoursImport() {
     const el = document.getElementById('lc-ck-hours');
@@ -513,7 +604,10 @@ S.LaborDashboard = {
       dropSub: 'Needs Staff, Date, and Hours. Shift matched if present. One row per shift.',
       fields: PosIngest.FIELDS.hours,
       confirmLabel: 'Import',
-      onState: st => this._toggleBtns('lc-ck-hours-btns', st),
+      // The Import / Cancel row lives OUTSIDE the mapper's card, exactly as Books and the shift
+      // cockpit render it — which is also why the handover has to carry TWO nodes, not one.
+      actionsEl: '#lc-ck-hours-actions',
+      onState: st => { this._toggleBtns('lc-ck-hours-btns', st); this._onMapState('hours', st); },
       /* ⛔ THE MAPPER NO LONGER COMMITS. It hands the file to the confirm screen, which is where the
          operator presses the button. Same shape as every other converted door. */
       onComplete: rows => this._openLaborReview('hours', rows)
@@ -528,7 +622,8 @@ S.LaborDashboard = {
       dropSub: 'Needs Staff and Date plus card and/or cash tips. Servers match your roster by name.',
       fields: PosIngest.FIELDS.tips,
       confirmLabel: 'Import',
-      onState: st => this._toggleBtns('lc-ck-tips-btns', st),
+      actionsEl: '#lc-ck-tips-actions',
+      onState: st => { this._toggleBtns('lc-ck-tips-btns', st); this._onMapState('tips', st); },
       onComplete: rows => this._openLaborReview('tips', rows)
     });
   },
