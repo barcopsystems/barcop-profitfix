@@ -2137,7 +2137,7 @@ S.RevenueMenuItems = {
       // below already re-fetches the slot after rendering; this now matches it.
       this.renderLanding();
       const res = document.getElementById('mi-imp-result');
-      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the import. Nothing was changed — check your connection and try again.</div>';
+      if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the import. Nothing was changed. Check your connection and try again.</div>';
       return;
     }
     // Sections the file brought in join THIS type's list, so the operator's own menu sections are

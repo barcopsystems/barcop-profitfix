@@ -833,7 +833,7 @@ S.RevenueMenuEngineering = {
              : (nNeg && !nameTrouble && !nInc)
                  ? 'Every item came out at negative units after returns, so the previous figures were left alone.'
              : ((nInc || nNeg) && !nameTrouble)
-                 ? 'The item names matched — see below for what happened to each row.'
+                 ? 'The item names matched. See below for what happened to each row.'
              : ((nRet || nAmb) && !nSkip)
                  ? 'Bar Cop found every name on your menu but could not use them. See below.'
              : 'Check that the item names in your export match your menu.'))
@@ -852,6 +852,12 @@ S.RevenueMenuEngineering = {
             + '. Bar Cop could not tell which one rang, so both were left at their previous figures. '
             + 'Rename one of each pair in Menu Builder and drop the file again.') : '')
         + (fl.incomplete && fl.incomplete.length ? note('Skipped, no readable units-sold figure: ' + list(fl.incomplete) + '. These names matched your menu, so check the units column in your export.') : '')
+        /* The other half of the same fact, and it needs its own sentence rather than a softer version
+           of the one above: these dishes DID update, from their other rows. Gated on `fl.updated` so
+           a run that wrote nothing can never claim an item updated. */
+        + (fl.updated && (fl.incompletePartial || []).length
+            ? note('Some rows had no readable units-sold figure: ' + list(fl.incompletePartial)
+                   + '. These items still updated from their other rows.') : '')
         // A dropped item is a MEASUREMENT THAT WENT MISSING. It keeps last week's units, and this
         // screen presents those as this week's mix — so silence here is a wrong Star/Dog call.
         + (fl.netNegative && fl.netNegative.length ? note('Left at the previous figure: ' + list(fl.netNegative) + '. Returns exceeded sales in this file, so the units came out negative and were not written.') : '')
@@ -859,7 +865,7 @@ S.RevenueMenuEngineering = {
         // header. Reported as a count so the operator's totals reconcile.
         + ((nSkip - (fl.unmatched || []).length) > 0
             ? note((nSkip - fl.unmatched.length) + ' row' + ((nSkip - fl.unmatched.length) === 1 ? '' : 's')
-                   + ' skipped with no item name — usually a subtotal or section line in the export.') : '');
+                   + ' skipped with no item name, usually a subtotal or section line in the export.') : '');
     }
     return '<div class="card form-card no-print">'
       + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Re-import Units Sold</span>' + App.freqTag('As needed') + '</div>'
@@ -901,6 +907,16 @@ S.RevenueMenuEngineering = {
     ambiguous:   'More than one menu item has this name',
     retired:     'This item is no longer on your live menu',
     incomplete:  'Could not read the units on this row',
+    /* ⛔⛔ THE SAME ROW WHEN ITS DISH LANDED ANYWAY, and it is the fold's own fault line: `incomplete`
+       is decided per ROW while landing is decided per ITEM. A daypart-split export whose Lunch cell
+       reads "N/A" puts that dish on the screen TWICE — once in Going In at its summed units, once
+       here with nothing readable. Measured on Kyle's walk: Truffle Fries and Calamari both sat in
+       Needs A Look reading "Could not read the units on this row" while both were updating (120 to 49
+       and 66 to 45). The bare sentence reads as "this dish did not import", and the operator's fix
+       for that is to hand-edit a figure that had just imported correctly.
+       ⚠ IT IS NOT FOLDED INTO THE DISH ROW. There is no units figure to add, and hiding the row would
+       drop the one fact the operator cannot get anywhere else: a row of their file was not read. */
+    incompleteFed: 'Units unreadable, other rows still count',
     netNegative: 'Returns came to more than the sales, so this item keeps its previous figure',
     merged:      'Summed with the other rows for this item',
     'new':       'Updating this item\'s units sold',
@@ -932,6 +948,15 @@ S.RevenueMenuEngineering = {
        operator has to act on. */
     const seen = new Map();          // entry -> the shell row that represents its dish
     const fedBy = new Map();         // entry -> how many file rows fed it
+    /* Which dishes are going in, by the name the BUILDER used. An `incomplete` verdict carries
+       `it.name` (the MENU's spelling) and so does every landing entry, so comparing through the walk
+       is exact — comparing the file's own cell text would miss a dish whose export spells it in a
+       different case. Re-derived on every render, so removing the dish puts its unreadable row back
+       to the plain reason without a second code path. */
+    const landedNames = new Set((built.perRow || [])
+      .filter(v => v.lands && v.entry).map(v => v.entry.name));
+    const noteKey = v => (v.status === 'incomplete' && landedNames.has(v.name))
+      ? 'incompleteFed' : v.status;
     (built.perRow || []).forEach((v, i) => {
       const raw = v.raw || {};
       /* The key is what Remove acts on. A dish is keyed by its ITEM, so taking it out takes every
@@ -951,12 +976,25 @@ S.RevenueMenuEngineering = {
          and the row asks which wins. Here it is the item’s PREVIOUS weekly units, set by the last
          import or the seed. Measured on the first walk: "49 you entered 95" about a figure nobody
          entered. This door builds its own sub-line and leaves `compare` alone for the doors it fits. */
+      /* ⛔⛔ AND A HELD-BACK DISH NAMES WHAT IT KEEPS. Every landing row shows "was N", so the ONE row
+         whose whole subject is the previous figure was the only row on the screen that never showed
+         it: Key Lime Pie printed a bare `-18` under a column headed Units Sold, over a note reading
+         "this item keeps its previous figure" — and 30, the figure it actually keeps, appeared
+         nowhere. `-18` is true about the file's arithmetic and is a number that exists nowhere once
+         the button is pressed, which makes it the worst thing to leave alone on the row.
+         ⚠ THE FIGURE IS READ OFF THE ITEM, the same `was` the landing rows use, so the cell cannot
+         describe a record holding something else. A row with no entry (a totals line, an unmatched
+         name, an unreadable row) has no item and still shows nothing, which is right — there is no
+         previous figure to keep. */
+      const keepsPrev = !v.lands && v.entry && was != null;
       const cell = (v.lands && was != null && Math.round(was) !== Math.round(units))
         ? esc(shown) + ImportConfirm.sub('was ' + Math.round(was))
-        : esc(shown);
+        : keepsPrev
+          ? esc(shown) + ImportConfirm.sub('keeps ' + Math.round(was))
+          : esc(shown);
       const row = {
         cells: [esc(v.name || '(no name)'), cell],
-        note: this.PMIX_NOTES[v.status] || '',
+        note: this.PMIX_NOTES[noteKey(v)] || '',
         notes: [], lands: !!v.lands, needsYou: false, key: key
       };
       rows.push(row);
@@ -993,10 +1031,20 @@ S.RevenueMenuEngineering = {
     this._pmixReview = { rows: rows || [], open: {}, removed: {} };
     this.draw();
   },
-  /* ⚠ RE-WALKED ON EVERY RENDER OVER THE ROWS NOT REMOVED, and on this lane that genuinely changes
-     answers: taking out the row that carried the returns can lift a dish out of net-negative and back
-     into going in. That is right — it is the operator’s decision — and it is why the walk is the one
-     place the outcome is decided rather than being cached at the drop. */
+  /* ⚠ RE-WALKED ON EVERY RENDER OVER THE ROWS NOT REMOVED, so the outcome is decided here rather than
+     cached at the drop.
+     ⛔ AND THE OLD NOTE AT THIS LINE OVERSTATED WHAT THE OPERATOR CAN DO. It said taking out the row
+     that carried the returns can lift a dish out of net-negative and back into going in. The BUILDER
+     really does behave that way, measured over the real 104-row file: drop the Key Lime Pie Returns
+     row alone and its three surviving rows go netNegative/-18 to landing/22. But no control on this
+     screen can reach that case, because Remove is keyed by DISH ('item:' + item_id), so all four Key
+     Lime Pie rows share one key and go together. What the re-walk actually serves today is removing
+     whole dishes and standalone rows, plus the key map that keeps the screen and the write reading
+     one decision.
+     ⚠ SO A NET-NEGATIVE DISH HAS NO ACTION ON THIS SCREEN: its only control produces the same outcome
+     as leaving it alone. That is a real gap and it is deliberate for now, because the alternative is
+     a per-row list, which is exactly what the fold was built to end. The row at least names the
+     figure it keeps. Kyle's call whether the returns row earns its own control. */
   /* ⛔ REMOVE NOW ACTS ON A DISH, so working out which file rows survive needs the walk that maps
      rows to dishes. One full walk to get the keys, then a rebuild over what is left — the second
      walk is what keeps the screen and the write reading the same decision. */
@@ -1030,8 +1078,18 @@ S.RevenueMenuEngineering = {
     const r = this._pmixReview || { open: {} };
     return ImportConfirm.panel(Object.assign(this._pmixPanelOpts(), {
       label: 'Check this file before it goes in',
-      lead: 'Nothing is saved until you press the button below. Every row from your file is here with '
-          + 'what Bar Cop worked out. Take out anything you do not want.',
+      /* ⛔⛔ NOT "EVERY ROW FROM YOUR FILE IS HERE". That sentence was copied from `r-server-check`,
+         where it is TRUE because that screen renders one row per file row. This door FOLDS: Kyle's
+         first walk put 104 file rows on screen as 81, and the fold's own note below states the trade
+         in as many words ("every row is ACCOUNTED FOR, not every row is LISTED"). So the lead
+         promised the one thing this screen deliberately does not do, on the one door built to combine
+         rows. [[test-the-first-drop]] rule 4: copy the REASON, not the shape.
+         ⚠ AND IT SAYS WHAT HAPPENED INSTEAD. Dropping the false half without replacing it would
+         leave the operator to work out on their own why 104 rows came back as 81, which is the
+         question the sentence exists to answer. */
+      lead: 'Nothing is saved until you press the button below. Every item from your file is here with '
+          + 'what Bar Cop worked out, and rows for the same item are added into one line. '
+          + 'Take out anything you do not want.',
       columns: [{ label: 'Item', width: 40 }, { label: 'Units Sold', width: 16 }],
       outcomeLabel: 'What happens',
       removedRows: this._pmixReviewRemoved(),
@@ -1094,7 +1152,24 @@ S.RevenueMenuEngineering = {
     // carries, and a name two LIVE items share. Both were previously written or silently dropped;
     // both are now refused by the builder, so both must be carried here or they become the exact
     // silent drop the other three buckets exist to prevent.
-    const { toAdd, skipped, incomplete, netNegative, retired, ambiguous, merged } = PosIngest.build('pmix', rows);
+    const { toAdd, skipped, incomplete, netNegative, retired, ambiguous, merged, perRow } = PosIngest.build('pmix', rows);
+    /* ⛔⛔⛔ `incomplete` IS PER ROW AND LANDING IS PER ITEM, so a dish can be in BOTH. Measured on
+       Kyle's first walk of the real 104-row file: `incomplete` came back ['Truffle Fries','Calamari']
+       while `toAdd` wrote those same two dishes at 49 and 45, and the line under the import read
+       "Skipped, no readable units-sold figure: Truffle Fries, Calamari" about an import that had just
+       updated them. That is the one sentence an operator acts on, and the action it invites is to
+       hand-edit a figure that is already correct.
+       ⚠ THE SPLIT LIVES HERE, NOT IN `buildPmix`. That list is honestly per-row and six unconverted
+       lanes read the same shape; moving it would be the opposite of the additive contract `perRow`
+       was added under. The door is where both facts are in hand, so the door answers it.
+       ⚠ MATCHED THROUGH `perRow`, not by comparing the file's own cell text: an incomplete verdict
+       carries `it.name` and so does every landing entry, so the two agree on spelling by construction
+       rather than by luck of the export's capitalisation. */
+    const _pr = perRow || [];
+    const _landed = new Set(_pr.filter(v => v.lands && v.entry).map(v => v.entry.name));
+    const _incRows = _pr.filter(v => v.status === 'incomplete' && v.name && v.name !== '(blank)');
+    const _incSkipped = [...new Set(_incRows.filter(v => !_landed.has(v.name)).map(v => v.name))];
+    const _incPartial = [...new Set(_incRows.filter(v => _landed.has(v.name)).map(v => v.name))];
     let updated = 0, failed = false;
     if (toAdd.length) {
       // Honor the commit result: discarding it reported "Updated units sold on N items" after a
@@ -1119,7 +1194,10 @@ S.RevenueMenuEngineering = {
     // this week's mix, driving its Star/Dog call, its suggested price and the weekly upside.
     this._coversFlash = { updated, failed, merged: merged || 0,
       unmatched: skipped.filter(s => s && s !== '(blank)'),
-      incomplete: (incomplete || []).filter(s => s && s !== '(blank)'),
+      // Only the dishes that landed NOWHERE. `nIncomplete` below still counts every unreadable ROW,
+      // because the headline branches ask "was anything wrong with the units?" about the file.
+      incomplete: _incSkipped,
+      incompletePartial: _incPartial,
       netNegative: (netNegative || []).filter(Boolean),
       // ⚠ RAW COUNTS drive the headline; the lists above only supply names. A PMIX row with an empty
       // Item Name cell lands in `skipped` as '(blank)', gets filtered out here, and then the headline

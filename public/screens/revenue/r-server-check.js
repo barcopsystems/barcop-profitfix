@@ -687,14 +687,14 @@ S.RevenueServerCheck = {
        the Staff Roster to add people already on it. Same fix as the PMIX door one screen over.
        Anything involving a genuinely unmatched name still falls through to the column message. */
     else if (nUnd && !nSkip && !nInc)
-      head = 'No rows imported. Bar Cop could not read a date on any row — check the date column in your export.';
+      head = 'No rows imported. Bar Cop could not read a date on any row. Check the date column in your export.';
     else if (nInc && !nSkip && !nUnd)
       head = 'No rows imported. Every name matched your roster, but no row had both covers and sales.';
     // ⚠ THE MIXED CASE. Each branch above demands the other two buckets be empty, so a file with
     // some undated rows AND some that rang nothing fell through to the column message — with the
     // notes underneath naming only dates and covers. Every combination needs a true headline.
     else if (!nSkip && (nUnd || nInc))
-      head = 'No rows imported. Every name matched your roster — see below for what stopped each row.';
+      head = 'No rows imported. Every name matched your roster. See below for what stopped each row.';
     /* ⚠ AND THE FALLBACK BLAMED COLUMNS THAT WERE FINE. Every branch above demands `nSkip` be zero,
        so ANY unmatched or blank name sent a mixed file here — printing "check that the file has
        server, covers, and sales columns" directly above "Not matched to your roster: …" and
@@ -730,7 +730,7 @@ S.RevenueServerCheck = {
       // has none. Report it as a count so the totals an operator adds up actually reconcile.
       + ((nSkip - (fl.unmatched || []).length) > 0
           ? note((nSkip - fl.unmatched.length) + ' row' + ((nSkip - fl.unmatched.length) === 1 ? '' : 's')
-                 + ' skipped with no server name — usually a subtotal or section line in the export.') : '');
+                 + ' skipped with no server name, usually a subtotal or section line in the export.') : '');
   },
   mountServerImport() {
     const el = document.getElementById('rsc-imp-csv');
@@ -1144,7 +1144,7 @@ S.RevenueServerCheck = {
        The import lane on this same screen honours its commit result carefully; the hand-entry lane
        threw it away. Keep the form populated on a refusal so the entry is retryable. */
     App.putRecord('core', 'revenue_server_check', entry).then(saved => {
-      if (!saved) { fail('That did not save. Your entry is still here — try again.'); return; }
+      if (!saved) { fail('That did not save. Your entry is still here. Try again.'); return; }
       this._form = this.freshForm();
       this._entryId = App.uid();
       this._calc = null;
@@ -1193,7 +1193,7 @@ S.RevenueServerCheck = {
     // Step 0.5: the twin needs the same result check. Closing the modal on a refused write threw
     // the operator's corrections away and left the old figures on screen looking accepted.
     App.putRecord('core', 'revenue_server_check', entry).then(saved => {
-      if (!saved) return fail('That did not save. Your changes are still here — try again.');
+      if (!saved) return fail('That did not save. Your changes are still here. Try again.');
       App.closeModal('rsc-edit-modal'); this.draw();
     });
   }
