@@ -699,7 +699,7 @@ S.EventsRegulars = {
        message is built here and rendered BY renderList, not written into the DOM after it:
        renderList reassigns innerHTML, so anything written first is destroyed on the spot. */
     if (!saved) {
-      const failed = 'Could not save the import. Nothing was changed — check your connection and try again.';
+      const failed = 'Could not save the import. Nothing was changed. Check your connection and try again.';
       /* ⛔ A REFUSED WRITE ON THE CONFIRM SCREEN REPORTS INTO THE SHELL'S RESULT SLOT, AND THE SCREEN
          IS NOT RE-RENDERED. The screen stays up with every row still on it, so the operator presses
          Add again rather than re-dropping the file and re-mapping its columns — and a re-render here
@@ -730,7 +730,7 @@ S.EventsRegulars = {
       // day-first exactly like the other two, and its "cannot settle the order" answer was simply
       // not in this test — so an ambiguous visit column imported silently mis-monthed (S199's
       // defect, live in the new column).
-      if (bConv.contradictory || aConv.contradictory || lvConv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled — check any date where both numbers are 12 or under');
+      if (bConv.contradictory || aConv.contradictory || lvConv.contradictory) bits.push('some dates read day-first and others month-first, so day-and-month order could not be settled. Check any date where both numbers are 12 or under');
       /* ⛔ ONCE A DOOR HAS A CONFIRM SCREEN, ITS SUCCESS LINE IS THE HEADLINE ALONE. Every clause
          below it — already in your book, repeated in the file, no name, the three dates Bar Cop
          could not read, and the day-first warning — is a row or a sentence on the screen the
