@@ -903,7 +903,12 @@ S.RevenueMenuEngineering = {
     incomplete:  'Could not read the units on this row',
     netNegative: 'Returns came to more than the sales, so this item keeps its previous figure',
     merged:      'Summed with the other rows for this item',
-    'new':       'Updating this item\'s units sold'
+    'new':       'Updating this item\'s units sold',
+    /* ⛔⛔ THE TOTALS ROWS WENT OUT SILENT ON THE FIRST WALK. `buildPmix` gained the `summary` status
+       the same day and this map did not, so the three rows that FOUND that defect — Grand Total, Team
+       Average, TOTALS — rendered with an empty What Happens cell, under a column header that is a
+       promise. Kyle's rule from door 9, broken again in the same session he gave it. */
+    summary:     'Your file\'s own totals line, not a menu item'
   },
   pmixReviewRows(built, opts) {
     opts = opts || {};
@@ -928,8 +933,15 @@ S.RevenueMenuEngineering = {
          a NaN, which `!= null` would have let through into the comparison cell. */
       const was = it && Number.isFinite(it.weekly_covers) ? it.weekly_covers : null;
       const shown = (units == null || isNaN(units)) ? '\u2014' : String(Math.round(units));
-      const cell = (v.lands && was != null)
-        ? ImportConfirm.compare(shown, String(Math.round(was)))
+      /* ⛔⛔ "was 95", NOT "you entered 95". `ImportConfirm.compare` writes *"you entered X"*, which is
+         exactly right on the sales and per-server doors — there the second figure IS a number the
+         operator typed by hand, and the row is asking which one wins. Here it is the item's PREVIOUS
+         weekly units, set by the last import or the seed. Measured on the first walk: "49 you entered
+         95" about a figure nobody entered. Same helper, wrong sentence, because the two doors are
+         asking different questions — so this one builds its own sub-line and leaves `compare` alone
+         for the doors whose words it fits. */
+      const cell = (v.lands && was != null && Math.round(was) !== Math.round(units))
+        ? esc(shown) + ImportConfirm.sub('was ' + Math.round(was))
         : esc(shown);
       let lands = !!v.lands;
       if (lands) { if (counted.has(v.entry)) lands = false; else counted.add(v.entry); }
@@ -979,6 +991,9 @@ S.RevenueMenuEngineering = {
       removedRows: this._pmixReviewRemoved(),
       removable: true,
       open: r.open,
+      // The section is what the rows ARE; the button keeps its own verb. Without this the head read
+      // as the bare word "Update" above "72 Items Bar Cop worked out".
+      settledLabel: 'Going In',
       goAttr: 'data-pmreview-go', backAttr: 'data-pmreview-back', backLabel: 'Start Over',
       resultId: 'me-cov-result',
       busy: !!this._pmixReviewWriting
