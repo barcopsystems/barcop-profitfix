@@ -182,6 +182,17 @@ S.RevenueMenuEngineering = {
       return;
     }
     const priced = (App.data.menu_items || []).some(i => i.price && App.menuItemCost(i) && !i.archived);   // live cost, matching :53/:94/:194 (S111a)
+    /* ⛔⛔⛔ THE CONFIRM SCREEN OWNS THE PAGE. The classification board below carries Reprice, Make
+       Live and the batch apply, every one of which writes on the press — four inches under a sentence
+       promising nothing is saved until a different press. Two opposite write models on one page, with
+       the destructive one under the reassuring line, is the shape Kyle found on `ev-regulars`.
+       ⚠ `_pmixReview` lives on the screen OBJECT, not in the DOM, so Remove, Put Back and a redraw
+       cannot lose the operator's file. */
+    if (this._pmixReview) {
+      this.container.innerHTML = '<div class="screen">' + this.pmixReviewHTML() + '</div>';
+      this._wirePmixReview();
+      return;
+    }
     this.container.innerHTML = '<div class="screen">' + (priced ? this.coversImportHtml() : '') + this.classificationHtml() + '</div>';
     const c = this.container;
     c.querySelectorAll('.me-reprice').forEach(b => b.addEventListener('click', () => this.openReprice(b.dataset.id)));
@@ -866,11 +877,153 @@ S.RevenueMenuEngineering = {
       actionsEl: '#me-cov-actions',
       fields: PosIngest.FIELDS.pmix,
       confirmLabel: 'Update Units Sold',
-      onComplete: rows => this.applyCoversImport(rows)
+      /* ⛔ THE MAPPER NO LONGER COMMITS. It hands the file to the confirm screen, which is where the
+         operator presses the button. Same shape as every other converted door. */
+      onComplete: rows => this._openPmixReview(rows)
     });
   },
 
-  async applyCoversImport(rows) {
+  /* ── DOOR 11: THE PRODUCT-MIX CONFIRM SCREEN ─────────────────────────────────────
+     ONE DOOR, SO THE MAPPING LIVES HERE. Per-server needed a shared mapper because two screens showed
+     the same rows; product mix has exactly one door since the cockpit zone became a signpost, so there
+     is nothing for this to drift from.
+     ⛔⛔ THE UNITS CELL SHOWS THE DISH’S SUMMED TOTAL, NOT THE ROW’S OWN UNITS, because that is what
+     the write uses. A daypart-split export names one dish several times and `buildPmix` folds them;
+     the flash already explains that merge, because otherwise the operator sees a number bigger than
+     any row in their file with no reason given. On a per-row screen that fact belongs on the row.
+     ⛔ AND THE COUNT IS DISHES, NOT ROWS. Two rows land as one menu item, so a button promising 2 over
+     a table showing one dish is the reference screen’s worst defect wearing a new costume. The shell
+     derives its number from the rows, so the noun has to be the dish and the merged rows must not
+     each claim their own. */
+  PMIX_NOTES: {
+    noName:      'No item name on this row',
+    noMatch:     'This name is not on your menu',
+    ambiguous:   'More than one menu item has this name',
+    retired:     'This item is no longer on your live menu',
+    incomplete:  'Could not read the units on this row',
+    netNegative: 'Returns came to more than the sales, so this item keeps its previous figure',
+    merged:      'Summed with the other rows for this item',
+    'new':       'Updating this item\'s units sold'
+  },
+  pmixReviewRows(built, opts) {
+    opts = opts || {};
+    const removed = opts.removed || {};
+    const items = (App.data && App.data.menu_items) || [];
+    const byId = {}; items.forEach(it => { if (it) byId[it.id] = it; });
+    const rows = [];
+    /* ⚠ THE FIRST ROW OF A MERGED SET CARRIES THE COUNT. `built.toAdd` holds ONE entry per dish, so the
+       shell must see exactly one landing row per dish or its derived number doubles. The first row for
+       an entry lands; the rest say they were summed into it and do not count again. */
+    const counted = new Set();
+    (built.perRow || []).forEach((v, i) => {
+      const key = (v.raw && v.raw._rid != null) ? v.raw._rid : i;
+      if (removed[key]) return;
+      const it = v.entry ? byId[v.entry.item_id] : null;
+      const units = v.entry ? v.entry.covers : App.parseNum((v.raw || {}).units);
+      /* ⚠ `Number.isFinite`, NOT `!= null`, AND THE REASON IS NOT COSMETIC. `weekly_covers != null` is
+         how `_measured` asks "is this item RANKABLE", and `verify-menu-zero-seller` D3 pins that the
+         rule is written in exactly one place — so reusing the spelling here made a second copy of a
+         rule this screen has already been bitten by. The question on THIS row is different: is there a
+         previous figure to show the operator as `was`. `isFinite` says that precisely and also rejects
+         a NaN, which `!= null` would have let through into the comparison cell. */
+      const was = it && Number.isFinite(it.weekly_covers) ? it.weekly_covers : null;
+      const shown = (units == null || isNaN(units)) ? '\u2014' : String(Math.round(units));
+      const cell = (v.lands && was != null)
+        ? ImportConfirm.compare(shown, String(Math.round(was)))
+        : esc(shown);
+      let lands = !!v.lands;
+      if (lands) { if (counted.has(v.entry)) lands = false; else counted.add(v.entry); }
+      rows.push({
+        cells: [esc(v.name || '(no name)'), cell],
+        note: this.PMIX_NOTES[v.status] || '',
+        notes: [], lands: lands, needsYou: false, key: key
+      });
+    });
+    return { rows: rows, count: rows.filter(r => r.lands).length };
+  },
+
+  _openPmixReview(rows) {
+    (rows || []).forEach((r, i) => { if (r && r._rid == null) r._rid = 'pm' + i; });
+    this._pmixReview = { rows: rows || [], open: {}, removed: {} };
+    this.draw();
+  },
+  /* ⚠ RE-WALKED ON EVERY RENDER OVER THE ROWS NOT REMOVED, and on this lane that genuinely changes
+     answers: taking out the row that carried the returns can lift a dish out of net-negative and back
+     into going in. That is right — it is the operator’s decision — and it is why the walk is the one
+     place the outcome is decided rather than being cached at the drop. */
+  _pmixReviewSummary() {
+    const r = this._pmixReview;
+    if (!r) return { rows: [], count: 0 };
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    return this.pmixReviewRows(PosIngest.build('pmix', live), { removed: {} });
+  },
+  _pmixReviewRemoved() {
+    const r = this._pmixReview;
+    if (!r) return [];
+    const gone = r.rows.filter(x => r.removed[x._rid]);
+    if (!gone.length) return [];
+    return this.pmixReviewRows(PosIngest.build('pmix', gone), { removed: {} }).rows;
+  },
+  _pmixPanelOpts() {
+    const s = this._pmixReviewSummary();
+    return { rows: s.rows, verb: 'Update', noun: 'Item', nounPlural: 'Items' };
+  },
+  pmixReviewHTML() {
+    const r = this._pmixReview || { open: {} };
+    return ImportConfirm.panel(Object.assign(this._pmixPanelOpts(), {
+      label: 'Check this file before it goes in',
+      lead: 'Nothing is saved until you press the button below. Every row from your file is here with '
+          + 'what Bar Cop worked out. Take out anything you do not want.',
+      columns: [{ label: 'Item', width: 40 }, { label: 'Units Sold', width: 16 }],
+      outcomeLabel: 'What happens',
+      removedRows: this._pmixReviewRemoved(),
+      removable: true,
+      open: r.open,
+      goAttr: 'data-pmreview-go', backAttr: 'data-pmreview-back', backLabel: 'Start Over',
+      resultId: 'me-cov-result',
+      busy: !!this._pmixReviewWriting
+    }));
+  },
+  _wirePmixReview() {
+    const c = this.container, r = this._pmixReview;
+    if (!c || !r) return;
+    c.querySelectorAll('[data-confirm-section]').forEach(h => h.addEventListener('click', () => {
+      const k = h.dataset.confirmSection;
+      r.open[k] = (k === 'needs') ? (r.open[k] === false) : !r.open[k];
+      this.draw();
+    }));
+    c.querySelectorAll('[data-confirm-remove]').forEach(b => b.addEventListener('click', () => {
+      r.removed[b.dataset.confirmRemove] = true; this.draw();
+    }));
+    c.querySelectorAll('[data-confirm-restore]').forEach(b => b.addEventListener('click', () => {
+      delete r.removed[b.dataset.confirmRestore]; this.draw();
+    }));
+    c.querySelector('[data-pmreview-go]')?.addEventListener('click', () => this._runPmixReview());
+    c.querySelector('[data-pmreview-back]')?.addEventListener('click', () => {
+      this._pmixReview = null; this.draw();
+    });
+  },
+  /* ⛔ ONE PRESS, ONE IMPORT. The button is rebuilt by every redraw, so a flag on the screen object is
+     the only thing a redraw cannot hand back. */
+  async _runPmixReview() {
+    const r = this._pmixReview;
+    if (!r || this._pmixReviewWriting) return;
+    this._pmixReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-pmreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
+    try {
+      await this.applyCoversImport(r.rows.filter(x => !r.removed[x._rid]), { reviewed: true });
+    } finally {
+      this._pmixReviewWriting = false;
+      if (this._pmixReview) {
+        const b = this.container && this.container.querySelector('[data-pmreview-go]');
+        if (b) { b.disabled = false; b.textContent = ImportConfirm.goLabel(this._pmixPanelOpts()); }
+      }
+    }
+  },
+
+  async applyCoversImport(rows, opts) {
+    opts = opts || {};
     // One ingest path: PosIngest matches by name + upserts weekly_covers.
     // ⚠ `retired` and `ambiguous` are I4's two refused outcomes — a name only an inactive item
     // carries, and a name two LIVE items share. Both were previously written or silently dropped;
