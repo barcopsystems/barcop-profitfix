@@ -145,7 +145,7 @@ S.ShiftDashboard = {
        Reading it here is one release path instead of four, and it cannot drift from what the lanes
        do because it IS what they do. A flash set by something other than an import finds no
        takeover to clear, so this is a no-op there. */
-    if (flash && !this._salesReview) this._clearTakeover();
+    if (flash && !this._anyReview()) this._clearTakeover();
 
     /* ⛔⛔ A TAKEOVER WITH NO MAPPER LEFT IS A LIE ABOUT THE STATE, AND IT STRANDS THE OPERATOR.
        Kyle found it on Close The Books (2026-08-07): *"if you drop a file and it takes over page...
@@ -161,7 +161,7 @@ S.ShiftDashboard = {
        ⚠ THE CONFIRM SCREEN IS THE EXCEPTION AND IT IS WHY THE GUARD READS BOTH: `_salesReview` lives
        on the OBJECT, not in the DOM, so a file that got that far genuinely IS still in progress and
        has to survive the round trip untouched. */
-    if (this._ckTakeover != null && !this._ckCarry && !this._salesReview) this._clearTakeover();
+    if (this._ckTakeover != null && !this._ckCarry && !this._anyReview()) this._clearTakeover();
 
     /* ⛔⛔ BUILT TO MATCH CLOSE THE BOOKS, which is the one that shipped and was walked. Kyle,
        comparing them side by side: *"books is on the right... yours is image on the left.. you did it
@@ -183,15 +183,16 @@ S.ShiftDashboard = {
            CONFIRM: the shell's panel and nothing else. It already brings its own heading, its own
            card around the table and its own buttons below it, so wrapping it in a second card gave
            *"a card inside another card"* and a duplicate title. */
-        + (this._salesReview
-            ? '<div style="margin-top:18px;">' + this.salesReviewHTML() + '</div>'
+        + (this._anyReview()
+            ? '<div style="margin-top:18px;">'
+              + (this._salesReview ? this.salesReviewHTML() : this.serverReviewHTML()) + '</div>'
             : '<div class="card form-card" style="margin-top:18px;">'
               +   '<div class="card-title">' + esc(this.CK_TITLE[this._ckTakeover] || 'Check your import') + '</div>'
               +   '<div id="sc-ck-takeover"></div>'
               + '</div>'
               + '<div id="sc-ck-takeover-actions" style="margin-top:14px;"></div>')
         + '</div>';
-      if (!this._salesReview && this._ckCarry) {
+      if (!this._anyReview() && this._ckCarry) {
         const slot = document.getElementById('sc-ck-takeover');
         if (slot) slot.appendChild(this._ckCarry);
         const aslot = document.getElementById('sc-ck-takeover-actions');
@@ -229,7 +230,7 @@ S.ShiftDashboard = {
     // ⚠ NOT WHILE THE CONFIRM SCREEN IS UP. Its markup replaces the whole step, so #sc-ck-import is
     // gone and re-mounting the dropzone would hand the operator a second file picker over a file
     // they have not finished confirming.
-    if (this._openStep === 'import' && this._salesMode !== 'manual' && !this._salesReview) {
+    if (this._openStep === 'import' && this._salesMode !== 'manual' && !this._anyReview()) {
       this.mountImport();
       if (this._optOpen && this._optOpen.server) this.mountServer();
       if (this._optOpen && this._optOpen.pmix) this.mountPmix();
@@ -395,7 +396,12 @@ S.ShiftDashboard = {
 
   /* The question `render` asks before it decides its layout. The confirm screen holds it open too: a
      file already dropped and waiting to be confirmed must not lose the page out from under it. */
-  ckTakeover() { return this._ckTakeover != null || !!this._salesReview; },
+  /* Any lane's confirm screen. FIVE sites ask this question — the release on a flash, the stranded
+     guard, the mapper re-attach, the drop-zone mount and `ckTakeover` — and each one was written
+     against `_salesReview` when sales was the only converted lane. One accessor means a third lane
+     joins by adding its field here, not by finding five call sites. */
+  _anyReview() { return this._salesReview || this._serverReview; },
+  ckTakeover() { return this._ckTakeover != null || !!this._anyReview(); },
   _ckCarryActs: null,  // the mapper's Import/Cancel row, which lives in its own element
   _clearTakeover() { this._ckTakeover = null; this._ckCarry = null; this._ckCarryActs = null; },
 
@@ -1437,10 +1443,85 @@ S.ShiftDashboard = {
       confirmLabel: 'Import',
       actionsEl: '#sc-ck-server-actions',
       onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._toggleOptLink('server', st); this._onMapState('server', st); },
-      onComplete: rows => this.importServer(rows)
+      // ⛔ THE MAPPER NO LONGER COMMITS on this lane either. Same shape as the sales zone beside it.
+      onComplete: rows => this._openServerReview(rows)
     });
   },
-  async importServer(rows) {
+  /* ── DOOR 10: the per-server confirm screen, and it is the SAME screen `r-server-check` renders ──
+     Both zones read the identical `PosIngest.build('server')` and show the identical columns, so the
+     verdict-to-row mapping comes from ONE function. It lives on `S.RevenueServerCheck` because that is
+     the screen that owns the per-server job; this zone is a shortcut to the same work, and it calls in
+     exactly as `hub-books-home` calls `S.HubOperatingExpenses.renderMoneyOut()`.
+     ⛔ NOT A SECOND COPY OF THE MAPPING. Two copies of a decision is how a button ends up promising a
+     number the write does not honour, which is the whole defect this rollout exists to close.
+     `verify-server-import-review.js` block G is the census that keeps it that way. */
+  _openServerReview(rows) {
+    (rows || []).forEach((r, i) => { if (r && r._rid == null) r._rid = 'sr' + i; });
+    this._serverReview = { rows: rows || [], open: {}, removed: {}, useFile: {} };
+    this.render(this.container, this.actions);
+  },
+  _serverReviewSummary() {
+    const r = this._serverReview;
+    if (!r) return { rows: [], count: 0 };
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    return S.RevenueServerCheck.serverReviewRows(
+      PosIngest.build('server', live), { removed: {}, useFile: r.useFile });
+  },
+  _serverReviewRemoved() {
+    const r = this._serverReview;
+    if (!r) return [];
+    const gone = r.rows.filter(x => r.removed[x._rid]);
+    if (!gone.length) return [];
+    return S.RevenueServerCheck.serverReviewRows(
+      PosIngest.build('server', gone), { removed: {}, useFile: {} }).rows;
+  },
+  serverReviewHTML() {
+    const r = this._serverReview || { open: {} };
+    return ImportConfirm.panel(Object.assign(this._serverPanelOpts(), {
+      label: 'Check this file before it goes in',
+      lead: 'Nothing is saved until you press the button below. Every row from your file is here with '
+          + 'what Bar Cop worked out. Take out anything you do not want.',
+      columns: [
+        { label: 'Server', width: 22 }, { label: 'Date', width: 14 }, { label: 'Shift', width: 12 },
+        { label: 'Covers', width: 9 }, { label: 'Sales', width: 13 }
+      ],
+      outcomeLabel: 'What happens',
+      removedRows: this._serverReviewRemoved(),
+      removable: true,
+      open: r.open,
+      goAttr: 'data-svreview-go', backAttr: 'data-svreview-back', backLabel: 'Start Over',
+      resultId: 'sc-ck-server-res',
+      busy: !!this._serverReviewWriting
+    }));
+  },
+  // The label comes from the SHELL, not a second copy of its rule.
+  _serverPanelOpts() {
+    const s = this._serverReviewSummary();
+    return { rows: s.rows, verb: 'Add', noun: 'Check', nounPlural: 'Checks' };
+  },
+  async _runServerReview() {
+    const r = this._serverReview;
+    if (!r || this._serverReviewWriting) return;
+    this._serverReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-svreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try {
+      await this.importServer(r.rows.filter(x => !r.removed[x._rid]),
+        { reviewed: true, useFile: r.useFile });
+    } finally {
+      this._serverReviewWriting = false;
+      /* ⛔ ONLY SUCCESS CLEARS THE SCREEN. A refused write keeps every row up so the operator can press
+         again without re-dropping the file, and the error goes into the zone's own result slot — the
+         same slot the flash uses, which already sits under that drop box. */
+      if (this._serverReview) {
+        const b = this.container && this.container.querySelector('[data-svreview-go]');
+        if (b) { b.disabled = false; b.textContent = ImportConfirm.goLabel(this._serverPanelOpts()); }
+      }
+    }
+  },
+
+  async importServer(rows, opts) {
+    opts = opts || {};
     // `incomplete` (on the roster, rang no covers/sales) is split out of `skipped` (name
     // not matched) by buildServer. Destructure BOTH or those rows vanish with no mention:
     // they used to be counted in the skipped total. Server Check's door reports both.
@@ -1477,7 +1558,14 @@ S.ShiftDashboard = {
        whose every row is a conflict has an EMPTY toAdd, and falling into "no server rows imported.
        Each row needs a server name…" would blame the file for rows Bar Cop understood perfectly. */
     const serverExtra = [];
-    if (conflicts && conflicts.length) {
+    /* ⛔⛔ ON THE REVIEWED PATH THE ANSWER IS ALREADY ON THE ROW, so the modal must not fire. Asking
+       twice for one decision is what door 2 removed from this screen for the sales lane; the confirm
+       screen shows both sets of figures with Keep Mine / Use The File and `opts.useFile` is the answer.
+       ⚠ `App.promptImportConflicts` STAYS for the lanes that still write on the press. */
+    if (opts.reviewed) {
+      const chose = opts.useFile || {};
+      (conflicts || []).forEach(c => { if (chose[c.key]) serverExtra.push(c.useRec); });
+    } else if (conflicts && conflicts.length) {
       const figs = v => v.covers + (v.covers === 1 ? ' cover' : ' covers') + ' · $'
         + (Math.round((v.sales || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const rowLabel = c => { const dt = new Date(c.date + 'T00:00:00');
@@ -1575,6 +1663,11 @@ S.ShiftDashboard = {
       + serverOutcomes + '.';
     if (this._optOpen) this._optOpen.server = false;   // collapse back to the link
     this._openStep = 'import';
+    /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. Every refusal above returns with the
+       screen and every row still up, having written into this zone's own `-res` slot — so reaching
+       this line IS what says the write landed. Clearing it here also releases the takeover, because
+       `ckTakeover()` reads `_anyReview()`, and the flash then lands under the drop box it came from. */
+    this._serverReview = null;
     this.render(this.container, this.actions);
   },
 
@@ -1965,6 +2058,33 @@ S.ShiftDashboard = {
         this.render(this.container, this.actions); return;
       }
       if (ev.target.closest('[data-salesreview-go]')) { this._runSalesReview(); return; }
+      /* ── The per-server confirm screen's controls (door 10) ─────────────────────────────────────
+         Same delegated handler the sales lane uses, so neither can stack listeners on a redraw. */
+      if (this._serverReview) {
+        const r = this._serverReview;
+        const sec = ev.target.closest('[data-confirm-section]');
+        if (sec) { const k = sec.dataset.confirmSection;
+          // `needs` defaults OPEN, so its toggle is inverted — the shell's own convention.
+          r.open[k] = (k === 'needs') ? (r.open[k] === false) : !r.open[k];
+          this.render(this.container, this.actions); return; }
+        const rm = ev.target.closest('[data-confirm-remove]');
+        if (rm) { r.removed[rm.dataset.confirmRemove] = true; this.render(this.container, this.actions); return; }
+        // Remove is reversible right up to the button, like every other control on this screen.
+        const put = ev.target.closest('[data-confirm-restore]');
+        if (put) { delete r.removed[put.dataset.confirmRestore]; this.render(this.container, this.actions); return; }
+        const cf = ev.target.closest('[data-svconf]');
+        if (cf) { const k = cf.dataset.svconf;
+          if (cf.dataset.use === 'file') r.useFile[k] = true; else delete r.useFile[k];
+          this.render(this.container, this.actions); return; }
+        if (ev.target.closest('[data-svreview-go]')) { this._runServerReview(); return; }
+        if (ev.target.closest('[data-svreview-back]')) {
+          /* Back to the drop zone, not out of the step, and the page comes back with it: the carried
+             mapper is spent once its rows have gone to the confirm screen, so leaving the takeover set
+             would re-attach a dead node over the step. Same call the sales lane's Start Over makes. */
+          this._serverReview = null; this._clearTakeover();
+          this.render(this.container, this.actions); return;
+        }
+      }
       if (ev.target.closest('[data-salesreview-back]')) {
         // Back to the drop zone, not out of the step. A mapping belongs to the file it was made
         // for, so the file is re-dropped from scratch — nothing was written to undo.
