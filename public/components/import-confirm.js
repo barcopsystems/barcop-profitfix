@@ -301,8 +301,14 @@ const ImportConfirm = {
       const settledOpen = !!openMap.settled;
       body = '';
       if (needs.length) {
+        /* ⚠ THE SUB FOLLOWS THE BUTTON'S OWN VERB. It read "before you add" for every door, which was
+           true while every door said Add — product mix says **Update**, and the section then told the
+           operator to check rows "before you add" under a button that does not say add. Same class as
+           the sales door's lead, which was pinned against the button's label for exactly this reason.
+           ⚠ NO CHANGE FOR AN `Add` DOOR: the verb IS "Add" there, so the sentence is identical. */
         body += this._section(opts.needsLabel || 'Needs A Look',
-          needs.length + ' row' + (needs.length === 1 ? '' : 's') + ' to check before you add',
+          needs.length + ' row' + (needs.length === 1 ? '' : 's') + ' to check before you '
+            + String(verb || 'Add').toLowerCase(),
           needsOpen ? table(needs) : '', needsOpen, true, 'needs');
       }
       if (settled.length) {
@@ -316,7 +322,12 @@ const ImportConfirm = {
            against a truth of $28,503.63.
            The section stays COLLAPSED, because the button below 200 rows of table is a measured
            defect of its own. What changes is that a door may say what is actually in there. */
-        body += this._section((verb === 'Add' ? 'Going In' : verb),
+        /* ⚠ A DOOR MAY NAME THIS SECTION. The fallback `verb === 'Add' ? 'Going In' : verb` was fine
+           while every door said Add; the product-mix door says **Update**, and the head then rendered
+           as the bare word "Update" sitting above "72 Items Bar Cop worked out" — a title that reads
+           like a stray button. `settledLabel` lets the door say what the section IS ("Going In") while
+           the button keeps its own verb, and the fallback is untouched for every existing door. */
+        body += this._section(opts.settledLabel || (verb === 'Add' ? 'Going In' : verb),
           opts.settledSub
             ? settled.length + ' ' + (settled.length === 1 ? noun : (opts.nounPlural || noun + 's')) + ' ' + opts.settledSub
             : settled.length + ' ' + (settled.length === 1 ? noun : (opts.nounPlural || noun + 's')) + ' Bar Cop worked out',
