@@ -746,40 +746,35 @@ S.InventorySpotCheck = {
        A 43-row per-sale export ends at sold = 1. The sibling door in this same section
        (`posByProduct.addProduct` in ic-report-variance) already sums; this one never did. */
     const totals = {};      // product id -> summed sold
-    /* ⛔⛔ EVERY DROPPED ROW IS NAMED, NOT COUNTED (contract rule 8: the result names what was left
-       out, BY NAME). All four of these used to be bare tallies — *"1 name not matched to a product"*
-       and never which one — so the operator was told something in their file had been ignored and
-       given no way to find it short of reading the file against their product list by hand. On the
-       one door whose whole job is a POUR VARIANCE, an unnamed dropped row is a hole in the divisor.
-       ⚠ AND `noMatch` COUNTED **ROWS** UNDER A SENTENCE THAT SAYS "NAMES". One product on three
-       unmatched rows read "3 names not matched" against one name — the per-row-versus-per-thing
-       defect, in a sentence that names its own unit out loud. It counts distinct names now, so the
-       number and the list it introduces can never disagree.
-       ⚠ THE OFF-CHECK AND UNREADABLE COUNTS STAY PER **ROW**, because their sentences say "rows" —
-       a product on three off-check rows is three rows and one name, and both are true. */
-    let offCheck = 0, unreadable = 0;
-    const offNames = [], noNames = [], unreadNames = [], negNames = [];
-    const seenNoMatch = new Set();
+    /* ⛔⛔⛔ THE REPORT RUNS ONE WAY ONLY: WHAT ON THIS CHECK COULD NOT BE FILLED. Not what in the
+       file could not be placed. Kyle, after a real drop (2026-08-08): *"if the user only spot checks
+       a couple of items but drops in the entire pos sells for all their products then the list of
+       products not on this check could be way long... why can't the list just match the products that
+       were spot checked and ignore the rest... because you are trying to match the drop file with
+       what is being spot checked and that isn't how a user might do it."*
+       ⛔ HE IS RIGHT AND IT IS A DIRECTION ERROR. A POS exports the WHOLE shift; a spot check is
+       deliberately a handful of bottles, and nothing asks the operator to trim the file first. So a
+       row for a product not on this check is the NORMAL SHAPE of a correct drop, and so is a row for
+       something that is not one of their products at all. Reporting either produces noise
+       proportional to the FILE — his screenshot: one product checked, a tail naming four others and
+       "and 1 more" — and it buries the one thing worth reading.
+       ⚠ THE SUBJECT IS THE CHECK, SO THE BUCKETS ARE COMPUTED AFTER THE FILL, keyed on the products
+       ON SCREEN rather than on rows walked. `sawRows` is what separates "the file never mentioned
+       it" from "the file mentioned it and the figure was unusable", which are different fixes. */
+    const sawRows = new Set();   // checked products the file had at least one row for
+    const negNames = [];
     const add = (list, nm) => { if (nm && list.indexOf(nm) < 0) list.push(nm); };
     rows.forEach(r => {
-      const rawName = String(r.product == null ? '' : r.product).trim();
-      const p = byName[rawName.toLowerCase()];
-      if (!p) {
-        /* ⚠ A BLANK PRODUCT CELL HAS NO NAME TO PRINT, and "1 name not matched: " with nothing after
-           it is worse than the count was. Same `(blank)` treatment `buildServer` gives it. */
-        const label = rawName || '(blank)';
-        const k = label.toLowerCase();
-        if (!seenNoMatch.has(k)) { seenNoMatch.add(k); noNames.push(label); }
-        return;
-      }
-      // ⚠ THE PRODUCT'S OWN SPELLING, not the file's. The match is case-insensitive, so printing the
-      // file's text would show the operator a name that is not the one on their list.
-      if (!onScreen[p.id]) { offCheck++; add(offNames, p.name); return; }
+      const p = byName[String(r.product == null ? '' : r.product).trim().toLowerCase()];
+      // Not one of your products, or not on this check: both are the ordinary shape of a whole-shift
+      // report dropped onto a short check, and neither is this screen's business.
+      if (!p || !onScreen[p.id]) return;
+      sawRows.add(p.id);
       // App.parseNum, not parseFloat: `parseFloat('1,200')` is 1 and `parseFloat('$45')` is NaN,
       // which silently DROPPED the row. Every other numeric read in this section uses the one
       // coercion; this door had a private copy that disagreed with it on four shapes.
       const sold = App.parseNum(r.sold);
-      if (sold == null) { unreadable++; add(unreadNames, p.name); return; }
+      if (sold == null) return;
       /* ⚠ A NEGATIVE ROW IS NETTED, NOT DROPPED. Refusing it per row fought the summing directly
          above: a POS export that prints returns on their own line ("Tito's 60", "Tito's -4") had
          the refund THROWN AWAY and filled 60 instead of 56 — 4 phantom pours of "sold", which is
@@ -788,13 +783,26 @@ S.InventorySpotCheck = {
       totals[p.id] = (totals[p.id] || 0) + sold;
     });
     let filled = 0;
+    const filledIds = new Set(), negIds = new Set();
     Object.keys(totals).forEach(pid => {
       /* Only a net-negative TOTAL is refused. The typed field is `<input type="number" min="0">`,
          so the operator cannot enter one; a file whose refunds exceed its sales for a product is
          not a quantity the check can use, and writing it produced phantom theft. */
-      if (totals[pid] < 0) { add(negNames, nameById[pid]); return; }
+      if (totals[pid] < 0) { negIds.add(pid); add(negNames, nameById[pid]); return; }
       const inp = onScreen[pid].querySelector('.sp-sold');
-      if (inp) { inp.value = totals[pid]; this.recalcLine(onScreen[pid]); filled++; }
+      if (inp) { inp.value = totals[pid]; this.recalcLine(onScreen[pid]); filled++; filledIds.add(pid); }
+    });
+    /* ⭐ THE ONLY THING WORTH SAYING: a product ON THIS CHECK that the drop could not fill, and which
+       of the three reasons applies. Two of these existed as row tallies; the third did not exist at
+       all — a checked product the file never mentions used to sit at a blank Sold box with no way to
+       tell "there is no line for it in this report" from "the import skipped it". That is the bucket
+       the inversion exposed, and it is the one an operator can actually act on: wrong report, wrong
+       shift, or a name that does not match. */
+    const noLine = [], badFig = [];
+    Object.keys(onScreen).forEach(pid => {
+      if (filledIds.has(pid) || negIds.has(pid)) return;
+      if (sawRows.has(pid)) add(badFig, nameById[pid]);   // rows arrived, no usable figure on any
+      else add(noLine, nameById[pid]);                    // the file never mentions it
     });
     this.recalcTotal();
     this.syncDraft();
@@ -811,31 +819,34 @@ S.InventorySpotCheck = {
          same failure as naming none. */
       const listOf = names => names.slice(0, 4).map(esc).join(', ')
         + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '');
-      const noMatch = noNames.length, negative = negNames.length;
+      /* ⛔ THREE SENTENCES, ALL ABOUT PRODUCTS **ON THIS CHECK**, and each one a different fix: find
+         the right report, look at the Sold column, or read the refunds. Merging them would send the
+         operator to the wrong one, which is the mis-naming this door has already been corrected for
+         twice.
+         ⚠ ESCAPED, AND THAT IS NEW BECAUSE THE CONTENT IS NEW: this line printed only integers until
+         it started carrying a product name the operator typed. Capped at four with the count of what
+         it did not print — the convention `csv-mapper` uses for unread columns. The cap is a backstop
+         here rather than the main event, because the list is bounded by how many products the
+         operator chose to check. */
       const notes = [];
-      if (offCheck)   notes.push(offCheck + ' row' + (offCheck === 1 ? '' : 's') + ' for products not on this check: ' + listOf(offNames));
-      if (noMatch)    notes.push(noMatch + ' name' + (noMatch === 1 ? '' : 's') + ' not matched to a product: ' + listOf(noNames));
-      if (unreadable) notes.push(unreadable + ' row' + (unreadable === 1 ? '' : 's') + ' with no readable sold figure: ' + listOf(unreadNames));
-      if (negative)   notes.push(negative + ' negative sold figure' + (negative === 1 ? '' : 's') + ' ignored: ' + listOf(negNames));
+      if (noLine.length) notes.push(noLine.length + ' not in your file: ' + listOf(noLine));
+      if (badFig.length) notes.push(badFig.length + ' with no readable sold figure: ' + listOf(badFig));
+      if (negNames.length) notes.push(negNames.length + ' where refunds came to more than sales: ' + listOf(negNames));
       const tail = notes.length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes.join(' · ') + ')</span>' : '';
       res.innerHTML = filled > 0
         ? '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Filled POS sold for ' + filled + ' product' + (filled === 1 ? '' : 's') + '. Review the variance below, then save.' + tail + '</div>'
-        /* ⚠ THE ZERO-FILL HEADLINE MUST NAME THE CAUSE THAT ACTUALLY APPLIES. It said "No products
-           matched… make sure the names match" whenever nothing filled — including when the names
-           matched perfectly and the figures were unreadable or net-negative, and on an empty file.
-           An absolute claim may only fire when the other buckets are empty. */
+        /* ⚠ THE ZERO-FILL HEADLINE MUST NAME THE CAUSE THAT ACTUALLY APPLIES, and an absolute claim
+           may only fire when the other buckets are empty. With the report inverted the causes are
+           simpler: either the file has no line for anything on this check (wrong report, wrong
+           shift, or the names differ), or it does and none of the figures were usable. */
         : '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
-          + (offCheck && !noMatch && !unreadable && !negative
-              ? 'Nothing filled. Those products are not on this check yet — add them first.'
-             /* ⚠ `&& !offCheck` — without it, three of the sixteen bucket combinations claimed
-                "The products matched" while off-check rows had matched NOTHING on the check, and
-                sent the operator to fix a sold column when the real fix was to add the products.
-                An absolute claim needs EVERY other bucket empty. */
-             : (unreadable || negative) && !noMatch && !offCheck
-              ? 'Nothing filled. The products matched, but no row carried a sold figure Bar Cop could use.'
-             : noMatch || offCheck
+          + (noLine.length && !badFig.length && !negNames.length
+              ? 'Nothing filled. This file has no line for any product on this check — make sure it is the right report, and that the names match your products.'
+             : (badFig.length || negNames.length) && !noLine.length
+              ? 'Nothing filled. Bar Cop found these products in the file, but no row carried a sold figure it could use.'
+             : noLine.length || badFig.length || negNames.length
               ? 'Nothing filled.'
-              : 'No products matched. Add the products to the check first, and make sure the names match.')
+              : 'Nothing filled. Add the products you are checking first, then drop the report.')
           + tail + '</div>';
     }
   },
