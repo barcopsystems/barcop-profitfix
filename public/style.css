@@ -937,19 +937,25 @@ body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
   cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;
   transition:background 0.12s;
 }
-.rail-item:hover{background:var(--hover);}
-.rail-item.active{background:var(--nav-act);}
+/* ⛔ THE SAME TWO TOKENS THE SIDEBAR ROWS ALREADY USE, not a second pair. The first version reached
+   for --hover and --nav-act, which are not what `.app.proto .nav-item` uses, so the rail's states
+   did not match the menu standing right beside it. --c3 hover / --c4 active, app-wide. */
+.rail-item:hover{background:var(--c3);}
+.rail-item.active{background:var(--c4);}
 .rail-label{
   font-size:13.5px;font-weight:600;color:var(--t2);
   overflow:hidden;white-space:nowrap;transition:color 0.12s;
 }
 .rail-item:hover .rail-label{color:var(--w);}
 .rail-item.active .rail-label{color:var(--w);}
-/* Which MENU is showing, which is not the same fact as which PAGE you are on. Both can be true at
-   once and on different rows: open Labor's menu from an Inventory page and Inventory stays active
-   while Labor reads open. */
-.rail-item.rail-open{background:var(--hover);}
-.rail-item.rail-open .rail-label{color:var(--w);}
+/* Which MENU is showing is not the same fact as which PAGE you are on, and both can be true on
+   DIFFERENT rows at once: open Labor's menu from an Inventory page and Inventory stays active
+   while Labor reads open.
+   ⛔ BUT IT GETS NO BACKGROUND FILL. The first version painted it --hover, so a row that was merely
+   showing its menu looked exactly like a mouse-over that had got stuck. Kyle's words, and he was
+   right. Gold is what this app already uses for "this is the current one" and it cannot be read as
+   a hover state. */
+.rail-item.rail-open .rail-label{color:var(--gold);}
 
 /* ── THE SECTION MENU OVERLAY ─────────────────────────────────────────────────────────────────
    Sits immediately beside the rail and floats OVER the page rather than pushing it, so the layout
@@ -961,12 +967,19 @@ body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
 :root{ --rail-menu-w: 190px; }
 #rail-menu-backdrop{display:none;}
 #rail-menu{display:none;}
+/* ⛔ THE BACKDROP COVERS THE CONTENT ONLY — never the rail, never the top bar. The first version
+   used `inset:0` at a z-index above the rail, which DIMMED THE RAIL ITSELF and made it read as a
+   different, washed-out colour. It is also the more honest shape: the dimmed region is exactly the
+   region that is inert, so "click the screen to close" points at what it dims. */
 body.chrome-on.rail-menu-on #rail-menu-backdrop{
-  display:block;position:fixed;inset:0;z-index:118;background:rgba(0,0,0,0.35);
+  display:block;position:fixed;z-index:113;background:rgba(0,0,0,0.35);
+  top:var(--navh);left:calc(var(--rail-w) + var(--rail-menu-w));right:0;bottom:0;
 }
 body.chrome-on #rail-menu{
-  position:fixed;top:var(--navh);left:var(--rail-w);bottom:0;width:var(--rail-menu-w);z-index:119;
-  background:#070E15;border-right:1px solid var(--b-edge);
+  position:fixed;top:var(--navh);left:var(--rail-w);bottom:0;width:var(--rail-menu-w);z-index:114;
+  /* ⛔ var(--bg), never a hex. --bg IS #070E15, which is the colour Kyle asked for, so hardcoding
+     it was a second spelling of a token that already existed ([[color-system-locked]]). */
+  background:var(--bg);border-right:1px solid var(--b-edge);
   overflow-y:auto;overflow-x:hidden;
   transform:translateX(-100%);opacity:0;pointer-events:none;
   transition:transform 0.16s ease,opacity 0.16s ease;
@@ -974,10 +987,11 @@ body.chrome-on #rail-menu{
 }
 body.chrome-on.rail-menu-on #rail-menu{transform:translateX(0);opacity:1;pointer-events:auto;}
 body.demo.chrome-on #rail-menu{bottom:40px;}
-/* The overlay hosts the section's OWN sidebar markup, so it inherits every .nav-* rule already
-   written for a sidebar. These two only re-point what was scoped to the shells. */
-#rail-menu .sidebar-nav{padding:14px 0;}
-#rail-menu .nav-item{padding:7px 18px;}
+/* The wrapper carries `.app.proto` so the section's own sidebar rules all apply (see index.html).
+   These three undo ONLY the shell LAYOUT that class also brings — the grid, its areas and its
+   overflow — and touch nothing about how the nav itself looks. */
+#rail-menu .rail-menu-scope{display:block;grid-template-columns:none;grid-template-areas:none;overflow:visible;height:auto;}
+#rail-menu .rail-menu-scope .sidebar-nav{height:auto;}
 
 /* ⛔ AND BOTH SHELLS GIVE UP THEIR PERMANENT SIDEBAR COLUMN, which is where the 100px of content
    width actually comes from. The module grid drops to one column and both asides are hidden.

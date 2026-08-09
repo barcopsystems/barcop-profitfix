@@ -2480,6 +2480,23 @@ const App = {
        HEADER that expands a group in place, and closing the menu on those would shut it every time
        the operator opened a drop-down to look inside. */
     const host = document.getElementById('rail-menu');
+    /* ⛔⛔ CAPTURE PHASE, AND THAT IS THE WHOLE FIX FOR "none of the links work".
+       `_renderNav` wires each row to a bare `App.navigate(screen)`, which renders into
+       `#content-area` — inside `#app`, which is HIDDEN whenever the operator is on the Hub or in a
+       different section. Browsing Inventory's menu from the Hub and pressing Order Sheet therefore
+       painted the page into a hidden shell and looked like a dead link.
+       `jumpToSection` has always known this (`showApp(key)` THEN `navigate(screen)`); the overlay
+       is the first thing that could navigate ACROSS sections without going through it. Capture runs
+       before the row's own listener, so the shell is up by the time navigate() fires. */
+    if (host) host.addEventListener('click', (e) => {
+      const item = e.target.closest && e.target.closest('.nav-item');
+      if (!item) return;
+      const sec = App._railOpen;
+      if (sec && item.dataset.screen && App._SECTION_DASH[sec]) {
+        const appEl = document.getElementById('app');
+        if (!appEl || appEl.classList.contains('hidden') || App._activeModule !== sec) App.showApp(sec);
+      }
+    }, true);
     if (host) host.addEventListener('click', (e) => {
       const item = e.target.closest && e.target.closest('.nav-item');
       if (!item) return;

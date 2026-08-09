@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/bar-graph-icon.png?v=1"/>
 <link rel="apple-touch-icon" href="assets/bar-graph-icon.png?v=1"/>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=286"/>
+<link rel="stylesheet" href="style.css?v=287"/>
 <style>
 @media print {
   /* Flip the dark theme to a light, readable theme for print.
@@ -186,7 +186,16 @@
      without something dimmed, nothing tells the operator the page behind is inert. -->
 <div id="rail-menu-backdrop"></div>
 <div id="rail-menu">
-  <nav class="sidebar-nav" id="rail-menu-nav"></nav>
+  <!-- ⛔⛔ THE .app.proto WRAPPER IS LOAD-BEARING, DO NOT REMOVE IT. Every sidebar style in this
+       app is scoped `.app.proto ...` or `:is(.app.proto, .hub-app) ...` — 83 rules covering the
+       label case and size, the row padding, the hover and active fills, the mobile-style accordion,
+       AND the rule that hides the retired section switcher. A body-level overlay sits inside
+       neither shell, so it got NONE of them: the menu rendered in tiny uppercase with the dead
+       switcher back on top of it. Carrying the class is what makes the overlay identical to the
+       sidebar it replaced, by construction rather than by re-deriving 83 rules by hand. -->
+  <div class="app proto rail-menu-scope">
+    <nav class="sidebar-nav" id="rail-menu-nav"></nav>
+  </div>
 </div>
 
 <!-- APP -->
@@ -506,6 +515,6 @@
      sweep goes red instead. -->
 <script src="https://js.stripe.com/v3/"></script>
 <script src="db.js?v=162"></script>
-<script src="app.js?v=825"></script>
+<script src="app.js?v=826"></script>
 </body>
 </html>
