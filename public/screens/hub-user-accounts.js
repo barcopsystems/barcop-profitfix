@@ -387,8 +387,19 @@ S.HubUserAccounts = {
     const sub = App.subscription || { status: 'inactive', plan: null };
     const isOwner = !!(window.DB && DB.isOwner && DB.isOwner());
     if (sub.status === 'active') {
+      /* ⛔⛔ THE RENEWS / CANCELS LINE MOVED HERE WHEN THE SETTINGS LANDING WAS RETIRED (2026-08-08),
+         and it had to: that page was the ONLY place an operator was told their subscription ends.
+         Deleting it would have left a cancelling customer reading "Active" with nothing to say the
+         plan stops on the 13th — and the version before it said "Renews", which is the false
+         statement `verify-cancel-at-period-end` exists to prevent ([[output-honesty]]).
+         Same wording, same date format, on the page that is actually about the account. */
+      const endTxt = sub.period_end
+        ? new Date(sub.period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
       el.innerHTML = '<div style="font-size:12px;color:var(--t2);line-height:1.7;">Bar Cop · '
-        + 'Status: <span style="color:var(--green);font-weight:700;">Active</span></div>'
+        + 'Status: <span style="color:var(--green);font-weight:700;">Active</span>'
+        + (endTxt ? ' · ' + (sub.cancel_at_period_end ? 'Cancels ' : 'Renews ') + esc(endTxt) : '')
+        + '</div>'
         + (isOwner
             ? '<div style="margin-top:10px;"><button class="btn btn-ghost" id="ua-billing-portal">Manage Billing</button></div>'
             : '<div style="margin-top:10px;font-size:12px;color:var(--t3);">Only the account owner can manage billing.</div>')
