@@ -511,7 +511,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 
 /* Menu Planning — the per-item briefing tiles. */
 .mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;align-items:stretch;}
-.mp-tile{background:#08131A;border:1px solid var(--b-edge);border-radius:var(--r2);padding:16px 18px 18px;display:flex;flex-direction:column;overflow:hidden;}
+.mp-tile{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r2);padding:16px 18px 18px;display:flex;flex-direction:column;overflow:hidden;}
 .mp-name{font-weight:700;color:var(--t1);font-size:14px;}
 .mp-stats{display:flex;flex-wrap:wrap;gap:14px 18px;margin:11px 0 12px;padding-bottom:12px;border-bottom:1px solid var(--row-div);}
 .mp-stat{display:flex;flex-direction:column;gap:3px;}
@@ -846,9 +846,9 @@ select.ua-team-role-sel,select.ua-perm-level{appearance:none;-webkit-appearance:
 .tbl.csvm-preview thead th,
 .tbl.csvm-preview tbody td,
 .page .tbl.csvm-preview thead th,
-.page .tbl.csvm-preview tbody td{background:#070E15;}
+.page .tbl.csvm-preview tbody td{background:var(--bg);}
 .tbl.csvm-preview tbody tr:hover td,
-.page .tbl.csvm-preview tbody tr:hover td{background:#070E15;}
+.page .tbl.csvm-preview tbody tr:hover td{background:var(--bg);}
 @media (max-width:768px){
   .page{padding:16px 14px 72px;}
   .page-head{flex-direction:column;gap:14px;}
