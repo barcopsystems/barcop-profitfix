@@ -2486,7 +2486,11 @@ const App = {
        ten `_railHasMenu` already answers for. The Hub, Week in Review and Workflow have no menu and
        no parent, so they stand alone rather than being given a section they do not belong to. */
     const sec = (!force && this._railHasMenu(this._railCtx)) ? this._railLabelOf(this._railCtx) : null;
-    el.innerHTML = (sec ? '<span class="tn-sec">' + esc(sec) + '</span><span class="tn-sep"></span>' : '')
+    /* ⛔ `tn-title-sec`, NOT `tn-sec`. That name belonged to row 2's clickable section pills, whose
+       CSS outlived the markup — so the prefix picked up their padding, hover fill and pointer
+       cursor and read as a link that went nowhere. The pill rules are deleted now; the distinct
+       name is belt and braces. */
+    el.innerHTML = (sec ? '<span class="tn-title-sec">' + esc(sec) + '</span><span class="tn-sep"></span>' : '')
       + '<span class="tn-pg">' + esc(page) + '</span>';
   },
 

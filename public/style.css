@@ -1179,23 +1179,30 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    is controlled (18px, not the full row) and no markup carries a purely decorative node. */
 .tn-page #tn-help::before{
   content:'';position:absolute;left:-8px;top:50%;transform:translateY(-50%);
-  width:1px;height:18px;background:var(--b-edge);
+  width:1px;height:18px;background:var(--b1);   /* same token as .tn-sep, or the two bar dividers drift */
 }
 /* #tn-global is empty since the rail took the global links; keep the node, drop its 16px gap. */
 .tn-global{display:none;}
 /* 14px, down from 15. The title carries a section prefix now, so it is a longer string in the same
    space, and the smaller size is what keeps it from crowding the bar. */
 .tn-title{
-  font-size:14px;font-weight:700;color:var(--w);margin:0;
+  font-size:14px;font-weight:700;color:var(--t1);margin:0;
   display:flex;align-items:center;gap:12px;min-width:0;
   white-space:nowrap;overflow:hidden;
 }
 /* The section reads as the parent, so it sits back; the page itself is the subject and stays white.
    Kyle's shape: Inventory | Order Sheet | (i) — and the second divider is the one already sitting
    before the help button, so the two are the same 18px mark. */
-.tn-sec{color:var(--t2);font-weight:600;flex-shrink:0;}
-.tn-sep{width:1px;height:18px;background:var(--b-edge);flex-shrink:0;}
-.tn-pg{overflow:hidden;text-overflow:ellipsis;}
+/* Static text, not a control: no cursor, no hover, no padding. The section is context, the page is
+   the subject, and neither one is a link. */
+.tn-title-sec{color:var(--t2);font-weight:600;flex-shrink:0;}
+/* ⛔ --b1, not --b-edge. --b-edge is #14222A, a CARD border read against a card fill; on the top
+   bar's darker --bg it was effectively invisible. --b1 is rgba(255,255,255,0.15), the app's token
+   for a line that is meant to be SEEN. Both dividers in the bar use it so they cannot drift apart. */
+.tn-sep{width:1px;height:18px;background:var(--b1);flex-shrink:0;}
+/* Not pure white. Against the grey section prefix, --w read as a jump rather than a hierarchy;
+   --t1 is the app's own "primary text" and still clearly the brighter of the two. */
+.tn-pg{color:var(--t1);overflow:hidden;text-overflow:ellipsis;}
 .tn-global{display:flex;align-items:center;gap:2px;height:100%;min-width:0;overflow:hidden;}
 .tn-glink{display:flex;align-items:center;height:100%;padding:0 13px;font-size:13.5px;font-weight:600;color:var(--t3);cursor:pointer;white-space:nowrap;transition:color .12s;}
 .tn-glink:hover,.tn-glink.active{color:var(--w);}
@@ -1209,10 +1216,17 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .tn-row2{display:flex;align-items:center;gap:8px;height:66px;padding:0 16px;background:var(--surface);border-top:1px solid var(--b-edge);border-bottom:1px solid var(--b-edge);}
 .tn-collapse{width:33px;height:33px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--b-edge);border-radius:var(--r2);color:var(--t3);cursor:pointer;flex-shrink:0;transition:background .12s,color .12s;}
 .tn-collapse:hover{background:var(--c3);color:var(--t1);}
+/* ⛔⛔ THE `.tn-sec` PILL RULES ARE GONE, AND THEY ARE WHAT KYLE SAW. They styled row 2's clickable
+   section pills — `padding:0 13px`, `cursor:pointer`, a `--c3` hover fill — and row 2 was deleted
+   in stage 1, so they had ZERO renderers. Then I named the title's section prefix `.tn-sec` too and
+   it inherited all of it: a hover box, 13px of padding pushing it off its divider, and a pointer
+   cursor on text that goes nowhere. Three symptoms, one collision.
+   ⭐ THE LESSON IS THE DEAD CODE, NOT THE NAME. A retired rule that nobody deletes is a landmine
+   for the next person who picks the obvious class name — and "obvious" is exactly what they will
+   pick. The prefix is `.tn-title-sec` now, and this is deleted rather than left lying there.
+   ⚠ `.tn-row2`, `.tn-row2-right`, `.tn-grp-label`, `.tn-global` and `.tn-glink` are dead the same
+   way (0 JS references, measured). Flagged to Kyle rather than swept up here. */
 .tn-sections{display:flex;align-items:center;gap:2px;height:100%;min-width:0;overflow:hidden;}
-.tn-sec{display:flex;align-items:center;height:38px;padding:0 13px;border-radius:var(--r2);font-size:14px;font-weight:700;letter-spacing:0.2px;color:var(--t2);background:transparent;cursor:pointer;white-space:nowrap;transition:background .12s,color .12s;}
-.tn-sec:hover{background:var(--c3);color:var(--t1);}
-.tn-sec.active{background:var(--c4);color:var(--w);}
 .tn-grp-label{font-size:14px;font-weight:700;letter-spacing:0.2px;color:#485C6A;flex-shrink:0;margin:0 8px 0 4px;}
 .tn-row2-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0;}
 #tn-acct{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;}
