@@ -2221,10 +2221,20 @@ const App = {
       { h: 'Recurring Patterns', p: ['Problems that keep showing up over a rolling 90 days: the same cashier short again and again, voids stacking on one shift type, chronic shrinkage on one product, a vendor with repeated discrepancies, or labor blowing out on the same day of week. Each names the pattern and a screen to act on it.'] },
       { h: 'Landing and history', p: ['The landing holds the Generate button (run it whenever you want a fresh read; it scores your trailing 30 days), a live data badge showing what level the audit would come out at right now, the latest audit with its six section scores, and the Audit History list of past runs to reopen. Bar Cop keeps one audit a day so you can watch the trend. The sidebar links across to your Profit, Revenue, and Cash audits, which live with their Recovery Fix Systems.'] }
     ] },
-    'books-home': { title: 'How the Books Overview Works', sections: [
-      { h: 'What this page is', p: ['The Books overview: your back office at a glance. Books builds the files your accountant needs (Weekly P&L Brief, Month-End Books, Annual Review) and tracks your permits, licenses, and operating expenses. This page rolls it all up from what you have logged, so the numbers match the Month-End file.'] },
-      { h: 'What you see', p: ['The tiles up top show this month\'s net sales, prime cost, year-to-date revenue, and how many permit renewals are due. The Current Month card is a mini P&L for the month so far. Recent Months lists the last several months, and the side panel shows Coming Due when a renewal is near, or your Year-to-Date bottom line when nothing is due. Before you have logged anything, a Get Started strip points you at logging your first week, adding your fixed bills, and entering your permits.'] },
-      { h: 'How to use it', p: ['Use the Quick Actions to jump to Month-End Books, the Weekly P&L Brief, Annual Review, or Operating Expenses. Books for Accountant on the Current Month card opens the month-end file. Everything here is read-only; the work happens on the pages it links to.'] }
+    /* ⛔⛔⛔ REWRITTEN 2026-08-08 FROM THE PAGE, NOT FROM THE PLAN (Kyle: *"the close the books and
+       the money out page i help text is both wrong"*). Every one of the three sections below
+       described a page that no longer exists: tiles up top, a Current Month card, Recent Months, a
+       Coming Due side panel, Quick Actions, and "everything here is read-only". Measured on the
+       shipped build: this page is Where You Stand, a progress banner, FOUR STEPS and an As Needed
+       row, and the first step renders the money out form and its importer in place. "Read-only" was
+       the exact opposite of true for the one step an operator does the most work in.
+       ⛔ AND THE FORM AND IMPORTER SECTIONS BELONG HERE, not on Money Out. The one-ledger rebuild
+       moved the add card onto this page and left the help behind on the ledger it came from. */
+    'books-home': { title: 'How Close The Books Works', sections: [
+      { h: 'What this page is', p: ['Your month-end close, worked top to bottom. You land on where you stand, see how far along you are, and take the four steps in order. This is the page that turns a month of logged data into the file your accountant works from.'] },
+      { h: 'The four steps', p: ['1. Log this month\'s money out: every bill and every cash outflow, typed in or dropped from a bank or card statement. 2. Make sure the weeks are all in, because revenue on the income statement is your confirmed weeks. 3. Review your income statement for the month. 4. Generate Month-End Books, which builds the workbook. Mark a step done and the bar advances; mark it not done to reopen it. The As Needed row underneath is the off-cycle jobs, not part of the close.'] },
+      { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing runs from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
+      { h: 'Dropping a statement', p: ['On the money out step, switch the Add form to Import File and drop a CSV or Excel export from your bank or card. Map the columns once (date and amount are required) and Bar Cop remembers it. The file then stops on a check screen that takes the page: every row is listed with where it is going, grouped by category, with anything already logged held back and anything that is not an operating expense held back in its own card so it cannot be double counted. Nothing is saved until you press Add on that screen.'] }
     ] },
     'settings-home': { title: 'How the Settings Overview Works', sections: [
       { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details and service periods. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
@@ -2261,8 +2271,16 @@ const App = {
       { h: 'Marking one renewed', p: ['When you renew a permit, click Mark Renewed and set the next renewal date (Bar Cop suggests it from the recurrence). That is all this page does. What the renewal cost is a bill like any other: it comes in with your statement on Close The Books, or you type it there once, and it lands on the Licenses and Permits line of your P&L.'] },
       { h: 'Good to know', p: ['Bar Cop tracks the dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements and deadlines with your issuing agency.'] }
     ] },
-    'operating-expenses': { title: 'How Operating Expenses Work', sections: [
-      { h: 'What this page is', p: ['Where you log the bills that are not COGS or labor (wages and salaries both live in Labor Control, not here): rent, utilities, insurance, marketing, professional fees, software, and the rest. These roll into the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
+    /* ⛔⛔ RENAMED AND NARROWED 2026-08-08. The sidebar has said Money Out since the one-ledger
+       rebuild and this still said Operating Expenses, which is the OLD name for half of what the
+       page holds — cash outflows are the other half and are not operating expenses at all.
+       ⛔ AND IT DESCRIBED CONTROLS THAT ARE NOT ON THIS PAGE. The rebuild moved the add form and the
+       importer onto Close The Books (`hub-books-home` mounts `renderMoneyOut`), so "Two dates on the
+       form" and "Importing" were instructions for a screen the reader was not on. Both moved to
+       `books-home`, where the controls actually are. What is left is the LEDGER, which is what this
+       page now is: three tabs, the stat strip, By Category and the log. */
+    'operating-expenses': { title: 'How Money Out Works', sections: [
+      { h: 'What this page is', p: ['The record of everything that left the bank: the bills that are not COGS or labor (wages and salaries both live in Labor Control, not here) plus the cash outflows that are not a cost of running the bar. You log it on Close The Books; this page is where it all lives afterwards, and it is what feeds the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
       /* ⚠ THIS SECTION DESCRIBED A PAGE THAT NO LONGER EXISTS, in four separate claims. It promised
          month cards for "this month and next", a Recurring/Variable split inside each, next month's
          recurring bills listed as Expected before they post, and Expense History as its own sidebar
@@ -2281,15 +2299,17 @@ const App = {
         'Money Out opens on Bills: the money that comes in on a statement or an invoice, which is what rolls into your income statement. Cash Outflows is money that genuinely left the bank but is not a cost of running the bar, so Books keeps it off that statement: owner draws, loan payments, capital and equipment, tax remittances. All Money Out is the two added together. Everything follows the tab you are on, so the numbers up top, the By Category table and the log all describe that one kind of money.',
         'Up top you get this month, last month, year to date, and what it comes to as a share of revenue. By Category breaks those same periods out line by line so you can see which one moved. The log underneath is the whole back-record, newest first, with Edit and Delete on every row, so there is no separate history page to go to. The range chips sit above the log and filter the log only: the figures higher up keep their own periods whatever chip you pick.'
       ] },
-      { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing runs from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
       /* ⚠ THIS SECTION USED TO DESCRIBE A CHECKBOX, a How Often picker, an "Ends after" field and a
          Stop button. Build order C removed every one of them from the bill form — a bill recurs
          because it keeps happening, derived off the ledger — so the whole paragraph was instructions
          for controls that are not on the screen. Rewritten to what the app does, in the same words
          `hub-help.js` already uses ([[the-loop]] #61: retiring a feature is three greps, and the
-         help text is the one nobody does). */
-      { h: 'Recurring bills', p: ['Nothing to tick and no schedule to fill in. Bar Cop works out which bills recur by watching what you actually log: drop two months of statements and it picks up rent, insurance and your subscriptions on its own, and projects them onto your Cash Forecast. A bill that stops showing up stops being projected, so cancelling a service needs no extra step. For a bill that moves around each month, like a utility, use Repeat to copy last month forward and set the new amount.'] },
-      { h: 'Importing', p: ['Switch the Add form to Import File and drop a CSV or Excel export. Map the columns once (date and amount are required), and the rows import; anything already logged is skipped.'] },
+         help text is the one nobody does).
+         ⚠⚠ AND IT HAPPENED AGAIN IN THE SAME PARAGRAPH: it ended by telling the operator to "use
+         Repeat to copy last month forward". `Repeat` was one of the three row actions deleted on
+         2026-08-06 — measured, the word does not appear in this screen's live code at all, only in
+         the comment recording its removal. The help outlived the control by two days. */
+      { h: 'Recurring bills', p: ['Nothing to tick and no schedule to fill in. Bar Cop works out which bills recur by watching what you actually log: drop two months of statements on Close The Books and it picks up rent, insurance and your subscriptions on its own, and projects them onto your Cash Forecast. A bill that stops showing up stops being projected, so cancelling a service needs no extra step.'] },
       /* ⚠ AND THIS ONE WAS FALSE ON BOTH HALVES. Repairs stopped living in Shift Control at Phase 2
          item 12 and platform fees stopped living in the weekly numbers at build piece 2. It told the
          operator to keep two real deductions OFF the log that Books reads. */
