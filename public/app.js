@@ -2542,13 +2542,28 @@ const App = {
     this._markRailOpen();
   },
 
-  /* Two different states, two different marks, and conflating them is a lie either way:
-     `.active` is THE PAGE YOU ARE ON and never moves when you browse; `.rail-open` is WHICH MENU
-     IS SHOWING. Open Labor's menu from an Inventory page and Inventory stays active while Labor
-     reads open, which is the truth. */
+  /* ⛔⛔ ONE ROW IS MARKED AT A TIME, AND WHILE A MENU IS OPEN IT IS THE OPEN ONE.
+     Kyle, walking it: *"it just is a little confusing visually to have the active section and the
+     open menu section both colored at the same time."* He is right, and the reason is that the two
+     marks were competing for the same meaning — the eye reads "highlighted" as "where I am", so two
+     highlights ask the operator to hold two answers to one question.
+     So the mark FOLLOWS THE MENU: open Shift from an Inventory page and Shift wears it while
+     Inventory stands down. Close without navigating and Inventory takes it straight back. Navigate
+     into Shift and it simply keeps it, because by then it really is the active section.
+     ⭐ DONE BY MOVING THE `active` CLASS, not by a second set of colours. A CSS "stand down" rule
+     needs `:not(.rail-open)` plus a matching hover override to out-specify itself, which is three
+     rules that can disagree; moving one class means the DOM says exactly what the screen shows and
+     there is only ever one styled state to maintain.
+     `_railCtx` is the context the rail was last rendered with, which is what the mark reverts TO. */
   _markRailOpen() {
-    document.querySelectorAll('#rail-nav .rail-item').forEach(el =>
-      el.classList.toggle('rail-open', !!this._railOpen && el.dataset.railSec === this._railOpen));
+    const open = this._railOpen;
+    const ctx = this._railCtx;
+    document.querySelectorAll('#rail-nav .rail-item').forEach(el => {
+      const isOpen = !!open && el.dataset.railSec === open;
+      el.classList.toggle('rail-open', isOpen);
+      const key = el.dataset.railSec || el.dataset.railGo;
+      el.classList.toggle('active', open ? isOpen : key === ctx);
+    });
   },
 
   _wireRailMenu() {
@@ -2653,6 +2668,9 @@ const App = {
   },
 
   _renderProtoTopnav(context) {
+    /* Remembered because `_markRailOpen` has to know what the mark reverts TO when a menu closes
+       without navigating. Every caller already passes the right value; this just keeps it. */
+    this._railCtx = context;
     const rail = document.getElementById('rail-nav');
     if (rail) {
       const r = ([k, l]) => this._railRow(k, l, context);

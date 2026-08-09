@@ -978,15 +978,11 @@ body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
 }
 .rail-item:hover .rail-label{color:var(--w);}
 .rail-item.active .rail-label{color:var(--w);}
-/* Which MENU is showing is not the same fact as which PAGE you are on, and both can be true on
-   DIFFERENT rows at once: open Labor's menu from an Inventory page and Inventory stays active
-   while Labor reads open.
-   ⛔ BUT IT GETS NO BACKGROUND FILL. The first version painted it --hover, so a row that was merely
-   showing its menu looked exactly like a mouse-over that had got stuck. Kyle's words, and he was
-   right. Gold is what this app already uses for "this is the current one" and it cannot be read as
-   a hover state. */
-.rail-item.rail-open .rail-label{color:var(--gold);}
-.rail-item.rail-open .rail-icon{color:var(--gold);}
+/* ⛔ `.rail-open` HAS NO LOOK OF ITS OWN, ON PURPOSE. It marks WHICH MENU IS SHOWING, and while a
+   menu is showing `_markRailOpen` moves the `active` class onto that same row — so the open row is
+   already wearing white text and a gold icon and a second treatment here would be the two competing
+   highlights Kyle asked to get rid of. The class stays because the state is real and the code and
+   the harness both read it; only the styling went. */
 
 /* ── THE SECTION MENU OVERLAY ─────────────────────────────────────────────────────────────────
    Sits immediately beside the rail and floats OVER the page rather than pushing it, so the layout
