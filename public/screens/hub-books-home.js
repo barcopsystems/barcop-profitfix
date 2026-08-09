@@ -368,7 +368,7 @@ S.HubBooksHome = {
       : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + dc + '</span> of ' + total
           + (this.atCurrentMonth() ? ' done this month' : ' done') + '</span>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
-      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      + '<div class="ck-head">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Books</div>'
       + '</div>'
       /* ⚠ THE SELECTOR IS THE FIRST THING IN THE BODY, UNDER THE HEADER — not above the card's own
