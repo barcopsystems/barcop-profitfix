@@ -342,7 +342,7 @@ S.InventoryDashboard = {
          through past weeks — so the phrase was wrong on every week but the current one (F2). */
       : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + doneCount + '</span> of ' + total + ' done</span>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
-      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      + '<div class="ck-head">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Close Out Your Week</div>'
       + '</div>'
       + '<div style="padding:18px 22px;">'
