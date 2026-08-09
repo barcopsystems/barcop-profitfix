@@ -59,7 +59,7 @@
 
   --sidebar-w:      220px;
   --sidebar-w-coll: 52px;
-  --navh:           118px;              /* shared top-nav height (row1 52 + row2 66); one row on mobile (set below) */
+  --navh:           52px;               /* shared top-bar height. ONE row since the 2026-08-08 rail redesign (was 118 = row1 52 + row2 66; row 2's section pills moved into the left rail). */
 }
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -900,6 +900,93 @@ body.chrome-on #proto-topnav{
 /* Offset both app layers below the fixed nav (mirrors the body.demo offsets). */
 body.chrome-on #app{margin-top:var(--navh);height:calc(100vh - var(--navh));}
 body.chrome-on #hub-wrapper{top:var(--navh) !important;}   /* beats the inline inset:0 */
+
+/* ── THE PERSISTENT LEFT RAIL (2026-08-08) ────────────────────────────────────────────────────
+   Fixed, body-level, below the top bar and above both shells. It is 120px, which is not a
+   shrunken 220: MEASURED against the real font, the widest rail label ("Workflow" 59px,
+   "Inventory" 58px at 13.5px Barlow semibold) needs 14 + 17 + 10 + 59 + 14 = 114px with its icon,
+   so 120 fits with 6px of slack. Narrower than that and the labels start truncating, which is the
+   one thing the rail exists to avoid.
+   ⭐ AND IT GIVES SCREEN BACK, IT DOES NOT TAKE IT. Every page carried a 220px section sidebar
+   before this. Rail 120 + the section menu as an overlay means content gains 100px across the app,
+   on top of the 66px of vertical that deleting row 2 returns. */
+:root{ --rail-w: 120px; }
+#proto-rail{display:none;}
+body.chrome-on #proto-rail{
+  display:block;overflow-y:auto;overflow-x:hidden;
+  position:fixed;top:var(--navh);left:0;bottom:0;width:var(--rail-w);z-index:115;
+  background:var(--bg);border-right:1px solid var(--b-edge);
+}
+body.demo.chrome-on #proto-rail{bottom:40px;}
+/* Both shells step aside for it. The rail is fixed, so this is the only thing holding content off
+   it — no page sets its own left offset, which is what keeps --rail-w the single source of the
+   number ([[the-loop]]: one fact, one place). */
+body.chrome-on #app{margin-left:var(--rail-w);}
+body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
+
+.rail-nav{padding:14px 0;}
+.rail-group{display:flex;flex-direction:column;}
+.rail-divider{height:0;border-top:1px solid var(--b-edge);margin:14px 14px;}
+.rail-grp-label{
+  font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--t4);padding:14px 14px 6px;
+}
+.rail-group:first-child .rail-grp-label{padding-top:0;}
+.rail-item{
+  display:flex;align-items:center;gap:10px;padding:7px 14px;
+  cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;
+  transition:background 0.12s;
+}
+.rail-item:hover{background:var(--hover);}
+.rail-item.active{background:var(--nav-act);}
+.rail-label{
+  font-size:13.5px;font-weight:600;color:var(--t2);
+  overflow:hidden;white-space:nowrap;transition:color 0.12s;
+}
+.rail-item:hover .rail-label{color:var(--w);}
+.rail-item.active .rail-label{color:var(--w);}
+/* Which MENU is showing, which is not the same fact as which PAGE you are on. Both can be true at
+   once and on different rows: open Labor's menu from an Inventory page and Inventory stays active
+   while Labor reads open. */
+.rail-item.rail-open{background:var(--hover);}
+.rail-item.rail-open .rail-label{color:var(--w);}
+
+/* ── THE SECTION MENU OVERLAY ─────────────────────────────────────────────────────────────────
+   Sits immediately beside the rail and floats OVER the page rather than pushing it, so the layout
+   underneath never reflows and the operator's place on the page is not lost.
+   190px is measured, not picked: all 82 nav labels in the app were checked and the widest real
+   link is "Revenue Playbook" at 107px, needing 18 + 17 + 10 + 107 + 18 = 170px with its icon.
+   ⚠ Do not reintroduce TEXT group headers here — "By Recovery System" is 119px and would need
+   182px. The flat desktop list renders groups as bare dividers, which is what keeps 190 safe. */
+:root{ --rail-menu-w: 190px; }
+#rail-menu-backdrop{display:none;}
+#rail-menu{display:none;}
+body.chrome-on.rail-menu-on #rail-menu-backdrop{
+  display:block;position:fixed;inset:0;z-index:118;background:rgba(0,0,0,0.35);
+}
+body.chrome-on #rail-menu{
+  position:fixed;top:var(--navh);left:var(--rail-w);bottom:0;width:var(--rail-menu-w);z-index:119;
+  background:#070E15;border-right:1px solid var(--b-edge);
+  overflow-y:auto;overflow-x:hidden;
+  transform:translateX(-100%);opacity:0;pointer-events:none;
+  transition:transform 0.16s ease,opacity 0.16s ease;
+  display:block;
+}
+body.chrome-on.rail-menu-on #rail-menu{transform:translateX(0);opacity:1;pointer-events:auto;}
+body.demo.chrome-on #rail-menu{bottom:40px;}
+/* The overlay hosts the section's OWN sidebar markup, so it inherits every .nav-* rule already
+   written for a sidebar. These two only re-point what was scoped to the shells. */
+#rail-menu .sidebar-nav{padding:14px 0;}
+#rail-menu .nav-item{padding:7px 18px;}
+
+/* ⛔ AND BOTH SHELLS GIVE UP THEIR PERMANENT SIDEBAR COLUMN, which is where the 100px of content
+   width actually comes from. The module grid drops to one column and both asides are hidden.
+   The markup stays exactly where it is, deliberately: #sidebar-nav and .hub-app .sidebar-nav are
+   still what _renderNav and S.Hub.renderSidebar write to when no target is passed, and the MOBILE
+   drawer parses those same sources. Deleting the nodes would take the mobile menu with them. */
+body.chrome-on .app.proto{grid-template-columns:1fr;}
+body.chrome-on .app.proto > .sidebar{display:none;}
+body.chrome-on .hub-app > .sidebar{display:none;}
 /* Demo banner is pinned to the BOTTOM now, so the nav stays at the very top (top:0)
    like normal and the app layers just reserve 40px at the bottom for it. */
 body.demo.chrome-on #app{height:calc(100vh - var(--navh) - 40px);}
@@ -1078,10 +1165,17 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 :is(.app.proto, .hub-app):not(.sidebar-collapsed) .nav-flat .nav-divider{height:0;border-top:1px solid var(--b-edge);margin:13px 18px;}
 
 @media (max-width:768px){
-  :root{--navh:52px;}                 /* one row (row 2 hidden) on mobile */
   .app.proto{display:flex;}
-  .tn-row2{display:none;}
   .tn-global{display:none;}
+  /* ⛔⛔ MOBILE DOES NOT GET THE RAIL, AND NOTHING ABOUT MOBILE CHANGED IN THE REDESIGN.
+     The burger opens App.openMobileNav (the bottom sheet), which already carries every rail
+     destination in a two-level drill and already closes before it navigates. Two menus offering
+     the same thing on a 375px screen is the "one fact in two places" problem in its most expensive
+     form. So the rail is hidden and BOTH shell offsets are undone — a margin-left of 120 with no
+     rail behind it would push every page off the screen edge. */
+  #proto-rail{display:none !important;}
+  body.chrome-on #app{margin-left:0;}
+  body.chrome-on #hub-wrapper{left:0 !important;}
   .tn-mobile-burger{display:flex;}
   #tn-settings{display:none;}   /* App Settings lives in the burger menu on mobile */
   .app.proto .sec-switch{display:block;}

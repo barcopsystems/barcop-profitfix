@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/bar-graph-icon.png?v=1"/>
 <link rel="apple-touch-icon" href="assets/bar-graph-icon.png?v=1"/>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=283"/>
+<link rel="stylesheet" href="style.css?v=286"/>
 <style>
 @media print {
   /* Flip the dark theme to a light, readable theme for print.
@@ -139,13 +139,19 @@
   </div>
 </div>
 
-<!-- PROTO: shared two-row top nav (body-level, above #app and #hub-wrapper).
-     Static children so the relocated account-switcher nodes survive re-renders. -->
+<!-- PROTO: the shared top bar (body-level, above #app and #hub-wrapper).
+     Static children so the relocated account-switcher nodes survive re-renders.
+     ⛔ ONE ROW as of the 2026-08-08 rail redesign. Row 2 (the Control/Recovery
+     section pills + the account switcher) is GONE: the pills moved into the
+     persistent left rail below, and #tn-acct moved up into .tn-right so the bar
+     name still has a home. --navh drops 118 -> 52, which hands 66px of vertical
+     back to every page in the app. -->
 <div id="proto-topnav">
     <div class="tn-row1">
       <img src="assets/logo.png" alt="Bar Cop" class="tn-logo"/>
       <div class="tn-global" id="tn-global"></div>
       <div class="tn-right">
+        <div id="tn-acct"></div>
         <span class="tn-date" id="tn-date"></span>
         <button class="tn-iconbtn" id="tn-help" type="button" title="Directions for this page">
           <svg viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="5.7" r="0.75" fill="currentColor"/><path d="M8.5 7.9v3.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
@@ -158,10 +164,29 @@
         </button>
       </div>
     </div>
-    <div class="tn-row2">
-      <div class="tn-sections" id="tn-sections"></div>
-      <div class="tn-row2-right"><div id="tn-acct"></div></div>
-    </div>
+</div>
+
+<!-- PROTO: the persistent left rail (body-level, so it survives the shell swap).
+     ⭐ THE POINT OF PUTTING IT HERE: the app has TWO shells, #app for module pages
+     and .hub-app for Hub/Review/Audits/Books/Settings, and it HIDES one to show the
+     other. A rail inside either one would vanish every time the operator crossed
+     between them. Body level is the only place it can be permanent.
+     Filled by App._renderProtoTopnav(context) — the same one function, with the
+     same context argument, that used to fill the two top-nav rows. -->
+<div id="proto-rail">
+  <nav class="rail-nav" id="rail-nav"></nav>
+</div>
+
+<!-- PROTO: the section menu, as an OVERLAY beside the rail (App.openRailMenu).
+     Body-level for the same reason the rail is: it has to outlive the shell swap.
+     ⛔ IT IS NOT A SECOND MENU. App._renderNav(module, target) renders the exact
+     sidebar the section already builds straight into #rail-menu-nav, so a page
+     cannot be listed in one and missing from the other.
+     The backdrop is what makes "click the screen to close" discoverable at all —
+     without something dimmed, nothing tells the operator the page behind is inert. -->
+<div id="rail-menu-backdrop"></div>
+<div id="rail-menu">
+  <nav class="sidebar-nav" id="rail-menu-nav"></nav>
 </div>
 
 <!-- APP -->
@@ -335,7 +360,7 @@
 <script>var S = {};</script>
 <script src="sample-profile.js?v=3"></script>
 <script src="nav.js?v=121"></script>
-<script src="screens/hub.js?v=256"></script>
+<script src="screens/hub.js?v=257"></script>
 <script src="screens/hub-bar-cop-audit.js?v=72"></script>
 <script src="screens/hub-audit-help.js?v=7"></script>
 <script src="screens/hub-books-help.js?v=10"></script>
@@ -481,6 +506,6 @@
      sweep goes red instead. -->
 <script src="https://js.stripe.com/v3/"></script>
 <script src="db.js?v=162"></script>
-<script src="app.js?v=822"></script>
+<script src="app.js?v=825"></script>
 </body>
 </html>

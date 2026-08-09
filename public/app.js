@@ -737,15 +737,11 @@ const App = {
     };
     const tnBurger = document.getElementById('tn-mobile-burger');
     if (tnBurger) tnBurger.onclick = () => App.openMobileNav();
+    // Settings is management-only, but a Staff member still needs to reach Your Account to change
+    // their password, so they land there instead (that page renders password-only for Staff). The
+    // rule lives in _openSettingsForRole because the rail's Settings row needs the identical one.
     const tnSettings = document.getElementById('tn-settings');
-    if (tnSettings) tnSettings.onclick = () => {
-      // Settings is management-only, but a Staff member still needs to reach Your
-      // Account to change their password — send them straight there (the page
-      // renders password-only for Staff).
-      const role = (window.DB && DB.role && DB.role()) || null;
-      if (role === 'staff') { if (window.S && S.HubUserAccounts) S.HubUserAccounts.open('account'); return; }
-      if (window.S && S.HubSettingsHome) S.HubSettingsHome.open();
-    };
+    if (tnSettings) tnSettings.onclick = () => this._openSettingsForRole();
     const tnHelp = document.getElementById('tn-help');
     if (tnHelp) tnHelp.onclick = () => this.openPageHelp();
     const tnDate = document.getElementById('tn-date');
@@ -1922,6 +1918,9 @@ const App = {
   // Jump to a section's dashboard (or the Hub) from the switcher. showApp hides
   // the Hub wrapper and shows the module shell, so this works from anywhere.
   jumpToSection(key) {
+    // Any real navigation closes the overlay behind it — including the mobile drawer's own calls,
+    // which is harmless there because the overlay is never open on mobile.
+    this.closeRailMenu();
     if (key === 'hub') { this.showHub(); return; }
     const screen = this._SECTION_DASH[key];
     if (!screen) return;
@@ -1932,8 +1931,16 @@ const App = {
     this.navigate(screen);
   },
 
-  _renderNav(module) {
-    const nav = document.getElementById('sidebar-nav');
+  /* `target` is optional and defaults to the shell's own sidebar, which is every caller that
+     existed before 2026-08-08. The rail's overlay passes its own container so a section's menu can
+     be rendered WITHOUT navigating to it — clicking Labor while reading Inventory has to show
+     Labor's pages and leave the operator where they are.
+     ⭐ ONE RENDERER, TWO CONTAINERS, which is the same shape as `_planMenuImport(rows, target)` on
+     the menu door: the screen and the write point the identical walk at different targets so they
+     cannot describe different outcomes. A second menu builder for the overlay is exactly how the
+     overlay ends up offering a page the sidebar dropped. */
+  _renderNav(module, target) {
+    const nav = target || document.getElementById('sidebar-nav');
     if (!nav) return;
     if (module === 'revenue') {
       nav.innerHTML = Revenue.navHTML();
@@ -2167,9 +2174,17 @@ const App = {
   // shell DOM is static in index.html so the relocated account-switcher nodes
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
-  _PROTO_GLOBAL:   [['hub','Hub'],['flowmap','Map'],['week-review','Review'],['audit','Audits'],['events','Events'],['books','Books']],
-  _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
+  /* ⛔ THESE FOUR TABLES ARE THE RAIL, IN RENDER ORDER, and the grouping is the design.
+     `_PROTO_GLOBAL` lost `flowmap` to `_PROTO_BOTTOM` in the 2026-08-08 rail redesign: Kyle's call
+     that the Map sits with Settings and Sign Out under the divider, not with the places you work.
+     Every key here MUST be answered by `_protoGlobalClick` or by `_SECTION_DASH`, and
+     `verify-nav-rail-reachability` asserts exactly that against the tables rather than trusting
+     that the two lists were kept in step (integrity #11: a control wired under one spelling and
+     rendered under another is a dead row that looks alive). */
+  _PROTO_GLOBAL:   [['hub','Hub'],['week-review','Review'],['audit','Audits'],['events','Events'],['books','Books']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
+  _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
+  _PROTO_BOTTOM:   [['flowmap','Map'],['settings','Settings'],['signout','Sign Out']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
@@ -2396,27 +2411,155 @@ const App = {
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
     if (g === 'books') return (window.S && S.HubBooksHome)   ? S.HubBooksHome.open()   : null;
     if (g === 'events') return this.jumpToSection('events');
+    /* Settings and Sign Out joined the router when they moved off the top bar into the rail's
+       bottom group. Settings keeps the gear button's exact rule rather than a second copy of it:
+       Staff cannot reach Settings, but they still need Your Account to change their password, so
+       they land there. Two spellings of one access rule is how they drift apart. */
+    if (g === 'settings') return this._openSettingsForRole();
+    if (g === 'signout')  return this._signOut();
   },
+
+  /* ── The section menu overlay ─────────────────────────────────────────────────────────────────
+     FOUR WAYS OUT, and between them they cover the two things an operator can mean:
+       a link inside it  -> navigate AND close   (landing on a page with the menu over it is the
+                            whole reason auto-close won: MEASURED on the shipped Order Sheet, the
+                            overlay would sit over 141px of a 248px product-name column)
+       the same section  -> toggle closed, stay put
+       another section   -> SWAP, do not close (browsing across sections must not cost two clicks)
+       the screen / Esc  -> close, stay put
+     ⭐ OPENING THE MENU IS NOT A COMMITMENT. Every exit that is not a link leaves the operator
+     exactly where they were, which is what makes it safe to go looking. */
+  _railOpen: null,
+
+  toggleRailMenu(key) {
+    if (this._railOpen === key) { this.closeRailMenu(); return; }
+    this.openRailMenu(key);
+  },
+
+  openRailMenu(key) {
+    const nav = document.getElementById('rail-menu-nav');
+    const hubCtx = this._RAIL_HUB_CTX[key];
+    /* ⛔ NO DEAD END. If the overlay is not on the page for any reason, fall back to navigating
+       into the section rather than swallowing the click. A rail row that silently does nothing is
+       the dead-tab defect, and it is worse than a navigation the operator did not ask for.
+       ⚠ The two kinds of section fall back through DIFFERENT doors: jumpToSection only knows
+       module keys, so a hub section handed to it would return silently on the missing
+       _SECTION_DASH lookup and produce the exact dead row this guard exists to prevent. */
+    if (!nav || (hubCtx && !(window.S && S.Hub))) {
+      if (hubCtx) this._protoGlobalClick(key); else this.jumpToSection(key);
+      return;
+    }
+    if (hubCtx) S.Hub.renderSidebar(hubCtx, nav);
+    else this._renderNav(key, nav);
+    this._railOpen = key;
+    document.body.classList.add('rail-menu-on');
+    this._markRailOpen();
+  },
+
+  closeRailMenu() {
+    if (!this._railOpen) return;
+    this._railOpen = null;
+    document.body.classList.remove('rail-menu-on');
+    this._markRailOpen();
+  },
+
+  /* Two different states, two different marks, and conflating them is a lie either way:
+     `.active` is THE PAGE YOU ARE ON and never moves when you browse; `.rail-open` is WHICH MENU
+     IS SHOWING. Open Labor's menu from an Inventory page and Inventory stays active while Labor
+     reads open, which is the truth. */
+  _markRailOpen() {
+    document.querySelectorAll('#rail-nav .rail-item').forEach(el =>
+      el.classList.toggle('rail-open', !!this._railOpen && el.dataset.railSec === this._railOpen));
+  },
+
+  _wireRailMenu() {
+    const bd = document.getElementById('rail-menu-backdrop');
+    if (bd) bd.addEventListener('click', () => App.closeRailMenu());
+    /* Close AFTER the nav's own handler has run, so the navigation is never racing the teardown.
+       Scoped to `.nav-item` on purpose: in mobile-style sidebars a `.nav-section` is an accordion
+       HEADER that expands a group in place, and closing the menu on those would shut it every time
+       the operator opened a drop-down to look inside. */
+    const host = document.getElementById('rail-menu');
+    if (host) host.addEventListener('click', (e) => {
+      const item = e.target.closest && e.target.closest('.nav-item');
+      if (!item) return;
+      /* ⛔⛔ A HUB-SECTION ROW CARRIES data-hub-action, AND ITS HANDLER LIVES ON THE HUB SHELL'S
+         OWN NODE, NOT ON THIS ONE. Rendering Books' menu into the overlay without this line paints
+         every row correctly and does nothing on click — the dead-tab defect, which is why
+         S.Hub.routeSidebarAction had to become a named member before these three sections could
+         join. Module rows are already wired by _renderNav's own handlers, so they are left alone.
+         The `.nav-disabled` and `enter` cases are handled inside the router, not duplicated here. */
+      if (item.dataset.hubAction && window.S && S.Hub && S.Hub.routeSidebarAction) {
+        S.Hub.routeSidebarAction(item);
+      }
+      setTimeout(() => App.closeRailMenu(), 0);
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') App.closeRailMenu(); });
+  },
+
+  _openSettingsForRole() {
+    const role = (window.DB && DB.role && DB.role()) || null;
+    if (role === 'staff') { if (window.S && S.HubUserAccounts) S.HubUserAccounts.open('account'); return; }
+    if (window.S && S.HubSettingsHome) S.HubSettingsHome.open();
+  },
+
+  async _signOut() {
+    await DB.signOut();
+    this.showAuth();
+  },
+  /* ── The rail (2026-08-08) ────────────────────────────────────────────────────────────────────
+     Renders the four rail tables into #rail-nav, marks the one entry that matches `context`, and
+     wires each row. Same signature and same three callers it has always had (showHub,
+     openHubFullPage, showApp), because `context` was already the right argument: every caller
+     already knew which destination it was rendering.
+
+     ⛔ A ROW IS EITHER A PLACE OR A CONTAINER, NEVER BOTH. `_PROTO_GLOBAL` and `_PROTO_BOTTOM` rows
+     navigate on click. `_PROTO_CONTROL` and `_PROTO_RECOVERY` rows own a section MENU, so they open
+     the overlay and go nowhere — clicking Inventory must not drag the operator off the page they
+     are reading just because they wanted to look at the menu. `data-rail-sec` marks the second kind
+     so stage 2's overlay can find them; until it lands they fall back to jumpToSection, so no
+     destination is unreachable mid-build. */
+  /* ⛔ WHICH RAIL ROWS OWN A MENU IS A FACT ABOUT THE APP, NOT ABOUT WHICH TABLE A ROW SITS IN.
+     Events lives in `_PROTO_GLOBAL` and Settings in `_PROTO_BOTTOM`, yet both have a full section
+     menu; Hub, Review and Map sit in those same tables with none. Deciding from the table would
+     have made Events navigate and Audits navigate purely because of where they were listed.
+     ⭐ AND IT MATCHES THE MOBILE DRAWER EXACTLY, which was the tell that it is the right line:
+     openMobileNav gives Hub / Map / Review leaf rows that navigate, and drills these same ten. */
+  _RAIL_HUB_CTX: { audit: 'audit', books: 'books', settings: 'settings' },
+  _railHasMenu(k) {
+    return !!this._RAIL_HUB_CTX[k] || !!this._SECTION_DASH[k];
+  },
+
+  _railRow(k, label, context) {
+    const isSection = this._railHasMenu(k);
+    return '<div class="rail-item' + (k === context ? ' active' : '') + '"'
+      + (isSection ? ' data-rail-sec="' : ' data-rail-go="') + k + '">'
+      + '<span class="rail-label">' + esc(label) + '</span></div>';
+  },
+
   _renderProtoTopnav(context) {
-    const globalEl = document.getElementById('tn-global');
-    if (globalEl) {
-      globalEl.innerHTML = this._PROTO_GLOBAL.map(([k, l]) =>
-        '<div class="tn-glink' + (k === context ? ' active' : '') + '" data-g="' + k + '">' + esc(l) + '</div>').join('');
-      globalEl.querySelectorAll('.tn-glink[data-g]').forEach(el =>
-        el.addEventListener('click', () => App._protoGlobalClick(el.dataset.g)));
+    const rail = document.getElementById('rail-nav');
+    if (rail) {
+      const r = ([k, l]) => this._railRow(k, l, context);
+      rail.innerHTML =
+          '<div class="rail-group">' + this._PROTO_GLOBAL.map(r).join('') + '</div>'
+        + '<div class="rail-divider"></div>'
+        + '<div class="rail-group"><div class="rail-grp-label">Control</div>'
+        +   this._PROTO_CONTROL.map(r).join('') + '</div>'
+        + '<div class="rail-group"><div class="rail-grp-label">Recovery</div>'
+        +   this._PROTO_RECOVERY.map(r).join('') + '</div>'
+        + '<div class="rail-divider"></div>'
+        + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>';
+      rail.querySelectorAll('.rail-item[data-rail-go]').forEach(el =>
+        el.addEventListener('click', () => { App.closeRailMenu(); App._protoGlobalClick(el.dataset.railGo); }));
+      rail.querySelectorAll('.rail-item[data-rail-sec]').forEach(el =>
+        el.addEventListener('click', () => App.toggleRailMenu(el.dataset.railSec)));
+      this._markRailOpen();
     }
-    const secEl = document.getElementById('tn-sections');
-    if (secEl) {
-      const pill = ([k, l]) => '<div class="tn-sec' + (k === context ? ' active' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>';
-      secEl.innerHTML = '<span class="tn-grp-label">Control:</span>'
-        + this._PROTO_CONTROL.map(pill).join('')
-        + '<span class="tn-grp-label">Recovery:</span>'
-        + this._PROTO_RECOVERY.map(pill).join('');
-      secEl.querySelectorAll('.tn-sec[data-sec]').forEach(el =>
-        el.addEventListener('click', () => App.jumpToSection(el.dataset.sec)));
-    }
-    // Relocate the account/location switcher + group dashboard into the top nav
-    // (once). renderAccountSwitcher fills them by id, so moving the nodes is safe.
+    /* Relocate the account/location switcher + group dashboard into the top bar (once).
+       renderAccountSwitcher fills them BY ID, so moving the nodes is safe — and it is why #tn-acct
+       is static markup rather than something this function rebuilds. The container moved from the
+       deleted row 2 up into .tn-right; the ids did not, so nothing else had to change. */
     const acct = document.getElementById('tn-acct');
     if (acct) {
       ['topbar-account-switcher', 'topbar-group-dashboard'].forEach(id => {
@@ -10128,10 +10271,11 @@ function wireAuth() {
     }
   });
 
-  document.getElementById('signout-btn')?.addEventListener('click', async () => {
-    await DB.signOut();
-    App.showAuth();
-  });
+  // One sign-out implementation, shared with the rail's Sign Out row (App._signOut).
+  document.getElementById('signout-btn')?.addEventListener('click', () => App._signOut());
+  // The rail overlay's backdrop / link / Escape handlers. Wired ONCE here rather than on every
+  // open, so nothing accumulates a second listener each time the menu is used.
+  App._wireRailMenu();
 }
 
 /* ── Boot ── */
