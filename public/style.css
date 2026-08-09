@@ -371,20 +371,22 @@ input,select,textarea{color-scheme:dark;}
 .hs-tab:hover{color:var(--t1) !important;}
 
 /* ══ CONTENT ══ */
-/* ⛔ THE RIGHT GAP WAS WIDER THAN THE LEFT BY EXACTLY THE SCROLLBAR WIDTH, and Kyle spotted it.
-   MEASURED on the shipped build: the scroller is 1362 wide with a 1352 client box, so
-   `scrollbar-gutter:stable` was reserving 10px — on the INLINE-END edge only. The page centres
-   inside the 1352, then that reserved 10px sits to its right, so left read 44 and right read 54 on
-   every page, including ones that do not scroll at all.
-   ⭐ `both-edges` reserves the same gutter on BOTH sides, so the two gaps are equal whatever the
-   scrollbar measures — which matters because it is 10px here, ~15px on default Windows Chrome and
-   0 with overlay scrollbars. Padding the left by a magic 10px would have been right on this machine
-   and wrong on the next one.
-   ⚠ The plain `stable` is declared FIRST on purpose: a browser too old to parse `both-edges` drops
-   that whole declaration and keeps the original behaviour rather than losing the gutter entirely
-   and making pages jump as you move between a scrolling and a non-scrolling one.
-   VERIFIED live at 1482 and 1366, on the Hub, a scrolling page and a short one: left == right. */
-.content{flex:1;overflow-y:auto;background:var(--bg);scrollbar-gutter:stable;scrollbar-gutter:stable both-edges;}
+/* ⛔ NO scrollbar-gutter AT ALL, AND THAT IS THE POINT. It used to be `stable`, which reserves the
+   scrollbar's width on the INLINE-END edge whether a scrollbar is there or not — measured on the
+   shipped build as 10px, giving left 44 / right 54 on every page, including ones that never scroll.
+   ⚠ MY FIRST FIX WAS `both-edges` AND IT WAS THE WRONG DIRECTION. It equalised the two gaps by
+   reserving 10px on the LEFT as well, so the page got narrower margins on both sides instead of the
+   same margin it already had. Kyle: *"no i didn't want the left side wider .. the left and top stay
+   as they were .. i wanted the right side not as wide."* Equal is not the goal on its own; the goal
+   is the ONE spacing the page already had, on all four sides.
+   ⭐ MEASURED with the reservation gone — 1366 (cap not binding): left 28, right 28, top 28 on a
+   scrolling page, a short page and the Hub. 1600 (cap binding): 103/103 and 108/108, still equal.
+   ⚠ THE TRADE, STATED: `stable` existed so the page could not shift when moving between a scrolling
+   and a non-scrolling screen. Measured, that shift is **5px and only above ~1440**, because a
+   centred capped column re-centres in a box that lost the scrollbar's width. At 1440 and below the
+   column is full-width and there is NO shift at all. 5px on a large monitor is a smaller cost than
+   a permanently uneven right margin on every screen. */
+.content{flex:1;overflow-y:auto;background:var(--bg);}
 .screen{padding:var(--sp) var(--sp) 56px;max-width:var(--page-w);width:100%;margin:0 auto;}
 
 /* ══ BUTTONS ══ */
