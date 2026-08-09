@@ -851,7 +851,7 @@ S.InventorySpotCheck = {
            shift, or the names differ), or it does and none of the figures were usable. */
         : '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
           + (noLine.length && !badFig.length && !negNames.length
-              ? 'Nothing filled. This file has no line for any product on this check — make sure it is the right report, and that the names match your products.'
+              ? 'Nothing filled. This file has no line for any product on this check. Make sure it is the right report, and that the names match your products.'
              : (badFig.length || negNames.length) && !noLine.length
               ? 'Nothing filled. Bar Cop found these products in the file, but no row carried a sold figure it could use.'
              : noLine.length || badFig.length || negNames.length
