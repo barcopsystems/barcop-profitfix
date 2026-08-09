@@ -1183,10 +1183,19 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 }
 /* #tn-global is empty since the rail took the global links; keep the node, drop its 16px gap. */
 .tn-global{display:none;}
+/* 14px, down from 15. The title carries a section prefix now, so it is a longer string in the same
+   space, and the smaller size is what keeps it from crowding the bar. */
 .tn-title{
-  font-size:15px;font-weight:700;color:var(--w);margin:0;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-size:14px;font-weight:700;color:var(--w);margin:0;
+  display:flex;align-items:center;gap:12px;min-width:0;
+  white-space:nowrap;overflow:hidden;
 }
+/* The section reads as the parent, so it sits back; the page itself is the subject and stays white.
+   Kyle's shape: Inventory | Order Sheet | (i) — and the second divider is the one already sitting
+   before the help button, so the two are the same 18px mark. */
+.tn-sec{color:var(--t2);font-weight:600;flex-shrink:0;}
+.tn-sep{width:1px;height:18px;background:var(--b-edge);flex-shrink:0;}
+.tn-pg{overflow:hidden;text-overflow:ellipsis;}
 .tn-global{display:flex;align-items:center;gap:2px;height:100%;min-width:0;overflow:hidden;}
 .tn-glink{display:flex;align-items:center;height:100%;padding:0 13px;font-size:13.5px;font-weight:600;color:var(--t3);cursor:pointer;white-space:nowrap;transition:color .12s;}
 .tn-glink:hover,.tn-glink.active{color:var(--w);}

@@ -1556,7 +1556,7 @@ const App = {
       document.body.classList.remove('hub-dashboard');  // a sub-page is open → show the sidebar
       if (window.S && S.Hub && S.Hub.renderSidebar) S.Hub.renderSidebar(_sideCtx);
     }
-    this._renderProtoTopnav(this._GLOBAL_OF_ACTION[activeAction] || '');  // highlight this page's global link
+    this._renderProtoTopnav(this._globalOfAction(activeAction));  // highlight this page's rail row
     const content = document.querySelector('.hub-app .content');
     if (!content) {
       this.openHubOverlay(renderFn);
@@ -2179,6 +2179,18 @@ const App = {
   _PROTO_SIGNOUT:  [['signout','Sign Out']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'flowmap': 'flowmap' },
+  /* ⛔⛔ AND EVERY SETTINGS PAGE WAS MISSING FROM THAT MAP — nine of them. Found while checking the
+     new title: Settings read no section prefix, and the same lookup drives the rail highlight, so
+     **the Settings row never lit up either** on any of its own pages.
+     ⭐ FIXED BY DERIVING, NOT BY TYPING NINE MORE ENTRIES. `_HUB_SIDEBAR_OF_ACTION` already knows
+     which section every hub page belongs to, because that is what decides its sidebar, and for
+     these three the sidebar key and the rail key are the same word. A second hand-kept list of the
+     same fact is what let the first one fall behind ([[harness-review-like-code]] #141). */
+  _globalOfAction(action) {
+    if (this._GLOBAL_OF_ACTION[action]) return this._GLOBAL_OF_ACTION[action];
+    const side = this._HUB_SIDEBAR_OF_ACTION[action];
+    return (side === 'audit' || side === 'books' || side === 'settings') ? side : '';
+  },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
@@ -2434,18 +2446,48 @@ const App = {
      #topbar-title and every Hub-shell page goes through openHubFullPage(title, …), but the HUB
      ITSELF is neither: showHub swaps the whole view without a title write, so the bar kept
      whatever the previous page had left in it. It passes its own name in. */
-  _syncPageTitle(force) {
-    const el = document.getElementById('tn-title');
-    if (!el) return;
-    if (force) { el.textContent = force; return; }
+  /* ⭐⭐ THE PAGE NAME IS READ OFF THE NAV LINK THE OPERATOR CLICKED, not from a second table.
+     Kyle: *"make sure the page titles match the actual link text on the overlay menu."* Measured
+     across eleven screens, two already disagreed — Events' landing was titled "Dashboard" over a
+     link saying **Book The Events**, and the void log was "Void and Comp Log" over **Void and
+     Comps**. Hand-correcting those two would have fixed today and nothing else; nine branches of
+     `navigate` write those titles and any of them can drift again tomorrow.
+     Reading `.nav-item.active .nav-label` makes the two agree BY CONSTRUCTION — there is only one
+     string, and it is the one the operator just read in the menu.
+     ⚠ The old topbar title stays as the FALLBACK, for any page that is not in a menu at all. */
+  _pageNameFromNav() {
     const appEl = document.getElementById('app');
     const moduleShellUp = appEl && !appEl.classList.contains('hidden');
+    const nav = moduleShellUp
+      ? document.getElementById('sidebar-nav')
+      : document.querySelector('.hub-app .sidebar-nav');
+    const act = nav && nav.querySelector('.nav-item.active .nav-label');
+    if (act && act.textContent.trim()) return act.textContent.trim();
     const src = moduleShellUp
       ? document.getElementById('topbar-title')
       : document.querySelector('.hub-app .topbar .topbar-title');
-    const t = ((src && src.textContent) || '').trim();
+    return ((src && src.textContent) || '').trim();
+  },
+
+  // The rail label for a key, from the same four tables the rail itself renders.
+  _railLabelOf(key) {
+    const tables = [this._PROTO_GLOBAL, this._PROTO_CONTROL, this._PROTO_RECOVERY, this._PROTO_BOTTOM, this._PROTO_SIGNOUT];
+    for (const t of tables) for (const [k, l] of (t || [])) if (k === key) return l;
+    return null;
+  },
+
+  _syncPageTitle(force) {
+    const el = document.getElementById('tn-title');
+    if (!el) return;
+    const page = force || this._pageNameFromNav();
     // Only overwrite with something real, so a shell mid-swap never blanks the bar.
-    if (t) el.textContent = t;
+    if (!page) return;
+    /* The section prefix goes on exactly the pages that HAVE an overlay menu, which is the same
+       ten `_railHasMenu` already answers for. The Hub, Week in Review and Workflow have no menu and
+       no parent, so they stand alone rather than being given a section they do not belong to. */
+    const sec = (!force && this._railHasMenu(this._railCtx)) ? this._railLabelOf(this._railCtx) : null;
+    el.innerHTML = (sec ? '<span class="tn-sec">' + esc(sec) + '</span><span class="tn-sep"></span>' : '')
+      + '<span class="tn-pg">' + esc(page) + '</span>';
   },
 
   /* The module title is written by nine different branches of `navigate`, several of which return
