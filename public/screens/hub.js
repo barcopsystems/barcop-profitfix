@@ -1210,7 +1210,6 @@ S.Hub = {
     // unified drawer (App.openMobileNav); this default shows on the desktop
     // Help / Contact pages.
     const sidebarNav = ''
-      + App.sectionSelectorHTML('hub')
       + '<div class="nav-section">Support</div>'
       + navItem('help',            'Help and FAQ', 'help', [])
       + navItem('report-bug',      'Report a Bug', 'bug',  []);
