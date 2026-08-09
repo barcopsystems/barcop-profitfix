@@ -737,17 +737,22 @@ const App = {
     };
     const tnBurger = document.getElementById('tn-mobile-burger');
     if (tnBurger) tnBurger.onclick = () => App.openMobileNav();
-    // Settings is management-only, but a Staff member still needs to reach Your Account to change
-    // their password, so they land there instead (that page renders password-only for Staff). The
-    // rule lives in _openSettingsForRole because the rail's Settings row needs the identical one.
+    /* ⚠ The top bar's settings gear is GONE as of the rail redesign — Settings is a row in the
+       rail's bottom group on desktop and lives in the burger drawer on mobile, so a third door
+       would be a third place to keep the Staff rule in step. The lookup stays guarded because
+       `_openSettingsForRole` is still the one implementation both remaining doors call. */
     const tnSettings = document.getElementById('tn-settings');
     if (tnSettings) tnSettings.onclick = () => this._openSettingsForRole();
     const tnHelp = document.getElementById('tn-help');
     if (tnHelp) tnHelp.onclick = () => this.openPageHelp();
     const tnDate = document.getElementById('tn-date');
     if (tnDate) tnDate.textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    const tnLogo = document.querySelector('.tn-logo');
-    if (tnLogo) { tnLogo.style.cursor = 'pointer'; tnLogo.title = 'Go to The Hub'; tnLogo.onclick = () => this.showHub(); }
+    // Two logo slots now, and BOTH must go to the Hub: the rail's (desktop) and the top bar's
+    // (mobile, where the rail is hidden). A querySelector for the first `.tn-logo` would have wired
+    // only one of them and the other would have looked identical and done nothing.
+    document.querySelectorAll('.tn-logo, #rail-logo-img').forEach(el => {
+      el.style.cursor = 'pointer'; el.title = 'Go to The Hub'; el.onclick = () => this.showHub();
+    });
     const hbBtn = document.getElementById('topbar-hamburger');
     if (hbBtn) hbBtn.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-open');
@@ -1594,6 +1599,9 @@ const App = {
       const subEl = topbarLeft.querySelector('.topbar-sub');
       if (subEl) subEl.textContent = '';
     }
+    // The Hub-shell half of the page-name mirror. The module half is an observer on #topbar-title;
+    // this node is built by hub.js after boot and has exactly one writer, so one call does it.
+    this._syncPageTitle();
     // Clear topbar-right so prior screen actions don't bleed across.
     const topbarRight = document.querySelector('.hub-app .topbar .topbar-right');
     if (topbarRight) topbarRight.innerHTML = '';
@@ -2429,6 +2437,42 @@ const App = {
        the screen / Esc  -> close, stay put
      ⭐ OPENING THE MENU IS NOT A COMMITMENT. Every exit that is not a link leaves the operator
      exactly where they were, which is what makes it safe to go looking. */
+  /* ── The top bar's page name ───────────────────────────────────────────────────────────────────
+     ⛔ A MIRROR, NEVER A THIRD SOURCE. Nine sites in this file already write the page name into
+     `#topbar-title`, and `openHubFullPage` writes its own into `.hub-app .topbar .topbar-title`.
+     Both of those topbars are display:none under chrome-on, but both are still correctly
+     maintained, and one of them is read back for the PDF export title. Adding a tenth writer would
+     be a hand-kept list of nine call sites, which is the shape that goes stale silently
+     ([[harness-review-like-code]] #141). This copies whichever one the live shell owns.
+     ⭐ WHICH SHELL IS LIVE IS ASKED THE ONLY RELIABLE WAY — `#app.hidden`. Guessing from
+     visibility is the #1 source of false findings in this app ([[no-preview-server]]). */
+  _syncPageTitle() {
+    const el = document.getElementById('tn-title');
+    if (!el) return;
+    const appEl = document.getElementById('app');
+    const moduleShellUp = appEl && !appEl.classList.contains('hidden');
+    const src = moduleShellUp
+      ? document.getElementById('topbar-title')
+      : document.querySelector('.hub-app .topbar .topbar-title');
+    const t = ((src && src.textContent) || '').trim();
+    // Only overwrite with something real, so a shell mid-swap never blanks the bar.
+    if (t) el.textContent = t;
+  },
+
+  /* The module title is written by nine different branches of `navigate`, several of which return
+     early, so there is no single line to append to. An observer on the node they ALL write catches
+     every one of them, including any added later — the same "derive it, do not list it" move the
+     import census uses. The Hub-shell side gets one explicit call from `openHubFullPage`, because
+     that node is created by hub.js after boot and there is exactly one writer. */
+  _wirePageTitle() {
+    const t1 = document.getElementById('topbar-title');
+    if (t1 && window.MutationObserver) {
+      new MutationObserver(() => App._syncPageTitle())
+        .observe(t1, { childList: true, characterData: true, subtree: true });
+    }
+    this._syncPageTitle();
+  },
+
   _railOpen: null,
 
   toggleRailMenu(key) {
@@ -10293,6 +10337,8 @@ function wireAuth() {
   // The rail overlay's backdrop / link / Escape handlers. Wired ONCE here rather than on every
   // open, so nothing accumulates a second listener each time the menu is used.
   App._wireRailMenu();
+  // Mirror the page name into the top bar. Wired once, after the static nodes exist.
+  App._wirePageTitle();
 }
 
 /* ── Boot ── */

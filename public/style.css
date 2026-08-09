@@ -911,12 +911,24 @@ body.chrome-on #hub-wrapper{top:var(--navh) !important;}   /* beats the inline i
    before this. Rail 120 + the section menu as an overlay means content gains 100px across the app,
    on top of the 66px of vertical that deleting row 2 returns. */
 :root{ --rail-w: 120px; }
+/* ⛔ THE TOP BAR STARTS AFTER THE RAIL. Kyle: "the bar cop logo is no longer part of the top bar,
+   it is part of the left side menu, and then the top nav bar goes from there across." So the rail
+   owns the full-height left column including the logo, and the bar spans the rest. */
+body.chrome-on #proto-topnav{left:var(--rail-w);}
 #proto-rail{display:none;}
+/* ⛔ top:0, NOT top:var(--navh). The rail is now the full-height left column and it owns the logo,
+   so it runs from the very top and the top bar starts to its right. Its logo block is exactly
+   --navh tall, which is what lines the first rail row up with the bottom edge of the bar. */
 body.chrome-on #proto-rail{
   display:block;overflow-y:auto;overflow-x:hidden;
-  position:fixed;top:var(--navh);left:0;bottom:0;width:var(--rail-w);z-index:115;
+  position:fixed;top:0;left:0;bottom:0;width:var(--rail-w);z-index:115;
   background:var(--bg);border-right:1px solid var(--b-edge);
 }
+.rail-logo{
+  height:var(--navh);display:flex;align-items:center;padding:0 14px;
+  border-bottom:1px solid var(--b-edge);
+}
+.rail-logo img{height:22px;width:auto;display:block;}
 body.demo.chrome-on #proto-rail{bottom:40px;}
 /* Both shells step aside for it. The rail is fixed, so this is the only thing holding content off
    it — no page sets its own left offset, which is what keeps --rail-w the single source of the
@@ -1082,6 +1094,17 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* Row 1 — brand + global destinations + utility. */
 .tn-row1{display:flex;align-items:center;gap:16px;height:52px;padding:0 16px;background:var(--bg);position:relative;}
 .tn-logo{height:22px;width:auto;display:block;flex-shrink:0;}
+/* The top bar's logo is the MOBILE slot only — the rail owns it on desktop and the rail is hidden
+   under 768px, so without this the logo would simply disappear on a phone. */
+.tn-logo-mobile{display:none;}
+/* The page's own name plus the one help "i", at the left of the bar. */
+.tn-page{display:flex;align-items:center;gap:8px;min-width:0;flex-shrink:1;}
+/* #tn-global is empty since the rail took the global links; keep the node, drop its 16px gap. */
+.tn-global{display:none;}
+.tn-title{
+  font-size:15px;font-weight:700;color:var(--w);margin:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
 .tn-global{display:flex;align-items:center;gap:2px;height:100%;min-width:0;overflow:hidden;}
 .tn-glink{display:flex;align-items:center;height:100%;padding:0 13px;font-size:13.5px;font-weight:600;color:var(--t3);cursor:pointer;white-space:nowrap;transition:color .12s;}
 .tn-glink:hover,.tn-glink.active{color:var(--w);}
@@ -1199,6 +1222,17 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   #proto-rail{display:none !important;}
   body.chrome-on #app{margin-left:0;}
   body.chrome-on #hub-wrapper{left:0 !important;}
+  /* With no rail, the bar goes back to full width and takes the logo back with it. The page NAME is
+     dropped rather than squeezed — on a 375px screen the bar already holds the logo, the bar name
+     and the burger, and a truncated title beside them is noise.
+     ⛔ BUT NOT THE HELP "i". It is the ONE info button in the app ([[help-model]]) and mobile needs
+     it as much as desktop, so only the title hides and the button re-orders to sit left of the
+     burger, exactly where it has always been on a phone. */
+  body.chrome-on #proto-topnav{left:0;}
+  .tn-logo-mobile{display:block;}
+  .tn-title{display:none;}
+  .tn-page{order:2;margin-left:auto;}
+  .tn-right{order:3;margin-left:0;}
   .tn-mobile-burger{display:flex;}
   #tn-settings{display:none;}   /* App Settings lives in the burger menu on mobile */
   .app.proto .sec-switch{display:block;}
