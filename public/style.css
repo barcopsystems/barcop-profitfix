@@ -1355,6 +1355,14 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
      the same thing on a 375px screen is the "one fact in two places" problem in its most expensive
      form. So the rail is hidden and BOTH shell offsets are undone — a margin-left of 120 with no
      rail behind it would push every page off the screen edge. */
+  /* ⛔ THE HUB'S SIDE PADDING ON MOBILE. Giving .hub-grid the desktop card box (--sp, 28px) and
+     zeroing the shell's own padding was right at every width EXCEPT this one: the shell drops to
+     14px on mobile, so the Hub went from 14 to 28 while every other page stayed at 14 — which is
+     exactly the wider gutter Kyle saw against Week in Review. Match the shell's mobile value.
+     ⚠ The desktop rule pads with a token and this one with a literal, because 14px is the SHELL's
+     number (set in hub.js's injected mobile style), not the card system's. Using --sp here would
+     re-create the mismatch the moment either one moved. */
+  .hub-grid{padding-left:14px;padding-right:14px;}
   #proto-rail{display:none !important;}
   body.chrome-on #app{margin-left:0;}
   body.chrome-on #hub-wrapper{left:0 !important;}
