@@ -146,6 +146,22 @@ S.InventorySpotCheck = {
     this.saveDraft();
   },
 
+  /* ⛔⛔ "AM I RESUMING" IS A QUESTION ABOUT WHEN THE DRAFT ARRIVED, NOT WHETHER ONE EXISTS.
+     Kyle, 2026-08-08: *"when i click the 'import pos report' button to open the drop box.. the red
+     resume/start over banner shows.. that should only show if i save for later and then come back."*
+     Right. The test was `draft && draft.lines.length`, and EVERY `syncDraft()` writes a draft — so
+     the banner announced a check the operator had never left. It stayed hidden only because adding a
+     product appends a line instead of re-rendering; toggling the importer and changing the Bar
+     Station both `syncDraft()` and then `renderMain()`, which is where he found it.
+     ⭐ A NAMED MEMBER, NOT A RENDER EXPRESSION, so it can be RUN rather than grepped — a source-text
+     pin goes green over code that does nothing.
+     ⚠ `_resumedAtOpen` IS CLEARED BY START OVER AND BY CANCEL, or an operator who starts over and
+     then counts fresh products gets the banner back for a check they just discarded. */
+  _resumedAtOpen: false,
+  _isResuming() {
+    return !!(this._resumedAtOpen && this.draft && this.draft.lines && this.draft.lines.length);
+  },
+
   // ── Count input by product type (mirrors Take Inventory) ─────────────────
   _isCaseBeer(p) { return p.category === 'Bottle Beer' && p.case_size && p.case_size > 0; },
   _isPourable(p) { return !!(p.container_size_oz && p.pour_size_oz); },
@@ -218,6 +234,9 @@ S.InventorySpotCheck = {
     this.actions = actions;
     actions.innerHTML = '';
     this.draft = this.loadDraft();
+    // ⭐ DECIDED ONCE, HERE. A draft that was already on disk when the screen opened is a check the
+    // operator left and came back to; one written later in this session is not.
+    this._resumedAtOpen = !!(this.draft && this.draft.lines && this.draft.lines.length);
     this._restoreTouched();
     this.posMode = 'manual';
     this.renderMain();
@@ -306,7 +325,7 @@ S.InventorySpotCheck = {
     const dft = this.draft || { lines: [] };
     this._curBar = (dft.location || '').trim();   // drives the per-line "<Bar> Pours Sold" label
     this._flagPct = this.flagPctSetting();
-    const resuming = !!(this.draft && this.draft.lines && this.draft.lines.length);
+    const resuming = this._isResuming();
 
     const active = App.activeShift();
     const defaultShift = dft.shift || (active && active.shift_type ? active.shift_type : 'Dinner');
@@ -323,6 +342,16 @@ S.InventorySpotCheck = {
         + inProg.map(c => '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:4px 0;">'
           + '<div class="alert-text">' + esc(c.location || 'Spot check') + (c.shift ? ' &middot; ' + esc(c.shift) : '')
             + ' &middot; started ' + this.ago(c.created_at) + '. Add the post-shift counts and POS sold to finish it.</div>'
+          /* ⛔⛔ A CHECK YOU ARE NOT GOING TO FINISH MUST BE DISCARDABLE. This banner offered only
+             "Finish This Check", and the S249 gate refuses that until every started line has a pre
+             count, a post count and the POS sold — so a pre-shift count that was never completed
+             nagged forever, on every device, with no control anywhere that could clear it. Kyle
+             found it from the other end: *"the red banner is back now with only finish this check
+             even though i never actually started another spot check."* Start Over sits beside the
+             LOCAL draft and cleared only that; the saved record had nothing.
+             ⚠ IT GOES THROUGH THE SCREEN'S EXISTING DELETE PATH (`confirmDel`), not a second one, so
+             there is one way a spot check is removed and one confirm to keep in step. */
+          + '<button class="btn btn-ghost btn-sm sp-drop-inprog" data-id="' + esc(c.id) + '">Discard</button>'
           + '<button class="btn btn-ghost btn-sm sp-open" data-id="' + esc(c.id) + '">Finish This Check</button>'
         + '</div>').join('')
         + '</div>'
@@ -491,6 +520,7 @@ S.InventorySpotCheck = {
       this.draft = null;
       this._openId = null; this._openCreatedAt = null;
       this._openWasComplete = false; this._openEditCount = 0;
+      this._resumedAtOpen = false;
       this._touched = {};
       this.renderHistory();
     });
@@ -498,12 +528,18 @@ S.InventorySpotCheck = {
     document.getElementById('sp-save-later')?.addEventListener('click', () => this.save(false));
     this.container.querySelectorAll('.sp-open').forEach(b =>
       b.addEventListener('click', () => this.openInProgress(b.dataset.id)));
+    // ⚠ NAMED IN THE CONFIRM. "Delete this?" over an unfinished count is the generic wording; saying
+    // what it is stops an operator deleting a FINISHED check they thought this was.
+    this.container.querySelectorAll('.sp-drop-inprog').forEach(b =>
+      b.addEventListener('click', () => this.confirmDel(b.dataset.id, 'this unfinished spot check')));
 
     this.container.onclick = ev => {
       const collHead = ev.target.closest('.card-collapse-head');
       if (collHead) { App.toggleCollapse(collHead); return; }
       if (ev.target.closest('#sp-resume')) { this.container.querySelector('.alert-bar')?.remove(); return; }
-      if (ev.target.closest('#sp-discard')) { this.clearDraft(); this.renderMain(); return; }
+      // ⚠ AND IT STOPS BEING A RESUME. Without this an operator who starts over and then counts a
+      // fresh product gets the banner back for the check they just discarded.
+      if (ev.target.closest('#sp-discard')) { this.clearDraft(); this._resumedAtOpen = false; this.renderMain(); return; }
       if (ev.target.closest('#sp-history')) { App.pushView(() => this.renderHistory()); return; }
       const posSeg = ev.target.closest('.sp-posmode');
       if (posSeg) { this.syncDraft(); this.posMode = posSeg.dataset.mode; this.renderMain(); return; }
@@ -1114,6 +1150,9 @@ S.InventorySpotCheck = {
     this._openWasComplete = c.status !== 'in_progress';
     this._openEditCount = c.edit_count || 0;
     this.draft = { ...c.draft_state, started_at: c.created_at };
+    // Reopening a saved check IS resuming one, so the bar belongs here — this is the case it was
+    // written for.
+    this._resumedAtOpen = true;
     this.saveDraft();
     this._touched = {};
     this._onHistory = false;
@@ -1182,8 +1221,10 @@ S.InventorySpotCheck = {
     };
   },
 
-  async confirmDel(id) {
-    if (!(await App.confirmDelete())) return;
+  // `subject` is optional and additive: the in-progress banner names what it is discarding, the
+  // history detail keeps the generic wording it has always had.
+  async confirmDel(id, subject) {
+    if (!(await App.confirmDelete(subject))) return;
     await App.removeRecord('ic', 'spot_check', id);
     if (this._onHistory) this.renderHistory(); else this.renderMain();
   }
