@@ -137,7 +137,11 @@ S.FlowMap = {
   render() {
     const tree = this.STAGES.map(st => this.stageCard(st)).join('');
     this.container.innerHTML = this.styleBlock()
-      + '<div class="screen" style="max-width:none;">'
+      /* ⛔ The inline `max-width:none` is gone (2026-08-08). Workflow was full-width by choice back
+         when it was one of only two pages with no sidebar; with the 120px rail every page shares
+         one width and this was the hardest opt-out to find, because an inline style beats the
+         stylesheet and nothing in style.css could have overridden it. */
+      + '<div class="screen">'
       + '<div class="fm-wrap"><div class="fm-tree">' + tree + '</div>'
       + '<div class="fm-panel-col"><div class="fm-panel" id="fm-panel">' + this.panelHtml(this._sel ? this._nodes[this._sel] : null) + '</div></div>'
       + '</div></div>';
