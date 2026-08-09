@@ -867,6 +867,9 @@ select.ua-team-role-sel,select.ua-perm-level{appearance:none;-webkit-appearance:
 body.chrome-on #proto-topnav{
   display:flex;flex-direction:column;overflow:hidden;
   position:fixed;top:0;left:0;right:0;height:var(--navh);z-index:120;background:var(--bg);
+  /* The bar needs an edge of its own now that the rail carries one. box-sizing is border-box
+     app-wide, so the border sits INSIDE --navh and nothing below it shifts by a pixel. */
+  border-bottom:1px solid var(--b-edge);
 }
 /* Offset both app layers below the fixed nav (mirrors the body.demo offsets). */
 body.chrome-on #app{margin-top:var(--navh);height:calc(100vh - var(--navh));}
@@ -895,7 +898,10 @@ body.chrome-on #proto-topnav{left:var(--rail-w);}
 body.chrome-on #proto-rail{
   display:flex;flex-direction:column;overflow:hidden;
   position:fixed;top:0;left:0;bottom:0;width:var(--rail-w);z-index:115;
-  background:var(--bg);border-right:1px solid var(--b-edge);
+  /* Kyle's call: the rail is --surface (#08131A) and the section overlay stays --bg (#070E15), so
+     the menu that slides out reads as sitting BEHIND the rail rather than continuing it. Tokens,
+     never the hex ([[color-system-locked]]). */
+  background:var(--surface);border-right:1px solid var(--b-edge);
 }
 .rail-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;}
 .rail-logo{
@@ -903,7 +909,12 @@ body.chrome-on #proto-rail{
   border-bottom:1px solid var(--b-edge);
 }
 .rail-logo img{height:22px;width:auto;display:block;}
-.rail-logo-icon{display:none;}
+/* ⛔ SCOPED TO .rail-logo, AND THAT IS THE WHOLE BUG. As `.rail-logo-icon{display:none}` it lost to
+   `.rail-logo img{display:block}` on specificity — one class beats one class, but the img rule also
+   carries an element selector (0,1,1 against 0,1,0). So the bar-graph mark rendered beside the
+   wordmark and the logo read as duplicated. The collapsed rules never showed it because they are
+   `body.rail-collapsed …` (0,2,0) and already won. */
+.rail-logo .rail-logo-icon{display:none;}
 .rail-collapse{
   display:flex;align-items:center;gap:10px;padding:10px 14px;flex-shrink:0;
   background:none;border:0;border-top:1px solid var(--b-edge);width:100%;
@@ -1104,7 +1115,21 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    under 768px, so without this the logo would simply disappear on a phone. */
 .tn-logo-mobile{display:none;}
 /* The page's own name plus the one help "i", at the left of the bar. */
-.tn-page{display:flex;align-items:center;gap:8px;min-width:0;flex-shrink:1;}
+.tn-page{display:flex;align-items:center;gap:16px;min-width:0;flex-shrink:1;}
+/* ⭐ DESKTOP: the "i" is the ICON, not a button. No fill, no border, no box — it turns gold on
+   hover like every other "this is live" mark in the app. The chrome button treatment stays on
+   MOBILE, where it sits beside the burger and needs to read as a tap target (restored below). */
+.tn-page #tn-help{
+  width:auto;height:auto;background:none;border:0;border-radius:0;padding:0;
+  position:relative;color:var(--t3);
+}
+.tn-page #tn-help:hover{background:none;color:var(--gold);}
+/* The divider between the page name and the "i". A pseudo-element rather than a span so the height
+   is controlled (18px, not the full row) and no markup carries a purely decorative node. */
+.tn-page #tn-help::before{
+  content:'';position:absolute;left:-8px;top:50%;transform:translateY(-50%);
+  width:1px;height:18px;background:var(--b-edge);
+}
 /* #tn-global is empty since the rail took the global links; keep the node, drop its 16px gap. */
 .tn-global{display:none;}
 .tn-title{
@@ -1238,6 +1263,19 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .tn-title{display:none;}
   .tn-page{order:2;margin-left:auto;}
   .tn-right{order:3;margin-left:0;}
+  /* ⛔ THE "i" AND THE BURGER ARE TWO SEPARATE FLEX CHILDREN OF .tn-row1, so the space between them
+     was the ROW's 16px gap, not .tn-right's 8px — which is why they sat further apart than any
+     other pair of buttons in the app. Match the row gap to the button gap and they line up. */
+  .tn-row1{gap:8px;}
+  .tn-page{gap:8px;}
+  /* Mobile keeps the chrome-button treatment: beside the burger the "i" has to read as a tap
+     target, and there is no page name for a divider to divide. */
+  .tn-page #tn-help{
+    width:33px;height:33px;background:var(--c3);border:1px solid transparent;
+    border-radius:var(--r2);padding:0;color:var(--t2);
+  }
+  .tn-page #tn-help:hover{background:var(--c4);color:var(--w);}
+  .tn-page #tn-help::before{display:none;}
   .tn-mobile-burger{display:flex;}
   #tn-settings{display:none;}   /* App Settings lives in the burger menu on mobile */
   #tn-acct #topbar-group-dashboard{display:none !important;}
@@ -1578,6 +1616,17 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* Bar name / compact switcher that sits top-right of the module nav (where the old
    Group button was). Single-location = the name; multi = the .at-qsel picker. */
 .tn-barname{font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;color:var(--t1);white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;}
+/* ⭐⭐ THE DIVIDER BETWEEN THE DATE AND THE BAR NAME, AND IT IS CONDITIONAL BY CONSTRUCTION.
+   Kyle: it belongs on a single-bar account, not beside the multi-location picker, which already
+   has its own border and chevron. `renderAccountSwitcher` renders exactly two shapes —
+   `<span class="tn-barname">` for one bar and `<select class="at-qsel">` for several — so hanging
+   the rule on .tn-barname means it simply cannot appear in the multi case. No flag to keep in step
+   and no :has() to depend on: the markup already answers the question. */
+.tn-barname{position:relative;padding-left:12px;margin-left:4px;}
+.tn-barname::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:1px;height:18px;background:var(--b-edge);
+}
 .mnav-barname{font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;color:var(--t1);}
 
 /* Backdrop sits behind the sidebar overlay. Real div (not pseudo) so we can
