@@ -16,7 +16,16 @@
      Engineering: outer 1320, inner 1264, left edge 164 on all six. */
   --page-w:    1320px;
   --bg:        #070E15;
-  --surface:   #08131A;
+  /* ⛔⛔ CARD FILL = PAGE FILL (2026-08-08, Kyle's call, reversible by one value).
+     It was #08131A against a #070E15 page — a difference of 1, 5, 5, which is barely a fill at all.
+     The card is defined by its BORDER and its header band now, and the tone it used to spend on the
+     body buys a header that previously did nothing.
+     ⚠ MEASURED FIRST: every rule filled with --surface carries its own border, so nothing loses its
+     edge when the fill drops. Revert = put #08131A back here, one value, no other change. */
+  --surface:   #070E15;
+  /* The card's header band, which is the ONLY thing that used to be --surface and must NOT follow
+     it down — the whole point of the change is that the header becomes visible against the body. */
+  --card-head: #08131A;
   --input:     #070E15;
   --panel:     #08131A;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
   --zone:      #0B1722;                /* Un-box language: data ROW fill, just slightly lighter than --surface so rows lift off the header band. The header band uses --surface (the sidebar color) and row hover uses --nav-act (the sidebar's selected navy), so the three stay in one family. This is the only new tone; --bg and --surface remain the two mains. */
@@ -407,7 +416,12 @@ input,select,textarea{color-scheme:dark;}
    empty — in the dropzone state nothing renders there, so its spacing shouldn't push
    a sibling button (e.g. Add Products' Cancel) away from the card. */
 #ip-csv-actions:empty{margin:0!important;}
-.card-title{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--b-edge);}
+/* ⭐ THE HEADER IS A BAND NOW, not just text over a line. It bleeds to the card's edges with
+   negative margins that cancel the card's own 20px padding, so the fill runs corner to corner and
+   the card reads as titled rather than as a rectangle with a rule across it.
+   ⚠ This is what the card body gave up its fill FOR. If the band is ever removed, --surface has to
+   go back to #08131A in the same edit or a card becomes a bare outline with nothing to anchor it. */
+.card-title{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);background:var(--card-head);margin:-20px -20px 16px;padding:13px 20px;border-bottom:1px solid var(--b-edge);border-radius:var(--r) var(--r) 0 0;}
 .card-actions{display:flex;gap:8px;padding-top:14px;margin-top:14px;border-top:1px solid var(--b-edge);align-items:center;}
 /* Modal close X — a thin icon inside the card's top-right corner, brightens on hover. */
 .app-modal-x{position:absolute;top:12px;right:12px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:none;background:none;color:var(--t3);cursor:pointer;z-index:2;padding:0;border-radius:50%;transition:color .12s;}
