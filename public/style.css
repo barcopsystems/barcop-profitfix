@@ -998,7 +998,16 @@ body.demo.chrome-on #rail-menu{bottom:40px;}
    The markup stays exactly where it is, deliberately: #sidebar-nav and .hub-app .sidebar-nav are
    still what _renderNav and S.Hub.renderSidebar write to when no target is passed, and the MOBILE
    drawer parses those same sources. Deleting the nodes would take the mobile menu with them. */
-body.chrome-on .app.proto{grid-template-columns:1fr;}
+/* ⛔⛔⛔ THE AREAS STRING HAS TO GO TOO, AND LEAVING IT OUT SHIPPED A BROKEN BUILD.
+   `grid-template-columns:1fr` alone does NOT make this a one-column grid: `grid-template-areas:
+   "sidebar main"` names TWO areas, so the browser keeps a second column and auto-sizes the first.
+   MEASURED LIVE on the pushed build: `grid-template-columns` computed to **586.78px 775.219px** —
+   a 586px phantom column where the hidden sidebar used to be — which squeezed every page into a
+   709px card. That is why the app "opened everything in mobile view": nothing was switching to a
+   mobile layout, the CONTENT WAS SIMPLY TOO NARROW for the tables to stay tabular.
+   With `"main"` the grid collapses to a single 1362px column and the same table renders 7 real
+   columns again. ⚠ `.hub-app` is display:flex with no areas, so it never had this. */
+body.chrome-on .app.proto{grid-template-columns:1fr;grid-template-areas:"main";}
 body.chrome-on .app.proto > .sidebar{display:none;}
 body.chrome-on .hub-app > .sidebar{display:none;}
 /* Demo banner is pinned to the BOTTOM now, so the nav stays at the very top (top:0)
