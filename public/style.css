@@ -920,7 +920,8 @@ body.chrome-on #proto-rail{
   background:none;border:0;border-top:1px solid var(--b-edge);width:100%;
   cursor:pointer;font-family:inherit;text-align:left;
 }
-.rail-collapse:hover{background:var(--c3);}
+/* No fill here either. The collapse control is a rail row like any other and a lone filled row at
+   the bottom would be the only box left in the column. */
 .rail-collapse:hover .rail-icon,.rail-collapse:hover .rail-label{color:var(--w);}
 
 /* ── COLLAPSED: icons only ────────────────────────────────────────────────────────────────────
@@ -960,11 +961,11 @@ body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
   cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;
   transition:background 0.12s;
 }
-/* ⛔ THE SAME TWO TOKENS THE SIDEBAR ROWS ALREADY USE, not a second pair. The first version reached
-   for --hover and --nav-act, which are not what `.app.proto .nav-item` uses, so the rail's states
-   did not match the menu standing right beside it. --c3 hover / --c4 active, app-wide. */
-.rail-item:hover{background:var(--c3);}
-.rail-item.active{background:var(--c4);}
+/* ⛔⛔ THE RAIL CARRIES NO FILLS AT ALL. Kyle, walking it: "remove all of the background mouse over
+   / active colors .. it should only be white text/icon on mouse over .. white text gold icon on
+   active page." Colour alone does the work here, and it has to: the rail is 120px of stacked rows
+   against the section overlay's own list, and a filled row in each reads as two competing
+   selections. The overlay keeps its fills; the rail states are text and icon only. */
 /* 17px to match every other nav icon in the app, and flex-shrink:0 so a long label can ellipsis
    without squashing the icon. MEASURED: 14 pad + 17 icon + 10 gap + 59 ("Workflow", the widest
    label) + 14 pad = 114px inside a 120px rail. */
