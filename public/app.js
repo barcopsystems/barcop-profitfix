@@ -8955,6 +8955,19 @@ const App = {
     const el = document.getElementById('nav-' + id);
     if (el) el.classList.add('active');
     this.wireNavAccordion(document.getElementById('sidebar-nav'));
+    /* ⛔⛔ SYNC THE TITLE HERE, WHERE THE ACTIVE ROW IS ACTUALLY SET. This is the module twin of the
+       call in `openHubFullPage`, and leaving it out is what Kyle saw on Events: clicking "Book The
+       Events" in the overlay gave the title "Dashboard".
+       ⚠ WHY THE OBSERVER WAS NOT ENOUGH, and why it looked fine when I tested it. The module side
+       mirrors via a MutationObserver on `#topbar-title`, which fires as a MICROTASK — fine when the
+       whole navigation happens in one synchronous block, which is exactly what
+       `App.showApp(m); App.navigate(id)` does, so a scripted probe passed on all twelve screens.
+       A REAL CLICK goes capture-then-bubble through two handlers and the screen's own async render,
+       so the observer can fire while no `.nav-item.active` exists yet — and the fallback then reads
+       the old `#topbar-title`. Reproduced by clicking the overlay rather than calling navigate.
+       ⭐ THE LESSON: an ordering fix is not done until BOTH mechanisms are ordered. I fixed the hub
+       half and left the module half depending on timing. */
+    this._syncPageTitle();
   },
 
   updatePeriod() {
