@@ -2577,6 +2577,18 @@ const App = {
     nav._builtCtx = null;
     if (hubCtx) S.Hub.renderSidebar(hubCtx, nav);
     else this._renderNav(key, nav);
+    /* ⛔⛔⛔ STRIP THE IDS FROM THE COPY. The overlay renders the section's OWN sidebar markup, which
+       carries `id="nav-<screen>"` on every row — so opening a menu put a SECOND element with that id
+       into the document, and `#rail-menu` sits before `#app`, so `getElementById` started answering
+       with the overlay's row instead of the shell's.
+       MEASURED: after clicking a link in the overlay, `#sidebar-nav .nav-item.active` was **(none)**
+       — `updateNav` had marked the overlay's copy — and the page title fell back to the old
+       `#topbar-title`, which is why Events read "Dashboard" over a link saying Book The Events.
+       ⭐ THE CLASS OF BUG IS BIGGER THAN THE TITLE. Duplicate ids are invalid, and every
+       `getElementById` in the app resolves by document order, so any of them could have started
+       answering with the overlay's copy. The overlay routes by `data-screen` / `data-hub-action`
+       and class, never by id, so it does not need them. */
+    nav.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
     this._railOpen = key;
     document.body.classList.add('rail-menu-on');
     this._markRailOpen();
