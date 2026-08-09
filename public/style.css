@@ -1064,15 +1064,17 @@ body.demo.chrome-on #rail-menu{bottom:40px;}
 /* The section's name at the top of its own menu. Same treatment as the rail's CONTROL / RECOVERY
    labels: small, uppercase, --t4, plainly not a link. It takes the position the first link used to
    sit in, which pushes Close The Week down to where the eye already goes. */
-/* MEASURED on the pushed build: the header text sat at y=66 against the Hub row's label at y=73,
-   and its box bottom touched the first link with 0px between them. The 7px top padding is that
-   difference exactly — it is the rail row's own `padding:7px 14px`, which is what the header is
-   lining up against. Bottom 18 gives the first link room to read as the start of the list rather
-   than the second line of the heading.
-   ⚠ --t3, not --t4. At 0.22 alpha the section name was fainter than the divider under it. */
+/* ⚠ 11px TOP, AND THE BOX MATH SAID 7. Measuring text-box tops put the header at y=66 against the
+   Hub label's y=73, so 7px looked exact — and on screen it still sat high. The two are DIFFERENT
+   FONT SIZES (10px uppercase against 13.5px), so equal box tops are not equal baselines, and the
+   eye reads the baseline. Kyle called the remaining 3-4px; that is where the extra 4 comes from.
+   ⭐ The lesson: a measurement answers the question you asked it. "Are the boxes level" and "does
+   it look level" are different questions, and only one of them is the operator's.
+   Bottom 13 tightens the gap he asked for by 5. --t3 rather than --t4 because at 0.22 alpha the
+   section name was fainter than the divider under it. */
 .rail-menu-head{
   font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
-  color:var(--t3);padding:7px 18px 18px;
+  color:var(--t3);padding:11px 18px 13px;
 }
 #rail-menu .sidebar-nav{padding-top:14px;}
 /* ⛔ WHILE A MENU IS OPEN, THE PAGE NAME IS DESCRIBING A PAGE YOU ARE NOT LOOKING AT — and if the
