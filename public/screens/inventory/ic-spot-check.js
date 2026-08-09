@@ -405,9 +405,19 @@ S.InventorySpotCheck = {
     const historyRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Take Spot Check</div>'
       + '<button class="btn btn-ghost btn-sm" id="sp-history">View History</button></div>';
-    this.container.innerHTML = '<div class="screen">' + inProgBar + resumeBar + statsCard + historyRow + setup + posCard
+    /* ⛔ THE IMPORTER SITS **AFTER** THE PRODUCTS IT FILLS (Kyle, 2026-08-08): *"when products are
+       selected to spot check the products go under the import pos report card... make the pos report
+       card go under the last product being spot checked above the finish spot check button."* Right,
+       and the reason is the order of the job: you pick the products, you count them, and THEN you
+       fill the sold column from the register report. Sitting above the list it asked to be used
+       before there was anything to fill.
+       ⚠ ITS RESULT LINE GOES WITH IT, deliberately — `#sp-pos-result` lives inside `posCard`, so the
+       "Filled POS sold for N products" line now lands directly above the button the operator presses
+       next instead of a screen away from it. */
+    this.container.innerHTML = '<div class="screen">' + inProgBar + resumeBar + statsCard + historyRow + setup
       + '<div class="sh" id="sp-products-title" style="margin:24px 0 10px;display:none;">Products to spot check</div>'
       + '<div id="sp-lines">' + lineHtmls + '</div>'
+      + posCard
       /* TWO STAGES, TWO BUTTONS. "Save for Later" is the one an operator wants after the
          pre-shift count, and it is offered rather than hidden behind a localStorage draft they
          had no way to know about. "Finish Spot Check" says what it does: it is the door into
@@ -1021,10 +1031,27 @@ S.InventorySpotCheck = {
        pointed at Save for Later instead, which is the thing they actually wanted. */
     const state = this.collectState();
     if (finalize && !this._checkComplete(state.lines)) {
-      const short = this._incompleteLines(state.lines).length;
+      const shortLines = this._incompleteLines(state.lines);
+      const short = shortLines.length;
+      /* ⛔⛔ NAME WHAT IS ACTUALLY MISSING. Kyle, with pre AND post entered and only the sold blank:
+         *"it says product still needs its post-shift count and pos sold.. even though the post shift
+         is already entered."* The GATE was right — that line genuinely cannot be finished — but the
+         sentence was a fixed string naming both stages whatever was missing, so it sent the operator
+         back to redo a count they had just done and buried the one field that was blank.
+         ⚠ THE SAME RULE THIS DOOR HAS BEEN CORRECTED FOR TWICE on its zero-fill headline: an
+         absolute claim may only fire when the other buckets are empty. Asked per incomplete LINE and
+         OR-ed, so with several half-done products the sentence covers all of them without claiming
+         any single one is missing everything. */
+      const parts = [];
+      if (shortLines.some(l => !l.pre_entered))  parts.push('a pre-shift count');
+      if (shortLines.some(l => !l.post_entered)) parts.push('a post-shift count');
+      if (shortLines.some(l => l.sold == null))  parts.push('the POS sold');
+      const need = parts.length > 1
+        ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1]
+        : (parts[0] || 'the rest of its counts');
       this._saveMsg(short
-        ? short + (short === 1 ? ' product still needs' : ' products still need')
-          + ' its post-shift count and POS sold. Use Save for Later and finish it after the shift.'
+        ? short + (short === 1 ? ' product still needs ' : ' products still need ') + need
+          + '. Use Save for Later and finish it after the shift.'
         : 'Enter a pre count, a post count and the POS sold on at least one product before you finish this check.');
       lines.forEach(l => { if (l.dataset.started === '1' && l.dataset.done !== '1') l.classList.add('sp-missing'); });
       return;
