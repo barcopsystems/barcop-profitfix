@@ -1602,15 +1602,20 @@ const App = {
       const subEl = topbarLeft.querySelector('.topbar-sub');
       if (subEl) subEl.textContent = '';
     }
-    // The Hub-shell half of the page-name mirror. The module half is an observer on #topbar-title;
-    // this node is built by hub.js after boot and has exactly one writer, so one call does it.
-    this._syncPageTitle();
     // Clear topbar-right so prior screen actions don't bleed across.
     const topbarRight = document.querySelector('.hub-app .topbar .topbar-right');
     if (topbarRight) topbarRight.innerHTML = '';
     // Light up the matching sidebar entry so the operator can see at a
     // glance which Hub section they are in.
     if (activeAction) this.setActiveHubNav(activeAction);
+    /* ⛔⛔ THE TITLE SYNC BELONGS **AFTER** THAT LINE, AND SITTING ABOVE IT WAS A REAL DEFECT.
+       `_syncPageTitle` reads `.nav-item.active .nav-label`, and `setActiveHubNav` is what MOVES that
+       class. Called first, it read the PREVIOUS page's row — so Settings pages showed the last
+       page's name: Team Members titled "Recovery Targets", the landing titled "Team Members".
+       ⚠ The module half never showed it because that side is a MutationObserver, and a microtask
+       runs after the whole synchronous block regardless of where the write sits. Two mechanisms for
+       one job, and only the ordered one could be got wrong. */
+    this._syncPageTitle();
     // Point the nav "i" page-help at this Hub-shell page's directions (null =
     // fall back to the full Help and FAQ); clears any stale module screen.
     this._activeScreenObj = this._hubHelpShim(activeAction);
@@ -2195,7 +2200,7 @@ const App = {
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings-home': 'settings', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -2254,10 +2259,6 @@ const App = {
       { h: 'The four steps', p: ['1. Log this month\'s money out: every bill and every cash outflow, typed in or dropped from a bank or card statement. 2. Make sure the weeks are all in, because revenue on the income statement is your confirmed weeks. 3. Review your income statement for the month. 4. Generate Month-End Books, which builds the workbook. Mark a step done and the bar advances; mark it not done to reopen it. The As Needed row underneath is the off-cycle jobs, not part of the close.'] },
       { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing runs from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
       { h: 'Dropping a statement', p: ['On the money out step, switch the Add form to Import File and drop a CSV or Excel export from your bank or card. Map the columns once (date and amount are required) and Bar Cop remembers it. The file then stops on a check screen that takes the page: every row is listed with where it is going, grouped by category, with anything already logged held back and anything that is not an operating expense held back in its own card so it cannot be double counted. Nothing is saved until you press Add on that screen.'] }
-    ] },
-    'settings-home': { title: 'How the Settings Overview Works', sections: [
-      { h: 'What this is', p: ['Where you set up Bar Cop and manage your account. Business Profile holds your operation details and service periods. Recovery Targets are the benchmarks Bar Cop measures you against.'] },
-      { h: 'This page', p: ['A snapshot of how Bar Cop is tuned: your account, your profile, sales, service periods, and your targets, each with a quick Edit link so you can sanity-check it without opening every form. The owner also sees the plan, and admins get a Manage Members shortcut to the team.'] }
     ] },
     'weekly-pnl': { title: 'How the Weekly P&L Brief Works', sections: [
       { h: 'What this page is', p: ['Builds your weekly revenue, COGS, and labor into an Excel file you can hand to a bookkeeper or open in QuickBooks, Xero, or any spreadsheet. It is the lighter, more frequent companion to the Month-End Books file.'] },
@@ -2662,7 +2663,9 @@ const App = {
   _openSettingsForRole() {
     const role = (window.DB && DB.role && DB.role()) || null;
     if (role === 'staff') { if (window.S && S.HubUserAccounts) S.HubUserAccounts.open('account'); return; }
-    if (window.S && S.HubSettingsHome) S.HubSettingsHome.open();
+    /* ⛔ Was S.HubSettingsHome.open(). The landing is retired, so the door that used to pass
+       THROUGH it goes straight to the first real settings page instead. */
+    if (window.S && S.HubSettings) S.HubSettings.open('business-profile');
   },
 
   async _signOut() {
@@ -2934,7 +2937,7 @@ const App = {
       const pr = PAGE_REMAP[key] || {};
       const mkPage = (p) => { const it = pageItem(p); if (pr[it.label]) it.label = pr[it.label]; if (it.label === 'Help and FAQ') it.label = 'Help'; return it; };
       const items = [];
-      const homeId = App._SECTION_DASH[key] || ({ books: 'books-home', settings: 'settings-home' })[key] || '';
+      const homeId = App._SECTION_DASH[key] || ({ books: 'books-home' })[key] || '';
       if (homeFn) items.push({ label: homeLabel || 'Dashboard', icon: IC.dash, home: true, id: homeId, go: homeFn });
       sgs.forEach(g => {
         if (g.pages.length === 1) {
@@ -2958,7 +2961,11 @@ const App = {
         drill('Events', 'events', () => App.jumpToSection('events'), 'Book The Events', IC.events),
         drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Close The Books', IC.books),
         // App Settings is off in the live demo (same as the desktop gear, which is hidden).
-        ...(App.demoMode ? [] : [drill('Settings', 'settings', () => S2.HubSettingsHome && S2.HubSettingsHome.open(), 'Bar Cop Settings', IC.settings, 'App Settings')])
+        /* ⚠ NO homeFn AND NO homeLabel ANY MORE, and this is the one place the retirement reaches
+           MOBILE: `sectionNode` only pushes a landing row `if (homeFn)`, so dropping it removes the
+           "Bar Cop Settings" row and leaves the drill opening the section's pages directly — the
+           same shape Audits has always had. Unavoidable: the page it pointed at is gone. */
+        ...(App.demoMode ? [] : [drill('Settings', 'settings', null, null, IC.settings, 'App Settings')])
       ]},
       { label: 'Control', items: [
         drill('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Close The Week', IC.inventory),
