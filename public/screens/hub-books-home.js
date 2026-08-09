@@ -15,7 +15,9 @@ S.HubBooksHome = {
 
   open() {
     if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
-    App.openHubFullPage('Books', (mount) => { this.container = mount; this.render(mount); }, 'books-home');
+    // ⚠ Same rule: the sidebar leaf says Close The Books, so the header does too. Three names for
+    // one page (leaf, header, help title) is a page an operator cannot search for or ask about.
+    App.openHubFullPage('Close The Books', (mount) => { this.container = mount; this.render(mount); }, 'books-home');
   },
 
   // Operating income is a LEVEL and it goes under zero on a down month or a down

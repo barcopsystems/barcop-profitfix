@@ -394,7 +394,9 @@ S.HubOperatingExpenses = {
        the same reason they are refused on the P&L. Demo and any session before the role
        resolves still pass — _hubBlocked returns false when there is no role. */
     if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
-    App.openHubFullPage('Operating Expenses', (mount) => {
+    // ⚠ THE PAGE HAS ONE NAME. The sidebar row has said Money Out since the one-ledger rebuild and
+    // this header still said Operating Expenses, which is the old name for half of what is on it.
+    App.openHubFullPage('Money Out', (mount) => {
       this.container = mount;
       this._mountedAt = App._mountSeq;   // stamped inside the mount callback, AFTER openHubFullPage bumps it
       this.renderMain();
