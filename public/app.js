@@ -1048,6 +1048,9 @@ const App = {
     this._activeScreenObj = this._hubHelpShim('hub'); // nav "i" → Hub directions
     this._curHubSection = null;                       // Hub dashboard is not a section
     this._renderProtoTopnav('hub');               // Hub link active, no section active
+    // The Hub is the one page with no topbar-title to mirror, so it names itself. Without this the
+    // bar kept the last section's page name after coming home.
+    this._syncPageTitle('The Hub');
     this.renderAccountSwitcher();
     this._recordLocation({ mode: 'hub', module: null, screen: 'hub', label: 'Hub' });
     this.enforcePaywall();   // no active subscription → locked "Choose your plan" popup over the Hub
@@ -2192,7 +2195,11 @@ const App = {
   _PROTO_GLOBAL:   [['hub','Hub'],['week-review','Review'],['audit','Audits'],['events','Events'],['books','Books']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
-  _PROTO_BOTTOM:   [['flowmap','Workflow'],['settings','Settings'],['signout','Sign Out']],
+  /* Sign Out is its own group behind its own divider. It is the only row in the rail that ENDS the
+     session rather than going somewhere, and a destructive control sitting flush under Settings is
+     one mis-click from taking the operator out mid-shift. */
+  _PROTO_BOTTOM:   [['flowmap','Workflow'],['settings','Settings']],
+  _PROTO_SIGNOUT:  [['signout','Sign Out']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
@@ -2446,9 +2453,14 @@ const App = {
      ([[harness-review-like-code]] #141). This copies whichever one the live shell owns.
      ⭐ WHICH SHELL IS LIVE IS ASKED THE ONLY RELIABLE WAY — `#app.hidden`. Guessing from
      visibility is the #1 source of false findings in this app ([[no-preview-server]]). */
-  _syncPageTitle() {
+  /* `force` is for the one page that has no topbar-title to mirror. Every module screen writes
+     #topbar-title and every Hub-shell page goes through openHubFullPage(title, …), but the HUB
+     ITSELF is neither: showHub swaps the whole view without a title write, so the bar kept
+     whatever the previous page had left in it. It passes its own name in. */
+  _syncPageTitle(force) {
     const el = document.getElementById('tn-title');
     if (!el) return;
+    if (force) { el.textContent = force; return; }
     const appEl = document.getElementById('app');
     const moduleShellUp = appEl && !appEl.classList.contains('hidden');
     const src = moduleShellUp
@@ -2493,6 +2505,16 @@ const App = {
       if (hubCtx) this._protoGlobalClick(key); else this.jumpToSection(key);
       return;
     }
+    /* ⛔⛔ CLEAR THE HUB RENDERER'S CACHE FIRST, AND THIS IS THE "Audits goes to the last section"
+       BUG. `renderSidebar` early-returns on `nav._builtCtx === context` so an in-section navigation
+       keeps the open drop-down. That cache lives on the NODE — and this one node is written by TWO
+       renderers. Open Audits (sets _builtCtx='audit'), open Inventory (_renderNav overwrites the
+       markup and never touches _builtCtx), open Audits again: the guard matches, it returns early,
+       and the overlay is still showing Inventory.
+       ⚠ MY OWN COMMENT ON THAT CACHE MISSED IT — it reasoned about two CONTAINERS keeping separate
+       caches, which is true, and never asked what happens when one container has two writers. The
+       overlay rebuilds on every open by design, so the cache has no job here at all. */
+    nav._builtCtx = null;
     if (hubCtx) S.Hub.renderSidebar(hubCtx, nav);
     else this._renderNav(key, nav);
     this._railOpen = key;
@@ -2620,7 +2642,9 @@ const App = {
         + '<div class="rail-group"><div class="rail-grp-label">Recovery</div>'
         +   this._PROTO_RECOVERY.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
-        + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>';
+        + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>'
+        + '<div class="rail-divider"></div>'
+        + '<div class="rail-group">' + this._PROTO_SIGNOUT.map(r).join('') + '</div>';
       rail.querySelectorAll('.rail-item[data-rail-go]').forEach(el =>
         el.addEventListener('click', () => { App.closeRailMenu(); App._protoGlobalClick(el.dataset.railGo); }));
       rail.querySelectorAll('.rail-item[data-rail-sec]').forEach(el =>
