@@ -155,8 +155,52 @@ S.Hub = {
   // (grab-bag) nav cached when the Hub last rendered. The delegated click
   // handler lives on .sidebar-nav (wired once in render), so swapping
   // innerHTML keeps it live.
-  renderSidebar(context) {
-    const nav = document.querySelector('.hub-app .sidebar-nav');
+  /* ⛔⛔ THE HUB SIDEBAR'S ACTION ROUTER, AND IT HAD TO BECOME A NAMED MEMBER BEFORE THE RAIL
+     OVERLAY COULD SHOW THESE SECTIONS AT ALL (2026-08-08).
+     It used to be an anonymous if/else chain living inside the click listener bound to ONE node,
+     so any other surface rendering the same rows would have painted them perfectly and done
+     NOTHING on click. That is the dead-tab defect (integrity #11): wired in one place, rendered in
+     another, and it looks alive right up until somebody presses it.
+     Now both callers route through here: the Hub shell's own delegated listener, and
+     App._wireRailMenu's listener on the overlay. One implementation, so a new action reaches both
+     surfaces the day it is added rather than the day somebody remembers the second copy. */
+  routeSidebarAction(item) {
+    if (!item || item.classList.contains('nav-disabled')) return;
+    const action = item.dataset.hubAction;
+    if (action === 'enter') return this._enter(item.dataset.screen, item.dataset.mod);
+    if (action === 'hub-home')           return App.showHub();
+    if (action === 'audit-help')         return S.HubAuditHelp?.open?.();
+    if (action === 'books-help')         return S.HubBooksHelp?.open?.();
+    if (action === 'settings-help')      return S.HubSettingsHelp?.open?.();
+    if (action === 'help')               return S.HubHelp.open();
+    if (action === 'settings-home')      return S.HubSettingsHome?.open?.();
+    if (action === 'settings-profile')   return S.HubSettings.open('business-profile');
+    if (action === 'settings-targets')   return S.HubSettings.open('recovery-targets');
+    if (action === 'settings')           return S.HubSettings.open();
+    if (action === 'user-account')       return S.HubUserAccounts.open('account');
+    if (action === 'user-data')          return S.HubUserAccounts.open('data');
+    if (action === 'user-team')          return S.HubUserAccounts.open('team');
+    if (action === 'user-accounts')      return S.HubUserAccounts.open();
+    if (action === 'bar-cop-audit')      return S.HubBarCopAudit?.open?.();
+    if (action === 'books-home')         return S.HubBooksHome?.open?.();
+    if (action === 'breakeven')          return S.HubBreakEven?.open?.();
+    if (action === 'books')              return S.HubBooks.open();
+    if (action === 'weekly-pnl')         return S.Reports?._openQboModal?.();
+    if (action === 'year-end')           return S.HubYearEnd.open();
+    if (action === 'operating-expenses') return S.HubOperatingExpenses?.open?.();
+    if (action === 'permits')            return S.HubPermits?.open?.();
+    if (action === 'report-bug')         return (S.HubReportBug.openModal || S.HubReportBug.open).call(S.HubReportBug);
+    if (action === 'contact-support')    return (S.HubSupport.openModal || S.HubSupport.open).call(S.HubSupport);
+  },
+
+  /* `target` is optional and defaults to the Hub shell's own sidebar, which is every caller that
+     existed before the rail. The overlay passes its own container so Audits, Books and Settings
+     can be BROWSED from a page in another section without navigating into them — the same
+     one-renderer-two-containers move `App._renderNav` got.
+     ⭐ `_builtCtx` is cached ON THE NODE, not on this object, so the two containers keep separate
+     caches and neither can suppress the other's rebuild. */
+  renderSidebar(context, target) {
+    const nav = target || document.querySelector('.hub-app .sidebar-nav');
     if (!nav) return;
     // Mobile-style Hub sections (a Dashboard leaf + group-icon accordions, like
     // the module sidebars). Each maps to its section landing's activeAction.
@@ -1339,36 +1383,11 @@ S.Hub = {
     if (navEl) navEl.addEventListener('click', (ev) => {
       const item = ev.target.closest('.nav-item');
       if (!item || item.classList.contains('nav-disabled')) return;
-      const action = item.dataset.hubAction;
       // Close the mobile sidebar after the click so the navigated screen has
       // full width to render. No-op on desktop where the class is never set.
       closeHubMobileSidebar();
-      if (action === 'enter') this._enter(item.dataset.screen, item.dataset.mod);
-      else if (action === 'hub-home')           App.showHub();
-      else if (action === 'audit-help')         S.HubAuditHelp?.open?.();
-      else if (action === 'books-help')         S.HubBooksHelp?.open?.();
-      else if (action === 'settings-help')      S.HubSettingsHelp?.open?.();
-      else if (action === 'help')               S.HubHelp.open();
-      else if (action === 'settings-home')      S.HubSettingsHome?.open?.();
-      else if (action === 'settings-profile')   S.HubSettings.open('business-profile');
-      else if (action === 'settings-targets')   S.HubSettings.open('recovery-targets');
-      else if (action === 'settings')           S.HubSettings.open();
-      else if (action === 'user-account')       S.HubUserAccounts.open('account');
-      else if (action === 'user-data')          S.HubUserAccounts.open('data');
-      else if (action === 'user-team')          S.HubUserAccounts.open('team');
-      else if (action === 'user-accounts')      S.HubUserAccounts.open();
-      else if (action === 'bar-cop-audit')      S.HubBarCopAudit?.open?.();
-      else if (action === 'books-home')         S.HubBooksHome?.open?.();
-      else if (action === 'breakeven')          S.HubBreakEven?.open?.();
-      else if (action === 'books')              S.HubBooks.open();
-      else if (action === 'weekly-pnl')         S.Reports?._openQboModal?.();
-      else if (action === 'year-end')           S.HubYearEnd.open();
-      else if (action === 'operating-expenses') S.HubOperatingExpenses?.open?.();
-      else if (action === 'permits')            S.HubPermits?.open?.();
-      else if (action === 'report-bug')         (S.HubReportBug.openModal || S.HubReportBug.open).call(S.HubReportBug);
-      else if (action === 'contact-support')    (S.HubSupport.openModal || S.HubSupport.open).call(S.HubSupport);
+      this.routeSidebarAction(item);
     });
-
     // Trend chart data point hover — populate and position the shared
     // tooltip with the dot's week, value, status, and target.
     const tip = container.querySelector('#hd-chart-tip');
