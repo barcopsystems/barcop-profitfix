@@ -1080,8 +1080,13 @@ body.demo.chrome-on #rail-menu{bottom:40px;}
    same argument as the backdrop over the content: what is inert should look inert.
    ⚠ The page name AND its help "i" only. The date and the bar name are still true, and greying the
    bar name would read as "this bar is inactive". */
-.tn-page{transition:opacity 0.16s;}
-body.rail-menu-on .tn-page{opacity:0.3;}
+/* ⛔ HIDDEN, NOT FADED. It was `opacity:0.3` and Kyle read the result as the top row changing
+   colour — which is exactly what a partly-transparent element over a dark bar does: you still see
+   it, just muddied, so the bar looks like a different shade rather than like the title is gone.
+   ⚠ `visibility`, not `opacity:0`. At zero opacity the help "i" is invisible AND STILL CLICKABLE —
+   an invisible hit target sitting over the page you are trying to click away to. `visibility:hidden`
+   takes it out of hit-testing, and it holds its space so nothing in the bar shifts on open. */
+body.rail-menu-on .tn-page{visibility:hidden;}
 #rail-menu .nav-item .nav-label{font-size:13.5px;}
 
 /* ⛔ AND BOTH SHELLS GIVE UP THEIR PERMANENT SIDEBAR COLUMN, which is where the 100px of content
