@@ -137,7 +137,7 @@ S.EventsDashboard = {
       ? '<span style="color:var(--green);font-weight:700;">&#10003; Your events are handled</span>'
       : '<span style="color:var(--t2);"><span style="color:var(--t1);font-weight:800;">' + dc + '</span> of ' + total + ' handled</span>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;margin-bottom:16px;">'
-      + '<div style="padding:11px 22px;border-bottom:1px solid var(--b2);">'
+      + '<div class="ck-head">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Book Out Your Events</div>'
       + '</div>'
       + '<div style="padding:18px 22px;">'
