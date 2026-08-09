@@ -1074,7 +1074,7 @@ body.demo.chrome-on #rail-menu{bottom:40px;}
    section name was fainter than the divider under it. */
 .rail-menu-head{
   font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
-  color:var(--t3);padding:11px 18px 13px;
+  color:var(--gold);padding:11px 18px 13px;
 }
 #rail-menu .sidebar-nav{padding-top:14px;}
 /* ⛔ WHILE A MENU IS OPEN, THE PAGE NAME IS DESCRIBING A PAGE YOU ARE NOT LOOKING AT — and if the
