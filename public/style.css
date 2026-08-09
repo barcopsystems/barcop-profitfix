@@ -1023,6 +1023,18 @@ body.demo.chrome-on #rail-menu{bottom:40px;}
    overflow — and touch nothing about how the nav itself looks. */
 #rail-menu .rail-menu-scope{display:block;grid-template-columns:none;grid-template-areas:none;overflow:visible;height:auto;}
 #rail-menu .rail-menu-scope .sidebar-nav{height:auto;}
+/* ⭐ THE OVERLAY'S FIRST LINK LINES UP WITH THE RAIL'S FIRST LINK, and the two numbers below are
+   MEASURED on the shipped build, not guessed. Both columns start at the same y (--navh), the rows
+   already share 7px of vertical padding, so the only things out of step were the nav's own top pad
+   and the label size:
+       rail    padding-top 14px · label 13.5px · label top 73
+       overlay padding-top 21px · label 14px   · label top 80
+   Re-pointing those two puts every label at 73 in both columns, on the module sections AND the
+   hub-shell ones (both render as .nav-flat — verified live on `inventory` and `books`).
+   ⚠ Scoped by ID on purpose: the 21px and the 14px come from the shared `.nav-flat` rules that the
+   real sidebars still use, and those must not move. This changes the OVERLAY only. */
+#rail-menu .sidebar-nav{padding-top:14px;}
+#rail-menu .nav-item .nav-label{font-size:13.5px;}
 
 /* ⛔ AND BOTH SHELLS GIVE UP THEIR PERMANENT SIDEBAR COLUMN, which is where the 100px of content
    width actually comes from. The module grid drops to one column and both asides are hidden.
