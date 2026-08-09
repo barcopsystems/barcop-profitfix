@@ -2589,6 +2589,24 @@ const App = {
        answering with the overlay's copy. The overlay routes by `data-screen` / `data-hub-action`
        and class, never by id, so it does not need them. */
     nav.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    /* ⭐ THE SECTION'S NAME, AT THE TOP OF ITS OWN MENU. Kyle, walking it: open Labor's menu from an
+       Inventory page and the top bar still reads "Inventory | Delivery History" directly above the
+       list, 20px away and in the same column — so the bar reads as the menu's heading, for the
+       WRONG section, and the eye skips the real first row.
+       ⛔ It also closes a gap nobody had named: the overlay carried NOTHING saying which section it
+       belonged to. The lit rail row is 120px away, and the whole point of his report is that the eye
+       does not travel there.
+       ⚠ Quiet on purpose — styled like the rail's own CONTROL / RECOVERY labels. A bold header would
+       just move the eye-skip down one row; the first thing with weight in that column must stay
+       Close The Week. And the text comes from the SAME `_railLabelOf` the title prefix uses, so the
+       menu and the bar cannot disagree about what the section is called. */
+    const secLabel = this._railLabelOf(key);
+    if (secLabel) {
+      const head = document.createElement('div');
+      head.className = 'rail-menu-head';
+      head.textContent = secLabel;          // textContent, never innerHTML
+      nav.insertBefore(head, nav.firstChild);
+    }
     this._railOpen = key;
     document.body.classList.add('rail-menu-on');
     this._markRailOpen();

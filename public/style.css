@@ -1061,7 +1061,21 @@ body.demo.chrome-on #rail-menu{bottom:40px;}
    hub-shell ones (both render as .nav-flat — verified live on `inventory` and `books`).
    ⚠ Scoped by ID on purpose: the 21px and the 14px come from the shared `.nav-flat` rules that the
    real sidebars still use, and those must not move. This changes the OVERLAY only. */
+/* The section's name at the top of its own menu. Same treatment as the rail's CONTROL / RECOVERY
+   labels: small, uppercase, --t4, plainly not a link. It takes the position the first link used to
+   sit in, which pushes Close The Week down to where the eye already goes. */
+.rail-menu-head{
+  font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--t4);padding:0 18px 10px;
+}
 #rail-menu .sidebar-nav{padding-top:14px;}
+/* ⛔ WHILE A MENU IS OPEN, THE PAGE NAME IS DESCRIBING A PAGE YOU ARE NOT LOOKING AT — and if the
+   menu belongs to a different section, it is describing a different section too. Dimming it is the
+   same argument as the backdrop over the content: what is inert should look inert.
+   ⚠ The page name AND its help "i" only. The date and the bar name are still true, and greying the
+   bar name would read as "this bar is inactive". */
+.tn-page{transition:opacity 0.16s;}
+body.rail-menu-on .tn-page{opacity:0.45;}
 #rail-menu .nav-item .nav-label{font-size:13.5px;}
 
 /* ⛔ AND BOTH SHELLS GIVE UP THEIR PERMANENT SIDEBAR COLUMN, which is where the 100px of content
