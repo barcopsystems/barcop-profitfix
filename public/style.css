@@ -1182,7 +1182,6 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   width:1px;height:18px;background:var(--b1);   /* same token as .tn-sep, or the two bar dividers drift */
 }
 /* #tn-global is empty since the rail took the global links; keep the node, drop its 16px gap. */
-.tn-global{display:none;}
 /* 14px, down from 15. The title carries a section prefix now, so it is a longer string in the same
    space, and the smaller size is what keeps it from crowding the bar. */
 .tn-title{
@@ -1203,9 +1202,6 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* Not pure white. Against the grey section prefix, --w read as a jump rather than a hierarchy;
    --t1 is the app's own "primary text" and still clearly the brighter of the two. */
 .tn-pg{color:var(--t1);overflow:hidden;text-overflow:ellipsis;}
-.tn-global{display:flex;align-items:center;gap:2px;height:100%;min-width:0;overflow:hidden;}
-.tn-glink{display:flex;align-items:center;height:100%;padding:0 13px;font-size:13.5px;font-weight:600;color:var(--t3);cursor:pointer;white-space:nowrap;transition:color .12s;}
-.tn-glink:hover,.tn-glink.active{color:var(--w);}
 .tn-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .tn-iconbtn{width:33px;height:33px;display:flex;align-items:center;justify-content:center;background:var(--c3);border:1px solid transparent;border-radius:var(--r2);color:var(--t2);cursor:pointer;transition:background .12s,color .12s;}
 .tn-iconbtn:hover{background:var(--c4);color:var(--w);}
@@ -1213,9 +1209,6 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 @media (max-width:560px){.tn-date{display:none;}}
 
 /* Row 2 — the working sections as pills + the sidebar collapse toggle. */
-.tn-row2{display:flex;align-items:center;gap:8px;height:66px;padding:0 16px;background:var(--surface);border-top:1px solid var(--b-edge);border-bottom:1px solid var(--b-edge);}
-.tn-collapse{width:33px;height:33px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--b-edge);border-radius:var(--r2);color:var(--t3);cursor:pointer;flex-shrink:0;transition:background .12s,color .12s;}
-.tn-collapse:hover{background:var(--c3);color:var(--t1);}
 /* ⛔⛔ THE `.tn-sec` PILL RULES ARE GONE, AND THEY ARE WHAT KYLE SAW. They styled row 2's clickable
    section pills — `padding:0 13px`, `cursor:pointer`, a `--c3` hover fill — and row 2 was deleted
    in stage 1, so they had ZERO renderers. Then I named the title's section prefix `.tn-sec` too and
@@ -1226,16 +1219,10 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    pick. The prefix is `.tn-title-sec` now, and this is deleted rather than left lying there.
    ⚠ `.tn-row2`, `.tn-row2-right`, `.tn-grp-label`, `.tn-global` and `.tn-glink` are dead the same
    way (0 JS references, measured). Flagged to Kyle rather than swept up here. */
-.tn-sections{display:flex;align-items:center;gap:2px;height:100%;min-width:0;overflow:hidden;}
-.tn-grp-label{font-size:14px;font-weight:700;letter-spacing:0.2px;color:#485C6A;flex-shrink:0;margin:0 8px 0 4px;}
-.tn-row2-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0;}
 #tn-acct{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;}
-.tn-grp-btn{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 9px;background:var(--c3);border:1px solid transparent;border-radius:var(--r2);color:var(--t2);cursor:pointer;font-family:'Barlow',sans-serif;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;transition:background .12s,color .12s;}
-.tn-grp-btn:hover{background:var(--c4);color:var(--w);}
-.tn-grp-btn svg{width:13px;height:13px;}
 .tn-mobile-burger{display:none;width:33px;height:33px;align-items:center;justify-content:center;background:var(--c3);border:1px solid transparent;border-radius:var(--r2);color:var(--t2);cursor:pointer;flex-shrink:0;transition:background .12s,color .12s;}
 .tn-mobile-burger:hover{background:var(--c4);color:var(--w);}
-.tn-iconbtn svg,.tn-collapse svg,.tn-mobile-burger svg{width:16px;height:16px;}
+.tn-iconbtn svg,.tn-mobile-burger svg{width:16px;height:16px;}
 
 /* Sidebar in proto: hide the logo + in-sidebar switcher (the top nav owns those),
    bigger readable labels, more room, active row = the --c4 accent fill. */
@@ -1316,7 +1303,6 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 
 @media (max-width:768px){
   .app.proto{display:flex;}
-  .tn-global{display:none;}
   /* ⛔⛔ MOBILE DOES NOT GET THE RAIL, AND NOTHING ABOUT MOBILE CHANGED IN THE REDESIGN.
      The burger opens App.openMobileNav (the bottom sheet), which already carries every rail
      destination in a two-level drill and already closes before it navigates. Two menus offering
@@ -1365,15 +1351,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    The single grouped menu the top-nav burger opens on mobile: all top-level
    destinations + the current section's pages + Support. Built/torn down per
    open; desktop never sees it (the burger is hidden above 768px). */
-.tn-mnav-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;}
 .tn-mnav{position:fixed;top:0;left:0;height:100%;width:300px;max-width:86vw;background:var(--surface);border-right:1px solid var(--b1);box-shadow:10px 0 30px rgba(0,0,0,0.45);z-index:9001;transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;}
-.tn-mnav-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px 13px 18px;border-bottom:1px solid var(--b-edge);flex-shrink:0;}
-.tn-mnav-title{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);}
-.tn-mnav-body{overflow-y:auto;flex:1;padding-bottom:24px;-webkit-overflow-scrolling:touch;}
-.tn-mnav-grp{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:17px 18px 5px;}
-.tn-mnav-item{padding:11px 18px;font-size:14px;color:var(--t1);cursor:pointer;}
-.tn-mnav-item:hover,.tn-mnav-item:active{background:var(--c3);color:var(--w);}
-.tn-mnav-item.cur{color:var(--gold);font-weight:600;}
 
 /* ══ SUMMARY TABLE ══ */
 .sum-tbl{width:100%;border-collapse:collapse;font-size:12px;}

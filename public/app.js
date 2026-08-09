@@ -731,10 +731,10 @@ const App = {
     if (toggleBtn) toggleBtn.onclick = () => {
       document.getElementById('app').classList.toggle('sidebar-collapsed');
     };
-    const tnCollapse = document.getElementById('tn-collapse');
-    if (tnCollapse) tnCollapse.onclick = () => {
-      document.getElementById('app').classList.toggle('sidebar-collapsed');
-    };
+    /* ⛔ The `#tn-collapse` handler is gone with the class. There is no such element in the markup
+       (measured: 0 in index.html), the lookup was guarded, so it silently wired nothing — and what
+       it toggled was `sidebar-collapsed` on #app, the OLD sidebar collapse that the rail's own
+       toggle replaced in stage 5. Dead wiring for a dead button for a dead mode. */
     const tnBurger = document.getElementById('tn-mobile-burger');
     if (tnBurger) tnBurger.onclick = () => App.openMobileNav();
     /* ⚠ The top bar's settings gear is GONE as of the rail redesign — Settings is a row in the
