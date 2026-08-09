@@ -196,35 +196,6 @@ input,select,textarea{color-scheme:dark;}
 .sidebar-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 0;scrollbar-width:none;}
 .sidebar-nav::-webkit-scrollbar{display:none;}
 
-/* ══ Section switcher — the bordered control at the top of every section
-   sidebar. Jumps between the Hub and the 6 main sections without routing back.
-   The 4-box dashboard icon in front of the name links to that section's
-   dashboard; clicking the rest opens the switcher. Collapsed = icon only. */
-.sec-switch{position:relative;margin:6px 8px 8px;}
-.sec-switch-btn{
-  display:flex;align-items:center;gap:9px;cursor:pointer;
-  border:1px solid var(--b2);border-radius:var(--r2);background:transparent;
-  color:var(--t2);font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;
-  letter-spacing:0.2px;padding:8px 12px;transition:background 0.12s,border-color 0.12s,color 0.12s;
-}
-.sec-switch-btn:hover,.sec-switch.open .sec-switch-btn{background:var(--surface);border-color:var(--b1);color:var(--t1);}
-.sec-switch-dash{display:flex;flex-shrink:0;color:var(--t3);transition:color 0.12s;}
-.sec-switch-dash:hover{color:var(--gold);}
-.sec-switch-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sec-switch-menu{
-  position:absolute;top:100%;left:0;right:0;z-index:120;margin-top:4px;
-  background:var(--surface);border:1px solid var(--b1);border-radius:var(--r2);
-  box-shadow:0 12px 36px rgba(0,0,0,0.6);padding:5px;
-}
-.sec-switch-item{padding:8px 12px;font-size:13px;color:var(--t2);cursor:pointer;border-radius:var(--r2);white-space:nowrap;font-family:'Barlow',sans-serif;}
-.sec-switch-item:hover{background:var(--input);color:var(--t1);}
-.sec-switch-item.current{color:var(--gold);font-weight:700;}
-/* Collapsed sidebar: only the dashboard icon shows (click = dashboard). */
-.app.sidebar-collapsed .sec-switch,.hub-app.sidebar-collapsed .sec-switch{margin:6px 0 8px;}
-.app.sidebar-collapsed .sec-switch-btn,.hub-app.sidebar-collapsed .sec-switch-btn{justify-content:center;padding:8px 0;}
-.app.sidebar-collapsed .sec-switch-label,.hub-app.sidebar-collapsed .sec-switch-label{display:none;}
-.app.sidebar-collapsed .sec-switch-menu,.hub-app.sidebar-collapsed .sec-switch-menu{left:100%;right:auto;top:0;margin:0 0 0 8px;min-width:185px;}
-
 .nav-section{
   padding:10px 14px 2px;
   font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
@@ -1087,7 +1058,6 @@ body.chrome-on .hub-app .topbar{display:none;}
 }
 body.chrome-on .hub-app .sidebar{border-right:1px solid var(--b-edge);height:100%;}
 body.chrome-on .hub-app .sidebar-logo{display:none;}
-body.chrome-on .hub-app .sec-switch{display:none;}
 body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
 /* Week in Review — full-width like the Hub, 2-column section grid, equal-height rows */
 .wr-screen{max-width:none;padding:var(--sp) 24px 24px;}
@@ -1173,7 +1143,6 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* No sidebar collapse toggle (removed): the sidebar logo + switcher are hidden,
    the nav starts clean at the top. Mobile still auto-tucks it behind the burger. */
 .app.proto .sidebar-logo{display:none;}
-.app.proto .sec-switch{display:none;}
 .app.proto .sidebar-nav{padding:12px 0;}
 .app.proto .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
 .app.proto .nav-section:first-child{padding-top:6px;}
@@ -1271,7 +1240,6 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .tn-right{order:3;margin-left:0;}
   .tn-mobile-burger{display:flex;}
   #tn-settings{display:none;}   /* App Settings lives in the burger menu on mobile */
-  .app.proto .sec-switch{display:block;}
   #tn-acct #topbar-group-dashboard{display:none !important;}
   /* The shared nav replaces the old header on mobile and the burger opens the
      drawer, so hide the old topbar everywhere so it does not double up. */

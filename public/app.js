@@ -1902,29 +1902,6 @@ const App = {
   // The dashboard screen each module lands on when entered.
   _SECTION_DASH: { profit: 'dashboard', revenue: 'r-dashboard', cash: 'c-dashboard', events: 'ev-dashboard', inventory: 'ic-dashboard', labor: 'lc-dashboard', shift: 'sc-dashboard' },
 
-  // Markup for the section switcher. currentKey defaults to the active module
-  // (set before the module nav renders); the Hub sidebar passes 'hub'. Text
-  // only, no chevron. The menu lists all sections; the current one is marked.
-  sectionSelectorHTML(currentKey) {
-    const cur = currentKey || this._activeModule || 'hub';
-    const found = this.SECTIONS.find(s => s[0] === cur);
-    const label = found ? found[1] : 'The Hub';
-    const rows = this.SECTIONS.map(([k, l]) =>
-      '<div class="sec-switch-item' + (k === cur ? ' current' : '') + '" data-sec="' + k + '">' + esc(l) + '</div>'
-    ).join('');
-    // The 4-box dashboard icon in front of the section name is a direct link to
-    // this section's dashboard (it replaces the old standalone Dashboard nav
-    // row). Clicking the icon goes to the dashboard; clicking the rest of the
-    // selector opens the switcher. Collapsed, only the icon shows.
-    const dashIcon = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
-    return '<div class="sec-switch" data-cur="' + cur + '">'
-      + '<div class="sec-switch-btn">'
-      +   '<span class="sec-switch-dash" title="' + esc(label) + ' dashboard">' + dashIcon + '</span>'
-      +   '<span class="sec-switch-label">' + esc(label) + '</span>'
-      + '</div>'
-      + '<div class="sec-switch-menu" hidden>' + rows + '</div>'
-      + '</div>';
-  },
 
   // Jump to a section's dashboard (or the Hub) from the switcher. showApp hides
   // the Hub wrapper and shows the module shell, so this works from anywhere.
@@ -10513,33 +10490,4 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const m of muts) for (const n of m.addedNodes) { sweepAutofill(n); sweepTables(n); }
   }).observe(document.body, { childList: true, subtree: true });
 
-  // Section switcher (the dropdown at the top of every section sidebar). One
-  // delegated handler so it works in both the module shell (#sidebar-nav) and
-  // the Hub's own sidebar, and survives every nav re-render.
-  const closeSwitchers = () => document.querySelectorAll('.sec-switch.open').forEach(sw => {
-    sw.classList.remove('open');
-    const m = sw.querySelector('.sec-switch-menu'); if (m) m.hidden = true;
-  });
-  document.addEventListener('click', e => {
-    // The dashboard icon jumps straight to the current section's dashboard.
-    const dash = e.target.closest('.sec-switch-dash');
-    if (dash) {
-      const sw = dash.closest('.sec-switch');
-      closeSwitchers();
-      if (sw) App.jumpToSection(sw.dataset.cur);
-      return;
-    }
-    // The rest of the selector opens the section switcher.
-    const btn = e.target.closest('.sec-switch-btn');
-    if (btn) {
-      const sw = btn.closest('.sec-switch');
-      const wasOpen = sw && sw.classList.contains('open');
-      closeSwitchers();
-      if (sw && !wasOpen) { sw.classList.add('open'); const m = sw.querySelector('.sec-switch-menu'); if (m) m.hidden = false; }
-      return;
-    }
-    const item = e.target.closest('.sec-switch-item');
-    if (item) { closeSwitchers(); App.jumpToSection(item.dataset.sec); return; }
-    closeSwitchers();
-  });
 });
