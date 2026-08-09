@@ -201,7 +201,7 @@ S.WeekReview = {
          waits on the weekly close. Said ONCE, under the row, rather than stuffing words into a
          38px number slot. Gated on the week RECORD, never on a null figure. */
       + (m.confirmed ? ''
-          : '<div class="wr-tophead" style="padding-top:0;font-size:11.5px;color:var(--t3);line-height:1.6;">'
+          : '<div class="wr-note" style="padding-top:0;font-size:11.5px;color:var(--t3);line-height:1.6;">'
             + 'This week is not confirmed yet, so these fill in once you confirm it. The section cards below show what has been logged so far.</div>')
       + '</div>';
   },
