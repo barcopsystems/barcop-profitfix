@@ -34,6 +34,17 @@ S.RecoveryTimeline = {
   ACCENT: { bg: 'var(--green-bg)', bord: 'rgba(81,138,121,0.45)', dot: 'var(--green)', when: 'var(--green)', line: RT_GREEN },
 
   startDate(moduleKey) {
+    // ⚠ ANCHOR ON THE DURABLE BASELINE — the SAME start recoverySeries measures from (S173, the
+    // completion of S170). This was the earliest fix_log DATE, which drifts LATER than the baseline
+    // (or ages out): so the chart's zero-anchor, the "N weeks in" phase text, and opWeeks all
+    // disagreed with the series, throwing the recovery line off-canvas (negative x) when a backdated
+    // import predated the fix_log row. min over ALL of the module's gaps (a superset of the series'
+    // dollar gaps), so the anchor is never LATER than any plotted point and stays non-null whenever
+    // any fix exists. Falls back to the fix_log date for a fix not yet promoted to a durable baseline.
+    if (window.Recovery && Recovery._gapEntries) {
+      const dates = Recovery._gapEntries(moduleKey).map(e => Recovery.baselineFor(e)).filter(Boolean);
+      if (dates.length) return dates.map(d => String(d).slice(0, 10)).sort()[0];
+    }
     const log = (App.data && Array.isArray(App.data.fix_log) ? App.data.fix_log : [])
       .filter(e => e.module === moduleKey && e.date);
     if (!log.length) return null;
