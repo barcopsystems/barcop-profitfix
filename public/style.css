@@ -371,7 +371,20 @@ input,select,textarea{color-scheme:dark;}
 .hs-tab:hover{color:var(--t1) !important;}
 
 /* ══ CONTENT ══ */
-.content{flex:1;overflow-y:auto;background:var(--bg);scrollbar-gutter:stable;}
+/* ⛔ THE RIGHT GAP WAS WIDER THAN THE LEFT BY EXACTLY THE SCROLLBAR WIDTH, and Kyle spotted it.
+   MEASURED on the shipped build: the scroller is 1362 wide with a 1352 client box, so
+   `scrollbar-gutter:stable` was reserving 10px — on the INLINE-END edge only. The page centres
+   inside the 1352, then that reserved 10px sits to its right, so left read 44 and right read 54 on
+   every page, including ones that do not scroll at all.
+   ⭐ `both-edges` reserves the same gutter on BOTH sides, so the two gaps are equal whatever the
+   scrollbar measures — which matters because it is 10px here, ~15px on default Windows Chrome and
+   0 with overlay scrollbars. Padding the left by a magic 10px would have been right on this machine
+   and wrong on the next one.
+   ⚠ The plain `stable` is declared FIRST on purpose: a browser too old to parse `both-edges` drops
+   that whole declaration and keeps the original behaviour rather than losing the gutter entirely
+   and making pages jump as you move between a scrolling and a non-scrolling one.
+   VERIFIED live at 1482 and 1366, on the Hub, a scrolling page and a short one: left == right. */
+.content{flex:1;overflow-y:auto;background:var(--bg);scrollbar-gutter:stable;scrollbar-gutter:stable both-edges;}
 .screen{padding:var(--sp) var(--sp) 56px;max-width:var(--page-w);width:100%;margin:0 auto;}
 
 /* ══ BUTTONS ══ */
