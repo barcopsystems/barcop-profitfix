@@ -2192,7 +2192,7 @@ const App = {
   _PROTO_GLOBAL:   [['hub','Hub'],['week-review','Review'],['audit','Audits'],['events','Events'],['books','Books']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
-  _PROTO_BOTTOM:   [['flowmap','Map'],['settings','Settings'],['signout','Sign Out']],
+  _PROTO_BOTTOM:   [['flowmap','Workflow'],['settings','Settings'],['signout','Sign Out']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'flowmap': 'flowmap' },
   // Which Hub-shell sidebar a full-page action mounts. 'none' = keep the
@@ -2214,8 +2214,8 @@ const App = {
       { h: 'The six section cards', p: ['One card per system: Inventory, Labor, Shift, Profit, Revenue, and Cash. Each shows that section\'s headline numbers over its weekly-close steps with a progress bar, so you see where each section stands and step into the exact work right from the Hub. The whole card is a link into that section.'] },
       { h: 'Multiple bars', p: ['Your bar name shows in the top bar. If you run more than one bar, that name becomes a switcher: pick another bar and Bar Cop reloads into it.'] }
     ] },
-    'flowmap': { title: 'How the Map Works', sections: [
-      { h: 'What this is', p: ['The Map is how your whole week fits together, top to bottom. Bar Cop runs on one sitting at the end of the week: close your three Control sections, roll them up and work the money in Recovery, then chase only what the close flags. This lays the flow out so you can see where every piece sits and why.'] },
+    'flowmap': { title: 'How Workflow Works', sections: [
+      { h: 'What this is', p: ['Workflow is how your whole week fits together, top to bottom. Bar Cop runs on one sitting at the end of the week: close your three Control sections, roll them up and work the money in Recovery, then chase only what the close flags. This lays the flow out so you can see where every piece sits and why.'] },
       { h: 'The four stages', p: ['1. Close your Control sections: Inventory, Labor, Shift. 2. Work the money in Recovery: Profit, Revenue, Cash, each starting with Confirm the Week. 3. As needed: the jobs you open only when the close flags them, never on a schedule. 4. Where it lands: the Hub, Books, and your Bar Cop Audit score. Events feeds the week on its own clock.'] },
       { h: 'Reading a node', p: ['Tap any section or step and the panel tells you what it is, why it sits where it does, and what it hands off, in plain terms. The stage number turns green to mark where you last looked. Open takes you straight to the page that does that work. The plumbing, which number feeds which, lives in each section\'s Help under Connections; this is the flow of the work, not the data.'] }
     ] },
@@ -2591,10 +2591,20 @@ const App = {
     return !!this._RAIL_HUB_CTX[k] || !!this._SECTION_DASH[k];
   },
 
+  /* Every rail row carries an icon, from the SHARED section map, because the collapsed rail is
+     icons alone — a row with no icon would simply vanish there. `_RAIL_IC` maps the rail's own keys
+     onto that map; only `flowmap` needs translating (its icon has always been called `blueprint`). */
+  _RAIL_IC: { hub: 'hub', 'week-review': 'review', audit: 'audit', events: 'events', books: 'books',
+              inventory: 'inventory', labor: 'labor', shift: 'shift',
+              profit: 'profit', revenue: 'revenue', cash: 'cash',
+              flowmap: 'blueprint', settings: 'settings', signout: 'signout' },
+
   _railRow(k, label, context) {
     const isSection = this._railHasMenu(k);
+    const ic = this._NAV_SECTION_IC[this._RAIL_IC[k]] || '';
     return '<div class="rail-item' + (k === context ? ' active' : '') + '"'
       + (isSection ? ' data-rail-sec="' : ' data-rail-go="') + k + '">'
+      + '<svg class="rail-icon" viewBox="0 0 17 17" fill="none">' + ic + '</svg>'
       + '<span class="rail-label">' + esc(label) + '</span></div>';
   },
 
@@ -2633,6 +2643,41 @@ const App = {
   // Section sub-group (drop-down) icons, keyed by the ORIGINAL sub-group name.
   // Shared by the mobile drawer (accordion headers) and the desktop mobile-style
   // sidebar. Only drop-down HEADERS use these; nested links stay icon-less.
+  /* ⭐ THE SECTION ICONS, SHARED BY THE LEFT RAIL AND THE MOBILE DRAWER (hoisted 2026-08-08).
+     It was a local const inside openMobileNav, so the rail would have needed a second copy of
+     fifteen SVGs — and two icon sets for the same ten sections drift the moment one is edited.
+     Same reasoning as _NAV_GROUP_IC directly below, one level up.
+     ⚠ Each surface still PICKS from it: mobile keeps IC.audit for Review, the rail uses its own
+     'review' key, because Review and Audits sit adjacent in the rail and reading as the same icon
+     is worse there than the inconsistency. Shared map, explicit choices, no drift. */
+  _NAV_SECTION_IC: {
+    hub:'<rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/>',
+    blueprint:'<rect x="2" y="3" width="13" height="11" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 6.5h3M5 9.5h5M11.5 6v4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+    audit:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    events:'<rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    books:'<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+    /* ⛔ A REAL TOOTHED COG, not the spoked star this used to be. Kyle: "the settings link gets the
+       actual standard settings gear icon not the one the button currently has." The old one drew a
+       circle with eight straight spokes radiating out, which reads as a sun or an asterisk at 17px;
+       nobody recognises it as settings. This is the outline everyone does recognise.
+       ⚠ It is the SHARED map, so the mobile drawer's Settings row gets the same icon. That is the
+       point of sharing it, and one settings icon app-wide is the right answer anyway. */
+    settings:'<circle cx="8.5" cy="8.5" r="2.4" stroke="currentColor" stroke-width="1.3"/><path d="M13.6 10.4a1.1 1.1 0 0 0 .22 1.21l.04.04a1.35 1.35 0 1 1-1.91 1.91l-.04-.04a1.1 1.1 0 0 0-1.21-.22 1.1 1.1 0 0 0-.67 1v.11a1.35 1.35 0 1 1-2.7 0v-.06a1.1 1.1 0 0 0-.72-1 1.1 1.1 0 0 0-1.21.22l-.04.04a1.35 1.35 0 1 1-1.91-1.91l.04-.04a1.1 1.1 0 0 0 .22-1.21 1.1 1.1 0 0 0-1-.67h-.11a1.35 1.35 0 1 1 0-2.7h.06a1.1 1.1 0 0 0 1-.72 1.1 1.1 0 0 0-.22-1.21l-.04-.04a1.35 1.35 0 1 1 1.91-1.91l.04.04a1.1 1.1 0 0 0 1.21.22h.05a1.1 1.1 0 0 0 .67-1v-.11a1.35 1.35 0 1 1 2.7 0v.06a1.1 1.1 0 0 0 .67 1 1.1 1.1 0 0 0 1.21-.22l.04-.04a1.35 1.35 0 1 1 1.91 1.91l-.04.04a1.1 1.1 0 0 0-.22 1.21v.05a1.1 1.1 0 0 0 1 .67h.11a1.35 1.35 0 1 1 0 2.7h-.06a1.1 1.1 0 0 0-1 .67z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>',
+    // Week in Review: a page with a tick. Distinct from `audit` on purpose — the two sit adjacent
+    // in the rail, where reading as the same mark is worse than differing from the mobile drawer.
+    review:'<rect x="3.5" y="2" width="10" height="13" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M6 5.5h5M6 8h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M6 11.4l1.4 1.4 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    signout:'<path d="M6.5 2.5H3.8c-.7 0-1.3.6-1.3 1.3v9.4c0 .7.6 1.3 1.3 1.3h2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M10.8 11.3L14 8.5l-3.2-2.8M6.8 8.5H14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    inventory:'<path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.2"/>',
+    labor:'<circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    shift:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    profit:'<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    revenue:'<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    cash:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 4.7v7.6M10.6 6.3c-.4-.6-1.2-1-2.1-1-1.2 0-2.1.6-2.1 1.6 0 2.1 4.3 1.1 4.3 3.2 0 1-.9 1.6-2.2 1.6-1 0-1.8-.4-2.2-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
+    help:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
+    bug:'<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+    dash:'<path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
+  },
+
   _NAV_GROUP_IC: {
     'Analysis':'<circle cx="7" cy="7" r="4.3" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2l4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
     'Weekly':'<rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
@@ -2761,23 +2806,7 @@ const App = {
     // flat, uniform list shows at a time, so it stays clean however deep the nav
     // goes. The section/sub-group holding the current page are marked so the menu
     // opens drilled-in there with that page highlighted.
-    const IC = {
-      hub:'<rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/>',
-      blueprint:'<rect x="2" y="3" width="13" height="11" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 6.5h3M5 9.5h5M11.5 6v4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
-      audit:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      events:'<rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      books:'<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
-      settings:'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      inventory:'<path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.2"/>',
-      labor:'<circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      shift:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      profit:'<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-      revenue:'<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-      cash:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 4.7v7.6M10.6 6.3c-.4-.6-1.2-1-2.1-1-1.2 0-2.1.6-2.1 1.6 0 2.1 4.3 1.1 4.3 3.2 0 1-.9 1.6-2.2 1.6-1 0-1.8-.4-2.2-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
-      help:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
-      bug:'<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
-      dash:'<path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
-    };
+    const IC = App._NAV_SECTION_IC;
     // Group (drop-down) icons live on App._NAV_GROUP_IC (shared with the desktop
     // mobile-style sidebar). Only accordion HEADERS use them; nested links don't.
     const GIC = App._NAV_GROUP_IC;
@@ -2813,7 +2842,7 @@ const App = {
     const root = { title: 'Bar Cop Menu', groups: [
       { label: 'Go to', items: [
         { label: 'Hub', icon: IC.hub, go: () => App.showHub() },
-        { label: 'Map', icon: IC.blueprint, go: () => S2.FlowMap && S2.FlowMap.open() },
+        { label: 'Workflow', icon: IC.blueprint, go: () => S2.FlowMap && S2.FlowMap.open() },
         { label: 'Review', icon: IC.audit, go: () => S2.WeekReview && S2.WeekReview.open() },
         drill('Audits', 'audit', null, null, IC.audit),
         drill('Events', 'events', () => App.jumpToSection('events'), 'Book The Events', IC.events),

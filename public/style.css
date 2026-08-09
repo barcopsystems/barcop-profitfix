@@ -954,9 +954,15 @@ body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
    did not match the menu standing right beside it. --c3 hover / --c4 active, app-wide. */
 .rail-item:hover{background:var(--c3);}
 .rail-item.active{background:var(--c4);}
+/* 17px to match every other nav icon in the app, and flex-shrink:0 so a long label can ellipsis
+   without squashing the icon. MEASURED: 14 pad + 17 icon + 10 gap + 59 ("Workflow", the widest
+   label) + 14 pad = 114px inside a 120px rail. */
+.rail-icon{width:17px;height:17px;flex-shrink:0;color:var(--t3);transition:color 0.12s;}
+.rail-item:hover .rail-icon{color:var(--w);}
+.rail-item.active .rail-icon{color:var(--gold);}
 .rail-label{
   font-size:13.5px;font-weight:600;color:var(--t2);
-  overflow:hidden;white-space:nowrap;transition:color 0.12s;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;transition:color 0.12s;
 }
 .rail-item:hover .rail-label{color:var(--w);}
 .rail-item.active .rail-label{color:var(--w);}
@@ -968,6 +974,7 @@ body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
    right. Gold is what this app already uses for "this is the current one" and it cannot be read as
    a hover state. */
 .rail-item.rail-open .rail-label{color:var(--gold);}
+.rail-item.rail-open .rail-icon{color:var(--gold);}
 
 /* ── THE SECTION MENU OVERLAY ─────────────────────────────────────────────────────────────────
    Sits immediately beside the rail and floats OVER the page rather than pushing it, so the layout
