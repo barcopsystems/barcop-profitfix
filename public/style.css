@@ -1191,8 +1191,14 @@ body.hub-dashboard .hub-app .content{padding-left:0;padding-right:0;}
 }
 /* Hub "Where You Stand" card is hand-built (not a .card), so it needs its own
    full-bleed-header padding that tracks the app standard: normal on desktop,
-   tightened to the phone card padding so it matches every other card. */
-.hub-wys-head{padding:15px 20px;}
+   tightened to the phone card padding so it matches every other card.
+   ⭐ AND ITS OWN BAND, for the same reason. When the card body flattened to the page colour, the
+   fill moved to the header — but that move rode on `.card-title`, and this header is hand-rolled,
+   so it kept a divider and lost its anchor: a bare outline with a rule across it. `--card-head` is
+   the one owner of that colour, so this tracks any recolour of the real card. The padding is
+   untouched on purpose; the band is a FILL, not a re-layout. The wrapper at hub.js carries
+   overflow:hidden, which is what clips the band to the card's top radius. */
+.hub-wys-head{padding:15px 20px;background:var(--card-head);}
 .hub-wys-body{padding:18px 20px;}
 @media (max-width:768px){
   .hub-wys-head,.wr-tophead{padding:15px 14px;}
