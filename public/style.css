@@ -947,7 +947,12 @@ body.chrome-on #proto-rail{
   /* Kyle's call: the rail is --surface (#08131A) and the section overlay stays --bg (#070E15), so
      the menu that slides out reads as sitting BEHIND the rail rather than continuing it. Tokens,
      never the hex ([[color-system-locked]]). */
-  background:var(--surface);border-right:1px solid var(--b-edge);
+  /* ⛔ --panel, NOT --surface. You asked for the rail at #08131A and --surface held that value at
+     the time; when --surface dropped to the page colour the rail silently went with it. --panel is
+     the pre-existing token for a raised surface and still holds #08131A, so the rail keeps its own
+     tone whatever the card fill does. A colour asked for by VALUE has to be pinned to a token that
+     means that value, not to whichever token happened to hold it that day. */
+  background:var(--panel);border-right:1px solid var(--b-edge);
 }
 .rail-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;}
 .rail-logo{
