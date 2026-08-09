@@ -1064,9 +1064,15 @@ body.demo.chrome-on #rail-menu{bottom:40px;}
 /* The section's name at the top of its own menu. Same treatment as the rail's CONTROL / RECOVERY
    labels: small, uppercase, --t4, plainly not a link. It takes the position the first link used to
    sit in, which pushes Close The Week down to where the eye already goes. */
+/* MEASURED on the pushed build: the header text sat at y=66 against the Hub row's label at y=73,
+   and its box bottom touched the first link with 0px between them. The 7px top padding is that
+   difference exactly — it is the rail row's own `padding:7px 14px`, which is what the header is
+   lining up against. Bottom 18 gives the first link room to read as the start of the list rather
+   than the second line of the heading.
+   ⚠ --t3, not --t4. At 0.22 alpha the section name was fainter than the divider under it. */
 .rail-menu-head{
   font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
-  color:var(--t4);padding:0 18px 10px;
+  color:var(--t3);padding:7px 18px 18px;
 }
 #rail-menu .sidebar-nav{padding-top:14px;}
 /* ⛔ WHILE A MENU IS OPEN, THE PAGE NAME IS DESCRIBING A PAGE YOU ARE NOT LOOKING AT — and if the
@@ -1075,7 +1081,7 @@ body.demo.chrome-on #rail-menu{bottom:40px;}
    ⚠ The page name AND its help "i" only. The date and the bar name are still true, and greying the
    bar name would read as "this bar is inactive". */
 .tn-page{transition:opacity 0.16s;}
-body.rail-menu-on .tn-page{opacity:0.45;}
+body.rail-menu-on .tn-page{opacity:0.3;}
 #rail-menu .nav-item .nav-label{font-size:13.5px;}
 
 /* ⛔ AND BOTH SHELLS GIVE UP THEIR PERMANENT SIDEBAR COLUMN, which is where the 100px of content
