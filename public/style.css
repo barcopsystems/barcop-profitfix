@@ -919,16 +919,45 @@ body.chrome-on #proto-topnav{left:var(--rail-w);}
 /* ⛔ top:0, NOT top:var(--navh). The rail is now the full-height left column and it owns the logo,
    so it runs from the very top and the top bar starts to its right. Its logo block is exactly
    --navh tall, which is what lines the first rail row up with the bottom edge of the bar. */
+/* A flex COLUMN, so the collapse toggle pins to the bottom edge and only the nav scrolls. The
+   toggle is the only way back out of the collapsed rail, so it must never scroll out of reach. */
 body.chrome-on #proto-rail{
-  display:block;overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-direction:column;overflow:hidden;
   position:fixed;top:0;left:0;bottom:0;width:var(--rail-w);z-index:115;
   background:var(--bg);border-right:1px solid var(--b-edge);
 }
+.rail-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;}
 .rail-logo{
-  height:var(--navh);display:flex;align-items:center;padding:0 14px;
+  height:var(--navh);display:flex;align-items:center;padding:0 14px;flex-shrink:0;
   border-bottom:1px solid var(--b-edge);
 }
 .rail-logo img{height:22px;width:auto;display:block;}
+.rail-logo-icon{display:none;}
+.rail-collapse{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;flex-shrink:0;
+  background:none;border:0;border-top:1px solid var(--b-edge);width:100%;
+  cursor:pointer;font-family:inherit;text-align:left;
+}
+.rail-collapse:hover{background:var(--c3);}
+.rail-collapse:hover .rail-icon,.rail-collapse:hover .rail-label{color:var(--w);}
+
+/* ── COLLAPSED: icons only ────────────────────────────────────────────────────────────────────
+   ⭐ ONE TOKEN MOVES EVERYTHING. The top bar's left edge, both shell offsets, the overlay and its
+   backdrop all position off var(--rail-w), so re-pointing it here slides all five together and
+   there is no list of call sites to keep in step. --sidebar-w-coll is the width the old sidebar's
+   own collapsed mode already used; reusing it keeps one number for "a rail with icons only". */
+body.rail-collapsed{ --rail-w: var(--sidebar-w-coll); }
+body.rail-collapsed .rail-logo{justify-content:center;padding:0;}
+body.rail-collapsed .rail-logo-full{display:none;}
+body.rail-collapsed .rail-logo-icon{display:block;height:20px;}
+body.rail-collapsed .rail-item,
+body.rail-collapsed .rail-collapse{justify-content:center;padding:9px 0;gap:0;}
+body.rail-collapsed .rail-label{display:none;}
+/* The group headings are words, so they have nothing to show at 52px. The DIVIDERS stay: they are
+   the only thing left telling Control from Recovery from the bottom group. */
+body.rail-collapsed .rail-grp-label{display:none;}
+body.rail-collapsed .rail-divider{margin:10px 10px;}
+body.rail-collapsed .rail-collapse svg{transform:rotate(180deg);}
 body.demo.chrome-on #proto-rail{bottom:40px;}
 /* Both shells step aside for it. The rail is fixed, so this is the only thing holding content off
    it — no page sets its own left offset, which is what keeps --rail-w the single source of the

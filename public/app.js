@@ -2485,6 +2485,42 @@ const App = {
     this._syncPageTitle();
   },
 
+  /* ── Collapsing the rail to icons ─────────────────────────────────────────────────────────────
+     Kyle: "the collapse is good for once a user knows them by heart and then want a little more
+     room." That only means anything if it STICKS, so it is remembered per device. It is a display
+     preference with no account behind it, which is exactly what localStorage is for
+     ([[localstorage-survives-reseed]]) — and it must not ride on the bar's data, or switching bars
+     would silently re-expand the menu.
+     ⭐⭐ THE WHOLE COLLAPSE IS ONE VARIABLE. Every piece of chrome already positions off
+     `var(--rail-w)`: the top bar's left edge, both shells' offsets, the overlay and its backdrop.
+     Re-pointing that one token moves all five together, so there is no list of places to keep in
+     step and nothing can be forgotten. */
+  _RAIL_COLLAPSE_KEY: 'bc_rail_collapsed',
+
+  railCollapsed() {
+    try { return localStorage.getItem(this._RAIL_COLLAPSE_KEY) === '1'; } catch (e) { return false; }
+  },
+
+  applyRailCollapsed(on) {
+    document.body.classList.toggle('rail-collapsed', !!on);
+    const btn = document.getElementById('rail-collapse');
+    if (btn) {
+      btn.title = on ? 'Expand the menu' : 'Collapse the menu';
+      const lab = btn.querySelector('.rail-label');
+      if (lab) lab.textContent = 'Collapse';
+    }
+    try { localStorage.setItem(this._RAIL_COLLAPSE_KEY, on ? '1' : '0'); } catch (e) {}
+  },
+
+  toggleRailCollapsed() {
+    const next = !this.railCollapsed();
+    this.applyRailCollapsed(next);
+    /* ⛔ CLOSE THE SECTION MENU ON THE WAY. The overlay is positioned at `left:var(--rail-w)`, so
+       collapsing under an open menu slides it 68px left while the operator is reading it. Nothing
+       breaks, but the page jumps for no reason the operator asked for. */
+    this.closeRailMenu();
+  },
+
   _railOpen: null,
 
   toggleRailMenu(key) {
@@ -2539,6 +2575,11 @@ const App = {
   },
 
   _wireRailMenu() {
+    const col = document.getElementById('rail-collapse');
+    if (col) col.addEventListener('click', () => App.toggleRailCollapsed());
+    // Apply the remembered state at boot, BEFORE the first paint of a page, so the rail does not
+    // render wide and then snap narrow.
+    this.applyRailCollapsed(this.railCollapsed());
     const bd = document.getElementById('rail-menu-backdrop');
     if (bd) bd.addEventListener('click', () => App.closeRailMenu());
     /* Close AFTER the nav's own handler has run, so the navigation is never racing the teardown.
@@ -2624,7 +2665,11 @@ const App = {
   _railRow(k, label, context) {
     const isSection = this._railHasMenu(k);
     const ic = this._NAV_SECTION_IC[this._RAIL_IC[k]] || '';
+    /* The `title` is not decoration: collapsed, the label is gone and the icon is all there is, so
+       without it a row the operator does not recognise has no way to identify itself. Rendered
+       always rather than only when collapsed, because the rail is not re-rendered on collapse. */
     return '<div class="rail-item' + (k === context ? ' active' : '') + '"'
+      + ' title="' + esc(label) + '"'
       + (isSection ? ' data-rail-sec="' : ' data-rail-go="') + k + '">'
       + '<svg class="rail-icon" viewBox="0 0 17 17" fill="none">' + ic + '</svg>'
       + '<span class="rail-label">' + esc(label) + '</span></div>';

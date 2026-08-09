@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/bar-graph-icon.png?v=1"/>
 <link rel="apple-touch-icon" href="assets/bar-graph-icon.png?v=1"/>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=290"/>
+<link rel="stylesheet" href="style.css?v=291"/>
 <style>
 @media print {
   /* Flip the dark theme to a light, readable theme for print.
@@ -180,8 +180,19 @@
      Filled by App._renderProtoTopnav(context) — the same one function, with the
      same context argument, that used to fill the two top-nav rows. -->
 <div id="proto-rail">
-  <div class="rail-logo"><img src="assets/logo.png" alt="Bar Cop" id="rail-logo-img"/></div>
+  <!-- Two logo files, not one image scaled down: collapsed the rail is 52px and the wordmark would
+       be illegible, so it swaps to the bar-graph mark. Same pair the old sidebar already used. -->
+  <div class="rail-logo">
+    <img src="assets/logo.png" alt="Bar Cop" id="rail-logo-img" class="rail-logo-full"/>
+    <img src="assets/bar-graph-icon.png" alt="Bar Cop" class="rail-logo-icon"/>
+  </div>
   <nav class="rail-nav" id="rail-nav"></nav>
+  <!-- Pinned to the bottom, outside the scrolling nav, so it is reachable at any scroll position.
+       It is the only way back out of the collapsed rail, so it can never scroll off. -->
+  <button class="rail-collapse" id="rail-collapse" type="button" title="Collapse the menu">
+    <svg class="rail-icon" viewBox="0 0 17 17" fill="none"><path d="M10.5 4L6 8.5l4.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.5 3.5v10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    <span class="rail-label">Collapse</span>
+  </button>
 </div>
 
 <!-- PROTO: the section menu, as an OVERLAY beside the rail (App.openRailMenu).
@@ -522,6 +533,6 @@
      sweep goes red instead. -->
 <script src="https://js.stripe.com/v3/"></script>
 <script src="db.js?v=162"></script>
-<script src="app.js?v=829"></script>
+<script src="app.js?v=830"></script>
 </body>
 </html>
