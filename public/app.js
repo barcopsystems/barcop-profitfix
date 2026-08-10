@@ -2781,6 +2781,15 @@ const App = {
         if (node && node.parentElement !== acct) acct.appendChild(node);
       });
     }
+    /* THE RAIL — the one whole-bar read, reachable from every page.
+       ⚠ WIRED ONCE, GUARDED BY A FLAG, because this function runs on every navigation and a second
+       listener would open two stacked modals. The node is static markup in index.html (like
+       #tn-acct), so it survives every render and there is nothing to re-bind. */
+    const railBtn = document.getElementById('tn-rail');
+    if (railBtn && !railBtn._wired) {
+      railBtn._wired = true;
+      railBtn.addEventListener('click', () => BarCopBriefing.open());
+    }
   },
 
   // Section sub-group (drop-down) icons, keyed by the ORIGINAL sub-group name.

@@ -83,6 +83,12 @@
   --sidebar-w:      220px;
   --sidebar-w-coll: 52px;
   --navh:           52px;               /* shared top-bar height. ONE row since the 2026-08-08 rail redesign (was 118 = row1 52 + row2 66; row 2's section pills moved into the left rail). */
+  /* ⭐ THE HEIGHT OF EVERY CONTROL IN THE TOP BAR'S RIGHT-HAND GROUP. On a multi-bar account the
+     bar name IS a real <select>, and The Rail button has to sit flush with it top and bottom.
+     MEASURED LIVE on the deployed build: the select renders at 30px; .btn is 27 and .btn-sm is 20,
+     so no stock button matched. Owned here so the two cannot be written twice and drift apart —
+     same reasoning as --rail-w. Change this and both move together. */
+  --tb-ctl-h:       30px;
 }
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -1265,7 +1271,11 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .tn-title-sec{color:var(--t2);font-weight:600;flex-shrink:0;}
 /* ⛔ --b1, not --b-edge. --b-edge is #14222A, a CARD border read against a card fill; on the top
    bar's darker --bg it was effectively invisible. --b1 is rgba(255,255,255,0.15), the app's token
-   for a line that is meant to be SEEN. Both dividers in the bar use it so they cannot drift apart. */
+   for a line that is meant to be SEEN.
+   ⚠ THIS COMMENT USED TO SAY "both dividers in the bar use it so they cannot drift apart." There
+   are THREE — section|page, page|(i), and date|bar name — and the third was still --b-edge for
+   weeks while this line asserted otherwise. It is pinned now (verify-topbar-chrome A1), because a
+   comment cannot keep two values in step and this one was quietly wrong the whole time. */
 .tn-sep{width:1px;height:18px;background:var(--b1);flex-shrink:0;}
 /* Not pure white. Against the grey section prefix, --w read as a jump rather than a hierarchy;
    --t1 is the app's own "primary text" and still clearly the brighter of the two. */
@@ -1751,10 +1761,25 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    the rule on .tn-barname means it simply cannot appear in the multi case. No flag to keep in step
    and no :has() to depend on: the markup already answers the question. */
 .tn-barname{position:relative;padding-left:12px;margin-left:4px;}
+/* ⛔ --b1, MATCHING THE OTHER TWO. This was --b-edge (#14222A, a CARD border read against a card
+   fill) and on the top bar's darker --bg it was effectively invisible next to the two crisp
+   dividers on the left. Kyle saw it in one look. The .tn-sep comment below already stated the rule
+   and said "BOTH dividers in the bar use it" — there are THREE, and this was the one that did not.
+   A comment is not a pin; verify-topbar-chrome asserts all three agree now. */
 .tn-barname::before{
   content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
-  width:1px;height:18px;background:var(--b-edge);
+  width:1px;height:18px;background:var(--b1);
 }
+/* THE RAIL — the one whole-bar read, on every page. Bar-scoped, so it lives on the RIGHT beside the
+   bar name; the left of the bar is page-scoped (page title + its "i") and mixing the two blurs
+   exactly that distinction. Height comes from --tb-ctl-h so it is flush with the multi-bar <select>.
+   ⚠ Styling rides on .btn/.btn-primary, so trying the ghost treatment is a class swap in the
+   markup, not a rewrite here. */
+.tn-rail{height:var(--tb-ctl-h);}
+/* The bar switcher, only where it sits in the top bar. .at-qsel is the switcher's own class (its
+   only two references are in renderAccountSwitcher) but the height is scoped anyway, so a future
+   reuse of the class elsewhere cannot inherit a top-bar measurement. */
+.tn-right .at-qsel{height:var(--tb-ctl-h);}
 .mnav-barname{font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;color:var(--t1);}
 
 /* Backdrop sits behind the sidebar overlay. Real div (not pseudo) so we can
