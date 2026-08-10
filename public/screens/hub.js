@@ -251,6 +251,91 @@ S.Hub = {
     }
   },
 
+  /* ── THE SECTION STRIP: SIX SYSTEMS, ONE ROW ────────────────────────────────
+     Replaces six cards that carried three stats, a progress bar, four hand-ticked step rows and a
+     footer each. Kyle, 2026-08-10, on why: *"the current dashboard is the main image on the
+     website.. and it looked intimidating... too much work.. 6 cards.. 4 steps each."* The Hub is the
+     shop window, and it was still advertising the 24-step model Close The Week replaced.
+
+     ⛔⛔ AND IT NO LONGER READS A COCKPIT. The old cards were BUILT from `safeSteps(S.<Cockpit>)`, so
+     the six screens being deleted were not merely linked — they were the data source. Every value
+     below comes from a store, a shared engine, or a screen that survives.
+
+     ⭐ WHICH SIX, AND WHY THESE: measured across all 18 stats the Hub used to show, only FIVE are
+     scored against a target at all (`tcol(value, target, dir)`) and two more carry a hard danger
+     rule. The other eleven are raw facts the app never forms an opinion about — which is exactly why
+     a bare "Shift -$28" told an operator nothing.
+     ⭐ LABEL THE METRIC, NOT THE SYSTEM. "Over / short" says what the number is; "Shift" does not.
+     ⚠ LABOR % SAT ON THE REVENUE CARD — the one labour metric with a target, while the Labor card
+     carried three unjudged figures. Filed under the system it measures now.
+
+     ⛔⛔⛔ AND A ZERO IS ONLY PRINTED WHEN IT IS MEASURED. The old empty state read
+     *Revenue $0.00 · Voids $0.00 · Over/short "Not counted"* — two cells claiming a measured zero
+     beside one telling the truth, and "Voids $0.00" reads as GOOD NEWS to someone who has imported
+     nothing. Every cell here answers "-" until it has a basis. */
+  _stripMetrics() {
+    const D = App.data || {};
+    const newest = arr => (arr || []).reduce((best, w) =>
+      (!best || String(w.period_end || '') > String(best.period_end || '')) ? w : best, null);
+    const pW = newest(D.weeks);
+    const rW = newest((D.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0));
+
+    /* BELOW PAR comes from the ORDER SHEET, not from the dying Inventory cockpit. Measured:
+       `ic-dashboard.computeState` never calculated it — it called `belowParByVendor()` (1,493 chars,
+       self-contained, on a screen that survives) and summed the plan. That one fact is why the Hub
+       needs no engine extraction to lose its last cockpit dependency.
+       ⚠ NO COUNT, NO BASIS. `latest` is the count the plan is measured from; without it "nothing is
+       below par" would be a claim about data that does not exist. */
+    let belowPar = null;
+    const os = (typeof S !== 'undefined') && S.InventoryOrderSheet;
+    if (os && os.belowParByVendor) {
+      const plan = os.belowParByVendor();
+      if (plan && plan.latest && plan.groups) {
+        belowPar = 0;
+        Object.keys(plan.groups).forEach(v =>
+          (plan.groups[v] || []).forEach(l => { belowPar += (l.cost || 0); }));
+      }
+    }
+
+    /* OVER / SHORT for the week on screen. A week with no drawer counted is "Not counted", which is
+       the honest wording this file already used for exactly this cell. */
+    const wkEnd = App.nextSunday ? App.nextSunday() : null;
+    const wkStart = (wkEnd && App.weekStartFor) ? App.weekStartFor(wkEnd) : null;
+    const vars = ((App.shiftData || {}).sc_variances || []).filter(v => {
+      const d = String((v && v.date) || '').slice(0, 10);
+      return !!d && (!wkStart || d >= wkStart) && (!wkEnd || d <= wkEnd);
+    });
+    const netVar = vars.reduce((t, v) => t + (v.variance || 0), 0);
+
+    const cashSF = (typeof CashEngine !== 'undefined' && CashEngine.survivalForecast)
+      ? CashEngine.survivalForecast(13) : { hasData: false };
+    const runway = !cashSF.hasData ? null
+      : (cashSF.runway == null ? '13+ wks'
+         : cashSF.runway === 0 ? 'This wk' : cashSF.runway + ' wk' + (cashSF.runway === 1 ? '' : 's'));
+
+    return [
+      { label: 'Below par',     mod: 'inventory', value: belowPar == null ? '-' : App.fmtCurrency(belowPar, 0) },
+      { label: 'Labor %',       mod: 'labor',     value: (rW && rW.labor_pct_blended != null) ? App.fmtPct(rW.labor_pct_blended) : '-' },
+      { label: 'Over / short',  mod: 'shift',     value: vars.length ? App.fmtSigned(netVar, 2) : 'Not counted' },
+      { label: 'Prime cost',    mod: 'profit',    value: (pW && pW.prime_cost_pct != null) ? App.fmtPct(pW.prime_cost_pct) : '-' },
+      { label: 'Check average', mod: 'revenue',   value: (rW && rW.check_avg != null) ? App.fmtCurrency(rW.check_avg) : '-' },
+      { label: 'Cash runway',   mod: 'cash',      value: runway || '-' }
+    ];
+  },
+
+  /* One row, six cells, each a door into its section. ⚠ THROUGH `jumpToSection`, which lands on the
+     section's own first page — never on a cockpit screen id, which is what made the old cards
+     undeletable. */
+  _sectionStrip(metrics) {
+    const cell = m =>
+      '<div onclick="App.jumpToSection(\'' + esc(m.mod) + '\')" style="flex:1;min-width:96px;cursor:pointer;">'
+      + '<div style="font-size:17px;font-weight:700;color:var(--t1);white-space:nowrap;">' + esc(m.value) + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:2px;white-space:nowrap;">' + esc(m.label) + '</div>'
+      + '</div>';
+    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;display:flex;gap:16px;flex-wrap:wrap;">'
+      + (metrics || []).map(cell).join('') + '</div>';
+  },
+
   render(container) {
     this._stage = container;
     // Outer wrapper scrolls when the dashboard content exceeds the viewport
@@ -609,93 +694,13 @@ S.Hub = {
     // ── Section cards: one per section, Control row + Recovery row. Each mirrors
     //    its section, a headline number/state + the weekly-close status + a jump
     //    into that section. The whole card is the deep link. ──
-    const auditLine = (a) => {
-      if (!a || a.overall_score == null) return '<span style="color:var(--t4);">No audit yet, run it for a baseline</span>';
-      const when = a.date ? shortDate(a.date) : null;
-      return 'Audit <b style="color:' + softScore(a.overall_score) + ';">' + a.overall_score + '</b>' + (when ? ' · last run ' + when : '');
-    };
-    // ── Section card: a snapshot of the section (3-stat strip from its own
-    //    dashboard) over the weekly-close checklist. Control cards carry the
-    //    step checklist + progress bar; Recovery cards carry the stat strip +
-    //    audit line until their Close The Week pages are built. ──
-    const statStrip = (stats) => '<div style="display:flex;align-items:flex-start;">'
-      + (stats || []).map((s, i) =>
-          (i > 0 ? '<div style="width:1px;align-self:stretch;background:var(--b2);margin:0 11px;flex-shrink:0;"></div>' : '')
-          + '<div style="min-width:0;flex:1;"><div style="font-size:8.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(s.label) + '</div>'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:21px;font-weight:600;line-height:1;margin-top:4px;white-space:nowrap;color:' + (s.color || (s.warn ? 'var(--amber)' : 'var(--t1)')) + ';">' + s.value + '</div></div>'
-        ).join('') + '</div>';
-    const progBar = (dc, total) => {
-      const pct = total ? Math.round(dc / total * 100) : 0;
-      return '<div style="height:5px;background:var(--bg);border:1px solid var(--b-edge);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--green);transition:width .2s;"></div></div>';
-    };
-    // Each step row deep-links to its OWN step open on the section page (sets the
-    // section's _openStep before navigating); the outer card opens it at default.
-    const stepRows = (steps, objName, screen, mod) => (steps || []).map((s, i) => {
-      const go = 'event.stopPropagation();' + (objName ? 'S.' + objName + '._openStep=\'' + s.key + '\';' : '') + 'S.Hub._enter(\'' + screen + '\',\'' + (mod || '') + '\')';
-      return '<div class="hd-step" onclick="' + go + '" style="display:flex;align-items:center;gap:10px;padding:9px 11px;margin-top:6px;background:#0D181E;border-radius:6px;font-size:12px;line-height:1.2;cursor:pointer;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">'
-        + (s.done
-            ? '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;background:var(--green);color:var(--bg);font-size:10px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;">&#10003;</span>'
-            : '<span style="flex-shrink:0;width:16px;height:16px;border-radius:50%;border:1px solid var(--b-edge);color:var(--t3);font-size:9px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>')
-        + '<span style="flex:1;min-width:0;">' + esc(s.label) + '</span>'
-        + '<span style="flex-shrink:0;color:var(--t4);font-size:13px;">&rsaquo;</span></div>';
-    }).join('');
-    const richCard = (o) => {
-      // A locked section keeps its card in the same grid cell (no reflow) but
-      // blanks the stats to dashes, drops the weekly-close steps, and routes the
-      // whole card to the no-access notice. Non-staff never lock, so the card
-      // renders exactly as before.
-      const lk = lockArea(o.screen);
-      const sum = lk ? null : o.sum;
-      const stats = lk ? (o.stats || []).map(s => ({ label: s.label, value: '-', color: 'var(--t4)' })) : o.stats;
-      const statNote = lk ? '' : o.statNote;
-      const footer = lk ? 'Request access from the owner' : o.footer;
-      const cardGo = lk ? 'App.showNoAccess()'
-        : (o.objName ? 'S.' + o.objName + '._openStep=null;' : '') + 'S.Hub._enter(\'' + o.screen + '\',\'' + (o.mod || '') + '\')';
-      const strip = statNote
-        ? '<div style="display:flex;align-items:flex-start;gap:8px;">'
-            + '<div style="flex:1;min-width:0;">' + statStrip(stats) + '</div>'
-            + '<span style="flex-shrink:0;font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--t3);margin-top:2px;white-space:nowrap;">' + esc(statNote) + '</span>'
-          + '</div>'
-        : statStrip(stats);
-      const body = strip
-        + (sum ? '<div style="margin-top:13px;">' + progBar(sum.doneCount, sum.total) + '</div>'
-                 + '<div style="margin-top:4px;display:flex;flex-direction:column;">' + stepRows(sum.steps, o.objName, o.screen, o.mod) + '</div>' : '')
-        + (footer ? '<div style="font-size:11px;color:var(--t3);line-height:1.4;border-top:1px solid var(--b-edge);margin-top:' + (sum ? '12px' : '13px') + ';padding-top:9px;">' + footer + '</div>' : '');
-      return '<div style="display:flex;flex-direction:column;min-width:0;">'
-        + '<div class="sh" style="margin:0 0 10px;">' + esc(o.title) + '</div>'
-        + '<div class="hd-row" onclick="' + cardGo + '" style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;flex:1;min-width:0;">'
-        +   body + '</div></div>';
-    };
-    const safeSteps = (obj) => { try { return (obj && obj.hubSteps) ? obj.hubSteps() : null; } catch (e) { return null; } };
-    // Control: stat strip + step checklist, all from each section's hubSteps().
-    const icSum = safeSteps(S.InventoryDashboard), lcSum = safeSteps(S.LaborDashboard), scSum = safeSteps(S.ShiftDashboard);
-    const scLast = latestOf(((App.shiftData || {}).sc_shifts) || [], ['date']);
-    const icCard = richCard({ title:'Inventory', screen:'ic-dashboard', mod:'inventory', objName:'InventoryDashboard', stats: icSum && icSum.stats, sum: icSum, footer: icLast ? 'Last count ' + shortDate(icLast) : 'No counts logged yet' });
-    const lcCard = richCard({ title:'Labor', screen:'lc-dashboard', mod:'labor', objName:'LaborDashboard', stats: lcSum && lcSum.stats, sum: lcSum, footer: lcLast ? 'Hours through ' + shortDate(lcLast) : 'No hours logged yet' });
-    const scCard = richCard({ title:'Shift', screen:'sc-dashboard', mod:'shift', objName:'ShiftDashboard', stats: scSum && scSum.stats, sum: scSum, statNote: (scSum && scSum.lastWk) ? 'last wk' : '', footer: scLast ? 'Sales through ' + shortDate(scLast) : 'No sales logged yet' });
-    // Recovery: stat strip + progress bar + step checklist (from each Close The
-    // Week page's hubSteps()) + audit line, same shape as the Control cards.
-    const tcol = (v, t, dir) => v != null ? bandColor(band(v, t, dir)) : 'var(--t1)';
-    const pfStats = [
-      { label:'Pour Cost', value: pW?.bar?.cost_pct != null ? App.fmtPct(pW.bar.cost_pct) : '-', color: tcol(pW?.bar?.cost_pct, pourT, 'low') },
-      { label:'Food Cost', value: pW?.food?.cost_pct != null ? App.fmtPct(pW.food.cost_pct) : '-', color: tcol(pW?.food?.cost_pct, foodT, 'low') },
-      { label:'Prime Cost', value: pW?.prime_cost_pct != null ? App.fmtPct(pW.prime_cost_pct) : '-', color: tcol(pW?.prime_cost_pct, primeT, 'low') }
-    ];
-    const rvStats = [
-      { label:'Check Avg', value: rW?.check_avg != null ? App.fmtCurrency(rW.check_avg) : '-', color: tcol(rW?.check_avg, caT, 'high') },
-      { label:'RPLH', value: rW?.rplh_blended != null ? App.fmtCurrency(rW.rplh_blended, 0) : '-' },
-      { label:'Labor %', value: rW?.labor_pct_blended != null ? App.fmtPct(rW.labor_pct_blended) : '-', color: tcol(rW?.labor_pct_blended, laborT, 'low') }
-    ];
-    const cashPos = (window.CashEngine && CashEngine.position) ? CashEngine.position() : { hasOpening:false };
-    const csStats = [
-      { label:'Trapped Cash', value: trapped.hasData ? App.fmtCurrency(trappedCash, 0) : '-' },
-      { label:'Runway', value: runwayTxt || '-', color: (cashSF.hasData && cashSF.runway != null && cashSF.runway <= 4) ? 'var(--red-soft)' : 'var(--t1)' },
-      { label:'Safe to Spend', value: cashPos.hasOpening ? App.fmtBal(cashPos.safe, 0) : '-', color: (cashPos.hasOpening && cashPos.safe < 0) ? 'var(--red-soft)' : 'var(--t1)' }
-    ];
-    const pfSum = safeSteps(S.Dashboard), rvSum = safeSteps(S.RevenueDashboard), csSum = safeSteps(S.CashDashboard);
-    const pfCard = richCard({ title:'Profit', screen:'dashboard', mod:'profit', objName:'Dashboard', stats: pfStats, sum: pfSum, footer: auditLine(pA) });
-    const rvCard = richCard({ title:'Revenue', screen:'r-dashboard', mod:'revenue', objName:'RevenueDashboard', stats: rvStats, sum: rvSum, footer: auditLine(rA) });
-    const csCard = richCard({ title:'Cash', screen:'c-dashboard', mod:'cash', objName:'CashDashboard', stats: csStats, sum: csSum, footer: auditLine(cA) });
+    /* ⛔⛔ THE SIX SECTION CARDS WERE CUT HERE, 2026-08-10, AND THE DEPENDENCY WENT WITH THEM.
+       They carried three stats, a progress bar, FOUR hand-ticked step rows and a footer each — 24
+       rows of a checklist nothing downstream ever read, on the page that is the marketing image.
+       Kyle: *"it looked intimidating... too much work.. 6 cards.. 4 steps each."*
+       ⭐ AND THEY WERE BUILT FROM `safeSteps(S.<Cockpit>)`, so the six screens being deleted were
+       the Hub's DATA SOURCE, not merely its links. `_sectionStrip` / `_stripMetrics` replace them
+       from stores, CashEngine and the surviving order sheet. Pinned by `verify-hub-no-cockpit`. */
 
     // Audit Scores panel — three stacked rows, one per module.
     // Each row uses the PDF-cover layout: bold module name + action top-right,
@@ -1178,14 +1183,14 @@ S.Hub = {
     // with the action band taller than the detail band so the eye lands on the
     // win and the next move first. Flip to false to restore the prior
     // equal-weight grid exactly (kept intact below; panels are unchanged).
-    // ── Hub landing layout: the money line, the Needs Attention band, then the
-    //    six section cards (Control row + Recovery row) the operator closes each
-    //    week. Cards are content-height (no fixed rows), so the page breathes. ──
-    const hubGrid = `<div class="hub-grid" style="display:grid;grid-template-rows:auto auto auto auto;gap:18px;padding-bottom:18px;">
+    /* ── Hub landing layout: the money line, the Needs Attention band, then ONE ROW covering all six
+       systems. It was two rows of three cards, each carrying a progress bar and four hand-ticked
+       step rows — 24 rows of checklist on the page that is the product's marketing image. ── */
+    const sectionStrip = this._sectionStrip(this._stripMetrics());
+    const hubGrid = `<div class="hub-grid" style="display:grid;grid-template-rows:auto auto auto;gap:18px;padding-bottom:18px;">
           <div class="hub-grid-tiles">${topCard}</div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">${priorityCard}${needsBand}</div>
-          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${icCard}${lcCard}${scCard}</div>
-          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;">${pfCard}${rvCard}${csCard}</div>
+          <div class="hub-grid-row">${sectionStrip}</div>
         </div>`;
 
     // ── Compose ──
