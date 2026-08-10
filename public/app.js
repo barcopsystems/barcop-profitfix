@@ -3140,10 +3140,21 @@ const App = {
     panel.appendChild(headEl);
     panel.appendChild(bodyEl);
 
-    // Open drilled into the section you are in (module via _activeModule, hub via
-    // _curHubSection), so reopening the menu on ANY of its pages — the dashboard
-    // included — returns to that section's menu with the current page highlighted.
-    const curKey = onHub ? (App._curHubSection || '') : (App._activeModule || '');
+    /* Open drilled into the section you are in, so reopening the menu on any of its pages returns to
+       that section's menu with the current page highlighted.
+       ⛔⛔⛔ ASK WHICH RAIL ROW IS LIT, NOT WHICH SHELL IS UP. This read
+       `onHub ? _curHubSection : _activeModule`, and Kyle found what that costs: open History from the
+       main menu, reopen the menu, and it drilled into PROFIT. Week History goes through
+       `openScreen('week-history')` — a MODULE screen, unlike its two rail siblings Close and Review,
+       which are hub pages — so `onHub` was false and the expression fell through to `_activeModule`,
+       which holds whatever shell was last up and is **seeded `'profit'` at declaration**. It was
+       never "no section"; it was always Profit ([[lessons-paid-for]] #14: a default is decided by
+       whoever assigns first, not by the reader).
+       ⭐ `_railCtx` is the row the rail is currently marking — `_protoGlobalClick('week-history')`
+       sets it — and `_railHasMenu` is the app's own answer to "does that row own a menu to drill
+       into". The rail was already right; the drawer was answering a different question. One
+       accessor, so the two menus cannot disagree about where you are. */
+    const curKey = App._railHasMenu(App._railCtx) ? App._railCtx : '';
     const stack = [root];
     if (curKey) {
       let secItem = null;
