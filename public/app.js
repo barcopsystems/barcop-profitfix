@@ -1904,8 +1904,23 @@ const App = {
     ['shift',     'Shift Control'],
   ],
 
-  // The dashboard screen each module lands on when entered.
+  /* ⛔⛔⛔ THIS IS A LANDING MAP AND NOTHING ELSE. It answers "which screen does this module open
+     on", and every entry is a screen that can be retired.
+     It used to answer a SECOND, unrelated question by accident — "is this rail row a module
+     section?" — because having a landing screen happened to be true of exactly the sections.
+     `_railHasMenu` and the rail overlay's cross-section click capture both leaned on that proxy, and
+     it is about to become false: the six close-the-week cockpits are being deleted and every one of
+     them IS a section's landing screen. Six of the ten menu-owning rail rows would have gone dead at
+     once, from a table nobody would think to open while deleting a screen.
+     ⭐ MEMBERSHIP NOW COMES FROM `_isSection`, off the `SECTIONS` registry above. Pinned by
+     `verify-rail-menu-overlay` C4: with this map EMPTIED, all ten rows still own their menu. */
   _SECTION_DASH: { profit: 'dashboard', revenue: 'r-dashboard', cash: 'c-dashboard', events: 'ev-dashboard', inventory: 'ic-dashboard', labor: 'lc-dashboard', shift: 'sc-dashboard' },
+
+  /* Is this key one of the module sections? Read off `SECTIONS`, which is the registry the section
+     switcher already draws from, so there is ONE list and a section cannot exist in one place and
+     not the other. `hub` is IN that registry and is deliberately NOT a section: it owns no menu and
+     its rail row navigates, exactly like Review and Map. */
+  _isSection(k) { return !!k && k !== 'hub' && this.SECTIONS.some(s => s[0] === k); },
 
 
   // Jump to a section's dashboard (or the Hub) from the switcher. showApp hides
@@ -2692,7 +2707,11 @@ const App = {
       const item = e.target.closest && e.target.closest('.nav-item');
       if (!item) return;
       const sec = App._railOpen;
-      if (sec && item.dataset.screen && App._SECTION_DASH[sec]) {
+      // ⛔ MEMBERSHIP AGAIN. This asks "is the open overlay a module section", so that the shell is
+      // swapped before navigating; it never wanted that section's landing screen. Reading the landing
+      // map meant a retired cockpit would stop the swap and paint every cross-section jump into a
+      // hidden shell — the dead-link defect this handler's own comment above records.
+      if (sec && item.dataset.screen && App._isSection(sec)) {
         const appEl = document.getElementById('app');
         if (!appEl || appEl.classList.contains('hidden') || App._activeModule !== sec) App.showApp(sec);
       }
@@ -2746,7 +2765,9 @@ const App = {
      openMobileNav gives Hub / Map / Review leaf rows that navigate, and drills these same ten. */
   _RAIL_HUB_CTX: { audit: 'audit', books: 'books', settings: 'settings' },
   _railHasMenu(k) {
-    return !!this._RAIL_HUB_CTX[k] || !!this._SECTION_DASH[k];
+    // ⛔ MEMBERSHIP, NOT "HAS A LANDING SCREEN" — see the note on `_SECTION_DASH`. Reading that map
+    // here meant a section lost its whole menu the moment its landing screen was retired.
+    return !!this._RAIL_HUB_CTX[k] || this._isSection(k);
   },
 
   /* Every rail row carries an icon, from the SHARED section map, because the collapsed rail is
