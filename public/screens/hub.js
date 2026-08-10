@@ -291,9 +291,15 @@ S.Hub = {
     if (os && os.belowParByVendor) {
       const plan = os.belowParByVendor();
       if (plan && plan.latest && plan.groups) {
+        /* ⛔ THE COST IS NOT A FIELD ON THE LINE — it is `suggested × unit_cost`, exactly as the
+           Inventory cockpit computed it. My first version read `l.cost`, which does not exist, so
+           the strip printed a confident **$0** on a demo whose old card read $3,988.05: a false zero
+           on the one cell whose whole job is saying money is sitting on the shelf. The harness
+           certified it because the fixture INVENTED `{cost: …}` instead of copying the real line
+           ([[the-loop]] integrity #6 — read the dependency's shape, never guess it). */
         belowPar = 0;
         Object.keys(plan.groups).forEach(v =>
-          (plan.groups[v] || []).forEach(l => { belowPar += (l.cost || 0); }));
+          (plan.groups[v] || []).forEach(l => { belowPar += (l.suggested || 0) * (l.unit_cost || 0); }));
       }
     }
 
@@ -316,11 +322,58 @@ S.Hub = {
     return [
       { label: 'Below par',     mod: 'inventory', value: belowPar == null ? '-' : App.fmtCurrency(belowPar, 0) },
       { label: 'Labor %',       mod: 'labor',     value: (rW && rW.labor_pct_blended != null) ? App.fmtPct(rW.labor_pct_blended) : '-' },
-      { label: 'Over / short',  mod: 'shift',     value: vars.length ? App.fmtSigned(netVar, 2) : 'Not counted' },
+      /* ⛔ `App.fmtSigned` RETURNS `{ text, sign }`, NOT A STRING. Without `.text` the cell rendered
+         a literal **[object Object]** on the shipped Hub. My fixture stubbed it as a string-returner,
+         so every assertion about this cell passed over the defect — a stub of a different SHAPE from
+         the real helper is the same trap as one that is more forgiving. Block E refuses any
+         non-string value now, which closes the class rather than this one cell.
+         ⚠ AND THE MONEY COMES FROM `fmtBal`, WHICH IS WHAT THE SHIFT COCKPIT USED — `fmtSigned.text`
+         alone yields "-28.25" with no currency mark. `fmtSigned` is here only for the SIGN, exactly
+         as the card did it. Copy the reason, not just the shape ([[test-the-first-drop]] rule 4). */
+      { label: 'Over / short',  mod: 'shift',     value: vars.length
+          ? (App.fmtSigned(netVar, 2).sign > 0 ? '+' : '') + App.fmtBal(netVar) : 'Not counted' },
       { label: 'Prime cost',    mod: 'profit',    value: (pW && pW.prime_cost_pct != null) ? App.fmtPct(pW.prime_cost_pct) : '-' },
       { label: 'Check average', mod: 'revenue',   value: (rW && rW.check_avg != null) ? App.fmtCurrency(rW.check_avg) : '-' },
       { label: 'Cash runway',   mod: 'cash',      value: runway || '-' }
     ];
+  },
+
+  /* ── NEEDS ATTENTION, CAPPED BY SEVERITY RATHER THAN BY COUNT ───────────────
+     Both Hub lists used to sit in a 188px `overflow-y:auto` box. Kyle: *"i want to get rid of the
+     scrollbars.. because on mobile it is a real pain hitting the scrolling areas when you are just
+     trying to scroll down the page."* And the scroll was buying almost nothing — 8 items in a box
+     that showed about five, so it hid roughly three rows in exchange for a nested scroll trap.
+
+     ⛔⛔ BUT A STRAIGHT TOP-N WOULD BURY AN EXPIRED PERMIT. On the shipped Hub, ServSafe (expired 13
+     days) sat THIRD, below a certificate not due for another 8 — so a cap of four would have pushed
+     something genuinely expired out of sight to make room for something merely upcoming. Needs
+     Attention is not a ranked list, it is a mix of severities.
+     ⭐ SO EVERY RED SHOWS, however many there are, and ambers fill whatever room is left. The list
+     can only grow past the cap for things that are actually wrong. */
+  /* ── THE ONE THING TO DO, PICKED HERE RATHER THAN INSIDE `render` ───────────
+     A member so it can be RUN by a harness. The two defects that shipped on the section strip both
+     lived in code no assertion could execute, and the label rule below is exactly the kind that goes
+     wrong quietly: a recovery action reads *"Free $2,421.80 of lazy shelf cash: $2,405.00 in dead
+     stock, $16.80 above par"*, and only the part before the first full stop belongs on a headline.
+     ⚠ SPLIT ON A SENTENCE END, NOT ON ANY DOT — a decimal point is not a full stop, and cutting at
+     one would render "Free $2" ([[harness-review-like-code]] #15, which cost a red on correct code
+     for the same reason). `\.\s` and `\.$` are the two real endings. */
+  _doFirst(items) {
+    const all = items || [];
+    if (!all.length) return null;
+    const it = all[0];
+    const raw = String(it.action || '');
+    const label = (raw.split(/\.\s|\.$/)[0] || raw).trim();
+    return { label: label, impact: it.impact || 0, more: all.length - 1, item: it };
+  },
+
+  _needsCapped(items, cap) {
+    const all = items || [];
+    const red = all.filter(a => a && a.sev === 'bad');
+    const amber = all.filter(a => a && a.sev !== 'bad');
+    const room = Math.max(0, (cap || 4) - red.length);
+    const shown = red.concat(amber.slice(0, room));
+    return { shown: shown, more: all.length - shown.length };
   },
 
   /* One row, six cells, each a door into its section. ⚠ THROUGH `jumpToSection`, which lands on the
@@ -608,20 +661,27 @@ S.Hub = {
     // a Get Started title, one subtitle line, and a flex row of numbered chips
     // that navigate. Each chip carries its own module so the Hub router lands on
     // the right section.
-    const gsChip = (n, label, screen, mod) =>
-        '<div onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid var(--gold-tint-bord);border-radius:8px;background:var(--gold-tint);">'
+    /* ⚠ THE CHIPS GO THROUGH `jumpToSection`, NOT AT A COCKPIT SCREEN ID. They pointed at
+       `ic-dashboard` / `lc-dashboard` / `sc-dashboard` — three of the six being deleted — so the very
+       first thing a new operator pressed would have been a dead link. `jumpToSection` lands on each
+       section's own first page, which is one door and already correct. */
+    const gsChip = (n, label, mod) =>
+        '<div onclick="App.jumpToSection(\'' + mod + '\')" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid var(--gold-tint-bord);border-radius:8px;background:var(--gold-tint);">'
       +   '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;line-height:1;background:var(--sel-active-bg);color:var(--gold);">' + n + '</span>'
       +   '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
-    const gettingStarted = '<div class="card form-card" style="margin:0;">'
-      + '<div class="card-title">Get Started</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Four steps to getting started in Bar Cop. Set up your Control sections first, then run your first audit.</div>'
+    const gettingStarted = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Set up your Control sections first, then run your first audit.</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      +   gsChip(1, 'Set up Inventory Control', 'ic-dashboard', 'inventory')
-      +   gsChip(2, 'Set up Labor Control', 'lc-dashboard', 'labor')
-      +   gsChip(3, 'Set up Shift Control', 'sc-dashboard', 'shift')
-      +   gsChip(4, 'Run your first audit', 'audit-tracker', 'profit')
-      + '</div></div>';
-    const topCard = hubStarted ? tiles : gettingStarted;
+      +   gsChip(1, 'Set up Inventory Control', 'inventory')
+      +   gsChip(2, 'Set up Labor Control', 'labor')
+      +   gsChip(3, 'Set up Shift Control', 'shift')
+      +   gsChip(4, 'Run your first audit', 'profit')
+      + '</div>';
+    /* ⛔ THE MONEY BAND ALWAYS RENDERS. It used to be REPLACED wholesale by the Get Started box, so a
+       new operator never saw the four numbers the product exists to produce — the one thing on the
+       page that says what Bar Cop is for. The band shows its own empty state; Get Started moved into
+       the "do this first" slot below it, which is the same region a seeded account uses for its
+       biggest money move. One design, both states ([[empty-state-day1]]). */
+    const topCard = tiles;
 
     // ── Needs Attention band: the fires (alerts) + section-less weekly nudges
     //    (month-end Books, etc.). Catches what does not belong to a weekly section
@@ -660,14 +720,26 @@ S.Hub = {
         ? 'S.Hub._enter(\'' + d.screen + '\',\'' + d.mod + '\')'
         : 'S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')';
     };
-    const paiRow = (it) => {
-      const lbl = (String(it.action || '').split(/\.\s|\.$/)[0] || it.action || '').trim();
-      const val = it.impact > 0 ? App.fmtCurrency(it.impact, 0) + '/mo' : '';
-      return rowDiv(paiGo(it), 'var(--gold)', lbl, val, 'var(--gold)');
-    };
-    const priorityCard = cardWrap('Priority Actions', topItems.length
-      ? '<div style="max-height:188px;overflow-y:auto;">' + topItems.map(paiRow).join('') + '</div>'
-      : '<div style="font-size:12px;color:var(--t2);line-height:1.6;">Run an audit and your biggest money moves rank here, each a tap from its fix.</div>');
+    /* ── DO THIS FIRST: ONE THING ────────────────────────────────────────────
+       This was a ranked list of eight in a scroll box. One item is calmer AND more useful: the app
+       has done the analysis, so it should say what the answer is rather than hand back a shortlist.
+       ⭐ AND IT IS THE SAME REGION AS GET STARTED. Seeded, it is the biggest money move; empty, it is
+       the four setup steps. Same position, same promise — the app tells you the one next thing.
+       ⚠ THE REST ARE NAMED, NOT HIDDEN: "N more" carries them to the Playbook rather than to a
+       scrollbar nobody finds on a phone. */
+    const first = this._doFirst(itemRows);
+    const doFirst = first
+      ? '<div onclick="' + paiGo(first.item) + '" style="cursor:pointer;">'
+        + '<div style="font-size:15px;font-weight:700;color:var(--t1);line-height:1.35;">' + esc(first.label) + '</div>'
+        + (first.impact > 0
+            ? '<div style="font-size:12px;color:var(--t2);margin-top:5px;">Worth <span style="color:var(--gold);font-weight:700;">'
+              + App.fmtCurrency(first.impact, 0) + '</span> a month</div>' : '')
+        + '</div>'
+        + (first.more
+            ? '<div onclick="S.Hub._enter(\'recovery-playbook\',\'profit\')" style="font-size:11px;color:var(--gold);cursor:pointer;padding:10px 0 0;">'
+              + first.more + ' more</div>' : '')
+      : gettingStarted;
+    const priorityCard = cardWrap(topItems.length ? 'Do This First' : 'Get Started', doFirst);
 
     // ── Needs Attention: operational outliers only (permits, certs, OT, cash,
     //    maintenance, vendor, loss-prevention, month-end Books). Act Now over Keep
@@ -678,11 +750,18 @@ S.Hub = {
       const critical = bandItems.filter(a => a.sev === 'bad');
       const watch    = bandItems.filter(a => a.sev !== 'bad');
       const naRow = (a, dot) => rowDiv(goOf(a), dot, a.label || a.text || '', a.value || '', 'var(--t2)');
-      // No group headers: severity reads from the dot color (red = act now,
-      // amber = keep an eye) and the order (reds first).
-      needsBand = cardWrap('Needs Attention', '<div style="max-height:188px;overflow-y:auto;">'
-        + critical.map(a => naRow(a, 'var(--red)')).join('')
-        + watch.map(a => naRow(a, 'var(--amber)')).join('')
+      /* No group headers: severity reads from the dot colour (red = act now, amber = keep an eye)
+         and the order (reds first).
+         ⛔ NO SCROLL BOX. Capped by SEVERITY through `_needsCapped` — every red shows however many
+         there are, ambers fill the rest, and anything past that is named rather than hidden behind a
+         scrollbar the operator has to find on a phone. */
+      const capped = this._needsCapped(bandItems, 4);
+      needsBand = cardWrap('Needs Attention', '<div>'
+        + capped.shown.map(a => naRow(a, a.sev === 'bad' ? 'var(--red)' : 'var(--amber)')).join('')
+        + (capped.more
+            ? '<div onclick="S.Hub._enter(\'hub-permits\',\'\')" style="font-size:11px;color:var(--gold);cursor:pointer;padding:8px 0 2px;">'
+              + capped.more + ' more' + '</div>'
+            : '')
         + '</div>');
     } else {
       needsBand = '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">Needs Attention</div>'
