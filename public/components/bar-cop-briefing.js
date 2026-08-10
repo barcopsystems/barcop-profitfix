@@ -26,21 +26,34 @@ window.BarCopBriefing = {
   attach(containerEl, snapshot) {
     if (!containerEl) return;
     if (snapshot) this._snap = snapshot;
-    containerEl.innerHTML = '<button class="btn btn-ghost btn-sm" id="bcb-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
+    containerEl.innerHTML = '<button class="btn btn-ghost btn-sm" id="bcb-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">The Rail</button>';
     const btn = containerEl.querySelector('#bcb-btn');
-    if (btn) btn.addEventListener('click', () => this._handleClick());
+    if (btn) btn.addEventListener('click', () => this.open());
+  },
+
+  /* THE ONE DOOR. The Rail button sits in the top bar on every page, so the snapshot cannot come
+     from whatever the Hub last rendered — it is computed here, at click time, from App.data.
+     ⛔ BARE CALL ON PURPOSE. If S.Hub.briefingSnapshot is ever missing this must fail loudly:
+     optional-chaining it would fall back to a stale-or-empty _snap and print a confident-looking
+     briefing with most of the bar missing, which is the one outcome worse than an error
+     ([[the-loop]] #40). */
+  open() {
+    this._snap = S.Hub.briefingSnapshot();
+    this._handleClick();
   },
 
   _handleClick() {
     if (!this._hasData()) {
-      this._showError('Run an audit first. The briefing reads your Profit, Revenue, Cash, and Bar Cop Audit scores to size up the whole operation.');
+      this._showError('Run an audit first. The Rail reads your Profit, Revenue, Cash, and Bar Cop Audit scores to size up the whole operation.');
       return;
     }
-    const text = this._buildBriefing();
-    const generated_at = new Date().toISOString();
-    App.data.bar_cop_briefing = { text: text, generated_at: generated_at };
-    try { App.save(); } catch (e) { /* show it regardless of a slow save */ }
-    this._showModal(text, generated_at);
+    /* ⚠ NOT PERSISTED ANY MORE, AND THE COMMENT THAT SAID IT WAS HAS GONE WITH IT. This used to
+       write App.data.bar_cop_briefing and fire an App.save() on every open, under a header
+       claiming it made a reopen instant. Nothing ever read it back — _handleClick always rebuilt —
+       so it was a save round-trip per click buying nothing, and the briefing is rebuilt from
+       current data anyway, which is the behaviour you actually want now that the button is on
+       every page ([[the-loop]] #25: computed, persisted, read nowhere). */
+    this._showModal(this._buildBriefing(), new Date().toISOString());
   },
 
   // 3 to 4 short paragraphs off the Hub snapshot: overall state, where the money
@@ -112,7 +125,7 @@ window.BarCopBriefing = {
   _showModal(bodyHtml, generated_at) {
     const dateStr = generated_at ? this._fmtDate(generated_at) : '';
     const html = '<div class="card form-card" style="margin:0;">'
-      + '<div class="card-title">Bar Cop Briefing' + (dateStr ? ' &middot; as of ' + esc(dateStr) : '') + '</div>'
+      + '<div class="card-title">The Rail' + (dateStr ? ' &middot; as of ' + esc(dateStr) : '') + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>'
       + '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Generated from your logged Bar Cop data. A read on where you stand, not real-time and not financial or business advice.</div>'
       + '</div>';
