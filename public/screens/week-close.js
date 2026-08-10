@@ -51,14 +51,48 @@ S.WeekClose = {
     container() { return S.WeekClose.container; },
     rerender()  { S.WeekClose.render(S.WeekClose.container); }
   },
+  /* The Shift cockpit's lanes. A SECOND host object because the zone ids, the carried node and the
+     takeover flag all live on the cockpit object — Labor's lane cannot be told about Shift's.
+     ⚠ The takeover slot is shared: only one file is ever mid-import, and both cockpits release
+     before another can claim. */
+  SC_HOST: {
+    zone: { import: 'wc-sales', cash: 'wc-cash' },
+    takeover: 'wc-takeover',
+    container() { return S.WeekClose.container; },
+    rerender()  { S.WeekClose.render(S.WeekClose.container); }
+  },
+  // ⚠ NO `_sc()` TWIN. I added one and never called it — every Shift read goes through the `LANES`
+  // table's `obj`, so a second accessor was a member computed and read nowhere ([[the-loop]] #25).
   _lb() { return S.LaborDashboard || null; },
 
   /* ⛔ THE ROW KEY IS NOT THE LANE KEY, and assuming it was is the obvious mistake here: this page
      calls it `sales`, the Shift cockpit calls that lane `import`. `mount` names the cockpit member
      that mounts it, so a lane is one row of table rather than a branch in three places. */
   LANES: {
-    hours: { host: 'LB_HOST', obj: 'LaborDashboard', key: 'hours', mount: 'mountHoursImport' },
-    tips:  { host: 'LB_HOST', obj: 'LaborDashboard', key: 'tips',  mount: 'mountTipsImport'  }
+    sales: { host: 'SC_HOST', obj: 'ShiftDashboard',  key: 'import', mount: 'mountImport' },
+    hours: { host: 'LB_HOST', obj: 'LaborDashboard', key: 'hours',  mount: 'mountHoursImport' },
+    tips:  { host: 'LB_HOST', obj: 'LaborDashboard', key: 'tips',   mount: 'mountTipsImport' },
+    cash:  { host: 'SC_HOST', obj: 'ShiftDashboard',  key: 'cash',   mount: 'mountCashImport' }
+  },
+  /* ⛔ THE TWO COCKPITS SPELL THE SAME CONTRACT DIFFERENTLY — `lbClaim`/`_lbLaneKey`/`lbTakeover`
+     against `ckClaim`/`_ckLaneKey`/`ckTakeover`. ONE explicit branch rather than member names held
+     as STRINGS in the table, and the reason is not style: a string is invisible to a rename and to
+     `verify-no-retired-code`, which counts qualified references — the string version reported both
+     lane-key readers as dead members on the day they were written. Naming them here means a rename
+     breaks loudly and the ratchet can see them. */
+  _isLabor(L)      { return L.obj === 'LaborDashboard'; },
+  _laneOpen(L, o)  { return this._isLabor(L) ? o.lbTakeover() : o.ckTakeover(); },
+  _laneKey(L, o)   { return this._isLabor(L) ? o._lbLaneKey() : o._ckLaneKey(); },
+  _laneClaim(L, o) { if (this._isLabor(L)) o.lbClaim(this[L.host]); else o.ckClaim(this[L.host]); },
+  // Which ROW this page is showing a lane for, or '' — reversed off the table, never assumed equal.
+  _laneRow() {
+    const keys = Object.keys(this.LANES);
+    for (let i = 0; i < keys.length; i++) {
+      const L = this.LANES[keys[i]], o = S[L.obj];
+      if (!o || !this._laneOpen(L, o)) continue;
+      if (this._laneKey(L, o) === L.key) return keys[i];
+    }
+    return '';
   },
   _laneObj(rowKey) {
     const L = this.LANES[rowKey];
@@ -182,7 +216,7 @@ S.WeekClose = {
       ? 'From your counts'
       : (st.cogs.lastCount ? 'Type it on the confirm. Last count ' + this._shortDate(st.cogs.lastCount) : 'Type it on the confirm');
     return [
-      { key: 'sales', label: 'Sales', ready: st.sales.length > 0, go: 'sc-dashboard',
+      { key: 'sales', label: 'Sales', ready: st.sales.length > 0, go: 'sc-dashboard', lane: 'sales',
         note: st.sales.length ? st.sales.length + ' day' + (st.sales.length === 1 ? '' : 's') + ' in, ' + money(st.salesTotal) : 'Not in yet' },
       /* ⛔ THE DROP BELONGS WHERE THE RESULT SHOWS. This row is where the operator reads what the
          week's hours are, so it is where the file goes in; a door whose answer appears on a
@@ -191,7 +225,7 @@ S.WeekClose = {
         note: st.hours.length ? st.hoursTotal.toFixed(1) + ' hours across ' + st.hours.length + ' row' + (st.hours.length === 1 ? '' : 's') : 'Not in yet' },
       { key: 'tips', label: 'Tips', ready: st.tips.length > 0, go: 'lc-tip-log', optional: true, lane: 'tips',
         note: st.tips.length ? money(st.tipsTotal) + ' logged' : 'None logged' },
-      { key: 'cash', label: 'Cash over and short', ready: st.cash.length > 0, go: 'sc-cash-control', optional: true,
+      { key: 'cash', label: 'Cash over and short', ready: st.cash.length > 0, go: 'sc-cash-control', optional: true, lane: 'cash',
         note: st.cash.length ? st.cash.length + ' drawer count' + (st.cash.length === 1 ? '' : 's') : 'No drawer counted' },
       { key: 'cogs', label: 'Cost of goods', ready: st.cogs.has, go: 'ic-take-inventory', derived: true,
         note: cogsNote },
@@ -298,33 +332,53 @@ S.WeekClose = {
      its container, so rebuilding here would throw the operator's parsed file away and put them back
      on an empty drop zone, silently. The lane detaches and carries the node; this puts the same
      element back, listeners and parsed rows intact. */
-  renderLane(container) {
-    const LC = this._lb();
+  renderLane(container, rowKey) {
+    const L = this.LANES[rowKey] || this.LANES.hours;
+    const o = S[L.obj];
+    const labor = L.obj === 'LaborDashboard';
     const st = this.state();
     const rows = this.rows(st);
     const required = rows.filter(r => !r.optional);
-    const T = this.LB_HOST.takeover;
-    const onConfirm = !!LC._anyLaborReview();
+    const T = this[L.host].takeover;
+    /* Each cockpit names its own confirm-screen members. Labor's are `_anyLaborReview` /
+       `laborReviewHTML` / `_wireLaborReview`; Shift's are `_anyReview` / `_reviewHTML`, and Shift
+       wires its confirm screen through the cockpit's own `wire()` rather than a separate member. */
+    const onConfirm = labor ? !!o._anyLaborReview() : !!o._anyReview();
+    const carry     = labor ? o._lbCarry     : o._ckCarry;
+    const carryActs = labor ? o._lbCarryActs : o._ckCarryActs;
+    const title     = labor ? (o.LC_TITLE && o.LC_TITLE[o._lbTakeover])
+                            : (o.CK_TITLE && o.CK_TITLE[o._ckTakeover]);
 
     container.innerHTML = '<div class="screen">'
       + this.banner(st, required.filter(r => r.ready).length, required.length)
       + (onConfirm
-          ? '<div style="margin-top:18px;">' + LC.laborReviewHTML() + '</div>'
+          ? '<div style="margin-top:18px;">' + (labor ? o.laborReviewHTML() : o._reviewHTML()) + '</div>'
           : '<div class="card form-card" style="margin-top:18px;">'
-            +   '<div class="card-title">' + esc((LC.LC_TITLE && LC.LC_TITLE[LC._lbTakeover]) || 'Check your import') + '</div>'
+            +   '<div class="card-title">' + esc(title || 'Check your import') + '</div>'
             +   '<div id="' + T + '"></div>'
             + '</div>'
             + '<div id="' + T + '-actions" style="margin-top:14px;"></div>')
+      /* ⛔ THE TAKEOVER RESULT SLOT. Shift's cash lane resolves its map-or-add prompt to
+         `<takeover>-res` whenever a dropped file owns the page, so a page that renders no such slot
+         swallows a CONTROL the operator has to answer — the defect `_cashPanelSlot`'s own comment
+         records. Rendered for both lanes; harmless where it is unused. */
+      + '<div id="' + T + '-res"></div>'
       + '</div>';
 
-    if (!onConfirm && LC._lbCarry) {
+    if (!onConfirm && carry) {
       const slot = document.getElementById(T);
-      if (slot) slot.appendChild(LC._lbCarry);
+      if (slot) slot.appendChild(carry);
       const aslot = document.getElementById(T + '-actions');
-      if (aslot && LC._lbCarryActs) aslot.appendChild(LC._lbCarryActs);
+      if (aslot && carryActs) aslot.appendChild(carryActs);
     }
     this.wire();
-    if (onConfirm) LC._wireLaborReview();
+    /* ⛔ THE CONFIRM SCREEN'S OWN CONTROLS. Labor exposes a wiring member; Shift wires its confirm
+       screen inside the cockpit's `wire()`, which binds `this.container.onclick` — so it is given
+       THIS page's container, and the host is what makes its redraws land back here. */
+    if (onConfirm) {
+      if (labor) o._wireLaborReview();
+      else { o.container = container; o.wire(); }
+    }
     // The takeover draws BELOW the banner, so on a short window a dropped file moves nothing the
     // operator can see. Only on the way in; on the way out the rows are what they want back.
     setTimeout(() => document.getElementById(T)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
@@ -338,15 +392,17 @@ S.WeekClose = {
     /* ⭐ THE LANE BELONGS TO THE PAGE DRAWING IT, AND THIS PAGE ONLY DRAWS THE ONE IT HOSTS. Claiming
        a lane this page has no zone for would point every id, every container read and every redraw
        at markup it never rendered. */
-    /* ⛔ THE COCKPIT ANSWERS IN ITS OWN LANE KEY, AND THIS PAGE RENDERS ROW KEYS. They happen to
-       match for Labor and they will NOT for Shift, whose sales lane is called `import` — so the
-       table is reversed rather than the keys assumed equal. */
-    const inFlight = LC && LC.lbTakeover() ? LC._lbLaneKey() : null;
-    const laneHere = !!inFlight && Object.keys(this.LANES)
-      .some(rk => this.LANES[rk].obj === 'LaborDashboard' && this.LANES[rk].key === inFlight);
+    /* ⛔ THE COCKPIT ANSWERS IN ITS OWN LANE KEY, AND THIS PAGE RENDERS ROW KEYS. They match for
+       Labor and they do NOT for Shift, whose sales lane is called `import` — so the table is
+       reversed rather than the keys assumed equal. */
+    const inFlightRow = this._laneRow();
     const laneOpen = !!(this._openLane && this._laneZone(this._openLane));
-    if (LC && (laneHere || laneOpen)) LC.lbClaim(this.LB_HOST);
-    if (laneHere) return this.renderLane(container);
+    const claimRow = inFlightRow || (laneOpen ? this._openLane : '');
+    if (claimRow) {
+      const L = this.LANES[claimRow], o = S[L.obj];
+      if (o) this._laneClaim(L, o);
+    }
+    if (inFlightRow) return this.renderLane(container, inFlightRow);
 
     /* ⛔ THE LANDING MESSAGE BELONGS TO THE PAGE THAT RAN THE IMPORT. `importLane` sets `_flash` the
        moment a write lands and the cockpit reads it in its own render — which never runs when this
