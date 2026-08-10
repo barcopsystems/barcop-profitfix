@@ -234,11 +234,8 @@ S.CashDashboard = {
     const freedLine = f.building
       ? '<span style="color:var(--t3);">Cash Freed builds here as you count, the drop in trapped cash from your first weeks.</span>'
       : '<span><span style="color:var(--green);font-weight:700;">' + App.fmtCurrency(f.dollars, 0) + '</span> in cash freed so far, trapped cash down from your first weeks.</span>';
-    const showIns = t.hasData || (st.survival && st.survival.hasData);
     return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title"' + (showIns ? ' style="display:flex;align-items:center;justify-content:space-between;gap:12px;"' : '') + '><span>Where You Stand</span>'
-      +   (showIns ? '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>' : '')
-      + '</div>'
+      + '<div class="card-title">Where You Stand</div>'
       + heroBody
       + '<div style="font-size:12px;color:var(--t3);margin-top:10px;padding-bottom:2px;">' + freedLine + '</div>'
       + this.survivalStrip(st)
@@ -536,69 +533,8 @@ S.CashDashboard = {
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
       if (ev.target.closest('.c-wk-prev')) { this._stepWeek(-7); return; }
       if (ev.target.closest('.c-wk-next')) { this._stepWeek(7); return; }
-      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       if (ev.target.closest('.c-wk-now'))  { this._weekStart = null; this._openStep = null; this.render(this.container, this.actions); return; }
     };
   },
 
-  // ── Bar Cop Briefing: a written read of the cash picture, same button Profit
-  //    and Revenue carry. Built fresh from your logged data on every open — there is no
-  //    cache and no API call ([[the-loop]] #53: the old comment here claimed both).
-  // Code-generated (no API): survival read, where cash is stuck, the one move.
-  showInsights() {
-    const st = this._st || this.computeState();
-    const sf = st.survival, t = st.trapped;
-    if (!(sf && sf.hasData) && !(t && t.hasData)) {
-      DashUI.insightsModal('Bar Cop Briefing', 'Take a couple of counts and add your sales, schedule, and bills, and Bar Cop can read your cash for you.');
-      return;
-    }
-    DashUI.insightsModal('Bar Cop Briefing', this._insBriefing(st));
-  },
-
-  _insBriefing(st) {
-    /* ⛔ App.fmtBal, NOT a private '$' + n. Two of the figures below go under zero (the low
-       point, and Safe to Spend — whose own clause only fires when it IS negative), so the
-       private version printed "$-13,375" every time it mattered, two inches under the strip
-       above printing "-$13,375" for the same number. audit-outlook.js had already fixed its
-       copy of this and carried a comment explaining why; this was the THIRD implementation. */
-    const m = (n) => App.fmtBal(n || 0, 0);
-    const sf = st.survival || {}, pos = st.position || {}, cyc = st.cycle || {}, t = st.trapped || {};
-    const totalVendors = (window.CashEngine && CashEngine.vendors) ? CashEngine.vendors().length : 0;
-    const onTerms = (st.termVendors || []).length;
-    const paras = [];
-
-    // 1 — the survival read
-    if (sf.hasOpening) {
-      let p1 = sf.runway == null ? 'Your cash holds all thirteen weeks ahead.'
-             : sf.runway === 0 ? 'Your cash runs out this week. This is the fire.'
-             : 'Your cash runs about ' + sf.runway + ' week' + (sf.runway === 1 ? '' : 's') + ' before it would go negative.';
-      if (sf.lowPoint) p1 += ' The tightest week is ' + this.fmtWk(sf.lowPoint.ws) + ' at ' + m(sf.lowPoint.balance) + '.';
-      if (sf.tightWeeks > 0) p1 += ' ' + sf.tightWeeks + ' of the next thirteen run tight, more going out than coming in.';
-      if (pos.hasOpening && pos.safe != null) p1 += ' Safe to spend right now is ' + m(pos.safe) + (pos.safe < 0 ? ', which means you are into money already spoken for.' : '.');
-      paras.push(p1);
-    } else {
-      let p1 = 'Set your opening cash balance in Cash Position and this becomes a real runway instead of just timing.';
-      if (sf.tightWeeks > 0) p1 = sf.tightWeeks + ' of the next thirteen weeks run more cash out than in. ' + p1;
-      paras.push(p1);
-    }
-
-    // 2 — where the cash is stuck
-    let p2 = '';
-    if (t.hasData && t.total > 0) p2 = m(t.total) + ' of shelf cash is stuck, ' + m(t.dead) + ' in dead stock and ' + m(t.overPar) + ' above par. ';
-    else if (t.hasData) p2 = 'Almost nothing is trapped on the shelf, your inventory is working. ';
-    // ONE cycle sentence, shared with the audit briefing. A negative cycle is the GOOD side
-    // and used to render as "locked about -17 days" here — see App.cashCycleSentence.
-    if (cyc.hasData) p2 += App.cashCycleSentence(cyc.cycle, cyc.dio, cyc.dpo);
-    if (p2.trim()) paras.push(p2.trim());
-
-    // 3 — the single move that matters most
-    let move;
-    if (sf.hasOpening && sf.runway != null && sf.runway <= 4) move = 'Buy runway this week. Move a payment to its due date and hold any order you can before the tight week lands.';
-    else if (t.hasData && t.total > 2000) move = 'The fastest cash is on your own shelf. Run the dead stock down and order to par in Trapped Cash.';
-    else if (totalVendors && onTerms < totalVendors) move = 'Put the ' + (totalVendors - onTerms) + ' vendor' + ((totalVendors - onTerms) === 1 ? '' : 's') + ' without terms on terms, so you stop financing them early.';
-    else move = 'Nothing on fire. Keep ordering to par and paying on the due date, not before.';
-    paras.push(move);
-
-    return paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
-  }
 };
