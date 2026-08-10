@@ -1992,25 +1992,22 @@ const App = {
     nav.classList.toggle('nav-mstyle', mstyle);
     nav._mstyleClosed = false;
     if (mstyle) {
-      /* ⛔⛔⛔ THE ROW SAYS "CLOSE THE WEEK", SO IT GOES TO CLOSE THE WEEK. It pointed at
-         `_SECTION_DASH[module]` — the section's own cockpit — because for years that cockpit WAS the
-         section's close-the-week page. There is one real Close The Week page now, and the six
-         cockpits are being deleted, so this row's label was about to become a promise it could not
-         keep. Six rows, one per section, all saying the same thing and all landing somewhere else.
-         ⚠ A HUB PAGE IS NOT A MODULE SCREEN, so this cannot be `data-screen`: that hook routes
-         through `App.navigate`, which paints into `#content-area`. Close The Week renders through
-         `openHubFullPage` into `.hub-app`. `data-nav` is the file's existing hook for exactly this
-         (`hub`, `report-bug`), and `_protoGlobalClick('week-close')` is the door the rail already
-         uses — so there is ONE opener, not a second copy of it. */
-      const wkLeaf = ['inventory', 'labor', 'shift', 'cash', 'profit', 'revenue'].indexOf(module) !== -1;
-      const dashScreen = wkLeaf ? 'week-close' : this._SECTION_DASH[module];
+      /* ⛔⛔⛔ NO "CLOSE THE WEEK" LEAF HERE ANY MORE. Kyle, 2026-08-10, reading the shipped menus:
+         *"why are the 'close the week' page links still in the 6 overlay menus and pointing back to
+         the close the week page?"* A per-section close-the-week row made sense while every section
+         HAD its own cockpit; there is ONE page now, reached from the rail's own Week group, so six
+         copies of it inside the section menus were six duplicate routes to one destination. The same
+         call the History row got when it was pulled off the Profit and Revenue menus.
+         ⚠ EVENTS KEEPS ITS LEAF — "Book The Events" points at `ev-dashboard`, which survives and is
+         genuinely per-section. It is the only module left that lands anywhere of its own. */
+      const dashScreen = this._SECTION_DASH[module];
       const firstSec = nav.querySelector('.nav-section');
-      if (dashScreen && firstSec && !nav.querySelector('#nav-' + dashScreen)) {
+      if (module === 'events' && dashScreen && firstSec && !nav.querySelector('#nav-' + dashScreen)) {
         const dleaf = document.createElement('div');
         dleaf.className = 'nav-item nav-leaf';
         dleaf.id = 'nav-' + dashScreen;
-        if (wkLeaf) dleaf.dataset.nav = 'week-close'; else dleaf.dataset.screen = dashScreen;
-        const dleafLabel = wkLeaf ? 'Close The Week' : (module === 'events' ? 'Book The Events' : 'Dashboard');
+        dleaf.dataset.screen = dashScreen;
+        const dleafLabel = 'Book The Events';
         dleaf.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="nav-label">' + dleafLabel + '</span>';
         firstSec.parentNode.insertBefore(dleaf, firstSec);
       }
@@ -2029,15 +2026,8 @@ const App = {
     nav.querySelectorAll('.nav-item[data-nav="hub"]').forEach(el => {
       el.addEventListener('click', () => App.showHub());
     });
-    /* The "Close The Week" leaf at the top of each section's sidebar. Through the SAME door the rail
-       uses (`_protoGlobalClick`), never a second call to `S.WeekClose.open()` — one opener means the
-       page cannot be entered two ways that drift apart. */
-    nav.querySelectorAll('.nav-item[data-nav="week-close"]').forEach(el => {
-      el.addEventListener('click', () => {
-        document.getElementById('app')?.classList.remove('sidebar-open');
-        App._protoGlobalClick('week-close');
-      });
-    });
+    // ⚠ The `data-nav="week-close"` listener went with the leaf it served. A hook installed for
+    // markup nothing renders is dead code that reads as coverage.
     // Report a Bug opens the shared bug-report flow (same as the Hub sidebar).
     nav.querySelectorAll('.nav-item[data-nav="report-bug"]').forEach(el => {
       el.addEventListener('click', () => {
@@ -2237,7 +2227,10 @@ const App = {
   /* Sign Out is its own group behind its own divider. It is the only row in the rail that ENDS the
      session rather than going somewhere, and a destructive control sitting flush under Settings is
      one mis-click from taking the operator out mid-shift. */
-  _PROTO_BOTTOM:   [['flowmap','Workflow'],['settings','Settings']],
+  // ⚠ WORKFLOW IS GONE FROM BOTH MENUS (Kyle, 2026-08-10: that page is being deleted). Removed here
+  // rather than in each menu, so the rail and the mobile drawer — which now reads these same tables
+  // — drop it together instead of one at a time.
+  _PROTO_BOTTOM:   [['settings','Settings']],
   _PROTO_SIGNOUT:  [['signout','Sign Out']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
   _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'week-close': 'week-close', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'flowmap': 'flowmap' },
@@ -3066,14 +3059,9 @@ const App = {
       const pr = PAGE_REMAP[key] || {};
       const mkPage = (p) => { const it = pageItem(p); if (pr[it.label]) it.label = pr[it.label]; if (it.label === 'Help and FAQ') it.label = 'Help'; return it; };
       const items = [];
-      /* ⚠ THE ID IS FOR THE HIGHLIGHT, SO IT HAS TO NAME WHERE THE ROW ACTUALLY GOES. `activeId`
-         reads `data-screen || data-hubAction`, so a row that opens Close The Week must carry
-         `week-close` or it never lights up — and the six section rows that say "Close The Week" do
-         exactly that now. Keyed off the row's own label rather than a second list of section keys:
-         the label and the destination are set together, one line apart, so they cannot drift. */
-      const homeId = homeLabel === 'Close The Week'
-        ? 'week-close'
-        : (App._SECTION_DASH[key] || ({ books: 'books-home' })[key] || '');
+      /* ⚠ THE ID IS FOR THE HIGHLIGHT, so it names where the row goes. The `Close The Week` branch
+         that used to live here went with the six duplicate rows it served. */
+      const homeId = App._SECTION_DASH[key] || ({ books: 'books-home' })[key] || '';
       if (homeFn) items.push({ label: homeLabel || 'Dashboard', icon: IC.dash, home: true, id: homeId, go: homeFn });
       sgs.forEach(g => {
         if (g.pages.length === 1) {
@@ -3088,38 +3076,48 @@ const App = {
       return { label: label, key: key, icon: icon, node: sectionNode(label, key, homeFn, homeLabel, panelTitle) };
     };
 
+    /* ── THE MOBILE DRAWER IS THE RAIL, IN THE RAIL'S OWN ORDER ─────────────────────────────────
+       Kyle, 2026-08-10: *"mobile menu should match the desktop... hub, audits, events, books..
+       divider close, review, history, divider.. inventory, labor, shift, divider.. profit, revenue,
+       cash, divider.. settings."*
+       ⛔⛔ SO IT IS GENERATED FROM THE FOUR RAIL TABLES, NOT HAND-LISTED BESIDE THEM. Two menus
+       written out separately are two things to keep in step, and they had ALREADY drifted: this
+       drawer was missing Close and History entirely while carrying Settings up beside Books, and the
+       six section rows each carried a duplicate "Close The Week" home. Reading the tables makes
+       "they match" structural instead of a promise someone has to remember.
+       ⛔ AND THERE IS EXACTLY ONE LINK TO CLOSE THE WEEK NOW — the Week group's own `Close` row. The
+       six per-section copies are gone: they made sense when every section HAD a close-the-week page,
+       and that stopped being true.
+       ⚠ WORKFLOW IS IN NEITHER MENU: Kyle is deleting that page. Removed from `_PROTO_BOTTOM` too,
+       so the rail and the drawer drop it together rather than one at a time.
+       ⚠ THE SECTIONS KEEP THEIR DRILLS — they have real sub-pages. What they lost is the HOME ROW,
+       which `sectionNode` only pushes `if (homeFn)`; the same shape Audits has always had. Events
+       and Books keep theirs because their landing pages are real and survive. */
+    const railRow = (k, label) => {
+      const icon = IC[App._RAIL_IC[k]] || '';
+      // Sections drill into their own pages; everything else is a leaf that goes straight there.
+      if (App._isSection(k)) return drill(label, k, null, null, icon);
+      if (k === 'audit' || k === 'books' || k === 'settings') {
+        const home = k === 'books' ? () => S2.HubBooksHome && S2.HubBooksHome.open() : null;
+        return drill(label, k, home, home ? 'Close The Books' : null, icon,
+          k === 'settings' ? 'App Settings' : null);
+      }
+      /* ⭐ ONE DOOR. `_protoGlobalClick` is what the rail presses, so Hub / Close / Review / History
+         cannot open one way on desktop and another on mobile — which is exactly how Review came to
+         call `S2.WeekReview.open()` directly here while the rail routed through the handler. */
+      return { label: label, icon: icon, go: () => App._protoGlobalClick(k) };
+    };
+    const railGroup = (label, table) => ({ label: label, items: table.map(([k, l]) => railRow(k, l)) });
     const root = { title: 'Bar Cop Menu', groups: [
-      { label: 'Go to', items: [
-        { label: 'Hub', icon: IC.hub, go: () => App.showHub() },
-        { label: 'Workflow', icon: IC.blueprint, go: () => S2.FlowMap && S2.FlowMap.open() },
-        { label: 'Review', icon: IC.audit, go: () => S2.WeekReview && S2.WeekReview.open() },
-        drill('Audits', 'audit', null, null, IC.audit),
-        drill('Events', 'events', () => App.jumpToSection('events'), 'Book The Events', IC.events),
-        drill('Books', 'books', () => S2.HubBooksHome && S2.HubBooksHome.open(), 'Close The Books', IC.books),
-        // App Settings is off in the live demo (same as the desktop gear, which is hidden).
-        /* ⚠ NO homeFn AND NO homeLabel ANY MORE, and this is the one place the retirement reaches
-           MOBILE: `sectionNode` only pushes a landing row `if (homeFn)`, so dropping it removes the
-           "Bar Cop Settings" row and leaves the drill opening the section's pages directly — the
-           same shape Audits has always had. Unavoidable: the page it pointed at is gone. */
-        ...(App.demoMode ? [] : [drill('Settings', 'settings', null, null, IC.settings, 'App Settings')])
-      ]},
-      /* ⛔⛔ THE MOBILE TWIN OF THE SIDEBAR LEAF, AND IT HAD THE SAME PROMISE TO KEEP. Six rows
-         labelled "Close The Week" whose home row opened the SECTION'S OWN COCKPIT — the six being
-         deleted. They open the real page now, through the same `_protoGlobalClick` door the rail and
-         the desktop leaf use.
-         ⚠ EVENTS IS DELIBERATELY UNTOUCHED: its dashboard survives and its row says "Book The
-         Events", which is a different promise ([[the-loop]] step 0.5 — find the twin, then check it
-         is actually a twin). */
-      { label: 'Control', items: [
-        drill('Inventory', 'inventory', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.inventory),
-        drill('Labor', 'labor', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.labor),
-        drill('Shift', 'shift', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.shift)
-      ]},
-      { label: 'Recovery', items: [
-        drill('Profit', 'profit', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.profit),
-        drill('Revenue', 'revenue', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.revenue),
-        drill('Cash', 'cash', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.cash)
-      ]}
+      /* Events keeps its own landing row; it is the one section here whose dashboard survives. */
+      { label: 'Go to', items: App._PROTO_GLOBAL.map(([k, l]) =>
+          k === 'events' ? drill(l, k, () => App.jumpToSection('events'), 'Book The Events', IC.events)
+                         : railRow(k, l)) },
+      railGroup('Week', App._PROTO_WEEK),
+      railGroup('Control', App._PROTO_CONTROL),
+      railGroup('Recovery', App._PROTO_RECOVERY),
+      // App Settings is off in the live demo, same as the desktop gear.
+      ...(App.demoMode ? [] : [railGroup('Settings', App._PROTO_BOTTOM)])
     ]};
 
     // ── DOM shell (inline-positioned so it shows even against a cached CSS) ──
