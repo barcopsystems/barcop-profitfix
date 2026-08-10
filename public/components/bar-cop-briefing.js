@@ -12,10 +12,28 @@ window.BarCopBriefing = {
 
   _snap: null,
 
-  _hasData() {
-    const d = App.data || {};
-    const has = (arr) => Array.isArray(arr) && arr.length > 0;
-    return has(d.audits) || has(d.revenue_audits) || has(d.cash_audits) || has(d.bar_cop_audits);
+  /* ⭐⭐ IS THERE ANYTHING TRUE TO SAY? That is the gate, and it is NOT "has an audit been run".
+     ⛔ IT USED TO BE. `_hasData()` asked for one row in audits / revenue_audits / cash_audits /
+     bar_cop_audits and refused outright otherwise. Correct when the briefing was audit-scores-first
+     — its own header still says it reads those scores "to size up the whole operation" — but it
+     then grew the weekly leak lines, the section paragraph and the one-move line, none of which
+     need an audit, and the gate never moved with them.
+     MEASURED on a bar with logged weeks and worked steps but no audit: **4 of the 5 paragraphs were
+     real and the operator was shown NONE of them.** The first paragraph already degrades honestly on
+     its own ("Nothing scored yet."), so the audit half was never the thing that needed protecting.
+     ⚠ AND IT MATTERS MORE SINCE THE RAIL MOVED TO THE TOP BAR. On the Hub it was one refusal on one
+     page; now it is on every page a new bar opens in its first week.
+     ⚠ ZEROES ARE NOT SUBSTANCE. Day one has all eight sections present at 0 of 4 and a weekly
+     readout of 0/0, so every disjunct below tests for a REAL value, never for the field existing. */
+  _hasSubstance(s) {
+    s = s || {};
+    const a = s.audits || {};
+    const w = s.weekly || {};
+    const scored   = ['profit', 'revenue', 'cash', 'barCop'].some(k => a[k] != null);
+    const money    = (w.leak || 0) > 0 || (w.opp || 0) > 0 || (s.recovered || 0) > 0;
+    const progress = (s.sections || []).some(x => (x.done || 0) > 0);
+    const flagged  = (s.critical || []).length > 0;
+    return scored || money || progress || flagged;
   },
 
   _fmtDate(iso) {
@@ -40,8 +58,14 @@ window.BarCopBriefing = {
   },
 
   _handleClick() {
-    if (!this._hasData()) {
-      this._showError('Run an audit first. The Rail reads your Profit, Revenue, Cash, and Bar Cop Audit scores to size up the whole operation.');
+    /* Gated on the SNAPSHOT, not on the stores: `open()` has just built it, and it is the same
+       object every paragraph reads, so the button cannot refuse over data the briefing would have
+       used. The old copy demanded an audit and named nothing else; a logged week or one worked step
+       is enough to fill this in, and saying so is what makes it a day-one screen rather than a
+       locked door. */
+    if (!this._hasSubstance(this._snap)) {
+      this._showError('Nothing to read yet. The Rail sizes up the whole bar from your own logged numbers. '
+        + 'Close out a week, work a step, or run any audit and it fills in from there.');
       return;
     }
     /* ⚠ NOT PERSISTED ANY MORE, AND THE COMMENT THAT SAID IT WAS HAS GONE WITH IT. This used to
