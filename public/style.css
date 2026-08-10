@@ -586,6 +586,20 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 
 /* ══ SECTION HEADING ══ */
 .sh{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;}
+/* ⛔⛔ THE IMPORT CONFIRM SCREEN'S HEADING, AND IT EXISTS BECAUSE A CLASS CHANGED MEANING UNDER A
+   CONSUMER THAT WAS NEVER INSIDE A CARD. It used to be `.card-title`, chosen 2026-08-04 for the
+   divider rule Kyle asked for ("needs the divider line"). The card-colour pass then made
+   `.card-title` the head BAND of a card: a `--card-head` fill, a top radius, and
+   `margin:-20px -20px 16px` that only lands as the first child of a `.card` with 20px padding.
+   ⛔ MEASURED ON THE LIVE BUILD: NONE of the 13 confirm call sites across 10 doors wraps the panel
+   in a card — the panel's own sections ARE cards, so wrapping it would nest them. So the band hung
+   20px outside its container on both sides (6px past the page edge), painted a fill with no card
+   under it, and its -20px top cancelled the space above it. Kyle found it on Close The Week; it was
+   live on all ten.
+   ⭐ SO IT TAKES `.sh` — the documented heading-OUTSIDE-a-card class, byte-identical typography —
+   plus the divider, and nothing else. MUST STAY BELOW `.sh`: same specificity, so the later rule
+   is what wins the margin. */
+.ic-head{padding-bottom:12px;border-bottom:1px solid var(--b-edge);margin-bottom:14px;}
 
 /* ══ CALC PANEL ══ */
 .calc{background:var(--input);border:1px solid var(--b2);border-radius:var(--r);padding:14px 18px;display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
