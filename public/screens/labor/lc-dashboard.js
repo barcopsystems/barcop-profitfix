@@ -103,6 +103,11 @@ S.LaborDashboard = {
   // ── Render ───────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container; this.actions = actions;
+    /* ⭐ THIS PAGE DRAWS THE LANE, SO IT OWNS IT. Close The Week hosts the hours lane too and both
+       pages can hold markup at once; claiming on render is what keeps the ids, the container reads
+       and the re-render pointed at the page the operator is actually looking at. A parsed file
+       carried in from the other page is adopted here rather than left redrawing a hidden shell. */
+    this.lbClaim(null);
     if (actions) actions.innerHTML = '';
     const done = this.stepDone();
     const doneCount = this.ORDER.filter(k => done[k]).length;
@@ -110,18 +115,10 @@ S.LaborDashboard = {
     const flash = this._flash; this._flash = null;
     const wys = this._wys();
 
-    /* ⛔⛔⛔ A FINISHED IMPORT GIVES THE PAGE BACK, and this is the line I left out of the copy.
-       Kyle, 2026-08-08: *"click add hours.. logs the hours but takes you back to the mapping screen
-       with the import hours button.. click import again and it takes you to the needs a look screen
-       saying already logged."* The write clears `_laborReview`, but the takeover flag and the CARRIED
-       MAPPER NODE were still set, so the render re-attached a spent mapper and offered the file back
-       for a second import that then correctly read as already logged.
-       ⭐ `_flash` is the one signal every lane already sets the moment it lands, so reading it here is
-       ONE release path that cannot drift from what the lanes do, because it IS what they do. A flash
-       set by something other than an import finds no takeover to clear, so it is a no-op there.
-       ⚠ AND IT MUST NOT FIRE WHILE A CONFIRM SCREEN IS UP: a refused write sets a message and KEEPS
-       the screen, and tearing the page away there would lose every row the operator is looking at. */
-    if (flash && !this._anyLaborReview()) this._clearLbTakeover();
+    /* ⛔ "A FINISHED IMPORT GIVES THE PAGE BACK" USED TO BE A LINE RIGHT HERE, reading `_flash` and
+       calling `_clearLbTakeover()`. It is now in `importLane` at the moment the write lands, because
+       a lane hosted by Close The Week never reaches this render and the release simply would not
+       have happened there. One release path, on the path both pages share. Do not add it back. */
 
     /* ⛔⛔ THE STRANDED PAGE. The takeover FLAG lives on the screen object and outlives the DOM, so
        navigating away and back would leave it claiming an import over a mapper that did not survive:
@@ -530,6 +527,32 @@ S.LaborDashboard = {
   lbTakeover() { return this._lbTakeover != null || !!this._anyLaborReview(); },
   _clearLbTakeover() { this._lbTakeover = null; this._lbCarry = null; this._lbCarryActs = null; },
 
+  /* ── THE HOST ────────────────────────────────────────────────────────────────
+     THE LANE DRAWS ON WHICHEVER PAGE IS SHOWING IT. This cockpit was the only page that could until
+     Close The Week, so `lc-ck-hours` was written as a literal in four separate places and the
+     re-render was written as `this.render` in eight.
+     ⛔⛔ WHY A LITERAL IS WRONG, AND IT IS STRUCTURAL: the app has TWO shells. Module screens render
+     into `#content-area` inside `#app`, hub pages into `.hub-app`, and the app HIDES the one it is
+     not showing rather than removing it. So both pages can hold markup at the same moment and
+     `getElementById` answers with whichever sits first in the document — the same duplicate-id
+     defect the rail overlay shipped with, this time with the operator's parsed file on it. A host
+     therefore NAMES ITS OWN ids.
+     A host is `{ zone: {hours:'wc-hours'}, takeover: 'wc-takeover', container(), rerender() }`.
+     `null` means this cockpit, so the page that already shipped stays the default rather than
+     becoming a special case.
+     ⭐ OWNERSHIP IS CLAIMED BY WHOEVER DRAWS. A page calls `lbClaim` as it renders the lane, so the
+     lane always belongs to the page in front of the operator — and a parsed file carried across a
+     navigation is ADOPTED by the page they land on rather than stranded on the one they left. */
+  _lbHost: null,
+  lbClaim(host)  { this._lbHost = host || null; },
+  _lbZone(key)   { return (this._lbHost ? this._lbHost.zone : this.LC_ZONE)[key] || ''; },
+  _lbContainer() { return this._lbHost ? this._lbHost.container() : this.container; },
+  _lbRerender()  { if (this._lbHost) this._lbHost.rerender(); else this.render(this.container, this.actions); },
+  /* Which lane is in flight, so a page can refuse to draw one it does not render. Close The Week
+     hosts hours and not tips, and a page that drew a lane it has no zone for would name an element
+     it never rendered and then re-render itself over an import it cannot show. */
+  _lbLaneKey()   { return this._laborReview ? this._laborReview.type : this._lbTakeover; },
+
   /* ⛔⛔⛔ THE HANDOVER, AND THE ONE THING IT MUST NOT DO IS REBUILD THE MAPPER.
      `CSVMapper.mount()` opens with `container.innerHTML = <drop zone>`, so escalating by re-mounting
      would throw the operator's parsed file away and put them back on an empty drop zone — work lost,
@@ -546,24 +569,26 @@ S.LaborDashboard = {
        ⚠ `drop` also fires when a mapper first MOUNTS, which is why this is gated on the zone already
        owning the page: at mount time nothing does, so it is a no-op. */
     if (st === 'drop') {
-      if (this._lbTakeover === key) { this._clearLbTakeover(); this.render(this.container, this.actions); }
+      if (this._lbTakeover === key) { this._clearLbTakeover(); this._lbRerender(); }
       return;
     }
     if (st !== 'map' || this._lbTakeover != null) return;
-    const node = document.getElementById(this.LC_ZONE[key] || '');
+    const zone = this._lbZone(key);
+    const node = zone ? document.getElementById(zone) : null;
     if (!node) return;
-    const acts = document.getElementById(this.LC_ZONE[key] + '-actions');
+    const acts = document.getElementById(zone + '-actions');
     this._lbCarry = node;
     this._lbCarryActs = acts || null;
     node.remove();
     if (acts) acts.remove();
     this._lbTakeover = key;
-    this.render(this.container, this.actions);
+    this._lbRerender();
   },
 
   // ── Inline hours import (step 1) ─────────────────────────────────────────────
   mountHoursImport() {
-    const el = document.getElementById('lc-ck-hours');
+    const zone = this._lbZone('hours');
+    const el = zone ? document.getElementById(zone) : null;
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your weekly timeclock export here',
@@ -572,8 +597,8 @@ S.LaborDashboard = {
       confirmLabel: 'Import',
       // The Import / Cancel row lives OUTSIDE the mapper's card, exactly as Books and the shift
       // cockpit render it — which is also why the handover has to carry TWO nodes, not one.
-      actionsEl: '#lc-ck-hours-actions',
-      onState: st => { this._toggleBtns('lc-ck-hours-btns', st); this._onMapState('hours', st); },
+      actionsEl: '#' + zone + '-actions',
+      onState: st => { this._toggleBtns(zone + '-btns', st); this._onMapState('hours', st); },
       /* ⛔ THE MAPPER NO LONGER COMMITS. It hands the file to the confirm screen, which is where the
          operator presses the button. Same shape as every other converted door. */
       onComplete: rows => this._openLaborReview('hours', rows)
@@ -581,15 +606,16 @@ S.LaborDashboard = {
   },
   // ── Inline tips import (step 2) ──────────────────────────────────────────────
   mountTipsImport() {
-    const el = document.getElementById('lc-ck-tips');
+    const zone = this._lbZone('tips');
+    const el = zone ? document.getElementById(zone) : null;
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS tips export here',
       dropSub: 'Needs Staff and Date plus card and/or cash tips. Servers match your roster by name.',
       fields: PosIngest.FIELDS.tips,
       confirmLabel: 'Import',
-      actionsEl: '#lc-ck-tips-actions',
-      onState: st => { this._toggleBtns('lc-ck-tips-btns', st); this._onMapState('tips', st); },
+      actionsEl: '#' + zone + '-actions',
+      onState: st => { this._toggleBtns(zone + '-btns', st); this._onMapState('tips', st); },
       onComplete: rows => this._openLaborReview('tips', rows)
     });
   },
@@ -694,7 +720,7 @@ S.LaborDashboard = {
   _openLaborReview(type, rows) {
     (rows || []).forEach((r, i) => { if (r && r._rid == null) r._rid = 'lb' + i; });
     this._laborReview = { type: type, rows: rows || [], open: {}, removed: {} };
-    this.render(this.container, this.actions);
+    this._lbRerender();
   },
   _laborReviewSummary() {
     const r = this._laborReview;
@@ -733,23 +759,26 @@ S.LaborDashboard = {
       open: r.open,
       settledLabel: 'Going In',
       goAttr: 'data-lbreview-go', backAttr: 'data-lbreview-back', backLabel: 'Start Over',
-      resultId: r.type === 'hours' ? 'lc-ck-hours-res' : 'lc-ck-tips-res',
+      // ⛔ THE RESULT SLOT BELONGS TO THE HOST. It was the literal `'lc-ck-hours-res'`, which on a
+      // hub page names an element only the hidden cockpit ever rendered — so a refused import would
+      // have written its reason into a node nobody can see.
+      resultId: this._lbZone(r.type) + '-res',
       busy: !!this._laborReviewWriting
     }));
   },
   _wireLaborReview() {
-    const c = this.container, r = this._laborReview;
+    const c = this._lbContainer(), r = this._laborReview;
     if (!c || !r) return;
     c.querySelectorAll('[data-confirm-section]').forEach(h => h.addEventListener('click', () => {
       const k = h.dataset.confirmSection;
       r.open[k] = (k === 'needs') ? (r.open[k] === false) : !r.open[k];
-      this.render(this.container, this.actions);
+      this._lbRerender();
     }));
     c.querySelectorAll('[data-confirm-remove]').forEach(b => b.addEventListener('click', () => {
-      r.removed[b.dataset.confirmRemove] = true; this.render(this.container, this.actions);
+      r.removed[b.dataset.confirmRemove] = true; this._lbRerender();
     }));
     c.querySelectorAll('[data-confirm-restore]').forEach(b => b.addEventListener('click', () => {
-      delete r.removed[b.dataset.confirmRestore]; this.render(this.container, this.actions);
+      delete r.removed[b.dataset.confirmRestore]; this._lbRerender();
     }));
     c.querySelector('[data-lbreview-go]')?.addEventListener('click', () => this._runLaborReview());
     c.querySelector('[data-lbreview-back]')?.addEventListener('click', () => this._backFromLaborReview());
@@ -764,7 +793,7 @@ S.LaborDashboard = {
   _backFromLaborReview() {
     this._laborReview = null;
     this._clearLbTakeover();
-    this.render(this.container, this.actions);
+    this._lbRerender();
   },
 
   // ⛔ ONE PRESS, ONE IMPORT. The button is rebuilt by every redraw, so a flag on the screen object is
@@ -773,17 +802,18 @@ S.LaborDashboard = {
     const r = this._laborReview;
     if (!r || this._laborReviewWriting) return;
     this._laborReviewWriting = true;
-    const btn = this.container && this.container.querySelector('[data-lbreview-go]');
+    const host = this._lbContainer();
+    const btn = host && host.querySelector('[data-lbreview-go]');
     if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
     try {
       const live = r.rows.filter(x => !r.removed[x._rid]);
-      await this.importLane(r.type, live,
-        r.type === 'hours' ? 'lc-ck-hours-res' : 'lc-ck-tips-res',
+      await this.importLane(r.type, live, this._lbZone(r.type) + '-res',
         r.type === 'hours' ? 'tips' : 'schedule', { reviewed: true });
     } finally {
       this._laborReviewWriting = false;
       if (this._laborReview) {
-        const b = this.container && this.container.querySelector('[data-lbreview-go]');
+        const h2 = this._lbContainer();
+        const b = h2 && h2.querySelector('[data-lbreview-go]');
         if (b) { b.disabled = false; b.textContent = ImportConfirm.goLabel(this._laborPanelOpts()); }
       }
     }
@@ -881,8 +911,24 @@ S.LaborDashboard = {
        without re-dropping the file, and `setRes` writes into the shell's OWN result slot, so nothing
        re-renders over the message. */
     if (opts.reviewed) this._laborReview = null;
+    /* ⛔⛔⛔ A FINISHED IMPORT GIVES THE PAGE BACK, AND THAT RELEASE BELONGS HERE, NOT IN A RENDER.
+       Kyle, 2026-08-08: *"click add hours.. logs the hours but takes you back to the mapping screen
+       with the import hours button.. click import again and it takes you to the needs a look screen
+       saying already logged."* The write clears `_laborReview`, but the takeover flag and the
+       CARRIED MAPPER NODE survived it, so the redraw re-attached a spent mapper and offered the same
+       file for a second import.
+       ⚠ IT WAS FIXED IN THIS COCKPIT'S `render`, keyed on `_flash` — one release path while there
+       was one page. A lane hosted by Close The Week never runs this cockpit's render, so that fix
+       would simply not have happened there and the defect would have come straight back on the new
+       page. The release moved to the one place both hosts pass through: the moment the write lands.
+       ⚠ AND IT MUST NOT TEAR AWAY A CONFIRM SCREEN. Today the line above has always cleared it by
+       the time this runs, so the guard reads as redundant — it is not. `reviewed` is an OPTION, and
+       a lane that ever commits without one would hit this line with the screen still up and lose
+       every row the operator is looking at. The guard is what the release costs, not an assumption
+       about who calls it. */
+    if (!this._anyLaborReview()) this._clearLbTakeover();
     this._openStep = nextStep;
-    this.render(this.container, this.actions);
+    this._lbRerender();
   },
 
   // ── Wiring ───────────────────────────────────────────────────────────────────
