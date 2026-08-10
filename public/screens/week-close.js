@@ -132,6 +132,21 @@ S.WeekClose = {
     };
   },
 
+  /* ⛔⛔ A NUMBER IS NOT HONEST ON ITS OWN, IT IS HONEST WITH ITS SCOPE. Kyle imported a tips file,
+     read "34 tip records imported" over a Tips row saying "None logged", and reported it as broken.
+     Both were true: the flash counts the FILE, the row counts the WEEK this page is showing, and his
+     file was dated outside it. Neither sentence said what it was counting.
+     ⭐ SILENT WHEN EVERY ROW LANDED IN VIEW. The row already shows those, and a line that also fires
+     on the happy path is the noise that stops an operator reading it on the day it matters. */
+  _flashScope(dates) {
+    const all = (dates || []).filter(Boolean);
+    if (!all.length) return '';
+    const n = all.filter(d => this.inWeek(d)).length;
+    if (n === all.length) return '';
+    const range = App.dateRangeLabel ? App.dateRangeLabel(this.weekStart(), this.weekEnd()) : '';
+    return n ? ' ' + n + ' in ' + range + '.' : ' None are in ' + range + '.';
+  },
+
   // No App.shortDate exists; the cockpits each carry their own. One local one, same format.
   _shortDate(ymd) {
     if (!ymd) return '';
@@ -319,7 +334,8 @@ S.WeekClose = {
        page hosts the lane, so a successful import would report NOTHING here and then announce itself
        on the Labor cockpit later, out of context. Read and cleared here for the same reason. */
     const flash = LC ? LC._flash : null;
-    if (LC) LC._flash = null;
+    const flashDates = LC ? LC._flashDates : null;
+    if (LC) { LC._flash = null; LC._flashDates = null; }
     if (flash) this._openLane = null;   // the file went in; give the page back
 
     const st = this.state();
@@ -333,7 +349,8 @@ S.WeekClose = {
 
     container.innerHTML = '<div class="screen">'
       + this.banner(st, ready, required.length)
-      + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:0 2px 14px;">&#10003; ' + esc(flash) + '</div>' : '')
+      + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:0 2px 14px;">&#10003; '
+                 + esc(flash) + esc(this._flashScope(flashDates)) + '</div>' : '')
       + '<div class="sh" style="margin:0 0 10px;">What This Week Needs</div>'
       + rows.map(r => this.row(r)).join('')
       + '<div style="margin:18px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + confirmBtn + '</div>'
