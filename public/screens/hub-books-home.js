@@ -193,6 +193,14 @@ S.HubBooksHome = {
     generate: { title: 'Generate Month-End Books',             act: 'books' }
   },
   stepDone() { const dm = this.doneMap(); const r = {}; this.ORDER.forEach(k => { r[k] = !!dm[k]; }); return r; },
+  /* ⭐ THE SHARED "how is this section doing this week" INTERFACE — see the note on the Events
+     dashboard's copy of this. The Rail reads all eight sections through it, so it never has to
+     render a page to find out whether a section is closed out. Same shape the other seven return. */
+  hubSteps() {
+    const done = this.stepDone();
+    const steps = this.ORDER.map(k => ({ key: k, label: this._META[k].title, done: !!done[k] }));
+    return { steps, stats: null, doneCount: steps.filter(s => s.done).length, total: steps.length };
+  },
 
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');

@@ -1543,6 +1543,24 @@ S.Hub = {
     const metrics = this.hubMetrics();
     const alerts = this.hubAlerts(metrics);
     return {
+      /* ⭐ WHERE THE EIGHT SECTIONS STAND THIS WEEK, through each dashboard's own hubSteps().
+         ⛔ NOT scraped from Week In Review. That page fills `this._pdf` as a SIDE EFFECT of its
+         section builders running, so reading it means rendering a page to ask a question — and The
+         Rail is in the top bar, on screens that never render it. Events and Books were given
+         hubSteps() in the same edit so all eight answer the same way.
+         ⚠ Each call is guarded because it reaches into another screen object: one section throwing
+         must cost that section's line, never the whole briefing. The Hub's own `safeSteps` does
+         exactly this for its three, and the reason is the same. */
+      sections: [
+        { name: 'Inventory', o: S.InventoryDashboard }, { name: 'Labor', o: S.LaborDashboard },
+        { name: 'Shift', o: S.ShiftDashboard },         { name: 'Profit', o: S.Dashboard },
+        { name: 'Revenue', o: S.RevenueDashboard },     { name: 'Cash', o: S.CashDashboard },
+        { name: 'Events', o: S.EventsDashboard },       { name: 'Books', o: S.HubBooksHome }
+      ].map(d => {
+        let s = null;
+        try { s = (d.o && d.o.hubSteps) ? d.o.hubSteps() : null; } catch (e) { s = null; }
+        return s ? { name: d.name, done: s.doneCount, total: s.total } : null;
+      }).filter(Boolean),
       bar: s.bar_name || 'Your Operation',
       opportunity: anyAudit ? (auditOpp(pA) + auditOpp(rA) + auditOpp(cA)) : null,
       recovered: recoveryTotal.dollars,
