@@ -2174,11 +2174,12 @@ const App = {
      `verify-nav-rail-reachability` asserts exactly that against the tables rather than trusting
      that the two lists were kept in step (integrity #11: a control wired under one spelling and
      rendered under another is a dead row that looks alive). */
-  _PROTO_GLOBAL:   [['hub','Hub'],['week-review','Review'],['audit','Audits'],['events','Events'],['books','Books']],
-  /* THE WEEK GROUP. One weekly close, above Control, because it is the only thing in the rail with
-     a deadline. Stage 1 carries Close alone; Review and History join it when Week In Review is
-     re-pointed at the last CLOSED week and Week History moves off the Profit and Revenue menus. */
-  _PROTO_WEEK:     [['week-close','Close']],
+  _PROTO_GLOBAL:   [['hub','Hub'],['audit','Audits'],['events','Events'],['books','Books']],
+  /* THE WEEK GROUP, above Control because it is the only thing in the rail with a deadline. The
+     week is ONE job in three tenses and they now sit together: Close it, Review what it was, and
+     look back at History. Review moved out of `_PROTO_GLOBAL` and History off the Profit and
+     Revenue section menus, where it had been duplicated. */
+  _PROTO_WEEK:     [['week-close','Close'],['week-review','Review'],['week-history','History']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   /* Sign Out is its own group behind its own divider. It is the only row in the rail that ENDS the
@@ -2425,6 +2426,17 @@ const App = {
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
     if (g === 'week-review') return (window.S && S.WeekReview) ? S.WeekReview.open() : null;
     if (g === 'week-close')  return (window.S && S.WeekClose)  ? S.WeekClose.open()  : null;
+    /* ⛔ HISTORY IS A MODULE SCREEN, NOT A HUB PAGE — the only row in the rail that is. So it routes
+       through `openScreen`, which swaps the module shell FIRST and then navigates; a bare
+       `navigate` would render it into `#content-area` while the hub shell is the visible one, which
+       is the dead-link defect the overlay had. `openScreen` reads `DB.SCREEN_GROUPS` to know which
+       module to swap to and to answer `canAccess`, so the id MUST be registered there. */
+    /* ⛔ AND THE RAIL MARK HAS TO BE PUT BACK AFTERWARDS. `openScreen` calls `showApp(module)`, which
+       re-renders the rail with the MODULE as its context — so opening History would light up the
+       PROFIT row (its module), not the row the operator just clicked. `openScreen` is synchronous,
+       so re-marking on the next line is the whole fix. Navigating on to any profit screen re-renders
+       with 'profit' and clears it, which is correct. */
+    if (g === 'week-history') { this.openScreen('week-history'); return this._renderProtoTopnav('week-history'); }
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
     if (g === 'books') return (window.S && S.HubBooksHome)   ? S.HubBooksHome.open()   : null;
     if (g === 'events') return this.jumpToSection('events');
@@ -2740,7 +2752,8 @@ const App = {
   /* Every rail row carries an icon, from the SHARED section map, because the collapsed rail is
      icons alone — a row with no icon would simply vanish there. `_RAIL_IC` maps the rail's own keys
      onto that map; only `flowmap` needs translating (its icon has always been called `blueprint`). */
-  _RAIL_IC: { hub: 'hub', 'week-review': 'review', 'week-close': 'dash', audit: 'audit', events: 'events', books: 'books',
+  _RAIL_IC: { hub: 'hub', 'week-review': 'review', 'week-close': 'dash', 'week-history': 'history',
+              audit: 'audit', events: 'events', books: 'books',
               inventory: 'inventory', labor: 'labor', shift: 'shift',
               profit: 'profit', revenue: 'revenue', cash: 'cash',
               flowmap: 'blueprint', settings: 'settings', signout: 'signout' },
@@ -2832,6 +2845,11 @@ const App = {
     // Week in Review: a page with a tick. Distinct from `audit` on purpose — the two sit adjacent
     // in the rail, where reading as the same mark is worse than differing from the mobile drawer.
     review:'<rect x="3.5" y="2" width="10" height="13" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M6 5.5h5M6 8h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M6 11.4l1.4 1.4 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+    /* ⛔ WEEK HISTORY'S OWN GLYPH, carried over from the `nav-week-history` row it is replacing, so
+       the icon an operator already associates with that screen does not change meaning when the row
+       moves into the rail. ⚠ A key missing from this map renders an EMPTY icon and the row simply
+       VANISHES in the collapsed rail, which is icons alone — the row is not broken, it is invisible. */
+    history:'<path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/>',
     signout:'<path d="M6.5 2.5H3.8c-.7 0-1.3.6-1.3 1.3v9.4c0 .7.6 1.3 1.3 1.3h2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M10.8 11.3L14 8.5l-3.2-2.8M6.8 8.5H14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
     inventory:'<path d="M2.5 5L8.5 2l6 3v7l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.2"/>',
     labor:'<circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',

@@ -460,6 +460,16 @@ const DB = {
     'recipe-cost-analysis':'profit','profit-experiments':'profit','vendor-tracker':'profit',
     'vendor-watch':'profit','vendor-scorecard':'profit','vendor-discrepancy':'profit',
     'profit-forecast':'profit','help':'_always',
+    /* ⛔ REGISTERED EXPLICITLY 2026-08-10, when Week History moved out of the Profit and Revenue
+       section menus into the rail's WEEK group. It was never listed here, so `_areaOf` was answering
+       for it by FALLBACK — the final `return 'profit'` for prefix-less ids. That gave the right
+       answer by accident, and an accident is not a decision: `openScreen` now routes this row, and
+       `openScreen` asks `canAccess` before it swaps the shell.
+       ⚠ 'profit' PRESERVES TODAY'S BEHAVIOUR EXACTLY — it is not a permissions change. But it is now
+       the odd one out in its own rail group: Close and Review beside it are ungated hub pages, so a
+       Manager scoped away from Profit sees a History row that refuses them. That is Kyle's call, not
+       a thing to change quietly here. */
+    'week-history':'profit',
     // Revenue Recovery
     'r-dashboard':'revenue','r-this-week':'revenue','r-forecast':'revenue',
     'r-audit':'revenue','r-fix':'revenue','r-server-check':'revenue','r-menu-items':'revenue',
