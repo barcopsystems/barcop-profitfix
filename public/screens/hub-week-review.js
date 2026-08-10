@@ -193,7 +193,6 @@ S.WeekReview = {
     return '<div class="card" style="margin-bottom:16px;overflow:hidden;padding:0 !important;">'
       + '<div class="wr-tophead" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Week In Review</div>'
-      +   '<button class="btn btn-ghost btn-sm no-print" id="wr-brief" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>'
       + '</div>'
       + '<div class="wr-statrow wr-topstats" style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + stats + '</div>'
       /* ⛔ SAY WHY THESE ARE BLANK (W2). Three dashes up here beside "Net Sales $19,150" in the
@@ -806,55 +805,6 @@ S.WeekReview = {
       a.addEventListener('click', () => this._step(parseInt(a.dataset.step, 10))));
     mount.querySelector('.wr-now')?.addEventListener('click', () => { this._wkStart = this._monday(); this.render(mount); });
     document.getElementById('wr-export')?.addEventListener('click', () => this._exportPDF());
-    document.getElementById('wr-brief')?.addEventListener('click', () => this.showBriefing());
-  },
-
-  // ── Bar Cop Briefing — a written cross-section read of the week. Code-generated
-  //    (no API), off the same per-section payloads the page and PDF are built from.
-  showBriefing() {
-    DashUI.insightsModal('Bar Cop Briefing', this._briefing());
-  },
-  _briefing() {
-    const m = this._weekMoney();
-    const secs = this._pdf || [];
-    const money = n => App.fmtCurrency(n, 0);
-    const pctv = v => (v != null && !isNaN(v)) ? (Number(v).toFixed(1) + '%') : null;
-    const paras = [];
-
-    // 1 — the week's headline
-    if (m.netSales != null) {
-      let p1 = 'This week rang ' + money(m.netSales);
-      const bits = [];
-      if (m.prime != null) bits.push('a ' + pctv(m.prime) + ' prime cost');
-      if (m.laborPct != null) bits.push(pctv(m.laborPct) + ' labor');
-      if (bits.length) p1 += ' on ' + bits.join(' and ');
-      paras.push(p1 + '.');
-    } else {
-      paras.push('The week is not confirmed yet, so the sales and cost numbers are still open. Confirm it in Profit or Revenue and the money reads fill in.');
-    }
-
-    // 2 — who is on it, who slipped
-    const complete = secs.filter(s => s.status === 'Complete').map(s => s.name);
-    const openSecs = secs.filter(s => s.status !== 'Complete');
-    if (complete.length) paras.push(complete.join(', ') + ' closed clean this week.' + (openSecs.length ? '' : ' The whole board is caught up.'));
-    if (openSecs.length) {
-      const lead = this._isThisWeek() ? 'Still open: ' : 'Fell short: ';
-      paras.push(lead + openSecs.map(s => s.name + ' (' + s.status + ')').join(', ') + '.');
-    }
-
-    // 3 — the biggest open items across the board
-    const opens = secs.filter(s => s.open && !/^Nothing/.test(s.open)).map(s => s.name + ', ' + s.open.split(';')[0].trim());
-    if (opens.length) paras.push('Worth chasing first: ' + opens.slice(0, 4).join('; ') + '.');
-    else paras.push('Nothing is carrying over. Clean week across the board.');
-
-    // 4 — the one move
-    let move;
-    if (m.netSales == null) move = 'The one move this week: confirm the week in Profit and Revenue so the whole page reads real, then take down the biggest leak.';
-    else if (openSecs.length) move = 'Finish the open sign-offs above before next week starts, worst first.';
-    else move = 'Nothing urgent. Hold the discipline and keep every section closing on time.';
-    paras.push(move);
-
-    return paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
   },
 
   // Plain-text status + tag strip for the PDF.

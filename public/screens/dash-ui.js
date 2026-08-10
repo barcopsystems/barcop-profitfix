@@ -71,22 +71,14 @@ const DashUI = {
   },
 
 
-  // Shared briefing modal for the Control + Recovery cockpits, routed through the
-  // standard App.openModal (navy backdrop, corner X, inset header, 18px padding).
-  // ⚠ THE DISCLAIMER IS UNCONDITIONAL, AND IT MUST STAY THAT WAY (S261, 2026-07-30).
-  // It used to render only when a THIRD `generated_at` argument was passed — a leftover of the
-  // API-backed briefing and its once-a-week cache. That cache is gone (the briefing is
-  // deterministic code now), and all 17 call sites across 9 screens pass TWO arguments, so the
-  // disclaimer sat behind a gate nothing in the app could open. This modal prints runway,
-  // safe-to-spend and survival reads; the disclaimer is not optional. Pinned by
-  // verify-briefing-disclaimer.js AT THE TWO-ARG ARITY PRODUCTION USES — a three-arg pin
-  // would have passed while every real briefing printed nothing ([[the-loop]] #47).
-  insightsModal(label, bodyHtml) {
-    const html = '<div class="card form-card" style="margin:0;">'
-      + '<div class="card-title">' + (label || 'Bar Cop Briefing') + '</div>'
-      + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>'
-      + '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Bar Cop builds this from your own logged data each time you open it. Not financial or business advice.</div>'
-      + '</div>';
-    App.openModal(html, { id: 'db-insights-modal', maxWidth: 620 });
-  }
+  /* ⛔ `insightsModal` IS GONE. It was the shared modal for the eight per-section Bar Cop Briefings,
+     and all 17 of its call sites went with them when the section briefings were retired in favour of
+     The Rail — the one whole-bar read, in the top bar on every page. Zero callers remained, and a
+     shared helper left lying about is a landmine for whoever picks the obvious name later (the
+     `.tn-sec` collision cost a defect exactly that way).
+     ⚠ THE DISCLAIMER IT CARRIED IS NOT LOST, WHICH IS THE ONLY REASON THIS COULD GO. Both surviving
+     briefing modals print their own: `bar-cop-briefing._showModal` (The Rail) and
+     `audit-outlook` (the per-audit Bar Cop Briefing). `verify-briefing-disclaimer.js` is re-pointed
+     at those two — the invariant was always "a briefing modal must carry its disclaimer", never
+     "this function must exist" ([[harness-review]] #139: pin the property, not the mechanism). */
 };

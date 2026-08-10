@@ -329,40 +329,8 @@ S.HubBooksHome = {
       + stripNote
       + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-act="books">Income Statement</button></div></div>';
 
-    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>'
-      + '<button class="btn btn-ghost btn-sm" data-act="briefing" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button></div>'
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Where You Stand</div>'
       + hero + secondary + '</div>';
-  },
-
-  // ── Bar Cop Briefing: a written read of the books. Code-generated (no API),
-  //    same button the section dashboards carry. ───────────────────────────────
-  showInsights() {
-    if (!((App.data && App.data.weeks) || []).length) { DashUI.insightsModal('Bar Cop Briefing', 'Confirm a few weeks and add your operating expenses, and Bar Cop can read your books for you.'); return; }
-    DashUI.insightsModal('Bar Cop Briefing', this._insBriefing(this._computeState()));
-  },
-  _insBriefing(st) {
-    // Same rule as _money above: these are LEVELS, and the paragraph below adds
-    // "still in the red for the month" off `mInc < 0`, so the value it prints beside
-    // that clause is negative by construction.
-    const m = v => (v == null || isNaN(v)) ? '-' : App.fmtBal(Number(v), 0);
-    const pct = v => (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%';
-    const paras = [];
-
-    // 1 — year to date
-    paras.push('Year to date you are at ' + m(st.ytdInc) + ' in operating income' + (st.ytdMargin != null ? ', a ' + pct(st.ytdMargin) + ' operating margin' : '') + '.');
-
-    // 2 — this month so far
-    paras.push(esc(st.monthName) + ' so far: ' + m(st.cmRev) + ' in revenue at a ' + pct(st.cmPrimePct) + ' prime cost, ' + m(st.mInc) + ' operating income' + (st.mInc < 0 ? ', still in the red for the month' : '') + '.');
-
-    // 3 — the one move
-    let move;
-    const billsMonth = this._bills().filter(r => r && String(r.date || '').slice(0, 7) === st.curKey).length;
-    if (billsMonth === 0) move = 'Log this month\'s bills first, so the operating income above is complete before you close.';
-    else if (st.dueCount > 0) move = 'Clear the ' + st.dueCount + ' permit or license item' + (st.dueCount === 1 ? '' : 's') + ' flagged' + (st.expiredCt > 0 ? ', ' + st.expiredCt + ' already expired' : '') + '.';
-    else move = 'The numbers are current. Generate Month-End Books when you are ready to hand it to your accountant.';
-    paras.push(move);
-
-    return paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
   },
 
   // ── Close Out Your Books banner (Cash card pattern, no week selector) ────────
@@ -554,8 +522,7 @@ S.HubBooksHome = {
 
   _wire() {
     const go = (act) => {
-      if (act === 'briefing')                this.showInsights();
-      else if (act === 'books')              S.HubBooks?.open?.();
+      if (act === 'books')              S.HubBooks?.open?.();
       else if (act === 'weekly-pnl')         S.Reports?._openQboModal?.();
       else if (act === 'year-end')           S.HubYearEnd?.open?.();
       else if (act === 'operating-expenses') S.HubOperatingExpenses?.open?.();

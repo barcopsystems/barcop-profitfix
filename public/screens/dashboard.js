@@ -20,7 +20,7 @@ S.Dashboard = {
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Profit. Profit Recovery is about margin: where the cost of your pours, plates, and the rest is eating money you already earned. You land on the week, see how far along you are, and work the steps top to bottom on the last night of the week.'] },
-      { h: 'Where You Stand', p: ['Up top is Where You Stand: the recoverable profit your latest audit found, what you have put back so far once your fixes are measured, and your pour, food, and prime cost for the week against target. Tap Bar Cop Briefing for a written read of where your costs are heading.'] },
+      { h: 'Where You Stand', p: ['Up top is Where You Stand: the recoverable profit your latest audit found, what you have put back so far once your fixes are measured, and your pour, food, and prime cost for the week against target. For a written read of the whole operation, including where these costs are heading, hit The Rail in the top bar.'] },
       { h: 'The Steps', p: ['1. Confirm the Week: confirm this week\'s bar and food sales and costs, so everything below has numbers. 2. Check your costs against target: your pour, food, and prime cost for the week, so you see exactly where margin slipped before you act. 3. Work your biggest leak: open Profit Fix on the biggest-dollar leak and take it down. 4. Run your Profit audit: score the whole operation and refresh your leak board. Run it whenever you want a fresh read, flagged here when it has been a while.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Read the numbers, launch into the screen that does the work, and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] }
     ]);
@@ -111,10 +111,9 @@ S.Dashboard = {
     // A scored audit, not just any audit: an estimate-only run records N/A
     // (overall null) and must not flip the hero off a guess.
     const hasData = this.audits().some(a => a.overall_score != null);
-    const insightsBtn = '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
 
     container.innerHTML = '<div class="screen">'
-      + (hasData ? this.whereYouStand(insightsBtn) : this.getStartedBox())
+      + (hasData ? this.whereYouStand() : this.getStartedBox())
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -131,7 +130,7 @@ S.Dashboard = {
   // Hero = the recoverable-profit opportunity from the latest audit; a recovered-
   // so-far line; then a cost-health strip (pour / food / prime vs target) plus the
   // Profit Forecast, the profit parallel of Cash's runway read. Color = meaning.
-  whereYouStand(insightsBtn) {
+  whereYouStand() {
     const s = (window.Recovery && Recovery.moduleSummary) ? Recovery.moduleSummary('profit') : { recovered: 0, withFigure: 0, logged: 0 };
     const latestAudit = App.latestEvent ? App.latestEvent(this.audits()) : null;
     const monthly = latestAudit ? (latestAudit.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
@@ -154,7 +153,7 @@ S.Dashboard = {
       : '<span style="color:var(--t3);">Recovered profit builds here as you work fixes and log your weeks.</span>';
 
     return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>' + insightsBtn + '</div>'
+      + '<div class="card-title">Where You Stand</div>'
       + heroBody
       + '<div style="font-size:12px;color:var(--t3);margin-top:10px;padding-bottom:2px;">' + recoveredLine + '</div>'
       + this.costStrip()
@@ -398,7 +397,6 @@ S.Dashboard = {
       const un = ev.target.closest('[data-undone]');
       if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
       if (ev.target.closest('[data-confirm-week]')) { ConfirmWeek.open(this.weekEnd(), { onDone: () => this.render(this.container, this.actions) }); return; }
-      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       // Leak-board rows (.fp-fixarea) are wired by FixPanel.wireFixAreas; skip them
       // here so a tap routes into the fix process, not a no-op.
       if (ev.target.closest('.fp-fixarea') || ev.target.closest('.fp-step')) return;
@@ -410,63 +408,4 @@ S.Dashboard = {
     };
   },
 
-  // ── Bar Cop Briefing: a written read of the profit week, cached a week per
-  //    section. Built fresh from your logged data on every open: no cache, no API call. ─────────────
-  // Code-generated (no API): reads the cost trend and writes three short
-  // paragraphs in the operator voice, the worst cost, the trends, the one move.
-  showInsights() {
-    const weeks = this.weeks().slice().sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
-    if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Briefing', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
-
-    const t = this.targets();
-    const bT = t.bar_pour_cost_pct || 22, fT = t.food_cost_pct || 32, pT = t.prime_cost_pct || 60;
-    const r1 = n => (Math.round(n * 10) / 10).toFixed(1);
-    const money = n => '$' + Math.round(n).toLocaleString('en-US');
-    const direction = v => {
-      if (v.length < 3) return 'still too few weeks to call a trend';
-      const d = v[v.length - 1] - v[0];
-      return d > 0.5 ? 'rising, getting worse' : d < -0.5 ? 'falling, improving' : 'holding steady';
-    };
-    const bR = weeks.map(w => w.bar && w.bar.revenue).filter(v => v != null);
-    const aR = bR.length ? bR.reduce((s, x) => s + x, 0) / bR.length : 0;
-
-    const costs = [
-      { name: 'Bar pour cost', arr: weeks.map(w => w.bar && w.bar.cost_pct),  tgt: bT, act: 'jigger the wells, cost your recipes, and watch pour variance in Spot Check' },
-      { name: 'Food cost',     arr: weeks.map(w => w.food && w.food.cost_pct), tgt: fT, act: 'tighten portions and log waste in Inventory' },
-      { name: 'Prime cost',    arr: weeks.map(w => w.prime_cost_pct),          tgt: pT, act: 'work the biggest of pour, food, and labor first in Profit Fix', composite: true }
-    ].map(c => { const v = c.arr.filter(x => x != null); return Object.assign(c, { cur: v.length ? v[v.length - 1] : null, n: v.length, dir: direction(v) }); })
-     .filter(c => c.cur != null);
-    costs.forEach(c => c.over = c.cur - c.tgt);
-    const curB = (costs.find(c => c.name === 'Bar pour cost') || {}).cur;
-    const barOver = (curB != null && curB > bT) ? Math.round((curB - bT) / 100 * aR) : 0;
-    // Prime is the COMPOSITE of pour, food and labor, so it must never compete with its
-    // own parts for "the first one to chase": chasing prime IS chasing those, which its
-    // own action line admits ("work the biggest of pour, food, and labor first"), so the
-    // Briefing could tell you to chase prime and prime could tell you to go chase the
-    // parts it just outranked. _topLeak() below drops COMPOSITE_GAPS for exactly this,
-    // and the Profit Audit carries prime as unscored CONTEXT, not a section. It stays in
-    // the trend sentence, where reporting the combined number is the whole point.
-    const worst = costs.filter(c => !c.composite).slice().sort((a, b) => b.over - a.over)[0];
-
-    const paras = [];
-    if (worst && worst.over > 0.05) {
-      let p1 = 'Your ' + worst.name.toLowerCase() + ' is running ' + r1(worst.cur) + '% against a ' + worst.tgt + '% target, ' + r1(worst.over) + ' point' + (Math.round(worst.over) === 1 ? '' : 's') + ' over and the first one to chase.';
-      if (worst.name === 'Bar pour cost' && barOver > 0) p1 += ' On about ' + money(aR) + ' of bar sales a week, that overage is roughly ' + money(barOver) + ' walking out.';
-      paras.push(p1);
-    } else if (costs.length) {
-      paras.push('Your costs are at or under target: ' + costs.map(c => c.name.toLowerCase().replace(' cost', '') + ' ' + r1(c.cur) + '%').join(', ') + '. Nothing here is bleeding, which is the whole job.');
-    }
-    // Only the costs that HAVE a trend go in the trend sentence. Every cost used to be
-    // listed, so a cost with under 3 weeks spliced its own guard clause into the middle
-    // of the sentence: "food cost is still too few weeks to call a trend".
-    const trended = costs.filter(c => c.n >= 3);
-    if (trended.length) {
-      paras.push('Over the last ' + Math.max.apply(null, trended.map(c => c.n)) + ' weeks, ' + trended.map(c => c.name.toLowerCase() + ' is ' + c.dir).join(', ') + '.');
-    }
-    if (worst && worst.over > 0.05) paras.push('This week, put the wrench on ' + worst.name.toLowerCase() + ': ' + worst.act + ' until it comes back to target.');
-    else paras.push('Nothing urgent to chase. Hold the discipline and keep logging every week so the trend stays honest.');
-
-    const html = paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
-    DashUI.insightsModal('Bar Cop Briefing', html);
-  }
 };

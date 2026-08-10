@@ -474,9 +474,10 @@ S.Hub = {
                   : App.fmtCurrency(Math.abs(beSum.delta), 0) + ' short last week');
     const tiles =
         '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
-      + '<div class="hub-wys-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--b2);">'
+      /* The briefing slot is gone from this header. The Rail is the ONE whole-bar read now and it
+         lives in the top bar, reachable from every page — including this one. */
+      + '<div class="hub-wys-head" style="border-bottom:1px solid var(--b2);">'
       +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Where You Stand</div>'
-      +   '<div id="hub-briefing-slot" style="flex-shrink:0;"></div>'
       + '</div>'
       + '<div class="hub-wys-body" style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;">'
       + heroTile('dashboard', "S.Hub._enter('dashboard','profit')", 'Open Profit Close The Week', 'Total Opportunity',
@@ -1112,30 +1113,12 @@ S.Hub = {
     }
     const readoutPanel = `${shWrapOpen('Weekly Gaps')}${readoutBody}<div style="margin-top:auto;padding-top:12px;font-size:10px;color:var(--t4);flex-shrink:0;">From this week's numbers</div>${shWrapClose}`;
 
-    // Snapshot for the Bar Cop Briefing (weekly cross-system narrative button in
-    // the Where You Stand card). Mirrors the displayed numbers so the written
-    // read never contradicts the dashboard.
-    this._briefingData = {
-      bar: barName,
-      opportunity: anyAudit ? totalOpp : null,
-      recovered: recoveryTotal.dollars,
-      fixes: recoveryTotal.fixes,
-      audits: {
-        profit:  pA ? pA.overall_score : null,
-        revenue: rA ? rA.overall_score : null,
-        cash:    cA ? cA.overall_score : null,
-        barCop:  bcScore,
-        target:  (pA && pA.raw && pA.raw.TARGET_SCORE) || 70
-      },
-      weekly: {
-        leak: readout.leakTotal,
-        opp:  readout.oppTotal,
-        items: (readout.items || []).slice(0, 6).map(it => ({ label: it.label, weekly: it.weekly, module: it.module }))
-      },
-      metrics: metrics.map(m => ({ label: m.label, val: m.disp, target: m.tgt, status: m.status })),
-      critical: alerts.filter(a => a.sev === 'bad').map(a => a.text).slice(0, 8)
-    };
-
+    /* ⛔ THE SNAPSHOT IS NOT BUILT HERE ANY MORE — `briefingSnapshot()` is its ONE owner.
+       This assembled `this._briefingData` inline, which meant the read only existed once the Hub
+       had drawn; The Rail is in the top bar and gets pressed on pages that never render this one.
+       ⚠ Leaving this here alongside the member would have been the worse outcome of the two: two
+       implementations of the same object, agreeing today and drifting the first time either was
+       edited, on the very read whose promise is that it never contradicts the dashboard. */
     // ── Sidebar nav SVG icons, 17x17 viewBox to match the module sidebars ──
     const navIcons = {
       profit:  '<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
@@ -1304,24 +1287,11 @@ S.Hub = {
     // Default sidebar active state on the Hub Dashboard view.
     if (App.setActiveHubNav) App.setActiveHubNav('hub-home');
 
-    // Mount the Bar Cop Briefing button (weekly cross-system narrative).
-    const _bSlot = document.getElementById('hub-briefing-slot');
-    if (window.BarCopBriefing && _bSlot) BarCopBriefing.attach(_bSlot, this._briefingData);
-
-    // Line the Bar Cop Audit divider up flush with the Briefing button's left
-    // edge: both right-anchor to the card's right padding, so a right margin sized
-    // to the width difference shifts the whole audit cell (divider + score, gap
-    // intact) left until the divider sits under the button's left edge. rAF so the
-    // button is laid out before we measure.
-    requestAnimationFrame(() => {
-      const slot = document.getElementById('hub-briefing-slot');
-      const cell = document.getElementById('hub-audit-cell');
-      if (slot && cell && slot.offsetWidth) {
-        const extra = slot.offsetWidth - cell.offsetWidth;
-        cell.style.marginRight = (extra > 0 ? extra : 0) + 'px';
-      }
-    });
-
+    /* ⛔ THE BRIEFING MOUNT AND ITS ALIGNMENT PASS ARE GONE WITH THE BUTTON. The rAF block sized the
+       Bar Cop Audit cell's right margin to the Briefing button's width so the two right edges lined
+       up; with no button to measure it would have shifted the cell by the slot's zero width, which
+       is a silent layout change rather than an error. Delete the measurement with the thing it
+       measured. */
     // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
     document.getElementById('hub-signout')?.addEventListener('click', async () => {
       if (App.demoMode) { window.location.href = '/'; return; }
