@@ -27,6 +27,30 @@ S.WeekClose = {
 
   container: null,
   _weekEnd: null,
+  _openLane: null,      // the row whose import door is open, or null
+
+  /* ── STAGE 2: THE HOURS LANE, HOSTED HERE ───────────────────────────────────
+     ⭐ NOTHING ABOUT THE IMPORT IS REIMPLEMENTED. The drop zone, the column mapper, the confirm
+     screen, the roster match, the closed-pay-period test and the write are all `S.LaborDashboard`'s
+     `importLane`, which already runs through the shared `ImportConfirm.panel` shell. The only thing
+     that differs between that page and this one is the HOSTING, so this object is the whole
+     difference: the ids this page renders, its takeover slots, its container, and its redraw.
+     ⛔⛔ AND THE IDS HAVE TO BE THIS PAGE'S OWN. Module screens render into `#content-area` inside
+     `#app`, hub pages like this one into `.hub-app`, and the app HIDES the shell it is not showing
+     rather than removing it. Reusing `lc-ck-hours` would leave two elements with that id in the
+     document and `getElementById` answers with whichever comes first — so the mapper could mount
+     into the hidden cockpit and the operator would drop a file onto nothing. That is the
+     rail-overlay duplicate-id defect with a parsed timeclock file riding on it.
+     ⚠ HOURS ONLY, DELIBERATELY. There is no `tips` zone because this page does not render one, and
+     the lane asks the host what it hosts before it draws: a tips import taken over on the Labor
+     cockpit stays on the Labor cockpit. */
+  LB_HOST: {
+    zone: { hours: 'wc-hours' },
+    takeover: 'wc-takeover',
+    container() { return S.WeekClose.container; },
+    rerender()  { S.WeekClose.render(S.WeekClose.container); }
+  },
+  _lb() { return S.LaborDashboard || null; },
 
   open() {
     App.openHubFullPage('Close The Week', (mount) => { this.container = mount; this.render(mount); }, 'week-close');
@@ -109,7 +133,10 @@ S.WeekClose = {
     return [
       { key: 'sales', label: 'Sales', ready: st.sales.length > 0, go: 'sc-dashboard',
         note: st.sales.length ? st.sales.length + ' day' + (st.sales.length === 1 ? '' : 's') + ' in, ' + money(st.salesTotal) : 'Not in yet' },
-      { key: 'hours', label: 'Hours', ready: st.hours.length > 0, go: 'lc-log-hours',
+      /* ⛔ THE DROP BELONGS WHERE THE RESULT SHOWS. This row is where the operator reads what the
+         week's hours are, so it is where the file goes in; a door whose answer appears on a
+         different page is a signpost, not a door. `lane` is the key the host names a zone for. */
+      { key: 'hours', label: 'Hours', ready: st.hours.length > 0, go: 'lc-log-hours', lane: 'hours',
         note: st.hours.length ? st.hoursTotal.toFixed(1) + ' hours across ' + st.hours.length + ' row' + (st.hours.length === 1 ? '' : 's') : 'Not in yet' },
       { key: 'tips', label: 'Tips', ready: st.tips.length > 0, go: 'lc-tip-log', optional: true,
         note: st.tips.length ? money(st.tipsTotal) + ' logged' : 'None logged' },
@@ -165,6 +192,17 @@ S.WeekClose = {
       ? '<span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:12px;font-weight:800;">&#10003;</span>'
       : '<span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;border:1px solid ' + (r.optional ? 'var(--b1)' : 'var(--gold)') + ';"></span>';
     const noteCol = r.ready ? 'var(--t2)' : (r.optional ? 'var(--t3)' : 'var(--t2)');
+    /* The import door stays available on a row that is already in: a timeclock week arrives in more
+       than one file often enough, and re-dropping cannot double-count (the builder dedups on staff,
+       date and amount). "Open" is still the way to type them in by hand, and it only shows while
+       there is nothing in yet. */
+    /* ⚠ "HIDE", NOT "CLOSE". The open state read `Close` for one draft, on the page whose banner says
+       CLOSE OUT YOUR WEEK and whose primary button is Confirm the Week. One word, two meanings, six
+       inches apart. */
+    const laneOpen = !!r.lane && this._openLane === r.lane;
+    const laneBtn = (r.lane && this.LB_HOST.zone[r.lane])
+      ? '<button class="btn btn-ghost btn-sm wc-lane" data-lane="' + esc(r.lane) + '">'
+        + (laneOpen ? 'Hide' : 'Import file') + '</button>' : '';
     const btn = r.ready ? '' : '<button class="btn btn-ghost btn-sm wc-go" data-go="' + esc(r.go) + '">Open</button>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);margin-bottom:10px;">'
       + '<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;">'
@@ -174,13 +212,94 @@ S.WeekClose = {
       +       (r.optional ? ' <span style="font-size:10px;font-weight:600;color:var(--t4);letter-spacing:0.5px;">OPTIONAL</span>' : '') + '</div>'
       +     '<div style="font-size:11px;color:' + noteCol + ';margin-top:2px;">' + esc(r.note) + '</div>'
       +   '</div>'
-      +   btn
-      + '</div></div>';
+      +   (laneBtn || btn ? '<div style="display:flex;gap:8px;flex-shrink:0;">' + laneBtn + btn + '</div>' : '')
+      + '</div>'
+      + (laneOpen ? this.laneBody(r.lane) : '')
+      + '</div>';
+  },
+
+  /* The three slots the lane names through the host: the mapper's own element, the Import/Cancel row
+     which CSVMapper renders OUTSIDE the mapper, and the result slot.
+     ⛔ THE ACTIONS SLOT IS NOT OPTIONAL. Money Out's first handover carried only the mapper and Kyle
+     found the result on the live build: a parsed file, the column mapper, and nothing but Cancel.
+     ⚠ THE RESULT SLOT IS DELIBERATELY EMPTY HERE and it is worth saying so rather than leaving the
+     next reader to work it out: the only writer is `importLane`, which now only ever runs from the
+     confirm screen, and that screen renders its OWN slot under the same name. It is here because the
+     zone is three elements on the cockpit too, and a lane that finds two of them on one page and
+     three on the other is a difference waiting to be a defect. */
+  laneBody(key) {
+    const z = this.LB_HOST.zone[key];
+    if (!z) return '';
+    /* ⚠ NO EXPLAINER SENTENCE HERE, and the first draft had one. `verify-design-code` RULE 2b caught
+       it: instructional copy belongs in the nav "i", not on a card. It was redundant twice over
+       anyway — the drop zone's own `dropTitle`/`dropSub` already say what the file needs, and the
+       confirm screen's lead already says nothing is saved until the button is pressed. */
+    return '<div style="border-top:1px solid var(--b-edge);padding:16px;">'
+      + '<div id="' + z + '"></div><div id="' + z + '-actions"></div><div id="' + z + '-res"></div>'
+      + '</div>';
+  },
+
+  /* ── THE PAGE WHILE A FILE IS ON IT ─────────────────────────────────────────
+     Same shape the cockpits use and for the reason written at that line: the week banner STAYS, so
+     the operator keeps the context of what they are closing, and the row list goes, so there is one
+     job on the screen.
+     ⛔ THE LIVE MAPPER NODE IS RE-ATTACHED, NEVER REBUILT. `CSVMapper.mount()` opens by overwriting
+     its container, so rebuilding here would throw the operator's parsed file away and put them back
+     on an empty drop zone, silently. The lane detaches and carries the node; this puts the same
+     element back, listeners and parsed rows intact. */
+  renderLane(container) {
+    const LC = this._lb();
+    const st = this.state();
+    const rows = this.rows(st);
+    const required = rows.filter(r => !r.optional);
+    const T = this.LB_HOST.takeover;
+    const onConfirm = !!LC._anyLaborReview();
+
+    container.innerHTML = '<div class="screen">'
+      + this.banner(st, required.filter(r => r.ready).length, required.length)
+      + (onConfirm
+          ? '<div style="margin-top:18px;">' + LC.laborReviewHTML() + '</div>'
+          : '<div class="card form-card" style="margin-top:18px;">'
+            +   '<div class="card-title">' + esc((LC.LC_TITLE && LC.LC_TITLE[LC._lbTakeover]) || 'Check your import') + '</div>'
+            +   '<div id="' + T + '"></div>'
+            + '</div>'
+            + '<div id="' + T + '-actions" style="margin-top:14px;"></div>')
+      + '</div>';
+
+    if (!onConfirm && LC._lbCarry) {
+      const slot = document.getElementById(T);
+      if (slot) slot.appendChild(LC._lbCarry);
+      const aslot = document.getElementById(T + '-actions');
+      if (aslot && LC._lbCarryActs) aslot.appendChild(LC._lbCarryActs);
+    }
+    this.wire();
+    if (onConfirm) LC._wireLaborReview();
+    // The takeover draws BELOW the banner, so on a short window a dropped file moves nothing the
+    // operator can see. Only on the way in; on the way out the rows are what they want back.
+    setTimeout(() => document.getElementById(T)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   },
 
   render(container) {
     if (!container) return;
     this.container = container;
+    const LC = this._lb();
+
+    /* ⭐ THE LANE BELONGS TO THE PAGE DRAWING IT, AND THIS PAGE ONLY DRAWS THE ONE IT HOSTS. Claiming
+       a lane this page has no zone for would point every id, every container read and every redraw
+       at markup it never rendered. */
+    const laneHere = !!(LC && LC.lbTakeover() && this.LB_HOST.zone[LC._lbLaneKey()]);
+    const laneOpen = !!(this._openLane && this.LB_HOST.zone[this._openLane]);
+    if (LC && (laneHere || laneOpen)) LC.lbClaim(this.LB_HOST);
+    if (laneHere) return this.renderLane(container);
+
+    /* ⛔ THE LANDING MESSAGE BELONGS TO THE PAGE THAT RAN THE IMPORT. `importLane` sets `_flash` the
+       moment a write lands and the cockpit reads it in its own render — which never runs when this
+       page hosts the lane, so a successful import would report NOTHING here and then announce itself
+       on the Labor cockpit later, out of context. Read and cleared here for the same reason. */
+    const flash = LC ? LC._flash : null;
+    if (LC) LC._flash = null;
+    if (flash) this._openLane = null;   // the file went in; give the page back
+
     const st = this.state();
     const rows = this.rows(st);
     const required = rows.filter(r => !r.optional);
@@ -192,11 +311,14 @@ S.WeekClose = {
 
     container.innerHTML = '<div class="screen">'
       + this.banner(st, ready, required.length)
+      + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:0 2px 14px;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div class="sh" style="margin:0 0 10px;">What This Week Needs</div>'
       + rows.map(r => this.row(r)).join('')
       + '<div style="margin:18px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + confirmBtn + '</div>'
       + '</div>';
     this.wire();
+    // The markup is in the document by now, which is what the mount looks the zone up in.
+    if (LC && laneOpen && this._openLane === 'hours') LC.mountHoursImport();
   },
 
   wire() {
@@ -207,6 +329,13 @@ S.WeekClose = {
     c.querySelector('.wc-now')?.addEventListener('click', () => { this._weekEnd = null; this.render(this.container); });
     c.querySelectorAll('.wc-go').forEach(el =>
       el.addEventListener('click', () => App.openScreen(el.dataset.go)));
+    /* Opening the import door is not a commitment: the same button closes it, and the mapper's own
+       Cancel gives the page back through the lane. */
+    c.querySelectorAll('.wc-lane').forEach(el => el.addEventListener('click', () => {
+      const k = el.dataset.lane;
+      this._openLane = (this._openLane === k) ? null : k;
+      this.render(this.container);
+    }));
     /* The confirm is the EXISTING popup, not a second copy of that form. It writes the `week` and
        `revenue_week` records, which is the whole definition of a closed week. */
     /* ⚠ `open(weekEnd, opts)` takes an OPTIONS OBJECT with `onDone`, not a bare callback. A callback
