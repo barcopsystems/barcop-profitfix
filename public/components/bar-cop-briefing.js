@@ -23,13 +23,10 @@ window.BarCopBriefing = {
     catch (e) { return ''; }
   },
 
-  attach(containerEl, snapshot) {
-    if (!containerEl) return;
-    if (snapshot) this._snap = snapshot;
-    containerEl.innerHTML = '<button class="btn btn-ghost btn-sm" id="bcb-btn" style="font-size:10px;padding:4px 10px;letter-spacing:1px;">The Rail</button>';
-    const btn = containerEl.querySelector('#bcb-btn');
-    if (btn) btn.addEventListener('click', () => this.open());
-  },
+  /* ⛔ `attach()` IS GONE. It mounted a button into the Hub's Where You Stand header and handed it a
+     snapshot built during that page's render. The Rail replaced both: one button, static in the top
+     bar, taking its snapshot on demand. Its only caller went with the Hub's slot, and a mounting
+     helper with nothing to mount is the kind of leftover the next person reuses by accident. */
 
   /* THE ONE DOOR. The Rail button sits in the top bar on every page, so the snapshot cannot come
      from whatever the Hub last rendered — it is computed here, at click time, from App.data.

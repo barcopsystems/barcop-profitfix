@@ -141,9 +141,17 @@ window.AuditOutlook = {
   _showModal(auditType, audit, bodyHtml) {
     const typeLabel = this._typeLabel(auditType);
     const period = (audit.date || '').slice(0, 10);
+    /* ⛔ THE DISCLAIMER WAS MISSING HERE, AND IT HAD BEEN THE WHOLE TIME. `verify-briefing-disclaimer`
+       was written for `DashUI.insightsModal` and pinned only that one; when the per-section
+       briefings were retired for The Rail and the pin was re-pointed at the two SURVIVING briefing
+       modals, this one came back empty. Both siblings carry it — The Rail's `_showModal` and
+       formerly insightsModal — and this modal prints a scored audit read, which is exactly the
+       output [[legal-protection]] wants it on. Unconditional, never behind an argument gate: that
+       is the defect the original pin was born from. */
     const html = '<div class="card form-card" style="margin:0;">'
       + '<div class="card-title">Bar Cop Briefing: ' + esc(typeLabel) + (period ? ' &middot; ' + esc(period) : '') + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.9;">' + bodyHtml + '</div>'
+      + '<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--b2);font-size:10px;color:var(--t4);line-height:1.6;">Generated from your logged Bar Cop data. A read on this audit, not real-time and not financial or business advice.</div>'
       + '</div>';
     App.openModal(html, { id: 'ao-modal', maxWidth: 620 });
   },
