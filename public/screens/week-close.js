@@ -55,11 +55,18 @@ S.WeekClose = {
      takeover flag all live on the cockpit object — Labor's lane cannot be told about Shift's.
      ⚠ The takeover slot is shared: only one file is ever mid-import, and both cockpits release
      before another can claim. */
+  /* ⚠ AND THIS HOST NAMES A WEEK, WHICH `LB_HOST` DOES NOT NEED. A dropped file carries its own
+     dates, so the hours and tips lanes never ask what week the page is showing. The sales lane has a
+     second door — the Enter Manually grid — which BUILDS seven day rows and pre-fills them, so it
+     has to build the seven days the operator can see. Giving `LB_HOST` the same two members would be
+     two members computed and read nowhere ([[the-loop]] #25); it gets them when a lane needs them. */
   SC_HOST: {
     zone: { import: 'wc-sales', cash: 'wc-cash' },
     takeover: 'wc-takeover',
     container() { return S.WeekClose.container; },
-    rerender()  { S.WeekClose.render(S.WeekClose.container); }
+    rerender()  { S.WeekClose.render(S.WeekClose.container); },
+    weekStart() { return S.WeekClose.weekStart(); },
+    weekEnd()   { return S.WeekClose.weekEnd(); }
   },
   // ⚠ NO `_sc()` TWIN. I added one and never called it — every Shift read goes through the `LANES`
   // table's `obj`, so a second accessor was a member computed and read nowhere ([[the-loop]] #25).
@@ -216,7 +223,16 @@ S.WeekClose = {
       ? 'From your counts'
       : (st.cogs.lastCount ? 'Type it on the confirm. Last count ' + this._shortDate(st.cogs.lastCount) : 'Type it on the confirm');
     return [
-      { key: 'sales', label: 'Sales', ready: st.sales.length > 0, go: 'sc-dashboard', lane: 'sales',
+      /* ⛔⛔ NO `go` ON THIS ROW ANY MORE, AND THAT IS THE POINT OF THE WHOLE CHANGE. It pointed at
+         `sc-dashboard` — one of the six cockpits being deleted — and it was the ONLY row on this page
+         that did; the other five point at screens that survive. It pointed there because the per-day
+         grid lived only on that cockpit, so a bar with no POS export had to be sent to a dying page
+         to key their week in. The grid is on this row now, behind the same door as the file drop, so
+         there is nothing left to send them to.
+         ⭐ THE DOOR SAYS "ADD SALES", NOT "IMPORT FILE", because behind it are two ways in. A button
+         labelled for one of them hides the other from the operator who most needs it: the one with
+         no export to drop. */
+      { key: 'sales', label: 'Sales', ready: st.sales.length > 0, lane: 'sales', laneLabel: 'Add sales',
         note: st.sales.length ? st.sales.length + ' day' + (st.sales.length === 1 ? '' : 's') + ' in, ' + money(st.salesTotal) : 'Not in yet' },
       /* ⛔ THE DROP BELONGS WHERE THE RESULT SHOWS. This row is where the operator reads what the
          week's hours are, so it is where the file goes in; a door whose answer appears on a
@@ -287,8 +303,11 @@ S.WeekClose = {
     const laneOpen = !!r.lane && this._openLane === r.lane;
     const laneBtn = (r.lane && this._laneZone(r.lane))
       ? '<button class="btn btn-ghost btn-sm wc-lane" data-lane="' + esc(r.lane) + '">'
-        + (laneOpen ? 'Hide' : 'Import file') + '</button>' : '';
-    const btn = r.ready ? '' : '<button class="btn btn-ghost btn-sm wc-go" data-go="' + esc(r.go) + '">Open</button>';
+        + (laneOpen ? 'Hide' : (r.laneLabel || 'Import file')) + '</button>' : '';
+    // ⚠ GUARDED ON `go`, not just on `ready`. The Sales row carries no `go` at all now, and without
+    // this it would render `data-go=""` — a button that navigates nowhere, on the row whose whole
+    // job this change was.
+    const btn = (r.ready || !r.go) ? '' : '<button class="btn btn-ghost btn-sm wc-go" data-go="' + esc(r.go) + '">Open</button>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);margin-bottom:10px;">'
       + '<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;">'
       +   mark
@@ -315,12 +334,58 @@ S.WeekClose = {
   laneBody(key) {
     const z = this._laneZone(key);
     if (!z) return '';
+    // The sales row is the one with two ways in — see `salesLaneBody`.
+    if (key === 'sales') return this.salesLaneBody(z);
     /* ⚠ NO EXPLAINER SENTENCE HERE, and the first draft had one. `verify-design-code` RULE 2b caught
        it: instructional copy belongs in the nav "i", not on a card. It was redundant twice over
        anyway — the drop zone's own `dropTitle`/`dropSub` already say what the file needs, and the
        confirm screen's lead already says nothing is saved until the button is pressed. */
     return '<div style="border-top:1px solid var(--b-edge);padding:16px;">'
       + '<div id="' + z + '"></div><div id="' + z + '-actions"></div><div id="' + z + '-res"></div>'
+      + '</div>';
+  },
+
+  /* ── THE SALES ROW HAS TWO WAYS IN, AND THEY SHARE ONE DOOR ─────────────────
+     Kyle's call, 2026-08-10: one door on the row, with the `Import File | Enter Manually` segmented
+     toggle inside it. That is the locked unified-import standard — one card, one toggle, never two
+     stacked boxes — and it is the shape `sc-dashboard` already uses, so the toggle IS that cockpit's
+     `_salesSeg()` rather than a second copy of it, and the grid IS its `_manualSalesGrid()`.
+     ⛔⛔ WHY THIS ROW AND NOT A SCREEN OF ITS OWN: `saveManualSales` is the ONLY way to key a week's
+     sales in with no POS export, and it lived on `sc-dashboard`, which is being deleted. Sending the
+     operator somewhere else to type their week in is the signpost-not-a-door mistake the Hours row's
+     note already records, and it would have rebuilt the page we are removing.
+     ⭐ NOTHING ABOUT THE WRITE IS REIMPLEMENTED, exactly as with the file lanes: the grid still goes
+     through `saveManualSales` → `importSales({manual:true})` → `_doImportSales`, the same writer the
+     drop uses. What this page supplies is the HOSTING — its ids, its week, its redraw.
+     ⚠ THE MODE LIVES ON THE COCKPIT OBJECT (`_salesMode`), not here, because the grid, the toggle and
+     the save all read it. One lane, one object, one state; a copy on this page could disagree with
+     the grid it is drawing.
+     ⚠ AND THE RESULT SLOT IS RENDERED IN BOTH MODES. `saveManualSales` prints every refusal into
+     `<zone>-res` — an unreadable cell, a negative, a covers-only day — so a mode that omits it
+     swallows the reason a save was refused and the button reads as dead.
+     ⚠ "SAVE SALES", NOT "SAVE THE WEEK", which is what the cockpit's own button says. On a page whose
+     banner reads CLOSE OUT YOUR WEEK and whose primary button is Confirm the Week, a second control
+     saying "the week" is the one-word-two-meanings trap the Hide/Close note above records. */
+  /* Which half of the toggle is showing. Read in TWO places — the body it draws, and the mount at
+     the end of `render` — so it is one accessor: a page that draws the grid and then mounts a mapper
+     into a drop zone it did not render is the shape that produces a live-looking dead control. */
+  _salesManual() {
+    const o = this._laneObj('sales');
+    return !!(o && o._salesMode === 'manual' && typeof o._manualSalesGrid === 'function');
+  },
+  salesLaneBody(z) {
+    const o = this._laneObj('sales');
+    // No cockpit object loaded means no toggle and no grid to offer; the file drop still works.
+    const manual = this._salesManual();
+    const seg = (o && o._salesSeg) ? o._salesSeg() : '';
+    const body = (manual && o._manualSalesGrid)
+      ? o._manualSalesGrid()
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
+        +   '<button class="btn btn-primary btn-sm wc-savesales" data-savesales="1">Save Sales</button>'
+        + '</div>'
+      : '<div id="' + z + '"></div><div id="' + z + '-actions"></div>';
+    return '<div style="border-top:1px solid var(--b-edge);padding:16px;">'
+      + seg + body + '<div id="' + z + '-res"></div>'
       + '</div>';
   },
 
@@ -446,7 +511,11 @@ S.WeekClose = {
     this.wire();
     /* The markup is in the document by now, which is what the mount looks the zone up in. The member
        name comes off the table so a new lane is a table row, not another branch here. */
-    if (laneOpen) {
+    /* ⛔ AND NOT WHILE THE HAND-ENTRY GRID IS SHOWING. In that mode this page renders no drop zone,
+       so the mount would look up an id that is not here — and `getElementById` does not answer with
+       nothing when the cockpit's own markup is still in the hidden shell. A mount that finds the
+       other page's zone is exactly the defect the host ids exist to stop. */
+    if (laneOpen && !(this._openLane === 'sales' && this._salesManual())) {
       const L = this.LANES[this._openLane], o = this._laneObj(this._openLane);
       if (o && L && typeof o[L.mount] === 'function') o[L.mount]();
     }
@@ -467,6 +536,27 @@ S.WeekClose = {
       this._openLane = (this._openLane === k) ? null : k;
       this.render(this.container);
     }));
+    /* ── THE SALES ROW'S TWO DOORS ────────────────────────────────────────────
+       ⛔ THIS PAGE HAS TO WIRE THEM ITSELF. The cockpit binds these two controls in its own `wire()`,
+       which sets `this.container.onclick` — and that handler is only installed when the COCKPIT
+       renders. Nothing on this page runs it, so a toggle copied across without its wiring would draw
+       perfectly and do nothing on click. That is the dead-control shape this build already paid for
+       once, in the Confirm the Week button.
+       ⚠ THE MODE IS WRITTEN ONTO THE COCKPIT OBJECT, which is where the grid, the toggle and the save
+       all read it. */
+    c.querySelectorAll('[data-salesmode]').forEach(el => el.addEventListener('click', () => {
+      const o = this._laneObj('sales');
+      if (!o) return;
+      o._salesMode = el.dataset.salesmode;
+      this.render(this.container);
+    }));
+    /* The save is the cockpit's own `saveManualSales`, which reads its cells and writes its result
+       through the host — so this page hands it nothing and stubs nothing. It redraws through
+       `_ckRerender`, which is this page, so there is no render call here either. */
+    c.querySelector('.wc-savesales')?.addEventListener('click', () => {
+      const o = this._laneObj('sales');
+      if (o && o.saveManualSales) o.saveManualSales();
+    });
     /* The confirm is the EXISTING popup, not a second copy of that form. It writes the `week` and
        `revenue_week` records, which is the whole definition of a closed week. */
     /* ⚠ `open(weekEnd, opts)` takes an OPTIONS OBJECT with `onDone`, not a bare callback. A callback
