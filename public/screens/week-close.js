@@ -404,13 +404,21 @@ S.WeekClose = {
     }
     if (inFlightRow) return this.renderLane(container, inFlightRow);
 
-    /* ⛔ THE LANDING MESSAGE BELONGS TO THE PAGE THAT RAN THE IMPORT. `importLane` sets `_flash` the
-       moment a write lands and the cockpit reads it in its own render — which never runs when this
-       page hosts the lane, so a successful import would report NOTHING here and then announce itself
-       on the Labor cockpit later, out of context. Read and cleared here for the same reason. */
-    const flash = LC ? LC._flash : null;
-    const flashDates = LC ? LC._flashDates : null;
-    if (LC) { LC._flash = null; LC._flashDates = null; }
+    /* ⛔ THE LANDING MESSAGE BELONGS TO THE PAGE THAT RAN THE IMPORT. Each commit sets `_flash` the
+       moment a write lands and its own cockpit reads it in that cockpit's render — which never runs
+       when this page hosts the lane, so a successful import reports NOTHING here and then announces
+       itself on the cockpit later, out of context.
+       ⛔⛔ FROM EVERY COCKPIT THIS PAGE HOSTS, NOT JUST LABOR. It read `LC._flash` alone until
+       2026-08-10 and the walk caught it: seven days of sales landed from this page, the write was
+       perfect, and the page said nothing and stayed on the wrong week. The lanes are plural; so is
+       this read. */
+    let flash = null, flashDates = null;
+    Object.keys(this.LANES).forEach(rk => {
+      const o = S[this.LANES[rk].obj];
+      if (!o || !o._flash) return;
+      if (!flash) { flash = o._flash; flashDates = o._flashDates || null; }
+      o._flash = null; o._flashDates = null;
+    });
     if (flash) this._openLane = null;   // the file went in; give the page back
     /* ⚠ BEFORE `state()` IS READ, or the rows are built for the week we are leaving and the page
        reports the old week under a line announcing the new one. */
