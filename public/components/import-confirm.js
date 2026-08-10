@@ -404,14 +404,25 @@ const ImportConfirm = {
         removedOpen ? table(removedRows, true) : '', removedOpen, false, 'removed');
     }
 
-      /* ⚠ `card-title`, WHICH IS WHAT THE REFERENCE USES AND WHAT CARRIES THE RULE UNDER IT (Kyle,
-         2026-08-04: *"operating expenses still doesn't match add products... needs the divider
-         line"*). It was a hand-rolled span at a different size, weight and letter-spacing, so every
-         confirm screen in the rollout read as a near-miss of the door they were copied from.
-         ⚠ BLAST RADIUS, STATED: this is the shared shell, so vendors, staff, menu items and
-         sales-by-day all gain the same rule. That is the point of the shell — the alternative is one
-         door matching Add Products and four not. */
-    return (opts.label ? '<div class="card-title">' + esc(opts.label) + '</div>' : '')
+      /* ⚠ THE HEADING CARRIES THE DIVIDER RULE (Kyle, 2026-08-04: *"operating expenses still doesn't
+         match add products... needs the divider line"*). It was a hand-rolled span at a different
+         size, weight and letter-spacing, so every confirm screen in the rollout read as a near-miss
+         of the door they were copied from.
+         ⛔⛔ IT WAS `.card-title` UNTIL 2026-08-10, AND THAT CLASS CHANGED MEANING UNDERNEATH IT.
+         The card-colour pass made `.card-title` the head BAND of a card — a `--card-head` fill and
+         `margin:-20px -20px 16px`, which only lands as the first child of a `.card` with 20px
+         padding. MEASURED: none of the 13 call sites across 10 doors wraps this panel in a card,
+         because the panel's own SECTIONS are cards and wrapping would nest them. So on every confirm
+         screen in the app the heading hung 20px outside its container on both sides, painted a fill
+         with no card under it, and its -20px top ate the gap above. Kyle walked Close The Week and
+         found it; it was live on all ten doors.
+         ⭐ `.sh` IS THE HEADING-OUTSIDE-A-CARD CLASS and its typography is byte-identical, so the
+         only thing that changes is the band going away. `.ic-head` adds back the divider and nothing
+         else. Top spacing belongs to the HOST — every door already gives it a wrapper margin or
+         `.screen`'s own padding, and a top margin here would double it.
+         ⚠ BLAST RADIUS, STATED: this is the shared shell, so all 10 doors move together. That is the
+         intent — all 10 carried the identical defect. */
+    return (opts.label ? '<div class="sh ic-head">' + esc(opts.label) + '</div>' : '')
       + (opts.lead ? '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin:0 0 18px;">' + esc(opts.lead) + '</div>' : '')
       /* ⛔ THE CARD IS LOAD-BEARING, NOT DECORATION. `.row-list tbody td` is
          #0D181E and a cockpit step workspace is #0D181E too, so a bare table
