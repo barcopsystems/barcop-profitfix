@@ -18,6 +18,17 @@ S.EventsDashboard = {
     close:    { n: 4, title: 'Close out completed events' }
   },
 
+  /* ⭐ THE SHARED "how is this section doing this week" INTERFACE. Six section dashboards already
+     answered it; Events and Books did not, so anything wanting a whole-bar read had to render the
+     Week In Review page and scrape the payloads its section builders push out as a SIDE EFFECT.
+     The Rail is in the top bar on every page, so it cannot render a page to ask a question.
+     Same shape the other six return. */
+  hubSteps() {
+    const st = this._computeState();
+    const steps = this.ORDER.map(k => ({ key: k, label: this._META[k].title, done: !!this.stepInfo(k, st).done }));
+    return { steps, stats: null, doneCount: steps.filter(s => s.done).length, total: steps.length };
+  },
+
   EB() { return S.EventsBookings; },
   _money(v) { return (v == null || isNaN(v)) ? '-' : App.fmtCurrency(Number(v)); },
   _runSheetStarted(b) { return !!(b.timeline || b.menu_notes || b.bev_notes || b.setup_notes || b.av_notes || b.guaranteed_count); },
