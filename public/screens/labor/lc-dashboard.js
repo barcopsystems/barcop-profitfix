@@ -487,55 +487,8 @@ S.LaborDashboard = {
       + '</div>'
       + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="lc-build-schedule">Build Schedule</button></div>'
       + '</div>';
-    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>'
-      + '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button></div>'
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Where You Stand</div>'
       + hero + secondary + '</div>';
-  },
-
-  // ── Bar Cop Briefing: a written read of the labor week, cached a week per
-  //    section. Built fresh from your logged data on every open: no cache, no API call. ─────────────
-  // Code-generated (no API): where labor stands, where it leaks, the one move.
-  showInsights() {
-    const st = this._wys();
-    if (!st.hasHours) { DashUI.insightsModal('Bar Cop Briefing', 'Log a week of hours and Bar Cop can read your labor week for you.'); return; }
-    DashUI.insightsModal('Bar Cop Briefing', this._insBriefing(st));
-  },
-
-  _insBriefing(st) {
-    const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
-    const target = App.laborTargetPct ? App.laborTargetPct() : 29;
-    const today = App.todayLocal();
-    const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return App.ymdLocal(d); })();
-    const activeIds = new Set(this.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
-    const uncovered = this.callouts().filter(c => this.inWeek(c.date) && !c.covered).length;
-    const expiring = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30).length;
-    const expired = this.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
-    const nextBuilt = this.schedules().some(s => s.week_start === this.nextWeekStart());
-    const paras = [];
-
-    // 1 — where labor stands
-    let p1 = 'Labor ran ' + m(st.wkCost) + ' on ' + st.wkHours.toFixed(1) + ' hours this week. ';
-    if (st.laborPct != null) p1 += 'That is ' + st.laborPct.toFixed(1) + '% of floor sales against a ' + target + '% target, ' + (st.laborPct > target ? 'over the line.' : 'inside the line.') + (st.rplh != null ? ' Revenue per labor hour is ' + m(st.rplh) + '.' : '');
-    else p1 += 'Import this week\'s sales and the labor percent fills in.';
-    paras.push(p1);
-
-    // 2 — where it leaks
-    const leaks = [];
-    if (st.over > 0) leaks.push(st.over + ' staff projected over ' + App.OT_THRESHOLD + ' hours, about ' + m(st.otPremium) + ' in overtime premium');
-    if (st.approaching > 0) leaks.push(st.approaching + ' more approaching overtime');
-    if (uncovered > 0) leaks.push(uncovered + ' uncovered call-out' + (uncovered === 1 ? '' : 's') + ' this week');
-    if (expired > 0 || expiring > 0) leaks.push(expired + ' expired and ' + expiring + ' expiring certification' + (expiring === 1 ? '' : 's') + ' within thirty days');
-    paras.push(leaks.length ? 'Where it leaks: ' + leaks.join(', ') + '.' : 'No overtime, no uncovered shifts, and the certs are current. The schedule is clean this week.');
-
-    // 3 — the single move
-    let move;
-    if (!nextBuilt) move = 'Build next week\'s schedule first, and build it to the cover forecast so the hours match the room before the week starts.';
-    else if (st.over > 0) move = 'Kill the overtime before it starts. Trim the ' + st.over + ' staff over the line in Build Schedule.';
-    else if (uncovered > 0) move = 'Cover the ' + uncovered + ' open shift' + (uncovered === 1 ? '' : 's') + ' now, before someone eats a double.';
-    else move = 'Nothing urgent. Keep scheduling to the forecast and watch the overtime flags.';
-    paras.push(move);
-
-    return paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
   },
 
   outlierStrip() {
@@ -935,7 +888,6 @@ S.LaborDashboard = {
   // ── Wiring ───────────────────────────────────────────────────────────────────
   wire() {
     this.container.onclick = ev => {
-      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       const head = ev.target.closest('.lc-step-head');
       if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
       const dn = ev.target.closest('[data-done]');
