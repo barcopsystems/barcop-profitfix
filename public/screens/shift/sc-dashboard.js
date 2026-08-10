@@ -1240,6 +1240,12 @@ S.ShiftDashboard = {
     this._flash = allToAdd.length + ' day' + (allToAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
       + (opts.reviewed ? '' : salesOutcomes)
       + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + (opts.reviewed ? '' : repNote) + '.' + cwNote;
+    /* ⛔⛔ WHAT LANDED, BY DATE, so a host that shows ONE WEEK can say which week it means and move
+       to it. Walked on the shipped build 2026-08-10: seven days of Aug 17-23 went in from Close The
+       Week, the Sales row kept reading the Aug 10-16 figure and the page said NOTHING — the same
+       defect the Labor lane had, on the lane beside it, because `_flashDates` was added there and
+       not here. The DATES, not a week label: this lane does not know what week its host is showing. */
+    this._flashDates = allToAdd.map(r => r && r.date).filter(Boolean);
     /* ⛔⛔ THE RELEASE, MOVED HERE from this cockpit's `render` when Close The Week began hosting the
        lane. A hub page never runs that render, so the takeover flag and the spent mapper would have
        survived the write and the page would redraw a mapper whose file has already gone in — Kyle's
@@ -2082,6 +2088,8 @@ S.ShiftDashboard = {
             + ' skipped, no over/short figure)' : '') + undatedNote);
     this._flash = allToAdd.length + ' reconcile' + (allToAdd.length === 1 ? '' : 's') + ' imported'
       + outcomes + '.';
+    // ⛔ WHAT LANDED, BY DATE — same reason as the sales commit above. Two commit paths, both stamp it.
+    this._flashDates = allToAdd.map(r => r && r.date).filter(Boolean);
     // ⛔ THE RELEASE — same reason as the sales commit above. Two commit paths, so it lives in both.
     if (!this._anyReview()) this._clearTakeover();
     this._openStep = 'exc';
