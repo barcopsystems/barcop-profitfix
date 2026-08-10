@@ -138,13 +138,32 @@ S.WeekClose = {
      file was dated outside it. Neither sentence said what it was counting.
      ⭐ SILENT WHEN EVERY ROW LANDED IN VIEW. The row already shows those, and a line that also fires
      on the happy path is the noise that stops an operator reading it on the day it matters. */
-  _flashScope(dates) {
+  _flashScope(dates, jumped) {
     const all = (dates || []).filter(Boolean);
     if (!all.length) return '';
+    const range = App.dateRangeLabel ? App.dateRangeLabel(this.weekStart(), this.weekEnd()) : '';
+    // The week moved to meet the file, so say which week is now on screen.
+    if (jumped) return ' Showing ' + range + '.';
     const n = all.filter(d => this.inWeek(d)).length;
     if (n === all.length) return '';
-    const range = App.dateRangeLabel ? App.dateRangeLabel(this.weekStart(), this.weekEnd()) : '';
     return n ? ' ' + n + ' in ' + range + '.' : ' None are in ' + range + '.';
+  },
+
+  /* ⛔⛔ THE PAGE GOES WHERE THE FILE WENT. Kyle reported "none logged" TWICE over an import that had
+     landed perfectly — the rows were dated in another week and this page shows one week at a time.
+     Naming the week in the flash was not enough: he had imported tips and the page still would not
+     show them, so the second report was the same as the first.
+     ⭐ WHEN EVERY LANDED ROW FALLS IN ONE WEEK, THAT IS UNAMBIGUOUSLY THE WEEK HE MEANS. A file
+     straddling weeks has no single answer, so it stays put and keeps the sentence instead.
+     ⚠ Week math through the SHARED helpers, never hand-rolled — `weekStartFor` then `periodEndFor`
+     is how every other weekly page in the app turns a date into its week. */
+  _flashWeek(dates) {
+    const all = (dates || []).filter(Boolean);
+    if (!all.length || !App.weekStartFor || !App.periodEndFor) return '';
+    const ends = {};
+    all.forEach(d => { const e = App.periodEndFor(App.weekStartFor(d)); if (e) ends[e] = 1; });
+    const keys = Object.keys(ends);
+    return keys.length === 1 ? keys[0] : '';
   },
 
   // No App.shortDate exists; the cockpits each carry their own. One local one, same format.
@@ -337,6 +356,11 @@ S.WeekClose = {
     const flashDates = LC ? LC._flashDates : null;
     if (LC) { LC._flash = null; LC._flashDates = null; }
     if (flash) this._openLane = null;   // the file went in; give the page back
+    /* ⚠ BEFORE `state()` IS READ, or the rows are built for the week we are leaving and the page
+       reports the old week under a line announcing the new one. */
+    const jumpTo = flash ? this._flashWeek(flashDates) : '';
+    const jumped = !!jumpTo && jumpTo !== this.weekEnd();
+    if (jumped) this._weekEnd = jumpTo;
 
     const st = this.state();
     const rows = this.rows(st);
@@ -350,7 +374,7 @@ S.WeekClose = {
     container.innerHTML = '<div class="screen">'
       + this.banner(st, ready, required.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:0 2px 14px;">&#10003; '
-                 + esc(flash) + esc(this._flashScope(flashDates)) + '</div>' : '')
+                 + esc(flash) + esc(this._flashScope(flashDates, jumped)) + '</div>' : '')
       + '<div class="sh" style="margin:0 0 10px;">What This Week Needs</div>'
       + rows.map(r => this.row(r)).join('')
       + '<div style="margin:18px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + confirmBtn + '</div>'
