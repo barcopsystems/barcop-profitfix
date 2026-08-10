@@ -575,13 +575,18 @@ S.ShiftDashboard = {
       // the note in hubSteps. Every consumer of netVar must check it before showing a figure.
       const wkVar = this.variances().filter(v => this.inWeek(v.date));
       const netVar = wkVar.reduce((t, v) => t + (v.variance || 0), 0);
-      // shorts/oot/walked computed HERE, in the stat-week context, so _insBriefing reads them off `st`
-      // instead of recomputing against the (often empty) selected week — that mismatch printed last
-      // week's net short with this week's zero shift/walked counts (S76).
-      const shorts = wkVar.filter(v => v.status === 'Short').length;
-      const oot = wkVar.filter(v => v.status === 'Over' || v.status === 'Short').length;
-      const walked = this.walkedTabs().filter(r => this.inWeek(r.date)).length;
-      return { wkS, rev, covers, checkAvg, voidTot, compTot, netVar, varCount: wkVar.length, shorts, oot, walked, days: wkS.length, hasSales: wkS.length > 0, lastWk: sw.lastWk };
+      /* ⛔ `shorts` / `oot` / `walked` ARE GONE FROM THIS RETURN. They existed for S76: the section
+         briefing read them off `st` instead of recomputing against the (often empty) selected week,
+         which had printed last week's net short beside this week's zero shift and walked counts.
+         That briefing was retired for The Rail, and it was their ONLY consumer — measured, not
+         assumed. A field computed, returned and read nowhere is dead weight that reads as live
+         ([[the-loop]] #25), and the next person to add a consumer would inherit three numbers with
+         no stated week.
+         ⚠ THE STAT-WEEK RULE ITSELF IS UNTOUCHED and still matters: everything above is computed in
+         the stat-week context and `_weekEnd` is restored in the `finally`. `varCount` stays, because
+         it carries "was the drawer counted at all", which `netVar` alone cannot express, and the
+         review card and hubSteps both read it. */
+      return { wkS, rev, covers, checkAvg, voidTot, compTot, netVar, varCount: wkVar.length, days: wkS.length, hasSales: wkS.length > 0, lastWk: sw.lastWk };
     } finally { this._weekEnd = sv; }
   },
 
@@ -616,68 +621,8 @@ S.ShiftDashboard = {
       + '</div>'
       + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="theft-risk">Loss Prevention</button></div>'
       + '</div>';
-    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>'
-      + '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button></div>'
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Where You Stand</div>'
       + hero + secondary + '</div>';
-  },
-
-  // ── Bar Cop Briefing: a written read of the floor week, cached a week per
-  //    section. Built fresh from your logged data on every open: no cache, no API call. ─────────────
-  // Code-generated (no API): where sales stand, where money walks, the one move.
-  showInsights() {
-    const st = this._wys();
-    if (!st.hasSales) { DashUI.insightsModal('Bar Cop Briefing', 'Import a week of sales and Bar Cop can read your floor week for you.'); return; }
-    DashUI.insightsModal('Bar Cop Briefing', this._insBriefing(st));
-  },
-
-  _insBriefing(st) {
-    const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
-    // Read off `st` (the stat week _wys resolved), NOT a recompute against the selected week — the two
-    // disagree on a fresh Monday and the Briefing printed last week's net short with this week's zero
-    // counts (S76). `counted` gates every cash claim so an uncounted week never reads clean.
-    const shorts = st.shorts || 0, oot = st.oot || 0, walked = st.walked || 0;
-    const counted = st.varCount > 0;
-    const vc = (st.voidTot || 0) + (st.compTot || 0);
-    const paras = [];
-
-    // 1 — where sales stand
-    let p1 = 'You rang ' + m(st.rev) + ' across ' + st.days + ' day' + (st.days === 1 ? '' : 's') + ' this week on ' + st.covers + ' covers';
-    p1 += st.checkAvg != null ? ', a ' + m(st.checkAvg) + ' check.' : '.';
-    paras.push(p1);
-
-    // 2 — where money is walking. Cash figures are gated on `counted`, and the "no drawer counted"
-    // note is INDEPENDENT of voids/comps (S79): an ordinary week has voids, which used to fill `walks`
-    // and suppress the note while the tile above still read "Not counted".
-    const walks = [];
-    if (counted && st.netVar < 0) walks.push('the drawer came up ' + m(Math.abs(st.netVar)) + ' short net' + (shorts > 0 ? ' across ' + shorts + ' short shift' + (shorts === 1 ? '' : 's') : ''));
-    else if (counted && st.netVar > 0) walks.push('the drawer ran ' + m(st.netVar) + ' over net, which is its own flag');
-    if (oot > 0) walks.push(oot + ' drawer' + (oot === 1 ? '' : 's') + ' out of tolerance');
-    if (vc > 0) walks.push(m(st.voidTot) + ' in voids and ' + m(st.compTot) + ' in comps');
-    if (walked > 0) walks.push(walked + ' walked tab' + (walked === 1 ? '' : 's'));
-
-    let p2;
-    if (!counted) {
-      p2 = 'No drawer was counted this week, so cash is unread'
-         + (walks.length ? '. On the floor: ' + walks.join(', ') + '.' : '. Reconcile the drawers and this fills in.');
-    } else if (walks.length) {
-      p2 = 'Where money is walking: ' + walks.join(', ') + '.';
-    } else {
-      p2 = 'The register is clean this week. Drawer is in tolerance and voids and comps are quiet.';
-    }
-    paras.push(p2);
-
-    // 3 — the single move, tied to what para 2 actually found (S78). The final "nothing walking" is
-    // reachable ONLY when `walks` is empty, so a walked tab or a within-tolerance net short (both of
-    // which para 2 lists) never reads as "nothing walking" one line below "money is walking".
-    let move;
-    if (!counted) move = 'Reconcile the drawers first so cash gets read, then log the exceptions as they happen.';
-    else if (oot > 0 || st.netVar < -20) move = 'Chase the cash first. Pull the out-of-tolerance drawers in Cash Control and see who counted and when.';
-    else if (vc > 0) move = 'Watch the voids and comps by server in Loss Prevention. The ones who spike are the conversation.';
-    else if (walks.length) move = 'Nothing major this week, but it is not spotless. Keep the drawer counts honest and log the exceptions as they happen.';
-    else move = 'Nothing walking this week. Keep the drawer counts honest and log the exceptions as they happen.';
-    paras.push(move);
-
-    return paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
   },
 
   outlierStrip() {
@@ -1485,7 +1430,6 @@ S.ShiftDashboard = {
   // server to the roster by name; unmatched rows are skipped and surfaced.
   // The label comes from the SHELL, not a second copy of its rule.
 
-
   // ── Inline product-mix (PMIX) import (step 1 optional) ───────────────────────
   // Feeds Menu Engineering covers. Matches each item to the menu by name and
   // updates weekly_covers in place; unmatched item names are skipped and surfaced.
@@ -2093,7 +2037,6 @@ S.ShiftDashboard = {
   // ── Wiring ───────────────────────────────────────────────────────────────────
   wire() {
     this.container.onclick = ev => {
-      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       const sm = ev.target.closest('[data-salesmode]');
       if (sm) { this._salesMode = sm.dataset.salesmode; this._openStep = 'import'; this.render(this.container, this.actions); return; }
       if (ev.target.closest('[data-savesales]')) { this.saveManualSales(); return; }
