@@ -673,16 +673,23 @@ S.ShiftDashboard = {
   // its own Cancel) takes over; show it again when the mapper returns to the drop zone.
 
   // ── Inline sales import (step 1) ─────────────────────────────────────────────
+  /* ⛔⛔ THE MOUNT IS PART OF THE LANE, AND MISSING IT IS SILENT. This read `sc-ck-import` as a
+     literal until 2026-08-10, so on Close The Week `getElementById` returned null, the guard below
+     returned early and the operator got an EMPTY drop zone — no error, no mapper, nothing. Found by
+     walking the shipped page, not by any pin: every assertion covered the re-render, the ids and the
+     container, and none of them mounts. The Labor twins were done correctly and this pair was not
+     ([[the-loop]] step 0.5 — find the twin BEFORE you fix, then carry it). */
   mountImport() {
-    const el = document.getElementById('sc-ck-import');
+    const zone = this._ckZone('import');
+    const el = zone ? document.getElementById(zone) : null;
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your weekly POS sales-by-day report here',
       dropSub: 'Needs a Date column plus your sales (bar and/or food). Covers optional. One row per day.',
       fields: PosIngest.FIELDS.sales,
       confirmLabel: 'Import',
-      actionsEl: '#sc-ck-import-actions',
-      onState: st => { this._toggleBtns('sc-ck-import-btns', st); this._onMapState('import', st); },
+      actionsEl: '#' + zone + '-actions',
+      onState: st => { this._toggleBtns(zone + '-btns', st); this._onMapState('import', st); },
       /* ⛔ THE FILE DOES NOT WRITE ITSELF ANY MORE. It goes to the confirm screen, exactly as Add
          Products does, and the Import press there is what moves responsibility for what lands from
          Bar Cop to the operator. This door was picked to prove the pattern BECAUSE it is the worst
@@ -1478,16 +1485,18 @@ S.ShiftDashboard = {
   // The POS blind close already computed over/short; drop that report and the
   // variance pattern lands without a hand reconcile. Manual reconcile lives on
   // Cash Control as the fallback.
+  // ⛔ THE ZONE COMES FROM THE HOST — see the note on `mountImport`. Same silent empty drop zone.
   mountCashImport() {
-    const el = document.getElementById('sc-ck-cash');
+    const zone = this._ckZone('cash');
+    const el = zone ? document.getElementById(zone) : null;
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS cash or drawer report here',
       dropSub: 'Needs a Date column plus Over/Short, or Expected and Counted cash. Register and cashier matched if present.',
       fields: PosIngest.FIELDS.cash,
       confirmLabel: 'Import',
-      actionsEl: '#sc-ck-cash-actions',
-      onState: st => { this._toggleBtns('sc-ck-cash-btns', st); this._onMapState('cash', st); },
+      actionsEl: '#' + zone + '-actions',
+      onState: st => { this._toggleBtns(zone + '-btns', st); this._onMapState('cash', st); },
       onComplete: rows => this.importCash(rows)
     });
   },
