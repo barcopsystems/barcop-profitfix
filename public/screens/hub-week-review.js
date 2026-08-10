@@ -28,7 +28,26 @@ S.WeekReview = {
     return App.ymdLocal(d);
   },
   _addDays(ymd, n) { const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + n); return App.ymdLocal(d); },
-  _wkS() { return this._wkStart || this._monday(); },
+  /* ⛔⛔ IT OPENS ON THE LAST WEEK YOU ACTUALLY CLOSED, NOT ON THE ONE IN PROGRESS. This is the
+     accountability view: a week half-lived has half its records, so landing on it reports a bar that
+     looks like it did nothing — every section thin, every "Carrying Into Next Week" full — about a
+     week nobody has finished yet. The week an operator wants to review is the one they just closed.
+     ⭐ A CLOSED WEEK IS A `weeks` RECORD with a `period_end`, which is exactly what Confirm the Week
+     writes and the only durable definition of "closed" in the app ([[confirm-the-week]]). No ticks.
+     ⚠ FALLS BACK TO THIS WEEK when nothing has been confirmed yet, because on day one there is no
+     closed week and an empty page with no selector is worse than the live one. The stepper still
+     goes anywhere; this only decides where it OPENS. */
+  _lastClosedMonday() {
+    const ends = ((App.data && App.data.weeks) || [])
+      .map(w => String((w && w.period_end) || '').slice(0, 10))
+      .filter(Boolean).sort();
+    const last = ends[ends.length - 1];
+    if (!last) return '';
+    const m = this._monday(last);
+    // Never open on a FUTURE week: a week confirmed early would otherwise land the page ahead of today.
+    return m > this._monday() ? '' : m;
+  },
+  _wkS() { return this._wkStart || this._lastClosedMonday() || this._monday(); },
   _wkE() { return this._addDays(this._wkS(), 6); },
   _inWeek(dstr) { const d = String(dstr || '').slice(0, 10); const s = this._wkS(), e = this._wkE(); return !!d && d >= s && d <= e; },
   _isThisWeek() { return this._wkS() >= this._monday(); },
