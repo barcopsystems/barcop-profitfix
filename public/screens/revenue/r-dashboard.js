@@ -16,7 +16,7 @@ S.RevenueDashboard = {
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Revenue. Revenue Recovery is the top line: where check average, menu mix, covers, and labor efficiency are leaving money on the table. You land on the week, see how far along you are, and work the steps top to bottom on the last night of the week.'] },
-      { h: 'Where You Stand', p: ['Up top is the recoverable revenue your latest audit found, what you have added back so far once your fixes are measured, and your check average, labor percent, and revenue per labor hour for the week against target. Tap Bar Cop Briefing for a written read of where the numbers are heading.'] },
+      { h: 'Where You Stand', p: ['Up top is the recoverable revenue your latest audit found, what you have added back so far once your fixes are measured, and your check average, labor percent, and revenue per labor hour for the week against target. For a written read of the whole operation, including where these numbers are heading, hit The Rail in the top bar.'] },
       { h: 'The Steps', p: ['1. Confirm the Week: confirm this week\'s sales, covers, and labor so everything below has numbers. 2. Check your numbers against target: check average, labor percent, and revenue per labor hour, so you see exactly where the top line slipped. 3. Work your biggest leak: open Revenue Fix on the biggest-dollar gap and take it down. 4. Run your Revenue audit: score the whole top line and refresh your leak board. Run it whenever you want a fresh read, flagged here when it has been a while.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Read the numbers, launch into the screen that does the work, and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] }
     ]);
@@ -109,10 +109,9 @@ S.RevenueDashboard = {
     // A scored audit, not just any audit: an estimate-only run records N/A
     // (overall null) and must not flip the hero off a guess.
     const hasData = this.audits().some(a => a.overall_score != null);
-    const insightsBtn = '<button class="btn btn-ghost btn-sm" id="r-insights-btn" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button>';
 
     container.innerHTML = '<div class="screen">'
-      + (hasData ? this.whereYouStand(insightsBtn) : this.getStartedBox())
+      + (hasData ? this.whereYouStand() : this.getStartedBox())
       + this.banner(doneCount, this.ORDER.length)
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:12px 2px 0;">&#10003; ' + esc(flash) + '</div>' : '')
       + '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
@@ -126,7 +125,7 @@ S.RevenueDashboard = {
   },
 
   // ── Where You Stand (the revenue money card, modeled on Profit / Cash) ───────
-  whereYouStand(insightsBtn) {
+  whereYouStand() {
     const s = (window.Recovery && Recovery.moduleSummary) ? Recovery.moduleSummary('revenue') : { recovered: 0, withFigure: 0, logged: 0 };
     const latestAudit = App.latestEvent ? App.latestEvent(this.audits()) : null;
     const monthly = latestAudit ? (latestAudit.action_items || []).reduce((sum, a) => sum + (a.monthly_impact || 0), 0) : 0;
@@ -149,7 +148,7 @@ S.RevenueDashboard = {
       : '<span style="color:var(--t3);">Recovered revenue builds here as you work fixes and log your weeks.</span>';
 
     return '<div class="card form-card" style="margin-bottom:16px;">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>' + insightsBtn + '</div>'
+      + '<div class="card-title">Where You Stand</div>'
       + heroBody
       + '<div style="font-size:12px;color:var(--t3);margin-top:10px;padding-bottom:2px;">' + recoveredLine + '</div>'
       + this.numbersStrip()
@@ -381,7 +380,6 @@ S.RevenueDashboard = {
       const un = ev.target.closest('[data-undone]');
       if (un) { this.setDone(un.dataset.undone, false); this._openStep = un.dataset.undone; this.render(this.container, this.actions); return; }
       if (ev.target.closest('[data-confirm-week]')) { ConfirmWeek.open(this.weekEnd(), { onDone: () => this.render(this.container, this.actions) }); return; }
-      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       if (ev.target.closest('.fp-fixarea') || ev.target.closest('.fp-step')) return;
       const go = ev.target.closest('[data-go]');
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
@@ -391,41 +389,4 @@ S.RevenueDashboard = {
     };
   },
 
-  // ── Bar Cop Briefing — a written read on the recent revenue + labor trend. ──
-  // Code-generated (no API): check average, labor, and the one revenue move.
-  showInsights() {
-    const weeks = (App.data.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0).sort((a, b) => (a.period_end || '').localeCompare(b.period_end || '')).slice(-8);
-    if (weeks.length < 2) { DashUI.insightsModal('Bar Cop Briefing', 'Enter at least two weeks of data and Bar Cop can read the trend for you.'); return; }
-
-    const t = App.data.revenue_settings?.targets || {};
-    const avg = arr => { const v = arr.filter(x => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
-    const money = n => '$' + Math.round(n).toLocaleString('en-US');
-    const caT = t.check_avg || 35;
-    const lpT = App.laborTargetPct();
-    const caVals  = weeks.map(w => w.check_avg).filter(v => v != null);
-    const lpVals  = weeks.map(w => w.labor_pct_blended).filter(v => v != null);
-    const covVals = weeks.map(w => w.covers).filter(v => v != null);
-    const aCA = avg(caVals), aCov = avg(covVals);
-    const curCA = caVals.length ? caVals[caVals.length - 1] : null;
-    const curLP = lpVals.length ? lpVals[lpVals.length - 1] : null;
-    const caTrend = caVals.length >= 3 ? (caVals[caVals.length - 1] - caVals[0] > 1 ? 'trending up and improving' : caVals[0] - caVals[caVals.length - 1] > 1 ? 'trending down and worsening' : 'holding steady') : null;
-    const caGap = (aCA < caT) ? Math.round((caT - aCA) * aCov) : 0;
-
-    const paras = [];
-    if (curCA != null) {
-      let p1 = 'Your check average is running $' + curCA.toFixed(2) + ' against a $' + caT + ' target, ' + (curCA < caT ? 'money left on every table.' : 'right where you want it.');
-      if (caTrend) p1 += ' It is ' + caTrend + '.';
-      if (caGap > 0 && aCov > 0) p1 += ' On about ' + Math.round(aCov) + ' covers a week, closing that gap is roughly ' + money(caGap) + '.';
-      paras.push(p1);
-    }
-    if (curLP != null) {
-      paras.push('Labor ran ' + curLP.toFixed(1) + '% of sales against a ' + lpT.toFixed(1) + '% target, ' + (curLP > lpT ? 'carrying hours the sales did not ask for.' : 'matched to the room.'));
-    }
-    if (caGap > 0) paras.push('The fastest revenue this week is the check. Set a drink-and-app standard, teach it at pre-shift, and track it by server in Server Check.');
-    else if (curLP != null && curLP > lpT) paras.push('The money this week is in the schedule. Build to the cover forecast and cut the hour that is not earning.');
-    else paras.push('Nothing screaming here. Hold the check and the schedule, and keep the covers coming.');
-
-    const html = paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
-    DashUI.insightsModal('Bar Cop Briefing', html);
-  }
 };
