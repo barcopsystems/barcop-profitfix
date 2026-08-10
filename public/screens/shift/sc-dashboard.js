@@ -127,6 +127,11 @@ S.ShiftDashboard = {
   // ── Render ──────────────────────────────────────────────────────────────────
   render(container, actions) {
     this.container = container; this.actions = actions;
+    /* ⭐ THIS PAGE DRAWS THE LANE, SO IT OWNS IT. Close The Week hosts the sales and cash lanes too
+       and both pages can hold markup at once; claiming on render keeps the ids, the container reads
+       and the redraw pointed at the page the operator is actually looking at, and a parsed file
+       carried in from the other page is adopted here rather than left redrawing a hidden shell. */
+    this.ckClaim(null);
     if (actions) actions.innerHTML = '';
     if (!this._weekEnd) this._weekEnd = App.nextSunday ? App.nextSunday() : App.todayLocal();
     const done = this.stepDone();
@@ -153,12 +158,12 @@ S.ShiftDashboard = {
        remaining steps, not Where You Stand. The operator dropped a file and is doing one job.
        ⚠ The carried mapper is re-attached, never re-mounted — see `_onMapState`. Once the mapper has
        handed its rows over, `_salesReview` is what holds the page and the carried node is spent. */
-    /* ⛔ A FINISHED IMPORT GIVES THE PAGE BACK, and `_flash` is the one signal every lane already
-       sets the moment it lands — sales, per-server, product mix and cash all set it and re-render.
-       Reading it here is one release path instead of four, and it cannot drift from what the lanes
-       do because it IS what they do. A flash set by something other than an import finds no
-       takeover to clear, so this is a no-op there. */
-    if (flash && !this._anyReview()) this._clearTakeover();
+    /* ⛔ "A FINISHED IMPORT GIVES THE PAGE BACK" USED TO BE A LINE RIGHT HERE, reading `_flash` and
+       calling `_clearTakeover()`. It moved into the TWO commit paths (`_doImportSales` and
+       `_commitCash`) when Close The Week began hosting these lanes: a hub page never runs this
+       cockpit's render, so the release simply would not have happened there — and that is the exact
+       defect Kyle reported on the Labor lane. One release path, on the path both hosts share.
+       Do not add it back. */
 
     /* ⛔⛔ A TAKEOVER WITH NO MAPPER LEFT IS A LIE ABOUT THE STATE, AND IT STRANDS THE OPERATOR.
        Kyle found it on Close The Books (2026-08-07): *"if you drop a file and it takes over page...
@@ -266,7 +271,7 @@ S.ShiftDashboard = {
        step's button row. Written AFTER the mounts, because `CSVMapper.mount` repaints its own
        container and a message put there first would be gone. */
     if (flashInZone) {
-      const slot = document.getElementById((this.CK_ZONE[flashZone] || '') + '-res');
+      const slot = document.getElementById(this._ckZone(flashZone) + '-res');
       if (slot) slot.innerHTML = '<div style="font-size:12px;color:var(--gold);font-weight:700;margin:12px 2px 0;">'
         + '&#10003; ' + esc(flash) + '</div>';
     }
@@ -451,6 +456,33 @@ S.ShiftDashboard = {
   _ckCarryActs: null,  // the mapper's Import/Cancel row, which lives in its own element
   _clearTakeover() { this._ckTakeover = null; this._ckCarry = null; this._ckCarryActs = null; },
 
+  /* ── THE HOST ────────────────────────────────────────────────────────────────
+     THE LANE DRAWS ON WHICHEVER PAGE IS SHOWING IT. This cockpit was the only page that could until
+     Close The Week, so `sc-ck-import` was a literal and the redraw was `this.render` in thirteen
+     places. Same contract `lc-dashboard` already carries, and for the same measured reason.
+     ⛔⛔ WHY A LITERAL IS WRONG, AND IT IS STRUCTURAL: the app has TWO shells. Module screens render
+     into `#content-area` inside `#app`, hub pages into `.hub-app`, and the app HIDES the one it is
+     not showing rather than removing it. So both pages can hold markup at once and `getElementById`
+     answers with whichever sits first in the document — the operator would drop a file onto a page
+     nobody can see. A host NAMES ITS OWN ids.
+     ⚠ THE SPLIT HERE IS BY BRANCH, NOT BY MEMBER, and that is what makes this cockpit harder than
+     Labor's: seven of the lane's redraws live inside the cockpit's own `wire()` click handler,
+     interleaved with four that belong to the cockpit. The week stepper, the step heads, Mark Done
+     and BOTH `saveManualSales` calls stay `this.render` — the manual grid is this page's, and it
+     must not follow the lane onto a hub page. */
+  _ckHost: null,
+  ckClaim(host)  { this._ckHost = host || null; },
+  _ckZone(key)   { return (this._ckHost ? this._ckHost.zone : this.CK_ZONE)[key] || ''; },
+  _ckContainer() { return this._ckHost ? this._ckHost.container() : this.container; },
+  _ckRerender()  { if (this._ckHost) this._ckHost.rerender(); else this.render(this.container, this.actions); },
+  // Which lane is in flight, so a page can refuse to draw one it does not render.
+  _ckLaneKey()   { return this._salesReview ? 'import' : (this._cashReview ? 'cash' : this._ckTakeover); },
+  /* The host's takeover slot. `_cashPanelSlot` needs it: the cash map-or-add prompt falls back to
+     the takeover slot when a dropped file owns the page, and on a hub host `sc-ck-takeover-res`
+     does not exist — so the prompt would find no slot and the press would do nothing, which is the
+     exact defect the comment at `_cashPanelSlot` was written for. */
+  _ckTakeoverId() { return this._ckHost ? this._ckHost.takeover : 'sc-ck-takeover'; },
+
   /* ⛔⛔⛔ THE HANDOVER, AND THE ONE THING IT MUST NOT DO IS REBUILD THE MAPPER.
      `CSVMapper.mount()` opens with `container.innerHTML = <drop zone>`, so escalating by re-rendering
      and re-mounting would throw the operator's parsed file away and put them back on an empty drop
@@ -470,11 +502,12 @@ S.ShiftDashboard = {
        ⚠ `drop` also fires when a mapper first MOUNTS, which is why this is gated on the zone already
        owning the page — at mount time nothing does, so it is a no-op. */
     if (st === 'drop') {
-      if (this._ckTakeover === key) { this._clearTakeover(); this.render(this.container, this.actions); }
+      if (this._ckTakeover === key) { this._clearTakeover(); this._ckRerender(); }
       return;
     }
     if (st !== 'map' || this._ckTakeover != null) return;
-    const node = document.getElementById(this.CK_ZONE[key] || '');
+    const zone = this._ckZone(key);
+    const node = zone ? document.getElementById(zone) : null;
     if (!node) return;
     /* ⛔⛔⛔ CARRY THE ACTIONS SLOT TOO, OR THE IMPORT BUTTON IS GONE AND THE FILE IS A DEAD END.
        CSVMapper renders its confirm button into a SEPARATE element — `actionsEl` — not into the
@@ -483,13 +516,13 @@ S.ShiftDashboard = {
        got the column mapper, and had nothing but Cancel. Kyle found that on the live build.
        ⚠ THE LESSON, WRITTEN AT THE LINE: when you move state across a rebuild, enumerate EVERY node
        the component owns, not the one you were thinking about. */
-    const acts = document.getElementById(this.CK_ZONE[key] + '-actions');
+    const acts = document.getElementById(zone + '-actions');
     this._ckCarry = node;
     this._ckCarryActs = acts || null;
     node.remove();
     if (acts) acts.remove();
     this._ckTakeover = key;
-    this.render(this.container, this.actions);
+    this._ckRerender();
   },
 
   workspace(k, isDone) {
@@ -670,7 +703,7 @@ S.ShiftDashboard = {
   _openSalesReview(rows) {
     this._salesReview = { rows: (rows || []).slice(), useTheirs: {} };
     this._openStep = 'import';
-    this.render(this.container, this.actions);
+    this._ckRerender();
   },
 
   /* ⛔ ONE WALK PRODUCES THE ROWS, THEIR STATUS AND THE COUNT. This is the property `_routeSummary`
@@ -869,7 +902,7 @@ S.ShiftDashboard = {
          sections would be worse, not better. A fact about this door, not a row-count threshold. */
       flat: true,
       goAttr: 'data-salesreview-go', backAttr: 'data-salesreview-back', backLabel: 'Start Over',
-      resultId: 'sc-ck-import-res',
+      resultId: this._ckZone('import') + '-res',
       busy: busy
     });
   },
@@ -881,7 +914,7 @@ S.ShiftDashboard = {
     const r = this._salesReview;
     if (!r || this._salesReviewWriting) return;
     this._salesReviewWriting = true;
-    const btn = this.container && this.container.querySelector('[data-salesreview-go]');
+    const btn = this._ckContainer() && this._ckContainer().querySelector('[data-salesreview-go]');
     if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
     // `reviewed` says the operator has already been shown every outcome row by row and accepted it,
     // which is what lets the success line drop back to a headline. An explicit flag, not the
@@ -895,7 +928,7 @@ S.ShiftDashboard = {
          file. Do NOT re-render here: the failure path writes into #sc-ck-import-res and a re-render
          would destroy the only message saying what happened. */
       if (this._salesReview) {
-        const b = this.container && this.container.querySelector('[data-salesreview-go]');
+        const b = this._ckContainer() && this._ckContainer().querySelector('[data-salesreview-go]');
         // ⚠ Counted ONCE into a local. Calling it twice in one expression runs the whole build twice
         // and, on anything less deterministic, lets the number and its own plural disagree
         // ([[harness-review-like-code]] #27).
@@ -1009,7 +1042,7 @@ S.ShiftDashboard = {
       ? ' (' + zeroSkipped.length + ' day' + (zeroSkipped.length === 1 ? '' : 's') + ' came in at $0 and '
         + (zeroSkipped.length === 1 ? 'was' : 'were') + ' skipped: use Enter Manually to record a zero day)'
       : '';
-    const res = document.getElementById('sc-ck-import-res');
+    const res = document.getElementById(this._ckZone('import') + '-res');
     const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
     const note = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">' + m + '</div>'; };
     /* A conflict: the file disagrees with days the operator entered BY HAND. The answer arrives in
@@ -1200,8 +1233,15 @@ S.ShiftDashboard = {
     this._flash = allToAdd.length + ' day' + (allToAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
       + (opts.reviewed ? '' : salesOutcomes)
       + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + (opts.reviewed ? '' : repNote) + '.' + cwNote;
+    /* ⛔⛔ THE RELEASE, MOVED HERE from this cockpit's `render` when Close The Week began hosting the
+       lane. A hub page never runs that render, so the takeover flag and the spent mapper would have
+       survived the write and the page would redraw a mapper whose file has already gone in — Kyle's
+       2026-08-08 defect, on a new page. The guard is what it costs: a REFUSED write returns long
+       before here, but `reviewed` is an option and a lane committing without one would reach this
+       line with the operator's rows still on the screen. */
+    if (!this._anyReview()) this._clearTakeover();
     this._openStep = 'cash';
-    this.render(this.container, this.actions);
+    this._ckRerender();
   },
 
   // ── Manual sales entry (step-1 "Enter Manually" toggle) ──────────────────────
@@ -1293,7 +1333,7 @@ S.ShiftDashboard = {
          difference no one would ever guess.) Send the explicit zero the grid means. */
       rows.push({ date: d, bar: has(bar) ? bar : '0', food: has(food) ? food : '0', covers: has(cov) ? cov : '0' });
     });
-    const res = document.getElementById('sc-ck-import-res');
+    const res = document.getElementById(this._ckZone('import') + '-res');
     const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
     // Name the day the way the GRID does ("Thu, Jul 23"), not as a raw ISO date. Anything standing
     // between the operator and a save has to point at a row they can actually see.
@@ -1560,8 +1600,11 @@ S.ShiftDashboard = {
      prompt could not render and the press did nothing at all. Not a message going missing: a
      CONTROL the operator has to answer, for every bar whose POS names its registers differently. */
   _cashPanelSlot() {
-    return document.getElementById('sc-ck-cash-res')
-        || document.getElementById('sc-ck-takeover-res');
+    // ⚠ BOTH IDS COME FROM THE HOST NOW. The two shapes are unchanged — the lane's own result slot
+    // first, the takeover slot second — but on Close The Week they are `wc-cash-res` and
+    // `wc-takeover-res`, and a hardcoded pair would send this prompt to the hidden cockpit.
+    return document.getElementById(this._ckZone('cash') + '-res')
+        || document.getElementById(this._ckTakeoverId() + '-res');
   },
   _showCashMap(unmatched) {
     const res = this._cashPanelSlot();
@@ -1654,7 +1697,7 @@ S.ShiftDashboard = {
         const msg = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Could not save the register setup, so the cash counts were not imported. Try again.</div>';
         const err = document.getElementById('sc-cm-err');
         if (err) err.innerHTML = msg;
-        else { const res = document.getElementById('sc-ck-cash-res'); if (res) res.innerHTML = msg; }
+        else { const res = document.getElementById(this._ckZone('cash') + '-res'); if (res) res.innerHTML = msg; }
         return;
       }
       /* ⛔ THE REGISTERS ARE SAVED; THE FIGURES ARE NOT. Setting a register up is the operator's own
@@ -1808,7 +1851,7 @@ S.ShiftDashboard = {
     (rows || []).forEach((r, i) => { if (r && r._rid == null) r._rid = 'cr' + i; });
     this._cashReview = { rows: (rows || []).slice(), open: {}, removed: {}, useFile: {} };
     this._openStep = 'cash';
-    this.render(this.container, this.actions);
+    this._ckRerender();
   },
 
   /* ⛔⛔ RE-WALKED ON EVERY RENDER OVER THE ROWS NOT REMOVED, and that is deliberate: the walk is the
@@ -1876,7 +1919,7 @@ S.ShiftDashboard = {
       verb: 'Add', noun: 'Reconcile', nounPlural: 'Reconciles',
       open: r.open,
       goAttr: 'data-cashreview-go', backAttr: 'data-cashreview-back', backLabel: 'Start Over',
-      resultId: 'sc-ck-cash-res',
+      resultId: this._ckZone('cash') + '-res',
       busy: !!this._cashReviewWriting
     });
   },
@@ -1887,7 +1930,7 @@ S.ShiftDashboard = {
     const r = this._cashReview;
     if (!r || this._cashReviewWriting) return;
     this._cashReviewWriting = true;
-    const btn = this.container && this.container.querySelector('[data-cashreview-go]');
+    const btn = this._ckContainer() && this._ckContainer().querySelector('[data-cashreview-go]');
     if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
     try {
       await this._commitCash(r.rows.filter(x => !r.removed[x._rid]),
@@ -1899,7 +1942,7 @@ S.ShiftDashboard = {
          NOT re-render here: the failure path writes into the shell's result slot and a re-render
          would destroy the only message saying what happened. */
       if (this._cashReview) {
-        const b = this.container && this.container.querySelector('[data-cashreview-go]');
+        const b = this._ckContainer() && this._ckContainer().querySelector('[data-cashreview-go]');
         if (b) { b.disabled = false; b.textContent = ImportConfirm.goLabel(this._cashPanelOpts()); }
       }
     }
@@ -2030,8 +2073,10 @@ S.ShiftDashboard = {
             + ' skipped, no over/short figure)' : '') + undatedNote);
     this._flash = allToAdd.length + ' reconcile' + (allToAdd.length === 1 ? '' : 's') + ' imported'
       + outcomes + '.';
+    // ⛔ THE RELEASE — same reason as the sales commit above. Two commit paths, so it lives in both.
+    if (!this._anyReview()) this._clearTakeover();
     this._openStep = 'exc';
-    this.render(this.container, this.actions);
+    this._ckRerender();
   },
 
   // ── Wiring ───────────────────────────────────────────────────────────────────
@@ -2048,7 +2093,7 @@ S.ShiftDashboard = {
         const key = sconf.dataset.salesconf;
         if (sconf.dataset.use === 'file') this._salesReview.useTheirs[key] = true;
         else delete this._salesReview.useTheirs[key];
-        this.render(this.container, this.actions); return;
+        this._ckRerender(); return;
       }
       if (ev.target.closest('[data-salesreview-go]')) { this._runSalesReview(); return; }
       /* ── The cash confirm screen's own controls. They come BEFORE the step handlers because none
@@ -2061,15 +2106,15 @@ S.ShiftDashboard = {
           // `needs` defaults OPEN, so its toggle is inverted — the shell's own convention, written
           // generically so a new section key (`notgoing`, `removed`) needs no line here.
           this._cashReview.open[k] = (k === 'needs') ? (this._cashReview.open[k] === false) : !this._cashReview.open[k];
-          this.render(this.container, this.actions); return;
+          this._ckRerender(); return;
         }
         const rm = ev.target.closest('[data-confirm-remove]');
-        if (rm) { this._cashReview.removed[rm.dataset.confirmRemove] = true; this.render(this.container, this.actions); return; }
+        if (rm) { this._cashReview.removed[rm.dataset.confirmRemove] = true; this._ckRerender(); return; }
         /* ⛔ REMOVE IS REVERSIBLE. Every other control here is, right up to the button, under a
            sentence reading "Nothing is saved until you do" — Remove was the one that destroyed, and
            the only way back was Start Over, which drops the file. */
         const rs = ev.target.closest('[data-confirm-restore]');
-        if (rs) { delete this._cashReview.removed[rs.dataset.confirmRestore]; this.render(this.container, this.actions); return; }
+        if (rs) { delete this._cashReview.removed[rs.dataset.confirmRestore]; this._ckRerender(); return; }
         /* The row's own conflict answer. Default is KEEP MINE and it stays that way unless the
            operator picks the file — the answer is STORED, not applied, so nothing is written until
            Add, and the button's count, the row and the write all read from this one place. */
@@ -2078,7 +2123,7 @@ S.ShiftDashboard = {
           const key = cc.dataset.cashconf;
           if (cc.dataset.use === 'file') this._cashReview.useFile[key] = true;
           else delete this._cashReview.useFile[key];
-          this.render(this.container, this.actions); return;
+          this._ckRerender(); return;
         }
       }
       if (ev.target.closest('[data-cashreview-go]')) { this._runCashReview(); return; }
@@ -2088,14 +2133,14 @@ S.ShiftDashboard = {
         // ⚠ AND THE PAGE COMES BACK WITH IT. The carried mapper is spent once its rows have gone to
         // the confirm screen, so leaving the takeover set would re-attach a dead node over the step.
         this._cashReview = null; this._pendingCashRows = null;
-        this._clearTakeover(); this.render(this.container, this.actions); return;
+        this._clearTakeover(); this._ckRerender(); return;
       }
       if (ev.target.closest('[data-salesreview-back]')) {
         // Back to the drop zone, not out of the step. A mapping belongs to the file it was made
         // for, so the file is re-dropped from scratch — nothing was written to undo.
         // ⚠ AND THE PAGE COMES BACK WITH IT. The carried mapper is spent once its rows have gone to
         // the confirm screen, so leaving the takeover set would re-attach a dead node over the step.
-        this._salesReview = null; this._clearTakeover(); this.render(this.container, this.actions); return;
+        this._salesReview = null; this._clearTakeover(); this._ckRerender(); return;
       }
       /* ⚠ NO SECOND CANCEL HERE, DELIBERATELY. I rendered one under the mapper and Kyle caught it on
          the first walk: CSVMapper already draws its own beside Import, so the page had two. The
