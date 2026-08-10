@@ -85,10 +85,14 @@
   --navh:           52px;               /* shared top-bar height. ONE row since the 2026-08-08 rail redesign (was 118 = row1 52 + row2 66; row 2's section pills moved into the left rail). */
   /* ⭐ THE HEIGHT OF EVERY CONTROL IN THE TOP BAR'S RIGHT-HAND GROUP. On a multi-bar account the
      bar name IS a real <select>, and The Rail button has to sit flush with it top and bottom.
-     MEASURED LIVE on the deployed build: the select renders at 30px; .btn is 27 and .btn-sm is 20,
-     so no stock button matched. Owned here so the two cannot be written twice and drift apart —
-     same reasoning as --rail-w. Change this and both move together. */
-  --tb-ctl-h:       30px;
+     Owned here so the two cannot be written twice and drift apart — same reasoning as --rail-w.
+     ⭐ CHANGE THIS ONE VALUE AND BOTH MOVE TOGETHER, still flush. That is the whole point of the
+     token: the height is a single decision, not two that have to be kept in step.
+     ⚠ 24px, down from the 30px the bare <select> renders at (Kyle: "too tall for sure"). MEASURED
+     LIVE at six settings before picking: at 24 neither control clips — `scrollHeight` equals
+     `clientHeight` on both — and inside a 52px bar it leaves 14px of air above and below. Below
+     about 22 the select's own line box starts to fight the box it is given. */
+  --tb-ctl-h:       24px;
 }
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -1775,11 +1779,19 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    exactly that distinction. Height comes from --tb-ctl-h so it is flush with the multi-bar <select>.
    ⚠ Styling rides on .btn/.btn-primary, so trying the ghost treatment is a class swap in the
    markup, not a rewrite here. */
-.tn-rail{height:var(--tb-ctl-h);}
+/* ⚠ The horizontal padding is overridden too. `.btn` carries `padding:8px 18px`, and the 8px was
+   fighting the explicit height while the 18px made it wider than it needs to be beside the bar
+   name. 0 vertical (the height owns that, and .btn already centres by flex) and 12px each side:
+   MEASURED 94px wide -> 82px, with the 11px uppercase label still clearing its own box. */
+.tn-rail{height:var(--tb-ctl-h);padding:0 12px;}
 /* The bar switcher, only where it sits in the top bar. .at-qsel is the switcher's own class (its
    only two references are in renderAccountSwitcher) but the height is scoped anyway, so a future
    reuse of the class elsewhere cannot inherit a top-bar measurement. */
-.tn-right .at-qsel{height:var(--tb-ctl-h);}
+/* ⚠ Padding and type size are scoped to the TOP BAR only. `.at-qsel`'s own 12px/`7px 26px 7px 10px`
+   is right where a quick-select sits in a page body; up here it made the bar name 173px wide next
+   to an 82px button. 11px matches the button's scale and takes it to 154px. The 20px on the right
+   still clears the chevron, which `.at-qsel` paints at `right 8px center`. */
+.tn-right .at-qsel{height:var(--tb-ctl-h);padding:0 20px 0 8px;font-size:11px;}
 .mnav-barname{font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;color:var(--t1);}
 
 /* Backdrop sits behind the sidebar overlay. Real div (not pseudo) so we can
