@@ -2175,6 +2175,10 @@ const App = {
      that the two lists were kept in step (integrity #11: a control wired under one spelling and
      rendered under another is a dead row that looks alive). */
   _PROTO_GLOBAL:   [['hub','Hub'],['week-review','Review'],['audit','Audits'],['events','Events'],['books','Books']],
+  /* THE WEEK GROUP. One weekly close, above Control, because it is the only thing in the rail with
+     a deadline. Stage 1 carries Close alone; Review and History join it when Week In Review is
+     re-pointed at the last CLOSED week and Week History moves off the Profit and Revenue menus. */
+  _PROTO_WEEK:     [['week-close','Close']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   /* Sign Out is its own group behind its own divider. It is the only row in the rail that ENDS the
@@ -2183,7 +2187,7 @@ const App = {
   _PROTO_BOTTOM:   [['flowmap','Workflow'],['settings','Settings']],
   _PROTO_SIGNOUT:  [['signout','Sign Out']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'flowmap': 'flowmap' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'week-close': 'week-close', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'flowmap': 'flowmap' },
   /* ⛔⛔ AND EVERY SETTINGS PAGE WAS MISSING FROM THAT MAP — nine of them. Found while checking the
      new title: Settings read no section prefix, and the same lookup drives the rail highlight, so
      **the Settings row never lit up either** on any of its own pages.
@@ -2200,7 +2204,7 @@ const App = {
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'week-close': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -2219,6 +2223,12 @@ const App = {
       { h: 'What this is', p: ['Workflow is how your whole week fits together, top to bottom. Bar Cop runs on one sitting at the end of the week: close your three Control sections, roll them up and work the money in Recovery, then chase only what the close flags. This lays the flow out so you can see where every piece sits and why.'] },
       { h: 'The four stages', p: ['1. Close your Control sections: Inventory, Labor, Shift. 2. Work the money in Recovery: Profit, Revenue, Cash, each starting with Confirm the Week. 3. As needed: the jobs you open only when the close flags them, never on a schedule. 4. Where it lands: the Hub, Books, and your Bar Cop Audit score. Events feeds the week on its own clock.'] },
       { h: 'Reading a node', p: ['Tap any section or step and the panel tells you what it is, why it sits where it does, and what it hands off, in plain terms. The stage number turns green to mark where you last looked. Open takes you straight to the page that does that work. The plumbing, which number feeds which, lives in each section\'s Help under Connections; this is the flow of the work, not the data.'] }
+    ] },
+    'week-close': { title: 'How Closing The Week Works', sections: [
+      { h: 'What this is', p: ['The one place a week gets closed. It reads what you have already logged, tells you what the week still needs, and then you confirm it. There is nothing to tick off: every line is read from your real records, so it cannot say the sales are in when they are not.'] },
+      { h: 'What the week needs', p: ['Sales and hours are what the numbers are built from. Tips, cash over and short, and catering fill in when you have them, and a week closes fine without any of the three. Anything marked optional is not a gap.'] },
+      { h: 'Cost of goods', p: ['If your counts happen to span this week, Bar Cop prices the cost of goods from them and says so. If they do not, you type it on the confirm. Counting weekly is not required, and Bar Cop will never book a month of usage onto one week.'] },
+      { h: 'Confirming', p: ['Confirm the Week saves the week\'s figures. Anything missing reads as blank, so you can confirm now and fill the rest in later. Once it is confirmed the button reopens the same form so you can correct it.'] }
     ] },
     'week-review': { title: 'How Week in Review Works', sections: [
       { h: 'What this is', p: ['The accountability side of your weekly close. For any week it reads what your team actually did in each section, whether the close got finished, what it turned up, and what is carrying into next week, so you see in one place where the crew is on it and where things slid.'] },
@@ -2413,6 +2423,7 @@ const App = {
     if (g === 'hub')     return this.showHub();
     if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
     if (g === 'week-review') return (window.S && S.WeekReview) ? S.WeekReview.open() : null;
+    if (g === 'week-close')  return (window.S && S.WeekClose)  ? S.WeekClose.open()  : null;
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
     if (g === 'books') return (window.S && S.HubBooksHome)   ? S.HubBooksHome.open()   : null;
     if (g === 'events') return this.jumpToSection('events');
@@ -2472,7 +2483,7 @@ const App = {
 
   // The rail label for a key, from the same four tables the rail itself renders.
   _railLabelOf(key) {
-    const tables = [this._PROTO_GLOBAL, this._PROTO_CONTROL, this._PROTO_RECOVERY, this._PROTO_BOTTOM, this._PROTO_SIGNOUT];
+    const tables = [this._PROTO_GLOBAL, this._PROTO_WEEK, this._PROTO_CONTROL, this._PROTO_RECOVERY, this._PROTO_BOTTOM, this._PROTO_SIGNOUT];
     for (const t of tables) for (const [k, l] of (t || [])) if (k === key) return l;
     return null;
   },
@@ -2728,7 +2739,7 @@ const App = {
   /* Every rail row carries an icon, from the SHARED section map, because the collapsed rail is
      icons alone — a row with no icon would simply vanish there. `_RAIL_IC` maps the rail's own keys
      onto that map; only `flowmap` needs translating (its icon has always been called `blueprint`). */
-  _RAIL_IC: { hub: 'hub', 'week-review': 'review', audit: 'audit', events: 'events', books: 'books',
+  _RAIL_IC: { hub: 'hub', 'week-review': 'review', 'week-close': 'dash', audit: 'audit', events: 'events', books: 'books',
               inventory: 'inventory', labor: 'labor', shift: 'shift',
               profit: 'profit', revenue: 'revenue', cash: 'cash',
               flowmap: 'blueprint', settings: 'settings', signout: 'signout' },
@@ -2756,6 +2767,8 @@ const App = {
       rail.innerHTML =
           '<div class="rail-group">' + this._PROTO_GLOBAL.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
+        + '<div class="rail-group"><div class="rail-grp-label">Week</div>'
+        +   this._PROTO_WEEK.map(r).join('') + '</div>'
         + '<div class="rail-group"><div class="rail-grp-label">Control</div>'
         +   this._PROTO_CONTROL.map(r).join('') + '</div>'
         + '<div class="rail-group"><div class="rail-grp-label">Recovery</div>'
