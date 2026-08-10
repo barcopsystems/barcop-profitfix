@@ -1888,11 +1888,18 @@ const App = {
 
   _activeModule: 'profit',
 
-  // The Hub + the 6 main sections, in Hub-sidebar order. Drives the section
-  // switcher (the dark dropdown at the top of every section sidebar) so the
-  // operator jumps straight between sections without routing back through the
-  // Hub. Bar Cop Audit / Accounting / Operations / Setup / Support are not
-  // here on purpose — they live inside the Hub, reached via "The Hub".
+  /* THE SECTION REGISTRY: the Hub plus the SEVEN module sections, in Hub-sidebar order. Bar Cop
+     Audit / Accounting / Operations / Setup / Support are not here on purpose — they live inside the
+     Hub, reached via "The Hub".
+     ⛔⛔ THIS COMMENT USED TO SAY "the 6 main sections" AND "drives the section switcher (the dark
+     dropdown at the top of every section sidebar)". BOTH WERE FALSE, and Kyle caught the second one
+     by asking a one-line question: there is no section switcher in this app — the only switcher left
+     is the ACCOUNT `<select>` in the topbar. The dropdown this described was replaced by the nav rail
+     in the 2026-08-08 redesign and the comment outlived it, so the table read as UI plumbing when it
+     is really the registry. **I then repeated the claim in my own comment below, having taken it
+     from here rather than from the code** ([[code-is-truth]]).
+     ⚠ AND IT HAD NO READER AT ALL until `_isSection` below — a table kept alive for a control that
+     no longer existed. Naming what it IS is what stops it being deleted as dead code. */
   SECTIONS: [
     ['hub',       'The Hub'],
     ['profit',    'Profit Recovery'],
@@ -1914,12 +1921,22 @@ const App = {
      once, from a table nobody would think to open while deleting a screen.
      ⭐ MEMBERSHIP NOW COMES FROM `_isSection`, off the `SECTIONS` registry above. Pinned by
      `verify-rail-menu-overlay` C4: with this map EMPTIED, all ten rows still own their menu. */
-  _SECTION_DASH: { profit: 'dashboard', revenue: 'r-dashboard', cash: 'c-dashboard', events: 'ev-dashboard', inventory: 'ic-dashboard', labor: 'lc-dashboard', shift: 'sc-dashboard' },
+  /* ⛔⛔ EVERY ENTRY IS A SCREEN THAT SURVIVES THE COCKPIT RETIREMENT. These were the six
+     close-the-week cockpits until 2026-08-10; each is now the FIRST ROW OF ITS OWN SECTION'S NAV,
+     which is the row already sitting at the top of that sidebar — so the highlighted row matches the
+     page and no second hand-typed map exists to drift. Events is unchanged: its dashboard survives.
+     ⭐ REMAINING READERS, and they are all fallbacks now that the twelve "Close The Week" entry
+     points go to the real page: `jumpToSection` (the rail overlay's no-dead-end fallback, and
+     Events) and `sectionNode`'s highlight id. Pointing them at survivors BEFORE the files are
+     deleted is what makes the deletion itself a pure file removal.
+     ⚠ `verify-nav-rail-reachability` C2b/C2d holds this: no landing may name one of the six, and
+     every landing must be a screen `_CONVERTED` can actually route to. */
+  _SECTION_DASH: { profit: 'audit-tracker', revenue: 'r-audit', cash: 'c-audit', events: 'ev-dashboard', inventory: 'ic-take-inventory', labor: 'lc-build-schedule', shift: 'sc-cash-control' },
 
-  /* Is this key one of the module sections? Read off `SECTIONS`, which is the registry the section
-     switcher already draws from, so there is ONE list and a section cannot exist in one place and
-     not the other. `hub` is IN that registry and is deliberately NOT a section: it owns no menu and
-     its rail row navigates, exactly like Review and Map. */
+  /* Is this key one of the module sections? Read off the `SECTIONS` registry above, so there is ONE
+     list and a section cannot exist in one place and not the other. `hub` is IN that registry and is
+     deliberately NOT a section: it owns no menu and its rail row navigates, exactly like Review and
+     Map. */
   _isSection(k) { return !!k && k !== 'hub' && this.SECTIONS.some(s => s[0] === k); },
 
 
@@ -1975,14 +1992,25 @@ const App = {
     nav.classList.toggle('nav-mstyle', mstyle);
     nav._mstyleClosed = false;
     if (mstyle) {
-      const dashScreen = this._SECTION_DASH[module];
+      /* ⛔⛔⛔ THE ROW SAYS "CLOSE THE WEEK", SO IT GOES TO CLOSE THE WEEK. It pointed at
+         `_SECTION_DASH[module]` — the section's own cockpit — because for years that cockpit WAS the
+         section's close-the-week page. There is one real Close The Week page now, and the six
+         cockpits are being deleted, so this row's label was about to become a promise it could not
+         keep. Six rows, one per section, all saying the same thing and all landing somewhere else.
+         ⚠ A HUB PAGE IS NOT A MODULE SCREEN, so this cannot be `data-screen`: that hook routes
+         through `App.navigate`, which paints into `#content-area`. Close The Week renders through
+         `openHubFullPage` into `.hub-app`. `data-nav` is the file's existing hook for exactly this
+         (`hub`, `report-bug`), and `_protoGlobalClick('week-close')` is the door the rail already
+         uses — so there is ONE opener, not a second copy of it. */
+      const wkLeaf = ['inventory', 'labor', 'shift', 'cash', 'profit', 'revenue'].indexOf(module) !== -1;
+      const dashScreen = wkLeaf ? 'week-close' : this._SECTION_DASH[module];
       const firstSec = nav.querySelector('.nav-section');
       if (dashScreen && firstSec && !nav.querySelector('#nav-' + dashScreen)) {
         const dleaf = document.createElement('div');
         dleaf.className = 'nav-item nav-leaf';
         dleaf.id = 'nav-' + dashScreen;
-        dleaf.dataset.screen = dashScreen;
-        const dleafLabel = (['inventory', 'labor', 'shift', 'cash', 'profit', 'revenue'].indexOf(module) !== -1) ? 'Close The Week' : (module === 'events' ? 'Book The Events' : 'Dashboard');
+        if (wkLeaf) dleaf.dataset.nav = 'week-close'; else dleaf.dataset.screen = dashScreen;
+        const dleafLabel = wkLeaf ? 'Close The Week' : (module === 'events' ? 'Book The Events' : 'Dashboard');
         dleaf.innerHTML = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="nav-label">' + dleafLabel + '</span>';
         firstSec.parentNode.insertBefore(dleaf, firstSec);
       }
@@ -2000,6 +2028,15 @@ const App = {
     });
     nav.querySelectorAll('.nav-item[data-nav="hub"]').forEach(el => {
       el.addEventListener('click', () => App.showHub());
+    });
+    /* The "Close The Week" leaf at the top of each section's sidebar. Through the SAME door the rail
+       uses (`_protoGlobalClick`), never a second call to `S.WeekClose.open()` — one opener means the
+       page cannot be entered two ways that drift apart. */
+    nav.querySelectorAll('.nav-item[data-nav="week-close"]').forEach(el => {
+      el.addEventListener('click', () => {
+        document.getElementById('app')?.classList.remove('sidebar-open');
+        App._protoGlobalClick('week-close');
+      });
     });
     // Report a Bug opens the shared bug-report flow (same as the Hub sidebar).
     nav.querySelectorAll('.nav-item[data-nav="report-bug"]').forEach(el => {
@@ -3029,7 +3066,14 @@ const App = {
       const pr = PAGE_REMAP[key] || {};
       const mkPage = (p) => { const it = pageItem(p); if (pr[it.label]) it.label = pr[it.label]; if (it.label === 'Help and FAQ') it.label = 'Help'; return it; };
       const items = [];
-      const homeId = App._SECTION_DASH[key] || ({ books: 'books-home' })[key] || '';
+      /* ⚠ THE ID IS FOR THE HIGHLIGHT, SO IT HAS TO NAME WHERE THE ROW ACTUALLY GOES. `activeId`
+         reads `data-screen || data-hubAction`, so a row that opens Close The Week must carry
+         `week-close` or it never lights up — and the six section rows that say "Close The Week" do
+         exactly that now. Keyed off the row's own label rather than a second list of section keys:
+         the label and the destination are set together, one line apart, so they cannot drift. */
+      const homeId = homeLabel === 'Close The Week'
+        ? 'week-close'
+        : (App._SECTION_DASH[key] || ({ books: 'books-home' })[key] || '');
       if (homeFn) items.push({ label: homeLabel || 'Dashboard', icon: IC.dash, home: true, id: homeId, go: homeFn });
       sgs.forEach(g => {
         if (g.pages.length === 1) {
@@ -3059,15 +3103,22 @@ const App = {
            same shape Audits has always had. Unavoidable: the page it pointed at is gone. */
         ...(App.demoMode ? [] : [drill('Settings', 'settings', null, null, IC.settings, 'App Settings')])
       ]},
+      /* ⛔⛔ THE MOBILE TWIN OF THE SIDEBAR LEAF, AND IT HAD THE SAME PROMISE TO KEEP. Six rows
+         labelled "Close The Week" whose home row opened the SECTION'S OWN COCKPIT — the six being
+         deleted. They open the real page now, through the same `_protoGlobalClick` door the rail and
+         the desktop leaf use.
+         ⚠ EVENTS IS DELIBERATELY UNTOUCHED: its dashboard survives and its row says "Book The
+         Events", which is a different promise ([[the-loop]] step 0.5 — find the twin, then check it
+         is actually a twin). */
       { label: 'Control', items: [
-        drill('Inventory', 'inventory', () => App.jumpToSection('inventory'), 'Close The Week', IC.inventory),
-        drill('Labor', 'labor', () => App.jumpToSection('labor'), 'Close The Week', IC.labor),
-        drill('Shift', 'shift', () => App.jumpToSection('shift'), 'Close The Week', IC.shift)
+        drill('Inventory', 'inventory', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.inventory),
+        drill('Labor', 'labor', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.labor),
+        drill('Shift', 'shift', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.shift)
       ]},
       { label: 'Recovery', items: [
-        drill('Profit', 'profit', () => App.jumpToSection('profit'), 'Close The Week', IC.profit),
-        drill('Revenue', 'revenue', () => App.jumpToSection('revenue'), 'Close The Week', IC.revenue),
-        drill('Cash', 'cash', () => App.jumpToSection('cash'), 'Close The Week', IC.cash)
+        drill('Profit', 'profit', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.profit),
+        drill('Revenue', 'revenue', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.revenue),
+        drill('Cash', 'cash', () => App._protoGlobalClick('week-close'), 'Close The Week', IC.cash)
       ]}
     ]};
 
