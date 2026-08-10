@@ -56,8 +56,8 @@ window.BarCopBriefing = {
     this._showModal(this._buildBriefing(), new Date().toISOString());
   },
 
-  // 3 to 4 short paragraphs off the Hub snapshot: overall state, where the money
-  // is, anything urgent, and the one move to make first.
+  // Up to 5 short paragraphs off the snapshot: overall state, where the money is, where the eight
+  // sections stand this week, anything urgent, and the one move to make first.
   _buildBriefing() {
     const s = this._snap || {};
     const a = s.audits || {};
@@ -106,7 +106,28 @@ window.BarCopBriefing = {
       paras.push('No sized leaks or revenue gaps are flagged this week. Either the systems are tight or they are hungry for more logged weeks. Keep closing your weeks and the picture sharpens.');
     }
 
-    // 3 — anything urgent this week.
+    /* 3 — WHERE THE EIGHT SECTIONS STAND THIS WEEK. This paragraph came from the Week In Review
+       briefing, which is being retired: it was the one part of that read which was about the whole
+       BAR rather than about that page's numbers, so it belongs here. Sections are named, never
+       counted ("Inventory, Labor and Shift closed clean" beats "3 of 8 complete") — the operator
+       needs to know WHICH one is behind, and a bare count makes them go and look. */
+    const secs = s.sections || [];
+    if (secs.length) {
+      const clean = secs.filter(x => x.total > 0 && x.done >= x.total).map(x => x.name);
+      const open  = secs.filter(x => x.total > 0 && x.done < x.total);
+      const list  = (arr) => arr.length > 1 ? arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1] : arr[0];
+      let p3 = '';
+      if (clean.length && !open.length) p3 = 'Every section is closed out this week. The whole board is caught up.';
+      else if (clean.length) p3 = list(clean) + ' ' + (clean.length === 1 ? 'is' : 'are') + ' closed out this week. ';
+      // Name the shortfall with its own numbers; "still open" alone sends them hunting.
+      if (open.length) {
+        p3 += (clean.length ? 'Still open: ' : 'Nothing is closed out yet this week. Still open: ')
+          + open.map(x => x.name + ' (' + x.done + ' of ' + x.total + ')').join(', ') + '.';
+      }
+      if (p3) paras.push(p3.trim());
+    }
+
+    // 4 — anything urgent this week.
     const crit = (s.critical || []);
     const belowAudits = [['Profit', a.profit], ['Revenue', a.revenue], ['Cash', a.cash], ['Bar Cop', a.barCop]].filter(([, v]) => v != null && v < target).map(([l]) => l);
     if (crit.length || belowAudits.length) {
@@ -116,7 +137,7 @@ window.BarCopBriefing = {
       paras.push('Handle this week: ' + bits.join('; ') + '.');
     }
 
-    // 4 — the one move to make first (only when there is a sized item).
+    // 5 — the one move to make first (only when there is a sized item).
     if (items[0]) paras.push('If you touch one thing first, make it ' + String(items[0].label).toLowerCase() + '. It is the biggest single number on the board and it moves the fastest.');
 
     return paras.map(p => '<div style="margin-bottom:14px;">' + esc(p) + '</div>').join('');
