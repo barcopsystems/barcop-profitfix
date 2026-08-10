@@ -335,46 +335,13 @@ S.Hub = {
     const caT   = rt.check_avg ?? 35;
     const laborT= App.laborTargetPct();
 
-    const metrics = [
-      { label:'Bar Pour Cost', val: pW?.bar?.cost_pct ?? null, disp: pW?.bar?.cost_pct!=null?App.fmtPct(pW.bar.cost_pct):null, tgt: pourT+'%', status: band(pW?.bar?.cost_pct ?? null, pourT, 'low'), screen:'dashboard', mod:'profit' },
-      { label:'Food Cost', val: pW?.food?.cost_pct ?? null, disp: pW?.food?.cost_pct!=null?App.fmtPct(pW.food.cost_pct):null, tgt: foodT+'%', status: band(pW?.food?.cost_pct ?? null, foodT, 'low'), screen:'dashboard', mod:'profit' },
-      { label:'Prime Cost', val: pW?.prime_cost_pct ?? null, disp: pW?.prime_cost_pct!=null?App.fmtPct(pW.prime_cost_pct):null, tgt: primeT+'%', status: band(pW?.prime_cost_pct ?? null, primeT, 'low'), screen:'dashboard', mod:'profit' },
-      { label:'Check Average', val: rW?.check_avg ?? null, disp: rW?.check_avg!=null?App.fmtCurrency(rW.check_avg):null, tgt: App.fmtCurrency(caT), status: band(rW?.check_avg ?? null, caT, 'high'), screen:'r-dashboard', mod:'revenue' },
-      { label:'Labor %', val: rW?.labor_pct_blended ?? null, disp: rW?.labor_pct_blended!=null?App.fmtPct(rW.labor_pct_blended):null, tgt: laborT+'%', status: band(rW?.labor_pct_blended ?? null, laborT, 'low'), screen:'r-dashboard', mod:'revenue' },
-    ];
-
-    // ── Alerts — metric breaches plus forward-looking signals ──
-    const sevRank = { bad:0, warn:1 };
-    const metricAlerts = metrics
-      .filter(m => m.status === 'warn' || m.status === 'bad')
-      .map(m => ({
-        sev: m.status,
-        label: m.label, value: m.disp + ' / ' + m.tgt,
-        text: m.label + ' at ' + m.disp + ' · target ' + m.tgt,
-        screen: m.screen, mod: m.mod
-      }));
-    // Audit-based alerts so "All Clear" is honest: a recovery audit scoring
-    // below target, or one overdue / never run, is a real open item. We do NOT
-    // dump audit action items here (they have their own Priority panel).
-    const auditAlerts = [];
-    [ { name:'Profit', a:pA, screen:'audit-tracker', mod:'profit' },
-      { name:'Revenue', a:rA, screen:'r-audit', mod:'revenue' },
-      { name:'Cash', a:cA, screen:'c-audit', mod:'cash' }
-    ].forEach(d => {
-      if (!d.a) { auditAlerts.push({ sev:'warn', label: d.name + ' audit', value: 'not run', text: d.name + ' audit not run yet', screen:d.screen, mod:d.mod }); return; }
-      const score  = d.a.overall_score;
-      const target = (d.a.raw && d.a.raw.TARGET_SCORE) || 70;
-      if (score != null && score < target) {
-        auditAlerts.push({ sev: score < target - 10 ? 'bad' : 'warn', label: d.name + ' audit', value: score + ' / ' + target + '+', text: d.name + ' audit at ' + score + ' · target ' + target + '+', screen:d.screen, mod:d.mod });
-      }
-      const daysSince = d.a.date ? Math.floor((Date.now() - new Date(d.a.date + 'T00:00:00').getTime()) / 86400000) : null;
-      if (daysSince != null && daysSince > 30) {
-        auditAlerts.push({ sev:'warn', label: d.name + ' audit', value: 'last run ' + daysSince + 'd', text: d.name + ' audit last run ' + daysSince + ' days ago, run a fresh one', screen:d.screen, mod:d.mod });
-      }
-    });
-    const alerts = metricAlerts.concat(this.forwardAlerts()).concat(auditAlerts)
-      .sort((a,b) => sevRank[a.sev] - sevRank[b.sev])
-      .slice(0, 50);
+    /* ⭐ BOTH OF THESE ARE MEMBERS NOW (see hubMetrics / hubAlerts above the weekly readout).
+       They were locals here, which meant the Bar Cop Briefing snapshot could only be built while
+       the Hub was drawing. The Rail button lives in the top bar on every page, so it needs them
+       from anywhere — and the answer is one implementation both callers read, never a second copy
+       that drifts from what this page displays. */
+    const metrics = this.hubMetrics();
+    const alerts = this.hubAlerts(metrics);
 
     // ── Priority action items ──
     // Show every action item from every audited module, ranked by dollar
@@ -1473,6 +1440,128 @@ S.Hub = {
     // 'expired' and 'due' are the screen's own filter values; anything else falls back to all.
     if (filter) S.HubPermits._filter = filter;
     S.HubPermits.open();
+  },
+
+  /* ── The Hub's data reads, lifted OUT of render() so The Rail can use them ──────────────────
+     ⛔ WHY THESE ARE MEMBERS AND NOT LOCALS ANY MORE. The Rail button sits in the TOP BAR, so it
+     is on every page — including the one an operator lands on cold from a bookmark or a refresh.
+     The briefing snapshot used to be assembled inline at the end of `render()`, which means it
+     only existed after the Hub had drawn. Pressed anywhere else, the briefing would have read an
+     empty object and printed a thin, confident-sounding page that was missing most of the bar.
+     That is worse than an error, because nothing looks wrong.
+     ⭐ AND THEY ARE EXTRACTED, NOT COPIED. render() calls these too, so there is ONE implementation
+     of "what are the key metrics" and ONE of "what is on the alert list". A second copy computed
+     for the briefing would drift from the dashboard the first time either was edited, and the
+     snapshot's whole promise is that the written read never contradicts the displayed numbers. */
+
+  // The newest record in a list, by date. Event logs load date-desc, so "latest" cannot be
+  // assumed to be the last array element — this is render()'s own `last`, shared rather than twinned.
+  _newestOf(a) {
+    const rd = r => ((r && (r.date || r.period_end || r.generated_at || r.saved_at || r.created_at)) || '') + '';
+    return (a && a.length) ? a.slice().sort((x, y) => rd(y).localeCompare(rd(x)))[0] : null;
+  },
+
+  // The five key metrics with their targets and status band. Same shape render() puts on screen.
+  hubMetrics() {
+    const data = App.data || {};
+    const s  = data.settings || {};
+    const pt = s.targets || {};
+    const rt = (data.revenue_settings || {}).targets || {};
+    const pW = this._newestOf(data.weeks || []);
+    // ⚠ The revenue-week filter is part of the question, not a tidy-up: a week with no revenue on
+    // either side is not a week that can carry a check average. render() filters identically.
+    const rW = this._newestOf((data.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0));
+    const band = (val, target, dir) => {
+      if (val == null) return 'none';
+      if (dir === 'low') return val <= target ? 'good' : val <= target * 1.1 ? 'warn' : 'bad';
+      return val >= target ? 'good' : val >= target * 0.9 ? 'warn' : 'bad';
+    };
+    const pourT = pt.bar_pour_cost_pct ?? 22;
+    const foodT = pt.food_cost_pct ?? 32;
+    const primeT = pt.prime_cost_pct ?? 60;
+    const caT = rt.check_avg ?? 35;
+    const laborT = App.laborTargetPct();
+    return [
+      { label:'Bar Pour Cost', val: pW?.bar?.cost_pct ?? null, disp: pW?.bar?.cost_pct!=null?App.fmtPct(pW.bar.cost_pct):null, tgt: pourT+'%', status: band(pW?.bar?.cost_pct ?? null, pourT, 'low'), screen:'dashboard', mod:'profit' },
+      { label:'Food Cost', val: pW?.food?.cost_pct ?? null, disp: pW?.food?.cost_pct!=null?App.fmtPct(pW.food.cost_pct):null, tgt: foodT+'%', status: band(pW?.food?.cost_pct ?? null, foodT, 'low'), screen:'dashboard', mod:'profit' },
+      { label:'Prime Cost', val: pW?.prime_cost_pct ?? null, disp: pW?.prime_cost_pct!=null?App.fmtPct(pW.prime_cost_pct):null, tgt: primeT+'%', status: band(pW?.prime_cost_pct ?? null, primeT, 'low'), screen:'dashboard', mod:'profit' },
+      { label:'Check Average', val: rW?.check_avg ?? null, disp: rW?.check_avg!=null?App.fmtCurrency(rW.check_avg):null, tgt: App.fmtCurrency(caT), status: band(rW?.check_avg ?? null, caT, 'high'), screen:'r-dashboard', mod:'revenue' },
+      { label:'Labor %', val: rW?.labor_pct_blended ?? null, disp: rW?.labor_pct_blended!=null?App.fmtPct(rW.labor_pct_blended):null, tgt: laborT+'%', status: band(rW?.labor_pct_blended ?? null, laborT, 'low'), screen:'r-dashboard', mod:'revenue' },
+    ];
+  },
+
+  // Metric breaches + forward-looking signals + audit-state alerts, worst first.
+  hubAlerts(metrics) {
+    const data = App.data || {};
+    metrics = metrics || this.hubMetrics();
+    const sevRank = { bad: 0, warn: 1 };
+    const metricAlerts = metrics
+      .filter(m => m.status === 'warn' || m.status === 'bad')
+      .map(m => ({ sev: m.status, label: m.label, value: m.disp + ' / ' + m.tgt,
+        text: m.label + ' at ' + m.disp + ' · target ' + m.tgt, screen: m.screen, mod: m.mod }));
+    /* Audit-based alerts so "All Clear" is honest: a recovery audit scoring below target, or one
+       overdue / never run, is a real open item. Action items are NOT dumped here; they have their
+       own Priority panel. */
+    const auditAlerts = [];
+    [ { name:'Profit',  a: this._newestOf(data.audits || []),         screen:'audit-tracker', mod:'profit' },
+      { name:'Revenue', a: this._newestOf(data.revenue_audits || []), screen:'r-audit',       mod:'revenue' },
+      { name:'Cash',    a: this._newestOf(data.cash_audits || []),    screen:'c-audit',       mod:'cash' }
+    ].forEach(d => {
+      if (!d.a) { auditAlerts.push({ sev:'warn', label: d.name + ' audit', value: 'not run', text: d.name + ' audit not run yet', screen: d.screen, mod: d.mod }); return; }
+      const score = d.a.overall_score;
+      const target = (d.a.raw && d.a.raw.TARGET_SCORE) || 70;
+      if (score != null && score < target) {
+        auditAlerts.push({ sev: score < target - 10 ? 'bad' : 'warn', label: d.name + ' audit', value: score + ' / ' + target + '+', text: d.name + ' audit at ' + score + ' · target ' + target + '+', screen: d.screen, mod: d.mod });
+      }
+      const days = d.a.date ? Math.floor((Date.now() - new Date(d.a.date + 'T00:00:00').getTime()) / 86400000) : null;
+      if (days != null && days > 30) {
+        auditAlerts.push({ sev:'warn', label: d.name + ' audit', value: 'last run ' + days + 'd', text: d.name + ' audit last run ' + days + ' days ago, run a fresh one', screen: d.screen, mod: d.mod });
+      }
+    });
+    return metricAlerts.concat(this.forwardAlerts()).concat(auditAlerts)
+      .sort((a, b) => sevRank[a.sev] - sevRank[b.sev])
+      .slice(0, 50);
+  },
+
+  /* THE RAIL's snapshot. Computed from App.data on demand, so it is correct from any page and is
+     never staler than the moment it is asked. ⚠ It must keep mirroring what the Hub displays —
+     that is the whole reason the written read can be trusted — which is why it reads the same
+     hubMetrics() / hubAlerts() / weeklyReadout() the Hub itself renders from. */
+  briefingSnapshot() {
+    const data = App.data || {};
+    const s = data.settings || {};
+    const pA = this._newestOf(data.audits || []);
+    const rA = this._newestOf(data.revenue_audits || []);
+    const cA = this._newestOf(data.cash_audits || []);
+    const bcA = this._newestOf(data.bar_cop_audits || []);
+    const auditOpp = a => a ? (a.action_items || []).reduce((sum, x) => sum + (x.monthly_impact || 0), 0) : 0;
+    // A scored audit in any system, not merely a recorded run: an estimate-only audit records N/A.
+    const anyAudit = [].concat(data.audits || [], data.revenue_audits || [], data.cash_audits || [])
+      .some(a => a && a.overall_score != null);
+    const recoveryTotal = window.Recovery ? Recovery.total() : { dollars: 0, fixes: 0 };
+    const readout = this.weeklyReadout();
+    const metrics = this.hubMetrics();
+    const alerts = this.hubAlerts(metrics);
+    return {
+      bar: s.bar_name || 'Your Operation',
+      opportunity: anyAudit ? (auditOpp(pA) + auditOpp(rA) + auditOpp(cA)) : null,
+      recovered: recoveryTotal.dollars,
+      fixes: recoveryTotal.fixes,
+      audits: {
+        profit:  pA ? pA.overall_score : null,
+        revenue: rA ? rA.overall_score : null,
+        cash:    cA ? cA.overall_score : null,
+        barCop:  bcA ? bcA.overall_score : null,
+        target:  (pA && pA.raw && pA.raw.TARGET_SCORE) || 70
+      },
+      weekly: {
+        leak: readout.leakTotal,
+        opp:  readout.oppTotal,
+        items: (readout.items || []).slice(0, 6).map(it => ({ label: it.label, weekly: it.weekly, module: it.module }))
+      },
+      metrics: metrics.map(m => ({ label: m.label, val: m.disp, target: m.tgt, status: m.status })),
+      critical: alerts.filter(a => a.sev === 'bad').map(a => a.text).slice(0, 8)
+    };
   },
 
   /* Weekly money readout (Section 10.3) — what is leaking this week, where, and
