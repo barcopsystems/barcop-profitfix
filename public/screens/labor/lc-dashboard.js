@@ -827,7 +827,17 @@ S.LaborDashboard = {
        the file repeated verbatim is now counted ONCE — at this door that is hours into gross pay and
        tips into Form 8027, so it was the most expensive place the bug lived. A bucket no door reads
        is worse than the bug: the operator's row count stops matching Bar Cop's and nothing says why. */
-    const { toAdd, skipped, incomplete, undated, dupCount, fileRepeats } = PosIngest.build(type, rows);
+    /* ⛔⛔ AND `summaryRows` JOINS IT FOR THE THIRD TIME, FOUND BY WALKING THE SHIPPED LANE. A real
+       59-line timeclock export went in: 55 landed and the result line named 3 skips. 55 + 3 = 58.
+       The missing one was the export's own "Grand Total" row — counted by the builder, listed on the
+       confirm screen ("Your file's own totals line, not a person"), and dropped from the sentence the
+       operator is left holding. **The comment directly above predicted this exact failure and I
+       still shipped it**, which is what makes it worth writing down again: a bucket is not read
+       until you can point at the words it produces.
+       ⚠ Five other doors already report it — `r-server-check`'s wording and the reason behind it
+       ("it used to say the roster did not match, which tells the operator to ADD A POS TOTALS LINE
+       as a staff member") is what this follows. */
+    const { toAdd, skipped, incomplete, undated, dupCount, fileRepeats, summaryRows } = PosIngest.build(type, rows);
     const noun = type === 'hours' ? 'hour' : 'tip';
     /* ⚠ THE THIRD DOOR INTO lc_actuals, AND IT HAD NO LOCK CHECK EITHER (L6). A closed pay period
        stamps the rows that existed at the time, so an import writes straight past it. Dropped here
@@ -856,8 +866,15 @@ S.LaborDashboard = {
        is to add the staff member, who already exists, which is how a roster gets duplicated. Split
        at the builder now, exactly as buildServer and buildPmix already were. */
     const nUnd = (undated || []).length, nInc = (incomplete || []).length;
+    const nSum = (summaryRows || []).length;
     const figure = type === 'hours' ? 'no hours rung' : 'no tips to log';
     const outcomes = (skipped.length ? ' (' + skipped.length + ' skipped, name not on your roster)' : '')
+      /* Next to the roster count on purpose: these are the two "this row is not a person" cases, and
+         the totals line used to be counted INSIDE the roster one. Read together they say the file had
+         two kinds of non-person row; read apart, the operator goes looking for a staff member called
+         Grand Total. "Nothing to fix" is the point — it is not a problem with their export. */
+      + (nSum ? ' (' + nSum + ' row' + (nSum === 1 ? '' : 's')
+          + ' skipped, your file\'s own totals line. Nothing to fix.)' : '')
       + (nInc ? ' (' + nInc + ' row' + (nInc === 1 ? '' : 's') + ' skipped, ' + figure + ')' : '')
       + (nUnd ? ' (' + nUnd + ' row' + (nUnd === 1 ? '' : 's') + ' skipped, no readable date)' : '')
       + (dupCount ? ' (' + dupCount + ' already logged)' : '')
@@ -867,7 +884,11 @@ S.LaborDashboard = {
       // Counted once, and said so — never folded into "already logged", which would be false.
       + ((fileRepeats || 0) ? ' (' + fileRepeats + ' repeated line' + (fileRepeats === 1 ? '' : 's') + ' counted once)' : '');
     if (!toAdd.length) {
-      const others = skipped.length + nInc + nUnd;
+      /* ⚠ `nSum` COUNTS HERE TOO. This gate decides whether the dup-only headline ("All N were
+         already logged") may claim ALL of them — so a file carrying dups AND a totals line would
+         print a headline that is false about the totals row. It falls through to the general branch
+         now, which names both. */
+      const others = skipped.length + nInc + nUnd + nSum;
       /* ⚠ THE HEADLINE MUST NOT POINT AT THE COLUMNS WHEN THE COLUMNS ARE THE ONE THING THAT CANNOT
          BE WRONG. Staff, Date and Hours are all `required: true`, and CSVMapper blocks the Import
          button until every required field is mapped — so by the time this fires, the columns are
