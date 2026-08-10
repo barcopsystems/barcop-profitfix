@@ -43,7 +43,11 @@ S.ShiftDashboard = {
     const cur = App.nextSunday ? App.nextSunday() : App.todayLocal();
     if (n > 0 && next > cur) return;   // never walk into the future
     this._weekEnd = next;
-    this._openStep = null; this._flash = null;
+    // ⚠ THE DATES GO WITH THE MESSAGE, EVERY TIME. `_flashDates` is a companion of `_flash`, and any
+    // line that drops one while keeping the other leaves dates behind for the next message to
+    // inherit — which is how a hand save on Close The Week could jump the operator to an old
+    // import's week. Pinned as a structural sweep in `verify-lane-host` I10.
+    this._openStep = null; this._flash = null; this._flashDates = null;
     this.render(this.container, this.actions);
   },
 
@@ -139,6 +143,12 @@ S.ShiftDashboard = {
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
     const flash = this._flash; this._flash = null;
     const flashZone = this._flashZone; this._flashZone = null;
+    /* ⚠ `_flashDates` IS CONSUMED WITH THE MESSAGE IT BELONGS TO. This page never reads it — only a
+       host that shows ONE week does, to move its selector to meet the file — so it used to sit on
+       the object after its own flash had been shown and eaten here, waiting to be picked up by the
+       next message that carried no dates of its own. A companion field has to be consumed by
+       whoever consumes the thing it is a companion to. */
+    this._flashDates = null;
     /* ⛔⛔⛔ A LANDED IMPORT HAS TO BE REPORTED SOMEWHERE, AND IT WAS NOT BEING. A zone's `-res` slot
        lives inside `workspace(zone)`, which `stepRow` renders ONLY while that step is open — and
        every lane advances the step in the same breath as it sets the flash (`_doImportSales` moves
@@ -467,12 +477,40 @@ S.ShiftDashboard = {
      nobody can see. A host NAMES ITS OWN ids.
      ⚠ THE SPLIT HERE IS BY BRANCH, NOT BY MEMBER, and that is what makes this cockpit harder than
      Labor's: seven of the lane's redraws live inside the cockpit's own `wire()` click handler,
-     interleaved with four that belong to the cockpit. The week stepper, the step heads, Mark Done
-     and BOTH `saveManualSales` calls stay `this.render` — the manual grid is this page's, and it
-     must not follow the lane onto a hub page. */
+     interleaved with four that belong to the cockpit. The week stepper, the step heads and Mark Done
+     stay `this.render` — those are this page's chrome and nothing else draws them.
+     ⛔⛔ THE MANUAL GRID IS NOT IN THAT LIST ANY MORE, AND THE LINE THAT SAID SO WAS WRONG WITHIN A
+     DAY. It read *"BOTH `saveManualSales` calls stay `this.render` — the manual grid is this page's,
+     and it must not follow the lane onto a hub page."* Close The Week now hosts that grid, because
+     it is the ONLY way to key a week in with no POS export and this cockpit is being deleted. So all
+     THREE of its redraws route through the host: both of `saveManualSales`'s own, and the
+     cleared-only exit inside `_doImportSales`, which `opts.cleared` makes manual-only. A save made
+     on the hub page used to repaint this one, and the page in front of the operator said nothing —
+     which reads as a dead Save button ([[the-loop]] #9: a fix written into one page's render does
+     not exist for the second page). Pinned by `verify-lane-host` block I8. */
   _ckHost: null,
   ckClaim(host)  { this._ckHost = host || null; },
   _ckZone(key)   { return (this._ckHost ? this._ckHost.zone : this.CK_ZONE)[key] || ''; },
+  /* ⛔⛔ THE WEEK IS PART OF THE HOST CONTRACT, AND IT IS WHAT THE MANUAL GRID HANGS ON. The drop
+     zone does not care which week the page is showing — a file carries its own dates. The Enter
+     Manually grid is the opposite: it BUILDS seven day rows and pre-fills them, so it has to be the
+     seven days the operator can see. Both pages keep their own week selector, so reading
+     `this.weekStart()` from a hub host would draw a grid for the cockpit's week — the operator types
+     into Aug 3-9 and the save lands on Jul 20-26, silently, with no screen saying so.
+     ⚠ BOTH ENDS FROM THE HOST, never one end plus arithmetic. `inWeek` compares against a start AND
+     an end, and re-deriving the end here would be a second copy of the app's week rule
+     ([[the-loop]] #36). A host that names no week is the cockpit's own, which is what makes this
+     inert on the page that already shipped. */
+  _ckWeekStart() { return (this._ckHost && this._ckHost.weekStart) ? this._ckHost.weekStart() : this.weekStart(); },
+  _ckWeekEnd()   { return (this._ckHost && this._ckHost.weekEnd)   ? this._ckHost.weekEnd()   : this.weekEnd(); },
+  _ckInWeek(d)   { const s = this._ckWeekStart(), e = this._ckWeekEnd(); d = String(d || '').slice(0, 10); return !!d && d >= s && d <= e; },
+  /* ⛔⛔⛔ THE GRID'S CELL IDS ARE THE HOST'S, FOR THE REASON THE ZONE IDS ARE. `scm-bar-<date>` was a
+     literal, and the app HIDES `#app` rather than emptying it — so with the cockpit's grid still in
+     the document, `getElementById` answers with the hidden page's cell and the save reads figures
+     nobody typed. Measured in `verify-lane-host` I7c: 111 saved over the 3,000 on screen.
+     ⭐ ONE ACCESSOR FOR BOTH SIDES. The render and the read have to agree on the spelling, and two
+     true statements about two spellings are not a test that they agree ([[the-loop]] integrity #11). */
+  _mgCell(kind, ymd) { return this._ckZone('import') + '-m' + kind + '-' + ymd; },
   _ckContainer() { return this._ckHost ? this._ckHost.container() : this.container; },
   _ckRerender()  { if (this._ckHost) this._ckHost.rerender(); else this.render(this.container, this.actions); },
   // Which lane is in flight, so a page can refuse to draw one it does not render.
@@ -1101,7 +1139,8 @@ S.ShiftDashboard = {
       if (opts.cleared) {
         this._flash = opts.cleared + ' day' + (opts.cleared === 1 ? '' : 's') + ' cleared to zero'
           + (kept ? ', ' + kept + ' day' + (kept === 1 ? '' : 's') + ' kept as entered' : '') + skipNote + undNote + zeroNote + covNote + coNote + sameNote + '.';
-        this._openStep = 'cash'; this.render(this.container, this.actions); return;
+        this._flashDates = null;   // no dates to report; see the note at saveManualSales's exits
+        this._openStep = 'cash'; this._ckRerender(); return;
       }
       // ⚠ "ALREADY MATCHED" IS A SUCCESS, NOT A BROKEN FILE. Re-dropping the same export is the
       // ordinary way to land here, and without this it fell through to the red "check that the file
@@ -1267,7 +1306,7 @@ S.ShiftDashboard = {
     return '<div class="seg-toggle" style="margin-bottom:14px;">' + btn('import', 'Import File') + btn('manual', 'Enter Manually') + '</div>';
   },
   _weekDays() {
-    const out = [], s = new Date(this.weekStart() + 'T00:00:00');
+    const out = [], s = new Date(this._ckWeekStart() + 'T00:00:00');
     for (let i = 0; i < 7; i++) {
       const d = new Date(s.getFullYear(), s.getMonth(), s.getDate() + i);
       out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
@@ -1276,14 +1315,14 @@ S.ShiftDashboard = {
   },
   _manualSalesGrid() {
     const days = this._weekDays(), existing = {};
-    this.shifts().filter(s => this.inWeek(s.date)).forEach(s => { existing[String(s.date).slice(0, 10)] = s; });
+    this.shifts().filter(s => this._ckInWeek(s.date)).forEach(s => { existing[String(s.date).slice(0, 10)] = s; });
     const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
     const v = (s, f) => (s && s[f] != null && s[f] !== '') ? s[f] : '';
     const dollar = (id, val) => '<td style="background:#0D181E;"><div class="fw" style="margin:0;"><span class="pre">$</span><input class="form-input pre" type="number" step="0.01" min="0" id="' + id + '" value="' + val + '" style="width:100%;min-width:0;"/></div></td>';
     const plain = (id, val) => '<td style="background:#0D181E;"><input class="form-input" type="number" step="1" min="0" id="' + id + '" value="' + val + '" style="width:100%;min-width:0;"/></td>';
     const lbl = t => '<td style="font-weight:600;color:var(--t1);background:#0D181E;white-space:nowrap;">' + t + '</td>';
     const rows = days.map(d => { const s = existing[d];
-      return '<tr class="cw-line">' + lbl(fmt(d)) + dollar('scm-bar-' + d, v(s, 'bar_revenue')) + dollar('scm-food-' + d, v(s, 'floor_revenue')) + plain('scm-cov-' + d, v(s, 'covers')) + '</tr>';
+      return '<tr class="cw-line">' + lbl(fmt(d)) + dollar(this._mgCell('bar', d), v(s, 'bar_revenue')) + dollar(this._mgCell('food', d), v(s, 'floor_revenue')) + plain(this._mgCell('cov', d), v(s, 'covers')) + '</tr>';
     }).join('');
     return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">No POS export this week? Key it in by hand. Enter each day\'s bar and food sales, plus covers if you track them, then save. It lands exactly like the file drop and feeds Confirm the Week the same way.</div>'
       + '<div style="overflow-x:auto;"><table class="ing-tbl pill" style="table-layout:fixed;width:100%;">'
@@ -1309,7 +1348,7 @@ S.ShiftDashboard = {
          Refuse the whole save and name the day — the same treatment a negative gets. Guessing
          either way is wrong when we cannot read what is on their screen. */
       const el = id => document.getElementById(id) || {};
-      const eBar = el('scm-bar-' + d), eFood = el('scm-food-' + d), eCov = el('scm-cov-' + d);
+      const eBar = el(this._mgCell('bar', d)), eFood = el(this._mgCell('food', d)), eCov = el(this._mgCell('cov', d));
       const bad = e => !!(e.validity && e.validity.badInput);
       if (bad(eBar) || bad(eFood) || bad(eCov)) { unreadable.push(d); return; }
       const bar = eBar.value, food = eFood.value, cov = eCov.value;
@@ -1408,7 +1447,7 @@ S.ShiftDashboard = {
        one on screen ([[the-loop]] #36). A date with no saved record can never match, so a brand-new
        day always writes. */
     const priorByDate = {};
-    this.shifts().filter(s => this.inWeek(s.date)).forEach(s => { priorByDate[String(s.date).slice(0, 10)] = s; });
+    this.shifts().filter(s => this._ckInWeek(s.date)).forEach(s => { priorByDate[String(s.date).slice(0, 10)] = s; });
     const cents = x => Math.round((App.parseNum(x) ?? 0) * 100);
     const unchanged = r => {
       const p = priorByDate[r.date];
@@ -1428,7 +1467,15 @@ S.ShiftDashboard = {
       this._flash = untouched === 1
         ? 'Nothing to save. That day already reads exactly this way.'
         : 'Nothing to save. Those ' + untouched + ' days already read exactly this way.';
-      this.render(this.container, this.actions);
+      /* ⛔⛔ A FLASH WITH NO DATES MUST SAY SO, OR IT INHERITS THE LAST IMPORT'S. `_flashDates` is
+         what moves Close The Week's week selector to meet a file, and nothing consumed it alongside
+         `_flash` — so an import run on this cockpit weeks ago left its dates on the object, and the
+         first hand save on the hub page would carry them and jump the operator to that week under a
+         line reading "Nothing to save". Every day this message is about came out of `_weekDays()`,
+         which is the week already on screen, so there is nothing to disambiguate: null is the honest
+         answer and it keeps the scope line silent. Same at the two other manual exits. */
+      this._flashDates = null;
+      this._ckRerender();
       return;
     }
 
@@ -1474,8 +1521,9 @@ S.ShiftDashboard = {
     this._flash = (cleared
       ? cleared + ' day' + (cleared === 1 ? '' : 's') + ' cleared to zero.'
       : 'Those days were already empty.') + co;
+    this._flashDates = null;      // see the note at the nothing-to-save exit
     this._openStep = 'cash';
-    this.render(this.container, this.actions);
+    this._ckRerender();
   },
 
   // ── Inline per-server sales import (step 1 optional) ─────────────────────────
@@ -2174,7 +2222,7 @@ S.ShiftDashboard = {
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
       if (ev.target.closest('.sc-wk-prev')) { this._stepWeek(-7); return; }
       if (ev.target.closest('.sc-wk-next')) { this._stepWeek(7); return; }
-      if (ev.target.closest('.sc-wk-now'))  { this._weekEnd = null; this._openStep = null; this._flash = null; this.render(this.container, this.actions); return; }
+      if (ev.target.closest('.sc-wk-now'))  { this._weekEnd = null; this._openStep = null; this._flash = null; this._flashDates = null; this.render(this.container, this.actions); return; }
     };
   }
 };
