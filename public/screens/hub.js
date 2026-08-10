@@ -725,8 +725,18 @@ S.Hub = {
        has done the analysis, so it should say what the answer is rather than hand back a shortlist.
        ⭐ AND IT IS THE SAME REGION AS GET STARTED. Seeded, it is the biggest money move; empty, it is
        the four setup steps. Same position, same promise — the app tells you the one next thing.
-       ⚠ THE REST ARE NAMED, NOT HIDDEN: "N more" carries them to the Playbook rather than to a
-       scrollbar nobody finds on a phone. */
+       ⚠ THE REST ARE COUNTED, NOT LINKED. "N more" is a CAPTION, not a door.
+       ⛔⛔ IT WAS A DOOR AND THE DOOR WAS WRONG. It carried the operator to `recovery-playbook`,
+       which routes correctly and is a 32,365-character essay ("What running without systems costs")
+       that does not contain the words "check average" — the very item the headline above it had just
+       named. So the link was not dead, it was a BROKEN PROMISE, which is harder to spot and reads
+       worse. There is no screen anywhere that holds "the other N recovery actions, ranked", and
+       inventing one contradicts this card's whole reason to exist: the app has done the analysis, so
+       it says the answer instead of handing back a shortlist. A "N more" LINK hands back the
+       shortlist. The count still earns its place as a fact — it says the app found N+1 things and
+       picked one — so it stays as quiet text in `--t3`.
+       ⚠ AND THE COLOUR HAD TO MOVE OFF `--gold` WITH THE ONCLICK. Gold is this page's money/tappable
+       signal; gold text that no longer responds to a press is a second lie replacing the first. */
     const first = this._doFirst(itemRows);
     const doFirst = first
       ? '<div onclick="' + paiGo(first.item) + '" style="cursor:pointer;">'
@@ -736,7 +746,7 @@ S.Hub = {
               + App.fmtCurrency(first.impact, 0) + '</span> a month</div>' : '')
         + '</div>'
         + (first.more
-            ? '<div onclick="S.Hub._enter(\'recovery-playbook\',\'profit\')" style="font-size:11px;color:var(--gold);cursor:pointer;padding:10px 0 0;">'
+            ? '<div style="font-size:11px;color:var(--t3);padding:10px 0 0;">'
               + first.more + ' more</div>' : '')
       : gettingStarted;
     const priorityCard = cardWrap(topItems.length ? 'Do This First' : 'Get Started', doFirst);
@@ -754,12 +764,26 @@ S.Hub = {
          and the order (reds first).
          ⛔ NO SCROLL BOX. Capped by SEVERITY through `_needsCapped` — every red shows however many
          there are, ambers fill the rest, and anything past that is named rather than hidden behind a
-         scrollbar the operator has to find on a phone. */
+         scrollbar the operator has to find on a phone.
+         ⛔⛔⛔ THE OVERFLOW LINE WAS A DEAD LINK AND IT SHIPPED TO THE LIVE DEMO.
+         `_enter('hub-permits','')` reaches NOTHING: the hub branch of `_enter` needs
+         `module === 'hub'` AND `screen === 'permits'`, so this got neither, fell through to the
+         module router, which does not know that id, and rendered **"Coming soon."** on the page that
+         is the product's marketing image.
+         ⭐ AND `hub-permits.js` IS A FINISHED 30KB SCREEN. The page was never the problem. The door
+         is `_enterPermits(filter)`, 46 lines below `_enter` in this same object, and TWO ROWS OF THIS
+         VERY CARD already call it correctly. I invented a route past a working one.
+         ⛔ SO WHY NO LINK AT ALL: the overflow spans permits, certs, overtime, cash, maintenance and
+         vendor, which live on five different screens. No single destination is honest for a mixed
+         list, and `hub-permits` would be right for only some of it. The count stays as a fact in
+         `--t3`; every individual row still deep-links to its own item through `goOf`.
+         🔧 `verify-hub-destinations.js` now resolves EVERY destination in this file against the
+         app's own `_CONVERTED` register, so a made-up screen id cannot ship again. */
       const capped = this._needsCapped(bandItems, 4);
       needsBand = cardWrap('Needs Attention', '<div>'
         + capped.shown.map(a => naRow(a, a.sev === 'bad' ? 'var(--red)' : 'var(--amber)')).join('')
         + (capped.more
-            ? '<div onclick="S.Hub._enter(\'hub-permits\',\'\')" style="font-size:11px;color:var(--gold);cursor:pointer;padding:8px 0 2px;">'
+            ? '<div style="font-size:11px;color:var(--t3);padding:8px 0 2px;">'
               + capped.more + ' more' + '</div>'
             : '')
         + '</div>');
