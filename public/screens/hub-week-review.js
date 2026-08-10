@@ -47,7 +47,13 @@ S.WeekReview = {
     // Never open on a FUTURE week: a week confirmed early would otherwise land the page ahead of today.
     return m > this._monday() ? '' : m;
   },
-  _wkS() { return this._wkStart || this._lastClosedMonday() || this._monday(); },
+  /* ⛔⛔ ONE RULE, TWO READERS. `_wkS` is NOT the only thing that decides where this page opens —
+     `render` pins `_wkStart` on its first pass so the week is stable across re-renders, and it did
+     that with `_monday()`. So the first version of this change put the fallback in `_wkS` alone and
+     was completely INERT: render had already assigned this week before `_wkS` was ever consulted.
+     It read correct and did nothing, and only walking the page showed it. Both readers ask here. */
+  _defaultMonday() { return this._lastClosedMonday() || this._monday(); },
+  _wkS() { return this._wkStart || this._defaultMonday(); },
   _wkE() { return this._addDays(this._wkS(), 6); },
   _inWeek(dstr) { const d = String(dstr || '').slice(0, 10); const s = this._wkS(), e = this._wkE(); return !!d && d >= s && d <= e; },
   _isThisWeek() { return this._wkS() >= this._monday(); },
@@ -782,7 +788,9 @@ S.WeekReview = {
 
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
-    if (this._wkStart == null) this._wkStart = this._monday();
+    // ⛔ THE SEED IS THE REAL DECISION — see `_defaultMonday`. This line is what actually decides
+    // where the page opens, and pointing it at `_monday()` is what made the first attempt inert.
+    if (this._wkStart == null) this._wkStart = this._defaultMonday();
 
     const products = ((App.inventoryData && App.inventoryData.ic_products) || []).filter(p => p.active !== false);
     const counts = (App.inventoryData && App.inventoryData.ic_counts) || [];
