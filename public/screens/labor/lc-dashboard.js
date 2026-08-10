@@ -925,6 +925,13 @@ S.LaborDashboard = {
     // in one set of words — and the undated count cannot be reported on two paths and dropped on the third.
     this._flash = toAdd.length + ' ' + noun + ' record' + (toAdd.length === 1 ? '' : 's') + ' imported'
       + outcomes + '.';
+    /* ⛔⛔ WHAT LANDED, BY DATE, SO THE PAGE SHOWING THIS CAN SAY WHICH WEEK IT MEANS. Kyle, 2026-08-10,
+       on the pushed tips lane: *"imported test tip file.. says imported.. tips card 'none logged'."*
+       Both numbers were TRUE — this sentence counts the FILE, the row counts the WEEK on screen, and
+       his file was dated outside it. Neither said what it was counting, so the first read is "broken".
+       ⚠ The DATES, not a week label: this lane does not know what week its host is showing, and a
+       file can straddle several. The host counts them against its own window. */
+    this._flashDates = toAdd.map(r => r && r.date).filter(Boolean);
     /* ⛔⛔⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS, AND ONLY ON SUCCESS. Leaving this out is what door 11
        shipped with: the write landed every time and the render put the same screen straight back,
        because `workspace` reads the review first. The two early returns above and the refusal branch
