@@ -26,7 +26,7 @@ S.InventoryDashboard = {
   showHowTo() {
     App.showHelpModal('How the Weekly Close Works', [
       { p: ['This is your weekly close-out for Inventory. You land on the week, see how far along you are, and work the steps top to bottom. Open a step to do it; when the week is done it reads "You\'re current this week."'] },
-      { h: 'Where You Stand', p: ['The card up top reads your inventory value on hand and how many weeks of business that covers, then breaks down where your shelf cash sits: what is on the reorder, what you used this period, and shrinkage over the last 30 days. Hit Bar Cop Briefing for a written read of your week in plain language.'] },
+      { h: 'Where You Stand', p: ['The card up top reads your inventory value on hand and how many weeks of business that covers, then breaks down where your shelf cash sits: what is on the reorder, what you used this period, and shrinkage over the last 30 days. For a written read of your week in plain language, across every section, hit The Rail in the top bar.'] },
       { h: 'The Steps', p: ['1. Take this week\'s count: count your inventory in Take Inventory. 2. Receive deliveries: log anything that came in since your last count, or mark it none. 3. Place your orders: everything below par, grouped by vendor, with the cost to refill, and create the orders in the Order Sheet. 4. Review the flags: shrinkage written off, spot-check flags, and dead stock worth chasing.'] },
       { h: 'Working A Step', p: ['Click a step to open it. Take Inventory, Receive Delivery, and the Order Sheet open the full screen and come back. Mark a step done and the bar advances; mark it not done to reopen it. The week selector steps you back to close out a prior week.'] },
       { h: 'As-Needed Work', p: ['The row under the steps keeps Spot Check and Par Suggestions one tap away. Neither is part of the weekly close, but both are worth a look when a number stops making sense.'] }
@@ -523,12 +523,9 @@ S.InventoryDashboard = {
       + '</div>'
       + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="ic-report-variance">Variance Report</button></div>'
       + '</div>';
-    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><span>Where You Stand</span>'
-      + '<button class="btn btn-ghost btn-sm" data-insights style="font-size:10px;padding:4px 10px;letter-spacing:1px;">Bar Cop Briefing</button></div>'
+    return '<div class="card form-card" style="margin-bottom:16px;"><div class="card-title">Where You Stand</div>'
       + hero + secondary + '</div>';
   },
-
-
 
   parNudge(n) {
     return '<div data-go="ic-par-suggestions" style="margin-top:12px;padding:11px 13px;background:var(--input);border:1px solid var(--b2);border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
@@ -554,51 +551,9 @@ S.InventoryDashboard = {
     ]);
   },
 
-  // ── Bar Cop Briefing: a written read of the inventory week, the same button
-  //    the recovery dashboards carry. Built fresh from your logged data on every open —
-  //    there is no cache and no API call.
-  // Code-generated (no API): where inventory stands, where cash is stuck, the move.
-  showInsights() {
-    const st = this._st || this.computeState();
-    if (!st.latest) { DashUI.insightsModal('Bar Cop Briefing', 'Take a couple of counts and Bar Cop can read your inventory week for you.'); return; }
-    DashUI.insightsModal('Bar Cop Briefing', this._insBriefing(st));
-  },
-
-  _insBriefing(st) {
-    const m = (n) => '$' + Math.round(n || 0).toLocaleString('en-US');
-    const paras = [];
-
-    // 1 — where the inventory stands
-    let p1 = 'You are holding ' + m(st.inventoryValue) + ' on the shelf';
-    if (st.weeksOnHand != null) p1 += ', about ' + st.weeksOnHand.toFixed(1) + ' weeks of stock';
-    p1 += '. ' + (st.hasCountThisWeek ? 'Your count is current, so this read is real.'
-                : st.latest ? 'Last count was ' + st.lastAge + ' days ago, so the number drifts until you recount.'
-                : 'No count on file yet, so treat this as a starting point.');
-    paras.push(p1);
-
-    // 2 — where cash is leaking or stuck
-    const leaks = [];
-    if (st.shrink > 0) leaks.push(m(st.shrink) + ' written off to shrinkage in the last thirty days');
-    if (st.deadAll > 0) leaks.push(st.deadAll + ' dead item' + (st.deadAll === 1 ? '' : 's') + ' tying up cash' + (st.dead && st.dead.length ? ', worst is ' + st.dead[0].name + ' at ' + m(st.dead[0].tied) : ''));
-    if (st.parOff > 0) leaks.push(st.parOff + ' par' + (st.parOff === 1 ? '' : 's') + ' off versus real usage');
-    if (st.menuOver > 0) leaks.push(st.menuOver + ' menu item' + (st.menuOver === 1 ? '' : 's') + ' now over cost target');
-    paras.push(leaks.length ? 'Where cash is stuck: ' + leaks.join(', ') + '.' : 'Nothing is leaking or stuck right now. Shrinkage is clean and the pars are close to usage.');
-
-    // 3 — the single move
-    let move;
-    if (st.reorderCount > 0) move = 'Place your order first: ' + m(st.reorderTotal) + ' across ' + st.reorderCount + ' product' + (st.reorderCount === 1 ? '' : 's') + ' are below par.';
-    else if (st.dead && st.dead.length) move = 'Run down the dead stock, starting with ' + st.dead[0].name + '. It is cash sitting still.';
-    else if (!st.hasCountThisWeek) move = 'Take this week\'s count so the whole read is real, not drifting.';
-    else move = 'Nothing urgent. Hold the count rhythm and keep the pars tight to usage.';
-    paras.push(move);
-
-    return paras.map(p => '<p style="margin:0 0 12px;">' + esc(p) + '</p>').join('');
-  },
-
   // ── Wiring ───────────────────────────────────────────────────────────────────
   wire() {
     this.container.onclick = ev => {
-      if (ev.target.closest('[data-insights]')) { this.showInsights(); return; }
       const head = ev.target.closest('.ic-step-head');
       if (head) { const k = head.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container, this.actions); return; }
       const dn = ev.target.closest('[data-done]');
