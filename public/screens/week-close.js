@@ -473,7 +473,15 @@ S.WeekClose = {
        passed positionally would have been read as `opts` and silently ignored, so the popup would
        save and this page would never redraw to show it. Checked against the signature. */
     c.querySelector('.wc-confirm')?.addEventListener('click', () => {
-      if (window.ConfirmWeek && ConfirmWeek.open) {
+      /* ⛔⛔⛔ NOT `window.ConfirmWeek`. THIS BUTTON DID NOTHING FROM THE DAY STAGE 1 SHIPPED, and
+         Kyle found it. `confirm-week.js` declares `const ConfirmWeek = {...}` at top level, and a
+         top-level `const` in a plain script does NOT become a property of `window` — so the guard
+         was permanently FALSE and the one button this whole page exists to end with was dead.
+         ⚠ THE LESSON WAS ALREADY WRITTEN DOWN AND I WROTE THE BUG ANYWAY: `!!window.App` is false
+         for exactly the same reason, recorded from chat 53. A `window.X` guard is only correct when
+         something does `window.X = ...`; 19 components here do, and this one does not.
+         ⭐ SWEPT THE WHOLE TREE: this was the ONLY one. Pinned so it cannot come back. */
+      if (typeof ConfirmWeek !== 'undefined' && ConfirmWeek.open) {
         ConfirmWeek.open(this.weekEnd(), { onDone: () => this.render(this.container) });
       }
     });
