@@ -41,16 +41,33 @@ S.WeekClose = {
      document and `getElementById` answers with whichever comes first — so the mapper could mount
      into the hidden cockpit and the operator would drop a file onto nothing. That is the
      rail-overlay duplicate-id defect with a parsed timeclock file riding on it.
-     ⚠ HOURS ONLY, DELIBERATELY. There is no `tips` zone because this page does not render one, and
-     the lane asks the host what it hosts before it draws: a tips import taken over on the Labor
-     cockpit stays on the Labor cockpit. */
+     ⚠ ONE HOST PER COCKPIT, because the zone ids, the carried node and the takeover flag all live on
+     the cockpit object — Labor's lane cannot be told about Shift's. What this page adds is the
+     `LANES` table below, which is the only place that knows a row on this page maps to a lane on a
+     cockpit. A lane joins by adding one row there. */
   LB_HOST: {
-    zone: { hours: 'wc-hours' },
+    zone: { hours: 'wc-hours', tips: 'wc-tips' },
     takeover: 'wc-takeover',
     container() { return S.WeekClose.container; },
     rerender()  { S.WeekClose.render(S.WeekClose.container); }
   },
   _lb() { return S.LaborDashboard || null; },
+
+  /* ⛔ THE ROW KEY IS NOT THE LANE KEY, and assuming it was is the obvious mistake here: this page
+     calls it `sales`, the Shift cockpit calls that lane `import`. `mount` names the cockpit member
+     that mounts it, so a lane is one row of table rather than a branch in three places. */
+  LANES: {
+    hours: { host: 'LB_HOST', obj: 'LaborDashboard', key: 'hours', mount: 'mountHoursImport' },
+    tips:  { host: 'LB_HOST', obj: 'LaborDashboard', key: 'tips',  mount: 'mountTipsImport'  }
+  },
+  _laneObj(rowKey) {
+    const L = this.LANES[rowKey];
+    return L ? (S[L.obj] || null) : null;
+  },
+  _laneZone(rowKey) {
+    const L = this.LANES[rowKey];
+    return L ? ((this[L.host] || {}).zone || {})[L.key] || '' : '';
+  },
 
   open() {
     App.openHubFullPage('Close The Week', (mount) => { this.container = mount; this.render(mount); }, 'week-close');
@@ -138,7 +155,7 @@ S.WeekClose = {
          different page is a signpost, not a door. `lane` is the key the host names a zone for. */
       { key: 'hours', label: 'Hours', ready: st.hours.length > 0, go: 'lc-log-hours', lane: 'hours',
         note: st.hours.length ? st.hoursTotal.toFixed(1) + ' hours across ' + st.hours.length + ' row' + (st.hours.length === 1 ? '' : 's') : 'Not in yet' },
-      { key: 'tips', label: 'Tips', ready: st.tips.length > 0, go: 'lc-tip-log', optional: true,
+      { key: 'tips', label: 'Tips', ready: st.tips.length > 0, go: 'lc-tip-log', optional: true, lane: 'tips',
         note: st.tips.length ? money(st.tipsTotal) + ' logged' : 'None logged' },
       { key: 'cash', label: 'Cash over and short', ready: st.cash.length > 0, go: 'sc-cash-control', optional: true,
         note: st.cash.length ? st.cash.length + ' drawer count' + (st.cash.length === 1 ? '' : 's') : 'No drawer counted' },
@@ -200,7 +217,7 @@ S.WeekClose = {
        CLOSE OUT YOUR WEEK and whose primary button is Confirm the Week. One word, two meanings, six
        inches apart. */
     const laneOpen = !!r.lane && this._openLane === r.lane;
-    const laneBtn = (r.lane && this.LB_HOST.zone[r.lane])
+    const laneBtn = (r.lane && this._laneZone(r.lane))
       ? '<button class="btn btn-ghost btn-sm wc-lane" data-lane="' + esc(r.lane) + '">'
         + (laneOpen ? 'Hide' : 'Import file') + '</button>' : '';
     const btn = r.ready ? '' : '<button class="btn btn-ghost btn-sm wc-go" data-go="' + esc(r.go) + '">Open</button>';
@@ -228,7 +245,7 @@ S.WeekClose = {
      zone is three elements on the cockpit too, and a lane that finds two of them on one page and
      three on the other is a difference waiting to be a defect. */
   laneBody(key) {
-    const z = this.LB_HOST.zone[key];
+    const z = this._laneZone(key);
     if (!z) return '';
     /* ⚠ NO EXPLAINER SENTENCE HERE, and the first draft had one. `verify-design-code` RULE 2b caught
        it: instructional copy belongs in the nav "i", not on a card. It was redundant twice over
@@ -287,8 +304,13 @@ S.WeekClose = {
     /* ⭐ THE LANE BELONGS TO THE PAGE DRAWING IT, AND THIS PAGE ONLY DRAWS THE ONE IT HOSTS. Claiming
        a lane this page has no zone for would point every id, every container read and every redraw
        at markup it never rendered. */
-    const laneHere = !!(LC && LC.lbTakeover() && this.LB_HOST.zone[LC._lbLaneKey()]);
-    const laneOpen = !!(this._openLane && this.LB_HOST.zone[this._openLane]);
+    /* ⛔ THE COCKPIT ANSWERS IN ITS OWN LANE KEY, AND THIS PAGE RENDERS ROW KEYS. They happen to
+       match for Labor and they will NOT for Shift, whose sales lane is called `import` — so the
+       table is reversed rather than the keys assumed equal. */
+    const inFlight = LC && LC.lbTakeover() ? LC._lbLaneKey() : null;
+    const laneHere = !!inFlight && Object.keys(this.LANES)
+      .some(rk => this.LANES[rk].obj === 'LaborDashboard' && this.LANES[rk].key === inFlight);
+    const laneOpen = !!(this._openLane && this._laneZone(this._openLane));
     if (LC && (laneHere || laneOpen)) LC.lbClaim(this.LB_HOST);
     if (laneHere) return this.renderLane(container);
 
@@ -317,8 +339,12 @@ S.WeekClose = {
       + '<div style="margin:18px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + confirmBtn + '</div>'
       + '</div>';
     this.wire();
-    // The markup is in the document by now, which is what the mount looks the zone up in.
-    if (LC && laneOpen && this._openLane === 'hours') LC.mountHoursImport();
+    /* The markup is in the document by now, which is what the mount looks the zone up in. The member
+       name comes off the table so a new lane is a table row, not another branch here. */
+    if (laneOpen) {
+      const L = this.LANES[this._openLane], o = this._laneObj(this._openLane);
+      if (o && L && typeof o[L.mount] === 'function') o[L.mount]();
+    }
   },
 
   wire() {
