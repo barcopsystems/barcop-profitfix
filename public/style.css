@@ -1535,8 +1535,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    chevron simply never highlights. `.ip-rt-head` (the product-import confirm screen) was
    built to reuse `.card.collapsed` for the ROTATION, which needed no CSS at all, and the
    hover colour was the half that does. Kyle caught it on the live screen. */
-.pf-step-head:hover .card-chevron,.c-step-head:hover .card-chevron,.ic-step-head:hover .card-chevron,.lc-step-head:hover .card-chevron,.sc-step-head:hover .card-chevron,.ek-step-head:hover .card-chevron,.bk-step-head:hover .card-chevron,.ip-rt-head:hover .card-chevron{color:var(--gold);}
-.pf-step-head.collapsed .card-chevron,.c-step-head.collapsed .card-chevron,.ic-step-head.collapsed .card-chevron,.lc-step-head.collapsed .card-chevron,.sc-step-head.collapsed .card-chevron,.ek-step-head.collapsed .card-chevron,.bk-step-head.collapsed .card-chevron{transform:rotate(-90deg);}
+.pf-step-head:hover .card-chevron,.c-step-head:hover .card-chevron,.ic-step-head:hover .card-chevron,.lc-step-head:hover .card-chevron,.sc-step-head:hover .card-chevron,.ek-step-head:hover .card-chevron,.bk-step-head:hover .card-chevron,.wc-step-head:hover .card-chevron,.ip-rt-head:hover .card-chevron{color:var(--gold);}
+.pf-step-head.collapsed .card-chevron,.c-step-head.collapsed .card-chevron,.ic-step-head.collapsed .card-chevron,.lc-step-head.collapsed .card-chevron,.sc-step-head.collapsed .card-chevron,.ek-step-head.collapsed .card-chevron,.bk-step-head.collapsed .card-chevron,.wc-step-head.collapsed .card-chevron{transform:rotate(-90deg);}
 .card.collapsed .collapse-body{display:none;}
 .card.collapsed .card-title{margin-bottom:0;padding-bottom:0;border-bottom:none;}
 .collapse-off{display:none !important;}  /* must beat the inline display:flex on out-of-card button rows */
