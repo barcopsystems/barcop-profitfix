@@ -10,9 +10,16 @@
    open for years; only its Bar Cop usage is new. The arc is a real recovery the
    audits can stand behind: weeks 1-2 are the failing pre-Bar-Cop baseline (high
    cost, the numbers the day-one intake audit reflects), fixes start landing in
-   week 3, cost falls fastest through weeks 3-7, and weeks 11-13 settle near
-   target. Week 13 (~$19.2k/week) matches the settings annual run-rate figures:
-   $624k bar + $374k food.
+   week 3, cost falls fastest through weeks 3-7, WEEK 8 GOES BACKWARDS, and weeks
+   11-13 settle near target. Week 13 (~$19.2k/week) matches the settings annual
+   run-rate figures: $624k bar + $374k food.
+
+   ⭐ THE ARC IS NOT A STRAIGHT LINE, DELIBERATELY. Week 8 is a bad week on cost
+   and week 13 carries a run of comps (`spike`). Both were added 2026-08-10 for
+   the same reason: the profile improved on every metric in every week, so the
+   live demo could only ever show good news, and a product whose whole promise is
+   telling an operator the truth should not look like it has never had a bad
+   week. Neither one weakens the recovery story; both make it believable.
 
    The weekly numbers are BUILT from a compact spec (covers, check average, and
    the three cost percentages) so every figure reconciles by construction:
@@ -64,8 +71,19 @@
     [490, 36.5, 26.5, 36.5, 30.7],      // wk 5
     [492, 36.8, 25.6, 35.7, 30.3],      // wk 6
     [494, 37.1, 24.8, 35.0, 30.0],      // wk 7  (prime crosses under 60 here)
-    [496, 37.4, 24.2, 34.4, 29.7],      // wk 8
-    [497, 37.6, 23.8, 33.9, 29.4],      // wk 9
+    /* ⛔ WEEK 8 GOES BACKWARDS ON PURPOSE, AND IT IS NOT A TYPO. Prime rises 58.6 to 59.9 here, the
+       only week in thirteen that does. Before this the spec improved on EVERY metric in EVERY week,
+       which is not a thing a real bar does: measured, 12 of 12 better week over week, 11 of 11 at
+       two weeks, 9 of 9 at four. A prospect scrolling Week History saw a suspiciously perfect line.
+       ⭐ THE STORY IS ORDINARY, WHICH IS THE POINT: a heavy week where waste and overtime got away
+       (pour 24.8 to 25.6, food 35.0 to 36.0, labor 30.0 to 30.4) and week 9 pulls it straight back.
+       ⚠ DISCIPLINE DOES NOT COLLAPSE WITH IT — no `loose` flag. That flag also drives unauthorised
+       voids and the Theft Risk pattern, and this is a bad week on cost, not a bad week on honesty.
+       ⚠ AND IT CANNOT REACH THE HUB, WHICH IS WHY IT SITS HERE AND NOT LATER. The Hub headline
+       compares the LAST CLOSED week against two weeks back, so weeks 11-13 are the only ones it can
+       ever read. This is for the history, not for that card. */
+    [496, 37.4, 25.6, 36.0, 30.4],      // wk 8  (the one bad week: waste and overtime got away)
+    [497, 37.6, 23.8, 33.9, 29.4],      // wk 9  (pulled straight back)
     // ── Weeks 10-13 — settling near target, the locked current state ──
     [498, 37.8, 23.5, 33.5, 29.2],      // wk 10
     [499, 38.0, 23.2, 33.2, 29.0],      // wk 11
