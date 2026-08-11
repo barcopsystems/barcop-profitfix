@@ -31,7 +31,7 @@ S.WeekClose = {
 
   /* ── STAGE 2: THE HOURS LANE, HOSTED HERE ───────────────────────────────────
      ⭐ NOTHING ABOUT THE IMPORT IS REIMPLEMENTED. The drop zone, the column mapper, the confirm
-     screen, the roster match, the closed-pay-period test and the write are all `S.LaborDashboard`'s
+     screen, the roster match, the closed-pay-period test and the write are all `S.LaborLane`'s
      `importLane`, which already runs through the shared `ImportConfirm.panel` shell. The only thing
      that differs between that page and this one is the HOSTING, so this object is the whole
      difference: the ids this page renders, its takeover slots, its container, and its redraw.
@@ -70,15 +70,14 @@ S.WeekClose = {
   },
   // ⚠ NO `_sc()` TWIN. I added one and never called it — every Shift read goes through the `LANES`
   // table's `obj`, so a second accessor was a member computed and read nowhere ([[the-loop]] #25).
-  _lb() { return S.LaborDashboard || null; },
 
   /* ⛔ THE ROW KEY IS NOT THE LANE KEY, and assuming it was is the obvious mistake here: this page
      calls it `sales`, the Shift cockpit calls that lane `import`. `mount` names the cockpit member
      that mounts it, so a lane is one row of table rather than a branch in three places. */
   LANES: {
     sales: { host: 'SC_HOST', obj: 'ShiftDashboard',  key: 'import', mount: 'mountImport' },
-    hours: { host: 'LB_HOST', obj: 'LaborDashboard', key: 'hours',  mount: 'mountHoursImport' },
-    tips:  { host: 'LB_HOST', obj: 'LaborDashboard', key: 'tips',   mount: 'mountTipsImport' },
+    hours: { host: 'LB_HOST', obj: 'LaborLane', key: 'hours',  mount: 'mountHoursImport' },
+    tips:  { host: 'LB_HOST', obj: 'LaborLane', key: 'tips',   mount: 'mountTipsImport' },
     cash:  { host: 'SC_HOST', obj: 'ShiftDashboard',  key: 'cash',   mount: 'mountCashImport' }
   },
   /* ⛔ THE TWO COCKPITS SPELL THE SAME CONTRACT DIFFERENTLY — `lbClaim`/`_lbLaneKey`/`lbTakeover`
@@ -87,7 +86,7 @@ S.WeekClose = {
      `verify-no-retired-code`, which counts qualified references — the string version reported both
      lane-key readers as dead members on the day they were written. Naming them here means a rename
      breaks loudly and the ratchet can see them. */
-  _isLabor(L)      { return L.obj === 'LaborDashboard'; },
+  _isLabor(L)      { return L.obj === 'LaborLane'; },
   _laneOpen(L, o)  { return this._isLabor(L) ? o.lbTakeover() : o.ckTakeover(); },
   _laneKey(L, o)   { return this._isLabor(L) ? o._lbLaneKey() : o._ckLaneKey(); },
   _laneClaim(L, o) { if (this._isLabor(L)) o.lbClaim(this[L.host]); else o.ckClaim(this[L.host]); },
@@ -438,7 +437,7 @@ S.WeekClose = {
   renderLane(container, rowKey) {
     const L = this.LANES[rowKey] || this.LANES.hours;
     const o = S[L.obj];
-    const labor = L.obj === 'LaborDashboard';
+    const labor = L.obj === 'LaborLane';
     const st = this.state();
     const rows = this.rows(st);
     const required = rows.filter(r => !r.optional);
@@ -490,7 +489,6 @@ S.WeekClose = {
   render(container) {
     if (!container) return;
     this.container = container;
-    const LC = this._lb();
 
     /* ⭐ THE LANE BELONGS TO THE PAGE DRAWING IT, AND THIS PAGE ONLY DRAWS THE ONE IT HOSTS. Claiming
        a lane this page has no zone for would point every id, every container read and every redraw
