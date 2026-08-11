@@ -202,14 +202,18 @@ S.WeekReview = {
      Sorting fixes the ordering and the truncation together.
      ⚠ STABLE within a band — the authored order inside red (and inside amber) is roughly
      worst-first and must not be shuffled. Pinned by verify-week-review-urgency-and-period.js. */
-  _openList(items) {
+  /* ⚠ `emptyMsg` EXISTS FOR BOOKS, AND IT IS THE KIND OF THING A DELETION CREATES. Books' band is
+     headed "To Close" and it closes a MONTH, so the shared "Clean week." line was wrong there the
+     moment the permits row came off and the band could actually render empty on real data. A default
+     that was never reached is not a default that was right. */
+  _openList(items, emptyMsg) {
     const rank = o => (o && o.sev === 'red') ? 0 : 1;
     const ranked = items.map((o, i) => ({ o, i }))
       .sort((a, b) => (rank(a.o) - rank(b.o)) || (a.i - b.i))
       .map(x => x.o);
     return ranked.length
       ? '<div style="display:flex;flex-direction:column;gap:8px;">' + ranked.slice(0, 5).map(o => this._openItem(o.t, o.sev)).join('') + '</div>'
-      : '<div style="font-size:12.5px;color:var(--green);padding:2px 0;">&#10003; Nothing open. Clean week.</div>';
+      : '<div style="font-size:12.5px;color:var(--green);padding:2px 0;">&#10003; ' + (emptyMsg || 'Nothing open. Clean week.') + '</div>';
   },
   /* ⭐ AUDIT FRESHNESS, ASKED AT THE WEEK'S END, NOT AGAINST THE WALL CLOCK. The cockpits' own
      `_auditState` measures days since the newest audit against `Date.now()`, so on a recap of a week
@@ -233,8 +237,16 @@ S.WeekReview = {
      whole app were this one line. A recap does not need eight doors on it. */
   _sectionCard(name, blocks) {
     const idiv = '<div class="wr-idiv"></div>';
+    /* ⛔ THE SAME HEADER BAND THE REST OF THE APP USES (Kyle: *"make the headers on the 8 section
+       cards normal header height like close the week header height"*). MEASURED on the shipped
+       build: `.ck-head` is 34px (11/22 padding, a 9px uppercase label) and `.wr-head` was 51px
+       (15/20 padding, a 17px Barlow Condensed title). Matching the HEIGHT means matching the
+       TREATMENT — at 17px the line box alone is 21px, so no padding change gets to 34.
+       ⚠ ONE DEVIATION FROM `.ck-head`, DELIBERATE: the label keeps `--t1` rather than `--t3`. That
+       band is a page banner with one instance on screen; this one names one of eight cards sitting
+       beside `--t3` band labels inside the card, and at the same grey the card would have no name. */
     const header = '<div class="wr-head" style="display:flex;align-items:center;gap:12px;min-width:0;">'
-      + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--t1);">' + esc(name) + '</span>'
+      + '<span style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t1);">' + esc(name) + '</span>'
       + '</div>';
     const body = blocks.map(b => '<div class="wr-block">' + this._eyebrow(b.label) + b.html + '</div>').join(idiv);
     return '<div class="card" style="padding:0 !important;overflow:hidden;margin:0;display:flex;flex-direction:column;">'
@@ -305,10 +317,10 @@ S.WeekReview = {
       stat('Prime Cost', pct(m.prime)),
       stat('Labor', pct(m.laborPct))
     ].join(vdiv);
+    /* ⛔ NO HEADER BAND ON THE STATS BOX (Kyle, 2026-08-11: *"remove the header on the stats box so
+       just the stats inside the border"*). It read "WEEK IN REVIEW" directly under a page already
+       titled Week in Review, so the band cost 42px of vertical to repeat the title back. */
     return '<div class="card" style="margin-bottom:16px;overflow:hidden;padding:0 !important;">'
-      + '<div class="wr-tophead" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Week In Review</div>'
-      + '</div>'
       + '<div class="wr-statrow wr-topstats" style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + stats + '</div>'
       /* ⛔ SAY WHY THESE ARE BLANK (W2). Three dashes up here beside "Net Sales $19,150" in the
          Shift card read as a contradiction; they are two different questions and only this one
@@ -611,6 +623,16 @@ S.WeekReview = {
     /* ⚠ NAME THEM OR TOTAL THEM, NEVER BOTH. The first version printed the total AND then named each
        one, so a single walked tab read "1 walked tab, $41. $41 Tue, Aug 4 by Marcus T." — the same
        figure twice in one sentence. At one row the total IS the row. */
+    // Permits/licensing is a SHIFT screen now (`sc-licensing`), so its carry-over belongs on this
+    // card. Same numbers, read through the tracker's own status rule, just filed under its section.
+    const HP = S.HubPermits;
+    let permDue = 0, permExpired = 0;
+    if (HP && HP._status) {
+      ((App.data && App.data.permits_compliance) || []).forEach(r => {
+        const s = HP._status(r);
+        if (s.key === 'expired' || s.key === 'critical' || s.key === 'warn') { permDue++; if (s.key === 'expired') permExpired++; }
+      });
+    }
     if (walkedN) {
       const amt = walkRows.reduce((t, r) => t + (r.amount || 0), 0);
       did.push(this._n(walkedN + ' walked ' + this._plu(walkedN, 'tab')) + ', '
@@ -634,6 +656,7 @@ S.WeekReview = {
     if (shorts > 0) open.push({ t: '<b>' + shorts + '</b> cash-short shift' + (shorts === 1 ? '' : 's') + ' to chase', sev: 'red' });
     if (days > 0 && reconN === 0) open.push({ t: 'Cash was never reconciled this week', sev: 'amber' });
     if (walkedN > 0) open.push({ t: '<b>' + walkedN + '</b> walked tab' + (walkedN === 1 ? '' : 's') + ' this week', sev: 'amber' });
+    if (permDue > 0) open.push({ t: '<b>' + permDue + '</b> permit/license item' + (permDue === 1 ? '' : 's') + ' need attention', sev: permExpired > 0 ? 'red' : 'amber' });
 
     (this._pdf || (this._pdf = [])).push({ name: 'Shift', activity: this._didPlain(did),
       results: 'Net Sales ' + App.fmtCurrency(rev, 0) + ', Covers ' + covers + ', Check Avg ' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + ', Over/Short ' + (netVar > 0 ? '+' : '') + App.fmtBal(netVar, 0) + ', Voids+Comps ' + App.fmtCurrency(voidTot + compTot, 0),
@@ -987,9 +1010,17 @@ S.WeekReview = {
        nothing durable records that the month-end pack was produced (the localStorage stamp is the
        run DATE, not the month it covers, so it cannot answer the question). The two items that
        survive are both records: the month's bill rows, and the permit dates. */
+    /* ⛔⛔ PERMITS ARE NOT BOOKS' ANY MORE, AND THIS CARD WAS THE LAST PLACE SAYING THEY WERE. Kyle,
+       2026-08-11: *"books has to close and 3 permits listed.. but permits are not in books
+       anymore."* He is right and the source says so out loud: `hub-books-home.js` carries the note
+       *"the tracker in Shift Control"*, and `app.js` registers the screen as `'sc-licensing':
+       S.HubPermits` — a SHIFT screen. `BH._computeState` still computes `dueCount`/`expiredCt` for
+       its own day-one step, so the number was real; it was filed under the wrong section.
+       ⭐ THE FINDING IS NOT LOST, IT MOVED to the Shift card, which is where the tracker lives and
+       where the door goes. Reporting an expired permit under Books and nowhere else would have been
+       the worse of the two fixes. */
     const open = [];
     if (billsMonth === 0) open.push({ t: 'No bills logged this month yet', sev: 'amber' });
-    if (st.dueCount > 0) open.push({ t: '<b>' + st.dueCount + '</b> permit/license item' + (st.dueCount === 1 ? '' : 's') + ' need attention', sev: st.expiredCt > 0 ? 'red' : 'amber' });
 
     (this._pdf || (this._pdf = [])).push({ name: 'Books', activity: this._didPlain(did),
       results: 'Op Income YTD ' + BH._money(st.ytdInc) + ', Margin ' + BH._pct(st.ytdMargin) + ', Month Revenue ' + BH._money(st.cmRev) + ', Month Income ' + BH._money(st.mInc),
@@ -997,7 +1028,7 @@ S.WeekReview = {
     return this._sectionCard('Books', [
       { label: 'Done This Week', html: activity },
       { label: 'What It Turned Up &middot; Month + YTD', html: results },
-      { label: 'To Close', html: this._openList(open) }
+      { label: 'To Close', html: this._openList(open, 'Nothing left to close on the month.') }
     ]);
   },
 
