@@ -1887,12 +1887,17 @@ S.Hub = {
        labor, check average, voids and comps, overtime. The dollar is what the MOVE is worth per week
        at current volume, which is the sentence an operator finishes for you: "food cost down half a
        point, that is fifty quid a week."
-       ⚠ AND EITHER CARD CAN BE LEGITIMATELY EMPTY. A fortnight where nothing slipped has no drag,
-       and saying so is the truth, not a gap in the page. */
+       ⚠ AND EITHER CARD CAN BE LEGITIMATELY EMPTY. Two weeks where nothing slipped has no drag, and
+       saying so is the truth, not a gap in the page.
+       ⚠ THE EMPTY STATE NAMES THE WINDOW IN THE SAME WORDS THE REST OF THE PAGE USES. It said "this
+       fortnight", which is British and does not appear anywhere else in the product; every other
+       reference to this comparison says two weeks. Kyle caught it. A word nobody in an Austin bar
+       would say is a small thing that makes a page read as written by somebody else
+       ([[writing-style]] — operator to operator, in their words). */
     const bwCard = (t, o, isGain) => {
       if (!o) return hbPanel(hbSh(t)
         + '<div style="font-size:12px;color:var(--t3);">'
-        + (isGain ? 'Nothing improved this fortnight' : 'Nothing slipped this fortnight') + '</div>');
+        + (isGain ? 'Nothing improved in the last two weeks' : 'Nothing slipped in the last two weeks') + '</div>');
       const col = isGain ? 'var(--green)' : 'var(--red)';
       const amount = App.fmtCurrency(Math.abs(o.dollars), 0);
       return hbPanel(hbSh(t)
