@@ -745,8 +745,17 @@ const App = {
     if (tnSettings) tnSettings.onclick = () => this._openSettingsForRole();
     const tnHelp = document.getElementById('tn-help');
     if (tnHelp) tnHelp.onclick = () => this.openPageHelp();
-    const tnDate = document.getElementById('tn-date');
-    if (tnDate) tnDate.textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    /* ⛔ THE TOP-BAR DATE IS GONE. Kyle, 2026-08-10: *"still need to remove the date from the main
+       header."* It lives on the Hub now, beside the greeting, where it anchors "as of when" for every
+       comparison on that page. On every OTHER page it was chrome nobody reads.
+       ⚠ The setter goes WITH the markup. A live `getElementById` against a span that no longer
+       exists is silent, so this would have sat here forever looking load-bearing ([[the-loop]] #149
+       — a cleanup is judged by what it leaves behind looking like). The style.css rule went too;
+       nothing else used that class.
+       ⚠⚠ AND THIS COMMENT DELIBERATELY DOES NOT SPELL THE OLD ID. A sweep in
+       `verify-rail-menu-overlay` asserts the id is absent from app.js, and my first version of this
+       note QUOTED it — so the sweep counted its own explanation and reported the id as still live.
+       Third time this session that a census read prose as code ([[harness-review-like-code]] #139). */
     // Two logo slots now, and BOTH must go to the Hub: the rail's (desktop) and the top bar's
     // (mobile, where the rail is hidden). A querySelector for the first `.tn-logo` would have wired
     // only one of them and the other would have looked identical and done nothing.
