@@ -705,10 +705,17 @@ S.Hub = {
       return '<div style="font-size:11px;font-weight:700;color:' + col + ';margin-top:5px;white-space:nowrap;">'
         + esc(m.deltaText) + '</div>';
     };
-    const cell = m =>
+    /* ⛔ VERTICAL DIVIDERS BETWEEN THE CELLS. Kyle: *"the bottom card.. the stats need vertical
+       dividers or something between them."* Six numbers in a flex row with only a gap between them
+       read as one run-on line; a hairline makes each a separate reading. `:not(:last-child)` would
+       need a class and a stylesheet rule, so the border is written per cell and suppressed on the
+       last one by index — one place, no CSS to keep in step. */
+    const cell = (m, i, arr) =>
       '<div onclick="' + (m.screen ? 'S.Hub._enter(\'' + esc(m.screen) + '\',\'' + esc(m.mod) + '\')'
                                    : 'App.jumpToSection(\'' + esc(m.mod) + '\')')
-      + '" style="flex:1;min-width:112px;cursor:pointer;">'
+      + '" style="flex:1;min-width:112px;cursor:pointer;padding-right:16px;'
+      + (i < arr.length - 1 ? 'border-right:1px solid var(--b2);' : '')
+      + '">'
       + '<div style="font-size:17px;font-weight:700;color:var(--t1);white-space:nowrap;">' + esc(m.value) + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:2px;white-space:nowrap;">' + esc(m.label) + '</div>'
       + (m.sub ? '<div style="font-size:10px;color:var(--t4);margin-top:1px;white-space:nowrap;">' + esc(m.sub) + '</div>' : '')
@@ -947,25 +954,39 @@ S.Hub = {
         '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
       /* The briefing slot is gone from this header. The Rail is the ONE whole-bar read now and it
          lives in the top bar, reachable from every page — including this one. */
-      + '<div class="hub-wys-head" style="border-bottom:1px solid var(--b2);">'
-      +   '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);">Where You Stand</div>'
-      + '</div>'
+      /* ⛔ THE "WHERE YOU STAND" HEADING IS GONE, KYLE'S CALL: *"remove the where you stand header..
+         stats only in the border card."* The band is four labelled money figures inside a bordered
+         card; a heading over them only repeated what the labels already say, and it cost a whole
+         row of vertical space at the top of the page that sells the product. */
       + '<div class="hub-wys-body" style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;">'
-      + heroTile('dashboard', "S.Hub._enter('dashboard','profit')", 'Open Profit Close The Week', 'Total Opportunity',
+      /* ⛔⛔ ALL THREE OF THESE POINTED AT DYING COCKPITS. Kyle, 2026-08-10: *"the top stats.. those
+         need to be linked to the fix systems not the old close the week pages."* `dashboard`,
+         `r-dashboard` and `c-dashboard` are three of the six screens 1c deletes, so these tiles were
+         a live countdown to three dead links on the marketing page. They open the FIX system for
+         their own money now, which is also the honest destination: a tile that says "here is what is
+         on the table" should land where you go and take it.
+         ⚠ THROUGH `_enterFix`, NOT `_enter`, so each one gets the module's real fix screen
+         (`profit-fix` / `r-fix` / `c-fix`) from the one accessor that already knows the mapping —
+         never a second hand-typed list that can drift ([[the-loop]] step 0.5, find the twin).
+         ⭐ BREAK-EVEN IS UNCHANGED: `S.HubBreakEven.open()` is a Hub page that survives.
+         🔧 Pinned by `verify-hub-destinations` C2, which resolves every destination in this file
+         against the app's real router. */
+      + heroTile('profit-fix', "S.Hub._enterFix('profit',null)", 'Open the Profit Fix system', 'Total Opportunity',
              anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              /* ⚠ `--t1`, NOT `--w`. Kyle, 2026-08-10: *"change all white text and numbers to a light
                 grey though so it is easier on the eyes."* Pure white out-shines the gold hero on a
                 dark page and is harsh at 40px. `--t1` is the light grey the rest of the product
                 already uses for a number ([[color-system-locked]] — the token, never a hex). */
              anyAudit && totalOpp > 0 ? 'var(--t1)' : 'var(--t4)',
-             anyAudit ? 'On the table to recover a month' : 'Run an audit to surface this')
+             /* Kyle: *"shorten the 'on the table to recover a month' text.. too long."* */
+             anyAudit ? 'To recover a month' : 'Run an audit to surface this')
       + statDiv
-      + heroTile('r-dashboard', "S.Hub._enter('r-dashboard','revenue')", 'Open Revenue Close The Week', 'Recovered',
+      + heroTile('r-fix', "S.Hub._enterFix('revenue',null)", 'Open the Revenue Fix system', 'Recovered',
              recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
              recoveryTotal.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
              recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') : 'Mark a fix to start')
       + statDiv
-      + heroTile('c-dashboard', "S.Hub._enter('c-dashboard','cash')", 'Open Cash Close The Week', 'Trapped Cash',
+      + heroTile('c-fix', "S.Hub._enterFix('cash',null)", 'Open the Cash Fix system', 'Trapped Cash',
              trapped.hasData ? App.fmtCurrency(trappedCash, 0) : 'No data',
              trapped.hasData ? (trappedCash > 0 ? 'var(--t1)' : 'var(--green)') : 'var(--t4)',
              trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
@@ -1074,61 +1095,35 @@ S.Hub = {
        ⚠ AND THE COLOUR HAD TO MOVE OFF `--gold` WITH THE ONCLICK. Gold is this page's money/tappable
        signal; gold text that no longer responds to a press is a second lie replacing the first. */
     const first = this._doFirst(itemRows);
+    /* ⛔ AND NOW THE COUNT IS GONE ENTIRELY. Kyle, 2026-08-10: *"remove the '6 more' that has no
+       meaning to a user."* He is right and it is the end of a three-step retreat worth recording: it
+       was a LINK to a page that did not hold the list, then a caption, and now nothing. A bare "6
+       more" tells an operator there are six things somewhere with no way to see them and no reason
+       to care — the count was only ever meaningful to me, as proof the ranking had a pile behind it.
+       ⭐ WHICH IS THE CARD'S WHOLE POINT: the app did the analysis, so it says the answer. A count of
+       what it did not say is the shortlist coming back in smaller type. */
     const doFirst = first
       ? '<div onclick="' + paiGo(first.item) + '" style="cursor:pointer;">'
-        + '<div style="font-size:15px;font-weight:700;color:var(--t1);line-height:1.35;">' + esc(first.label) + '</div>'
+        /* Kyle: *"make the close the check average gap a little bigger."* 15px -> 18px. */
+        + '<div style="font-size:18px;font-weight:700;color:var(--t1);line-height:1.3;">' + esc(first.label) + '</div>'
         + (first.impact > 0
-            ? '<div style="font-size:12px;color:var(--t2);margin-top:5px;">Worth <span style="color:var(--gold);font-weight:700;">'
+            ? '<div style="font-size:12px;color:var(--t2);margin-top:6px;">Worth <span style="color:var(--gold);font-weight:700;">'
               + App.fmtCurrency(first.impact, 0) + '</span> a month</div>' : '')
         + '</div>'
-        + (first.more
-            ? '<div style="font-size:11px;color:var(--t3);padding:10px 0 0;">'
-              + first.more + ' more</div>' : '')
       : gettingStarted;
-    const priorityCard = cardWrap(topItems.length ? 'Do This First' : 'Get Started', doFirst);
-
-    // ── Needs Attention: operational outliers only (permits, certs, OT, cash,
-    //    maintenance, vendor, loss-prevention, month-end Books). Act Now over Keep
-    //    An Eye. Audits + recovery leaks live elsewhere. ──
+    /* ⛔⛔ `priorityCard` AND `needsBand` ARE DELETED, NOT LEFT SITTING. The movement rebuild replaced
+       both with `doFirstBand` and the Band-4 row list, and each was DECLARED AND NEVER READ from that
+       moment — 45 lines of a previous layout that still looked load-bearing, including the
+       `hub-permits` overflow caption. It was doing active harm: `verify-hub-destinations`' D block
+       was asserting against captions in code nothing renders, so the suite was policing a page that
+       no longer exists ([[the-loop]] #25 — a thing computed and read nowhere is a fix that never
+       shipped; the same is true of a card that is built and never placed).
+       ⭐ THE OVERFLOW CAPTION IS GONE FROM BOTH LISTS NOW, which is the end of a three-step retreat:
+       a LINK to a page that did not hold the list, then a caption, then nothing. Kyle: *"remove the
+       '6 more' that has no meaning to a user"* and *"no links to the ones not listed.. they are
+       listed in multiple places on the app."*
+       ⚠ `bandItems` SURVIVES — the new Needs You list reads it. Only the dead render went. */
     const bandItems = this.forwardAlerts().concat(dueItems);
-    let needsBand;
-    if (bandItems.length) {
-      const critical = bandItems.filter(a => a.sev === 'bad');
-      const watch    = bandItems.filter(a => a.sev !== 'bad');
-      const naRow = (a, dot) => rowDiv(goOf(a), dot, a.label || a.text || '', a.value || '', 'var(--t2)');
-      /* No group headers: severity reads from the dot colour (red = act now, amber = keep an eye)
-         and the order (reds first).
-         ⛔ NO SCROLL BOX. Capped by SEVERITY through `_needsCapped` — every red shows however many
-         there are, ambers fill the rest, and anything past that is named rather than hidden behind a
-         scrollbar the operator has to find on a phone.
-         ⛔⛔⛔ THE OVERFLOW LINE WAS A DEAD LINK AND IT SHIPPED TO THE LIVE DEMO.
-         `_enter('hub-permits','')` reaches NOTHING: the hub branch of `_enter` needs
-         `module === 'hub'` AND `screen === 'permits'`, so this got neither, fell through to the
-         module router, which does not know that id, and rendered **"Coming soon."** on the page that
-         is the product's marketing image.
-         ⭐ AND `hub-permits.js` IS A FINISHED 30KB SCREEN. The page was never the problem. The door
-         is `_enterPermits(filter)`, 46 lines below `_enter` in this same object, and TWO ROWS OF THIS
-         VERY CARD already call it correctly. I invented a route past a working one.
-         ⛔ SO WHY NO LINK AT ALL: the overflow spans permits, certs, overtime, cash, maintenance and
-         vendor, which live on five different screens. No single destination is honest for a mixed
-         list, and `hub-permits` would be right for only some of it. The count stays as a fact in
-         `--t3`; every individual row still deep-links to its own item through `goOf`.
-         🔧 `verify-hub-destinations.js` now resolves EVERY destination in this file against the
-         app's own `_CONVERTED` register, so a made-up screen id cannot ship again. */
-      const capped = this._needsCapped(bandItems, 4);
-      needsBand = cardWrap('Needs Attention', '<div>'
-        + capped.shown.map(a => naRow(a, a.sev === 'bad' ? 'var(--red)' : 'var(--amber)')).join('')
-        + (capped.more
-            ? '<div style="font-size:11px;color:var(--t3);padding:8px 0 2px;">'
-              + capped.more + ' more' + '</div>'
-            : '')
-        + '</div>');
-    } else {
-      needsBand = '<div style="display:flex;flex-direction:column;min-width:0;"><div class="sh" style="margin:0 0 10px;">Needs Attention</div>'
-        + '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;flex:1;display:flex;align-items:center;gap:10px;">'
-        + '<span style="color:var(--green);font-weight:800;font-size:15px;">&#10003;</span>'
-        + '<span style="font-size:12px;color:var(--t2);">All clear. Nothing needs you outside your weekly close.</span></div></div>';
-    }
 
     // ── Section cards: one per section, Control row + Recovery row. Each mirrors
     //    its section, a headline number/state + the weekly-close status + a jump
@@ -1651,24 +1646,48 @@ S.Hub = {
     // ── Band 1a: the climb, plus the three recovery audits underneath it ──
     const climb = this._auditClimb();
     const mods = this._moduleAudits();
+    /* ⛔⛔ THE REAL COMPONENT, NOT A HAND-DRAWN RING. Kyle: *"the other audit scores circles are not
+       right.. they should be like the circles on the actual audit section scores."* `AuditUI.scoreRing`
+       is that circle — an SVG arc filled to the score, used in EVERY section header across all four
+       audits "so they read identically", per its own comment. I drew a plain bordered div with a
+       hand-rolled colour ladder instead, which is a second implementation of a shared job and it
+       looked nothing like the audits.
+       ⭐ `App.scoreColor` is the shared colour ladder too, so the label under the ring cannot drift
+       from the ring's own fill ([[the-loop]]: grep the DESTINATION for how anything else does it —
+       the existing callers are the spec). */
     const hbRing = m => {
       const has = m.score != null;
-      const col = !has ? 'var(--t4)' : (m.score >= 70 ? 'var(--green)' : (m.score >= 50 ? 'var(--amber)' : 'var(--red)'));
-      return '<div onclick="S.Hub._enter(\'' + m.screen + '\',\'' + m.mod + '\')" style="flex:1;cursor:pointer;text-align:center;">'
-        + '<div style="width:46px;height:46px;margin:0 auto;border-radius:50%;border:2px solid ' + col
-        + ';display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:' + col + ';">'
-        + (has ? m.score : '-') + '</div>'
+      const ring = has
+        ? AuditUI.scoreRing(m.score, 46)
+        : '<div style="width:46px;height:46px;border-radius:50%;border:2px solid var(--b2);display:flex;'
+          + 'align-items:center;justify-content:center;font-size:14px;color:var(--t4);">-</div>';
+      return '<div onclick="S.Hub._enter(\'' + m.screen + '\',\'' + m.mod + '\')" style="flex:1;cursor:pointer;'
+        + 'display:flex;flex-direction:column;align-items:center;">'
+        + ring
         + '<div style="font-size:11px;color:' + hbGrey + ';margin-top:6px;">' + esc(m.name) + '</div>'
         + '<div style="font-size:10px;color:var(--t4);margin-top:2px;">'
         + (m.date ? 'Run ' + esc(shortDate(m.date) || m.date) : 'Never run') + '</div></div>';
     };
     const climbBlock = hbSh('Bar Cop Audit')
       + (climb
+        /* ⛔ THE RULE BETWEEN THE TWO SCORES IS A GRADIENT, AND THAT IS WHAT MAKES THE SPACE WORK.
+           Kyle: *"the line going between the 40 and the 75 isn't anything like the image you showed..
+           that is what made the space between the 2 scores work."* A flat `--b2` hairline reads as a
+           divider separating two unrelated numbers; a rule that BRIGHTENS from dim into the score's
+           own colour reads as a journey from there to here, which is the whole point of the band.
+           ⭐ It ends on `App.scoreColor(climb.last)`, the app's shared ladder, so the rule, the number
+           and the rings below it can never disagree about what 75 is worth.
+           ⚠ It is two labelled endpoints and a rule, NOT a plotted series — the one thing on this
+           page that comes close to a chart, and Kyle has seen it and kept it. */
         ? '<div style="display:flex;align-items:flex-end;gap:14px;">'
           + '<div><div style="font-size:30px;font-weight:700;color:var(--t3);line-height:1;">' + climb.first + '</div>'
           + '<div style="font-size:10px;color:var(--t4);margin-top:4px;">' + esc(shortDate(climb.firstDate) || '') + '</div></div>'
-          + '<div style="flex:1;height:2px;background:var(--b2);margin-bottom:16px;"></div>'
-          + '<div style="text-align:right;"><div style="font-size:48px;font-weight:800;color:' + hbGrey + ';line-height:.9;">'
+          + '<div style="flex:1;height:2px;margin-bottom:16px;background:linear-gradient(90deg,var(--b2),'
+          + App.scoreColor(climb.last) + ');"></div>'
+          /* Kyle: *"the score color should be the right color and you can make the 75 a little less
+             bold.. not smaller just not as bold."* 48px stays, 800 -> 600. */
+          + '<div style="text-align:right;"><div style="font-size:48px;font-weight:600;color:'
+          + App.scoreColor(climb.last) + ';line-height:.9;">'
           + climb.last + '</div><div style="font-size:10px;color:var(--t3);margin-top:5px;">today</div></div></div>'
           + '<div style="margin-top:12px;display:flex;align-items:center;gap:9px;">'
           /* ⛔ `climb.delta`, NOT `climb.hbDelta`. A blind `\bdelta\b` rename hit the PROPERTY as well
@@ -1722,11 +1741,25 @@ S.Hub = {
 
     // ── Band 2: the one action ──
     /* Kyle: *"do this first card has #08131A background and normal ghost button not gold button."*
-       `--card-hbHead` IS #08131A, so the token goes in rather than the hex ([[color-system-locked]]). */
-    const doFirstBand = '<div style="background:var(--card-hbHead);border:1px solid var(--b-edge);'
-      + 'border-left:3px solid var(--gold);border-radius:0;padding:16px 18px;display:flex;'
+       `--card-head` IS #08131A, so the token goes in rather than the hex ([[color-system-locked]]).
+       ⛔⛔ AND THIS LINE SHIPPED AS `var(--card-hbHead)` — MY BLIND `\bhead\b` RENAME MATCHED INSIDE
+       THE CSS TOKEN NAME. An unknown custom property is not an error, it just resolves to nothing,
+       so the card silently lost its background and NOTHING anywhere reported it. That is the third
+       thing that rename broke (after the property accesses and `g.dataset.band`), and all three were
+       invisible to `node --check` and to 449 harnesses. **A rename is a text edit, not a refactor:
+       bound it to the block you own and read every hit.**
+       Kyle also called the gold edge: *"get rid of the gold left side border."* */
+    const doFirstBand = '<div style="background:var(--card-head);border:1px solid var(--b-edge);'
+      + 'border-radius:var(--r);padding:16px 18px;display:flex;'
       + 'align-items:center;gap:20px;flex-wrap:wrap;">'
-      + '<div style="flex:1;min-width:220px;">' + doFirst + '</div>'
+      /* ⚠ THE BAND LOST ITS HEADING IN THE REBUILD AND NOBODY NOTICED FOR TWO PUSHES. The old
+         `cardWrap('Do This First', …)` supplied it; the new band replaced the wrapper and did not
+         carry the label across, so the most important card on the page was an unlabelled sentence.
+         Caught by `verify-hub-no-cockpit` F1b, whose whole job is refusing to let a list pass by
+         being DELETED — it went red on "doFirst=false" over a card that was still rendering. */
+      + '<div style="flex:1;min-width:220px;">'
+      +   hbSh(topItems.length ? 'Do this first' : 'Get started')
+      +   doFirst + '</div>'
       + (first ? '<button class="btn btn-ghost btn-sm" onclick="' + paiGo(first.item) + '">Open the fix</button>' : '')
       + '</div>';
 
@@ -1753,8 +1786,17 @@ S.Hub = {
     /* Kyle: *"the Needs you same number of rows and no links to the ones not listed.. they are listed
        in multiple places on the app.. so user can find them all."* So the overflow caption is gone
        entirely. The trade, stated once: seven reds show five and nothing says the other two exist. */
+    /* ⛔ A FIXED ROW HEIGHT, NOT PADDING, SO THE TWO CARDS LINE UP. Kyle: *"the rows in both cards
+       need to be the same height so the 5 rows are flush with each other on top and bottom."* They
+       were `padding:10px` around content of different heights — the tick circle is 17px, a plain
+       label is ~15px — so Needs You and Done This Week drifted apart by a few pixels per row and by
+       the fifth row the two cards ended at visibly different points. `height` + `box-sizing` makes
+       every row identical in both cards regardless of what is inside it, which is the only way five
+       rows can be flush top AND bottom. */
+    const ROW_H = 38;
     const hbRow = (inner) => '<div class="hd-arow" style="display:flex;align-items:center;gap:10px;'
-      + 'padding:10px 12px;border-radius:2px;margin-bottom:6px;">' + inner + '</div>';
+      + 'height:' + ROW_H + 'px;box-sizing:border-box;padding:0 12px;border-radius:2px;'
+      + 'margin-bottom:6px;">' + inner + '</div>';
     const needRows = this._needsCapped(bandItems, 5).shown.map(a => hbRow(
       '<span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:'
       + (a.sev === 'bad' ? 'var(--red)' : 'var(--amber)') + ';"></span>'
