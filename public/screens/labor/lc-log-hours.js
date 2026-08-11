@@ -139,9 +139,9 @@ S.LaborLogHours = {
       + '<div class="f" style="flex:1 1 90px;min-width:0;"><label>Hours</label>'
       + '<input type="number" id="' + p + 'hours" min="0" step="0.25" value="' + v(a?.hours) + '"/></div>'
       + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Wage</label>'
-      + '<div class="f-display" style="color:var(--w);" id="' + p + 'c-wage">-</div></div>'
+      + '<div class="f-display" style="color:var(--t1);" id="' + p + 'c-wage">-</div></div>'
       + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Labor Cost</label>'
-      + '<div class="f-display" style="color:var(--w);" id="' + p + 'c-cost">-</div></div>'
+      + '<div class="f-display" style="color:var(--t1);" id="' + p + 'c-cost">-</div></div>'
       + '</div>'
       + App.noteField({ id: p + 'notes', value: a?.notes });
   },
