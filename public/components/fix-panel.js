@@ -47,6 +47,33 @@ window.FixPanel = {
     return moduleKey === 'revenue' ? 'r-fix' : 'profit-fix';
   },
 
+  /* ── "ON TRACK" IS ABOUT THE STEPS, NOT ABOUT THE NUMBER ────────────────────────────────────
+     Kyle, 2026-08-10, on the handoff from the Hub: *"we are telling the user the biggest gap is
+     check average and to go work the fix.. but when you go to the fix all steps are being worked..
+     so it looks weird."*
+     ⭐ MEASURED, AND IT IS NOT A DATA CONTRADICTION — BOTH STATEMENTS ARE TRUE ABOUT DIFFERENT
+     THINGS. `Recovery.gapImpact('check-average')` returns `onTarget:false` with real money on the
+     table, while `health()` returns "On track" because every watched STEP is current. So the
+     operator arrives from a card that said "close this gap" and reads a green "On track", which
+     reasonably looks like the app contradicting itself.
+     ⛔ THE HONEST LINE NAMES WHICH ONE IT MEANS. A system can be run perfectly and still be short of
+     target: that is the normal state of a fix that is working but has not landed yet, and hiding it
+     is how "on track" comes to mean nothing.
+     ⚠ ONE IMPLEMENTATION, THREE CALLERS. profit-fix, r-fix and c-fix each build this status line
+     with their own copy of the same expression; a clause written into three of them separately is
+     three things to keep in step, and the twins on this page have drifted before
+     ([[the-loop]] step 0.5 — grep for the second IMPLEMENTATION, not the second caller). */
+  stillShortNote(gapId, state) {
+    if (state !== 'running' || !gapId) return '';
+    if (!window.Recovery || !Recovery.gapImpact) return '';
+    const imp = Recovery.gapImpact(gapId);
+    /* No note when the gap has hit target, and none when it cannot be measured at all — an absent
+       reading is not a failing one, and saying "short of target" over missing data would be the
+       false-negative twin of the false $0 this codebase keeps producing. */
+    if (!imp || imp.onTarget || !(imp.dollars > 0)) return '';
+    return '<span style="color:var(--amber);"> &middot; still short of target</span>';
+  },
+
   // Infer which gap-area a Priority Action Item belongs to from its text.
   // Used to route PAI clicks into the relevant Fix Process when the action
   // item lacks an explicit gap_id (older audits, Claude-generated items). The
