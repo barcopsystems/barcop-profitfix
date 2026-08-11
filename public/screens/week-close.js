@@ -237,15 +237,15 @@ S.WeekClose = {
       /* ⛔ THE DROP BELONGS WHERE THE RESULT SHOWS. This row is where the operator reads what the
          week's hours are, so it is where the file goes in; a door whose answer appears on a
          different page is a signpost, not a door. `lane` is the key the host names a zone for. */
-      { key: 'hours', label: 'Hours', ready: st.hours.length > 0, go: 'lc-log-hours', lane: 'hours',
+      { key: 'hours', label: 'Hours', ready: st.hours.length > 0, go: 'lc-log-hours', goLabel: 'Log Hours', lane: 'hours',
         note: st.hours.length ? st.hoursTotal.toFixed(1) + ' hours across ' + st.hours.length + ' row' + (st.hours.length === 1 ? '' : 's') : 'Not in yet' },
-      { key: 'tips', label: 'Tips', ready: st.tips.length > 0, go: 'lc-tip-log', optional: true, lane: 'tips',
+      { key: 'tips', label: 'Tips', ready: st.tips.length > 0, go: 'lc-tip-log', goLabel: 'Tip Tracking', optional: true, lane: 'tips',
         note: st.tips.length ? money(st.tipsTotal) + ' logged' : 'None logged' },
-      { key: 'cash', label: 'Cash over and short', ready: st.cash.length > 0, go: 'sc-cash-control', optional: true, lane: 'cash',
+      { key: 'cash', label: 'Cash over and short', ready: st.cash.length > 0, go: 'sc-cash-control', goLabel: 'Cash Control', optional: true, lane: 'cash',
         note: st.cash.length ? st.cash.length + ' drawer count' + (st.cash.length === 1 ? '' : 's') : 'No drawer counted' },
-      { key: 'cogs', label: 'Cost of goods', ready: st.cogs.has, go: 'ic-take-inventory', derived: true,
+      { key: 'cogs', label: 'Cost of goods', ready: st.cogs.has, go: 'ic-take-inventory', goLabel: 'Take Inventory', derived: true,
         note: cogsNote },
-      { key: 'catering', label: 'Catering', ready: st.catering.length > 0, go: 'ev-bookings', optional: true, derived: true,
+      { key: 'catering', label: 'Catering', ready: st.catering.length > 0, go: 'ev-bookings', goLabel: 'Bookings', optional: true, derived: true,
         note: st.catering.length ? st.catering.length + ' event' + (st.catering.length === 1 ? '' : 's') + ' this week' : 'No events this week' }
     ];
   },
@@ -288,38 +288,50 @@ S.WeekClose = {
 
   /* One row per piece of the week. Ready reads green, missing reads neutral, and an optional piece
      never reads as a failure: plenty of bars run a week with no tips and no drawer count. */
-  row(r) {
-    const mark = r.ready
-      ? '<span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:12px;font-weight:800;">&#10003;</span>'
-      : '<span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;border:1px solid ' + (r.optional ? 'var(--b1)' : 'var(--gold)') + ';"></span>';
+  /* ⛔⛔⛔ THE ROW IS AN ACCORDION, THE SAME ONE CLOSE THE BOOKS USES. Kyle, 2026-08-11: *"the 6 steps
+     need to be the circle numbers if they are not checked off.. and the cards need to open by click
+     and have the chevron on the right side just like the second image.. not the ghost buttons."*
+     ⭐ THE NUMBER IS A SHAPE, NOT A TICK, and that is the one thing borrowing from Books could have
+     got wrong. Books numbers its steps because they ARE manual checkboxes; every check on this page
+     is DERIVED from records and always was. Kyle said it himself: *"just without the mark done
+     button."* Nothing on this page became tickable.
+     ⚠ `_openLane` HOLDS THE ROW KEY. For the four import rows `lane === key` already, and the two
+     derived rows have no lane at all — the mount site is guarded on `_laneZone(...)` returning a
+     zone, so a non-lane key parks there harmlessly. MEASURED BEFORE RELYING ON IT: `renderLane`
+     falls back to `LANES.hours` for an unknown key, so an unguarded call would have mounted the
+     HOURS importer underneath Cost of Goods.
+     ⚠ `wc-step-head` joins the shared `*-step-head` chevron rules in style.css rather than inventing
+     a hook, so the rotation and the gold hover come from the same place as every other accordion. */
+  row(r, num) {
+    const isOpen = this._openLane === r.key;
+    const circle = r.ready
+      ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
+      : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.45);">' + num + '</span>';
+    const bg = isOpen ? 'var(--step-open)' : (r.ready ? 'var(--input)' : 'var(--surface)');
     const noteCol = r.ready ? 'var(--t2)' : (r.optional ? 'var(--t3)' : 'var(--t2)');
-    /* The import door stays available on a row that is already in: a timeclock week arrives in more
-       than one file often enough, and re-dropping cannot double-count (the builder dedups on staff,
-       date and amount). "Open" is still the way to type them in by hand, and it only shows while
-       there is nothing in yet. */
-    /* ⚠ "HIDE", NOT "CLOSE". The open state read `Close` for one draft, on the page whose banner says
-       CLOSE OUT YOUR WEEK and whose primary button is Confirm the Week. One word, two meanings, six
-       inches apart. */
-    const laneOpen = !!r.lane && this._openLane === r.lane;
-    const laneBtn = (r.lane && this._laneZone(r.lane))
-      ? '<button class="btn btn-ghost btn-sm wc-lane" data-lane="' + esc(r.lane) + '">'
-        + (laneOpen ? 'Hide' : (r.laneLabel || 'Import file')) + '</button>' : '';
-    // ⚠ GUARDED ON `go`, not just on `ready`. The Sales row carries no `go` at all now, and without
-    // this it would render `data-go=""` — a button that navigates nowhere, on the row whose whole
-    // job this change was.
-    const btn = (r.ready || !r.go) ? '' : '<button class="btn btn-ghost btn-sm wc-go" data-go="' + esc(r.go) + '">Open</button>';
-    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);margin-bottom:10px;">'
-      + '<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;">'
-      +   mark
+    let html = '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;margin-bottom:10px;">'
+      + '<div class="wc-step-head' + (isOpen ? '' : ' collapsed') + '" data-lane="' + esc(r.key) + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
+      +   circle
       +   '<div style="flex:1;min-width:0;">'
       +     '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(r.label)
       +       (r.optional ? ' <span style="font-size:10px;font-weight:600;color:var(--t4);letter-spacing:0.5px;">OPTIONAL</span>' : '') + '</div>'
       +     '<div style="font-size:11px;color:' + noteCol + ';margin-top:2px;">' + esc(r.note) + '</div>'
       +   '</div>'
-      +   (laneBtn || btn ? '<div style="display:flex;gap:8px;flex-shrink:0;">' + laneBtn + btn + '</div>' : '')
-      + '</div>'
-      + (laneOpen ? this.laneBody(r.lane) : '')
+      +   '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
       + '</div>';
+    if (isOpen) html += this.laneBody(r.key) + this._goBody(r);
+    return html + '</div>';
+  },
+  /* ⭐ THE SECOND DOOR, NAMED FOR THE PAGE IT OPENS. The old row carried a ghost button reading
+     "Open", which told an operator nothing about where it went; Kyle's rule from the empty state
+     applies here too — *"the button has to match the page."* Sales is the exception and always was:
+     its manual entry happens INLINE on this page (`salesLaneBody`), so it needs no second door and
+     must not grow one. */
+  _goBody(r) {
+    if (r.key === 'sales' || !r.go) return '';
+    const hasLane = !!this._laneZone(r.key);
+    return '<div style="' + (hasLane ? '' : 'border-top:1px solid var(--b-edge);') + 'padding:' + (hasLane ? '0 16px 16px' : '14px 16px') + ';">'
+      + '<button class="btn btn-ghost btn-sm wc-go" data-go="' + esc(r.go) + '">' + esc(r.goLabel || 'Open') + '</button></div>';
   },
 
   /* The three slots the lane names through the host: the mapper's own element, the Import/Cancel row
@@ -505,7 +517,7 @@ S.WeekClose = {
       + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:0 2px 14px;">&#10003; '
                  + esc(flash) + esc(this._flashScope(flashDates, jumped)) + '</div>' : '')
       + '<div class="sh" style="margin:0 0 10px;">What This Week Needs</div>'
-      + rows.map(r => this.row(r)).join('')
+      + rows.map((r, i) => this.row(r, i + 1)).join('')
       + '<div style="margin:18px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + confirmBtn + '</div>'
       + '</div>';
     this.wire();
@@ -531,7 +543,13 @@ S.WeekClose = {
       el.addEventListener('click', () => App.openScreen(el.dataset.go)));
     /* Opening the import door is not a commitment: the same button closes it, and the mapper's own
        Cancel gives the page back through the lane. */
-    c.querySelectorAll('.wc-lane').forEach(el => el.addEventListener('click', () => {
+    /* ⛔⛔⛔ THE SELECTOR AND THE CLASS MOVED TOGETHER, AND FOR ONE RENDER THEY DID NOT. The ghost
+       button was `.wc-lane`; the whole row head is the control now and it is `.wc-step-head`. I
+       changed the markup, the gate stayed GREEN, and every one of the six rows was dead on click —
+       [[the-loop]] integrity #11, the defect that cost a day on the Menu Builder tabs. Pinned now by
+       `verify-week-close-accordion`, which parses the class out of the rendered row and the selector
+       out of this line and compares them, because a node harness cannot click. */
+    c.querySelectorAll('.wc-step-head').forEach(el => el.addEventListener('click', () => {
       const k = el.dataset.lane;
       this._openLane = (this._openLane === k) ? null : k;
       this.render(this.container);
