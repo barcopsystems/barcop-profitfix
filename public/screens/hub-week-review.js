@@ -310,7 +310,7 @@ S.WeekReview = {
     const pct = v => (v != null && !isNaN(v)) ? (Number(v).toFixed(1) + '%') : '-';
     const stat = (label, val) => '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">' + label + '</div>'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:600;line-height:0.9;color:var(--w);">' + val + '</div></div>';
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:600;line-height:0.9;color:var(--t1);">' + val + '</div></div>';
     const vdiv = '<div class="wr-vdiv" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 34px;"></div>';
     const stats = [
       stat('Net Sales', m.netSales != null ? App.fmtCurrency(m.netSales, 0) : '-'),
