@@ -3029,6 +3029,21 @@ S.HubSettings = {
       { kind:'menu',    name:'Anchor Burger',                reason:'Customer Goodwill', amount:18 },
       { kind:'custom',  name:'Staff meal, Cobb Salad',       reason:'Staff Meal',        amount:13 }
     ];
+    /* ── THE SPIKE WEEK: a run of comps nobody caught until the Hub said so ──────────────────
+       Kyle asked for a demo that can show a real drag, and the spec improved on every metric in
+       every week, so "your worst drag" had nothing to name. These land on the `spike` week only
+       (the last CLOSED one, which is the week the Hub compares), and they are deliberately spread
+       across servers and reasons: a run of service recovery, not one person giving the room away.
+       Concentrating them would have manufactured a Theft Risk pattern the demo does not want, which
+       is a different claim entirely ([[output-honesty]] — every displayed number must be true, and
+       that includes the story the shape of the data tells). */
+    const SPIKE_SC = [
+      { kind:'none', name:'',                    reason:'Service Recovery',  amount:88 },
+      { kind:'none', name:'',                    reason:'Manager Comp',      amount:64 },
+      { kind:'menu', name:'Steak Frites',        reason:'Sent back',         amount:34 },
+      { kind:'none', name:'',                    reason:'Customer Goodwill', amount:52 },
+      { kind:'menu', name:'Pan-Seared Salmon',   reason:'Sent back',         amount:29 }
+    ];
     const scVoidComps = [];
     let vcVi = 0, vcCi = 0;
     ANCHS.weeks.forEach(a => {
@@ -3037,6 +3052,21 @@ S.HubSettings = {
       const voidN = improving ? 1 : 3;
       const compN = improving ? 1 : 2;
       let vcDay = 1;
+      if (a.spike) {
+        SPIKE_SC.forEach((s, j) => {
+          scVoidComps.push({
+            id:uid(), date:dateStr(baseAgo + vcDay++), type:'Comp',
+            shift_type:vcShifts[(a.wk + j) % vcShifts.length],
+            item:(s.kind === 'none' ? '' : s.name),
+            menu_item_id:(s.kind === 'menu' ? findMenuId(s.name) : ''),
+            product_id:'', product_name:'', units:null, amount:s.amount,
+            server:vcServers[(a.wk + j) % vcServers.length], staff_id:'',
+            authorized_by:mgrs[(a.wk + j) % 3],
+            check_number:'', reason:s.reason, notes:'',
+            created_at:new Date().toISOString()
+          });
+        });
+      }
       for (let j = 0; j < voidN; j++) {
         const s = VOID_SC[vcVi % VOID_SC.length]; vcVi++;
         scVoidComps.push({
