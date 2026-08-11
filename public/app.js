@@ -3285,6 +3285,20 @@ const App = {
     if (id === 'settings') { S.HubSettings.open(); return; }
     if (id === 'settings-profile') { S.HubSettings.open('business-profile'); return; }
     if (id === 'settings-targets') { S.HubSettings.open('recovery-targets'); return; }
+    /* ⛔⛔⛔ CLOSE THE WEEK IS A HUB PAGE, AND WITHOUT THIS LINE EVERY DOOR TO IT SAYS "Coming soon."
+       Measured on the shipped build: `App.openScreen('week-close')` rendered exactly that, because
+       the id reaches the module router, which has never heard of it. That is the same failure as the
+       `hub-permits` dead link, and it is why the ~19 remaining cockpit links could NOT simply be
+       swapped to `'week-close'` — a blind find-and-replace would have shipped nineteen dead links in
+       one edit instead of one.
+       ⭐ SO THE ID BECOMES ROUTABLE FROM ANYWHERE, ONCE, HERE. `openScreen` is the app's cross-module
+       door (it is what `AuditUI`'s setup rows, the Fix panels and every `data-go` handler call), so
+       teaching it this one id fixes every consumer at the same time rather than each caller learning
+       a special case. `_protoGlobalClick` is the SAME door the rail uses, never a second
+       `S.WeekClose.open()` — two doors to one page drift apart ([[the-list]] step 1b).
+       ⚠ WHY IT SITS WITH `settings` AND NOT LOWER: the comment above already gives the reason. These
+       short-circuit BEFORE `showApp`, or the module shell flashes up behind a hub page. */
+    if (id === 'week-close') { this._protoGlobalClick('week-close'); return; }
     // Hub Accounting deliverables a fix step can deep-link to.
     if (id === 'weekly-pnl') { if (window.S && S.Reports && S.Reports._openQboModal) S.Reports._openQboModal(); return; }
     if (id === 'books') { if (window.S && S.HubBooks && S.HubBooks.open) S.HubBooks.open(); return; }
@@ -8716,6 +8730,14 @@ const App = {
     // Settings and Getting Started are Hub-owned views, never module screens —
     // open them in the Hub container regardless of where the call came from.
     if (id === 'settings') { S.HubSettings.open(); return; }
+    /* ⛔⛔ THE SAME DOOR HAS TO EXIST HERE TOO, AND FORGETTING IT WOULD HAVE LEFT HALF THE FIX DEAD.
+       `openScreen` now routes `week-close`, but `navigate` is a SEPARATE entry point and plenty of
+       callers reach it directly — `S.Hub._enter` does `showApp` then `navigate`, so every Hub due-row
+       and money tile comes through here, not through `openScreen`. Teaching only one of the two
+       would have fixed the audit rows and left the Hub's own rows saying "Coming soon.", which is
+       exactly the shape of the defect this whole sweep is about: one door fixed, its twin missed
+       ([[the-loop]] step 0.5 — find the twin before you fix). */
+    if (id === 'week-close') { this._protoGlobalClick('week-close'); return; }
     // Retire the old standalone "This Week" / "Revenue This Week" write screens.
     // Confirm the Week is the single weekly-close writer: it writes BOTH the profit
     // `week` and the revenue_week with the correct hourly-labor split and catering
