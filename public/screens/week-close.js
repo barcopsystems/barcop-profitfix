@@ -245,7 +245,7 @@ S.WeekClose = {
         note: st.cash.length ? st.cash.length + ' drawer count' + (st.cash.length === 1 ? '' : 's') : 'No drawer counted' },
       { key: 'cogs', label: 'Cost of goods', ready: st.cogs.has, go: 'ic-take-inventory', goLabel: 'Take Inventory', derived: true,
         note: cogsNote },
-      { key: 'catering', label: 'Catering', ready: st.catering.length > 0, go: 'ev-bookings', goLabel: 'Bookings', optional: true, derived: true,
+      { key: 'catering', label: 'Catering', ready: st.catering.length > 0, go: 'ev-bookings', goLabel: 'Event Bookings', optional: true, derived: true,
         note: st.catering.length ? st.catering.length + ' event' + (st.catering.length === 1 ? '' : 's') + ' this week' : 'No events this week' }
     ];
   },
@@ -330,7 +330,10 @@ S.WeekClose = {
   _goBody(r) {
     if (r.key === 'sales' || !r.go) return '';
     const hasLane = !!this._laneZone(r.key);
+    /* The two derived rows have no drop zone, so their line sits here, ABOVE the button, which is
+       the only thing in the body. The import rows already said theirs above the drop box. */
     return '<div style="' + (hasLane ? '' : 'border-top:1px solid var(--b-edge);') + 'padding:' + (hasLane ? '0 16px 16px' : '14px 16px') + ';">'
+      + (hasLane ? '' : this._explain(r.key))
       + '<button class="btn btn-ghost btn-sm wc-go" data-go="' + esc(r.go) + '">' + esc(r.goLabel || 'Open') + '</button></div>';
   },
 
@@ -343,16 +346,36 @@ S.WeekClose = {
      confirm screen, and that screen renders its OWN slot under the same name. It is here because the
      zone is three elements on the cockpit too, and a lane that finds two of them on one page and
      three on the other is a difference waiting to be a defect. */
+  /* ⛔⛔ ONE LINE PER ROW, AND KYLE RULED ON IT. `verify-design-code` RULE 2b flags instructional copy
+     on a card, and an earlier draft of this exact sentence was removed because of it. RULE 2b is a
+     CANDIDATE LIST, not a verdict — its own output says "for Kyle to rule on" — and on 2026-08-11 he
+     ruled: *"put a short to the point explainer text in each."* The baseline moves with his decision
+     written beside it, which is the difference between a ruling and a ratchet quietly slipping.
+     ⭐ ONE TABLE, NOT A SENTENCE INLINED AT SIX SITES. Six copies of this shape is six chances for
+     one of them to keep saying something the row stopped doing.
+     ⚠ EVERY LINE NAMES THE SECOND DOOR BY THE BUTTON'S OWN WORDS, so the sentence and the control
+     under it cannot drift apart — and COGS says "if they do not, you type it" because `icCOGS`
+     REFUSES to price a week off a count pair that does not span it. Promising automatic COGS to a
+     monthly counter would be the 4x prime-cost defect written into the copy. */
+  LANE_TEXT: {
+    sales:    'Drop your POS sales export for the week. Bar Cop reads each day off it and shows you every row before anything saves.',
+    hours:    'Drop your timeclock export for the week. Bar Cop matches each row to your roster and rates, or click Log Hours to key them in by hand.',
+    tips:     'Drop your tip export for the week, or click Tip Tracking to enter them by hand.',
+    cash:     'Drop your drawer count export for the week, or click Cash Control to count a drawer by hand.',
+    cogs:     'Counts that span this week price your cost of goods automatically on Confirm the Week. If they do not, you type it there instead.',
+    catering: 'Complete a booked catering event and its revenue is added to Confirm the Week automatically. Nothing to enter here.'
+  },
+  _explain(key) {
+    const t = this.LANE_TEXT[key];
+    return t ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(t) + '</div>' : '';
+  },
   laneBody(key) {
     const z = this._laneZone(key);
     if (!z) return '';
     // The sales row is the one with two ways in — see `salesLaneBody`.
     if (key === 'sales') return this.salesLaneBody(z);
-    /* ⚠ NO EXPLAINER SENTENCE HERE, and the first draft had one. `verify-design-code` RULE 2b caught
-       it: instructional copy belongs in the nav "i", not on a card. It was redundant twice over
-       anyway — the drop zone's own `dropTitle`/`dropSub` already say what the file needs, and the
-       confirm screen's lead already says nothing is saved until the button is pressed. */
     return '<div style="border-top:1px solid var(--b-edge);padding:16px;">'
+      + this._explain(key)
       + '<div id="' + z + '"></div><div id="' + z + '-actions"></div><div id="' + z + '-res"></div>'
       + '</div>';
   },
@@ -395,7 +418,10 @@ S.WeekClose = {
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
         +   '<button class="btn btn-primary btn-sm wc-savesales" data-savesales="1">Save Sales</button>'
         + '</div>'
-      : '<div id="' + z + '"></div><div id="' + z + '-actions"></div>';
+      : this._explain('sales') + '<div id="' + z + '"></div><div id="' + z + '-actions"></div>';
+    /* ⚠ THE IMPORT SIDE ONLY. Enter Manually already carries its own line — it comes from the SHIFT
+       cockpit's grid, which this page hosts rather than reimplements — so adding one here would put
+       two explainers under one toggle, on the mode that already had the better of them. */
     return '<div style="border-top:1px solid var(--b-edge);padding:16px;">'
       + seg + body + '<div id="' + z + '-res"></div>'
       + '</div>';
