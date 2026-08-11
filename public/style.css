@@ -5,9 +5,9 @@
      same fixed width now .. the hub, week in review, the workflow map and all other pages .. no
      more full width now with the rail left menu."
      ⛔ IT IS A TOKEN BECAUSE FIVE PLACES SET IT and three of those were OPT-OUTS that had to be
-     found: `.screen`, `.page`, `.wr-screen`'s `max-width:none`, flow-map's INLINE `max-width:none`,
-     and the Hub's `.hub-grid`, which never had a cap at all. A number typed five times is four
-     chances to disagree.
+     found: `.screen`, `.page`, `.wr-screen`'s `max-width:none`, flow-map's INLINE `max-width:none`
+     (that page was deleted 2026-08-11), and the Hub's `.hub-grid`, which never had a cap at all.
+     A number typed five times is four chances to disagree.
      ⭐ WHY 1320, and it is a property not a preference: content width is `viewport - 120` now that
      the rail is 120 and the scrollbar gutter is stable, so a 1320 cap binds at exactly 1440 — the
      widest common laptop. Every laptop at or below 1440 therefore fills its window edge to edge,
@@ -1207,7 +1207,9 @@ body.hub-dashboard .hub-app .content{padding-left:0;padding-right:0;}
    put a band behind a sentence. It gets its own name now: identical box, no fill. */
 .wr-note{padding:15px 20px;border-bottom:1px solid var(--b2);}
 .wr-block{padding:15px 20px;}
-.wr-foot{padding:14px 20px;}
+/* `.wr-foot` went with the "Open <section>" button on 2026-08-11 — the card has no footer row now,
+   so the rule had no element left to reach. Removed rather than left behind: dead CSS reads as a
+   slot something is supposed to fill. */
 .wr-idiv{height:1px;background:var(--b2);margin:0 20px;}
 /* On mobile the WR page tightens to the app's phone padding and the stat rows
    drop their vertical dividers (like the Hub Where You Stand card). The section
@@ -1218,7 +1220,7 @@ body.hub-dashboard .hub-app .content{padding-left:0;padding-right:0;}
   .wr-screen{padding:16px 14px 40px;}
   .wr-vdiv{display:none;}
   .wr-statrow{column-gap:22px;}
-  .wr-topstats,.wr-head,.wr-block,.wr-foot{padding-left:15px;padding-right:15px;}
+  .wr-topstats,.wr-head,.wr-block{padding-left:15px;padding-right:15px;}
   .wr-idiv{margin-left:15px;margin-right:15px;}
 }
 /* Hub "Where You Stand" card is hand-built (not a .card), so it needs its own

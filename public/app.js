@@ -2219,8 +2219,8 @@ const App = {
   // survive re-renders; we refill the global links + section pills and (once)
   // move the switcher up. body.chrome-on (set by the callers) shows the bar.
   /* ⛔ THESE FOUR TABLES ARE THE RAIL, IN RENDER ORDER, and the grouping is the design.
-     `_PROTO_GLOBAL` lost `flowmap` to `_PROTO_BOTTOM` in the 2026-08-08 rail redesign: Kyle's call
-     that the Map sits with Settings and Sign Out under the divider, not with the places you work.
+     `flowmap` (Workflow) left the rail in the 2026-08-08 redesign and the PAGE was deleted on
+     2026-08-11, so `_PROTO_BOTTOM` is Settings and Sign Out.
      Every key here MUST be answered by `_protoGlobalClick` or by `_SECTION_DASH`, and
      `verify-nav-rail-reachability` asserts exactly that against the tables rather than trusting
      that the two lists were kept in step (integrity #11: a control wired under one spelling and
@@ -2242,7 +2242,7 @@ const App = {
   _PROTO_BOTTOM:   [['settings','Settings']],
   _PROTO_SIGNOUT:  [['signout','Sign Out']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'week-close': 'week-close', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'flowmap': 'flowmap' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'week-close': 'week-close', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books' },
   /* ⛔⛔ AND EVERY SETTINGS PAGE WAS MISSING FROM THAT MAP — nine of them. Found while checking the
      new title: Settings read no section prefix, and the same lookup drives the rail highlight, so
      **the Settings row never lit up either** on any of its own pages.
@@ -2259,7 +2259,7 @@ const App = {
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'week-close': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings', 'flowmap': 'none' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'week-close': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -2278,11 +2278,10 @@ const App = {
       { h: 'The bottom row', p: ['Six operational readings, one per system, each a door: what is below par, hours logged, overtime, cost of goods, voids and comps, and your cash runway. The ones that read last week say so. Below par and cash runway carry no comparison because nothing stores a history of them, so they state today\'s figure and stop.'] },
       { h: 'Multiple bars', p: ['Your bar name shows in the top bar. If you run more than one bar, that name becomes a switcher: pick another bar and Bar Cop reloads into it.'] }
     ] },
-    'flowmap': { title: 'How Workflow Works', sections: [
-      { h: 'What this is', p: ['Workflow is how your whole week fits together, top to bottom. Bar Cop runs on one sitting at the end of the week: close your three Control sections, roll them up and work the money in Recovery, then chase only what the close flags. This lays the flow out so you can see where every piece sits and why.'] },
-      { h: 'The four stages', p: ['1. Close your Control sections: Inventory, Labor, Shift. 2. Work the money in Recovery: Profit, Revenue, Cash, each starting with Confirm the Week. 3. As needed: the jobs you open only when the close flags them, never on a schedule. 4. Where it lands: the Hub, Books, and your Bar Cop Audit score. Events feeds the week on its own clock.'] },
-      { h: 'Reading a node', p: ['Tap any section or step and the panel tells you what it is, why it sits where it does, and what it hands off, in plain terms. The stage number turns green to mark where you last looked. Open takes you straight to the page that does that work. The plumbing, which number feeds which, lives in each section\'s Help under Connections; this is the flow of the work, not the data.'] }
-    ] },
+    /* `'flowmap'` (Workflow) was removed on 2026-08-11 with the page. [[the-loop]] #61: retiring a
+       feature is three greps — the render call, the helpers whose only caller it was, and the HELP
+       TEXT that describes it. The help is the one nobody does, and a topic left behind here would
+       still be reachable by any caller passing that action to `openHubFullPage`. */
     'week-close': { title: 'How Closing The Week Works', sections: [
       { h: 'What this is', p: ['The one place a week gets closed. It reads what you have already logged, tells you what the week still needs, and then you confirm it. There is nothing to tick off: every line is read from your real records, so it cannot say the sales are in when they are not.'] },
       { h: 'What the week needs', p: ['Sales and hours are what the numbers are built from. Tips, cash over and short, and catering fill in when you have them, and a week closes fine without any of the three. Anything marked optional is not a gap.'] },
@@ -2291,10 +2290,12 @@ const App = {
       { h: 'Confirming', p: ['Confirm the Week saves the week\'s figures. Anything missing reads as blank, so you can confirm now and fill the rest in later. Once it is confirmed the button reopens the same form so you can correct it.'] }
     ] },
     'week-review': { title: 'How Week in Review Works', sections: [
-      { h: 'What this is', p: ['The accountability side of your weekly close. For any week it reads what your team actually did in each section, whether the close got finished, what it turned up, and what is carrying into next week, so you see in one place where the crew is on it and where things slid.'] },
-      { h: 'Pick a week', p: ['The arrows step back through your weeks; NOW marks the current one. Everything reads from your real logs and the steps you marked done, nothing projected.'] },
-      { h: 'Read a section', p: ['Done This Week is the raw activity that got logged, counts, deliveries, hours, tips, sales days, plus the Recovery work: audits run, sales reviews, discrepancies filed, investigations opened, and experiments running. The Weekly Close shows which sign-off steps got finished and which are still open. What It Turned Up is the result, and Carrying Into Next Week is the open items to clear.'] },
-      { h: 'Why some numbers read a dash', p: ['The Recovery sections (Profit, Revenue, Cash) only produce cost and margin numbers once you Confirm the Week. Until you do, the cost cells read a dash and the Weekly Close shows a red X on "Confirmed the week." That dash and that X are the signal to go confirm it, not a made-up number. This is on purpose.'] }
+      { h: 'What this is', p: ['The recap of a week that has finished. Section by section it reads what your team logged, what those records turned up, and what is carrying into the week after, so you can read one page and see how the week actually went.'] },
+      { h: 'It only shows finished weeks', p: ['The most recent week you can open is the one that just ended, and the arrows step back from there. A week still being lived has only half its records in it, so a recap of it would report a bar that looks like it did nothing about a week nobody has finished. It opens on the last week you confirmed.'] },
+      { h: 'Read a section', p: ['Done This Week is the raw activity that got logged, counts, deliveries, hours, tips, sales days, plus the Recovery work: audits run, sales reviews, discrepancies filed, investigations opened, and experiments running. What It Turned Up is the result those records produced. Carrying Into Next Week is what the week left open.'] },
+      { h: 'Everything here is a record', p: ['Every figure and every carried-over item comes from something Bar Cop actually has on file for that week, never from a box anyone ticked. If a week left nothing open, it says so.'] },
+      { h: 'Why some numbers read a dash', p: ['The Recovery sections (Profit, Revenue, Cash) only produce cost and margin numbers once the week is confirmed, which rolls up that week\'s revenue, cost of goods and labor. If a week was never confirmed those cells read a dash and the card says so. You can still confirm a past week from Close The Week and the numbers fill in. A dash is an honest blank, never a made-up number.'] },
+      { h: 'Export', p: ['Export PDF saves the week as a one-page report, named for the week it covers so two weeks never overwrite each other.'] }
     ] },
     'bar-cop-audit': { title: 'How the Bar Cop Audit Works', sections: [
       { h: 'What this is', p: [
@@ -2481,7 +2482,6 @@ const App = {
   _CONVERTED: new Set(['dashboard', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'week-history', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-dashboard', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
-    if (g === 'flowmap') return (window.S && S.FlowMap) ? S.FlowMap.open() : null;
     if (g === 'week-review') return (window.S && S.WeekReview) ? S.WeekReview.open() : null;
     if (g === 'week-close')  return (window.S && S.WeekClose)  ? S.WeekClose.open()  : null;
     /* ⛔ HISTORY IS A MODULE SCREEN, NOT A HUB PAGE — the only row in the rail that is. So it routes
@@ -2815,12 +2815,13 @@ const App = {
 
   /* Every rail row carries an icon, from the SHARED section map, because the collapsed rail is
      icons alone — a row with no icon would simply vanish there. `_RAIL_IC` maps the rail's own keys
-     onto that map; only `flowmap` needs translating (its icon has always been called `blueprint`). */
+     onto that map. Every key here is now a straight pass-through except the three Week rows; the
+     one entry that needed translating (`flowmap` → `blueprint`) went with the Workflow page. */
   _RAIL_IC: { hub: 'hub', 'week-review': 'review', 'week-close': 'dash', 'week-history': 'history',
               audit: 'audit', events: 'events', books: 'books',
               inventory: 'inventory', labor: 'labor', shift: 'shift',
               profit: 'profit', revenue: 'revenue', cash: 'cash',
-              flowmap: 'blueprint', settings: 'settings', signout: 'signout' },
+              settings: 'settings', signout: 'signout' },
 
   _railRow(k, label, context) {
     const isSection = this._railHasMenu(k);
@@ -2895,7 +2896,9 @@ const App = {
      is worse there than the inconsistency. Shared map, explicit choices, no drift. */
   _NAV_SECTION_IC: {
     hub:'<rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/>',
-    blueprint:'<rect x="2" y="3" width="13" height="11" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 6.5h3M5 9.5h5M11.5 6v4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+    /* `blueprint` was Workflow's icon and had exactly one reader, `_RAIL_IC`'s flowmap entry. Both
+       went with the page on 2026-08-11 — an icon nothing can name is dead weight in a map every
+       rail row reads. */
     audit:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
     events:'<rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
     books:'<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',

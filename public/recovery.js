@@ -338,19 +338,10 @@ window.Recovery = {
      (each with a period_end) and a module, return the markers to draw as
      [{ index, label, date }], where index is the charted week the fix landed
      in. Used so a trend chart shows when a fix went in against the metric. */
-  chartMarkers(weeks, moduleKey) {
-    const log = (App.data && Array.isArray(App.data.fix_log)) ? App.data.fix_log : [];
-    const dated = (weeks || []).filter(w => w && w.period_end);
-    if (dated.length < 2) return [];
-    const first = dated[0].period_end, last = dated[dated.length - 1].period_end;
-    return log
-      .filter(e => e.module === moduleKey && e.date && e.date >= first && e.date <= last)
-      .map(e => {
-        let idx = weeks.findIndex(w => w && w.period_end && w.period_end >= e.date);
-        if (idx < 0) idx = weeks.length - 1;
-        return { index: idx, label: e.gap_name || 'Fix', date: e.date };
-      });
-  },
+  /* `chartMarkers` was deleted 2026-08-11 with the Hub's dead mini trend charts, its only caller.
+     `App.data.fix_log` is untouched and still read elsewhere in this system; it was the CHART
+     MARKER that died, not the log. Found by `verify-no-retired-code`, not by hand — a retirement
+     reaches past the file you were editing ([[the-loop]] #63). */
 
   /* Live diagnosis of a gap-area: its latest weekly metric measured against
      target. Returns { band, onTarget, dollars, current, target, label } where
