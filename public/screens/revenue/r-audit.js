@@ -76,7 +76,7 @@ S.RevenueAudit = {
       { label: 'Menu items priced with units sold',        done: costedMenu.length >= 4, go: 'r-menu-items' },
       { label: 'Server checks logged',                 done: this._windowedServerCount() >= 3, go: 'r-server-check' },
       { label: 'Events completed',                     done: this._windowedCompletedEvents().length > 0, go: 'ev-dashboard' },
-      { label: 'Confirm the week',                     done: cd.check_average != null, go: 'r-dashboard' }
+      { label: 'Confirm the week',                     done: cd.check_average != null, go: 'week-close' }
     ];
   },
 
