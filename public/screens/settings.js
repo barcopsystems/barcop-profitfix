@@ -923,46 +923,17 @@ S.HubSettings = {
       }
     } catch (e) {}
 
-    // A history of closed-out weeks so the demo shows the operator has been doing
-    // the weekly Cash close, not starting cold. The Close The Week step-done marks live
-    // on the account now (App.acctSet); seed the last eight weeks fully closed and leave
-    // the current week open so there is work to do.
-    try {
-      const _mon = (d) => { const x = new Date(d); const wd = x.getDay(); x.setDate(x.getDate() + (wd === 0 ? -6 : 1 - wd)); return App.ymdLocal(x); };
-      const _curMon = _mon(new Date());
-      for (let w = 1; w <= 8; w++) {
-        const m = new Date(_curMon + 'T00:00:00'); m.setDate(m.getDate() - 7 * w);
-        App.acctSet('cash_cockpit_done_' + App.ymdLocal(m), { trapped: true, week: true, terms: true, audit: true });   // keys must match CashDashboard.ORDER ['trapped','week','terms','audit']; 'order' was bogus and 'audit' was missing
-      }
-      // Control sections, current week mid-close: the first two close steps are
-      // done, the last two still to do. Keyed to each page's own done-key (the
-      // current week), so it rolls forward week to week with no stale dates.
-      // Cockpit steps are now purely operator-marked (nothing auto-derives), so
-      // the sample must stamp its own mid-close state for every cockpit or the
-      // demo would read 0/4 everywhere. Each = most of the week's steps done, the
-      // last one or two still open so there is visible work to do.
-      if (window.S) {
-        /* ⚠ `orders` IS NOT STAMPED (2026-08-02, Kyle spotted it in the demo). It used to be, and
-           the same step renders "$3,988.05 to reorder, 6 vendors" from the seeded below-par stock —
-           so the demo showed a green tick on "Place your orders" sitting directly beside four
-           thousand dollars of ordering still to do, in one row, on the page a prospect sees first.
-           A seeded done-stamp is a CLAIM about what the sample operator has already done, and it
-           has to agree with the data seeded beside it ([[demo-coherence-over-accuracy]]).
-           ⚠ The app was never wrong here: the tick is the operator's manual call and the subtitle
-           reads live data, exactly as [[cockpit-steps-manual]] intends. Only the sample lied.
-           Inventory now opens 2 of 4 with ordering and the flag review still to do, which is also
-           the shape Shift and Cash already seed. */
-        if (S.InventoryDashboard) App.acctSet(S.InventoryDashboard._doneKey(), { count: true, deliveries: true });
-        if (S.LaborDashboard)     App.acctSet(S.LaborDashboard._doneKey(),     { hours: true, tips: true, schedule: true });
-        if (S.ShiftDashboard)     App.acctSet(S.ShiftDashboard._doneKey(),     { import: true, cash: true });
-        // Profit + Revenue: no stamp. Their step 1 (Confirm the Week) now derives
-        // its done-state from the confirmed-week record, and the current in-progress
-        // week has none yet, so the cockpit honestly opens on "Confirm the Week".
-        // (costs/numbers can't be reviewed until the week is confirmed, so nothing
-        // downstream is pre-marked either.)
-        if (S.CashDashboard)      App.acctSet(S.CashDashboard._doneKey(),      { trapped: true, week: true });
-      }
-    } catch (e) {}
+    /* ⛔ THE SEEDED COCKPIT TICKS ARE GONE (2026-08-11). This block stamped `cash_cockpit_done_` for
+       eight past weeks and then a mid-close done-map onto four of the six cockpit pages, so the demo
+       would not read 0 of 4 everywhere. Every key it wrote is read by exactly one thing: the cockpit
+       that declared it, and all six are deleted at 1c. Measured before cutting — no surviving screen
+       reads any `*_cockpit_done_` key. Books keeps its own `books_close_done_<month>` map and is
+       untouched.
+       ⚠ NOTHING REPLACES IT, BY KYLE'S RULING: *"no tick on the new close the week.. it stays
+       exactly how it functions now"*. Close The Week derives its green check from whether the week's
+       data actually landed, which is a stronger claim than a box somebody ticked, so there is no
+       done-map left to seed. `_clearCockpitStamps` above still sweeps the old prefix, deliberately:
+       a real account can be carrying stamps written before this. */
 
     const uid = () => App.uid();
     const today = new Date();

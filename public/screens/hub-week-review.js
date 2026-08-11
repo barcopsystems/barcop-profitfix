@@ -336,16 +336,17 @@ S.WeekReview = {
 
   // ── Inventory ───────────────────────────────────────────────────────────────
   _inventorySection() {
-    const ID = S.InventoryDashboard;
-    if (!ID) return '';
+    // No cockpit alias and no absence guard, for the reason written on the Profit card.
     const inv = (App.inventoryData) || {};
     const products = (inv.ic_products || []).filter(p => p.active !== false);
     if (!products.length || !(inv.ic_counts || []).length) return null;
 
-    const sv = ID._weekStart;
-    ID._weekStart = this._wkS();
-    let st;
-    try { st = ID.computeState(); } finally { ID._weekStart = sv; }
+    /* ⚠ THE BORROW HERE WAS LIVE IN MECHANISM AND INERT IN EFFECT, WHICH IS THE WORST OF BOTH.
+       `computeState()` returns 27 fields and exactly THREE depend on the week (`hasCountThisWeek`,
+       `weekCount`, `deliveriesThisWeek`). This card reads seven, and not one of them is on that
+       list — so the page moved another screen's week selector to change three values it then threw
+       away. Measured before cutting, not assumed. */
+    const st = this._inventoryFigures();
 
     /* ⭐ THE RECORDS, NOT THEIR COUNTS. Every one of these used to be `.length` and the whole point
        of the rewrite is the detail that was being thrown away on the next line. */
@@ -379,8 +380,11 @@ S.WeekReview = {
         + (prices ? ' ' + prices + ' price ' + this._plu(prices, 'change') + '.' : '')
         + (disc ? ' ' + disc + ' flagged with a discrepancy.' : ''));
     }
+    // Hoisted: the "Ordered" cell in What It Turned Up reads the same total this sentence does, so
+    // there is ONE sum and the band and the cell cannot drift apart ([[the-loop]] #54).
+    const ordTot = cOrders.reduce((t, o) => t + (o.total || 0), 0);
     if (cOrders.length) {
-      const tot = cOrders.reduce((t, o) => t + (o.total || 0), 0);
+      const tot = ordTot;
       const each = cOrders.length <= this._few()
         ? ' ' + this._join(cOrders.map(o => this._nm(o.vendor) + ' ' + this._m0(o.total)
             + this._on(o.date) + (String(o.status || '') === 'Open' ? ' and still open' : ''))) + '.'
@@ -429,7 +433,15 @@ S.WeekReview = {
     const results = this._resRow([
       this._res('Used This Period', st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-'),
       this._res('Below Par', App.fmtCurrency(st.reorderTotal, 0), st.reorderCount ? 'var(--amber)' : 'var(--t1)'),
-      this._res('Shrinkage 30d', App.fmtCurrency(st.shrink, 0), st.shrink > 0 ? 'var(--red)' : 'var(--t1)'),
+      /* ⛔ SHRINKAGE 30d CAME OFF THIS CARD (Kyle, 2026-08-11: *"get rid of the shrinkage and replace
+         it with order placed value"*). It was the clearest case of W3 on the page: a figure headed
+         with a finished week that measured the 30 days ending TODAY, so reviewing a week from March
+         printed this month's shrinkage. Ordered is the reviewed WEEK's own orders, off the same
+         records the band above lists.
+         ⚠ NEUTRAL, NO COLOUR. Money committed to stock is not good news or bad news, and colour on
+         this card means something ([[dashboard-discipline]]). Below Par is what still needs
+         ordering; Ordered is what was ordered — the two read as a pair. */
+      this._res('Ordered', App.fmtCurrency(ordTot, 0)),
       this._res('Dead Stock', String(st.deadAll), st.deadAll > 0 ? 'var(--red)' : 'var(--t1)')
     ]);
     /* ⛔ "Variance flags never reviewed this week" is GONE, not un-gated: its only evidence was the
@@ -445,7 +457,7 @@ S.WeekReview = {
 
     // The PDF carries the same sentences the screen shows. Paper and page say one thing.
     (this._pdf || (this._pdf = [])).push({ name: 'Inventory', activity: this._didPlain(did),
-      results: 'Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Shrinkage 30d ' + App.fmtCurrency(st.shrink, 0) + ', Dead Stock ' + st.deadAll,
+      results: 'Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Ordered ' + App.fmtCurrency(ordTot, 0) + ', Dead Stock ' + st.deadAll,
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Inventory', [
       { label: 'Done This Week', html: activity },
@@ -456,8 +468,7 @@ S.WeekReview = {
 
   // ── Labor ───────────────────────────────────────────────────────────────────
   _laborSection() {
-    const LD = S.LaborDashboard;
-    if (!LD) return '';
+    // No cockpit alias and no absence guard, for the reason written on the Profit card.
     const lab = (App.laborData) || {};
     if (!(lab.lc_staff || []).length || !(lab.lc_actuals || []).length) return null;
 
@@ -465,42 +476,43 @@ S.WeekReview = {
     const today = App.todayLocal();
     const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return App.ymdLocal(d); })();
 
-    const sv = LD._weekStart;
-    LD._weekStart = this._wkS();
-    let wkHours, wkCost, laborPct, rplh, proj, tipN, tipTotal, wkPeople, wkDays, cOuts, calloutN, calloutUncov, toPending, toNew, expired, expiring, schedBuilt;
-    try {
-      const wkStart = LD.weekStart(), wkEnd = LD.weekEnd();
-      const endCap = wkEnd < today ? wkEnd : today;
-      const wkActuals = LD.actuals().filter(a => a.date >= wkStart && a.date <= wkEnd);
-      wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
-      const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
-      const otPrem = App.otPremiumForRows ? App.otPremiumForRows(wkActuals).total : 0;   // 0.5x over 40/wk, not stored in a.cost
-      wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost + otPrem;
-      const weekRevenue = ((App.shiftData && App.shiftData.sc_shifts) || [])
-        .filter(s => LD.inWeek(s.date)).reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
-      laborPct = weekRevenue > 0 ? (wkCost / weekRevenue * 100) : null;
-      rplh = (wkHours > 0 && weekRevenue > 0) ? (weekRevenue / wkHours) : null;
-      proj = LD.weekProjection();
-      const wkTips = LD.tips().filter(t => LD.inWeek(t.date));
-      tipN = wkTips.length;
-      tipTotal = wkTips.reduce((t, r) => t + (r.total_tips || 0), 0);
-      wkPeople = new Set(wkActuals.map(a => a.name).filter(Boolean)).size;
-      wkDays = new Set(wkActuals.filter(a => (a.hours || 0) > 0).map(a => a.date)).size;
-      cOuts = LD.callouts().filter(c => LD.inWeek(c.date));
-      calloutN = cOuts.length;
-      calloutUncov = cOuts.filter(c => !c.covered).length;
-      toPending = LD.timeOff().filter(t => t.status === 'Requested').length;
-      /* ⛔ THE OLD STRIP PRINTED `toPending` UNDER "DONE THIS WEEK", AND IT IS NOT A WEEK FIGURE. It
-         counts every request still sitting unanswered, whenever it was made, so a request typed in
-         March was being reported as something the crew did last week. The pending count is a real
-         fact and it stays in Carrying Into Next Week, where it is true. What belongs in a recap is
-         requests RAISED in the week, off `created_at`. */
-      toNew = LD.timeOff().filter(t => this._inWeek(t.created_at)).length;
-      const activeIds = new Set(LD.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
-      expired = LD.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
-      expiring = LD.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30).length;
-      schedBuilt = LD.schedules().some(s => s.week_start === LD.nextWeekStart());
-    } finally { LD._weekStart = sv; }
+    /* ⭐⭐ THE WEEK IS A PARAMETER NOW, NOT A FIELD ON SOMEBODY ELSE'S SCREEN. This is the only one
+       of the five borrows that was doing real work: `weekStart` / `weekEnd` / `inWeek` /
+       `nextWeekStart` / `weekProjection` all read the Labor cockpit's `_weekStart`, so the page had
+       to move that selector to make them answer. The seven store reads underneath were never
+       week-aware at all — every one is a one-line `App.laborData.<key>` and they are read straight
+       here, the same way this file has always read `App.inventoryData` and `App.data`. */
+    const wkStart = this._wkS(), wkEnd = this._wkE();
+    const endCap = wkEnd < today ? wkEnd : today;
+    const wkActuals = (lab.lc_actuals || []).filter(a => a.date >= wkStart && a.date <= wkEnd);
+    const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
+    const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
+    const otPrem = App.otPremiumForRows ? App.otPremiumForRows(wkActuals).total : 0;   // 0.5x over 40/wk, not stored in a.cost
+    const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost + otPrem;
+    const weekRevenue = ((App.shiftData && App.shiftData.sc_shifts) || [])
+      .filter(s => this._inWeek(s.date)).reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
+    const laborPct = weekRevenue > 0 ? (wkCost / weekRevenue * 100) : null;
+    const rplh = (wkHours > 0 && weekRevenue > 0) ? (weekRevenue / wkHours) : null;
+    const proj = this._weekProjection(wkStart);
+    const wkTips = (lab.lc_tips || []).filter(t => this._inWeek(t.date));
+    const tipN = wkTips.length;
+    const tipTotal = wkTips.reduce((t, r) => t + (r.total_tips || 0), 0);
+    const wkPeople = new Set(wkActuals.map(a => a.name).filter(Boolean)).size;
+    const wkDays = new Set(wkActuals.filter(a => (a.hours || 0) > 0).map(a => a.date)).size;
+    const cOuts = (lab.lc_callouts || []).filter(c => this._inWeek(c.date));
+    const calloutN = cOuts.length;
+    const calloutUncov = cOuts.filter(c => !c.covered).length;
+    const toPending = (lab.lc_time_off || []).filter(t => t.status === 'Requested').length;
+    /* ⛔ THE OLD STRIP PRINTED `toPending` UNDER "DONE THIS WEEK", AND IT IS NOT A WEEK FIGURE. It
+       counts every request still sitting unanswered, whenever it was made, so a request typed in
+       March was being reported as something the crew did last week. The pending count is a real
+       fact and it stays in Carrying Into Next Week, where it is true. What belongs in a recap is
+       requests RAISED in the week, off `created_at`. */
+    const toNew = (lab.lc_time_off || []).filter(t => this._inWeek(t.created_at)).length;
+    const activeIds = new Set((lab.lc_staff || []).filter(s => s.status !== 'Inactive').map(s => s.id));
+    const expired = (lab.lc_certs || []).filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
+    const expiring = (lab.lc_certs || []).filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30).length;
+    const schedBuilt = (lab.lc_schedules || []).some(s => s.week_start === this._addDays(wkStart, 7));
 
     const otRisk = (proj.over || 0) + (proj.approaching || 0);
 
@@ -552,40 +564,41 @@ S.WeekReview = {
 
   // ── Shift ───────────────────────────────────────────────────────────────────
   _shiftSection() {
-    const SD = S.ShiftDashboard;
-    if (!SD) return '';
     const sh = (App.shiftData) || {};
     if (!(sh.sc_shifts || []).length) return null;
 
-    const sv = SD._weekEnd;
-    SD._weekEnd = this._wkE();
-    let rev, covers, checkAvg, voidTot, compTot, netVar, days, vcN, wasteN, walkedN, reconN, shorts,
-        bestDay, worstVar, topVC, wasteRows, walkRows, overs;
-    try {
-      const wkS = SD.shifts().filter(s => SD.inWeek(s.date));
-      rev = wkS.reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
-      covers = wkS.reduce((t, s) => t + (s.covers || 0), 0);
-      checkAvg = covers > 0 ? rev / covers : null;
-      const wkVC = SD.voidComps().filter(r => SD.inWeek(r.date));
-      voidTot = wkVC.filter(r => r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
-      compTot = wkVC.filter(r => r.type === 'Comp').reduce((t, r) => t + (r.amount || 0), 0);
-      const wkVar = SD.variances().filter(v => SD.inWeek(v.date));
-      netVar = wkVar.reduce((t, v) => t + (v.variance || 0), 0);
-      shorts = wkVar.filter(v => v.status === 'Short').length;
-      overs = wkVar.filter(v => v.status === 'Over').length;
-      reconN = wkVar.length;
-      days = wkS.length;
-      vcN = wkVC.length;
-      wasteRows = SD.waste().filter(r => SD.inWeek(r.date));
-      walkRows = SD.walkedTabs().filter(r => SD.inWeek(r.date));
-      wasteN = wasteRows.length;
-      walkedN = walkRows.length;
-      // Named only when one day genuinely beats every other — see `_topOf`.
-      bestDay = this._topOf(wkS, s => parseFloat(s.total_revenue) || 0);
-      worstVar = this._topOf(wkVar.filter(v => (v.variance || 0) < 0), v => -(v.variance || 0))
-        || (wkVar.filter(v => (v.variance || 0) < 0).length === 1 ? wkVar.filter(v => (v.variance || 0) < 0)[0] : null);
-      topVC = this._topOf(wkVC, r => r.amount || 0) || (wkVC.length === 1 ? wkVC[0] : null);
-    } finally { SD._weekEnd = sv; }
+    /* ⭐⭐ NO COCKPIT AT ALL HERE NOW, AND IT NEEDED NO PARAMETER. The five `SD.*()` calls were pure
+       store reads (`sc_shifts`, `sc_void_comps`, `sc_variances`, `sc_waste`, `sc_walked_tabs`) and
+       the only week-dependent one was `SD.inWeek`. This page already owns `_inWeek`.
+       ⚠ THE ONE THING THAT HAD TO BE PROVED FIRST, because it is not obvious: Shift is SUNDAY
+       anchored (`_weekEnd`, then `App.weekStartFor` back to a Monday) and this page is MONDAY
+       anchored (`_wkS`, +6 to a Sunday). Swapping one window for the other is only safe if they are
+       the SAME window. `verify-week-review-owns-its-week` block W asserts the round trip across
+       seventy consecutive days, plus the off-by-one control — [[the-loop]] #54: when two things
+       answer one question, pin the EQUALITY, never either side. */
+    const wkS = (sh.sc_shifts || []).filter(s => this._inWeek(s.date));
+    const rev = wkS.reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
+    const covers = wkS.reduce((t, s) => t + (s.covers || 0), 0);
+    const checkAvg = covers > 0 ? rev / covers : null;
+    const wkVC = (sh.sc_void_comps || []).filter(r => this._inWeek(r.date));
+    const voidTot = wkVC.filter(r => r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
+    const compTot = wkVC.filter(r => r.type === 'Comp').reduce((t, r) => t + (r.amount || 0), 0);
+    const wkVar = (sh.sc_variances || []).filter(v => this._inWeek(v.date));
+    const netVar = wkVar.reduce((t, v) => t + (v.variance || 0), 0);
+    const shorts = wkVar.filter(v => v.status === 'Short').length;
+    const overs = wkVar.filter(v => v.status === 'Over').length;
+    const reconN = wkVar.length;
+    const days = wkS.length;
+    const vcN = wkVC.length;
+    const wasteRows = (sh.sc_waste || []).filter(r => this._inWeek(r.date));
+    const walkRows = (sh.sc_walked_tabs || []).filter(r => this._inWeek(r.date));
+    const wasteN = wasteRows.length;
+    const walkedN = walkRows.length;
+    // Named only when one day genuinely beats every other — see `_topOf`.
+    const bestDay = this._topOf(wkS, s => parseFloat(s.total_revenue) || 0);
+    const worstVar = this._topOf(wkVar.filter(v => (v.variance || 0) < 0), v => -(v.variance || 0))
+      || (wkVar.filter(v => (v.variance || 0) < 0).length === 1 ? wkVar.filter(v => (v.variance || 0) < 0)[0] : null);
+    const topVC = this._topOf(wkVC, r => r.amount || 0) || (wkVC.length === 1 ? wkVC[0] : null);
 
     const did = [];
     if (days) did.push(this._n(days + ' ' + this._plu(days, 'day')) + ' of sales logged, ' + this._m0(rev)
@@ -684,10 +697,178 @@ S.WeekReview = {
     ]);
   },
 
+  /* ── The six inventory figures this card prints ───────────────────────────────────────────────
+     ⭐ THESE ARE THE SIX, AND ONLY THE SIX, THAT THE CARD READS. `computeState()` on the cockpit
+     built 27 fields for a page that draws four cells and four warning lines; the other twenty-one
+     are the cockpit's own steps and strips and die with it.
+     ⭐⭐ AND NONE OF THE REAL WORK MOVED HERE — every figure was already delegating to something
+     that survives 1c, which is why this is short:
+       periodCost / deadAll  ->  App.computeUsagePair + App._perpetualInventory + App.unitCost
+       reorderTotal / Count  ->  S.InventoryOrderSheet.belowParByVendor()  (the Order Sheet's ONE
+                                 plan, so the cockpit, the Order Sheet and the cash forecast cannot
+                                 disagree about what to buy)
+       parOff                ->  S.InventoryParSuggestions.computeSuggestion
+       menuOver              ->  App.menuItemsOverTarget()
+     ⛔ `shrink` WAS THE SEVENTH AND IT IS GONE (Kyle, 2026-08-11). It was a 30-day window ending
+     TODAY, printed under a heading naming a finished week, so a March review showed this month's
+     shrinkage. The cell is the reviewed week's own order value now. It also carried the only
+     hand-rolled day offset this file had, so `verify-window-cutoff`'s baseline for this file went
+     back to zero with it.
+     ⚠⚠ THE REST ARE STILL NUMBERS ABOUT TODAY UNDER A FINISHED WEEK'S HEADING. `periodCost` is the
+     newest count PAIR, `reorderTotal` / `deadAll` / `parOff` / `menuOver` are all as-of-now. That is
+     preserved here exactly as it shipped rather than quietly corrected, and it is still open as W3 —
+     a product call, not a refactor. */
+  _inventoryFigures() {
+    const inv = (App.inventoryData) || {};
+    const productById = id => (inv.ic_products || []).find(p => p.id === id);
+    const asc = [...(inv.ic_counts || [])].sort(App.cmpOldest);
+    const latest = asc.length ? asc[asc.length - 1] : null;
+    const prev = asc.length >= 2 ? asc[asc.length - 2] : null;
+
+    // One usage pair feeds both periodCost and deadAll, exactly as the cockpit did it.
+    const base = (latest && prev) ? App.computeUsagePair(prev, latest, inv.ic_deliveries || []) : null;
+    const periodCost = base
+      ? Object.values(base).reduce((s, b) => s + (b.unitCost != null ? Math.max(0, b.rawUsed) * b.unitCost : 0), 0)
+      : null;
+
+    const perp = App._perpetualInventory();
+    const deadAll = base ? Object.keys(perp).filter(pid => {
+      const p = productById(pid);
+      const oh = perp[pid].onHand;
+      if (!p || !(oh > 0)) return false;
+      const used = base[pid] ? Math.max(0, base[pid].rawUsed) : 0;
+      return used <= 0.001 && oh * (App.unitCost(p) || 0) >= 15;
+    }).length : 0;
+
+    /* ⛔ ONE DOOR FOR BELOW PAR. This is the Order Sheet's own plan, never a second below-par loop:
+       the cockpit once carried its own copy and the two drifted twice (a vendor already received
+       still showing below par, and a hidden product counted here but not there). */
+    let reorderTotal = 0, reorderCount = 0;
+    const _os = window.S && S.InventoryOrderSheet;
+    const _plan = (_os && _os.belowParByVendor) ? _os.belowParByVendor() : null;
+    if (_plan && _plan.groups) {
+      Object.keys(_plan.groups).forEach(v => (_plan.groups[v] || []).forEach(l => {
+        reorderTotal += (l.suggested || 0) * (l.unit_cost || 0);
+        reorderCount++;
+      }));
+    }
+
+    /* Pars that are off versus real usage. Gated on a SECOND count for the same reason the cockpit
+       gated it: with one count there is no usage period to judge a par against. */
+    let parOff = 0;
+    const PS = window.S && S.InventoryParSuggestions;
+    if (prev && latest && PS && PS.settings && PS.computeSuggestion) {
+      const settings = PS.settings();
+      let withPar = 0, tuned = 0;
+      (inv.ic_products || []).filter(p => p.active !== false).forEach(p => {
+        if (p.par_level == null || p.par_level === '') return;
+        const sug = PS.computeSuggestion(p, settings, latest.date);
+        if (!sug || sug.suggested == null) return;
+        withPar++;
+        const cur = Math.round(parseFloat(p.par_level) || 0);
+        const diff = Math.abs(sug.suggested - cur);
+        if (!(diff >= 1 && diff >= cur * 0.25)) tuned++;
+      });
+      parOff = withPar - tuned;
+    }
+
+    return { periodCost, reorderTotal, reorderCount, deadAll, parOff,
+             menuOver: App.menuItemsOverTarget().length };
+  },
+
+  /* ── Per-staff overtime projection for the reviewed week ──────────────────────────────────────
+     Hours already WORKED plus hours still SCHEDULED on days not yet worked. Same basis as Overtime
+     Watch, which this used to claim to match while actually running max(actual, scheduled) — the
+     basis Overtime Watch abandoned because it misses anyone already logging extra who still has
+     shifts to come.
+     ⭐ MOVED OFF THE LABOR COCKPIT, AND THE WEEK IS THE ONE THING THAT CHANGED. It used to read
+     `this.weekStart()` / `this.weekEnd()`, which is why this page had to move that screen's
+     selector to call it. It takes the Monday now, so nothing has to be mutated to ask it a
+     question. Every line below is otherwise the cockpit's own.
+     ⚠ NOTE, so nobody re-derives it: newest wins when a week somehow carries more than one
+     schedule, matching Overtime Watch, Log Hours, Pay Periods and the Call-Out Log. Rebuilding a
+     week does NOT strand a superseded record — Build Schedule replaces in place and loadWeek edits
+     the existing one — so this covers two managers posting the same week from different devices
+     before a sync. cmpNewest resolves it through its created_at tiebreak. */
+  _weekProjection(wkStart) {
+    const wkEnd = this._addDays(wkStart, 6);
+    const lab = (App.laborData) || {};
+    const curWeek = (lab.lc_actuals || []).filter(a => a.date >= wkStart && a.date <= wkEnd);
+    const sched = (lab.lc_schedules || []).filter(s => s.week_start === wkStart).sort(App.cmpNewest)[0] || null;
+    const proj = {};
+    const ensure = (id, name) => { if (!proj[id]) proj[id] = { id, name: name || '-', actual: 0, scheduled: 0 }; return proj[id]; };
+    const DAYS = App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    curWeek.forEach(a => {
+      if (App.isSalaried(a.staff_id)) return;
+      const e = ensure(a.staff_id || a.name, a.name);
+      e.actual += (a.hours || 0);
+      (e.workedDays = e.workedDays || {})[a.date] = true;   // this day is already logged
+    });
+    if (sched) (sched.shifts || []).forEach(sh => {
+      if (App.isSalaried(sh.staff_id)) return;
+      const e = ensure(sh.staff_id || sh.name, sh.name);
+      e.scheduled += (sh.hours || 0);
+      // wkStart is a Monday and DAYS is Monday-first, so the index is the day offset.
+      const di = DAYS.indexOf(sh.day);
+      const dt = di >= 0 ? this._addDays(wkStart, di) : null;
+      if (dt) (e.schedByDate = e.schedByDate || {})[dt] = (e.schedByDate[dt] || 0) + (sh.hours || 0);
+    });
+    let over = 0, approaching = 0, otPremium = 0;
+    Object.values(proj).forEach(e => {
+      const remainingSched = Object.keys(e.schedByDate || {}).reduce((t, d) =>
+        t + ((e.workedDays && e.workedDays[d]) ? 0 : e.schedByDate[d]), 0);
+      const projected = e.actual + remainingSched;
+      const wage = App.wageForStaffOn ? (App.wageForStaffOn(e.id, wkStart) || 0) : 0;
+      const otHours = Math.max(0, projected - App.OT_THRESHOLD);
+      otPremium += otHours * wage * 0.5;
+      if (projected > App.OT_THRESHOLD) over++;
+      else if (projected >= App.OT_APPROACHING) approaching++;
+    });
+    return { over, approaching, otPremium };
+  },
+
+  /* ── The four reads that used to live on the Profit and Revenue cockpits ──────────────────────
+     ⭐ MOVED, NOT REWRITTEN. Every body below is the cockpit's own, byte for byte, with one change:
+     the `this.targets()` / `this.weeks()` one-liners are folded in as literals rather than moved
+     as members of their own, because nothing else here reads them ([[the-loop]] #120 — a constant
+     only its own member reads goes inside it).
+     ⚠ THIS IS NOT A SECOND IMPLEMENTATION. Week in Review was the ONLY surviving consumer of all
+     four; the cockpits that declared them are deleted at 1c. A copy would be drift, a move is not. */
+  _savedProfitWeek(pe) { return ((App.data && App.data.weeks) || []).find(w => w.period_end === pe) || null; },
+  _savedRevenueWeek(pe) {
+    return ((App.data && App.data.revenue_weeks) || [])
+      .find(w => w.period_end === pe && ((w.bar_revenue || 0) + (w.floor_revenue || 0)) > 0) || null;
+  },
+  // The pour/food/prime cost rows for a saved week, each vs its own target.
+  _costRows(w) {
+    const t = (App.data && App.data.settings && App.data.settings.targets) || {};
+    const mk = (label, val, tgt) => ({ label, val, tgt, over: (val != null && val > tgt) });
+    return [
+      mk('Bar Pour Cost', (w.bar && w.bar.cost_pct != null) ? w.bar.cost_pct : null, t.bar_pour_cost_pct || 22),
+      mk('Food Cost',     (w.food && w.food.cost_pct != null) ? w.food.cost_pct : null, t.food_cost_pct || 32),
+      mk('Prime Cost',    (w.prime_cost_pct != null) ? w.prime_cost_pct : null,         t.prime_cost_pct || 60)
+    ];
+  },
+  // Check average, labor %, and revenue per labor hour for a week, each vs its
+  // target. good = hitting it (check avg + rplh higher is better; labor % lower).
+  _metricsRows(w) {
+    const t = (App.data && App.data.revenue_settings && App.data.revenue_settings.targets) || {};
+    const tCA = t.check_avg != null ? t.check_avg : 35;
+    const tLP = App.laborTargetPct ? App.laborTargetPct() : 30;
+    const tR  = t.rplh;
+    return [
+      { label: 'Check Average', value: w.check_avg != null ? App.fmtCurrency(w.check_avg) : '-', sub: 'target ' + App.fmtCurrency(tCA), good: w.check_avg != null ? (w.check_avg >= tCA) : null },
+      { label: 'Labor %', value: w.labor_pct_blended != null ? w.labor_pct_blended.toFixed(1) + '%' : '-', sub: 'target ' + tLP.toFixed(1) + '%', good: w.labor_pct_blended != null ? (w.labor_pct_blended <= tLP) : null },
+      { label: 'Revenue / Labor Hour', value: w.rplh_blended != null ? App.fmtCurrency(w.rplh_blended) : '-', sub: tR ? 'target ' + App.fmtCurrency(tR) : 'this week', good: (w.rplh_blended != null && tR) ? (w.rplh_blended >= tR) : null }
+    ];
+  },
+
   // ── Profit (Recovery) ───────────────────────────────────────────────────────
   _profitSection() {
-    const PD = S.Dashboard;
-    if (!PD) return '';
+    /* ⛔ NO `S.Dashboard` ALIAS AND NO `if (!PD) return ''` GUARD ANY MORE. That guard blanked the
+       whole card whenever the Profit cockpit file was absent, and after 1c it is absent forever, so
+       keeping it would have retired this card silently. Nothing here needs that file: `savedWeek`
+       and `_costRows` were already taking everything they use as arguments. */
     if (!((App.data && App.data.weeks) || []).length && !((App.data && App.data.audits) || []).length) return null;
 
     /* ⛔ TWO CURRENT-STATE FIGURES CAME OFF THIS CARD IN THE SAME EDIT, for one reason written
@@ -698,14 +879,16 @@ S.WeekReview = {
            `Recovery.gapImpact` as it stands TODAY, and `!done.leaks` was the checkbox.
        The Hub is the page that answers "what should I work on now"; this one answers "what did that
        week do". */
-    const sv = PD._weekEnd;
-    PD._weekEnd = this._wkE();
-    let w, costRows, overCount;
-    try {
-      w = PD.savedWeek(this._wkE());
-      costRows = w ? PD._costRows(w) : null;
-      overCount = costRows ? costRows.filter(r => r.over).length : 0;
-    } finally { PD._weekEnd = sv; }
+    /* ⭐⭐ THE BORROW IS GONE, AND IT WAS DEAD CODE. This block used to save the Profit cockpit's
+       `_weekEnd`, overwrite it with the reviewed week, call two members and put it back. MEASURED:
+       nothing inside the try block ever read that field. `savedWeek(pe)` takes the period_end as an
+       argument and `_costRows(w)` takes the week RECORD, so the whole save-set-restore moved a
+       value nothing consulted. A page that reads data has no business writing another screen's
+       state, and a `finally` is not a guarantee — anything throwing between the two lines leaves
+       that screen parked on a week its own operator never chose. */
+    const w = this._savedProfitWeek(this._wkE());
+    const costRows = w ? this._costRows(w) : null;
+    const overCount = costRows ? costRows.filter(r => r.over).length : 0;
 
     // Real recovery activity logged this week (records dated in the window).
     const dat = App.data || {};
@@ -777,19 +960,14 @@ S.WeekReview = {
 
   // ── Revenue (Recovery) ──────────────────────────────────────────────────────
   _revenueSection() {
-    const RD = S.RevenueDashboard;
-    if (!RD) return '';
+    // No cockpit alias and no absence guard, for the reason written on the Profit card.
     if (!((App.data && App.data.revenue_weeks) || []).length && !((App.data && App.data.revenue_audits) || []).length) return null;
 
     // Same two current-state figures came off this card as off Profit's — see the note there.
-    const sv = RD._weekEnd;
-    RD._weekEnd = this._wkE();
-    let w, metrics, offCount;
-    try {
-      w = RD.savedWeek(this._wkE());
-      metrics = RD.metricsRows(w || {});
-      offCount = metrics.filter(m => m.good === false).length;
-    } finally { RD._weekEnd = sv; }
+    // The borrow here was dead in the same way: neither member ever read `_weekEnd`.
+    const w = this._savedRevenueWeek(this._wkE());
+    const metrics = this._metricsRows(w || {});
+    const offCount = metrics.filter(m => m.good === false).length;
 
     const dat = App.data || {};
     const audWk   = (dat.revenue_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10)));
