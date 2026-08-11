@@ -1301,8 +1301,9 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .tn-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .tn-iconbtn{width:33px;height:33px;display:flex;align-items:center;justify-content:center;background:var(--c3);border:1px solid transparent;border-radius:var(--r2);color:var(--t2);cursor:pointer;transition:background .12s,color .12s;}
 .tn-iconbtn:hover{background:var(--c4);color:var(--w);}
-.tn-date{font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--t3);white-space:nowrap;}
-@media (max-width:560px){.tn-date{display:none;}}
+/* .tn-date removed 2026-08-10 with its markup and its setter. The date lives on the Hub now, beside
+   the greeting; on every other page it was chrome. All three went in the same edit so no orphan is
+   left looking load-bearing. */
 
 /* Row 2 — the working sections as pills + the sidebar collapse toggle. */
 /* ⛔⛔ THE `.tn-sec` PILL RULES ARE GONE, AND THEY ARE WHAT KYLE SAW. They styled row 2's clickable
