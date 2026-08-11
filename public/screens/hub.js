@@ -1063,8 +1063,18 @@ S.Hub = {
     // first thing a new operator sees after onboarding, so it points at the setup
     // that has to happen first — the three Control sections — then the first audit.
     // Nothing else can be done until those are set up.
-    const hubStarted = anyAudit || pWeeks.length > 0 || rWeeks.length > 0
-      || icCounts.length > 0 || recoveryTotal.dollars > 0 || trapped.hasData || bcScore != null;
+    /* ⛔⛔⛔ THE FLIP KEYS ON THE FOUR TILES' OWN DATA, NOT ON "HAS THE OPERATOR DONE ANYTHING".
+       Kyle, 2026-08-11: *"get started card is there until an actual number can be filled in on the
+       stat box .. then get started goes away and stat box shows."*
+       ⚠ THE OLD `hubStarted` WAS THE WRONG TEST FOR THIS AND WOULD HAVE SHIPPED THE SAME DEFECT BACK.
+       It counted confirmed weeks, inventory counts and a Bar Cop score — none of which fills any of
+       these four cells — so it could flip the band on and show FOUR "No data" boxes, which is
+       exactly the screen Kyle was looking at when he asked for this. The honest question is the one
+       he asked: can any of these four print a real number yet?
+       ⭐ Each clause is the tile's own source, so a fifth tile added later cannot be forgotten here:
+       Total Opportunity needs an audit, Recovered needs a measured fix, Trapped Cash needs a count,
+       Break-Even needs costs set. */
+    const bandHasANumber = anyAudit || recoveryTotal.dollars > 0 || trapped.hasData || !!beSum.hasData;
     // Same chip style as the section Get Started cards (App.controlGetStarted):
     // a Get Started title, one subtitle line, and a flex row of numbered chips
     // that navigate. Each chip carries its own module so the Hub router lands on
@@ -1084,12 +1094,18 @@ S.Hub = {
       +   gsChip(3, 'Set up Shift Control', 'shift')
       +   gsChip(4, 'Run your first audit', 'profit')
       + '</div>';
-    /* ⛔ THE MONEY BAND ALWAYS RENDERS. It used to be REPLACED wholesale by the Get Started box, so a
-       new operator never saw the four numbers the product exists to produce — the one thing on the
-       page that says what Bar Cop is for. The band shows its own empty state; Get Started moved into
-       the "do this first" slot below it, which is the same region a seeded account uses for its
-       biggest money move. One design, both states ([[empty-state-day1]]). */
-    const topCard = tiles;
+    /* ⛔⛔ REVERSED 2026-08-11, AND THE REASON I HAD IT THE OTHER WAY WAS WRONG. During the rebuild I
+       made the band always render, arguing a new operator should see "the four numbers the product
+       exists to produce". What they actually saw was **No data · $0 · No data · No data** occupying
+       the top of the page, with Get Started stranded in the middle. Four dead cells do not say what
+       Bar Cop is for; they say it has nothing to tell you.
+       ⭐ SO GET STARTED TAKES THE BAND'S PLACE UNTIL A TILE CAN PRINT A REAL NUMBER, which is the
+       locked flip rule ([[empty-state-day1]]) that this page had quietly stopped following. Same
+       region, same shell, one design in both states: the top of the Hub always holds the thing worth
+       looking at, whichever that is today. */
+    const topCard = bandHasANumber ? tiles
+      : '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:16px 18px;">'
+        + '<div class="sh" style="margin:0 0 10px;">Get started</div>' + gettingStarted + '</div>';
 
     // ── Needs Attention band: the fires (alerts) + section-less weekly nudges
     //    (month-end Books, etc.). Catches what does not belong to a weekly section
@@ -1153,15 +1169,18 @@ S.Hub = {
        to care — the count was only ever meaningful to me, as proof the ranking had a pile behind it.
        ⭐ WHICH IS THE CARD'S WHOLE POINT: the app did the analysis, so it says the answer. A count of
        what it did not say is the shortlist coming back in smaller type. */
-    const doFirst = first
-      ? '<div onclick="' + paiGo(first.item) + '" style="cursor:pointer;">'
+    /* ⚠ NO EMPTY BRANCH HERE ANY MORE. This used to fall back to `gettingStarted`, and once Get
+       Started moved up to the money band's place that branch became unreachable — `doFirstBand`
+       returns nothing at all when there is no action. An unreachable fallback that still names a
+       real card is how the next reader concludes this slot owns the empty state too. */
+    const doFirst = !first ? ''
+      : '<div onclick="' + paiGo(first.item) + '" style="cursor:pointer;">'
         /* Kyle: *"make the close the check average gap a little bigger."* 15px -> 18px. */
         + '<div style="font-size:18px;font-weight:700;color:var(--t1);line-height:1.3;">' + esc(first.label) + '</div>'
         + (first.impact > 0
             ? '<div style="font-size:12px;color:var(--t2);margin-top:6px;">Worth <span style="color:var(--gold);font-weight:700;">'
               + App.fmtCurrency(first.impact, 0) + '</span> a month</div>' : '')
-        + '</div>'
-      : gettingStarted;
+        + '</div>';
     /* ⛔⛔ `priorityCard` AND `needsBand` ARE DELETED, NOT LEFT SITTING. The movement rebuild replaced
        both with `doFirstBand` and the Band-4 row list, and each was DECLARED AND NEVER READ from that
        moment — 45 lines of a previous layout that still looked load-bearing, including the
@@ -1800,18 +1819,22 @@ S.Hub = {
        invisible to `node --check` and to 449 harnesses. **A rename is a text edit, not a refactor:
        bound it to the block you own and read every hit.**
        Kyle also called the gold edge: *"get rid of the gold left side border."* */
-    const doFirstBand = '<div style="background:var(--card-head);border:1px solid var(--b-edge);'
+    /* ⛔ THIS BAND STANDS DOWN WHEN GET STARTED HAS TAKEN THE TOP. It used to carry Get Started
+       itself when there was no action to name, which is why the empty Hub rendered it TWICE the
+       moment the flip moved Get Started up to the money band's place. One card, one home: this band
+       exists only when there is a real biggest money move to point at.
+       ⚠ THE HEADING LIVES HERE AND NOT IN `doFirst`, because the band lost its label once already in
+       the rebuild and shipped unlabelled for two pushes — the old `cardWrap('Do This First', …)`
+       supplied it and the replacement did not carry it across. `verify-hub-no-cockpit` F1b caught
+       that, which is the control whose whole job is refusing to let a card pass by being deleted. */
+    const doFirstBand = !first ? ''
+      : '<div style="background:var(--card-head);border:1px solid var(--b-edge);'
       + 'border-radius:var(--r);padding:16px 18px;display:flex;'
       + 'align-items:center;gap:20px;flex-wrap:wrap;">'
-      /* ⚠ THE BAND LOST ITS HEADING IN THE REBUILD AND NOBODY NOTICED FOR TWO PUSHES. The old
-         `cardWrap('Do This First', …)` supplied it; the new band replaced the wrapper and did not
-         carry the label across, so the most important card on the page was an unlabelled sentence.
-         Caught by `verify-hub-no-cockpit` F1b, whose whole job is refusing to let a list pass by
-         being DELETED — it went red on "doFirst=false" over a card that was still rendering. */
       + '<div style="flex:1;min-width:220px;">'
-      +   hbSh(topItems.length ? 'Do this first' : 'Get started')
+      +   hbSh('Do this first')
       +   doFirst + '</div>'
-      + (first ? '<button class="btn btn-ghost btn-sm" onclick="' + paiGo(first.item) + '">Open the fix</button>' : '')
+      + '<button class="btn btn-ghost btn-sm" onclick="' + paiGo(first.item) + '">Open the fix</button>'
       + '</div>';
 
     // ── Band 3: biggest gain and worst drag, in the audit's own vocabulary ──
