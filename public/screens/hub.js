@@ -274,12 +274,6 @@ S.Hub = {
      beside one telling the truth, and "Voids $0.00" reads as GOOD NEWS to someone who has imported
      nothing. Every cell here answers "-" until it has a basis. */
   _stripMetrics() {
-    const D = App.data || {};
-    const newest = arr => (arr || []).reduce((best, w) =>
-      (!best || String(w.period_end || '') > String(best.period_end || '')) ? w : best, null);
-    const pW = newest(D.weeks);
-    const rW = newest((D.revenue_weeks || []).filter(w => (w.bar_revenue || 0) + (w.floor_revenue || 0) > 0));
-
     /* BELOW PAR comes from the ORDER SHEET, not from the dying Inventory cockpit. Measured:
        `ic-dashboard.computeState` never calculated it — it called `belowParByVendor()` (1,493 chars,
        self-contained, on a screen that survives) and summed the plan. That one fact is why the Hub
@@ -303,39 +297,339 @@ S.Hub = {
       }
     }
 
-    /* OVER / SHORT for the week on screen. A week with no drawer counted is "Not counted", which is
-       the honest wording this file already used for exactly this cell. */
-    const wkEnd = App.nextSunday ? App.nextSunday() : null;
-    const wkStart = (wkEnd && App.weekStartFor) ? App.weekStartFor(wkEnd) : null;
-    const vars = ((App.shiftData || {}).sc_variances || []).filter(v => {
-      const d = String((v && v.date) || '').slice(0, 10);
-      return !!d && (!wkStart || d >= wkStart) && (!wkEnd || d <= wkEnd);
-    });
-    const netVar = vars.reduce((t, v) => t + (v.variance || 0), 0);
-
+    /* ⚠ OVER / SHORT LEFT THIS STRIP DELIBERATELY, IT WAS NOT DROPPED. It reads the CURRENT week, and
+       on a Monday morning that is "Not counted" for every operator alive — which is the same trap as
+       reading sales from a week that has not happened yet. The drawer variance still has its own
+       screen and still feeds Cash Integrity in the audit. `verify-hub-shift-notcounted-tile` pins the
+       "Not counted" wording, so it was RE-POINTED rather than deleted
+       ([[harness-review-like-code]] #69 — a feature that MOVED reads as one that was LOST). */
     const cashSF = (typeof CashEngine !== 'undefined' && CashEngine.survivalForecast)
       ? CashEngine.survivalForecast(13) : { hasData: false };
     const runway = !cashSF.hasData ? null
       : (cashSF.runway == null ? '13+ wks'
          : cashSF.runway === 0 ? 'This wk' : cashSF.runway + ' wk' + (cashSF.runway === 1 ? '' : 's'));
 
+    /* ⛔ THE STRIP STOPPED REPEATING THE BAND ABOVE IT. Kyle, 2026-08-10: *"the bottom section we put
+       entirely different things.. not repeating most of what is already in there where you are box."*
+       Prime cost, labor %, check average and weekly sales are all in the was-to-now band now, so a
+       strip carrying them again said the same thing twice on one screen. These six are OPERATIONAL
+       facts, each a different job, each a door into the section that owns it.
+       ⚠ I SWAPPED ONE OF KYLE'S OWN CANDIDATES OUT AND IT NEEDS HIS EYES: he listed "sales data",
+       but weekly sales is already a was-to-now pair, so it would have been the exact duplication he
+       asked me to remove. Cash runway takes the slot. Spot checks moved to Done This Week by his
+       call, because a "did you do it" fact reads better as a tick than as a number.
+       ⛔ BELOW PAR AND CASH RUNWAY CARRY NO DELTA AND NEVER WILL. Both are computed live (the order
+       sheet against the latest count; CashEngine against today's balances) and NOTHING stores a
+       dated history of either — measured across every store. A delta needs a past reading, so those
+       two cells state the figure and stop. The others compare against the week before last week. */
+    const lw = this._lastClosedWeek();
+    const money = (v, dp) => v == null ? '-' : App.fmtCurrency(v, dp == null ? 0 : dp);
     return [
-      { label: 'Below par',     mod: 'inventory', value: belowPar == null ? '-' : App.fmtCurrency(belowPar, 0) },
-      { label: 'Labor %',       mod: 'labor',     value: (rW && rW.labor_pct_blended != null) ? App.fmtPct(rW.labor_pct_blended) : '-' },
-      /* ⛔ `App.fmtSigned` RETURNS `{ text, sign }`, NOT A STRING. Without `.text` the cell rendered
-         a literal **[object Object]** on the shipped Hub. My fixture stubbed it as a string-returner,
-         so every assertion about this cell passed over the defect — a stub of a different SHAPE from
-         the real helper is the same trap as one that is more forgiving. Block E refuses any
-         non-string value now, which closes the class rather than this one cell.
-         ⚠ AND THE MONEY COMES FROM `fmtBal`, WHICH IS WHAT THE SHIFT COCKPIT USED — `fmtSigned.text`
-         alone yields "-28.25" with no currency mark. `fmtSigned` is here only for the SIGN, exactly
-         as the card did it. Copy the reason, not just the shape ([[test-the-first-drop]] rule 4). */
-      { label: 'Over / short',  mod: 'shift',     value: vars.length
-          ? (App.fmtSigned(netVar, 2).sign > 0 ? '+' : '') + App.fmtBal(netVar) : 'Not counted' },
-      { label: 'Prime cost',    mod: 'profit',    value: (pW && pW.prime_cost_pct != null) ? App.fmtPct(pW.prime_cost_pct) : '-' },
-      { label: 'Check average', mod: 'revenue',   value: (rW && rW.check_avg != null) ? App.fmtCurrency(rW.check_avg) : '-' },
-      { label: 'Cash runway',   mod: 'cash',      value: runway || '-' }
+      { label: 'Below par',      mod: 'inventory', screen: 'ic-order-sheet',
+        value: belowPar == null ? '-' : App.fmtCurrency(belowPar, 0), sub: 'to reorder' },
+      /* ⛔ EVERY DELTA DECLARES WHICH DIRECTION IS GOOD, because the colour answers good-or-bad and
+         not up-or-down. Hours has NO direction: more hours is neither good nor bad without knowing
+         the sales behind them, and colouring it would be the app pretending to a judgement it has
+         not made ([[dashboard-discipline]] — colour is meaning, and an unjudged figure stays neutral).
+         ⚠ THE DELTAS WERE COMPUTED AND RENDERED NOWHERE in my first version — `_sectionStrip` simply
+         did not read them. That is [[the-loop]] #25 exactly: a field computed, carried and never
+         read is a fix that never shipped. Caught by RUNNING the member and reading its output. */
+      { label: 'Hours logged',   mod: 'labor',     screen: 'lc-log-hours',
+        value: lw.hours == null ? '-' : (Math.round(lw.hours) + ' hrs'),
+        sub: lw.label, delta: lw.hoursDelta, deltaText: lw.hoursDelta == null ? null
+          : (lw.hoursDelta >= 0 ? '+' : '-') + Math.abs(Math.round(lw.hoursDelta)) + ' hrs', betterIsDown: null },
+      { label: 'Overtime',       mod: 'labor',     screen: 'lc-overtime-watch',
+        value: money(lw.otCost), sub: lw.label, delta: lw.otDelta,
+        deltaText: lw.otDelta == null ? null : (lw.otDelta >= 0 ? '+' : '-') + App.fmtCurrency(Math.abs(lw.otDelta), 0),
+        betterIsDown: true },
+      { label: 'Cost of goods',  mod: 'profit',    screen: 'dashboard',
+        value: money(lw.cogs), sub: lw.label, delta: lw.cogsDelta,
+        deltaText: lw.cogsDelta == null ? null : (lw.cogsDelta >= 0 ? '+' : '-') + App.fmtCurrency(Math.abs(lw.cogsDelta), 0),
+        betterIsDown: true },
+      { label: 'Voids and comps', mod: 'shift',    screen: 'sc-void-comp',
+        value: money(lw.voids, 2), sub: lw.label, delta: lw.voidsDelta,
+        deltaText: lw.voidsDelta == null ? null : (lw.voidsDelta >= 0 ? '+' : '-') + App.fmtCurrency(Math.abs(lw.voidsDelta), 2),
+        betterIsDown: true },
+      { label: 'Cash runway',    mod: 'cash',      screen: 'c-forecast',
+        value: runway || '-', sub: 'at today\'s burn' }
     ];
+  },
+
+  /* ── THE LAST CLOSED WEEK, AND THE ONE BEFORE IT ────────────────────────────────────────────
+     Kyle: *"on the sales/hours.. just put 'last week' or something small under them."* On a Monday
+     morning the current week is empty, so an operational figure read from it is zero for every
+     operator who opens the Hub at the start of their week. These read the last CLOSED week and say
+     so on the cell.
+     ⚠ "CLOSED" MEANS ENDED, NOT CONFIRMED. A week record is written when the operator confirms, and
+     they may confirm mid-week, so the newest `weeks` row is not reliably last week. The honest test
+     is the calendar: the newest week whose period_end falls BEFORE the current week began. */
+  _lastClosedWeek() {
+    const D = App.data || {};
+    const thisStart = (App.nextSunday && App.weekStartFor) ? App.weekStartFor(App.nextSunday()) : null;
+    const before = arr => (arr || [])
+      .filter(w => w && w.period_end && (!thisStart || String(w.period_end) < thisStart))
+      .sort((a, b) => String(b.period_end).localeCompare(String(a.period_end)));
+    const pw = before(D.weeks), rw = before(D.revenue_weeks);
+    const end = (pw[0] && pw[0].period_end) || (rw[0] && rw[0].period_end) || null;
+    if (!end) return { label: 'last week', hours: null, otCost: null, cogs: null, voids: null };
+    const prevEnd = (pw[1] && pw[1].period_end) || (rw[1] && rw[1].period_end) || null;
+
+    /* Seven days ending on period_end, inclusive. `App.weekStartFor` is the app's own answer so the
+       Hub cannot disagree with the rest of the product about where a week begins. */
+    const spanOf = e => ({ from: App.weekStartFor ? App.weekStartFor(e) : e, to: e });
+    const cur = spanOf(end), prv = prevEnd ? spanOf(prevEnd) : null;
+    const inSpan = (d, s) => { const x = String(d || '').slice(0, 10); return !!s && !!x && x >= s.from && x <= s.to; };
+
+    const acts = (App.laborData || {}).lc_actuals || [];
+    const vcs  = (App.shiftData || {}).sc_void_comps || [];
+    const sum = (arr, span, pick) => !span ? null
+      : arr.reduce((t, r) => inSpan(r && r.date, span) ? t + (Number(pick(r)) || 0) : t, 0);
+
+    /* OVERTIME COST, NOT OVERTIME HOURS. `lc_actuals` carries `hours`, `wage` and `cost` per row;
+       hours past 40 in the week for one person are the overtime. Summed per staff member so a
+       person working two short shifts is not counted as two people ([[labor-cost-model]] — read it
+       before changing any labor number; the OT premium invariant lives there). */
+    const otCostFor = span => {
+      if (!span) return null;
+      const byStaff = {};
+      acts.forEach(r => { if (inSpan(r && r.date, span)) {
+        const k = r.staff_id || r.name || '?';
+        byStaff[k] = byStaff[k] || { h: 0, wage: Number(r.wage) || 0 };
+        byStaff[k].h += Number(r.hours) || 0;
+        if (!byStaff[k].wage) byStaff[k].wage = Number(r.wage) || 0;
+      } });
+      return Object.keys(byStaff).reduce((t, k) => {
+        const o = Math.max(0, byStaff[k].h - 40);
+        return t + o * byStaff[k].wage * 0.5;      // the PREMIUM half only, per the locked model
+      }, 0);
+    };
+
+    const cogsFor = w => (!w) ? null : ((Number(w.bar) || 0) + (Number(w.food) || 0));
+    const d = (now, was) => (now == null || was == null) ? null : now - was;
+
+    const hours = sum(acts, cur, r => r.hours);
+    const otC = otCostFor(cur), voids = sum(vcs, cur, r => r.amount), cogs = cogsFor(pw[0]);
+    return {
+      label: 'last week',
+      end: end,
+      hours: hours, hoursDelta: d(hours, sum(acts, prv, r => r.hours)),
+      otCost: otC, otDelta: d(otC, otCostFor(prv)),
+      cogs: cogs, cogsDelta: d(cogs, cogsFor(pw[1])),
+      voids: voids, voidsDelta: d(voids, sum(vcs, prv, r => r.amount))
+    };
+  },
+
+  /* Good morning / afternoon / evening, off the operator's own clock. Kyle's call, 2026-08-10.
+     Takes the hour so a harness can drive all three without waiting for the day to pass. */
+  _greeting(hour) {
+    const h = (hour == null) ? new Date().getHours() : hour;
+    return h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
+  },
+
+  /* ── THE CLIMB: the Bar Cop Audit's whole history in two numbers ────────────────────────────
+     ⛔⛔ READ THE RIGHT STORE. There are FOUR audit stores and they are easy to confuse: `audits` is
+     the PROFIT audit, `revenue_audits`, `cash_audits`, and `bar_cop_audits` is the meta one whose
+     score is the "75" on screen. I built the first version of this band off `audits` and told Kyle
+     the climb was 33 to 75 — mixing the profit audit's floor with the Bar Cop audit's ceiling. The
+     real Bar Cop climb is 40 to 75. Two stores, one sentence, and the number looked plausible the
+     whole time ([[code-is-truth]] — read it out of the store, every time).
+     ⚠ ONE AUDIT MEANS NO CLIMB. A single reading has nothing to climb from, so this returns null and
+     the band renders its first-audit state rather than a delta against nothing. */
+  _auditClimb() {
+    const B = ((App.data || {}).bar_cop_audits || [])
+      .filter(a => a && a.date && a.overall_score != null)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    if (B.length < 2) return null;
+    const first = B[0], last = B[B.length - 1];
+    const days = Math.round((new Date(last.date + 'T00:00:00') - new Date(first.date + 'T00:00:00')) / 86400000);
+    return {
+      first: first.overall_score, firstDate: first.date,
+      last: last.overall_score, lastDate: last.date,
+      delta: last.overall_score - first.overall_score,
+      count: B.length, weeks: Math.max(1, Math.round(days / 7))
+    };
+  },
+
+  /* The three recovery audits, each with its own last-run date. Kyle: *"have profit, revenue, cash
+     audits with last run date or something in small text."* Never run reads as a dash, not a zero —
+     a zero is a score somebody earned. */
+  _moduleAudits() {
+    const D = App.data || {};
+    const one = (arr, name, screen, mod) => {
+      const a = (D[arr] || []).filter(x => x && x.date && x.overall_score != null)
+        .sort((x, y) => String(y.date).localeCompare(String(x.date)))[0];
+      return { name: name, screen: screen, mod: mod,
+               score: a ? a.overall_score : null, date: a ? a.date : null };
+    };
+    return [
+      one('audits', 'Profit', 'audit-tracker', 'profit'),
+      one('revenue_audits', 'Revenue', 'r-audit', 'revenue'),
+      one('cash_audits', 'Cash', 'c-audit', 'cash')
+    ];
+  },
+
+  /* ── MOVEMENT: a FIXED two-week comparison, never a growing window ──────────────────────────
+     Kyle, 2026-08-10: *"should it be on a set running 2 week comparison? ... 4 weeks is too long..
+     and don't think 1 week works?"* Measured across all thirteen weeks of history before answering:
+     one-week moves ran a median of $818/mo (NOT noise, which is what I had claimed off a single
+     pair), two-week $1,728/mo, four-week $3,215/mo.
+     ⭐ TWO WEEKS, FIXED. A window that widens as the account ages grows without bound and stops
+     meaning anything; a fixed one always answers the same question.
+     ⛔ THE NUMBER SHRINKS AS THE OPERATOR IMPROVES, and that surprised us both: on this history the
+     two-week reading decayed $3,025 -> $1,728 -> $836 -> $647 as prime cost converged. So the
+     sentence carries the POINTS as well as the money, or a bar that has done everything right for a
+     quarter reads its smallest headline ever as a let-down. The long story is the climb, on the left.
+     ⛔ AND BELOW ABOUT $100 A MONTH IT STOPS CLAIMING A RESULT. $25 a week on a $19,000 week is not
+     a result, it is noise wearing a dollar sign. */
+  _movement() {
+    const D = App.data || {};
+    const thisStart = (App.nextSunday && App.weekStartFor) ? App.weekStartFor(App.nextSunday()) : null;
+    const closed = arr => (arr || [])
+      .filter(w => w && w.period_end && (!thisStart || String(w.period_end) < thisStart))
+      .sort((a, b) => String(b.period_end).localeCompare(String(a.period_end)));
+    const P = closed(D.weeks), R = closed(D.revenue_weeks);
+    const rBy = {}; R.forEach(r => { rBy[r.period_end] = r; });
+    const pNow = P[0], pWas = P[2], rNow = R[0], rWas = R[2];
+    if (!pNow && !rNow) return null;
+
+    const sales = r => r ? ((Number(r.bar_revenue) || 0) + (Number(r.floor_revenue) || 0)) : null;
+    const pair = (label, was, now, betterIsUp, fmt) =>
+      (was == null || now == null) ? null
+        : { label: label, was: fmt(was), now: fmt(now), delta: now - was,
+            good: betterIsUp ? (now > was) : (now < was), flat: now === was };
+
+    const pairs = [
+      pair('Prime cost', pWas && pWas.prime_cost_pct, pNow && pNow.prime_cost_pct, false, v => App.fmtPct(v)),
+      pair('Labor', rWas && rWas.labor_pct_blended, rNow && rNow.labor_pct_blended, false, v => App.fmtPct(v)),
+      pair('Check average', rWas && rWas.check_avg, rNow && rNow.check_avg, true, v => App.fmtCurrency(v)),
+      pair('Weekly sales', sales(rWas), sales(rNow), true, v => App.fmtCurrency(v, 0))
+    ].filter(Boolean);
+
+    /* THE HEADLINE. Prime cost is COGS plus labor as a share of sales, so a move in it is the one
+       figure that answers "am I running the place better", and points times sales is real money.
+       ⚠ The sales basis is the CURRENT week's, not the old one: the saving is what today's volume
+       is worth at the better cost, which is the number an operator can actually keep. */
+    const nowPrime = pNow && pNow.prime_cost_pct, wasPrime = pWas && pWas.prime_cost_pct;
+    const basis = sales(rNow || (pNow ? rBy[pNow.period_end] : null));
+    let headline = null;
+    if (nowPrime != null && wasPrime != null && basis) {
+      const pts = wasPrime - nowPrime;                 // positive = improved
+      const monthly = Math.round(pts / 100 * basis * 4.333);
+      headline = (Math.abs(monthly) < 100)
+        ? { holding: true, prime: App.fmtPct(nowPrime) }
+        : { holding: false, better: monthly > 0, amount: App.fmtCurrency(Math.abs(monthly), 0),
+            pts: Math.abs(pts).toFixed(1) };
+    }
+    return { pairs: pairs, headline: headline, window: 'two weeks ago' };
+  },
+
+  /* ── BIGGEST GAIN AND WORST DRAG, IN THE AUDIT'S OWN WORDS ──────────────────────────────────
+     ⭐⭐⭐ THE HUB WRITES NO PROSE HERE, AND THAT IS THE WHOLE POINT. Kyle asked how the explainer line
+     under these two cards is kept consistent and stopped from drifting into longer sentences. The
+     answer is that it is not written by this file at all: `sub_score_detail` already carries, per
+     measure, a `label` from a CLOSED vocabulary. Measured over 270 measures in 13 audits: 29
+     distinct labels, 13 to 37 characters, and not one of the 64 `extra` strings is even a sentence.
+     ⛔ `extra` IS DELIBERATELY NOT PRINTED. Its median length is ZERO (absent more than half the
+     time), so anything built on it changes height with the data — exactly the drift Kyle was worried
+     about. Worse, on Operational Consistency every extra reads "8 weeks of P&L data (need 3+)",
+     which is a data-sufficiency note; printing that under "your biggest gain" would have been
+     quietly wrong. The label plus the measure's own was-to-now percentage says more and cannot grow.
+     ⭐ THE LINE IS THE BIGGEST MOVER INSIDE THE SECTION, NOT THE BEST OR WORST SCORE. Picking the
+     highest gave "Weekly covers consistency, 96%", true and empty; the biggest mover gave "Weekly
+     labor % consistency, 54% -> 87%", which is WHY the section moved.
+     ⚠ TWO GUARDS, BOTH FROM WHAT THE DATA CAN DO: skip any measure flagged `na` (none on today's
+     seed, but the field exists so a live account will hit it), and match measures BY LABEL across
+     the two audits so a newly added measure cannot read as an infinite improvement. */
+  _bestWorst() {
+    const B = ((App.data || {}).bar_cop_audits || [])
+      .filter(a => a && a.date && a.sub_scores)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    if (B.length < 2) return null;
+    const last = B[B.length - 1], prev = B[B.length - 2];
+    const now = last.sub_scores || {}, was = prev.sub_scores || {};
+    const moves = Object.keys(now)
+      .filter(k => now[k] != null && was[k] != null)
+      .map(k => ({ key: k, score: now[k], delta: now[k] - was[k] }))
+      .sort((a, b) => b.delta - a.delta);
+    if (moves.length < 2) return null;
+
+    const title = k => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const mover = (key, wantUp) => {
+      const A = (last.sub_score_detail || {})[key] || [];
+      const Pm = {};
+      ((prev.sub_score_detail || {})[key] || []).forEach(m => {
+        if (m && !m.na && typeof m.pct === 'number') Pm[m.label] = m.pct;
+      });
+      const rows = A.filter(m => m && !m.na && typeof m.pct === 'number' && Pm[m.label] != null)
+        .map(m => ({ label: m.label, now: m.pct, was: Pm[m.label], delta: m.pct - Pm[m.label] }));
+      if (!rows.length) return null;
+      rows.sort((a, b) => wantUp ? b.delta - a.delta : a.delta - b.delta);
+      return rows[0];
+    };
+    const g = moves[0], d = moves[moves.length - 1];
+    return {
+      gain: { section: title(g.key), score: g.score, delta: g.delta, measure: mover(g.key, true) },
+      drag: { section: title(d.key), score: d.score, delta: d.delta, measure: mover(d.key, false) }
+    };
+  },
+
+  /* ── DONE THIS WEEK: five fixed rows, ticked only by a real record ──────────────────────────
+     Kyle, 2026-08-10: *"just pick the top 4-5 things.. so they are always listed and check off when
+     done.. Monday resets."*
+     ⛔ SAY THE OBVIOUS THING OUT LOUD: this IS a weekly checklist, and a checklist is what the Hub
+     just deleted. The difference that makes it right is that NOTHING HERE CAN BE TICKED BY HAND. A
+     tick appears because a dated record exists, so it cannot be faked and it needs no storage of its
+     own. Five derived rows is not twenty-four hand-ticked ones ([[cockpit-steps-manual]] is about
+     the opposite thing — steps the operator marks; these are facts the app observes).
+     ⭐ SPOT CHECK REPLACED COUNT DRAWERS, KYLE'S CALL: *"users may never reconcile drawers or drop a
+     drawer pos.. more likely to spot check."* A row that most operators can never satisfy is a row
+     that makes the list look broken. */
+  _doneThisWeek() {
+    const end = App.nextSunday ? App.nextSunday() : null;
+    const start = (end && App.weekStartFor) ? App.weekStartFor(end) : null;
+    const inWeek = d => {
+      const x = String(d || '').slice(0, 10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(x) && (!start || x >= start) && (!end || x <= end);
+    };
+    /* The DAY it happened, for the row's caption. `App.ymdLocal`/local-date convention throughout —
+       never `toISOString`, which shifts a late-evening record into the next day ([[local-date-convention]]). */
+    const dayOf = d => {
+      const x = String(d || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(x)) return '';
+      const dt = new Date(x + 'T00:00:00');
+      return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+    };
+    const firstIn = arr => (arr || []).filter(r => r && inWeek(r.date))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
+
+    const INV = App.inventoryData || {}, LAB = App.laborData || {}, SH = App.shiftData || {};
+    const rows = [
+      { label: 'Take inventory count', screen: 'ic-take-inventory', mod: 'inventory', hit: firstIn(INV.ic_counts) },
+      { label: 'Log hours',            screen: 'lc-log-hours',      mod: 'labor',     hit: firstIn(LAB.lc_actuals) },
+      { label: 'Import sales',         screen: 'sc-cash-control',   mod: 'shift',     hit: firstIn(SH.sc_shifts) },
+      /* ⛔ THROUGH THE SHARED HELPER, NOT THE RAW STORE, AND THE SUITE CAUGHT ME. My first version
+         read `ic_spot_checks` directly, which counts an IN-PROGRESS check as a completed one — so
+         opening a spot check and walking away would have ticked the row. `App.completedSpotChecks()`
+         is the app's one answer to "which spot checks actually happened" and every other consumer
+         already goes through it. A private copy of a shared job is a copy that has already drifted
+         ([[the-loop]] "grep for other IMPLEMENTATIONS, not for callers"). */
+      /* ⚠ A BARE CALL, DELIBERATELY. My first fix wrote `App.completedSpotChecks ? … : INV.ic_spot_checks`
+         out of habit, and that guard means "if the helper is missing, go quietly back to counting
+         in-progress checks as done" — it reinstates the exact defect on the failure path. A helper
+         required for CORRECTNESS is called bare so a missing one fails loudly instead of producing a
+         silently wrong tick ([[the-loop]] #40). */
+      { label: 'Spot check',           screen: 'ic-spot-check',     mod: 'inventory',
+        hit: firstIn(App.completedSpotChecks()) }
+    ].map(r => ({ label: r.label, screen: r.screen, mod: r.mod,
+                  done: !!r.hit, when: r.hit ? dayOf(r.hit.date) : '' }));
+
+    /* The last row is the week itself. A `week` record ENDING on this week's Sunday means the
+       operator confirmed it; nothing else in the app writes one ([[confirm-the-week]] — ONE popup
+       writes both the profit `week` and the `revenue_week`). */
+    const wk = ((App.data || {}).weeks || []).filter(w => w && String(w.period_end) === String(end))[0];
+    rows.push({ label: 'Close and confirm the week', screen: 'week-close', mod: '',
+                done: !!wk, when: wk ? dayOf(wk.period_end) : '' });
+    return rows;
   },
 
   /* ── NEEDS ATTENTION, CAPPED BY SEVERITY RATHER THAN BY COUNT ───────────────
@@ -380,10 +674,24 @@ S.Hub = {
      section's own first page — never on a cockpit screen id, which is what made the old cards
      undeletable. */
   _sectionStrip(metrics) {
+    /* ⛔ COLOUR ON THE TEXT, NEVER A BADGE, and only where a direction has been DECLARED. A cell with
+       `betterIsDown: null` (hours) stays neutral, and a cell with no delta at all (below par, cash
+       runway, which nothing stores a history of) renders no chip rather than a zero. */
+    const chip = m => {
+      if (!m.deltaText || m.delta == null) return '';
+      const good = (m.betterIsDown == null) ? null : (m.betterIsDown ? m.delta < 0 : m.delta > 0);
+      const col = good == null ? 'var(--t3)' : (good ? 'var(--green)' : 'var(--red)');
+      return '<div style="font-size:11px;font-weight:700;color:' + col + ';margin-top:5px;white-space:nowrap;">'
+        + esc(m.deltaText) + '</div>';
+    };
     const cell = m =>
-      '<div onclick="App.jumpToSection(\'' + esc(m.mod) + '\')" style="flex:1;min-width:96px;cursor:pointer;">'
+      '<div onclick="' + (m.screen ? 'S.Hub._enter(\'' + esc(m.screen) + '\',\'' + esc(m.mod) + '\')'
+                                   : 'App.jumpToSection(\'' + esc(m.mod) + '\')')
+      + '" style="flex:1;min-width:112px;cursor:pointer;">'
       + '<div style="font-size:17px;font-weight:700;color:var(--t1);white-space:nowrap;">' + esc(m.value) + '</div>'
       + '<div style="font-size:11px;color:var(--t3);margin-top:2px;white-space:nowrap;">' + esc(m.label) + '</div>'
+      + (m.sub ? '<div style="font-size:10px;color:var(--t4);margin-top:1px;white-space:nowrap;">' + esc(m.sub) + '</div>' : '')
+      + chip(m)
       + '</div>';
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;display:flex;gap:16px;flex-wrap:wrap;">'
       + (metrics || []).map(cell).join('') + '</div>';
@@ -504,7 +812,11 @@ S.Hub = {
     const topItems = itemRows.slice(0, 8);
     const overflowItems = Math.max(0, itemRows.length - topItems.length);
 
-    const todayStr = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    /* ⚠ `todayStr` WENT WITH THE HEADER DATE. Kyle: *"date removed from main header.. i would just
+       remove the date from the header"* — it lives on the page now, beside the greeting, where it
+       anchors "as of when" for every comparison on the Hub. A `const` left behind after its only
+       reader goes is how dead code accumulates, so it went in the same edit ([[the-loop]] #25:
+       grep every field you add, or remove, for a second occurrence). */
 
     // ── UI builders ──
     const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
@@ -620,7 +932,11 @@ S.Hub = {
       + '<div class="hub-wys-body" style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;">'
       + heroTile('dashboard', "S.Hub._enter('dashboard','profit')", 'Open Profit Close The Week', 'Total Opportunity',
              anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
-             anyAudit && totalOpp > 0 ? 'var(--w)' : 'var(--t4)',
+             /* ⚠ `--t1`, NOT `--w`. Kyle, 2026-08-10: *"change all white text and numbers to a light
+                grey though so it is easier on the eyes."* Pure white out-shines the gold hero on a
+                dark page and is harsh at 40px. `--t1` is the light grey the rest of the product
+                already uses for a number ([[color-system-locked]] — the token, never a hex). */
+             anyAudit && totalOpp > 0 ? 'var(--t1)' : 'var(--t4)',
              anyAudit ? 'On the table to recover a month' : 'Run an audit to surface this')
       + statDiv
       + heroTile('r-dashboard', "S.Hub._enter('r-dashboard','revenue')", 'Open Revenue Close The Week', 'Recovered',
@@ -630,7 +946,7 @@ S.Hub = {
       + statDiv
       + heroTile('c-dashboard', "S.Hub._enter('c-dashboard','cash')", 'Open Cash Close The Week', 'Trapped Cash',
              trapped.hasData ? App.fmtCurrency(trappedCash, 0) : 'No data',
-             trapped.hasData ? (trappedCash > 0 ? 'var(--w)' : 'var(--green)') : 'var(--t4)',
+             trapped.hasData ? (trappedCash > 0 ? 'var(--t1)' : 'var(--green)') : 'var(--t4)',
              trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
       + statDiv
       + heroTile('hub-books-home', "S.HubBreakEven.open()", 'Open Break-Even', 'Break-Even', beVal, beCol, beSub)
@@ -1289,10 +1605,159 @@ S.Hub = {
     /* ── Hub landing layout: the money line, the Needs Attention band, then ONE ROW covering all six
        systems. It was two rows of three cards, each carrying a progress bar and four hand-ticked
        step rows — 24 rows of checklist on the page that is the product's marketing image. ── */
+    /* ── THE HUB, REBUILT AROUND MOVEMENT RATHER THAN STATE ─────────────────────────────────────
+       Kyle, 2026-08-10, on the version before this one: *"it's just small and empty and boring.. why
+       not progression on data.. improvements on numbers.. you were here last week/month.. today
+       you're here.. here is your biggest growth area and your worst."* He was right, and the
+       diagnosis underneath it was that every object on the page had the SAME grammar — small grey
+       label, number, caption, sixteen times. Sixteen different facts that all look like the same
+       fact read as a spreadsheet. So each band here has a DIFFERENT grammar: pairs, a journey, a
+       ranked judgement, rows, a strip.
+       ⭐ AND IT FILLS 1200px BECAUSE PROGRESSION IS NATURALLY WIDE. A was-to-now fact is a pair, and
+       pairs tile across a wide screen; a lone headline in 64px type does not, which is what killed
+       the previous attempt. */
+    const hbGrey = 'var(--t1)';
+    /* ⛔ COLOUR ON THE TEXT, NEVER A BADGE. Kyle: *"no badge background on any numbers.. color text
+       only not color badge."* And the colour answers GOOD OR BAD, not up or down — labor falling is
+       green, check average falling would be red. A generic dashboard cannot do that because it does
+       not know what good means for each figure. */
+    const hbDelta = (good, text) => '<span style="font-size:11px;font-weight:700;color:'
+      + (good == null ? 'var(--t4)' : (good ? 'var(--green)' : 'var(--red)')) + ';white-space:nowrap;">'
+      + esc(text) + '</span>';
+    const hbPanel = (inner, extra) => '<div style="background:var(--surface);border:1px solid var(--b-edge);'
+      + 'border-radius:var(--r);padding:16px 18px;' + (extra || '') + '">' + inner + '</div>';
+    const hbSh = t => '<div class="sh" style="margin:0 0 10px;">' + esc(t) + '</div>';
+
+    // ── Band 1a: the climb, plus the three recovery audits underneath it ──
+    const climb = this._auditClimb();
+    const mods = this._moduleAudits();
+    const hbRing = m => {
+      const has = m.score != null;
+      const col = !has ? 'var(--t4)' : (m.score >= 70 ? 'var(--green)' : (m.score >= 50 ? 'var(--amber)' : 'var(--red)'));
+      return '<div onclick="S.Hub._enter(\'' + m.screen + '\',\'' + m.mod + '\')" style="flex:1;cursor:pointer;text-align:center;">'
+        + '<div style="width:46px;height:46px;margin:0 auto;border-radius:50%;border:2px solid ' + col
+        + ';display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:' + col + ';">'
+        + (has ? m.score : '-') + '</div>'
+        + '<div style="font-size:11px;color:' + hbGrey + ';margin-top:6px;">' + esc(m.name) + '</div>'
+        + '<div style="font-size:10px;color:var(--t4);margin-top:2px;">'
+        + (m.date ? 'Run ' + esc(shortDate(m.date) || m.date) : 'Never run') + '</div></div>';
+    };
+    const climbBlock = hbSh('Bar Cop Audit')
+      + (climb
+        ? '<div style="display:flex;align-items:flex-end;gap:14px;">'
+          + '<div><div style="font-size:30px;font-weight:700;color:var(--t3);line-height:1;">' + climb.first + '</div>'
+          + '<div style="font-size:10px;color:var(--t4);margin-top:4px;">' + esc(shortDate(climb.firstDate) || '') + '</div></div>'
+          + '<div style="flex:1;height:2px;background:var(--b2);margin-bottom:16px;"></div>'
+          + '<div style="text-align:right;"><div style="font-size:48px;font-weight:800;color:' + hbGrey + ';line-height:.9;">'
+          + climb.last + '</div><div style="font-size:10px;color:var(--t3);margin-top:5px;">today</div></div></div>'
+          + '<div style="margin-top:12px;display:flex;align-items:center;gap:9px;">'
+          + hbDelta(climb.hbDelta >= 0, (climb.hbDelta >= 0 ? '+' : '') + climb.hbDelta + ' pts')
+          + '<span style="font-size:12px;color:var(--t2);">in ' + climb.weeks + ' week'
+          + (climb.weeks === 1 ? '' : 's') + ', across ' + climb.count + ' audits</span></div>'
+        /* ⚠ A LABEL, NOT A SENTENCE. `verify-design-code` RULE 2b caught three explainer sentences
+           I had written onto cards here (9 -> 12 in the ratchet), and the no-prose-on-cards standard
+           is right: an empty state names what is missing, it does not narrate. Shorter is also the
+           operator voice — directives, not lessons ([[writing-style]]). */
+        : '<div style="font-size:12px;color:var(--t3);padding:6px 0 10px;">No audits yet</div>')
+      + '<div style="display:flex;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--b2);">'
+      + mods.map(hbRing).join('') + '</div>';
+
+    // ── Band 1b: where you were, where you are ──
+    const mv = this._movement();
+    const hbPair = p => '<div style="display:grid;grid-template-columns:120px 1fr auto;align-items:center;gap:14px;'
+      + 'padding:9px 0;border-top:1px solid var(--b2);">'
+      + '<span class="sh" style="margin:0;">' + esc(p.label) + '</span>'
+      + '<span><span style="font-size:14px;color:var(--t3);">' + esc(p.was) + '</span>'
+      + '<span style="color:var(--t4);margin:0 8px;font-size:13px;">&rarr;</span>'
+      + '<span style="font-size:18px;font-weight:700;color:' + hbGrey + ';">' + esc(p.now) + '</span></span>'
+      + hbDelta(p.flat ? null : p.good, (p.good ? '▲ ' : '▼ ') + esc(p.was) + ' to ' + esc(p.now)) + '</div>';
+    const hbHead = mv && mv.headline;
+    const hbHeadline = !hbHead ? ''
+      : '<div style="font-size:21px;font-weight:700;color:' + hbGrey + ';line-height:1.3;margin:2px 0 14px;">'
+        + (hbHead.holding
+            ? 'You are holding steady at <span style="color:var(--gold);">' + esc(hbHead.prime) + '</span> prime cost.'
+            : 'You are running about <span style="color:var(--gold);">' + esc(hbHead.amount) + ' a month</span> '
+              + (hbHead.better ? 'better' : 'worse') + ' than two weeks ago.')
+        + '</div>';
+    const movementBlock = hbSh('Where you were, where you are')
+      + (mv && mv.pairs.length
+        ? hbHeadline + mv.pairs.map(hbPair).join('')
+        : '<div style="font-size:12px;color:var(--t3);padding:6px 0;">Needs two closed weeks</div>');
+
+    // ── Band 2: the one action ──
+    /* Kyle: *"do this first card has #08131A background and normal ghost button not gold button."*
+       `--card-hbHead` IS #08131A, so the token goes in rather than the hex ([[color-system-locked]]). */
+    const doFirstBand = '<div style="background:var(--card-hbHead);border:1px solid var(--b-edge);'
+      + 'border-left:3px solid var(--gold);border-radius:0;padding:16px 18px;display:flex;'
+      + 'align-items:center;gap:20px;flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:220px;">' + doFirst + '</div>'
+      + (first ? '<button class="btn btn-ghost btn-sm" onclick="' + paiGo(first.item) + '">Open the fix</button>' : '')
+      + '</div>';
+
+    // ── Band 3: biggest gain and worst drag, in the audit's own vocabulary ──
+    const bw = this._bestWorst();
+    const bwCard = (t, o, isGain) => {
+      if (!o) return hbPanel(hbSh(t) + '<div style="font-size:12px;color:var(--t3);">Needs a second audit</div>');
+      const col = isGain ? 'var(--green)' : 'var(--red)';
+      return hbPanel(hbSh(t)
+        + '<div style="display:flex;align-items:baseline;gap:11px;margin:2px 0 8px;flex-wrap:wrap;">'
+        + '<span style="font-size:25px;font-weight:800;color:' + col + ';">' + o.score + '</span>'
+        + '<span style="font-size:16px;font-weight:700;color:' + hbGrey + ';">' + esc(o.section) + '</span>'
+        + hbDelta(isGain, (o.hbDelta >= 0 ? '+' : '') + o.hbDelta) + '</div>'
+        + (o.measure
+            ? '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">'
+              + '<span style="font-size:12px;color:var(--t2);">' + esc(o.measure.label) + '</span>'
+              + '<span style="font-size:12px;color:var(--t3);white-space:nowrap;">' + o.measure.was
+              + '% <span style="color:var(--t4);">&rarr;</span> <span style="color:' + col + ';font-weight:700;">'
+              + o.measure.now + '%</span></span></div>'
+            : ''));
+    };
+
+    // ── Band 4: needs you, and what is already done ──
+    /* Kyle: *"the Needs you same number of rows and no links to the ones not listed.. they are listed
+       in multiple places on the app.. so user can find them all."* So the overflow caption is gone
+       entirely. The trade, stated once: seven reds show five and nothing says the other two exist. */
+    const hbRow = (inner) => '<div class="hd-arow" style="display:flex;align-items:center;gap:10px;'
+      + 'padding:10px 12px;border-radius:2px;margin-bottom:6px;">' + inner + '</div>';
+    const needRows = this._needsCapped(bandItems, 5).shown.map(a => hbRow(
+      '<span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:'
+      + (a.sev === 'bad' ? 'var(--red)' : 'var(--amber)') + ';"></span>'
+      + '<span style="flex:1;min-width:0;font-size:12px;color:' + hbGrey + ';white-space:nowrap;'
+      + 'overflow:hidden;text-overflow:ellipsis;cursor:pointer;" onclick="' + goOf(a) + '">'
+      + esc(a.label || a.text || '') + '</span>'
+      + (a.value ? '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">' + esc(a.value) + '</span>' : '')
+    )).join('');
+    const doneRows = this._doneThisWeek().map(r => hbRow(
+      '<span style="width:17px;height:17px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;'
+      + 'justify-content:center;font-size:11px;font-weight:800;border:1px solid '
+      + (r.done ? 'var(--green);color:var(--green);' : 'var(--b1);color:transparent;') + '">'
+      + (r.done ? '✓' : '') + '</span>'
+      + '<span style="flex:1;min-width:0;font-size:12px;color:' + (r.done ? hbGrey : 'var(--t2)') + ';">'
+      + esc(r.label) + '</span>'
+      + '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">' + esc(r.when) + '</span>'
+    )).join('');
+
+    // ── Band 5: six operational facts, one job each, every one a door ──
     const sectionStrip = this._sectionStrip(this._stripMetrics());
-    const hubGrid = `<div class="hub-grid" style="display:grid;grid-template-rows:auto auto auto;gap:18px;padding-bottom:18px;">
+
+    const dateLine = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    const hubGrid = `<div class="hub-grid" style="display:grid;gap:18px;padding-bottom:18px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+            <div style="font-size:19px;font-weight:700;color:${hbGrey};">${esc(this._greeting())}, ${esc(barName)}</div>
+            <div style="font-size:12px;color:var(--t3);">${esc(dateLine)}</div>
+          </div>
           <div class="hub-grid-tiles">${topCard}</div>
-          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">${priorityCard}${needsBand}</div>
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:stretch;">
+            ${hbPanel(climbBlock)}${hbPanel(movementBlock)}
+          </div>
+          ${doFirstBand}
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">
+            ${bwCard('Your biggest gain', bw && bw.gain, true)}${bwCard('Your worst drag', bw && bw.drag, false)}
+          </div>
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">
+            ${hbPanel(hbSh('Needs you') + (needRows || '<div style="font-size:12px;color:var(--t2);">All clear. Nothing needs you outside your weekly close.</div>'))}
+            ${hbPanel(hbSh('Done this week') + doneRows)}
+          </div>
           <div class="hub-grid-row">${sectionStrip}</div>
         </div>`;
 
@@ -1378,7 +1843,6 @@ S.Hub = {
                 <svg viewBox="0 0 17 17" fill="none"><rect x="2" y="4" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="8" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="12" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>
               </button>
               <h1 class="topbar-title">${esc(barName)}</h1>
-              <span class="topbar-sub">${todayStr}</span>
             </div>
             <div id="hub-topbar-account-switcher" style="display:none;"></div>
             <div id="hub-topbar-group-dashboard" style="display:none;"></div>
