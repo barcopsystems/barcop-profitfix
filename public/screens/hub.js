@@ -885,8 +885,9 @@ S.Hub = {
        the Hub was drawing. The Rail button lives in the top bar on every page, so it needs them
        from anywhere — and the answer is one implementation both callers read, never a second copy
        that drifts from what this page displays. */
-    const metrics = this.hubMetrics();
-    const alerts = this.hubAlerts(metrics);
+    /* ⭐ NOTHING ON THIS PAGE READS `hubMetrics` / `hubAlerts` ANY MORE — the two locals fed the
+       dead Key Metrics and Alerts panels. Both members STAY: `briefingSnapshot()` calls them, and
+       The Rail button is in the top bar on every page, so the read has to exist away from here. */
 
     // ── Priority action items ──
     // Show every action item from every audited module, ranked by dollar
@@ -906,10 +907,8 @@ S.Hub = {
     collect(rA, 'Revenue', 'revenue');
     collect(cA, 'Cash', 'cash');
     itemRows.sort((a,b) => b.impact - a.impact);
-    // Cap visible PAIs at 8 — top by impact — so the most important items are
-    // never hidden behind a scrollbar. Overflow flagged in a small footer.
-    const topItems = itemRows.slice(0, 8);
-    const overflowItems = Math.max(0, itemRows.length - topItems.length);
+    // `topItems` / `overflowItems` sliced `itemRows` for the dead Priority Actions panel. `itemRows`
+    // itself SURVIVES — `this._doFirst(itemRows)` is what fills the Hub's "Do this first" row.
 
     /* ⚠ `todayStr` WENT WITH THE HEADER DATE. Kyle: *"date removed from main header.. i would just
        remove the date from the header"* — it lives on the page now, beside the greeting, where it
@@ -917,19 +916,8 @@ S.Hub = {
        reader goes is how dead code accumulates, so it went in the same edit ([[the-loop]] #25:
        grep every field you add, or remove, for a second occurrence). */
 
-    // ── UI builders ──
-    const PANEL = `background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:13px 15px;display:flex;flex-direction:column;overflow:hidden;min-height:0;`;
-
-    // Heading-outside panel (matches the Control + Recovery dashboards): the
-    // title is a single-line .sh heading ABOVE the card (standard 10px gap to
-    // its card; the grid's 18px row gap gives the larger gap above) and the
-    // PANEL card flexes to fill the grid cell. Any sub line lives inside the
-    // card, not under the heading.
-    const shWrapOpen = (t, cardPad) => '<div style="display:flex;flex-direction:column;min-width:0;min-height:0;">'
-      + '<div class="sh" style="margin:0 0 10px;">' + t + '</div>'
-      + '<div style="' + PANEL + 'flex:1;' + (cardPad ? 'padding:' + cardPad + ';' : '') + '">';
-    const shWrapClose = '</div></div>';
-    const cardSub = (s) => '<div style="font-size:10px;color:var(--t4);margin:0 0 8px;flex-shrink:0;">' + s + '</div>';
+    /* `PANEL`, `shWrapOpen`, `shWrapClose` and `cardSub` were the dead panels' shell and went with
+       them — every reader was one of the six. `cardSub` had no reader at all, before or after. */
 
     // Stat tiles — center-aligned to match the 4-stat tile pattern used
     // throughout the rest of the app (module dashboards, etc.). Big number in
@@ -1242,421 +1230,21 @@ S.Hub = {
        the Hub's DATA SOURCE, not merely its links. `_sectionStrip` / `_stripMetrics` replace them
        from stores, CashEngine and the surviving order sheet. Pinned by `verify-hub-no-cockpit`. */
 
-    // Audit Scores panel — three stacked rows, one per module.
-    // Each row uses the PDF-cover layout: bold module name + action top-right,
-    // big score / 100 with the score bar full-width below it, then the red
-    // dollar statement (or green "On target") computed honestly from the
-    // audit's action_items, then audit date + trend in small subtext. The
-    // action: audits are uncapped now, so there is no countdown. The button is
-    // always live (Run First Audit before the first, Run Audit after).
-    const auditRow = (name, audit, trend, screen, mod, isFirst) => {
-      const score      = audit?.overall_score ?? null;
-      // Number stays a quiet neutral; the score bar + marker below carry the
-      // red/amber/green so the color is not doubled up on the number.
-      const scoreColor = score != null ? 'var(--t1)' : 'var(--t4)';
-      const btnLabel   = !audit ? 'Run First Audit' : 'Run Audit';
-      const actionHtml = '<button class="btn btn-ghost btn-sm" onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')">' + btnLabel + '</button>';
-
-      // Score block: big number / 100 + target line + bar with marker
-      let scoreBlock;
-      if (score != null) {
-        const barPct = Math.max(0, Math.min(100, Math.round(score)));
-        scoreBlock = ''
-          + '<div style="display:flex;align-items:baseline;gap:12px;">'
-          +   '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:' + scoreColor + ';line-height:1;">'
-          +     score + '<span style="font-family:\'Barlow\',sans-serif;font-size:11px;color:var(--t3);font-weight:600;letter-spacing:0.04em;"> / 100</span></div>'
-          +   '<div style="flex:1;font-size:10px;color:var(--t3);">Your target ' + ((audit && audit.raw && audit.raw.TARGET_SCORE) || 70) + ' or higher</div>'
-          + '</div>'
-          // Status bar shortened on the right so it clears the "Next Audit"
-          // countdown / "Run Audit" button area (~85px wide on the right
-          // edge of the row above). Bar still spans the score+industry text.
-          + '<div style="margin-top:7px;margin-right:85px;">'
-          +   '<div style="display:flex;height:6px;border-radius:4px;overflow:hidden;">'
-          +     '<div style="width:50%;background:var(--red);"></div>'
-          +     '<div style="width:20%;background:var(--amber);"></div>'
-          +     '<div style="width:30%;background:var(--green);"></div>'
-          +   '</div>'
-          +   '<div style="position:relative;height:0;">'
-          +     '<div style="position:absolute;top:-9px;left:' + barPct + '%;width:3px;height:11px;background:var(--w);border-radius:2px;transform:translateX(-1.5px);box-shadow:0 0 0 1.5px var(--surface);"></div>'
-          +   '</div>'
-          + '</div>';
-      } else {
-        scoreBlock = '<div style="display:flex;align-items:baseline;gap:12px;">'
-          + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:var(--t4);line-height:1;">--</div>'
-          + '<div style="flex:1;font-size:11px;color:var(--t3);">Run the first audit to score this recovery system.</div>'
-          + '</div>';
-      }
-
-      // Combined summary line: leak status, trend vs last audit, audit date.
-      // Was three stacked rows; now one inline row to free vertical space and
-      // let the card breathe.
-      let summaryLine = '';
-      if (audit) {
-        const monthly = (audit.action_items || []).reduce((s, a) => s + (a.monthly_impact || 0), 0);
-        const weekly  = monthly / 4.345;
-        const parts = [];
-        // Module-aware: Profit cost leaks read "Leaking" (red); Revenue is mostly
-        // projected growth so it reads "Opportunity" (gold), never pooled as a
-        // leak; Cash's cash-to-free is a one-time amount, so no weekly dollar line.
-        if (mod === 'cash') {
-          // no weekly dollar line for Cash — the cash to free is a one-time amount in the audit
-        } else if (weekly > 0) {
-          if (mod === 'revenue') {
-            parts.push('<span style="color:var(--t3);">Opportunity <span style="color:var(--t2);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
-          } else {
-            parts.push('<span style="color:var(--t3);">Leaking <span style="color:var(--t2);font-weight:700;">~' + App.fmtCurrency(weekly, 0) + ' /wk</span></span>');
-          }
-        } else {
-          parts.push('<span style="color:var(--green);font-weight:700;">On target</span>');
-        }
-        if (trend != null) {
-          parts.push('<span style="color:' + (trend>=0?'var(--green)':'var(--red)') + ';font-weight:700;">'
-            + (trend>=0?'+':'') + trend + ' pts</span>');
-        }
-        if (audit.date) {
-          parts.push('<span style="color:var(--t3);">since ' + shortDate(audit.date) + ' audit</span>');
-        }
-        summaryLine = '<div style="font-size:10px;color:var(--t3);margin-top:8px;line-height:1.4;">'
-          + parts.join(' <span style="color:var(--t4);">&middot;</span> ')
-          + '</div>';
-      }
-
-      return '<div>'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">'
-        +   '<div style="font-size:10px;font-weight:800;letter-spacing:0.18em;color:var(--t1);text-transform:uppercase;">' + name + '</div>'
-        +   '<div style="flex-shrink:0;">' + actionHtml + '</div>'
-        + '</div>'
-        + '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;">'
-        +   scoreBlock
-        +   summaryLine
-        + '</div>'
-        + '</div>';
-    };
-    const auditPanel = `${shWrapOpen('Audit Scores', '14px')}
-      <div style="display:flex;flex-direction:column;gap:14px;flex:1;">
-        ${auditRow('Profit',  pA, sysTrend(pAudits), 'audit-tracker', 'profit',  true)}
-        ${auditRow('Revenue', rA, sysTrend(rAudits), 'r-audit',       'revenue', false)}
-        ${auditRow('Cash',    cA, sysTrend(cAudits), 'c-audit',       'cash',    false)}
-      </div>${shWrapClose}`;
-
-    // (The old "Continue Setup" catch-up banner was removed with the Getting
-    // Started checklist; the Hub's empty-state tiles + each section's day-one
-    // guide are the onboarding now.)
-    // (A "Closing the week" roll-up banner lived here and was PULLED 2026-08-02 — see the note
-    //  on weekCloseRollup's removal in THE LIST: the app has no notion of which steps are
-    //  REQUIRED to close a week, so any count it printed was a number nobody had defined.)
-    // Key metrics panel — 6 tiles in a 3x2 grid (2 rows of 3). Tighter padding
-    // and a 22px number so each tile fits in the shorter container that now
-    // shares the middle column with the Recovery Scoreboard above it.
-    const metricCells = metrics.map(m => `
-      <div class="hd-metric" onclick="S.Hub._enter('${m.screen}','${m.mod}')">
-        <div style="font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);">${m.label}</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;line-height:1;color:${bandColor(m.status)};">${m.disp || '-'}</div>
-        <div style="font-size:9px;color:var(--t4);">${m.disp ? 'Target ' + m.tgt : 'No data'}</div>
-      </div>`).join('');
-    const metricsPanel = `${shWrapOpen('Key Metrics', '14px')}
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;">${metricCells}</div>${shWrapClose}`;
-
-    // Alerts panel — focal headline up top (big red count if alerts exist,
-    // big green check + "All Clear" headline if not), then the alert rows
-    // below as a clean list. Row styling matches the Priority Action Items
-    // panel so the two list cards feel like a pair.
-    let alertsPanel;
-    if (alerts.length) {
-      // Triage: split into Critical (bad) and Watch (warn) under their own
-      // headers so the operator instantly sees what matters today.
-      const rowOf = (a, isFirst, dotCol) => '<div class="hd-row hd-arow" onclick="S.Hub._enter(\'' + a.screen + '\',\'' + a.mod + '\')" '
-        + 'style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--b-edge);'
-        + (isFirst ? 'border-top:1px solid var(--b-edge);' : '') + '">'
-        + '<span style="width:8px;height:8px;border-radius:50%;background:' + dotCol + ';flex-shrink:0;"></span>'
-        + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(a.text) + '</div>'
-        + '</div>';
-      const groupHead = (label, col, first) => '<div style="font-size:9px;font-weight:800;letter-spacing:0.13em;text-transform:uppercase;color:' + col + ';margin:' + (first ? '0' : '14px') + ' 0 7px;">' + label + '</div>';
-      const critical = alerts.filter(a => a.sev === 'bad');
-      const watch    = alerts.filter(a => a.sev === 'warn');
-      const alertRows =
-          (critical.length ? groupHead('Critical', 'var(--red)', true) + critical.map((a, i) => rowOf(a, i === 0, 'var(--red)')).join('') : '')
-        + (watch.length    ? groupHead('Watch', 'var(--amber)', !critical.length) + watch.map((a, i) => rowOf(a, i === 0, 'var(--amber)')).join('') : '');
-      const alertHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--red);line-height:1;">' + alerts.length + '</div>'
-        + '<div style="font-size:11px;color:var(--t2);line-height:1.35;position:relative;top:3px;">'
-        +   'item' + (alerts.length===1?'':'s') + ' to address'
-        +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">Worst first.</div>'
-        + '</div></div>';
-      alertsPanel = `${shWrapOpen('Alerts')}${alertHead}
-        <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;margin-top:14px;">${alertRows}</div>${shWrapClose}`;
-    } else {
-      const allClear = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;">'
-        + '<svg width="38" height="38" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-        + '<div style="font-size:18px;font-weight:800;color:var(--green);letter-spacing:0.04em;">All Clear</div>'
-        + '<div style="font-size:10px;color:var(--t3);line-height:1.4;max-width:240px;">Weekly metrics on target and every recovery audit run, current, and at or above target.</div>'
-        + '</div>';
-      alertsPanel = `${shWrapOpen('Alerts')}${allClear}${shWrapClose}`;
-    }
-
-    // Trend chart panel — three stacked mini charts: Bar Pour Cost %,
-    // Check Average $, Prime Cost %. Each chart sits in its own bordered
-    // card. Line stroke is tuned for the small chart size (1.7px) — the
-    // module dashboards use 2.5 because those charts are 3x taller.
-    // Fix-event markers (Section 10.5) ride on the bottom chart only so
-    // they show up once instead of three times. Each data point carries
-    // hover data attributes consumed by the shared tooltip below.
-    const miniChart = (label, weeks, valueOf, target, valFmt, dir, withMarkers) => {
-      const series   = weeks.map(w => valueOf(w));
-      const lastVal  = [...series].reverse().find(v => v != null) ?? null;
-      const status   = lastVal != null ? band(lastVal, target, dir) : 'none';
-      const curColor = bandColor(status);
-      const curDisp  = lastVal != null ? valFmt(lastVal) : '--';
-      const tgtDisp  = valFmt(target);
-
-      const card = (inner) => '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:7px 10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">' + inner + '</div>';
-
-      const head = '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px;flex-shrink:0;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);">' + label + '</div>'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;font-weight:700;color:' + curColor + ';line-height:1;">' + curDisp + '</div>'
-        + '<div style="margin-left:auto;font-size:9px;color:var(--t4);">Target ' + tgtDisp + '</div>'
-        + '</div>';
-
-      const nonNull = series.filter(v => v != null);
-      if (nonNull.length < 2) {
-        return card(head
-          + '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">Need 2+ weeks</div>');
-      }
-
-      const W = 540, H = 54, P = { t:6, r:6, b:4, l:6 };
-      const cw = W-P.l-P.r, ch = H-P.t-P.b;
-      let mn = Math.min(...nonNull, target);
-      let mx = Math.max(...nonNull, target);
-      const sp = (mx-mn)*0.2 || 1; mn -= sp; mx += sp;
-      const x = i => P.l + (series.length > 1 ? (i/(series.length-1))*cw : cw/2);
-      const y = v => P.t + ch - ((v-mn)/(mx-mn||1))*ch;
-
-      // Smooth path through non-null values; nulls keep their x slot so the
-      // time axis stays honest, the path just skips them. Build the line
-      // path and the area path (line + closure down to chart floor) in the
-      // same pass; the area gets a vertical gradient fill that fades to
-      // transparent, matching the audit score chart style.
-      const baseY = (H-P.b).toFixed(1);
-      let d = '', area = '';
-      let prev = -1, lastX = null;
-      for (let i = 0; i < series.length; i++) {
-        const v = series[i];
-        if (v == null) continue;
-        const xi = x(i), yi = y(v);
-        if (prev < 0) {
-          d    = 'M' + xi.toFixed(1) + ',' + yi.toFixed(1);
-          area = 'M' + xi.toFixed(1) + ',' + baseY + ' L' + xi.toFixed(1) + ',' + yi.toFixed(1);
-        } else {
-          const cp = (xi-x(prev))*0.35;
-          const seg = ' C' + (x(prev)+cp).toFixed(1) + ',' + y(series[prev]).toFixed(1) + ' '
-            + (xi-cp).toFixed(1) + ',' + yi.toFixed(1) + ' '
-            + xi.toFixed(1) + ',' + yi.toFixed(1);
-          d    += seg;
-          area += seg;
-        }
-        lastX = xi;
-        prev = i;
-      }
-      if (area) area += ' L' + lastX.toFixed(1) + ',' + baseY + ' Z';
-
-      const gradId = 'hub-trend-' + label.replace(/[^a-z]/gi,'').toLowerCase();
-
-      const tgtLine = '<line x1="'+P.l+'" y1="'+y(target).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+y(target).toFixed(1)+'" stroke="#DBAB46" stroke-width="0.7" stroke-dasharray="4,4" opacity="0.4"/>';
-
-      // Dots render as HTML <div>s positioned absolutely over the SVG
-      // (instead of <circle>s inside the SVG). The SVG uses
-      // preserveAspectRatio="none" so the line stretches to fill the card,
-      // but that same stretching squishes SVG circles into vertical ovals.
-      // CSS-sized divs stay round regardless of how the SVG is scaled.
-      const dots = series.map((v,i) => {
-        if (v == null) return '';
-        const xPct = (x(i) / W * 100).toFixed(2);
-        const yPct = (y(v) / H * 100).toFixed(2);
-        const wkRaw = weeks[i] && weeks[i].period_end;
-        const wkDate = wkRaw ? (shortDate(wkRaw) || '').toUpperCase() : '';
-        const dotBand = band(v, target, dir);
-        return '<div class="hd-chart-dot"'
-          + ' data-label="' + esc(label) + '"'
-          + ' data-disp="' + esc(valFmt(v)) + '"'
-          + ' data-tgt="' + esc(tgtDisp) + '"'
-          + ' data-date="' + esc(wkDate) + '"'
-          + ' data-band="' + dotBand + '"'
-          + ' style="position:absolute;left:' + xPct + '%;top:' + yPct + '%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;">'
-          + '<div class="hd-chart-marker"></div>'
-          + '</div>';
-      }).join('');
-
-      let markerSvg = '';
-      if (withMarkers && window.Recovery && window.FixPanel) {
-        // The chart's OWN weeks, which is what `series` (and therefore every x position)
-        // is built from. This read the outer `pWeeks` instead, and that array arrives
-        // date-DESC from loadEvents, so slicing its tail returned the OLDEST weeks in
-        // reverse order and every marker would have landed on the wrong week. Dead today
-        // (all three miniChart calls pass withMarkers false), but armed for whoever
-        // switches markers on.
-        const refWeeks = weeks;
-        if (refWeeks.length >= 2) {
-          const marks = ['profit','revenue']
-            .reduce((acc,m) => acc.concat(Recovery.chartMarkers(refWeeks, m)), []);
-          const mxFn = i => P.l + (refWeeks.length > 1 ? (i/(refWeeks.length-1))*cw : cw/2);
-          markerSvg = FixPanel.markerSvg(marks, mxFn, P.t, H-P.b);
-        }
-      }
-
-      // Trend chart is the dashboard's visual rest zone — muted gold line and
-      // a barely-there area fill so the shape carries the story without
-      // adding to the color noise. Status still comes through via the head
-      // (current value in band color) and per-dot hover tooltips.
-      return card(head
-        + '<div style="position:relative;flex:1;min-height:0;">'
-        +   '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" width="100%" height="100%" style="display:block;position:absolute;inset:0;">'
-        +     '<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'
-        +       '<stop offset="0%" stop-color="#151C1C" stop-opacity="1"/>'
-        +       '<stop offset="100%" stop-color="#151C1C" stop-opacity="0"/>'
-        +     '</linearGradient></defs>'
-        +     markerSvg
-        +     tgtLine
-        +     (area ? '<path d="'+area+'" fill="url(#'+gradId+')"/>' : '')
-        +     '<path d="'+d+'" fill="none" stroke="#363523" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-        +   '</svg>'
-        +   dots
-        + '</div>');
-    };
-
-    const w8p = _newest(pWeeks).slice(0, 8).reverse();
-    const w8r = _newest(rWeeks).slice(0, 8).reverse();
-    const pourSeries  = w8p.map(w => w?.bar?.cost_pct ?? null);
-    const caSeries    = w8r.map(w => w?.check_avg ?? null);
-    const primeSeries = w8p.map(w => w?.prime_cost_pct ?? null);
-    const anyTrend = pourSeries.filter(v=>v!=null).length >= 2
-                  || caSeries.filter(v=>v!=null).length >= 2
-                  || primeSeries.filter(v=>v!=null).length >= 2;
-
-    let trendBody;
-    if (!anyTrend) {
-      trendBody = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Enter 2+ weeks to see trends</div>';
-    } else {
-      trendBody = ''
-        + miniChart('Bar Pour Cost %', w8p, w => w?.bar?.cost_pct ?? null,    pourT,  v => v.toFixed(1) + '%', 'low',  false)
-        + miniChart('Check Average',   w8r, w => w?.check_avg ?? null,        caT,    v => App.fmtCurrency(v), 'high', false)
-        + miniChart('Prime Cost %',    w8p, w => w?.prime_cost_pct ?? null,   primeT, v => v.toFixed(1) + '%', 'low',  false);
-    }
-    const chartPanel = `${shWrapOpen('Cost & Revenue Trend', '14px')}
-      <div style="flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden;">${trendBody}</div>${shWrapClose}`;
-
-    // Priority Action Items panel — dollar amount is the magnet (big gold
-    // Barlow Condensed on the left), then a small module badge above the
-    // action text on the right. Row styling matches the Alerts panel so the
-    // two list cards feel like a pair.
-    const actionBody = topItems.length
-      ? topItems.map((it,i) => {
-          const dollar = it.impact > 0 ? App.fmtCurrency(it.impact, 0) : '-';
-          const modBadgeColors = {
-            Profit:  { c: 'var(--t3)', bg: 'transparent' },
-            Revenue: { c: 'var(--t3)', bg: 'transparent' },
-            Cash:    { c: 'var(--t3)', bg: 'transparent' }
-          };
-          const mc = modBadgeColors[it.sys] || modBadgeColors.Profit;
-          return '<div class="hd-row hd-arow" onclick="S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')" '
-            + 'style="display:flex;align-items:center;gap:14px;padding:10px 12px;border-bottom:1px solid var(--b-edge);'
-            + (i === 0 ? 'border-top:1px solid var(--b-edge);' : '') + '">'
-            + '<div style="flex-shrink:0;min-width:65px;white-space:nowrap;">'
-            +   '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:700;color:var(--t1);line-height:1;">' + dollar + '</span>'
-            +   (it.impact > 0 ? '<span style="font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/mo</span>' : '')
-            + '</div>'
-            + '<div style="flex:1;min-width:0;font-size:11px;line-height:1.45;">'
-            +   '<span style="font-size:9px;font-weight:800;letter-spacing:0.1em;color:' + mc.c + ';">' + it.sys.toUpperCase() + '</span>'
-            +   '<span style="color:var(--t3);"> &middot; </span>'
-            +   '<span style="color:var(--t1);">' + esc(it.action) + '</span>'
-            + '</div>'
-            + '</div>';
-        }).join('')
-      : `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px;text-align:center;line-height:1.5;padding:0 20px;">Run an audit in any system and your highest-impact opportunities will be ranked here.</div>`;
-    const overflowFooter = overflowItems > 0
-      ? '<div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--b2);font-size:10px;color:var(--t3);text-align:center;flex-shrink:0;">+ ' + overflowItems + ' more action item' + (overflowItems === 1 ? '' : 's') + ' across your audits</div>'
-      : '';
-    // First-run guide: with no audit run yet, the Priority Actions panel
-    // becomes a welcoming "Start Here" with the three steps to a first recovery
-    // number, so a brand-new operator is never left wondering what to do.
-    const ghStep = (n, t, d, btn, onclick) =>
-        '<div style="display:flex;gap:13px;align-items:flex-start;padding:15px 2px;' + (n === 1 ? '' : 'border-top:1px solid var(--b2);') + '">'
-      +   '<div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--gold-bg);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">' + n + '</div>'
-      +   '<div style="flex:1;min-width:0;">'
-      +     '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px;">' + t + '</div>'
-      +     '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:10px;">' + d + '</div>'
-      +     '<button class="btn btn-primary btn-sm" onclick="' + onclick + '">' + btn + '</button>'
-      +   '</div>'
-      + '</div>';
-    const startHereGuide =
-        '<div style="font-size:12.5px;color:var(--t2);line-height:1.55;padding:2px 2px 8px;">Welcome to Bar Cop. It finds the money leaking out of your operation and tells you exactly how to plug it. Two steps to your first recovery number:</div>'
-      + ghStep(1, 'Run your first audit', 'Profit, Revenue, or Cash. Each one scores you and surfaces exactly where money is slipping away.', 'Run an Audit', 'S.Hub._enter(\'audit-tracker\',\'profit\')')
-      + ghStep(2, 'Log this week\'s numbers', 'Enter Profit and Revenue each week so your gaps, trends, and metrics fill in.', 'Enter This Week', 'S.Hub._enter(\'this-week\',\'profit\')');
-    const aiCount = itemRows.length;
-    const actionHead = '<div style="background:var(--bg);border:1px solid var(--b-edge);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:38px;font-weight:700;color:var(--t1);line-height:1;">' + aiCount + '</div>'
-      + '<div style="font-size:11px;color:var(--t2);line-height:1.35;position:relative;top:3px;">'
-      +   'action item' + (aiCount === 1 ? '' : 's')
-      +   '<div style="font-size:10px;color:var(--t3);margin-top:2px;">From your audits</div>'
-      + '</div></div>';
-    const actionPanel = !anyAudit
-      ? `${shWrapOpen('Start Here')}<div style="flex:1;overflow-y:auto;">${startHereGuide}</div>${shWrapClose}`
-      : `${shWrapOpen('Priority Actions')}${actionHead}
-      <div class="hd-scroll" style="flex:1;display:flex;flex-direction:column;margin-top:14px;">${actionBody}</div>${overflowFooter}${shWrapClose}`;
-
-    // Weekly money readout panel — big red weekly leak total up top, then a
-    // ranked list of the gap areas producing it. Same emotional language as
-    // the Audit Scores card: lead with the dollar number, support with detail.
-    const readout = this.weeklyReadout();
-    const hasWeekData = pWeeks.length > 0 || rWeeks.length > 0;
-
-    // Neutral per-module label (color = meaning only; no category tint).
-    const modBadge = (mod) => '<span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:0.08em;color:var(--t3);flex-shrink:0;min-width:62px;">'
-      + (mod || '').toUpperCase() + '</span>';
-
-    let readoutBody;
-    if (!hasWeekData) {
-      readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 16px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:36px;font-weight:700;color:var(--t4);line-height:1;">-- / wk</div>'
-        + '<div style="font-size:11px;color:var(--t3);line-height:1.5;max-width:240px;">Enter this week\'s numbers in Profit and Revenue to see what is leaking and where.</div>'
-        + '<button class="btn btn-ghost btn-sm" onclick="S.Hub._enter(\'this-week\',\'profit\')" style="margin-top:4px;">Enter This Week</button>'
-        + '</div>';
-    } else if (readout.items.length === 0) {
-      readoutBody = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;">'
-        + '<svg width="34" height="34" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="var(--green)" stroke-width="1.6"/><path d="M8 13l3.5 3.5L18 9" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-        + '<div style="display:flex;align-items:baseline;gap:8px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:var(--green);line-height:1;">$0</div><div style="font-size:11px;color:var(--green);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">/ wk</div></div>'
-        + '<div style="font-size:11px;color:var(--green);font-weight:700;">Holding the line.</div>'
-        + '<div style="font-size:10px;color:var(--t3);line-height:1.4;max-width:240px;">Every gap area with a weekly dollar metric is on target.</div>'
-        + '</div>';
-    } else {
-      const shown = readout.items.slice(0, 50);
-      const roRows = shown.map((it, i) => {
-        const isLast = i === shown.length - 1;
-        return '<div class="hd-row" onclick="S.Hub._enterFix(\'' + it.module + '\',\'' + esc(it.gapId) + '\')"'
-          + ' style="display:flex;align-items:center;gap:10px;padding:9px 4px;'
-          + (isLast ? '' : 'border-bottom:1px solid var(--b2);') + '">'
-          + modBadge(it.module)
-          + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.label) + '</div>'
-          + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:var(--t1);">' + App.fmtCurrency(it.weekly, 0) + '<span style="font-family:\'Barlow\',sans-serif;font-size:9px;color:var(--t3);font-weight:600;margin-left:2px;">/wk</span></div>'
-          + '</div>';
-      }).join('');
-      // Split hero: recoverable cost leak (red) and projected revenue
-      // opportunity (gold) shown as two distinct figures, never pooled into one
-      // "leaking" total (decision 2). Each appears only when it has dollars.
-      const heroNum = (val, color, label) => '<div style="display:flex;align-items:baseline;gap:6px;">'
-        + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:34px;font-weight:700;color:' + color + ';line-height:1;">' + App.fmtCurrency(val, 0) + '</div>'
-        + '<div style="font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.06em;text-transform:uppercase;line-height:1.2;">/wk<br>' + label + '</div>'
-        + '</div>';
-      readoutBody = ''
-        + '<div style="display:flex;align-items:baseline;gap:22px;flex-wrap:wrap;">'
-        +   (readout.leakTotal > 0 ? heroNum(readout.leakTotal, 'var(--red)', 'leaking') : '')
-        +   (readout.oppTotal  > 0 ? heroNum(readout.oppTotal,  'var(--gold)', 'opportunity') : '')
-        + '</div>'
-        + '<div style="font-size:10px;color:var(--t3);margin-top:6px;line-height:1.4;">'
-        +   'across ' + readout.items.length + ' gap area' + (readout.items.length === 1 ? '' : 's') + '.'
-        + '</div>'
-        + '<div class="hd-scroll" style="margin-top:12px;flex:1;display:flex;flex-direction:column;">' + roRows + '</div>';
-    }
-    const readoutPanel = `${shWrapOpen('Weekly Gaps')}${readoutBody}<div style="margin-top:auto;padding-top:12px;font-size:10px;color:var(--t4);flex-shrink:0;">From this week's numbers</div>${shWrapClose}`;
+    /* ⛔⛔⛔ THE FIVE DEAD PANELS WERE CUT HERE (2026-08-11). `auditPanel`, `metricsPanel`,
+       `alertsPanel`, `chartPanel`, `actionPanel` and `readoutPanel` were all DECLARED AND NEVER
+       READ — the chat-57 rebuild replaced the old six-panel grid with the movement bands and left
+       ~415 lines of builder behind, still executing on every Hub render to produce strings nothing
+       inserted. Their exclusive closure went with them: `auditRow`, `metricCells`, `alertHead`,
+       `alertRows`, `allClear`, `miniChart`, the four trend series, `trendBody`, `actionBody`,
+       `overflowFooter`, `ghStep`, `startHereGuide`, `actionHead`, `aiCount`, `readout`,
+       `readoutBody`, `modBadge`, `hasWeekData` and `heroNum`.
+       ⭐ THE DEAD SET IS A FIXPOINT, NOT A LIST ([[the-loop]] #63): the five Kyle named pulled in
+       nineteen more, over four rounds, and every one was re-derived by READING its references
+       rather than trusting the closure probe — whose spans attribute anything sitting between two
+       dead declarations to the earlier one, which over-deletes.
+       ⛔ AND TWO NAMES IN THE SET ARE LIVE MEMBERS OF `S.DashUI` — `metricsPanel` and `auditPanel`
+       both exist there, for other screens. The duplicate-name trap: count the call sites in THIS
+       file, because a name existing elsewhere is not evidence about this one. */
 
     /* ⛔ THE SNAPSHOT IS NOT BUILT HERE ANY MORE — `briefingSnapshot()` is its ONE owner.
        This assembled `this._briefingData` inline, which meant the read only existed once the Hub
@@ -2248,11 +1836,11 @@ S.Hub = {
     const caT = rt.check_avg ?? 35;
     const laborT = App.laborTargetPct();
     return [
-      { label:'Bar Pour Cost', val: pW?.bar?.cost_pct ?? null, disp: pW?.bar?.cost_pct!=null?App.fmtPct(pW.bar.cost_pct):null, tgt: pourT+'%', status: band(pW?.bar?.cost_pct ?? null, pourT, 'low'), screen:'dashboard', mod:'profit' },
-      { label:'Food Cost', val: pW?.food?.cost_pct ?? null, disp: pW?.food?.cost_pct!=null?App.fmtPct(pW.food.cost_pct):null, tgt: foodT+'%', status: band(pW?.food?.cost_pct ?? null, foodT, 'low'), screen:'dashboard', mod:'profit' },
-      { label:'Prime Cost', val: pW?.prime_cost_pct ?? null, disp: pW?.prime_cost_pct!=null?App.fmtPct(pW.prime_cost_pct):null, tgt: primeT+'%', status: band(pW?.prime_cost_pct ?? null, primeT, 'low'), screen:'dashboard', mod:'profit' },
-      { label:'Check Average', val: rW?.check_avg ?? null, disp: rW?.check_avg!=null?App.fmtCurrency(rW.check_avg):null, tgt: App.fmtCurrency(caT), status: band(rW?.check_avg ?? null, caT, 'high'), screen:'r-dashboard', mod:'revenue' },
-      { label:'Labor %', val: rW?.labor_pct_blended ?? null, disp: rW?.labor_pct_blended!=null?App.fmtPct(rW.labor_pct_blended):null, tgt: laborT+'%', status: band(rW?.labor_pct_blended ?? null, laborT, 'low'), screen:'r-dashboard', mod:'revenue' },
+      { label:'Bar Pour Cost', val: pW?.bar?.cost_pct ?? null, disp: pW?.bar?.cost_pct!=null?App.fmtPct(pW.bar.cost_pct):null, tgt: pourT+'%', status: band(pW?.bar?.cost_pct ?? null, pourT, 'low') },
+      { label:'Food Cost', val: pW?.food?.cost_pct ?? null, disp: pW?.food?.cost_pct!=null?App.fmtPct(pW.food.cost_pct):null, tgt: foodT+'%', status: band(pW?.food?.cost_pct ?? null, foodT, 'low') },
+      { label:'Prime Cost', val: pW?.prime_cost_pct ?? null, disp: pW?.prime_cost_pct!=null?App.fmtPct(pW.prime_cost_pct):null, tgt: primeT+'%', status: band(pW?.prime_cost_pct ?? null, primeT, 'low') },
+      { label:'Check Average', val: rW?.check_avg ?? null, disp: rW?.check_avg!=null?App.fmtCurrency(rW.check_avg):null, tgt: App.fmtCurrency(caT), status: band(rW?.check_avg ?? null, caT, 'high') },
+      { label:'Labor %', val: rW?.labor_pct_blended ?? null, disp: rW?.labor_pct_blended!=null?App.fmtPct(rW.labor_pct_blended):null, tgt: laborT+'%', status: band(rW?.labor_pct_blended ?? null, laborT, 'low') },
     ];
   },
 
@@ -2264,7 +1852,7 @@ S.Hub = {
     const metricAlerts = metrics
       .filter(m => m.status === 'warn' || m.status === 'bad')
       .map(m => ({ sev: m.status, label: m.label, value: m.disp + ' / ' + m.tgt,
-        text: m.label + ' at ' + m.disp + ' · target ' + m.tgt, screen: m.screen, mod: m.mod }));
+        text: m.label + ' at ' + m.disp + ' · target ' + m.tgt }));
     /* Audit-based alerts so "All Clear" is honest: a recovery audit scoring below target, or one
        overdue / never run, is a real open item. Action items are NOT dumped here; they have their
        own Priority panel. */
