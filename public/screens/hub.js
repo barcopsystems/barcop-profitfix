@@ -342,7 +342,14 @@ S.Hub = {
         value: money(lw.otCost), sub: lw.label, delta: lw.otDelta,
         deltaText: lw.otDelta == null ? null : (lw.otDelta >= 0 ? '+' : '-') + App.fmtCurrency(Math.abs(lw.otDelta), 0),
         betterIsDown: true },
-      { label: 'Cost of goods',  mod: 'profit',    screen: 'dashboard',
+      /* ⛔ NOT `dashboard`. Kyle: *"the cost of good stat can't link to the old profit close the week
+         page."* It was one of the six cockpits 1c deletes — I fixed the three money tiles and left
+         this one behind, which is the "I did it for one and not the other" miss for the fourth time
+         this build ([[lessons-paid-for]] #12).
+         ⭐ `week-history` IS THE HONEST DESTINATION, not just a surviving one: this figure is
+         `bar.cogs + food.cogs` off the CONFIRMED WEEK RECORD, and Week History is where those
+         records live. A stat should land where its own number came from. */
+      { label: 'Cost of goods',  mod: 'profit',    screen: 'week-history',
         value: money(lw.cogs), sub: lw.label, delta: lw.cogsDelta,
         deltaText: lw.cogsDelta == null ? null : (lw.cogsDelta >= 0 ? '+' : '-') + App.fmtCurrency(Math.abs(lw.cogsDelta), 0),
         betterIsDown: true },
@@ -1805,14 +1812,30 @@ S.Hub = {
       + esc(a.label || a.text || '') + '</span>'
       + (a.value ? '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">' + esc(a.value) + '</span>' : '')
     )).join('');
+    /* ⛔ THE TICK IS CLOSE THE WEEK'S TICK, NOT A THIRD SPELLING OF ONE. Kyle: *"the circle
+       checkmarks on done this week are wrong.. should be like the checkmarks on the week close page..
+       same style just smaller."* `week-close.js#row` FILLS the circle green with a knocked-out mark
+       (`background:var(--green);color:var(--bg)`); mine was an outlined ring with a green glyph, a
+       different object doing the same job on the two pages an operator moves between every week.
+       Copied exactly, 22px -> 18px, and the empty state keeps that file's own hairline ring.
+       ⚠ THE UNDONE RING USES `--b1`, NOT `--gold`. Close The Week golds an outstanding row because
+       that page is a checklist you are working right now; the Hub is a read, and a gold ring there
+       would nag about five jobs on a Monday morning ([[test-the-first-drop]] rule 4 — copy the
+       REASON, not just the shape). */
     const doneRows = this._doneThisWeek().map(r => hbRow(
-      '<span style="width:17px;height:17px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;'
-      + 'justify-content:center;font-size:11px;font-weight:800;border:1px solid '
-      + (r.done ? 'var(--green);color:var(--green);' : 'var(--b1);color:transparent;') + '">'
-      + (r.done ? '✓' : '') + '</span>'
+      (r.done
+        ? '<span style="width:18px;height:18px;border-radius:50%;flex-shrink:0;display:flex;'
+          + 'align-items:center;justify-content:center;background:var(--green);color:var(--bg);'
+          + 'font-size:10px;font-weight:800;">&#10003;</span>'
+        : '<span style="width:18px;height:18px;border-radius:50%;flex-shrink:0;'
+          + 'border:1px solid var(--b1);"></span>')
       + '<span style="flex:1;min-width:0;font-size:12px;color:' + (r.done ? hbGrey : 'var(--t2)') + ';">'
       + esc(r.label) + '</span>'
-      + '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">' + esc(r.when) + '</span>'
+      /* Kyle: *"need something in front of the dates like 'last done tue X/XX'."* A bare "Tue, 8/11"
+         beside a job title reads as a due date as easily as a done date, and on this card it is
+         always the latter. */
+      + '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">'
+      + (r.when ? 'Last done ' + esc(r.when) : '') + '</span>'
     )).join('');
 
     // ── Band 5: six operational facts, one job each, every one a door ──
