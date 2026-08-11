@@ -60,7 +60,7 @@ S.CashForecast = {
     if (!fc.hasData) {
       this.container.innerHTML = '<div class="screen">' + this.positionCard(fc, opening, true)
         + '<div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">The Survival Forecast reads your sales, payroll, purchases, and bills from across Bar Cop. Once your shift sales and a schedule are in, your quarter fills in here.</div>'
-        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="sc-dashboard">Import Sales</button></div></div></div>';
+        + '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-go="week-close">Import Sales</button></div></div></div>';
       this.wire();
       return;
     }

@@ -73,7 +73,7 @@ S.CashAudit = {
     return [
       { label: 'Opening cash balance set',   done: hasOpening,   go: 'c-position' },
       { label: 'Two inventory counts taken', done: counts >= 2,  go: 'ic-take-inventory' },
-      { label: 'A week of POS sales imported', done: sales >= 1, go: 'sc-dashboard' },
+      { label: 'A week of POS sales imported', done: sales >= 1, go: 'week-close' },
       { label: 'Vendors on payment terms',   done: terms > 0,    go: 'ic-vendors' }
     ];
   },
