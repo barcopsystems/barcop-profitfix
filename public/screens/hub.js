@@ -404,7 +404,24 @@ S.Hub = {
       }, 0);
     };
 
-    const cogsFor = w => (!w) ? null : ((Number(w.bar) || 0) + (Number(w.food) || 0));
+    /* ⛔⛔⛔ A WEEK'S `bar` / `food` / `catering` / `other` ARE OBJECTS, NOT NUMBERS. Each is
+       `{ revenue, cogs, labor, cost_pct, … }`. My first version wrote `Number(w.bar) || 0`, which is
+       `NaN || 0` = **0**, so Cost of goods shipped a confident **$0** to the live Hub where the truth
+       was $5,092. Caught by walking the pushed build, not by any assertion, because my fixture had
+       invented flat numbers.
+       ⛔ THAT IS THE THIRD TIME THIS EXACT CLASS HAS BITTEN THIS ONE STRIP: `[object Object]` in the
+       over/short cell, a false `$0` on below par, and now this. Every one was a fixture that made up
+       the dependency's shape instead of copying it ([[lessons-paid-for]] #20). The fixture carries
+       the real nested shape now, so a flat number can never certify this again.
+       ⚠ ALL FOUR BUCKETS, not just bar and food. Catering and other carry cogs too, and a bar that
+       does events would have been quietly under-reported. */
+    const cogsFor = w => {
+      if (!w) return null;
+      return ['bar', 'food', 'catering', 'other'].reduce((t, k) => {
+        const b = w[k];
+        return t + (b && typeof b === 'object' ? (Number(b.cogs) || 0) : 0);
+      }, 0);
+    };
     const d = (now, was) => (now == null || was == null) ? null : now - was;
 
     const hours = sum(acts, cur, r => r.hours);
@@ -493,9 +510,13 @@ S.Hub = {
     if (!pNow && !rNow) return null;
 
     const sales = r => r ? ((Number(r.bar_revenue) || 0) + (Number(r.floor_revenue) || 0)) : null;
+    /* `deltaText` is formatted HERE, beside the values it describes, so the render never has to
+       guess whether a pair is points, dollars or a count. A formatter chosen at render time is how
+       "▲ 56.1% to 55.4%" happened. */
     const pair = (label, was, now, betterIsUp, fmt) =>
       (was == null || now == null) ? null
         : { label: label, was: fmt(was), now: fmt(now), delta: now - was,
+            deltaText: fmt(Math.abs(now - was)),
             good: betterIsUp ? (now > was) : (now < was), flat: now === was };
 
     const pairs = [
@@ -955,14 +976,13 @@ S.Hub = {
       // the Briefing button — money line left, operation-health read right. The
       // cell's width is matched to the Briefing button after mount (see below) so
       // the divider lines up flush with the button's left edge.
-      + '<div style="flex:1 1 16px;min-width:0;"></div>'
-      + '<div id="hub-audit-cell" style="flex-shrink:0;display:flex;align-items:flex-start;">'
-      +   '<div class="hub-stat-div" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin-right:30px;"></div>'
-      +   heroTile('bar-cop-audit', "S.HubBarCopAudit.open()", 'Open the Bar Cop Audit', 'Bar Cop Audit',
-             bcScore != null ? bcScore : 'None',
-             bcScore != null ? softScore(bcScore) : 'var(--t4)',
-             bcScore != null ? App.scoreLabel(bcScore) + bcNextTxt : 'Run the Bar Cop Audit')
-      + '</div>'
+      /* ⛔ THE BAR COP AUDIT TILE CAME OUT OF THIS BAND, AND THE WALK IS WHAT FOUND IT. The climb
+         panel directly underneath is now the Bar Cop Audit read — first score, today's score, the
+         gain and the three recovery audits — so the live page carried the heading "BAR COP AUDIT"
+         TWICE, eight inches apart, showing 75 both times. The band is the MONEY line: four dollar
+         figures, nothing else. `bcScore` / `softScore` / `bcNextTxt` still feed The Rail and the
+         briefing, so nothing else lost a reader ([[the-loop]] #149 — enumerate what a registration
+         is FOR before removing it). */
       + '</div></div>';
 
     // Getting Started replaces Where You Stand until the operator has fed Bar Cop
@@ -1651,7 +1671,11 @@ S.Hub = {
           + '<div style="text-align:right;"><div style="font-size:48px;font-weight:800;color:' + hbGrey + ';line-height:.9;">'
           + climb.last + '</div><div style="font-size:10px;color:var(--t3);margin-top:5px;">today</div></div></div>'
           + '<div style="margin-top:12px;display:flex;align-items:center;gap:9px;">'
-          + hbDelta(climb.hbDelta >= 0, (climb.hbDelta >= 0 ? '+' : '') + climb.hbDelta + ' pts')
+          /* ⛔ `climb.delta`, NOT `climb.hbDelta`. A blind `\bdelta\b` rename hit the PROPERTY as well
+             as the local, so the live band printed "undefined pts". I checked that rename for leaks
+             OUTSIDE my block and never checked inside it — the half I owned was the half I did not
+             look at. Found by reading the shipped page, not by any assertion. */
+          + hbDelta(climb.delta >= 0, (climb.delta >= 0 ? '+' : '') + climb.delta + ' pts')
           + '<span style="font-size:12px;color:var(--t2);">in ' + climb.weeks + ' week'
           + (climb.weeks === 1 ? '' : 's') + ', across ' + climb.count + ' audits</span></div>'
         /* ⚠ A LABEL, NOT A SENTENCE. `verify-design-code` RULE 2b caught three explainer sentences
@@ -1670,7 +1694,19 @@ S.Hub = {
       + '<span><span style="font-size:14px;color:var(--t3);">' + esc(p.was) + '</span>'
       + '<span style="color:var(--t4);margin:0 8px;font-size:13px;">&rarr;</span>'
       + '<span style="font-size:18px;font-weight:700;color:' + hbGrey + ';">' + esc(p.now) + '</span></span>'
-      + hbDelta(p.flat ? null : p.good, (p.good ? '▲ ' : '▼ ') + esc(p.was) + ' to ' + esc(p.now)) + '</div>';
+      /* ⛔ THE CHIP SAYS THE CHANGE, NOT THE PAIR AGAIN. It rendered "▲ 56.1% to 55.4%" on the live
+         build — a word-for-word repeat of the two figures three inches to its left, with the arrow
+         pointing UP on a number that went DOWN. Two separate errors in one string: the ARROW is
+         direction (down is down, always) and the COLOUR is judgement (down on prime cost is green).
+         Conflating them is exactly what makes a generic dashboard unable to say anything useful. */
+      + hbDelta(p.flat ? null : p.good,
+          (p.delta === 0 ? '' : (p.delta < 0 ? '▼ ' : '▲ '))
+          /* ⚠ NO HAND-ROLLED FALLBACK. My first version wrote `p.deltaText || Math.abs(p.delta).toFixed(…)`
+             and `verify-signed-zero-display` refused it — correctly, twice over: it is a private
+             re-implementation of a formatter the app already owns, AND a fallback to the exact shape
+             that fix replaced ([[the-loop]] #40 / [[harness-review-like-code]] #10). `pair()` always
+             sets `deltaText`, so the fallback was unreachable as well as wrong. */
+          + esc(p.deltaText)) + '</div>';
     const hbHead = mv && mv.headline;
     const hbHeadline = !hbHead ? ''
       : '<div style="font-size:21px;font-weight:700;color:' + hbGrey + ';line-height:1.3;margin:2px 0 14px;">'
@@ -1703,7 +1739,7 @@ S.Hub = {
         + '<div style="display:flex;align-items:baseline;gap:11px;margin:2px 0 8px;flex-wrap:wrap;">'
         + '<span style="font-size:25px;font-weight:800;color:' + col + ';">' + o.score + '</span>'
         + '<span style="font-size:16px;font-weight:700;color:' + hbGrey + ';">' + esc(o.section) + '</span>'
-        + hbDelta(isGain, (o.hbDelta >= 0 ? '+' : '') + o.hbDelta) + '</div>'
+        + hbDelta(isGain, (o.delta >= 0 ? '+' : '') + o.delta) + '</div>'
         + (o.measure
             ? '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">'
               + '<span style="font-size:12px;color:var(--t2);">' + esc(o.measure.label) + '</span>'
