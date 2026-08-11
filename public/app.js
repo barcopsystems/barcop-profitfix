@@ -5821,9 +5821,23 @@ const App = {
       + '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--b2);font-size:12px;color:var(--t3);line-height:1.5;">'
       + 'Need a hand? Tap the info <strong>i</strong> button at the top right for directions on this page, anytime.</div>'
       + '</div></div>';
+    /* ⛔⛔⛔ `openScreen`, NOT `navigate`. Kyle on the live build, 2026-08-11: *"and the empty state
+       buttons don't work.."* MEASURED from Week in Review before changing anything — `_activeModule`
+       was `'profit'` and `#app` was HIDDEN, so `App.navigate('ic-vendors')` painted "Coming soon."
+       into a hidden `#content-area` and the visible page did not move at all. Not a wrong landing, a
+       SILENT one. `App.openScreen` from the same state opened the real Vendors screen.
+       ⭐ `navigate` is MODULE-INTERNAL: it branches on `this._activeModule` and falls through for any
+       id outside it. `openScreen` is the cross-module door — resolve the module, swap the shell if it
+       differs OR the app is hidden, then call `navigate` — so it is a strict SUPERSET. A same-module
+       step with the shell already up takes the byte-identical path it took before; the only steps
+       whose behaviour changes are the ones that were dead ([[the-loop]] #146).
+       ⚠ 40 files and 78 steps ride on this one line, and a routing change is INVISIBLE — it fails
+       silently on a day-one screen the seeded demo cannot even render. So it is pinned before it is
+       changed, by `verify-setupcard-cross-module.js`, which also sweeps every step in the tree and
+       proves its destination resolves ([[proactive-ux-polish]] THE BOUNDARY). */
     container.onclick = ev => {
       const go = ev.target.closest('.setup-go');
-      if (go && go.dataset.go) App.navigate(go.dataset.go);
+      if (go && go.dataset.go) App.openScreen(go.dataset.go);
     };
   },
 

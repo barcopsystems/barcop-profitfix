@@ -1195,16 +1195,19 @@ body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
 body.hub-dashboard .hub-app .content{padding-left:0;padding-right:0;}
 .wr-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 @media (max-width:960px){.wr-grid{grid-template-columns:1fr;}}
-.wr-tophead{padding:15px 20px;border-bottom:1px solid var(--b2);background:var(--card-head);}
+/* `.wr-tophead` went with the stats box's header band on 2026-08-11 — the card carries the three
+   figures and nothing else now, so there was no element left for the rule to reach. */
 .wr-topstats{padding:20px 22px;}
 /* The eight Week In Review SECTION card headers (Inventory, Labor, Shift, Profit, Revenue, Cash,
-   Events, Books). Same band as every other card head; its title is larger than the 9px eyebrow the
-   other heads use, which is exactly why the first census missed it. */
-.wr-head{padding:15px 20px;border-bottom:1px solid var(--b2);background:var(--card-head);}
+   Events, Books). Same box as `.ck-head`, so a section card's head is the app's standard header
+   band and not a taller one-off. Measured before and after: 51px -> 34px, identical to Close The
+   Week's. Its title used to be a 17px Barlow Condensed line, which is exactly why the first
+   card-head census missed it. */
+.wr-head{padding:11px 22px;border-bottom:1px solid var(--b2);background:var(--card-head);}
 /* ⛔ NOT A HEAD, AND IT USED TO BORROW ONE. The "this week is not confirmed yet" explainer sits
    UNDER the top stat row, inside the same card — it is a note, not the card's header. It reused
-   `.wr-tophead` purely for the padding and the divider, so filling that class filled this too and
-   put a band behind a sentence. It gets its own name now: identical box, no fill. */
+   the top head's class purely for the padding and the divider, so filling that class filled this
+   too and put a band behind a sentence. It gets its own name now: identical box, no fill. */
 .wr-note{padding:15px 20px;border-bottom:1px solid var(--b2);}
 .wr-block{padding:15px 20px;}
 /* `.wr-foot` went with the "Open <section>" button on 2026-08-11 — the card has no footer row now,
@@ -1237,13 +1240,13 @@ body.hub-dashboard .hub-app .content{padding-left:0;padding-right:0;}
 /* ⭐ THE COCKPIT PAGE CARD'S HEAD — the "Close Out Your Week" band on all eight weekly-close pages
    (Profit, Revenue, Cash, Inventory, Labor, Shift, Events, Books Home). Those eight hand-rolled the
    SAME head inline, byte for byte, so this is one owner rather than eight copies that drift; it is
-   the same move `.wr-tophead` and `.hub-wys-head` already were, not a new mechanism.
+   the same move `.hub-wys-head` already was, not a new mechanism.
    ⚠ The padding is 11px 22px because that is exactly what the inline heads carried. Nothing moves;
    the only thing this adds is the fill. The card wrapper on each page carries overflow:hidden,
    which is what clips the band to the top radius. */
 .ck-head{padding:11px 22px;border-bottom:1px solid var(--b2);background:var(--card-head);}
 @media (max-width:768px){
-  .hub-wys-head,.wr-tophead,.wr-note{padding:15px 14px;}
+  .hub-wys-head,.wr-note{padding:15px 14px;}
   .hub-wys-body{padding:18px 14px;}
 }
 body.chrome-on .hub-app .nav-section{font-size:10px;letter-spacing:1.6px;padding:18px 20px 7px;color:var(--t4);}
