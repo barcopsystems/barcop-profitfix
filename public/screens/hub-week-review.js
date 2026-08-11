@@ -961,8 +961,36 @@ S.WeekReview = {
     if (!BH) return '';
     if (!((App.data && App.data.weeks) || []).length) return null;
 
-    let st;
-    try { st = BH._computeState(); } catch (e) { return null; }
+    /* ⛔⛔⛔ THE FIGURES BELONG TO THE REVIEWED WEEK'S OWN MONTH, AND THEY USED TO BELONG TO JULY.
+       Kyle, 2026-08-11: *"what it turned up is i assuming still listing july numbers.. when the week
+       showing is the 1st week of august review.. and why would it say nothing left to close on the
+       month if it is the first week of the month? that card makes no sense."*
+       MEASURED on the shipped build, reviewing Aug 3-9: `basisKey` was **2026-07**, `monthName` was
+       **"July 2026"**, and the card printed July's $75,323 and $9,040.24 under a heading reading
+       "MONTH + YTD" — having computed that month name and then never shown it.
+       ⭐ THE CAUSE IS A GOOD QUESTION ASKED ON THE WRONG PAGE. `BH._computeState` answers "the last
+       SETTLED month", which is exactly right for the Books cockpit, whose job is closing a month you
+       can actually close. A recap of a week in August has to answer about August or say nothing.
+       ⚠ AND A PART-MONTH IS NOT AN ANSWER EITHER: August so far is `netRev 38,430 / opInc -5,584`,
+       negative because every bill is in and only two weeks of revenue are. So the band shows the
+       month's figures ONLY once that month is settled, and says so plainly until then. */
+    const HB = S.HubBooks;
+    /* The week's month is its `period_end` month. That is this codebase's own definition of which
+       week a record belongs to — `confirm-week` stamps `period_end`, `_weekMoney` matches on it —
+       so a week straddling a boundary lands where the rest of the app already puts it. */
+    const mKey = this._wkE().slice(0, 7);
+    const nowKey = App.todayLocal().slice(0, 7);
+    /* ⚠ BOTH HALVES, AND THE SECOND ONE IS NOT OPTIONAL. `_weeksComplete('2026-08')` returns
+       `complete: true` on the 11th — it only means "no GAPS among the weeks that exist", not "the
+       month is over". Measured. Same pair `_basisKey` uses, read rather than reinvented. */
+    const wc = (HB && HB._weeksComplete) ? (HB._weeksComplete(mKey) || {}) : {};
+    const settled = !!(mKey < nowKey && wc.complete);
+    const mLabel = (HB && HB._monthLabel) ? HB._monthLabel(mKey) : mKey;
+    const P  = (HB && HB._plParts) ? HB._plParts(mKey, false) : null;
+    const PY = (HB && HB._plParts) ? HB._plParts(mKey, true)  : null;
+    const mRev = P ? P.netRev : null, mInc = P ? P.opInc : null;
+    const yNet = PY ? PY.netRev : null, yInc = PY ? PY.opInc : null;
+    const yMargin = (yNet) ? yInc / yNet : null;
 
     /* ⛔ BILLS ARE NOT OUTFLOWS, AND THIS COUNTED ONE DRAW AS BOTH. Since the one-ledger merge
        `operating_expenses` also holds the cash outflows, so an owner draw incremented "Bills
@@ -977,7 +1005,7 @@ S.WeekReview = {
     // counting two different sets of records (the cutover — see CashEngine.cashOutflows).
     const outRows = (CashEngine.cashOutflows() || []).filter(o => this._inWeek(o.date || o.created_at));
     const outflowWk = outRows.length;
-    const billsMonth = opex.filter(r => r && String(r.date || '').slice(0, 7) === st.curKey).length;
+    const billsMonth = opex.filter(r => r && String(r.date || '').slice(0, 7) === mKey).length;
     const rawRun = key => { try { return localStorage.getItem(key); } catch (e) { return null; } };
     const pnlRun = rawRun('books_report_run_weeklypnl');
     const meRun  = rawRun('books_report_run_monthend');
@@ -999,12 +1027,17 @@ S.WeekReview = {
       + this._m0(outRows.reduce((t, o) => t + (Number(o.amount) || 0), 0)) + '.');
     if (reportsWk) did.push(this._n(reportsWk + ' ' + this._plu(reportsWk, 'report')) + ' run.');
     const activity = this._didList(did);
-    const results = this._resRow([
-      this._res('Op Income YTD', BH._money(st.ytdInc), st.ytdInc < 0 ? 'var(--red)' : 'var(--t1)'),
-      this._res('Margin', BH._pct(st.ytdMargin)),
-      this._res('Month Revenue', BH._money(st.cmRev)),
-      this._res('Month Income', BH._money(st.mInc), st.mInc < 0 ? 'var(--red)' : 'var(--t1)')
-    ]);
+    /* Once the month is closed the figures are real and they say WHICH month, out loud, in the band
+       label. Until then the band holds the sentence rather than a number, which is what Kyle asked
+       for: *"once books are closed what it turned up stats will show here."* */
+    const results = settled
+      ? this._resRow([
+          this._res('Op Income YTD', BH._money(yInc), yInc < 0 ? 'var(--red)' : 'var(--t1)'),
+          this._res('Margin', BH._pct(yMargin)),
+          this._res('Month Revenue', BH._money(mRev)),
+          this._res('Month Income', BH._money(mInc), mInc < 0 ? 'var(--red)' : 'var(--t1)')
+        ])
+      : this._didRow(esc(mLabel) + ' is still open. Its figures show here once the month-end books are closed.');
 
     /* ⛔ "<Month> books not closed yet" is GONE: its only evidence was the `generate` tick, and
        nothing durable records that the month-end pack was produced (the localStorage stamp is the
@@ -1019,16 +1052,26 @@ S.WeekReview = {
        ⭐ THE FINDING IS NOT LOST, IT MOVED to the Shift card, which is where the tracker lives and
        where the door goes. Reporting an expired permit under Books and nowhere else would have been
        the worse of the two fixes. */
+    /* ⭐ A STANDING DIRECTIVE, NOT AN ALERT (Kyle: *"would be a good place just to put a simple
+       directive... simple gives them a nice directive to remember to do it"*). It is rendered as a
+       plain row, deliberately: the dotted amber pills on every other card mean "something is wrong
+       here", and a monthly routine is not a finding. Once the month IS settled the band goes back to
+       reporting, and the only thing it can report is a month that never got a bill in it. */
     const open = [];
-    if (billsMonth === 0) open.push({ t: 'No bills logged this month yet', sev: 'amber' });
+    if (settled && billsMonth === 0) open.push({ t: 'No bills were ever logged for ' + esc(mLabel), sev: 'amber' });
+    const toClose = settled
+      ? this._openList(open, 'Nothing left to close on ' + esc(mLabel) + '.')
+      : this._didRow('Get all your bills and cash outflows in before the month ends, then close the month-end books.');
 
     (this._pdf || (this._pdf = [])).push({ name: 'Books', activity: this._didPlain(did),
-      results: 'Op Income YTD ' + BH._money(st.ytdInc) + ', Margin ' + BH._pct(st.ytdMargin) + ', Month Revenue ' + BH._money(st.cmRev) + ', Month Income ' + BH._money(st.mInc),
-      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing to close' });
+      results: settled
+        ? 'Op Income YTD ' + BH._money(yInc) + ', Margin ' + BH._pct(yMargin) + ', ' + mLabel + ' Revenue ' + BH._money(mRev) + ', ' + mLabel + ' Income ' + BH._money(mInc)
+        : mLabel + ' is still open, so its figures are not in yet.',
+      open: this._stripTags(this._tidy(toClose)) });
     return this._sectionCard('Books', [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up &middot; Month + YTD', html: results },
-      { label: 'To Close', html: this._openList(open, 'Nothing left to close on the month.') }
+      { label: settled ? 'What It Turned Up &middot; ' + esc(mLabel) : 'What It Turned Up', html: results },
+      { label: 'To Close', html: toClose }
     ]);
   },
 
