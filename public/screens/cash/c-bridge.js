@@ -68,7 +68,7 @@ S.CashBridge = {
   // and only the result line goes bare.
   headline(br, b) {
     const kept = br.cashKept, diff = br.profit - kept;
-    const keptCol = kept < 0 ? 'var(--red)' : 'var(--w)';
+    const keptCol = kept < 0 ? 'var(--red)' : 'var(--t1)';
     // Without two inventory counts the bridge cannot see cash moving onto or off the
     // shelf: inventoryChange returns { change: 0, hasData: false }, so cashKept is profit
     // minus the LOGGED outflows only. The waterfall row already gates on hasData, but the
