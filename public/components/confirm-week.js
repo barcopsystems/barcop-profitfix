@@ -356,6 +356,17 @@ const ConfirmWeek = {
       message: 'This replaces the numbers you manually entered with the latest calculated numbers from your Control data.',
       confirmText: 'Use Calculated Numbers',
       cancelText: 'Keep My Numbers',
+      /* ⛔ THE RENAME PUSHED THE BUTTON ROW ONTO TWO LINES, AND THE FIX BELONGS AT THIS CALL. The
+         shared row is `flex-wrap:wrap` at a 420px dialog, so 364px of content space held
+         "Update from Control" beside "Keep My Numbers" and does not hold "Use Calculated Numbers".
+         ⭐ `maxWidth` IS THE SEAM THE COMPONENT ALREADY PROVIDES, so one dialog widens and the other
+         hundred are byte-for-byte untouched. Dropping `flex-wrap` instead would have put every
+         narrow-screen dialog in the app at risk of overflowing to fix one caller's copy, which is a
+         shared layout change dressed as a copy fix ([[the-loop]] #65 — pin that the old inputs
+         survive, and do not tighten a shared margin while fixing something else).
+         ⚠ THE WRAP STAYS, deliberately: it is the phone fallback, and on a narrow screen these two
+         SHOULD stack rather than run off the edge. */
+      maxWidth: 500,
       danger: false
     }).then(ok => { if (ok) apply(); });
   },
