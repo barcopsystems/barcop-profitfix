@@ -981,8 +981,8 @@ S.Hub = {
       const lastEnd = App.ymdLocal(nd);
       const wkConfirmed = arr => (arr || []).some(w => ((w.period_end || '') + '').slice(0, 10) >= lastEnd);
       const due = [];
-      if (!wkConfirmed(data.weeks))         due.push({ text: 'Confirm last week in Profit',  screen: 'dashboard',   mod: 'profit'  });
-      if (!wkConfirmed(data.revenue_weeks)) due.push({ text: 'Confirm last week in Revenue', screen: 'r-dashboard', mod: 'revenue' });
+      if (!wkConfirmed(data.weeks))         due.push({ text: 'Confirm last week in Profit',  screen: 'week-close',  mod: ''        });
+      if (!wkConfirmed(data.revenue_weeks)) due.push({ text: 'Confirm last week in Revenue', screen: 'week-close',  mod: ''        });
       const dueRows = due.length
         ? due.slice(0, 3).map(it =>
             '<div onclick="S.Hub._enter(\'' + it.screen + '\',\'' + it.mod + '\')" style="display:flex;align-items:center;gap:9px;padding:6px 0;cursor:pointer;font-size:12px;color:var(--t1);line-height:1.35;">'
@@ -2449,7 +2449,7 @@ S.Hub = {
         sev: gap > 3 ? 'bad' : 'warn',
         label: 'Prime cost over target', value: lw.prime_cost_pct.toFixed(1) + '% / ' + primeT + '%',
         text: 'Prime cost is tracking at ' + lw.prime_cost_pct.toFixed(1) + '%, ' + gap.toFixed(1) + ' points over your ' + primeT + '% target. Hold this pace and the month closes about ' + App.fmtCurrency(monthlyOver, 0) + ' over.',
-        screen: 'dashboard', mod: 'profit'
+        screen: 'profit-fix', mod: 'profit'
       });
     }
 

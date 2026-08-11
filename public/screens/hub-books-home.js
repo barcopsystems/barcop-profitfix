@@ -515,7 +515,7 @@ S.HubBooksHome = {
       [
         { done: d.hasWeeks,   num: 1, label: 'Confirm your first week',          go: 'this-week' },
         { done: d.hasOpex,    num: 2, label: 'Add your operating expenses',     go: 'operating-expenses' },
-        { done: d.hasInv,     num: 3, label: 'Set up Inventory Control',        go: 'ic-dashboard' },
+        { done: d.hasInv,     num: 3, label: 'Set up Inventory Control',        go: 'ic-vendors' },
         { done: d.hasPermits, num: 4, label: 'Enter your permits and licenses', go: 'permits' }
       ]);
   },
@@ -540,7 +540,7 @@ S.HubBooksHome = {
       // modal, so the step's own label went unanswered. Keep this key in step with the
       // day-one strip above — verify-action-key-wired.js pins that they agree (S260).
       else if (act === 'this-week')          App.openScreen('this-week');
-      else if (act === 'ic-dashboard')       App.openScreen('ic-dashboard');
+      else if (act === 'ic-vendors')         App.openScreen('ic-vendors');
     };
     /* The month arrows, wired per element like everything else on this page. `_stepMonth` does the
        clamping, so neither arrow can walk off the end of the data. */

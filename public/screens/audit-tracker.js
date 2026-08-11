@@ -38,7 +38,7 @@ S.AuditTracker = {
       { label: 'Deliveries logged',                    done: (cd.deliveries_logged || 0) > 0, go: 'ic-receive-delivery' },
       { label: 'Voids and comps logged',               done: (cd.void_comp_count || 0) > 0, go: 'sc-void-comp' },
       { label: 'Cash reconciled',                      done: (cd.cash_reconciliations || 0) > 0, go: 'sc-cash-control' },
-      { label: 'Confirm the week',                     done: cd.bar_cost_pct != null || cd.prime_cost_pct != null, go: 'dashboard' }
+      { label: 'Confirm the week',                     done: cd.bar_cost_pct != null || cd.prime_cost_pct != null, go: 'week-close' }
     ];
   },
 

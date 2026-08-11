@@ -915,7 +915,7 @@ S.HubBarCopAudit = {
     return [
       { label: 'Two inventory counts taken',  done: invDone,   go: 'ic-take-inventory' },
       { label: 'Two weeks of labor hours logged', done: laborDone, go: 'lc-log-hours' },
-      { label: 'Two weeks of POS sales imported', done: shiftDone, go: 'sc-dashboard' },
+      { label: 'Two weeks of POS sales imported', done: shiftDone, go: 'week-close' },
       { label: 'Profit Audit run',            done: pAud,      go: 'audit-tracker' },
       { label: 'Revenue Audit run',           done: rAud,      go: 'r-audit' }
     ];

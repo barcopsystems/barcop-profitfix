@@ -101,7 +101,7 @@ S.ProfitForecast = {
         title: 'Profit Forecast',
         lead: 'Once you have a few weeks confirmed, Bar Cop projects your profit forward at your current pace and at your cost targets, so you can see what tightening up is worth. You have ' + rr.nW + ' week' + (rr.nW === 1 ? '' : 's') + ' saved so far.',
         steps: [
-          { title: 'Confirm your weeks', desc: 'Confirm each week from the Profit dashboard. A few weeks gives an honest run-rate.', btn: 'Confirm the Week', screen: 'dashboard', done: rr.nW > 0 },
+          { title: 'Confirm your weeks', desc: 'Confirm each week on Close The Week. A few weeks gives an honest run-rate.', btn: 'Confirm the Week', screen: 'week-close', done: rr.nW > 0 },
           { title: 'Set your cost targets', desc: 'Your prime cost target drives the at-target scenario.', btn: 'App Settings', screen: 'settings', done: false }
         ]
       });

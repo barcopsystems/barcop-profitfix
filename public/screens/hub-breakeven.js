@@ -250,7 +250,7 @@ S.HubBreakEven = {
       App.setupCard(mount, {
         title: 'Break-Even',
         lead: 'Your fixed costs are set. Break-Even needs a few logged weeks to read your cost structure, what share of every sales dollar goes to product and labor.',
-        steps: [{ title: 'Close a few weeks', desc: 'Log your weekly sales and costs so Bar Cop can read your prime cost and draw the line.', btn: 'Close The Week', screen: 'dashboard', done: false }]
+        steps: [{ title: 'Close a few weeks', desc: 'Log your weekly sales and costs so Bar Cop can read your prime cost and draw the line.', btn: 'Close The Week', screen: 'week-close', done: false }]
       });
       return;
     }
