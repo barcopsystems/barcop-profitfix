@@ -645,7 +645,20 @@ S.WeekReview = {
       this._res('Net Sales', App.fmtCurrency(rev, 0)),
       this._res('Covers', String(covers)),
       this._res('Check Avg', checkAvg != null ? App.fmtCurrency(checkAvg) : '-'),
-      this._res('Over / Short', (netVar > 0 ? '+' : '') + App.fmtBal(netVar, 0), netVar < 0 ? 'var(--red)' : 'var(--t1)'),
+      /* ⛔⛔⛔ A WEEK NOBODY COUNTED A DRAWER IN MUST NEVER READ "$0.00 OVER/SHORT". `netVar` is a
+         bare reduce over the week's variance records, so zero records reduce to 0 — and 0 printed
+         in neutral is indistinguishable from a genuinely square week. That is the invariant
+         `verify-uncounted-drawer-week` was written for, and it was pinned only to the Shift
+         cockpit's `whereYouStand`; THIS page replaced that surface and never inherited the guard
+         ([[lessons-paid-for]] #9 — a fix written into one page's render does not exist for the
+         second). `reconN` was already computed two lines up and read by nothing here.
+         ⚠ AND THE SIGN COMES OFF THE ROUNDED VALUE, not the raw one. `App.fmtBal(x, 0)` rounds to
+         whole dollars, so a raw -0.004 prints "$0.00" while `netVar < 0` paints it red — a figure
+         that says nothing is wrong in the colour that says something is. The cockpit's twin uses
+         `fmtSigned(...).sign` for exactly this reason; both readings now agree. */
+      this._res('Over / Short',
+        reconN ? (App.fmtSigned(netVar, 0).sign > 0 ? '+' : '') + App.fmtBal(netVar, 0) : 'Not counted',
+        reconN ? (App.fmtSigned(netVar, 0).sign < 0 ? 'var(--red)' : 'var(--t1)') : 'var(--t3)'),
       this._res('Voids + Comps', App.fmtCurrency(voidTot + compTot, 0))
     ]);
     /* ⛔ "Loss flags never reviewed this week" is GONE — its only evidence was the `review` tick.
@@ -659,7 +672,10 @@ S.WeekReview = {
     if (permDue > 0) open.push({ t: '<b>' + permDue + '</b> permit/license item' + (permDue === 1 ? '' : 's') + ' need attention', sev: permExpired > 0 ? 'red' : 'amber' });
 
     (this._pdf || (this._pdf = [])).push({ name: 'Shift', activity: this._didPlain(did),
-      results: 'Net Sales ' + App.fmtCurrency(rev, 0) + ', Covers ' + covers + ', Check Avg ' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + ', Over/Short ' + (netVar > 0 ? '+' : '') + App.fmtBal(netVar, 0) + ', Voids+Comps ' + App.fmtCurrency(voidTot + compTot, 0),
+      // ⚠ THE PDF SAYS WHAT THE SCREEN SAYS. Same guard, same rounded sign — this line is the one
+      // that gets handed to somebody, so a "$0.00" here for an uncounted week is the same lie in a
+      // document ([[the-loop]] #54: the moment a quantity is printed twice, the test is that they agree).
+      results: 'Net Sales ' + App.fmtCurrency(rev, 0) + ', Covers ' + covers + ', Check Avg ' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + ', Over/Short ' + (reconN ? (App.fmtSigned(netVar, 0).sign > 0 ? '+' : '') + App.fmtBal(netVar, 0) : 'Not counted') + ', Voids+Comps ' + App.fmtCurrency(voidTot + compTot, 0),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Shift', [
       { label: 'Done This Week', html: activity },
