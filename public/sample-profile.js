@@ -28,11 +28,30 @@
   var BAR_SHARE       = 0.625;  // bar's share of total revenue
   var BAR_LABOR_SHARE = 0.61;   // bar department's share of total labor dollars
 
-  // Each row: [covers, check_avg, bar_pour_pct, food_cost_pct, labor_pct_blended, loose]
+  // Each row: [covers, check_avg, bar_pour_pct, food_cost_pct, labor_pct_blended, loose, spike]
   // wk = row index + 1 (row 0 is the oldest week). loose = the pre-Bar-Cop /
   // onboarding weeks before discipline takes hold; it drives the void/comp,
   // cash-variance, and walked-tab seeds (more events, looser authorization when
   // loose) so the early audits see real problems and the recent ones read clean.
+  //
+  /* ── `spike` — ONE BAD FORTNIGHT, ON PURPOSE ──────────────────────────────────
+     Kyle, 2026-08-10: *"making the seed data have a more compelling gain and drag
+     would be good for the live demo."*
+     ⛔ THE PROBLEM IT FIXES: this spec improves on EVERY metric in EVERY week, so
+     the Hub's "your worst drag" card had nothing to name. Measured across the
+     thirteen weeks: 12 of 12 better week over week, 11 of 11 at two weeks, 9 of 9
+     at four. A prospect could open the demo forever and never see the half of the
+     page that reports bad news, which is the half that proves the product is
+     honest. The same monotony is why the movement headline can only ever say
+     "better", never "worse" or "holding steady".
+     ⭐ SO THE MOST RECENT WEEK GETS A RUN OF COMPS. It is the most believable
+     drag a real bar produces, it does not touch the cost percentages the audits
+     and the run-rate depend on, and the seeded audit snapshots are hardcoded so
+     the 40-to-75 climb is unaffected. The improving story still holds on cost;
+     one operational thing got away, which is what an operator's week looks like.
+     ⚠ IT MUST LAND IN THE LAST CLOSED WEEK, not the current one. The Hub compares
+     the last closed week against two weeks before it, so a spike on the live
+     unfinished week would be invisible to the card it exists to fill. */
   var SPEC = [
     // ── Weeks 1-2 — pre-Bar-Cop baseline: bleeding on cost, the numbers the
     //    day-one intake audit reflects (pour ~30%, food ~40%, prime ~67%) ──
@@ -51,11 +70,12 @@
     [498, 37.8, 23.5, 33.5, 29.2],      // wk 10
     [499, 38.0, 23.2, 33.2, 29.0],      // wk 11
     [500, 38.2, 23.0, 33.0, 28.8],      // wk 12
-    [500, 38.3, 22.8, 32.9, 28.6],      // wk 13  (current state; matches annual run-rate)
+    [500, 38.3, 22.8, 32.9, 28.6, 0, 1], // wk 13  (current state; matches annual run-rate) + comp spike
   ];
 
   function buildWeek(t, i) {
     var covers = t[0], check_avg = t[1], pour = t[2], food = t[3], laborPct = t[4], loose = !!t[5];
+    var spike = !!t[6];
     var total_rev   = Math.round(covers * check_avg);
     var bar_rev     = Math.round(total_rev * BAR_SHARE);
     var food_rev    = total_rev - bar_rev;
@@ -70,7 +90,7 @@
       total_rev: total_rev, bar_rev: bar_rev, food_rev: food_rev,
       bar_cogs: bar_cogs, food_cogs: food_cogs, bar_labor: bar_labor, food_labor: food_labor,
       bar_pour_pct: pour, food_cost_pct: food, labor_pct_blended: laborPct,
-      prime_cost_pct: +prime.toFixed(1), loose: loose
+      prime_cost_pct: +prime.toFixed(1), loose: loose, spike: spike
     };
   }
 
