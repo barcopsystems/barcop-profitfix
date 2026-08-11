@@ -23,17 +23,20 @@ window.BarCopBriefing = {
      its own ("Nothing scored yet."), so the audit half was never the thing that needed protecting.
      ⚠ AND IT MATTERS MORE SINCE THE RAIL MOVED TO THE TOP BAR. On the Hub it was one refusal on one
      page; now it is on every page a new bar opens in its first week.
-     ⚠ ZEROES ARE NOT SUBSTANCE. Day one has all eight sections present at 0 of 4 and a weekly
-     readout of 0/0, so every disjunct below tests for a REAL value, never for the field existing. */
+     ⚠ ZEROES ARE NOT SUBSTANCE. Day one has a weekly readout of 0/0 and audits that have never
+     run, so every disjunct below tests for a REAL value, never for the field existing. */
   _hasSubstance(s) {
     s = s || {};
     const a = s.audits || {};
     const w = s.weekly || {};
     const scored   = ['profit', 'revenue', 'cash', 'barCop'].some(k => a[k] != null);
     const money    = (w.leak || 0) > 0 || (w.opp || 0) > 0 || (s.recovered || 0) > 0;
-    const progress = (s.sections || []).some(x => (x.done || 0) > 0);
+    /* ⛔ `progress` IS GONE WITH PARAGRAPH 3, and dropping it TIGHTENS this gate rather than
+       loosening it. It let a bar qualify as having something to say on the strength of ticked
+       checkboxes alone — so an operator who had pressed Mark Done four times and logged no records
+       got a briefing with nothing in it but that. Every disjunct left is a real measurement. */
     const flagged  = (s.critical || []).length > 0;
-    return scored || money || progress || flagged;
+    return scored || money || flagged;
   },
 
   _fmtDate(iso) {
@@ -77,8 +80,9 @@ window.BarCopBriefing = {
     this._showModal(this._buildBriefing(), new Date().toISOString());
   },
 
-  // Up to 5 short paragraphs off the snapshot: overall state, where the money is, where the eight
-  // sections stand this week, anything urgent, and the one move to make first.
+  // Up to 4 short paragraphs off the snapshot: overall state, where the money is, anything urgent,
+  // and the one move to make first. (A fifth named where the eight sections stood; it counted
+  // manual ticks and was dropped 2026-08-11 — see the note at its old home below.)
   _buildBriefing() {
     const s = this._snap || {};
     const a = s.audits || {};
@@ -127,26 +131,16 @@ window.BarCopBriefing = {
       paras.push('No sized leaks or revenue gaps are flagged this week. Either the systems are tight or they are hungry for more logged weeks. Keep closing your weeks and the picture sharpens.');
     }
 
-    /* 3 — WHERE THE EIGHT SECTIONS STAND THIS WEEK. This paragraph came from the Week In Review
-       briefing, which is being retired: it was the one part of that read which was about the whole
-       BAR rather than about that page's numbers, so it belongs here. Sections are named, never
-       counted ("Inventory, Labor and Shift closed clean" beats "3 of 8 complete") — the operator
-       needs to know WHICH one is behind, and a bare count makes them go and look. */
-    const secs = s.sections || [];
-    if (secs.length) {
-      const clean = secs.filter(x => x.total > 0 && x.done >= x.total).map(x => x.name);
-      const open  = secs.filter(x => x.total > 0 && x.done < x.total);
-      const list  = (arr) => arr.length > 1 ? arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1] : arr[0];
-      let p3 = '';
-      if (clean.length && !open.length) p3 = 'Every section is closed out this week. The whole board is caught up.';
-      else if (clean.length) p3 = list(clean) + ' ' + (clean.length === 1 ? 'is' : 'are') + ' closed out this week. ';
-      // Name the shortfall with its own numbers; "still open" alone sends them hunting.
-      if (open.length) {
-        p3 += (clean.length ? 'Still open: ' : 'Nothing is closed out yet this week. Still open: ')
-          + open.map(x => x.name + ' (' + x.done + ' of ' + x.total + ')').join(', ') + '.';
-      }
-      if (p3) paras.push(p3.trim());
-    }
+    /* ⛔⛔ PARAGRAPH 3 IS GONE, AND WHAT IT WAS MADE OF IS WHY (Kyle, 2026-08-11: *"drop the
+       paragraph"*). It read "Inventory, Labor and Shift are closed out this week. Still open:
+       Cash (2 of 4)" — sourced from each section's `hubSteps()`, which counts a MANUAL TICK MAP.
+       Close The Week measured that map: 32 steps across the eight cockpits, 31 of them checkboxes
+       an operator ticked by hand, and NOTHING downstream ever read a tick. So this paragraph was
+       reporting how many boxes had been pressed, in the voice of how the bar is doing, on the
+       screen an operator opens to find out how the bar is doing.
+       ⭐ IT ALSO UNBLOCKED 1c. The six cockpits are being deleted and this was their last surviving
+       reader; every other paragraph here comes from records. Nothing replaced it, deliberately —
+       the honest version of this sentence is Close The Week, which derives every line from data. */
 
     // 4 — anything urgent this week.
     const crit = (s.critical || []);
