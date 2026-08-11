@@ -75,10 +75,10 @@ S.WeekClose = {
      calls it `sales`, the Shift cockpit calls that lane `import`. `mount` names the cockpit member
      that mounts it, so a lane is one row of table rather than a branch in three places. */
   LANES: {
-    sales: { host: 'SC_HOST', obj: 'ShiftDashboard',  key: 'import', mount: 'mountImport' },
+    sales: { host: 'SC_HOST', obj: 'ShiftLane',  key: 'import', mount: 'mountImport' },
     hours: { host: 'LB_HOST', obj: 'LaborLane', key: 'hours',  mount: 'mountHoursImport' },
     tips:  { host: 'LB_HOST', obj: 'LaborLane', key: 'tips',   mount: 'mountTipsImport' },
-    cash:  { host: 'SC_HOST', obj: 'ShiftDashboard',  key: 'cash',   mount: 'mountCashImport' }
+    cash:  { host: 'SC_HOST', obj: 'ShiftLane',  key: 'cash',   mount: 'mountCashImport' }
   },
   /* ⛔ THE TWO COCKPITS SPELL THE SAME CONTRACT DIFFERENTLY — `lbClaim`/`_lbLaneKey`/`lbTakeover`
      against `ckClaim`/`_ckLaneKey`/`ckTakeover`. ONE explicit branch rather than member names held
@@ -474,12 +474,16 @@ S.WeekClose = {
       if (aslot && carryActs) aslot.appendChild(carryActs);
     }
     this.wire();
-    /* ⛔ THE CONFIRM SCREEN'S OWN CONTROLS. Labor exposes a wiring member; Shift wires its confirm
-       screen inside the cockpit's `wire()`, which binds `this.container.onclick` — so it is given
-       THIS page's container, and the host is what makes its redraws land back here. */
+    /* ⛔ THE CONFIRM SCREEN'S OWN CONTROLS. Each lane exposes a wiring member of its own now, and
+       this page hands it THIS page's container.
+       ⚠ IT USED TO READ `o.container = container; o.wire()` FOR SHIFT — assigning the cockpit its
+       container and running that whole page's click handler, seven pieces of unrelated chrome and
+       all, just to reach the confirm screen's buttons. It worked only because none of those chrome
+       selectors is on screen while a confirm screen is up. The lane's half is `_ckHandle` now and
+       `ckWire` installs it, so this page runs the lane's controls and nothing else. */
     if (onConfirm) {
       if (labor) o._wireLaborReview();
-      else { o.container = container; o.wire(); }
+      else o.ckWire(container);
     }
     // The takeover draws BELOW the banner, so on a short window a dropped file moves nothing the
     // operator can see. Only on the way in; on the way out the rows are what they want back.
