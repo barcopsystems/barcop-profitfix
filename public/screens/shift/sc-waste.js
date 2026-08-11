@@ -509,31 +509,6 @@ S.ShiftWaste = {
     else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; } }
   },
 
-  // Log waste from the running shift in a focused pop-up using the SAME multi-
-  // line batch builder as the landing (header + lines + Save All), so a manager
-  // can enter several at once. onDone re-renders the active shift. preset pre-
-  // fills date / shift from the open shift.
-  openLogModal(onDone, preset) {
-    if (!App.canEdit('sc-waste')) return;
-    this.editId = null;
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Log Waste / Spill</div>'
-      + this.builderInner(preset)
-      + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="wlb-save">Save All</button>'
-      + '<span id="wlb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + '</div></div>';
-    const modal = App.openModal(html, { id: 'wl-log-modal', maxWidth: 860, noClose: true });
-    if (!modal) return;
-    modal.addEventListener('change', ev => this.onLineChange(ev));
-    modal.addEventListener('click', ev => {
-      if (ev.target.closest('#wlb-add')) { this.addLine(); return; }
-      const rm = ev.target.closest('.wll-del');
-      if (rm) { this.removeLine(rm.closest('.wl-line')); return; }
-      if (ev.target.closest('#wlb-cancel')) { App.closeModal('wl-log-modal'); return; }
-      if (ev.target.closest('#wlb-save')) { this.saveBatch(() => { App.closeModal('wl-log-modal'); if (typeof onDone === 'function') onDone(); }); return; }
-    });
-  },
-
   async confirmDel(id) {
     const ok = await App.confirmDelete();
     if (!ok) return;

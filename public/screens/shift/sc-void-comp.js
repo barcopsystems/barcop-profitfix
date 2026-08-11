@@ -298,7 +298,7 @@ S.ShiftVoidComp = {
     this.wireList();
     // ⚠ NOT WHILE THE CONFIRM SCREEN IS UP: its markup replaces the card, so `#vc-csv` is gone and
     // re-mounting would hand the operator a second file picker over a file they have not confirmed.
-    if (this.entryMode === 'import' && !this._voidReview) this.mountImporter('vc-csv');
+    if (this.entryMode === 'import' && !this._voidReview) this.mountImporter();
   },
 
   wireList() {
@@ -443,47 +443,6 @@ S.ShiftVoidComp = {
     this.wireFormFields('vce-');
     document.getElementById('vce-save')?.addEventListener('click', () => this.saveEdit(id));
     document.getElementById('vce-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('vc-edit-modal'); this.confirmDel(id); });
-  },
-
-  // Log voids/comps from the running shift in a focused pop-up using the SAME
-  // multi-line batch builder as the landing (header + lines + Save All), so a
-  // manager can enter several at once. onDone re-renders the active shift.
-  // preset pre-fills date/shift from the open shift.
-  openLogModal(onDone, preset) {
-    if (!App.canEdit('sc-void-comp')) return;
-    this.editId = null;
-    this._modalMode = 'manual';
-    const done = () => { App.closeModal('vc-log-modal'); if (typeof onDone === 'function') onDone(); };
-    // Re-render the pop-up in place on a mode flip. openModal replaces by id, so
-    // toggling swaps the body cleanly and re-wires the fresh overlay.
-    const mount = () => {
-      const body = this._modalMode === 'import'
-        ? '<div id="vc-csv-m"></div><div id="vc-imp-result-m"></div>'
-        : this.builderInner(preset)
-          + '<div class="card-actions">'
-          + '<button class="btn btn-primary" id="vcb-save">Save All</button>'
-          + '<span id="vcb-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-          + '</div>';
-      const html = '<div class="card form-card" style="margin:0;">'
-        + '<div class="card-title">Log Voids / Comps</div>'
-        + this.modeToggleHtml(this._modalMode, 'vc-mmode')
-        + body
-        + '</div>';
-      const modal = App.openModal(html, { id: 'vc-log-modal', maxWidth: 880, noClose: true });
-      if (!modal) return;
-      modal.addEventListener('change', ev => this.onLineChange(ev));
-      modal.addEventListener('click', ev => {
-        const mb = ev.target.closest('.vc-mmode');
-        if (mb) { this._modalMode = mb.dataset.mode; mount(); return; }
-        if (ev.target.closest('#vcb-add')) { this.addLine(); return; }
-        const rm = ev.target.closest('.vcl-del');
-        if (rm) { this.removeLine(rm.closest('.vc-line')); return; }
-        if (ev.target.closest('#vcb-cancel')) { App.closeModal('vc-log-modal'); return; }
-        if (ev.target.closest('#vcb-save')) { this.saveBatch(done); return; }
-      });
-      if (this._modalMode === 'import') this.mountImporter('vc-csv-m', done);
-    };
-    mount();
   },
 
   // Collect the form (prefix p) into a record body, or null after an error.
@@ -742,25 +701,27 @@ S.ShiftVoidComp = {
      ⚠ Before adding a date format anywhere, add it to PosIngest.normDate. verify-import-date-year.js
      case C6 now scans EVERY CSVMapper door file for a private date parser, not the two it already
      knew about — which is the only reason this copy was found. */
-  mountImporter(elId, after) {
-    const el = document.getElementById(elId);
+  /* ⛔ THE FILE STOPS AT THE CONFIRM SCREEN (door 8 of the rollout). It used to go straight to
+     `importRows`, which built and WROTE in one press and then flattened the result into one line
+     afterwards.
+     ⭐ THERE IS ONE MOUNT NOW, AND IT TOOK A DELETION TO GET THERE. This took `(elId, after)` and
+     branched on `elId === 'vc-csv-m'` — the drop zone inside `openLogModal`'s pop-up. That member
+     had ZERO callers and was deleted (Kyle, 2026-08-11), so `vc-csv-m` can never exist again: the
+     result-slot ternary, the straight-to-write branch and the `after` callback were all reachable
+     only through it. The one surviving caller passes `'vc-csv'` and nothing else, so what is left
+     is what actually runs. ⚠ An optional parameter no caller passes is a dead gate and everything
+     behind it is unreachable ([[the-loop]] #62) — the tell was the comment above claiming the modal
+     "keeps the old straight-through call" about a modal that no longer existed. */
+  mountImporter() {
+    const el = document.getElementById('vc-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
-    const resultId = elId === 'vc-csv-m' ? 'vc-imp-result-m' : 'vc-imp-result';
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS voids and comps export here',
       dropSub: 'Needs an Amount column. Void-or-comp, item, server, reason, and date are matched if your export has them.',
-      actionsEl: elId === 'vc-csv' ? '#vc-imp-actions' : undefined,
+      actionsEl: '#vc-imp-actions',
       fields: PosIngest.FIELDS.voids,
       confirmLabel: 'Import',
-      /* ⛔ THE FILE STOPS HERE NOW (door 8 of the rollout). It used to go straight to `importRows`,
-         which built and WROTE in one press and then flattened the result into one line afterwards.
-         ⚠ The modal mount (`vc-csv-m`) keeps the old straight-through call: `openLogModal` has ZERO
-         references anywhere in `public/`, so that path is unreachable and building a confirm screen
-         into a modal nobody can open would be new surface with no operator behind it. Flagged
-         separately rather than wired blind. */
-      onComplete: rows => (elId === 'vc-csv-m'
-        ? this.importRows(rows, resultId, after)
-        : this._openVoidReview(rows))
+      onComplete: rows => this._openVoidReview(rows)
     });
   },
 
