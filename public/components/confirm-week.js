@@ -159,7 +159,7 @@ const ConfirmWeek = {
       + '<div class="card-title">Confirm the Week &mdash; ' + esc(rangeLabel) + '</div>'
       + checklist + moneyStrip + grid + coversField + manual
       + '<div class="card-actions"><button class="btn btn-primary" id="cw-save">' + confirmLabel + '</button>'
-      +   '<button class="btn btn-ghost" id="cw-refresh">Refresh from Control</button>'
+      +   '<button class="btn btn-ghost" id="cw-refresh">Use Calculated Numbers</button>'
       +   '<span id="cw-err" style="color:var(--red);font-size:12px;align-self:center;display:none;"></span></div>'
       + '</div>';
 
@@ -323,7 +323,7 @@ const ConfirmWeek = {
   },
 
   // Force the Control-sourced cells back to the live auto-fill, overwriting any
-  // manual edits (this is what "Refresh from Control" promises). Leaves the
+  // manual edits (this is what "Use Calculated Numbers" promises). Leaves the
   // manual optional fields (ancillary, notes) alone and does not re-render.
   _refresh() {
     const pe = this._weekEnd;
@@ -352,9 +352,9 @@ const ConfirmWeek = {
     const edited = Object.keys(auto).some(id => num(document.getElementById(id) && document.getElementById(id).value) !== num(auto[id]));
     if (!edited) { apply(); return; }
     App.confirm({
-      title: 'Refresh from Control?',
+      title: 'Use the calculated numbers?',
       message: 'This replaces the numbers you manually entered with the latest calculated numbers from your Control data.',
-      confirmText: 'Update from Control',
+      confirmText: 'Use Calculated Numbers',
       cancelText: 'Keep My Numbers',
       danger: false
     }).then(ok => { if (ok) apply(); });
@@ -571,7 +571,7 @@ const ConfirmWeek = {
       const barMoved  = Number.isFinite(now[i].bar)  && cents(now[i].bar)  !== cents(was[i].bar);
       const foodMoved = Number.isFinite(now[i].food) && cents(now[i].food) !== cents(was[i].food);
       /* ⚠ THE GATE IS "DID THE COUNT-DERIVED VALUE MOVE", NOT "does the stored value differ". Those
-         cells are hand-editable and Refresh from Control is opt-in, so a typed COGS legitimately
+         cells are hand-editable and Use Calculated Numbers is opt-in, so a typed COGS legitimately
          disagrees with the counts forever. Gating on the stored value would offer to overwrite that
          typing on every unrelated count edit ([[user-chooses-conflicts]]). */
       if (!barMoved && !foodMoved) return;
