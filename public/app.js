@@ -8723,17 +8723,34 @@ const App = {
     // let a divergent second record be written. Every entry point that still targets
     // them (Getting Started, a Fix result link, a stale nav) now opens the Confirm
     // the Week popup for the current week over the section's Close The Week dashboard.
+    /* ⛔⛔⛔ THIS OPENED A DYING COCKPIT BEHIND THE POPUP, AND KYLE FOUND IT ON WEEK HISTORY.
+       *"click confirm the week button under the popup it goes to the old close the week page ...
+       again.. i shouldn't have to keep finding these."* He is right, and worse: I READ THIS EXACT
+       CODE earlier in the same build, wrote down that `dashId` lands on one of the six screens 1c
+       deletes, and filed it as a future liability instead of fixing it. It was never a future
+       liability — it is the page an operator lands on today.
+       ⭐ CLOSE THE WEEK IS THE PAGE NOW, so the popup opens over the page that owns the weekly close
+       rather than over a cockpit that is being deleted. Through `_protoGlobalClick`, which is the
+       ONE door the rail already uses — never a second `S.WeekClose.open()` call, because two doors
+       to one page drift ([[the-list]] step 1b).
+       ⚠ THE WEEK COMES FROM THE PAGE THAT IS ABOUT TO BE ON SCREEN, not from the cockpit's selector.
+       `S.WeekClose.weekEnd()` is its own accessor and falls back to `App.nextSunday()`, so the popup
+       and the page behind it can never disagree about which week is being confirmed — which was a
+       real defect on this exact pairing once before. */
     if (id === 'this-week' || id === 'r-this-week') {
-      const isProfit = (id === 'this-week');
-      const dashId = isProfit ? 'dashboard' : 'r-dashboard';
-      const dash   = isProfit ? S.Dashboard : S.RevenueDashboard;
-      this.openScreen(dashId);
-      const pe = (dash && dash.weekEnd) ? dash.weekEnd()
-        : ((S.ThisWeek && S.ThisWeek.currentWeekEnd) ? S.ThisWeek.currentWeekEnd() : this.todayLocal());
+      this._protoGlobalClick('week-close');
+      const wc = (typeof S !== 'undefined') && S.WeekClose;
+      const pe = (wc && wc.weekEnd) ? wc.weekEnd() : this.nextSunday();
       if (typeof ConfirmWeek !== 'undefined' && ConfirmWeek.open) {
+        /* ⛔ `render(container)`, NOT `rerender()`. My first version called `wc.rerender()`, which is
+           UNDEFINED on `S.WeekClose` — measured on the shipped build. `rerender` exists only on the
+           two HOST literals inside that file (`SC_HOST` / `LB_HOST`), and `sliceMember` refusing to
+           slice it was the tell. Behind a `&&` guard it would have failed silently: confirm a week
+           and the page behind the popup never repaints, which reads as "the save did nothing".
+           Same family as a `window.X` read on a bare const — the guard turns a loud failure into a
+           quiet wrong result ([[the-loop]] #40). */
         ConfirmWeek.open(pe, { onDone: () => {
-          const c = document.getElementById('content-area'), a = document.getElementById('topbar-actions');
-          if (dash && dash.render && c) dash.render(c, a);
+          if (wc && wc.render && wc.container) wc.render(wc.container);
         } });
       }
       return;
