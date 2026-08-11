@@ -443,6 +443,26 @@ S.Hub = {
     };
   },
 
+  /* ── GET STARTED: the four first jobs on an empty account ───────────────────────────────────
+     Kyle, 2026-08-11: *"setup inventory control needs to go to list vendors.. setup labor control..
+     to add positions.. setup shift control needs to go to add registers."*
+     ⭐ EACH ONE IS THE FIRST THING YOU CAN ACTUALLY DO, not the section's front door. You cannot
+     count stock with no vendors, schedule with no positions, or reconcile with no registers, so a
+     chip that lands on the section's first nav row sends a new operator somewhere they can only
+     read. All four were OPENED on the shipped build before being written here: List Vendors renders
+     ADD A VENDOR, Add Positions renders ADD POSITION, Drawers / Registers renders ADD REGISTER.
+     ⚠ A MEMBER SO A HARNESS CAN RESOLVE THEM. Built inline, these destinations were invisible to
+     `verify-hub-destinations` (it scans for literal `_enter` calls and these are interpolated) —
+     the same blind spot that let a dead cockpit link ship in the metric strip. */
+  _getStartedSteps() {
+    return [
+      { label: 'Set up Inventory Control', screen: 'ic-vendors',    mod: 'inventory' },
+      { label: 'Set up Labor Control',     screen: 'lc-positions',  mod: 'labor' },
+      { label: 'Set up Shift Control',     screen: 'sc-drawers',    mod: 'shift' },
+      { label: 'Run your first audit',     screen: 'audit-tracker', mod: 'profit' }
+    ];
+  },
+
   /* Good morning / afternoon / evening, off the operator's own clock. Kyle's call, 2026-08-10.
      Takes the hour so a harness can drive all three without waiting for the day to pass. */
   _greeting(hour) {
@@ -1079,20 +1099,36 @@ S.Hub = {
     // a Get Started title, one subtitle line, and a flex row of numbered chips
     // that navigate. Each chip carries its own module so the Hub router lands on
     // the right section.
-    /* ⚠ THE CHIPS GO THROUGH `jumpToSection`, NOT AT A COCKPIT SCREEN ID. They pointed at
-       `ic-dashboard` / `lc-dashboard` / `sc-dashboard` — three of the six being deleted — so the very
-       first thing a new operator pressed would have been a dead link. `jumpToSection` lands on each
-       section's own first page, which is one door and already correct. */
-    const gsChip = (n, label, mod) =>
-        '<div onclick="App.jumpToSection(\'' + mod + '\')" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid var(--gold-tint-bord);border-radius:8px;background:var(--gold-tint);">'
+    /* ⭐⭐ EACH CHIP NAMES THE EXACT FIRST JOB, NOT THE SECTION. Kyle, 2026-08-11: *"setup inventory
+       control needs to go to list vendors.. setup labor control.. to add positions.. setup shift
+       control needs to go to add registers."*
+       ⛔ THEY WENT THROUGH `jumpToSection`, WHICH LANDS ON WHATEVER THE SECTION'S FIRST NAV ROW
+       HAPPENS TO BE. That was a fix for a worse bug (they used to point at `ic-dashboard` and two
+       siblings, three of the six cockpits being deleted, so a new operator's FIRST press was a dead
+       link) but it left the destination decided by a table, not by the promise on the chip. A chip
+       reading "Set up Inventory Control" landing on Take Inventory is not wrong exactly, it is just
+       not the first thing you can actually DO on an empty account: you cannot count what has no
+       vendors, you cannot schedule with no positions, you cannot reconcile with no registers.
+       ⚠ ALL FOUR OPENED ON THE SHIPPED BUILD BEFORE THIS WAS WRITTEN, which is the one check a
+       destination's correctness cannot be inferred without ([[lessons-paid-for]] #18): List Vendors
+       renders ADD A VENDOR, Add Positions renders ADD POSITION, Drawers / Registers renders ADD
+       REGISTER. Every one is the empty form, which is exactly where a new operator should land.
+       ⚠ AND CHIP 4 IS NOW EXPLICIT TOO. It reached `audit-tracker` anyway, via the profit section's
+       landing entry, but its promise is "run your first audit" and not "wherever profit happens to
+       land" — so it names the screen rather than depending on a table that can move under it. */
+    const gsChip = (n, label, screen, mod) =>
+        '<div onclick="S.Hub._enter(\'' + screen + '\',\'' + mod + '\')" style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;min-width:200px;padding:11px 13px;border:1px solid var(--gold-tint-bord);border-radius:8px;background:var(--gold-tint);">'
       +   '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;line-height:1;background:var(--sel-active-bg);color:var(--gold);">' + n + '</span>'
       +   '<span style="font-size:12px;font-weight:600;color:var(--t1);">' + label + '</span></div>';
+    /* ⛔ THE FOUR DESTINATIONS LIVE IN A MEMBER (`_getStartedSteps`), NOT INLINE, AND THE REASON IS A
+       BLIND SPOT I ALREADY PAID FOR ONCE. `verify-hub-destinations` scans for LITERAL `_enter('x','y')`
+       calls; a chip built by interpolation is invisible to it, which is exactly how Cost of goods
+       shipped pointing at a dying cockpit in the strip. A member can be RUN, so the harness resolves
+       each destination for real instead of parsing a template ([[the-loop]] #21 — a filtered search
+       space is where the bug hides). */
     const gettingStarted = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Set up your Control sections first, then run your first audit.</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      +   gsChip(1, 'Set up Inventory Control', 'inventory')
-      +   gsChip(2, 'Set up Labor Control', 'labor')
-      +   gsChip(3, 'Set up Shift Control', 'shift')
-      +   gsChip(4, 'Run your first audit', 'profit')
+      +   this._getStartedSteps().map((s, i) => gsChip(i + 1, s.label, s.screen, s.mod)).join('')
       + '</div>';
     /* ⛔⛔ REVERSED 2026-08-11, AND THE REASON I HAD IT THE OTHER WAY WAS WRONG. During the rebuild I
        made the band always render, arguing a new operator should see "the four numbers the product
