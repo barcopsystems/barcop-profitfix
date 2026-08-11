@@ -90,16 +90,92 @@ S.WeekReview = {
   _eyebrow(t) {
     return '<div style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin-bottom:11px;">' + t + '</div>';
   },
-  _act(n, label) {
-    const zero = !n;
-    return '<div style="min-width:0;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:23px;font-weight:600;line-height:1;color:' + (zero ? 'var(--t4)' : 'var(--t1)') + ';">' + n + '</div>'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:4px;">' + label + '</div></div>';
+  /* ── DONE THIS WEEK: WRITTEN ROWS, NOT A NUMBER STRIP ─────────────────────────────────────────
+     ⛔⛔⛔ Kyle, 2026-08-11: *"i want to make the done this week section more of a written out text
+     rows that actual describe what happened.. not just spot checks 1.. but one spot check was taken
+     on x/xx by 'name here' and it found X, y and z.. like an actual review of the week and what
+     actually happened.. not just a bunch of numbers."*
+     ⭐ THE RECORDS CARRIED ALL OF IT AND THE STRIP THREW IT AWAY. A spot check stores its date, its
+     location, its shift, who ran it, how many products were flagged and the dollar variance, and the
+     card printed the single character "1". Measured across every store before a line was written.
+     ⛔ ONLY WHAT HAPPENED (Kyle: *"correct only what happen"*). Nothing with a zero behind it gets a
+     line at all, because a recap that lists what did NOT happen is the accusation this page just had
+     removed, coming back in a sentence. A section that logged nothing all week says so once.
+     ⚠⚠ EVERY CLAUSE IS CONDITIONAL ON ITS OWN FIELD, and that is not defensive habit, it is measured:
+     `reason` is an EMPTY STRING on the seed's only call-out and `item` is blank on three of the six
+     void/comps. A sentence built by plain concatenation prints "by " or ", ." with nothing after it,
+     which is worse than the number it replaced. */
+  /* ⛔⛔⛔ EVERY STAFF NAME IN THIS APP ENDS IN A PERIOD — "Maria G.", "Jake T.", "Devin R." — so any
+     sentence that ends on a name prints "..", and a dropped optional clause can leave a double space
+     behind it. Both showed up the first time the card was rendered against the REAL seed rather than
+     a fixture I wrote, which is the whole argument for doing that ([[the-loop]] #32).
+     ⭐ NORMALISED IN ONE PLACE, not policed at the seventeen sites that compose a sentence. An
+     enumeration of compose sites is a guess about the surface and it will be wrong the next time a
+     line is added; this cannot be forgotten ([[the-loop]] #90 — remove the window, do not police it).
+     ⚠ SHARED WITH THE EXPORT, because the PDF builds from the same lines and a tidy screen beside a
+     ragged PDF is the same defect with an extra step (step 0.6, the second consumer). */
+  _tidy(s) {
+    return String(s == null ? '' : s)
+      .replace(/ {2,}/g, ' ')
+      .replace(/([.!?])\1+/g, '$1')
+      .replace(/\s+([.,;])/g, '$1')
+      .trim();
   },
-  _actRow(items) {
-    const vdiv = '<div class="wr-vdiv" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 22px;"></div>';
-    return '<div class="wr-statrow" style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + items.join(vdiv) + '</div>';
+  _didRow(html) {
+    return '<div style="font-size:12.5px;color:var(--t2);line-height:1.55;">' + this._tidy(html) + '</div>';
   },
+  _didList(lines) {
+    const rows = (lines || []).filter(Boolean);
+    return rows.length
+      ? '<div style="display:flex;flex-direction:column;gap:9px;">' + rows.map(l => this._didRow(l)).join('') + '</div>'
+      : '<div style="font-size:12.5px;color:var(--t3);padding:2px 0;">Nothing logged this week.</div>';
+  },
+  // The count leads the sentence so the band is still scannable at a glance.
+  _n(v) { return '<b style="color:var(--t1);font-weight:700;">' + v + '</b>'; },
+  _plu(n, one, many) { return n === 1 ? one : (many || (one + 's')); },
+  // A blank name is common on imported rows; it must drop the clause, never print "by ".
+  _nm(v) { const s = String(v == null ? '' : v).trim(); return s ? esc(s) : ''; },
+  _by(v) { const s = this._nm(v); return s ? ' by ' + s : ''; },
+  _day(ymd) {
+    const d = new Date(String(ymd || '').slice(0, 10) + 'T00:00:00');
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  },
+  _on(ymd) { const s = this._day(ymd); return s ? ' ' + s : ''; },
+  _m0(v) { return App.fmtCurrency(v || 0, 0); },
+  /* CENTS ONLY WHEN THERE ARE CENTS. A single record's amount sat beside a rounded total in the same
+     sentence and read "$301. Biggest was $88.00" — two spellings of money one clause apart. Rounding
+     the individual figure instead would have been the wrong trade: a $88.50 comp is not $89. */
+  _amt(v) { const n = Number(v) || 0; return Math.round(n) === n ? App.fmtCurrency(n, 0) : App.fmtCurrency(n); },
+  // "2 bottles" but "1 bottle" — a quantity of 1 against a plural stored unit reads as a typo.
+  _qty(q, unit) {
+    const u = String(unit || '').trim();
+    const one = Number(q) === 1 && /s$/i.test(u) ? u.slice(0, -1) : u;
+    return q + (one ? ' ' + esc(one) : '');
+  },
+  // "A, B and C" — an Oxford-free join, because these are read as a sentence.
+  _join(list) {
+    const a = (list || []).filter(Boolean);
+    return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  },
+  /* ⚠ NO SUPERLATIVE OUT OF A TIE OR A SINGLE ROW. Five of this week's six labor days are 62.2 hours
+     to the decimal, so "busiest day" would have named whichever one happened to sort first — a fact
+     the data does not support, printed with total confidence. Returns null unless one row beats every
+     other outright ([[the-loop]] #83: two orthogonal facts in one slot, and the ternary picks). */
+  _topOf(rows, valOf) {
+    if (!rows || rows.length < 2) return null;
+    const s = rows.slice().sort((a, b) => valOf(b) - valOf(a));
+    return valOf(s[0]) > valOf(s[1]) ? s[0] : null;
+  },
+  /* NAME THEM WHILE THERE ARE FEW, SUMMARISE WHEN THERE ARE MANY. Three is a LAYOUT budget, not a
+     measurement: four named events overflow a half-width card on a laptop. Said out loud so nobody
+     later reads it as a finding about the data ([[the-loop]] #28).
+     ⛔⛔ A METHOD, NOT A DATA PROPERTY. It was `_few: 3` for an hour and that made the "name them
+     individually" branch UNTESTABLE: every slicer in the suite lifts METHODS by name and a data
+     property is invisible to all of them ([[the-loop]] #16 / #120), so `this._few()` was `undefined`
+     in every fixture, `n <= undefined` was false, and all eight sections silently took the summarise
+     path in every pin that existed. Nothing went red. It surfaced only when the card was rendered
+     against the real seed and a single walked tab refused to name itself. */
+  _few() { return 3; },
   _res(label, val, col) {
     return '<div style="min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">' + label + '</div>'
@@ -259,23 +335,90 @@ S.WeekReview = {
     let st;
     try { st = ID.computeState(); } finally { ID._weekStart = sv; }
 
-    const wkCounts   = (inv.ic_counts || []).filter(c => this._inWeek(c.date)).length;
-    const wkSpot     = App.completedSpotChecks().filter(s => this._inWeek(s.date)).length;
-    const wkDeliv    = st.deliveriesThisWeek || 0;
-    const wkOrders   = (inv.ic_orders || []).filter(o => this._inWeek(o.date)).length;
-    const wkAdj      = (inv.ic_adjustments || []).filter(a => this._inWeek(a.date_time || a.created_at)).length;
-    const wkTransfer = (inv.ic_transfers || []).filter(t => this._inWeek(t.date_time || t.created_at)).length;
+    /* ⭐ THE RECORDS, NOT THEIR COUNTS. Every one of these used to be `.length` and the whole point
+       of the rewrite is the detail that was being thrown away on the next line. */
+    const cCounts = (inv.ic_counts || []).filter(c => this._inWeek(c.date));
+    const cSpot   = App.completedSpotChecks().filter(s => this._inWeek(s.date));
+    const cDeliv  = (inv.ic_deliveries || []).filter(d => this._inWeek(d.date));
+    const cOrders = (inv.ic_orders || []).filter(o => this._inWeek(o.date));
+    const cAdj    = (inv.ic_adjustments || []).filter(a => this._inWeek(a.date_time || a.created_at));
+    const cXfer   = (inv.ic_transfers || []).filter(t => this._inWeek(t.date_time || t.created_at));
+    const wkOrders = cOrders.length;
 
-    const activity = this._actRow([
-      this._act(wkCounts, 'Counts'), this._act(wkDeliv, 'Deliveries'), this._act(wkOrders, 'Orders'),
-      this._act(wkSpot, 'Spot Checks'), this._act(wkAdj, 'Adjustments'), this._act(wkTransfer, 'Transfers')
-    ]);
+    const did = [];
+    if (cCounts.length) {
+      if (cCounts.length <= this._few()) cCounts.forEach(c => {
+        const locs = (c.locations || []).length;
+        did.push(this._n(esc(c.type || 'Stock') + ' count') + ' taken' + this._on(c.date) + this._by(c.counted_by)
+          + (locs ? ' across ' + locs + ' ' + this._plu(locs, 'location') : '') + '. '
+          + (c.item_count || 0) + ' ' + this._plu(c.item_count || 0, 'product') + ', '
+          + this._m0(c.total_value) + ' on the shelf.');
+      });
+      else did.push(this._n(cCounts.length + ' counts') + ' taken, ' + this._m0(cCounts[cCounts.length - 1].total_value)
+        + ' on the shelf at the last one' + this._on(cCounts[cCounts.length - 1].date) + '.');
+    }
+    if (cDeliv.length) {
+      const tot = cDeliv.reduce((t, d) => t + (d.total || 0), 0);
+      const prices = cDeliv.reduce((t, d) => t + (d.price_change_count || 0), 0);
+      const disc = cDeliv.filter(d => d.has_discrepancy).length;
+      const vend = this._join([...new Set(cDeliv.map(d => this._nm(d.vendor)).filter(Boolean))].slice(0, this._few()));
+      did.push(this._n(cDeliv.length + ' ' + this._plu(cDeliv.length, 'delivery', 'deliveries')) + ' received, '
+        + this._m0(tot) + (vend ? ' from ' + vend : '') + '.'
+        + (prices ? ' ' + prices + ' price ' + this._plu(prices, 'change') + '.' : '')
+        + (disc ? ' ' + disc + ' flagged with a discrepancy.' : ''));
+    }
+    if (cOrders.length) {
+      const tot = cOrders.reduce((t, o) => t + (o.total || 0), 0);
+      const each = cOrders.length <= this._few()
+        ? ' ' + this._join(cOrders.map(o => this._nm(o.vendor) + ' ' + this._m0(o.total)
+            + this._on(o.date) + (String(o.status || '') === 'Open' ? ' and still open' : ''))) + '.'
+        : '';
+      did.push(this._n(cOrders.length + ' ' + this._plu(cOrders.length, 'order')) + ' placed, ' + this._m0(tot) + '.' + each);
+    }
+    if (cSpot.length) {
+      if (cSpot.length <= this._few()) cSpot.forEach(s => {
+        const shift = this._nm(s.shift);
+        did.push(this._n('1 spot check') + this._on(s.date)
+          + (this._nm(s.location) ? ', ' + this._nm(s.location) : '') + (shift ? ', ' + shift.toLowerCase() : '')
+          + this._by(s.checked_by) + '. '
+          + (s.flagged_count || 0) + ' of ' + (s.product_count || 0) + ' ' + this._plu(s.product_count || 0, 'product')
+          + ' flagged' + (s.total_variance_dollar ? ', ' + this._amt(s.total_variance_dollar) + ' out' : '') + '.');
+      });
+      else {
+        const flagged = cSpot.reduce((t, s) => t + (s.flagged_count || 0), 0);
+        const varTot = cSpot.reduce((t, s) => t + (s.total_variance_dollar || 0), 0);
+        did.push(this._n(cSpot.length + ' spot checks') + ' run, ' + flagged + ' ' + this._plu(flagged, 'product')
+          + ' flagged' + (varTot ? ', ' + this._amt(varTot) + ' out' : '') + '.');
+      }
+    }
+    if (cAdj.length) {
+      const each = cAdj.length <= this._few()
+        ? ' ' + this._join(cAdj.map(a => this._qty(a.quantity, a.unit) + ' ' + this._nm(a.product_name)
+            + ' ' + (String(a.direction || '') === 'in' ? 'in' : 'out')
+            + (this._nm(a.reason) ? ' (' + this._nm(a.reason).toLowerCase() + ')' : '')
+            + this._on(a.date_time) + this._by(a.performed_by))) + '.'
+        : '';
+      did.push(this._n(cAdj.length + ' ' + this._plu(cAdj.length, 'adjustment')) + ' made.' + each);
+    }
+    if (cXfer.length) {
+      const each = cXfer.length <= this._few()
+        ? ' ' + this._join(cXfer.map(t => this._qty(t.quantity, t.unit) + ' ' + this._nm(t.product_name)
+            + (this._nm(t.from_location) ? ' from ' + this._nm(t.from_location) : '')
+            + (this._nm(t.to_location) ? ' to ' + this._nm(t.to_location) : '')
+            + this._on(t.date_time) + this._by(t.performed_by))) + '.'
+        : '';
+      did.push(this._n(cXfer.length + ' ' + this._plu(cXfer.length, 'transfer')) + ' made.' + each);
+    }
+    const activity = this._didList(did);
+    /* ⛔ OVER TARGET IS NOT A CELL HERE ANY MORE. Kyle, 2026-08-11: *"in the inventory what it turned
+       up get rid of the over target stat all together.. it just stays in the carrying into next
+       week."* It was the same fact printed twice on one card, once as a number and once as the line
+       telling you to do something about it. */
     const results = this._resRow([
       this._res('Used This Period', st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-'),
       this._res('Below Par', App.fmtCurrency(st.reorderTotal, 0), st.reorderCount ? 'var(--amber)' : 'var(--t1)'),
       this._res('Shrinkage 30d', App.fmtCurrency(st.shrink, 0), st.shrink > 0 ? 'var(--red)' : 'var(--t1)'),
-      this._res('Dead Stock', String(st.deadAll), st.deadAll > 0 ? 'var(--red)' : 'var(--t1)'),
-      this._res('Over Target', String(st.menuOver), st.menuOver > 0 ? 'var(--red)' : 'var(--t1)')
+      this._res('Dead Stock', String(st.deadAll), st.deadAll > 0 ? 'var(--red)' : 'var(--t1)')
     ]);
     /* ⛔ "Variance flags never reviewed this week" is GONE, not un-gated: its only evidence was the
        `review` checkbox, and nothing in the app records that a human looked at a flag. An item with
@@ -288,9 +431,9 @@ S.WeekReview = {
     if (st.parOff > 0) open.push({ t: '<b>' + st.parOff + '</b> par' + (st.parOff === 1 ? '' : 's') + ' off versus real usage', sev: 'amber' });
     if (st.menuOver > 0) open.push({ t: '<b>' + st.menuOver + '</b> menu item' + (st.menuOver === 1 ? '' : 's') + ' over cost target', sev: 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Inventory',
-      activity: 'Counts ' + wkCounts + ', Deliveries ' + wkDeliv + ', Orders ' + wkOrders + ', Spot Checks ' + wkSpot + ', Adjustments ' + wkAdj + ', Transfers ' + wkTransfer,
-      results: 'Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Shrinkage 30d ' + App.fmtCurrency(st.shrink, 0) + ', Dead Stock ' + st.deadAll + ', Over Target ' + st.menuOver,
+    // The PDF carries the same sentences the screen shows. Paper and page say one thing.
+    (this._pdf || (this._pdf = [])).push({ name: 'Inventory', activity: this._didPlain(did),
+      results: 'Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Shrinkage 30d ' + App.fmtCurrency(st.shrink, 0) + ', Dead Stock ' + st.deadAll,
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Inventory', [
       { label: 'Done This Week', html: activity },
@@ -312,7 +455,7 @@ S.WeekReview = {
 
     const sv = LD._weekStart;
     LD._weekStart = this._wkS();
-    let wkHours, wkCost, laborPct, rplh, proj, tipN, calloutN, calloutUncov, toPending, expired, expiring, schedBuilt;
+    let wkHours, wkCost, laborPct, rplh, proj, tipN, tipTotal, wkPeople, wkDays, cOuts, calloutN, calloutUncov, toPending, toNew, expired, expiring, schedBuilt;
     try {
       const wkStart = LD.weekStart(), wkEnd = LD.weekEnd();
       const endCap = wkEnd < today ? wkEnd : today;
@@ -326,10 +469,21 @@ S.WeekReview = {
       laborPct = weekRevenue > 0 ? (wkCost / weekRevenue * 100) : null;
       rplh = (wkHours > 0 && weekRevenue > 0) ? (weekRevenue / wkHours) : null;
       proj = LD.weekProjection();
-      tipN = LD.tips().filter(t => LD.inWeek(t.date)).length;
-      calloutN = LD.callouts().filter(c => LD.inWeek(c.date)).length;
-      calloutUncov = LD.callouts().filter(c => LD.inWeek(c.date) && !c.covered).length;
+      const wkTips = LD.tips().filter(t => LD.inWeek(t.date));
+      tipN = wkTips.length;
+      tipTotal = wkTips.reduce((t, r) => t + (r.total_tips || 0), 0);
+      wkPeople = new Set(wkActuals.map(a => a.name).filter(Boolean)).size;
+      wkDays = new Set(wkActuals.filter(a => (a.hours || 0) > 0).map(a => a.date)).size;
+      cOuts = LD.callouts().filter(c => LD.inWeek(c.date));
+      calloutN = cOuts.length;
+      calloutUncov = cOuts.filter(c => !c.covered).length;
       toPending = LD.timeOff().filter(t => t.status === 'Requested').length;
+      /* ⛔ THE OLD STRIP PRINTED `toPending` UNDER "DONE THIS WEEK", AND IT IS NOT A WEEK FIGURE. It
+         counts every request still sitting unanswered, whenever it was made, so a request typed in
+         March was being reported as something the crew did last week. The pending count is a real
+         fact and it stays in Carrying Into Next Week, where it is true. What belongs in a recap is
+         requests RAISED in the week, off `created_at`. */
+      toNew = LD.timeOff().filter(t => this._inWeek(t.created_at)).length;
       const activeIds = new Set(LD.staff().filter(s => s.status !== 'Inactive').map(s => s.id));
       expired = LD.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
       expiring = LD.certs().filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30).length;
@@ -338,12 +492,24 @@ S.WeekReview = {
 
     const otRisk = (proj.over || 0) + (proj.approaching || 0);
 
-    const activity = this._actRow([
-      this._act(wkHours ? wkHours.toFixed(1) : 0, 'Hours'),
-      this._act(tipN, 'Tip Entries'),
-      this._act(calloutN, 'Call-Outs'),
-      this._act(toPending, 'Time-Off')
-    ]);
+    const did = [];
+    if (wkHours > 0) did.push(this._n(wkHours.toFixed(1) + ' hours') + ' logged'
+      + (wkPeople ? ' across ' + wkPeople + ' ' + this._plu(wkPeople, 'person', 'people') : '')
+      + (wkDays ? ' over ' + wkDays + ' ' + this._plu(wkDays, 'day') : '') + ', '
+      + this._m0(wkCost) + ' in pay.');
+    if (tipN) did.push(this._n(tipN + ' tip ' + this._plu(tipN, 'entry', 'entries')) + ' logged'
+      + (tipTotal ? ', ' + this._m0(tipTotal) + ' declared' : '') + '.');
+    if (calloutN) {
+      const each = calloutN <= this._few()
+        ? ' ' + this._join(cOuts.map(c => this._nm(c.name) + this._on(c.date)
+            + (this._nm(c.type) ? ', ' + this._nm(c.type).toLowerCase() : '')
+            + (c.covered ? (this._nm(c.covered_by) ? ', covered by ' + this._nm(c.covered_by) : ', covered') : ', not covered'))) + '.'
+        : ' ' + calloutUncov + ' went uncovered.';
+      did.push(this._n(calloutN + ' ' + this._plu(calloutN, 'call-out')) + '.' + each);
+    }
+    if (toNew) did.push(this._n(toNew + ' time-off ' + this._plu(toNew, 'request')) + ' raised.');
+    if (schedBuilt) did.push(this._n('Next week\'s schedule') + ' was built.');
+    const activity = this._didList(did);
     const results = this._resRow([
       this._res('Labor Cost', App.fmtCurrency(wkCost, 0)),
       this._res('Labor %', laborPct != null ? laborPct.toFixed(1) + '%' : '-', (laborPct != null && laborPct > target) ? 'var(--amber)' : 'var(--t1)'),
@@ -362,8 +528,7 @@ S.WeekReview = {
     if (expired > 0) open.push({ t: '<b>' + expired + '</b> certification' + (expired === 1 ? '' : 's') + ' expired', sev: 'red' });
     if (expiring > 0) open.push({ t: '<b>' + expiring + '</b> certification' + (expiring === 1 ? '' : 's') + ' expiring within 30 days', sev: 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Labor',
-      activity: 'Hours ' + (wkHours ? wkHours.toFixed(1) : 0) + ', Tip Entries ' + tipN + ', Call-Outs ' + calloutN + ', Time-Off ' + toPending,
+    (this._pdf || (this._pdf = [])).push({ name: 'Labor', activity: this._didPlain(did),
       results: 'Labor Cost ' + App.fmtCurrency(wkCost, 0) + ', Labor % ' + (laborPct != null ? laborPct.toFixed(1) + '%' : '-') + ', Hours ' + wkHours.toFixed(1) + ', RPLH ' + (rplh != null ? App.fmtCurrency(rplh) : '-') + ', OT Risk ' + otRisk,
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Labor', [
@@ -382,7 +547,8 @@ S.WeekReview = {
 
     const sv = SD._weekEnd;
     SD._weekEnd = this._wkE();
-    let rev, covers, checkAvg, voidTot, compTot, netVar, days, vcN, wasteN, walkedN, reconN, shorts;
+    let rev, covers, checkAvg, voidTot, compTot, netVar, days, vcN, wasteN, walkedN, reconN, shorts,
+        bestDay, worstVar, topVC, wasteRows, walkRows, overs;
     try {
       const wkS = SD.shifts().filter(s => SD.inWeek(s.date));
       rev = wkS.reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
@@ -394,17 +560,65 @@ S.WeekReview = {
       const wkVar = SD.variances().filter(v => SD.inWeek(v.date));
       netVar = wkVar.reduce((t, v) => t + (v.variance || 0), 0);
       shorts = wkVar.filter(v => v.status === 'Short').length;
+      overs = wkVar.filter(v => v.status === 'Over').length;
       reconN = wkVar.length;
       days = wkS.length;
       vcN = wkVC.length;
-      wasteN = SD.waste().filter(r => SD.inWeek(r.date)).length;
-      walkedN = SD.walkedTabs().filter(r => SD.inWeek(r.date)).length;
+      wasteRows = SD.waste().filter(r => SD.inWeek(r.date));
+      walkRows = SD.walkedTabs().filter(r => SD.inWeek(r.date));
+      wasteN = wasteRows.length;
+      walkedN = walkRows.length;
+      // Named only when one day genuinely beats every other — see `_topOf`.
+      bestDay = this._topOf(wkS, s => parseFloat(s.total_revenue) || 0);
+      worstVar = this._topOf(wkVar.filter(v => (v.variance || 0) < 0), v => -(v.variance || 0))
+        || (wkVar.filter(v => (v.variance || 0) < 0).length === 1 ? wkVar.filter(v => (v.variance || 0) < 0)[0] : null);
+      topVC = this._topOf(wkVC, r => r.amount || 0) || (wkVC.length === 1 ? wkVC[0] : null);
     } finally { SD._weekEnd = sv; }
 
-    const activity = this._actRow([
-      this._act(days, 'Days'), this._act(reconN, 'Reconciles'), this._act(vcN, 'Voids/Comps'),
-      this._act(wasteN, 'Waste'), this._act(walkedN, 'Walked Tabs')
-    ]);
+    const did = [];
+    if (days) did.push(this._n(days + ' ' + this._plu(days, 'day')) + ' of sales logged, ' + this._m0(rev)
+      + ' on ' + covers + ' ' + this._plu(covers, 'cover') + '.'
+      + (bestDay ? ' Best night' + this._on(bestDay.date) + ', ' + this._m0(bestDay.total_revenue)
+          + (bestDay.covers ? ' on ' + bestDay.covers + ' covers' : '') + '.' : ''));
+    if (reconN) {
+      const clean = reconN - shorts - overs;
+      did.push(this._n(reconN + ' drawer ' + this._plu(reconN, 'reconcile')) + ', '
+        + (shorts + overs === 0 ? 'all within tolerance.'
+           : clean + ' within tolerance, ' + this._join([shorts ? shorts + ' short' : '', overs ? overs + ' over' : ''].filter(Boolean)) + '.')
+        + (worstVar ? ' Worst was ' + this._nm(worstVar.drawer) + this._on(worstVar.date) + ', '
+            + App.fmtBal(worstVar.variance, 0) + this._by(worstVar.cashier) + '.' : ''));
+    }
+    /* ⚠ COMPOSED FROM PARTS AND JOINED, NOT CONCATENATED WITH SPACES BUILT IN. The first version
+       glued the clauses together with its own separators and printed "Biggest was $120.00  Tue,
+       Aug 4." — a DOUBLE SPACE where the blank server dropped out. The pin's own `got=` showed it.
+       Every optional clause is a list entry now, so dropping one cannot leave its spacing behind. */
+    if (vcN) {
+      const bits = topVC ? ['Biggest was ' + this._amt(topVC.amount),
+        this._nm(topVC.item) ? 'on ' + this._nm(topVC.item) : '',
+        this._nm(topVC.server) ? 'by ' + this._nm(topVC.server) : '',
+        this._day(topVC.date)].filter(Boolean) : [];
+      did.push(this._n(vcN + ' ' + this._plu(vcN, 'void or comp', 'voids and comps')) + ', ' + this._m0(voidTot + compTot) + '.'
+        + (bits.length ? ' ' + bits.join(' ')
+            + (this._nm(topVC.reason) ? ' (' + this._nm(topVC.reason).toLowerCase() + ')' : '') + '.' : ''));
+    }
+    if (wasteN) {
+      const cost = wasteRows.reduce((t, r) => t + (r.cost || 0), 0);
+      const top = this._topOf(wasteRows, r => r.cost || 0) || (wasteN === 1 ? wasteRows[0] : null);
+      did.push(this._n(wasteN + ' waste ' + this._plu(wasteN, 'entry', 'entries')) + (cost ? ', ' + this._m0(cost) : '') + '.'
+        + (top && this._nm(top.product_name) ? ' Most of it ' + this._nm(top.product_name)
+            + (this._nm(top.reason) ? ' (' + this._nm(top.reason).toLowerCase() + ')' : '') + '.' : ''));
+    }
+    /* ⚠ NAME THEM OR TOTAL THEM, NEVER BOTH. The first version printed the total AND then named each
+       one, so a single walked tab read "1 walked tab, $41. $41 Tue, Aug 4 by Marcus T." — the same
+       figure twice in one sentence. At one row the total IS the row. */
+    if (walkedN) {
+      const amt = walkRows.reduce((t, r) => t + (r.amount || 0), 0);
+      did.push(this._n(walkedN + ' walked ' + this._plu(walkedN, 'tab')) + ', '
+        + (walkedN <= this._few()
+            ? this._join(walkRows.map(r => this._amt(r.amount) + this._on(r.date) + this._by(r.server)))
+            : this._m0(amt)) + '.');
+    }
+    const activity = this._didList(did);
     const results = this._resRow([
       this._res('Net Sales', App.fmtCurrency(rev, 0)),
       this._res('Covers', String(covers)),
@@ -421,8 +635,7 @@ S.WeekReview = {
     if (days > 0 && reconN === 0) open.push({ t: 'Cash was never reconciled this week', sev: 'amber' });
     if (walkedN > 0) open.push({ t: '<b>' + walkedN + '</b> walked tab' + (walkedN === 1 ? '' : 's') + ' this week', sev: 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Shift',
-      activity: 'Days ' + days + ', Reconciles ' + reconN + ', Voids/Comps ' + vcN + ', Waste ' + wasteN + ', Walked Tabs ' + walkedN,
+    (this._pdf || (this._pdf = [])).push({ name: 'Shift', activity: this._didPlain(did),
       results: 'Net Sales ' + App.fmtCurrency(rev, 0) + ', Covers ' + covers + ', Check Avg ' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + ', Over/Short ' + (netVar > 0 ? '+' : '') + App.fmtBal(netVar, 0) + ', Voids+Comps ' + App.fmtCurrency(voidTot + compTot, 0),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Shift', [
@@ -457,16 +670,39 @@ S.WeekReview = {
 
     // Real recovery activity logged this week (records dated in the window).
     const dat = App.data || {};
-    const auditsWk  = (dat.audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
-    const reviewsWk = (dat.sales_reviews || []).filter(r => this._inWeek(r.date || r.created_at)).length;
-    const discWk    = (dat.vendor_discrepancies || []).filter(d => this._inWeek(d.date || d.filed_at || d.created_at)).length;
-    const investWk  = (dat.variance_investigations || []).filter(i => this._inWeek(i.opened_date || i.date)).length;
-    const expActive = (dat.profit_initiatives || []).filter(e => e.status === 'Active').length;
+    const audWk     = (dat.audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10)));
+    const revWk     = (dat.sales_reviews || []).filter(r => this._inWeek(r.date || r.created_at));
+    const discWkR   = (dat.vendor_discrepancies || []).filter(d => this._inWeek(d.date || d.filed_at || d.created_at));
+    const investWkR = (dat.variance_investigations || []).filter(i => this._inWeek(i.opened_date || i.date));
+    const auditsWk = audWk.length;
+    /* ⛔ SAME DEFECT AS LABOR'S TIME-OFF COUNT: `status === 'Active'` is a fact about TODAY, and it
+       was printed under "Done This Week". An experiment started in June was being reported as this
+       week's work. A recap counts what STARTED in the week; the running total is current state and
+       belongs on the Hub, which is the page that answers "what now". */
+    const expNew = (dat.profit_initiatives || []).filter(e => this._inWeek(e.start_date || e.created_at));
 
-    const activity = this._actRow([
-      this._act(auditsWk, 'Audits Run'), this._act(reviewsWk, 'Sales Reviews'), this._act(discWk, 'Discrepancies'),
-      this._act(investWk, 'Investigations'), this._act(expActive, 'Experiments')
-    ]);
+    const did = [];
+    audWk.forEach(a => did.push(this._n('Profit audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
+      + (a.overall_score != null ? ', scored ' + a.overall_score : '') + '.'
+      + ((a.action_items || []).length ? ' ' + a.action_items.length + ' action '
+          + this._plu(a.action_items.length, 'item') + ' worth '
+          + this._m0((a.action_items || []).reduce((s, x) => s + (x.monthly_impact || 0), 0) * 12) + '/yr.' : '')));
+    revWk.forEach(r => {
+      const s = r.summary || {};
+      did.push(this._n('Sales review') + ' filed' + this._on(r.date || r.created_at) + '.'
+        + (s.reviewed ? ' ' + s.reviewed + ' ' + this._plu(s.reviewed, 'server') + ' checked, '
+            + (s.flagged || 0) + ' flagged' + (s.high ? ', ' + s.high + ' high risk' : '')
+            + (s.exposure ? ', ' + this._amt(s.exposure) + ' exposed' : '') + '.' : ''));
+    });
+    if (discWkR.length) {
+      const over = discWkR.reduce((t, d) => t + (d.overcharge || 0), 0);
+      did.push(this._n(discWkR.length + ' vendor ' + this._plu(discWkR.length, 'discrepancy', 'discrepancies')) + ' filed'
+        + (over ? ', ' + this._m0(over) + ' overcharged' : '') + '.');
+    }
+    if (investWkR.length) did.push(this._n(investWkR.length + ' variance ' + this._plu(investWkR.length, 'investigation')) + ' opened.');
+    if (expNew.length) did.push(this._n(expNew.length + ' ' + this._plu(expNew.length, 'experiment')) + ' started'
+      + (expNew.length <= this._few() ? ': ' + this._join(expNew.map(e => this._nm(e.name))) : '') + '.');
+    const activity = this._didList(did);
     const costCell = (i, label) => {
       const r = costRows ? costRows[i] : null;
       const has = r && r.val != null;
@@ -490,8 +726,7 @@ S.WeekReview = {
     else if (ag.stale) open.push({ t: 'Profit audit was <b>' + ag.days + '</b> days old when this week closed', sev: 'amber' });
 
     const pcv = i => (costRows && costRows[i] && costRows[i].val != null) ? (costRows[i].val.toFixed(1) + '%') : '-';
-    (this._pdf || (this._pdf = [])).push({ name: 'Profit',
-      activity: 'Audits Run ' + auditsWk + ', Sales Reviews ' + reviewsWk + ', Discrepancies ' + discWk + ', Investigations ' + investWk + ', Experiments ' + expActive,
+    (this._pdf || (this._pdf = [])).push({ name: 'Profit', activity: this._didPlain(did),
       results: 'Bar Pour ' + pcv(0) + ', Food ' + pcv(1) + ', Prime ' + pcv(2),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Profit', [
@@ -518,16 +753,38 @@ S.WeekReview = {
     } finally { RD._weekEnd = sv; }
 
     const dat = App.data || {};
-    const auditsWk = (dat.revenue_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
-    const priceWk  = (dat.revenue_price_log || []).filter(p => this._inWeek(p.date || p.created_at || p.changed_at)).length;
-    const dogWk    = (dat.menu_dog_tests || []).filter(t => this._inWeek(t.start_date || t.created_at)).length;
-    const checkWk  = (dat.revenue_server_checks || []).filter(c => this._inWeek(c.date || c.created_at)).length;
-    const expActive = (dat.initiatives || []).filter(e => e.status === 'Active').length;
+    const audWk   = (dat.revenue_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10)));
+    const priceWkR = (dat.revenue_price_log || []).filter(p => this._inWeek(p.date || p.created_at || p.changed_at));
+    const dogWkR   = (dat.menu_dog_tests || []).filter(t => this._inWeek(t.start_date || t.created_at));
+    const checkWkR = (dat.revenue_server_checks || []).filter(c => this._inWeek(c.date || c.created_at));
+    const auditsWk = audWk.length;
+    // Started in the week, not running today — see the note on the Profit card.
+    const expNew = (dat.initiatives || []).filter(e => this._inWeek(e.start_date || e.created_at));
 
-    const activity = this._actRow([
-      this._act(auditsWk, 'Audits Run'), this._act(priceWk, 'Price Changes'), this._act(dogWk, 'Dog Tests'),
-      this._act(checkWk, 'Server Checks'), this._act(expActive, 'Experiments')
-    ]);
+    const did = [];
+    audWk.forEach(a => did.push(this._n('Revenue audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
+      + (a.overall_score != null ? ', scored ' + a.overall_score : '') + '.'));
+    if (priceWkR.length) {
+      const each = priceWkR.length <= this._few()
+        ? ' ' + this._join(priceWkR.map(p => this._nm(p.item_name)
+            + (p.old_price != null && p.new_price != null ? ' ' + this._amt(p.old_price) + ' to ' + this._amt(p.new_price) : ''))) + '.'
+        : '';
+      did.push(this._n(priceWkR.length + ' price ' + this._plu(priceWkR.length, 'change')) + ' made.' + each);
+    }
+    if (dogWkR.length) did.push(this._n(dogWkR.length + ' dog ' + this._plu(dogWkR.length, 'test')) + ' started'
+      + (dogWkR.length <= this._few() ? ' on ' + this._join(dogWkR.map(t => this._nm(t.item_name))) : '') + '.');
+    if (checkWkR.length) {
+      const sales = checkWkR.reduce((t, c) => t + (c.sales || 0), 0);
+      const covs = checkWkR.reduce((t, c) => t + (c.covers || 0), 0);
+      const who = [...new Set(checkWkR.map(c => this._nm(c.server_name)).filter(Boolean))];
+      did.push(this._n(checkWkR.length + ' server ' + this._plu(checkWkR.length, 'check')) + ' run'
+        + this._on(checkWkR[0].date) + '.'
+        + (who.length && who.length <= this._few() ? ' ' + this._join(who) + '.' : '')
+        + (sales ? ' ' + this._m0(sales) + ' across ' + covs + ' ' + this._plu(covs, 'cover') + '.' : ''));
+    }
+    if (expNew.length) did.push(this._n(expNew.length + ' ' + this._plu(expNew.length, 'experiment')) + ' started'
+      + (expNew.length <= this._few() ? ': ' + this._join(expNew.map(e => this._nm(e.name))) : '') + '.');
+    const activity = this._didList(did);
     const mCell = (i, label) => {
       const m = metrics[i];
       const col = (m && m.good != null) ? (m.good ? 'var(--green)' : 'var(--red)') : 'var(--t1)';
@@ -547,8 +804,7 @@ S.WeekReview = {
     if (!ag.ever) open.push({ t: 'No Revenue audit had been run by the end of this week', sev: 'amber' });
     else if (ag.stale) open.push({ t: 'Revenue audit was <b>' + ag.days + '</b> days old when this week closed', sev: 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Revenue',
-      activity: 'Audits Run ' + auditsWk + ', Price Changes ' + priceWk + ', Dog Tests ' + dogWk + ', Server Checks ' + checkWk + ', Experiments ' + expActive,
+    (this._pdf || (this._pdf = [])).push({ name: 'Revenue', activity: this._didPlain(did),
       results: 'Check Avg ' + metrics[0].value + ', Labor % ' + metrics[1].value + ', Rev/Labor Hr ' + metrics[2].value,
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Revenue', [
@@ -572,14 +828,22 @@ S.WeekReview = {
     if (!trapped.hasData && !sf.hasData) return null;
 
     const dat = App.data || {};
-    const auditsWk  = (dat.cash_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10))).length;
-    const expActive = (dat.cash_initiatives || []).filter(e => e.status === 'Active').length;
+    const audWk = (dat.cash_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10)));
+    const auditsWk = audWk.length;
+    // Started in the week, not running today — see the note on the Profit card.
+    const expNew = (dat.cash_initiatives || []).filter(e => this._inWeek(e.start_date || e.created_at));
+    const outWk = (CashEngine.cashOutflows() || []).filter(o => this._inWeek(o.date || o.created_at));
 
     const runwayLabel = r => r == null ? '13+ wks' : r === 0 ? 'This wk' : r + ' wk' + (r === 1 ? '' : 's');
 
-    const activity = this._actRow([
-      this._act(auditsWk, 'Audits Run'), this._act(expActive, 'Experiments')
-    ]);
+    const did = [];
+    audWk.forEach(a => did.push(this._n('Cash audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
+      + (a.overall_score != null ? ', scored ' + a.overall_score : '') + '.'));
+    if (outWk.length) did.push(this._n(outWk.length + ' cash ' + this._plu(outWk.length, 'outflow')) + ' logged, '
+      + this._m0(outWk.reduce((t, o) => t + (Number(o.amount) || 0), 0)) + '.');
+    if (expNew.length) did.push(this._n(expNew.length + ' ' + this._plu(expNew.length, 'experiment')) + ' started'
+      + (expNew.length <= this._few() ? ': ' + this._join(expNew.map(e => this._nm(e.name))) : '') + '.');
+    const activity = this._didList(did);
     const results = this._resRow([
       this._res('Trapped Cash', trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-', (trapped.hasData && trapped.total > 0) ? 'var(--amber)' : 'var(--t1)'),
       this._res('Runway', (sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-', (sf.hasOpening && sf.runway != null) ? 'var(--red)' : 'var(--t1)'),
@@ -596,8 +860,7 @@ S.WeekReview = {
     if (!ag.ever) open.push({ t: 'No Cash audit had been run by the end of this week', sev: 'amber' });
     else if (ag.stale) open.push({ t: 'Cash audit was <b>' + ag.days + '</b> days old when this week closed', sev: 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Cash',
-      activity: 'Audits Run ' + auditsWk + ', Experiments ' + expActive,
+    (this._pdf || (this._pdf = [])).push({ name: 'Cash', activity: this._didPlain(did),
       results: 'Current position: Trapped Cash ' + (trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-') + ', Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-') + ', Safe to Spend ' + (pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-') + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-'),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Cash', [
@@ -618,13 +881,34 @@ S.WeekReview = {
     try { st = ED._computeState(); } catch (e) { return null; }
 
     const bookings = (App.data && App.data.bookings) || [];
-    const newBookWk = bookings.filter(b => this._inWeek(b.date_received)).length;
-    const heldWk    = bookings.filter(b => this._inWeek(b.event_date) && (b.stage === 'Booked' || b.stage === 'Completed')).length;
-    const depCollWk = bookings.filter(b => this._inWeek(b.deposit_paid_date)).length;
+    const newBook = bookings.filter(b => this._inWeek(b.date_received));
+    const held    = bookings.filter(b => this._inWeek(b.event_date) && (b.stage === 'Booked' || b.stage === 'Completed'));
+    const depColl = bookings.filter(b => this._inWeek(b.deposit_paid_date));
 
-    const activity = this._actRow([
-      this._act(newBookWk, 'New Bookings'), this._act(heldWk, 'Events Held'), this._act(depCollWk, 'Deposits In')
-    ]);
+    const did = [];
+    if (newBook.length) {
+      // `quoted_total` is 0 on two of the seed's three new bookings, so the money clause is optional.
+      const each = newBook.length <= this._few()
+        ? ' ' + this._join(newBook.map(b => this._nm(b.event_name)
+            + (this._nm(b.contact_name) ? ' for ' + this._nm(b.contact_name) : '')
+            + this._on(b.event_date)
+            + (b.party_size ? ', ' + b.party_size + ' people' : '')
+            + (b.quoted_total ? ', ' + this._m0(b.quoted_total) + ' quoted' : ''))) + '.'
+        : '';
+      did.push(this._n(newBook.length + ' new ' + this._plu(newBook.length, 'booking')) + ' taken.' + each);
+    }
+    if (held.length) {
+      const rev = held.reduce((t, b) => t + (Number(b.actual_revenue) || 0), 0);
+      const each = held.length <= this._few()
+        ? ' ' + this._join(held.map(b => this._nm(b.event_name) + this._on(b.event_date)
+            + (b.actual_revenue ? ', ' + this._m0(b.actual_revenue) : ''))) + '.'
+        : '';
+      did.push(this._n(held.length + ' ' + this._plu(held.length, 'event')) + ' held'
+        + (rev ? ', ' + this._m0(rev) + ' in' : '') + '.' + each);
+    }
+    if (depColl.length) did.push(this._n(depColl.length + ' ' + this._plu(depColl.length, 'deposit')) + ' collected, '
+      + this._m0(depColl.reduce((t, b) => t + (Number(b.deposit_amount) || 0), 0)) + '.');
+    const activity = this._didList(did);
     const results = this._resRow([
       this._res('Booked', ED._money(st.bookedRev)),
       this._res('Pipeline', ED._money(st.pipeline)),
@@ -638,8 +922,7 @@ S.WeekReview = {
     if (st.noRunSheet.length) open.push({ t: '<b>' + st.noRunSheet.length + '</b> upcoming event' + (st.noRunSheet.length === 1 ? '' : 's') + ' need a run sheet', sev: 'amber' });
     if (st.completedOpen.length) open.push({ t: '<b>' + st.completedOpen.length + '</b> completed event' + (st.completedOpen.length === 1 ? '' : 's') + ' to close out', sev: 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Events',
-      activity: 'New Bookings ' + newBookWk + ', Events Held ' + heldWk + ', Deposits In ' + depCollWk,
+    (this._pdf || (this._pdf = [])).push({ name: 'Events', activity: this._didPlain(did),
       results: 'Booked ' + ED._money(st.bookedRev) + ', Pipeline ' + ED._money(st.pipeline) + ', Deposits Due ' + ED._money(st.depositsDue) + ', Win Rate ' + st.conv,
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     return this._sectionCard('Events', [
@@ -665,10 +948,12 @@ S.WeekReview = {
        only row was a draw. */
     const opex = ((App.data && App.data.operating_expenses) || [])
       .filter(r => !S.HubOperatingExpenses.isCashOnlyCategory(r && r.category));
-    const billsWk = opex.filter(r => r && this._inWeek(r.date)).length;
+    const billRows = opex.filter(r => r && this._inWeek(r.date));
+    const billsWk = billRows.length;
     // ⭐ THE LEDGER, through the engine's own reader, so this count and the forecast can never be
     // counting two different sets of records (the cutover — see CashEngine.cashOutflows).
-    const outflowWk = (CashEngine.cashOutflows() || []).filter(o => this._inWeek(o.date || o.created_at)).length;
+    const outRows = (CashEngine.cashOutflows() || []).filter(o => this._inWeek(o.date || o.created_at));
+    const outflowWk = outRows.length;
     const billsMonth = opex.filter(r => r && String(r.date || '').slice(0, 7) === st.curKey).length;
     const rawRun = key => { try { return localStorage.getItem(key); } catch (e) { return null; } };
     const pnlRun = rawRun('books_report_run_weeklypnl');
@@ -679,9 +964,18 @@ S.WeekReview = {
        already drifted twice — Kyle spotted the second: *"the week review 4 steps don't match books
        now."* Deriving it from `BH.ORDER` fixed the drift and left the real defect standing, which is
        that the whole band counted checkboxes. There is nothing left here to keep in step. */
-    const activity = this._actRow([
-      this._act(billsWk, 'Bills Logged'), this._act(outflowWk, 'Outflows Logged'), this._act(reportsWk, 'Reports Run')
-    ]);
+    const did = [];
+    if (billsWk) {
+      const tot = billRows.reduce((t, r) => t + (Number(r.amount) || 0), 0);
+      const top = this._topOf(billRows, r => Number(r.amount) || 0) || (billsWk === 1 ? billRows[0] : null);
+      did.push(this._n(billsWk + ' ' + this._plu(billsWk, 'bill')) + ' logged, ' + this._m0(tot) + '.'
+        + (top && this._nm(top.vendor || top.category) ? ' Largest ' + this._nm(top.vendor || top.category)
+            + ' ' + this._m0(top.amount) + '.' : ''));
+    }
+    if (outflowWk) did.push(this._n(outflowWk + ' cash ' + this._plu(outflowWk, 'outflow')) + ' logged, '
+      + this._m0(outRows.reduce((t, o) => t + (Number(o.amount) || 0), 0)) + '.');
+    if (reportsWk) did.push(this._n(reportsWk + ' ' + this._plu(reportsWk, 'report')) + ' run.');
+    const activity = this._didList(did);
     const results = this._resRow([
       this._res('Op Income YTD', BH._money(st.ytdInc), st.ytdInc < 0 ? 'var(--red)' : 'var(--t1)'),
       this._res('Margin', BH._pct(st.ytdMargin)),
@@ -697,8 +991,7 @@ S.WeekReview = {
     if (billsMonth === 0) open.push({ t: 'No bills logged this month yet', sev: 'amber' });
     if (st.dueCount > 0) open.push({ t: '<b>' + st.dueCount + '</b> permit/license item' + (st.dueCount === 1 ? '' : 's') + ' need attention', sev: st.expiredCt > 0 ? 'red' : 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Books',
-      activity: 'Bills Logged ' + billsWk + ', Outflows Logged ' + outflowWk + ', Reports Run ' + reportsWk,
+    (this._pdf || (this._pdf = [])).push({ name: 'Books', activity: this._didPlain(did),
       results: 'Op Income YTD ' + BH._money(st.ytdInc) + ', Margin ' + BH._pct(st.ytdMargin) + ', Month Revenue ' + BH._money(st.cmRev) + ', Month Income ' + BH._money(st.mInc),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing to close' });
     return this._sectionCard('Books', [
@@ -764,6 +1057,11 @@ S.WeekReview = {
   },
 
   _stripTags(s) { return String(s == null ? '' : s).replace(/<[^>]*>/g, ''); },
+  // The written band, flattened for the export. Same sentences, no markup.
+  _didPlain(lines) {
+    const rows = (lines || []).filter(Boolean).map(l => this._tidy(this._stripTags(l)));
+    return rows.length ? rows.join(' ') : 'Nothing logged this week.';
+  },
 
   // Data-driven PDF built from the per-section payloads collected during render.
   async _exportPDF() {
