@@ -569,38 +569,82 @@ S.Hub = {
      seed, but the field exists so a live account will hit it), and match measures BY LABEL across
      the two audits so a newly added measure cannot read as an infinite improvement. */
   _bestWorst() {
-    const B = ((App.data || {}).bar_cop_audits || [])
-      .filter(a => a && a.date && a.sub_scores)
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-    if (B.length < 2) return null;
-    const last = B[B.length - 1], prev = B[B.length - 2];
-    const now = last.sub_scores || {}, was = prev.sub_scores || {};
-    const moves = Object.keys(now)
-      .filter(k => now[k] != null && was[k] != null)
-      .map(k => ({ key: k, score: now[k], delta: now[k] - was[k] }))
-      .sort((a, b) => b.delta - a.delta);
-    if (moves.length < 2) return null;
+    const D = App.data || {};
+    const thisStart = (App.nextSunday && App.weekStartFor) ? App.weekStartFor(App.nextSunday()) : null;
+    const closed = arr => (arr || [])
+      .filter(w => w && w.period_end && (!thisStart || String(w.period_end) < thisStart))
+      .sort((a, b) => String(b.period_end).localeCompare(String(a.period_end)));
+    const P = closed(D.weeks), R = closed(D.revenue_weeks);
+    const pNow = P[0], pWas = P[2], rNow = R[0], rWas = R[2];
+    if (!pNow || !pWas || !rNow || !rWas) return null;
 
-    const title = k => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    const mover = (key, wantUp) => {
-      const A = (last.sub_score_detail || {})[key] || [];
-      const Pm = {};
-      ((prev.sub_score_detail || {})[key] || []).forEach(m => {
-        if (m && !m.na && typeof m.pct === 'number') Pm[m.label] = m.pct;
-      });
-      const rows = A.filter(m => m && !m.na && typeof m.pct === 'number' && Pm[m.label] != null)
-        .map(m => ({ label: m.label, now: m.pct, was: Pm[m.label], delta: m.pct - Pm[m.label] }));
-      if (!rows.length) return null;
-      rows.sort((a, b) => wantUp ? b.delta - a.delta : a.delta - b.delta);
-      return rows[0];
+    /* Seven days ending on each period_end, so the event stores can be summed over the SAME two
+       weeks the P&L rows compare. One window for the whole card. */
+    const span = e => ({ from: App.weekStartFor ? App.weekStartFor(e) : e, to: e });
+    const curSpan = span(pNow.period_end), wasSpan = span(pWas.period_end);
+    const inSpan = (d, s) => { const x = String(d || '').slice(0, 10); return !!x && x >= s.from && x <= s.to; };
+    const sumIn = (arr, s, pick) => (arr || []).reduce((t, r) => inSpan(r && r.date, s) ? t + (Number(pick(r)) || 0) : t, 0);
+
+    const pct = (o, k) => (o && o[k] != null) ? Number(o[k]) : null;
+    const rev = o => (o ? (Number(o.revenue) || 0) : 0);
+    const totalRev = r => r ? ((Number(r.bar_revenue) || 0) + (Number(r.floor_revenue) || 0)) : 0;
+
+    /* ── EVERY CANDIDATE IS A REAL OPERATING NUMBER WITH A REAL WEEKLY DOLLAR ────────────────
+       `dollars` is what the MOVE is worth per week at CURRENT volume: a rate change times the base
+       it applies to, or, for the event stores, the change itself. Positive = money in the operator's
+       pocket. `good` is the direction that helps, which is not always down and not always up. */
+    const cand = [];
+    const addRate = (label, wasPct, nowPct, base, unit) => {
+      if (wasPct == null || nowPct == null || !(base > 0)) return;
+      cand.push({ label: label, was: App.fmtPct(wasPct), now: App.fmtPct(nowPct),
+                  dollars: Math.round((wasPct - nowPct) / 100 * base), unit: unit });
     };
-    const g = moves[0], d = moves[moves.length - 1];
+    addRate('Bar pour cost', pct(pWas.bar, 'cost_pct'), pct(pNow.bar, 'cost_pct'), rev(pNow.bar), 'a week');
+    addRate('Food cost',     pct(pWas.food, 'cost_pct'), pct(pNow.food, 'cost_pct'), rev(pNow.food), 'a week');
+    addRate('Labor',         pct(rWas, 'labor_pct_blended'), pct(rNow, 'labor_pct_blended'), totalRev(rNow), 'a week');
+
+    /* CHECK AVERAGE uses the week's own `covers`, which is a stored field , never revenue divided by
+       the check average, which is the same number wearing a disguise and would make the dollar figure
+       an identity rather than a measurement. */
+    if (rNow.check_avg != null && rWas.check_avg != null && Number(rNow.covers) > 0) {
+      cand.push({ label: 'Check average', was: App.fmtCurrency(rWas.check_avg), now: App.fmtCurrency(rNow.check_avg),
+                  dollars: Math.round((rNow.check_avg - rWas.check_avg) * Number(rNow.covers)), unit: 'a week' });
+    }
+
+    const vcs = (App.shiftData || {}).sc_void_comps || [];
+    const vNow = sumIn(vcs, curSpan, r => r.amount), vWas = sumIn(vcs, wasSpan, r => r.amount);
+    if (vcs.length) cand.push({ label: 'Voids and comps', was: App.fmtCurrency(vWas, 0), now: App.fmtCurrency(vNow, 0),
+                                dollars: Math.round(vWas - vNow), unit: 'a week' });
+
+    /* OVERTIME PREMIUM, per the locked labor model: hours past 40 per PERSON per week, at half the
+       wage on top ([[labor-cost-model]] , read it before changing any labor number). */
+    const acts = (App.laborData || {}).lc_actuals || [];
+    const otFor = s => {
+      const by = {};
+      acts.forEach(r => { if (inSpan(r && r.date, s)) {
+        const k = r.staff_id || r.name || '?';
+        by[k] = by[k] || { h: 0, wage: Number(r.wage) || 0 };
+        by[k].h += Number(r.hours) || 0;
+        if (!by[k].wage) by[k].wage = Number(r.wage) || 0;
+      } });
+      return Object.keys(by).reduce((t, k) => t + Math.max(0, by[k].h - 40) * by[k].wage * 0.5, 0);
+    };
+    if (acts.length) {
+      const oNow = otFor(curSpan), oWas = otFor(wasSpan);
+      cand.push({ label: 'Overtime', was: App.fmtCurrency(oWas, 0), now: App.fmtCurrency(oNow, 0),
+                  dollars: Math.round(oWas - oNow), unit: 'a week' });
+    }
+
+    const moved = cand.filter(c => c.dollars !== 0);
+    if (!moved.length) return { gain: null, drag: null, window: 'two weeks ago' };
+    moved.sort((a, b) => b.dollars - a.dollars);
+    const top = moved[0], bottom = moved[moved.length - 1];
     return {
-      gain: { section: title(g.key), score: g.score, delta: g.delta, measure: mover(g.key, true) },
-      drag: { section: title(d.key), score: d.score, delta: d.delta, measure: mover(d.key, false) }
+      gain: top.dollars > 0 ? top : null,
+      drag: bottom.dollars < 0 ? bottom : null,
+      window: 'two weeks ago'
     };
   },
-
   /* ── DONE THIS WEEK: five fixed rows, ticked only by a real record ──────────────────────────
      Kyle, 2026-08-10: *"just pick the top 4-5 things.. so they are always listed and check off when
      done.. Monday resets."*
@@ -1772,21 +1816,36 @@ S.Hub = {
 
     // ── Band 3: biggest gain and worst drag, in the audit's own vocabulary ──
     const bw = this._bestWorst();
+    /* ⛔⛔⛔ THESE TWO CARDS STOPPED SPEAKING IN AUDIT SCORES. Kyle, 2026-08-10: *"they are currently
+       bar cop audit section scores.. something the user might not know what they are referencing
+       right away.. what about actual stats from inventory or whatever.. like food cost saved xx%
+       worth $xx last week."*
+       ⭐ HE IS RIGHT AND THE OLD VERSION FAILED ITS OWN TEST. "Operational Consistency 86, +16" is a
+       true reading of a Bar Cop sub-score and it is meaningless standing at the bar: it names an
+       internal scoring category, not a thing an operator does. `Recovery Action -11` is worse, since
+       nothing in the room is called that.
+       ⭐ NOW EVERY CANDIDATE IS AN OPERATING NUMBER WITH A WEEKLY DOLLAR: bar pour cost, food cost,
+       labor, check average, voids and comps, overtime. The dollar is what the MOVE is worth per week
+       at current volume, which is the sentence an operator finishes for you: "food cost down half a
+       point, that is fifty quid a week."
+       ⚠ AND EITHER CARD CAN BE LEGITIMATELY EMPTY. A fortnight where nothing slipped has no drag,
+       and saying so is the truth, not a gap in the page. */
     const bwCard = (t, o, isGain) => {
-      if (!o) return hbPanel(hbSh(t) + '<div style="font-size:12px;color:var(--t3);">Needs a second audit</div>');
+      if (!o) return hbPanel(hbSh(t)
+        + '<div style="font-size:12px;color:var(--t3);">'
+        + (isGain ? 'Nothing improved this fortnight' : 'Nothing slipped this fortnight') + '</div>');
       const col = isGain ? 'var(--green)' : 'var(--red)';
+      const amount = App.fmtCurrency(Math.abs(o.dollars), 0);
       return hbPanel(hbSh(t)
-        + '<div style="display:flex;align-items:baseline;gap:11px;margin:2px 0 8px;flex-wrap:wrap;">'
-        + '<span style="font-size:25px;font-weight:800;color:' + col + ';">' + o.score + '</span>'
-        + '<span style="font-size:16px;font-weight:700;color:' + hbGrey + ';">' + esc(o.section) + '</span>'
-        + hbDelta(isGain, (o.delta >= 0 ? '+' : '') + o.delta) + '</div>'
-        + (o.measure
-            ? '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">'
-              + '<span style="font-size:12px;color:var(--t2);">' + esc(o.measure.label) + '</span>'
-              + '<span style="font-size:12px;color:var(--t3);white-space:nowrap;">' + o.measure.was
-              + '% <span style="color:var(--t4);">&rarr;</span> <span style="color:' + col + ';font-weight:700;">'
-              + o.measure.now + '%</span></span></div>'
-            : ''));
+        + '<div style="display:flex;align-items:baseline;gap:10px;margin:2px 0 8px;flex-wrap:wrap;">'
+        + '<span style="font-size:25px;font-weight:700;color:' + col + ';">' + esc(amount) + '</span>'
+        + '<span style="font-size:13px;color:var(--t2);">' + (isGain ? 'saved' : 'lost') + ' ' + esc(o.unit) + '</span>'
+        + '</div>'
+        + '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">'
+        +   '<span style="font-size:13px;font-weight:700;color:' + hbGrey + ';">' + esc(o.label) + '</span>'
+        +   '<span style="font-size:12px;color:var(--t3);white-space:nowrap;">' + esc(o.was)
+        +     ' <span style="color:var(--t4);">&rarr;</span> <span style="color:' + col + ';font-weight:700;">'
+        +     esc(o.now) + '</span></span></div>');
     };
 
     // ── Band 4: needs you, and what is already done ──
@@ -1848,7 +1907,7 @@ S.Hub = {
             <div style="font-size:12px;color:var(--t3);">${esc(dateLine)}</div>
           </div>
           <div class="hub-grid-tiles">${topCard}</div>
-          <div class="hub-grid-row" style="display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:stretch;">
+          <div class="hub-grid-row" style="display:grid;grid-template-columns:396px 1fr;gap:18px;align-items:stretch;">
             ${hbPanel(climbBlock)}${hbPanel(movementBlock)}
           </div>
           ${doFirstBand}
@@ -1856,7 +1915,7 @@ S.Hub = {
             ${bwCard('Your biggest gain', bw && bw.gain, true)}${bwCard('Your worst drag', bw && bw.drag, false)}
           </div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">
-            ${hbPanel(hbSh('Needs you') + (needRows || '<div style="font-size:12px;color:var(--t2);">All clear. Nothing needs you outside your weekly close.</div>'))}
+            ${hbPanel(hbSh('Needs attention') + (needRows || '<div style="font-size:12px;color:var(--t2);">All clear. Nothing needs you outside your weekly close.</div>'))}
             ${hbPanel(hbSh('Done this week') + doneRows)}
           </div>
           <div class="hub-grid-row">${sectionStrip}</div>
