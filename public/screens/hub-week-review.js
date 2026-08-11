@@ -1048,7 +1048,15 @@ S.WeekReview = {
         title: 'Week in Review',
         lead: 'Week in Review recaps a week that has finished: what your team logged in each section, what it turned up, and what carried over. It reads your real records, so there is nothing here until a week has been worked.',
         steps: [
-          { title: 'Add your products', desc: 'Vendors first, then the products you buy from them.', btn: 'Add Products', screen: 'ic-vendors', done: products.length > 0 },
+          /* ⛔ THE BUTTON NAMES THE PAGE IT OPENS. Kyle, 2026-08-11: *"you have the 'add products'
+             button going to the list vendors page... the button has to match the page."* I took the
+             destination from the Hub's Get Started chip, which points at `ic-vendors` for its own
+             reasons, and wrote a products label over it. `app.js`'s title table settles it:
+             `ic-product-setup` is titled "Add Products" and `ic-vendors` is "List Vendors".
+             ⚠ AND THE DESCRIPTION WAS OVER-CLAIMING TOO. It said "Vendors first", which is not a
+             requirement: `vendor` is `required:false` on the product intake, so a product saves with
+             no vendor on it. A step that invents a prerequisite sends an operator on an errand. */
+          { title: 'Add your products', desc: 'What you buy and what it costs.', btn: 'Add Products', screen: 'ic-product-setup', done: products.length > 0 },
           { title: 'Take a count', desc: 'Count your stock. Once a week has been worked, it reads back here the following week.', btn: 'Take Inventory', screen: 'ic-take-inventory', done: counts.length > 0 }
         ]
       });
