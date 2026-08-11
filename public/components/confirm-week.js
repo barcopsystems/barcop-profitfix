@@ -103,7 +103,7 @@ const ConfirmWeek = {
     const checklist = allReady
       ? '<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:14px;">This week is ready to confirm.</div>'
       : '<div style="margin-bottom:14px;">'
-        + chkRow(m.ready.pos,   'POS sales dropped in Shift', 'sc-dashboard')
+        + chkRow(m.ready.pos,   'POS sales imported', 'week-close')
         + chkRow(m.ready.count, 'Inventory count taken (for COGS)', 'ic-take-inventory')
         + chkRow(m.ready.hours, 'Hours logged in Labor', 'lc-log-hours')
         + '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Missing pieces read as blank. You can still confirm and fill them later.</div>'
