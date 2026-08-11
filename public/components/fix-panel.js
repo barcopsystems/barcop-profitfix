@@ -256,24 +256,10 @@ window.FixPanel = {
 
 
 
-  // Vertical fix-event markers for an annotated trend chart. xFn maps a week
-  // index to an x coordinate; top/bottom are the plot edges.
-  markerSvg(markers, xFn, top, bottom) {
-    if (!markers || !markers.length) return '';
-    return markers.map(m => {
-      const x  = xFn(m.index).toFixed(1);
-      const t  = top.toFixed(1);
-      const b  = bottom.toFixed(1);
-      const cy = (bottom - 5).toFixed(1);
-      return ''
-        + '<line x1="' + x + '" y1="' + t + '" x2="' + x + '" y2="' + cy + '" '
-        +   'stroke="rgba(219,171,70,0.18)" stroke-width="1" stroke-dasharray="3,4"/>'
-        + '<circle cx="' + x + '" cy="' + cy + '" r="4" fill="#DBAB46" '
-        +   'stroke="rgba(0,0,0,0.35)" stroke-width="0.5">'
-        +   '<title>' + esc(m.label) + ' implemented ' + esc(m.date) + '</title>'
-        + '</circle>';
-    }).join('');
-  },
+  /* `markerSvg` was deleted 2026-08-11 with the Hub's dead mini trend charts, its only caller.
+     `App.data.fix_log` is untouched and still read elsewhere in this system; it was the CHART
+     MARKER that died, not the log. Found by `verify-no-retired-code`, not by hand — a retirement
+     reaches past the file you were editing ([[the-loop]] #63). */
 
   // ════════════════════════════════════════════════════════════════════════
   //  MASTER / DETAIL — the Fix screen (board landing → focused gap page)
