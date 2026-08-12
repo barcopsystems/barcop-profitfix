@@ -460,16 +460,19 @@ const DB = {
     'recipe-cost-analysis':'profit','profit-experiments':'profit','vendor-tracker':'profit',
     'vendor-watch':'profit','vendor-scorecard':'profit','vendor-discrepancy':'profit',
     'profit-forecast':'profit','help':'_always',
-    /* ⛔ REGISTERED EXPLICITLY 2026-08-10, when Week History moved out of the Profit and Revenue
-       section menus into the rail's WEEK group. It was never listed here, so `_areaOf` was answering
-       for it by FALLBACK — the final `return 'profit'` for prefix-less ids. That gave the right
-       answer by accident, and an accident is not a decision: `openScreen` now routes this row, and
-       `openScreen` asks `canAccess` before it swaps the shell.
-       ⚠ 'profit' PRESERVES TODAY'S BEHAVIOUR EXACTLY — it is not a permissions change. But it is now
-       the odd one out in its own rail group: Close and Review beside it are ungated hub pages, so a
-       Manager scoped away from Profit sees a History row that refuses them. That is Kyle's call, not
-       a thing to change quietly here. */
-    'week-history':'profit',
+    /* ⭐⭐⭐ THE WEEK GROUP IS ITS OWN AREA (Kyle, 2026-08-12: "the week section that includes it's
+       3 pages close, review, history.. i would think needs added"). It is the rail group with a
+       deadline, and before this it was answered THREE different ways:
+         · `week-close`  had NO gate at all — `WeekClose.open()` went straight to openHubFullPage,
+           so Close The Week was reachable by any member of any bar.
+         · `week-review` asked the MANAGEMENT-ONLY question (`_hubBlocked()`), so every admin got in
+           regardless of what the owner had granted them.
+         · `week-history` was filed under 'profit' — flagged here on 2026-08-10 as "the odd one out
+           in its own rail group... that is Kyle's call". He has now made it.
+       ⛔⛔ THIS IS A REAL PERMISSIONS CHANGE AND IT FAILS CLOSED, WHICH IS THE SAFE DIRECTION: no
+       stored membership carries a `week` key, so every existing member loses these three pages until
+       the owner grants Week. That is deliberate — the alternative is inventing access nobody chose. */
+    'week-close':'week','week-review':'week','week-history':'week',
     // Revenue Recovery
     'r-this-week':'revenue','r-forecast':'revenue',
     'r-audit':'revenue','r-fix':'revenue','r-server-check':'revenue','r-menu-items':'revenue',
@@ -480,8 +483,15 @@ const DB = {
     // Events
     'ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always',
-    // Books
+    /* Books.
+       ⛔ EVERY BOOKS PAGE MUST BE LISTED HERE, and two were not. `_areaOf` has no `hub-` prefix rule,
+       so an unregistered hub page falls all the way through to the final `return 'profit'` — it
+       becomes a PROFIT page as far as permissions are concerned, silently. Measured 2026-08-12:
+       `hub-operating-expenses` and `hub-year-end` both resolved to 'profit'. Money Out only gated
+       correctly because its own `open()` passes `'hub-books-home'` as the representative id rather
+       than its own; Annual Review had no gate at all and was reachable by anyone. */
     'hub-books':'books','hub-books-home':'books','hub-breakeven':'books',
+    'hub-operating-expenses':'books','hub-year-end':'books',
     // Bar Cop Audit (the cross-section meta-audit — its own grantable area)
     'bar-cop-audit':'audit'
   },
@@ -512,6 +522,22 @@ const DB = {
 
   screenAllowed(screen) { return this.canAccessLevel(screen) !== null; },
   screenCanEdit(screen) { return this.canAccessLevel(screen) === 'edit'; },   // Full Access
+
+  /* ⭐ ASK ABOUT AN AREA DIRECTLY, without inventing a representative screen for it.
+     `canAccessLevel` answers "can this member open THIS SCREEN"; the rail needs "can this member use
+     THIS SECTION AT ALL", which is the same question one level up. Before this the rail had no way
+     to ask it, so it never did — every section's overlay menu opened for every member and the
+     refusals only happened one page deeper, which is exactly what Kyle reported on Books.
+     ⛔ THE PERMISSION SHAPE IS KNOWN IN ONE PLACE. This reads `_permissions` here rather than
+     letting app.js reach into it, so a change to how a grant is stored has one consumer, not two.
+     ⚠ The two open cases are deliberate and match `canAccessLevel` exactly: no role resolved yet
+     (the demo, and any session before the membership loads) and the owner. Divergence here would
+     mean the rail and the screens disagree about who is allowed in. */
+  areaAllowed(area) {
+    if (!this._role) return true;        // demo / not yet resolved — open, same as canAccessLevel
+    if (this.isOwner()) return true;     // owner = full access to everything
+    return !!(this._permissions || {})[area];
+  },
 
   // ── Data ──────────────────────────────────────────────────────────────────
   // Gate: false until the initial load has CONFIRMED what the account holds. No

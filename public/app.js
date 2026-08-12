@@ -2681,6 +2681,14 @@ const App = {
   },
 
   openRailMenu(key) {
+    /* ⛔⛔⛔ THE ACCESS GATE, AND IT HAS TO BE THE FIRST THING. Every other refusal in this app is a
+       page refusing itself, which meant a member with Books = No Access could still open the Books
+       menu and read the whole list of what they cannot do — and reach anything in it that had been
+       shipped without a gate of its own. Refusing the SECTION states the rule once, at the door the
+       operator actually presses, instead of relying on N pages each remembering to ask.
+       ⚠ BEFORE the fallback below, deliberately: that fallback navigates INTO the section, so
+       checking after it would hand a blocked member the very screen this is refusing. */
+    if (!this._railSectionAllowed(key)) { this.showNoAccess(); return; }
     const nav = document.getElementById('rail-menu-nav');
     const hubCtx = this._RAIL_HUB_CTX[key];
     /* ⛔ NO DEAD END. If the overlay is not on the page for any reason, fall back to navigating
@@ -2857,6 +2865,26 @@ const App = {
     // ⛔ MEMBERSHIP, NOT "HAS A LANDING SCREEN" — see the note on `_SECTION_DASH`. Reading that map
     // here meant a section lost its whole menu the moment its landing screen was retired.
     return !!this._RAIL_HUB_CTX[k] || this._isSection(k);
+  },
+
+  /* ⭐⭐⭐ CAN THIS MEMBER USE THIS SECTION AT ALL? (Kyle, 2026-08-12, using the app with a real
+     scoped member: "if a member was permissioned to no access on books.. just clicking books in the
+     rail menu should give the no access prompt and not the individual pages in the books overlay
+     menu.") He is right, and the reason it was wrong is that nothing had ever asked this question:
+     the refusals all lived one page deeper, so the menu opened, and any page in it that had been
+     given no gate of its own was simply reachable.
+     ⭐ THE RAIL KEYS AND THE GRANTABLE AREA KEYS ARE THE SAME NINE WORDS — inventory, labor, shift,
+     profit, revenue, cash, events, books, audit. That is not a coincidence to lean on quietly, so
+     `verify-area-access-doors` asserts the two sets are equal; if a section is ever added without a
+     matching area, this returns false for it and the gate says so rather than opening it.
+     ⛔ SETTINGS IS THE ONE SECTION THAT IS NEVER AREA-GATED, and it is not an oversight: a staff
+     member reaches Your Account through it to change their own password (`_openSettingsForRole`
+     routes them straight there, and `hub-user-accounts` refuses every other group). Blocking this
+     menu would lock a member out of their own credentials. */
+  _railSectionAllowed(key) {
+    if (key === 'settings') return true;
+    if (!window.DB || !DB.areaAllowed) return true;
+    return DB.areaAllowed(key);
   },
 
   /* Every rail row carries an icon, from the SHARED section map, because the collapsed rail is
