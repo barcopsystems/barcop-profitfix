@@ -129,6 +129,10 @@ const Cash = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Cash Audit</span>
       </div>
+      <div class="nav-item" data-screen="c-forecast" id="nav-c-forecast">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Cash Forecast</span>
+      </div>
       <div class="nav-item" data-screen="c-playbook" id="nav-c-playbook">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 4C7 2.9 4.7 2.6 2.7 3.1v9c2-.5 4.3-.2 5.8.9 1.5-1.1 3.8-1.4 5.8-.9v-9C12.3 2.6 10 2.9 8.5 4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 4v9" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Cash Playbook</span>
@@ -138,6 +142,10 @@ const Cash = {
         <span class="nav-label">Cash Fix</span>
       </div>
       <div class="nav-section">Free Up Cash</div>
+      <div class="nav-item" data-screen="c-purchasing" id="nav-c-purchasing">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l6 3v7l-6 3-6-3V5l6-3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Purchasing</span>
+      </div>
       <div class="nav-item" data-screen="c-trapped" id="nav-c-trapped">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="6.5" width="12" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.2 6.5V4.8a3.3 3.3 0 0 1 6.6 0V6.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="10.3" r="1.4" stroke="currentColor" stroke-width="1.2"/></svg>
         <span class="nav-label">Trapped Cash</span>
@@ -145,15 +153,6 @@ const Cash = {
       <div class="nav-item" data-screen="c-capital" id="nav-c-capital">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 14.5V8M7 14.5V4M11.5 14.5V10M2.5 14.5h12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 3.5l2.5-1.5 1 2.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Capital Efficiency</span>
-      </div>
-      <div class="nav-item" data-screen="c-purchasing" id="nav-c-purchasing">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l6 3v7l-6 3-6-3V5l6-3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Purchasing</span>
-      </div>
-      <div class="nav-section">Cash Flow</div>
-      <div class="nav-item" data-screen="c-forecast" id="nav-c-forecast">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Cash Forecast</span>
       </div>
       <div class="nav-item" data-screen="c-position" id="nav-c-position">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="4.5" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7.2h13" stroke="currentColor" stroke-width="1.2"/><path d="M11 10.3h2.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
