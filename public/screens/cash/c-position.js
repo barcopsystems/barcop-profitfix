@@ -136,16 +136,23 @@ S.CashPosition = {
             : '<div style="font-size:12px;color:var(--green);margin-top:10px;">Fully reserved. Your cushion covers ' + CashEngine.reserveWeeks() + ' weeks of fixed costs with no sales.</div>');
     return '<div class="sh" style="margin:24px 0 10px;">Your Reserve</div>'
       + '<div class="card">' + body
-      /* The button names the PAGE it opens, not an outcome it cannot produce. `c-trapped` is a
-         read-only report -- it writes nothing and its own controls are two more navigations plus
-         Export PDF -- so a button reading "Free Trapped Cash" promised a result no click of it
-         delivers. Same class as the Inventory step's "Create Order" button that opened the Order
-         Sheet and created nothing (Kyle, 2026-08-02: the behaviour was right, the word was wrong).
-         "Trapped Cash" is what the rest of the app calls this page: it is the registered title, it
-         is `fix-cash`'s own first step label, and `recovery-playbook` deliberately separates the
-         report (`show: 'Trapped Cash'`) from the system (`fixLabel: 'Free Trapped Cash system'`,
-         which lives at `c-fix`). The sentence above still tells the operator to free it. */
-      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-trapped">Trapped Cash</button></div></div>';
+      /* ⛔ THIS CONTROL WAS WRONG TWICE, AND THE SECOND DIAGNOSIS REPLACED THE FIRST. It shipped as
+         **"Free Trapped Cash" pointing at `c-trapped`** — a read-only report that writes nothing and
+         whose own controls are two more navigations plus Export PDF. So the label promised a result
+         no click of it delivers, the same class as the Inventory step's "Create Order" button that
+         opened the Order Sheet and created nothing (Kyle, 2026-08-02: *the behaviour was right, the
+         word was wrong*).
+         ⭐ Applying that precedent, the first fix renamed the button to "Trapped Cash". That was
+         honest but it answered the smaller question. **The label was not the wrong half — the
+         DESTINATION was.** The sentence directly above tells the operator to free trapped cash to
+         close a reserve gap, and `recovery-playbook` deliberately separates the REPORT
+         (`show: 'Trapped Cash'`) from the SYSTEM that actually walks them through it
+         (`fixLabel: 'Free Trapped Cash system'`, `screen: 'c-fix'`, `focus: 'free-trapped'`).
+         Sending someone who has been told to act to a page that only reports is the same defect one
+         level up: the control still cannot produce what the sentence promises.
+         ⚠ `data-focus` is not decoration. Cash Fix opens on whichever system it judges needs work
+         first, so without it a reserve-short bar can land on a different gap entirely. */
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-fix" data-focus="free-trapped">Cash Fix</button></div></div>';
   },
 
   resetForm() {
@@ -166,6 +173,14 @@ S.CashPosition = {
     this.container.onclick = ev => {
       if (ev.target.closest('#cp-save') || ev.target.closest('#cp-reset')) return;
       const go = ev.target.closest('[data-go]');
+      /* `App._fixFocus` is the app's one-shot for "open the Fix screen ON this gap" — set it, then
+         navigate, and the Fix screen's render consumes and clears it. Six screens already deliver a
+         focus this way (`recovery-playbook` off `dataset.focus`, `c-audit`/`audit-tracker`/`r-audit`
+         off `dataset.gap`, `fix-panel` twice). Without it, Cash Fix opens on whichever system it
+         decides needs work first, which on a bar whose reserve is short need not be the one the
+         operator just pressed. Reading the existing convention rather than inventing a second one
+         ([[the-loop]] #95 — grep the mechanism's NAME across the tree before designing anything). */
+      if (go && go.dataset.focus) App._fixFocus = go.dataset.focus;
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };
   }
