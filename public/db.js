@@ -478,7 +478,7 @@ const DB = {
     // Cash Recovery
     'c-audit':'cash','c-playbook':'cash','c-fix':'cash','c-trapped':'cash','c-purchasing':'cash','c-capital':'cash','c-forecast':'cash','c-position':'cash','c-bridge':'cash','c-experiments':'cash','c-help':'_always',
     // Events
-    'ev-dashboard':'events','ev-bookings':'events','ev-calendar':'events',
+    'ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always',
     // Books
     'hub-books':'books','hub-books-home':'books','hub-breakeven':'books',

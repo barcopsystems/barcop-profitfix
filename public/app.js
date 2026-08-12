@@ -1852,7 +1852,13 @@ const App = {
     { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'audit-tracker',        moduleName:'Profit Recovery' },
     { group:'revenue-recovery',    label:'Revenue Recovery',         module:'revenue',   screen:'r-audit',              moduleName:'Revenue Recovery' },
     { group:'cash-recovery',       label:'Cash Recovery',            module:'cash',      screen:'c-audit',              moduleName:'Cash Recovery' },
-    { group:'events',              label:'Events',                   module:'events',    screen:'ev-dashboard',         moduleName:'Events' }
+    /* ⛔ `ev-bookings`, NOT `ev-dashboard`, since the Events dashboard was deleted 2026-08-12.
+       `staffLanding()` walks this table IN ORDER and returns the FIRST accessible screen, so a
+       scoped Events user lands here and nowhere else. **No walk can catch a mistake in this line**:
+       the demo carries no role and an owner short-circuits before it is read, which is exactly how
+       six of seven areas nearly shipped pointing at deleted screens at 1c. Bookings is the section's
+       pipeline and `bookings` is its unified store, so it is the honest landing. */
+    { group:'events',              label:'Events',                   module:'events',    screen:'ev-bookings',          moduleName:'Events' }
   ],
 
   // Pick the first accessible screen as a non-admin user's landing.
@@ -1940,7 +1946,7 @@ const App = {
      deleted is what makes the deletion itself a pure file removal.
      ⚠ `verify-nav-rail-reachability` C2b/C2d holds this: no landing may name one of the six, and
      every landing must be a screen `_CONVERTED` can actually route to. */
-  _SECTION_DASH: { profit: 'audit-tracker', revenue: 'r-audit', cash: 'c-audit', events: 'ev-dashboard', inventory: 'ic-take-inventory', labor: 'lc-build-schedule', shift: 'sc-cash-control' },
+  _SECTION_DASH: { profit: 'audit-tracker', revenue: 'r-audit', cash: 'c-audit', events: 'ev-bookings', inventory: 'ic-take-inventory', labor: 'lc-build-schedule', shift: 'sc-cash-control' },
 
   /* Is this key one of the module sections? Read off the `SECTIONS` registry above, so there is ONE
      list and a section cannot exist in one place and not the other. `hub` is IN that registry and is
@@ -2007,8 +2013,11 @@ const App = {
          HAD its own cockpit; there is ONE page now, reached from the rail's own Week group, so six
          copies of it inside the section menus were six duplicate routes to one destination. The same
          call the History row got when it was pulled off the Profit and Revenue menus.
-         ⚠ EVENTS KEEPS ITS LEAF — "Book The Events" points at `ev-dashboard`, which survives and is
-         genuinely per-section. It is the only module left that lands anywhere of its own. */
+         ⚠ EVENTS KEEPS ITS LEAF, and since 2026-08-12 that leaf is `ev-bookings`. The Events
+         dashboard it used to point at is DELETED — Kyle: *"it is not needed and serves no purpose to
+         a user other than an extra link on the events overlay menu."* Events is still the only
+         module that lands anywhere of its own; the destination is now the pipeline rather than a
+         dashboard over it. */
       const dashScreen = this._SECTION_DASH[module];
       const firstSec = nav.querySelector('.nav-section');
       if (module === 'events' && dashScreen && firstSec && !nav.querySelector('#nav-' + dashScreen)) {
@@ -2479,7 +2488,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'week-history', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
+  _CONVERTED: new Set(['profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'week-history', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'week-review') return (window.S && S.WeekReview) ? S.WeekReview.open() : null;
@@ -8840,7 +8849,6 @@ const App = {
     if (this._activeModule === 'events') {
       const evTitles = {
         'hub':          ['Recovery Hub', ''],
-        'ev-dashboard': ['Dashboard', 'Events'],
         'ev-bookings':  ['Bookings', 'Events'],
         'ev-calendar':  ['Calendar', 'Events'],
         'ev-regulars':  ['Regulars', 'Events'],
@@ -8848,7 +8856,6 @@ const App = {
         'ev-help':      ['Help and FAQ', 'Events'],
       };
       const evScreens = {
-        'ev-dashboard': S.EventsDashboard,
         'ev-bookings':  S.EventsBookings,
         'ev-calendar':  S.EventsCalendar,
         'ev-regulars':  S.EventsRegulars,
@@ -9721,8 +9728,9 @@ const App = {
      every window at once (measured: a single 2027 row moved a Last-7-Days team average from $35.00
      to $56.67, and diluted the Revenue audit's comp rate to 5% against a truth of 10%).
      ⚠ AS OF 2026-07-27 ONLY TWO CALLERS BOUND THE TOP — r-server-check's scorecard and r-audit's S4
-     window, the two that were measured. theft-risk's brief, cash-engine's vendor scorecard,
-     ev-dashboard's win rate and hub's price re-drift are still open at the top (S217 on THE LIST).
+     window, the two that were measured. theft-risk's brief, cash-engine's vendor scorecard and
+     hub's price re-drift are still open at the top (S217 on THE LIST). ⚠ The Events dashboard's win
+     rate used to be on that list and went with the screen when it was deleted 2026-08-12.
      Stated as a measurement with its scope, not as an all-clear.
      ⚠ Compare DATE STRINGS, not Date objects. Building the cutoff from `new Date()` keeps the
      current time of day, so a row stamped earlier in the day on the boundary date falls out and
