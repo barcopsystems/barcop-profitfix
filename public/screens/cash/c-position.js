@@ -136,7 +136,16 @@ S.CashPosition = {
             : '<div style="font-size:12px;color:var(--green);margin-top:10px;">Fully reserved. Your cushion covers ' + CashEngine.reserveWeeks() + ' weeks of fixed costs with no sales.</div>');
     return '<div class="sh" style="margin:24px 0 10px;">Your Reserve</div>'
       + '<div class="card">' + body
-      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-trapped">Free Trapped Cash</button></div></div>';
+      /* The button names the PAGE it opens, not an outcome it cannot produce. `c-trapped` is a
+         read-only report -- it writes nothing and its own controls are two more navigations plus
+         Export PDF -- so a button reading "Free Trapped Cash" promised a result no click of it
+         delivers. Same class as the Inventory step's "Create Order" button that opened the Order
+         Sheet and created nothing (Kyle, 2026-08-02: the behaviour was right, the word was wrong).
+         "Trapped Cash" is what the rest of the app calls this page: it is the registered title, it
+         is `fix-cash`'s own first step label, and `recovery-playbook` deliberately separates the
+         report (`show: 'Trapped Cash'`) from the system (`fixLabel: 'Free Trapped Cash system'`,
+         which lives at `c-fix`). The sentence above still tells the operator to free it. */
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-trapped">Trapped Cash</button></div></div>';
   },
 
   resetForm() {
