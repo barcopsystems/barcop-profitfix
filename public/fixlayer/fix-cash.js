@@ -76,7 +76,15 @@ FIX.cash = [
         { kind: 'result', target: 'c-forecast', targetLabel: 'Cash Forecast',
           title: 'Read the quarter ahead',
           detail: 'Open the Cash Forecast and read cash in against cash out across the next thirteen weeks. Enter your cash on hand to see a running balance, your low-point week, and your runway, and stress-test a slow season or a big buy before you commit to it.' },
-        { kind: 'action',
+        /* ⛔ THIS STEP HAD NO TARGET AT ALL (found 2026-08-12, Kyle: *"yes that needs to be linked
+           to the right page"*). It is a WATCHED step — it reads "3 tight weeks ahead" off the
+           forecast — and it was the only watched step in any of the three Fix areas with no button,
+           so an operator was told to go and find something with nowhere to go.
+           ⭐ THE RIGHT PAGE IS THE CASH FORECAST, and it is the same page step 0 opens on purpose:
+           step 0 is "read the quarter", this one is "find the tight week IN it". `c-forecast` is
+           what renders `Tightest Week`, the `Tight Weeks` count and "Tight at <week>. Bottoms out
+           at ...", so it is where the sentence above can actually be acted on. */
+        { kind: 'action', target: 'c-forecast', targetLabel: 'Cash Forecast',
           title: 'Spot any tight week',
           detail: 'Find the week where cash out beats cash in. A quarterly bill on a slow week, the same week as a big order, is what catches you short.' },
         { kind: 'action', target: 'books', targetLabel: 'Books',
