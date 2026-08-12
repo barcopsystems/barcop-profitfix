@@ -242,7 +242,15 @@ S.HubBreakEven = {
       App.setupCard(mount, {
         title: 'Break-Even',
         lead: 'Break-Even shows the sales you need to cover your costs and how you are tracking against it. It needs your fixed costs first, your recurring bills like rent, insurance, and utilities.',
-        steps: [{ title: 'Log your operating expenses', desc: 'Add your recurring monthly bills in Operating Expenses. Those are the nut this number is built on.', btn: 'Operating Expenses', screen: 'operating-expenses', done: false }]
+        /* ⛔ THE BUTTON NAMED A PAGE THAT NO LONGER EXISTS UNDER THAT NAME. `operating-expenses` is
+           titled **Money Out** — its own `openHubFullPage('Money Out', ...)` and its Books sidebar
+           leaf both say so — so pressing "Operating Expenses" landed the operator somewhere with a
+           different name at the top. Kyle, walking the empty state 2026-08-12: *"the operating
+           expenses button goes to the wrong page."* The destination was right; the word was wrong,
+           which is the same class as the Trapped Cash button earlier today.
+           ⚠ The description said "in Operating Expenses" too — a control and the sentence above it
+           have to name the same place, or fixing one just moves the confusion. */
+        steps: [{ title: 'Log your money out', desc: 'Add your recurring monthly bills in Money Out. Those are the nut this number is built on.', btn: 'Money Out', screen: 'operating-expenses', done: false }]
       });
       return;
     }

@@ -17,7 +17,12 @@ S.Reports = {
         mount.innerHTML='<div class="screen">'
           + '<div class="card form-card">'
             + '<div class="card-title">Weekly P&amp;L Brief</div>'
-            + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm a week from the Profit dashboard first, and it shows here to export.</div>'
+            /* ⛔ "the Profit dashboard" NAMED A SCREEN THAT NO LONGER EXISTS. It was deleted at 1c
+               (2026-08-11); Close The Week is where a week gets confirmed now, and it is what the
+               button below already opens. Kyle found all three of these on one empty-state walk,
+               2026-08-12 — a stale destination in copy is the [[the-loop]] #61 shape: retiring a
+               feature is three greps, and the HELP TEXT is the one that gets left behind. */
+            + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm a week in Close The Week first, and it shows here to export.</div>'
             // S271: it named the Profit dashboard and gave no way to get there. 'this-week' is
             // the canonical id — openScreen lands the dashboard AND opens Confirm the Week (S260).
             + '<div style="margin-top:14px;"><button class="btn btn-primary btn-sm" id="pnl-go-confirm">Confirm a Week</button></div>'

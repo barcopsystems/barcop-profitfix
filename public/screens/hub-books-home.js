@@ -38,8 +38,24 @@ S.HubBooksHome = {
   },
   _money(v)  { return (v == null || isNaN(v)) ? '-' : App.fmtBal(Number(v)); },
   _pct(v)    { return (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%'; },
-  _dateLbl(iso) { try { const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { return null; } },
-  _lastRun(key) { try { const v = localStorage.getItem(key); return v ? this._dateLbl(v) : null; } catch (e) { return null; } },
+  /* ⛔ A BARE `YYYY-MM-DD` PARSES AS UTC MIDNIGHT AND RENDERS A DAY EARLY west of Greenwich —
+     `new Date('2026-08-12')` prints **Aug 11** in Austin. This only ever took full ISO timestamps
+     before; `books_generated` stores `App.todayLocal()`, which is a bare YMD, so the stamp had to be
+     anchored to LOCAL midnight the way every other date reader in the app does
+     ([[local-date-convention]]). `hub.js`'s own `shortDate` uses this exact length test. */
+  _dateLbl(iso) {
+    try {
+      const s = String(iso);
+      const d = new Date(s.length <= 10 ? s + 'T00:00:00' : s);
+      return isNaN(d) ? null : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch (e) { return null; }
+  },
+  /* ⛔ `_lastRun` IS DELETED (2026-08-12). It read a DEVICE key to caption the generate step, which
+     is the defect Kyle found — an empty account was told "Report last run Aug 12". The caption reads
+     the account record now, and the retired-code ratchet confirmed this helper had no other caller.
+     ⚠ THE localStorage MARKER ITSELF STAYS, and that is deliberate: `hub-week-review` reads
+     `books_report_run_*` through its own `rawRun`, so removing the `setItem` in `hub-books._generate`
+     would have broken a different screen. A dead READER is not a dead KEY. */
 
   // ── Per-month "done" stamps (operator-controlled, local to the device) ──────
   /* ⭐⭐⭐ THE MONTH THE WHOLE PAGE IS ABOUT (Kyle, 2026-08-07). Every figure on this landing already
@@ -444,8 +460,16 @@ S.HubBooksHome = {
        closing month there is no true sentence to print, so it prints none. */
     if (k === 'weeks') {
       const HB = S.HubBooks;
-      if (!HB || !HB._closingMonthKey || !HB._weeksComplete) return '';
-      const key = HB._closingMonthKey();
+      if (!HB || !HB._weeksComplete) return '';
+      /* ⛔⛔ THE NOTE MUST NAME THE MONTH THE PAGE IS ON, and it was naming a different one (Kyle,
+         2026-08-12, walking the empty state on August: *"make sure the week are in.. still says
+         july"*). `_closingMonthKey()` answers "which month are you closing", which walks BACK — the
+         same shift as `_basisKey`, and the same mistake I made one line up in `stepDone`. Fixing the
+         TICK and leaving the SUBTITLE meant the step and its own caption disagreed about the month.
+         ⭐ The whole row now reads from `_curKey()`: the selector says August, the tick asks August,
+         the caption says August. One month per page, stated once ([[the-loop]] #54 — the invariant
+         is the agreement, not either side). */
+      const key = this._curKey();
       const W = HB._weeksComplete(key);
       const name = HB._monthLabel ? HB._monthLabel(key) : key;
       if (!W.count) return 'No weeks confirmed yet for ' + esc(name);
@@ -469,7 +493,20 @@ S.HubBooksHome = {
       const name = (HB && HB._monthLabel) ? HB._monthLabel(key) : key;
       return esc(name) + ' operating income ' + this._money(P ? P.opInc : 0);
     }
-    if (k === 'generate') { const d = this._lastRun('books_report_run_monthend'); return d ? 'Report last run ' + d : 'Not run yet'; }
+    /* ⛔⛔ THIS READ localStorage AND CLAIMED A REPORT ON A BRAND-NEW ACCOUNT (Kyle, 2026-08-12,
+       walking the empty state: *"in empty state it shows a date the month end was generated"*).
+       `_lastRun` reads `books_report_run_monthend`, a DEVICE key — it survives a re-seed, an account
+       switch and a Clear Data, so an empty bar was told "Report last run Aug 12" about a file it has
+       never generated ([[localstorage-survives-reseed]], and [[output-honesty]]: a displayed fact
+       must be true).
+       ⭐ The account record this step already ticks off answers the same question honestly, and it is
+       keyed by MONTH — so the caption now speaks about the month on screen instead of about whatever
+       this browser last did. */
+    if (k === 'generate') {
+      const key = this._curKey();
+      const on = ((App.data && App.data.books_generated) || {})[key];
+      return on ? 'Generated ' + (this._dateLbl(on) || on) : 'Not generated yet';
+    }
     return '';
   },
 

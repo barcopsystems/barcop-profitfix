@@ -51,8 +51,9 @@ S.HubYearEnd = {
     if (!this._hasData()) {
       mount.innerHTML = '<div class="screen"><div class="card form-card">'
         + '<div class="card-title">Annual Review</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm your weeks from the Profit dashboard through the year, and your Annual Review builds here, ready to generate.</div>'
-        // S271: it named the Profit dashboard and gave no way to get there.
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm your weeks in Close The Week through the year, and your Annual Review builds here, ready to generate.</div>'
+        // S271 gave it a button; 2026-08-12 fixed the name, because the Profit dashboard it pointed
+        // at was deleted at 1c. Close The Week is where a week is confirmed now.
         + '<div style="margin-top:14px;"><button class="btn btn-primary btn-sm" id="ye-go-confirm">Confirm a Week</button></div>'
         + '</div></div>';
       if (App.setHubTopbarActions) App.setHubTopbarActions('');

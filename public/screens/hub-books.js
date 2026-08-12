@@ -42,9 +42,19 @@ S.HubBooks = {
     if (!(App.data?.weeks || []).some(w => w && w.period_end)) {
       mount.innerHTML = '<div class="screen"><div class="card form-card">'
         + '<div class="card-title">Month-End Books</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm your weeks from the Profit dashboard and log your operating expenses, and your Month-End Books build here, ready to close.</div>'
+        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;">No weeks confirmed yet. Confirm your weeks in Close The Week and log your money out, and your Month-End Books build here, ready to close.</div>'
+        /* ⛔ THIS EMPTY STATE NAMED A DESTINATION AND GAVE NO WAY TO GET THERE — the exact gap S271
+           closed on its two siblings (Weekly P&L Brief, Annual Review) and this one was missed.
+           Kyle found it walking the empty state, 2026-08-12: *"one doesn't have the confirm week
+           button."* [[empty-state-day1]]: a no-data state is the real page, empty and GUIDED, and a
+           sentence telling the operator where to go is not guidance without the door.
+           ⚠ `this-week` is the canonical confirm-the-week id: `openScreen` intercepts it to land
+           Close The Week AND raise the Confirm the Week popup. Same call both siblings make. */
+        + '<div style="margin-top:14px;"><button class="btn btn-primary btn-sm" id="mb-go-confirm">Confirm a Week</button></div>'
         + '</div></div>';
       if (App.setHubTopbarActions) App.setHubTopbarActions('');
+      document.getElementById('mb-go-confirm')?.addEventListener('click',
+        () => App.openScreen('this-week'));
       return;
     }
     const months = this._availableMonths();
