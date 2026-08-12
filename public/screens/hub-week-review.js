@@ -384,12 +384,16 @@ S.WeekReview = {
     // there is ONE sum and the band and the cell cannot drift apart ([[the-loop]] #54).
     const ordTot = cOrders.reduce((t, o) => t + (o.total || 0), 0);
     if (cOrders.length) {
-      const tot = ordTot;
+      /* ⛔ W4: THE PARTS HAVE TO ADD UP TO THE TOTAL BESIDE THEM. `_m0` rounds to whole dollars, so
+         two orders of $1,808.50 and $1,209.50 printed as "$1,809" and "$1,210" under a total of
+         "$3,018" — parts summing $1 OVER their own total, on the same line. `_amt` shows cents only
+         when there are cents, so the arithmetic closes on screen and a whole-dollar week still
+         reads clean. The TOTAL uses it too, or the same gap opens from the other side. */
       const each = cOrders.length <= this._few()
-        ? ' ' + this._join(cOrders.map(o => this._nm(o.vendor) + ' ' + this._m0(o.total)
+        ? ' ' + this._join(cOrders.map(o => this._nm(o.vendor) + ' ' + this._amt(o.total)
             + this._on(o.date) + (String(o.status || '') === 'Open' ? ' and still open' : ''))) + '.'
         : '';
-      did.push(this._n(cOrders.length + ' ' + this._plu(cOrders.length, 'order')) + ' placed, ' + this._m0(tot) + '.' + each);
+      did.push(this._n(cOrders.length + ' ' + this._plu(cOrders.length, 'order')) + ' placed, ' + this._amt(ordTot) + '.' + each);
     }
     if (cSpot.length) {
       if (cSpot.length <= this._few()) cSpot.forEach(s => {
@@ -441,7 +445,7 @@ S.WeekReview = {
          ⚠ NEUTRAL, NO COLOUR. Money committed to stock is not good news or bad news, and colour on
          this card means something ([[dashboard-discipline]]). Below Par is what still needs
          ordering; Ordered is what was ordered — the two read as a pair. */
-      this._res('Ordered', App.fmtCurrency(ordTot, 0)),
+      this._res('Ordered This Week', App.fmtCurrency(ordTot, 0)),
       this._res('Dead Stock', String(st.deadAll), st.deadAll > 0 ? 'var(--red)' : 'var(--t1)')
     ]);
     /* ⛔ "Variance flags never reviewed this week" is GONE, not un-gated: its only evidence was the
@@ -457,11 +461,20 @@ S.WeekReview = {
 
     // The PDF carries the same sentences the screen shows. Paper and page say one thing.
     (this._pdf || (this._pdf = [])).push({ name: 'Inventory', activity: this._didPlain(did),
-      results: 'Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Ordered ' + App.fmtCurrency(ordTot, 0) + ', Dead Stock ' + st.deadAll,
+      // ⛔ W3: the PDF is the artefact that leaves the building, so it names the basis too.
+      results: 'Current stock: Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Dead Stock ' + st.deadAll + '; Ordered this week ' + App.fmtCurrency(ordTot, 0),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
+    /* ⛔ W3: EVERY CELL NAMES ITS OWN BASIS NOW. Three of these four are figures about TODAY —
+       `Below Par` is the Order Sheet's plan as it stands, `Dead Stock` is what is tying up cash
+       right now, and `Used This Period` is the newest count PAIR, whenever those counts happened.
+       Printed under a heading naming a finished week they read as that week's numbers, which is the
+       defect this card already removed `Recoverable/yr` and `Shrinkage 30d` for.
+       ⭐ THE PAGE ALREADY HAD THE ANSWER: Cash and Events both suffix the band when its figures are
+       current state (`· Current Position`, `· Current Pipeline`). Inventory joins them, and the one
+       genuinely week-true cell says so in its own label rather than being tarred by the suffix. */
     return this._sectionCard('Inventory', [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up', html: results },
+      { label: 'What It Turned Up &middot; Current Stock', html: results },
       { label: 'Carrying Into Next Week', html: this._openList(open) }
     ]);
   },
