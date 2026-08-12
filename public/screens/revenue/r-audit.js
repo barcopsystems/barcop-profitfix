@@ -75,7 +75,10 @@ S.RevenueAudit = {
       { label: 'Hours logged in Labor',                done: cd.labor_pct_blended != null || cd.rplh_blended != null, go: 'lc-log-hours' },
       { label: 'Menu items priced with units sold',        done: costedMenu.length >= 4, go: 'r-menu-items' },
       { label: 'Server checks logged',                 done: this._windowedServerCount() >= 3, go: 'r-server-check' },
-      { label: 'Events completed',                     done: this._windowedCompletedEvents().length > 0, go: 'ev-dashboard' },
+      /* `ev-bookings`, not the deleted Events dashboard (2026-08-12). This row is a live control an
+         operator clicks to go and DO the thing it names, and completing an event happens on the
+         bookings pipeline, so the destination is now closer to the work than the dashboard was. */
+      { label: 'Events completed',                     done: this._windowedCompletedEvents().length > 0, go: 'ev-bookings' },
       { label: 'Confirm the week',                     done: cd.check_average != null, go: 'week-close' }
     ];
   },
