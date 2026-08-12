@@ -3360,17 +3360,21 @@ const App = {
           });
         });
       } else {
-        /* Level 2 (section): every page as a flat row with its icon.
-           ⛔ NO DIVIDERS HERE ANY MORE (Kyle, 2026-08-12: "both the books and events menus are not
-              correct.. and need to be updated to match the desktop overlay menus").
-           MEASURED on the pushed build, opening each overlay and counting `.nav-section` elements:
-           inventory 0, labor 0, books 0, events 0, audit 0 — **every desktop overlay is a FLAT list**,
-           and the mobile panels were the only place the sub-groups still drew a rule. So this was
-           never a Books-and-Events problem; those are just the two Kyle happened to open.
-           ⚠ THE ROOT KEEPS ITS DIVIDERS. Level 1 groups Go to / Week / Control / Recovery / Session
-           exactly as the RAIL does, and the rail draws rules between those. Only the section panels
-           go flat. */
+        /* Level 2 (section): the Dashboard leaf, then every page as a flat row (with its icon), a
+           divider between the source sub-groups. No accordions.
+           ⛔⛔ THESE DIVIDERS WERE REMOVED ON 2026-08-12 AND PUT STRAIGHT BACK, AND THE REASON IS A
+           PROBE ERROR WORTH LEAVING WRITTEN DOWN. I checked whether the desktop overlay groups its
+           rows by counting `.nav-section` elements in `#rail-menu-nav` and got **0 for all five
+           sections** — inventory, labor, books, events, audit — and read that as "every desktop
+           overlay is a flat list". It is not. The overlay emits **`.nav-divider`**, a different
+           class: Books really is `Close Books, All Money Out, Break-Even ── Weekly P&L Brief,
+           Month-End Books, Annual Review ── Help`.
+           ⭐ FIVE IDENTICAL ZEROES WAS THE TELL AND I NAMED IT AND WENT ANYWAY: a sweep that finds
+           nothing everywhere is reporting that it is blind, not that the thing is absent
+           ([[harness-review-like-code]] #67b). Count the SHAPE (a 1px child that is not a nav-item),
+           never one class name you assumed. */
         node.items.forEach(it => {
+          divider();
           if (it.pages) {
             it.pages.forEach(p => {
               const pr = mkRow(p.label, '', !!p.id && p.id === activeId, p.icon);
