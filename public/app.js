@@ -3321,6 +3321,14 @@ const App = {
        branch, so the section had one label, two destinations, and only one of them right.
        Routing both by id here means there is ONE door, not two spellings of the job. */
     if (id === 'operating-expenses') { if (window.S && S.HubOperatingExpenses && S.HubOperatingExpenses.open) S.HubOperatingExpenses.open(); return; }
+    /* ⛔ `books-home` NEEDED A ROUTE OF ITS OWN (2026-08-12). It was reachable only as a hub ACTION
+       (`data-hub-action`), so `openScreen('books-home')` fell through to "Coming soon." — the exact
+       trap [[the-loop]] #24 records for `week-close`, which is intercepted six lines up for the same
+       reason. Break-Even's day-one card sends an operator here to LOG money out, and a setup card
+       dispatches through `data-go` → `openScreen`, so without this the button was a dead end.
+       ⚠ Money Out is READ-ONLY HISTORY; the entry card mounts inside Close Books' first step. Any
+       control that says "log your money out" belongs here, not there. */
+    if (id === 'books-home') { if (window.S && S.HubBooksHome && S.HubBooksHome.open) S.HubBooksHome.open(); return; }
     /* ⛔ NO 'cash-outflows' ROUTE. The standalone Cash Outflows page was the pre-rebuild screen; Cash
        Outflows is a TAB on Money Out now, over the same ledger. Its last door was the "Go There"
        button on the Money Out add form, deleted with that prompt, and the page it opened disagreed
