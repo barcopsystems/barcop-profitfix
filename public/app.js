@@ -1821,7 +1821,7 @@ const App = {
   // Used by showStaffHub() to render the staff landing page.
   STAFF_TILES: [
     // Inventory Control
-    { group:'inventory-dashboard', label:'Inventory Overview',       module:'inventory', screen:'ic-dashboard',         moduleName:'Inventory Control' },
+    { group:'inventory-dashboard', label:'Inventory Overview',       module:'inventory', screen:'ic-take-inventory',    moduleName:'Inventory Control' },
     { group:'take-inventory',      label:'Take Inventory',           module:'inventory', screen:'ic-take-inventory',    moduleName:'Inventory Control' },
     { group:'receive-delivery',    label:'Receive Delivery',         module:'inventory', screen:'ic-receive-delivery',  moduleName:'Inventory Control' },
     { group:'place-orders',        label:'Place Orders',             module:'inventory', screen:'ic-order-sheet',       moduleName:'Inventory Control' },
@@ -1829,7 +1829,7 @@ const App = {
     { group:'manage-products',     label:'Manage Products & Vendors',module:'inventory', screen:'ic-product-setup',     moduleName:'Inventory Control' },
     { group:'inventory-reports',   label:'Inventory Reports',        module:'inventory', screen:'ic-report-stock',      moduleName:'Inventory Control' },
     // Labor Control
-    { group:'labor-dashboard',     label:'Labor Overview',           module:'labor',     screen:'lc-dashboard',         moduleName:'Labor Control' },
+    { group:'labor-dashboard',     label:'Labor Overview',           module:'labor',     screen:'lc-build-schedule',    moduleName:'Labor Control' },
     { group:'log-hours',           label:'Log Hours',                module:'labor',     screen:'lc-log-hours',         moduleName:'Labor Control' },
     { group:'log-tips',            label:'Tip Tracking',             module:'labor',     screen:'lc-tip-log',           moduleName:'Labor Control' },
     { group:'view-schedule',       label:'View Schedule',            module:'labor',     screen:'lc-schedule-history',  moduleName:'Labor Control' },
@@ -1839,7 +1839,7 @@ const App = {
     { group:'call-out-log',        label:'Call-Out Log',             module:'labor',     screen:'lc-callout-log',       moduleName:'Labor Control' },
     { group:'labor-reports',       label:'Labor History',            module:'labor',     screen:'lc-reports',           moduleName:'Labor Control' },
     // Shift Control
-    { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-dashboard',         moduleName:'Shift Control' },
+    { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-cash-control',      moduleName:'Shift Control' },
     { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-control',      moduleName:'Shift Control' },
     { group:'checklists',          label:'Run Checklists',               module:'shift', screen:'sc-checklists',        moduleName:'Shift Control' },
     { group:'preshift',            label:'Pre-Shift Briefing',       module:'shift',     screen:'sc-preshift',          moduleName:'Shift Control' },
@@ -1849,9 +1849,9 @@ const App = {
     { group:'maintenance',         label:'Licensing',                module:'shift',     screen:'sc-licensing',         moduleName:'Shift Control' },
     { group:'incident',            label:'Incident Log',             module:'shift',     screen:'sc-incidents',         moduleName:'Shift Control' },
     // Recovery
-    { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'dashboard',            moduleName:'Profit Recovery' },
-    { group:'revenue-recovery',    label:'Revenue Recovery',         module:'revenue',   screen:'r-dashboard',          moduleName:'Revenue Recovery' },
-    { group:'cash-recovery',       label:'Cash Recovery',            module:'cash',      screen:'c-dashboard',          moduleName:'Cash Recovery' },
+    { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'audit-tracker',        moduleName:'Profit Recovery' },
+    { group:'revenue-recovery',    label:'Revenue Recovery',         module:'revenue',   screen:'r-audit',              moduleName:'Revenue Recovery' },
+    { group:'cash-recovery',       label:'Cash Recovery',            module:'cash',      screen:'c-audit',              moduleName:'Cash Recovery' },
     { group:'events',              label:'Events',                   module:'events',    screen:'ev-dashboard',         moduleName:'Events' }
   ],
 
@@ -2479,7 +2479,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['dashboard', 'profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-dashboard', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'sc-dashboard', 'lc-dashboard', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-dashboard', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'week-history', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-dashboard', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
+  _CONVERTED: new Set(['profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-fix', 'r-this-week', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-dashboard', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'week-history', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     if (g === 'week-review') return (window.S && S.WeekReview) ? S.WeekReview.open() : null;
@@ -8862,7 +8862,6 @@ const App = {
         'r-audit':            ['Revenue Audit', 'Monthly Score and Progress'],
         'r-playbook':         ['Revenue Playbook', 'The Strategy Behind the Fix'],
         'r-fix':                  ['Revenue Fix', 'Fix Process and Guidance'],
-        'r-dashboard':            ['Close The Week', 'Revenue Recovery'],
         'r-experiments':          ['Experiments', ''],
         'r-forecast':             ['Revenue Forecast', 'Plan Next Week'],
         'r-this-week':            ['This Week', 'Weekly Entry'],
@@ -8878,7 +8877,6 @@ const App = {
         'r-audit':            S.RevenueAudit,
         'r-playbook':         S.RecoveryPlaybook,
         'r-fix':              S.RevenueFix,
-        'r-dashboard':        S.RevenueDashboard,
         'r-experiments':      S.RecoveryExperiments,
         'r-forecast':         S.RevenueForecast,
         'r-this-week':        S.RevenueThisWeek,
@@ -8904,7 +8902,6 @@ const App = {
     if (this._activeModule === 'cash') {
       const cashTitles = {
         'hub':           ['Recovery Hub', ''],
-        'c-dashboard':   ['Close The Week', 'Cash Recovery'],
         'c-experiments': ['Experiments', ''],
         'c-audit':       ['Cash Audit', 'Weekly Score and Progress'],
         'c-playbook':    ['Cash Playbook', 'The Strategy Behind the Fix'],
@@ -8918,7 +8915,6 @@ const App = {
         'c-help':        ['Help and FAQ', ''],
       };
       const cashScreens = {
-        'c-dashboard':   S.CashDashboard,
         'c-experiments': S.RecoveryExperiments,
         'c-audit':       S.CashAudit,
         'c-playbook':    S.RecoveryPlaybook,
@@ -8944,7 +8940,6 @@ const App = {
     if (this._activeModule === 'inventory') {
       const icTitles = {
         'hub':                 ['Recovery Hub', ''],
-        'ic-dashboard':        ['Close The Week', 'Inventory Control'],
         'ic-product-setup':    ['Add Products', 'Inventory Control'],
         'ic-prep-batches':     ['Prep Batches', 'Inventory Control'],
         'ic-locations':        ['Set Locations', 'Inventory Control'],
@@ -8966,7 +8961,6 @@ const App = {
         'ic-help':             ['Help and FAQ', 'Inventory Control'],
       };
       const icScreens = {
-        'ic-dashboard':      S.InventoryDashboard,
         'ic-product-setup':  S.InventoryProducts,
         'ic-prep-batches':   S.PrepBatches,
         'ic-locations':      S.InventoryLocations,
@@ -9000,7 +8994,6 @@ const App = {
     if (this._activeModule === 'shift') {
       const scTitles = {
         'hub':                   ['Recovery Hub', ''],
-        'sc-dashboard':          ['Close The Week', 'Shift Control'],
         'sc-cash-control':       ['Cash Control', 'Shift Control'],
         'sc-cash-history':       ['Cash History', 'Shift Control'],
         'sc-void-comp':          ['Void and Comp Log', 'Shift Control'],
@@ -9015,7 +9008,6 @@ const App = {
         'sc-help':               ['Help and FAQ', 'Shift Control'],
       };
       const scScreens = {
-        'sc-dashboard': S.ShiftDashboard,
         'sc-cash-control': S.ShiftCashControl,
         'sc-cash-history': S.ShiftCashHistory,
         'sc-void-comp': S.ShiftVoidComp,
@@ -9045,7 +9037,6 @@ const App = {
     if (this._activeModule === 'labor') {
       const lcTitles = {
         'hub':                   ['Recovery Hub', ''],
-        'lc-dashboard':          ['Close The Week', 'Labor Control'],
         'lc-build-schedule':     ['Build Schedule', 'Labor Control'],        'lc-schedule-history':   ['Schedule History', 'Labor Control'],
         'lc-log-hours':          ['Log Hours', 'Labor Control'],
         'lc-pay-periods':        ['Pay Periods', 'Labor Control'],
@@ -9062,7 +9053,6 @@ const App = {
         'lc-help':               ['Help and FAQ', 'Labor Control'],
       };
       const lcScreens = {
-        'lc-dashboard': S.LaborDashboard,
         'lc-positions': S.LaborPositions,
         'lc-staff-roster': S.LaborStaffRoster,
         'lc-training': S.LaborTraining,
@@ -9089,7 +9079,6 @@ const App = {
 
     const titles = {
       'hub':           ['Recovery Hub', ''],
-      'dashboard':     ['Close The Week', 'Profit Recovery'],
       // T1: no 'this-week' entry. The interception above returns before this map is
       // ever read for that id, and the grid it titled is gone. The interception STAYS —
       // three callers still openScreen('this-week') to reach Confirm the Week.
@@ -9112,7 +9101,6 @@ const App = {
 
     const screens = {
       'hub':           S.Hub,
-      'dashboard':     S.Dashboard,
       'week-history':  S.WeekHistory,
       'profit-forecast':S.ProfitForecast,
       'recipe-cost-analysis':S.RecipeCostAnalysis,

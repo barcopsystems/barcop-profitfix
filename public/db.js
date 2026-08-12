@@ -440,7 +440,7 @@ const DB = {
     'ic-par-suggestions':'inventory',
     'ic-product-setup':'inventory','ic-locations':'inventory','ic-vendors':'inventory','ic-prep-batches':'inventory',
     'ic-report-stock':'inventory','ic-report-usage':'inventory','ic-report-variance':'inventory',
-    'ic-dashboard':'inventory','ic-help':'_always',
+    'ic-help':'_always',
     // Labor
     'lc-log-hours':'labor',
     'lc-tip-log':'labor','lc-tip-history':'labor',
@@ -448,14 +448,14 @@ const DB = {
     'lc-staff-roster':'labor','lc-positions':'labor','lc-training':'labor',
     'lc-callout-log':'labor','lc-time-off':'labor',
     'lc-reports':'labor','lc-overtime-watch':'labor','lc-pay-periods':'labor','lc-payroll-export':'labor',
-    'lc-dashboard':'labor','lc-help':'_always',
+    'lc-help':'_always',
     // Shift
     'sc-cash-history':'shift','sc-cash-control':'shift','sc-drawers':'shift',
     'sc-checklists':'shift','sc-checklist-templates':'shift',
     'sc-void-comp':'shift','sc-maintenance':'shift','sc-incidents':'shift','sc-waste':'shift','sc-walked-tabs':'shift',
-    'sc-dashboard':'shift','sc-help':'_always',
+    'sc-help':'_always',
     // Profit Recovery
-    'dashboard':'profit','this-week':'profit','audit-tracker':'profit','profit-fix':'profit',
+    'this-week':'profit','audit-tracker':'profit','profit-fix':'profit',
     'cash-recon':'profit','theft-risk':'profit','sales-integrity':'profit',
     'recipe-cost-analysis':'profit','profit-experiments':'profit','vendor-tracker':'profit',
     'vendor-watch':'profit','vendor-scorecard':'profit','vendor-discrepancy':'profit',
@@ -471,12 +471,12 @@ const DB = {
        a thing to change quietly here. */
     'week-history':'profit',
     // Revenue Recovery
-    'r-dashboard':'revenue','r-this-week':'revenue','r-forecast':'revenue',
+    'r-this-week':'revenue','r-forecast':'revenue',
     'r-audit':'revenue','r-fix':'revenue','r-server-check':'revenue','r-menu-items':'revenue',
     'r-menu-engineering':'revenue','r-menu-planning':'revenue',
     'r-dog-test':'revenue','r-experiments':'revenue','r-help':'_always',
     // Cash Recovery
-    'c-dashboard':'cash','c-audit':'cash','c-playbook':'cash','c-fix':'cash','c-trapped':'cash','c-purchasing':'cash','c-capital':'cash','c-forecast':'cash','c-position':'cash','c-bridge':'cash','c-experiments':'cash','c-help':'_always',
+    'c-audit':'cash','c-playbook':'cash','c-fix':'cash','c-trapped':'cash','c-purchasing':'cash','c-capital':'cash','c-forecast':'cash','c-position':'cash','c-bridge':'cash','c-experiments':'cash','c-help':'_always',
     // Events
     'ev-dashboard':'events','ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always',
