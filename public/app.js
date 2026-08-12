@@ -2583,12 +2583,25 @@ const App = {
     /* The section prefix goes on exactly the pages that HAVE an overlay menu, which is the same
        ten `_railHasMenu` already answers for. The Hub, Week in Review and Workflow have no menu and
        no parent, so they stand alone rather than being given a section they do not belong to. */
-    const sec = (!force && this._railHasMenu(this._railCtx)) ? this._railLabelOf(this._railCtx) : null;
+    /* ⭐ THE KEY, NOT JUST THE LABEL. The prefix is now a CONTROL that opens this section's overlay,
+       so the click needs the rail key. Deriving both from the SAME `_railCtx` in the same statement
+       is what makes it impossible for the bar to name one section and open another — the agreement
+       is structural rather than something a second lookup has to keep in step. */
+    const secKey = (!force && this._railHasMenu(this._railCtx)) ? this._railCtx : null;
+    const sec = secKey ? this._railLabelOf(secKey) : null;
     /* ⛔ `tn-title-sec`, NOT `tn-sec`. That name belonged to row 2's clickable section pills, whose
        CSS outlived the markup — so the prefix picked up their padding, hover fill and pointer
        cursor and read as a link that went nowhere. The pill rules are deleted now; the distinct
-       name is belt and braces. */
-    el.innerHTML = (sec ? '<span class="tn-title-sec">' + esc(sec) + '</span><span class="tn-sep"></span>' : '')
+       name is belt and braces.
+       ⭐ A REAL <button>, NOT A SPAN WITH A LISTENER. `verify-role-button-keyboard` exists because
+       the one `role="button"` span in this app announced itself as a button and did nothing on
+       Enter or Space. A real button gets both keys, the tab stop and the `:focus-visible` ring for
+       free, and `#tn-help` two nodes along is the same trick — a button reset to look like bare
+       text. Kyle asked for a control here; this is what a control is in this codebase. */
+    el.innerHTML = (sec
+        ? '<button type="button" class="tn-title-sec" data-rail-sec="' + esc(secKey) + '"'
+          + ' title="Open the ' + esc(sec) + ' menu">' + esc(sec) + '</button><span class="tn-sep"></span>'
+        : '')
       + '<span class="tn-pg">' + esc(page) + '</span>';
   },
 
@@ -2602,6 +2615,24 @@ const App = {
     if (t1 && window.MutationObserver) {
       new MutationObserver(() => App._syncPageTitle())
         .observe(t1, { childList: true, characterData: true, subtree: true });
+    }
+    /* ⛔ DELEGATED, AND IT HAS TO BE. `_syncPageTitle` rewrites `#tn-title`'s innerHTML on EVERY
+       navigation, so a listener bound to the button itself is destroyed on the next page and the
+       control silently stops working one screen in — the shape that looks fine in a single test and
+       dead in real use. `#tn-title` is static markup in index.html, so one listener on it survives
+       every re-render and there is nothing to re-bind. Same reasoning as the rail's own wire-once.
+       ⚠ `_wirePageTitle` is called from exactly one place (the boot wiring), so this cannot stack.
+       Pinned, because a second caller would give every click two handlers. */
+    const title = document.getElementById('tn-title');
+    if (title && !title._secWired) {
+      title._secWired = true;
+      title.addEventListener('click', (e) => {
+        const btn = e.target.closest('.tn-title-sec[data-rail-sec]');
+        /* Read the key off the BUTTON, not off `App._railCtx`. They agree today because the same
+           render writes both, and reading the element keeps it that way if navigation ever becomes
+           async: the click opens the section whose NAME the operator actually pressed. */
+        if (btn) App.toggleRailMenu(btn.dataset.railSec);
+      });
     }
     this._syncPageTitle();
   },

@@ -1305,9 +1305,24 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* The section reads as the parent, so it sits back; the page itself is the subject and stays white.
    Kyle's shape: Inventory | Order Sheet | (i) — and the second divider is the one already sitting
    before the help button, so the two are the same 18px mark. */
-/* Static text, not a control: no cursor, no hover, no padding. The section is context, the page is
-   the subject, and neither one is a link. */
-.tn-title-sec{color:var(--t2);font-weight:600;flex-shrink:0;}
+/* ⭐ NOW A CONTROL (Kyle, 2026-08-12): the section name opens its OWN overlay menu, so an operator
+   can reopen it from the rail row or from the header. It only ever renders on a page whose section
+   HAS a menu -- `_syncPageTitle` gates the prefix on `_railHasMenu`, which is the same ten sections
+   the rail drills -- so there is no state where this is a control that goes nowhere.
+   ⛔ IT IS A REAL <button>, SO THIS RULE IS A RESET FIRST. A button brings its own font, fill,
+   border and padding; without stripping them the prefix renders as a grey pill mid-title. Same
+   trick as `.tn-page #tn-help` two rules up, which is a button dressed as a bare icon.
+   ⚠ font-size/family INHERIT rather than being restated: `.tn-title` owns 14px and the control
+   must not fork that number, or the section and the page name drift apart on the next type pass. */
+.tn-title-sec{
+  color:var(--t2);font-weight:600;flex-shrink:0;
+  background:none;border:0;padding:0;margin:0;cursor:pointer;
+  font-family:inherit;font-size:inherit;line-height:inherit;
+}
+/* Kyle's spec exactly: the same grey, white on hover. That is also what a rail row does on hover
+   (white text + icon), and the rail row is the OTHER door to this same menu -- the two ways in
+   should not read as two different kinds of thing. */
+.tn-title-sec:hover{color:var(--w);}
 /* ⛔ --b1, not --b-edge. --b-edge is #14222A, a CARD border read against a card fill; on the top
    bar's darker --bg it was effectively invisible. --b1 is rgba(255,255,255,0.15), the app's token
    for a line that is meant to be SEEN.
