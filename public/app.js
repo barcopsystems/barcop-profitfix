@@ -3067,7 +3067,7 @@ const App = {
     // Parse a section's sidebar HTML into its sub-groups, each with its pages, so
     // the mobile menu keeps the COUNTS / ORDERING / … structure and is never one
     // giant flat list.
-    const groupsOf = (htmlFn) => {
+    const groupsOf = (htmlFn, keepSupport) => {
       const out = [];
       try {
         const tmp = document.createElement('div');
@@ -3078,9 +3078,20 @@ const App = {
             cur = { group: (el.textContent || '').trim(), pages: [] };
             out.push(cur);
           } else if (el.classList && el.classList.contains('nav-item')) {
-            if (el.dataset.nav === 'report-bug') return;
+            /* ⛔ THE SUPPORT ROWS ARE DROPPED EVERYWHERE EXCEPT SETTINGS (Kyle, 2026-08-12: "on the
+               settings menu the contact support and report a bug links are both missing").
+               ⭐ WHY NOT SIMPLY UNFILTER: `Report a Bug` is rendered by all SEVEN module sidebars
+               (nav.js) plus Books and Audits, so letting it through everywhere would repeat one row
+               in nine drawer panels — which is what this filter was written for and it is right
+               about those. It was WRONG about Settings, where the Support group actually lives, and
+               filtering it there left a phone with no route to support at all. One place, and this
+               is the one. */
+            if (!keepSupport) {
+              if (el.dataset.nav === 'report-bug') return;
+              const a0 = el.dataset.hubAction || '';
+              if (a0 === 'report-bug' || a0 === 'contact-support') return;
+            }
             const action = el.dataset.hubAction || '';
-            if (action === 'report-bug' || action === 'contact-support') return;
             const label = (el.querySelector('.nav-label')?.textContent || '').trim();
             if (!label) return;
             if (!cur) { cur = { group: '', pages: [] }; out.push(cur); }
@@ -3143,7 +3154,7 @@ const App = {
     // keep their icons; the accordion sub-group HEADERS now carry a group icon
     // too. The only rows with no icon are the final links nested under a drop-down.
     const sectionNode = (label, key, homeFn, homeLabel, panelTitle) => {
-      const sgs = groupsOf(() => navHtml(key));
+      const sgs = groupsOf(() => navHtml(key), key === 'settings');
       const gr = GROUP_REMAP[key] || {};
       const pr = PAGE_REMAP[key] || {};
       const mkPage = (p) => { const it = pageItem(p); if (pr[it.label]) it.label = pr[it.label]; if (it.label === 'Help and FAQ') it.label = 'Help'; return it; };
@@ -3206,7 +3217,13 @@ const App = {
       railGroup('Control', App._PROTO_CONTROL),
       railGroup('Recovery', App._PROTO_RECOVERY),
       // App Settings is off in the live demo, same as the desktop gear.
-      ...(App.demoMode ? [] : [railGroup('Settings', App._PROTO_BOTTOM)])
+      ...(App.demoMode ? [] : [railGroup('Settings', App._PROTO_BOTTOM)]),
+      /* ⛔ SIGN OUT WAS MISSING FROM THE PHONE ENTIRELY (Kyle, 2026-08-12). This drawer is generated
+         from the rail tables, and `_PROTO_SIGNOUT` — which the rail renders as its own group at the
+         foot — was simply never added to the list, so there was NO way to sign out on mobile.
+         ⭐ Its own group, so it lands behind a divider exactly as it does in the rail, and rendered
+         in the demo too for the same reason the rail does: one table, one answer, both menus. */
+      railGroup('Session', App._PROTO_SIGNOUT)
     ]};
 
     // ── DOM shell (inline-positioned so it shows even against a cached CSS) ──
@@ -3279,7 +3296,13 @@ const App = {
               + accts.map(a => '<option value="' + esc(a.id) + '"' + (a.id === active.id ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('')
               + '</select>'
           : '<span class="mnav-barname">' + esc((active && active.name) || 'My Bar') + '</span>';
+        /* ⭐ THE RAIL BUTTON LIVES HERE NOW (Kyle, 2026-08-12), not in the mobile top bar. The bar
+           name is `flex:1` so it absorbs the slack, then The Rail, then the × — which lands exactly
+           where it already was, because it is `flex-shrink:0` and last in the row.
+           ⛔ ROOT ONLY. It is on the main menu screen, not on the drilled-in section panels, whose
+           head is Back / title / × and has no room for a fourth control. */
         headEl.innerHTML = '<span class="mnav-head-loc">' + locHtml + '</span>'
+          + '<button class="btn btn-primary mnav-rail" type="button" title="A read on how the bar is doing">The Rail</button>'
           + '<button class="mnav-x" type="button" aria-label="Close">×</button>';
         const sel = headEl.querySelector('.mnav-loc-sel');
         if (sel) sel.addEventListener('change', (ev) => {
@@ -3288,6 +3311,13 @@ const App = {
         });
       }
       headEl.querySelector('.mnav-x').addEventListener('click', close);
+      /* ⛔ THROUGH `fire()`, like every other row in this sheet. The briefing is a MODAL, so opening
+         it while the drawer is still up would stack two overlays and leave the operator closing two
+         things to get back. `fire` slides the sheet down first, then opens it. */
+      const railB = headEl.querySelector('.mnav-rail');
+      if (railB) railB.addEventListener('click', () => fire(() => {
+        if (typeof BarCopBriefing !== 'undefined' && BarCopBriefing.open) BarCopBriefing.open();
+      }));
       const backBtn = headEl.querySelector('.mnav-back');
       if (backBtn) backBtn.addEventListener('click', () => { stack.pop(); render(); });
 

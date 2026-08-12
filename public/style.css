@@ -298,6 +298,10 @@ input,select,textarea{color-scheme:dark;}
    place of the (removed) "Bar Cop Menu" title, with the close X on the right. */
 .mnav-head-loc{flex:1;min-width:0;display:flex;align-items:center;overflow:hidden;}
 .mnav-head-loc .mnav-barname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* THE RAIL, moved off the mobile top bar and into the menu head (Kyle, 2026-08-12).
+   Height matches .mnav-x exactly so the three controls sit on one line, and flex-shrink:0
+   keeps it whole — the bar name beside it is the flexible one and already ellipsises. */
+.mnav-rail{height:34px;padding:0 12px;flex-shrink:0;}
 .mnav-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-top:12px;padding-bottom:28px;background:var(--surface);}
 /* Flat mobile drawer (matches the desktop flat sidebar): a flat icon list with a
    divider between groups, no accordions. Default muted, white on tap, active page
@@ -1462,6 +1466,13 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   body.chrome-on #proto-topnav{left:0;}
   .tn-logo-mobile{display:block;}
   .tn-title{display:none;}
+  /* ⛔ THE RAIL BUTTON IS NOT IN THE TOP BAR ON A PHONE (Kyle, 2026-08-12). It measured 81.5px
+     of a 375px row, beside a 94px logo, a 33px "i" and a 33px burger — and it is one tap
+     deeper in the menu now, in the head row with the bar name and the ×.
+     ⚠ HIDDEN, NOT MOVED. The node is static markup in index.html and App wires it once at
+     boot; relocating it would mean re-parenting a wired node on every resize. The drawer
+     builds its own button and calls the same BarCopBriefing.open(). */
+  .tn-rail{display:none;}
   .tn-page{order:2;margin-left:auto;}
   .tn-right{order:3;margin-left:0;}
   /* ⛔ THE "i" AND THE BURGER ARE TWO SEPARATE FLEX CHILDREN OF .tn-row1, so the space between them
