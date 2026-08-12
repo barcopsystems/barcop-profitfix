@@ -3374,7 +3374,17 @@ const App = {
            ([[harness-review-like-code]] #67b). Count the SHAPE (a 1px child that is not a nav-item),
            never one class name you assumed. */
         node.items.forEach(it => {
-          divider();
+          /* ⛔ NO RULE UNDER THE LANDING LEAF (Kyle, 2026-08-12: "remove the divider after close
+             books.. it should be close books, all money out, break-even.. divider"), and it is the
+             DESKTOP behaviour being matched rather than a preference: the overlay's converter drops
+             any group header with no nav-item above it, and `renderSidebar` PREPENDS the leaf into
+             the first block — so desktop reads `Close Books, All Money Out, Break-Even ── …`.
+             Mobile pushed the leaf as its own item, so it consumed the `started` slot and the first
+             real group drew a rule instead. Skipping it here hands that slot to the first sub-group,
+             which is what makes the two menus agree.
+             ⚠ Books is the only section with a leaf today (Events' was removed as a duplicate), but
+             the rule is written for the shape, not for Books. */
+          if (!it.home) divider();
           if (it.pages) {
             it.pages.forEach(p => {
               const pr = mkRow(p.label, '', !!p.id && p.id === activeId, p.icon);
