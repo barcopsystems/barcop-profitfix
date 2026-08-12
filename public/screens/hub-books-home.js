@@ -2,9 +2,10 @@
 
 /* ── Books home — "Close Out Your Books" landing ─────────────────────────────
    The Books section landing, opened from the top-nav "Books" link. Mirrors the
-   Control/Cash "Close The Week" pattern: a Where You Stand card (the headline
-   P&L number on top, a secondary read below), the monthly Close Out Your Books
-   step checklist (expandable steps + green progress bar), and an As Needed row.
+   Control/Cash "Close The Week" pattern: the monthly Close Out Your Books step
+   checklist and nothing above it. Where You Stand, the As Needed row and the
+   day-one Get Started box were all removed on 2026-08-12 (Kyle) so the page opens
+   on the thing it is for. Every step derives its tick from data, like Close The Week.
    Monthly close, no week selector. Numbers roll up from the same S.HubBooks
    aggregators the Month-End file is built from, so they always agree; the work
    happens on the screens the steps link to. */
@@ -15,9 +16,9 @@ S.HubBooksHome = {
 
   open() {
     if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
-    // ⚠ Same rule: the sidebar leaf says Close The Books, so the header does too. Three names for
-    // one page (leaf, header, help title) is a page an operator cannot search for or ask about.
-    App.openHubFullPage('Close The Books', (mount) => { this.container = mount; this.render(mount); }, 'books-home');
+    // ⚠ Same rule: the sidebar leaf says Close Books, so the header does too, and so does the help
+    // title. Three names for one page is a page an operator cannot search for or ask about.
+    App.openHubFullPage('Close Books', (mount) => { this.container = mount; this.render(mount); }, 'books-home');
   },
 
   // Operating income is a LEVEL and it goes under zero on a down month or a down
@@ -262,7 +263,6 @@ S.HubBooksHome = {
     this.container = mount;
 
     const st = this._computeState();
-    const gs = this.getStartedDone();
     const done = this.stepDone();
     const doneCount = this.ORDER.filter(k => done[k]).length;
     if (this._openStep == null) this._openStep = this.ORDER.find(k => !done[k]) || '';
@@ -281,14 +281,15 @@ S.HubBooksHome = {
        button. The sales confirm on sc-dashboard stays in its step because a week is seven rows. */
     const takeover = S.HubOperatingExpenses.moneyOutTakeover();
     mount.innerHTML = '<div class="screen">'
-      /* ⛔ WHERE YOU STAND IS OFF THIS PAGE (Kyle, 2026-08-12: *"the where you stand card gets
-         removed.. so the page starts with close out your books progress card"*). The page opens on
-         the thing it is for — closing the month — instead of a summary of a month you have not
-         closed yet. The figures it showed are all still one click away on the income statement.
-         ⚠ THE DAY-ONE BOX STAYS. Kyle named Where You Stand only, and a brand-new account with no
-         weeks confirmed still needs its four-step guidance ([[empty-state-day1]]) — otherwise the
-         page opens on a progress card reading 0 of 3 with nothing saying how to start. */
-      + (gs.hasWeeks ? '' : this.getStartedBox(gs))
+      /* ⛔ THE PAGE OPENS ON ITS OWN PROGRESS CARD, IN EVERY STATE (Kyle, 2026-08-12: first *"the
+         where you stand card gets removed.. so the page starts with close out your books progress
+         card"*, then, walking the empty state, *"it still has the getting started card.. get rid of
+         that"*).
+         ⚠ I KEPT THE DAY-ONE BOX ON THE FIRST PASS and he removed it on the second, which is worth
+         recording rather than quietly deleting: the three steps ARE the day-one guidance here. Each
+         one names a job and opens the screen that does it, so an empty account already sees what to
+         do — a second checklist above the first was two answers to one question, not a guided empty
+         state. [[empty-state-day1]] asks for the real page, empty and guided; this page is that. */
       + this.banner(doneCount, this.ORDER.length)
       + (takeover
         ? '<div style="margin-top:18px;" id="bk-moneyout"></div>'
@@ -580,27 +581,12 @@ S.HubBooksHome = {
      flagged" next-move line still names them; only this button changed. The tracker lives in Shift
      Control now and the Hub's three alert rows are its door. */
 
-  // ── Day one: four-step Get Started box (Cash Close The Week pattern). Each step
-  // reads done off real data; once all four are done the Where You Stand card
-  // takes its place. The Close Out Your Books steps and As Needed never change.
-  getStartedDone() {
-    const has = (a) => Array.isArray(a) && a.length > 0;
-    const hasWeeks   = has(App.data && App.data.weeks);
-    const hasOpex    = has(this._bills());
-    const hasInv     = has(App.inventoryData && App.inventoryData.ic_products);
-    const hasPermits = has(App.data && App.data.permits_compliance);
-    return { hasWeeks, hasOpex, hasInv, hasPermits, all: hasWeeks && hasOpex && hasInv && hasPermits };
-  },
-  getStartedBox(d) {
-    return DashUI.dayOneStrip(
-      'Your books build themselves from what you log. Four steps and this card fills in with your operating income, month to date and year to date.',
-      [
-        { done: d.hasWeeks,   num: 1, label: 'Confirm your first week',          go: 'this-week' },
-        { done: d.hasOpex,    num: 2, label: 'Add your operating expenses',     go: 'operating-expenses' },
-        { done: d.hasInv,     num: 3, label: 'Set up Inventory Control',        go: 'ic-vendors' },
-        { done: d.hasPermits, num: 4, label: 'Enter your permits and licenses', go: 'permits' }
-      ]);
-  },
+  /* ⛔ THE DAY-ONE GET STARTED BOX IS DELETED (Kyle, 2026-08-12: *"it still has the getting started
+     card.. get rid of that"*). `getStartedDone` and `getStartedBox` went with it, and so did
+     `DashUI.dayOneStrip` — Books was its only consumer in the tree.
+     ⭐ The three derived steps ARE the day-one guidance now: each names a job and opens the screen
+     that does it, so an empty account already sees what to do. A second checklist above the first
+     was two answers to one question. */
 
   _wire() {
     const go = (act) => {

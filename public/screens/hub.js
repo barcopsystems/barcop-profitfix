@@ -72,8 +72,12 @@ S.Hub = {
        Money Out and Break-Even are one pair now — where the money went, and what it takes to cover
        it — and the divider below them opens the Accounting group. The "Operations" heading went with
        Licensing: a group of one is not a group. */
+    /* ⛔ NO DIVIDER ABOVE THE FIRST ROW (Kyle, 2026-08-12: *"remove the divider line between it and
+       the money out link"*). An empty `nav-section` renders as a rule, and this one sat between the
+       Close Books leaf and Money Out — separating a page from the first thing you do on it. The
+       dividers that remain each open a NAMED group (Accounting, Support), which is what they are
+       for; a rule with nothing above it is decoration. */
     return ''
-      + '<div class="nav-section"></div>'
       /* ⭐⭐⭐ BUILD ORDER D — THREE ROWS OVER ONE STORE BECOME ONE. Phase 1 migrated every cash
          outflow into the expense ledger, item 19 stage 1 gave the log a kind chip that shows bills
          and cash together, and B made this screen read-only history with one entry point on Close
@@ -89,7 +93,7 @@ S.Hub = {
          ⚠ Those two were `_writePair` / `_deletePair` until build order E, when they wrote a second
          store as well. `verify-money-out-one-row.js` C2/C4 pin that they exist and are still reached
          from here, so this note cannot go stale again without the gate saying so. */
-      + row('operating-expenses', 'Money Out', 'expense')
+      + row('operating-expenses', 'All Money Out', 'expense')
       + row('breakeven', 'Break-Even', 'breakeven')
       /* ⛔ LICENSING LEFT THIS SIDEBAR (build piece 5). It is a Shift Control screen now — see
          `nav.js`. Kyle: *"it has nothing to do with books really."* Correct once it holds no money:
@@ -205,7 +209,7 @@ S.Hub = {
     // the module sidebars). Each maps to its section landing's activeAction.
     const CHECKLIST_ICON = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
     const MSTYLE = {
-      books:    { id: 'nav-books-home',    action: 'books-home', leafLabel: 'Close The Books', leafIcon: CHECKLIST_ICON },
+      books:    { id: 'nav-books-home',    action: 'books-home', leafLabel: 'Close Books', leafIcon: CHECKLIST_ICON },
       // No landing leaf: the Bar Cop Settings page is retired, so this section opens straight
       // onto its own pages, the same way Audits does.
       settings: { keepSupport: true },
