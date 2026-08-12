@@ -1102,7 +1102,13 @@ S.WeekReview = {
 
   // ── Events (pipeline, not a weekly close) ───────────────────────────────────
   _eventsSection() {
-    const ED = S.EventsDashboard;
+    /* ⛔ `S.EventsBookings`, NOT the deleted `S.EventsDashboard` (2026-08-12). This guard is the
+       reason the deletion had to be measured rather than swept: it returns '' rather than throwing,
+       so pointing it at a screen that no longer exists would have removed this whole section from
+       the week recap **silently** — no error, no empty state, just a recap that stops mentioning
+       Events. `_computeState` and `_money` moved to Bookings, which is where their data already
+       lived. */
+    const ED = S.EventsBookings;
     if (!ED) return '';
     if (!((App.data && App.data.bookings) || []).length) return null;
 
@@ -1143,7 +1149,13 @@ S.WeekReview = {
       this._res('Booked', ED._money(st.bookedRev)),
       this._res('Pipeline', ED._money(st.pipeline)),
       this._res('Deposits Due', ED._money(st.depositsDue), st.depositsDue > 0 ? 'var(--amber)' : 'var(--t1)'),
-      this._res('Win Rate', st.conv)
+      /* ⛔ THE WINDOW IS DISCLOSED HERE BECAUSE THIS IS WHERE THE OPERATOR NOW READS THE NUMBER.
+         The Events dashboard labelled it "Win Rate, 90d"; deleting that screen (2026-08-12) left the
+         figure showing on this page under a bare "Win Rate", i.e. a 90-day rate with nothing saying
+         so. `verify-copy-numbers-match-code` caught it, which is exactly the rule that pin exists
+         for: a displayed window has to be quoted in the copy the operator reads, not in the file
+         that happens to compute it. */
+      this._res('Win Rate, 90d', st.conv)
     ]);
 
     const open = [];
