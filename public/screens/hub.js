@@ -1482,10 +1482,24 @@ S.Hub = {
        reference to this comparison says two weeks. Kyle caught it. A word nobody in an Austin bar
        would say is a small thing that makes a page read as written by somebody else
        ([[writing-style]] — operator to operator, in their words). */
-    const bwCard = (t, o, isGain) => {
+    /* ⛔ THIS CARD HAS TWO EMPTY STATES AND PRINTED ONE SENTENCE FOR BOTH (found 2026-08-12 by
+       walking the Hub's day one, which had never been done). `_bestWorst()` returns NULL when there
+       are not enough closed weeks, and an OBJECT with a null gain or drag when the weeks are there
+       and nothing moved. The old signature took `bw && bw.gain`, which collapses both into one
+       falsy value, so a brand-new bar with no data at all was told "Nothing slipped in the last two
+       weeks" about a fortnight that never happened.
+       ⭐ The page already knew the difference ONE PANEL UP: `movementBlock` prints its own
+       needs-more-weeks line off `mv.pairs.length` ([[lessons-paid-for]] #33 — a guard that lives in
+       one card's render does not exist for the card beside it).
+       ⚠ AND IT SAYS THREE, NOT TWO. `_bestWorst` compares `P[0]` against `P[2]`, so three closed
+       weeks are needed even though the SPAN it reports is two weeks. Borrowing the neighbour's exact
+       words would have shipped a second sentence that is not true. */
+    const bwCard = (t, reading, key, isGain) => {
+      const o = reading ? reading[key] : null;
       if (!o) return hbPanel(hbSh(t)
         + '<div style="font-size:12px;color:var(--t3);">'
-        + (isGain ? 'Nothing improved in the last two weeks' : 'Nothing slipped in the last two weeks') + '</div>');
+        + (!reading ? 'Needs three closed weeks'
+           : isGain ? 'Nothing improved in the last two weeks' : 'Nothing slipped in the last two weeks') + '</div>');
       const col = isGain ? 'var(--green)' : 'var(--red)';
       const amount = App.fmtCurrency(Math.abs(o.dollars), 0);
       return hbPanel(hbSh(t)
@@ -1564,10 +1578,18 @@ S.Hub = {
           </div>
           ${doFirstBand}
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">
-            ${bwCard('Your biggest gain', bw && bw.gain, true)}${bwCard('Your worst drag', bw && bw.drag, false)}
+            ${bwCard('Your biggest gain', bw, 'gain', true)}${bwCard('Your worst drag', bw, 'drag', false)}
           </div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">
-            ${hbPanel(hbSh('Needs attention') + (needRows || '<div style="font-size:12px;color:var(--t2);">All clear. Nothing needs you outside your weekly close.</div>'))}
+            ${hbPanel(hbSh('Needs attention') + (needRows || (bandHasANumber
+              ? '<div style="font-size:12px;color:var(--t2);">All clear. Nothing needs you outside your weekly close.</div>'
+              /* ⛔ AN EMPTY `needRows` HAS TWO CAUSES AND ONLY ONE OF THEM IS GOOD NEWS. On a bar
+                 with no data at all nothing CAN be flagged, and the old single fallback printed a
+                 green all-clear over an operation nobody has looked at yet ([[the-loop]] #72 — a
+                 count is only an all-clear if it could have counted anything). `bandHasANumber` is
+                 the page's own answer to "is there anything to say", and it already decides whether
+                 the top of the Hub shows the money band or Get started. */
+              : '<div style="font-size:12px;color:var(--t2);">Nothing to flag yet. Once your sections are set up, what needs you shows here.</div>')))}
             ${hbPanel(hbSh('Done this week') + doneRows)}
           </div>
           <div class="hub-grid-row">${sectionStrip}</div>
