@@ -214,7 +214,21 @@ S.HubBooksHome = {
      out" — its comment above says bills AND cash outflows. Ticking it off `_bills()` would leave an
      operator who logged an owner draw and a loan payment looking at an unticked step. */
   stepDone() {
-    const monthKey = this._basisKey(this._curKey());
+    /* ⛔⛔ `_curKey()`, NEVER `_basisKey()`, AND I SHIPPED THE WRONG ONE (Kyle, 2026-08-12: *"the
+       month now is august and the seed data checkmarks step 2 with weeks confirmed of july.. that
+       makes no sense to the user.. they are in august"*).
+       `_basisKey` deliberately walks BACK to the newest COMPLETE month, because a part-month makes a
+       RATIO lie — a full month of fixed bills lands on the 5th while revenue accrues weekly, so
+       August reads as a heavy loss until about the 20th. That reasoning is about FIGURES, and it
+       belonged to the Where You Stand hero, which is no longer on this page.
+       ⭐ A CHECKLIST IS THE OPPOSITE QUESTION. "Close out your books" is about the month the operator
+       is standing in and has work left to do in. Asking it of July meant the page's own header said
+       August while every tick answered for July — and step 2 showed green because July's weeks are
+       all in, on a page whose whole job is telling you what August still needs.
+       ⚠ The label at `_monthLabel(this._curKey())` was always the selected month. The steps have to
+       agree with the words above them; `verify-books-steps-derived` D7 now pins that equality rather
+       than each side separately, which is what let this through. */
+    const monthKey = this._curKey();
     const HB = S.HubBooks;
 
     const inMonth = r => String((r && (r.date || r.due_date || r.paid_date)) || '').slice(0, 7) === monthKey;
