@@ -1025,14 +1025,28 @@ body.demo.chrome-on #proto-rail{bottom:40px;}
 body.chrome-on #app{margin-left:var(--rail-w);}
 body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
 
-.rail-nav{padding:14px 0;}
+.rail-nav{padding:14px 0;display:flex;flex-direction:column;}
 .rail-group{display:flex;flex-direction:column;}
+/* THE FOOT OF THE RAIL. Sign Out is the one row that ends the session rather than going
+   somewhere, so it must never sit flush under Settings. It used to buy that with a divider
+   line; it buys it with distance now, which is the bigger separation of the two. The auto
+   margin collapses to nothing when the rail overflows, so on a short viewport Sign Out just
+   scrolls with everything else rather than covering a row. The divider below it belongs to
+   .rail-collapse (its border-top), which is why there is no line of its own here. */
+.rail-end{margin-top:auto;}
 .rail-divider{height:0;border-top:1px solid var(--b-edge);margin:14px 14px;}
 .rail-grp-label{
   font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
   color:var(--t4);padding:14px 14px 6px;
 }
 .rail-group:first-child .rail-grp-label{padding-top:0;}
+/* MEASURED, not chosen. Every other gap between a rail word and the thing above it is 21px:
+   Books->line 21, History->CONTROL 21, Shift->RECOVERY 21. Only a label sitting under a
+   DIVIDER got 28, because it pays twice - the divider own 14px bottom margin AND the label
+   own 14px padding-top. 7px here makes that one gap 21 and leaves the other three alone.
+   WEEK is the only label in the rail that follows a divider; the selector says so rather
+   than naming it, so it stays right if the groups are ever reordered. */
+.rail-divider + .rail-group > .rail-grp-label{padding-top:7px;}
 .rail-item{
   display:flex;align-items:center;gap:10px;padding:7px 14px;
   cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;
