@@ -629,9 +629,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 /* ══ METRIC CARDS ══ */
 .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
 .metric-card{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:16px;text-align:center;}
-.metric-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:10px;}
-.metric-val{font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:600;letter-spacing:-0.5px;line-height:1;margin-bottom:6px;color:var(--t1);}
-.metric-val.on-target{color:var(--t1);} .metric-val.over-target{color:var(--red);}
+/* ⛔ `.metric-label` / `.metric-val` / `.on-target` / `.over-target` DELETED 2026-08-12. Zero uses
+   in the whole tree — the metric tile they styled went with an earlier dashboard rebuild and only
+   the CSS was left behind. Checked as a PAIR before cutting ([[the-loop]] #61: retiring a feature
+   is three greps, and a sibling class is the second one): the only remaining `metric-` strings in
+   any .js or .html are the words "metric-based" and "metric-times" in prose, not class names. */
 /* Supporting lines all share the quiet uppercase label treatment, so the
    metric number stays the only colored element in the card. */
 .metric-target,.metric-impact,.metric-trend{
