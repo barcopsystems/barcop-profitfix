@@ -10,7 +10,7 @@ const ProfitNav = {
         <span class="nav-label">Profit Audit</span>
       </div>
       <div class="nav-item" data-screen="profit-forecast" id="nav-profit-forecast">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 12l4-4 3 3 6-7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.5 4h3.5v3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Profit Forecast</span>
       </div>
       <div class="nav-item" data-screen="recovery-playbook" id="nav-recovery-playbook">
