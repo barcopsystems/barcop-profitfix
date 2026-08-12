@@ -1009,7 +1009,19 @@ S.HubSettings = {
       // Demo catering is shown honestly via the Completed "Westlake Realty Lunch
       // Catering" booking (current week) + the Events section.
       const othRev = (a.wk % 4 === 0) ? 180 + (a.wk % 3) * 60 : 0;
-      return { id:uid(), week_num:a.wk, period_end:endDate, saved_at:new Date().toISOString(),
+      /* ⚠ A WEEK IS CONFIRMED THE MORNING AFTER IT CLOSES, NOT ALL THIRTEEN AT THE INSTANT THE DEMO
+         SEEDED. This was `new Date().toISOString()`, so every seeded week claimed the same timestamp.
+         Nothing DISPLAYS `saved_at` today (swept: no formatter, label or render consumer), so it was
+         never a wrong number on screen — but `cash-engine` breaks ties between DUPLICATE rows for one
+         period on exactly this field, and thirteen identical stamps make that tiebreak meaningless
+         the day a duplicate appears. `daysAgoISO` is the sibling helper for this job and it is
+         declared further down, out of scope here, so the stamp comes off each week's OWN period_end.
+         ⛔ `toISOString()` is right for the VALUE — `saved_at` is a timestamp, not a YMD, so
+         [[local-date-convention]]'s ban on `toISOString().slice(0,10)` does not apply. */
+      const savedAt = new Date(endDate + 'T00:00:00');
+      savedAt.setDate(savedAt.getDate() + 1);
+      savedAt.setHours(10, 0, 0, 0);
+      return { id:uid(), week_num:a.wk, period_end:endDate, saved_at:savedAt.toISOString(),
         bar:{ revenue:a.bar_rev, cogs:a.bar_cogs, labor:a.bar_labor, cost_pct:a.bar_pour_pct,
               labor_pct:a.bar_labor/a.bar_rev*100, vs_target_pct:a.bar_pour_pct-22, vs_target_dollar:((a.bar_pour_pct-22)/100)*a.bar_rev },
         food:{ revenue:a.food_rev, cogs:a.food_cogs, labor:a.food_labor, cost_pct:a.food_cost_pct,
