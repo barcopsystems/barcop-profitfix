@@ -32,7 +32,11 @@ S.WeekReview = {
   _wkStart: null,   // Monday (ymd) of the selected week; null = this week
 
   open() {
-    if (App._hubBlocked && App._hubBlocked()) return;   // app-wide accountability view — not for Staff
+    /* ⛔ WAS `_hubBlocked()` — the MANAGEMENT-ONLY question, which only asks "is this person an
+       admin". So every admin reached this page regardless of what the owner had granted them,
+       while Close beside it had no gate at all and History was filed under Profit: three pages
+       in one rail group, three different answers. They are the Week area now. */
+    if (App._hubBlocked && App._hubBlocked('week-review')) return;
     App.openHubFullPage('Week in Review', (mount) => { this.container = mount; this.render(mount); }, 'week-review');
   },
 

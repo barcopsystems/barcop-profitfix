@@ -110,6 +110,10 @@ S.WeekClose = {
   },
 
   open() {
+    /* ⛔ THIS PAGE HAD NO ACCESS GATE AT ALL until 2026-08-12 — it went straight to openHubFullPage,
+       so Close The Week was reachable by every member of every bar whatever the owner had granted.
+       It is now the Week area, alongside Review and History (db.js SCREEN_GROUPS). */
+    if (App._hubBlocked && App._hubBlocked('week-close')) return;
     App.openHubFullPage('Close The Week', (mount) => { this.container = mount; this.render(mount); }, 'week-close');
   },
 

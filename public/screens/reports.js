@@ -9,6 +9,13 @@
 
 S.Reports = {
   _openQboModal(){
+    /* ⛔ NO ACCESS GATE HERE EITHER until 2026-08-12. This is the Books overlay's "Weekly P&L
+       Brief" row: it renders its own hub page, so nothing upstream refused it and a member with
+       Books = No Access could read the bar's P&L.
+       ⚠ It gates on `hub-books-home` rather than an id of its own because this door is a MODAL
+       opener on Reports, not a registered screen — the same representative-id shape the other
+       three Books doors already use. */
+    if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;
     if (App.stampFixView) App.stampFixView('weekly-pnl');
     const weeks=(App.data.weeks||[]).slice().sort((a,b)=>new Date(a.period_end||0)-new Date(b.period_end||0));
     App.openHubFullPage('Weekly P&L Brief', (mount) => {

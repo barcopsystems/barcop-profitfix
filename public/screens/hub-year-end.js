@@ -40,6 +40,12 @@ S.HubYearEnd = {
   // shows "ANNUAL REVIEW | Back to Dashboard". Action buttons live next to
   // the Year dropdown inside the picker card.
   open() {
+    /* ⛔ THIS PAGE HAD NO ACCESS GATE AT ALL until 2026-08-12. It sits in the Books overlay menu
+       and renders its own page, so a member with Books = No Access reached it by opening that
+       menu and clicking Annual Review — which is the one Kyle found live. `hub-year-end` is
+       registered in db.js SCREEN_GROUPS now, so the id gates on the area it actually belongs to
+       rather than falling through `_areaOf` to 'profit'. */
+    if (App._hubBlocked && App._hubBlocked('hub-year-end')) return;
     App.openHubFullPage('Annual Review', (mount) => this._render(mount), 'year-end');
   },
 

@@ -21,6 +21,14 @@ S.HubUserAccounts = {
   // No pre-selected defaults: every area starts at No Access on a new invite, so
   // nobody is over-permissioned by accident.
   AREAS: [
+    /* ⭐ WEEK IS FIRST because the grid follows the rail's own order — Control, then Recovery,
+       then the global sections — and Week sits above Control in the rail.
+       ⛔ ADDING AN AREA FAILS CLOSED: no stored membership carries a `week` key, so every
+       existing member loses Close / Review / History until the owner grants it here. That is
+       the safe direction and it is deliberate — the alternative is inventing access nobody
+       chose. `verify-area-access-doors` F1 pins that every area the app ENFORCES appears in
+       this list, because an area that cannot be granted is a permanent lockout. */
+    { key: 'week',      label: 'Week' },
     { key: 'inventory', label: 'Inventory Control' },
     { key: 'labor',     label: 'Labor Control' },
     { key: 'shift',     label: 'Shift Control' },
