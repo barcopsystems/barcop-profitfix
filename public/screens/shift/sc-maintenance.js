@@ -46,7 +46,7 @@ S.ShiftMaintenance = {
     App.showHelpModal('How the Maintenance Log Works', [
       { p: ['Equipment breaks and falls through the cracks between shifts. Log it here and it carries forward until someone fixes it. Open and urgent items show up as alerts on the Hub so the next manager sees them.'] },
       { h: 'Log an issue', p: ['Capture what broke, where, how urgent it is, and a short description. Assign it to a staff member or an outside vendor (an HVAC tech, a plumber), whoever is handling the fix.'] },
-      { h: 'Work it to closed', p: ['Move the status from Open to In Progress to Resolved as the repair happens. Mark it Resolved when it is fixed and it drops to the bottom of the list, so the open work stays up top. That status is the whole record: there is no second date to keep in step. What a repair COST is entered once, with the rest of your money out, on Close The Books.'] },
+      { h: 'Work it to closed', p: ['Move the status from Open to In Progress to Resolved as the repair happens. Mark it Resolved when it is fixed and it drops to the bottom of the list, so the open work stays up top. That status is the whole record: there is no second date to keep in step. What a repair COST is entered once, with the rest of your money out, on Close Books.'] },
       { h: 'Filter and Export', p: ['Use the range chips or a custom date range to narrow the list to this week or this month. Open work always sorts to the top, urgent first, with resolved issues below. Export PDF saves the filtered list, and Worksheet prints a blank sheet to mark issues by hand during the shift.'] }
     ]);
   },
