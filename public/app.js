@@ -3433,7 +3433,16 @@ const App = {
   // Profit Fix view-tracking: stamp the day a "review/read this screen" target
   // was opened, so the Fix steps that are reviews (not records) can verify
   // against it. Keyed to the screen the operator actually lands on.
-  _VIEW_STAMP: { 'dashboard': 'dashboard', 'theft-risk': 'theft-risk', 'vendor-tracker': 'vendor-tracker', 'vendor-watch': 'vendor-tracker', 'vendor-scorecard': 'vendor-tracker', 'vendor-discrepancy': 'vendor-tracker', 'r-menu-engineering': 'r-menu-engineering', 'lc-overtime-watch': 'lc-overtime-watch', 'lc-reports': 'lc-reports', 'c-trapped': 'c-trapped', 'c-purchasing': 'c-purchasing', 'c-forecast': 'c-forecast', 'ic-par-suggestions': 'ic-par-suggestions', 'ic-vendors': 'ic-vendors' },
+  /* ⛔⛔ `'dashboard'` CAME OUT AT 1c AND `audit-tracker` / `week-history` WENT IN (2026-08-11).
+     Three Profit Fix steps read `view:dashboard` — "read your actual pour cost", "read your actual
+     food cost", "read prime cost every Monday" — and the only screen that could stamp that key was
+     the Profit cockpit, now deleted. ⚠ THEY WERE ALREADY BROKEN BEFORE THE DELETION: their buttons
+     have long opened `audit-tracker` and `week-history`, and neither was registered here, so doing
+     what the step said stamped nothing and the step never ticked. Kyle found it by using the app.
+     ⭐ THE RULE THIS TABLE HAS TO KEEP: a watched `view:` step is satisfiable ONLY if the screen its
+     own button opens stamps the key that step reads. Pinned by `verify-fix-view-steps-satisfiable`,
+     which walks all three Fix areas and fails on any step whose button cannot tick it. */
+  _VIEW_STAMP: { 'audit-tracker': 'audit-tracker', 'week-history': 'week-history', 'theft-risk': 'theft-risk', 'vendor-tracker': 'vendor-tracker', 'vendor-watch': 'vendor-tracker', 'vendor-scorecard': 'vendor-tracker', 'vendor-discrepancy': 'vendor-tracker', 'r-menu-engineering': 'r-menu-engineering', 'lc-overtime-watch': 'lc-overtime-watch', 'lc-reports': 'lc-reports', 'c-trapped': 'c-trapped', 'c-purchasing': 'c-purchasing', 'c-forecast': 'c-forecast', 'ic-par-suggestions': 'ic-par-suggestions', 'ic-vendors': 'ic-vendors' },
   stampFixView(key) {
     if (!this.data) return;
     this.data.fix_views = this.data.fix_views || {};
