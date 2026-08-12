@@ -2334,7 +2334,7 @@ const App = {
        the exact opposite of true for the one step an operator does the most work in.
        ⛔ AND THE FORM AND IMPORTER SECTIONS BELONG HERE, not on Money Out. The one-ledger rebuild
        moved the add card onto this page and left the help behind on the ledger it came from. */
-    'books-home': { title: 'How Close The Books Works', sections: [
+    'books-home': { title: 'How Close Books Works', sections: [
       { h: 'What this page is', p: ['Your month-end close, worked top to bottom. You land on where you stand, see how far along you are, and take the four steps in order. This is the page that turns a month of logged data into the file your accountant works from.'] },
       { h: 'The four steps', p: ['1. Log this month\'s money out: every bill and every cash outflow, typed in or dropped from a bank or card statement. 2. Make sure the weeks are all in, because revenue on the income statement is your confirmed weeks. 3. Review your income statement for the month. 4. Generate Month-End Books, which builds the workbook. Mark a step done and the bar advances; mark it not done to reopen it. The As Needed row underneath is the off-cycle jobs, not part of the close.'] },
       { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing runs from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
@@ -2379,7 +2379,7 @@ const App = {
        form" and "Importing" were instructions for a screen the reader was not on. Both moved to
        `books-home`, where the controls actually are. What is left is the LEDGER, which is what this
        page now is: three tabs, the stat strip, By Category and the log. */
-    'operating-expenses': { title: 'How Money Out Works', sections: [
+    'operating-expenses': { title: 'How All Money Out Works', sections: [
       { h: 'What this page is', p: ['The record of everything that left the bank: the bills that are not COGS or labor (wages and salaries both live in Labor Control, not here) plus the cash outflows that are not a cost of running the bar. You log it on Close The Books; this page is where it all lives afterwards, and it is what feeds the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
       /* ⚠ THIS SECTION DESCRIBED A PAGE THAT NO LONGER EXISTS, in four separate claims. It promised
          month cards for "this month and next", a Recurring/Variable split inside each, next month's
