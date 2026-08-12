@@ -3119,6 +3119,17 @@ const App = {
         'user-data':          () => S2.HubUserAccounts && S2.HubUserAccounts.open('data'),
         'user-team':          () => S2.HubUserAccounts && S2.HubUserAccounts.open('team'),
         'settings-help':      () => S2.HubSettingsHelp && S2.HubSettingsHelp.open(),
+        /* ⛔⛔ THESE TWO WERE MISSING AND IT SHIPPED (Kyle, 2026-08-12: "both the support and bug
+           report links close the menu and that is it.. the popup forms do not show").
+           ⭐ THE CAUSE IS THE SHAPE, NOT THE TYPO: this map only ever needed the actions the drawer
+           could REACH, and these two were filtered out of every panel — so the day the filter was
+           lifted for Settings, two rows arrived at a router that had never heard of them.
+           `if (r[p.action])` then does nothing, `fire()` has already closed the sheet, and the row
+           reads as dead. Unfiltering a row and routing it are ONE change, not two.
+           ⚠ Same `openModal || open` shape as `Hub.routeSidebarAction`, because these two open a
+           MODAL rather than a page and the desktop door already decides that. */
+        'report-bug':         () => S2.HubReportBug && (S2.HubReportBug.openModal || S2.HubReportBug.open).call(S2.HubReportBug),
+        'contact-support':    () => S2.HubSupport && (S2.HubSupport.openModal || S2.HubSupport.open).call(S2.HubSupport),
         'help':               () => S2.HubHelp && S2.HubHelp.open()
       };
       if (r[p.action]) r[p.action]();
@@ -3209,10 +3220,15 @@ const App = {
     };
     const railGroup = (label, table) => ({ label: label, items: table.map(([k, l]) => railRow(k, l)) });
     const root = { title: 'Bar Cop Menu', groups: [
-      /* Events keeps its own landing row; it is the one section here whose dashboard survives. */
-      { label: 'Go to', items: App._PROTO_GLOBAL.map(([k, l]) =>
-          k === 'events' ? drill(l, k, () => App.jumpToSection('events'), 'Book The Events', IC.events)
-                         : railRow(k, l)) },
+      /* ⛔ THE EVENTS LANDING ROW IS GONE, AND IT WAS A DUPLICATE (Kyle, 2026-08-12).
+         It rendered "Book The Events" → `jumpToSection('events')`, and `_SECTION_DASH.events` is
+         **`ev-bookings`** — the exact screen the next row down, "Event Booking", already opens. Two
+         rows, one destination, and only on the phone: the desktop Events overlay has five rows and
+         no landing leaf. Measured both, tapping the real control.
+         ⚠ Books keeps ITS landing row because the desktop overlay genuinely has one ("Close Books"),
+         which is the whole point of comparing against the rendered overlay rather than the raw
+         sidebar builder — the builder output matches NEITHER menu. */
+      { label: 'Go to', items: App._PROTO_GLOBAL.map(([k, l]) => railRow(k, l)) },
       railGroup('Week', App._PROTO_WEEK),
       railGroup('Control', App._PROTO_CONTROL),
       railGroup('Recovery', App._PROTO_RECOVERY),
@@ -3344,10 +3360,17 @@ const App = {
           });
         });
       } else {
-        // Level 2 (section): the Dashboard leaf, then every page as a flat row
-        // (with its icon), a divider between the source sub-groups. No accordions.
+        /* Level 2 (section): every page as a flat row with its icon.
+           ⛔ NO DIVIDERS HERE ANY MORE (Kyle, 2026-08-12: "both the books and events menus are not
+              correct.. and need to be updated to match the desktop overlay menus").
+           MEASURED on the pushed build, opening each overlay and counting `.nav-section` elements:
+           inventory 0, labor 0, books 0, events 0, audit 0 — **every desktop overlay is a FLAT list**,
+           and the mobile panels were the only place the sub-groups still drew a rule. So this was
+           never a Books-and-Events problem; those are just the two Kyle happened to open.
+           ⚠ THE ROOT KEEPS ITS DIVIDERS. Level 1 groups Go to / Week / Control / Recovery / Session
+           exactly as the RAIL does, and the rail draws rules between those. Only the section panels
+           go flat. */
         node.items.forEach(it => {
-          divider();
           if (it.pages) {
             it.pages.forEach(p => {
               const pr = mkRow(p.label, '', !!p.id && p.id === activeId, p.icon);

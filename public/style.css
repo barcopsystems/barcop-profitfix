@@ -301,7 +301,7 @@ input,select,textarea{color-scheme:dark;}
 /* THE RAIL, moved off the mobile top bar and into the menu head (Kyle, 2026-08-12).
    Height matches .mnav-x exactly so the three controls sit on one line, and flex-shrink:0
    keeps it whole — the bar name beside it is the flexible one and already ellipsises. */
-.mnav-rail{height:34px;padding:0 12px;flex-shrink:0;}
+.mnav-rail{height:28px;padding:0 10px;font-size:10px;flex-shrink:0;}
 .mnav-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-top:12px;padding-bottom:28px;background:var(--surface);}
 /* Flat mobile drawer (matches the desktop flat sidebar): a flat icon list with a
    divider between groups, no accordions. Default muted, white on tap, active page
@@ -1473,6 +1473,16 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
      boot; relocating it would mean re-parenting a wired node on every resize. The drawer
      builds its own button and calls the same BarCopBriefing.open(). */
   .tn-rail{display:none;}
+  /* ⛔ THE 16px GAP BETWEEN THE "i" AND THE BURGER, and it is TWO gaps, not one wide one.
+     MEASURED on the pushed build at 375px: 8px is the ROW gap between .tn-page and
+     .tn-right, and the other 8px is .tn-right own gap around #tn-acct — which sits there
+     with two children and ZERO width, so it renders nothing and still claims a gap slot.
+     An invisible flex item is still a flex item.
+     ⭐ HIDING IT COSTS NOTHING ON A PHONE: the group-dashboard child is already display:none
+     here, and the multi-bar switcher lives in the MENU HEAD (openMobileNav renders
+     .mnav-loc-sel whenever there is more than one bar), so the top bar is not the only
+     door to it. That is what makes this safe rather than a control quietly disappearing. */
+  #tn-acct{display:none;}
   .tn-page{order:2;margin-left:auto;}
   .tn-right{order:3;margin-left:0;}
   /* ⛔ THE "i" AND THE BURGER ARE TWO SEPARATE FLEX CHILDREN OF .tn-row1, so the space between them
