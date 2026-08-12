@@ -699,6 +699,20 @@ S.HubBooks = {
 
       const filename = App.fileSafe(barName) + ' - Month-End Books Worksheet - ' + this._monthLabel(monthKey) + '.xlsx';
       XLSX.writeFile(wb, filename);
+      /* ⭐ THE STEP TICK FOR "Generate Month-End Books" (Kyle, 2026-08-12: *"the new step 3 auto
+         checks off when the month end books generate button is pushed"*). Close Out Your Books
+         derives all three of its steps now, and this is the only one whose subject is an ACTION
+         rather than a record — so the action leaves one.
+         ⛔ KEYED BY THE MONTH GENERATED, NOT BY TODAY. The step is asked per month, so a global
+         "books were generated" flag would tick December because July was closed.
+         ⛔ AND ON THE ACCOUNT, NOT IN localStorage. The marker below is device-local and survives a
+         re-seed ([[localstorage-survives-reseed]]); a tick that travels with the browser instead of
+         the books is the manual tick with extra steps. It stays because a different reader uses it.
+         ⚠ AFTER `writeFile`, never on the button press: this sits inside the try, so a workbook that
+         throws on its way out leaves the step honestly unticked. */
+      App.data.books_generated = App.data.books_generated || {};
+      App.data.books_generated[monthKey] = App.todayLocal();
+      App.saveKey('books_generated');
       try { localStorage.setItem('books_report_run_monthend', new Date().toISOString()); } catch (e) {}
 
       this._setStatus('Downloaded ' + filename, 'var(--gold)');

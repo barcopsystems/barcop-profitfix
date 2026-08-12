@@ -168,9 +168,12 @@ S.HubBooksHome = {
     const nowBtn = isCur ? '' : '<button class="btn btn-ghost btn-sm bk-mo-now" style="margin-left:4px;">This Month</button>';
     return '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>';
   },
-  _doneKey() { return 'books_close_done_' + this._curKey(); },   // account-synced (App.data), follows the user across devices; no per-browser suffix
-  doneMap()  { return App.acctGet(this._doneKey(), {}); },
-  setDone(step, val) { const m = { ...this.doneMap() }; m[step] = val; App.acctSet(this._doneKey(), m); },
+  /* ⛔ THE TICK STORE IS GONE (2026-08-12). `_doneKey` / `doneMap` / `setDone` let the operator mark
+     a step done by hand, which meant the page could disagree with itself: tick "the weeks are all
+     in", delete a week, and it still read done. `stepDone()` above derives all three from the data
+     instead, so a step cannot outlive the thing it claims.
+     ⚠ Removing the buttons WITHOUT removing this would have been the worse state — a live `doneMap`
+     read by a page with no way to set it is a step frozen at whatever it last was. */
 
   /* ⚠ THE POSITION IS THE NUMBER. `_META` carried `n: 1..4` as literals, so inserting a step meant
      hand-renumbering every one below it — the kind of edit that ships a "3" sitting in position 4.
@@ -180,7 +183,15 @@ S.HubBooksHome = {
      order, each one a thing that must be true before the next. The weekly brief is a between-closes
      export for a bookkeeper — useful, and not a step in closing a month. It stays reachable as its
      own As Needed button, which is what that row is for. */
-  ORDER: ['expenses', 'weeks', 'review', 'generate'],
+  /* ⛔ THREE STEPS SINCE 2026-08-12, AND EVERY ONE OF THEM DERIVES ITSELF. Kyle: *"mark done buttons
+     get removed and the steps green checked needs to be automated like the close the week page.. it
+     auto checks off only when all of the month's weeks have been confirmed."* Close The Week has no
+     tick at all — `verify-week-close-accordion` D1/D2 pin that every check on that page is a RECORD —
+     and this page now works the same way.
+     ⚠ "Review your income statement" WAS step 3 and is GONE, on Kyle's call. It was the one step with
+     nothing behind it: reviewing is a thing you do with your eyes, so the only way to tick it was to
+     ask the operator, which is the manual tick this change removes. */
+  ORDER: ['expenses', 'weeks', 'generate'],
   _META: {
     /* ⚠ "operating expenses" WAS HALF THE DOOR (Kyle, 2026-08-07). This step logs everything that
        leaves the bank: bills AND cash outflows (owner draws, loan payments, tax, capital). The Log
@@ -189,10 +200,32 @@ S.HubBooksHome = {
     expenses: { title: 'Log this month\'s money out', act: 'operating-expenses' },
     // Revenue on the income statement IS the confirmed weeks. See hub-books._weeksComplete.
     weeks:    { title: 'Make sure the weeks are all in',       act: 'this-week' },
-    review:   { title: 'Review your income statement',         act: 'books' },
     generate: { title: 'Generate Month-End Books',             act: 'books' }
   },
-  stepDone() { const dm = this.doneMap(); const r = {}; this.ORDER.forEach(k => { r[k] = !!dm[k]; }); return r; },
+
+  /* ⭐⭐ EVERY STEP IS A QUESTION ABOUT DATA, ASKED OF THE MONTH ON SCREEN. No tick store, nothing
+     the operator can assert about their own book-keeping — the same contract Close The Week keeps.
+     ⛔ ALL THREE TAKE THE MONTH, because this page has a month selector. A global "any money out
+     logged" or "books were generated" flag would tick every month from one month's work, which is
+     the shape [[the-loop]] #47 keeps catching: a question asked at month granularity must be asked
+     of a month.
+     ⛔ MONEY OUT READS THE RAW LEDGER, NOT `_bills()`. That helper deliberately filters cash-only
+     categories out for the income statement, and this step's own title is "Log this month's money
+     out" — its comment above says bills AND cash outflows. Ticking it off `_bills()` would leave an
+     operator who logged an owner draw and a loan payment looking at an unticked step. */
+  stepDone() {
+    const monthKey = this._basisKey(this._curKey());
+    const HB = S.HubBooks;
+
+    const inMonth = r => String((r && (r.date || r.due_date || r.paid_date)) || '').slice(0, 7) === monthKey;
+    const expenses = ((App.data && App.data.operating_expenses) || []).some(inMonth);
+
+    const weeks = !!(HB && HB._weeksComplete && (HB._weeksComplete(monthKey) || {}).complete);
+
+    const generate = !!((App.data && App.data.books_generated) || {})[monthKey];
+
+    return { expenses: expenses, weeks: weeks, generate: generate };
+  },
 
   render(mount) {
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
@@ -218,14 +251,24 @@ S.HubBooksHome = {
        button. The sales confirm on sc-dashboard stays in its step because a week is seven rows. */
     const takeover = S.HubOperatingExpenses.moneyOutTakeover();
     mount.innerHTML = '<div class="screen">'
-      + (gs.hasWeeks ? this.whereYouStand(st) : this.getStartedBox(gs))
+      /* ⛔ WHERE YOU STAND IS OFF THIS PAGE (Kyle, 2026-08-12: *"the where you stand card gets
+         removed.. so the page starts with close out your books progress card"*). The page opens on
+         the thing it is for — closing the month — instead of a summary of a month you have not
+         closed yet. The figures it showed are all still one click away on the income statement.
+         ⚠ THE DAY-ONE BOX STAYS. Kyle named Where You Stand only, and a brand-new account with no
+         weeks confirmed still needs its four-step guidance ([[empty-state-day1]]) — otherwise the
+         page opens on a progress card reading 0 of 3 with nothing saying how to start. */
+      + (gs.hasWeeks ? '' : this.getStartedBox(gs))
       + this.banner(doneCount, this.ORDER.length)
       + (takeover
         ? '<div style="margin-top:18px;" id="bk-moneyout"></div>'
         : '<div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">'
           +   this.ORDER.map(k => this.stepRow(k, done, st)).join('')
-          + '</div>'
-          + this.asNeeded(st))
+          + '</div>')
+          /* ⛔ AS NEEDED IS OFF THE PAGE (Kyle, 2026-08-12: *"the as needed line with buttons also
+             goes away"*). It was a row of buttons to other screens sitting under a checklist about
+             closing THIS month, so it read as more steps without being any. Every destination it
+             offered is still reachable from the Books sidebar. */
       + '</div>';
     this._wire();
     /* ⛔⛔ RE-MOUNTED AFTER EVERY RENDER, and this is the whole reason the workspace resolves its
@@ -418,9 +461,13 @@ S.HubBooksHome = {
 
   workspace(k, isDone) {
     const explain = (txt) => '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">' + txt + '</div>';
-    const markBtn = isDone
-      ? '<button class="btn btn-ghost btn-sm" data-undone="' + k + '">Mark not done</button>'
-      : '<button class="btn btn-primary btn-sm" data-done="' + k + '">Mark Done</button>';
+    /* ⛔ NO MARK DONE, AND NO MARK NOT DONE (Kyle, 2026-08-12). Both are gone with the tick store:
+       `stepDone()` derives all three steps from the month's own data, so there is nothing for an
+       operator to assert and nothing to un-assert. Close The Week works this way and always has.
+       ⚠ `markBtn` stays as an empty string rather than being deleted from its three render sites,
+       so the layout below is byte-identical minus one button — a removal that also re-flows three
+       step bodies is two changes wearing one diff. */
+    const markBtn = '';
     /* ⭐⭐⭐ STEP 1 IS THE WORK, NOT A LINK TO IT. Every other step opens a REPORT, which is a page;
        this one is data entry, and Kyle's objection was exactly that it sent you somewhere else to
        do it: *"one place.. that is the only place the user has to go to drop or enter an expense."*
@@ -481,14 +528,6 @@ S.HubBooksHome = {
      ⚠ THE PERMIT DUE-COUNT DID NOT LEAVE THIS FILE. `_state` still counts them and the "clear the N
      flagged" next-move line still names them; only this button changed. The tracker lives in Shift
      Control now and the Hub's three alert rows are its door. */
-  asNeeded() {
-    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;">'
-      + '<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-right:4px;">As needed</span>'
-      + '<button class="btn btn-ghost btn-sm" data-act="breakeven">Break-Even</button>'
-      + '<button class="btn btn-ghost btn-sm" data-act="weekly-pnl">Weekly P&amp;L Brief</button>'
-      + '<button class="btn btn-ghost btn-sm" data-act="year-end">Annual Review</button>'
-      + '</div>';
-  },
 
   // ── Day one: four-step Get Started box (Cash Close The Week pattern). Each step
   // reads done off real data; once all four are done the Where You Stand card
@@ -546,8 +585,9 @@ S.HubBooksHome = {
     this.container.querySelectorAll('.bk-step-head').forEach(h => h.addEventListener('click', () => {
       const k = h.dataset.step; this._openStep = (this._openStep === k) ? '' : k; this.render(this.container);
     }));
-    this.container.querySelectorAll('[data-done]').forEach(b => b.addEventListener('click', () => { this.setDone(b.dataset.done, true); this._openStep = null; this.render(this.container); }));
-    this.container.querySelectorAll('[data-undone]').forEach(b => b.addEventListener('click', () => { this.setDone(b.dataset.undone, false); this.render(this.container); }));
+    /* ⛔ THE TICK HANDLERS ARE GONE WITH THE BUTTONS AND THE STORE (2026-08-12). Leaving a listener
+       bound to a control the page no longer renders is the harmless-looking half of a removal that
+       makes the next reader think the mechanism is still live. */
   }
 
 };
