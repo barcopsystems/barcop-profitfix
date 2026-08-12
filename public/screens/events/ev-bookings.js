@@ -309,6 +309,56 @@ S.EventsBookings = {
   },
   depositsDueTotal() { return this.depositsDueList().reduce((s, b) => s + this._depositHeld(b), 0); },
 
+  /* ══════════════════════════════════════════════════════════════════════════════════════════════
+     MOVED HERE 2026-08-12 WHEN THE EVENTS DASHBOARD WAS DELETED. Kyle: *"it is not needed and
+     serves no purpose to a user other than an extra link on the events overlay menu."*
+     ⛔ AND THE DELETION WOULD HAVE SILENTLY GUTTED WEEK IN REVIEW. `hub-week-review._eventsSection`
+     opens `const ED = S.EventsDashboard; if (!ED) return '';` — a guard, so with the file gone the
+     week recap's entire Events section would have rendered as NOTHING, with no error and no empty
+     state. It was invisible to the removal scope because that file ALIASES the object to a local:
+     a census for `EventsDashboard.` never sees `const ED = S.EventsDashboard`
+     ([[lessons-paid-for]] #22 — enumerate the shapes you expect and you miss the one you did not).
+     ⭐ HOME CHOSEN BY WHERE THE WORK ALREADY LIVES, not by who calls it. `_computeState` read
+     `isOpen` / `daysSince` / `quoteTotal` / `depositsDueList` / `depositsDueTotal` / `daysUntil`
+     off this object through an `EB()` accessor, so moving it here collapses that accessor to `this`
+     and deletes a hop. Week in Review owning Events pipeline arithmetic would have been the wrong
+     shape even though it is the only consumer today.
+     ⚠ 2,451 chars of a 17,801-char file survived the deletion. The other 86% was genuinely dead.
+     ══════════════════════════════════════════════════════════════════════════════════════════════ */
+  _money(v) { return (v == null || isNaN(v)) ? '-' : App.fmtCurrency(Number(v)); },
+
+  _runSheetStarted(b) { return !!(b.timeline || b.menu_notes || b.bev_notes || b.setup_notes || b.av_notes || b.guaranteed_count); },
+
+  _computeState() {
+    const all = (App.data && App.data.bookings) || [];
+    const today = App.todayLocal();
+    const open = all.filter(b => this.isOpen(b.stage));
+    const stale = open.filter(b => { const d = this.daysSince(b.date_received); return d != null && d >= 3; });
+    const booked = all.filter(b => b.stage === 'Booked');
+    const futureBooked = booked.filter(b => b.event_date && b.event_date >= today);
+    const bookedRev = futureBooked.reduce((s, b) => s + this.quoteTotal(b), 0);
+    const next = futureBooked.slice().sort((a, b) => (a.event_date || '').localeCompare(b.event_date || ''))[0] || null;
+    const pipeline = open.reduce((s, b) => s + this.quoteTotal(b), 0);
+    // ⚠ ONE DEFINITION, shared with the Bookings strip — they were two computations and disagreed by
+    // $2,000.00 on the same set, and neither dropped a booking whose balance was already settled.
+    const depDueList = this.depositsDueList();
+    const depositsDue = this.depositsDueTotal();
+
+    // The briefing sentence says "your win rate is X over the last 90 days", so the window is
+    // 90 days, not 91 — and it is bounded at the top too (S217), or an enquiry typed with a future
+    // received-date counts toward the win rate from whenever it was entered.
+    const inWin = App.inWindow(90);
+    const closed = all.filter(b => (b.stage === 'Booked' || b.stage === 'Completed' || b.stage === 'Lost') && inWin(b.date_received));
+    const wins = closed.filter(b => b.stage === 'Booked' || b.stage === 'Completed').length;
+    const conv = closed.length >= 5 ? Math.round(100 * wins / closed.length) + '%' : (closed.length ? wins + ' of ' + closed.length : '-');
+
+    const soon14 = futureBooked.filter(b => { const d = this.daysUntil(b.event_date); return d != null && d >= 0 && d <= 14; });
+    const noRunSheet = soon14.filter(b => !this._runSheetStarted(b));
+    const completedOpen = all.filter(b => b.stage === 'Completed' && !(parseFloat(b.actual_revenue) > 0));
+
+    return { all, open, stale, booked, futureBooked, bookedRev, next, pipeline, depDueList, depositsDue, conv, soon14, noRunSheet, completedOpen };
+  },
+
   balanceDue(b) {
     const quoted = this.quoteTotal(b);
     const dep = this._depositHeld(b);
