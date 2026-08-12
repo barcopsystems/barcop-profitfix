@@ -583,7 +583,12 @@ S.RecoveryPlaybook = {
                 ['8+ weeks', 'Strong', 'You can absorb a slow stretch and a surprise without flinching'],
                 ['4-8 weeks', 'Healthy', 'Normal for a well-run bar; just watch the tight weeks on the forecast'],
                 ['2-4 weeks', 'Thin', 'Free your trapped cash and tighten terms before the next slow patch'],
-                ['Under 2 weeks', 'Tight', 'One bad fortnight is a crisis; work every lever in this playbook now']
+                /* "fortnight" is British, and it is not a word anybody in an Austin bar says. Kyle
+                   caught the same slip on the Hub's movement cards; this was the last one left in
+                   operator-facing copy. The replacement borrows this table's OWN vocabulary — rows
+                   above it already say "a slow stretch" and "the next slow patch" — and it does not
+                   repeat "two weeks", which the row's first cell already states. */
+                ['Under 2 weeks', 'Tight', 'One bad stretch is a crisis; work every lever in this playbook now']
               ],
               note: 'Runway needs your cash on hand, the one number only you know. Enter it on the Cash Forecast, plus any line of credit you would lean on, and the weekly net becomes a real runway that knows your backstop.' },
             { t: 'h', text: 'Cash Conversion Cycle' },
