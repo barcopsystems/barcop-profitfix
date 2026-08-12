@@ -238,7 +238,14 @@ S.Hub = {
     nav._mstyleClosed = false;
     if (ms) {
       if (ms.id) {
-        const firstSec = nav.querySelector('.nav-section');
+        /* ⛔ THE LEAF GOES FIRST, FULL STOP — it used to be inserted before the first `.nav-section`,
+           which worked only because every sidebar happened to open with a section header. Removing
+           the Books sidebar's leading empty divider (Kyle's ask, 2026-08-12) moved the anchor to the
+           "Accounting" header, so Close Books landed THIRD, under All Money Out and Break-Even.
+           ⚠ A divider was load-bearing and nothing said so. `_auditSidebarHTML` and
+           `_settingsSidebarHTML` both still start with a section, so prepending is byte-identical for
+           them — measured before changing it. */
+        const firstSec = nav.firstElementChild;
         if (firstSec && !nav.querySelector('#' + ms.id)) {
           const d = document.createElement('div');
           d.className = 'nav-item nav-leaf';

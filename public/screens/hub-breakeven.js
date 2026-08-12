@@ -242,15 +242,20 @@ S.HubBreakEven = {
       App.setupCard(mount, {
         title: 'Break-Even',
         lead: 'Break-Even shows the sales you need to cover your costs and how you are tracking against it. It needs your fixed costs first, your recurring bills like rent, insurance, and utilities.',
-        /* ⛔ THE BUTTON NAMED A PAGE THAT NO LONGER EXISTS UNDER THAT NAME. `operating-expenses` is
-           titled **Money Out** — its own `openHubFullPage('Money Out', ...)` and its Books sidebar
-           leaf both say so — so pressing "Operating Expenses" landed the operator somewhere with a
-           different name at the top. Kyle, walking the empty state 2026-08-12: *"the operating
-           expenses button goes to the wrong page."* The destination was right; the word was wrong,
-           which is the same class as the Trapped Cash button earlier today.
-           ⚠ The description said "in Operating Expenses" too — a control and the sentence above it
-           have to name the same place, or fixing one just moves the confusion. */
-        steps: [{ title: 'Log your money out', desc: 'Add your recurring monthly bills in Money Out. Those are the nut this number is built on.', btn: 'Money Out', screen: 'operating-expenses', done: false }]
+        /* ⛔⛔⛔ I FIXED THIS BUTTON'S NAME TWICE AND NEVER CHECKED ITS DESTINATION, AND THE
+           DESTINATION WAS THE WRONG HALF BOTH TIMES. It shipped as "Operating Expenses", I renamed
+           it to "Money Out" when that page's title changed, then to "All Money Out" when Kyle
+           renamed the leaf — three passes over the LABEL of a control pointing at the wrong page.
+           Kyle, 2026-08-12: *"you don't log money out in money out.. that is the history.. you drop
+           expenses and cash outflows in close books."*
+           ⭐ HE IS RIGHT AND THE SOURCE ALREADY SAID SO: `hub-operating-expenses` describes itself as
+           *"read-only history for every kind of money out"*, and its entry card (`_addCardHtml`) is
+           MOUNTED INSIDE Close Books' first step. One door, and it is not this one. I had read that
+           comment while renaming and did not connect it ([[lessons-paid-for]] #32 — read the
+           CONSUMER; a page's name tells you nothing about what it lets you DO).
+           ⚠ `books-home` needed an `openScreen` route added for this to work at all — it was a hub
+           action only, so a `data-go` at it hit "Coming soon." */
+        steps: [{ title: 'Log your money out', desc: 'Drop your bank statement, or enter your bills by hand, on Close Books. Those are the nut this number is built on.', btn: 'Close Books', screen: 'books-home', done: false }]
       });
       return;
     }

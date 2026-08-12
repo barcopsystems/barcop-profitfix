@@ -214,7 +214,12 @@ S.HubBooksHome = {
        leaves the bank: bills AND cash outflows (owner draws, loan payments, tax, capital). The Log
        Type picker on the form is the whole point, and a title naming one of the two reads as if
        the other belongs somewhere else — which is the confusion the one-ledger rebuild removed. */
-    expenses: { title: 'Log this month\'s money out', act: 'operating-expenses' },
+    /* ⚠ `act` POINTED AT MONEY OUT, WHICH IS THE HISTORY PAGE, NOT WHERE YOU LOG. Nothing reads it —
+       `_META[k]` is destructured for the title only, and this step's body mounts the entry card
+       (`_addCardHtml`) inline, which is the one door. Dropped rather than corrected: a dead field
+       naming the wrong destination is how the next reader wires a button to the wrong page, which is
+       exactly what happened on Break-Even's day-one card three times over. */
+    expenses: { title: 'Log this month\'s money out' },
     // Revenue on the income statement IS the confirmed weeks. See hub-books._weeksComplete.
     weeks:    { title: 'Make sure the weeks are all in',       act: 'this-week' },
     generate: { title: 'Generate Month-End Books',             act: 'books' }
