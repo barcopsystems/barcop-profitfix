@@ -2335,8 +2335,9 @@ const App = {
        ⛔ AND THE FORM AND IMPORTER SECTIONS BELONG HERE, not on Money Out. The one-ledger rebuild
        moved the add card onto this page and left the help behind on the ledger it came from. */
     'books-home': { title: 'How Close Books Works', sections: [
-      { h: 'What this page is', p: ['Your month-end close, worked top to bottom. You land on where you stand, see how far along you are, and take the four steps in order. This is the page that turns a month of logged data into the file your accountant works from.'] },
-      { h: 'The four steps', p: ['1. Log this month\'s money out: every bill and every cash outflow, typed in or dropped from a bank or card statement. 2. Make sure the weeks are all in, because revenue on the income statement is your confirmed weeks. 3. Review your income statement for the month. 4. Generate Month-End Books, which builds the workbook. Mark a step done and the bar advances; mark it not done to reopen it. The As Needed row underneath is the off-cycle jobs, not part of the close.'] },
+      { h: 'What this page is', p: ['Your month-end close, worked top to bottom. Three steps in order, and the page turns a month of logged data into the file your accountant works from. Use the month selector at the top to close last month while you are standing in this one.'] },
+      { h: 'The three steps', p: ['1. Log this month\'s money out: every bill and every cash outflow, typed in or dropped from a bank or card statement. 2. Make sure the weeks are all in, because revenue on the income statement is your confirmed weeks. 3. Generate Month-End Books, which builds the workbook.'] },
+      { h: 'Nothing to mark done', p: ['There is no Mark Done button and nothing to tick. Each step goes green off your own data: step 1 when money out is logged for the month you are on, step 2 when every one of that month\'s weeks is confirmed, step 3 when the workbook has been generated for it. That means a step cannot claim something your records do not show, and it un-ticks itself if the data goes away. Close The Week works the same way.'] },
       { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing runs from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
       { h: 'Dropping a statement', p: ['On the money out step, switch the Add form to Import File and drop a CSV or Excel export from your bank or card. Map the columns once (date and amount are required) and Bar Cop remembers it. The file then stops on a check screen that takes the page: every row is listed with where it is going, grouped by category, with anything already logged held back and anything that is not an operating expense held back in its own card so it cannot be double counted. Nothing is saved until you press Add on that screen.'] }
     ] },
@@ -2368,7 +2369,7 @@ const App = {
       /* ⚠ THIS PROMISED THE RENEWAL WOULD LOG THE COST "so your bookkeeper does not enter it twice",
          and it was doing the opposite: the row it wrote carried the permit's TYPE as its vendor, so
          the same fee off a bank statement imported as a second row. Build piece 5 closed that door. */
-      { h: 'Marking one renewed', p: ['When you renew a permit, click Mark Renewed and set the next renewal date (Bar Cop suggests it from the recurrence). That is all this page does. What the renewal cost is a bill like any other: it comes in with your statement on Close The Books, or you type it there once, and it lands on the Licenses and Permits line of your P&L.'] },
+      { h: 'Marking one renewed', p: ['When you renew a permit, click Mark Renewed and set the next renewal date (Bar Cop suggests it from the recurrence). That is all this page does. What the renewal cost is a bill like any other: it comes in with your statement on Close Books, or you type it there once, and it lands on the Licenses and Permits line of your P&L.'] },
       { h: 'Good to know', p: ['Bar Cop tracks the dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements and deadlines with your issuing agency.'] }
     ] },
     /* ⛔⛔ RENAMED AND NARROWED 2026-08-08. The sidebar has said Money Out since the one-ledger
@@ -2380,7 +2381,7 @@ const App = {
        `books-home`, where the controls actually are. What is left is the LEDGER, which is what this
        page now is: three tabs, the stat strip, By Category and the log. */
     'operating-expenses': { title: 'How All Money Out Works', sections: [
-      { h: 'What this page is', p: ['The record of everything that left the bank: the bills that are not COGS or labor (wages and salaries both live in Labor Control, not here) plus the cash outflows that are not a cost of running the bar. You log it on Close The Books; this page is where it all lives afterwards, and it is what feeds the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
+      { h: 'What this page is', p: ['The record of everything that left the bank: the bills that are not COGS or labor (wages and salaries both live in Labor Control, not here) plus the cash outflows that are not a cost of running the bar. You log it on Close Books; this page is where it all lives afterwards, and it is what feeds the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
       /* ⚠ THIS SECTION DESCRIBED A PAGE THAT NO LONGER EXISTS, in four separate claims. It promised
          month cards for "this month and next", a Recurring/Variable split inside each, next month's
          recurring bills listed as Expected before they post, and Expense History as its own sidebar
@@ -2396,7 +2397,7 @@ const App = {
          14 rows with the figures above unmoved). An operator reading a chip as a page-wide filter
          would misread every number on the screen. */
       { h: 'The three tabs', p: [
-        'Money Out opens on Bills: the money that comes in on a statement or an invoice, which is what rolls into your income statement. Cash Outflows is money that genuinely left the bank but is not a cost of running the bar, so Books keeps it off that statement: owner draws, loan payments, capital and equipment, tax remittances. All Money Out is the two added together. Everything follows the tab you are on, so the numbers up top, the By Category table and the log all describe that one kind of money.',
+        'All Money Out opens on Bills: the money that comes in on a statement or an invoice, which is what rolls into your income statement. Cash Outflows is money that genuinely left the bank but is not a cost of running the bar, so Books keeps it off that statement: owner draws, loan payments, capital and equipment, tax remittances. All Money Out is the two added together. Everything follows the tab you are on, so the numbers up top, the By Category table and the log all describe that one kind of money.',
         'Up top you get this month, last month, year to date, and what it comes to as a share of revenue. By Category breaks those same periods out line by line so you can see which one moved. The log underneath is the whole back-record, newest first, with Edit and Delete on every row, so there is no separate history page to go to. The range chips sit above the log and filter the log only: the figures higher up keep their own periods whatever chip you pick.'
       ] },
       /* ⚠ THIS SECTION USED TO DESCRIBE A CHECKBOX, a How Often picker, an "Ends after" field and a
@@ -2409,7 +2410,7 @@ const App = {
          Repeat to copy last month forward". `Repeat` was one of the three row actions deleted on
          2026-08-06 — measured, the word does not appear in this screen's live code at all, only in
          the comment recording its removal. The help outlived the control by two days. */
-      { h: 'Recurring bills', p: ['Nothing to tick and no schedule to fill in. Bar Cop works out which bills recur by watching what you actually log: drop two months of statements on Close The Books and it picks up rent, insurance and your subscriptions on its own, and projects them onto your Cash Forecast. A bill that stops showing up stops being projected, so cancelling a service needs no extra step.'] },
+      { h: 'Recurring bills', p: ['Nothing to tick and no schedule to fill in. Bar Cop works out which bills recur by watching what you actually log: drop two months of statements on Close Books and it picks up rent, insurance and your subscriptions on its own, and projects them onto your Cash Forecast. A bill that stops showing up stops being projected, so cancelling a service needs no extra step.'] },
       /* ⚠ AND THIS ONE WAS FALSE ON BOTH HALVES. Repairs stopped living in Shift Control at Phase 2
          item 12 and platform fees stopped living in the weekly numbers at build piece 2. It told the
          operator to keep two real deductions OFF the log that Books reads. */
@@ -2451,7 +2452,7 @@ const App = {
     ] },
     'user-data': { title: 'How Data and Backup Works', sections: [
       { h: 'What this page is', p: ['Everything that gets your data out of Bar Cop and back in. Because a backup is the whole account, this page is the account owner only. Admins and staff never see it.'] },
-      { h: 'Your own copy', p: ['Export Backup writes the entire account to one file: settings, targets, weekly numbers, all three Recovery Audits, your Bar Cop Audits, recipes, the fix log, Operating Expenses, Permits, and every Inventory, Labor and Shift record. Keep it offsite. Restore from Backup reads that same file back to recover your data or move it to another account.'] },
+      { h: 'Your own copy', p: ['Export Backup writes the entire account to one file: settings, targets, weekly numbers, all three Recovery Audits, your Bar Cop Audits, recipes, the fix log, your money out log, Permits, and every Inventory, Labor and Shift record. Keep it offsite. Restore from Backup reads that same file back to recover your data or move it to another account.'] },
       { h: 'Automatic backups', p: ['Bar Cop saves a full backup of this bar on its own, about once a day, so there is always a recent point to fall back to without you remembering anything. Pick a date in the list and Restore rolls the whole account back to how it stood then.'] },
       { h: 'Restore points you take yourself', p: ['Create Restore Point saves the account as it is right now. Take one before anything big: a price change across the menu, a bulk import, a first inventory count. Those are the only ones you can delete by hand, because the automatic dailies are the safety net and must not be crowded out.'] },
       { h: 'How far back it goes', p: ['Bar Cop keeps the last 30 automatic daily backups and the last 10 restore points you took yourself, each in its own pool so a busy day of manual saves can never push the dailies off the end.'] },
@@ -3124,7 +3125,7 @@ const App = {
       if (App._isSection(k)) return drill(label, k, null, null, icon);
       if (k === 'audit' || k === 'books' || k === 'settings') {
         const home = k === 'books' ? () => S2.HubBooksHome && S2.HubBooksHome.open() : null;
-        return drill(label, k, home, home ? 'Close The Books' : null, icon,
+        return drill(label, k, home, home ? 'Close Books' : null, icon,
           k === 'settings' ? 'App Settings' : null);
       }
       /* ⭐ ONE DOOR. `_protoGlobalClick` is what the rail presses, so Hub / Close / Review / History
