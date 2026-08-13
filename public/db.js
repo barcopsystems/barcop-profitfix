@@ -899,7 +899,22 @@ const DB = {
         const { error } = await this._sb.from(table).upsert({
           account_id: accountId, user_id: this._user.id, data: data, updated_at: new Date().toISOString()
         }, { onConflict: 'account_id' });
-        if (error) { failed++; }
+        // ⛔ THE REPLAY PATH REPORTED NOTHING AT ALL. This is the SECOND writer of ic/lc/sc_data
+        // and it had no denial reporting, so a refused replay was completely silent — the worst
+        // version of this defect, because a queue that can never drain is exactly the one nobody
+        // finds by looking. Only fires on 42501 (the reporter's own filter), so an ordinary
+        // network failure is unaffected.
+        if (error) {
+          failed++;
+          /* ⚠⚠ GUARDED AND CAUGHT, and `verify-sync-reports-truth` is what proved it has to be.
+             This sits INSIDE a try whose catch does `failed++` — so a reporter that throws counts
+             ONE refused store as TWO, and that number is what the sync banner tells the operator.
+             An observability call must never be able to change the thing it observes; app.js's
+             backfill reporter is wrapped for exactly this reason and says so. This is the mirror of
+             [[the-loop]] #40: a helper required for CORRECTNESS gets a bare call, and one that is
+             purely a report must never be allowed to become a wrong number. */
+          try { this._reportRlsDenial && this._reportRlsDenial(table, null, error); } catch (e) {}
+        }
         else { this._clearPending(lsKey); synced++; }
       } catch (e) { failed++; }
     }
@@ -1317,12 +1332,32 @@ const DB = {
   // narrow, a lapsed subscription, a role gap — and the person it is happening to has no way to
   // tell you. This is the difference between "we hardened permissions" and "we locked out a
   // paying customer and never found out."
+  /* ⛔⛔ THE TABLE GOES IN THE MESSAGE, NOT ONLY IN THE DETAIL, AND THAT IS THE WHOLE FIX.
+     `logClientError` dedupes on `kind + '|' + message` — correct, and the flood cap has to stay —
+     but every denial here shared ONE message with the table hidden in `detail`. So a real signup
+     walk that was refused on ic_data, lc_data AND sc_data filed a SINGLE row naming whichever came
+     first, and five refusals reached nobody. Measured on 2026-08-13: six denials in the Postgres
+     log, one row in client_errors. The dedupe was never wrong; the KEY was, because it did not
+     include the thing that makes two denials different.
+     ⭐ AND IT CARRIES A STACK NOW. `_writeControl` is reached from saveInventory / saveLabor /
+     saveShift, which between them have call sites across a dozen screens, and the report named
+     none of them — so "what wrote this?" could not be answered from the data at all. A stack on a
+     path that has ALREADY failed costs nothing, and it answers that question once instead of a
+     chat at a time. It stays out of the dedupe key on purpose: keying on it would file one row per
+     call site and defeat the cap.
+     ⚠ The frames are sliced from 2 so the `Error` line and this function's own frame are dropped,
+     leaving the callers — the only part anyone reads. */
   _reportRlsDenial(table, kind, error) {
     try {
       const code = error && (error.code || error.status);
       if (String(code) !== '42501') return;
-      this.logClientError('rls_denied', 'Write denied by row-level security',
-        'table=' + table + ' kind=' + (kind || '-') + ' msg=' + ((error && error.message) || ''));
+      let where = '';
+      try { where = String(new Error('rls').stack || '').split('\n').slice(2, 9).join(' | ').slice(0, 1200); }
+      catch (e) { where = ''; }
+      this.logClientError('rls_denied',
+        'Write denied by row-level security: ' + table + (kind ? '/' + kind : ''),
+        'table=' + table + ' kind=' + (kind || '-') + ' msg=' + ((error && error.message) || '')
+        + ' at=' + where);
     } catch (e) {}
   },
 
