@@ -1219,6 +1219,38 @@ async function provisionFromSession(session, stripe) {
      ⚠ Both callers reach this, so the webhook cannot quietly provision what the claim refused.
      ⚠ `.limit(1)` on the accounts read, NOT `.single()`: a user with two bars is normal and
      single() would throw on exactly the customer this is about. */
+  /* ⛔⛔ THIS PAYMENT MAY ALREADY HAVE AN ACCOUNT — ITS OWN. ASK THAT FIRST.
+     Kyle paid $94.50 on 2026-08-13 and was told "you already have an account". He did not. What
+     happened: the WEBHOOK arrived first, ran this function, and created the user + account for
+     that email. His browser then returned and ran the SAME function again (which is the whole
+     design — two independent paths so a customer who paid can always get in), and the repeat-
+     payment refusal below saw a user owning an account and refused. **It refused because of the
+     account it had created for that very payment, seconds earlier.**
+     The find-or-create below was idempotent. The refusal stacked on top of it was not, because it
+     asked "does this EMAIL have an account" when the question is "does this PAYMENT have one".
+     ⭐ THE SUBSCRIPTION ID IS THE IDENTITY OF A PAYMENT, so it is asked first, then the customer
+     id — the webhook writes both in one upsert, so either resolves a re-entry. */
+  const _subRef = session.subscription;
+  const _subId  = (_subRef && typeof _subRef === 'object') ? _subRef.id : _subRef;
+  if (!accountId && (_subId || customerId)) {
+    let mine = null;
+    if (_subId) {
+      const { data } = await supabaseAdmin.from('subscriptions')
+        .select('account_id, user_id').eq('stripe_subscription_id', _subId).limit(1);
+      mine = (data && data.length) ? data[0] : null;
+    }
+    if (!mine && customerId) {
+      const { data } = await supabaseAdmin.from('subscriptions')
+        .select('account_id, user_id').eq('stripe_customer_id', customerId).limit(1);
+      mine = (data && data.length) ? data[0] : null;
+    }
+    if (mine) {
+      console.log('provisionFromSession: re-entry for an already-provisioned payment, account', mine.account_id);
+      accountId = mine.account_id;
+      userId = userId || mine.user_id;
+    }
+  }
+
   if (!accountId && session.metadata?.source === 'public_signup') {
     const email0 = session.customer_details?.email || session.customer_email;
     if (email0) {
@@ -1227,7 +1259,20 @@ async function provisionFromSession(session, stripe) {
       if (known) {
         const { data: owned } = await supabaseAdmin
           .from('accounts').select('id').eq('owner_user_id', known.id).limit(1);
+        /* ⛔ AND EVEN THEN, ONLY REFUSE ON POSITIVE EVIDENCE OF AN ESTABLISHED ACCOUNT.
+           There is a window inside the other path — user created, account created, and the
+           subscription row not written yet because it is waiting on a Stripe read — where the
+           lookups above find nothing and this would refuse a genuine customer all over again.
+           So an owned account with NO subscription row at all is treated as mid-provisioning,
+           not as a repeat: refusing somebody who has just paid is a far worse error than
+           creating a second bar for an account that has never paid for one. */
+        let established = false;
         if (owned && owned.length) {
+          const { data: subs } = await supabaseAdmin.from('subscriptions')
+            .select('stripe_customer_id').eq('account_id', owned[0].id).limit(1);
+          established = !!(subs && subs.length && subs[0].stripe_customer_id !== customerId);
+        }
+        if (established) {
           console.error('provisionFromSession: REFUSED a public signup, that email already has an account. The charge EXISTS at Stripe and needs a support decision:', email0);
           return { ok: false, reason: 'existing_account', accountId: null, userId: known.id, email: email0 };
         }
