@@ -568,13 +568,18 @@ const App = {
   async _startPublicCheckout() {
     const scr = document.getElementById('auth-screen');
     document.getElementById('app')?.classList.add('hidden');
-    const cover = (heading, sub, retry) => {
+    /* ⚠ `bare` EXISTS BECAUSE OF HOW LONG THIS SCREEN LIVES. The hand-off to Stripe is on screen
+       for a second or two, and Kyle read it as "something went wrong" precisely because there was
+       too much to read: logo, heading and a sentence naming the plan. Nobody finishes that in the
+       time it exists, so the eye registers unread text and assumes a problem. One short line is
+       the whole design. The FAILURE covers keep the full treatment — those are read at leisure. */
+    const cover = (heading, sub, retry, bare) => {
       if (!scr) return;
       scr.style.display = 'flex';
       scr.innerHTML = '<div class="auth-view" style="display:block;"><div class="auth-card">'
-        + '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
-        + '<div class="auth-heading">' + heading + '</div>'
-        + '<div class="auth-sub">' + sub + '</div>'
+        + (bare ? '' : '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>')
+        + '<div class="auth-heading"' + (bare ? ' style="margin:0;"' : '') + '>' + heading + '</div>'
+        + (sub ? '<div class="auth-sub">' + sub + '</div>' : '')
         + (retry ? '<div class="auth-inputs"><a class="btn btn-primary" href="https://www.barcop.com/pages/pricing" style="width:100%;display:block;text-align:center;">Back to Pricing</a></div>' : '')
         + '</div></div>';
     };
@@ -583,8 +588,7 @@ const App = {
       cover('Choose a plan first', 'That link did not carry a subscription plan, so there is nothing to set up yet. Pick a plan and Bar Cop will take you straight to payment.', true);
       return;
     }
-    cover('Taking You To Checkout', 'One moment. Bar Cop is opening a secure payment page for your <b style="color:var(--t1);">'
-      + (this._urlPlan === 'annual' ? 'Yearly' : 'Monthly') + '</b> plan.', false);
+    cover('Taking you to checkout...', '', false, true);
     try {
       const r = await fetch('/api/start-checkout', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -699,6 +703,13 @@ const App = {
     if (sub) sub.innerHTML = 'Payment received. You paid with <b style="color:var(--t1);">' + esc(email || '') + '</b>. Set a password and tell Bar Cop about your bar.';
     const tosRow = document.getElementById('signup-tos')?.closest('label');
     if (tosRow) tosRow.style.display = 'none';
+    /* ⛔ THE PANEL FOOT GOES. "Already have an account? Log in" and "Cancel" belong to SIGNUP,
+       where nothing has been created yet. Here the customer has paid and the account exists, so
+       "Cancel" implies an undo that does not exist, and "log in" invites them away from the one
+       screen that sets the password they would need to log in WITH. Hidden rather than deleted,
+       because the ordinary signup panel still needs both. */
+    const foot = document.querySelector('#auth-signup .auth-foot');
+    if (foot) foot.style.display = 'none';
     const btn = document.getElementById('signup-btn');
     if (btn) { btn.textContent = 'Finish Setup'; btn.disabled = false; }
   },
@@ -11015,7 +11026,13 @@ function wireAuth() {
   };
   document.getElementById('show-reset')?.addEventListener('click',  () => show('auth-reset'));
   document.getElementById('show-login2')?.addEventListener('click', () => show('auth-login'));
-  document.getElementById('show-signup')?.addEventListener('click', () => show('auth-signup'));
+  /* ⛔ TO THE PRICING PAGE, NOT THE SIGNUP FORM. Under checkout-first the plan is chosen BEFORE
+     payment, so a door that opens the account form skips the toggle entirely and lands the
+     operator in the old create-account-then-pay flow. Every route to a new account has to start
+     where the price is chosen. */
+  document.getElementById('show-signup')?.addEventListener('click', () => {
+    window.location.href = 'https://www.barcop.com/pages/pricing';
+  });
 
   // Signups closed: replace the whole card so EVERY route into it lands on the same message —
   // the login link, the demo's "Set Up My Bar" button, and a bookmarked /?signup=1. The button
