@@ -437,12 +437,47 @@ app.post('/api/create-checkout-session', async (req, res) => {
         console.error('create-checkout-session: Stripe dup-check failed (non-fatal):', e.message);
       }
     }
-    const priceId = plan === 'annual' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
+    /* ⛔⛔ AN EXPLICIT PLAN -> PRICE MAP THAT REFUSES WHAT IT DOES NOT RECOGNISE.
+       This was `plan === 'annual' ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY` — a binary ternary,
+       so it had no "I do not know this plan" branch and EVERY value that was not exactly the
+       lowercase string 'annual' fell through to MONTHLY. That is harmless while the only caller is
+       the in-app plan gate, which sends one of two dataset keys — but that is a fact about the
+       CALLER, not about this endpoint, and the next piece of this build lets a URL name the plan.
+       At that point `?plan=ANNUAL` or `?plan=yearly` is a customer who read $1,890/yr on the
+       website, pressed pay, and was put on $189/mo. It is silent on both sides: Stripe charged
+       exactly what it was asked for, and nothing here logged a thing.
+       ⚠ CASE AND SURROUNDING SPACE ARE NORMALISED, NOT REFUSED. 'ANNUAL' names annual
+       unambiguously, so refusing an upper-cased or hand-typed URL buys no safety and breaks a real
+       customer. What gets refused is a string that names no plan at all.
+       ⛔ `hasOwnProperty`, NEVER a bare `PLAN_PRICES[key]` lookup: `plan` is text straight off
+       req.body, so 'constructor', 'toString', 'valueOf' and '__proto__' all answer with inherited
+       junk on an object literal — and a truthy one sails past the "is it configured" guard below
+       and reaches Stripe as a price id.
+       ⚠ NON-STRINGS ARE REFUSED OUTRIGHT rather than coerced: `String(['annual'])` is 'annual', and
+       a JSON body can carry an array. Coercion here would be a second, undeclared spelling.
+       ⭐ BUILT INSIDE THE HANDLER ON PURPOSE. Nothing else reads it, and a sibling const at module
+       level is invisible to every harness slicer in the suite (that class has bitten three times).
+       ⭐ AND THE ENV NAME IN THE LOG NOW COMES OFF THE SAME MAP. It used to be a SECOND COPY of the
+       ternary, so an annual checkout with STRIPE_PRICE_ANNUAL unset reported MONTHLY as the missing
+       variable and sent whoever read that log to the wrong setting.
+       Pinned by verify-checkout-plan-price-map.js, seen red at 23 failures first. */
+    const PLAN_PRICES = {
+      monthly: { id: STRIPE_PRICE_MONTHLY, env: 'STRIPE_PRICE_MONTHLY' },
+      annual:  { id: STRIPE_PRICE_ANNUAL,  env: 'STRIPE_PRICE_ANNUAL'  }
+    };
+    const planKey = (typeof plan === 'string' ? plan : '').trim().toLowerCase();
+    if (!Object.prototype.hasOwnProperty.call(PLAN_PRICES, planKey)) {
+      // JSON.stringify so a newline in the body cannot forge a log line, and capped.
+      console.error('create-checkout-session: unrecognised plan ' + JSON.stringify(planKey).slice(0, 60) + ' — refusing, nothing charged.');
+      return res.status(400).json({ error: 'That subscription plan was not recognised. Please choose a plan and try again.' });
+    }
+    const chosenPlan = PLAN_PRICES[planKey];
+    const priceId = chosenPlan.id;
     // Fail loudly if the price env for this plan is not configured, rather than
     // sending an empty/undefined price to Stripe or (previously) a hardcoded test
     // ID. Prevents a charge from ever landing on the wrong product after go-live.
     if (!priceId) {
-      console.error('create-checkout-session: STRIPE_PRICE_' + (plan === 'annual' ? 'ANNUAL' : 'MONTHLY') + ' is not set — refusing checkout.');
+      console.error('create-checkout-session: ' + chosenPlan.env + ' is not set — refusing checkout.');
       return res.status(500).json({ error: 'Billing is not fully configured yet. Please try again shortly or contact support.' });
     }
     const sessionArgs = {
