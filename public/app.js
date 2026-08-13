@@ -351,6 +351,11 @@ const App = {
     });
     this._wireSyncLifecycle();
     this._initFloatNav();
+    /* ⛔ FIRST, BEFORE ANY BRANCH CAN LEAVE OR ANY SCREEN CAN REWRITE THE URL. `showAuth` strips
+       the whole query string on `?signup=1`, and the demo branch below returns out of init
+       entirely — so a plan named in the URL has to be taken here or not at all. Pure read, no
+       network, cannot throw out of its own try, and harmless on every path that ignores it. */
+    this._captureUrlPlan();
     // Demo entry: ?demo=1, or the clean /demo path (also tolerate a mistyped
     // /demo=1 with no question mark). The Vercel catch-all serves index.html for
     // /demo, so the app loads here and just needs to switch into demo mode.
@@ -1089,10 +1094,87 @@ const App = {
     if (s === 'active' || s === 'unknown' || s === 'trialing') { this._removePlanGate(); return; }
     // Pass the status through so the gate can tell a brand-new signup apart from
     // a returning customer whose subscription lapsed (past due / cancelled).
-    this.showPlanGate({ status: s });
+    // ⭐ The carried plan goes in too, so the picker opens on the plan they chose — see the note
+    //   on preselection in showPlanGate. Read BEFORE _maybeAutoCheckout consumes it.
+    this.showPlanGate({ status: s, plan: this._urlPlan });
+    this._maybeAutoCheckout(s);
+  },
+
+  /* ⭐ PIECE A PART 3 — A CARRIED PLAN GOES STRAIGHT TO PAYMENT.
+     ⛔⛔ THE GATE IS RAISED FIRST AND THIS RUNS SECOND. Opening checkout INSTEAD of the gate was
+     the obvious shape and it is wrong three ways, all of them written in `openEmbeddedCheckout`'s
+     own comment: its Cancel "closes the modal and leaves the plan gate underneath ready to retry",
+     which is only true if something put a gate there. Without it, cancelling at Stripe lands on an
+     unlocked Hub with no way to pay at all; a failed `startCheckout` has no `#gate-err` to write
+     into; and the async gap between here and the payment sheet leaves the Hub exposed and
+     clickable. The gate costs nothing underneath — checkout sits at z-index 9800 over its 9700 —
+     and it turns every failure path back onto the recovery surface that already works.
+     ⛔ WHO IS NEVER HANDED A PAYMENT SHEET, identified POSITIVELY and never by exclusion (the same
+     rule showPlanGate states for its account-deleting Start Over):
+       · past_due / unpaid — they HAVE a plan and a bounced card. The billing portal is the answer;
+         a fresh subscription sheet here is how a SECOND subscription gets minted beside the one
+         that is already billing.
+       · canceled / paused — a real account with real data, told "your data is safe and waiting".
+         An automatic payment form over that is a sales pitch, not a recovery surface.
+       · anything Stripe adds later — falls through to the gate, which is the safe branch.
+     ⛔ CONSUME-ONCE, CLEARED BEFORE THE CALL. `enforcePaywall` runs at the end of EVERY `showHub`,
+     so without this, cancelling at Stripe and going Home would re-open the payment sheet and the
+     operator could never reach their own Hub to sign out. Same discipline as `_applySignupDraft`.
+     ⭐⭐ IT PRESSES THE GATE'S OWN BUTTON RATHER THAN RE-IMPLEMENTING IT, and that is the whole
+     design. The first version of this called `startCheckout` itself and hand-copied everything
+     around it: the 'Going to checkout...' label, the disable-and-restore, the `#gate-err` routing.
+     Three copies of one behaviour — the exact drift class this codebase keeps paying for, written
+     directly underneath a comment of mine warning about it. Driving the real control means the
+     plan, the label, the busy state, the error surface and the past-due branch all stay in ONE
+     place, and anything added to that handler later is inherited here for free.
+     ⚠ WHICH MAKES THE PRESELECTION LOAD-BEARING, not cosmetic: the handler bills whatever option
+     carries `.plan-selected`, so the carried plan reaches Stripe ONLY because showPlanGate opened
+     on it. Those two halves are pinned together, end to end, by verify-paywall-auto-checkout.js
+     block B — a press that bills the wrong plan is the failure this is most exposed to. */
+  _maybeAutoCheckout(status) {
+    if (!this._urlPlan) return;
+    if (status !== 'inactive' && status !== 'incomplete') return;
+    if (document.getElementById('checkout-modal')) return;   // already on the payment sheet
+    const btn = document.getElementById('gate-pay');
+    // No gate on screen means nothing to drive. Bail rather than starting a checkout with no
+    // surface behind it — the operator is looking at the gate's absence, not at a payment sheet.
+    if (!btn) return;
+    this._urlPlan = null;                                    // consume BEFORE the press can re-enter
+    btn.click();
   },
 
   _removePlanGate() { const g = document.getElementById('plan-gate'); if (g) g.remove(); },
+
+  /* ⭐ PIECE A PART 2 — CARRY A PLAN NAMED IN THE URL ACROSS THE SIGNUP.
+     ⛔⛔ THIS RUNS AT BOOT RATHER THAN WHERE THE PLAN IS USED, AND THAT IS THE WHOLE POINT.
+     `showAuth` runs `history.replaceState({}, '', window.location.pathname)` the moment
+     `?signup=1` is present — the marketing site's own deep link — so the query string is GONE
+     before the Create Account panel has been filled in, let alone before the plan gate exists.
+     `?checkout=success` wipes it a second time at another line. A lazy read at the gate would
+     therefore find nothing on every real signup, while reading perfectly correct in review.
+     ⚠ HELD IN MEMORY ONLY, matching `_signupDraft` — which is the standing proof that nothing
+     reloads between the signup form and `boot()`. A reload in between (an email-confirmation round
+     trip) drops the plan and lands the operator on the picker, and that is the RIGHT degradation:
+     the picker is the recovery surface and it already works. Persisting it would let a plan from
+     one visit attach itself to a different checkout later in the same tab.
+     ⛔ AN UNRECOGNISED PLAN IS DISCARDED, NEVER DEFAULTED — defaulting would put someone who
+     mistyped a URL into a monthly checkout without ever being shown a price.
+     ⚠ THE TWO WORDS ARE INLINE, NOT A SIBLING CONSTANT: a data property beside a member is
+     invisible to every slicer in the harness suite, and that class has cost this project three
+     times. They are pinned AGAINST the server's own PLAN_PRICES map by verify-url-plan-carry.js
+     block D, because two files answering "is this a plan" is precisely where a disagreement hides:
+     accept a word the server refuses and the operator gets a 400 at the moment they press pay.
+     ⚠ NOTHING ON THE WEBSITE SENDS `?plan=` YET. This is the half that RECEIVES it; it is inert
+     until a link carries one, and a plan id is not personal data, so a URL is a fine place for it. */
+  _urlPlan: null,
+  _captureUrlPlan() {
+    try {
+      const raw = new URLSearchParams(window.location.search).get('plan');
+      const key = (typeof raw === 'string' ? raw : '').trim().toLowerCase();
+      this._urlPlan = (key === 'monthly' || key === 'annual') ? key : null;
+    } catch (e) { this._urlPlan = null; }
+    return this._urlPlan;
+  },
 
   // ── Add Another Bar (unified flow) ───────────────────────────────────────────
   // Kicked off from the User Account page: onboarding (new-bar mode) → plan gate
@@ -1309,7 +1391,14 @@ const App = {
       o.style.background = on ? '#1E2B34' : '#0D181E';
     });
     opts.forEach(o => o.addEventListener('click', () => selectOpt(o)));
-    if (opts[0]) selectOpt(opts[0]);
+    /* ⭐ OPEN ON THE PLAN THEY CHOSE. This is correctness, not polish: with a carried plan the
+       payment sheet opens straight over this gate, and cancelling reveals it — so a gate that
+       always defaulted to its FIRST option would sit there with Monthly highlighted after an
+       ANNUAL checkout was abandoned, one press away from billing the wrong plan. That mis-billing
+       path would have been created by the auto-checkout itself. Falls back to the first option
+       exactly as before when no plan is carried. */
+    const wantedOpt = (ctx && ctx.plan) ? opts.filter(o => o.dataset.plan === ctx.plan)[0] : null;
+    if (wantedOpt || opts[0]) selectOpt(wantedOpt || opts[0]);
     const gateErr = (t) => { const e = document.getElementById('gate-err'); if (e) { e.textContent = t; e.style.display = 'block'; } };
     document.getElementById('gate-pay').addEventListener('click', async () => {
       const btn = document.getElementById('gate-pay');
