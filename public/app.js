@@ -1094,10 +1094,31 @@ const App = {
     if (s === 'active' || s === 'unknown' || s === 'trialing') { this._removePlanGate(); return; }
     // Pass the status through so the gate can tell a brand-new signup apart from
     // a returning customer whose subscription lapsed (past due / cancelled).
-    // ⭐ The carried plan goes in too, so the picker opens on the plan they chose — see the note
-    //   on preselection in showPlanGate. Read BEFORE _maybeAutoCheckout consumes it.
-    this.showPlanGate({ status: s, plan: this._urlPlan });
+    /* ⛔ THE GATE IS BUILT IN ITS FINAL MODE ONCE. An earlier version rendered the picker here and
+       let _maybeAutoCheckout replace it with the connecting cover a moment later — which paints,
+       for a frame or two, the very "choose your plan" screen this whole piece exists to stop
+       showing. ONE decision, ONE render: `_autoCheckoutPlan` answers "is this going straight to
+       payment", and both this line and the call below ask it, so they can never disagree. */
+    const auto = this._autoCheckoutPlan(s);
+    this.showPlanGate({ status: s, plan: this._urlPlan, connecting: !!auto });
     this._maybeAutoCheckout(s);
+  },
+
+  /* The one predicate that decides whether a carried plan goes straight to payment. Read by
+     enforcePaywall (to pick the gate's mode) and by _maybeAutoCheckout (to act), so there is no
+     second copy of the rule to drift.
+     ⛔ TWO INDEPENDENT REFUSALS FOR A FAILED CARD, ON PURPOSE. past_due/unpaid is excluded by its
+     own line AND by the positive inactive/incomplete test, so deleting either one still refuses
+     them. That defence in depth used to come for free — the old design pressed the gate's own
+     button, and for past_due that button opens the billing portal rather than a checkout — and the
+     redesign took it away. Selling a second subscription to someone whose card just bounced, beside
+     the one already billing, is the worst outcome this function has. */
+  _autoCheckoutPlan(status) {
+    if (!this._urlPlan) return null;
+    if (status === 'past_due' || status === 'unpaid') return null;
+    if (status !== 'inactive' && status !== 'incomplete') return null;
+    if (document.getElementById('checkout-modal')) return null;   // already on the payment sheet
+    return this._urlPlan;
   },
 
   /* ⭐ PIECE A PART 3 — A CARRIED PLAN GOES STRAIGHT TO PAYMENT.
@@ -1132,15 +1153,43 @@ const App = {
      on it. Those two halves are pinned together, end to end, by verify-paywall-auto-checkout.js
      block B — a press that bills the wrong plan is the failure this is most exposed to. */
   _maybeAutoCheckout(status) {
-    if (!this._urlPlan) return;
-    if (status !== 'inactive' && status !== 'incomplete') return;
-    if (document.getElementById('checkout-modal')) return;   // already on the payment sheet
-    const btn = document.getElementById('gate-pay');
-    // No gate on screen means nothing to drive. Bail rather than starting a checkout with no
-    // surface behind it — the operator is looking at the gate's absence, not at a payment sheet.
-    if (!btn) return;
-    this._urlPlan = null;                                    // consume BEFORE the press can re-enter
-    btn.click();
+    const plan = this._autoCheckoutPlan(status);
+    if (!plan) return;
+    this._urlPlan = null;                                    // consume BEFORE anything can re-enter
+
+    /* The gate is ALREADY on screen in connecting mode — enforcePaywall built it that way off the
+       same predicate. Nothing is re-rendered here, so the picker never paints even for a frame. */
+
+    const restore = (msg) => {
+      this._removePlanGate();
+      this.showPlanGate({ status: status, plan: plan });
+      if (msg) {
+        const e = document.getElementById('gate-err');
+        if (e) { e.textContent = msg; e.style.display = 'block'; }
+      }
+    };
+    /* Two different moments, and conflating them was the trap: FAILING TO OPEN must put the picker
+       back once, and CANCELLING at Stripe must also put it back — but the second happens after the
+       first has already succeeded. One shared "settled" flag would have let a successful open
+       silence the cancel handler, leaving the operator on a cover reading "one moment" forever. */
+    let phase = 'opening';
+    let guard = null;
+    const failOpen = (msg) => {
+      if (phase !== 'opening') return;
+      phase = 'done';
+      if (guard) clearTimeout(guard);
+      restore(msg);
+    };
+    /* ⛔ A HUNG FETCH NEVER SETTLES. `create-checkout-session` has no timeout, so without this a
+       dropped connection strands the operator on a contentless cover with only Sign Out — strictly
+       worse than the picker they used to get. The ceiling puts the real gate back. */
+    guard = setTimeout(() => failOpen('That took longer than expected. Pick your plan to try again.'), 20000);
+    Promise.resolve(this.startCheckout(plan, failOpen, { onCancel: () => restore() }))
+      .then(ok => {
+        if (ok) { phase = 'open'; if (guard) clearTimeout(guard); }
+        else failOpen();
+      })
+      .catch(() => failOpen('Could not open checkout. Try again, or contact support.'));
   },
 
   _removePlanGate() { const g = document.getElementById('plan-gate'); if (g) g.remove(); },
@@ -1348,8 +1397,24 @@ const App = {
     }
     // past_due keeps its existing plan — send them to the billing portal to fix
     // the card, not back through a fresh plan picker.
-    const showPicker = !isPastDue;
+    /* ⛔⛔ CONNECTING MODE — Kyle walked the signup and found this: with a plan carried from the
+       website, the gate went up showing a full "choose your plan" picker and SAT THERE for several
+       seconds while `create-checkout-session` made its round trip, then Stripe's sheet dropped over
+       it. So the one screen an operator is shown after answering the price question on the website
+       is a screen asking the price question again. His words: "it looks really dumb and confusing".
+       In this mode the gate is still the full-screen cover (that is what makes cancel and every
+       error land somewhere safe), but it says what is happening instead of asking anything. The
+       picker, the pay button and the billing clause are all withheld until there is a reason to
+       show them — a refusal, or a cancel — at which point `_maybeAutoCheckout` re-renders the real
+       gate over the top. Sign Out stays, so a hung network can never trap anyone here. */
+    const connecting = !!(ctx && ctx.connecting);
+    const showPicker = !isPastDue && !connecting;
     const primaryLabel = isPastDue ? 'Update Payment Method' : 'Continue to Payment';
+    if (connecting) {
+      heading = 'Setting Up Your Subscription';
+      bodyHtml = 'Opening secure checkout for the <b style="color:var(--t1);">'
+        + ((ctx.plan === 'annual') ? 'Yearly' : 'Monthly') + '</b> plan. One moment.';
+    }
     const planOpt = (plan, label, note) =>
       '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
       + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
@@ -1372,9 +1437,16 @@ const App = {
             +   'Continuing starts a recurring subscription for this bar at the price shown, charged to your card and renewing automatically each billing period until you cancel. You can cancel anytime under Manage Billing; cancellation stops future charges, and the current period is not refunded. See our <a href="' + App.TOS_TERMS_URL + '" target="_blank" rel="noopener" style="color:var(--gold);">Terms of Use</a>.'
             + '</div>'
           : '')
-      + '<button class="btn btn-primary" id="gate-pay" style="width:100%;padding:14px 20px;font-size:12px;">' + primaryLabel + '</button>'
+      // No pay button while connecting: there is nothing to press, and a disabled-looking primary
+      // button is the "wall of dead controls" this project already learned not to render.
+      + (connecting ? '' : '<button class="btn btn-primary" id="gate-pay" style="width:100%;padding:14px 20px;font-size:12px;">' + primaryLabel + '</button>')
       + '<div id="gate-err" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>'
-      + (isNewBar
+      // ⛔ START OVER IS WITHHELD WHILE CONNECTING. It DELETES the account, and offering a
+      // destructive escape beside "one moment" during a payment hand-off is the worst possible
+      // pairing. Sign Out is the safe exit and it stays on every branch.
+      + (connecting
+          ? '<div style="text-align:center;margin-top:18px;"><button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>'
+          : isNewBar
           ? '<div style="text-align:center;margin-top:18px;"><button class="auth-link" id="gate-cancel" style="font-size:11px;">Cancel</button></div>'
           : isNewSignup
             ? '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button>'
@@ -1400,7 +1472,7 @@ const App = {
     const wantedOpt = (ctx && ctx.plan) ? opts.filter(o => o.dataset.plan === ctx.plan)[0] : null;
     if (wantedOpt || opts[0]) selectOpt(wantedOpt || opts[0]);
     const gateErr = (t) => { const e = document.getElementById('gate-err'); if (e) { e.textContent = t; e.style.display = 'block'; } };
-    document.getElementById('gate-pay').addEventListener('click', async () => {
+    document.getElementById('gate-pay')?.addEventListener('click', async () => {
       const btn = document.getElementById('gate-pay');
       // Past due: the subscription still exists, so open the Stripe billing portal
       // to update the card rather than starting a second subscription.
@@ -1448,7 +1520,10 @@ const App = {
 
   // Create a Stripe checkout session for the signed-in owner and open the
   // embedded checkout on top of the Hub (no redirect out to Stripe).
-  async startCheckout(plan, onErr) {
+  // `ctx` is forwarded straight to openEmbeddedCheckout so a caller can learn about a CANCEL, which
+  // is not an error and so never reaches onErr. The auto-checkout needs it: cancelling at Stripe
+  // has to put the plan picker back, and nothing else would tell it that happened.
+  async startCheckout(plan, onErr, ctx) {
     try {
       const accountId = await DB._ensureAccountId();
       const headers = await DB._authHeaders();
@@ -1456,7 +1531,7 @@ const App = {
         method: 'POST', headers, body: JSON.stringify({ accountId, plan })
       });
       const data = await r.json();
-      if (data.clientSecret) return await this.openEmbeddedCheckout(data, onErr);
+      if (data.clientSecret) return await this.openEmbeddedCheckout(data, onErr, ctx);
       onErr(data.error || 'Could not start checkout. Try again, or contact support.');
       return false;
     } catch (e) { onErr('Connection error. Try again.'); return false; }
@@ -1496,7 +1571,10 @@ const App = {
         modal.remove();
         // Cancelling a new bar's checkout discards the just-created bar and
         // returns to User Accounts; a normal checkout just reveals the gate.
+        // ⛔ ...except when the gate underneath is the CONNECTING cover, which says "one moment"
+        // and has no way forward. `onCancel` is how the auto-checkout puts the real picker back.
         if (ctx.newBar) await this.discardNewBar();
+        else if (typeof ctx.onCancel === 'function') ctx.onCancel();
       });
       return true;
     } catch (e) {
