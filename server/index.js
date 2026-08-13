@@ -313,6 +313,37 @@ app.get('/api/health', async (req, res) => {
 const STRIPE_PRICE_MONTHLY = (process.env.STRIPE_PRICE_MONTHLY || '').trim(); // $189/mo
 const STRIPE_PRICE_ANNUAL  = (process.env.STRIPE_PRICE_ANNUAL  || '').trim(); // $1,890/yr
 const ALL_MODULES     = ['profit', 'revenue'];
+
+/* ⭐⭐ THE PLAN -> PRICE MAP, AND THE ONLY ONE. Two routes ask it now: the authenticated checkout
+   (Add Another Bar, and the in-app gate) and the PUBLIC checkout-first route, where the plan
+   arrives from a pricing page rather than an in-app picker. Two copies of this map is the drift
+   this suite exists to catch, and it would be a mis-BILLING, so there is one.
+   ⛔ IT REFUSES WHAT IT DOES NOT RECOGNISE. This replaced
+   `plan === 'annual' ? ANNUAL : MONTHLY` — a binary ternary with no "I do not know this" branch,
+   so everything that was not exactly that string billed MONTHLY.
+   ⚠ Case and surrounding space are NORMALISED, not refused: `ANNUAL` names annual unambiguously
+   and refusing a hand-typed URL buys nothing. What is refused is a string that names no plan.
+   ⛔ `hasOwnProperty`, never a bare lookup: `plan` is text off a request body, so `constructor`,
+   `toString` and `__proto__` all answer with inherited junk on an object literal, and a truthy
+   one would walk past the "is it configured" guard and reach Stripe as a price id.
+   ⚠ Non-strings are refused rather than coerced: `String(['annual'])` is 'annual', and a JSON
+   body can carry an array. Returns null for "no such plan"; the CALLER decides the refusal. */
+function planPrice(plan) {
+  const PLAN_PRICES = {
+    monthly: { id: STRIPE_PRICE_MONTHLY, env: 'STRIPE_PRICE_MONTHLY' },
+    annual:  { id: STRIPE_PRICE_ANNUAL,  env: 'STRIPE_PRICE_ANNUAL'  }
+  };
+  const key = (typeof plan === 'string' ? plan : '').trim().toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(PLAN_PRICES, key)) return null;
+  return { key: key, id: PLAN_PRICES[key].id, env: PLAN_PRICES[key].env };
+}
+/* The statuses that GRANT access, and the single source for it. Must stay in step with
+   has_active_subscription() in SUPABASE_SETUP.sql, which is ('active', 'trialing') — if the two
+   ever disagree the app lets someone in that the database then refuses every write for, which
+   reads to the operator as a broken app rather than a billing state. NOT the same list as
+   LIVE_SUB_STATES: that one is "a subscription exists at Stripe" and is used to BLOCK a second
+   checkout, which correctly includes past_due and incomplete. */
+const LIVE_ACCESS_STATES = ['active', 'trialing'];
 // Stripe states that count as a LIVE subscription for a bar (do not let a second one be
 // created, and do not discard the account). Only terminal states (canceled,
 // incomplete_expired) are absent so reactivation / a genuine fresh start still works.
@@ -461,17 +492,12 @@ app.post('/api/create-checkout-session', async (req, res) => {
        ternary, so an annual checkout with STRIPE_PRICE_ANNUAL unset reported MONTHLY as the missing
        variable and sent whoever read that log to the wrong setting.
        Pinned by verify-checkout-plan-price-map.js, seen red at 23 failures first. */
-    const PLAN_PRICES = {
-      monthly: { id: STRIPE_PRICE_MONTHLY, env: 'STRIPE_PRICE_MONTHLY' },
-      annual:  { id: STRIPE_PRICE_ANNUAL,  env: 'STRIPE_PRICE_ANNUAL'  }
-    };
-    const planKey = (typeof plan === 'string' ? plan : '').trim().toLowerCase();
-    if (!Object.prototype.hasOwnProperty.call(PLAN_PRICES, planKey)) {
+    const chosenPlan = planPrice(plan);
+    if (!chosenPlan) {
       // JSON.stringify so a newline in the body cannot forge a log line, and capped.
-      console.error('create-checkout-session: unrecognised plan ' + JSON.stringify(planKey).slice(0, 60) + ' — refusing, nothing charged.');
+      console.error('create-checkout-session: unrecognised plan ' + JSON.stringify(String(plan == null ? '' : plan)).slice(0, 60) + ' — refusing, nothing charged.');
       return res.status(400).json({ error: 'That subscription plan was not recognised. Please choose a plan and try again.' });
     }
-    const chosenPlan = PLAN_PRICES[planKey];
     const priceId = chosenPlan.id;
     // Fail loudly if the price env for this plan is not configured, rather than
     // sending an empty/undefined price to Stripe or (previously) a hardcoded test
@@ -1155,6 +1181,270 @@ app.post('/api/reconcile-subscriptions', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+/* ⭐⭐ THE ONE PLACE A PAID CHECKOUT BECOMES AN ACCOUNT.
+   Lifted out of the webhook so the CLAIM route (checkout-first signup) and the WEBHOOK can both
+   call it. Two callers, one implementation, deliberately: the claim is fast and the webhook is
+   reliable, and the day they disagree is the day somebody has paid and cannot get in.
+   ⛔ IT MUST STAY IDEMPOTENT. Both callers race by design, and Stripe re-delivers events. Every
+   step below is find-or-create and the subscription write is an upsert on account_id, so the
+   second caller through is a no-op rather than a second account.
+   ⛔ IT NEVER DECIDES WHETHER MONEY CHANGED HANDS. The caller establishes that (the webhook by
+   signature, the claim by retrieving the session from Stripe) and passes the session in. This
+   function trusts its argument, so nothing may hand it a session that came from a browser.
+   RETURNS { ok, accountId, userId, email, isNewSubscriber, status, reason } — never throws for a
+   business outcome, so the caller decides the HTTP answer. A thrown error is a real fault.
+
+   ⚠ `status` COMES FROM THE SUBSCRIPTION, NOT FROM A BOOLEAN. This used to be
+   `subscription_status: paid ? 'active' : 'incomplete'` — the same binary-ternary shape as the
+   plan bug fixed on 2026-08-13, and wrong in the same way: it collapses everything Stripe can
+   say into two words. It happened to work for a trial only because `no_payment_required` sits in
+   the `paid` set, and it then stored 'active' over a subscription Stripe calls 'trialing'.
+   Reading the real status also means a delayed bank debit lands as 'incomplete' because STRIPE
+   says so, not because we guessed. */
+async function provisionFromSession(session, stripe) {
+  const customerId = session.customer;
+  const email      = session.customer_details?.email || session.customer_email;
+
+  let userId    = session.metadata?.user_id || null;
+  let accountId = session.metadata?.account_id || null;
+  /* ⛔ A REPEAT PAYMENT ON AN EMAIL THAT ALREADY HAS AN ACCOUNT IS REFUSED (Kyle, 2026-08-13).
+     Only on a PUBLIC checkout-first session — an authenticated one carries account_id and is a
+     deliberate Add Another Bar, which must keep working. His reasoning: someone paying twice by
+     accident (paid, closed the tab, unsure it worked, paid again) is far likelier than someone
+     buying a second bar from the public pricing page, and creating a second account for the
+     first case is the worse mistake.
+     ⛔ REFUSED MEANS NO SECOND ACCOUNT. IT DOES NOT MEAN THE MONEY IS HANDLED. The charge exists
+     at Stripe and this logs LOUDLY so it is findable; whether it is refunded or converted into a
+     second bar is a support decision and deliberately not automated here.
+     ⚠ Both callers reach this, so the webhook cannot quietly provision what the claim refused.
+     ⚠ `.limit(1)` on the accounts read, NOT `.single()`: a user with two bars is normal and
+     single() would throw on exactly the customer this is about. */
+  if (!accountId && session.metadata?.source === 'public_signup') {
+    const email0 = session.customer_details?.email || session.customer_email;
+    if (email0) {
+      const { data: users } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const known = users?.users?.find(u => u.email === email0);
+      if (known) {
+        const { data: owned } = await supabaseAdmin
+          .from('accounts').select('id').eq('owner_user_id', known.id).limit(1);
+        if (owned && owned.length) {
+          console.error('provisionFromSession: REFUSED a public signup, that email already has an account. The charge EXISTS at Stripe and needs a support decision:', email0);
+          return { ok: false, reason: 'existing_account', accountId: null, userId: known.id, email: email0 };
+        }
+      }
+    }
+  }
+
+  if (!userId && email) {
+    // Paginate generously — an unpaginated listUsers() returns only the first ~50 users, so past
+    // that a returning customer on a metadata-less checkout would not be found and we would
+    // wrongly try to re-create them.
+    const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const found = existing?.users?.find(u => u.email === email);
+    if (found) {
+      userId = found.id;
+    } else {
+      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: { created_via: 'stripe_checkout' },
+      });
+      if (createErr) {
+        // Likely a concurrent webhook re-delivery already created them — re-look up.
+        const { data: retry } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        const now = retry?.users?.find(u => u.email === email);
+        if (now) userId = now.id;
+        else console.error('provisionFromSession: failed to create Supabase user:', createErr.message);
+      } else {
+        userId = created.user.id;
+        console.log('provisionFromSession: account created for new subscriber:', email);
+      }
+    }
+  }
+
+  // Billing is per bar (per account). The signup flow passes account_id in metadata; if it is
+  // missing (e.g. a raw payment link, or the public checkout-first session), fall back to the
+  // account this user owns, and provision one if they own none.
+  if (!accountId && userId) {
+    const { data: acct } = await supabaseAdmin
+      .from('accounts').select('id').eq('owner_user_id', userId).limit(1).maybeSingle();
+    accountId = acct?.id || null;
+    if (!accountId) {
+      const { data: newAcct } = await supabaseAdmin
+        .from('accounts').insert({ name: 'My Bar', owner_user_id: userId }).select('id').single();
+      if (newAcct) {
+        await supabaseAdmin.from('memberships').insert({ account_id: newAcct.id, user_id: userId, role: 'admin' });
+        accountId = newAcct.id;
+      }
+    }
+  }
+
+  if (!accountId) {
+    // Charged, and no account to attach it to. The caller must answer non-2xx so Stripe
+    // re-delivers, rather than acking success and stranding a paid customer with nothing.
+    console.error('provisionFromSession: no account_id resolved for customer', customerId);
+    return { ok: false, reason: 'no_account', accountId: null, userId, email };
+  }
+
+  // Only a brand-new subscription (no row yet) is a "new subscriber" — so the welcome email
+  // fires once, never on a Stripe re-delivery or a reactivation.
+  const { data: priorSub } = await supabaseAdmin
+    .from('subscriptions').select('account_id').eq('account_id', accountId).maybeSingle();
+  const isNewSubscriber = !priorSub;
+
+  // THE REAL STATUS, off the subscription itself. `session.subscription` is an id on a webhook
+  // event and may already be expanded on a retrieved session, so handle both. If Stripe cannot
+  // be reached we fall back to 'incomplete', which is the SAFE direction: access is withheld and
+  // customer.subscription.updated corrects it moments later. Guessing 'active' would hand out
+  // access on a read failure.
+  let status = null;
+  const subRef = session.subscription;
+  try {
+    if (subRef && typeof subRef === 'object' && subRef.status) status = subRef.status;
+    else if (subRef && stripe) status = (await stripe.subscriptions.retrieve(subRef)).status;
+  } catch (e) {
+    console.error('provisionFromSession: could not read subscription status:', e.message);
+  }
+  if (!status) status = 'incomplete';
+  const live = LIVE_ACCESS_STATES.includes(status);
+
+  const { error: subWriteErr } = await supabaseAdmin.from('subscriptions').upsert({
+    account_id:             accountId,
+    user_id:                userId,
+    stripe_customer_id:     customerId,
+    // Store the subscription id so later subscription.updated/deleted events key on THIS
+    // subscription, not the customer. If an operator ever runs two bars under one Stripe
+    // Customer (same email via Link), a customer-keyed update would clobber the other bar.
+    stripe_subscription_id: (subRef && typeof subRef === 'object') ? subRef.id : (subRef || null),
+    subscription_status:    status,
+    subscription_plan:      'full_access',
+    active_modules:         live ? ALL_MODULES : [],
+    current_period_end:     null,
+    updated_at:             session._eventIso || new Date().toISOString(),
+  }, { onConflict: 'account_id' });
+
+  if (subWriteErr) {
+    // CHECK THIS WRITE. supabase-js returns {error} rather than throwing, so a discarded result
+    // used to fall straight through to a 200 — Stripe marks the event delivered and NEVER
+    // retries. The customer is billed while has_active_subscription() stays false and the
+    // RESTRICTIVE require_active_sub policy denies every write: paying, and permanently locked
+    // out, with the app holding no record they ever paid.
+    console.error('provisionFromSession: subscriptions upsert FAILED for account',
+                  accountId, subWriteErr.message || subWriteErr);
+    return { ok: false, reason: 'sub_write_failed', accountId, userId, email, status };
+  }
+
+  return { ok: true, accountId, userId, email, isNewSubscriber, status, live, reason: null };
+}
+
+/* ── CHECKOUT-FIRST: the two PUBLIC routes ───────────────────────────────────────────────────
+   These are the only unauthenticated money-adjacent endpoints in the app, because at this point
+   in the flow there IS no user yet — that is the whole idea. So: they are rate limited, they
+   create nothing but a Stripe session, and the claim below trusts NOTHING from the browser
+   except a session id it immediately re-reads from Stripe. */
+
+/* START — a pricing-page button lands here. Creates a HOSTED Stripe session and hands back its
+   url. No account, no user, no membership: if the customer walks away at Stripe, nothing exists.
+   That single property is what deletes the whole abandoned-unpaid-account class. */
+app.post('/api/start-checkout', async (req, res) => {
+  if (!SIGNUPS_OPEN) {
+    return res.status(503).json({ error: 'Bar Cop is not taking new accounts right now. Please check back shortly.' });
+  }
+  // Unauthenticated, so it is rate limited by the shared limiter (per-IP plus a spoof-proof
+  // global backstop). Without it this is a free way to make Stripe sessions all day.
+  if (notifyRateLimited(req, 'start-checkout', 8, 60)) {
+    return res.status(429).json({ error: 'Too many attempts. Please wait a minute and try again.' });
+  }
+  const chosen = planPrice((req.body || {}).plan);
+  if (!chosen) {
+    return res.status(400).json({ error: 'That subscription plan was not recognised.' });
+  }
+  if (!chosen.id) {
+    console.error('start-checkout: ' + chosen.env + ' is not set — refusing checkout.');
+    return res.status(500).json({ error: 'Billing is not fully configured yet. Please try again shortly or contact support.' });
+  }
+  try {
+    const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: chosen.id, quantity: 1 }],
+      // {CHECKOUT_SESSION_ID} is substituted by Stripe. The claim re-reads it from Stripe, so a
+      // forged or edited id resolves to nothing rather than provisioning anything.
+      success_url: 'https://app.barcop.com/?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+      cancel_url:  'https://www.barcop.com/pages/pricing',
+      // The marker BOTH the claim and the webhook read to know this was a public signup, which is
+      // what turns on the already-has-an-account refusal. On the subscription too, so a later
+      // event can still tell where it came from.
+      metadata: { source: 'public_signup', plan: chosen.key },
+      subscription_data: { metadata: { source: 'public_signup', plan: chosen.key } },
+      allow_promotion_codes: true,
+      // Terms accepted and RECORDED on the session itself, at the moment money changes hands —
+      // stronger evidence than a checkbox on a page we do not control. Needs the Terms URL set in
+      // Stripe's Checkout branding settings, or Stripe refuses to create the session.
+      consent_collection: { terms_of_service: 'required' },
+    });
+    return res.json({ url: session.url });
+  } catch (e) {
+    console.error('start-checkout failed:', e.message);
+    return res.status(500).json({ error: 'Could not start checkout. Please try again, or contact support.' });
+  }
+});
+
+/* CLAIM — the return from Stripe lands here with the session id. Verifies it WITH STRIPE, then
+   provisions through the SAME shared function the webhook uses, and hands back a one-time
+   sign-in so the customer never types a password to get in the first time.
+   ⛔ IT IS A RACE WITH THE WEBHOOK BY DESIGN, AND THAT IS FINE: provisionFromSession is
+   find-or-create throughout and the subscription write is an upsert, so whichever arrives second
+   is a no-op. Two paths exist because the claim is FAST and the webhook is RELIABLE, and a
+   customer who paid must be able to get in even if one of them never happens. */
+app.post('/api/claim-checkout', async (req, res) => {
+  if (notifyRateLimited(req, 'claim-checkout', 12, 120)) {
+    return res.status(429).json({ error: 'Too many attempts. Please wait a minute and try again.' });
+  }
+  const sessionId = String((req.body || {}).session_id || '');
+  if (!sessionId) return res.status(400).json({ error: 'Missing session id.' });
+  try {
+    const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
+    let session;
+    try {
+      session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['subscription'] });
+    } catch (e) {
+      // An unknown or forged id. Nothing is provisioned and nothing is logged as a fault.
+      return res.status(404).json({ error: 'That checkout could not be found.' });
+    }
+    // Not complete yet is NOT an error — the browser can come back. Anything else is refused.
+    if (session.status !== 'complete') {
+      return res.status(409).json({ error: 'That checkout is not finished.', pending: true });
+    }
+    const prov = await provisionFromSession(session, stripe);
+    if (prov.reason === 'existing_account') {
+      return res.status(409).json({
+        error: 'That email already has a Bar Cop account. Log in, then use Add Another Bar to set up this one.',
+        existing: true, email: prov.email });
+    }
+    if (!prov.ok) {
+      // The webhook is still coming, so this is retryable rather than terminal. Never say "done".
+      return res.status(503).json({ error: 'We are still setting up your bar. Refresh in a moment.', retry: true });
+    }
+    // A one-time sign-in for THIS email. The browser exchanges the hash for a session, so the
+    // customer lands inside the app already signed in and sets a password on the next screen.
+    let tokenHash = null;
+    try {
+      const { data: link } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink', email: prov.email });
+      tokenHash = link?.properties?.hashed_token || null;
+    } catch (e) {
+      console.error('claim-checkout: could not mint a sign-in for', prov.email, e.message);
+    }
+    // ⚠ NO tokenHash IS NOT A FAILURE. The account exists and is paid; they can still get in with
+    // a password reset. Say so rather than reporting an error over a working account.
+    return res.json({ ok: true, email: prov.email, accountId: prov.accountId, tokenHash: tokenHash });
+  } catch (e) {
+    console.error('claim-checkout failed:', e.message);
+    return res.status(503).json({ error: 'We are still setting up your bar. Refresh in a moment.', retry: true });
+  }
+});
+
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
   const sig    = req.headers['stripe-signature'];
@@ -1173,127 +1463,22 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
     // ordering guard in applySubUpdate compares like-for-like and drops stale retries.
     const eventIso = event.created ? new Date(event.created * 1000).toISOString() : new Date().toISOString();
     if (event.type === 'checkout.session.completed') {
-      const session    = event.data.object;
-      const customerId = session.customer;
-      const email      = session.customer_details?.email || session.customer_email;
-
-      let userId    = session.metadata?.user_id || null;
-      let accountId = session.metadata?.account_id || null;
-
-      if (!userId && email) {
-        // Paginate generously — an unpaginated listUsers() returns only the first
-        // ~50 users, so past that a returning customer on a metadata-less (payment
-        // link) checkout wouldn't be found and we'd wrongly try to re-create them.
-        const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        const found = existing?.users?.find(u => u.email === email);
-        if (found) {
-          userId = found.id;
-        } else {
-          const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-            email,
-            email_confirm: true,
-            user_metadata: { created_via: 'stripe_checkout' },
-          });
-          if (createErr) {
-            // Likely a concurrent webhook re-delivery already created them — re-look up.
-            const { data: retry } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-            const now = retry?.users?.find(u => u.email === email);
-            if (now) userId = now.id;
-            else console.error('Failed to create Supabase user:', createErr.message);
-          } else {
-            userId = created.user.id;
-            console.log('Account created for new subscriber:', email);
-          }
-        }
+      const session = event.data.object;
+      // The event time rides along so the shared provisioner stamps updated_at the same way the
+      // other handlers do, keeping applySubUpdate's ordering guard comparing like for like.
+      session._eventIso = eventIso;
+      const prov = await provisionFromSession(session, stripe);
+      if (!prov.ok) {
+        // Non-2xx so Stripe re-delivers. Acking success here is what strands a paid customer.
+        return res.status(500).json({ error: prov.reason + '; Stripe will retry' });
       }
-
-      // Billing is per bar (per account). The signup flow passes account_id in
-      // metadata; if it is missing (e.g. a raw payment link), fall back to the
-      // account this user owns.
-      if (!accountId && userId) {
-        const { data: acct } = await supabaseAdmin
-          .from('accounts')
-          .select('id')
-          .eq('owner_user_id', userId)
-          .limit(1)
-          .maybeSingle();
-        accountId = acct?.id || null;
-        // Metadata-less checkout by a user who owns no account yet (payment link):
-        // provision an account + owner membership so a paying customer is never
-        // left charged with nothing attached. Normal signup passes metadata and
-        // skips this entirely.
-        if (!accountId) {
-          const { data: newAcct } = await supabaseAdmin
-            .from('accounts').insert({ name: 'My Bar', owner_user_id: userId }).select('id').single();
-          if (newAcct) {
-            await supabaseAdmin.from('memberships').insert({ account_id: newAcct.id, user_id: userId, role: 'admin' });
-            accountId = newAcct.id;
-          }
-        }
-      }
-
-      if (accountId) {
-        // Only a brand-new subscription (no row yet) is a "new subscriber" — so the
-        // welcome email fires once, never on a Stripe re-delivery or a reactivation.
-        const { data: priorSub } = await supabaseAdmin
-          .from('subscriptions').select('account_id').eq('account_id', accountId).maybeSingle();
-        const isNewSubscriber = !priorSub;
-        // Only grant ACTIVE access when the checkout's payment actually cleared. Card
-        // checkout completes 'paid' (and free/trial is 'no_payment_required'); a delayed
-        // method like bank debit can complete UNPAID and fail later. We still record the
-        // subscription row (so the account is tracked and keyed by subscription id), but
-        // hold it inactive until customer.subscription.updated confirms it went active.
-        const paid = !session.payment_status
-          || session.payment_status === 'paid'
-          || session.payment_status === 'no_payment_required';
-        // CHECK THIS WRITE. supabase-js returns {error} rather than throwing, so a discarded
-        // result fell straight through to res.json({received:true}) below — Stripe marks the
-        // event delivered and NEVER retries. There is no recovery path: reconcileSubscriptions
-        // only walks rows that already exist, and later renewal events find no row by
-        // subscription id and no un-stamped row by customer, then return silently. The customer
-        // is billed monthly while has_active_subscription() stays false and the RESTRICTIVE
-        // require_active_sub policy denies every write — paying, and permanently locked out,
-        // with the app holding no record they ever paid. The `else` branch below already returns
-        // 500 so Stripe re-delivers when it cannot resolve an account; the branch that actually
-        // GRANTS access needs the same protection.
-        const { error: subWriteErr } = await supabaseAdmin.from('subscriptions').upsert({
-          account_id:             accountId,
-          user_id:                userId,
-          stripe_customer_id:     customerId,
-          // Store the subscription id so later subscription.updated/deleted events key
-          // on THIS subscription, not the customer. If an operator ever runs two bars
-          // under one Stripe Customer (same email via Link), a customer-keyed update
-          // would clobber the other bar; keying on the subscription id can't.
-          stripe_subscription_id: session.subscription || null,
-          subscription_status:    paid ? 'active' : 'incomplete',
-          subscription_plan:      'full_access',
-          active_modules:         paid ? ALL_MODULES : [],
-          current_period_end:     null,
-          updated_at:             eventIso,
-        }, { onConflict: 'account_id' });
-        if (subWriteErr) {
-          // Before the welcome email, deliberately: welcoming a customer into an account whose
-          // subscription row does not exist sends them to a screen that denies every write.
-          console.error('checkout.session.completed: subscriptions upsert FAILED for account',
-                        accountId, subWriteErr.message || subWriteErr);
-          return res.status(500).json({ error: 'subscription write failed; Stripe will retry' });
-        }
-        if (paid && isNewSubscriber && email) {
-          const { data: acctRow } = await supabaseAdmin
-            .from('accounts').select('name').eq('id', accountId).maybeSingle();
-          // Fire-and-forget on this long-running server: a slow or hung Resend call must
-          // never delay the webhook ack (a delayed ack makes Stripe retry the whole
-          // event). The priorSub check above already gates it to the first activation,
-          // so this fires exactly once and never on a re-delivery.
-          sendWelcomeEmail(email, acctRow && acctRow.name).catch(() => {});
-        }
-      } else {
-        // We charged the customer but could not resolve an account to attach the
-        // subscription to (e.g. a transient DB failure on a metadata-less payment
-        // link). Return non-2xx so Stripe re-delivers and we can try again, rather
-        // than acking success and stranding a paid customer with no account.
-        console.error('checkout.session.completed: no account_id resolved for customer', customerId);
-        return res.status(500).json({ error: 'account provisioning failed; Stripe will retry' });
+      if (prov.live && prov.isNewSubscriber && prov.email) {
+        const { data: acctRow } = await supabaseAdmin
+          .from('accounts').select('name').eq('id', prov.accountId).maybeSingle();
+        // Fire-and-forget on this long-running server: a slow or hung Resend call must never
+        // delay the webhook ack (a delayed ack makes Stripe retry the whole event). The
+        // isNewSubscriber check gates it to the first activation, so it fires exactly once.
+        sendWelcomeEmail(prov.email, acctRow && acctRow.name).catch(() => {});
       }
     }
 
