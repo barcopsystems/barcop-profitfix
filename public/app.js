@@ -412,6 +412,15 @@ const App = {
       return;
     }
     const session = await DB.getSession();
+    /* ⭐ CHECKOUT-FIRST ENTRY, and the `!session` half is the guard that matters. A visitor with no
+       account goes straight to a hosted Stripe page. A SIGNED-IN visitor falls through to the
+       ordinary boot instead: they already have an account, so a public checkout would take their
+       money and then be refused at the claim. Refusing before the charge beats refusing after it,
+       and the app is where Add Another Bar lives. */
+    if (!session && new URLSearchParams(window.location.search).get('start') === '1') {
+      await this._startPublicCheckout();
+      return;
+    }
     if (session) {
       this._bootedUserId = session.user?.id || null;
       // Returning from a Stripe checkout, the return_url carries ?bar=<id> so we
@@ -534,6 +543,53 @@ const App = {
       + '<div class="auth-sub" style="margin-top:14px;">Your data is safe on your account. If this keeps happening, try another network or email support@barcop.com.</div>'
       + '</div></div>';
     document.getElementById('boot-retry')?.addEventListener('click', () => location.reload());
+  },
+
+  /* ⭐⭐ CHECKOUT-FIRST: the pricing page lands here as `/?start=1&plan=annual`.
+     No account exists yet and that is the entire point — this hop asks the server for a HOSTED
+     Stripe session and hands the browser over. If the customer walks away at Stripe, nothing was
+     created: no auth user, no account, nothing to clean up, nothing to lock out of its own data.
+     ⛔ IT GOES THROUGH THE APP RATHER THAN STRAIGHT FROM SHOPIFY ON PURPOSE. It reuses the plan
+     validation that already exists here, it gives the operator a branded "one moment" instead of a
+     dead pause on a marketing page, and it keeps the public endpoint's caller in one place.
+     ⚠ A SIGNED-IN VISITOR IS NEVER SENT TO A PUBLIC CHECKOUT. They already have an account, so a
+     public session would be REFUSED at the claim after their card was charged. Kyle's rule is
+     "refuse and point at Add Another Bar" — doing that BEFORE the money moves is strictly better
+     than after, so this bails to the ordinary boot and they land in the app where that button is. */
+  async _startPublicCheckout() {
+    const scr = document.getElementById('auth-screen');
+    document.getElementById('app')?.classList.add('hidden');
+    const cover = (heading, sub, retry) => {
+      if (!scr) return;
+      scr.style.display = 'flex';
+      scr.innerHTML = '<div class="auth-view" style="display:block;"><div class="auth-card">'
+        + '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
+        + '<div class="auth-heading">' + heading + '</div>'
+        + '<div class="auth-sub">' + sub + '</div>'
+        + (retry ? '<div class="auth-inputs"><a class="btn btn-primary" href="https://www.barcop.com/pages/pricing" style="width:100%;display:block;text-align:center;">Back to Pricing</a></div>' : '')
+        + '</div></div>';
+    };
+    // No plan, or one that names nothing: the pricing page is the only place that can answer it.
+    if (!this._urlPlan) {
+      cover('Choose a plan first', 'That link did not carry a subscription plan, so there is nothing to set up yet. Pick a plan and Bar Cop will take you straight to payment.', true);
+      return;
+    }
+    cover('Taking You To Checkout', 'One moment. Bar Cop is opening a secure payment page for your <b style="color:var(--t1);">'
+      + (this._urlPlan === 'annual' ? 'Yearly' : 'Monthly') + '</b> plan.', false);
+    try {
+      const r = await fetch('/api/start-checkout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: this._urlPlan })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data && data.url) { window.location.href = data.url; return; }
+      // Say what the server said when it is worth saying, and never claim it worked.
+      cover('Could not open checkout', (data && data.error)
+        ? String(data.error)
+        : 'Something stopped the payment page from opening. Nothing has been charged. Please try again in a moment.', true);
+    } catch (e) {
+      cover('Could not reach Bar Cop', 'Check your connection and try again. Nothing has been charged.', true);
+    }
   },
 
   async startDemo() {
