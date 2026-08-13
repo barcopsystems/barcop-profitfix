@@ -871,7 +871,7 @@ const App = {
       + '</span>'
       + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Set Up My Bar</button>';
     document.body.appendChild(bar);
-    document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = '/?signup=1'; });
+    document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = 'https://www.barcop.com/pages/pricing'; });
   },
 
   // The public demo is fully functional EXCEPT App Settings (a visitor can't
@@ -898,7 +898,7 @@ const App = {
       + '<button class="btn btn-ghost btn-sm" id="demo-stay" style="margin-top:10px;">Keep Exploring</button>'
       + '</div>';
     document.body.appendChild(m);
-    m.querySelector('#demo-go').addEventListener('click', () => { window.location.href = '/?signup=1'; });
+    m.querySelector('#demo-go').addEventListener('click', () => { window.location.href = 'https://www.barcop.com/pages/pricing'; });
     m.querySelector('#demo-stay').addEventListener('click', () => m.remove());
     m.addEventListener('click', e => { if (e.target === m) m.remove(); });
     return true;
