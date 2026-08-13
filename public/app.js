@@ -623,6 +623,7 @@ const App = {
     };
     const RELOAD = '<div class="auth-inputs"><button class="btn btn-primary" id="claim-retry" style="width:100%;">Try Again</button></div>';
     const LOGIN  = '<div class="auth-inputs"><button class="btn btn-primary" id="claim-login" style="width:100%;">Go To Log In</button></div>';
+    const PRICING = '<div class="auth-inputs"><a class="btn btn-primary" href="https://www.barcop.com/pages/pricing" style="width:100%;display:block;text-align:center;">Back to Pricing</a></div>';
     const wire = () => {
       document.getElementById('claim-retry')?.addEventListener('click', () => location.reload());
       document.getElementById('claim-login')?.addEventListener('click', () => { window.location.href = '/'; });
@@ -637,6 +638,25 @@ const App = {
       if (r.status === 409 && d && d.existing) {
         cover('You Already Have An Account', (d.email ? esc(d.email) + ' already has a Bar Cop account. ' : '')
           + 'Log in, then use Add Another Bar to set this one up. Your payment is on file, so contact support@barcop.com if you need a hand.', LOGIN);
+        wire(); return;
+      }
+      /* ⛔⛔ THREE DIFFERENT "NOT OK"s, AND ONLY ONE OF THEM MAY MENTION A PAYMENT.
+         Found by walking the shipped build: a forged or EXPIRED session id took the catch-all
+         below and told the visitor "Your payment went through", which is a claim about their money
+         made on the one path where nothing is known to have been paid. Stripe sessions expire, and
+         a bookmarked or re-opened success URL lands here for real — so this was a dead end
+         asserting a charge, under a Try Again that could never work.
+         · 404  the session does not exist at Stripe. Nothing is known. Claim NOTHING.
+         · 409  Stripe has it but it never completed. Not paid.
+         · else the server RETRIEVED the session, saw it complete, and only provisioning lagged —
+                so the payment genuinely did go through and saying so is a kindness, not a guess. */
+      if (r.status === 404) {
+        cover('We Could Not Find That Checkout', 'This link does not match a checkout at our payment provider, or it has expired. '
+          + 'If you have paid, log in with the email you used, or contact support@barcop.com and we will sort it out.', LOGIN);
+        wire(); return;
+      }
+      if (r.status === 409 && d && d.pending) {
+        cover('That Checkout Was Not Finished', 'No payment was taken. Pick your plan and Bar Cop will take you straight back to the payment page.', PRICING);
         wire(); return;
       }
       if (!r.ok || !d || !d.ok) {
