@@ -1666,6 +1666,36 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* ══ AUTH ══ */
 .auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;}
 .auth-view{width:400px;}
+/* ⭐ THE MERGED SIGNUP FORM (Kyle's mockup, 2026-08-12): account + basics + service periods on
+   ONE screen, so a new operator meets one form instead of two full-page steps.
+   ⛔ 400px CANNOT HOLD THREE FIELDS ACROSS, which is the mockup's whole layout, so this panel
+   alone opts into a wider card. Every other auth panel is untouched at 400. */
+.auth-view-wide{width:660px;}
+/* Each block is a plain .auth-inputs panel — it already carries the dark fill, the radius and the
+   16px gap, so three of them stack into the mockup's three separated sections with no new box. */
+.su-block{text-align:left;}
+.su-sec{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--t1);margin-bottom:12px;}
+.su-help{font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:11px;}
+/* wrap, so the three-across rows become one-per-line on a narrow card rather than overflowing */
+.su-row{display:flex;gap:12px;flex-wrap:wrap;}
+.su-row > .f{flex:1;min-width:150px;}
+/* ⚠ MEASURED, AND IT CORRECTED ME: there was NO pre-existing overflow. `.auth-screen` is a FLEX
+   container, so a 400px card already shrinks to fit a 375px phone — every panel measures 375 and
+   fits without any rule at all. An earlier note here claimed a 25px overflow; it was wrong.
+   ⭐ SO THIS IS NOT A FIX, IT IS BREATHING ROOM, and only for the wide panel. 660px shrunk to 375
+   with 36px of card padding leaves 303px for three stacked fields; 16px of screen padding and 22px
+   of card padding gives 299px inside a card that does not touch the screen edges.
+   ⛔ SCOPED TO .auth-view-wide. Login, reset, set-password and the paywall are untouched — they
+   render exactly as they do today, and restyling four screens nobody asked about is the blanket
+   change this project does not make. */
+@media (max-width:768px){
+  /* ⚠ padding on the VIEW, not on the shared .auth-screen — that element hosts all five
+     panels, so padding it would move the other four. box-sizing keeps 100% + padding inside the
+     viewport. An earlier version reached for a parent selector matching the inline display style:
+     brittle, and solving a problem that plain scoping already solves. */
+  .auth-view-wide{width:100%;max-width:100%;padding:0 16px;box-sizing:border-box;}
+  .auth-view-wide .auth-card{padding:22px;}
+}
 .auth-card{background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:36px;}
 .auth-logo{display:flex;justify-content:center;margin-bottom:24px;}
 .auth-heading{font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:6px;text-align:center;}

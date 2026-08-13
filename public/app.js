@@ -794,8 +794,17 @@ const App = {
     // member can't access are shown in place but blanked + gated with a friendly
     // no-access notice (see S.Hub.render + App.showNoAccess), so there is no
     // separate simplified landing anymore.
+    /* ⭐⭐ THREE CASES NOW, NOT TWO (Kyle's merged signup form, 2026-08-12).
+       The signup form collects the bar's basics and service periods on the SAME screen as the
+       account, so a brand-new signup arrives here already answered. `_signupDraft` is the hand-off:
+       the form could not write these itself because `App.data.settings` does not exist until
+       `loadAllData()` runs, which is the line above this one.
+       ⛔ ONBOARDING IS NOT DEAD AND MUST NOT BE. It still runs for (a) any existing account that
+       never finished it, and (b) Add Another Bar, which mounts it with {newBar:true} and saves
+       NOTHING — the bar is created only after payment. Deleting it would take that path with it. */
     if (!this.data.settings.onboarding_complete) {
-      Onboarding.start();
+      if (this._signupDraft) this._applySignupDraft();
+      else Onboarding.start();
     } else {
       this.showHub();
       this._promptSync();
@@ -1871,6 +1880,47 @@ const App = {
     return { module: 'inventory', screen: 'ic-take-inventory' };
   },
 
+
+  /* Apply the answers the merged signup form collected, then open the Hub.
+     ⛔ ITS OWN MEMBER BECAUSE THE CALLER IS NOT ASYNC. Written inline in boot it was
+     `await` inside a synchronous function — caught by `node --check`, which is the one thing a
+     syntax check CAN see. A named member also means a harness can lift and run it, which an inline
+     branch in a 200-line boot cannot.
+     ⛔ CONSUME-ONCE. The draft is cleared BEFORE the first await, so a second boot (Supabase
+     re-emits SIGNED_IN when the tab regains visibility) cannot re-apply a stale one over settings
+     the operator has since edited.
+     ⚠ The write order matters: settings first, then the account-name sync. If the sync fails the
+     bar is still named correctly IN the app — only the switcher label lags, which is recoverable
+     from Business Profile. The reverse order would leave a named account with no settings. */
+  async _applySignupDraft() {
+    const d = this._signupDraft;
+    if (!d) return false;
+    this._signupDraft = null;
+    const s = this.data.settings;
+    s.bar_name        = d.bar_name;
+    s.city_state      = d.city_state;
+    s.service_periods = d.service_periods;
+    s.onboarding_complete = true;
+    try {
+      await this.saveKey('settings');
+    } catch (e) {
+      /* The account exists and the operator is signed in, so the recoverable state is the Hub with
+         onboarding still owed — never a dead screen. Business Profile writes the same four fields. */
+      console.error('signup draft save failed', e);
+    }
+    /* Keep the bar switcher (accounts.name) in step with the name just set — the same sync
+       Onboarding.finish does, and for the same reason: the signup trigger names a fresh account
+       after the user's EMAIL, so without this the switcher shows an email address. */
+    try {
+      if (window.DB && DB.setAccountName) {
+        await DB.setAccountName(s.bar_name);
+        if (this.renderAccountSwitcher) await this.renderAccountSwitcher();
+      }
+    } catch (e) { console.error('account name sync', e); }
+    this.showHub();
+    this._promptSync();
+    return true;
+  },
 
   showApp(module) {
     // Close any open Hub overlay modal before entering a module view
@@ -10648,8 +10698,26 @@ function wireAuth() {
     opts.forEach(o => o.addEventListener('click', () => select(o)));
     if (opts[0]) select(opts[0]);  // default to Monthly
   };
-  wirePlanPicker('signup-plan-picker');
+  /* ⛔ `wirePlanPicker('signup-plan-picker')` WAS HERE AND WIRED NOTHING — measured: no element of
+     that id exists in index.html. It is debris from when the plan was chosen on the signup form,
+     before the in-app gate replaced that shape. Removed rather than left looking load-bearing. */
   wirePlanPicker('paywall-plan-picker');
+
+  /* ── THE MERGED SIGNUP FORM'S SERVICE PERIODS (Kyle's mockup, 2026-08-12) ─────────────────────
+     The same control Onboarding mounts, with the same defaults: every preset except Breakfast, on.
+     Mounted once here because the panel is static markup — there is nothing to re-bind, the same
+     reason #tn-acct and the rail are wired once at boot.
+     ⚠ LIFTED FROM THE PRESETS, never a hand-typed list: `App.SERVICE_PERIOD_PRESETS` is the one
+     source of what a period is called and when it runs, and a second copy here would drift the day
+     a preset changes. */
+  (() => {
+    const mountEl = document.getElementById('su-sp-mount');
+    if (!mountEl || !window.ServicePeriods) return;
+    const defaults = (App.SERVICE_PERIOD_PRESETS || [])
+      .filter(p => p.name !== 'Breakfast')
+      .map(p => ({ id: 'sp_su_' + p.name.toLowerCase().replace(/[^a-z]/g, ''), name: p.name, start: p.start, end: p.end }));
+    App._suSpCtrl = ServicePeriods.mount(mountEl, { selected: defaults });
+  })();
   const selectedPlan = (pickerId) => {
     const sel = document.querySelector('#' + pickerId + ' .plan-opt.plan-selected');
     return (sel && sel.dataset.plan) || 'monthly';
@@ -10691,7 +10759,36 @@ function wireAuth() {
     if (!email || email.indexOf('@') < 1) return showErr('Enter a valid email address.');
     if (!pw1 || pw1.length < 8) return showErr('Password must be at least 8 characters.');
     if (pw1 !== pw2) return showErr('Passwords do not match.');
+
+    /* ── THE ONBOARDING HALF, VALIDATED BEFORE ANYTHING IS CREATED ────────────────────────────
+       ⛔ ORDER IS THE WHOLE POINT: every one of these refusals fires BEFORE `DB.signUp`, so a blank
+       bar name can never leave a half-made auth user behind. A guard placed after the create would
+       be the "what has the operator already spent" mistake — here it would be an account.
+       ⚠ The rules are Onboarding.finish's, not new ones: name/city/state required, at least one
+       service period, and no unnamed custom period. Copying the REASON, not just the shape. */
+    const suName  = (document.getElementById('su-name').value || '').trim();
+    const suCity  = (document.getElementById('su-city').value || '').trim();
+    const suState = (document.getElementById('su-state').value || '').trim();
+    const flag = (id, bad) => document.getElementById(id)?.closest('.f')?.classList.toggle('ob-invalid', bad);
+    flag('su-name', !suName); flag('su-city', !suCity); flag('su-state', !suState);
+    if (!suName || !suCity || !suState) return showErr('Enter your bar name, city and state.');
+
+    const spAll = App._suSpCtrl ? App._suSpCtrl.value() : [];
+    if (spAll.some(p => !(p.name || '').trim())) return showErr('Name your custom period, or turn it off.');
+    const spPicked = spAll.filter(p => p && p.name);
+    if (!spPicked.length) return showErr('Pick at least one service period.');
+
     if (!tos) return showErr('Please agree to the Terms of Use and Privacy Policy to continue.');
+
+    /* ⭐ HANDED TO BOOT, NOT WRITTEN HERE. `App.data.settings` does not exist yet — it arrives with
+       `loadAllData()` on SIGNED_IN — so this stashes the answers and boot applies them at the one
+       point the settings object is guaranteed to be there. That also keeps ONE write path: boot
+       already decides onboarding-or-Hub, and it now has a third case. */
+    App._signupDraft = {
+      bar_name: suName,
+      city_state: suCity && suState ? suCity + ', ' + suState : (suCity || suState || ''),
+      service_periods: spPicked
+    };
 
     btn.textContent = 'Creating account...'; btn.disabled = true;
     try {
