@@ -421,6 +421,15 @@ const App = {
       await this._startPublicCheckout();
       return;
     }
+    /* ⭐ THE CHECKOUT-FIRST RETURN. `!session` is what tells it apart from the EXISTING return
+       (an in-app upgrade, or Add Another Bar), which is already signed in and handled below. */
+    if (!session) {
+      const _rq = new URLSearchParams(window.location.search);
+      if (_rq.get('checkout') === 'success' && _rq.get('session_id')) {
+        await this._claimCheckout(_rq.get('session_id'));
+        return;
+      }
+    }
     if (session) {
       this._bootedUserId = session.user?.id || null;
       // Returning from a Stripe checkout, the return_url carries ?bar=<id> so we
@@ -590,6 +599,88 @@ const App = {
     } catch (e) {
       cover('Could not reach Bar Cop', 'Check your connection and try again. Nothing has been charged.', true);
     }
+  },
+
+  /* ⭐⭐ THE RETURN FROM STRIPE. Lands as `/?checkout=success&session_id=…` with NO session, because
+     on checkout-first the customer has never signed in — the account is created by this call.
+     ⛔ THE SERVER IS THE ONE THAT DECIDES ANYTHING. All this sends is the session id; the server
+     re-reads it from Stripe, so a forged or edited id resolves to nothing.
+     ⚠ THE URL IS CLEANED BEFORE THE SIGN-IN, not after: a reload mid-way must not re-run a claim
+     with a token that has already been spent.
+     ⚠ NO ONE-TIME TOKEN IS NOT A FAILURE. The account exists and is paid; they get in with
+     Forgot Password. Reporting an error over a working, paid account is the worse answer. */
+  async _claimCheckout(sessionId) {
+    const scr = document.getElementById('auth-screen');
+    document.getElementById('app')?.classList.add('hidden');
+    const cover = (heading, sub, action) => {
+      if (!scr) return;
+      scr.style.display = 'flex';
+      scr.innerHTML = '<div class="auth-view" style="display:block;"><div class="auth-card">'
+        + '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
+        + '<div class="auth-heading">' + heading + '</div>'
+        + '<div class="auth-sub">' + sub + '</div>'
+        + (action || '') + '</div></div>';
+    };
+    const RELOAD = '<div class="auth-inputs"><button class="btn btn-primary" id="claim-retry" style="width:100%;">Try Again</button></div>';
+    const LOGIN  = '<div class="auth-inputs"><button class="btn btn-primary" id="claim-login" style="width:100%;">Go To Log In</button></div>';
+    const wire = () => {
+      document.getElementById('claim-retry')?.addEventListener('click', () => location.reload());
+      document.getElementById('claim-login')?.addEventListener('click', () => { window.location.href = '/'; });
+    };
+    cover('Payment Received', 'Setting up your bar. This takes a few seconds.', '');
+    try {
+      const r = await fetch('/api/claim-checkout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.status === 409 && d && d.existing) {
+        cover('You Already Have An Account', (d.email ? esc(d.email) + ' already has a Bar Cop account. ' : '')
+          + 'Log in, then use Add Another Bar to set this one up. Your payment is on file, so contact support@barcop.com if you need a hand.', LOGIN);
+        wire(); return;
+      }
+      if (!r.ok || !d || !d.ok) {
+        // Retryable, not terminal: the webhook provisions independently and may simply be a
+        // moment behind. Never say "done" and never say "failed".
+        cover('Still Setting Up Your Bar', 'Your payment went through. Bar Cop is finishing your account, which can take a few seconds.', RELOAD);
+        wire(); return;
+      }
+      window.history.replaceState({}, '', '/');
+      if (d.tokenHash && DB._sb) {
+        const { error } = await DB._sb.auth.verifyOtp({ token_hash: d.tokenHash, type: 'magiclink' });
+        if (!error) { this._showFinishSetup(d.email); return; }
+      }
+      cover('Your Bar Is Ready', 'Use Forgot Password with ' + esc(d.email || 'your email')
+        + ' to set a password, then log in. Your subscription is active.', LOGIN);
+      wire();
+    } catch (e) {
+      cover('Still Setting Up Your Bar', 'Your payment went through. Check your connection and try again.', RELOAD);
+      wire();
+    }
+  },
+
+  /* THE FINISH SCREEN. Kyle\'s design: one screen, not two. It REUSES the signup form rather than
+     growing a second one — same fields, same validation, same service-period control — with the
+     email filled in and LOCKED, because it is the address that paid and changing it here would
+     desync the account from the Stripe customer. Changing it later belongs in Settings (E1).
+     ⚠ The Terms row is hidden: acceptance was collected and RECORDED by Stripe on the session,
+     which is stronger evidence than a checkbox here. */
+  _showFinishSetup(email) {
+    this._finishMode = true;
+    this.showAuth();
+    ['auth-login', 'auth-signup', 'auth-reset', 'auth-set-password', 'auth-paywall'].forEach(x => {
+      const el = document.getElementById(x); if (el) el.style.display = (x === 'auth-signup') ? '' : 'none';
+    });
+    const em = document.getElementById('signup-email');
+    if (em && email) { em.value = email; em.readOnly = true; em.style.opacity = '0.7'; }
+    const head = document.querySelector('#auth-signup .auth-heading');
+    if (head) head.textContent = 'Finish Setting Up Your Bar Cop Account';
+    const sub = document.querySelector('#auth-signup .auth-sub');
+    if (sub) sub.innerHTML = 'Payment received. You paid with <b style="color:var(--t1);">' + esc(email || '') + '</b>. Set a password and tell Bar Cop about your bar.';
+    const tosRow = document.getElementById('signup-tos')?.closest('label');
+    if (tosRow) tosRow.style.display = 'none';
+    const btn = document.getElementById('signup-btn');
+    if (btn) { btn.textContent = 'Finish Setup'; btn.disabled = false; }
   },
 
   async startDemo() {
@@ -11001,7 +11092,9 @@ function wireAuth() {
     const spPicked = spAll.filter(p => p && p.name);
     if (!spPicked.length) return showErr('Pick at least one service period.');
 
-    if (!tos) return showErr('Please agree to the Terms of Use and Privacy Policy to continue.');
+    // Terms were collected and recorded by Stripe on the checkout session in finish mode, so the
+    // row is hidden and this refusal would be asking for something that is not on screen.
+    if (!App._finishMode && !tos) return showErr('Please agree to the Terms of Use and Privacy Policy to continue.');
 
     /* ⭐ HANDED TO BOOT, NOT WRITTEN HERE. `App.data.settings` does not exist yet — it arrives with
        `loadAllData()` on SIGNED_IN — so this stashes the answers and boot applies them at the one
@@ -11013,8 +11106,24 @@ function wireAuth() {
       service_periods: spPicked
     };
 
-    btn.textContent = 'Creating account...'; btn.disabled = true;
+    btn.textContent = App._finishMode ? 'Setting up...' : 'Creating account...'; btn.disabled = true;
     try {
+      /* ⛔ FINISH MODE DIVERGES HERE AND NOWHERE ELSE. The account already exists — it was created
+         from the paid Stripe session — so creating one would be a second account for a customer
+         who has paid once. All that is owed is the password, and the draft above, which boot
+         applies exactly as it does for the ordinary path. ONE write path, two ways in. */
+      if (App._finishMode) {
+        const { error: pwErr } = await DB._sb.auth.updateUser({ password: pw1 });
+        if (pwErr) {
+          btn.textContent = 'Finish Setup'; btn.disabled = false;
+          return showErr(pwErr.message || 'Could not set your password. Please try again.');
+        }
+        App._finishMode = false;
+        await App.loadAllData();
+        App.subscription = await DB.getSubscription();
+        App.boot();
+        return;
+      }
       const { data: suData, error: signErr } = await DB.signUp(email, pw1);
       if (signErr) {
         btn.textContent = 'Create Account'; btn.disabled = false;
