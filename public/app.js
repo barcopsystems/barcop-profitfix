@@ -974,6 +974,23 @@ const App = {
        ⛔ ONBOARDING IS NOT DEAD AND MUST NOT BE. It still runs for (a) any existing account that
        never finished it, and (b) Add Another Bar, which mounts it with {newBar:true} and saves
        NOTHING — the bar is created only after payment. Deleting it would take that path with it. */
+    /* ⛔⛔ AN ACCOUNT PROVISIONED FROM A PAID CHECKOUT HAS NO PASSWORD YET, AND THAT FACT HAS TO
+       LIVE ON THE ACCOUNT, NOT IN A VARIABLE. Kyle walked this on 2026-08-13 and landed on ordinary
+       onboarding: `_finishMode` is in memory, so a reload, a closed tab or a second visit loses it.
+       Plain onboarding never asks for a password — so the customer would finish it, reach the Hub,
+       and have NO WAY BACK IN, with nothing having told them. That is the worst end state this
+       whole rebuild exists to prevent, reached by pressing F5.
+       ⭐ `provisionFromSession` already stamps `created_via: 'stripe_checkout'` on every user it
+       creates, so the marker was there before this bug was. Read it here, clear it when a password
+       is actually set, and the finish screen becomes unskippable however the operator arrives.
+       ⚠ It is checked BEFORE onboarding on purpose: the finish screen already asks everything
+       onboarding does, so sending them to onboarding first would ask twice and still leave them
+       without a password. */
+    const _meta = (window.DB && DB._user && DB._user.user_metadata) || {};
+    if (_meta.created_via === 'stripe_checkout' && !_meta.password_set) {
+      this._showFinishSetup(DB._user.email);
+      return;
+    }
     if (!this.data.settings.onboarding_complete) {
       if (this._signupDraft) this._applySignupDraft();
       else Onboarding.start();
@@ -11133,11 +11150,21 @@ function wireAuth() {
          who has paid once. All that is owed is the password, and the draft above, which boot
          applies exactly as it does for the ordinary path. ONE write path, two ways in. */
       if (App._finishMode) {
-        const { error: pwErr } = await DB._sb.auth.updateUser({ password: pw1 });
+        /* `password_set` is what releases the finish screen at boot. It rides in the SAME call as
+           the password, so the two can never disagree — a password set without the marker would
+           send them back here forever, and the marker without the password would strand them with
+           no way to log in. */
+        const { data: upd, error: pwErr } = await DB._sb.auth.updateUser({
+          password: pw1, data: { password_set: true }
+        });
         if (pwErr) {
           btn.textContent = 'Finish Setup'; btn.disabled = false;
           return showErr(pwErr.message || 'Could not set your password. Please try again.');
         }
+        /* ⛔ REFRESH THE CACHED USER. `boot()` two lines down reads `DB._user.user_metadata`, and a
+           stale copy still says password_set is missing — which routes straight back to this screen
+           in a loop, on the one path where the operator has done everything right. */
+        if (upd && upd.user) DB._user = upd.user;
         App._finishMode = false;
         await App.loadAllData();
         App.subscription = await DB.getSubscription();
