@@ -443,7 +443,20 @@ input,select,textarea{color-scheme:dark;}
 /* Popup form-cards: even padding all sides and inset (not full-bleed) header/footer
    dividers, so the modal reads contained. On-page form-cards keep their full-bleed bands. */
 #app-modal-host .form-card{padding:18px;}
-#app-modal-host .form-card > .card-title{margin:0 0 16px;padding:0 0 14px;}
+/* ⛔ NO HEAD BAND ON A POPUP (Kyle, 2026-08-12: "they all have this background color above the
+   header line that goes half way up.. that needs removed").
+   THE CAUSE, MEASURED ON THE LIVE RAIL POPUP: this rule already cancelled the base .card-title
+   band's NEGATIVE MARGIN and its horizontal padding — but not its background:var(--card-head).
+   So the fill survived with nothing to bleed to and rendered as a floating rectangle INSET by the
+   card's own 14px padding, sitting above the divider: fill rgb(8,19,26), inset 15px on all four
+   sides. A band that does not reach the card edge is not a band, it is a box.
+   ⭐ THE DIVIDER STAYS. That is what this heading was borrowing the class FOR in the first place
+   ([[lessons-paid-for]] #11 — .card-title was rented for its rule, then became a band under it),
+   and a line is all a popup header needs.
+   ⛔ SCOPED TO #app-modal-host DELIBERATELY. A real card head SHOULD carry the fill — that is the
+   whole card-colour pass. 144 .card-title sites live in page cards and not one of them changes
+   here, and verify-card-head-band pins that they keep their band, so widening this fails the gate. */
+#app-modal-host .form-card > .card-title{margin:0 0 16px;padding:0 0 14px;background:none;border-radius:0;}
 #app-modal-host .form-card .card-actions{margin:16px 0 0;padding:14px 0 0;}
 /* On phones a multi-action modal footer stacks full-width (clean tap targets)
    instead of ragged wrapping. Chips/filters/segmented toggles are not .card-actions,
