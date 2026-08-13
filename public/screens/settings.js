@@ -1702,14 +1702,36 @@ S.HubSettings = {
     ];
 
     // ── Dog tests ──
+    /* ⛔⛔ EVERY ONE OF THESE CARRIES `item_id` NOW, AND WITHOUT IT THE ACTIVE TEST TESTED NOTHING.
+       Kyle, walking the Dog Test Tracker: *"is that missing information? it doesn't look like it is
+       testing anything?"* — the running Key Lime Pie test read **"not set on item"** with no lift.
+       ⭐ THE LABEL POINTED AT THE WRONG THING. The item was not missing a figure — all 78 menu items
+       carry `weekly_covers`. `currentFor` resolves the CURRENT volume as
+       `itemMap[t.item_id].weekly_covers`, and these records had no `item_id` at all, so there was
+       nothing to resolve. The real create door always writes one (`r-dog-test` sets `item_id: itemId`
+       and defaults the baseline off that same item), so this was seed-only — a record shape the app
+       itself never produces ([[seed-honesty-audit]]).
+       ⚠ SECOND CONSUMER, and it was silently dead too: `r-menu-engineering.dogTestFor(id)` filters
+       `t.item_id === id`, so the board could never show a test badge for these three items.
+       ⚠ THE DECIDED ROWS ARE UNAFFECTED BY THE LINK: history reads `current_volume ?? liveCur`, so
+       the snapshot still wins and Veggie Grain Bowl stays 41, Pretzel Bites stays 19. Those
+       snapshots are honest — the real app writes `current_volume` AT DECISION TIME.
+       ⛔ WHICH IS WHY THE ACTIVE TEST NO LONGER CARRIES ONE. It had `current_volume:33`, a field a
+       running test cannot have yet; the live item figure IS its current volume, by design.
+       ⚠ AND THE BASELINE MOVED 30 -> 27 SO THERE IS SOMETHING TO SEE. Key Lime Pie sells 30/wk, so a
+       baseline of 30 renders "+0 units (+0%)" — still reading as a test that is not testing. The
+       baseline is what the dish sold BEFORE the change, it lives on this record, and it is read by
+       nothing outside the Dog Test screen (swept), so it is the one lever here with no blast radius:
+       27 -> 30 is +3 (+11%) on day 34 of 90. Moving the ITEM to 33 instead would have shifted Menu
+       Engineering, the board and the rundown to make one demo card read better. */
     App.data.menu_dog_tests = [
-      { id:uid(), item_name:'Veggie Grain Bowl', start_date:dateStr(40), baseline_volume:28,
+      { id:uid(), item_id:(rItem('Veggie Grain Bowl') || {}).id, item_name:'Veggie Grain Bowl', start_date:dateStr(40), baseline_volume:28,
         change_notes:'Rewrote the menu description and moved it up under Entrees.',
         current_volume:41, status:'Kept', decided_at:daysAgoISO(12) },
-      { id:uid(), item_name:'Key Lime Pie', start_date:dateStr(34), baseline_volume:30,
+      { id:uid(), item_id:(rItem('Key Lime Pie') || {}).id, item_name:'Key Lime Pie', start_date:dateStr(34), baseline_volume:27,
         change_notes:'Added a dessert mention to the server close-out script.',
-        current_volume:33, status:'Testing', decided_at:null },
-      { id:uid(), item_name:'Pretzel Bites', start_date:dateStr(78), baseline_volume:38,
+        status:'Testing', decided_at:null },
+      { id:uid(), item_id:(rItem('Pretzel Bites') || {}).id, item_name:'Pretzel Bites', start_date:dateStr(78), baseline_volume:38,
         change_notes:'Ran it as a featured app for two weeks to see if volume held.',
         current_volume:19, status:'Removed', decided_at:daysAgoISO(58) },
     ];
