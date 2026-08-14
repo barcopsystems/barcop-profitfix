@@ -510,17 +510,29 @@ S.Hub = {
         how: 'Add your vendors and products, set your pars, take one count.',
         gain: 'Straight away: what to reorder, and the cash sitting on your shelves.',
         lights: ['Below par'], done: n(I.ic_counts) },
+      /* ⛔ REQUIRED EVEN WITH A PERFECT POS, and this is the opposite of registers. Measured in
+         `PosIngest`: an hours row whose name is not on the roster is `noMatch` and `lands: false` —
+         its own comment says *"an unmatched NAME is a roster fix"*, because auto-creating people
+         once meant "they added a duplicate that fixed nothing and corrupted the roster". A drawer
+         report CAN mint registers; an hours report can never mint staff. The copy has to say so or
+         an operator with a good POS export skips this and imports nothing. */
       { label: 'Add your people', screen: 'lc-positions', mod: 'labor',
         how: 'Add your positions, then your staff.',
-        gain: 'Hours are what turn your sales into a real labor cost, and no week closes without them.',
+        gain: 'Needed either way: an hours report only lands for people already on your roster.',
         lights: ['Hours logged', 'Overtime'], done: n(L.lc_positions) && n(L.lc_staff) },
       { label: 'Add your registers', screen: 'sc-drawers', mod: 'shift', optional: true,
         how: 'Only if you reconcile drawers in Bar Cop each shift.',
         gain: 'Drop a drawer report at step 4 instead and Bar Cop sets your registers up from it.',
         lights: [], done: n(S2.sc_drawers) },
+      /* ⭐ THE TWO WAYS ARE NAMED HERE AND NOWHERE ELSE ON THIS CARD. Close the Week already shows
+         both doors per piece — the drop lane AND a second button named for the page it opens (Log
+         Hours, Tip Tracking, Cash Control, Take Inventory, Event Bookings), with sales' manual
+         entry inline. Repeating that matrix on the Hub would duplicate it, and a duplicate drifts.
+         This step just sets the expectation; the page itself does the teaching, at the moment the
+         operator is choosing. */
       { label: 'Close your first week', screen: 'week-close', mod: 'profit',
-        how: 'Drop your sales, log your hours, and your count comes in on its own.',
-        gain: 'Now the Hub fills in: cost of goods, hours and overtime, voids and comps.',
+        how: 'Drop your POS reports for the week, or enter each piece by hand.',
+        gain: 'Every piece shows you both ways. Cost of goods comes off your count on its own.',
         lights: ['Cost of goods', 'Voids and comps'], done: n(D.weeks) }
     ];
   },
@@ -1187,23 +1199,30 @@ S.Hub = {
        ⚠ THE CHIP CARRIES `flex:1`, WHICH MEANS THE MAIN AXIS. Dropped straight into a COLUMN it
        would grow vertically and stretch the button to the tallest column. The one-line row wrapper
        gives it a horizontal main axis again, so it fills the column's width and keeps its height. */
-    const gsCol = (n, s) =>
-      '<div style="flex:1;min-width:200px;display:flex;flex-direction:column;">'
-      +   '<div style="display:flex;">'
+    /* ⛔ NO GOLD SENTENCES. Kyle, 2026-08-14: *"get rid of all the gold text color.. it's too much
+       gold.. if you want like one gold word 'word:' or something in gold fine.. but full sentences
+       no."* The second line was gold end to end across all four columns, which turned an accent
+       into the page's loudest colour. The divider does the separating. */
+    const gsCol = (n, s, col) =>
+      '<div class="hub-gs-step">'
+      +   '<div style="display:flex;grid-row:1;grid-column:' + col + ';">'
       +     gsChip(n, esc(s.label)
       /* Close the Week's exact OPTIONAL treatment, so both screens mean the same thing by it. */
               + (s.optional ? ' <span style="font-size:10px;font-weight:600;color:var(--t4);letter-spacing:0.5px;">OPTIONAL</span>' : ''),
               s.screen, s.mod)
       +   '</div>'
-      +   '<div style="font-size:11px;color:' + (s.optional ? 'var(--t3)' : 'var(--t2)') + ';line-height:1.55;padding:9px 2px 0;">'
+      +   '<div style="grid-row:2;grid-column:' + col + ';font-size:11px;color:' + (s.optional ? 'var(--t3)' : 'var(--t2)') + ';line-height:1.55;padding:9px 2px 12px;">'
       +     esc(s.how) + '</div>'
-      +   (s.gain ? '<div style="font-size:11px;color:var(--gold);line-height:1.55;margin-top:9px;padding:9px 2px 0;border-top:1px solid var(--b-edge);">'
-      +     esc(s.gain) + '</div>' : '')
+      +   '<div style="grid-row:3;grid-column:' + col + ';font-size:11px;color:var(--t2);line-height:1.55;padding:11px 2px 0;border-top:1px solid var(--b-edge);">'
+      +     esc(s.gain || '') + '</div>'
       + '</div>';
     const gettingStarted = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
       + 'Four steps to your first closed week. Each one adds to the last.</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      +   gsSteps.map((s, i) => gsCol(i + 1, s)).join('')
+      /* ⚠ EVERY STEP RENDERS ALL THREE PARTS, even an empty payoff line, or its column would have no
+         row 3 and the divider would vanish from that column alone — which is exactly the ragged look
+         this grid exists to fix. */
+      + '<div class="hub-gs">'
+      +   gsSteps.map((s, i) => gsCol(i + 1, s, i + 1)).join('')
       + '</div>';
     /* ⛔⛔ REVERSED 2026-08-11, AND THE REASON I HAD IT THE OTHER WAY WAS WRONG. During the rebuild I
        made the band always render, arguing a new operator should see "the four numbers the product
