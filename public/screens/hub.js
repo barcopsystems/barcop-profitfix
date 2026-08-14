@@ -465,12 +465,63 @@ S.Hub = {
      ⚠ A MEMBER SO A HARNESS CAN RESOLVE THEM. Built inline, these destinations were invisible to
      `verify-hub-destinations` (it scans for literal `_enter` calls and these are interpolated) —
      the same blind spot that let a dead cockpit link ship in the metric strip. */
+  /* ⭐⭐ EACH STEP NOW SAYS WHAT IT BUYS, AND EVERY PAYOFF IS MEASURED (Kyle, 2026-08-14: *"what does
+     that do for the user is what i think is missing... each main step should compound on the next"*).
+     `lights` names the Hub cells that step turns from a dash into a figure, and
+     `verify-hub-getting-started` RUNS `_stripMetrics` per section to prove each one. Nothing here
+     may claim a cell the measurement does not produce.
+     ⛔ THE PAYOFFS COME FROM THREE STORES, NOT ONE, and I had this wrong until it was measured:
+     cost of goods off the WEEK record, hours and overtime off `lc_actuals`, voids off
+     `sc_void_comps`. So each step owns its own cells and the week close is what makes them readable
+     together. That is the compounding, and it is a fact about the code rather than a copy device.
+     ⛔ STEP 2 DOES NOT SAY "your hours appear here". Measured: once a week closes, hours read
+     `0 hrs` whether or not any were logged, because `sum()` returns null only when there is no
+     span. The true claim is that Close the Week GATES on `st.hours.length > 0`, so there is no
+     closing a week without them.
+     ⚠ RUN YOUR FIRST AUDIT IS GONE, by Kyle's call: *"the audit pages have their own steps to show
+     what user needs to do for a full audit"*. The destination is the weekly loop now, which is what
+     the four steps were always building toward.
+     ⚠ REGISTERS ARE OPTIONAL, and the app already proves why: drop a drawer report and the cash
+     import offers "Add as a new register" for every name it does not know, remembering the POS's
+     spelling. It is only a real step for an operator reconciling drawers by hand. */
+  /* Get Started's visibility, stored on the ACCOUNT so the choice follows the operator to every
+     device. Three states and only one is permanent: 'open', 'hidden' (reversible), 'dismissed'.
+     ⚠ ANY UNRECOGNISED VALUE READS AS 'open'. The card coming back is a nuisance; the card being
+     gone because a stray value looked like a dismissal is data the operator cannot get back. */
+  _gsState() {
+    const v = ((App.data || {}).settings || {}).hub_getting_started;
+    return (v === 'hidden' || v === 'dismissed') ? v : 'open';
+  },
+  async _gsSet(state) {
+    if (App.demoMode) return;
+    const s = (App.data || {}).settings;
+    if (!s) return;
+    s.hub_getting_started = state;
+    try { await App.saveKey('settings'); } catch (e) { console.error('get-started state save failed', e); }
+    // Repaint: every one of these states is a different card.
+    if (App.showHub) App.showHub();
+  },
+
   _getStartedSteps() {
+    const D = App.data || {}, I = App.inventoryData || {}, L = App.laborData || {}, S2 = App.shiftData || {};
+    const n = a => ((a || []).length > 0);
     return [
-      { label: 'Set up Inventory Control', screen: 'ic-vendors',    mod: 'inventory' },
-      { label: 'Set up Labor Control',     screen: 'lc-positions',  mod: 'labor' },
-      { label: 'Set up Shift Control',     screen: 'sc-drawers',    mod: 'shift' },
-      { label: 'Run your first audit',     screen: 'audit-tracker', mod: 'profit' }
+      { label: 'Count your bar', screen: 'ic-vendors', mod: 'inventory',
+        how: 'Add your vendors and products, set your pars, take one count.',
+        gain: 'Straight away: what to reorder, and the cash sitting on your shelves.',
+        lights: ['Below par'], done: n(I.ic_counts) },
+      { label: 'Add your people', screen: 'lc-positions', mod: 'labor',
+        how: 'Add your positions, then your staff.',
+        gain: 'Hours are what turn your sales into a real labor cost, and no week closes without them.',
+        lights: ['Hours logged', 'Overtime'], done: n(L.lc_positions) && n(L.lc_staff) },
+      { label: 'Add your registers', screen: 'sc-drawers', mod: 'shift', optional: true,
+        how: 'Only if you reconcile drawers in Bar Cop each shift.',
+        gain: 'Drop a drawer report at step 4 instead and Bar Cop sets your registers up from it.',
+        lights: [], done: n(S2.sc_drawers) },
+      { label: 'Close your first week', screen: 'week-close', mod: 'profit',
+        how: 'Drop your sales, log your hours, and your count comes in on its own.',
+        gain: 'Now the Hub fills in: cost of goods, hours and overtime, voids and comps.',
+        lights: ['Cost of goods', 'Voids and comps'], done: n(D.weeks) }
     ];
   },
 
@@ -1125,9 +1176,25 @@ S.Hub = {
        shipped pointing at a dying cockpit in the strip. A member can be RUN, so the harness resolves
        each destination for real instead of parsing a template ([[the-loop]] #21 — a filtered search
        space is where the bug hides). */
-    const gettingStarted = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">Set up your Control sections first, then run your first audit.</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      +   this._getStartedSteps().map((s, i) => gsChip(i + 1, s.label, s.screen, s.mod)).join('')
+    /* ⛔ ROWS, NOT A FLEX ROW OF CHIPS. Each step now carries what it does AND what it buys, which
+       is two more lines than a chip can hold. The number, the label and the reason read down the
+       page in the order an operator does them. */
+    const gsSteps = this._getStartedSteps();
+    const gsRow = (n, s) =>
+      '<div onclick="S.Hub._enter(\'' + s.screen + '\',\'' + s.mod + '\')" style="display:flex;gap:11px;align-items:flex-start;cursor:pointer;padding:11px 13px;border:1px solid var(--gold-tint-bord);border-radius:8px;background:var(--gold-tint);">'
+      +   '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;line-height:1;background:var(--sel-active-bg);color:var(--gold);margin-top:1px;">' + n + '</span>'
+      +   '<span style="flex:1;min-width:0;">'
+      /* The OPTIONAL flag is Close the Week's exact treatment, so the two screens mean the same
+         thing by the same word: 10px / 600 / --t4, and it never blocks anything. */
+      +     '<span style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(s.label) + '</span>'
+      +     (s.optional ? ' <span style="font-size:10px;font-weight:600;color:var(--t4);letter-spacing:0.5px;">OPTIONAL</span>' : '')
+      +     '<div style="font-size:11px;color:' + (s.optional ? 'var(--t3)' : 'var(--t2)') + ';line-height:1.55;margin-top:3px;">' + esc(s.how) + '</div>'
+      +     (s.gain ? '<div style="font-size:11px;color:var(--gold);line-height:1.55;margin-top:3px;">' + esc(s.gain) + '</div>' : '')
+      +   '</span></div>';
+    const gettingStarted = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
+      + 'Four steps to your first closed week. Each one adds to the last.</div>'
+      + '<div style="display:flex;flex-direction:column;gap:8px;">'
+      +   gsSteps.map((s, i) => gsRow(i + 1, s)).join('')
       + '</div>';
     /* ⛔⛔ REVERSED 2026-08-11, AND THE REASON I HAD IT THE OTHER WAY WAS WRONG. During the rebuild I
        made the band always render, arguing a new operator should see "the four numbers the product
@@ -1138,9 +1205,39 @@ S.Hub = {
        locked flip rule ([[empty-state-day1]]) that this page had quietly stopped following. Same
        region, same shell, one design in both states: the top of the Hub always holds the thing worth
        looking at, whichever that is today. */
-    const topCard = bandHasANumber ? tiles
-      : '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:16px 18px;">'
-        + '<div class="sh" style="margin:0 0 10px;">Get started</div>' + gettingStarted + '</div>';
+    /* ⛔⛔ THE TWO CARDS STACK NOW. They used to be either/or, and the cost was measured: with only
+       inventory set up, `getStarted:false` and the money band took over — so the reward for
+       finishing step 1 was that the instructions VANISHED, taking steps 2, 3 and 4 with them. Kyle:
+       *"the money card shows under the getting started card once a number can be shown so a user
+       can see a result of their work."* Get Started stays until the operator dismisses it, and the
+       money band appears underneath the moment it has something real to say.
+       ⭐ The band's own flip rule is untouched: it still renders only when a tile can print a real
+       number, because four "No data" boxes say Bar Cop has nothing to tell you.
+       ⛔ HIDDEN vs DISMISSED, and only the second is permanent. Both live in `settings` rather than
+       localStorage so the choice follows the ACCOUNT: hiding on the office laptop and finding it
+       back on the phone would read as a bug, and "permanently removed" has to mean everywhere.
+       ⚠ NOT ON THE DEMO. Settings are read-only there, so a Dismiss carrying a permanent-delete
+       warning would either do nothing or warn a prospect about deleting something on the shop
+       window. The demo shows the money band it has always shown. */
+    const gsState = (this._gsState ? this._gsState() : 'open');
+    const gsHead = '<div style="display:flex;align-items:center;gap:10px;margin:0 0 10px;">'
+      + '<div class="sh" style="margin:0;flex:1;">Get started</div>'
+      + '<button class="btn btn-ghost btn-sm" id="hub-gs-hide" style="font-size:10px;padding:3px 9px;">'
+      +   (gsState === 'hidden' ? 'Show' : 'Hide') + '</button>'
+      + '<button class="btn btn-ghost btn-sm" id="hub-gs-dismiss" style="font-size:10px;padding:3px 9px;">Dismiss</button>'
+      + '</div>';
+    const allDone = gsSteps.filter(s => !s.optional).every(s => s.done);
+    const gsBody = gsState === 'hidden' ? ''
+      /* ⚠ FOUR WORDS, NOT TWELVE. This read "You are set up. Dismiss this when you are done with
+         it." and `verify-design-code` RULE 2b took the file 2 -> 3 on card prose. It was right: the
+         Dismiss button is eighteen pixels away in the head, so the sentence was explaining a
+         control the operator can already see. */
+      : allDone ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;">You are set up.</div>'
+      : gettingStarted;
+    const gsCard = (App.demoMode || gsState === 'dismissed') ? ''
+      : '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;">'
+        + gsHead + gsBody + '</div>';
+    const topCard = gsCard + (bandHasANumber ? tiles : '');
 
     // ── Needs Attention band: the fires (alerts) + section-less weekly nudges
     //    (month-end Books, etc.). Catches what does not belong to a weekly section
@@ -1709,6 +1806,28 @@ S.Hub = {
        up; with no button to measure it would have shifted the cell by the slot's zero width, which
        is a silent layout change rather than an error. Delete the measurement with the thing it
        measured. */
+    /* ── Get Started: hide (reversible) and dismiss (not) ────────────────────────────────────
+       ⛔ THE RE-RENDER IS THE WHOLE POINT OF DOING THIS IN THE WIRE STEP. Both controls change what
+       the card is, so both have to repaint it; a handler that saves and leaves the old markup on
+       screen reads as the button doing nothing. */
+    document.getElementById('hub-gs-hide')?.addEventListener('click', async () => {
+      await this._gsSet(this._gsState() === 'hidden' ? 'open' : 'hidden');
+    });
+    document.getElementById('hub-gs-dismiss')?.addEventListener('click', async () => {
+      /* ⚠ THE WARNING NAMES WHAT IS LOST AND THAT IT IS FOREVER. Kyle's call: no restore row in
+         Settings, the same bar as anything else destructive here. Hide is offered in the prompt
+         because it is the answer for anyone who only wanted it out of the way. */
+      /* ⚠ AN OPTIONS OBJECT, not positional arguments. Written `App.confirm(title, body, ok, cancel)`
+         first, which passes a STRING where `opts` is read — every field would have come back
+         undefined and the dialog would have said "Are you sure?" over a blank message with a
+         Confirm button. Copied from a real call site rather than guessed. */
+      const ok = await App.confirm({
+        title: 'Remove Get Started for good?',
+        message: 'These steps will not come back. If you just want them out of the way, use Hide instead.',
+        confirmText: 'Remove', cancelText: 'Cancel'
+      });
+      if (ok) await this._gsSet('dismissed');
+    });
     // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
     document.getElementById('hub-signout')?.addEventListener('click', async () => {
       if (App.demoMode) { window.location.href = '/'; return; }
