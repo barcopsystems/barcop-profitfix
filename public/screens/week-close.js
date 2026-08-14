@@ -114,6 +114,16 @@ S.WeekClose = {
        so Close The Week was reachable by every member of every bar whatever the owner had granted.
        It is now the Week area, alongside Review and History (db.js SCREEN_GROUPS). */
     if (App._hubBlocked && App._hubBlocked('week-close')) return;
+    /* ⭐ LANDING OPENS THE FIRST THING STILL OWED (Kyle, 2026-08-14: *"the 1st step on the list not
+       done should always be open"*). The page used to land with every row shut, so the first action
+       on a brand-new account was always a click that did nothing but reveal the real first action.
+       ⛔ HERE AND NOT IN `render`. `_openLane` is a plain property, so assigning it during render
+       would reinstate itself on every repaint — the operator could never close a row, and every
+       import (which re-renders) would fight them ([[lessons-paid-for]] #14: a default is decided by
+       whoever assigns first, and a default written in the render is not a default, it is a lock).
+       ⚠ NOTHING OPENS WHEN NOTHING IS OWED: with every row ready the filter is empty and this is
+       null, which is the all-closed state the confirmed week should land in. */
+    this._openLane = (this.rows(this.state()).filter(r => !r.ready)[0] || {}).key || null;
     App.openHubFullPage('Close The Week', (mount) => { this.container = mount; this.render(mount); }, 'week-close');
   },
 
@@ -222,9 +232,19 @@ S.WeekClose = {
      task list: a row that says "type it" is describing where the number comes from, not a chore. */
   rows(st) {
     const money = v => App.fmtCurrency(v || 0);
+    /* ⛔⛔ THREE CASES, AND ONLY THE LAST ONE IS AN EMPTY STATE. My first change rewrote two of them
+       and `verify-week-close` D1 caught it: *"a monthly counter is told where the number comes from,
+       never to go and count"*. That pin is right and it protects a real operator — a bar that counts
+       once a month has a perfectly good last count, and telling them to go and count every week is a
+       weekly nag for doing nothing wrong.
+       ⭐ THE DISTINCTION IS WHETHER A COUNT EXISTS AT ALL. With one on file the note explains the
+       source and dates it; with none, there is nothing to explain and the only thing that produces
+       a cost of goods is a count, so the note names it and matches the row's own Take Inventory
+       button ([[lessons-paid-for]] #47). Typing stays available on the confirm screen either way. */
     const cogsNote = st.cogs.has
       ? 'From your counts'
-      : (st.cogs.lastCount ? 'Type it on the confirm. Last count ' + this._shortDate(st.cogs.lastCount) : 'Type it on the confirm');
+      : (st.cogs.lastCount ? 'Type it on the confirm. Last count ' + this._shortDate(st.cogs.lastCount)
+                           : 'Take a count to fill this in');
     return [
       /* ⛔⛔ NO `go` ON THIS ROW ANY MORE, AND THAT IS THE POINT OF THE WHOLE CHANGE. It pointed at
          `sc-dashboard` — one of the six cockpits being deleted — and it was the ONLY row on this page
