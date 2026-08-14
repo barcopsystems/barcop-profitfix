@@ -110,6 +110,23 @@ S.HubUserAccounts = {
       + '</div>'
       + '<div style="margin-top:12px;"><button class="btn btn-ghost" id="ua-pw-btn">Update Password</button></div>'
       + '<div id="ua-pw-msg" style="font-size:12px;margin-top:8px;display:none;"></div>';
+    /* E1. ⛔ TYPED TWICE, AND THAT IS THE WHOLE SAFETY MODEL. There is no confirmation mail by
+       design, so the new address is live the moment it saves — and a password reset then goes to
+       whatever was typed here. A typo is unrecoverable without support, which is the exact state
+       this feature exists to end, so the second field is not politeness. It is the guard, and it
+       matches the password card directly below it. */
+    /* ⚠ NO EXPLANATORY LINE ON THE CARD. The first version opened with "This is the address you log
+       in with, and the one a password reset is sent to" and `verify-design-code` RULE 2b took the
+       file 10 -> 11 card-prose hits. It was right twice over: the standard bans prose on a form
+       card, and the Password section directly below carries none, so mine was inconsistent with its
+       own neighbour. The section title and the two labels say what this does; the guard is the
+       second field, not a sentence. */
+    const emailBody = '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+      +   '<div class="f" style="width:220px;"><label>New Email</label><input class="suf" type="email" id="ua-email1" placeholder="name@yourbar.com" autocomplete="off"/></div>'
+      +   '<div class="f" style="width:220px;"><label>Confirm Email</label><input class="suf" type="email" id="ua-email2" placeholder="Re-type the new email" autocomplete="off"/></div>'
+      + '</div>'
+      + '<div style="margin-top:12px;"><button class="btn btn-ghost" id="ua-email-btn">Update Email</button></div>'
+      + '<div id="ua-email-msg" style="font-size:12px;margin-top:8px;display:none;"></div>';
     // ⚠ "Switch between them up top" was cut in BOTH the demo and the real app (Kyle,
     // 2026-08-01): it points at the bar switcher, which is not on screen in the demo at all.
     const barsBody = '<div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Each bar is its own subscription and books.</div>'
@@ -156,6 +173,9 @@ S.HubUserAccounts = {
     const isStaff = (window.DB && DB.role && DB.role()) === 'staff';
     const sections = [];
     if (showAccount) {
+      // Above Password: it is the half of the login that had no door at all until now, and it is
+      // what a reset link depends on.
+      sections.push({ title: 'Login Email', body: emailBody });
       sections.push({ title: 'Password', body: pwBody });
       if (isOwnerNow) {
         sections.push({ title: 'Subscription', body: '<div id="ua-sub-content"></div>' });
@@ -195,7 +215,7 @@ S.HubUserAccounts = {
     // alone — on Data and Backup it would be answering a question nobody asked.
     const accountHeader = '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;">'
       + (showData ? 'Data and Backup' : 'Your Account') + '</div>'
-      + ((showAccount && userEmail) ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Signed in as <span style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span></div>' : '');
+      + ((showAccount && userEmail) ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Signed in as <span id="ua-signed-in-as" style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span></div>' : '');
     const accountCard = '<div class="card form-card" style="margin-bottom:16px;">' + accountHeader + cardInner + '</div>';
 
     // Team Members heading + the member list sit on the card background (like
@@ -292,6 +312,7 @@ S.HubUserAccounts = {
 
   // ── Wiring ────────────────────────────────────────────────────────────────
   wire() {
+    document.getElementById('ua-email-btn')?.addEventListener('click', () => this.changeLoginEmail());
     document.getElementById('ua-pw-btn')?.addEventListener('click', () => this.changePassword());
     document.getElementById('ua-export-data')?.addEventListener('click', () => this.exportBackup());
     document.getElementById('ua-import-btn')?.addEventListener('click', () => document.getElementById('ua-import-file')?.click());
@@ -556,6 +577,40 @@ S.HubUserAccounts = {
         }
       }
     });
+  },
+
+  // ── Login email change (E1) ──────────────────────────────────────────────
+  async changeLoginEmail() {
+    if (App.demoBlock && App.demoBlock()) return;
+    const e1  = (document.getElementById('ua-email1').value || '').trim();
+    const e2  = (document.getElementById('ua-email2').value || '').trim();
+    const msg = document.getElementById('ua-email-msg');
+    const btn = document.getElementById('ua-email-btn');
+    const say = (t, bad) => { msg.style.color = bad ? 'var(--red)' : 'var(--gold)'; msg.textContent = t; msg.style.display = 'block'; };
+    if (!e1) return say('Enter your new email address.', true);
+    // Compared case-insensitively: the two boxes agreeing is the claim, not how they were typed.
+    if (e1.toLowerCase() !== e2.toLowerCase()) return say('The two email addresses do not match.', true);
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      const r = await DB.changeLoginEmail(e1);
+      if (!r || !r.ok) { say((r && r.error) || 'Could not change your email.', true); return; }
+      document.getElementById('ua-email1').value = ''; document.getElementById('ua-email2').value = '';
+      /* ⚠ THE STRIPE HALF IS REPORTED, NOT SWALLOWED. The login has moved either way — they can log
+         in and reset with the new address — but a drift at Stripe breaks the duplicate check on Add
+         Another Bar later, and the operator is the one who would hit it. */
+      say(r.reason === 'unchanged' ? 'That is already your login email.'
+        : r.stripeOk === false
+          ? 'Email updated. Billing records could not be updated just now. Contact support@barcop.com so they match.'
+          : 'Email updated. Use it next time you log in.', false);
+      /* ⛔ UPDATED IN PLACE, NOT BY RE-RENDERING. A re-render rebuilds this card and destroys the
+         message that was just written into it, so the operator would see the save and no
+         confirmation of it — and it would reach for a host this object does not hold. One node
+         changes, which is the only thing on screen that is now stale. */
+      const who = document.getElementById('ua-signed-in-as');
+      if (who && r.email) who.textContent = r.email;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Update Email';
+    }
   },
 
   // ── Password change — copied from settings.js ────────────────────────────
