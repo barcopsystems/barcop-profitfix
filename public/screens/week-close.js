@@ -123,8 +123,19 @@ S.WeekClose = {
        whoever assigns first, and a default written in the render is not a default, it is a lock).
        ⚠ NOTHING OPENS WHEN NOTHING IS OWED: with every row ready the filter is empty and this is
        null, which is the all-closed state the confirmed week should land in. */
-    this._openLane = (this.rows(this.state()).filter(r => !r.ready)[0] || {}).key || null;
+    this._openLane = this._firstOwed(this.rows(this.state()));
     App.openHubFullPage('Close The Week', (mount) => { this.container = mount; this.render(mount); }, 'week-close');
+  },
+
+  /* ⭐ ONE MEMBER STATES THE RULE, because three places now ask it: landing (`open`), a landed
+     import (`render`, guarded on `flash`) and the week stepper. It was written out twice already
+     and the third copy is where a rule starts to drift — the same reason the app has one
+     `_needsWeeksMsg` and one `_stillSavingNotice`.
+     ⚠ RETURNS null WHEN NOTHING IS OWED, which is the all-closed state a finished week must land
+     in, and is Kyle's rule exactly: *"the only time a step should not be open and all steps closed
+     is when all 6 steps are done."* */
+  _firstOwed(rows) {
+    return ((rows || []).filter(r => !r.ready)[0] || {}).key || null;
   },
 
   /* ── The week ───────────────────────────────────────────────────────────────
@@ -133,10 +144,21 @@ S.WeekClose = {
   weekEnd()   { return this._weekEnd || App.nextSunday(); },
   weekStart() { return App.weekStartFor(this.weekEnd()); },
   atCurrentWeek() { return this.weekEnd() === App.nextSunday(); },
+  /* ⛔ THE STEPPER RE-ASKS WHICH ROW IS OPEN, and it has to (Kyle, 2026-08-14). Without this the
+     open row belongs to the week the operator just LEFT: land on a finished week, where nothing is
+     open and that is correct, press the arrow back to a week still owed, and the page shows six
+     closed rows with no hint which one is next. That is the same "the first action is a click that
+     only reveals the real first action" defect `open()` exists to prevent, reached through a button
+     this page draws itself.
+     ⚠ AFTER `_weekEnd` MOVES, or it answers for the old week. And HERE rather than in `render`,
+     for the reason `open()` gives: `_openLane` is a plain property, so deciding it during a repaint
+     makes it a lock the operator can never close ([[lessons-paid-for]] #14). Stepping is a discrete
+     operator action, exactly like landing. */
   stepWeek(days) {
     const d = new Date(this.weekEnd() + 'T00:00:00');
     d.setDate(d.getDate() + days);
     this._weekEnd = App.ymdLocal(d);
+    this._openLane = this._firstOwed(this.rows(this.state()));
     this.render(this.container);
   },
   inWeek(date) {
@@ -571,7 +593,7 @@ S.WeekClose = {
        closing everything rather than being added on top of it.
        ⚠ ONLY ON A LANDED IMPORT. Guarded on `flash` so an ordinary re-render never reopens a row the
        operator has just closed by hand. */
-    if (flash) this._openLane = (rows.filter(r => !r.ready)[0] || {}).key || null;
+    if (flash) this._openLane = this._firstOwed(rows);
 
     const confirmBtn = st.confirmed
       ? '<button class="btn btn-ghost wc-confirm">Edit the confirmed week</button>'
