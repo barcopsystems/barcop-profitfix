@@ -1644,8 +1644,15 @@ const App = {
       + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">' + bodyHtml + '</div>'
       + (showPicker
           ? '<div id="gate-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">'
-            +   planOpt('monthly', '<b>Monthly</b> &middot; $189/mo', '')
-            +   planOpt('annual',  '<b>Annual</b> &middot; $1,890/yr', 'save $378')
+            /* ⛔ BOTH PLANS ARE PRICED PER MONTH. Setting $189/mo against a $1,890 annual TOTAL
+               makes the cheaper plan read as the expensive one, which is why that comparison came
+               off the pricing page — and this gate, the screen a LAPSED customer is recovered on,
+               was still running it. $157.50 is the figure the website toggle and Stripe's own
+               checkout page both print, so the three surfaces now say one thing.
+               ⛔ `data-plan` IS THE SERVER'S PLAN ID: only the LABEL is "Yearly". Renaming the
+               value sends a plan `planPrice()` does not know and the checkout is refused. */
+            +   planOpt('monthly', '<b>Monthly</b> &middot; $189 / month', '')
+            +   planOpt('annual',  '<b>Yearly</b> &middot; $157.50 / month', 'billed annually &middot; save $378')
             + '</div>'
             // In-app billing clause: the terms the operator agrees to by paying. Kept
             // in step with the website Refund Policy (recurring, per bar, auto-renews,
@@ -1684,10 +1691,15 @@ const App = {
        payment sheet opens straight over this gate, and cancelling reveals it — so a gate that
        always defaulted to its FIRST option would sit there with Monthly highlighted after an
        ANNUAL checkout was abandoned, one press away from billing the wrong plan. That mis-billing
-       path would have been created by the auto-checkout itself. Falls back to the first option
-       exactly as before when no plan is carried. */
+       path would have been created by the auto-checkout itself.
+       ⛔ WITH NOTHING CARRIED IT NOW OPENS ON YEARLY, not on whichever option renders first. Both
+       callers pass a plan, so the no-carry case is the signed-in customer whose subscription has
+       lapsed — the one audience that reaches this picker cold — and the website's toggle opens on
+       Yearly. Opening on Monthly here made the two surfaces disagree about the default. A carried
+       plan still beats it, which is the line above and what J5 controls. */
     const wantedOpt = (ctx && ctx.plan) ? opts.filter(o => o.dataset.plan === ctx.plan)[0] : null;
-    if (wantedOpt || opts[0]) selectOpt(wantedOpt || opts[0]);
+    const defaultOpt = opts.filter(o => o.dataset.plan === 'annual')[0] || opts[0];
+    if (wantedOpt || defaultOpt) selectOpt(wantedOpt || defaultOpt);
     const gateErr = (t) => { const e = document.getElementById('gate-err'); if (e) { e.textContent = t; e.style.display = 'block'; } };
     document.getElementById('gate-pay')?.addEventListener('click', async () => {
       const btn = document.getElementById('gate-pay');
