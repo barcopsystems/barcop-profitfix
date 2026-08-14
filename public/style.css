@@ -2144,3 +2144,18 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .evcal-holiday{background:transparent;border:1px dashed var(--b1);color:var(--t3);}
 .evcal-agenda{display:none;}
 @media(max-width:768px){.evcal-grid{display:none;}.evcal-agenda{display:block;}.evcal-agenda .evcal-chip{display:inline-block;margin:3px 4px 0 0;}}
+/* ── Hub Get Started: four columns, three ALIGNED rows ──────────────────────
+   The dividers have to land on the same line across all four columns, and each column's first
+   block is a different number of lines, so a flex row cannot do it and a min-height would be a
+   magic number that rots the next time the copy changes. The wrapper is display:contents, so each
+   step's three parts become items of the SAME grid and every row aligns by construction.
+   ⚠ ROW AND COLUMN ARE BOTH SET INLINE, deliberately: auto-placement with only an explicit row
+   walks one cursor across the whole grid and can drop a part into the wrong column.
+   ⚠ THE MOBILE RULE TURNS THE WRAPPER BACK INTO A BLOCK. Its children stop being grid items, so
+   the inline grid-row/grid-column simply stop applying and each step stacks as one unit. */
+.hub-gs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 10px;}
+.hub-gs>.hub-gs-step{display:contents;}
+@media(max-width:900px){
+  .hub-gs{display:block;}
+  .hub-gs>.hub-gs-step{display:block;margin-bottom:14px;}
+}
