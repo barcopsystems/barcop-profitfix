@@ -1603,7 +1603,22 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .pf-step-head:hover .card-chevron,.c-step-head:hover .card-chevron,.ic-step-head:hover .card-chevron,.lc-step-head:hover .card-chevron,.sc-step-head:hover .card-chevron,.ek-step-head:hover .card-chevron,.bk-step-head:hover .card-chevron,.wc-step-head:hover .card-chevron,.ip-rt-head:hover .card-chevron{color:var(--gold);}
 .pf-step-head.collapsed .card-chevron,.c-step-head.collapsed .card-chevron,.ic-step-head.collapsed .card-chevron,.lc-step-head.collapsed .card-chevron,.sc-step-head.collapsed .card-chevron,.ek-step-head.collapsed .card-chevron,.bk-step-head.collapsed .card-chevron,.wc-step-head.collapsed .card-chevron{transform:rotate(-90deg);}
 .card.collapsed .collapse-body{display:none;}
-.card.collapsed .card-title{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+/* ⛔ A COLLAPSED CARD IS THE BAND AND NOTHING ELSE (Kyle, 2026-08-14, on Spot Check and every other
+   card with a chevron): *"when you hide the section the background gets halved in the closed card
+   so only the top half is still the #08131A background."*
+   MEASURED ON THE DEPLOYED BUILD: collapsed card 49px painted --surface, band 27px painted
+   --card-head, so **21px of card body showed under the band**. The band cancels the card's TOP and
+   SIDE padding with negative margins and always has — nothing cancelled the card's own 20px
+   padding-BOTTOM, and with the body hidden that padding was all that was left.
+   ⭐ THE CARD GIVES UP ITS BOTTOM PADDING, rather than the band growing to cover it. The band then
+   simply IS the card, at exactly the height it has when open.
+   ⚠ AND THE BAND KEEPS ITS OWN PADDING. This rule used to zero `padding-bottom` too, which made a
+   collapsed head 27px with 13px above the text and 0 below — the text sat off-centre inside its own
+   band. Only the MARGIN and the divider belong to the open state.
+   ⚠ ALL FOUR CORNERS. Open, the band rounds its top two and the card body owns the bottom two;
+   collapsed there is no body, so square bottom corners would poke out of the card's radius. */
+.card.collapsed{padding-bottom:0;}
+.card.collapsed .card-title{margin-bottom:0;border-bottom:none;border-radius:var(--r);}
 .collapse-off{display:none !important;}  /* must beat the inline display:flex on out-of-card button rows */
 /* Enter Manually / Import File segmented toggle (unified-import-pattern). Wraps instead of overflowing the card; stacks full-width on phones. */
 .seg-toggle{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;}
