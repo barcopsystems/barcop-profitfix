@@ -573,16 +573,8 @@ const App = {
        too much to read: logo, heading and a sentence naming the plan. Nobody finishes that in the
        time it exists, so the eye registers unread text and assumes a problem. One short line is
        the whole design. The FAILURE covers keep the full treatment — those are read at leisure. */
-    const cover = (heading, sub, retry, bare) => {
-      if (!scr) return;
-      scr.style.display = 'flex';
-      scr.innerHTML = '<div class="auth-view" style="display:block;"><div class="auth-card">'
-        + (bare ? '' : '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>')
-        + '<div class="auth-heading"' + (bare ? ' style="margin:0;"' : '') + '>' + heading + '</div>'
-        + (sub ? '<div class="auth-sub">' + sub + '</div>' : '')
-        + (retry ? '<div class="auth-inputs"><a class="btn btn-primary" href="https://www.barcop.com/pages/pricing" style="width:100%;display:block;text-align:center;">Back to Pricing</a></div>' : '')
-        + '</div></div>';
-    };
+    const PRICING_BTN = '<div class="auth-inputs"><a class="btn btn-primary" href="https://www.barcop.com/pages/pricing" style="width:100%;display:block;text-align:center;">Back to Pricing</a></div>';
+    const cover = (heading, sub, retry, bare) => this._flowCover(heading, sub, retry ? PRICING_BTN : '', bare);
     // No plan, or one that names nothing: the pricing page is the only place that can answer it.
     if (!this._urlPlan) {
       cover('Choose a plan first', 'That link did not carry a subscription plan, so there is nothing to set up yet. Pick a plan and Bar Cop will take you straight to payment.', true);
@@ -616,15 +608,7 @@ const App = {
   async _claimCheckout(sessionId) {
     const scr = document.getElementById('auth-screen');
     document.getElementById('app')?.classList.add('hidden');
-    const cover = (heading, sub, action) => {
-      if (!scr) return;
-      scr.style.display = 'flex';
-      scr.innerHTML = '<div class="auth-view" style="display:block;"><div class="auth-card">'
-        + '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
-        + '<div class="auth-heading">' + heading + '</div>'
-        + '<div class="auth-sub">' + sub + '</div>'
-        + (action || '') + '</div></div>';
-    };
+    const cover = (heading, sub, action) => this._flowCover(heading, sub, action, false);
     const RELOAD = '<div class="auth-inputs"><button class="btn btn-primary" id="claim-retry" style="width:100%;">Try Again</button></div>';
     const LOGIN  = '<div class="auth-inputs"><button class="btn btn-primary" id="claim-login" style="width:100%;">Go To Log In</button></div>';
     const PRICING = '<div class="auth-inputs"><a class="btn btn-primary" href="https://www.barcop.com/pages/pricing" style="width:100%;display:block;text-align:center;">Back to Pricing</a></div>';
@@ -672,7 +656,8 @@ const App = {
       window.history.replaceState({}, '', '/');
       if (d.tokenHash && DB._sb) {
         const { error } = await DB._sb.auth.verifyOtp({ token_hash: d.tokenHash, type: 'magiclink' });
-        if (!error) { this._showFinishSetup(d.email); return; }
+        // Down BEFORE the handover: the finish screen needs the auth markup this used to destroy.
+        if (!error) { this._flowCoverClear(); this._showFinishSetup(d.email); return; }
       }
       cover('Your Bar Is Ready', 'Use Forgot Password with ' + esc(d.email || 'your email')
         + ' to set a password, then log in. Your subscription is active.', LOGIN);
@@ -691,6 +676,8 @@ const App = {
      which is stronger evidence than a checkbox here. */
   _showFinishSetup(email) {
     this._finishMode = true;
+    // Belt and braces: whichever door reached here, no cover may be left on top of the form.
+    this._flowCoverClear();
     this.showAuth();
     ['auth-login', 'auth-signup', 'auth-reset', 'auth-set-password', 'auth-paywall'].forEach(x => {
       const el = document.getElementById(x); if (el) el.style.display = (x === 'auth-signup') ? '' : 'none';
@@ -712,6 +699,41 @@ const App = {
     if (foot) foot.style.display = 'none';
     const btn = document.getElementById('signup-btn');
     if (btn) { btn.textContent = 'Finish Setup'; btn.disabled = false; }
+  },
+
+  /* ⛔⛔ THE COVERS PAINT INTO THEIR OWN NODE, NEVER INTO #auth-screen.
+     Kyle paid $1 and sat on "PAYMENT RECEIVED" forever. The cause: the claim cover did
+     `authScreen.innerHTML = …`, and **#auth-signup lives inside #auth-screen** — so painting the
+     cover DELETED the signup form out of the DOM. `_showFinishSetup` then looked for
+     `#auth-signup`, `#signup-email`, `#signup-btn`, found null every time, set nothing, showed
+     nothing, and the last thing painted stayed up permanently.
+     ⚠ IT WORKED WHEN TESTED FROM `boot()` because that path reaches the finish screen with the
+     markup intact — no cover had run. The ONE path that breaks it is the one a paying customer
+     takes. A screen is not "reachable" until it is reached the way the customer reaches it.
+     ⭐ A separate overlay also means the cover cannot be destroyed BY the thing it hands to, and
+     `_flowCoverClear()` is the single way it comes down, so it can never be orphaned on screen. */
+  _flowCover(heading, sub, action, bare) {
+    let m = document.getElementById('flow-cover');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'flow-cover';
+      // Above the auth screen and the app, below nothing else this flow uses.
+      m.style.cssText = 'position:fixed;inset:0;z-index:9600;background:var(--bg);'
+        + 'display:flex;align-items:center;justify-content:center;padding:20px;';
+      document.body.appendChild(m);
+    }
+    m.style.display = 'flex';
+    m.innerHTML = '<div class="auth-view" style="display:block;"><div class="auth-card">'
+      + (bare ? '' : '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>')
+      + '<div class="auth-heading"' + (bare ? ' style="margin:0;"' : '') + '>' + heading + '</div>'
+      + (sub ? '<div class="auth-sub">' + sub + '</div>' : '')
+      + (action || '') + '</div></div>';
+    return m;
+  },
+
+  _flowCoverClear() {
+    const m = document.getElementById('flow-cover');
+    if (m) m.remove();
   },
 
   async startDemo() {
