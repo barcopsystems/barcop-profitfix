@@ -502,6 +502,22 @@ S.Hub = {
     if (App.showHub) App.showHub();
   },
 
+  /* ⛔⛔ "NEEDS TWO CLOSED WEEKS" WAS WRONG, AND IT WAS WRONG IN THE DIRECTION THAT WASTES A WEEK.
+     MEASURED on the live build by running `_movement` at one, two and three closed weeks: pairs
+     came back 0, **0**, 3. Both cards compare `P[0]` against `P[2]`, so three closed weeks are
+     needed even though the SPAN they report is two — `_bestWorst` already said three and its own
+     comment explains why. So an operator who closed their second week read "Needs two closed weeks"
+     while having exactly two, saw nothing appear, and had no way to know they were not owed
+     anything. One helper now, because two sentences about one requirement is how they drifted.
+     ⭐ AND IT CARRIES A DOOR. Three lines on the emptiest screen in the app stated a prerequisite
+     and offered nowhere to go; Needs Attention directly below them does it properly. Gold inline
+     link is the Hub's own convention (the "See all" row), not a new affordance. */
+  _needsWeeksMsg() {
+    return 'Needs three closed weeks. '
+      + '<span onclick="S.Hub._enter(\'week-close\',\'profit\')" '
+      + 'style="color:var(--gold);cursor:pointer;font-weight:600;">Close a week</span>';
+  },
+
   _getStartedSteps() {
     const D = App.data || {}, I = App.inventoryData || {}, L = App.laborData || {}, S2 = App.shiftData || {};
     const n = a => ((a || []).length > 0);
@@ -1580,7 +1596,7 @@ S.Hub = {
     const movementBlock = hbSh('Where you were, where you are')
       + (mv && mv.pairs.length
         ? hbHeadline + mv.pairs.map(hbPair).join('')
-        : '<div style="font-size:12px;color:var(--t3);padding:6px 0;">Needs two closed weeks</div>');
+        : '<div style="font-size:12px;color:var(--t3);padding:6px 0;">' + this._needsWeeksMsg() + '</div>');
 
     // ── Band 2: the one action ──
     /* Kyle: *"do this first card has #08131A background and normal ghost button not gold button."*
@@ -1647,7 +1663,7 @@ S.Hub = {
       const o = reading ? reading[key] : null;
       if (!o) return hbPanel(hbSh(t)
         + '<div style="font-size:12px;color:var(--t3);">'
-        + (!reading ? 'Needs three closed weeks'
+        + (!reading ? this._needsWeeksMsg()
            : isGain ? 'Nothing improved in the last two weeks' : 'Nothing slipped in the last two weeks') + '</div>');
       const col = isGain ? 'var(--green)' : 'var(--red)';
       const amount = App.fmtCurrency(Math.abs(o.dollars), 0);
@@ -1708,8 +1724,12 @@ S.Hub = {
       /* Kyle: *"need something in front of the dates like 'last done tue X/XX'."* A bare "Tue, 8/11"
          beside a job title reads as a due date as easily as a done date, and on this card it is
          always the latter. */
+      /* ⚠ AND A ROW THAT HAS NOT HAPPENED SAYS SO. This was an empty string, so on a day-one Hub
+         five rows carried a label and nothing else while the six facts below them all kept their
+         captions — the same screen disagreeing with itself about whether an empty row keeps its
+         second line. "Not yet" is scoped by the card's own heading, DONE THIS WEEK. */
       + '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">'
-      + (r.when ? 'Last done ' + esc(r.when) : '') + '</span>'
+      + (r.when ? 'Last done ' + esc(r.when) : 'Not yet') + '</span>'
     )).join('');
 
     // ── Band 5: six operational facts, one job each, every one a door ──
