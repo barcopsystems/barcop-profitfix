@@ -82,7 +82,13 @@
         <div class="auth-inputs su-block">
           <div class="su-sec">Account</div>
           <div class="su-row">
-            <div class="f"><label>Email</label><input type="email" id="signup-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
+            <!-- flex:1.25, not more: MEASURED on the 660px card at 13px Barlow. Three equal fields
+                 render 178px with 22px of internal padding, and `barcopsystems@yahoo.com` measures
+                 157.7px — so a real address was being clipped by the field it is shown in. At 1.25
+                 the email takes 205px and each password 164px, which still leaves 142px of text
+                 space against the 117px a 16-character password takes. The password fields are the
+                 ones with room to give; they were carrying ~39px they never used. -->
+            <div class="f" style="flex:1.25;"><label>Email</label><input type="email" id="signup-email" placeholder="you@yourbar.com" autocomplete="email"/></div>
             <div class="f"><label>Password</label><input type="password" id="signup-pw1" placeholder="At least 8 characters" autocomplete="new-password"/></div>
             <div class="f"><label>Confirm Password</label><input type="password" id="signup-pw2" placeholder="Confirm password" autocomplete="new-password"/></div>
           </div>
@@ -455,7 +461,7 @@
 <script src="screens/hub-help.js?v=33"></script>
 <script src="screens/hub-report-bug.js?v=12"></script>
 <script src="screens/hub-support.js?v=9"></script>
-<script src="screens/hub-user-accounts.js?v=65"></script>
+<script src="screens/hub-user-accounts.js?v=66"></script>
 <script src="screens/hub-group-dashboard.js?v=12"></script>
 <script src="screens/hub-books.js?v=85"></script>
 <script src="screens/hub-books-home.js?v=45"></script>
@@ -569,7 +575,7 @@
      would kill payments. `verify-cdn-integrity.js` asserts this tag stays unpinned BY NAME so the
      sweep goes red instead. -->
 <script src="https://js.stripe.com/v3/"></script>
-<script src="db.js?v=166"></script>
-<script src="app.js?v=879"></script>
+<script src="db.js?v=167"></script>
+<script src="app.js?v=880"></script>
 </body>
 </html>

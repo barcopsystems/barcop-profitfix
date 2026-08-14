@@ -687,7 +687,9 @@ const App = {
     const head = document.querySelector('#auth-signup .auth-heading');
     if (head) head.textContent = 'Finish Setting Up Your Bar Cop Account';
     const sub = document.querySelector('#auth-signup .auth-sub');
-    if (sub) sub.innerHTML = 'Payment received. You paid with <b style="color:var(--t1);">' + esc(email || '') + '</b>. Set a password and tell Bar Cop about your bar.';
+    // Two separate things, so two separate lines: what just happened to their money, then what
+    // they have to do next. Run together, the instruction reads like the tail of the receipt.
+    if (sub) sub.innerHTML = 'Payment received. You paid with <b style="color:var(--t1);">' + esc(email || '') + '</b>.<br>Set a password and tell Bar Cop about your bar.';
     const tosRow = document.getElementById('signup-tos')?.closest('label');
     if (tosRow) tosRow.style.display = 'none';
     /* ⛔ THE PANEL FOOT GOES. "Already have an account? Log in" and "Cancel" belong to SIGNUP,
@@ -981,6 +983,26 @@ const App = {
     };
   },
 
+  /* ⛔⛔⛔ WHO OWES A PASSWORD. Kyle found this by logging into his own main account on 2026-08-14
+     and landing on "Finish Setting Up", with no Sign Out on the screen and its only button set to
+     overwrite his bar's profile.
+     THE CAUSE WAS A REUSED FIELD. The gate read `created_via === 'stripe_checkout' && !password_set`.
+     `password_set` was invented the day before; `created_via` was not. The webhook has stamped it
+     on every account it provisions since at least 2026-05-18 — measured on his own user, created
+     that day and carrying it — so the gate read "the webhook made this account" as "this account
+     has never had a password" and captured EVERY customer provisioned before the finish screen
+     existed. A field's meaning belongs to the code that already writes it, not to the feature that
+     borrows it later.
+     ⭐ `needs_password` means one thing and is written in exactly one place: `provisionFromSession`,
+     on create, for an account that is being made without a password. A historical account cannot
+     carry it, so it cannot be captured. `DB.setPassword` clears it wherever a password is set.
+     ⚠ `password_set` is still honoured so the accounts that DID go through yesterday's finish
+     screen stay released — releasing is the safe direction, trapping is not. */
+  _needsPasswordSetup(meta) {
+    const m = meta || {};
+    return m.needs_password === true && !m.password_set;
+  },
+
   boot() {
     // A no-subscription account still boots (create account + onboarding are the
     // free tier). The Hub then shows the locked "Choose your plan" popup via
@@ -1020,7 +1042,7 @@ const App = {
        onboarding does, so sending them to onboarding first would ask twice and still leave them
        without a password. */
     const _meta = (window.DB && DB._user && DB._user.user_metadata) || {};
-    if (_meta.created_via === 'stripe_checkout' && !_meta.password_set) {
+    if (this._needsPasswordSetup(_meta)) {
       this._showFinishSetup(DB._user.email);
       return;
     }
@@ -11201,13 +11223,11 @@ function wireAuth() {
          who has paid once. All that is owed is the password, and the draft above, which boot
          applies exactly as it does for the ordinary path. ONE write path, two ways in. */
       if (App._finishMode) {
-        /* `password_set` is what releases the finish screen at boot. It rides in the SAME call as
-           the password, so the two can never disagree — a password set without the marker would
-           send them back here forever, and the marker without the password would strand them with
-           no way to log in. */
-        const { data: upd, error: pwErr } = await DB._sb.auth.updateUser({
-          password: pw1, data: { password_set: true }
-        });
+        /* The marker rides in the SAME call as the password, so the two can never disagree — a
+           password set without it sends them back here forever, and it without the password would
+           strand them with no way to log in. `DB.setPassword` is now the only writer of both, for
+           all three screens that set a password. */
+        const { data: upd, error: pwErr } = await DB.setPassword(pw1);
         if (pwErr) {
           btn.textContent = 'Finish Setup'; btn.disabled = false;
           return showErr(pwErr.message || 'Could not set your password. Please try again.');
@@ -11367,7 +11387,11 @@ function wireAuth() {
     if (!pw1 || pw1.length < 8) { msg.style.color='var(--red)'; msg.textContent='Password must be at least 8 characters.'; msg.style.display='block'; return; }
     if (pw1 !== pw2) { msg.style.color='var(--red)'; msg.textContent='Passwords do not match.'; msg.style.display='block'; return; }
     btn.textContent='Saving...'; btn.disabled=true;
-    const { data: updateData, error } = await DB._sb.auth.updateUser({ password: pw1 });
+    /* ⛔ THROUGH THE HELPER. This handler set the password and then called `App.boot()` on the line
+       below — and because it never stamped the marker, boot sent the customer straight to the
+       finish screen, permanently. The reset link was a trap for every checkout-provisioned
+       account. */
+    const { data: updateData, error } = await DB.setPassword(pw1);
     if (error) {
       btn.textContent='Set Password and Sign In'; btn.disabled=false;
       msg.style.color='var(--red)'; msg.textContent=error.message; msg.style.display='block';

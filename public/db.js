@@ -100,6 +100,23 @@ const DB = {
     return { data, error };
   },
 
+  /* ⛔ THE ONE PLACE A PASSWORD IS SET. Three screens used to call `updateUser({password})`
+     themselves and only ONE of them stamped the marker that releases the finish screen — so a
+     customer who set their password from a RESET LINK was sent to the finish screen by the very
+     handler that had just set it, and that screen has no Sign Out on it. One helper, so the
+     password and the marker can never again be written by different code.
+     ⭐ It refreshes `_user` too: boot reads `user_metadata` off the cached user, and a stale copy
+     still says the password is owed, which routes straight back to the same screen. */
+  async setPassword(password) {
+    if (!this._sb) return { error: { message: 'Not connected' } };
+    const res = await this._sb.auth.updateUser({
+      password: password,
+      data: { password_set: true, needs_password: false }
+    });
+    if (res && res.data && res.data.user) this._user = res.data.user;
+    return res;
+  },
+
   async signUp(email, password) {
     if (!this._sb) return { error: { message: 'Not connected' } };
     // Email confirmations are OFF (Stripe verifies the email at payment), so a
