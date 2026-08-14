@@ -2104,7 +2104,10 @@ const App = {
       this._acctActiveId = 'demo';
       ['topbar-account-switcher', 'hub-topbar-account-switcher'].forEach(slotId => {
         const slot = document.getElementById(slotId);
-        if (slot) { slot.style.cssText = 'display:flex;align-items:center;'; slot.innerHTML = '<span class="tn-barname">' + esc(barName) + '</span>'; }
+        // ⛔ NOTHING IN THE TOP HEADER FOR A SINGLE BAR (Kyle, 2026-08-14). The demo has one bar,
+        //    so it takes the same empty treatment as a real single-location account — this is the
+        //    build every prospect looks at, and it must not be the one place the name survives.
+        if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
       });
       ['topbar-group-dashboard', 'hub-topbar-group-dashboard', 'sidebar-multi-loc', 'hub-sidebar-multi-loc'].forEach(slotId => {
         const slot = document.getElementById(slotId);
@@ -2138,10 +2141,18 @@ const App = {
       const active = accounts.find(a => a.id === activeId) || accounts[0];
       if (!active) { slot.style.display = 'none'; slot.innerHTML = ''; return; }
       slot.style.cssText = 'display:flex;align-items:center;';
-      // Single location: the bar name (no picker needed). Multi: the compact
-      // switcher. No "Viewing" label, no Group button — same spot for both.
+      /* ⛔ ONE BAR: NOTHING GOES IN THE TOP HEADER (Kyle, 2026-08-14, walking the Hub): *"i just
+         don't want the bars name in the top header next to the rail button.. at all on any page...
+         and the only time something gets placed in the top header next to the rail button it is a
+         multi location the drop selector."* An operator with one bar already knows whose bar they
+         are in, so the name was chrome that bought nothing — and it dragged a vertical divider
+         along with it. The picker earns the spot because it is a CONTROL, not a label.
+         ⚠ THE SLOT IS HIDDEN, NOT JUST EMPTIED. An empty flex box still occupies the gap between
+         the date and The Rail, and the `.tn-barname::before` divider Kyle asked to see gone hangs
+         off the span, so the span has to be absent rather than blank. */
       if (!isMulti) {
-        slot.innerHTML = '<span class="tn-barname">' + esc(active.name || 'My Bar') + '</span>';
+        slot.style.display = 'none';
+        slot.innerHTML = '';
         return;
       }
       const options = accounts.map(a => {

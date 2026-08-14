@@ -1870,25 +1870,19 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 }
 .sidebar-multi-loc .smm-group-btn:hover{border-color:var(--gold);color:var(--gold);}
 
-/* Bar name / compact switcher that sits top-right of the module nav (where the old
-   Group button was). Single-location = the name; multi = the .at-qsel picker. */
-.tn-barname{font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;color:var(--t1);white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;}
-/* ⭐⭐ THE DIVIDER BETWEEN THE DATE AND THE BAR NAME, AND IT IS CONDITIONAL BY CONSTRUCTION.
-   Kyle: it belongs on a single-bar account, not beside the multi-location picker, which already
-   has its own border and chevron. `renderAccountSwitcher` renders exactly two shapes —
-   `<span class="tn-barname">` for one bar and `<select class="at-qsel">` for several — so hanging
-   the rule on .tn-barname means it simply cannot appear in the multi case. No flag to keep in step
-   and no :has() to depend on: the markup already answers the question. */
-.tn-barname{position:relative;padding-left:12px;margin-left:4px;}
-/* ⛔ --b1, MATCHING THE OTHER TWO. This was --b-edge (#14222A, a CARD border read against a card
-   fill) and on the top bar's darker --bg it was effectively invisible next to the two crisp
-   dividers on the left. Kyle saw it in one look. The .tn-sep comment below already stated the rule
-   and said "BOTH dividers in the bar use it" — there are THREE, and this was the one that did not.
-   A comment is not a pin; verify-topbar-chrome asserts all three agree now. */
-.tn-barname::before{
-  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
-  width:1px;height:18px;background:var(--b1);
-}
+/* ⛔ `.tn-barname` IS GONE (Kyle, 2026-08-14), AND SO IS THE DIVIDER THAT HUNG ON IT.
+   The top header used to show the bar's NAME when the account had one location, with a vertical
+   rule in front of it. His call, walking the Hub: *"i just don't want the bars name in the top
+   header next to the rail button.. at all on any page... and the only time something gets placed
+   in the top header next to the rail button it is a multi location the drop selector."* An
+   operator with one bar already knows whose bar they are in; the picker earns the spot because it
+   is a CONTROL, not a label.
+   The type rule, the padding rule and the `::before` divider all went with it rather than being
+   left to style a class nothing renders. `renderAccountSwitcher` now HIDES the slot outright for a
+   single bar and emits one shape, the `.at-qsel` picker, for several.
+   ⚠ SO THE TOP BAR HAS TWO DIVIDERS NOW, NOT THREE. `verify-topbar-chrome` block A pins that they
+   agree, and it was re-pointed in this same edit rather than left demanding a rule that can no
+   longer exist. */
 /* THE RAIL — the one whole-bar read, on every page. Bar-scoped, so it lives on the RIGHT beside the
    bar name; the left of the bar is page-scoped (page title + its "i") and mixing the two blurs
    exactly that distinction. Height comes from --tb-ctl-h so it is flush with the multi-bar <select>.
