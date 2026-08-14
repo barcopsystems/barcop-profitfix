@@ -548,7 +548,11 @@ S.WeekClose = {
       if (!flash) { flash = o._flash; flashDates = o._flashDates || null; }
       o._flash = null; o._flashDates = null;
     });
-    if (flash) this._openLane = null;   // the file went in; give the page back
+    /* ⛔ THE ADVANCE HAPPENS BELOW, NOT HERE. This read `if (flash) this._openLane = null` — the file
+       went in, the page closed everything and the operator had to hunt for the next thing. It has to
+       move to the next row still owed instead, and it cannot be decided here: `state()` has not been
+       re-read yet and the week may still JUMP to the one the file was for, so the row that is next
+       is not knowable until both have happened. */
     /* ⚠ BEFORE `state()` IS READ, or the rows are built for the week we are leaving and the page
        reports the old week under a line announcing the new one. */
     const jumpTo = flash ? this._flashWeek(flashDates) : '';
@@ -559,6 +563,15 @@ S.WeekClose = {
     const rows = this.rows(st);
     const required = rows.filter(r => !r.optional);
     const ready = required.filter(r => r.ready).length;
+    /* ⭐ A LANDED IMPORT ADVANCES TO THE NEXT THING OWED (Kyle, 2026-08-14). Same rule `open()` uses
+       on landing, asked again now that the imported row reads ready and the week is the file's own.
+       Optional rows are NOT skipped, by his call: Tips is genuinely the next step after hours.
+       ⭐ THE CONFIRMATION IS NOT BURIED. The flash renders ABOVE "What This Week Needs", so the
+       green line stays in view with the next row opened underneath it — which is why this replaced
+       closing everything rather than being added on top of it.
+       ⚠ ONLY ON A LANDED IMPORT. Guarded on `flash` so an ordinary re-render never reopens a row the
+       operator has just closed by hand. */
+    if (flash) this._openLane = (rows.filter(r => !r.ready)[0] || {}).key || null;
 
     const confirmBtn = st.confirmed
       ? '<button class="btn btn-ghost wc-confirm">Edit the confirmed week</button>'
