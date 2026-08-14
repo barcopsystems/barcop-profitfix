@@ -165,6 +165,29 @@ const DB = {
   // Sync accounts.name (the bar switcher's label) with the in-app bar name.
   // Called from onboarding + Business Profile save. Owner/admin only (enforced
   // server-side). Updates the cached list so the switcher reflects it at once.
+  /* E1. The login email moves SERVER-SIDE, through the admin API, so no confirmation mail is sent
+     (Kyle's call: "just let them change it and save"). `auth.updateUser({ email })` from here would
+     always send one, whatever Supabase's Secure email change setting says.
+     ⭐ Refresh the cached user afterwards: every screen reads the address off `DB._user`, so a
+     stale copy shows the old one until the next reload and reads as the change not having worked. */
+  async changeLoginEmail(email) {
+    if (!this._sb || !this._user) return { ok: false, error: 'Not signed in' };
+    try {
+      const headers = await this._authHeaders();
+      const r = await fetch('/api/change-login-email', {
+        method: 'POST', headers, body: JSON.stringify({ email: String(email || '').trim() })
+      });
+      const data = await r.json();
+      if (data && data.ok) {
+        const { data: fresh } = await this._sb.auth.getUser();
+        if (fresh && fresh.user) this._user = fresh.user;
+      }
+      return data;
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
+
   async setAccountName(name) {
     if (!this._sb || !this._user || !name || !String(name).trim()) return { ok: false };
     const accountId = await this._ensureAccountId();
