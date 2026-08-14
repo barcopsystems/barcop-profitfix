@@ -188,6 +188,32 @@ const DB = {
     }
   },
 
+  /* E2: your own display name, stored on your memberships. Empty CLEARS it, which is a real
+     choice, so this does not refuse a blank the way setAccountName does. */
+  async myName() {
+    if (!this._sb || !this._user) return { ok: false, name: null };
+    try {
+      const headers = await this._authHeaders();
+      const r = await fetch('/api/my-name', { method: 'POST', headers, body: '{}' });
+      return await r.json();
+    } catch (e) {
+      return { ok: false, name: null, error: e.message };
+    }
+  },
+
+  async setMyName(name) {
+    if (!this._sb || !this._user) return { ok: false, error: 'Not signed in' };
+    try {
+      const headers = await this._authHeaders();
+      const r = await fetch('/api/set-my-name', {
+        method: 'POST', headers, body: JSON.stringify({ name: String(name == null ? '' : name).trim() })
+      });
+      return await r.json();
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
+
   async setAccountName(name) {
     if (!this._sb || !this._user || !name || !String(name).trim()) return { ok: false };
     const accountId = await this._ensureAccountId();
