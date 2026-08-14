@@ -916,18 +916,38 @@ async function sendWelcomeEmail(email, barName) {
     const html =
         '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Arial,sans-serif;max-width:560px;margin:0 auto;color:#14222A;">'
       +   '<div style="background:#070E16;padding:20px 28px;text-align:center;">'
-      +     '<img src="https://app.barcop.com/assets/logo.png" alt="Bar Cop" width="190" height="33" style="display:inline-block;border:0;width:190px;height:33px;color:#ffffff;font-size:20px;font-weight:800;letter-spacing:0.5px;line-height:33px;" />'
+      /* ⛔ NO FIXED HEIGHT. It carried `height="33"` against a logo production actually serves at
+         1349x316 — true ratio 4.269, so at 190px wide it is 44.5px tall, and forcing 33 squashed it
+         26% vertically. Kyle saw it as stretched and he was right. A CORRECTED number would be
+         wrong again the next time the asset changes (and the local `logo.png` is already a
+         different file, a JPEG at a different ratio, which nothing compares because `_push-diff`
+         walks .js only). Pin the width, let the height compute, and it cannot be wrong again. */
+      +     '<img src="https://app.barcop.com/assets/logo.png" alt="Bar Cop" width="190" style="display:inline-block;border:0;width:190px;height:auto;color:#ffffff;font-size:20px;font-weight:800;letter-spacing:0.5px;" />'
       +   '</div>'
       +   '<div style="padding:26px 28px;font-size:15px;line-height:1.6;color:#2A3942;">'
       +     '<div style="font-size:22px;font-weight:800;color:#14222A;margin-bottom:14px;">You\'re in.</div>'
       +     '<p style="margin:0 0 14px;">Welcome to Bar Cop' + (bar ? '. You just set up <b>' + bar + '</b>' : '') + '. From here, Bar Cop does one job: it turns the numbers you already have into the money you\'re leaving on the table.</p>'
-      +     '<p style="margin:0 0 14px;">The loop is simple. Close your three Control sections each week (Inventory, Labor, Shift), work the money in Recovery (Profit, Revenue, Cash), then chase only what the week flags. Run your first audit and Bar Cop shows your biggest leaks in real dollars.</p>'
-      +     '<p style="margin:0 0 18px;"><b>Where to start:</b> open Bar Cop and work the Get Started steps on your Hub. Add your products, take a count, close a week. Your numbers start paying off from week one.</p>'
+      /* ⛔ THIS PARAGRAPH DESCRIBED A ROUTINE THAT DOES NOT EXIST. It said "close your three Control
+         sections each week (Inventory, Labor, Shift)" — the per-section cockpits Close the Week
+         replaced. Closing a week is ONE page whose rows are lifted and checked by
+         `verify-welcome-email` block B, so this sentence cannot drift from the page again. */
+      +     '<p style="margin:0 0 14px;">The loop is one page. Each week you open Close the Week and work down its rows: sales, hours, tips, cash over and short, cost of goods and catering. Drop your POS report on a row, or use the button beside it to enter that piece by hand. Cost of goods comes off your inventory count on its own. Once the week is closed, Profit, Revenue and Cash Recovery show you what it cost you, and your audits put real dollars on your biggest leaks.</p>'
+      /* ⛔ AND THIS ONE SKIPPED PEOPLE. "Add your products, take a count, close a week" leaves out
+         the one step a good POS export tempts an operator to skip and which is REQUIRED anyway: an
+         hours report only lands for names already on the roster (`PosIngest`: an unmatched name is
+         a roster fix, never a new person). Block C checks the steps AND their order against the
+         Hub card, because the card compounds and an email that reorders it teaches a wasted week. */
+      +     '<p style="margin:0 0 18px;"><b>Where to start:</b> open Bar Cop and work the Get Started steps on your Hub. Count your bar first: vendors, products, pars, one count. Then add your people, positions before staff. Registers are optional, only if you reconcile drawers in Bar Cop. Then close your first week. Step one pays off straight away, before any week closes: what is below par, and the cash sitting on your shelves.</p>'
       +     '<div style="margin:0 0 22px;"><a href="' + appUrl + '" style="display:inline-block;background:' + gold + ';color:#14222A;font-weight:800;font-size:14px;text-decoration:none;padding:13px 26px;border-radius:6px;">Open Bar Cop</a></div>'
       +     '<p style="margin:0 0 8px;font-weight:700;color:#14222A;">A few things worth knowing:</p>'
       +     '<ul style="margin:0 0 18px;padding-left:20px;">'
       +       '<li style="margin-bottom:6px;">Stuck on anything? The <a href="' + helpUrl + '" style="color:' + gold + ';font-weight:700;">Help Center</a> walks every screen.</li>'
-      +       '<li style="margin-bottom:6px;">Questions? Just reply to this email, or reach <a href="mailto:support@barcop.com" style="color:' + gold + ';font-weight:700;">support@barcop.com</a>.</li>'
+      /* ⛔ IT TOLD THEM TO REPLY TO A NOREPLY ADDRESS. `reply_to` really is set to the support inbox
+         below, so a reply DOES arrive — but the sender shown on screen reads noreply, so nobody
+         will try, and the line spends the customer's first impression on a dead end. Name the two
+         doors that visibly work. The in-app one is checked against the label the Hub actually
+         renders, so a rename cannot leave this pointing at a row that is not there. */
+      +       '<li style="margin-bottom:6px;">Questions? Email <a href="mailto:support@barcop.com" style="color:' + gold + ';font-weight:700;">support@barcop.com</a>, or open <b>Settings &rarr; Contact Support</b> in the app.</li>'
       +       '<li style="margin-bottom:6px;">Your subscription lives under <b>Settings &rarr; Your Account</b>. Cancel anytime; access runs through the period you\'ve paid for.</li>'
       +     '</ul>'
       +     '<p style="margin:0 0 16px;">Bar Cop was built by an operator who spent years watching good money walk out the door. Now it\'s yours. Let\'s go find it.</p>'
