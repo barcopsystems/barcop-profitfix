@@ -118,6 +118,22 @@
         <button class="btn btn-primary" id="signup-btn" style="width:100%;margin-top:16px;">Create Account</button>
         <div id="signup-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
       </div>
+      <!-- ⛔⛔⛔ THE CLOSED-DOOR CARD, AND IT MUST STAY *AFTER* THE REAL ONE. It used to be built by
+           overwriting `.auth-card`'s innerHTML at boot — and #auth-signup is ALSO the "Finish
+           Setting Up" screen a paying customer lands on, so shutting signups deleted every field
+           that screen needs and locked out anyone who had paid without yet setting a password.
+           It is a hidden sibling now, shown and hidden instead of replacing anything.
+           ⚠ IT CARRIES .auth-card / .auth-heading / .auth-sub so it needs no new styling, which
+           means DOCUMENT ORDER is what keeps `querySelector('#auth-signup .auth-card')` (and the
+           heading and sub that _showFinishSetup rewrites) resolving the REAL card. Moving this
+           block above the card would silently point all three at the refusal notice.
+           `verify-signups-closed` block P pins that order. -->
+      <div id="signup-closed-card" class="auth-card" style="display:none;">
+        <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
+        <div class="auth-heading">Bar Cop is not taking new accounts right now</div>
+        <div class="auth-sub" style="line-height:1.6;">We are doing some work under the hood. New signups are paused while we finish up. Check back shortly.</div>
+        <div style="font-size:12px;color:var(--t2);margin-top:20px;text-align:center;">Already have an account? Use Log In.</div>
+      </div>
       <div class="auth-foot">
         <div style="font-size:12px;color:var(--t2);">Already have an account? <button class="auth-link" id="show-login-from-signup">Log in to Bar Cop</button></div>
         <!-- Cancel: nothing has been created yet at this point (DB.signUp runs on submit), so this
@@ -576,6 +592,6 @@
      sweep goes red instead. -->
 <script src="https://js.stripe.com/v3/"></script>
 <script src="db.js?v=169"></script>
-<script src="app.js?v=880"></script>
+<script src="app.js?v=881"></script>
 </body>
 </html>

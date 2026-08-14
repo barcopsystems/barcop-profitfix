@@ -682,6 +682,15 @@ const App = {
     ['auth-login', 'auth-signup', 'auth-reset', 'auth-set-password', 'auth-paywall'].forEach(x => {
       const el = document.getElementById(x); if (el) el.style.display = (x === 'auth-signup') ? '' : 'none';
     });
+    /* ⛔ UNCOVER THE REAL CARD. With signups shut, `wireAuth` covers this panel with the "not
+       taking new accounts" notice. That message is for a stranger; this person has PAID, and the
+       fact that brings them here (`needs_password`) lives on the account, so the shut door does
+       not stop them arriving. Without these two lines they land on the refusal with no password
+       box and no way in. Harmless when the door is open — the notice is not on screen. */
+    const closedCard = document.getElementById('signup-closed-card');
+    if (closedCard) closedCard.style.display = 'none';
+    const realCard = document.querySelector('#auth-signup .auth-card');
+    if (realCard) realCard.style.display = '';
     const em = document.getElementById('signup-email');
     if (em && email) { em.value = email; em.readOnly = true; em.style.opacity = '0.7'; }
     const head = document.querySelector('#auth-signup .auth-heading');
@@ -11090,19 +11099,31 @@ function wireAuth() {
     window.location.href = 'https://www.barcop.com/pages/pricing';
   });
 
-  // Signups closed: replace the whole card so EVERY route into it lands on the same message —
-  // the login link, the demo's "Set Up My Bar" button, and a bookmarked /?signup=1. The button
-  // handler refuses independently below, so a hidden form is not the only stop.
+  /* Signups closed: cover the card so EVERY route into it lands on the same message — the login
+     link, the demo's "Set Up My Bar" button, and a bookmarked /?signup=1. The button handler
+     refuses independently below, so a hidden form is not the only stop.
+     ⛔⛔⛔ IT COVERS. IT DOES NOT REPLACE, AND THAT IS THE WHOLE POINT. This used to write over
+     `#auth-signup .auth-card` — and that card is ALSO the "Finish Setting Up" screen every paying
+     customer lands on (`_showFinishSetup`), reached from `boot()` off `needs_password`, which is
+     stored ON THE ACCOUNT and so is not gated on this flag at all. Overwriting it deleted the
+     email field, both password boxes and the button, so with the door shut a customer who had
+     PAID and not yet set a password was handed "not taking new accounts": no password box, no way
+     in, money already taken. Same defect as the $1 cover of 2026-08-13 that deleted the signup
+     form out of the DOM ([[lessons-paid-for]] #59), with a flag as the trigger.
+     ⚠ AND RESTORING THE HTML LATER IS NOT THE FIX EITHER: re-writing `.auth-card` rebuilds
+     `#su-sp-mount` as fresh nodes, leaving `App._suSpCtrl` bound to a detached control, so Service
+     Periods would come back empty with nothing on screen saying so. Nothing may destroy this card.
+     ⚠ ORDER-INDEPENDENT ON PURPOSE: hiding cannot strand anything, so it does not matter whether
+     a visitor opened the shut form earlier in the same page load. */
   if (!App.SIGNUPS_OPEN) {
     const _sc = document.querySelector('#auth-signup .auth-card');
-    if (_sc) {
-      _sc.innerHTML =
-        '<div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
-        + '<div class="auth-heading">Bar Cop is not taking new accounts right now</div>'
-        + '<div class="auth-sub" style="line-height:1.6;">We are doing some work under the hood. '
-        + 'New signups are paused while we finish up. Check back shortly.</div>'
-        + '<div style="font-size:12px;color:var(--t2);margin-top:20px;text-align:center;">'
-        + 'Already have an account? Use Log In.</div>';
+    const _cc = document.getElementById('signup-closed-card');
+    /* ⚠ THE FOOT IS DELIBERATELY LEFT ALONE. The shipped build only ever wrote over `.auth-card`,
+       so "Already have an account? Log in" and Cancel stayed on screen under the notice. Hiding
+       them here would be a visual change nobody asked for, riding in on a lockout fix. */
+    if (_sc && _cc) {
+      _cc.style.display = '';
+      _sc.style.display = 'none';
     }
   }
   document.getElementById('show-login-from-signup')?.addEventListener('click', () => show('auth-login'));
@@ -11164,10 +11185,15 @@ function wireAuth() {
   };
 
   document.getElementById('signup-btn')?.addEventListener('click', async () => {
-    // Independent of the card swap in wireAuth. That one hides the form; this one is the stop
-    // that survives a stale cached page or a console call, and it fires BEFORE DB.signUp so no
-    // auth user is ever minted while the door is shut.
-    if (!App.SIGNUPS_OPEN) {
+    /* Independent of the cover in wireAuth. That one hides the form; this one is the stop that
+       survives a stale cached page or a console call, and it fires BEFORE DB.signUp so no auth
+       user is ever minted while the door is shut.
+       ⛔ FINISH MODE IS EXEMPT, AND IT HAS TO BE. This same button is the paid customer's "Finish
+       Setup". That branch mints nothing — it sets a password on an account Stripe has already been
+       paid for — so a shut door has nothing to protect here, and refusing it locks a paying
+       customer out of the one screen that can let them in. The guard below still stands for every
+       route that would create something. */
+    if (!App.SIGNUPS_OPEN && !App._finishMode) {
       const e0 = document.getElementById('signup-error');
       if (e0) { e0.textContent = 'Bar Cop is not taking new accounts right now. Check back shortly.'; e0.style.display = 'block'; }
       return;
