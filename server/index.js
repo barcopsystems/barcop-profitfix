@@ -2505,6 +2505,92 @@ app.post('/api/add-account', async (req, res) => {
 // Keeps accounts.name (what the bar switcher shows) in sync with the in-app bar
 // name (settings.bar_name), which onboarding + Business Profile write. Caller
 // must be an owner or admin of the account.
+/* ── E1: CHANGE THE LOGIN EMAIL ───────────────────────────────────────────────────────────────
+   Under checkout-first the address comes from what the customer typed on STRIPE'S page, so a typo
+   is discovered at a password reset months later — and the reset link goes to the typo. There was
+   no email-change path in the app at all before this.
+
+   ⛔ WHY THE ADMIN API AND NOT THE CLIENT SDK. Kyle's call, 2026-08-14: "no confirm... just let
+   them change it and save". `auth.updateUser({ email })` from the browser ALWAYS sends a
+   confirmation link — Supabase's "Secure email change" setting only chooses whether one or both
+   addresses must confirm, never neither. `admin.updateUserById(..., { email_confirm: true })` sets
+   it outright. The dashboard setting is deliberately left ON for every other path.
+
+   ⛔ TWO WRITES, AND THE ORDER IS THE DESIGN. They cannot be atomic, so pick the order whose
+   failure state is survivable: the AUTH USER decides whether they can log in and whether a reset
+   can ever reach them, the Stripe customer's email only feeds the duplicate check on Add Another
+   Bar. Auth first. A failure after it leaves someone who can still get in and a drift we log by
+   name; the other order leaves someone locked out, which is what this exists to prevent.
+
+   ⚠ `memberships` IS NOT A THIRD WRITE. It has no email column — every screen resolves the address
+   from the auth user through the admin API — so moving the auth user fixes the whole app for free.
+   Measured 2026-08-14; the note that said three places was wrong. */
+async function changeLoginEmail(userId, newEmail, stripe) {
+  const email = String(newEmail || '').trim().toLowerCase();
+  // One address, one @, a dot in the domain, no whitespace. Deliberately not a clever regex: the
+  // real validation is that they typed it twice and that Supabase accepts it.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: 'invalid_email' };
+
+  const { data: me } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (!me || !me.user) return { ok: false, reason: 'no_such_user' };
+  if ((me.user.email || '').toLowerCase() === email) {
+    // Not an error. Reporting "could not change" for a no-op reads as a broken button.
+    return { ok: true, reason: 'unchanged', email: email, stripeOk: true };
+  }
+
+  /* ⛔ REFUSE AN ADDRESS ANOTHER LOGIN ALREADY HAS. Supabase would refuse it too, but its message
+     is not one to show an operator, and a collision here is worth naming precisely. */
+  const { data: all } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const clash = ((all && all.users) || []).find(u => (u.email || '').toLowerCase() === email && u.id !== userId);
+  if (clash) return { ok: false, reason: 'email_in_use' };
+
+  const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    email: email, email_confirm: true
+  });
+  if (authErr) return { ok: false, reason: 'auth_update_failed', message: authErr.message };
+
+  /* Stripe follows. Best effort, never silent: if it drifts, `create-checkout-session`'s duplicate
+     check (which keys on the auth email) stops finding their customer, and the failure has to be
+     findable by hand rather than discovered as a double subscription later. */
+  let stripeOk = true;
+  try {
+    const { data: subs } = await supabaseAdmin
+      .from('subscriptions').select('stripe_customer_id').eq('user_id', userId);
+    const ids = [...new Set(((subs) || []).map(s => s && s.stripe_customer_id).filter(Boolean))];
+    for (const cid of ids) await stripe.customers.update(cid, { email: email });
+  } catch (e) {
+    stripeOk = false;
+    console.error('change-login-email: the login MOVED but Stripe did NOT, for user ' + userId
+      + ' -> ' + email + '. The duplicate check keys on this address, so update the Stripe customer '
+      + 'by hand or Add Another Bar will mint a second one. Cause: ' + (e && e.message));
+  }
+  return { ok: true, email: email, stripeOk: stripeOk };
+}
+
+app.post('/api/change-login-email', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+    // The identity comes from the TOKEN. Nothing in the body decides whose email moves.
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData || !userData.user) return res.status(401).json({ error: 'Invalid auth token' });
+
+    const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
+    const out = await changeLoginEmail(userData.user.id, (req.body || {}).email, stripe);
+    if (!out.ok) {
+      const msg = out.reason === 'invalid_email' ? 'Enter a valid email address.'
+        : out.reason === 'email_in_use' ? 'That email is already used by another Bar Cop login.'
+        : 'Could not change your email. Please try again, or contact support@barcop.com.';
+      return res.status(out.reason === 'email_in_use' ? 409 : 400).json({ error: msg, reason: out.reason });
+    }
+    return res.json(out);
+  } catch (e) {
+    console.error('change-login-email exception:', e);
+    return res.status(500).json({ error: 'Could not change your email. Please try again.' });
+  }
+});
+
 app.post('/api/set-account-name', async (req, res) => {
   try {
     const { accountId, name } = req.body || {};
