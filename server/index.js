@@ -1779,7 +1779,11 @@ async function resolveRequester(accountId, jwt) {
 // account instead of creating a new one for them.
 app.post('/api/invite-user', async (req, res) => {
   try {
-    const { email, accountId, role, permissions } = req.body || {};
+    const { email, accountId, role, permissions, name } = req.body || {};
+    /* E2. Optional, and NULL is the normal state — every screen falls back to the email, so an
+       invite with no name behaves exactly as it did before this existed. Trimmed to null rather
+       than stored as '' so the fallback sees an absent name instead of a blank line. */
+    const memberName = String(name || '').trim().slice(0, 80) || null;
     if (!email || !accountId) {
       return res.status(400).json({ error: 'email and accountId required' });
     }
@@ -1857,6 +1861,10 @@ app.post('/api/invite-user', async (req, res) => {
         role: inviteRole,
         permissions: grantPerms,
         invited_by: inviterUserId,
+        // E2: carried here because THIS is the row the signup trigger reads. A name written only
+        // onto memberships would be lost for exactly the people who were invited rather than
+        // already registered, which is most of them.
+        name: memberName,
         created_at: new Date().toISOString()
       }, { onConflict: 'email,account_id' });
     if (inviteRecErr) {
@@ -1912,7 +1920,9 @@ app.post('/api/invite-user', async (req, res) => {
 
         const { error: insertError } = await supabaseAdmin
           .from('memberships')
-          .insert({ account_id: accountId, user_id: existingUserId, role: inviteRole, permissions: grantPerms, invited_by: inviterUserId });
+          // E2: the other half of the same write. This path serves an email that ALREADY has a
+          // login, so it never touches account_invites and the trigger never runs for it.
+          .insert({ account_id: accountId, user_id: existingUserId, role: inviteRole, permissions: grantPerms, invited_by: inviterUserId, name: memberName });
 
         if (insertError) {
           return res.status(500).json({ error: insertError.message });
@@ -2114,7 +2124,7 @@ app.post('/api/list-members', async (req, res) => {
 
     const { data: memberships, error: listError } = await supabaseAdmin
       .from('memberships')
-      .select('id, user_id, role, permissions, created_at, invited_by')
+      .select('id, user_id, role, permissions, created_at, invited_by, name')
       .eq('account_id', accountId)
       .order('created_at', { ascending: true });
 
@@ -2157,6 +2167,9 @@ app.post('/api/list-members', async (req, res) => {
         id: m.id,
         user_id: m.user_id,
         email,
+        // E2. Sent as null when unset, never as the email: the FALLBACK is the screen's decision,
+        // and a server that quietly substituted one would make "has a name" unanswerable.
+        name: (m.name && String(m.name).trim()) || null,
         role: m.role,
         permissions: m.permissions || {},
         confirmed,
@@ -2588,6 +2601,51 @@ app.post('/api/change-login-email', async (req, res) => {
   } catch (e) {
     console.error('change-login-email exception:', e);
     return res.status(500).json({ error: 'Could not change your email. Please try again.' });
+  }
+});
+
+/* E2: your own display name. The invite form names everybody else; this is the only way the OWNER
+   ever gets one, and they have a memberships row like everyone else, so one column covers both.
+   ⛔ ALL OF THEIR MEMBERSHIPS, NOT ONE. The column lives per-membership because that is where an
+   invite can carry it, but a person's name is one fact — a multi-bar owner being "Kyle" in one bar
+   and their email address in the other would read as a bug. No accountId is taken from the body
+   for the same reason it is not taken for the email change: the token decides whose name moves. */
+/* The read half. Without it the field renders empty for somebody who HAS set a name, which is
+   indistinguishable from the save never having worked. Any member can read their own. */
+app.post('/api/my-name', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData || !userData.user) return res.status(401).json({ error: 'Invalid auth token' });
+    const { data: rows } = await supabaseAdmin
+      .from('memberships').select('name').eq('user_id', userData.user.id).limit(1);
+    const name = (rows && rows.length && rows[0].name && String(rows[0].name).trim()) || null;
+    return res.json({ ok: true, name: name });
+  } catch (e) {
+    console.error('my-name exception:', e);
+    return res.status(500).json({ error: 'Could not read your name.' });
+  }
+});
+
+app.post('/api/set-my-name', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData || !userData.user) return res.status(401).json({ error: 'Invalid auth token' });
+
+    // Empty is a legitimate value: it CLEARS the name and the screens fall back to the email.
+    const name = String((req.body || {}).name || '').trim().slice(0, 80) || null;
+    const { error: upErr } = await supabaseAdmin
+      .from('memberships').update({ name: name }).eq('user_id', userData.user.id);
+    if (upErr) return res.status(500).json({ error: upErr.message });
+    return res.json({ ok: true, name: name });
+  } catch (e) {
+    console.error('set-my-name exception:', e);
+    return res.status(500).json({ error: 'Could not save your name. Please try again.' });
   }
 });
 
