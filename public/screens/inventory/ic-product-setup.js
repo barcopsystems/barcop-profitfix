@@ -855,6 +855,11 @@ S.InventoryProducts = {
         CSVMapper.mount(el, {
           actionsEl: '#ip-csv-actions',
           dropTitle: 'Drop your ' + cat + ' product file here',
+          /* ⭐ NAMES THIS DOOR (Kyle, 2026-08-14). Passing a subject is what tells the shared mapper
+             to put the drop box away once mapping opens and to carry the category into its heading.
+             It is the ONLY on-screen statement of which of the six categories this file is going
+             into once the box is gone, which is exactly why the two are one opt-in and not two. */
+          subject: cat,
           dropSub: 'Needs a product name column; cost, size, price and par are optional.',
           confirmLabel: 'Import',
           // The UNION, not just this card's fields: the file may route into other
