@@ -2292,8 +2292,21 @@ S.InventoryProducts = {
      (the supplier one rendered a blank circle), and the numbers were never the point.
      A heading that says what the section is, and one line only where the section is not
      self-explanatory. */
+  /* ⛔⛔ `.sh ic-head`, NOT `.card-title` (Kyle, 2026-08-14: *"the header 'your 18 products' is
+     breaking out of the max width and shouldn't have the background color.. this was fixed on
+     another drop file.. but it must be on all of them"*). He is right, and this is the SECOND
+     IMPLEMENTATION the sweep missed. `.card-title` became a card head BAND — a `--card-head` fill
+     plus `margin:-20px -20px 16px` — which only lands as the first child of a `.card` with 20px
+     padding. These section heads sit directly on the screen with no card around them, so the
+     negative margin pushed them 20px past their container on both sides and they painted a fill
+     with nothing under it. `ImportConfirm.panel` was fixed on 2026-08-10 and this private copy was
+     not, because the fix went to the shared shell and nobody grepped for a hand-rolled twin
+     ([[the-loop]]: when you fix a shared thing, grep for the second IMPLEMENTATION, not for callers).
+     ⭐ `.sh` is the heading-outside-a-card class and its typography is byte-identical, so the only
+     thing that changes is the band going away; `.ic-head` adds back the divider. Same pair the
+     shell uses, so the two cannot drift again. */
   _sectionHead(title, lead) {
-    return '<div class="card-title">' + esc(title) + '</div>'
+    return '<div class="sh ic-head">' + esc(title) + '</div>'
       + (lead ? '<div style="font-size:13.5px;color:var(--t2);line-height:1.55;margin:0 0 18px;">' + lead + '</div>' : '');
   },
 
