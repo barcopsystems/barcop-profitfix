@@ -509,13 +509,12 @@ S.Hub = {
      comment explains why. So an operator who closed their second week read "Needs two closed weeks"
      while having exactly two, saw nothing appear, and had no way to know they were not owed
      anything. One helper now, because two sentences about one requirement is how they drifted.
-     ⭐ AND IT CARRIES A DOOR. Three lines on the emptiest screen in the app stated a prerequisite
-     and offered nowhere to go; Needs Attention directly below them does it properly. Gold inline
-     link is the Hub's own convention (the "See all" row), not a new affordance. */
+     ⛔ NO LINK ON IT. It briefly carried a gold "Close a week" door on each of the three lines and
+     Kyle removed them (2026-08-14): *"remove the three gold close a week links."* Three gold links
+     stacked down one empty screen is the same too-much-gold he had just taken off the Get Started
+     card. The line states the requirement and stops. Do not helpfully re-add a door here. */
   _needsWeeksMsg() {
-    return 'Needs three closed weeks. '
-      + '<span onclick="S.Hub._enter(\'week-close\',\'profit\')" '
-      + 'style="color:var(--gold);cursor:pointer;font-weight:600;">Close a week</span>';
+    return 'Needs three closed weeks';
   },
 
   _getStartedSteps() {
