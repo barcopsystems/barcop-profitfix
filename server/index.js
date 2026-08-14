@@ -1289,10 +1289,17 @@ async function provisionFromSession(session, stripe) {
     if (found) {
       userId = found.id;
     } else {
+      /* ⛔⛔ `needs_password` IS THE MARKER THE APP GATES ON, AND IT IS WRITTEN ONLY HERE, ONLY ON
+         CREATE. `created_via` cannot do that job and never could: this webhook has stamped it on
+         every account it provisions since at least 2026-05-18, so reading it as "has no password
+         yet" captured every customer who ever paid — Kyle's own main account among them, which
+         booted into the finish screen and could not get out of it.
+         ⛔ ON CREATE ONLY. A returning customer takes the `found` branch above and must never be
+         re-marked, or paying again would send them to set a password they already have. */
       const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email,
         email_confirm: true,
-        user_metadata: { created_via: 'stripe_checkout' },
+        user_metadata: { created_via: 'stripe_checkout', needs_password: true },
       });
       if (createErr) {
         // Likely a concurrent webhook re-delivery already created them — re-look up.
