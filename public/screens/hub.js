@@ -1211,9 +1211,22 @@ S.Hub = {
               + (s.optional ? ' <span style="font-size:10px;font-weight:600;color:var(--t4);letter-spacing:0.5px;">OPTIONAL</span>' : ''),
               s.screen, s.mod)
       +   '</div>'
-      +   '<div style="grid-row:2;grid-column:' + col + ';font-size:11px;color:' + (s.optional ? 'var(--t3)' : 'var(--t2)') + ';line-height:1.55;padding:9px 2px 12px;">'
+      /* ⛔ ONE BORDERED BOX, BUILT FROM TWO GRID ITEMS. Kyle wants the text under each chip wrapped
+         like the Bar Cop Audit card: border only, no fill. It cannot be a single element, because
+         the rows are what align the divider across four columns of different-length copy — a
+         wrapper spanning both rows would lay its own contents out independently and the dividers
+         would go ragged again.
+         ⭐ SO THE BOX IS DRAWN ACROSS THE SEAM: row 2 takes the top, left and right with the top
+         corners rounded and NO bottom edge; row 3 takes a full border with the bottom corners
+         rounded. Its top edge IS the divider, which is why exactly one line lands on the seam.
+         ⚠ The gap under the chip is a MARGIN, not a grid row-gap: a row-gap applies to every row,
+         so it would also open a gap between rows 2 and 3 and split the box in half. */
+      +   '<div style="grid-row:2;grid-column:' + col + ';margin-top:8px;font-size:11px;color:'
+      +     (s.optional ? 'var(--t3)' : 'var(--t2)') + ';line-height:1.55;padding:11px 12px;'
+      +     'border:1px solid var(--b-edge);border-bottom:0;border-radius:8px 8px 0 0;">'
       +     esc(s.how) + '</div>'
-      +   '<div style="grid-row:3;grid-column:' + col + ';font-size:11px;color:var(--t2);line-height:1.55;padding:11px 2px 0;border-top:1px solid var(--b-edge);">'
+      +   '<div style="grid-row:3;grid-column:' + col + ';font-size:11px;color:var(--t2);line-height:1.55;'
+      +     'padding:11px 12px;border:1px solid var(--b-edge);border-radius:0 0 8px 8px;">'
       +     esc(s.gain || '') + '</div>'
       + '</div>';
     const gettingStarted = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
