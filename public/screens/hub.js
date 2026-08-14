@@ -1176,25 +1176,34 @@ S.Hub = {
        shipped pointing at a dying cockpit in the strip. A member can be RUN, so the harness resolves
        each destination for real instead of parsing a template ([[the-loop]] #21 — a filtered search
        space is where the bug hides). */
-    /* ⛔ ROWS, NOT A FLEX ROW OF CHIPS. Each step now carries what it does AND what it buys, which
-       is two more lines than a chip can hold. The number, the label and the reason read down the
-       page in the order an operator does them. */
     const gsSteps = this._getStartedSteps();
-    const gsRow = (n, s) =>
-      '<div onclick="S.Hub._enter(\'' + s.screen + '\',\'' + s.mod + '\')" style="display:flex;gap:11px;align-items:flex-start;cursor:pointer;padding:11px 13px;border:1px solid var(--gold-tint-bord);border-radius:8px;background:var(--gold-tint);">'
-      +   '<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;line-height:1;background:var(--sel-active-bg);color:var(--gold);margin-top:1px;">' + n + '</span>'
-      +   '<span style="flex:1;min-width:0;">'
-      /* The OPTIONAL flag is Close the Week's exact treatment, so the two screens mean the same
-         thing by the same word: 10px / 600 / --t4, and it never blocks anything. */
-      +     '<span style="font-size:12px;font-weight:700;color:var(--t1);">' + esc(s.label) + '</span>'
-      +     (s.optional ? ' <span style="font-size:10px;font-weight:600;color:var(--t4);letter-spacing:0.5px;">OPTIONAL</span>' : '')
-      +     '<div style="font-size:11px;color:' + (s.optional ? 'var(--t3)' : 'var(--t2)') + ';line-height:1.55;margin-top:3px;">' + esc(s.how) + '</div>'
-      +     (s.gain ? '<div style="font-size:11px;color:var(--gold);line-height:1.55;margin-top:3px;">' + esc(s.gain) + '</div>' : '')
-      +   '</span></div>';
+    /* ⛔ FOUR COLUMNS, AND THE CHIP IS UNTOUCHED. Kyle, 2026-08-14: *"i didn't want to change the
+       design... all 4 steps still in 4 columns.. the step buttons stayed the same.. and then under
+       each button in the 4 columns the text.. do this, this and this.. divider or something and the
+       app does this, this and this."* My first version turned the chips into stacked rows, which is
+       a design change nobody asked for ([[minimal-scope]]). `gsChip` is called exactly as it was;
+       everything new sits UNDER it, and the divider separates what the operator does from what Bar
+       Cop does with it.
+       ⚠ THE CHIP CARRIES `flex:1`, WHICH MEANS THE MAIN AXIS. Dropped straight into a COLUMN it
+       would grow vertically and stretch the button to the tallest column. The one-line row wrapper
+       gives it a horizontal main axis again, so it fills the column's width and keeps its height. */
+    const gsCol = (n, s) =>
+      '<div style="flex:1;min-width:200px;display:flex;flex-direction:column;">'
+      +   '<div style="display:flex;">'
+      +     gsChip(n, esc(s.label)
+      /* Close the Week's exact OPTIONAL treatment, so both screens mean the same thing by it. */
+              + (s.optional ? ' <span style="font-size:10px;font-weight:600;color:var(--t4);letter-spacing:0.5px;">OPTIONAL</span>' : ''),
+              s.screen, s.mod)
+      +   '</div>'
+      +   '<div style="font-size:11px;color:' + (s.optional ? 'var(--t3)' : 'var(--t2)') + ';line-height:1.55;padding:9px 2px 0;">'
+      +     esc(s.how) + '</div>'
+      +   (s.gain ? '<div style="font-size:11px;color:var(--gold);line-height:1.55;margin-top:9px;padding:9px 2px 0;border-top:1px solid var(--b-edge);">'
+      +     esc(s.gain) + '</div>' : '')
+      + '</div>';
     const gettingStarted = '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
       + 'Four steps to your first closed week. Each one adds to the last.</div>'
-      + '<div style="display:flex;flex-direction:column;gap:8px;">'
-      +   gsSteps.map((s, i) => gsRow(i + 1, s)).join('')
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      +   gsSteps.map((s, i) => gsCol(i + 1, s)).join('')
       + '</div>';
     /* ⛔⛔ REVERSED 2026-08-11, AND THE REASON I HAD IT THE OTHER WAY WAS WRONG. During the rebuild I
        made the band always render, arguing a new operator should see "the four numbers the product
