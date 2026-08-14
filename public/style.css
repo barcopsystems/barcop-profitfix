@@ -430,6 +430,19 @@ input,select,textarea{color-scheme:dark;}
    empty — in the dropzone state nothing renders there, so its spacing shouldn't push
    a sibling button (e.g. Add Products' Cancel) away from the card. */
 #ip-csv-actions:empty{margin:0!important;}
+/* ⭐ THE IMPORTER PANEL IS A WELL (Kyle, 2026-08-14: *"when the importer is open the background
+   around the drop box change to #0D181E"*). MEASURED before the change: the panel and the dashed
+   drop box were BOTH #070E15 — the card is `--surface` and `.csvm-drop` carries
+   `background:var(--input)`, which is the same value — so the dashed outline sat on its own colour
+   and read as a flat area rather than a target. Lifting only the SURROUND leaves the box darker
+   than what is around it, which is what makes it read as somewhere to drop something.
+   ⚠ THE HEX IS KYLE'S, GIVEN BY VALUE. `--gold-tint` is the token that already holds #0D181E, but
+   its name describes a selection tint and would read as wrong here; fourteen rules in this file
+   already write this value literally for the same reason (data rows, `.pf-step`, `.at-mtbl td`).
+   Worth a real token one day, named for what it is.
+   ⚠ SCOPED TO ADD PRODUCTS, which is the door Kyle walked. Nine other doors mount the same
+   `CSVMapper` into their own panel and still read flat. */
+#ip-import-panel{background:#0D181E;}
 /* ⭐ THE HEADER IS A BAND NOW, not just text over a line. It bleeds to the card's edges with
    negative margins that cancel the card's own 20px padding, so the fill runs corner to corner and
    the card reads as titled rather than as a rectangle with a rule across it.
