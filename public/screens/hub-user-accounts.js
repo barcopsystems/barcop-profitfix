@@ -569,7 +569,8 @@ S.HubUserAccounts = {
     const btn = document.getElementById('ua-pw-btn');
     btn.disabled = true; btn.textContent = 'Saving...';
     try {
-      const { error } = await DB._sb.auth.updateUser({ password: pw1 });
+      // Through the shared helper so this door stamps the same marker the others do.
+      const { error } = await DB.setPassword(pw1);
       if (error) {
         msg.style.color = 'var(--red)'; msg.textContent = error.message; msg.style.display = 'block';
       } else {
