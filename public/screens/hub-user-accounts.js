@@ -343,7 +343,12 @@ S.HubUserAccounts = {
       if (!nameEl || nameEl.value.trim()) return;
       const typed = String(ev.target.value || '').trim().toLowerCase();
       if (!typed) return;
-      const roster = (App.data && App.data.lc_staff) || [];
+      /* ⛔ `App.laborData`, NOT `App.data`. Written as `App.data.lc_staff` first and WALKED on the
+         deployed build: `App.data` has 34 keys and not one of them is the roster, so the prefill
+         was dead code that no assertion could see — the pin only checked that the string
+         `lc_staff` appeared. The stores are namespaced (`inventoryData`, `laborData`, `shiftData`)
+         and this one lives in labor. */
+      const roster = (App.laborData && App.laborData.lc_staff) || [];
       const hit = roster.filter(s => s && s.email && String(s.email).trim().toLowerCase() === typed)[0];
       if (hit && hit.name) nameEl.value = String(hit.name).trim();
     });
