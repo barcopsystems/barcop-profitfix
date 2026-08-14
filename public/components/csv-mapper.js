@@ -770,8 +770,30 @@ const CSVMapper = {
     // No card wrapper: the mapper sits directly on the canvas of whatever card it
     // was mounted in, laying out like the manual entry form (a thin divider off
     // the drop zone, a section heading, the field grid, then the action row).
+    /* ⛔⛔ A DOOR THAT NAMES ITS SUBJECT GETS THE MAPPER ON ITS OWN (Kyle, 2026-08-14, Add Products).
+       Two reasons the drop box goes once mapping opens, and the second is the one that matters:
+         · this member writes only into `.csvm-area`, so the box AND ITS LISTENERS stay live above
+           the mapping — a second drop silently re-parses and throws away the mapping the operator
+           has just checked, with no confirmation;
+         · Cancel already re-mounts back to the drop zone, so nothing is lost by hiding it.
+       ⛔ BUT THE BOX CARRIES THE ONLY CATEGORY LABEL ON SCREEN. This heading has always been a flat
+       "Map Your Columns" and never said what was being imported; the category lives once, inside
+       the box, as "Drop your Draft Beer product file here". Add Products has SIX upload buttons, so
+       hiding the box WITHOUT replacing that label is a way to map a file into the wrong category
+       with nothing on screen to catch it. The box therefore goes only where the door names itself.
+       ⭐ OPT-IN, DELIBERATELY. Kyle is walking one door at a time to get this layout right before it
+       is copied across the other nine. A door that passes no `subject` renders exactly what it
+       rendered yesterday — `verify-csv-mapper` S2/S2b are that promise, and they are the assertions
+       to keep while the rollout is half done. */
+    const subject = String(opts.subject || '').trim();
+    if (subject) {
+      const dz = container && container.querySelector && container.querySelector('.csvm-drop');
+      if (dz && dz.style) dz.style.display = 'none';
+    }
     let html = '<div class="divider"></div>'
-      + '<div class="sh" style="margin:0 0 12px;">Map Your Columns</div>'
+      + '<div class="sh" style="margin:0 0 12px;">Map Your Columns'
+      + (subject ? '<span style="color:var(--t3);"> &middot; </span>' + esc(subject) : '')
+      + '</div>'
       /* ⚠ ONE ROW IS "row". Found on the live build 2026-08-07: a one-row file read *"Found 1 rows."*
          over a button reading *"Import 1 Rows"*, on all 18 doors, because this component is shared.
          The convention was already here — the unread-columns sentence below guards its singular, and
