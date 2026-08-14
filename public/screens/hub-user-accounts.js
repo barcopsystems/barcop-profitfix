@@ -121,6 +121,15 @@ S.HubUserAccounts = {
        card, and the Password section directly below carries none, so mine was inconsistent with its
        own neighbour. The section title and the two labels say what this does; the guard is the
        second field, not a sentence. */
+    /* E2. The owner's own name. Everybody else is named at invite; the owner has a memberships row
+       like everyone else, so the same column serves them, and this is the only thing that ever
+       fills it. Blank is allowed and CLEARS it, falling the whole app back to the email. */
+    const nameBody = '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+      +   '<div class="f" style="width:260px;"><label>Your Name</label><input class="suf" type="text" id="ua-myname" placeholder="Shown to your team" autocomplete="off"/></div>'
+      + '</div>'
+      + '<div style="margin-top:12px;"><button class="btn btn-ghost" id="ua-myname-btn">Save Name</button></div>'
+      + '<div id="ua-myname-msg" style="font-size:12px;margin-top:8px;display:none;"></div>';
+
     const emailBody = '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
       +   '<div class="f" style="width:220px;"><label>New Email</label><input class="suf" type="email" id="ua-email1" placeholder="name@yourbar.com" autocomplete="off"/></div>'
       +   '<div class="f" style="width:220px;"><label>Confirm Email</label><input class="suf" type="email" id="ua-email2" placeholder="Re-type the new email" autocomplete="off"/></div>'
@@ -173,6 +182,8 @@ S.HubUserAccounts = {
     const isStaff = (window.DB && DB.role && DB.role()) === 'staff';
     const sections = [];
     if (showAccount) {
+      // Who you are, then how you log in, then your password.
+      sections.push({ title: 'Your Name', body: nameBody });
       // Above Password: it is the half of the login that had no door at all until now, and it is
       // what a reset link depends on.
       sections.push({ title: 'Login Email', body: emailBody });
@@ -231,6 +242,13 @@ S.HubUserAccounts = {
       + '</div>'
       + '<div style="font-size:14px;font-weight:700;color:var(--t3);margin:24px 0 14px;">Invite a Member</div>'
       + '<div class="form-row" style="gap:10px;flex-wrap:wrap;align-items:flex-end;">'
+      /* E2. Name first, because it is what the list shows and the email is the login detail under
+         it. Optional: leave it blank and the row reads exactly as it did before, off the email.
+         ⚠ NOT WIRED TO THE STAFF ROSTER. `lc_staff` carries names, but a bookkeeper or a partner
+         with a login is not on the payroll roster, so a rule that reads names out of it would be
+         right for some invites and quietly wrong for others. It PREFILLS from a matching roster
+         email below, which is a convenience that cannot be wrong. */
+      +   '<div class="f" style="width:200px;"><label>Name</label><input type="text" id="ua-team-name" placeholder="Optional" autocomplete="off"/></div>'
       +   '<div class="f" style="width:240px;"><label>Email Address</label><input type="email" id="ua-team-email" placeholder="name@email.com" autocomplete="off"/></div>'
       +   '<div class="f" style="width:120px;"><label>Role</label><select id="ua-team-role"><option value="staff">Staff</option>' + (isOwnerNow ? '<option value="admin">Admin</option>' : '') + '</select></div>'
       +   '<div class="f" style="width:auto;flex:0 0 auto;"><label style="visibility:hidden;">Invite</label>'
@@ -312,7 +330,23 @@ S.HubUserAccounts = {
 
   // ── Wiring ────────────────────────────────────────────────────────────────
   wire() {
+    document.getElementById('ua-myname-btn')?.addEventListener('click', () => this.saveMyName());
+    this._loadMyName();
     document.getElementById('ua-email-btn')?.addEventListener('click', () => this.changeLoginEmail());
+    /* E2 PREFILL. Typing an email that matches somebody on the staff roster fills their name in,
+       and only while the field is still empty so it can never overwrite what the owner typed.
+       ⚠ A CONVENIENCE, NOT A RULE. The roster is not the membership list — a bookkeeper or a
+       partner has a login and is not on payroll — so this offers a name when it happens to know
+       one and stays silent otherwise. */
+    document.getElementById('ua-team-email')?.addEventListener('input', (ev) => {
+      const nameEl = document.getElementById('ua-team-name');
+      if (!nameEl || nameEl.value.trim()) return;
+      const typed = String(ev.target.value || '').trim().toLowerCase();
+      if (!typed) return;
+      const roster = (App.data && App.data.lc_staff) || [];
+      const hit = roster.filter(s => s && s.email && String(s.email).trim().toLowerCase() === typed)[0];
+      if (hit && hit.name) nameEl.value = String(hit.name).trim();
+    });
     document.getElementById('ua-pw-btn')?.addEventListener('click', () => this.changePassword());
     document.getElementById('ua-export-data')?.addEventListener('click', () => this.exportBackup());
     document.getElementById('ua-import-btn')?.addEventListener('click', () => document.getElementById('ua-import-file')?.click());
@@ -577,6 +611,40 @@ S.HubUserAccounts = {
         }
       }
     });
+  },
+
+  // ── Your display name (E2) ───────────────────────────────────────────────
+  async _loadMyName() {
+    const el = document.getElementById('ua-myname');
+    if (!el) return;
+    // The demo has no server identity, and its team card already shows a named crew.
+    if (App.demoMode) { el.value = 'You'; return; }
+    try {
+      const r = await DB.myName();
+      // ⚠ Only fill an UNTOUCHED field. This is async, so an operator who started typing while it
+      // was in flight would otherwise have their input replaced by the stored value.
+      if (r && r.ok && r.name && !el.value.trim()) el.value = r.name;
+    } catch (e) { /* a name that will not load is not worth an error on this page */ }
+  },
+
+  async saveMyName() {
+    if (App.demoBlock && App.demoBlock()) return;
+    const el  = document.getElementById('ua-myname');
+    const msg = document.getElementById('ua-myname-msg');
+    const btn = document.getElementById('ua-myname-btn');
+    const say = (t, bad) => { msg.style.color = bad ? 'var(--red)' : 'var(--gold)'; msg.textContent = t; msg.style.display = 'block'; };
+    const name = (el.value || '').trim();
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      const r = await DB.setMyName(name);
+      if (!r || !r.ok) { say((r && r.error) || 'Could not save your name.', true); return; }
+      // Blank is a real choice, not a failure: it clears the name and every screen goes back to
+      // showing the email. Saying so is the difference between "cleared" and "did not save".
+      say(name ? 'Name saved. Your team sees this instead of your email.'
+               : 'Name cleared. Your team sees your email address.', false);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save Name';
+    }
   },
 
   // ── Login email change (E1) ──────────────────────────────────────────────
@@ -953,7 +1021,14 @@ S.HubUserAccounts = {
         : '';
 
       return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b2);flex-wrap:wrap;">'
-        +   '<div style="flex:1;min-width:160px;font-size:13px;color:var(--t1);">' + esc(m.email) + statusBadge + '</div>'
+        /* E2. Name on top, email as the quiet second line — the shape the DEMO has always shown,
+           which is how this gap surfaced: the shop window was demonstrating something the live app
+           could not do. With no name the row is exactly what it was, a single email line, because
+           an empty second line under a heading reads as broken data. */
+        +   '<div style="flex:1;min-width:160px;font-size:13px;color:var(--t1);">'
+        +     esc(m.name || m.email) + statusBadge
+        +     (m.name ? '<div style="color:var(--t3);font-size:11px;">' + esc(m.email) + '</div>' : '')
+        +   '</div>'
         +   '<div style="width:130px;">' + roleCell + '</div>'
         +   '<div style="width:100px;text-align:right;">' + editPermsBtn + '</div>'
         +   '<div style="width:110px;text-align:right;">' + makeOwnerBtn + '</div>'
@@ -1029,6 +1104,10 @@ S.HubUserAccounts = {
     const btn = document.getElementById('ua-team-invite');
     const email = (emailInput?.value || '').trim().toLowerCase();
     const role = roleSelect?.value || 'staff';
+    // E2. Optional by design: an invite with no name behaves exactly as it did before, because
+    // every screen falls back to the email.
+    const nameInput = document.getElementById('ua-team-name');
+    const name = (nameInput?.value || '').trim();
 
     if (!email || email.indexOf('@') < 1) {
       this._teamMsg('Enter a valid email address.', 'var(--red)');
@@ -1050,7 +1129,7 @@ S.HubUserAccounts = {
       if (!headers) return;
       const r = await fetch('/api/invite-user', {
         method: 'POST', headers,
-        body: JSON.stringify({ email, accountId, role, permissions })
+        body: JSON.stringify({ email, accountId, role, permissions, name })
       });
       const data = await r.json();
       if (!r.ok || !data.ok) {
