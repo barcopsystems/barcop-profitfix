@@ -790,7 +790,11 @@ const CSVMapper = {
       const dz = container && container.querySelector && container.querySelector('.csvm-drop');
       if (dz && dz.style) dz.style.display = 'none';
     }
-    let html = '<div class="divider"></div>'
+    /* ⛔ NO RULE WHERE THERE IS NOTHING TO DIVIDE (Kyle, 2026-08-14). This divider separated the
+       mapper from the drop box above it. On a door that names its subject the box is gone, so the
+       rule became the first thing on the panel, drawing a line under nothing. Padding is what
+       belongs there. It stays for the nine doors that still show the box. */
+    let html = (subject ? '<div style="height:18px;"></div>' : '<div class="divider"></div>')
       + '<div class="sh" style="margin:0 0 12px;">Map Your Columns'
       + (subject ? '<span style="color:var(--t3);"> &middot; </span>' + esc(subject) : '')
       + '</div>'
