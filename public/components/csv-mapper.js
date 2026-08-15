@@ -39,7 +39,12 @@ const CSVMapper = {
     if (extEl) extEl.innerHTML = '';
     const zone = container.querySelector('.csvm-drop');
     const input = container.querySelector('.csvm-file');
-    const over = on => { zone.style.borderColor = on ? 'rgba(255,255,255,.30)' : 'var(--b1)'; zone.style.background = on ? 'rgba(255,255,255,.04)' : 'var(--input)'; };
+    // ⛔ THE FILE-OVER FILL IS OPAQUE ON PURPOSE. It used to be a white wash, which
+    // is a see-through fill: the zone stopped painting its own colour and took
+    // whatever sat behind it, so the SAME line drew a different colour on every
+    // door (a card behind it on Add Products, a panel behind it on Close The
+    // Week). One token, one colour, on every door, whatever each one sits on.
+    const over = on => { zone.style.borderColor = on ? 'rgba(255,255,255,.30)' : 'var(--b1)'; zone.style.background = on ? 'var(--sel-active-bg)' : 'var(--input)'; };
     zone.addEventListener('click', () => input.click());
     input.addEventListener('change', e => { const f = e.target.files[0]; if (f) this._readFile(f, container, opts); input.value = ''; });
     ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); over(true); }));
