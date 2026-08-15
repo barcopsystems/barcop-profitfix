@@ -443,6 +443,11 @@ input,select,textarea{color-scheme:dark;}
    ⚠ SCOPED TO ADD PRODUCTS, which is the door Kyle walked. Nine other doors mount the same
    `CSVMapper` into their own panel and still read flat. */
 #ip-import-panel{background:#0D181E;}
+/* The routing review's wrapper: one box round the heading, the picker and the group rows, with the
+   action buttons outside it. Same fill as the importer panel above, so the two steps of one job
+   read as the same surface. A CLASS rather than an inline style because `verify-design-code` RULE 3
+   refuses a hardcoded hex in a screen file, correctly — the colour belongs here with the rest. */
+.ip-route-box{background:#0D181E;}
 /* ⭐ THE HEADER IS A BAND NOW, not just text over a line. It bleeds to the card's edges with
    negative margins that cancel the card's own 20px padding, so the fill runs corner to corner and
    the card reads as titled rather than as a rectangle with a rule across it.
