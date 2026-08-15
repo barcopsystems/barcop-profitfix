@@ -256,11 +256,19 @@ S.InventoryTakeInventory = {
     this.scrollTop();
   },
 
-  // Toggle one location tile's selected look (gold-tint fill + checkmark).
+  /* Toggle one location tile between its resting and selected look.
+     ⚠ THE COMMENT HERE USED TO SAY "gold-tint fill + checkmark" ABOUT THE SELECTED STATE, AND HAD
+     IT BACKWARDS: `--gold-tint` is the RESTING fill; selected is the selection colour. Anyone
+     acting on that sentence would have recoloured the wrong half.
+     ⛔ `--sel-active-bg`, NOT A LITERAL #1E2B34. That token holds this exact value and is the app's
+     standard selection fill — 48 uses across 32 files, every filter chip, mode pill, vendor chip,
+     service period and Profit Fix tile. These four location tiles were among the only selection
+     surfaces writing the hex by hand, so retuning the selection colour moved 48 things and left
+     these behind. */
   toggleLocTile(tile) {
     const on = !tile.classList.contains('selected');
     tile.classList.toggle('selected', on);
-    tile.style.background = on ? '#1E2B34' : 'var(--gold-tint)';
+    tile.style.background = on ? 'var(--sel-active-bg)' : 'var(--gold-tint)';
     tile.style.borderColor = on ? 'var(--gold-tint-bord)' : 'var(--b2)';
     const ck = tile.querySelector('.ti-loc-ck');
     if (ck) {
