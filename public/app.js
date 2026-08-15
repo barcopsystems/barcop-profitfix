@@ -8283,7 +8283,8 @@ const App = {
            had already filed came back with it. It only ever touches the work list now, and the
            words say so rather than leaving the operator to find out. */
         + '<label style="display:flex;align-items:center;gap:6px;margin:0;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap;">'
-        + '<input type="checkbox" class="bc-check" id="disp-all"/> Select all still to answer</label>'
+        + '<input type="checkbox" class="bc-check" id="disp-all"/> <span id="disp-all-lbl">'
+        + 'Select all still to answer</span></label>'
         + '<div class="f" style="max-width:215px;margin:0;flex:1 1 170px;"><select id="disp-choice">'
         + '<option value="">What happened...</option>'
         + CHOICES.map(c => '<option value="' + c.v + '">' + esc(c.label) + '</option>').join('')
@@ -8325,6 +8326,7 @@ const App = {
     const destWrap = overlay.querySelector('#disp-dest-wrap');
     const destEl = overlay.querySelector('#disp-dest');
     const allEl = overlay.querySelector('#disp-all');
+    const allLbl = overlay.querySelector('#disp-all-lbl');
     const applyBtn = overlay.querySelector('#disp-apply');
     const goBtn = overlay.querySelector('#disp-go');
     const err = overlay.querySelector('#disp-err');
@@ -8353,6 +8355,10 @@ const App = {
         const open = openRows();
         allEl.checked = open.length > 0 && open.every(s => checked[s.product_id]);
         allEl.disabled = open.length === 0;
+        /* ⛔ AND THE WORDS GO WITH IT (Kyle, 2026-08-15). Greying the box out while it still read
+           "Select all still to answer" left the label describing work that no longer exists, which
+           is a control explaining itself wrong rather than a control that is merely off. */
+        if (allLbl) allLbl.textContent = open.length ? 'Select all still to answer' : 'None left to select';
       }
     };
 
