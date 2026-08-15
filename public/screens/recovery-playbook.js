@@ -403,7 +403,12 @@ S.RecoveryPlaybook = {
       + '.pb-yn:hover{color:var(--w);border-color:rgba(255,255,255,0.28);}'
       + '.pb-yn.on.yes{color:var(--green);border-color:var(--green);}'
       + '.pb-yn.on.no{color:var(--red);border-color:var(--red);}'
-      + '.pb-diag-reveal{margin-top:10px;font-size:12.5px;line-height:1.65;color:var(--t2);background:#08131A;border-radius:var(--r);padding:10px 12px;}'
+      /* ⛔ `--panel`, NOT A LITERAL (Kyle, 2026-08-14). This was the LAST hardcoded #08131A in the
+         app, so it was the one box that would not follow when the raised-panel colour is retuned.
+         `--panel` rather than `--card-head`: both hold #08131A today, but this is a revealed
+         content panel — the same job the token's own comment names (Mark Fix Implemented, Quick
+         Reference, Hub Key Metrics) — not the band across the top of a card. */
+      + '.pb-diag-reveal{margin-top:10px;font-size:12.5px;line-height:1.65;color:var(--t2);background:var(--panel);border-radius:var(--r);padding:10px 12px;}'
       + '.pb-diag-cost{color:var(--red);font-weight:700;}'
       + '.pb-score-num{font-family:\'Barlow Condensed\',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--t1);margin:8px 0;}'
       + '.pb-score-num span{font-size:15px;color:var(--t3);}'
