@@ -635,12 +635,29 @@ S.Hub = {
             deltaText: fmt(Math.abs(now - was)),
             good: betterIsUp ? (now > was) : (now < was), flat: now === was };
 
+    /* ⭐⭐ THE TWO COMPONENTS, THEIR TOTAL, AND THE VOLUME THEY SIT ON (Kyle, 2026-08-14):
+       *"why did we do prime cost, labor, check average, weekly sales.. instead of Pour cost, Food
+       Cost, Prime Cost, Weekly Sales?"* There was never a recorded reason for the old four, and his
+       is better for one specific reason: PRIME COST IS COST OF GOODS PLUS LABOR, so showing Prime
+       AND Labor was the total plus one of its two halves — the cost-of-goods half never appeared at
+       all. An operator could watch prime move and had no way to tell whether pour or food drove it.
+       ⛔ PRIORITY-ORDERED CANDIDATES, FIRST FOUR THAT RESOLVE. *"if a bar does not sell food and
+       then has no food cost.. have the auto change to something else."* A bar with no food would
+       otherwise render THREE cells and an empty fourth slot, which reads as broken rather than as a
+       bar that does not do food. The two below the line are the fallbacks, in the order they should
+       fill in — and because the rule is "first four that resolve", it covers ANY missing metric,
+       not only food.
+       ⚠ `cost_pct` IS STORED ON THE WEEK RECORD, checked against a real one on the deployed build
+       (`bar:{cogs:2729, cost_pct:22.8, revenue:11969}`) rather than assumed from the field name. */
     const pairs = [
+      pair('Pour cost', pWas && pWas.bar && pWas.bar.cost_pct, pNow && pNow.bar && pNow.bar.cost_pct, false, v => App.fmtPct(v)),
+      pair('Food cost', pWas && pWas.food && pWas.food.cost_pct, pNow && pNow.food && pNow.food.cost_pct, false, v => App.fmtPct(v)),
       pair('Prime cost', pWas && pWas.prime_cost_pct, pNow && pNow.prime_cost_pct, false, v => App.fmtPct(v)),
+      pair('Weekly sales', sales(rWas), sales(rNow), true, v => App.fmtCurrency(v, 0)),
+      // ── fallbacks, used only when one of the four above cannot resolve ──
       pair('Labor', rWas && rWas.labor_pct_blended, rNow && rNow.labor_pct_blended, false, v => App.fmtPct(v)),
-      pair('Check average', rWas && rWas.check_avg, rNow && rNow.check_avg, true, v => App.fmtCurrency(v)),
-      pair('Weekly sales', sales(rWas), sales(rNow), true, v => App.fmtCurrency(v, 0))
-    ].filter(Boolean);
+      pair('Check average', rWas && rWas.check_avg, rNow && rNow.check_avg, true, v => App.fmtCurrency(v))
+    ].filter(Boolean).slice(0, 4);
 
     /* THE HEADLINE. Prime cost is COGS plus labor as a share of sales, so a move in it is the one
        figure that answers "am I running the place better", and points times sales is real money.
