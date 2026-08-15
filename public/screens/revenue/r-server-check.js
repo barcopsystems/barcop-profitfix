@@ -856,9 +856,9 @@ S.RevenueServerCheck = {
     });
     return { rows: rows, count: rows.filter(r => r.lands).length };
   },
-  /* Keep Mine / Use The File, on the row. The modal this replaces is still `App.promptImportConflicts`
-     and three doors still use it; these two do not any more. Default is KEEP YOUR OWN, unchanged —
-     the operator has to choose the file, never the other way round. */
+  /* Keep Mine / Use The File, on the row. This replaced a modal that asked the same question a
+     second time; that modal was retired 2026-08-15 once no door could reach it. Default is KEEP
+     YOUR OWN, unchanged — the operator has to choose the file, never the other way round. */
   _serverConflictHTML(v, useFile) {
     const k = esc(String((v.conflict || {}).key || ''));
     const btn = (val, label, on) => '<button type="button" class="btn btn-sm" data-svconf="' + k
@@ -882,26 +882,14 @@ S.RevenueServerCheck = {
     /* ⛔⛔ ON THE REVIEWED PATH THE ANSWER IS ALREADY ON THE ROW, so the modal must not fire. Asking
        twice for one decision is the shape door 2 removed from this app: the confirm screen shows both
        sets of figures with Keep Mine / Use The File, and `opts.useFile` is what the operator chose.
-       ⚠ `App.promptImportConflicts` STAYS for the doors that still write on the press — the cockpit's
-       per-server zone is one of them until it converts — so the helper is not retired here. */
-    if (opts.reviewed) {
-      const chose = opts.useFile || {};
-      (conflicts || []).forEach(c => { if (chose[c.key]) extra.push(c.useRec); });
-    } else if (conflicts && conflicts.length) {
-      const figs = v => v.covers + (v.covers === 1 ? ' cover' : ' covers') + ' · ' + App.fmtCurrency(v.sales || 0);
-      const label = c => { const dt = new Date(c.date + 'T00:00:00');
-        return c.name + ' · ' + (isNaN(dt.getTime()) ? c.date : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
-          + (c.shift ? ' · ' + c.shift : ''); };
-      const r = await App.promptImportConflicts({
-        title: 'Some checks were entered by hand',
-        intro: 'This file has different figures for ' + conflicts.length + ' check'
-             + (conflicts.length === 1 ? '' : 's') + ' you already entered or corrected by hand. Pick which to keep. Your own are kept unless you choose the file.',
-        rowLabel: 'Check', colMine: 'You entered', colTheirs: 'This file',
-        rows: conflicts.map(c => ({ key: c.key, label: label(c), mineText: figs(c.mine), theirsText: figs(c.theirs) }))
-      });
-      if (!r.confirmed) { this._impFlash = { cancelled: true }; this.draw(); return; }
-      conflicts.forEach(c => { if (r.useTheirs.has(c.key)) extra.push(c.useRec); });
-    }
+       ⚠ AND THE CONDITION IS GONE WITH IT. Every caller passed `reviewed:true`, so the modal this
+       used to fall back to was unreachable and was retired 2026-08-15. One path, no fallback. */
+    /* The answer is already on the row (Keep Mine / Use The File on the review screen) and
+       `opts.useFile` carries it. The modal that asked a second time was retired 2026-08-15:
+       both doors passed `reviewed:true`, so nothing could open it. The condition went with it,
+       for the same reason as the cash door. */
+    const chose = opts.useFile || {};
+    (conflicts || []).forEach(c => { if (chose[c.key]) extra.push(c.useRec); });
     const keptByHand = (conflicts ? conflicts.length : 0) - extra.length;
     extra.forEach(rec => toAdd.push(rec));
     /* ⛔⛔ `incomplete` IS PER **ROW** AND LANDING IS PER **SERVER + DATE**, so one empty Tuesday puts a
@@ -1029,7 +1017,7 @@ S.RevenueServerCheck = {
       c.querySelectorAll('[data-confirm-restore]').forEach(b => b.addEventListener('click', () => {
         delete r.removed[b.dataset.confirmRestore]; this.draw();
       }));
-      /* The row's own conflict answer, replacing `App.promptImportConflicts` at this door. Default is
+      /* The row's own conflict answer, which is the only one there is now. Default is
          KEEP MINE and it stays that way unless the operator picks the file — the answer is stored, not
          applied, so nothing is written until Add. */
       c.querySelectorAll('[data-svconf]').forEach(b => b.addEventListener('click', () => {
