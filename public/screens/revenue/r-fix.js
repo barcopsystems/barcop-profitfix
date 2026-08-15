@@ -16,7 +16,7 @@
 const RF_GOLD  = '#DBAB46';
 const RF_GREEN = '#518A79';
 const RF_GREY  = '#6E7C86';
-const RF_TRACK = '#0D181E';
+const RF_TRACK = 'var(--gold-tint)';
 const RF_DIM   = '#1B2630';
 const RF_TXT   = '#C9D3DA';
 
@@ -356,7 +356,7 @@ S.RevenueFix = {
     const mistakes = Array.isArray(g.commonMistakes) ? g.commonMistakes.slice(0, 4) : [];
     const watchOut = mistakes.length
       ? '<div class="sh" style="margin:16px 0 10px;">Watch Out For</div>'
-        + '<div style="background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:14px 16px;">'
+        + '<div style="background:var(--gold-tint);border:1px solid var(--b-edge);border-radius:8px;padding:14px 16px;">'
         + mistakes.map(t => '<div style="display:flex;gap:10px;padding:5px 0;font-size:12px;color:var(--t2);line-height:1.55;">'
             + '<span style="flex-shrink:0;width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:7px;"></span><span>' + esc(t) + '</span></div>').join('')
         + '</div>'
