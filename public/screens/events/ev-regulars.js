@@ -125,7 +125,16 @@ S.EventsRegulars = {
     /* ⛔ THE CONFIRM SCREEN TAKES THE ADD CARD'S SLOT, and the book below stays on screen — the same
        shape every door in the rollout uses. Keeping the list visible is the point: "already in your
        book" is a verdict about that list, and the operator can check it from where they are told it. */
-    const topCard = this._regularsReview ? this.regularsReviewHTML() : addCard;
+    /* ⚠ 8px OF BREATHING ROOM ABOVE THE CONFIRM SCREEN (Kyle, 2026-08-15: *"a little more space
+       between the stat box and 'check your regulars' text.. maybe 5-10px"*). Measured on the live
+       build: the gap was 16px, which is the stat card's own `margin-bottom` and nothing else — the
+       review replaces a `.card` that used to supply the rest. 8 puts it at 24.
+       ⚠ ON THIS DOOR, NOT IN THE SHELL. `ImportConfirm.panel` says so in its own header: top spacing
+       belongs to the host, because every door already gives it a wrapper margin or `.screen`'s
+       padding, and a margin in the shell would double it on the nine doors that are fine. */
+    const topCard = this._regularsReview
+      ? '<div style="margin-top:8px;">' + this.regularsReviewHTML() + '</div>'
+      : addCard;
 
     const chips = App.filterChips(this.filter, [
       { v: '', label: 'All' }, { v: 'bday', label: 'Birthdays' }, { v: 'anniv', label: 'Anniversaries' },
