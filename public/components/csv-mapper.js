@@ -821,7 +821,19 @@ const CSVMapper = {
           ? '<div style="font-size:12px;color:var(--gold);background:var(--gold-tint);border:1px solid var(--gold-tint-bord);border-radius:6px;padding:10px 12px;margin-bottom:14px;">Heads up: some rows have a different number of columns than the header. That usually means a number cell holds an unquoted comma (like 1,234), which splits the row and shifts the columns after it. Check the preview below lines up, or re-save the file with number columns quoted.</div>'
           : '')
       + hdrPick;
-    const cell = f => '<div class="f" style="width:210px;flex-shrink:0;"><label>' + esc(f.label)
+    /* ⛔ THE LABEL WRAPS HERE, AND ONLY HERE. `.f label` is nowrap app-wide, which is right for
+       an ordinary form field that can take the width it needs. These cells are pinned to a fixed
+       210px in a wrapping row, so a label longer than the cell had nowhere to go and ran straight
+       over the label of the cell beside it (Add Products, where "Unit Type (lb / case / each /
+       gallon / ...)" collided with "Pieces / Servings per Unit"). MEASURED IN THE REAL PAGE at the
+       real font, not estimated: that label ran 53px past its cell, and the longest label any door
+       carries ran 155px past, far enough to cross two neighbours. Wrapped, both fit two lines and
+       nothing needs a third. The min-height reserves those two lines so every dropdown in a row
+       still starts at the same height; a longer label is free to take a third and only makes its
+       own cell taller, which is untidy where the old behaviour was unreadable. Overriding
+       `.f label` itself would change every form in the app. */
+    const cell = f => '<div class="f" style="width:210px;flex-shrink:0;">'
+      + '<label style="white-space:normal;line-height:1.3;min-height:24px;">' + esc(f.label)
       + (f.required ? ' <span style="color:var(--red);">*</span>' : '') + '</label>'
       + '<select class="csvm-sel" data-key="' + f.key + '">' + optsFor(map[f.key] != null ? map[f.key] : -1) + '</select></div>';
     const split = this._splitFields(opts.fields, map);
