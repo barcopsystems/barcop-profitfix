@@ -2529,6 +2529,44 @@ S.InventoryProducts = {
     return /^(sub total|subtotal|grand total)\b/.test(flat) || /\b(sub total|subtotal|grand total)$/.test(flat);
   },
 
+  /* ⛔ A CHARGE IS NOT A PRODUCT (Kyle, 2026-08-15, reading his own beer guide): *"not sure how
+     bar cop doesn't know that 'keg deposit' is not a product"*. It did not. It read "Keg Deposit"
+     as a Draft Beer on the word Keg, and the operator would have got a product with a cost, a par
+     and a reorder point that nobody can pour. Every order guide carries these: deposits, delivery,
+     fuel, empties. Books has had the idea for months ("Not Operating Expenses"); inventory had
+     nothing.
+     ⚠ NARROW ON PURPOSE, the same discipline as the furniture test above and for the same reason
+     ([[the-loop]] #26 — a name-classifying vocabulary has eaten a real record three times in this
+     codebase). Anchored PHRASES, never a loose word list, and every one of them tested against a
+     list of real product names in the same edit.
+       · a name ENDING in deposit          Keg Deposit · Bottle Deposit · Case Deposit
+       · a name STARTING with deposit      Deposit Return · Deposits Refunded
+       · a name ENDING in fee / surcharge  Delivery Fee · Fuel Surcharge · Split Case Fee
+       · a QUALIFIED charge                Delivery Charge · Freight Charge · Handling Charge
+       · the empties                       Empty Keg Return · Empties · Keg Returns
+     ⚠ `\bfee$` cannot reach the "fee" inside coffee or toffee: there is no word boundary there.
+     ⛔⛔ "CHARGE" IS THE ONE THAT NEEDED A QUALIFIER, and it is the whole lesson in miniature.
+     A bare trailing `charge` reads "Delivery Charge" correctly and then eats **Depth Charge**,
+     which is a real beer several breweries make. So charge only counts behind a word about
+     getting the stuff to you. Depth Charge is in the harness's real-names list for good.
+     ⛔ AND IT DECIDES NOTHING PERMANENTLY. Like furniture, a charge is left UNASSIGNED, which puts
+     it in Not Going In with its reason on the row, in front of the operator, with its tick box.
+     One Move To overrules it, because the test only ever runs on a row with no category. */
+  _isChargeRow(row) {
+    const n = String((row && row.name) == null ? '' : row.name).trim();
+    if (!n) return false;
+    const flat = n.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (/\b(deposit|deposits)$/.test(flat)) return true;
+    if (/^(deposit|deposits)\b/.test(flat)) return true;
+    if (/\b(fee|fees|surcharge|surcharges)$/.test(flat)) return true;
+    if (/\b(delivery|freight|fuel|service|handling|pallet|split case)\s+charges?$/.test(flat)) return true;
+    if (/\b(empty|empties)\b.*\breturns?$/.test(flat)) return true;
+    if (/^(empties|empty kegs?|keg returns?)$/.test(flat)) return true;
+    return false;
+  },
+  // The two together: what this file carries that is not a thing you stock.
+  _isNotAProduct(row) { return this._isFurnitureRow(row) || this._isChargeRow(row); },
+
   /* ⭐⭐ THE PRE-FILL. Everything the vocabulary, the brand list and the column reading
      buy is spent HERE and nowhere else: it fills the list in before the operator sees it,
      and then gets out of the way. It is a head start, never a decision — every row it
@@ -2536,11 +2574,12 @@ S.InventoryProducts = {
      ⛔ NO FALLBACK TO THE CARD. A row nothing can place stays blank and sits at the TOP
      of the screen as the work. That is only affordable because the operator can now SEE
      it: the old design had to guess, because an unplaced row was a footnote.
-     ⛔ AND FURNITURE IS LEFT BLANK, NOT REMOVED. `*** SECTION ***` is almost certainly not
-     a product, but 'almost certainly' is not good enough to delete somebody's row for
-     them. It shows up unsorted and they remove it in the same sweep as everything else.
-     ([[the-loop]] #26 — a name-classifying vocabulary has eaten a real record three
-     times in this codebase; here it costs a checkbox instead of a product.) */
+     ⛔ AND WHAT IS NOT A PRODUCT IS LEFT BLANK, NOT REMOVED. `*** SECTION ***`, SUBTOTAL DRAFT and
+     KEG DEPOSIT are almost certainly not products, but 'almost certainly' is not good enough to
+     delete somebody's row for them. Leaving them unassigned is what routes them into Not Going In,
+     named and reversible: the row is on screen with its reason, its tick box still works, and one
+     Move To makes it a product again. ([[the-loop]] #26 — a name-classifying vocabulary has eaten
+     a real record three times in this codebase; here it costs a Move To instead of a product.) */
   _prefillAssign() {
     const r = this._routing;
     if (!r) return;
@@ -2548,7 +2587,7 @@ S.InventoryProducts = {
     const others = best ? this._groupableColumns(r.rows).filter(c => c.key !== best.key) : [];
     r.rows.forEach(row => {
       if (r.assignById[row._rid] !== undefined) return;
-      if (this._isFurnitureRow(row)) return;
+      if (this._isNotAProduct(row)) return;
       let guess = this._guessCategory(String(row.name == null ? '' : row.name).trim());
       /* ⛔ THE KEG VOLUME SITS BELOW THE NAME AND ABOVE THE COLUMN. Below the name
          because a product that says what it is outranks its container, and if the two
@@ -2585,15 +2624,16 @@ S.InventoryProducts = {
        ⚠ COUNTED BEFORE A SINGLE ROW IS FILLED. Counting as we go would put the card's own
        category into the set after the first fill, the file would read as mixed from row two
        onward, and every remaining row would be left behind — a fallback that fires once.
-       ⚠ AND FURNITURE IS TESTED AGAIN HERE. This is a second pass, so the guard that keeps
-       `*** SECTION ***` and SUBTOTAL out of the products does not carry over from the loop
-       above. A section divider becoming a product is worse than one left unsorted
-       ([[the-loop]] #26). */
+       ⚠ AND WHAT IS NOT A PRODUCT IS TESTED AGAIN HERE. This is a second pass, so the guard that
+       keeps `*** SECTION ***`, SUBTOTAL and a keg deposit out of the products does not carry over
+       from the loop above. A section divider or a deposit becoming a product is worse than one
+       left unsorted ([[the-loop]] #26), and the card fallback is exactly where it would happen:
+       every unplaced row on a single-category file takes the card's category. */
     const fileCats = new Set(Object.values(r.assignById).filter(Boolean));
     if (fileCats.size > 1 || !r.cardCat) return;
     r.rows.forEach(row => {
       if (r.assignById[row._rid] !== undefined) return;
-      if (this._isFurnitureRow(row)) return;
+      if (this._isNotAProduct(row)) return;
       r.assignById[row._rid] = r.cardCat;
     });
   },
@@ -2669,9 +2709,10 @@ S.InventoryProducts = {
   _routeVisibleRows() {
     const r = this._routing;
     if (!r) return [];
+    const st = this._routeSummary().status;
     return this._routeRows().filter(row => {
-      const c = r.assignById[row._rid];
-      return !c || !!r.open[c];
+      const g = this._routeGroupKey(row, st[row._rid]);
+      return !g || !!r.open[g];
     });
   },
   // Every row still in the import. A removed row is gone from the list and the counts.
@@ -2758,27 +2799,57 @@ S.InventoryProducts = {
      seeded from the product list and added to as it goes; `mine` + `seen` is that same set,
      separated only so the row can say WHICH it is — a name you already own is a dead end,
      a name repeated inside this file is not. `dup` still totals both, as it always did. */
+  /* ⭐⭐ THE WALK NOW SEPARATES "I CANNOT PLACE THIS" FROM "THIS IS NOT A PRODUCT" (Kyle,
+     2026-08-15). A furniture or charge row used to read `unplaced`, so the Not Sorted head said
+     *"1 row Bar Cop could not work out"* over SUBTOTAL DRAFT — a claim of ignorance about a row the
+     furniture test is confident about. The verdict never changed (neither one has a category, so
+     `runImport` never wrote either), only the words did, and the words were the defect.
+     ⛔ BOTH TESTS ONLY EVER RUN ON A ROW WITH NO CATEGORY, which is what keeps Move To in charge:
+     the moment the operator places one, it is a product and it lands. */
   _routeSummary() {
-    const by = {}, missing = [], status = {};
+    const by = {}, missing = [], status = {}, notIn = {};
     let nameless = 0, dup = 0;
     const all = this.products() || [];
     const mine = new Set(all.map(p => (p.name || '').trim().toLowerCase()));
     const hidden = new Set(all.filter(p => p.active === false).map(p => (p.name || '').trim().toLowerCase()));
     const seen = new Set();
+    const not = k => { notIn[k] = (notIn[k] || 0) + 1; };
     this._routeStamp().forEach(row => {
       const nm = String(row.name == null ? '' : row.name).trim();
-      if (!nm) { nameless++; status[row._rid] = 'nameless'; return; }
-      if (!row._category) { missing.push(nm); status[row._rid] = 'unplaced'; return; }
+      if (!nm) { nameless++; not('nameless'); status[row._rid] = 'nameless'; return; }
+      if (!row._category) {
+        if (this._isFurnitureRow(row)) { not('furniture'); status[row._rid] = 'furniture'; return; }
+        if (this._isChargeRow(row))    { not('charge');    status[row._rid] = 'charge';    return; }
+        missing.push(nm); status[row._rid] = 'unplaced'; return;
+      }
       const key = nm.toLowerCase();
-      if (mine.has(key)) { dup++; status[row._rid] = hidden.has(key) ? 'dupArchived' : 'dup'; return; }
-      if (seen.has(key)) { dup++; status[row._rid] = 'repeat'; return; }
+      if (mine.has(key)) { dup++; const k = hidden.has(key) ? 'dupArchived' : 'dup'; not(k); status[row._rid] = k; return; }
+      if (seen.has(key)) { dup++; not('repeat'); status[row._rid] = 'repeat'; return; }
       seen.add(key);
       status[row._rid] = 'ok';
       by[row._category] = (by[row._category] || 0) + 1;
     });
     const order = App.IC_CATEGORIES || [];
     const cats = Object.keys(by).sort((a, b) => order.indexOf(a) - order.indexOf(b));
-    return { by: by, cats: cats, missing: missing, nameless: nameless, dup: dup, status: status };
+    return { by: by, cats: cats, missing: missing, nameless: nameless, dup: dup, status: status, notIn: notIn };
+  },
+  /* ⛔⛔ ONE FUNCTION DECIDES WHICH GROUP A ROW IS IN, AND BOTH THE RENDERER AND THE BULK VERB ASK
+     IT. They used to agree by accident, because a row was always drawn under its own category. Now
+     a duplicate is drawn in Not Going In while still CARRYING that category, so a `r.open[cat]`
+     test would report a row as on screen when its category card is open and the row is somewhere
+     else entirely — which is the "only what is on screen" guarantee `_routeVisibleRows` exists to
+     make, broken from underneath ([[the-loop]] #11: assert the two against each other, or better,
+     do not let there be two). */
+  _NOT_IN_KEY: '__notgoing',
+  _routeGroupOf(status) {
+    if (status === 'unplaced') return null;              // Not Sorted Yet, always open
+    if (status === 'ok') return undefined;               // its own category; caller supplies it
+    return this._NOT_IN_KEY;
+  },
+  // The group key a row is actually DRAWN under, which is the only thing "is it on screen" can mean.
+  _routeGroupKey(row, status) {
+    const g = this._routeGroupOf(status);
+    return g === undefined ? (this._routing.assignById[row._rid] || null) : g;
   },
   // ONE SOURCE with the list above it, or the button and the screen disagree.
   _routeReadyCount() {
@@ -2806,8 +2877,8 @@ S.InventoryProducts = {
      nothing scrolls sideways. Kyle: *"column in different sections should still be
      aligned with each other"*. */
   _routeColgroup() {
-    return '<colgroup><col style="width:5%;"/><col style="width:33%;"/><col style="width:16%;"/>'
-      + '<col style="width:15%;"/><col style="width:16%;"/><col style="width:15%;"/></colgroup>';
+    return '<colgroup><col style="width:4%;"/><col style="width:25%;"/><col style="width:13%;"/>'
+      + '<col style="width:11%;"/><col style="width:12%;"/><col style="width:23%;"/><col style="width:12%;"/></colgroup>';
   },
   /* ⛔ A ROW THAT WILL NOT LAND SAYS SO ON ITSELF (Kyle, chat 27). Dim, plus one short
      line under the name giving the actual reason. That is what lets the header above it
@@ -2820,7 +2891,34 @@ S.InventoryProducts = {
     dup:         'Already in your list',
     dupArchived: 'Already in your list, hidden on the Inactive tab',
     repeat:      'Repeated in this file',
-    nameless:    'No product name'
+    nameless:    'No product name',
+    furniture:   'A heading in your file, not a product',
+    charge:      'A charge on your invoice, not a product'
+  },
+  /* ⛔ THE HEAD OF THE NOT-GOING-IN SECTION IS BUILT FROM THE STATUS, NOT FROM THE ROW SENTENCE.
+     Books learned this the hard way: lowercasing each row's full sentence and comma-joining them
+     produced "15 rows: 11 a deposit, not an expense, 1 zero dollars, nothing to log" — a fragment
+     salad. A row note is written to be read ON a row; a head needs a countable noun. */
+  _ROUTE_NOT_IN_NOUN: {
+    dup:         ['already in your list', 'already in your list'],
+    dupArchived: ['already there, hidden', 'already there, hidden'],
+    repeat:      ['repeated in this file', 'repeated in this file'],
+    nameless:    ['row with no name', 'rows with no name'],
+    furniture:   ['heading row', 'heading rows'],
+    charge:      ['charge', 'charges']
+  },
+  /* ⭐⭐⭐ WHAT HAPPENS TO **THIS** ROW, IN ITS OWN COLUMN (Kyle, 2026-08-15, comparing this screen
+     with the Books import): *"in the books import it has a 'What Happens' column that lists what
+     happens to every row... in add products it only says what happens to the products not going in
+     and it says that under the product name so not immediately obvious"*.
+     ⛔ EVERY ROW SAYS SOMETHING. Kyle already settled this on the Books door on 2026-08-06: *"saying
+     'what happens' on a column header and then it tells the user nothing makes no sense."* A landing
+     row names its destination, because the section head that also names it is one line above a card
+     the operator has to open, while this column header sits over every row of every card. */
+  _routeOutcome(row, status) {
+    if (status === 'ok') return 'Adds to ' + (this._routing.assignById[row._rid] || '');
+    if (status === 'unplaced') return 'Pick a category to add it';
+    return this._ROUTE_ROW_NOTE[status] || '';
   },
   _routeRowHtml(row, status, restorable) {
     const r = this._routing;
@@ -2829,21 +2927,24 @@ S.InventoryProducts = {
     // ⛔ AND A ROW IN THE REMOVED SECTION IS NEVER MARKED OR DIMMED. Dim means "you can leave this
     // alone", and the one control it carries is Put Back, the thing that undoes the mistake that put
     // it there. Same exception the shell makes for the same reason.
-    const note = restorable ? '' : (this._ROUTE_ROW_NOTE[status] || '');
+    /* ⛔ THE REASON MOVED OUT FROM UNDER THE NAME AND INTO ITS OWN COLUMN. It used to be a small
+       dim line under the product, which is only findable once you already know to look for it, and
+       only appeared on rows that were NOT landing, so there was nothing to scan down. */
+    const note = restorable ? 'Taken out of this import' : this._routeOutcome(row, status);
+    const dim  = !restorable && !!this._ROUTE_ROW_NOTE[status];
     /* ⛔ REMOVAL LIVES ON THE ROW (Kyle, chat 27). It replaces a bulk "Not a product"
        button, and that is not only tidier: a control sitting on the row can only ever
        act on a row the operator is looking at, by name. The bulk one took his entire
        import because it reached past the screen. Ghost, and in `.row-actions`, which is
        exactly how the product list below does its Edit and Delete. */
-    return '<tr' + (note ? ' style="opacity:0.5;"' : '') + '>'
+    return '<tr' + (dim ? ' style="opacity:0.5;"' : '') + '>'
       + '<td class="cb-left"><input type="checkbox" class="bc-check ip-rt-cb" value="' + esc(row._rid) + '"'
         + (r.checked[row._rid] ? ' checked' : '') + '/></td>'
-      + '<td>' + esc(row.name || '')
-        + (note ? '<div style="font-size:10px;color:var(--t3);letter-spacing:0.5px;margin-top:2px;">' + esc(note) + '</div>' : '')
-        + '</td>'
+      + '<td>' + esc(row.name || '') + '</td>'
       + '<td>' + esc(row.brand || '') + '</td>'
       + '<td>' + esc(size) + '</td>'
       + '<td>' + esc(row.sub_category || '') + '</td>'
+      + '<td><div style="font-size:12px;color:var(--t2);">' + esc(note) + '</div></td>'
       + '<td><div class="row-actions"><button type="button" class="btn btn-ghost btn-sm '
         + (restorable ? 'ip-rt-pb' : 'ip-rt-rm')
         + '" data-rid="' + esc(row._rid) + '">' + (restorable ? 'Put Back' : 'Remove') + '</button></div></td>'
@@ -2872,30 +2973,26 @@ S.InventoryProducts = {
       + '</div>';
     const table = '<div style="padding:0 16px 16px;overflow-x:auto;">'
       + '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._routeColgroup()
-      + '<thead><tr><th></th><th>Product</th><th>Brand</th><th>Size</th><th>In Your File</th><th></th></tr></thead>'
+      + '<thead><tr><th></th><th>Product</th><th>Brand</th><th>Size</th><th>In Your File</th>'
+      + '<th>What Happens</th><th></th></tr></thead>'
       + '<tbody>' + rows.map(row => this._routeRowHtml(row, (status || {})[row._rid], restorable)).join('') + '</tbody></table></div>';
-    /* ⛔ A MAPPED DESTINATION SITS AT THE PAGE COLOUR, OPEN OR SHUT (Kyle, 2026-08-15, looking at
-       the Draft Beer group after an import). `.card` fills with `--surface`, which raised every
-       group off the page; a destination is not a card you read, it is a bin you open. The fill is
-       on the CARD and not on the head, so the closed strip and the opened panel are the same
-       colour by construction rather than by two rules agreeing.
-       ⚠ A DESTINATION IS A SECTION WITH A CATEGORY THAT IS NOT THE REMOVED BIN. "Not Sorted Yet"
-       (no key, never toggles) and "Removed" (`restorable`) are exceptions to work through, not
-       places anything is going, so they stay raised. Kyle named the mapped ones only. */
-    const dest = !!key && !restorable;
+    /* ⚠ THE `--bg` FILL THAT WAS HERE IS GONE, and it was here for about an hour. Kyle asked for
+       the destination groups to sit at the page colour while the whole review was still wrapped in
+       one `.card`; taking that wrapper away (see `routePanelHTML`) puts every section directly on
+       the page, so the sections are the cards again and a `--bg` fill would make them vanish into
+       it. Same look he was after, one fewer rule, and it matches Books. */
     return '<div class="card' + (key && !isOpen ? ' collapsed' : '')
-      + '" style="padding:0;container-type:inline-size;' + (dest ? 'background:var(--bg);' : '')
-      + 'margin-top:' + (first ? '0' : '16') + 'px;">'
+      + '" style="padding:0;container-type:inline-size;margin-top:' + (first ? '0' : '16') + 'px;">'
       + head + (isOpen ? table : '') + '</div>';
   },
   routePanelHTML() {
     const r = this._routing;
     const cats = App.IC_CATEGORIES || [];
     const rows = this._routeRows();
-    const unsorted = rows.filter(row => !r.assignById[row._rid]);
-    const sorted = {};
-    rows.forEach(row => { const c = r.assignById[row._rid]; if (c) (sorted[c] = sorted[c] || []).push(row); });
-    const order = cats.filter(c => sorted[c]);
+    /* ⚠ THE SECTION ORDER IS THE OPERATOR'S CATEGORY LIST, and it is worked out here rather than
+       from the assignment map, because a row can carry a category and still not be drawn under it
+       (a duplicate is in Not Going In). `grouped` below is the one source for who is where. */
+    const order = cats.slice();
     // ⛔ VISIBLE checked rows, the same list `_routeCheckedIds` acts on, so the button
     // can never offer to move something it will not move.
     const nChecked = this._routeCheckedIds().length;
@@ -2925,35 +3022,62 @@ S.InventoryProducts = {
        the section heads now SUM to the button and every row that is not in the total says
        why on itself. */
     const s = this._routeSummary();
-    /* ⛔ WHAT IS LANDING COMES FIRST, WHAT IS NOT SINKS (Kyle, chat 27): *"so all the
-       active products being added are listed together first and then any already listed
-       products after."* His beer guide interleaved them — two live rows, a grey one, two
-       live, a grey — so working out what you are actually getting meant reading past the
-       ones you are not. The header already gives the number; this makes the list the same
-       shape as the number.
-       ⚠ TWO BUCKETS, NOT A SORT. Pushing into `keep` and `later` preserves the file's own
-       order inside each block by construction, so stability is structural rather than a
-       property of whichever sort the engine ships. The file's order is the only order the
-       operator knows.
-       ⚠ AND IT ASKS THE SAME QUESTION THE DIM ASKS — `_ROUTE_ROW_NOTE[status]`, the one
-       used by `_routeRowHtml` — so a row can never sink without being marked, or be marked
-       without sinking. */
-    const sink = rows => {
-      const keep = [], later = [];
-      (rows || []).forEach(row => (this._ROUTE_ROW_NOTE[s.status[row._rid]] ? later : keep).push(row));
-      return keep.concat(later);
-    };
-    if (unsorted.length) {
-      body += this._routeSection(sink(unsorted), 'Not Sorted Yet',
-        unsorted.length + ' row' + (unsorted.length === 1 ? '' : 's') + ' Bar Cop could not work out',
-        null, true, true, s.status);
-    }
-    order.forEach((c, i) => {
-      const n = s.by[c] || 0;
-      body += this._routeSection(sink(sorted[c]), c,
-        n + ' product' + (n === 1 ? '' : 's') + ' moving into ' + c,
-        c, !!r.open[c], !unsorted.length && i === 0, s.status);
+    /* ⛔⛔⛔ THE SINK IS GONE AND A NOT GOING IN SECTION REPLACES IT (Kyle, 2026-08-15, after
+       comparing this screen with the Books import side by side). Chat 27 had a row that would not
+       land stay inside its own category, dimmed, pushed to the bottom — his words then were *"all
+       the active products being added are listed together first and then any already listed
+       products after"*. That fixed the interleaving, and it left the real problem: a group headed
+       "8 products moving into Bottle Beer" rendered NINE rows, and the only place the ninth was
+       explained was a small grey line under its name.
+       ⭐ THE ARITHMETIC IS THE POINT, and it is Kyle's: *"the math in the groups equals the number
+       imported and the number being added is total imported minus the not going in."* So now
+           every category section  =  ONLY the rows that land, and its head counts exactly what it draws
+           Not Going In           =  every row that will not land, reasons counted on its head
+           Not Sorted Yet         =  the rows still to answer
+           the three                 SUM to the file's own row count, with nothing to infer
+       ⛔ ONE WALK DECIDES BOTH. `_routeGroupOf` puts the row in a section and `_routeSummary`
+       counts it, off the same status, so a head can never disagree with the rows under it. */
+    const grouped = {};
+    rows.forEach(row => {
+      const st = s.status[row._rid];
+      const g = this._routeGroupOf(st);
+      const key = g === undefined ? r.assignById[row._rid] : (g === null ? '__unsorted' : g);
+      (grouped[key] = grouped[key] || []).push(row);
     });
+    const notIn = grouped[this._NOT_IN_KEY] || [];
+    const stillUnsorted = grouped.__unsorted || [];
+    let firstUsed = false;
+    const isFirst = () => { if (firstUsed) return false; firstUsed = true; return true; };
+
+    if (stillUnsorted.length) {
+      body += this._routeSection(stillUnsorted, 'Not Sorted Yet',
+        stillUnsorted.length + ' row' + (stillUnsorted.length === 1 ? '' : 's') + ' Bar Cop could not work out',
+        null, true, isFirst(), s.status);
+    }
+    order.forEach(c => {
+      const inC = grouped[c] || [];
+      if (!inC.length) return;
+      body += this._routeSection(inC, c,
+        inC.length + ' product' + (inC.length === 1 ? '' : 's') + ' going into ' + c,
+        c, !!r.open[c], isFirst(), s.status);
+    });
+    /* ⛔ A REPORT, AND THE OPERATOR STILL GETS THE LAST WORD. Books splits this in two — its
+       certainty and its judgement — because a deposit really is money in and cannot be argued
+       with. Here every reason is arguable: a name you already own you might have meant to
+       re-add, and a row Bar Cop calls a charge might be something you really do stock. So the
+       tick boxes stay live and Move To takes any of them into a category, which turns it back
+       into a product. One section, not two, because there is nothing on this screen the operator
+       cannot overrule. */
+    if (notIn.length) {
+      const by = s.notIn || {};
+      const why = Object.keys(by).map(k => {
+        const n = by[k], w = this._ROUTE_NOT_IN_NOUN[k] || ['row', 'rows'];
+        return n + ' ' + (n === 1 ? w[0] : w[1]);
+      }).join(', ');
+      body += this._routeSection(notIn, 'Not Going In',
+        notIn.length + ' not going in: ' + why,
+        this._NOT_IN_KEY, !!r.open[this._NOT_IN_KEY], isFirst(), s.status);
+    }
 
     /* ⛔ LAST ON THE PAGE, AND COLLAPSED. Every row in it is one the operator has already decided
        about, and this screen's Add button already sits under every category section — putting a
@@ -3028,31 +3152,35 @@ S.InventoryProducts = {
 
     const ready = this._routeReadyCount();
     const busy = !!this._routeWriting;
-    const lead = unsorted.length
-      ? 'Bar Cop has put ' + (rows.length - unsorted.length) + ' of these where it thinks they go. '
-        + 'Check the ' + unsorted.length + ' it could not work out, pick a category, and press Move To to place them, '
+    /* ⚠ THE LEAD COUNTS THE ROWS STILL TO ANSWER, which is no longer the same as "has no category":
+       a heading row and a charge have no category either, and they are now answered — they are in
+       Not Going In with a reason. Reading `_routing.assignById` here would put SUBTOTAL DRAFT back
+       into the work the operator is told to do. */
+    const lead = stillUnsorted.length
+      ? 'Bar Cop has put ' + (rows.length - stillUnsorted.length) + ' of these where it thinks they go. '
+        + 'Check the ' + stillUnsorted.length + ' it could not work out, pick a category, and press Move To to place them, '
         + 'or Remove the ones that are not products.'
       : 'Bar Cop has put all ' + rows.length + ' of these where it thinks they go. Open a group to check it.';
 
     /* ⛔ "IMPORT N PRODUCTS" WAS UNTRUE WHERE IT STOOD (Kyle, chat 27): the file was
        imported two screens ago, and a button offering to import it again reads as though
        the work already happened. What this press does is ADD the products. */
-    /* ⭐ ONE WRAPPER ROUND THE WHOLE REVIEW, BUTTONS OUTSIDE IT (Kyle, 2026-08-14: *"put everything
-       except the add/start over buttons inside the same border wrapper with the #0D181E background
-       color"*). The heading, the lead, the category picker and the group rows are one piece of work
-       and now read as one; the two buttons that ACT on it sit under the box rather than inside it,
-       which is the same shape the import confirm shell uses and the reason its own buttons live in
-       `actionsEl` ([[lessons-paid-for]] #106 — the reference's layout, not just its mechanism).
-       ⚠ A PLAIN `.card` — border, radius, 20px padding, `--surface` fill. It briefly carried a
-       #0D181E fill to match the importer panel; Kyle looked at all three screens and sent the
-       colour back while keeping the box.
-       ⚠ THE HEADING STAYS `.sh ic-head`, NOT `.card-title`. Inside a card the usual head is the
-       band, and the band is the exact thing Kyle had removed from this heading an hour earlier. */
-    return '<div class="card">'
-      + this._sectionHead('Your ' + rows.length + ' Product' + (rows.length === 1 ? '' : 's'), lead)
+    /* ⛔⛔ THE OUTER WRAPPER IS GONE (Kyle, 2026-08-15: *"i don't like the imported products being
+       in the card... remove the outer surface card so imported screen is just like books"*).
+       ⚠ THIS REVERSES HIS OWN 2026-08-14 CALL, deliberately and by name, so nobody restores it from
+       the git history and calls it a regression. That day he asked for *"everything except the
+       add/start over buttons inside the same border wrapper"*, and with the review inside a card
+       the group sections were cards inside a card. Books never had the wrapper: its sections sit
+       directly on the page, which is what makes each one read as its own bin.
+       ⭐ AND IT TAKES A RULE WITH IT. The destination groups briefly carried a `--bg` fill to lift
+       them off the wrapper's `--surface`; with no wrapper there is nothing to lift them off, so the
+       fill went back out of `_routeSection` in the same edit rather than being left behind to make
+       every section invisible against the page.
+       ⚠ THE HEADING STAYS `.sh ic-head`, NOT `.card-title` — that pairing is the heading-outside-a-
+       card shape and it is now literally outside a card. */
+    return this._sectionHead('Your ' + rows.length + ' Product' + (rows.length === 1 ? '' : 's'), lead)
       + body
       + vendorBlock
-      + '</div>'
       + '<div class="no-print" style="margin:22px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && !busy ? '' : ' disabled')
       + '>' + (busy ? 'Adding...' : 'Add ' + ready + ' Product' + (ready === 1 ? '' : 's')) + '</button>'
