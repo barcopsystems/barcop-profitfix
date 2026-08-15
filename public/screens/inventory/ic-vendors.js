@@ -396,6 +396,7 @@ S.InventoryVendors = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your vendor list here',
+      subject: 'Vendors',
       dropSub: 'Needs a column for vendor name. Rep, phone, email, delivery days, terms, account number, order minimum, delivery fee, and free-delivery-over come in too if your file has them.',
       actionsEl: '#iv-imp-actions',
       fields: [

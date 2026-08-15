@@ -766,6 +766,7 @@ S.InventorySpotCheck = {
     const loc = document.getElementById('sp-loc')?.value || 'this register';
     CSVMapper.mount(el, {
       dropTitle: 'Drop the ' + loc + ' POS sales report for this shift',
+      subject: loc,
       dropSub: 'Needs columns for product name and pours or bottles sold. That register only, not the whole venue.<br>The sold number fills in on each product you have added.',
       fields: [
         { key: 'product', label: 'Product', required: true, match: ['product', 'item', 'name', 'description', 'item name', 'menu item', 'product name'] },

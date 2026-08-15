@@ -483,6 +483,7 @@ S.InventoryVarianceReport = {
         actionsEl: document.getElementById('vr-import-actions'),
         confirmLabel: 'Import POS Sales',
         dropTitle: 'Drop your ' + this.fmtLong(period.startC.date) + ' to ' + this.fmtLong(period.endC.date) + ' POS sales file here',
+        subject: this.fmtLong(period.startC.date) + ' to ' + this.fmtLong(period.endC.date),
         dropSub: 'Needs columns for product name, quantity sold, and sales amount.',
         fields: [
           /* ⚠⚠ THESE THREE LISTS HAD DRIFTED FROM `PosIngest.FIELDS.pmix`, WHICH READS THE SAME
