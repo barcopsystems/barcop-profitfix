@@ -792,9 +792,13 @@ const CSVMapper = {
     }
     /* ⛔ NO RULE WHERE THERE IS NOTHING TO DIVIDE (Kyle, 2026-08-14). This divider separated the
        mapper from the drop box above it. On a door that names its subject the box is gone, so the
-       rule became the first thing on the panel, drawing a line under nothing. Padding is what
-       belongs there. It stays for the nine doors that still show the box. */
-    let html = (subject ? '<div style="height:18px;"></div>' : '<div class="divider"></div>')
+       rule became the first thing on the panel, drawing a line under nothing.
+       ⚠ AND NOTHING REPLACES IT. My first version put an 18px spacer here and Kyle came straight
+       back: *"still too big of a gap between the text and the top border, should be the same as
+       image 3."* He was right — the panel is a `.card` with 20px of its own padding, so the spacer
+       was ADDITIVE and the heading sat at 38px while the routing box beside it sat at 20px. The
+       card's padding was already the gap. It stays for the nine doors that still show the box. */
+    let html = (subject ? '' : '<div class="divider"></div>')
       + '<div class="sh" style="margin:0 0 12px;">Map Your Columns'
       + (subject ? '<span style="color:var(--t3);"> &middot; </span>' + esc(subject) : '')
       + '</div>'
