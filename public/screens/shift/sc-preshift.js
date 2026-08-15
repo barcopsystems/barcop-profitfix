@@ -462,7 +462,7 @@ S.ShiftPreShift = {
       + cats[cat].map(i => {
           const m = this._itemMargin(i);
           const mTxt = m != null ? App.fmtCurrency(m) + ' margin' : '';
-          return '<div class="pb-pick-item" data-id="' + esc(i.id) + '" style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 12px;background:#0D181E;border-radius:6px;margin-top:6px;cursor:pointer;">'
+          return '<div class="pb-pick-item" data-id="' + esc(i.id) + '" style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 12px;background:var(--zone);border-radius:6px;margin-top:6px;cursor:pointer;">'
             + '<span style="font-size:13px;color:var(--t1);">' + esc(i.name || 'Item') + '</span>'
             + '<span style="font-size:11px;color:var(--gold);flex-shrink:0;">' + mTxt + '</span></div>';
         }).join('')

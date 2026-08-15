@@ -831,9 +831,9 @@ S.ShiftLane = {
     this.shifts().filter(s => this._ckInWeek(s.date)).forEach(s => { existing[String(s.date).slice(0, 10)] = s; });
     const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
     const v = (s, f) => (s && s[f] != null && s[f] !== '') ? s[f] : '';
-    const dollar = (id, val) => '<td style="background:#0D181E;"><div class="fw" style="margin:0;"><span class="pre">$</span><input class="form-input pre" type="number" step="0.01" min="0" id="' + id + '" value="' + val + '" style="width:100%;min-width:0;"/></div></td>';
-    const plain = (id, val) => '<td style="background:#0D181E;"><input class="form-input" type="number" step="1" min="0" id="' + id + '" value="' + val + '" style="width:100%;min-width:0;"/></td>';
-    const lbl = t => '<td style="font-weight:600;color:var(--t1);background:#0D181E;white-space:nowrap;">' + t + '</td>';
+    const dollar = (id, val) => '<td style="background:var(--zone);"><div class="fw" style="margin:0;"><span class="pre">$</span><input class="form-input pre" type="number" step="0.01" min="0" id="' + id + '" value="' + val + '" style="width:100%;min-width:0;"/></div></td>';
+    const plain = (id, val) => '<td style="background:var(--zone);"><input class="form-input" type="number" step="1" min="0" id="' + id + '" value="' + val + '" style="width:100%;min-width:0;"/></td>';
+    const lbl = t => '<td style="font-weight:600;color:var(--t1);background:var(--zone);white-space:nowrap;">' + t + '</td>';
     const rows = days.map(d => { const s = existing[d];
       return '<tr class="cw-line">' + lbl(fmt(d)) + dollar(this._mgCell('bar', d), v(s, 'bar_revenue')) + dollar(this._mgCell('food', d), v(s, 'floor_revenue')) + plain(this._mgCell('cov', d), v(s, 'covers')) + '</tr>';
     }).join('');
