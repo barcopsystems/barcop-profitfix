@@ -42,6 +42,14 @@
      plan options, tiles and progress tracks are a DIFFERENT job and read --gold-tint, which holds
      the same value today and can be moved on its own. */
   --zone:      #0D181E;
+  /* ⭐⭐ THE STAT BOX FILL (Kyle, 2026-08-14): *"any box that border wraps stat numbers only... no
+     header."* Those boxes are plain `.card`s, so they took `--surface` and could not be retuned
+     without dragging every real card with them. This is the token that splits them.
+     ⛔ A LITERAL, NOT `var(--surface)`. It STARTS at the same value so the push changes nothing on
+     screen — but an alias would mean --stat follows --surface, which is exactly the coupling this
+     exists to break. Change this line and every headerless stat box in the app moves; `.card`
+     stays where it is. */
+  --stat:      #070E15;
   --c3:        #111E26;                /* 3rd navy: menu borders/accents + secondary (icon) button backgrounds in the chrome */
   --c4:        #1E2B34;                /* 4th navy: accent splash — active section pills, active sidebar row, icon-button hover */
   --hover:     rgba(255,255,255,0.02);
@@ -438,6 +446,23 @@ input,select,textarea{color-scheme:dark;}
 
 /* ══ CARD ══ */
 .card{background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:20px;margin-bottom:16px;}
+/* ⭐⭐ A STAT BOX IS A CARD THAT HOLDS STATS AND HAS NO HEAD (Kyle, 2026-08-14), and this states
+   that sentence literally rather than tagging 60-odd boxes with a class they would each have to be
+   given. `.calc-item` is already the shared vocabulary for a stat (197 sites across 65 files) and
+   `.card-title` is what makes a card a headed card, so the shape IS the definition.
+   ⭐ WALKED ON 12 SCREENS BEFORE IT WAS WRITTEN — count history, spot check, delivery history,
+   dynamic pars, transfers, usage, variance, order history, theft risk, cash recon, profit forecast,
+   vendor tracker. It matched EXACTLY ONE box on each and every one held nothing but stats. Dynamic
+   Pars is the one that proves the `:not` half: 7 cards, and it correctly skipped the headed
+   Settings box.
+   ⭐ AND A NEW STAT BOX NEEDS NO EDIT — any future screen rendering a stat strip in a headerless
+   card is covered the day it ships.
+   ⚠ SPECIFICITY WINS WHATEVER THE ORDER: `:has()`/`:not()` carry the specificity of their argument,
+   so this outweighs the plain `.card` above. It sits here anyway so the two read together.
+   ⚠ THE ONE RISK, STATED: this is defined by SHAPE, not by a marker. A stat strip dropped into a
+   headerless card that is not meant to be a stat box would take the colour too. Nothing like that
+   exists today across the 12 screens walked; `verify-card-head-band` block SB holds the line. */
+.card:has(.calc-item):not(:has(.card-title)){background:var(--stat);}
 .card:last-child{margin-bottom:0;}
 /* An external actions row (CSVMapper's Import/Cancel target) drops its margin while
    empty — in the dropzone state nothing renders there, so its spacing shouldn't push
