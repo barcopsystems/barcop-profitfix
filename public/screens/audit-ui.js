@@ -102,7 +102,7 @@ const AuditUI = {
         ? 'Run it now and you get a <strong style="color:' + q.color + ';">Full data</strong> audit. Bar Cop has everything this reads.'
         : 'Run it now and you get a <strong style="color:' + q.color + ';">' + esc(q.label) + '</strong> audit. Fill in the rest below to move it up.';
     const rows = steps.map((s, i) =>
-      '<div class="au-fa-step"' + (s.done || !s.go ? '' : ' data-go="' + s.go + '"') + ' style="display:flex;align-items:center;gap:13px;padding:12px 14px;margin-top:8px;background:#0D181E;border-radius:8px;' + (s.done || !s.go ? '' : 'cursor:pointer;') + '">'
+      '<div class="au-fa-step"' + (s.done || !s.go ? '' : ' data-go="' + s.go + '"') + ' style="display:flex;align-items:center;gap:13px;padding:12px 14px;margin-top:8px;background:var(--zone);border-radius:8px;' + (s.done || !s.go ? '' : 'cursor:pointer;') + '">'
       + (s.done
           ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
           : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;">' + (i + 1) + '</span>')
@@ -146,7 +146,7 @@ const AuditUI = {
       const bar  = na ? 0 : Math.min(100, Math.max(0, score));
       const ps   = prev && prev.sections ? prev.sections[name] : null;
       const diff = (!na && ps != null) ? score - ps : null;
-      return '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0D181E;border-radius:6px;' + (i ? 'margin-top:6px;' : '') + '">'
+      return '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:var(--zone);border-radius:6px;' + (i ? 'margin-top:6px;' : '') + '">'
         + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t3);">' + esc(name) + '</div>'
         + (na ? '' : '<div style="width:70px;flex-shrink:0;background:var(--b2);height:6px;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + bar + '%;background:' + col + ';border-radius:3px;"></div></div>')
         + '<div style="width:34px;text-align:right;flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;color:' + col + ';">' + (na ? 'N/A' : score) + '</div>'
@@ -326,7 +326,7 @@ const AuditUI = {
   metricRows(rows) {
     if (!rows || !rows.length) return '';
     return rows.map((r, i) =>
-      '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:#0D181E;border-radius:6px;' + (i ? 'margin-top:6px;' : '') + '">'
+      '<div style="display:flex;align-items:center;gap:14px;padding:10px 14px;background:var(--zone);border-radius:6px;' + (i ? 'margin-top:6px;' : '') + '">'
       + '<div style="flex:1;min-width:0;font-size:12px;color:var(--t3);line-height:1.4;">' + esc(r.label) + (r.extra ? ' <span style="color:var(--t4);">(' + esc(r.extra) + ')</span>' : '') + '</div>'
       + '<div style="flex-shrink:0;font-size:13px;font-weight:600;text-align:right;white-space:nowrap;color:' + (r.valColor || 'var(--t1)') + ';">' + esc(r.value) + '</div>'
       + '</div>'

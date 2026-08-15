@@ -1775,7 +1775,7 @@ S.SalesIntegrity = {
     const invLabel = invOpen ? 'Reviewing' : invResolved ? 'Resolved' : 'Open Investigation';
     const invStyle = invResolved ? 'color:var(--green);' : (invOpen ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);' : '');
 
-    return '<div style="background:#0D181E;border-radius:8px;padding:16px 18px;margin-bottom:10px;">'
+    return '<div style="background:var(--zone);border-radius:8px;padding:16px 18px;margin-bottom:10px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">'
       +   '<div style="font-size:15px;font-weight:700;color:var(--t1);">' + esc(x.name) + '</div>'
       +   '<div style="display:flex;align-items:center;gap:12px;">'

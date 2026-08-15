@@ -1780,7 +1780,7 @@ S.Hub = {
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
         .hub-app .hd-row:hover{background:var(--hover);}
-        .hub-app .hd-arow{background:#0D181E;}
+        .hub-app .hd-arow{background:var(--zone);}
         .hub-app .hd-arow:hover{background:#0F1A21;}
         .hub-app .hd-step:hover{background:#13212A;}
         .hub-app .hd-prow{border-top:1px solid var(--b2);}

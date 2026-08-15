@@ -276,7 +276,7 @@ S.TheftRisk = {
     if (!invId) {
       const introDefs = v.stepsDef || this.VARIANCE_STEPS;
       const prev = introDefs.map((st, i) =>
-        '<div style="background:#0D181E;border-radius:var(--r2);padding:12px 14px;margin-bottom:8px;">'
+        '<div style="background:var(--zone);border-radius:var(--r2);padding:12px 14px;margin-bottom:8px;">'
         + '<div style="font-size:12px;font-weight:700;color:var(--t1);">' + (i + 1) + '. ' + esc(st.title) + '</div>'
         + '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">' + esc(st.detail) + '</div></div>').join('');
       card.innerHTML = '<div class="card-title">Open Investigation</div>'
@@ -303,7 +303,7 @@ S.TheftRisk = {
       if (idx === 2 && live.step3) extra = live.step3;
       const chk = '<span class="vim-check" data-step="' + idx + '" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;'
         + (s.done ? 'background:var(--green);color:var(--bg);border:1px solid var(--green);' : 'background:transparent;color:transparent;border:1px solid var(--t3);') + '">&#10003;</span>';
-      steps += '<div style="background:#0D181E;border:1px solid var(--b-edge);border-radius:6px;padding:12px 14px;margin-bottom:8px;">'
+      steps += '<div style="background:var(--gold-tint);border:1px solid var(--b-edge);border-radius:6px;padding:12px 14px;margin-bottom:8px;">'
         + '<div style="display:flex;gap:11px;align-items:flex-start;">' + chk
         + '<div style="flex:1;min-width:0;">'
         + '<div class="vim-step-title" data-step="' + idx + '" style="font-size:13px;font-weight:700;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">' + (idx + 1) + '. ' + esc(st.title) + '</div>'
