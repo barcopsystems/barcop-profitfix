@@ -309,6 +309,7 @@ S.EventsRegulars = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your regulars list here',
+      subject: 'Regulars',
       /* ⚠ THIS SENTENCE IS READ AT THE MOMENT THE OPERATOR DECIDES WHICH COLUMNS TO MAP, and it
          listed everything EXCEPT the column round 1 added. Anyone whose header is not in the
          auto-match vocabulary read this, concluded last visit was not supported, left it unmapped —
