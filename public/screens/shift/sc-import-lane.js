@@ -610,8 +610,9 @@ S.ShiftLane = {
        ⛔ THE MODAL IS GONE FROM THIS DOOR, deliberately, rather than kept as a fallback. Two places
        to answer one question is the drift this codebase has paid for four times, and a branch that
        nothing can reach reads as live coverage to the next person who greps it ([[the-loop]] #61).
-       `App.promptImportConflicts` itself stays — the cash and per-server doors still use it, and
-       they are next in the rollout.
+       The modal it replaced is GONE: it was retired 2026-08-15 once both remaining doors were
+       measured passing `reviewed:true`, so nothing could open it. The row is the only place a
+       conflict is ever answered now.
        ⚠ NO ANSWER MEANS KEEP YOUR OWN, which is the same default the prompt had. That is the safe
        direction: a caller that somehow reaches here without the screen can never overwrite an
        operator's own figures without being asked. */
@@ -1553,34 +1554,18 @@ S.ShiftLane = {
     /* ⛔⛔ ON THE REVIEWED PATH THE ANSWER IS ALREADY ON THE ROW, SO THE MODAL MUST NOT FIRE. Asking
        twice for one decision is the shape door 2 removed from this app: the confirm screen shows both
        sets of figures with Keep Mine / Use The File, and `opts.useFile` is what the operator chose.
-       ⚠ `App.promptImportConflicts` STAYS — `_commitCash` is called directly by seven harnesses and
-       the per-server door still uses the helper, so this is a branch, not a retirement. */
-    if (opts.reviewed) {
-      const chose = opts.useFile || {};
-      (conflicts || []).forEach(c => { if (chose[c.key]) { extra.push(c.useRec); usedTheirs++; } });
-    } else if (conflicts && conflicts.length) {
-      const money = v => v == null ? '—' : '$' + (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const dayLabel = d => { const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
-      const cashText = v => {
-        const os = v.variance;
-        const tag = os == null ? '' : (os < 0 ? ' short' : os > 0 ? ' over' : ' even');
-        return (os == null ? '—' : money(Math.abs(os)) + tag)
-             + (v.expected_cash != null && v.counted_cash != null ? ' (exp ' + money(v.expected_cash) + ' / count ' + money(v.counted_cash) + ')' : '');
-      };
-      const r = await App.promptImportConflicts({
-        title: 'Some drawers were counted by hand',
-        intro: 'This file has a different over/short for ' + conflicts.length + ' register-day' + (conflicts.length === 1 ? '' : 's')
-             + ' you already counted by hand. Pick which to keep. Your own count is kept unless you choose the file.',
-        rowLabel: 'Register / day', colMine: 'You counted', colTheirs: 'This file',
-        rows: conflicts.map(c => ({ key: c.key, label: (c.drawer || 'Register') + ' · ' + dayLabel(c.date), mineText: cashText(c.mine), theirsText: cashText(c.theirs) }))
-      });
-      // ⚠ NOT "nothing was changed" — importCash may have already created/persisted registers (the
-      // blank-slate auto-create, or an add/alias the operator picked in the map step) BEFORE this
-      // prompt. Those are the operator's own deliberate setup and are kept; only the over/short
-      // figures are cancelled. Say exactly that.
-      if (!r.confirmed) { note('Import cancelled. No over/short figures were imported.'); return; }
-      conflicts.forEach(c => { if (r.useTheirs.has(c.key)) { extra.push(c.useRec); usedTheirs++; } });
-    }
+       ⚠ AND IT IS NO LONGER A BRANCH. This used to choose between the row answer and a modal; the
+       modal was retired 2026-08-15 after measuring that every caller passed `reviewed:true`, so
+       the condition went with it. There is one path. */
+    /* The answer is already on the row: the review screen shows both figures with Keep Mine /
+       Use The File, and `opts.useFile` is what the operator chose. There is no second place to
+       answer it. `App.promptImportConflicts` was retired 2026-08-15 after measuring that both
+       doors passed `reviewed:true`, so no operator could ever open the modal it used to show.
+       ⚠ THE CONDITION WENT WITH IT. `opts.reviewed` existed only to choose between the row
+       answer and the modal; with one path left, an `if` on a value nobody passes is a branch
+       nothing can reach, which reads as live coverage to the next person who greps it. */
+    const chose = opts.useFile || {};
+    (conflicts || []).forEach(c => { if (chose[c.key]) { extra.push(c.useRec); usedTheirs++; } });
     const keptMine = (conflicts ? conflicts.length : 0) - usedTheirs;   // hand counts the operator kept at the prompt
     const kept = (keptManual || 0) + keptMine;                          // + hand counts the file matched
     const allToAdd = toAdd.concat(extra);
