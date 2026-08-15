@@ -118,8 +118,8 @@ const ConfirmWeek = {
     // Editable grid (Bar / Food rows x Revenue / COGS / Labor). Pill rows, fixed
     // layout so it always fits the modal; overflow-x wrapper (not .pill-wrap) so
     // it stays a table on desktop.
-    const cell = id => '<td style="background:#0D181E;"><div class="fw" style="margin:0;"><span class="pre">$</span><input class="form-input pre cw-in" type="number" step="0.01" id="' + id + '" style="width:100%;min-width:0;"/></div></td>';
-    const lbl = t => '<td style="font-weight:600;color:var(--t1);background:#0D181E;">' + t + '</td>';
+    const cell = id => '<td style="background:var(--zone);"><div class="fw" style="margin:0;"><span class="pre">$</span><input class="form-input pre cw-in" type="number" step="0.01" id="' + id + '" style="width:100%;min-width:0;"/></div></td>';
+    const lbl = t => '<td style="font-weight:600;color:var(--t1);background:var(--zone);">' + t + '</td>';
     const grid = '<div style="overflow-x:auto;margin:0 0 16px;"><table class="ing-tbl pill" style="table-layout:fixed;width:100%;">'
       + '<colgroup><col style="width:58px;"/><col/><col/><col/></colgroup>'
       + '<thead><tr><th></th><th>Revenue</th><th>COGS</th><th>Labor</th></tr></thead><tbody>'

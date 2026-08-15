@@ -190,7 +190,7 @@ window.FixPanel = {
         + '<div style="flex-shrink:0;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:600;color:' + b.color + ';line-height:1;">'
         + App.fmtCurrency(e.dollars, 0) + '<span style="font-size:10px;color:var(--t3);"> /yr</span></div>'
         + '</div>'
-        + '<div style="height:7px;background:#0D181E;border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + w + '%;background:' + b.bar + ';border-radius:4px;"></div></div>'
+        + '<div style="height:7px;background:var(--gold-tint);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + w + '%;background:' + b.bar + ';border-radius:4px;"></div></div>'
         + (steps(e) ? '<div style="margin-top:5px;">' + steps(e).replace('margin-left:8px;', '') + '</div>' : '')
         + '</div>';
     };
