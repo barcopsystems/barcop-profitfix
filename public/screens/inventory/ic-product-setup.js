@@ -2874,8 +2874,18 @@ S.InventoryProducts = {
       + '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._routeColgroup()
       + '<thead><tr><th></th><th>Product</th><th>Brand</th><th>Size</th><th>In Your File</th><th></th></tr></thead>'
       + '<tbody>' + rows.map(row => this._routeRowHtml(row, (status || {})[row._rid], restorable)).join('') + '</tbody></table></div>';
+    /* ⛔ A MAPPED DESTINATION SITS AT THE PAGE COLOUR, OPEN OR SHUT (Kyle, 2026-08-15, looking at
+       the Draft Beer group after an import). `.card` fills with `--surface`, which raised every
+       group off the page; a destination is not a card you read, it is a bin you open. The fill is
+       on the CARD and not on the head, so the closed strip and the opened panel are the same
+       colour by construction rather than by two rules agreeing.
+       ⚠ A DESTINATION IS A SECTION WITH A CATEGORY THAT IS NOT THE REMOVED BIN. "Not Sorted Yet"
+       (no key, never toggles) and "Removed" (`restorable`) are exceptions to work through, not
+       places anything is going, so they stay raised. Kyle named the mapped ones only. */
+    const dest = !!key && !restorable;
     return '<div class="card' + (key && !isOpen ? ' collapsed' : '')
-      + '" style="padding:0;container-type:inline-size;margin-top:' + (first ? '0' : '16') + 'px;">'
+      + '" style="padding:0;container-type:inline-size;' + (dest ? 'background:var(--bg);' : '')
+      + 'margin-top:' + (first ? '0' : '16') + 'px;">'
       + head + (isOpen ? table : '') + '</div>';
   },
   routePanelHTML() {
