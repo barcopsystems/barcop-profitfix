@@ -97,7 +97,19 @@ const ImportConfirm = {
     /* ⚠ NO NEW CSS. `.card.collapsed .card-chevron{transform:rotate(-90deg)}` already ships, so
        putting `collapsed` on the CARD gives the chevron for free — the same reasoning that kept the
        Add Products rebuild from needing a stylesheet change. */
-    return '<div class="card' + (open ? '' : ' collapsed') + '" style="padding:0;container-type:inline-size;margin-top:'
+    /* ⛔ `!important` ON THE PADDING, AND IT IS NOT DECORATION (Kyle, 2026-08-15, on Regulars — the
+       identical report he made about Add Products two hours earlier). style.css carries a blanket
+       `@media(max-width:768px) .card{padding:14px!important}`, which OVERRIDES the plain `padding:0`
+       these group cards are built with. On a phone every group therefore gained 14px it was told not
+       to have, on top of the head's own 16px and the table wrapper's 16px.
+       ⚠ An inline `!important` is the narrowest fix available: it beats an author `!important`
+       (measured on the deployed build, 14px to 0px) and touches nothing else. Editing the shared
+       `.card` rule would reach every card in the app, which is a design change and gets walked on
+       its own ([[color-system-policing]]).
+       ⚠ BLAST RADIUS, STATED: this is the shared shell, so all 10 import doors move together. That
+       is the intent — every one of them carried the identical defect, and Kyle has now reported it
+       from two different doors. */
+    return '<div class="card' + (open ? '' : ' collapsed') + '" style="padding:0!important;container-type:inline-size;margin-top:'
       + (first ? '0' : '16') + 'px;">'
       + '<div data-confirm-section="' + esc(key) + '" style="display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer;">'
       +   '<div style="flex:1;min-width:0;">'
