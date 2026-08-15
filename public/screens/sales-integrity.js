@@ -1477,6 +1477,7 @@ S.SalesIntegrity = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS per-server sales report here',
+      subject: 'Server Sales',
       // ⚠ NET SALES IS NAMED FIRST. It is the denominator for void %, comp %, refund %, average
       // check and sales per hour — five of nine signals — and every dollar figure on the report.
       // Measured without it: a server still went High Risk with the exposure printed as "-".
