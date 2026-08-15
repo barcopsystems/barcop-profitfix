@@ -881,7 +881,12 @@ S.Hub = {
       + (m.sub ? '<div style="font-size:10px;color:var(--t4);margin-top:1px;white-space:nowrap;">' + esc(m.sub) + '</div>' : '')
       + chip(m)
       + '</div>';
-    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;display:flex;gap:16px;flex-wrap:wrap;">'
+    /* ⭐ `--stat`, NOT `--surface` (Kyle, 2026-08-14: *"the hub number box should be a stat box"*).
+       It is a bordered box of stat numbers with no head, which is his definition exactly — it just
+       cannot be caught by `.card:has(.calc-item)` because the Hub hand-rolls its boxes rather than
+       using `.card`, and these cells are not `.calc-item`s. Reading the token directly gets the
+       same result: change `--stat` and this moves with every other stat box. */
+    return '<div style="background:var(--stat);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;display:flex;gap:16px;flex-wrap:wrap;">'
       + (metrics || []).map(cell).join('') + '</div>';
   },
 

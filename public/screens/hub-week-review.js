@@ -324,7 +324,11 @@ S.WeekReview = {
     /* ⛔ NO HEADER BAND ON THE STATS BOX (Kyle, 2026-08-11: *"remove the header on the stats box so
        just the stats inside the border"*). It read "WEEK IN REVIEW" directly under a page already
        titled Week in Review, so the band cost 42px of vertical to repeat the title back. */
-    return '<div class="card" style="margin-bottom:16px;overflow:hidden;padding:0 !important;">'
+    /* ⭐ `--stat` (Kyle, 2026-08-14: *"week in review a stat box"*). It is a `.card` with no head
+       already, but its stats are hand-rolled at 38px rather than `.calc-item`, so the shape-based
+       selector cannot see it. Reading the token here reaches the same place: change `--stat` and
+       this box moves with every other one. */
+    return '<div class="card" style="margin-bottom:16px;overflow:hidden;padding:0 !important;background:var(--stat);">'
       + '<div class="wr-statrow wr-topstats" style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + stats + '</div>'
       /* ⛔ SAY WHY THESE ARE BLANK (W2). Three dashes up here beside "Net Sales $19,150" in the
          Shift card read as a contradiction; they are two different questions and only this one

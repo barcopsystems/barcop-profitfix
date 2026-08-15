@@ -93,15 +93,27 @@ S.WeekHistory = {
       const l = confirmed[0], lp = l.p || {}, lr = l.r || {};
       const t = (App.data.settings && App.data.settings.targets) || {};
       const primeTgt = t.prime_cost_pct != null ? t.prime_cost_pct : 60;
+      /* ⭐ A STAT BOX, NOT A HEADED CARD (Kyle, 2026-08-14): *"get rid of the header in top card and
+         make it a stat box.. and move the 'latest confirmed week...' text line into the stat box
+         under the numbers."*
+         ⛔ NOTHING HERE SETS A COLOUR. Dropping the `.card-title` is the entire change: the box
+         already renders `.calc-item` stats, so `.card:has(.calc-item):not(:has(.card-title))` picks
+         it up and it reads `--stat` from the stylesheet like every other stat box. That selector
+         being shape-based rather than marker-based is what makes this one edit instead of three. */
       summary = '<div class="card form-card" style="margin-bottom:24px;">'
-        + '<div class="card-title">Latest Confirmed Week &middot; ' + esc(this.wk(l.pe)) + '</div>'
         + '<div style="display:flex;gap:26px;align-items:center;flex-wrap:wrap;">'
         + stat('Revenue', money0(this.totalRev(l)))
         + stat('Prime Cost', lp.prime_cost_pct != null ? lp.prime_cost_pct.toFixed(1) + '%' : '-', (lp.prime_cost_pct != null && lp.prime_cost_pct > primeTgt) ? 'warn' : 'good')
         + stat('Check Avg', lr.check_avg ? App.fmtCurrency(lr.check_avg) : '-')
         + stat('Labor %', lr.labor_pct_blended ? lr.labor_pct_blended.toFixed(1) + '%' : '-')
         + stat('RPLH', lr.rplh_blended ? App.fmtCurrency(lr.rplh_blended) : '-')
-        + '</div></div>';
+        + '</div>'
+        /* The line the header used to carry, now UNDER the numbers where it reads as what it is:
+           a caption saying which week these five figures are. As a header it was announcing the
+           box; here it is answering the question the numbers raise. */
+        + '<div style="font-size:11.5px;color:var(--t3);margin-top:14px;">Latest Confirmed Week &middot; '
+        + esc(this.wk(l.pe)) + '</div>'
+        + '</div>';
     } else {
       summary = '<div class="card form-card" style="margin-bottom:24px;"><div class="card-title">Week History</div>'
         + '<div style="font-size:13px;color:var(--t2);padding:2px 0;">No weeks confirmed yet. Confirm a week below and it lands here.</div></div>';
