@@ -881,12 +881,11 @@ S.Hub = {
       + (m.sub ? '<div style="font-size:10px;color:var(--t4);margin-top:1px;white-space:nowrap;">' + esc(m.sub) + '</div>' : '')
       + chip(m)
       + '</div>';
-    /* ⭐ `--stat`, NOT `--surface` (Kyle, 2026-08-14: *"the hub number box should be a stat box"*).
-       It is a bordered box of stat numbers with no head, which is his definition exactly — it just
-       cannot be caught by `.card:has(.calc-item)` because the Hub hand-rolls its boxes rather than
-       using `.card`, and these cells are not `.calc-item`s. Reading the token directly gets the
-       same result: change `--stat` and this moves with every other stat box. */
-    return '<div style="background:var(--stat);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;display:flex;gap:16px;flex-wrap:wrap;">'
+    /* ⚠ `--surface`. This is the SECTION STRIP, not the money band, and it stays an ordinary card.
+       I put it on `--stat` first and Kyle sent it back: *"wrong one on the hub.. the top number bar
+       in the image... the bottom one change back to normal card."* Two boxes of numbers sit near
+       each other on this page and only the TOP one is the stat box. */
+    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 16px;display:flex;gap:16px;flex-wrap:wrap;">'
       + (metrics || []).map(cell).join('') + '</div>';
   },
 
@@ -1103,8 +1102,13 @@ S.Hub = {
     const beSub = !beSum.hasData ? 'Set your costs to surface this'
       : (beSum.ok ? 'Cleared by ' + App.fmtCurrency(beSum.delta, 0) + ' last week'
                   : App.fmtCurrency(Math.abs(beSum.delta), 0) + ' short last week');
+    /* ⭐ `--stat` (Kyle, 2026-08-14: *"the hub number box should be a stat box"* — THIS one, the top
+       number bar). Four labelled money figures in a bordered box with no head is his definition
+       exactly. It cannot be caught by `.card:has(.calc-item)` because the Hub hand-rolls its boxes
+       rather than using `.card` and these cells are not `.calc-item`s, so it reads the token
+       directly, which lands in the same place: change `--stat` and this moves with the rest. */
     const tiles =
-        '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
+        '<div style="background:var(--stat);border:1px solid var(--b-edge);border-radius:var(--r);overflow:hidden;">'
       /* The briefing slot is gone from this header. The Rail is the ONE whole-bar read now and it
          lives in the top bar, reachable from every page — including this one. */
       /* ⛔ THE "WHERE YOU STAND" HEADING IS GONE, KYLE'S CALL: *"remove the where you stand header..
