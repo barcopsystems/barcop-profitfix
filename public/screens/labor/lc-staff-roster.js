@@ -426,6 +426,7 @@ S.LaborStaffRoster = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your staff list here',
+      subject: 'Staff',
       dropSub: 'Only Name is required; position, pay, status, phone, and email come in if your file has them.',
       actionsEl: '#sr-imp-actions',
       fields: [

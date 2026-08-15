@@ -162,6 +162,7 @@ S.LaborLane = {
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your weekly timeclock export here',
+      subject: 'Hours',
       dropSub: 'Needs Staff, Date, and Hours. Shift matched if present. One row per shift.',
       fields: PosIngest.FIELDS.hours,
       confirmLabel: 'Import',
@@ -181,6 +182,7 @@ S.LaborLane = {
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS tips export here',
+      subject: 'Tips',
       dropSub: 'Needs Staff and Date plus card and/or cash tips. Servers match your roster by name.',
       fields: PosIngest.FIELDS.tips,
       confirmLabel: 'Import',
