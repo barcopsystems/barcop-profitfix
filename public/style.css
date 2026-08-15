@@ -45,11 +45,14 @@
   /* ⭐⭐ THE STAT BOX FILL (Kyle, 2026-08-14): *"any box that border wraps stat numbers only... no
      header."* Those boxes are plain `.card`s, so they took `--surface` and could not be retuned
      without dragging every real card with them. This is the token that splits them.
-     ⛔ A LITERAL, NOT `var(--surface)`. It STARTS at the same value so the push changes nothing on
-     screen — but an alias would mean --stat follows --surface, which is exactly the coupling this
-     exists to break. Change this line and every headerless stat box in the app moves; `.card`
-     stays where it is. */
-  --stat:      #0C1216;
+     ⛔ A LITERAL, NOT `var(--surface)`. It shipped at #070E15, identical to `--surface`, so that
+     push was a provable no-op — and it has since been retuned twice on its own, which is the whole
+     point. An alias would have meant --stat followed --surface and neither move could have happened.
+     Change this line and every headerless stat box in the app moves; `.card` stays where it is.
+     ⚠ It now holds the SAME VALUE as `--zone` and `--gold-tint`. Three tokens, one value, three
+     different jobs — a stat box, a data row and a panel can still be moved apart at any time, which
+     is exactly what having three of them buys. Do not "tidy" them into one. */
+  --stat:      #131B21;
   --c3:        #111E26;                /* 3rd navy: menu borders/accents + secondary (icon) button backgrounds in the chrome */
   --c4:        #1E2B34;                /* 4th navy: accent splash — active section pills, active sidebar row, icon-button hover */
   --hover:     rgba(255,255,255,0.02);
