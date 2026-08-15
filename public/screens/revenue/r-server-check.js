@@ -742,6 +742,7 @@ S.RevenueServerCheck = {
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS per-server sales report here',
+      subject: 'Server Checks',
       dropSub: 'One row per server with covers and total sales. Bar Cop matches each row to your roster by name.',
       actionsEl: '#rsc-imp-actions',
       fields: PosIngest.FIELDS.server,

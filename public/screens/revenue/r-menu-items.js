@@ -1532,6 +1532,7 @@ S.RevenueMenuItems = {
       : 'Needs columns for item name and Category (Beer, Wine, NA Beverages, Snacks). Price and Weekly Units Sold come in if your file has them. Cost comes from the inventory product you link the item to, so edit an item afterward to link its product and the cost fills in from there.';
     CSVMapper.mount(el, {
       dropTitle: 'Drop your ' + t.noun + ' items file here',
+      subject: t.noun,
       dropSub: dropSub,
       onState: state => { const row = document.getElementById('mi-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : ''; },
       actionsEl: '#mi-imp-actions',

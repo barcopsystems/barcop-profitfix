@@ -882,6 +882,7 @@ S.RevenueMenuEngineering = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS product-mix (PMIX) report here',
+      subject: 'Product Mix',
       dropSub: 'One row per item with units sold for the week. Bar Cop matches each row to a menu item by name and refreshes its weekly units sold.',
       actionsEl: '#me-cov-actions',
       fields: PosIngest.FIELDS.pmix,
