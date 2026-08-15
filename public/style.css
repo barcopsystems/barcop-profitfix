@@ -28,7 +28,20 @@
   --card-head: #08131A;
   --input:     #070E15;
   --panel:     #08131A;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
-  --zone:      #0B1722;                /* Un-box language: data ROW fill, just slightly lighter than --surface so rows lift off the header band. The header band uses --surface (the sidebar color) and row hover uses --nav-act (the sidebar's selected navy), so the three stay in one family. This is the only new tone; --bg and --surface remain the two mains. */
+  /* ⭐⭐ THE DATA ROW FILL, AND NOW IT REALLY IS THE ONLY ONE (Kyle, 2026-08-14: *"every data row
+     that uses this color i need it consolidated into one root color"*).
+     Un-box language: rows sit just lighter than --surface so they lift off the header band, which
+     uses --surface (the sidebar colour); row hover uses --nav-act (the sidebar's selected navy), so
+     the three stay in one family.
+     ⛔ THE VALUE MOVED #0B1722 -> #0D181E, AND THAT IS THE ONE THING THAT CHANGES ON SCREEN. This
+     token was minted for exactly this job and had drifted to a SINGLE user — `.page .tbl tbody td` —
+     while every other data row in the app wrote #0D181E out by hand, 47 times across 17 files. So
+     Bar Cop had two data-row colours and one of them was on one screen. Consolidating means that
+     screen's rows join the other 47 rather than the other way round.
+     ⚠ CHANGE THIS LINE AND EVERY DATA ROW IN THE APP MOVES. That is the point of it. Panels, boxes,
+     plan options, tiles and progress tracks are a DIFFERENT job and read --gold-tint, which holds
+     the same value today and can be moved on its own. */
+  --zone:      #0D181E;
   --c3:        #111E26;                /* 3rd navy: menu borders/accents + secondary (icon) button backgrounds in the chrome */
   --c4:        #1E2B34;                /* 4th navy: accent splash — active section pills, active sidebar row, icon-button hover */
   --hover:     rgba(255,255,255,0.02);
@@ -506,7 +519,7 @@ input,select,textarea{color-scheme:dark;}
 /* Events New Booking inline form: equal cells so all data fits on two rows. */
 .eb-crow>.f{flex:1 1 130px;min-width:0;}
 /* Events staffing roster: the standard #0D181E data rows inside the workspace card. */
-.eb-staff-tbl tbody td{background:#0D181E;border-bottom:1px solid var(--row-div);}
+.eb-staff-tbl tbody td{background:var(--zone);border-bottom:1px solid var(--row-div);}
 .eb-staff-tbl tbody tr:last-child td{border-bottom:none;}
 
 /* Individual field */
@@ -761,17 +774,17 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .pf-line + .pf-line{border-top:1px solid var(--row-div);}
 /* Profit Fix step cards (open-system accordion body). .pf-step = the bordered
    card; .pf-stepcard = the clickable variant (whole wrapper opens the feature). */
-.pf-step{display:flex;gap:11px;background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:12px 14px;margin-bottom:8px;}
+.pf-step{display:flex;gap:11px;background:var(--zone);border:1px solid var(--b-edge);border-radius:8px;padding:12px 14px;margin-bottom:8px;}
 .pf-stepcard{cursor:pointer;transition:background .12s;}
 .pf-stepcard:hover{background:#0F1A21;}
 /* The system accordion header reuses the form-card collapse chevron exactly
    (size, hover-gold, and the -90deg rotation when collapsed). */
 .pf-sys-head:hover .card-chevron{color:var(--gold);}
 .pf-sys-head.collapsed .card-chevron{transform:rotate(-90deg);}
-.pf-progbar{height:6px;background:#0D181E;border-radius:4px;overflow:hidden;}
+.pf-progbar{height:6px;background:var(--gold-tint);border-radius:4px;overflow:hidden;}
 .pf-progbar>span{display:block;height:100%;background:var(--green);border-radius:4px;transition:width .4s ease;}
-.pf-step{border:1px solid var(--b-edge);border-radius:9px;margin-bottom:10px;background:#0D181E;transition:border-color .15s,background .15s;}
-.pf-step.cur{border-color:var(--gold);background:#0D181E;}
+.pf-step{border:1px solid var(--b-edge);border-radius:9px;margin-bottom:10px;background:var(--gold-tint);transition:border-color .15s,background .15s;}
+.pf-step.cur{border-color:var(--gold);background:var(--gold-tint);}
 .pf-step.up{cursor:pointer;}
 .pf-step.done{cursor:pointer;opacity:.6;}
 .pf-step.up:hover,.pf-step.done:hover{border-color:var(--gold-tint-bord);}
@@ -779,13 +792,13 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .pf-check.on{border-color:var(--gold);background:var(--gold);}
 .pf-srow{cursor:pointer;}
 .data-card .tbl thead th{vertical-align:middle;padding-top:13px;padding-bottom:13px;}
-.data-card .tbl tbody td{background:#0D181E;border-bottom:1px solid var(--row-div);}
+.data-card .tbl tbody td{background:var(--gold-tint);border-bottom:1px solid var(--row-div);}
 .data-card .tbl tbody tr:last-child td{border-bottom:none;}
 .data-card .tbl tbody tr:hover td{background:#0F1A21;}
 /* Profit Audit detail — section metric readout: a framed panel of #0D181E data rows (label left, value right). */
 .at-metrics{border:1px solid var(--b-edge);border-radius:8px;overflow:hidden;}
 .at-mtbl{width:100%;border-collapse:collapse;}
-.at-mtbl td{background:#0D181E;border-bottom:1px solid var(--row-div);padding:10px 14px;font-size:11px;vertical-align:top;}
+.at-mtbl td{background:var(--zone);border-bottom:1px solid var(--row-div);padding:10px 14px;font-size:11px;vertical-align:top;}
 .at-mtbl tr:last-child td{border-bottom:none;}
 .at-mtbl td:first-child{color:var(--t3);width:54%;}
 .at-mtbl td:last-child{color:var(--t1);font-weight:600;text-align:right;}
@@ -800,7 +813,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .row-list thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 12px 9px;border-bottom:1px solid var(--b-edge);}
 /* Data cells wrap so the table compresses to fit instead of overflowing; only
    the action buttons stay on one line. */
-.row-list tbody td{background:#0D181E;padding:12px;color:var(--t2);vertical-align:middle;}
+.row-list tbody td{background:var(--zone);padding:12px;color:var(--t2);vertical-align:middle;}
 .row-list tbody td:first-child{border-radius:6px 0 0 6px;}
 .row-list tbody td:last-child{border-radius:0 6px 6px 0;}
 /* Action cells (marked .no-print) align right and stay on one line; a data cell
@@ -824,7 +837,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 @container (max-width:700px){
   .row-list,.row-list tbody{display:block;}
   .row-list thead{display:none;}
-  .row-list tbody tr{display:block;background:#0D181E;border-radius:8px;padding:4px 14px;margin-bottom:8px;}
+  .row-list tbody tr{display:block;background:var(--zone);border-radius:8px;padding:4px 14px;margin-bottom:8px;}
   .row-list tbody td{display:flex;justify-content:space-between;align-items:center;gap:14px;background:transparent;padding:9px 0;border-radius:0;white-space:normal;text-align:left;border-bottom:1px solid var(--b-edge);}
   .row-list tbody tr td:last-child{border-bottom:none;}
   .row-list tbody td::before{content:attr(data-label);color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0;}
@@ -848,7 +861,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    section-header rows (.pnl-sec) + inline sub-line indentation. Left-aligned. */
 .pnl-list{width:100%;border-collapse:separate;border-spacing:0 4px;font-size:12px;}
 .pnl-list thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);text-align:left;padding:0 14px 9px;border-bottom:1px solid var(--b-edge);}
-.pnl-list tbody td{background:#0D181E;padding:9px 14px;color:var(--t2);vertical-align:middle;}
+.pnl-list tbody td{background:var(--zone);padding:9px 14px;color:var(--t2);vertical-align:middle;}
 .pnl-list tbody td:first-child{border-radius:6px 0 0 6px;}
 .pnl-list tbody td:last-child{border-radius:0 6px 6px 0;}
 .pnl-list tbody tr.pnl-sec td{background:transparent;padding:15px 14px 2px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);}
@@ -867,9 +880,9 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .dr-dragging td:first-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset 1px 0 0 0 var(--gold-tint-bord);}
 .dr-dragging td:last-child{box-shadow:inset 0 1px 0 0 var(--gold-tint-bord),inset 0 -1px 0 0 var(--gold-tint-bord),inset -1px 0 0 0 var(--gold-tint-bord);}
 /* Void/Comp + Waste + Tip Pool + Receive-Delivery batch-builder line rows use the data-row fill; header row stays. */
-.vc-line td,.wl-line td,.tp-row td,.tpe-row td,.aw-pool-row td,.aw-cash-line td,.rd-line td,.os-line td,.pb-line td,.lo-fmodal-row td,.tl-line td,.tr-line td,.adj-line td,.em-line td,.tw-line td,.mi-ing-line td,.rf-row td,.rw-line td,.wsem-line td,.cw-line td{background:#0D181E;}
+.vc-line td,.wl-line td,.tp-row td,.tpe-row td,.aw-pool-row td,.aw-cash-line td,.rd-line td,.os-line td,.pb-line td,.lo-fmodal-row td,.tl-line td,.tr-line td,.adj-line td,.em-line td,.tw-line td,.mi-ing-line td,.rf-row td,.rw-line td,.wsem-line td,.cw-line td{background:var(--zone);}
 /* A flagged delivery line keeps the standard data-row fill; the gold reason text + Flag button carry the flag, not a tinted row. */
-.rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:#0D181E;}
+.rd-line.rd-flagged td,.rd-flag-row.rd-flagged td{background:var(--zone);}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;}
 /* Order Sheet "Already Ordered" overflow (⋯) menu — floats over content so the row never grows taller. */
 .os-omenu{position:absolute;top:100%;right:0;margin-top:6px;z-index:60;min-width:152px;background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,0.45);}
@@ -1721,7 +1734,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .auth-heading{font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);margin-bottom:6px;text-align:center;}
 .auth-sub{font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.5;text-align:center;}
 /* Inputs grouped in a #0D181E panel so the fields read as one block. */
-.auth-inputs{background:#0D181E;border-radius:6px;padding:14px;margin-bottom:16px;}
+.auth-inputs{background:var(--gold-tint);border-radius:6px;padding:14px;margin-bottom:16px;}
 /* Footer links sit OUTSIDE the card, on the page background. */
 .auth-foot{text-align:center;margin-top:16px;}
 .auth-foot > div + div{margin-top:10px;}
@@ -1771,7 +1784,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .ing-tbl.pill{border-spacing:0;display:block;width:100%;}
   .ing-tbl.pill thead{display:none;}
   .ing-tbl.pill tbody{display:block;width:100%;}
-  .ing-tbl.pill tbody tr{display:block;background:#0D181E;border:1px solid var(--b-edge);border-radius:8px;padding:6px 14px 12px;margin:10px 0;}
+  .ing-tbl.pill tbody tr{display:block;background:var(--zone);border:1px solid var(--b-edge);border-radius:8px;padding:6px 14px 12px;margin:10px 0;}
   .ing-tbl.pill tbody td{display:block;background:transparent;border:none;border-radius:0;padding:6px 0;}
   .ing-tbl.pill tbody td::before{content:attr(data-label);display:block;color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
   .ing-tbl.pill tbody td[data-label=""]::before{content:none;}
@@ -2099,7 +2112,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .ing-tbl thead{display:none;}
   /* Linearize the table element itself (and tbody) so an inline table-layout:fixed + desktop column widths never size/inset the stacked rows on mobile. Without this the rows stay locked to the old column grid no matter their margin. */
   .ing-tbl,.ing-tbl tbody{display:block;width:100%;}
-  .ing-tbl tbody tr{display:block;background:#0D181E;border:1px solid var(--b-edge);border-radius:6px;padding:6px 12px 12px;margin:10px 0;}
+  .ing-tbl tbody tr{display:block;background:var(--zone);border:1px solid var(--b-edge);border-radius:6px;padding:6px 12px 12px;margin:10px 0;}
   .ing-tbl tbody td{display:block;background:transparent;padding:6px 0;border:none;}
   .ing-tbl tbody td::before{content:attr(data-label);display:block;color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
   .ing-tbl tbody td[data-label=""]::before{content:none;}

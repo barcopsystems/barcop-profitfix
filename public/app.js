@@ -1664,7 +1664,7 @@ const App = {
         + ((ctx.plan === 'annual') ? 'Yearly' : 'Monthly') + '</b> plan. One moment.';
     }
     const planOpt = (plan, label, note) =>
-      '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
+      '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:var(--gold-tint);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
       + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
     const m = document.createElement('div');
     m.id = 'plan-gate';
@@ -1715,7 +1715,7 @@ const App = {
       const on = o === el;
       o.classList.toggle('plan-selected', on);
       o.style.borderColor = 'var(--b-edge)';
-      o.style.background = on ? '#1E2B34' : '#0D181E';
+      o.style.background = on ? '#1E2B34' : 'var(--gold-tint)';
     });
     opts.forEach(o => o.addEventListener('click', () => selectOpt(o)));
     /* ⭐ OPEN ON THE PLAN THEY CHOSE. This is correctness, not polish: with a carried plan the
@@ -5040,7 +5040,7 @@ const App = {
     if (!key) return;
     const label = this._listLabels[key] || 'List';
     const id = 'list-mgr';
-    const rowStyle = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#0D181E;border-radius:6px;margin-bottom:6px;';
+    const rowStyle = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:var(--zone);border-radius:6px;margin-bottom:6px;';
     const linkStyle = 'color:var(--gold);cursor:pointer;font-size:11px;font-weight:600;';
     const valued = this._listIsValued(key);
     const methoded = this._listIsMethoded(key);
@@ -11149,7 +11149,7 @@ function wireAuth() {
       const on = o === el;
       o.classList.toggle('plan-selected', on);
       o.style.borderColor = 'var(--b-edge)';
-      o.style.background   = on ? '#1E2B34' : '#0D181E';
+      o.style.background   = on ? '#1E2B34' : 'var(--gold-tint)';
     });
     opts.forEach(o => o.addEventListener('click', () => select(o)));
     if (opts[0]) select(opts[0]);  // default to Monthly
