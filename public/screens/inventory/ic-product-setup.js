@@ -3027,9 +3027,21 @@ S.InventoryProducts = {
     /* ⛔ "IMPORT N PRODUCTS" WAS UNTRUE WHERE IT STOOD (Kyle, chat 27): the file was
        imported two screens ago, and a button offering to import it again reads as though
        the work already happened. What this press does is ADD the products. */
-    return this._sectionHead('Your ' + rows.length + ' Product' + (rows.length === 1 ? '' : 's'), lead)
+    /* ⭐ ONE WRAPPER ROUND THE WHOLE REVIEW, BUTTONS OUTSIDE IT (Kyle, 2026-08-14: *"put everything
+       except the add/start over buttons inside the same border wrapper with the #0D181E background
+       color"*). The heading, the lead, the category picker and the group rows are one piece of work
+       and now read as one; the two buttons that ACT on it sit under the box rather than inside it,
+       which is the same shape the import confirm shell uses and the reason its own buttons live in
+       `actionsEl` ([[lessons-paid-for]] #106 — the reference's layout, not just its mechanism).
+       ⚠ `.card` gives the border, the radius and the 20px padding; only the FILL is overridden, to
+       the same #0D181E the importer panel above it now uses so the two steps of one job match.
+       ⚠ THE HEADING STAYS `.sh ic-head`, NOT `.card-title`. Inside a card the usual head is the
+       band, and the band is the exact thing Kyle had removed from this heading an hour earlier. */
+    return '<div class="card ip-route-box">'
+      + this._sectionHead('Your ' + rows.length + ' Product' + (rows.length === 1 ? '' : 's'), lead)
       + body
       + vendorBlock
+      + '</div>'
       + '<div class="no-print" style="margin:22px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && !busy ? '' : ' disabled')
       + '>' + (busy ? 'Adding...' : 'Add ' + ready + ' Product' + (ready === 1 ? '' : 's')) + '</button>'
