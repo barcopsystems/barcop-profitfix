@@ -8191,102 +8191,215 @@ const App = {
     return ok;
   },
 
-  // The S133 disposition PROMPT. A shared helper: WIRED into the archive flow (ic-locations
-  // setArchived); the untick flow (Set Locations) is S181, not yet wired. Opened only when
-  // countedStockAt found real stock on the shelf being retired — an empty shelf never prompts. Asks
-  // what happened to each product's stock (bulk choice with a per-product override), writes it via
-  // disposeShelfStock, then runs `proceed` (the archive / untick itself). Cancel/X ABORTS: nothing is
-  // written and `proceed` never runs, so the shelf is not retired until the operator says where the
-  // stock went. `stock` = App.countedStockAt(fromLoc[, pid]).
+  /* THE S133 DISPOSITION PROMPT, REBUILT 2026-08-15 (Kyle, looking at Back Bar and its 17 rows).
+     ⛔ THIS IS THE SCREEN [[color-system-policing]] WAS WRITTEN ABOUT, AND IT NEVER GOT THE SWEEP.
+     That rule was created 2026-07-30 over this exact modal: selects carrying an inline
+     `padding:7px 9px` copied off `.form-input` with `class=""`, so every one rendered browser
+     defaults, plus a hand-rolled table instead of the app's. Both were still shipped this morning.
+     WHAT CHANGED, all of it his:
+       · ONE control at the top, not one per row. 17 products meant up to 34 dropdowns on screen
+         (each row can also carry a destination); it is now tick the rows, say what happened, Apply.
+       · An answered row LEAVES the work list and joins a section for that answer, so the counts are
+         visible and a wrong answer is one tick from being fixed. The Add Products review's shape.
+       · The list scrolls inside a capped box, so the dialog does not grow with the shelf.
+       · ONE button, left, and it is the JOB rather than a Confirm. No Cancel: the X already runs the
+         identical abort, and buttons-left-primary-first-no-Cancel is the locked popup standard.
+       · Every select sits in a `.f`, which is what gives it the `--input` fill and the soft-grey
+         chevron. No new CSS: the app already had the look, this dialog was just not using it.
+     ⛔⛔ NOTHING IS WRITTEN UNTIL THAT ONE BUTTON. Applying an answer only records it in memory.
+     Writing per batch was the alternative and it breaks the guarantee this dialog has always made:
+     abandon it half done and you would have stock booked off a shelf that still exists and was
+     never archived, and `disposeShelfStock` writes ONE record per call, so four batches would book
+     four dispositions where the books expect one. X still aborts with nothing done.
+     ⚠ AND THE SILENT DEFAULT IS GONE. The archive path used to open with every row preset to
+     "Still here", so Confirm alone carried the whole shelf forward. That value lands on the tax
+     worksheets, which this dialog's own copy warns about, so it is now an answer the operator gives
+     rather than one they fail to change. It costs one press: Select all, Still here, Apply. */
   promptShelfDisposition(fromLoc, stock, proceed, opts) {
     opts = opts || {};
-    // S184: on the UNTICK path the product is being REMOVED from this shelf, so "Still here" is a
-    // contradiction — disposeShelfStock writes nothing for 'stay' and the stock is dropped from on-hand,
-    // while the copy promises it is carried forward. Offer only Used/Moved and force an explicit pick.
-    // The ARCHIVE path (opts.untick absent) is unchanged: the shelf and its stock physically remain, so
-    // "Still here — carry forward" is correct and stays the default.
     const untick = !!opts.untick;
     stock = (stock || []).filter(s => s && s.product_id && s.onHand > 0);
-    if (!stock.length) { if (typeof proceed === 'function') proceed(); return; }   // nothing to dispose
+    if (!stock.length) { if (typeof proceed === 'function') proceed(); return; }
     const money = v => '$' + (Math.round((v || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const totalVal = stock.reduce((s, x) => s + (x.value || 0), 0);
-    // Destinations: active, non-archived shelves other than the one being retired (you cannot move
-    // stock onto a shelf you are retiring or one already archived).
+    // Destinations: active shelves other than the one being retired. You cannot move stock onto the
+    // shelf you are retiring, or onto one already archived.
     const dests = ((this.inventoryData && this.inventoryData.ic_locations) || [])
       .filter(l => l && l.name && !l.archived && l.name !== fromLoc).map(l => l.name);
-    const destOpts = () => '<option value="">Pick a shelf...</option>' + dests.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
-    const choiceSel = (cls, id) => '<select class="' + cls + '"' + (id ? ' id="' + id + '"' : '') + ' style="padding:7px 9px;">'
-      + (untick
-          ? '<option value="">Pick what happened...</option>'
-          : '<option value="stay">Still here — carry forward</option>')
-      + '<option value="used">Used / sold / tossed</option>'
-      + (dests.length ? '<option value="moved">Moved to another shelf</option>' : '')
-      + '</select>';
-    const rows = stock.map(s =>
-      '<tr data-pid="' + esc(s.product_id) + '" style="border-bottom:1px solid var(--b2);">'
-      + '<td style="padding:9px 10px;">' + esc(s.name || 'Product') + '</td>'
-      + '<td style="padding:9px 10px;white-space:nowrap;">' + (Math.round(s.onHand * 100) / 100) + ' <span style="color:var(--t3);">(' + money(s.value) + ')</span></td>'
-      + '<td style="padding:9px 10px;">' + choiceSel('disp-choice')
-      + (dests.length ? ' <select class="disp-dest" style="display:none;padding:7px 9px;">' + destOpts() + '</select>' : '') + '</td>'
-      + '</tr>').join('');
+
+    // Memory only, both of them. `answers` is each product's fate; `checked` is what Apply acts on.
+    const answers = {}, checked = {};
+
+    /* ⚠ "Still here" IS NOT OFFERED ON THE UNTICK PATH, and never was: the product is being taken
+       OFF this shelf, so staying is a contradiction. `disposeShelfStock` writes nothing for 'stay'
+       and the stock drops out of on-hand, while the copy promises it is carried forward. */
+    const CHOICES = (untick ? [] : [{ v: 'stay', label: 'Still here, carry forward' }])
+      .concat([{ v: 'used', label: 'Used / sold / tossed' }])
+      .concat(dests.length ? [{ v: 'moved', label: 'Moved to another shelf' }] : []);
+    // A moved row names WHERE, because "Moved to another shelf" on a row is not an answer.
+    const labelFor = a => a.choice === 'moved' ? 'Moved to ' + a.destLoc
+      : ((CHOICES.find(c => c.v === a.choice) || {}).label || a.choice);
+    const actionLabel = untick ? 'Save Changes' : 'Archive ' + fromLoc;
+    const plural = (k, one, many) => k + ' ' + (k === 1 ? one : many);
+
+    const rowHtml = s => {
+      const a = answers[s.product_id];
+      return '<tr>'
+        + '<td class="cb-left"><input type="checkbox" class="bc-check disp-cb" value="' + esc(s.product_id) + '"'
+          + (checked[s.product_id] ? ' checked' : '') + '/></td>'
+        + '<td>' + esc(s.name || 'Product') + '</td>'
+        + '<td style="white-space:nowrap;">' + (Math.round(s.onHand * 100) / 100)
+          + ' <span style="color:var(--t3);">(' + money(s.value) + ')</span></td>'
+        + '<td>' + (a ? esc(labelFor(a)) : '<span style="color:var(--t3);">Not answered yet</span>') + '</td>'
+        + '</tr>';
+    };
+    // ⚠ `container-type` is what lets the row-list stack on a narrow screen; without it the
+    // @container rule that does the stacking never fires. Same reason the import review carries it.
+    const section = (title, sub, rows, first) =>
+      '<div class="card" style="padding:0!important;container-type:inline-size;margin-top:' + (first ? '0' : '12') + 'px;">'
+      + '<div style="padding:12px 14px;">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--t1);">' + esc(title) + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + esc(sub) + '</div></div>'
+      + '<div style="padding:0 14px 12px;overflow-x:auto;">'
+      + '<table class="row-list" style="table-layout:fixed;width:100%;">'
+      + '<colgroup><col style="width:9%;"/><col style="width:37%;"/><col style="width:22%;"/><col style="width:32%;"/></colgroup>'
+      + '<thead><tr><th></th><th>Product</th><th>On hand</th><th>What happened</th></tr></thead>'
+      + '<tbody>' + rows.map(rowHtml).join('') + '</tbody></table></div></div>';
+
     const html = '<div class="card form-card">'
       + '<div class="card-title">What happened to the stock on ' + esc(fromLoc) + '?</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
       + esc(fromLoc) + ' still holds ' + money(totalVal) + ' of counted stock. Tell Bar Cop where it went so your books stay right. '
       + (untick
-          ? (stock.length > 1
-              ? 'You are taking these products off ' + esc(fromLoc) + ', so they cannot stay here — say whether they were used' + (dests.length ? ' or moved to another shelf.' : '.')
-              : 'You are taking it off ' + esc(fromLoc) + ', so it cannot stay here — say whether it was used' + (dests.length ? ' or moved to another shelf.' : '.'))
-          : 'Anything left as Still here is carried forward on your inventory value and flagged on your tax worksheets until you count it again.')
+          ? 'You are taking ' + (stock.length > 1 ? 'these products' : 'it') + ' off ' + esc(fromLoc)
+            + ', so ' + (stock.length > 1 ? 'they cannot' : 'it cannot') + ' stay here.'
+          : 'Anything carried forward stays on your inventory value and is flagged on your tax worksheets until you count it again.')
       + '</div>'
-      + (stock.length > 1 ? '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><label style="margin:0;font-size:12px;color:var(--t2);">Set all to</label>'
-          + choiceSel('', 'disp-bulk')
-          + (dests.length ? ' <select id="disp-bulk-dest" style="display:none;padding:7px 9px;">' + destOpts() + '</select>' : '') + '</div>' : '')
-      + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
-      + '<thead><tr style="text-align:left;color:var(--t3);border-bottom:1px solid var(--b2);"><th style="padding:9px 10px;">Product</th><th style="padding:9px 10px;">On hand</th><th style="padding:9px 10px;">What happened</th></tr></thead>'
-      + '<tbody>' + rows + '</tbody></table></div>'
+      // The whole batch interaction, in one row: tick rows, say what happened, Apply.
+      + '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
+        + '<label style="display:flex;align-items:center;gap:6px;margin:0;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap;">'
+        + '<input type="checkbox" class="bc-check" id="disp-all"/> Select all</label>'
+        + '<div class="f" style="max-width:215px;margin:0;flex:1 1 170px;"><select id="disp-choice">'
+        + '<option value="">What happened...</option>'
+        + CHOICES.map(c => '<option value="' + c.v + '">' + esc(c.label) + '</option>').join('')
+        + '</select></div>'
+        + (dests.length ? '<div class="f" id="disp-dest-wrap" style="max-width:190px;margin:0;display:none;"><select id="disp-dest">'
+            + '<option value="">Pick a shelf...</option>'
+            + dests.map(d => '<option value="' + esc(d) + '">' + esc(d) + '</option>').join('')
+            + '</select></div>' : '')
+        + '<button type="button" class="btn btn-primary btn-sm" id="disp-apply" disabled>Apply</button>'
+      + '</div>'
+      // ⚠ THE HEIGHT IS CAPPED, NOT FIXED (Kyle asked for a set height so the dialog does not grow
+      // with the shelf). A hard height would leave a two-product shelf staring at an empty box; a
+      // cap gives the same "never taller than this, then it scrolls" without the dead space.
+      + '<div id="disp-body" style="max-height:380px;overflow-y:auto;"></div>'
       + '<div id="disp-err" style="display:none;color:var(--red);font-size:12px;margin-top:10px;"></div>'
-      + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">'
-      + '<button type="button" class="btn btn-ghost" id="disp-cancel">Cancel</button>'
-      + '<button type="button" class="btn btn-primary" id="disp-confirm">Confirm</button></div>'
+      // ⛔ ONE BUTTON, LEFT. `.card-actions` is already flex with default left alignment, so the
+      // old inline `justify-content:flex-end` was the only thing putting it on the right.
+      + '<div class="card-actions"><button type="button" class="btn btn-primary" id="disp-go" disabled>'
+      + esc(actionLabel) + '</button></div>'
       + '</div>';
+
     const cancel = () => { App.closeModal('shelf-disp'); if (typeof opts.onCancel === 'function') opts.onCancel(); };
     const overlay = App.openModal(html, { id: 'shelf-disp', maxWidth: 660, onClose: cancel });
-    const all = () => Array.from(overlay.querySelectorAll('tr[data-pid]'));
-    const syncRow = tr => { const d = tr.querySelector('.disp-dest'); if (d) d.style.display = (tr.querySelector('.disp-choice').value === 'moved') ? '' : 'none'; };
-    all().forEach(tr => { tr.querySelector('.disp-choice').addEventListener('change', () => syncRow(tr)); syncRow(tr); });
-    const bulk = overlay.querySelector('#disp-bulk'), bulkDest = overlay.querySelector('#disp-bulk-dest');
-    if (bulk) {
-      const applyBulk = () => all().forEach(tr => {
-        tr.querySelector('.disp-choice').value = bulk.value;
-        const d = tr.querySelector('.disp-dest'); if (d && bulkDest) d.value = bulkDest.value;
-        syncRow(tr);
+    const bodyEl = overlay.querySelector('#disp-body');
+    const choiceEl = overlay.querySelector('#disp-choice');
+    const destWrap = overlay.querySelector('#disp-dest-wrap');
+    const destEl = overlay.querySelector('#disp-dest');
+    const allEl = overlay.querySelector('#disp-all');
+    const applyBtn = overlay.querySelector('#disp-apply');
+    const goBtn = overlay.querySelector('#disp-go');
+    const err = overlay.querySelector('#disp-err');
+
+    const openRows = () => stock.filter(s => !answers[s.product_id]);
+    const nChecked = () => stock.filter(s => checked[s.product_id]).length;
+
+    /* The toolbar and the action live OUTSIDE the redrawn body on purpose: a redraw would otherwise
+       reset the operator's half-made choice in the selector every time they ticked a row. */
+    const syncControls = () => {
+      const moved = choiceEl.value === 'moved';
+      if (destWrap) destWrap.style.display = moved ? '' : 'none';
+      const answerable = !!choiceEl.value && (!moved || !!(destEl && destEl.value));
+      const k = nChecked();
+      applyBtn.disabled = !(answerable && k > 0);
+      applyBtn.textContent = k ? 'Apply to ' + k : 'Apply';
+      const left = openRows().length;
+      goBtn.disabled = left > 0;
+      // The label says why it is disabled, so the operator never has to hunt for what is left.
+      goBtn.textContent = left ? actionLabel + ' (' + left + ' to answer)' : actionLabel;
+      if (allEl) allEl.checked = stock.length > 0 && k === stock.length;
+    };
+
+    const draw = () => {
+      const open = openRows();
+      const groups = {};
+      stock.forEach(s => { const a = answers[s.product_id]; if (!a) return;
+        const key = labelFor(a); (groups[key] = groups[key] || []).push(s); });
+      let out = '', first = true;
+      if (open.length) {
+        out += section('Still to answer', plural(open.length, 'product', 'products') + ' left', open, first);
+        first = false;
+      }
+      Object.keys(groups).forEach(key => {
+        out += section(key, plural(groups[key].length, 'product', 'products'), groups[key], first);
+        first = false;
       });
-      bulk.addEventListener('change', () => { if (bulkDest) bulkDest.style.display = (bulk.value === 'moved') ? '' : 'none'; applyBulk(); });
-      if (bulkDest) bulkDest.addEventListener('change', applyBulk);
-    }
-    overlay.querySelector('#disp-cancel').addEventListener('click', cancel);
-    overlay.querySelector('#disp-confirm').addEventListener('click', async () => {
-      const err = overlay.querySelector('#disp-err');
-      const dispositions = []; let bad = null, noPick = null;
-      all().forEach(tr => {
-        const pid = tr.getAttribute('data-pid');
-        const s = stock.find(x => x.product_id === pid) || {};
-        const choice = tr.querySelector('.disp-choice').value;
-        const destSel = tr.querySelector('.disp-dest');
-        const destLoc = (choice === 'moved' && destSel) ? destSel.value : '';
-        if (!choice) noPick = s.name || 'a product';                       // untick: the forced-pick placeholder was never changed
-        else if (choice === 'moved' && !destLoc) bad = s.name || 'a product';
-        dispositions.push({ product_id: pid, name: s.name, choice: choice, destLoc: destLoc, onHand: s.onHand, unitCost: s.unitCost });
+      bodyEl.innerHTML = out;
+      syncControls();
+    };
+
+    // Delegated, because the body is rewritten on every change and per-row listeners would not survive.
+    bodyEl.addEventListener('change', e => {
+      const cb = e.target;
+      if (!cb || !cb.classList || !cb.classList.contains('disp-cb')) return;
+      if (cb.checked) checked[cb.value] = true; else delete checked[cb.value];
+      syncControls();
+    });
+    if (allEl) allEl.addEventListener('change', () => {
+      stock.forEach(s => { if (allEl.checked) checked[s.product_id] = true; else delete checked[s.product_id]; });
+      draw();
+    });
+    choiceEl.addEventListener('change', syncControls);
+    if (destEl) destEl.addEventListener('change', syncControls);
+
+    applyBtn.addEventListener('click', () => {
+      const choice = choiceEl.value;
+      if (!choice) return;
+      const destLoc = (choice === 'moved' && destEl) ? destEl.value : '';
+      if (choice === 'moved' && !destLoc) return;
+      // ⚠ The tick is dropped as the answer lands, so the next Apply cannot act on a row the
+      // operator has already dealt with and stopped looking at.
+      stock.forEach(s => {
+        if (!checked[s.product_id]) return;
+        answers[s.product_id] = { choice: choice, destLoc: destLoc };
+        delete checked[s.product_id];
       });
-      if (noPick) { if (err) { err.textContent = 'Tell Bar Cop what happened to "' + noPick + '" — used' + (dests.length ? ', or moved to another shelf.' : '.'); err.style.display = 'block'; } return; }
-      if (bad) { if (err) { err.textContent = 'Pick where "' + bad + '" moved to, or choose ' + (untick ? 'Used.' : 'Used or Still here.'); err.style.display = 'block'; } return; }
-      const btn = overlay.querySelector('#disp-confirm'); btn.disabled = true; btn.textContent = 'Saving...';
+      if (err) err.style.display = 'none';
+      draw();
+    });
+
+    goBtn.addEventListener('click', async () => {
+      if (openRows().length) return;   // the button is disabled, but never trust that alone
+      /* ⛔ THE SAME PAYLOAD SHAPE THE PER-ROW VERSION BUILT, in the file's own order.
+         `disposeShelfStock` is untouched by this rebuild, so the write, its rollback and the
+         disposition record are exactly what they were. */
+      const dispositions = stock.map(s => {
+        const a = answers[s.product_id] || {};
+        return { product_id: s.product_id, name: s.name, choice: a.choice, destLoc: a.destLoc || '',
+                 onHand: s.onHand, unitCost: s.unitCost };
+      });
+      goBtn.disabled = true; goBtn.textContent = 'Saving...';
       const ok = await App.disposeShelfStock(fromLoc, dispositions);
-      if (!ok) { btn.disabled = false; btn.textContent = 'Confirm'; if (err) { err.textContent = 'Could not save that. Check your connection and try again.'; err.style.display = 'block'; } return; }
+      if (!ok) {
+        goBtn.disabled = false; goBtn.textContent = actionLabel;
+        if (err) { err.textContent = 'Could not save that. Check your connection and try again.'; err.style.display = 'block'; }
+        return;
+      }
       App.closeModal('shelf-disp');
       if (typeof proceed === 'function') proceed();
     });
+
+    draw();
   },
 
   // The S140 import-conflict PROMPT. Shared by the sales and cash importers. When a POS file lands
