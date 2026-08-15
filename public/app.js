@@ -8455,43 +8455,71 @@ const App = {
     const rows = (opts.rows || []).filter(Boolean);
     return new Promise(resolve => {
       if (!rows.length) { resolve({ confirmed: true, useTheirs: new Set() }); return; }
-      const sel = (cls, id) => '<select class="' + cls + '"' + (id ? ' id="' + id + '"' : '') + ' style="padding:7px 9px;">'
+      /* ⛔ THE SELECT SITS IN A `.f`, WHICH IS WHAT STYLES IT (Kyle, 2026-08-15, walking the modals
+         built during one stretch of work). This was the second and last dialog carrying the exact
+         signature the archive-disposition one had: `style="padding:7px 9px;"` copied off
+         `.form-input` with `class=""` left behind, so it took the one property that did not matter
+         and rendered browser defaults — Arial against Barlow, a grey-white fill against `--input`,
+         square corners, the OS arrow. `.f select` was already the app's answer. No new CSS.
+         ⚠ `margin:0` on the wrapper because `.f` carries a bottom margin meant for a form column,
+         and these sit in a table cell and in a toolbar row. */
+      const sel = (cls, id) => '<div class="f" style="margin:0;min-width:130px;">'
+        + '<select' + (cls ? ' class="' + cls + '"' : '') + (id ? ' id="' + id + '"' : '') + '>'
         + '<option value="mine" selected>Keep mine</option>'
         + '<option value="theirs">Use the file</option>'
-        + '</select>';
+        + '</select></div>';
       const body = rows.map(r =>
-        '<tr data-key="' + esc(r.key) + '" style="border-bottom:1px solid var(--b2);">'
-        + '<td style="padding:9px 10px;">' + esc(r.label) + '</td>'
-        + '<td style="padding:9px 10px;white-space:nowrap;">' + esc(r.mineText) + '</td>'
-        + '<td style="padding:9px 10px;white-space:nowrap;">' + esc(r.theirsText) + '</td>'
-        + '<td style="padding:9px 10px;">' + sel('imc-choice') + '</td>'
+        '<tr data-key="' + esc(r.key) + '">'
+        + '<td>' + esc(r.label) + '</td>'
+        + '<td style="white-space:nowrap;">' + esc(r.mineText) + '</td>'
+        + '<td style="white-space:nowrap;">' + esc(r.theirsText) + '</td>'
+        + '<td>' + sel('imc-choice') + '</td>'
         + '</tr>').join('');
       const html = '<div class="card form-card">'
         + '<div class="card-title">' + esc(opts.title || 'These were entered by hand') + '</div>'
         + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
         + esc(opts.intro || 'This file has different numbers for entries you already made by hand. Pick which to keep. Your own figures are kept unless you choose the file.') + '</div>'
-        + (rows.length > 1 ? '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><label style="margin:0;font-size:12px;color:var(--t2);">Set all to</label>'
+        + (rows.length > 1 ? '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">'
+            + '<label style="margin:0;font-size:12px;color:var(--t2);white-space:nowrap;">Set all to</label>'
             + sel('', 'imc-bulk') + '</div>' : '')
-        + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
-        + '<thead><tr style="text-align:left;color:var(--t3);border-bottom:1px solid var(--b2);">'
-        + '<th style="padding:9px 10px;">' + esc(opts.rowLabel || 'Entry') + '</th>'
-        + '<th style="padding:9px 10px;">' + esc(opts.colMine || 'Your figures') + '</th>'
-        + '<th style="padding:9px 10px;">' + esc(opts.colTheirs || 'This file') + '</th>'
-        + '<th style="padding:9px 10px;">Which wins</th></tr></thead>'
-        + '<tbody>' + body + '</tbody></table></div>'
-        + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">'
-        + '<button type="button" class="btn btn-ghost" id="imc-cancel">Cancel import</button>'
+        /* ⛔ THE APP'S OWN TABLE, NOT A HAND-ROLLED ONE. It was `<table style="border-collapse:
+           collapse">` with padding written onto every cell, which is the other half of the same
+           defect: it looks close enough until you put it beside a real one. `.row-list` brings the
+           pill rows, the header treatment and the mobile stacking for free.
+           ⚠ The card wrapper is what the stacking container query measures, and the capped scroll
+           box keeps the dialog from growing with the number of conflicts (a week of days across
+           several registers is not a short list). */
+        + '<div style="max-height:380px;overflow-y:auto;">'
+        + '<div class="card" style="padding:0!important;container-type:inline-size;margin:0;">'
+        + '<div style="padding:0 14px 12px;overflow-x:auto;">'
+        + '<table class="row-list" style="width:100%;">'
+        + '<thead><tr>'
+        + '<th>' + esc(opts.rowLabel || 'Entry') + '</th>'
+        + '<th>' + esc(opts.colMine || 'Your figures') + '</th>'
+        + '<th>' + esc(opts.colTheirs || 'This file') + '</th>'
+        + '<th>Which wins</th></tr></thead>'
+        + '<tbody>' + body + '</tbody></table></div></div></div>'
+        /* ⛔ ONE BUTTON, LEFT, NO CANCEL — Kyle's ruling on the twin, applied here. The X already
+           resolves { confirmed:false } and abandons the import, so "Cancel import" was a second
+           control doing the identical thing. `.card-actions` is flex with default left alignment,
+           so the old inline `justify-content:flex-end` was the only thing putting it on the right. */
+        + '<div class="card-actions">'
         + '<button type="button" class="btn btn-primary" id="imc-confirm">Apply</button></div>'
         + '</div>';
       let done = false;
       const finish = (val) => { if (done) return; done = true; App.closeModal('import-conflict'); resolve(val); };
       // onClose fires only on the X (openModal never calls it on a programmatic closeModal); the
       // `done` guard makes a double-close a no-op either way.
-      const overlay = App.openModal(html, { id: 'import-conflict', maxWidth: 640, onClose: () => finish({ confirmed: false, useTheirs: new Set() }) });
+      /* ⛔ 780, TIED TO `@container (max-width:700px)` IN style.css, exactly as the disposition
+         dialog is. `.row-list` stacks on the width of the CARD it sits in, not the viewport, so at
+         640 the section card measured under 700 and the table would have opened in its phone
+         layout on every screen — which is the defect Kyle caught on the twin. A phone is untouched:
+         there the modal is viewport-width, so it still stacks, which is the point of the rule.
+         🔧 `verify-import-conflicts-design` does the arithmetic rather than trusting this number. */
+      const overlay = App.openModal(html, { id: 'import-conflict', maxWidth: 780, onClose: () => finish({ confirmed: false, useTheirs: new Set() }) });
       const all = () => Array.from(overlay.querySelectorAll('tr[data-key]'));
       const bulk = overlay.querySelector('#imc-bulk');
       if (bulk) bulk.addEventListener('change', () => all().forEach(tr => { tr.querySelector('.imc-choice').value = bulk.value; }));
-      overlay.querySelector('#imc-cancel').addEventListener('click', () => finish({ confirmed: false, useTheirs: new Set() }));
       overlay.querySelector('#imc-confirm').addEventListener('click', () => {
         const useTheirs = new Set();
         all().forEach(tr => { if (tr.querySelector('.imc-choice').value === 'theirs') useTheirs.add(tr.getAttribute('data-key')); });
