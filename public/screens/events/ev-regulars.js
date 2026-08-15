@@ -91,7 +91,22 @@ S.EventsRegulars = {
     const segToggle = '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>';
     let body, belowButtons = '';
     if (this.entryMode === 'import') {
-      body = segToggle + '<div id="rg-csv"></div><div id="rg-imp-actions" style="margin-top:8px;"></div>';
+      /* ⛔ THE MAPPER OWNS THE PAGE ONCE A FILE IS IN (Kyle, 2026-08-15, first door he walked after
+         the drop-box rollout): *"still sitting in the add regular card with the toggle buttons..
+         import/cancel button inside the card.. and still has the regulars list below it"*.
+         He is right, and hiding the drop box is what exposed it: the mapping screen was always
+         nested inside the collapsible Add a Regular card, under the mode toggle, with its buttons in
+         the card and the whole book still underneath. Add Products has never looked like that — its
+         importer REPLACES the list region and its actions sit below the card.
+         ⚠ HIDDEN, NOT RE-RENDERED. `onState` fires from inside the mount, and re-rendering there
+         would rebuild `#rg-csv` and throw away the file the operator just dropped. Add Products
+         solves it the same way, by toggling `display` on one row, so this follows that precedent
+         rather than inventing a second mechanism.
+         ⚠ AND THE TOGGLE IS WRAPPED, not removed: it has to come back the moment they press Cancel,
+         which re-mounts the drop state and calls `onState('drop')`. */
+      body = '<div id="rg-imp-toggle">' + segToggle + '</div><div id="rg-csv"></div>';
+      // Outside the card, like the importer's own action row on Add Products.
+      belowButtons = '<div id="rg-imp-actions" class="no-print" style="margin:16px 0 24px;"></div>';
     } else {
       body = segToggle + this.formCells(null, 'rg', true);
       belowButtons = '<div data-collapse-group="rg-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
@@ -170,8 +185,13 @@ S.EventsRegulars = {
        verdict about that list, so keep the list visible"). That argument only ever covered the dup
        rows, and it bought them a glance at the price of putting Delete under an unconfirmed import.
        The screen already names every dup by name and contact, which is the part that was needed. */
+    /* ⚠ THE BOOK IS WRAPPED SO THE MAPPING STEP CAN HIDE IT TOO. The confirm screen already owns the
+       page (the ternary below), and Kyle's argument for that — Delete and Edit write on the press,
+       four inches under a sentence promising nothing is saved — is just as true while he is matching
+       columns. `mountImporter`'s `onState` hides this wrapper on 'map' and gives it back on 'drop',
+       by display rather than by re-render, because re-rendering would destroy the parsed file. */
     this.container.innerHTML = '<div class="screen">' + statStrip + topCard
-      + (this._regularsReview ? '' : listSection) + '</div>';
+      + (this._regularsReview ? '' : '<div id="rg-list-region">' + listSection + '</div>') + '</div>';
     this.wire();
     /* ⚠ NOT WHILE THE CONFIRM SCREEN IS UP. Its markup replaces the add card, so `#rg-csv` is gone,
        and re-mounting would hand the operator a second file picker over a file they have not
@@ -316,6 +336,22 @@ S.EventsRegulars = {
          and landed in the 100%-"no visit logged" state that column exists to end ([[copy-matches-app]]). */
       dropSub: 'Only Name is required; phone, email, birthday, anniversary, drink preferences, and last visit come in if your file has them.',
       actionsEl: '#rg-imp-actions',
+      /* ⛔ ONCE THE COLUMNS ARE UP, NOTHING ELSE IS. The mode toggle, the card's own head, the filter
+         chips with their Export, and the whole book go away while the operator is matching columns;
+         Cancel brings them all back because the mapper re-mounts in its drop state and fires 'drop'.
+         Everything here is display-only for the reason in `renderList`: a re-render would destroy
+         the parsed file. */
+      onState: state => {
+        const map = (state === 'map');
+        [['rg-imp-toggle', map], ['rg-list-region', map]].forEach(([id, hide]) => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = hide ? 'none' : '';
+        });
+        // The card's own head, which is the collapsible "Add a Regular" title.
+        const card = document.getElementById('rg-csv') && document.getElementById('rg-csv').closest('.card');
+        const head = card && card.querySelector('.card-title');
+        if (head) head.style.display = map ? 'none' : '';
+      },
       fields: [
         // Whole phrases only. A bare 'customer' / 'guest' / 'patron' matched the
         // Customer EMAIL column (every column in these files starts with the same
