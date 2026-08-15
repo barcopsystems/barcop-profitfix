@@ -2981,8 +2981,19 @@ S.InventoryProducts = {
        one `.card`; taking that wrapper away (see `routePanelHTML`) puts every section directly on
        the page, so the sections are the cards again and a `--bg` fill would make them vanish into
        it. Same look he was after, one fewer rule, and it matches Books. */
+    /* ⛔ `!important` ON THE PADDING, AND IT IS NOT DECORATION (Kyle, 2026-08-15: *"in mobile view
+       the groups wrappers have too much inner padding"*). style.css carries a blanket
+       `@media(max-width:768px) .card{padding:14px!important}`, which OVERRODE the plain `padding:0`
+       this card is built with — so on a phone every section gained 14px it was told not to have,
+       on top of the head's own 16px and the table wrapper's 16px. Measured on the deployed build:
+       computed padding 14px against an inline declaration of 0.
+       ⚠ An inline `!important` is the narrowest fix available: it beats an author `!important`
+       (measured, 14px to 0px) and it touches nothing else. Editing the shared rule would reach
+       every card in the app, which is a design change and gets walked on its own
+       ([[color-system-policing]]). The head and the table supply the real inset, exactly as they
+       do on desktop, so the card wants none. */
     return '<div class="card' + (key && !isOpen ? ' collapsed' : '')
-      + '" style="padding:0;container-type:inline-size;margin-top:' + (first ? '0' : '16') + 'px;">'
+      + '" style="padding:0!important;container-type:inline-size;margin-top:' + (first ? '0' : '16') + 'px;">'
       + head + (isOpen ? table : '') + '</div>';
   },
   routePanelHTML() {
@@ -3242,10 +3253,22 @@ S.InventoryProducts = {
        error state the rest of the app cannot represent), but the message now says WHERE they are. */
     const archived = new Set(this.products().filter(p => p.active === false)
       .map(p => (p.name || '').trim().toLowerCase()));
-    let dup = 0, dupArchived = 0, nameless = 0;
+    /* ⛔⛔ THIS MESSAGE AND THE REVIEW SCREEN MUST SAY THE SAME THING ABOUT THE SAME ROW (Kyle,
+       2026-08-15, found by walking the pushed build). The review told the operator SUBTOTAL DRAFT
+       was "a heading in your file, not a product" and Delivery Charge was "a charge on your
+       invoice"; one press later this message called both of them *"not added, no category set"* —
+       the wording the review had just replaced, reporting a settled fact as an unanswered
+       question. Same defect the other way round on duplicates: the review separates "already in
+       your list" from "repeated in this file" and this folded both into "duplicate names".
+       ⭐ THE FIX IS TO ASK THE SAME QUESTIONS, not to copy the sentences: the two furniture/charge
+       tests below are the ones `_routeSummary` uses, and `mine` is the same before-this-run set it
+       splits duplicates on. Reword either screen freely; they cannot disagree about WHICH bucket a
+       row is in, because there is one set of tests. */
+    const mine = new Set(taken);          // what the bar owned BEFORE this run started
+    let dup = 0, repeat = 0, dupArchived = 0, nameless = 0;
     // Rows the operator left on Skip, or whose value was never mapped to a category.
     // They are NOT imported and they are named in the result (Kyle, 2026-08-03).
-    const unplaceable = [];
+    const unplaceable = [], furniture = [], charges = [];
     rows.forEach(row => {
       const name = val(row, 'name');
       if (!name) { nameless++; return; }
@@ -3258,9 +3281,22 @@ S.InventoryProducts = {
          thrown away as a duplicate of something that was never imported. */
       const cat = ('_category' in row) ? String(row._category || '').trim() : cardCat;
       const spec = cat ? this.FORM_SPEC[cat] : null;
-      if (!spec) { unplaceable.push(name); return; }
+      if (!spec) {
+        // The same three-way split the review draws, so the two screens name a row identically.
+        if (this._isFurnitureRow(row)) furniture.push(name);
+        else if (this._isChargeRow(row)) charges.push(name);
+        else unplaceable.push(name);
+        return;
+      }
       const nameKey = name.toLowerCase();
-      if (taken.has(nameKey)) { if (archived.has(nameKey)) dupArchived++; else dup++; return; }
+      // ⚠ `mine` is consulted BEFORE `taken` grows, so a name this file repeats reads as a repeat
+      // rather than as something the bar already carried. Same split, same order, as the review.
+      if (taken.has(nameKey)) {
+        if (archived.has(nameKey)) dupArchived++;
+        else if (mine.has(nameKey)) dup++;
+        else repeat++;
+        return;
+      }
       taken.add(nameKey);
       // nonNeg here too: a `-750ml` credit line gave -25.4 oz, a NEGATIVE pour cost, and the row
       // still read Complete and rendered GREEN (the row-colour class keys off the sign).
@@ -3361,9 +3397,20 @@ S.InventoryProducts = {
        duplicate and nothing else. An absolute claim may only fire when the other buckets are empty. */
     const buckets = () => {
       const b = [];
-      if (dup) b.push(dup + ' duplicate name' + (dup === 1 ? '' : 's') + ' skipped');
-      if (dupArchived) b.push(dupArchived + ' already exist' + (dupArchived === 1 ? 's' : '') + ' but ' + (dupArchived === 1 ? 'is' : 'are') + ' hidden (see the Inactive tab)');
-      if (nameless) b.push(nameless + ' row' + (nameless === 1 ? '' : 's') + ' skipped with no product name');
+      /* ⭐⭐ ONE VOCABULARY, TWO SCREENS. `_ROUTE_NOT_IN_NOUN` is the table the review's Not Going
+         In head already counts with, so the words here are not merely CHOSEN to match it, they ARE
+         it. Reword a bucket once and both screens move together; there is no second spelling to
+         keep in step, which is what let these two drift in the first place. */
+      const noun = (k, n) => {
+        const w = this._ROUTE_NOT_IN_NOUN[k] || ['row', 'rows'];
+        return n + ' ' + (n === 1 ? w[0] : w[1]);
+      };
+      if (dup) b.push(noun('dup', dup));
+      if (repeat) b.push(noun('repeat', repeat));
+      // ⚠ The tab pointer stays. A hidden namesake is a dead end, and archive-then-reimport is the
+      // app's own documented recovery path, so the one thing this sentence owes them is WHERE it is.
+      if (dupArchived) b.push(noun('dupArchived', dupArchived) + ' (see the Inactive tab)');
+      if (nameless) b.push(noun('nameless', nameless) + ', skipped');
       /* ⚠ NAMED, not counted. Every other bucket here is a count because the operator can
          find those rows again in their own file. An unplaceable row is different: it was
          dropped on a decision the operator made on the mapping screen, and a bare "9 rows
@@ -3374,19 +3421,28 @@ S.InventoryProducts = {
          row list told the operator "House Vodka not imported" while House Vodka was sitting
          in their list — true about a row, false about their bar, and the only version they
          can act on is the one about their bar. Drop any name that did come in. */
-      const gone = unplaceable.filter(n =>
+      const notIn = list => list.filter(n =>
         !imported.some(p => (p.name || '').trim().toLowerCase() === n.trim().toLowerCase()));
-      if (gone.length) {
-        const shown = gone.slice(0, 5);
-        b.push(gone.length + ' not added, no category set: ' + shown.join(', ')
-          + (gone.length > shown.length ? ' and ' + (gone.length - shown.length) + ' more' : ''));
-      }
+      const named = list => {
+        const shown = list.slice(0, 5);
+        return shown.join(', ') + (list.length > shown.length ? ' and ' + (list.length - shown.length) + ' more' : '');
+      };
+      /* ⚠ THREE SENTENCES, NOT ONE, because they are three different facts and only ONE of them is
+         a question. A heading row and a charge are settled: nothing is owed and nothing is wrong.
+         A row with no category is the operator's to answer, which is why it keeps the wording that
+         says so. Folding them together is what made this message contradict the review. */
+      const goneFurn = notIn(furniture), goneChg = notIn(charges), goneUnp = notIn(unplaceable);
+      if (goneFurn.length) b.push(noun('furniture', goneFurn.length) + ': ' + named(goneFurn));
+      if (goneChg.length) b.push(noun('charge', goneChg.length) + ': ' + named(goneChg));
+      if (goneUnp.length) b.push(goneUnp.length + ' not added, no category set: ' + named(goneUnp));
       return b;
     };
     if (!imported.length) {
       const b = buckets();
-      const head = (dup || dupArchived) && !nameless ? 'No new products added.'
-        : nameless && !dup && !dupArchived ? 'No rows with a product name were found.'
+      // ⚠ `repeat` joins its siblings here too. It is a duplicate for the purpose of this headline,
+      // and leaving it out would let a file of nothing but repeats print the wrong absolute claim.
+      const head = (dup || repeat || dupArchived) && !nameless ? 'No new products added.'
+        : nameless && !dup && !repeat && !dupArchived ? 'No rows with a product name were found.'
         : b.length ? 'No new products added.'
         : 'No rows with a product name were found.';
       note(head + (b.length ? ' ' + b.join('. ') + '.' : ''));
