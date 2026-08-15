@@ -239,6 +239,7 @@ S.InventorySpotCheck = {
     this._resumedAtOpen = !!(this.draft && this.draft.lines && this.draft.lines.length);
     this._restoreTouched();
     this.posMode = 'manual';
+    this._posMsg = null;        // a fill report belongs to one visit, like the importer itself
     this.renderMain();
     const pend = App._pendingInvestigation;
     if (pend && pend.spotCheckId) {
@@ -425,11 +426,20 @@ S.InventorySpotCheck = {
     // POS sold: type on each line, or reveal the importer for this register's report.
     const posToggle = '<button type="button" class="btn btn-ghost btn-sm sp-posmode" data-mode="' + (this.posMode === 'import' ? 'manual' : 'import') + '">' + (this.posMode === 'import' ? 'Hide Importer' : 'Import POS Report') + '</button>';
     const posCard = '<div class="card no-print">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+      + '<div id="sp-pos-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;'
+        + (this.posMode === 'import' ? 'margin-bottom:14px;' : '') + '">'
       + '<div style="font-size:12px;color:var(--t3);line-height:1.6;flex:1;min-width:200px;">Enter the POS sold on each product manually, or import this register\'s report to fill them in.</div>'
       + posToggle + '</div>'
-      + (this.posMode === 'import' ? '<div style="margin-top:14px;"><div id="sp-pos-csv"></div><div id="sp-pos-result"></div></div>' : '')
-      + '</div>';
+      + (this.posMode === 'import' ? '<div id="sp-pos-csv"></div>' : '')
+      + '</div>'
+      /* ⛔ THE MAPPER'S BUTTONS LIVE OUTSIDE THE CARD (Kyle, 2026-08-15). `CSVMapper` renders no
+         action row of its own once it is given an `actionsEl`, so Fill POS Sold and Cancel land
+         here — a sibling AFTER the card closes — which is where Add Products has always put them.
+         ⚠ AND THE RESULT LINE IS A PERMANENT SLOT NOW. It used to live inside the import-only
+         block, so closing the importer destroyed the very sentence that says what the import did.
+         It renders from `_posMsg`, which is state, so a re-render carries it. */
+      + (this.posMode === 'import' ? '<div id="sp-pos-actions" class="no-print" style="margin:16px 0 0;"></div>' : '')
+      + '<div id="sp-pos-result">' + (this._posMsg || '') + '</div>';
 
     const historyRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Take Spot Check</div>'
@@ -451,7 +461,7 @@ S.InventorySpotCheck = {
          pre-shift count, and it is offered rather than hidden behind a localStorage draft they
          had no way to know about. "Finish Spot Check" says what it does: it is the door into
          history, and it refuses to open on a half-counted check. */
-      + '<div style="margin-top:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<div id="sp-finish-row" style="margin-top:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary" id="sp-save">' + (this._openWasComplete ? 'Save Changes' : 'Finish Spot Check') + '</button>'
         /* ⚠ NO "Save for Later" WHILE CORRECTING A FINISHED CHECK. It would set the record back to
            in_progress, which silently pulls a real check out of history AND out of the audit's
@@ -539,10 +549,12 @@ S.InventorySpotCheck = {
       if (ev.target.closest('#sp-resume')) { this.container.querySelector('.alert-bar')?.remove(); return; }
       // ⚠ AND IT STOPS BEING A RESUME. Without this an operator who starts over and then counts a
       // fresh product gets the banner back for the check they just discarded.
-      if (ev.target.closest('#sp-discard')) { this.clearDraft(); this._resumedAtOpen = false; this.renderMain(); return; }
+      if (ev.target.closest('#sp-discard')) { this.clearDraft(); this._resumedAtOpen = false; this._posMsg = null; this.renderMain(); return; }
       if (ev.target.closest('#sp-history')) { App.pushView(() => this.renderHistory()); return; }
       const posSeg = ev.target.closest('.sp-posmode');
-      if (posSeg) { this.syncDraft(); this.posMode = posSeg.dataset.mode; this.renderMain(); return; }
+      // Opening the importer starts a NEW import, so the last one's report goes. Hiding it keeps
+      // the report, because the fill it describes is still on the lines below.
+      if (posSeg) { this.syncDraft(); this.posMode = posSeg.dataset.mode; if (this.posMode === 'import') this._posMsg = null; this.renderMain(); return; }
     };
   },
 
@@ -776,6 +788,24 @@ S.InventorySpotCheck = {
         { key: 'sold',    label: 'Sold',    required: true, match: ['item qty', 'qty sold', 'quantity sold', 'units sold', 'sold qty', 'number sold', 'sold', 'pours', 'qty', 'quantity', 'units'] }
       ],
       confirmLabel: 'Fill POS Sold',
+      // Fill POS Sold / Cancel render into the row below the card, never inside it.
+      actionsEl: '#sp-pos-actions',
+      /* ⛔ THE MAPPING SCREEN GETS THE PAGE. Kyle, walking this door 2026-08-15: *"the header text
+         and hide importer button are still in card... while the mapping page is open the finish
+         spot check and save for later buttons should be hidden"*. Both rows are about starting or
+         finishing something, and neither is what the operator is doing while matching columns.
+         ⚠ HIDDEN, NOT RE-RENDERED: `onState` fires from INSIDE `CSVMapper.mount`, so a re-render
+         here rebuilds `#sp-pos-csv` and throws away the file just dropped.
+         ⚠ BOTH COME BACK AS `flex`, NEVER `''` — each is an inline flex row, and a bare reset drops
+         the layout (the lead and the toggle would stop sharing a line). Cancel re-mounts the drop
+         state and fires 'drop', which is the path back. */
+      onState: state => {
+        const map = (state === 'map');
+        [['sp-pos-head', 'flex'], ['sp-finish-row', 'flex']].forEach(([id, shown]) => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = map ? 'none' : shown;
+        });
+      },
       onComplete: rows => this.applyPosImport(rows)
     });
   },
@@ -853,8 +883,15 @@ S.InventorySpotCheck = {
     });
     this.recalcTotal();
     this.syncDraft();
-    const res = document.getElementById('sp-pos-result');
-    if (res) {
+    /* ⛔ THE IMPORTER IS FINISHED, SO IT CLOSES ITSELF (Kyle, 2026-08-15): *"the mapping screen
+       should close and it should revert back to a closed drop box card with only the text and
+       import button showing"*. A re-render is safe HERE and nowhere else in this flow —
+       `onComplete` runs after the mapper is done with the rows, and `csv-mapper`'s own `finally`
+       only touches `_importing` and a button that a re-render has already detached.
+       ⚠ THE DRAFT IS SYNCED ABOVE, BEFORE THE RE-RENDER, AND THE ORDER IS THE WHOLE SAFETY
+       ARGUMENT: the fill is written into the on-screen Sold boxes, and `renderMain` rebuilds every
+       line from the draft. Sync after, and the re-render throws the fill away. */
+    {
       /* `filled` counts PRODUCTS now. It used to increment inside the row loop, so a two-row file
          for one product reported "Filled POS sold for 2 products" — the reading that hid the
          overwrite above. And every way a row could be dropped was silent. */
@@ -880,8 +917,10 @@ S.InventorySpotCheck = {
       if (badFig.length) notes.push(badFig.length + ' with no readable sold figure: ' + listOf(badFig));
       if (negNames.length) notes.push(negNames.length + ' where refunds came to more than sales: ' + listOf(negNames));
       const tail = notes.length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes.join(' · ') + ')</span>' : '';
-      res.innerHTML = filled > 0
-        ? '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Filled POS sold for ' + filled + ' product' + (filled === 1 ? '' : 's') + '. Review the variance below, then save.' + tail + '</div>'
+      /* ⭐ NORMAL GREY, NOT THE GOLD MONEY ACCENT. Kyle: *"in normal grey text"*. Gold is the one
+         money hero in this app; a status line about a fill that landed is not it. */
+      this._posMsg = filled > 0
+        ? '<div style="font-size:13px;color:var(--t3);margin-top:12px;">Filled POS sold for ' + filled + ' product' + (filled === 1 ? '' : 's') + '. Review the variance below, then save.' + tail + '</div>'
         /* ⚠ THE ZERO-FILL HEADLINE MUST NAME THE CAUSE THAT ACTUALLY APPLIES, and an absolute claim
            may only fire when the other buckets are empty. With the report inverted the causes are
            simpler: either the file has no line for anything on this check (wrong report, wrong
@@ -895,6 +934,12 @@ S.InventorySpotCheck = {
               ? 'Nothing filled.'
               : 'Nothing filled. Add the products you are checking first, then drop the report.')
           + tail + '</div>';
+      /* ⛔ ONLY A LANDED FILL CLOSES IT. With nothing filled the operator's next move is to map a
+         different column and press again, so the mapper and the file they dropped have to stay —
+         closing here would make them re-drop the file to fix a column choice. The message is
+         written into the slot in place, which is why that slot is rendered unconditionally. */
+      if (filled > 0) { this.posMode = 'manual'; this.renderMain(); }
+      else { const res = document.getElementById('sp-pos-result'); if (res) res.innerHTML = this._posMsg; }
     }
   },
 
