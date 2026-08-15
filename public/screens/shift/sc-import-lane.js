@@ -236,6 +236,7 @@ S.ShiftLane = {
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your weekly POS sales-by-day report here',
+      subject: 'Sales',
       dropSub: 'Needs a Date column plus your sales (bar and/or food). Covers optional. One row per day.',
       fields: PosIngest.FIELDS.sales,
       confirmLabel: 'Import',
@@ -1060,6 +1061,7 @@ S.ShiftLane = {
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS cash or drawer report here',
+      subject: 'Cash',
       dropSub: 'Needs a Date column plus Over/Short, or Expected and Counted cash. Register and cashier matched if present.',
       fields: PosIngest.FIELDS.cash,
       confirmLabel: 'Import',

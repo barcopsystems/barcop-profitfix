@@ -717,6 +717,7 @@ S.ShiftVoidComp = {
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
       dropTitle: 'Drop your POS voids and comps export here',
+      subject: 'Voids and Comps',
       dropSub: 'Needs an Amount column. Void-or-comp, item, server, reason, and date are matched if your export has them.',
       actionsEl: '#vc-imp-actions',
       fields: PosIngest.FIELDS.voids,
