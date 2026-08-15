@@ -433,8 +433,8 @@ S.InventoryVarianceReport = {
 
     let importBlock;
     if (!this.posRows) {
-      importBlock = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Upload Full POS Sales</span>' + App.freqTag('As needed') + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin:-4px 0 12px;">Breaks your variance down to every product, recipe-level.</div>'
+      importBlock = '<div class="card form-card"><div class="card-title" id="vr-imp-head" style="display:flex;align-items:center;gap:10px;"><span>Upload Full POS Sales</span>' + App.freqTag('As needed') + '</div>'
+        + '<div id="vr-imp-lead" style="font-size:11px;color:var(--t3);margin:-4px 0 12px;">Breaks your variance down to every product, recipe-level.</div>'
         + '<div id="vr-import"></div></div>'
         + '<div id="vr-import-actions"></div>';
     } else {
@@ -485,6 +485,32 @@ S.InventoryVarianceReport = {
         dropTitle: 'Drop your ' + this.fmtLong(period.startC.date) + ' to ' + this.fmtLong(period.endC.date) + ' POS sales file here',
         subject: this.fmtLong(period.startC.date) + ' to ' + this.fmtLong(period.endC.date),
         dropSub: 'Needs columns for product name, quantity sold, and sales amount.',
+        /* ⛔ THE MAPPING SCREEN GETS THE CARD TO ITSELF. Kyle, walking this door 2026-08-15: it
+           *"opens mapping in the drop box wrapper with Upload full header... and breaks your
+           variance down... text still in the card"*. Both lines instruct the step the operator has
+           just finished, and on the mapping screen they sit directly above MAP YOUR COLUMNS.
+           ⭐ ADD PRODUCTS IS THE REFERENCE AND ITS SOURCE STATES THE REASON: `importPanelHTML` is a
+           bare form-card with no heading and no lead, because CSVMapper already prints the drop
+           title, the requirements line and its own heading, so anything put over the top says the
+           same thing twice. They stay in the DROP state, where they name the section under Dig
+           Deeper and carry the As-needed cadence Add Products has no equivalent of.
+           ⚠ HIDDEN, NOT RE-RENDERED. `onState` fires from INSIDE `CSVMapper.mount`, so a re-render
+           here rebuilds `#vr-import` and throws away the file just dropped. ev-regulars solves it
+           the same way, by toggling `display` on its own wrappers, so this follows that precedent
+           rather than inventing a second mechanism.
+           ⚠ AND THE HEAD COMES BACK AS `flex`, NEVER `''`. Its inline `display:flex` is what gives
+           the AS NEEDED tag its 10px gap and its vertical centring against the title; a bare reset
+           removes the inline display and the tag re-flows. Cancel re-mounts and fires 'drop'.
+           ⚠ TWO IDS, NOT ONE WRAPPER: `style.css` styles the head as `.form-card > .card-title`, a
+           DIRECT-CHILD selector, so wrapping the pair to toggle them together would strip the head
+           band's margins and change the drop state nobody complained about. */
+        onState: state => {
+          const map = (state === 'map');
+          [['vr-imp-head', 'flex'], ['vr-imp-lead', '']].forEach(([id, shown]) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = map ? 'none' : shown;
+          });
+        },
         fields: [
           /* ⚠⚠ THESE THREE LISTS HAD DRIFTED FROM `PosIngest.FIELDS.pmix`, WHICH READS THE SAME
              POS REPORTS CORRECTLY. Three separate mis-binds, all measured on real header rows:
