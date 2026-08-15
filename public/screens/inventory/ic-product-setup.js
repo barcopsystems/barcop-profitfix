@@ -3033,11 +3033,12 @@ S.InventoryProducts = {
        and now read as one; the two buttons that ACT on it sit under the box rather than inside it,
        which is the same shape the import confirm shell uses and the reason its own buttons live in
        `actionsEl` ([[lessons-paid-for]] #106 — the reference's layout, not just its mechanism).
-       ⚠ `.card` gives the border, the radius and the 20px padding; only the FILL is overridden, to
-       the same #0D181E the importer panel above it now uses so the two steps of one job match.
+       ⚠ A PLAIN `.card` — border, radius, 20px padding, `--surface` fill. It briefly carried a
+       #0D181E fill to match the importer panel; Kyle looked at all three screens and sent the
+       colour back while keeping the box.
        ⚠ THE HEADING STAYS `.sh ic-head`, NOT `.card-title`. Inside a card the usual head is the
        band, and the band is the exact thing Kyle had removed from this heading an hour earlier. */
-    return '<div class="card ip-route-box">'
+    return '<div class="card">'
       + this._sectionHead('Your ' + rows.length + ' Product' + (rows.length === 1 ? '' : 's'), lead)
       + body
       + vendorBlock
