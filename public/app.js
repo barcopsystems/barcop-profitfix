@@ -8301,7 +8301,20 @@ const App = {
       + '</div>';
 
     const cancel = () => { App.closeModal('shelf-disp'); if (typeof opts.onCancel === 'function') opts.onCancel(); };
-    const overlay = App.openModal(html, { id: 'shelf-disp', maxWidth: 660, onClose: cancel });
+    /* ⛔⛔ 780, NOT 660, AND IT IS THE TABLE THAT SETS IT (Kyle, 2026-08-15: *"why are they in mobile
+       view?"*). `.row-list` stacks on a CONTAINER query, `@container (max-width:700px)`, measured
+       against the card it sits in rather than the viewport, so that a sidebar can never push it
+       into a sideways scroll. I brought that pattern over from the full-width Add Products review
+       without asking what the container is worth INSIDE a modal: at 660 the section card measures
+       630, which is under 700, so it stacked on every screen ever made.
+       ⚠ MEASURED ON THE LIVE BUILD, not reasoned: 660 gives 630 and stacks · 720 gives 690 and
+       still stacks · 780 gives 750 and lays out as a table, with 50px of headroom over the
+       breakpoint. And the mobile behaviour the container query exists for is untouched, because a
+       phone modal is viewport-width, not maxWidth: 375 gives a 313px card and still stacks.
+       ⛔ SO THIS NUMBER IS TIED TO `@container (max-width:700px)` IN style.css. Retune that and this
+       has to move with it, which is why `verify-shelf-disposition` X22 reads both and does the
+       arithmetic rather than trusting either. */
+    const overlay = App.openModal(html, { id: 'shelf-disp', maxWidth: 780, onClose: cancel });
     const bodyEl = overlay.querySelector('#disp-body');
     const choiceEl = overlay.querySelector('#disp-choice');
     const destWrap = overlay.querySelector('#disp-dest-wrap');
