@@ -1910,6 +1910,7 @@ S.HubOperatingExpenses = {
     CSVMapper.mount(el, {
       // ⚠ "expenses" named half of what this door takes; a bank statement carries both.
       dropTitle: 'Drop your bank or card statement here',
+      subject: 'Money Out',
       /* ⛔ A7 — THE "import as Other" SENTENCE IS GONE, AND IT HAD BEEN FALSE SINCE ITEM 15. That
          fallback was deleted on purpose: 'Other' is a category the operator PICKS, which Books
          prints and Schedule C deducts on 27a, so a row Bar Cop could not read and a row they chose
