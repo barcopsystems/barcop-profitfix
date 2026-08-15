@@ -8277,8 +8277,13 @@ const App = {
       + '</div>'
       // The whole batch interaction, in one row: tick rows, say what happened, Apply.
       + '<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
+        /* ⛔ THE LABEL SAYS WHAT IT REACHES (Kyle, 2026-08-15). "Select all" beside a list that is
+           part work and part already answered reads as "all of them", which is what it used to do
+           and what he caught: answer five, tick Select all to sweep up the rest, and the five you
+           had already filed came back with it. It only ever touches the work list now, and the
+           words say so rather than leaving the operator to find out. */
         + '<label style="display:flex;align-items:center;gap:6px;margin:0;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap;">'
-        + '<input type="checkbox" class="bc-check" id="disp-all"/> Select all</label>'
+        + '<input type="checkbox" class="bc-check" id="disp-all"/> Select all still to answer</label>'
         + '<div class="f" style="max-width:215px;margin:0;flex:1 1 170px;"><select id="disp-choice">'
         + '<option value="">What happened...</option>'
         + CHOICES.map(c => '<option value="' + c.v + '">' + esc(c.label) + '</option>').join('')
@@ -8340,7 +8345,15 @@ const App = {
       goBtn.disabled = left > 0;
       // The label says why it is disabled, so the operator never has to hunt for what is left.
       goBtn.textContent = left ? actionLabel + ' (' + left + ' to answer)' : actionLabel;
-      if (allEl) allEl.checked = stock.length > 0 && k === stock.length;
+      /* ⚠ THE BOX READS THE WORK LIST, not the shelf. Comparing against every product meant it
+         could never show as checked once anything had been filed, which is the same confusion from
+         the other end. And with nothing left to answer there is nothing for it to reach, so it goes
+         out of service rather than sitting there implying it would do something. */
+      if (allEl) {
+        const open = openRows();
+        allEl.checked = open.length > 0 && open.every(s => checked[s.product_id]);
+        allEl.disabled = open.length === 0;
+      }
     };
 
     const draw = () => {
@@ -8368,8 +8381,16 @@ const App = {
       if (cb.checked) checked[cb.value] = true; else delete checked[cb.value];
       syncControls();
     });
+    /* ⛔⛔ IT REACHES THE WORK LIST ONLY. It used to walk every product on the shelf, so ticking it
+       after filing a group pulled those rows back in and the next Apply would silently overwrite an
+       answer the operator had already given, in a section they had stopped looking at. That is the
+       same shape as the bulk control that once took a whole import ([[the-loop]]: a control that
+       reaches past what the operator is working on is not thorough, it is invisible).
+       ⚠ UNTICKING clears everything, including a row the operator ticked in a filed section to
+       correct it. "None selected" has to mean none, or the next Apply carries a passenger. */
     if (allEl) allEl.addEventListener('change', () => {
-      stock.forEach(s => { if (allEl.checked) checked[s.product_id] = true; else delete checked[s.product_id]; });
+      if (allEl.checked) openRows().forEach(s => { checked[s.product_id] = true; });
+      else stock.forEach(s => { delete checked[s.product_id]; });
       draw();
     });
     choiceEl.addEventListener('change', syncControls);
