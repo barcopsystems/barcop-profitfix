@@ -15,19 +15,19 @@
      MEASURED live across the Hub, Week in Review, Workflow, Books, Order Sheet and Menu
      Engineering: outer 1320, inner 1264, left edge 164 on all six. */
   --page-w:    1320px;
-  --bg:        #070E15;
+  --bg:        #0C1216;
   /* ⛔⛔ CARD FILL = PAGE FILL (2026-08-08, Kyle's call, reversible by one value).
      It was #08131A against a #070E15 page — a difference of 1, 5, 5, which is barely a fill at all.
      The card is defined by its BORDER and its header band now, and the tone it used to spend on the
      body buys a header that previously did nothing.
      ⚠ MEASURED FIRST: every rule filled with --surface carries its own border, so nothing loses its
      edge when the fill drops. Revert = put #08131A back here, one value, no other change. */
-  --surface:   #070E15;
+  --surface:   #0F161B;
   /* The card's header band, which is the ONLY thing that used to be --surface and must NOT follow
      it down — the whole point of the change is that the header becomes visible against the body. */
-  --card-head: #08131A;
-  --input:     #070E15;
-  --panel:     #08131A;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
+  --card-head: #0F161B;
+  --input:     #0C1216;
+  --panel:     #0F161B;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
   /* ⭐⭐ THE DATA ROW FILL, AND NOW IT REALLY IS THE ONLY ONE (Kyle, 2026-08-14: *"every data row
      that uses this color i need it consolidated into one root color"*).
      Un-box language: rows sit just lighter than --surface so they lift off the header band, which
@@ -41,7 +41,7 @@
      ⚠ CHANGE THIS LINE AND EVERY DATA ROW IN THE APP MOVES. That is the point of it. Panels, boxes,
      plan options, tiles and progress tracks are a DIFFERENT job and read --gold-tint, which holds
      the same value today and can be moved on its own. */
-  --zone:      #0D181E;
+  --zone:      #131B21;
   /* ⭐⭐ THE STAT BOX FILL (Kyle, 2026-08-14): *"any box that border wraps stat numbers only... no
      header."* Those boxes are plain `.card`s, so they took `--surface` and could not be retuned
      without dragging every real card with them. This is the token that splits them.
@@ -49,7 +49,7 @@
      screen — but an alias would mean --stat follows --surface, which is exactly the coupling this
      exists to break. Change this line and every headerless stat box in the app moves; `.card`
      stays where it is. */
-  --stat:      #070E15;
+  --stat:      #0C1216;
   --c3:        #111E26;                /* 3rd navy: menu borders/accents + secondary (icon) button backgrounds in the chrome */
   --c4:        #1E2B34;                /* 4th navy: accent splash — active section pills, active sidebar row, icon-button hover */
   --hover:     rgba(255,255,255,0.02);
@@ -58,7 +58,7 @@
   --gold:      #DBAB46;
   --gold-h:    #C29638;
   --gold-bg:   rgba(219,171,70,0.10);
-  --gold-tint: #0D181E;                    /* selection / panel fill (heads-up boxes, banners, playbook + profit-fix active boxes). Opaque so it reads identically on any background. */
+  --gold-tint: #131B21;                    /* selection / panel fill (heads-up boxes, banners, playbook + profit-fix active boxes). Opaque so it reads identically on any background. */
   --gold-tint-bord: var(--b-edge);         /* selection border = the standard card border. */
   /* THE OPEN COCKPIT STEP, and it is its OWN token on purpose. Every one of the eight cockpit step
      rows used to read --gold-tint, which is shared with sixty other panel fills (heads-up boxes,
@@ -89,13 +89,13 @@
   --w:         #ffffff;
   --t1:        rgba(200,216,232,0.94);
   --t2:        rgba(200,216,232,0.66);
-  --t3:        rgba(255,255,255,0.38);
-  --t4:        rgba(255,255,255,0.22);
+  --t3:        rgba(255,255,255,0.45);
+  --t4:        rgba(255,255,255,0.25);
   --b1:        rgba(255,255,255,0.15);
-  --b2:        #14222A;                /* Divider/separator lines — same as the card border (--b-edge). */
+  --b2:        #151E25;                /* Divider/separator lines — same as the card border (--b-edge). */
   --track:     rgba(255,255,255,0.06); /* The old --b2: faint fill behind progress bars / pips (NOT a divider). */
-  --b-edge:    #14222A;                /* Card / outer + chrome border color (border only; --c3 backgrounds stay #111E26) */
-  --row-div:   #1B262B;                /* Divider line between #0D181E data rows — opaque so it reads identically no matter what sits behind it (data-card tables + .ing-tbl batch-builder line tables) */
+  --b-edge:    #151E25;                /* Card / outer + chrome border color (border only; --c3 backgrounds stay #111E26) */
+  --row-div:   #151E25;                /* Divider line between #0D181E data rows — opaque so it reads identically no matter what sits behind it (data-card tables + .ing-tbl batch-builder line tables) */
 
   --r:  4px;
   --r2: 3px;
