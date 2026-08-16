@@ -821,7 +821,7 @@ S.RevenueMenuEngineering = {
          file whose names were the whole problem ([[the-loop]] #24). */
       const nRet = fl.nRetired || 0, nAmb = fl.nAmbiguous || 0;
       const nameTrouble = nSkip + nRet + nAmb;
-      flash = '<div style="font-size:13px;margin-top:12px;color:' + (fl.updated ? 'var(--t2)' : 'var(--red)') + ';">'
+      flash = '<div id="me-imp-result" style="font-size:13px;margin-top:12px;color:' + (fl.updated ? 'var(--t2)' : 'var(--red)') + ';">'
         + (fl.failed ? 'Save failed. Try the import again.'
            : fl.updated ? 'Updated units sold on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's')
              + (fl.merged ? ' (' + fl.merged + ' extra row' + (fl.merged === 1 ? '' : 's') + ' combined into item totals)' : '') + '.'
@@ -912,8 +912,10 @@ S.RevenueMenuEngineering = {
         const map = (state === 'map');
         const head = document.getElementById('me-cov-head');
         if (head) head.style.display = map ? 'none' : 'flex';
-        const board = document.getElementById('me-board-region');
-        if (board) board.style.display = map ? 'none' : '';
+        ['me-board-region', 'me-imp-result'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = map ? 'none' : '';
+        });
         const impHead = document.getElementById('me-imp-head');
         if (impHead) impHead.style.display = map ? '' : 'none';
       },
