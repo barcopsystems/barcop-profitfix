@@ -439,9 +439,13 @@ S.RevenueMenuItems = {
        shown, so it cannot greet them again on a later visit. Same shape as Add Products. */
     const _flash = this._importFlash; this._importFlash = null;
     const _flashHtml = _flash
-      ? '<div style="font-size:13px;color:var(--gold);font-weight:700;margin:0 0 14px;">' + esc(_flash) + '</div>'
+      ? '<div style="font-size:13px;color:var(--t2);margin:0 0 12px;">' + esc(_flash) + '</div>'
       : '';
-    this.container.innerHTML = '<div class="screen">' + tilesBlock + _flashHtml
+    /* ⛔ FIRST ON THE PAGE, WHICH IS WHERE ADD PRODUCTS PUTS IT (Kyle, 2026-08-16: *"land above
+       the dishes card in grey text.. same place and text as add products"*). It used to sit BELOW
+       the add tiles, so the one line telling the operator what their file did was underneath three
+       buttons offering to add something else. */
+    this.container.innerHTML = '<div class="screen">' + _flashHtml + tilesBlock
       + (this._importOpen ? '' : tabsBlock) + lower + archivedSection + '</div>';
     this.wireLanding();
   },
@@ -2195,7 +2199,9 @@ S.RevenueMenuItems = {
        actually runs, which `node --check` cannot see ([[the-loop]] #72). */
     const quiet = !!opts.reviewed;
     const parts = [];
-    if (added)   parts.push('imported ' + added + ' new item' + (added === 1 ? '' : 's'));
+    // ⚠ "added", NOT "imported": the file was imported two screens ago and the button they pressed
+    // said Add N Items. Same rule Add Products and the staff roster already follow.
+    if (added)   parts.push('added ' + added + ' item' + (added === 1 ? '' : 's'));
     if (updated) parts.push('refreshed ' + updated + ' existing');
     // A skipped row is not a silent drop — the operator must be told their file mentioned items
     // that are off the live menu, or the counts look wrong and they re-drop the file.
@@ -2213,7 +2219,10 @@ S.RevenueMenuItems = {
        had to stay open to show it, and why the operator never saw their own menu afterwards. Same
        one-shot flash Add Products uses (`_importMsg`, ic-product-setup:615). */
     this._importFlash = parts.join(' and ').replace(/^./, c => c.toUpperCase())
-      + '. Edit any item to set its price, cost, or recipe.'
+      /* ⚠ NO INSTRUCTION SENTENCE. Add Products' result line is a headline and nothing else, and
+         "edit any item to set its price, cost, or recipe" is how-it-works copy, which belongs in
+         the nav "i" ([[help-model]]) rather than on the page after a successful write. */
+      + '.'
       + (!quiet && noCat ? ' Bar Cop files every item under a section, so fill the Category cells in and drop the file again to add '
         + (noCat === 1 ? 'that row' : 'those rows') + '.' : '')
       // ⚠ "each" COUNTS THE NAMES, not the rows ([[the-loop]] #86). One clashing name folds into
