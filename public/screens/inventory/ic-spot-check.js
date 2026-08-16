@@ -145,6 +145,12 @@ S.InventorySpotCheck = {
   _restoreTouched() { this._touched = {}; },
 
   syncDraft() {
+    /* ⭐ THE FUNNEL. Every path that changes what is on this check already syncs the draft — the
+       cell listener, the pre/post controls, adding a product, removing one — so putting the
+       visibility rule here reaches all of them through ONE call site instead of a hand-kept list
+       of four that a fifth path could quietly miss. It sits ABOVE the empty-state early return,
+       because emptying the last line is exactly when the buttons have to go. */
+    this._syncActions();
     const state = this.collectState();
     if (!state.lines.length && !state.location) { this.clearDraft(); return; }
     const started = (this.draft && this.draft.started_at) || new Date().toISOString();
@@ -431,7 +437,7 @@ S.InventorySpotCheck = {
       + '</div></div>';
 
     // POS sold: type on each line, or reveal the importer for this register's report.
-    const posToggle = '<button type="button" class="btn btn-ghost btn-sm sp-posmode" data-mode="' + (this.posMode === 'import' ? 'manual' : 'import') + '">' + (this.posMode === 'import' ? 'Hide Importer' : 'Import POS Report') + '</button>';
+    const posToggle = '<button type="button" id="sp-pos-toggle" class="btn btn-ghost btn-sm sp-posmode" data-mode="' + (this.posMode === 'import' ? 'manual' : 'import') + '">' + (this.posMode === 'import' ? 'Hide Importer' : 'Import POS Report') + '</button>';
     const posCard = '<div class="card no-print">'
       + '<div id="sp-pos-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;'
         + (this.posMode === 'import' ? 'margin-bottom:14px;' : '') + '">'
@@ -468,16 +474,11 @@ S.InventorySpotCheck = {
          pre-shift count, and it is offered rather than hidden behind a localStorage draft they
          had no way to know about. "Finish Spot Check" says what it does: it is the door into
          history, and it refuses to open on a half-counted check. */
-      /* ⛔ AND THEY ONLY EXIST ONCE THERE IS A CHECK TO FINISH (Kyle, 2026-08-15): *"seeing a
-         finish and save for later button when there is not active spot check is a little
-         confusing... make those buttons show only after at least one product has been added"*.
-         ⭐ ONE RULE COVERS BOTH HALVES OF WHAT HE ASKED FOR. Saving clears the draft, so the lines
-         go and the buttons go with them — the after-the-save half needs no second mechanism and
-         therefore cannot drift from the first.
-         ⚠ KEYED ON THE RENDERED LINES, NOT ON `dft.lines.length`: a line whose product has since
-         been deleted renders as nothing, and a check with no visible product on it is not a check
-         the operator can finish. */
-      + (lineHtmls ? '<div id="sp-finish-row" style="margin-top:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      /* ⛔ WHICH OF THESE IS ON SCREEN IS DECIDED BY `_syncActions`, NOT HERE. The rule is a LIVE
+         one — a Sold figure typed into a cell fires no re-render — so it cannot live in markup
+         that only runs on a render. Rendering them unconditionally and letting one member put
+         them away keeps it a single rule instead of two that have to agree. */
+      + '<div id="sp-finish-row" style="margin-top:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary" id="sp-save">' + (this._openWasComplete ? 'Save Changes' : 'Finish Spot Check') + '</button>'
         /* ⚠ NO "Save for Later" WHILE CORRECTING A FINISHED CHECK. It would set the record back to
            in_progress, which silently pulls a real check out of history AND out of the audit's
@@ -485,10 +486,11 @@ S.InventorySpotCheck = {
            localStorage draft still holds the work if they walk away mid-correction. */
         + (this._openWasComplete ? '' : '<button class="btn btn-ghost" id="sp-save-later">Save for Later</button>')
         + '<span id="sp-save-msg" style="display:none;color:var(--red);font-size:12px;margin-left:4px;"></span>'
-      + '</div>' : '')
+      + '</div>'
       + '</div>';
     App.applyCollapsed(this.container);
     this.updateProductsTitle();
+    this._syncActions();
     this._onHistory = false;
 
     // Mount sliders for any restored lines.
@@ -719,6 +721,34 @@ S.InventorySpotCheck = {
     const lines = document.getElementById('sp-lines');
     if (t && lines) t.style.display = lines.children.length ? '' : 'none';
   },
+  /* ⛔⛔ WHICH CONTROLS BELONG ON THE PAGE, IN ONE PLACE (Kyle's sequence, 2026-08-15):
+     *"no product added.. no buttons and import gated.. product added only the save for later
+     button is shown and stays.. after either a pours sold is manually entered in a cell or a pos
+     file is dropped the finish spot check shows... the import is ungated after a post-shift count
+     is entered."*
+     ⭐ SAVE FOR LATER ARRIVES WITH THE FIRST PRODUCT AND STAYS, because from that moment there is
+     work worth keeping. FINISH waits for a Sold figure, because a check with nothing to compare
+     against cannot be finished — and the POS import is only one of the two ways that box gets
+     filled, the keyboard being the other. Both roads end here rather than at the importer.
+     ⚠ READ OFF THE PAGE, NOT OFF THE DRAFT. Typing into a cell deliberately does not re-render,
+     so the draft is a frame behind the operator; the cells are the truth.
+     ⚠ AND THE TOGGLE IS NEVER GATED WHILE THE IMPORTER IS OPEN — it reads "Hide Importer" then,
+     and gating it would strand the operator inside a mapper with no way to close it. */
+  _syncActions() {
+    const lines = [...this.container.querySelectorAll('.sp-line')];
+    const anyProduct = lines.length > 0;
+    const anySold = lines.some(l => String((l.querySelector('.sp-sold') || {}).value || '').trim() !== '');
+    const touched = this._touched || {};
+    const anyPost = lines.some(l => (touched[l.dataset.lid] || {}).post);
+    const set = (id, on, disp) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = on ? (disp || '') : 'none';
+    };
+    set('sp-finish-row', anyProduct, 'flex');
+    set('sp-save-later', anyProduct);
+    set('sp-save', anySold);
+    set('sp-pos-toggle', this.posMode === 'import' || anyPost);
+  },
   // Clear the red required-field highlights.
   clearMissing() {
     this.container.querySelectorAll('.f.field-missing').forEach(f => f.classList.remove('field-missing'));
@@ -818,10 +848,15 @@ S.InventorySpotCheck = {
          state and fires 'drop', which is the path back. */
       onState: state => {
         const map = (state === 'map');
-        [['sp-pos-head', 'flex'], ['sp-finish-row', 'flex']].forEach(([id, shown]) => {
-          const el = document.getElementById(id);
-          if (el) el.style.display = map ? 'none' : shown;
-        });
+        const head = document.getElementById('sp-pos-head');
+        if (head) head.style.display = map ? 'none' : 'flex';
+        const fin = document.getElementById('sp-finish-row');
+        if (fin) fin.style.display = 'none';
+        /* ⛔ AND THE WAY BACK IS THE SAME RULE, NOT A BLANKET REVEAL. Restoring the row to 'flex'
+           here would hand Finish Spot Check to a check that has nothing to compare against, which
+           is the thing `_syncActions` exists to prevent. Two rules about one row is how they end
+           up disagreeing, so there is one. */
+        if (!map) this._syncActions();
       },
       onComplete: rows => this.applyPosImport(rows)
     });
