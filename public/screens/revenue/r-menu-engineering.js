@@ -821,7 +821,7 @@ S.RevenueMenuEngineering = {
          file whose names were the whole problem ([[the-loop]] #24). */
       const nRet = fl.nRetired || 0, nAmb = fl.nAmbiguous || 0;
       const nameTrouble = nSkip + nRet + nAmb;
-      flash = '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + (fl.updated ? 'var(--gold)' : 'var(--red)') + ';">'
+      flash = '<div style="font-size:13px;margin-top:12px;color:' + (fl.updated ? 'var(--t2)' : 'var(--red)') + ';">'
         + (fl.failed ? 'Save failed. Try the import again.'
            : fl.updated ? 'Updated units sold on ' + fl.updated + ' item' + (fl.updated === 1 ? '' : 's')
              + (fl.merged ? ' (' + fl.merged + ' extra row' + (fl.merged === 1 ? '' : 's') + ' combined into item totals)' : '') + '.'

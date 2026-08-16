@@ -661,7 +661,7 @@ S.RevenueServerCheck = {
     // below are the display subset, so they can be shorter and must never drive a claim.
     // The operator backed out of the conflict prompt. Nothing was written, and saying so is the
     // whole point — silence here reads as "it worked".
-    if (fl.cancelled) return '<div style="font-size:13px;margin-top:12px;font-weight:700;color:var(--t2);">Import cancelled. Nothing was changed.</div>';
+    if (fl.cancelled) return '<div style="font-size:13px;margin-top:12px;color:var(--t2);">Import cancelled. Nothing was changed.</div>';
     const nSkip = fl.nSkipped || 0, nInc = fl.nIncomplete || 0, nUnd = fl.nUndated || 0;
     /* ⚠ `keptByHand` COUNTS AS "SOMETHING ELSE HAPPENED". Without it, a file of 5 already-logged
        rows plus 2 conflicts the operator chose to keep printed "All 5 rows were already logged" —
@@ -731,7 +731,7 @@ S.RevenueServerCheck = {
     else                head = 'No rows imported. Each row needs a server name Bar Cop can match, a date, covers, and sales.';
     const note = t => '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">' + t + '</div>';
     const list = a => a.slice(0, 8).map(esc).join(', ') + (a.length > 8 ? ', and ' + (a.length - 8) + ' more' : '');
-    return '<div style="font-size:13px;margin-top:12px;font-weight:700;color:' + ((fl.added && !fl.failed) ? 'var(--gold)' : (fl.dupCount && !fl.failed) ? 'var(--t2)' : 'var(--red)') + ';">' + head + '</div>'
+    return '<div style="font-size:13px;margin-top:12px;color:' + ((fl.added && !fl.failed) ? 'var(--t2)' : (fl.dupCount && !fl.failed) ? 'var(--t2)' : 'var(--red)') + ';">' + head + '</div>'
       + (fl.unmatched && fl.unmatched.length ? note('Not matched to your roster: ' + list(fl.unmatched) + '. Add them in the Staff Roster or rename to match.') : '')
       + (fl.incomplete && fl.incomplete.length ? note('Skipped, no covers or sales rung: ' + list(fl.incomplete) + '. These are on your roster, nothing to fix.') : '')
       /* The other half of the same fact. These servers DID import, from their other shifts, so naming
