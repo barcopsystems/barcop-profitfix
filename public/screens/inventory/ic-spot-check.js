@@ -1290,7 +1290,7 @@ S.InventorySpotCheck = {
       const invOpen = invList.some(i => i.status !== 'resolved');
       const invResolved = !invOpen && invList.some(i => i.status === 'resolved');
       const action = (it.product_id && (it.flagged || invOpen || invResolved))
-        ? '<button class="btn btn-ghost btn-sm sp-review" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '" style="' + (invResolved ? 'color:var(--green);' : 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);') + '">' + (invOpen ? 'Reviewing' : invResolved ? 'Resolved' : 'Review') + '</button>'
+        ? '<button class="btn btn-ghost btn-sm sp-review" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '" style="' + (invResolved ? 'color:var(--green);' : 'background:var(--gold-tint);') + '">' + (invOpen ? 'Reviewing' : invResolved ? 'Resolved' : 'Review') + '</button>'
         : '';
       // A product that was on the check but never counted is LABELLED, not printed as a row of
       // zeros. Same treatment as a skipped product in Count History.

@@ -127,8 +127,8 @@ S.InventoryReceiveDelivery = {
       + '<td class="rd-ext val" style="white-space:nowrap;">$0.00</td>'
       + '<td><div class="row-actions">'
         + '<span class="rd-flag-msg" style="display:none;font-size:10px;font-weight:600;color:var(--gold);align-self:center;text-align:right;white-space:nowrap;"></span>'
-        + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);white-space:nowrap;">Flag</button>'
-        + '<button type="button" class="btn btn-ghost btn-sm rd-disc-status" style="display:none;white-space:nowrap;background:var(--gold-tint);border:1px solid var(--gold-tint-bord);">Filed</button>'
+        + '<button type="button" class="btn btn-ghost btn-sm rd-flag-btn" style="display:none;background:var(--gold-tint);white-space:nowrap;">Flag</button>'
+        + '<button type="button" class="btn btn-ghost btn-sm rd-disc-status" style="display:none;white-space:nowrap;background:var(--gold-tint);">Filed</button>'
         + '<button type="button" class="btn btn-danger btn-sm rd-remove">Delete</button>'
       + '</div></td>'
       + '</tr>';
