@@ -309,8 +309,10 @@ S.RevenueServerCheck = {
     if (this._entryMode === 'import') {
       return '<div class="card form-card">'
         + App.collapsibleCardTitle('rsc-newcheck', 'New Shift Check')
+        // Shown only while the columns are being matched, in place of the head above it.
+        + '<div class="card-title" id="rsc-imp-head" style="display:none;">Import your server checks</div>'
         + '<div class="collapse-body">' + seg
-          + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop a per-server sales export to build the whole team\'s scorecard at once, one row per server with covers and total sales. You can also drop it at your Shift weekly close.</div>'
+          + '<div id="rsc-imp-lead" style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop a per-server sales export to build the whole team\'s scorecard at once, one row per server with covers and total sales. You can also drop it at your Shift weekly close.</div>'
           + '<div id="rsc-imp-csv"></div>' + this._impFlashHtml() + '</div>'
         + '</div>'
         + '<div id="rsc-imp-actions" style="margin:16px 0 24px;"></div>';
@@ -489,11 +491,20 @@ S.RevenueServerCheck = {
       return;
     }
 
+    /* ⛔ ONE REGION, SO THE MAPPING STEP CAN PUT IT AWAY, and the split is the one the comment
+       above already made for the confirm screen: the scorecard and the log carry Edit, Delete and
+       Export, every one of which writes on the press or hands out a board the import is about to
+       change. THE STAT STRIP STAYS OUTSIDE IT for the reason stated there — it is the context of
+       what is being imported into and carries no write control.
+       ⚠ A WRAPPER, NOT A RE-RENDER — `mountServerImport`'s hook toggles `display` on it, because
+       re-rendering from inside the mount throws away the file the operator just dropped. */
     this.container.innerHTML = '<div class="screen">'
       + this.statStrip(scorecard, targetCA)
       + this.renderForm(targetCA)
-      + this.scorecardSection(scorecard, targetCA)
-      + this.logSection(log, targetCA)
+      + '<div id="rsc-list-region">'
+        + this.scorecardSection(scorecard, targetCA)
+        + this.logSection(log, targetCA)
+      + '</div>'
       + '</div>';
 
     this.wire();
@@ -622,7 +633,13 @@ S.RevenueServerCheck = {
     const on = m => (this._entryMode === m || (m === 'manual' && this._entryMode !== 'import'));
     const btn = (m, label) => '<button type="button" class="btn btn-sm rsc-mode" data-mode="' + m + '" style="'
       + (on(m) ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    return '<div class="seg-toggle" style="margin-bottom:14px;">' + btn('manual', 'Enter Manually') + btn('import', 'Import File') + '</div>';
+    /* ⛔ IMPORT IS OFFERED FIRST (Kyle, 2026-08-16: *"make import file first option in the card..
+       enter manually second option"*). A per-server sales report is a recurring POS export, so the
+       file is the ordinary way in and typing one check by hand is the exception — the opposite of
+       the roster and the vendor list, which are setup data and stay manual-first.
+       ⚠ ORDER ONLY. `_entryMode` still defaults to 'manual', so which mode the card OPENS in is
+       unchanged and is Kyle's call, not a side effect of this. */
+    return '<div class="seg-toggle" id="rsc-mode-toggle" style="margin-bottom:14px;">' + btn('import', 'Import File') + btn('manual', 'Enter Manually') + '</div>';
   },
   _impFlashHtml() {
     const fl = this._impFlash; this._impFlash = null;
@@ -745,6 +762,27 @@ S.RevenueServerCheck = {
       subject: 'Server Checks',
       dropSub: 'One row per server with covers and total sales. Bar Cop matches each row to your roster by name.',
       actionsEl: '#rsc-imp-actions',
+      /* ⛔ THE MAPPER TAKES THE PAGE (Kyle, 2026-08-16: *"then change drop to be like the
+         others"*). The card head, the Import/Manual toggle, the explainer above the drop box and
+         the whole board below it go while the columns are being matched.
+         ⚠ THE HEAD IS ADDRESSED BY ITS COLLAPSE KEY, not by a new id and not by a wrapper:
+         `style.css` styles it as `.form-card > .card-title`, a DIRECT-CHILD selector, so wrapping
+         it would strip the head band's margins.
+         ⚠ IT COMES BACK AS `flex` — the helper renders the head as an inline flex row, and a bare
+         reset would drop its title and chevron off one line. Cancel re-mounts and fires 'drop'.
+         ⚠ HIDDEN, NOT RE-RENDERED: this fires from inside `CSVMapper.mount`, so a re-render here
+         would rebuild `#rsc-imp-csv` and throw away the file just dropped. */
+      onState: state => {
+        const map = (state === 'map');
+        const head = this.container.querySelector('[data-collapse-key="rsc-newcheck"]');
+        if (head) head.style.display = map ? 'none' : 'flex';
+        ['rsc-mode-toggle', 'rsc-imp-lead', 'rsc-list-region'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = map ? 'none' : '';
+        });
+        const impHead = document.getElementById('rsc-imp-head');
+        if (impHead) impHead.style.display = map ? '' : 'none';
+      },
       fields: PosIngest.FIELDS.server,
       confirmLabel: 'Import',
       /* ⛔ THE MAPPER NO LONGER COMMITS. It hands the file to the confirm screen, which is where the
