@@ -121,6 +121,7 @@ S.EventsRegulars = {
     const im = this.importMsg; this.importMsg = null;
     const imHtml = im ? '<div style="margin-top:10px;font-size:12px;color:' + (im.bad ? 'var(--red)' : 'var(--t2)') + ';">' + esc(im.text) + '</div>' : '';
     const addCard = '<div class="card form-card">' + App.collapsibleCardTitle('rg-add', 'Add a Regular')
+      + '<div class="card-title" id="rg-imp-head" style="display:none;">Import your regulars</div>'
       + '<div class="collapse-body">' + body + imHtml + '</div></div>' + belowButtons;
     /* ⛔ THE CONFIRM SCREEN TAKES THE ADD CARD'S SLOT, and the book below stays on screen — the same
        shape every door in the rollout uses. Keeping the list visible is the point: "already in your
@@ -359,7 +360,12 @@ S.EventsRegulars = {
         // The card's own head, which is the collapsible "Add a Regular" title.
         const card = document.getElementById('rg-csv') && document.getElementById('rg-csv').closest('.card');
         const head = card && card.querySelector('.card-title');
-        if (head) head.style.display = map ? 'none' : '';
+        /* ⚠ BACK AS `flex`, NOT `''`. `App.collapsibleCardTitle` renders the head as an inline flex
+           row, so a bare reset drops its inline display and the title stops laying out as one. */
+        if (head) head.style.display = map ? 'none' : 'flex';
+        // And one simple line names the import while the head is away.
+        const impHead = document.getElementById('rg-imp-head');
+        if (impHead) impHead.style.display = map ? '' : 'none';
       },
       fields: [
         // Whole phrases only. A bare 'customer' / 'guest' / 'patron' matched the
