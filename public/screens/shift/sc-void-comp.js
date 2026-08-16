@@ -989,7 +989,7 @@ S.ShiftVoidComp = {
        (`_VOID_ROW_NOTE` carries three, the repeat is a row note), which is what makes the cut a
        removal of repetition rather than a loss of information.
        The full account survives for a caller with no screen in front of it — the modal path. */
-    const msg = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Imported '
+    const msg = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">Imported '
       + toAdd.length + ' record' + (toAdd.length === 1 ? '' : 's') + '.' + (opts.reviewed ? '' : outcomes) + '</div>';
     /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. Both refusal paths return above
        this line with the screen and every row still up, so the operator presses again rather than
