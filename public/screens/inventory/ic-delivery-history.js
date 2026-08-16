@@ -252,7 +252,7 @@ S.InventoryDeliveryHistory = {
       const dlabel = !disc ? 'Flag' : (disc.status === 'Resolved' ? 'Resolved' : 'Filed');
       // Unfiled Flag = dim/recessed (any line CAN be flagged later); Filed = brighter
       // plain ghost (an active claim); Resolved = green.
-      const dstyle = !disc ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);' : (disc.status === 'Resolved' ? 'color:var(--green);' : '');
+      const dstyle = !disc ? 'background:var(--gold-tint);' : (disc.status === 'Resolved' ? 'color:var(--green);' : '');
       return '<tr>'
         + '<td><div class="val">' + esc(it.name) + '</div></td>'
         + '<td>' + containerCol + '</td>'

@@ -43,8 +43,11 @@ S.InventoryVarianceReport = {
   QUICK_CATS: ['Liquor', 'Wine', 'Bottle Beer', 'Draft Beer'],  // the 4 main bar categories for the Quick Variance Check
 
   DEFAULT_THRESHOLDS: {
-    'Liquor':        { flag: 2 },
-    'Wine':          { flag: 3 },
+    /* ⭐ KYLE SET BOTH OF THESE TO 5% (2026-08-15). They are the number an operator judges
+       their own bar by, and these are only the starting point: whatever they change them to is
+       kept, and nothing on the card hands them back to these. */
+    'Liquor':        { flag: 5 },
+    'Wine':          { flag: 5 },
     'Bottle Beer':   { flag: 2 },
     'Draft Beer':    { flag: 10 },
     'Misc':          { flag: 10 },
@@ -904,8 +907,20 @@ S.InventoryVarianceReport = {
       await App.saveInventory();
       this.draw();
     }));
-    document.getElementById('vr-th-reset')?.addEventListener('click', async () => {
-      if (App.inventoryData) App.inventoryData.variance_thresholds = {};
+    /* ⛔ IT COMMITS WHAT IS ON SCREEN, WHICH IS THE CASE `change` CANNOT COVER: typing into the
+       last box and pressing Save without tabbing out of it first. Every field is read, so the
+       press means the same thing however the operator got there — and nothing here writes a
+       default over a number they set. */
+    document.getElementById('vr-th-save')?.addEventListener('click', async () => {
+      if (!App.inventoryData) App.inventoryData = {};
+      if (!App.inventoryData.variance_thresholds) App.inventoryData.variance_thresholds = {};
+      this.container.querySelectorAll('.vr-th').forEach(inp => {
+        const cat = inp.dataset.cat, key = inp.dataset.key;
+        const v = parseFloat(inp.value);
+        if (!cat || !key || isNaN(v) || v < 0) return;
+        if (!App.inventoryData.variance_thresholds[cat]) App.inventoryData.variance_thresholds[cat] = {};
+        App.inventoryData.variance_thresholds[cat][key] = v;
+      });
       await App.saveInventory();
       this.draw();
     });
@@ -927,7 +942,14 @@ S.InventoryVarianceReport = {
     return '<div class="card form-card no-print"><div class="card-title">Set Variance Standards</div>'
       + '<div class="form-row" style="gap:14px;align-items:flex-end;margin-bottom:0;flex-wrap:wrap;">'
       + this.STD_ORDER.map(k => box(k)).join('')
-      + '<div class="f" style="flex-shrink:0;"><label>&nbsp;</label><button class="btn btn-ghost" id="vr-th-reset">Reset</button></div>'
+      /* ⛔ SAVE, NOT RESET (Kyle, 2026-08-15): *"the button shouldn't reset to prefilled
+         standards for a user.. it should save whatever standards they change them too"*. The old
+         control wiped every tuned standard on one press, with no confirm, at the end of a row
+         whose entire content is the operator's own settings — which is the button they reach for.
+         ⚠ CENTRED RATHER THAN SPACED DOWN: the row is `align-items:flex-end` so the fields line
+         up on their inputs, and the old button was pushed onto that baseline with an empty label.
+         `align-self:center` centres it against the cells instead, and the spacer goes. */
+      + '<div class="f" style="flex-shrink:0;align-self:center;margin-bottom:0;"><button class="btn btn-ghost btn-sm" id="vr-th-save">Save</button></div>'
       + '</div></div>';
   },
 
@@ -1079,7 +1101,7 @@ S.InventoryVarianceReport = {
     if (!open && !resolved && s.label !== 'Flag') return '';   // OK, nothing to review
     const reason = this.flagReason(key, pct, unitVar, name);
     const label = open ? 'Reviewing' : resolved ? 'Resolved' : 'Review';
-    const style = (resolved ? 'color:var(--green);' : 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);') + 'white-space:nowrap;';
+    const style = (resolved ? 'color:var(--green);' : 'background:var(--gold-tint);') + 'white-space:nowrap;';
     return '<div style="text-align:right;"><button type="button" class="vr-review btn btn-ghost btn-sm" data-pid="' + esc(pid)
       + '" data-name="' + esc(name || '') + '" data-reason="' + esc(reason) + '" style="' + style + '">' + label + '</button></div>';
   },
