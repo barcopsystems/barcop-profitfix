@@ -1019,7 +1019,7 @@ S.InventoryVendors = {
        The full account survives for a caller with no screen in front of it.
        ⚠ "Added", not "Imported": the file was imported two screens ago, and the button they just
        pressed said Add. */
-    if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">'
+    if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">'
       + 'Added ' + toAdd.length + ' vendor' + (toAdd.length === 1 ? '' : 's') + '.'
       + (!opts.reviewed && notes().length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes().join(' · ') + ')</span>' : '')
       + '</div>';
