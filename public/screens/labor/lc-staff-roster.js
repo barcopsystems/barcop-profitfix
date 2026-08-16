@@ -287,8 +287,10 @@ S.LaborStaffRoster = {
     }
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-staff-roster', 'Add Staff Member')
+      // Shown only while the columns are being matched, in place of the head above it.
+      + '<div class="card-title" id="sr-imp-head" style="display:none;">Import Staff Roster</div>'
       + '<div class="collapse-body">'
-      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + '<div class="seg-toggle" id="sr-mode-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
       + '</div></div>'
       + actionRow;
@@ -349,7 +351,7 @@ S.LaborStaffRoster = {
        printed AFTER a successful write, at which point the review is cleared and the roster is back.
        Pinned by `verify-confirm-screen-owns-page.js`, which RENDERS this door rather than reading it. */
     this.container.innerHTML = '<div class="screen">'
-      + (this._staffReview ? this.staffReviewHTML() : addCard + below) + '</div>';
+      + (this._staffReview ? this.staffReviewHTML() : addCard + '<div id="sr-list-region">' + below + '</div>') + '</div>';
     this.container.onclick = ev => {
       /* The confirm screen's two controls. Both write state and re-render, so the button's count,
          the rows and what gets written all read from the same place. */
@@ -429,6 +431,36 @@ S.LaborStaffRoster = {
       subject: 'Staff',
       dropSub: 'Only Name is required; position, pay, status, phone, and email come in if your file has them.',
       actionsEl: '#sr-imp-actions',
+      /* ⛔ THE MAPPER TAKES THE PAGE (Kyle, walking this door 2026-08-16): *"mapping needs to
+         have the small header like the ones we have already done.. 'Import Staff Roster' or
+         whatever.. and no toggle buttons"*. The card head and the Enter Manually / Import File
+         toggle were still offering a different way to enter a person over the top of a file the
+         operator had already dropped, with `MAP YOUR COLUMNS · STAFF` underneath them.
+         ⛔ AND THE ROSTER GOES WITH THEM, on the argument `renderList` above already makes about
+         the confirm screen: it promises *"Nothing is saved until you do"* while the roster below
+         carries Delete, Edit and a clickable row that all write on the press, plus an Export PDF
+         handing out a roster that is about to change. Every clause of that is just as true while
+         the columns are being matched — same page, same buttons. Same shape as ic-vendors and
+         ev-regulars, which Kyle walked and kept.
+         ⚠ THE HEAD IS ADDRESSED BY ITS COLLAPSE KEY, not by a new id and not by a wrapper:
+         `style.css` styles it as `.form-card > .card-title`, a DIRECT-CHILD selector, so wrapping
+         it would strip the head band's margins. That attribute is what the collapse system
+         already identifies it by, which makes it the durable handle.
+         ⚠ IT COMES BACK AS `flex` — the helper renders the head as an inline flex row, and a bare
+         reset would drop its title and chevron off one line. Cancel re-mounts and fires 'drop'.
+         ⚠ HIDDEN, NOT RE-RENDERED: this fires from inside `CSVMapper.mount`, so a re-render here
+         would rebuild `#sr-csv` and throw away the file just dropped. */
+      onState: state => {
+        const map = (state === 'map');
+        const head = this.container.querySelector('[data-collapse-key="lc-staff-roster"]');
+        if (head) head.style.display = map ? 'none' : 'flex';
+        ['sr-mode-toggle', 'sr-list-region'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = map ? 'none' : '';
+        });
+        const impHead = document.getElementById('sr-imp-head');
+        if (impHead) impHead.style.display = map ? '' : 'none';
+      },
       fields: [
         /* ⚠ REQUIRED, and an ADP roster imported a JOB CLASSIFICATION as everyone's name: on
            `Associate ID | Legal Name | Job Title | Worker Category`, `name` is EXACT_ONLY so "Legal
