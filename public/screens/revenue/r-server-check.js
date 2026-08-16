@@ -17,7 +17,11 @@ S.RevenueServerCheck = {
   _saving: false,
   _form: null,
   _impFlash: null,   // one-shot result line for the per-server import
-  _entryMode: 'manual',   // New Shift Check card: 'manual' form or 'import' drop
+  /* ⛔ THE CARD OPENS ON IMPORT (Kyle, 2026-08-16: *"yes import 1st means import is the default
+     selected and open"*). A per-server sales report is a recurring POS export, so the file is the
+     ordinary way in; typing one check by hand is the exception. The roster and the vendor list are
+     setup data and stay manual-first, which is why this is a per-door decision and not a rule. */
+  _entryMode: 'import',   // New Shift Check card: 'import' drop (default) or 'manual' form
   /* The confirm screen's state, and it lives HERE rather than in the DOM so a redraw cannot lose the
      operator's file: `{ rows, open, removed, useFile }`. Null means no import is being confirmed, and
      `draw()` reads it to decide whether the page is the cockpit or the check screen. */
@@ -630,15 +634,21 @@ S.RevenueServerCheck = {
   // ── Per-server import: the toggle helper + result line ───────────────────────
   // PosIngest matches each row to the roster by name (same path the Shift close uses).
   _checkSeg() {
-    const on = m => (this._entryMode === m || (m === 'manual' && this._entryMode !== 'import'));
+    /* ⚠ ONE TEST, NOT TWO. `renderForm` decides which body to draw with `_entryMode === 'import'`,
+       so the highlight is derived from that same expression rather than from a second rule with its
+       own fallback — the old one read "manual wins unless the mode is explicitly import", which was
+       the default it is now wrong about. Two spellings of one decision is how a toggle comes to
+       highlight one option while the card below shows the other (integrity #11). */
+    const on = m => (m === 'import') === (this._entryMode === 'import');
     const btn = (m, label) => '<button type="button" class="btn btn-sm rsc-mode" data-mode="' + m + '" style="'
       + (on(m) ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     /* ⛔ IMPORT IS OFFERED FIRST (Kyle, 2026-08-16: *"make import file first option in the card..
        enter manually second option"*). A per-server sales report is a recurring POS export, so the
        file is the ordinary way in and typing one check by hand is the exception — the opposite of
        the roster and the vendor list, which are setup data and stay manual-first.
-       ⚠ ORDER ONLY. `_entryMode` still defaults to 'manual', so which mode the card OPENS in is
-       unchanged and is Kyle's call, not a side effect of this. */
+       ⛔ AND THE CARD OPENS ON IT. This was left as order-only for one turn, with the default a
+       separate question; Kyle ruled the same day: *"yes import 1st means import is the default
+       selected and open"*. `_entryMode` is `'import'` above. */
     return '<div class="seg-toggle" id="rsc-mode-toggle" style="margin-bottom:14px;">' + btn('import', 'Import File') + btn('manual', 'Enter Manually') + '</div>';
   },
   _impFlashHtml() {
