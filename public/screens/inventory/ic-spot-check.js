@@ -437,8 +437,8 @@ S.InventorySpotCheck = {
       + '</div></div>';
 
     // POS sold: type on each line, or reveal the importer for this register's report.
-    const posToggle = '<button type="button" id="sp-pos-toggle" class="btn btn-ghost btn-sm sp-posmode" data-mode="' + (this.posMode === 'import' ? 'manual' : 'import') + '">' + (this.posMode === 'import' ? 'Hide Importer' : 'Import POS Report') + '</button>';
-    const posCard = '<div class="card no-print">'
+    const posToggle = '<button type="button" class="btn btn-ghost btn-sm sp-posmode" data-mode="' + (this.posMode === 'import' ? 'manual' : 'import') + '">' + (this.posMode === 'import' ? 'Hide Importer' : 'Import POS Report') + '</button>';
+    const posCard = '<div class="card no-print" id="sp-pos-card">'
       + '<div id="sp-pos-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;'
         + (this.posMode === 'import' ? 'margin-bottom:14px;' : '') + '">'
       + '<div style="font-size:12px;color:var(--t3);line-height:1.6;flex:1;min-width:200px;">Enter the POS sold on each product manually, or import this register\'s report to fill them in.</div>'
@@ -747,7 +747,13 @@ S.InventorySpotCheck = {
     set('sp-finish-row', anyProduct, 'flex');
     set('sp-save-later', anyProduct);
     set('sp-save', anySold);
-    set('sp-pos-toggle', this.posMode === 'import' || anyPost);
+    /* ⛔ THE WHOLE CARD, NOT JUST THE BUTTON (Kyle, 2026-08-15): *"just not showing the card at
+       all until the import is ungated.. and show the entire card at the right time"*. Gating only
+       the button left the card's own sentence offering an import with no door to walk through,
+       which is a worse read than either half. One rule, on the container.
+       ⚠ AND NEVER WHILE THE IMPORTER IS OPEN: the card holds the mapper and the Hide Importer
+       button, so gating it then would strand the operator inside a mapper they cannot close. */
+    set('sp-pos-card', this.posMode === 'import' || anyPost);
   },
   // Clear the red required-field highlights.
   clearMissing() {
@@ -1223,7 +1229,18 @@ S.InventorySpotCheck = {
       this.clearDraft();
       this._openId = null; this._openCreatedAt = null; this._touched = {};
       this._openWasComplete = false; this._openEditCount = 0;
-      this.renderMain();
+      /* ⛔ FINISHING A CHECK OPENS THE CHECK (Kyle, 2026-08-15): *"when 'finished spot check' is
+         clicked.. it just stays on the empty spot check screen.. is there a way it takes the user
+         to that specific spot checks view page?"* There is, and it is the door this screen already
+         uses everywhere else: the history list, a row click and the investigation deep-link all
+         open one check through `App.pushView(() => this.renderDetail(id))`, so the floating back
+         button rides the view stack out of it (no per-page back button, [[form-table-standard]]).
+         ⚠ `rec.id`, NOT `this._openId` — the lines above have just nulled that, and reading it here
+         would open nothing on a new check and the WRONG check on a correction.
+         ⚠ SAVE FOR LATER STAYS PUT. It means "I am coming back to this", so handing the operator a
+         read-only view of a half-counted check is the opposite of what they pressed. */
+      if (finalize) App.pushView(() => this.renderDetail(rec.id));
+      else this.renderMain();
     } else {
       if (btn) { btn.disabled = false; btn.textContent = label || 'Try Again'; }
     }
