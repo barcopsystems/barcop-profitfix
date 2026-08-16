@@ -126,7 +126,7 @@ S.WeekHistory = {
         return '<tr>'
           + '<td data-label="Week"><div class="val">' + esc(this.wk(x.pe)) + '</div><div style="font-size:10px;color:var(--t3);">Not confirmed</div></td>'
           + '<td data-label="Revenue">-</td><td data-label="Prime Cost">-</td><td data-label="Check Avg">-</td><td data-label="Labor %">-</td><td data-label="RPLH">-</td>'
-          + '<td data-label="" class="no-print"><button class="btn btn-ghost btn-sm" data-confirm="' + esc(x.pe) + '" style="background:var(--gold-tint);border:1px solid var(--gold-tint-bord);white-space:nowrap;">Confirm</button></td>'
+          + '<td data-label="" class="no-print"><button class="btn btn-primary btn-sm" data-confirm="' + esc(x.pe) + '" style="white-space:nowrap;">Confirm</button></td>'
           + '</tr>';
       }
       const p = x.p, r = x.r || {};
