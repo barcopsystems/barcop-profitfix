@@ -92,6 +92,13 @@ S.InventorySpotCheck = {
   clearDraft() {
     try { localStorage.removeItem(this.DRAFT_KEY); } catch (e) {}
     this.draft = null;
+    /* ⛔ THE POS FILL REPORT GOES WITH THE WORK IT DESCRIBES (Kyle, 2026-08-15): *"after clicking
+       finish spot check.. and it saving.. the filled pos text.. is still there.. but there is no
+       active spot check"*. Four callers reach this member — the save, Start Over, cancelling an
+       edit, and emptying the last line — and every one of them means the same thing, so the rule
+       is stated HERE rather than four times ([[lessons-paid-for]] #15: a companion field must be
+       cleared by whoever clears its principal). */
+    this._posMsg = null;
   },
   // Read the whole on-screen check into a plain object (the same shape we save).
   collectState() {
@@ -461,7 +468,16 @@ S.InventorySpotCheck = {
          pre-shift count, and it is offered rather than hidden behind a localStorage draft they
          had no way to know about. "Finish Spot Check" says what it does: it is the door into
          history, and it refuses to open on a half-counted check. */
-      + '<div id="sp-finish-row" style="margin-top:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      /* ⛔ AND THEY ONLY EXIST ONCE THERE IS A CHECK TO FINISH (Kyle, 2026-08-15): *"seeing a
+         finish and save for later button when there is not active spot check is a little
+         confusing... make those buttons show only after at least one product has been added"*.
+         ⭐ ONE RULE COVERS BOTH HALVES OF WHAT HE ASKED FOR. Saving clears the draft, so the lines
+         go and the buttons go with them — the after-the-save half needs no second mechanism and
+         therefore cannot drift from the first.
+         ⚠ KEYED ON THE RENDERED LINES, NOT ON `dft.lines.length`: a line whose product has since
+         been deleted renders as nothing, and a check with no visible product on it is not a check
+         the operator can finish. */
+      + (lineHtmls ? '<div id="sp-finish-row" style="margin-top:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-primary" id="sp-save">' + (this._openWasComplete ? 'Save Changes' : 'Finish Spot Check') + '</button>'
         /* ⚠ NO "Save for Later" WHILE CORRECTING A FINISHED CHECK. It would set the record back to
            in_progress, which silently pulls a real check out of history AND out of the audit's
@@ -469,7 +485,8 @@ S.InventorySpotCheck = {
            localStorage draft still holds the work if they walk away mid-correction. */
         + (this._openWasComplete ? '' : '<button class="btn btn-ghost" id="sp-save-later">Save for Later</button>')
         + '<span id="sp-save-msg" style="display:none;color:var(--red);font-size:12px;margin-left:4px;"></span>'
-      + '</div></div>';
+      + '</div>' : '')
+      + '</div>';
     App.applyCollapsed(this.container);
     this.updateProductsTitle();
     this._onHistory = false;
@@ -549,7 +566,7 @@ S.InventorySpotCheck = {
       if (ev.target.closest('#sp-resume')) { this.container.querySelector('.alert-bar')?.remove(); return; }
       // ⚠ AND IT STOPS BEING A RESUME. Without this an operator who starts over and then counts a
       // fresh product gets the banner back for the check they just discarded.
-      if (ev.target.closest('#sp-discard')) { this.clearDraft(); this._resumedAtOpen = false; this._posMsg = null; this.renderMain(); return; }
+      if (ev.target.closest('#sp-discard')) { this.clearDraft(); this._resumedAtOpen = false; this.renderMain(); return; }
       if (ev.target.closest('#sp-history')) { App.pushView(() => this.renderHistory()); return; }
       const posSeg = ev.target.closest('.sp-posmode');
       // Opening the importer starts a NEW import, so the last one's report goes. Hiding it keeps
@@ -920,7 +937,7 @@ S.InventorySpotCheck = {
       /* ⭐ NORMAL GREY, NOT THE GOLD MONEY ACCENT. Kyle: *"in normal grey text"*. Gold is the one
          money hero in this app; a status line about a fill that landed is not it. */
       this._posMsg = filled > 0
-        ? '<div style="font-size:13px;color:var(--t3);margin-top:12px;">Filled POS sold for ' + filled + ' product' + (filled === 1 ? '' : 's') + '. Review the variance below, then save.' + tail + '</div>'
+        ? '<div style="font-size:13px;color:var(--t3);margin-top:12px;">Filled POS sold for ' + filled + ' product' + (filled === 1 ? '' : 's') + '. Review the variance above, then save.' + tail + '</div>'
         /* ⚠ THE ZERO-FILL HEADLINE MUST NAME THE CAUSE THAT ACTUALLY APPLIES, and an absolute claim
            may only fire when the other buckets are empty. With the report inverted the causes are
            simpler: either the file has no line for anything on this check (wrong report, wrong
