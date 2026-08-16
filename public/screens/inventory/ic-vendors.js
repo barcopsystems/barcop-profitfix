@@ -422,7 +422,7 @@ S.InventoryVendors = {
         const map = (state === 'map');
         const head = this.container.querySelector('[data-collapse-key="ic-vendors"]');
         if (head) head.style.display = map ? 'none' : 'flex';
-        ['iv-mode-toggle', 'iv-list-region'].forEach(id => {
+        ['iv-mode-toggle', 'iv-list-region', 'iv-imp-result'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.style.display = map ? 'none' : '';
         });
