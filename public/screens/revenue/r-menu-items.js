@@ -789,9 +789,14 @@ S.RevenueMenuItems = {
     // two-column form (540); a recipe item carries the ingredient builder, so it
     // runs at the prep-batch width (900). Kept in step on category change below.
     const isInv = this.formType === 'inventory';
-    const editLbl = { plate: 'Dish', cocktail: 'Cocktail', inventory: 'No Prep Item' }[this.formType] || 'Menu Item';
+    /* ⚠ THE OPERATOR-FACING WORD IS "Mixed Drink". `TYPES` renamed the label and deliberately kept
+       the KEY as 'cocktail' (renaming the key would re-file every drink in the app), and these two
+       titles were left behind on the old word — so one form read "Add Cocktail Item" while the tab
+       above it read Mixed Drinks. Kyle caught the ADD title; the EDIT title is the same string in
+       the same expression, and leaving it would make one form disagree with itself. */
+    const editLbl = { plate: 'Dish', cocktail: 'Mixed Drink', inventory: 'No Prep Item' }[this.formType] || 'Menu Item';
     const addTitle = this.formType === 'plate' ? 'Add Dish Item'
-      : this.formType === 'cocktail' ? 'Add Cocktail Item'
+      : this.formType === 'cocktail' ? 'Add Mixed Drink Item'
       : this.formType === 'inventory' ? 'Add No Prep Item' : 'Add Menu Item';
     const title = item ? ('Edit ' + editLbl) : addTitle;
     // ── ACTIVE / INACTIVE, mirroring Add Products exactly ────────────────────────────────────
@@ -1526,10 +1531,10 @@ S.RevenueMenuItems = {
        never falls back to `item.cost`, so following that instruction discards the imported cost.
        The advice is right; the promise was wrong, so the promise goes. */
     const dropSub = this.activeType === 'plate'
-      ? 'Needs columns for dish name and Category (Appetizers, Entrees, Sides, Desserts). Price, cost and Weekly Units Sold come in if your file has them. Dishes import without recipes; edit one afterward to build its recipe.'
+      ? 'Needs dish name and Category (Appetizers, Entrees, Sides, Desserts). Price, cost and Weekly Units Sold come in if your file has them.'
       : this.activeType === 'cocktail'
-      ? 'Needs columns for mixed drink name and Category (Cocktails, Shots, Frozen). Price, cost and Weekly Units Sold come in if your file has them. Mixed drinks import without recipes; edit one afterward to build its recipe.'
-      : 'Needs columns for item name and Category (Beer, Wine, NA Beverages, Snacks). Price and Weekly Units Sold come in if your file has them. Cost comes from the inventory product you link the item to, so edit an item afterward to link its product and the cost fills in from there.';
+      ? 'Needs mixed drink name and Category (Cocktails, Shots, Frozen). Price, cost and Weekly Units Sold come in if your file has them.'
+      : 'Needs item name and Category (Beer, Wine, NA Beverages, Snacks). Price and Weekly Units Sold come in if your file has them. Cost comes from the product you link afterward.';
     CSVMapper.mount(el, {
       dropTitle: 'Drop your ' + t.noun + ' items file here',
       subject: t.noun,
@@ -1596,7 +1601,14 @@ S.RevenueMenuItems = {
     const r = this._menuReview;
     if (!r) return { rows: [], count: 0 };
     const live = this._menuReviewLive();
-    const plan = this._planMenuImport(live, App.snapshotRows(this.items()));
+    /* ⛔⛔ `.map(s => s.copy)` — `App.snapshotRows` RETURNS UNDO PAIRS, `{ row, copy }`, NOT
+       records. Every one of the 50+ other call sites in the tree wants the pair; this one wants the
+       clone. Without the map the planner read `it.name` as undefined on every existing item, so all
+       of them keyed to the identical string `plate|`, nothing could ever match, and a re-dropped
+       file reported every row as "Adding this item" while the WRITE correctly refreshed them.
+       Kyle found it dropping a file with Anchor Burger on it (2026-08-16): measured on the live
+       build, the button promised 4 items and wrote 3. */
+    const plan = this._planMenuImport(live, App.snapshotRows(this.items()).map(s => s.copy));
     /* ⚠ ZIPPED BY INDEX, and that is safe by construction: `_planMenuImport` pushes exactly one
        verdict per input row, in order, at every exit. Pinned as `perRow.length === rows.length`. */
     const rows = (plan.perRow || []).map((x, i) => this._menuReviewRow(x, (live[i] || {})._rid));
@@ -1615,7 +1627,14 @@ S.RevenueMenuItems = {
     if (!r) return [];
     const gone = r.rows.filter(x => r.removed[x._rid]);
     if (!gone.length) return [];
-    const plan = this._planMenuImport(gone, App.snapshotRows(this.items()));
+    /* ⛔⛔ `.map(s => s.copy)` — `App.snapshotRows` RETURNS UNDO PAIRS, `{ row, copy }`, NOT
+       records. Every one of the 50+ other call sites in the tree wants the pair; this one wants the
+       clone. Without the map the planner read `it.name` as undefined on every existing item, so all
+       of them keyed to the identical string `plate|`, nothing could ever match, and a re-dropped
+       file reported every row as "Adding this item" while the WRITE correctly refreshed them.
+       Kyle found it dropping a file with Anchor Burger on it (2026-08-16): measured on the live
+       build, the button promised 4 items and wrote 3. */
+    const plan = this._planMenuImport(gone, App.snapshotRows(this.items()).map(s => s.copy));
     return (plan.perRow || []).map((x, i) => Object.assign(
       this._menuReviewRow(x, (gone[i] || {})._rid),
       { note: 'Taken out of this import', notes: [], lands: false }));
