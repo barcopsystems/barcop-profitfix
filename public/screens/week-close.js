@@ -595,13 +595,36 @@ S.WeekClose = {
        operator has just closed by hand. */
     if (flash) this._openLane = this._firstOwed(rows);
 
+    /* ⛔⛔ AND SO IS THE CLAIM AND THE MOUNT, BECAUSE THIS IS THE FIRST POINT THE PAGE KNOWS
+       WHICH ROW IT IS DRAWING (Kyle, walking a new-user run 2026-08-15): *"they drop sales and
+       add.. it auto opens the next step hours.. the drop file box is not there.. you have to
+       close the hours card and then reopen it for the drop file to show up."*
+       Both were decided ABOVE, before the advance, so after a landed import they described the
+       row the operator had just LEFT. On the path a new user takes the takeover had cleared
+       `_openLane` altogether, so the flag was false, the mount was skipped, and Hours rendered
+       its copy over no drop zone. Re-opening the row by hand works because the click handler
+       re-renders with `_openLane` already set — which is why this never showed up in ordinary
+       use and why it hits a first-time drop every time.
+       ⚠ THE CLAIM MATTERS AS MUCH AS THE MOUNT: a lane mounted into a host claimed by the row
+       being left points every id, every container read and every redraw at markup this page
+       never rendered — the one-host-per-cockpit hazard the header above warns about. */
+    const openNow = !!(this._openLane && this._laneZone(this._openLane));
+    if (openNow && this._openLane !== claimRow) {
+      const L2 = this.LANES[this._openLane], o2 = S[L2.obj];
+      if (o2) this._laneClaim(L2, o2);
+    }
+
     const confirmBtn = st.confirmed
       ? '<button class="btn btn-ghost wc-confirm">Edit the confirmed week</button>'
       : '<button class="btn btn-primary wc-confirm">Confirm the Week</button>';
 
     container.innerHTML = '<div class="screen">'
       + this.banner(st, ready, required.length)
-      + (flash ? '<div style="font-size:12px;color:var(--green);font-weight:700;margin:0 2px 14px;">&#10003; '
+      /* ⭐ GREY, NOT GREEN (Kyle, 2026-08-15): *"change the green text to grey text like on add
+         products."* Add Products reports a landed import in `--t2` at normal weight, and this is
+         the same kind of line: an account of something that already worked, not a status colour.
+         Green here also collided with the six green ticks directly under it. */
+      + (flash ? '<div style="font-size:12px;color:var(--t2);margin:0 2px 14px;">&#10003; '
                  + esc(flash) + esc(this._flashScope(flashDates, jumped)) + '</div>' : '')
       + '<div class="sh" style="margin:0 0 10px;">What This Week Needs</div>'
       + rows.map((r, i) => this.row(r, i + 1)).join('')
@@ -614,7 +637,7 @@ S.WeekClose = {
        so the mount would look up an id that is not here — and `getElementById` does not answer with
        nothing when the cockpit's own markup is still in the hidden shell. A mount that finds the
        other page's zone is exactly the defect the host ids exist to stop. */
-    if (laneOpen && !(this._openLane === 'sales' && this._salesManual())) {
+    if (openNow && !(this._openLane === 'sales' && this._salesManual())) {
       const L = this.LANES[this._openLane], o = this._laneObj(this._openLane);
       if (o && L && typeof o[L.mount] === 'function') o[L.mount]();
     }
