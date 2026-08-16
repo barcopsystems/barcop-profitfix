@@ -1,0 +1,1354 @@
+'use strict';
+
+/* ── Labor Control — Staff Roster (writes lc_staff) ───────────────────────────
+   The team roster — each staff member, their position, wage, and status. Wage
+   defaults from the position but is editable per person. The roster is the
+   source for scheduling, hours, tips, and (per Rule 20) Revenue Recovery's
+   server list. Stored in App.laborData (lc_data, Rule 21).
+
+   Landing = one Add Staff card with an Enter Manually / Import File toggle, then
+   the roster list. Clicking a staff member opens their page: an editable profile
+   plus Certifications and the Coaching Log (each added/edited in a pop-up). */
+
+S.LaborStaffRoster = {
+  detailId: null,
+  certEditId: null,
+  noteEditId: null,
+  entryMode: 'manual',     // landing card: type a profile (default) vs import a staff file. Roster is setup data, not a recurring POS export, so manual-first (matches Vendors).
+  _draft: null,            // in-memory Add-Staff draft (survives leave/return)
+
+  CERT_TYPES: ['TABC (Texas)', 'RBS (California)', 'RAMP (Pennsylvania)', 'ServSafe Food Handler',
+    'ServSafe Manager', 'Allergen Awareness', 'CPR / First Aid', 'Food Handler Permit',
+    'ABC On-Premise', 'Health Card', 'Other'],
+  NOTE_CATEGORIES: ['Praise', 'Coaching', 'Concern', 'Warning'],
+
+  // Shared column widths for the three detail-page tables (Certifications,
+  // Training, Coaching Log) so their columns line up down the page. Six columns;
+  // the Coaching Note cell spans columns 4-5 from there. S.LaborTraining reads it.
+  DETAIL_COLGROUP: '<colgroup><col style="width:20%"/><col style="width:15%"/><col style="width:14%"/><col style="width:14%"/><col style="width:16%"/><col style="width:21%"/></colgroup>',
+
+  staff() {
+    if (!App.laborData) App.laborData = {};
+    if (!Array.isArray(App.laborData.lc_staff)) App.laborData.lc_staff = [];
+    return App.laborData.lc_staff;
+  },
+  staffById(id) { return this.staff().find(s => s.id === id); },
+  positions() { return ((App.laborData && App.laborData.lc_positions) || []); },
+  positionById(id) { return this.positions().find(p => p.id === id); },
+
+  certs() {
+    if (!App.laborData) App.laborData = {};
+    if (!Array.isArray(App.laborData.lc_certs)) App.laborData.lc_certs = [];
+    return App.laborData.lc_certs;
+  },
+  certsForStaff(staffId) {
+    return this.certs().filter(c => c.staff_id === staffId).slice()
+      .sort((a, b) => (a.expiration_date || '').localeCompare(b.expiration_date || ''));
+  },
+  certStatus(cert) {
+    if (!cert || !cert.expiration_date) return 'ok';
+    const today = App.todayLocal();
+    if (cert.expiration_date < today) return 'expired';
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + 30);
+    if (cert.expiration_date <= App.ymdLocal(cutoff)) return 'expiring';
+    return 'ok';
+  },
+  // Roster-row rollup across all of a staff member's certs: any expired wins,
+  // else any expiring, else current; 'none' when nothing is on file.
+  certRollup(staffId) {
+    const list = this.certsForStaff(staffId);
+    if (list.length === 0) return 'none';
+    let worst = 'ok';
+    for (const c of list) {
+      const st = this.certStatus(c);
+      if (st === 'expired') return 'expired';
+      if (st === 'expiring') worst = 'expiring';
+    }
+    return worst;
+  },
+
+  notes() {
+    if (!App.laborData) App.laborData = {};
+    if (!Array.isArray(App.laborData.lc_staff_notes)) App.laborData.lc_staff_notes = [];
+    return App.laborData.lc_staff_notes;
+  },
+  notesForStaff(staffId) {
+    return this.notes().filter(n => n.staff_id === staffId).slice()
+      .sort((a, b) => (b.date || b.created_at || '').localeCompare(a.date || a.created_at || ''));
+  },
+
+  fmtDate(str) {
+    if (!str) return '-';
+    const d = new Date(String(str).length <= 10 ? str + 'T00:00:00' : str);
+    return isNaN(d.getTime()) ? esc(str) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  },
+
+  render(container, actions) {
+    // Seed starter positions + training templates for a fresh account so a new
+    // operator who lands on the roster first never hits the "add positions
+    // first" wall, and has onboarding checklists ready to assign. Both are
+    // one-time, guarded, and leave any account with existing data untouched.
+    if (S.LaborPositions && S.LaborPositions.ensureStarters) S.LaborPositions.ensureStarters();
+    if (S.LaborTraining && S.LaborTraining.ensureStarters) S.LaborTraining.ensureStarters();
+    this.container = container;
+    this.actions = actions;
+    // Cross-screen focus: Labor Reports (and others) set App._staffFocus =
+    // { staff_id } and navigate here to open that person's page directly.
+    if (App._staffFocus && App._staffFocus.staff_id) {
+      const sid = App._staffFocus.staff_id;
+      App._staffFocus = null;
+      if (this.staffById(sid)) { this.detailId = sid; App.pushView(() => this.renderUnified(sid)); return; }
+    }
+    this.renderList();
+  },
+
+  // The profile cells shared by the inline add form and the edit profile form
+  // so they never drift. One data row (Name, Position, Pay Type, Wage/Salary,
+  // Status) plus a second row (Phone, Email, Shift Lead). Pay Type swaps the pay
+  // field between an hourly Wage and an Annual Salary; salaried = exempt.
+  profileFormCells(s) {
+    // Oldest-first: lc_positions is row-per-record now and loads NEWEST-first, which put the
+    // last starter position (General Manager) at index 0 — so the Position dropdown opened on
+    // it and a new hire saved without touching the field silently became a GM on the GM's
+    // default pay, flowing into the schedule grid, tip-outs and every labor report.
+    const positions = this.positions().slice().sort(App.byCreation);
+    const deptShort = { 'Management': 'Mgmt', 'Front of House': 'FOH' };
+    const posLabel = p => (p.name || '').replace(/\bAssistant\b/gi, 'Asst.') + ', ' + (deptShort[p.department] || p.department || '');
+    // A NEW hire starts on an explicit "Select position..." — never on whichever position
+    // happens to sort first. Any default silently assigns a real role AND that position's
+    // default pay to anyone who tabs past the field, and it reads as a deliberate choice
+    // afterwards. save() already refuses an empty pick ("Choose a position."), and the
+    // change handler fills pay type + wage the moment one is chosen. An EXISTING person
+    // keeps their own position selected, so only the add path changes.
+    const posOpts = (s ? '' : '<option value="">Select position...</option>')
+      + positions.map(p =>
+        '<option value="' + p.id + '"' + (s && s.position_id === p.id ? ' selected' : '') + '>'
+        + esc(posLabel(p)) + '</option>').join('');
+    const defaultPos = s ? this.positionById(s.position_id) : null;
+    // A new hire inherits the position's default pay type and figure; an existing
+    // person keeps their own.
+    const isSal = s ? (s.pay_type === 'Salary') : !!(defaultPos && defaultPos.pay_type === 'Salary');
+    const payVal = isSal
+      ? (s ? ((s.annual_salary != null && s.annual_salary !== '') ? s.annual_salary : '')
+           : (defaultPos && defaultPos.default_salary != null ? defaultPos.default_salary : ''))
+      : (s ? ((s.wage != null && s.wage !== '') ? s.wage : '')
+           : (defaultPos && defaultPos.default_wage != null ? defaultPos.default_wage : ''));
+    return '<div class="form-row data-row" style="gap:12px;">'
+      + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Name</label>'
+      + '<input type="text" id="sr-name" value="' + esc(s?.name || '') + '" placeholder="Full name"/></div>'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Position</label>'
+      + '<select id="sr-pos">' + posOpts + '</select></div>'
+      + '<div class="f" style="flex:1 1 92px;min-width:0;"><label>Pay Type</label><select id="sr-paytype">'
+      + '<option' + (!isSal ? ' selected' : '') + '>Hourly</option>'
+      + '<option' + (isSal ? ' selected' : '') + '>Salary</option></select></div>'
+      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label id="sr-pay-label">' + (isSal ? 'Annual Salary' : 'Wage') + '</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-pay" min="0" step="0.01" '
+      + 'value="' + payVal + '" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="flex:1 1 92px;min-width:0;"><label>Status</label><select id="sr-status">'
+      + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
+      + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
+      + '</div>'
+      // One row: Secondary Role + Wage, then Phone, Email, Shift Lead. Secondary is
+      // a cross-trained employee who works a second position at a different wage;
+      // logging hours in that role costs at this rate (App.wageForStaffPosition),
+      // and the wage auto-fills from the role's default. Shift Lead lives OUTSIDE a
+      // .f wrapper on purpose: the global `.f input` rule forces appearance:none,
+      // which kills the native checkbox; a plain div keeps it rendering normally.
+      + '<div class="form-row data-row" style="gap:12px;">'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Secondary Role <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+      + '<select id="sr-pos2"><option value="">None</option>'
+      + positions.map(p => '<option value="' + p.id + '"' + (s && s.secondary_position_id === p.id ? ' selected' : '') + '>' + esc(posLabel(p)) + '</option>').join('')
+      + '</select></div>'
+      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Secondary Wage</label>'
+      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage2" min="0" step="0.01" value="' + (s && s.secondary_wage != null && s.secondary_wage !== '' ? s.secondary_wage : '') + '" placeholder="0.00"/></div></div>'
+      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Phone</label>'
+      + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
+      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Email</label>'
+      + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
+      + '<div style="flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:5px;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Lead</div>'
+      + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
+      + '<input type="checkbox" class="bc-check" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + '/>'
+      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager.</span></label></div>'
+      + '</div>'
+      + '<div class="form-row" style="gap:12px;margin-bottom:18px;"><div style="flex:1 1 100%;min-width:0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Regular Days Off</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+      + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(dn => {
+          const on = !!(s && Array.isArray(s.off_days) && s.off_days.indexOf(dn) >= 0);
+          return '<button type="button" class="sr-off-chip btn btn-sm" data-day="' + dn + '" data-on="' + (on ? '1' : '0') + '" style="'
+            + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+                  : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + dn + '</button>';
+        }).join('')
+      + '</div></div></div>';
+  },
+
+  // Wire the Pay Type + pay field for whichever profile form is mounted.
+  wirePayFields(editing) {
+    const posEl = document.getElementById('sr-pos');
+    const payEl = document.getElementById('sr-pay');
+    const typeEl = document.getElementById('sr-paytype');
+    const labelEl = document.getElementById('sr-pay-label');
+    if (!posEl || !payEl || !typeEl) return;
+    let wageTouched = !!editing;
+    let typeTouched = !!editing;
+    payEl.addEventListener('input', () => { wageTouched = true; });
+    // Changing the position pre-fills the pay type + figure from the position's
+    // defaults, unless the operator has already set them by hand on this form.
+    posEl.addEventListener('change', e => {
+      const p = this.positionById(e.target.value);
+      if (!p) return;
+      if (!typeTouched) {
+        const sal = p.pay_type === 'Salary';
+        typeEl.value = sal ? 'Salary' : 'Hourly';
+        if (labelEl) labelEl.textContent = sal ? 'Annual Salary' : 'Wage';
+      }
+      if (!wageTouched) {
+        payEl.value = typeEl.value === 'Salary'
+          ? (p.default_salary != null ? p.default_salary : '')
+          : (p.default_wage != null ? p.default_wage : '');
+      }
+    });
+    typeEl.addEventListener('change', () => {
+      typeTouched = true;
+      const sal = typeEl.value === 'Salary';
+      if (labelEl) labelEl.textContent = sal ? 'Annual Salary' : 'Wage';
+      wageTouched = false;
+      const p = this.positionById(posEl.value);
+      payEl.value = sal
+        ? (p && p.default_salary != null ? p.default_salary : '')
+        : (p && p.default_wage != null ? p.default_wage : '');
+    });
+    // Regular-days-off chips: plain selectable chip (no checkbox), gold-tint when on.
+    document.querySelectorAll('.sr-off-chip').forEach(chip => chip.addEventListener('click', () => {
+      const on = chip.dataset.on === '1';
+      chip.dataset.on = on ? '0' : '1';
+      chip.style.background = on ? 'transparent' : 'var(--sel-active-bg)';
+      chip.style.borderColor = on ? 'var(--b1)' : 'var(--gold-tint-bord)';
+      chip.style.color = on ? 'var(--t2)' : 'var(--t1)';
+      chip.style.fontWeight = on ? '' : '700';
+    }));
+    // Secondary wage auto-fills from the secondary role's default wage, mirroring
+    // the primary. Touched-detection seeds off any wage already on file so an
+    // existing custom secondary wage is not overwritten when the role changes;
+    // clearing the role (None) empties the wage and re-arms the auto-fill.
+    const pos2El = document.getElementById('sr-pos2');
+    const wage2El = document.getElementById('sr-wage2');
+    if (pos2El && wage2El) {
+      let wage2Touched = !!(wage2El.value && parseFloat(wage2El.value) > 0);
+      wage2El.addEventListener('input', () => { wage2Touched = true; });
+      pos2El.addEventListener('change', e => {
+        if (!e.target.value) { wage2El.value = ''; wage2Touched = false; return; }
+        if (wage2Touched) return;
+        const p = this.positionById(e.target.value);
+        wage2El.value = (p && p.default_wage != null) ? p.default_wage : '';
+      });
+    }
+  },
+
+  renderList() {
+    this.detailId = null;
+    this.actions.innerHTML = '';
+
+    if (this.positions().length === 0) {
+      App.setupCard(this.container, {
+        title: 'Build Your Roster',
+        lead: 'Each staff member is assigned a position, which sets their department and default wage. Add your positions first, then build the roster.',
+        steps: [
+          { title: 'Add your positions', desc: 'Set up the job roles you staff, like bartender and server, before adding people.', btn: 'Go to Positions', screen: 'lc-positions', done: false }
+        ]
+      });
+      return;
+    }
+
+    // One card, two ways in: type a profile by hand, or drop a staff list. A
+    // segmented toggle swaps the body. Same pattern as Log Hours / Tip Log.
+    const segBtn = (mode, label) => {
+      const on = this.entryMode === mode;
+      return '<button type="button" class="btn btn-sm sr-mode" data-mode="' + mode + '" style="'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
+    };
+    // Primary actions live BELOW the card (bottom-left), collapse-group tagged so
+    // they hide with the card. Import mode's Import / Cancel render into the same
+    // out-of-card slot via the CSVMapper actionsEl. Mirrors Log Hours / Tip Log.
+    let modeBody, actionRow;
+    if (this.entryMode === 'import') {
+      modeBody = '<div id="sr-csv"></div><div id="sr-imp-result"></div>';
+      actionRow = '<div id="sr-imp-actions" data-collapse-group="lc-staff-roster" style="margin-bottom:24px;"></div>';
+    } else {
+      modeBody = this.profileFormCells(null)
+        + App.noteField({ id: 'sr-notes' });
+      actionRow = '<div data-collapse-group="lc-staff-roster" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+        + '<button class="btn btn-primary" id="sr-save">Add Staff</button>'
+        + '<button class="btn btn-ghost" id="sr-startover">Start Over</button>'
+        + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+        + '</div>';
+    }
+    const addCard = '<div class="card form-card">'
+      + App.collapsibleCardTitle('lc-staff-roster', 'Add Staff Member')
+      // Shown only while the columns are being matched, in place of the head above it.
+      + '<div class="card-title" id="sr-imp-head" style="display:none;">Import Staff Roster</div>'
+      + '<div class="collapse-body">'
+      + '<div class="seg-toggle" id="sr-mode-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + modeBody
+      + '</div></div>'
+      + actionRow;
+
+    const list = [...this.staff()].sort((a, b) => {
+      if ((a.status === 'Inactive') !== (b.status === 'Inactive')) return a.status === 'Inactive' ? 1 : -1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    // Fixed column widths so the roster columns space evenly instead of bunching
+    // to the left around the longest cell.
+    const rosterCols = '<colgroup><col style="width:17%"/><col style="width:14%"/><col style="width:16%"/><col style="width:13%"/><col style="width:11%"/><col style="width:11%"/><col style="width:18%"/></colgroup>';
+    let below;
+    if (list.length === 0) {
+      below = '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list" style="table-layout:fixed;width:100%;">' + rosterCols + '<thead><tr>'
+        + '<th>Staff Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
+        + '</tr></thead><tbody><tr><td colspan="7" style="color:var(--t3);">No staff yet. Add your first team member above, or import a staff list.</td></tr></tbody></table></div>';
+    } else {
+      const rows = list.map(s => {
+        const pos = this.positionById(s.position_id);
+        const roll = this.certRollup(s.id);
+        const certCell = roll === 'expired'  ? '<span style="color:var(--red);font-weight:700;">Expired</span>'
+                       : roll === 'expiring' ? '<span style="color:var(--amber);font-weight:700;">Expiring</span>'
+                       : roll === 'ok'       ? '<span style="color:var(--t2);">Current</span>'
+                       : '<span style="color:var(--t3);">&mdash;</span>';
+        return '<tr class="sr-row" data-id="' + s.id + '" style="cursor:pointer;">'
+          + '<td><div class="val">' + esc(s.name || '-')
+            + (s.shift_lead ? ' <span style="color:var(--t2);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Lead</span>' : '') + '</div></td>'
+          + '<td>' + esc(pos ? pos.name : '-') + '</td>'
+          + '<td>' + esc(pos ? (pos.department || '-') : '-') + '</td>'
+          + '<td class="val">' + (s.wage != null ? App.fmtCurrency(s.wage) + '/hr'
+              : (App.isSalaried(s) ? App.fmtCurrency(s.annual_salary || 0) + '/yr' : '-')) + '</td>'
+          + '<td>' + (s.status === 'Inactive'
+              ? '<span style="color:var(--t3);font-weight:700;">Inactive</span>'
+              : '<span style="color:var(--t1);font-weight:700;">Active</span>') + '</td>'
+          + '<td>' + certCell + '</td>'
+          + '<td><div class="row-actions">'
+          + (App.canEdit('lc-staff-roster') ? '<button class="btn btn-ghost btn-sm sr-edit" data-id="' + s.id + '">Edit</button>' : '')
+          + (App.canEdit('lc-staff-roster') ? '<button class="btn btn-danger btn-sm sr-del" data-id="' + s.id + '">Delete</button>' : '')
+          + '</div></td></tr>';
+      }).join('');
+      below = '<div class="no-print" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:4px 0 10px;">'
+        + '<button class="btn btn-ghost btn-sm" id="sr-export">Export PDF</button></div>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">' + rosterCols + '<thead><tr>'
+        + '<th>Staff Name</th><th>Position</th><th>Department</th><th>Wage</th><th>Status</th><th>Certs</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }
+
+    /* ⛔⛔ THE CONFIRM SCREEN TAKES THE WHOLE PAGE. It used to take the add card's slot only, and the
+       roster stayed below it, on the reasoning that *"already on your roster is a verdict about that
+       list, so the operator can see it from here"*. Kyle killed that on the regulars door
+       (2026-08-07) and he is right, because the argument only ever covered the dup rows and the
+       price was much higher than a glance: this screen promises **"Nothing is saved until you do"**,
+       and the roster below it carries DELETE and EDIT, which write on the press. Two opposite write
+       models on one page with the destructive one under the reassuring sentence, plus an Export PDF
+       handing out a roster that is about to change.
+       ⚠ The `noPos` clause still says *"open them on the roster below"*, and that stays true: it is
+       printed AFTER a successful write, at which point the review is cleared and the roster is back.
+       Pinned by `verify-confirm-screen-owns-page.js`, which RENDERS this door rather than reading it. */
+    this.container.innerHTML = '<div class="screen">'
+      + (this._staffReview ? this.staffReviewHTML() : addCard + '<div id="sr-list-region">' + below + '</div>') + '</div>';
+    this.container.onclick = ev => {
+      /* The confirm screen's two controls. Both write state and re-render, so the button's count,
+         the rows and what gets written all read from the same place. */
+      // A section head opens or closes its own table. A closed section renders no rows at all, so
+      // this is what actually builds them.
+      const ssec = ev.target.closest('[data-confirm-section]');
+      if (ssec && this._staffReview) {
+        const k = ssec.dataset.confirmSection;
+        this._staffReview.open[k] = (k === 'needs') ? (this._staffReview.open[k] === false) : !this._staffReview.open[k];
+        this.renderList(); return;
+      }
+      /* Remove takes a row out of the import. No confirm: nothing is written until Add, the row is
+         named right beside the button, and Start Over re-drops the file. */
+      const srm = ev.target.closest('[data-confirm-remove]');
+      if (srm && this._staffReview) {
+        this._staffReview.removed[srm.dataset.confirmRemove] = true;
+        this.renderList(); return;
+      }
+      // Put Back, from the Removed section. The exact inverse, and the reason Remove is safe to
+      // press at all: nothing on this screen destroys anything until the button at the bottom.
+      const spb = ev.target.closest('[data-confirm-restore]');
+      if (spb && this._staffReview) {
+        delete this._staffReview.removed[spb.dataset.confirmRestore];
+        this.renderList(); return;
+      }
+      if (ev.target.closest('[data-staffreview-go]')) { this._runStaffReview(); return; }
+      if (ev.target.closest('[data-staffreview-back]')) {
+        // Back to the drop zone, not out of the import. A mapping belongs to the file it was made
+        // for, so the file is re-dropped from scratch. Nothing was written to undo.
+        this._staffReview = null; this.renderList(); return;
+      }
+      const modeBtn = ev.target.closest('.sr-mode');
+      // Switching mode abandons a confirm in progress, which is safe: nothing has been written.
+      if (modeBtn) { this._staffReview = null; this.entryMode = modeBtn.dataset.mode; this.renderList(); return; }
+      const head = ev.target.closest('.card-collapse-head');
+      if (head) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('#sr-startover')) { this._draft = null; this.renderList(); return; }
+      if (ev.target.closest('#sr-export'))    { App.exportPDF({ title: 'Staff Roster', root: this.container }); return; }
+      if (ev.target.closest('#sr-save'))     { this.saveProfile(null); return; }
+      const edit = ev.target.closest('.sr-edit');
+      const del = ev.target.closest('.sr-del');
+      const row = ev.target.closest('.sr-row');
+      if (del)        { ev.stopPropagation(); this.confirmDel(del.dataset.id); }
+      else if (edit)  { ev.stopPropagation(); const id = edit.dataset.id; App.pushView(() => this.renderUnified(id)); }
+      else if (row)   { const id = row.dataset.id; App.pushView(() => this.renderUnified(id)); }
+    };
+    /* ⚠ NOT WHILE THE CONFIRM SCREEN IS UP. Its markup replaces the add card, so `#sr-csv` is gone
+       and re-mounting would hand the operator a second file picker over a file they have not
+       finished confirming. */
+    if (this._staffReview) return;
+    if (this.entryMode === 'import') this.mountImporter();
+    else {
+      // Restore an in-progress Add-Staff draft, then sync the pay label to the
+      // restored Pay Type (a synthetic change event would wipe the pay value).
+      const formRoot = this.container.querySelector('.form-card');
+      if (formRoot && this._draft) {
+        App.restoreDraft(formRoot, this._draft);
+        const typeEl = document.getElementById('sr-paytype'), labelEl = document.getElementById('sr-pay-label');
+        if (typeEl && labelEl) labelEl.textContent = typeEl.value === 'Salary' ? 'Annual Salary' : 'Wage';
+      }
+      this.wirePayFields(false);
+      if (formRoot) {
+        const cap = () => { this._draft = App.captureDraft(formRoot); };
+        formRoot.addEventListener('input', cap);
+        formRoot.addEventListener('change', cap);
+      }
+    }
+    App.applyCollapsed(this.container);
+  },
+
+  // Mount the drag-drop + column mapper into the landing's import body.
+  mountImporter() {
+    const el = document.getElementById('sr-csv');
+    if (!el || typeof CSVMapper === 'undefined') return;
+    CSVMapper.mount(el, {
+      dropTitle: 'Drop your staff list here',
+      subject: 'Staff',
+      dropSub: 'Only Name is required; position, pay, status, phone, and email come in if your file has them.',
+      actionsEl: '#sr-imp-actions',
+      /* ⛔ THE MAPPER TAKES THE PAGE (Kyle, walking this door 2026-08-16): *"mapping needs to
+         have the small header like the ones we have already done.. 'Import Staff Roster' or
+         whatever.. and no toggle buttons"*. The card head and the Enter Manually / Import File
+         toggle were still offering a different way to enter a person over the top of a file the
+         operator had already dropped, with `MAP YOUR COLUMNS · STAFF` underneath them.
+         ⛔ AND THE ROSTER GOES WITH THEM, on the argument `renderList` above already makes about
+         the confirm screen: it promises *"Nothing is saved until you do"* while the roster below
+         carries Delete, Edit and a clickable row that all write on the press, plus an Export PDF
+         handing out a roster that is about to change. Every clause of that is just as true while
+         the columns are being matched — same page, same buttons. Same shape as ic-vendors and
+         ev-regulars, which Kyle walked and kept.
+         ⚠ THE HEAD IS ADDRESSED BY ITS COLLAPSE KEY, not by a new id and not by a wrapper:
+         `style.css` styles it as `.form-card > .card-title`, a DIRECT-CHILD selector, so wrapping
+         it would strip the head band's margins. That attribute is what the collapse system
+         already identifies it by, which makes it the durable handle.
+         ⚠ IT COMES BACK AS `flex` — the helper renders the head as an inline flex row, and a bare
+         reset would drop its title and chevron off one line. Cancel re-mounts and fires 'drop'.
+         ⚠ HIDDEN, NOT RE-RENDERED: this fires from inside `CSVMapper.mount`, so a re-render here
+         would rebuild `#sr-csv` and throw away the file just dropped. */
+      onState: state => {
+        const map = (state === 'map');
+        const head = this.container.querySelector('[data-collapse-key="lc-staff-roster"]');
+        if (head) head.style.display = map ? 'none' : 'flex';
+        ['sr-mode-toggle', 'sr-list-region', 'sr-imp-result'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = map ? 'none' : '';
+        });
+        const impHead = document.getElementById('sr-imp-head');
+        if (impHead) impHead.style.display = map ? '' : 'none';
+      },
+      fields: [
+        /* ⚠ REQUIRED, and an ADP roster imported a JOB CLASSIFICATION as everyone's name: on
+           `Associate ID | Legal Name | Job Title | Worker Category`, `name` is EXACT_ONLY so "Legal
+           Name" was unreachable, while bare `worker` hunted into "Worker Category". The payroll
+           spellings are explicit now and lead; `worker` moved to last so it can never outrank one. */
+        { key: 'name',          label: 'Name',          required: true,  match: ['employee name', 'legal name', 'display name', 'preferred name', 'full name', 'staff name', 'team member name', 'associate name', 'worker name', 'name', 'employee', 'staff', 'first name', 'last name', 'team member', 'associate', 'worker'] },
+        { key: 'position',      label: 'Position',      required: false, match: ['position', 'role', 'title', 'job', 'job title', 'job role', 'position title', 'job position'] },
+        /* ⚠ `'pay'` WAS IN pay_type's LIST AND IT STOLE THE WAGE COLUMN. `match` arrays are walked
+           in declared order and pay_type is declared first, so a header of exactly "Pay" bound to
+           pay_type and `wage` was left unmapped — every shift then cost $0.00. "Base Pay Rate" and
+           "Hourly Pay Rate" broke the same way on the word match. The door's own drop copy invites
+           the header ("position, pay, status, phone, and email come in if your file has them").
+           A column headed "Pay" is an AMOUNT, so it belongs to `wage`, last in its list. */
+        { key: 'pay_type',      label: 'Pay Type',      required: false, match: ['pay type', 'type', 'employment type', 'wage type', 'pay category'] },
+        { key: 'wage',          label: 'Wage ($/hr)',   required: false, match: ['wage', 'rate', 'hourly', 'pay rate', 'hourly rate', 'hourly wage', 'wage rate', 'hourly pay', 'pay per hour', 'pay/hr', 'base pay', 'pay'] },
+        { key: 'annual_salary', label: 'Annual Salary', required: false, match: ['salary', 'annual salary', 'annual', 'yearly salary', 'annual pay', 'yearly pay'] },
+        { key: 'status',        label: 'Status',        required: false, match: ['status', 'active', 'employment status', 'active status', 'staff status'] },
+        { key: 'phone',         label: 'Phone',         required: false, match: ['phone', 'mobile', 'cell', 'phone number', 'telephone', 'cell phone', 'contact phone', 'mobile number'] },
+        { key: 'email',         label: 'Email',         required: false, match: ['email', 'e-mail', 'email address', 'e mail', 'contact email', 'work email'] }
+      ],
+      confirmLabel: 'Import Staff',
+      /* ⛔ THE FILE DOES NOT WRITE ITSELF ANY MORE. It goes to the confirm screen, which prints each
+         person's RESOLVED PAY beside their name. Every pay defect this door has shipped was a figure
+         that differed from what the operator believed they were importing, and none of them is
+         visible in a mapper preview. */
+      onComplete: rows => this._openStaffReview(rows)
+    });
+  },
+
+  showHowTo() {
+    App.showHelpModal('How the Staff Roster Works', [
+      { p: ['The roster is your team: every staff member, their position, wage, and status. It is the source for scheduling, hours, tips, and the Revenue Recovery server list, so getting it right here means it is right everywhere.'] },
+      { h: 'Adding Someone', p: ['Pick Enter Manually, fill the row, and click Add Staff. The position sets the default pay type and figure, an hourly wage or a salary, which you can override per person. Wage changes are tracked with history, so past hours always cost out at the wage in effect on that day, not today\'s rate. Check Shift Lead on anyone who can run shifts and authorize like a manager even when they are hourly; Management already counts as a supervisor without it. If someone works a second role at a different rate, like a server who picks up bar shifts, set a Secondary Role and its wage; logging hours in that role then costs at the secondary rate, and a Role picker shows up on Log Hours for them.'] },
+      { h: 'Fixing A Wage Change', p: ['Open a person and a Wage History table shows every raise and cut with the date it took effect. If a change landed on the wrong day, those shifts cost out at the wrong rate, so Edit the change to correct its effective date, or Delete one entered in error. To change the current wage, edit the profile up top; that records a fresh change here on its own.'] },
+      { h: 'Regular Days Off', p: ['Tap the weekday chips to mark a standing day someone never works, like a server who is always off Sundays. Build Schedule blocks every one of those weekdays automatically, so you do not have to remember it each week. For a one-time request (a vacation week, a day off), use Time Off instead.'] },
+      { h: 'Importing A Staff List', p: ['Switch to Import File and drop a CSV or Excel file. Map the columns once and Bar Cop remembers it. Only Name is required; Position, Pay Type, Wage, Annual Salary, Status, Phone, and Email are matched if your file has them, and anything missing imports blank to fill in later. Each person\'s position matches your existing positions by name (set those up first for the cleanest import); an unmatched or blank position still imports, just open the person and pick one.', 'Before anything is written, Bar Cop lists every person in the file beside the pay it worked out for them, and puts whatever it could not read at the top. Nothing is saved until you press Add on that screen. Read the pay column: a wage Bar Cop could not use is the one mistake that quietly costs you money on every labor number.'] },
+      { h: 'Hourly or Salaried', p: ['Set Pay Type to Salary for an exempt manager or any fixed-salary role, then enter the annual salary. Bar Cop spreads that salary evenly across the year (salary divided by 52 each week) as a fixed labor cost, and salaried staff never show overtime. You can still log their hours so they count toward coverage and revenue per labor hour, but those hours never add an hourly cost. If a salaried employee is overtime eligible (non-exempt), set them to Hourly instead. How you classify staff under wage and hour law is your call. Bar Cop is a tool, not legal or payroll advice.'] },
+      { h: 'Certifications and Coaching', p: ['Click any staff member to open their page. That is where you add certifications (TABC, food handler, ServSafe, and the rest, with expiration dates Bar Cop flags before they lapse) and the coaching log (praise, coaching, concern, and warning notes that protect you if a tough HR moment ever lands).'] },
+      { h: 'Training', p: ['Each person\'s page also has a Training section. Use Assign Training to load an onboarding template onto them, check the steps off as they finish, and pick who signed off. Build the templates themselves on the Training screen, which also shows where every staff member stands at a glance.'] },
+      { h: 'Active or Inactive', p: ['Set a staff member Inactive when they leave instead of deleting them, so their past hours, tips, and records stay intact. Inactive staff drop off the schedule and tip pickers but keep their history.'] }
+    ]);
+  },
+
+  _openStaffReview(rows) {
+    this._staffReview = {
+      // ⚠ A STABLE ID PER ROW, so Remove has something to remove BY. The build returns one
+      // verdict per input row in the file's own order, so index is a real identity here.
+      rows: (rows || []).map((r, i) => Object.assign({}, r, { _rid: 'r' + i })),
+      open: {}, removed: {}
+    };
+    this.renderList();
+  },
+
+  /* ONE WALK produces the rows the screen shows AND the number the button prints, because both come
+     out of the same `_buildStaffRows` the write uses. */
+  _staffReviewSummary() {
+    const r = this._staffReview;
+    if (!r) return { rows: [], count: 0 };
+    // A removed row is gone from the list, the counts and the write.
+    const live = r.rows.filter(x => !r.removed[x._rid]);
+    const built = this._buildStaffRows(live);
+    // ⚠ Zipped by index: the build pushes exactly one entry per input row, in order.
+    const rows = built.list.map((x, i) => this._staffReviewRow(x, (live[i] || {})._rid));
+    return { rows: rows, count: rows.filter(x => x.lands).length, built: built };
+  },
+  _staffReviewCount() { return this._staffReview ? this._staffReviewSummary().count : 0; },
+
+  /* The rows the operator took out. Built through the SAME walk and the SAME row mapper as the rest,
+     so a removed row looks exactly as it did when they removed it — which is what makes Put Back
+     legible; a row rendering as a blank line is one nobody can decide about.
+     ⚠ A SEPARATE WALK, ON PURPOSE. Removed rows are gone from the live build, so a removed duplicate
+     stops blocking the row behind it. That is what makes Remove mean "take this out of the import"
+     rather than "hide it" — and it is why the verdicts from THIS walk are never read. */
+  _staffReviewRemoved() {
+    const r = this._staffReview;
+    if (!r) return [];
+    const gone = r.rows.filter(x => r.removed[x._rid]);
+    if (!gone.length) return [];
+    return this._buildStaffRows(gone).list.map((x, i) => Object.assign(
+      this._staffReviewRow(x, (gone[i] || {})._rid),
+      { note: 'Taken out of this import', notes: [], lands: false }));
+  },
+
+  /* One file row as an `ImportConfirm` row. `cells` is HTML this door escapes; `note` and `notes`
+     are TEXT the shell escapes and budgets to one line.
+     ⛔ THE PAY CELL IS THE WHOLE REASON THIS SCREEN EXISTS ON THIS DOOR. Every defect it has shipped
+     was a pay figure that differed from what the operator believed they were importing, and none of
+     them is visible in a mapper preview. It prints the figure that is about to be STORED, resolved
+     the same way the write resolves it, because they come from the same walk. */
+  _staffReviewRow(x, rid) {
+    const NOTE = {
+      'new':   'Adding this person',
+      dup:     'Already on your roster',
+      repeat:  'Repeated in this file',
+      blank:   'No name',
+      // Same sentence shape every converted door uses for this row: name what it IS, then what it
+      // is not, so the operator is never told to fix a roster spelling that is a footer.
+      summary: 'Your file\'s own totals line, not a person'
+    };
+    const rec = x.rec || {};
+    const raw = x.raw || {};
+    /* ⚠ FORMATTED EXACTLY AS THE ROSTER ROW BELOW FORMATS IT — `App.fmtCurrency(salary) + '/yr'`,
+       cents and all. `$52,000.00/yr` looks like it wants trimming, and trimming it here would make
+       this screen and the list it feeds print the same person's salary two different ways, which is
+       the "one quantity, two screens" trap. If the cents go, they go in both places at once. */
+    const money = v => App.fmtCurrency(v);
+    const pay = x.status !== 'new' ? '&mdash;'
+      : rec.pay_type === 'Salary'
+        ? (rec.annual_salary != null ? money(rec.annual_salary) + '/yr' : '&mdash;')
+        : (rec.wage != null ? money(rec.wage) + '/hr' : '&mdash;');
+    const positions = this.positions() || [];
+    const posName = rec.position_id
+      ? (positions.find(p => p.id === rec.position_id) || {}).name || ''
+      : String(raw.position || '').trim();
+    return {
+      cells: [x.name ? esc(x.name) : '&mdash;',
+              esc(posName) || '&mdash;',
+              pay,
+              esc(x.status === 'new' ? rec.status : String(raw.status || '').trim()) || '&mdash;'],
+      key: rid,
+      note: NOTE[x.status] || '',
+      notes: x.notes || [],
+      lands: x.status === 'new'
+    };
+  },
+
+  staffReviewHTML() {
+    const s = this._staffReviewSummary();
+    const n = s.rows.length;
+    const bad = s.rows.filter(x => !x.lands).length;
+    /* ⚠ EACH NUMBER NAMES ITS OWN COLLECTION: `n` is rows read out of the file, `bad` is rows that
+       will not land, and the button counts people who will be created. And the lead names the
+       button's own verb, so renaming the button rewrites this sentence with it. No em dashes. */
+    const lead = 'Bar Cop read ' + n + ' row' + (n === 1 ? '' : 's') + ' out of this file. '
+      + (bad
+          ? (bad === 1 ? 'One of them is not going in. ' : bad + ' of them are not going in. ') + 'Check the pay on the rest, then add them. '
+          : 'Check the pay on each of them, then add them. ')
+      + 'Nothing is saved until you do.';
+    return ImportConfirm.panel({
+      label: 'Check your roster',
+      lead: lead,
+      columns: [{ label: 'Name', width: 22 }, { label: 'Position', width: 16 },
+                { label: 'Pay', width: 14 }, { label: 'Status', width: 11 }],
+      outcomeLabel: 'What Happens',
+      rows: s.rows,
+      verb: 'Add', noun: 'Person', nounPlural: 'People',
+      removable: true,
+      // Removed rows are never part of `rows`, which is what keeps them out of the count, out of
+      // the needs/settled split and out of the "All N of these" lift with no special case anywhere.
+      removedRows: this._staffReviewRemoved(),
+      goAttr: 'data-staffreview-go', backAttr: 'data-staffreview-back', backLabel: 'Start Over',
+      resultId: 'sr-imp-result',
+      // The door owns which sections are open; a closed one builds no table at all.
+      open: (this._staffReview || {}).open,
+      busy: !!this._staffReviewWriting
+    });
+  },
+
+  /* One press, one import. The button is rebuilt by every re-render, so a flag on the screen is the
+     only thing a re-render cannot hand back. */
+  async _runStaffReview() {
+    const r = this._staffReview;
+    if (!r || this._staffReviewWriting) return;
+    this._staffReviewWriting = true;
+    const btn = this.container && this.container.querySelector('[data-staffreview-go]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+    try { await this.importStaffRows(r.rows.filter(x => !r.removed[x._rid]), { reviewed: true }); }
+    finally {
+      this._staffReviewWriting = false;
+      /* ⛔ ONLY SUCCESS CLEARS THE SCREEN, and `importStaffRows` is what clears it — a refused write
+         keeps every row so the operator presses again without re-dropping. Do NOT re-render here:
+         the failure path writes into the result slot and a re-render destroys it. */
+      if (this._staffReview) {
+        const b = this.container && this.container.querySelector('[data-staffreview-go]');
+        const n = this._staffReviewCount();
+        if (b) { b.disabled = false; b.textContent = 'Add ' + n + (n === 1 ? ' Person' : ' People'); }
+      }
+    }
+  },
+
+  /* ── The confirm screen ──────────────────────────────────────────────────────
+     Door 4 of the rollout. This door owns its columns and its build; `ImportConfirm` owns the
+     frame, the dim rule and the button's count, which it derives from the rows rather than taking
+     as an argument.
+
+     ⛔ THE ONE WALK. `importStaffRows` and the screen must decide "does this row land, and what
+     pay will it land with" in the same place. Two copies of that decision is how a button ends up
+     promising a number the write does not honour. Pure: no DOM, no writes, safe on every render. */
+  _buildStaffRows(rows) {
+    const posByName = {};
+    this.positions().forEach(p => { posByName[(p.name || '').trim().toLowerCase()] = p; });
+    /* Dedup by name against the roster AND within the file, so a re-drop after a mapping fix — or
+       next month's payroll export — never mints a second Ana Ruiz.
+       ⚠ The set is built from the WHOLE roster including Inactive, or re-importing a terminated
+       employee creates a second Active record and strands their history.
+       ⛔ TWO REASONS, NOT ONE: a name already on your roster is a dead end; a name repeated inside
+       the file is about the file. They used to share a bucket. */
+    const mine = new Set(this.staff().map(s => (s.name || '').trim().toLowerCase()));
+    const seen = new Set();
+    const list = [];
+    (rows || []).forEach(r => {
+      const name = (r.name || '').trim();
+      if (!name) { list.push({ raw: r, name: '', status: 'blank', notes: [] }); return; }
+      /* ⛔⛔ THE EXPORT'S OWN TOTALS LINE IS NOT A PERSON. A payroll or timeclock export ends in
+         "TOTAL" / "Grand Total" / "Team Average", and this walk read every one of them as a name to
+         hire: measured, a file with twelve footer spellings created twelve staff records, who then
+         appear in every staff picker, on the schedule and across the labor screens, and pick up a
+         wage from the position default.
+         ⛔ THE SAME SHARED TEST THE POS BUILDERS USE, never a word list of this door's own. It is
+         what makes "Grand Summers", "Tom Means", "Avery Nettles" and "Crew Jackson" real people
+         rather than footers — a vocabulary whitelist has deleted a real person from a theft report
+         three times ([[the-loop]] #26), so the control matters as much as the guard.
+         ⚠ ABOVE the dedup checks on purpose: a footer that happens to match a name already on the
+         roster must still read as a footer, not as "already on your roster". */
+      if (PosIngest.isSummaryName(name)) { list.push({ raw: r, name: name, status: 'summary', notes: [] }); return; }
+      const key = name.toLowerCase();
+      if (mine.has(key)) { list.push({ raw: r, name: name, status: 'dup', notes: [] }); return; }
+      if (seen.has(key)) { list.push({ raw: r, name: name, status: 'repeat', notes: [] }); return; }
+      seen.add(key);
+      const posCell = (r.position || '').trim();
+      const pos = posByName[posCell.toLowerCase()] || null;
+      /* ⚠⚠ "NON-EXEMPT" IS THE FLSA WORD FOR *HOURLY*, AND THE OLD TEST READ IT AS SALARIED.
+         `/salar|exempt/i` matches the "exempt" inside "Non-Exempt" — so an ADP/Paychex/Paylocity
+         roster, whose Employment Type column this door's own `match` list asks for by name, made
+         **every hourly employee salaried and then threw their wage away** (the salaried branch
+         stores `wage: null`). A $19.50/hr bartender's 40-hour week cost **$0.00 instead of $780**,
+         and labor cost, labor %, prime cost and RPLH all read low by that person's entire payroll.
+         The Pay column on the confirm screen exists so this class is visible BEFORE the write. */
+      const payTypeCell = (r.pay_type || '').trim();
+      const salNum = App.parseNum(r.annual_salary);
+      // ⚠ Declared HERE, above `salaried`, because `salaried` consults it.
+      const wageNum = App.parseNum(r.wage);
+      const saysSalary = /salar/i.test(payTypeCell)
+        || (/\bexempt\b/i.test(payTypeCell) && !/non[\s-]*exempt/i.test(payTypeCell));
+      /* ⚠ AND A SALARY FIGURE IS ITSELF THE CLASSIFICATION. Forcing `annual_salary` to null unless a
+         SEPARATE Pay Type column agreed made a Name/Title/Salary manager list — which is how a
+         three-person salaried list is actually written — import everyone Hourly with no wage.
+         ⚠⚠ BUT ONLY WHEN IT IS A REAL FIGURE AND THERE IS NO WAGE. `salNum != null` was true for
+         **zero**, so a file writing `0` into an unused Annual Salary column made every hourly
+         employee salaried and threw the wage away — the identical $0.00-a-shift failure the
+         Non-Exempt fix was written to kill, re-entered one round later through another door. */
+      const salaried = saysSalary || (!payTypeCell && salNum != null && salNum > 0 && wageNum == null);
+      /* App.parseNum, not parseFloat: `parseFloat('52,000')` is 52 and `parseFloat('$19.50')` is
+         NaN. XLSX is read with raw:false, so a Currency- or #,##0-formatted money column arrives as
+         exactly those strings. A $52,000 salary imported as $52.
+         A negative is refused rather than stored: the manual form carries min="0", and a negative
+         rate makes labor cost FALL when that person works. */
+      const wageOk = wageNum != null && wageNum >= 0;
+      const salOk = salNum != null && salNum >= 0;
+      const badPay = (wageNum != null && wageNum < 0) || (salNum != null && salNum < 0);
+      /* Fall back to the position's default wage, exactly as the manual form does the moment a
+         position is picked — otherwise the same file typed by hand and imported gives two answers,
+         and the import's answer costs every shift at $0.
+         ⛔ AND THAT FALLBACK IS AN ASSUMPTION, SO THE ROW SAYS SO. The figure did not come from
+         their file; it came from the position. Landing silently on a number the operator never
+         supplied is how a wrong wage survives an import nobody questioned. */
+      const posWage = (pos && pos.default_wage != null) ? pos.default_wage : null;
+      const usedPosWage = !salaried && !wageOk && posWage != null;
+      const inactive = /inactive|term/i.test((r.status || '').trim());
+      /* A cell the file HAD and Bar Cop could not use is reported; an ABSENT cell is not a problem
+         and must never be counted as one, or every name-and-position list reads broken. */
+      /* ⛔⛔ AND THE LOUDEST ONE: THIS PERSON WILL LAND WITH NO PAY AT ALL. Every defect in this
+         door's history ends in exactly this state, and it is the one the operator cannot see
+         downstream — `wageForStaffPosition` returns 0, `salariedCost` skips them, and their shifts
+         cost $0.00 while labor cost, labor %, prime cost and RPLH all read low by their whole
+         payroll. Nothing about the roster row says "unpaid"; it just shows a dash.
+         ⚠ FOUND ON A LIVE WALK, NOT BY A PIN, and the pins could not have found it: every fixture
+         had positions in it, so the position default always rescued a missing wage. On a roster with
+         NO positions yet — which is what a first-time operator actually has when they drop their
+         staff list — a refused negative wage and a blank wage both land as nothing, and the screen
+         said "Adding this person" with no more comment than a dash in the Pay column. */
+      const finalWage = salaried ? null : (wageOk ? wageNum : posWage);
+      const finalSalary = salaried ? (salOk ? salNum : null) : null;
+      const noPay = finalWage == null && finalSalary == null;
+      const notes = [];
+      if (noPay) notes.push('No pay set: their shifts will cost $0');
+      if (posCell && !pos) notes.push('Position not on your list');
+      else if (!posCell) notes.push('No position set');
+      if (badPay) notes.push('Negative pay figure ignored');
+      if (usedPosWage) notes.push('Wage came from the position default');
+      list.push({
+        raw: r, name: name, status: 'new', notes: notes,
+        badPay: badPay, noPos: !pos, badPos: !!(posCell && !pos), usedPosWage: usedPosWage,
+        noPay: noPay,
+        rec: {
+          id:            App.uid(),
+          name,
+          position_id:   pos ? pos.id : '',
+          pay_type:      salaried ? 'Salary' : 'Hourly',
+          // ⚠ ONE SOURCE with the `noPay` test above, or the row could say "no pay set" about a
+          // record that has some, or stay silent about one that has none.
+          wage:          finalWage,
+          annual_salary: finalSalary,
+          wage_history:  [],
+          status:        inactive ? 'Inactive' : 'Active',
+          phone:         (r.phone || '').trim(),
+          email:         (r.email || '').trim(),
+          notes:         '',
+          created_at:    new Date().toISOString()
+        }
+      });
+    });
+    return { list: list };
+  },
+
+  async importStaffRows(rows, opts) {
+    opts = opts || {};
+    /* ⛔ ONE WALK, SHARED WITH THE SCREEN. Everything below is REPORTING; nothing below decides
+       what lands or what pay it lands with. */
+    const built = this._buildStaffRows(rows);
+    const countOf = f => built.list.filter(f).length;
+    const toAdd    = built.list.filter(x => x.status === 'new').map(x => x.rec);
+    const dupes    = countOf(x => x.status === 'dup');
+    const repeated = countOf(x => x.status === 'repeat');
+    const blank    = countOf(x => x.status === 'blank');
+    const badPay   = countOf(x => x.badPay);
+
+    const result = document.getElementById('sr-imp-result');
+    /* ⚠ THE ZERO-ROW HEADLINE MUST NAME THE REASON THAT ACTUALLY APPLIES. "Each row needs a Name"
+       was printed even when every name was fine and every row was already on the roster — sending
+       the operator to fix a column that was correct. An absolute claim may only fire when the other
+       buckets are empty; the mixed case asserts nothing and lets the counts speak. */
+    if (toAdd.length === 0) {
+      // ⚠ AN ABSOLUTE CLAIM NEEDS EVERY OTHER BUCKET EMPTY, `repeated` included now that it has one.
+      const why = dupes && !blank && !repeated ? 'Everyone in this file is already on your roster.'
+        : blank && !dupes && !repeated ? 'No rows imported. Each row needs a Name.'
+        : dupes || blank || repeated ? 'No new staff imported.'
+        : 'No rows imported. Each row needs a Name.';
+      const bits = [];
+      if (dupes) bits.push(dupes + ' already on your roster');
+      if (repeated) bits.push(repeated + ' repeated in this file');
+      if (blank) bits.push(blank + ' row' + (blank === 1 ? '' : 's') + ' skipped with no name');
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">'
+        + why + (bits.length ? ' (' + bits.join(' · ') + ')' : '') + '</div>';
+      return;
+    }
+    this.staff().push(...toAdd);
+    const ok = await App.putRecordsBulk('lc', 'staff', toAdd);   // row-per-record
+    if (ok) {
+      App.markSetupDone('gs_lc_roster');
+      const noPos = toAdd.filter(s => !s.position_id).length;
+      /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. A refused write returns through
+         the else branch below with the screen still up, so the operator presses again rather than
+         re-dropping. This is the only line that knows the write landed. */
+      this._staffReview = null;
+      this.renderList();
+      const res2 = document.getElementById('sr-imp-result');
+      /* Every way a row can be dropped now reaches the operator. The only counter this door had was
+         `noPos`, so a 50-row export with 20 subtotal/spacer rows reported "Imported 30 staff
+         members." and said nothing about the other 20 — which is what hid every defect above. */
+      const notes = [];
+      if (dupes) notes.push(dupes + ' already on your roster');
+      if (repeated) notes.push(repeated + ' repeated in this file');
+      if (blank) notes.push(blank + ' row' + (blank === 1 ? '' : 's') + ' skipped with no name');
+      if (badPay) notes.push(badPay + ' negative pay figure' + (badPay === 1 ? '' : 's') + ' ignored');
+      if (noPos > 0) notes.push(noPos + ' need a position set; open them on the roster below');
+      /* ⛔ THE CLAUSE LIST IS FOR AN IMPORT NOBODY WAS SHOWN. Every one of those clauses is now a row
+         on the confirm screen, said once, where the operator read it and pressed Add. Repeating it
+         afterwards is the second telling. The full account survives for a caller with no screen in
+         front of it.
+         ⚠ "Added", not "Imported": the file was imported two screens ago and the button they pressed
+         said Add. And "people", not "staff members", to match that button. */
+      if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">Added '
+        + toAdd.length + (toAdd.length === 1 ? ' person' : ' people') + '.'
+        + (!opts.reviewed && notes.length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes.join(' · ') + ')</span>' : '') + '</div>';
+    } else {
+      const ids = new Set(toAdd.map(s => s.id));
+      App.laborData.lc_staff = this.staff().filter(s => !ids.has(s.id));
+      if (result) result.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">Save failed. Try again.</div>';
+    }
+  },
+
+  // ── Staff page — editable profile + Certifications + Coaching Log ──────────
+  renderUnified(staffId) {
+    const s = this.staffById(staffId);
+    if (!s) { this.renderList(); return; }
+    this.detailId = staffId;
+    this.actions.innerHTML = '';
+
+    this.container.innerHTML = '<div class="screen">'
+      + this.renderProfileEditCard(s)
+      + this.renderWageHistoryCard(s)
+      + this.renderCertsCard(staffId)
+      + (S.LaborTraining ? S.LaborTraining.rosterSectionHTML(staffId) : '')
+      + this.renderNotesCard(staffId)
+      + '</div>';
+    this.wireUnified(staffId);
+  },
+  renderDetail(staffId) { this.renderUnified(staffId); },
+
+  renderProfileEditCard(s) {
+    return '<div class="card form-card"><div class="card-title">Edit ' + esc(s.name || 'Profile') + '</div>'
+      + this.profileFormCells(s)
+      + App.noteField({ id: 'sr-notes', value: s?.notes })
+      + '</div>'
+      + '<div style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
+      + '<button class="btn btn-primary" id="sr-save">Update Profile</button>'
+      + '<button class="btn btn-ghost" id="sr-cancel">Cancel</button>'
+      + '<span id="sr-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
+  },
+
+  // ── Wage History section ─────────────────────────────────────────────
+  // Visible + correctable. Each profile wage change is auto-recorded, and
+  // App.wageForStaffOn costs past hours at the wage in effect on the day worked,
+  // so an effective date logged on the wrong day mis-costs those shifts. The
+  // operator can fix the date here, or delete a change recorded in error. Only
+  // shows once there is at least one change on file (so it never clutters a
+  // brand-new profile). Salaried staff never accrue wage history.
+  renderWageHistoryCard(s) {
+    const hist = Array.isArray(s.wage_history) ? s.wage_history : [];
+    if (!hist.length) return '';
+    const heading = '<div class="sh" style="margin:24px 0 10px;">Wage History</div>';
+    const canEdit = App.canEdit('lc-staff-roster');
+    const rows = hist.map((h, idx) => ({ h, idx }))
+      .sort((a, b) => (b.h.effective_date || '').localeCompare(a.h.effective_date || ''))
+      .map(({ h, idx }) => {
+        const delta = (h.new_wage != null && h.prior_wage != null) ? h.new_wage - h.prior_wage : null;
+        const deltaCell = delta == null ? '<span style="color:var(--t3);">-</span>'
+          : '<span style="color:' + (delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--amber)' : 'var(--t3)') + ';font-weight:600;">'
+            + (App.fmtSigned(delta, 2).sign > 0 ? '+' : '') + App.fmtBal(delta) + '/hr</span>';
+        return '<tr>'
+          + '<td><div class="val">' + this.fmtDate(h.effective_date) + '</div></td>'
+          + '<td>' + (h.prior_wage != null ? App.fmtCurrency(h.prior_wage) + '/hr' : '-') + '</td>'
+          + '<td class="val">' + (h.new_wage != null ? App.fmtCurrency(h.new_wage) + '/hr' : '-') + '</td>'
+          + '<td>' + deltaCell + '</td>'
+          + '<td><div class="row-actions">'
+          + (canEdit ? '<button class="btn btn-ghost btn-sm wh-edit" data-idx="' + idx + '">Edit</button>'
+            + '<button class="btn btn-danger btn-sm wh-del" data-idx="' + idx + '">Delete</button>' : '')
+          + '</div></td></tr>';
+      }).join('');
+    return heading
+      + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      + '<th>Effective</th><th>Was</th><th>New Wage</th><th>Change</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div style="font-size:11px;color:var(--t3);margin-top:8px;">Past hours cost out at the wage in effect on the day worked. Fix an effective date here if a change was recorded on the wrong day. To change the current wage, edit the profile above; that records a new change here.</div>';
+  },
+
+  // Edit a wage change's effective date (the field that drives past-hour costing).
+  openWageEditModal(staffId, idx) {
+    const s = this.staffById(staffId);
+    const h = (s && Array.isArray(s.wage_history)) ? s.wage_history[idx] : null;
+    if (!h) return;
+    const html = '<div class="card form-card narrow-form" style="margin:0;">'
+      + '<div class="card-title">Edit Wage Change</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
+      + (h.prior_wage != null ? App.fmtCurrency(h.prior_wage) + '/hr' : 'Prior wage') + ' to '
+      + (h.new_wage != null ? App.fmtCurrency(h.new_wage) + '/hr' : 'new wage')
+      + '. Correct the date this change actually took effect so past hours cost out at the right rate.</div>'
+      + '<div class="form-row" style="gap:14px;">'
+        + '<div class="f" style="width:180px;flex-shrink:0;"><label>Effective Date</label>'
+          + '<input type="date" id="wh-date" value="' + esc(h.effective_date || '') + '"/></div>'
+      + '</div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="wh-save">Save</button>'
+        + '<span id="wh-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'wh-modal', maxWidth: 460, noClose: true });
+    document.getElementById('wh-save')?.addEventListener('click', async () => {
+      const v = document.getElementById('wh-date')?.value;
+      const err = document.getElementById('wh-err');
+      if (!v) { if (err) { err.textContent = 'Pick the effective date.'; err.style.display = 'inline'; } return; }
+      const list = this.staff();
+      const i = list.findIndex(x => x.id === staffId);
+      if (i > -1 && Array.isArray(list[i].wage_history) && list[i].wage_history[idx]) {
+        // ⚠ NEVER MUTATE THE LIVE ROW AND NEVER DISCARD THE RESULT (S61). putRecord's revert
+        // restores the ARRAY SLOT, so it can only undo a change when it is handed a DIFFERENT
+        // object than the one already in the list (app.js says so at the revert itself). This used
+        // to edit list[i].wage_history[idx] in place and hand list[i] — making prev === rec, so the
+        // revert assigned the row to itself and undid nothing, while renderUnified repainted the
+        // new date as saved and the server kept the old one. App.wageForStaffOn reads wage_history
+        // to cost PAST hours, so a phantom effective date re-prices historical labour.
+        // ⚠⚠ A FLAT SPREAD IS NOT ENOUGH: wage_history is NESTED, so { ...list[i] } still shares
+        // the same array. Copy the array AND the entry being edited. (The correct twin in this file
+        // is saveProfile, but it only spreads flat fields, so it never had to solve this part.)
+        const hist = list[i].wage_history.map((h, n) =>
+          (n === idx ? { ...h, effective_date: v, updated_at: new Date().toISOString() } : h));
+        const out = { ...list[i], wage_history: hist };
+        if (!(await App.putRecord('lc', 'staff', out))) {
+          if (err) { err.textContent = 'Save failed. Try again.'; err.style.display = 'inline'; }
+          return;   // leave the box open so the retry is one click; putRecord already reverted
+        }
+      }
+      App.closeModal('wh-modal');
+      this.renderUnified(staffId);
+    });
+  },
+
+  async confirmDelWage(staffId, idx) {
+    const ok = await App.confirm({
+      title: 'Delete this wage change?',
+      message: 'This removes the recorded change from the wage history. Past hours will then cost out at the wage in effect before it. The current wage on the profile does not change.',
+      confirmText: 'Delete', cancelText: 'Cancel', danger: true
+    });
+    if (!ok) return;
+    const list = this.staff();
+    const i = list.findIndex(x => x.id === staffId);
+    if (i > -1 && Array.isArray(list[i].wage_history)) {
+      // Same rule as the wage-date save above (S61): a FRESH row object carrying a FRESH array, so
+      // putRecord's slot revert can actually put the entry back, and the result is CHECKED. The old
+      // shape spliced the live array and handed the same row, so a refused delete removed the raise
+      // from memory anyway and the next render showed it gone.
+      const hist = list[i].wage_history.filter((_, n) => n !== idx);
+      const out = { ...list[i], wage_history: hist };
+      if (!(await App.putRecord('lc', 'staff', out))) return;   // reverted; putRecord reports it
+    }
+    this.renderUnified(staffId);
+  },
+
+  wireUnified(staffId) {
+    this.container.onclick = null;
+    this.wirePayFields(true);
+    document.getElementById('sr-cancel')?.addEventListener('click', () => { this.detailId = null; App.goBack(); });
+    document.getElementById('sr-save')?.addEventListener('click', () => this.saveProfile(staffId));
+    // Wage history (correct an effective date, or delete a change logged in error)
+    this.container.querySelectorAll('.wh-edit').forEach(b => b.addEventListener('click', () => this.openWageEditModal(staffId, parseInt(b.dataset.idx, 10))));
+    this.container.querySelectorAll('.wh-del').forEach(b => b.addEventListener('click', () => this.confirmDelWage(staffId, parseInt(b.dataset.idx, 10))));
+    // Certifications
+    document.getElementById('cert-add')?.addEventListener('click', () => { this.certEditId = null; this.openCertModal(staffId); });
+    this.container.querySelectorAll('.cert-edit').forEach(b => b.addEventListener('click', () => { this.certEditId = b.dataset.id; this.openCertModal(staffId); }));
+    this.container.querySelectorAll('.cert-del').forEach(b => b.addEventListener('click', () => this.confirmDelCert(b.dataset.id, staffId)));
+    // Coaching notes
+    document.getElementById('note-add')?.addEventListener('click', () => { this.noteEditId = null; this.openNoteModal(staffId); });
+    this.container.querySelectorAll('.note-edit').forEach(b => b.addEventListener('click', () => { this.noteEditId = b.dataset.id; this.openNoteModal(staffId); }));
+    this.container.querySelectorAll('.note-del').forEach(b => b.addEventListener('click', () => this.confirmDelNote(b.dataset.id, staffId)));
+    // Training (assign + check off) — rendered and wired by S.LaborTraining so the
+    // template store and assignment records have one home (two doors, one store).
+    if (S.LaborTraining) S.LaborTraining.wireRosterSection(this.container, staffId, () => this.renderUnified(staffId));
+  },
+
+  // ── Certifications section ───────────────────────────────────────────
+  renderCertsCard(staffId) {
+    const list = this.certsForStaff(staffId);
+    const addBtn = '<div class="no-print" style="margin:12px 0 24px;"><button class="btn btn-ghost btn-sm" id="cert-add">+ Add Certification</button></div>';
+    const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + this.DETAIL_COLGROUP
+      + '<thead><tr><th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th></tr></thead>';
+    if (list.length === 0) {
+      return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+        + '<tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</td></tr></tbody></table></div>' + addBtn;
+    }
+    const rows = list.map(c => {
+      const status = this.certStatus(c);
+      const badge = status === 'expired' ? '<span style="color:var(--red);font-weight:700;">Expired</span>'
+                 : status === 'expiring' ? '<span style="color:var(--amber);font-weight:700;">Expiring</span>'
+                 : '<span style="color:var(--t2);">Current</span>';
+      return '<tr>'
+        + '<td><div class="val">' + esc(c.cert_type || '-') + '</div>'
+        + (c.cert_number ? '<div style="font-size:10px;color:var(--t3);">#' + esc(c.cert_number) + '</div>' : '') + '</td>'
+        + '<td>' + esc(c.issuer || '-') + '</td>'
+        + '<td>' + this.fmtDate(c.issue_date) + '</td>'
+        + '<td>' + this.fmtDate(c.expiration_date) + '</td>'
+        + '<td>' + badge + '</td>'
+        + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm cert-edit" data-id="' + c.id + '">Edit</button>'
+        + '<button class="btn btn-danger btn-sm cert-del" data-id="' + c.id + '">Delete</button>'
+        + '</div></td></tr>';
+    }).join('');
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+      + '<tbody>' + rows + '</tbody></table></div>' + addBtn;
+  },
+
+  // Cert add/edit in a focused pop-up (own cert- ids; no collision with the
+  // profile form behind it).
+  openCertModal(staffId) {
+    const c = this.certEditId ? this.certs().find(x => x.id === this.certEditId) : null;
+    const typeOpts = this.CERT_TYPES.map(t =>
+      '<option' + (c && c.cert_type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">' + (this.certEditId ? 'Edit Certification' : 'Add Certification') + '</div>'
+      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Certification Type' + App.manageListLink('cert_type') + '</label>'
+          + App.customSelect({ id: 'cert-type', key: 'cert_type', builtin: this.CERT_TYPES, selected: (c ? c.cert_type : ''), blank: true, blankLabel: 'Select type...' }) + '</div>'
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Cert Number <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+          + '<input type="text" id="cert-number" value="' + esc(c?.cert_number || '') + '" placeholder="Optional"/></div>'
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Issuer <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+          + '<input type="text" id="cert-issuer" value="' + esc(c?.issuer || '') + '" placeholder="State, school, etc."/></div>'
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Issue Date</label>'
+          + '<input type="date" id="cert-issued" value="' + esc(c?.issue_date || '') + '"/></div>'
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Expiration Date</label>'
+          + '<input type="date" id="cert-expires" value="' + esc(c?.expiration_date || '') + '"/></div>'
+      + '</div>'
+      + App.noteField({ id: 'cert-notes', value: c?.notes, placeholder: 'Optional context' })
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="cert-save">' + (this.certEditId ? 'Update' : 'Save Certification') + '</button>'
+        + '<span id="cert-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'cert-modal', maxWidth: 540, noClose: true });
+    App.wireCustomSelects(document);
+    document.getElementById('cert-save')?.addEventListener('click', () => this.saveCert(staffId));
+  },
+
+  async saveCert(staffId) {
+    const err = document.getElementById('cert-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const cert_type = document.getElementById('cert-type')?.value;
+    if (!cert_type) { fail('Pick a certification type.'); return; }
+    const expiration_date = document.getElementById('cert-expires')?.value;
+    if (!expiration_date) { fail('Expiration date is required so Bar Cop can flag it before it lapses.'); return; }
+
+    const rec = {
+      id:              this.certEditId || App.uid(),
+      staff_id:        staffId,
+      cert_type,
+      cert_number:     document.getElementById('cert-number')?.value.trim() || '',
+      issuer:          document.getElementById('cert-issuer')?.value.trim() || '',
+      issue_date:      document.getElementById('cert-issued')?.value || '',
+      expiration_date,
+      notes:           document.getElementById('cert-notes')?.value.trim() || '',
+      updated_at:      new Date().toISOString()
+    };
+    if (!this.certEditId) rec.created_at = new Date().toISOString();
+
+    const list = this.certs();
+    let out = rec;   // row-per-record: merge onto the existing cert on edit, then write one row
+    if (this.certEditId) { const i = list.findIndex(x => x.id === this.certEditId); if (i > -1) out = { ...list[i], ...rec }; }
+    const ok = await App.putRecord('lc', 'cert', out);
+    this.certEditId = null;
+    if (ok) { App.closeModal('cert-modal'); this.renderUnified(staffId); }
+    else fail('Save failed. Try again.');
+  },
+
+  async confirmDelCert(id, staffId) {
+    const ok = await App.confirmDelete();
+    if (!ok) return;
+    await App.removeRecord('lc', 'cert', id);   // row-per-record
+    this.renderUnified(staffId);
+  },
+
+  // ── Coaching Log section ─────────────────────────────────────────────
+  // Same row-list style as Certifications and Training, sharing DETAIL_COLGROUP so
+  // the columns line up down the page: Date, Type, Manager, then the Coaching Note
+  // spanning the 4th-5th columns. Type keeps its category color.
+  renderNotesCard(staffId) {
+    const list = this.notesForStaff(staffId);
+    const head = '<table class="row-list" style="table-layout:fixed;width:100%;">' + this.DETAIL_COLGROUP
+      + '<thead><tr><th>Date</th><th>Type</th><th>Manager</th><th colspan="2">Coaching Note</th><th></th></tr></thead>';
+    const addBtn = '<div class="no-print" style="margin:12px 0 24px;"><button class="btn btn-ghost btn-sm" id="note-add">+ Add Coaching Note</button></div>';
+    if (list.length === 0) {
+      return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+        + '<tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No coaching notes on file yet. Document praise, coaching moments, concerns, and warnings here. A written record is what protects the operator if a tough HR moment ever lands.</td></tr></tbody></table></div>' + addBtn;
+    }
+    const rows = list.map(n => {
+      const catColor = n.category === 'Praise' ? 'var(--green)'
+                     : n.category === 'Coaching' ? 'var(--steel)'
+                     : n.category === 'Concern' ? 'var(--amber)'
+                     : 'var(--red)';
+      return '<tr>'
+        + '<td><div class="val">' + this.fmtDate(n.date) + '</div></td>'
+        + '<td><span style="color:' + catColor + ';font-weight:700;">' + esc(n.category || 'Note') + '</span></td>'
+        + '<td>' + esc(n.manager_name || '-') + '</td>'
+        + '<td colspan="2"><div style="line-height:1.5;white-space:pre-wrap;">' + esc(n.text || '') + '</div></td>'
+        + '<td><div class="row-actions">'
+        + '<button class="btn btn-ghost btn-sm note-edit" data-id="' + n.id + '">Edit</button>'
+        + '<button class="btn btn-danger btn-sm note-del" data-id="' + n.id + '">Delete</button>'
+        + '</div></td></tr>';
+    }).join('');
+    return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
+      + '<tbody>' + rows + '</tbody></table></div>' + addBtn;
+  },
+
+  // Note add/edit in a focused pop-up (own note- ids; no collision with the
+  // coaching filter select behind it).
+  openNoteModal(staffId, opts) {
+    // opts.onSaved lets another screen (Server Check) open this same canonical
+    // coaching-note form in place and return to its own page on save, instead of
+    // re-rendering the staff page — two doors, one coaching log.
+    this._noteOnSaved = (opts && opts.onSaved) || null;
+    const n = this.noteEditId ? this.notes().find(x => x.id === this.noteEditId) : null;
+    const today = App.todayLocal();
+    const catOpts = this.NOTE_CATEGORIES.map(c =>
+      '<option' + (n && n.category === c ? ' selected' : (!n && c === 'Coaching' ? ' selected' : '')) + '>' + esc(c) + '</option>').join('');
+    // Who the note lands on, shown read-only so a note opened from another screen
+    // (Server Check) can never be logged against the wrong person by mistake.
+    const st = ((App.laborData && App.laborData.lc_staff) || []).find(s => s.id === staffId);
+    const who = st ? (st.name || '') : '';
+    const whoField = who
+      ? '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Staff Member</label>'
+        + '<input type="text" value="' + esc(who) + '" disabled title="This note logs to this person\'s coaching log."/></div>'
+      : '';
+    const html = '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">' + (this.noteEditId ? 'Edit Note' : 'Add Coaching Note') + '</div>'
+      + '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Date</label>'
+          + '<input type="date" id="note-date" value="' + esc(n?.date || today) + '"/></div>'
+        + whoField
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Category</label>'
+          + '<select id="note-cat">' + catOpts + '</select></div>'
+        + '<div class="f" style="flex:0 1 calc(50% - 8px);min-width:150px;"><label>Manager</label>'
+          + '<select id="note-mgr">' + App.staffOptions(n?.manager_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
+      + '</div>'
+      + '<div class="f" style="margin-top:6px;margin-bottom:0;"><label>Note</label>'
+        + '<textarea id="note-text" rows="5" placeholder="What happened, when, who was around, what was said. Specifics matter if this becomes a personnel matter later.">' + esc(n?.text || '') + '</textarea></div>'
+      + '<div class="card-actions">'
+        + '<button class="btn btn-primary" id="note-save">' + (this.noteEditId ? 'Update Note' : 'Save Note') + '</button>'
+        + '<span id="note-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div></div>';
+    App.openModal(html, { id: 'note-modal', maxWidth: 540, noClose: true });
+    document.getElementById('note-save')?.addEventListener('click', () => this.saveNote(staffId));
+  },
+
+  async saveNote(staffId) {
+    const err = document.getElementById('note-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const text = document.getElementById('note-text')?.value.trim();
+    if (!text) { fail('Write the note before saving.'); return; }
+    const managerId = document.getElementById('note-mgr')?.value || '';
+    const managerName = (this.staffById(managerId) || {}).name || '';
+
+    const rec = {
+      id:           this.noteEditId || App.uid(),
+      staff_id:     staffId,
+      date:         document.getElementById('note-date')?.value || App.todayLocal(),
+      category:     document.getElementById('note-cat')?.value || 'Coaching',
+      manager_id:   managerId,
+      manager_name: managerName,
+      text,
+      updated_at:   new Date().toISOString()
+    };
+    if (!this.noteEditId) rec.created_at = new Date().toISOString();
+
+    const list = this.notes();
+    let out = rec;   // row-per-record: merge onto the existing note on edit, then write one row
+    if (this.noteEditId) { const i = list.findIndex(x => x.id === this.noteEditId); if (i > -1) out = { ...list[i], ...rec }; }
+    const ok = await App.putRecord('lc', 'staff_note', out);
+    this.noteEditId = null;
+    if (ok) {
+      App.closeModal('note-modal');
+      const cb = this._noteOnSaved; this._noteOnSaved = null;
+      if (cb) cb(); else this.renderUnified(staffId);
+    }
+    else fail('Save failed. Try again.');
+  },
+
+  async confirmDelNote(id, staffId) {
+    const ok = await App.confirmDelete();
+    if (!ok) return;
+    await App.removeRecord('lc', 'staff_note', id);   // row-per-record
+    this.renderUnified(staffId);
+  },
+
+  // Profile save — feeds the inline Add Staff button (staffId null) and the staff
+  // page's Update Profile button (staffId set).
+  async saveProfile(staffId) {
+    const err = document.getElementById('sr-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const name = document.getElementById('sr-name')?.value.trim();
+    if (!name) { fail('Name is required.'); return; }
+    /* ⚠⚠ A UNIQUE NAME IS NOT A NICETY — IT IS WHAT THE WHOLE IMPORT LAYER STANDS ON (S215k).
+       `PosIngest._staffByName` is `m[name.toLowerCase()] = s`, the SHARED matcher behind five
+       builders (hours, tips, voids, server checks, cash). Two staff with one name collapse into
+       whichever record happens to sit later in the array: every imported row for that name lands on
+       one of them and the other can never receive a single hour, with nothing anywhere saying so.
+       At the timeclock door that is gross pay; at Server Check it is somebody else's covers.
+       ⚠ THE ROSTER IMPORT HAS ALWAYS REFUSED A DUPLICATE NAME — across the whole roster, Inactive
+       included ("or re-importing a terminated employee creates a second Active record and strands
+       their history"). This form checked only that the name was non-empty. Two doors writing one
+       record on two different rules; making them agree closes all five builders at once and makes
+       the ambiguous state unreachable, rather than teaching each builder to handle an ambiguity it
+       has no way to resolve ([[the-loop]] #20, #30).
+       ⚠ `s.id !== staffId` so editing someone does not collide with themselves; on an ADD staffId is
+       null and every row is compared. */
+    const nameKey = name.toLowerCase();
+    const clash = this.staff().find(s => s && s.id !== staffId && (s.name || '').trim().toLowerCase() === nameKey);
+    if (clash) {
+      /* ⚠ THE NAME IS QUOTED, NOT RUN INTO THE SENTENCE. Nearly every name in this app ends in an
+         initial ("Chris M."), so "You already have someone called " + name + "." printed
+         "Chris M.." — seen in the harness output the moment this shipped. Quoting closes the clause
+         without a second full stop and reads better besides. */
+      fail('"' + name + '" is already on your roster' + (clash.status === 'Inactive' ? ' (inactive)' : '')
+        + '. Bar Cop matches each row of your POS exports to staff by name, so two people cannot share one — '
+        + 'add a last initial or surname to tell them apart.');
+      return;
+    }
+    const posId = document.getElementById('sr-pos')?.value;
+    if (!posId) { fail('Choose a position.'); return; }
+    const payType = document.getElementById('sr-paytype')?.value === 'Salary' ? 'Salary' : 'Hourly';
+    const payRaw = parseFloat(document.getElementById('sr-pay')?.value);
+    const payVal = isNaN(payRaw) ? null : payRaw;
+    /* Hoisted out of the record literal so it can be checked beside its sibling below — a rate
+       validated in one place and read in another is how these two drift apart. */
+    const sec2Pos = document.getElementById('sr-pos2')?.value || '';
+    const wage2Raw = parseFloat(document.getElementById('sr-wage2')?.value);
+    const sec2Wage = sec2Pos ? (isNaN(wage2Raw) ? null : wage2Raw) : null;
+    /* ⚠⚠ PAY CANNOT BE NEGATIVE, AND NOTHING DOWNSTREAM WAS GOING TO CATCH IT (class D round 2).
+       This handler refused a missing name, a duplicate name and a missing position — all by name —
+       and then took `parseFloat` on the pay cell raw. `min="0"` on the input stops nothing: a
+       number input still hands back "-20" and nothing calls checkValidity.
+       ⚠ AND NO READER FLOORS IT, which is what separates this from most of its class.
+       `App.updateActual` is the single owner of the hours → wage → cost math and it guards HOURS
+       (`!isNaN && >= 0`, added for the `hours` field of the same class) — then computes
+       `rec.cost = rec.hours * wage` with the wage untouched, while `wageForStaffOn` returns
+       `staff.wage || 0` and passes a negative through unchanged. So 40 hours at -$20 books
+       **-$800 of labor**, which LOWERS labor %, LOWERS prime %, and reaches Books, the schedule
+       budget and the payroll export. The direction is the dangerous one: it makes the week look
+       better, which is the kind of wrong number nobody reports ([[output-honesty]]).
+       ⚠ ZERO AND BLANK ARE BOTH LEGITIMATE and are deliberately still accepted — blank is "not set
+       yet", which is not the same number as zero, and zero is a real answer (an owner drawing
+       nothing, an unpaid trial shift). Only a negative is impossible.
+       ⚠ The message follows the LABEL the form is showing: that one cell is "Wage" or "Annual
+       Salary" depending on Pay Type, and naming the wrong one sends the operator to the wrong box. */
+    const negPay = [
+      [payType === 'Salary' ? 'Annual salary' : 'Wage', payVal],
+      ['Secondary rate', sec2Wage]
+    ].filter(p => p[1] != null && p[1] < 0).map(p => p[0]);
+    if (negPay.length) {
+      fail(negPay.join(' and ') + ' cannot be negative.');
+      return;
+    }
+    const newWage = payType === 'Salary' ? null : payVal;
+    const annualSalary = payType === 'Salary' ? payVal : null;
+
+    const existing = staffId ? this.staff().find(x => x.id === staffId) : null;
+    const today = App.todayLocal();
+    let wageHistory = Array.isArray(existing?.wage_history) ? existing.wage_history.slice() : [];
+    if (existing && existing.wage != null && newWage != null && existing.wage !== newWage) {
+      wageHistory.push({ prior_wage: existing.wage, new_wage: newWage, effective_date: today, changed_at: new Date().toISOString() });
+    }
+
+    const rec = {
+      id:            staffId || App.uid(),
+      name,
+      position_id:   posId,
+      pay_type:      payType,
+      wage:          newWage,
+      annual_salary: annualSalary,
+      wage_history:  wageHistory,
+      status:        document.getElementById('sr-status')?.value || 'Active',
+      shift_lead:    !!document.getElementById('sr-lead')?.checked,
+      off_days:      [...document.querySelectorAll('.sr-off-chip')].filter(c => c.dataset.on === '1').map(c => c.dataset.day),
+      phone:         document.getElementById('sr-phone')?.value.trim() || '',
+      email:         document.getElementById('sr-email')?.value.trim() || '',
+      notes:         document.getElementById('sr-notes')?.value.trim() || '',
+      // Secondary role + rate (cleared together when no secondary role is set).
+      secondary_position_id: sec2Pos,
+      secondary_wage:        sec2Wage
+    };
+    if (!staffId) rec.created_at = new Date().toISOString();
+
+    // Row-per-record: build the record to persist (merge onto the existing staff on edit so
+    // fields not on the form — wage_history, created_at — survive) and write just that row.
+    const list = this.staff();
+    let out = rec;
+    if (staffId) { const i = list.findIndex(x => x.id === staffId); if (i > -1) out = { ...list[i], ...rec }; }
+
+    const btn = document.getElementById('sr-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const ok = await App.putRecord('lc', 'staff', out);
+    if (ok) {
+      App.markSetupDone('gs_lc_roster');
+      if (staffId) this.renderUnified(staffId);
+      else { this.detailId = null; this._draft = null; this.renderList(); }   // a saved add clears its draft
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = staffId ? 'Update Profile' : 'Add Staff'; }
+      fail('Save failed. Try again.');
+    }
+  },
+
+  async confirmDel(id) {
+    const s = this.staffById(id);
+    const hours = ((App.laborData && App.laborData.lc_actuals) || []).filter(a => a.staff_id === id).length;
+    const tips  = ((App.laborData && App.laborData.lc_tips)    || []).filter(t => t.staff_id === id).length;
+    const certN = this.certs().filter(c => c.staff_id === id).length;
+    const noteN = this.notes().filter(n => n.staff_id === id).length;
+    // If the person has any history, steer hard to Inactive (which keeps it all);
+    // deleting wipes their certs + coaching notes and leaves hours/tips nameless.
+    if (hours + tips + certN + noteN > 0) {
+      const ok = await App.confirm({
+        title: 'Delete ' + (s ? s.name : 'this staff member') + '?',
+        message: 'This person has logged history (hours, tips, certifications, or coaching notes). Deleting removes them and erases their certifications and coaching notes, and leaves their logged hours and tips with no name attached. Set them Inactive instead to keep every record intact. Delete anyway?',
+        confirmText: 'Delete Anyway',
+        cancelText: 'Cancel',
+        danger: true
+      });
+      if (!ok) return;
+    } else if (!(await App.confirmDelete())) {
+      return;
+    }
+    // Certs + coaching notes are row-per-record now — capture this person's ids BEFORE the
+    // removes mutate the arrays, then delete each row. lc_staff still lives in the lc_data
+    // blob (migrated in its own step), so it still goes through saveLabor.
+    const certIds = this.certs().filter(c => c.staff_id === id).map(c => c.id);
+    const noteIds = this.notes().filter(n => n.staff_id === id).map(n => n.id);
+    // Only cascade if the parent actually went. removeRecord reverts the staff row on a hard
+    // rejection, so an unchecked cascade would leave the person on the roster with their
+    // certifications and coaching log erased — the exact HR record the confirm promises to keep.
+    if (!(await App.removeRecord('lc', 'staff', id))) return;   // row-per-record (staff, then its certs + notes)
+    for (const cid of certIds) await App.removeRecord('lc', 'cert', cid);
+    for (const nid of noteIds) await App.removeRecord('lc', 'staff_note', nid);
+    this.renderList();
+  }
+};
