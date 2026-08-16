@@ -393,6 +393,7 @@ S.InventoryVarianceReport = {
   render(container, actions) {
     this.container = container;
     this.actions = actions;
+    this._thSaved = false;   // a save note belongs to the visit that pressed the button
     actions.innerHTML = '';
     // Always land on the Quick Variance Check (setup). The deep-dive product
     // report opens from a POS run or "View saved reports".
@@ -904,6 +905,11 @@ S.InventoryVarianceReport = {
       if (!App.inventoryData.variance_thresholds) App.inventoryData.variance_thresholds = {};
       if (!App.inventoryData.variance_thresholds[cat]) App.inventoryData.variance_thresholds[cat] = {};
       App.inventoryData.variance_thresholds[cat][key] = v;
+      /* The note describes a PRESS. Touching a field makes it stale, so it goes with the edit
+         ([[lessons-paid-for]] #15: grep every field you add for who NULLS it, not just who reads
+         it). It is cleared HERE and on screen entry, and nowhere else clears it — `draw()` runs
+         after every change and would wipe the note the moment it appeared. */
+      this._thSaved = false;
       await App.saveInventory();
       this.draw();
     }));
@@ -922,6 +928,7 @@ S.InventoryVarianceReport = {
         App.inventoryData.variance_thresholds[cat][key] = v;
       });
       await App.saveInventory();
+      this._thSaved = true;
       this.draw();
     });
   },
@@ -949,7 +956,22 @@ S.InventoryVarianceReport = {
          ⚠ CENTRED RATHER THAN SPACED DOWN: the row is `align-items:flex-end` so the fields line
          up on their inputs, and the old button was pushed onto that baseline with an empty label.
          `align-self:center` centres it against the cells instead, and the spacer goes. */
-      + '<div class="f" style="flex-shrink:0;align-self:center;margin-bottom:0;"><button class="btn btn-ghost btn-sm" id="vr-th-save">Save</button></div>'
+      /* ⚠ CENTRED ON THE INPUT ROW, NOT ON THE CELL. `align-self:center` was the first attempt and
+         Kyle sent it back: every other cell is a LABEL STACKED ON AN INPUT, so centring against the
+         cell puts the button above the middle of the input it belongs beside.
+         ⭐ NO MEASUREMENT IN IT. The wrapper STRETCHES to the row, carries the same label band the
+         other cells do, and the button sits in a box that takes what is left and centres inside.
+         That box is an input tall by construction, whatever the input height becomes. */
+      + '<div class="f" style="flex-shrink:0;margin-bottom:0;align-self:stretch;display:flex;flex-direction:column;">'
+        + '<label>&nbsp;</label>'
+        + '<div style="flex:1;display:flex;align-items:center;gap:8px;">'
+          + '<button class="btn btn-ghost btn-sm" id="vr-th-save">Save</button>'
+          /* ⭐ THE PRESS SAYS SOMETHING. Without it the only feedback is numbers staying where they
+             already were, which reads the same as a button that did nothing. Held as STATE because
+             the handler re-renders so the report's flags follow the new standards — anything
+             written into the node would be wiped half a frame later. */
+          + (this._thSaved ? '<span style="font-size:11px;color:var(--t3);">Saved</span>' : '')
+        + '</div></div>'
       + '</div></div>';
   },
 
