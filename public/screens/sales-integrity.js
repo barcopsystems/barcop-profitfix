@@ -1454,7 +1454,9 @@ S.SalesIntegrity = {
     this._viewing = null;
     const latest = (showId && this.reviews().find(r => r && r.id === showId)) || this.latestReview();
     const importCard = '<div class="card form-card">'
-      + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Sales Integrity Review</span>' + App.freqTag('As needed') + '</div>'
+      + '<div class="card-title" id="si-card-head" style="display:flex;align-items:center;gap:10px;"><span>Sales Integrity Review</span>' + App.freqTag('As needed') + '</div>'
+      // Shown only while the columns are being matched, in place of the head above it.
+      + '<div class="card-title" id="si-imp-head" style="display:none;">Import your server sales</div>'
       + '<div id="si-csv"></div><div id="si-imp-result"></div>'
       + '</div>'
       + '<div id="si-imp-actions" style="margin:14px 0 24px;"></div>';
@@ -1467,7 +1469,14 @@ S.SalesIntegrity = {
       body = this.renderReport(latest) + this.renderHistory(latest.id);
     }
 
-    this.container.innerHTML = '<div class="screen">' + importCard + body + '</div>';
+    /* ⛔ ONE REGION, SO THE MAPPING STEP CAN PUT IT AWAY. Whatever `body` is, it is the wrong
+       thing to have under a column mapper: with a review on file it carries Delete, Investigate
+       and Export PDF, and on day one it is a card explaining what to drop to an operator who has
+       already dropped it.
+       ⚠ A WRAPPER, NOT A RE-RENDER — `mountImporter`'s hook toggles `display` on it, because
+       re-rendering from inside the mount throws away the file the operator just dropped. */
+    this.container.innerHTML = '<div class="screen">' + importCard
+      + '<div id="si-list-region">' + body + '</div>' + '</div>';
     this.mountImporter();
     this.wire();
   },
@@ -1481,8 +1490,30 @@ S.SalesIntegrity = {
       // ⚠ NET SALES IS NAMED FIRST. It is the denominator for void %, comp %, refund %, average
       // check and sales per hour — five of nine signals — and every dollar figure on the report.
       // Measured without it: a server still went High Risk with the exposure printed as "-".
-      dropSub: 'Needs a Server column, and Net Sales does most of the work after that. Date, no-sales, voids, cash and card split, comps, checks, refunds, and hours are each read if your export has them — the Date column is what matches the report to drawer shortages and walked tabs you have already logged.',
+      dropSub: 'Needs a Server column, and Net Sales does most of the work after that. Date, no-sales, voids, comps, refunds, checks and hours come in if your file has them.',
       actionsEl: '#si-imp-actions',
+      /* ⛔ THE MAPPER TAKES THE PAGE (Kyle, 2026-08-16, walking this door). No mode toggle exists
+         here, and the head is a plain `.card-title` with no `data-collapse-key`, so it is addressed
+         by an id the way `ic-spot-check` does rather than by the collapse attribute.
+         ⚠ THE HEAD IS NOT RE-WORDED, because it carries a cadence tag that has to come back
+         untouched on Cancel. The header is a SECOND `.card-title`, hidden until the mapper is up,
+         and it comes back as `flex` or the title and the tag stop sharing a line.
+         ⭐ `si-imp-result` GOES TOO, which the doors still carrying that defect do not do: it sits
+         INSIDE this card below the mapper, so a second drop straight after an import would match
+         its columns underneath the previous run's result line.
+         ⚠ HIDDEN, NOT RE-RENDERED: this fires from inside `CSVMapper.mount`, so a re-render here
+         would rebuild `#si-csv` and throw away the file just dropped. */
+      onState: state => {
+        const map = (state === 'map');
+        const head = document.getElementById('si-card-head');
+        if (head) head.style.display = map ? 'none' : 'flex';
+        ['si-list-region', 'si-imp-result'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = map ? 'none' : '';
+        });
+        const impHead = document.getElementById('si-imp-head');
+        if (impHead) impHead.style.display = map ? '' : 'none';
+      },
       fields: this.FIELDS,
       confirmLabel: 'Analyze',
       onComplete: rows => this.runImport(rows)
