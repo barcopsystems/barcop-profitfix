@@ -771,12 +771,19 @@ S.ShiftLane = {
     const cwEnds = App.confirmedWeeksTouched(allToAdd.map(r => r && r.date));
     const cwLabel = d => { const dt = new Date(d + 'T00:00:00'); return isNaN(dt.getTime()) ? d
       : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+    /* ⭐ SHORT AND TO THE POINT (Kyle, 2026-08-15): *"make results text short and simple.. to the
+       point."* It was three sentences of parenthetical; it is two plain ones.
+       ⛔ AND THE REASSURANCE STAYS, because it is not decoration. My first pass cut it on the
+       reasoning that "re-confirm to pick these up" implies it, and
+       `verify-import-warns-confirmed-week` refused the build: without that clause the line reads as
+       damage rather than a note, which is the whole reason Kyle's call here was warn and not block.
+       The pin was the prior and it was right ([[the-loop]] #29). */
     const cwNote = cwEnds.length
-      ? ' Heads up: ' + (cwEnds.length === 1 ? 'this covers a week you already confirmed (week ending '
-          + cwLabel(cwEnds[0]) + ')' : 'this covers ' + cwEnds.length + ' weeks you already confirmed ('
-          + cwEnds.map(cwLabel).join(', ') + ')')
-        + '. Your confirmed figures are unchanged. Re-confirm ' + (cwEnds.length === 1 ? 'that week' : 'those weeks')
-        + ' if you want them to pick this up.'
+      ? (cwEnds.length === 1
+          ? ' Week ending ' + cwLabel(cwEnds[0]) + ' is already confirmed. Your confirmed figures are'
+            + ' unchanged. Re-confirm that week to pick these up.'
+          : ' ' + cwEnds.length + ' weeks you already confirmed are covered. Your confirmed figures are'
+            + ' unchanged. Re-confirm those weeks to pick these up.')
       : '';
     /* ⛔ THE CLAUSE LIST IS FOR AN IMPORT NOBODY WAS SHOWN (Kyle, 2026-08-04, looking at six
        parentheticals in green): *"all that green text is very hard to read and follow.. it is just
