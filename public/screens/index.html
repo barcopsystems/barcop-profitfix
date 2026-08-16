@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/bar-graph-icon.png?v=1"/>
 <link rel="apple-touch-icon" href="assets/bar-graph-icon.png?v=1"/>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=331"/>
+<link rel="stylesheet" href="style.css?v=340"/>
 <style>
 @media print {
   /* Flip the dark theme to a light, readable theme for print.
@@ -118,6 +118,22 @@
         <button class="btn btn-primary" id="signup-btn" style="width:100%;margin-top:16px;">Create Account</button>
         <div id="signup-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
       </div>
+      <!-- ⛔⛔⛔ THE CLOSED-DOOR CARD, AND IT MUST STAY *AFTER* THE REAL ONE. It used to be built by
+           overwriting `.auth-card`'s innerHTML at boot — and #auth-signup is ALSO the "Finish
+           Setting Up" screen a paying customer lands on, so shutting signups deleted every field
+           that screen needs and locked out anyone who had paid without yet setting a password.
+           It is a hidden sibling now, shown and hidden instead of replacing anything.
+           ⚠ IT CARRIES .auth-card / .auth-heading / .auth-sub so it needs no new styling, which
+           means DOCUMENT ORDER is what keeps `querySelector('#auth-signup .auth-card')` (and the
+           heading and sub that _showFinishSetup rewrites) resolving the REAL card. Moving this
+           block above the card would silently point all three at the refusal notice.
+           `verify-signups-closed` block P pins that order. -->
+      <div id="signup-closed-card" class="auth-card" style="display:none;">
+        <div class="auth-logo"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>
+        <div class="auth-heading">Bar Cop is not taking new accounts right now</div>
+        <div class="auth-sub" style="line-height:1.6;">We are doing some work under the hood. New signups are paused while we finish up. Check back shortly.</div>
+        <div style="font-size:12px;color:var(--t2);margin-top:20px;text-align:center;">Already have an account? Use Log In.</div>
+      </div>
       <div class="auth-foot">
         <div style="font-size:12px;color:var(--t2);">Already have an account? <button class="auth-link" id="show-login-from-signup">Log in to Bar Cop</button></div>
         <!-- Cancel: nothing has been created yet at this point (DB.signUp runs on submit), so this
@@ -134,8 +150,8 @@
         <div class="auth-sub">This bar needs an active subscription to use Bar Cop. Pick a plan to continue to checkout.</div>
         <label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>
         <div id="paywall-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 14px;">
-          <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $189/mo</span></div>
-          <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b-edge);background:#0D181E;border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $1,890/yr</span><span style="font-size:11px;color:var(--gold);">save $378</span></div>
+          <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b-edge);background:var(--gold-tint);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $189/mo</span></div>
+          <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b-edge);background:var(--gold-tint);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $1,890/yr</span><span style="font-size:11px;color:var(--gold);">save $378</span></div>
         </div>
         <button class="btn btn-primary" id="paywall-btn" style="width:100%;">Continue to Payment</button>
         <div id="paywall-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
@@ -434,7 +450,7 @@
 <script>var S = {};</script>
 <script src="sample-profile.js?v=4"></script>
 <script src="nav.js?v=126"></script>
-<script src="screens/hub.js?v=280"></script>
+<script src="screens/hub.js?v=287"></script>
 <script src="screens/hub-bar-cop-audit.js?v=73"></script>
 <script src="screens/hub-audit-help.js?v=7"></script>
 <script src="screens/hub-books-help.js?v=11"></script>
@@ -442,19 +458,19 @@
 <script src="screens/dash-ui.js?v=14"></script>
 <script src="components/initiative-tracker.js?v=21"></script>
 <script src="screens/experiments.js?v=5"></script>
-<script src="screens/recovery-playbook.js?v=46"></script>
-<script src="screens/this-week.js?v=61"></script><script src="screens/week-history.js?v=8"></script>
+<script src="screens/recovery-playbook.js?v=48"></script>
+<script src="screens/this-week.js?v=61"></script><script src="screens/week-history.js?v=10"></script>
 <script src="screens/profit-forecast.js?v=12"></script>
 <script src="screens/recipe-cost-analysis.js?v=16"></script>
 <script src="screens/vendor-tracker.js?v=25"></script>
-<script src="screens/theft-risk.js?v=55"></script>
-<script src="screens/sales-integrity.js?v=28"></script>
+<script src="screens/theft-risk.js?v=56"></script>
+<script src="screens/sales-integrity.js?v=30"></script>
 <script src="screens/cash-recon.js?v=17"></script>
 <script src="components/audit-outlook.js?v=15"></script>
 <script src="components/bar-cop-briefing.js?v=12"></script>
 <script src="components/file-drop.js?v=3"></script>
-<script src="components/audit-narrative.js?v=5"></script><script src="components/confirm-week.js?v=29"></script>
-<script src="screens/audit-ui.js?v=44"></script>
+<script src="components/audit-narrative.js?v=5"></script><script src="components/confirm-week.js?v=30"></script>
+<script src="screens/audit-ui.js?v=45"></script>
 <script src="screens/audit-tracker.js?v=99"></script>
 <script src="screens/reports.js?v=36"></script>
 <script src="screens/settings.js?v=316"></script>
@@ -466,33 +482,33 @@
 <script src="screens/hub-books.js?v=85"></script>
 <script src="screens/hub-books-home.js?v=45"></script>
 <script src="screens/hub-breakeven.js?v=25"></script>
-<script src="screens/hub-week-review.js?v=47"></script>
-<script src="screens/week-close.js?v=14"></script>
+<script src="screens/hub-week-review.js?v=48"></script>
+<script src="screens/week-close.js?v=18"></script>
 <script src="screens/hub-year-end.js?v=54"></script>
-<script src="screens/hub-operating-expenses.js?v=133"></script>
+<script src="screens/hub-operating-expenses.js?v=134"></script>
 <script src="screens/hub-cash-outflows.js?v=21"></script>
 <script src="screens/hub-permits.js?v=32"></script>
 <script src="screens/help.js?v=34"></script>
 <script src="screens/events/ev-bookings.js?v=68"></script>
 <script src="screens/events/ev-calendar.js?v=10"></script>
-<script src="screens/events/ev-regulars.js?v=28"></script>
+<script src="screens/events/ev-regulars.js?v=32"></script>
 <script src="screens/events/ev-pricing.js?v=20"></script>
 <script src="screens/events/ev-help.js?v=10"></script>
-<script src="screens/profit-fix.js?v=53"></script>
+<script src="screens/profit-fix.js?v=54"></script>
 <script src="screens/recovery-timeline.js?v=15"></script>
 <script src="screens/revenue/r-audit.js?v=95"></script>
 <script src="screens/revenue/r-forecast.js?v=23"></script>
 <script src="screens/revenue/r-this-week.js?v=39"></script>
-<script src="screens/revenue/r-server-check.js?v=56"></script>
-<script src="screens/revenue/r-menu-items.js?v=131"></script>
+<script src="screens/revenue/r-server-check.js?v=58"></script>
+<script src="screens/revenue/r-menu-items.js?v=133"></script>
 <script src="screens/revenue/r-menu-planning.js?v=28"></script>
-<script src="screens/revenue/r-menu-engineering.js?v=94"></script>
+<script src="screens/revenue/r-menu-engineering.js?v=96"></script>
 <script src="screens/revenue/r-dog-test.js?v=20"></script>
 <script src="screens/revenue/r-help.js?v=29"></script>
-<script src="screens/revenue/r-fix.js?v=25"></script>
+<script src="screens/revenue/r-fix.js?v=26"></script>
 <script src="cash-engine.js?v=80"></script>
 <script src="screens/cash/c-audit.js?v=28"></script>
-<script src="screens/cash/c-fix.js?v=14"></script>
+<script src="screens/cash/c-fix.js?v=15"></script>
 <script src="screens/cash/c-trapped.js?v=11"></script>
 <script src="screens/cash/c-purchasing.js?v=11"></script>
 <script src="screens/cash/c-capital.js?v=9"></script>
@@ -501,34 +517,34 @@
 <script src="screens/cash/c-bridge.js?v=23"></script>
 <script src="screens/cash/c-help.js?v=8"></script>
 <script src="components/bottle-slider.js?v=16"></script>
-<script src="components/csv-mapper.js?v=41"></script>
+<script src="components/csv-mapper.js?v=46"></script>
 <script src="components/pos-ingest.js?v=75"></script>
-<script src="components/import-confirm.js?v=15"></script>
+<script src="components/import-confirm.js?v=16"></script>
 <script src="components/cash-counter.js?v=8"></script>
 <script src="components/drag-reorder.js?v=2"></script>
 <script src="recovery.js?v=25"></script>
-<script src="components/fix-panel.js?v=58"></script>
+<script src="components/fix-panel.js?v=59"></script>
 <script src="components/fix-docs.js?v=3"></script>
 <script src="fixlayer/fix-profit.js?v=48"></script>
 <script src="fixlayer/fix-revenue.js?v=47"></script>
 <script src="fixlayer/fix-cash.js?v=5"></script>
-<script src="screens/inventory/ic-product-setup.js?v=154"></script>
+<script src="screens/inventory/ic-product-setup.js?v=164"></script>
 <script src="screens/inventory/ic-locations.js?v=68"></script>
-<script src="screens/inventory/ic-vendors.js?v=61"></script>
+<script src="screens/inventory/ic-vendors.js?v=64"></script>
 <script src="screens/inventory/ic-prep-batches.js?v=50"></script>
-<script src="screens/inventory/ic-take-inventory.js?v=67"></script>
+<script src="screens/inventory/ic-take-inventory.js?v=69"></script>
 <script src="screens/inventory/ic-count-history.js?v=43"></script>
-<script src="screens/inventory/ic-spot-check.js?v=71"></script>
+<script src="screens/inventory/ic-spot-check.js?v=78"></script>
 <script src="screens/inventory/ic-transfers.js?v=37"></script>
 <script src="screens/inventory/ic-empties.js?v=38"></script>
 <script src="screens/inventory/ic-adjustments.js?v=43"></script>
 <script src="screens/inventory/ic-par-suggestions.js?v=34"></script>
 <script src="screens/inventory/ic-order-sheet.js?v=57"></script>
 <script src="screens/inventory/ic-order-history.js?v=32"></script>
-<script src="screens/inventory/ic-receive-delivery.js?v=70"></script>
-<script src="screens/inventory/ic-delivery-history.js?v=41"></script>
+<script src="screens/inventory/ic-receive-delivery.js?v=71"></script>
+<script src="screens/inventory/ic-delivery-history.js?v=42"></script>
 <script src="screens/inventory/ic-report-usage.js?v=36"></script>
-<script src="screens/inventory/ic-report-variance.js?v=87"></script>
+<script src="screens/inventory/ic-report-variance.js?v=92"></script>
 <script src="screens/inventory/ic-report-stock.js?v=26"></script>
 <script src="screens/inventory/ic-help.js?v=19"></script>
 <script src="screens/shift/sc-drawers.js?v=35"></script>
@@ -537,19 +553,19 @@
 <script src="screens/shift/sc-cash-drop.js?v=18"></script>
 <script src="screens/shift/sc-safe-log.js?v=15"></script>
 <script src="screens/shift/sc-variance-log.js?v=21"></script>
-<script src="screens/shift/sc-void-comp.js?v=69"></script>
+<script src="screens/shift/sc-void-comp.js?v=70"></script>
 <script src="screens/shift/sc-walked-tabs.js?v=33"></script><script src="screens/shift/sc-waste.js?v=34"></script>
 <script src="screens/shift/sc-maintenance.js?v=39"></script>
 <script src="screens/shift/sc-incidents.js?v=13"></script>
 <script src="screens/shift/sc-opening-checklist.js?v=14"></script>
 <script src="screens/shift/sc-closing-checklist.js?v=14"></script>
 <script src="screens/shift/sc-checklists.js?v=31"></script>
-<script src="screens/shift/sc-preshift.js?v=28"></script>
+<script src="screens/shift/sc-preshift.js?v=30"></script>
 <script src="screens/shift/sc-checklist-templates.js?v=25"></script>
-<script src="screens/shift/sc-import-lane.js?v=1"></script>
+<script src="screens/shift/sc-import-lane.js?v=7"></script>
 <script src="screens/shift/sc-help.js?v=24"></script>
 <script src="screens/labor/lc-positions.js?v=44"></script>
-<script src="screens/labor/lc-staff-roster.js?v=92"></script>
+<script src="screens/labor/lc-staff-roster.js?v=94"></script>
 <script src="screens/labor/lc-training.js?v=10"></script>
 <script src="screens/labor/lc-build-schedule.js?v=83"></script>
 <script src="screens/labor/lc-schedule-history.js?v=19"></script><script src="screens/labor/lc-log-hours.js?v=68"></script>
@@ -562,8 +578,8 @@
 <script src="screens/labor/lc-time-off.js?v=8"></script>
 <script src="screens/labor/lc-reports.js?v=35"></script>
 <script src="screens/labor/lc-help.js?v=26"></script>
-<script src="screens/labor/lc-import-lane.js?v=1"></script>
-<script src="components/service-periods.js?v=8"></script>
+<script src="screens/labor/lc-import-lane.js?v=3"></script>
+<script src="components/service-periods.js?v=9"></script>
 <script src="components/onboarding.js?v=32"></script>
 <!-- ⛔⛔ DELIBERATELY NOT PINNED, AND DO NOT "FIX" THIS (M7). Every other third-party script on this
      page carries an `integrity` hash. Stripe's must not. `js.stripe.com/v3/` is UNVERSIONED BY
@@ -576,6 +592,6 @@
      sweep goes red instead. -->
 <script src="https://js.stripe.com/v3/"></script>
 <script src="db.js?v=169"></script>
-<script src="app.js?v=880"></script>
+<script src="app.js?v=889"></script>
 </body>
 </html>
