@@ -1641,8 +1641,11 @@ S.ShiftLane = {
         // operator read "4 reconciles imported" off a 6-row file and believe the week was counted.
         + (skipped.length ? ' (' + skipped.length + ' row' + (skipped.length === 1 ? '' : 's')
             + ' skipped, no over/short figure)' : '') + undatedNote);
+    /* ⭐ SAME AS THE SALES LINE ABOVE AND FOR THE SAME REASON (Kyle, 2026-08-15): the confirm
+       screen has just listed every register-day and what happens to it, so repeating the skips
+       here is the second telling. The manual path keeps them. */
     this._flash = allToAdd.length + ' reconcile' + (allToAdd.length === 1 ? '' : 's') + ' imported'
-      + outcomes + '.';
+      + (opts.reviewed ? '' : outcomes) + '.';
     // ⛔ WHAT LANDED, BY DATE — same reason as the sales commit above. Two commit paths, both stamp it.
     this._flashDates = allToAdd.map(r => r && r.date).filter(Boolean);
     // ⛔ THE RELEASE — same reason as the sales commit above. Two commit paths, so it lives in both.
