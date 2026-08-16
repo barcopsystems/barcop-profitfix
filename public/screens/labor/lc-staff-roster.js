@@ -823,7 +823,7 @@ S.LaborStaffRoster = {
          front of it.
          ⚠ "Added", not "Imported": the file was imported two screens ago and the button they pressed
          said Add. And "people", not "staff members", to match that button. */
-      if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--gold);font-weight:700;margin-top:12px;">Added '
+      if (res2) res2.innerHTML = '<div style="font-size:13px;color:var(--t2);margin-top:12px;">Added '
         + toAdd.length + (toAdd.length === 1 ? ' person' : ' people') + '.'
         + (!opts.reviewed && notes.length ? ' <span style="color:var(--t3);font-weight:400;">(' + notes.join(' · ') + ')</span>' : '') + '</div>';
     } else {
