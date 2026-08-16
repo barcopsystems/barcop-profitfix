@@ -210,7 +210,10 @@ S.LaborLane = {
     undated:  'Could not read the date on this row',
     repeat:   'Same line twice in your file, counted once',
     dup:      'Already logged',
-    locked:   'That week\'s pay period is closed'
+    /* ⚠ THE REMEDY LIVES HERE, NOT ONLY IN THE RESULT LINE. When the clause list was suppressed
+       for a reviewed import this was the one outcome whose fix existed nowhere else, and a skip the
+       operator cannot act on is the one that reads as data loss ([[the-loop]] #25). */
+    locked:   'That week\'s pay period is closed. Reopen it in Pay Periods to log these hours'
   },
   /* The two notes that read differently per lane. A `--` cell is "no hours to log", not "no tips". */
   _laborNote(type, status) {
@@ -495,8 +498,12 @@ S.LaborLane = {
     // the step done themselves when the week's hours/tips are fully in.
     // Same `outcomes` string as the zero-row and failure messages, so all three describe one import
     // in one set of words — and the undated count cannot be reported on two paths and dropped on the third.
+    /* ⭐ THE HEADLINE STANDS ALONE ON A REVIEWED IMPORT (Kyle, 2026-08-15): *"'70 hour records
+       imported' and then maybe the dates.. all that other stuff reads as basically unreadable."* Every
+       clause is a row on the screen he has just accepted, so this is the second telling of it; the
+       hand-entry path keeps the full account, because it has no screen in front of it. */
     this._flash = toAdd.length + ' ' + noun + ' record' + (toAdd.length === 1 ? '' : 's') + ' imported'
-      + outcomes + '.';
+      + (opts.reviewed ? '' : outcomes) + '.';
     /* ⛔⛔ WHAT LANDED, BY DATE, SO THE PAGE SHOWING THIS CAN SAY WHICH WEEK IT MEANS. Kyle, 2026-08-10,
        on the pushed tips lane: *"imported test tip file.. says imported.. tips card 'none logged'."*
        Both numbers were TRUE — this sentence counts the FILE, the row counts the WEEK on screen, and
