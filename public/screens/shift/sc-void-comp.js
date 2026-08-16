@@ -244,7 +244,14 @@ S.ShiftVoidComp = {
          looks self-contradictory is precisely when an operator reads the line under it. Seen on the
          seeded bar at Last Week. The card renders whenever there are comps at all; only the wording
          changes. Zero comps still says nothing, because then there is nothing to explain. */
-      const box = t => '<div style="margin-top:14px;border:1px solid var(--b-edge);background:var(--surface);border-radius:var(--r2);padding:11px 14px;font-size:12px;color:var(--t3);line-height:1.6;">' + t + '</div>';
+      /* ⛔ NO BOX (Kyle, 2026-08-16, on the stat banner): *"remove the text below the stats from
+         the wrapper around it and just put the text under the stats normally"*. It was a `--surface`
+         panel with a border and a radius sitting INSIDE a headerless stats card, which is the
+         box-in-box [[form-table-standard]] bans by name and which the palette makes worse: the card
+         is painted `--stat` by shape, so the inner `--surface` read as a second card.
+         ⚠ STILL SMALL AND DIM. "Remove the wrapper" is not "make it body copy" — 12px on `--t3` is
+         what keeps it a note under the numbers instead of competing with them. */
+      const box = t => '<div style="margin-top:12px;font-size:12px;color:var(--t3);line-height:1.6;">' + t + '</div>';
       const compRead = !comps.length ? ''
         : giveAway > 0
         ? box(App.fmtCurrency(giveAway) + ' in customer comps this range'
@@ -285,7 +292,14 @@ S.ShiftVoidComp = {
           + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + App.showOlderBar('sc', 'void_comp', filtered, this.filterPreset !== 'all');
       }
-      below = statsCard + this.filterRow() + listHtml;
+      /* ⛔ ONE REGION, SO THE MAPPING STEP CAN PUT IT AWAY, and the split is the one the comment
+         below already made for the confirm screen: the log carries Edit and Delete, and THE STATS
+         GO WITH IT because they read void % and comp % off that same log. That is the opposite of
+         `r-server-check`, whose strip stays — there it is context, here it is a reading of the very
+         rows being imported.
+         ⚠ A WRAPPER, NOT A RE-RENDER — `mountImporter`'s hook toggles `display` on it, because
+         re-rendering from inside the mount throws away the file the operator just dropped. */
+      below = '<div id="vc-list-region">' + statsCard + this.filterRow() + listHtml + '</div>';
     }
 
     /* ⛔ THE CONFIRM SCREEN TAKES THE WHOLE PAGE. Its one promise is "Nothing is saved until you do",
@@ -541,7 +555,8 @@ S.ShiftVoidComp = {
         + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
-    return '<div style="display:inline-flex;gap:6px;margin-bottom:18px;">'
+    // The id follows the caller's own class, so the helper stays general and the hook has a handle.
+    return '<div id="' + cls + '-toggle" style="display:inline-flex;gap:6px;margin-bottom:18px;">'
       + segBtn('import', 'Import File') + segBtn('manual', 'Enter Manually') + '</div>';
   },
 
@@ -561,6 +576,8 @@ S.ShiftVoidComp = {
         + '</div>';
     return '<div class="card form-card">'
       + App.collapsibleCardTitle('sc-void-comp', 'Log Voids / Comps', '<button class="btn btn-ghost btn-sm no-print" id="vc-print-blank" type="button">Worksheet</button>')
+      // Shown only while the columns are being matched, in place of the head above it.
+      + '<div class="card-title" id="vc-imp-head" style="display:none;">Import your voids and comps</div>'
       + '<div class="collapse-body">'
       + this.modeToggleHtml(this.entryMode, 'vc-mode')
       + body
@@ -720,6 +737,26 @@ S.ShiftVoidComp = {
       subject: 'Voids and Comps',
       dropSub: 'Needs an Amount column. Void-or-comp, item, server, reason, and date are matched if your export has them.',
       actionsEl: '#vc-imp-actions',
+      /* ⛔ THE MAPPER TAKES THE PAGE (Kyle, 2026-08-16, the last door on the walk). The head, the
+         Import/Manual toggle, the stats, the filter row and the log all go while the columns are
+         being matched, and the previous run's result line goes with them.
+         ⚠ THE HEAD IS ADDRESSED BY ITS COLLAPSE KEY, not by a new id and not by a wrapper:
+         `style.css` styles it as `.form-card > .card-title`, a DIRECT-CHILD selector, so wrapping
+         it would strip the head band's margins. It comes back as `flex` or its title and the
+         Worksheet button stop sharing a row.
+         ⚠ HIDDEN, NOT RE-RENDERED: this fires from inside `CSVMapper.mount`, so a re-render here
+         would rebuild `#vc-csv` and throw away the file just dropped. */
+      onState: state => {
+        const map = (state === 'map');
+        const head = this.container.querySelector('[data-collapse-key="sc-void-comp"]');
+        if (head) head.style.display = map ? 'none' : 'flex';
+        ['vc-mode-toggle', 'vc-list-region', 'vc-imp-result'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = map ? 'none' : '';
+        });
+        const impHead = document.getElementById('vc-imp-head');
+        if (impHead) impHead.style.display = map ? '' : 'none';
+      },
       fields: PosIngest.FIELDS.voids,
       confirmLabel: 'Import',
       onComplete: rows => this._openVoidReview(rows)
