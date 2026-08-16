@@ -2730,14 +2730,15 @@ const App = {
   _PROTO_WEEK:     [['week-close','Close'],['week-review','Review'],['week-history','History']],
   _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
-  /* Sign Out is the only row in the rail that ENDS the session rather than going somewhere, so it
-     must never sit flush under Settings — that is one mis-click from taking the operator out
-     mid-shift. It used to buy that separation with a divider line of its own. It now buys it with
-     DISTANCE instead: the group carries `.rail-end` (`margin-top:auto`), which drops it to the foot
-     of the rail, and the divider above it is the collapse control's own `border-top`.
-     ⛔ SO THE ORDER AT THE FOOT IS `Sign Out · divider · Collapse`, and the separation is a bigger
-     gap than the line ever was — do not "restore" the divider, it would strand under Settings with
-     the whole auto gap below it. */
+  /* ⛔ SIGN OUT LEFT THE RAIL ON 2026-08-16 (Kyle: *"move it from the side bar and put like in the
+     images"*). It now sits in the TOP NAV, left of the account switcher and The Rail, as plain
+     text with no icon — `#tn-signout` in index.html, wired beside `#tn-rail`.
+     ⭐ THE TABLE STAYS, AND THAT IS THE POINT: the phone's burger drawer is generated from these
+     same tables, and `_PROTO_SIGNOUT` not being read is exactly how Sign Out went missing from
+     mobile entirely once before. The rail stops rendering it; nothing else changes.
+     ⚠ The old reasoning here was about keeping it off the rail's Settings row by a mis-click —
+     that concern is answered by it no longer being in the rail at all. 🔧 `verify-signout-
+     reachable` now holds one way out per screen size, because nothing pinned the desktop one. */
   // ⚠ WORKFLOW IS GONE FROM BOTH MENUS (Kyle, 2026-08-10: that page is being deleted). Removed here
   // rather than in each menu, so the rail and the mobile drawer — which now reads these same tables
   // — drop it together instead of one at a time.
@@ -3415,8 +3416,7 @@ const App = {
         + '<div class="rail-group"><div class="rail-grp-label">Recovery</div>'
         +   this._PROTO_RECOVERY.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
-        + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>'
-        + '<div class="rail-group rail-end">' + this._PROTO_SIGNOUT.map(r).join('') + '</div>';
+        + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>';
       rail.querySelectorAll('.rail-item[data-rail-go]').forEach(el =>
         el.addEventListener('click', () => { App.closeRailMenu(); App._protoGlobalClick(el.dataset.railGo); }));
       rail.querySelectorAll('.rail-item[data-rail-sec]').forEach(el =>
@@ -3442,6 +3442,13 @@ const App = {
     if (railBtn && !railBtn._wired) {
       railBtn._wired = true;
       railBtn.addEventListener('click', () => BarCopBriefing.open());
+    }
+    /* Sign Out, wired the same way and guarded for the same reason: this function runs on every
+       navigation, and a second listener on THIS control would fire two sign-outs. */
+    const soBtn = document.getElementById('tn-signout');
+    if (soBtn && !soBtn._wired) {
+      soBtn._wired = true;
+      soBtn.addEventListener('click', () => App._signOut());
     }
   },
 

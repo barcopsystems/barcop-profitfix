@@ -1559,6 +1559,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .tn-page #tn-help::before{display:none;}
   .tn-mobile-burger{display:flex;}
   #tn-settings{display:none;}   /* App Settings lives in the burger menu on mobile */
+  #tn-signout{display:none;}    /* and so does Sign Out — the drawer renders _PROTO_SIGNOUT */
   #tn-acct #topbar-group-dashboard{display:none !important;}
   /* The shared nav replaces the old header on mobile and the burger opens the
      drawer, so hide the old topbar everywhere so it does not double up. */
@@ -1954,6 +1955,12 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    name. 0 vertical (the height owns that, and .btn already centres by flex) and 12px each side:
    MEASURED 94px wide -> 82px, with the 11px uppercase label still clearing its own box. */
 .tn-rail{height:var(--tb-ctl-h);padding:0 12px;}
+/* Sign Out: a text link, not a button. No fill, no border, no icon — it sits on the same control
+   row as the switcher and The Rail, so it takes their height and the top nav's own muted colour. */
+.tn-signout{height:var(--tb-ctl-h);padding:0 6px;background:none;border:0;color:var(--t2);
+  font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;
+  white-space:nowrap;transition:color .12s;}
+.tn-signout:hover{color:var(--w);}
 /* The bar switcher, only where it sits in the top bar. .at-qsel is the switcher's own class (its
    only two references are in renderAccountSwitcher) but the height is scoped anyway, so a future
    reuse of the class elsewhere cannot inherit a top-bar measurement. */
