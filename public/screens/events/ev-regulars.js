@@ -119,7 +119,9 @@ S.EventsRegulars = {
        It is cleared once shown, so it cannot greet the operator again days later on a screen they
        just opened. */
     const im = this.importMsg; this.importMsg = null;
-    const imHtml = im ? '<div style="margin-top:10px;font-size:12px;color:' + (im.bad ? 'var(--red)' : 'var(--t2)') + ';">' + esc(im.text) + '</div>' : '';
+    // ⚠ THE ID IS ON THE MESSAGE, NOT A WRAPPER: this is '' when there is nothing to say, so a
+    //   wrapper would emit an empty div every render. The hook null-guards, which is the shape.
+    const imHtml = im ? '<div id="rg-imp-result" style="margin-top:10px;font-size:12px;color:' + (im.bad ? 'var(--red)' : 'var(--t2)') + ';">' + esc(im.text) + '</div>' : '';
     const addCard = '<div class="card form-card">' + App.collapsibleCardTitle('rg-add', 'Add a Regular')
       + '<div class="card-title" id="rg-imp-head" style="display:none;">Import your regulars</div>'
       + '<div class="collapse-body">' + body + imHtml + '</div></div>' + belowButtons;
@@ -353,7 +355,7 @@ S.EventsRegulars = {
          the parsed file. */
       onState: state => {
         const map = (state === 'map');
-        [['rg-imp-toggle', map], ['rg-list-region', map]].forEach(([id, hide]) => {
+        [['rg-imp-toggle', map], ['rg-list-region', map], ['rg-imp-result', map]].forEach(([id, hide]) => {
           const el = document.getElementById(id);
           if (el) el.style.display = hide ? 'none' : '';
         });
