@@ -439,6 +439,8 @@ S.InventoryVarianceReport = {
     if (!this.posRows) {
       importBlock = '<div class="card form-card"><div class="card-title" id="vr-imp-head" style="display:flex;align-items:center;gap:10px;"><span>Upload Full POS Sales</span>' + App.freqTag('As needed') + '</div>'
         + '<div id="vr-imp-lead" style="font-size:11px;color:var(--t3);margin:-4px 0 12px;">Breaks your variance down to every product, recipe-level.</div>'
+        // Shown only while the columns are being matched, in place of the two lines above it.
+        + '<div class="card-title" id="vr-imp-map-head" style="display:none;">Import your POS sales</div>'
         + '<div id="vr-import"></div></div>'
         + '<div id="vr-import-actions"></div>';
     } else {
@@ -514,6 +516,8 @@ S.InventoryVarianceReport = {
             const el = document.getElementById(id);
             if (el) el.style.display = map ? 'none' : shown;
           });
+          const impHead = document.getElementById('vr-imp-map-head');
+          if (impHead) impHead.style.display = map ? '' : 'none';
         },
         fields: [
           /* ⚠⚠ THESE THREE LISTS HAD DRIFTED FROM `PosIngest.FIELDS.pmix`, WHICH READS THE SAME

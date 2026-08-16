@@ -443,6 +443,8 @@ S.InventorySpotCheck = {
         + (this.posMode === 'import' ? 'margin-bottom:14px;' : '') + '">'
       + '<div style="font-size:12px;color:var(--t3);line-height:1.6;flex:1;min-width:200px;">Enter the POS sold on each product manually, or import this register\'s report to fill them in.</div>'
       + posToggle + '</div>'
+      // Shown only while the columns are being matched, in place of the row above it.
+      + '<div class="card-title" id="sp-imp-head" style="display:none;">Import your POS report</div>'
       + (this.posMode === 'import' ? '<div id="sp-pos-csv"></div>' : '')
       + '</div>'
       /* ⛔ THE MAPPER'S BUTTONS LIVE OUTSIDE THE CARD (Kyle, 2026-08-15). `CSVMapper` renders no
@@ -858,6 +860,8 @@ S.InventorySpotCheck = {
         if (head) head.style.display = map ? 'none' : 'flex';
         const fin = document.getElementById('sp-finish-row');
         if (fin) fin.style.display = 'none';
+        const impHead = document.getElementById('sp-imp-head');
+        if (impHead) impHead.style.display = map ? '' : 'none';
         /* ⛔ AND THE WAY BACK IS THE SAME RULE, NOT A BLANKET REVEAL. Restoring the row to 'flex'
            here would hand Finish Spot Check to a check that has nothing to compare against, which
            is the thing `_syncActions` exists to prevent. Two rules about one row is how they end

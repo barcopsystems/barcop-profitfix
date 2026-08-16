@@ -865,7 +865,14 @@ S.InventoryProducts = {
           // The UNION, not just this card's fields: the file may route into other
           // categories, and a column with nowhere to bind is a column thrown away.
           fields: this.importFieldsForImport(cat).map(f => ({ key: f.key, label: f.label, required: f.required, match: f.aliases })),
-          onState: state => { const row = document.getElementById('ip-imp-cancel-row'); if (row) row.style.display = (state === 'map') ? 'none' : ''; },
+          onState: state => {
+            const map = (state === 'map');
+            const row = document.getElementById('ip-imp-cancel-row');
+            if (row) row.style.display = map ? 'none' : '';
+            // The header is the inverse of the drop copy: it exists only once the drop copy is gone.
+            const hd = document.getElementById('ip-imp-head');
+            if (hd) hd.style.display = map ? '' : 'none';
+          },
           // The mapper no longer imports. It hands the rows to the routing question,
           // which is what resolves each row's category before anything is written.
           onComplete: rows => { this._formCategory = cat; this._openRouting(rows, cat); }
@@ -2316,13 +2323,19 @@ S.InventoryProducts = {
   },
 
   importPanelHTML() {
-    /* ⚠ NO HEADING AND NO LEAD ON THIS ONE. CSVMapper already prints "Drop your Liquor
-       product file here" with its own requirements line, and then "MAP YOUR COLUMNS /
-       Match each field to a column from your file. Detected columns are pre-selected."
-       Adding a section head over the top of that said the same thing twice, which is the
-       "too much text" half of the complaint. A screen that already explains itself gets
-       nothing from us. */
+    /* ⚠ NO HEADING IN THE DROP STATE, AND THAT PART STILL HOLDS: CSVMapper already prints
+       "Drop your Liquor product file here" with its own requirements line, so a section head over
+       the top of it says the same thing twice.
+       ⭐ ON THE MAPPING SCREEN IT IS THE OPPOSITE (Kyle, 2026-08-15): *"add products could use it
+       too.. the small header 'Import Draft Beer List' or something"*. By then the drop copy is gone
+       and the only thing naming the file is the mapper's own `MAP YOUR COLUMNS · DRAFT BEER`, so a
+       line saying which of the six lists is going in is the context, not a repeat. Hidden until
+       `onState` reports 'map'.
+       ⚠ THE CATEGORY COMES OFF `_import`, which is what the mount already reads for its drop title
+       and its field set — one source, so the header cannot name a different list than the fields. */
+    const impCat = (this._import && this._import.cat) || '';
     return '<div class="card form-card" id="ip-import-panel">'
+      + '<div class="card-title" id="ip-imp-head" style="display:none;">Import ' + esc(impCat) + ' List</div>'
       + '<div id="ip-csv"></div>'
       + '</div>'
       + '<div id="ip-imp-cancel-row" class="no-print" style="margin:16px 0 24px;"><button type="button" class="btn btn-ghost" id="ip-imp-cancel">Cancel</button></div>'

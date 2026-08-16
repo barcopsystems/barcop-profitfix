@@ -257,6 +257,8 @@ S.InventoryVendors = {
        re-render keeps the heading true while App.captureDraft keeps the name in the field. */
     return '<div class="card form-card">'
       + App.collapsibleCardTitle('ic-vendors', this._setupFor ? 'Set Up ' + this._setupFor : 'Add a Vendor')
+      // Shown only while the columns are being matched, in place of the head above it.
+      + '<div class="card-title" id="iv-imp-head" style="display:none;">Import your vendors</div>'
       + '<div class="collapse-body">'
       + '<div class="seg-toggle" id="iv-mode-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
@@ -424,6 +426,8 @@ S.InventoryVendors = {
           const el = document.getElementById(id);
           if (el) el.style.display = map ? 'none' : '';
         });
+        const impHead = document.getElementById('iv-imp-head');
+        if (impHead) impHead.style.display = map ? '' : 'none';
       },
       fields: [
         // ⚠ REQUIRED. `Vendor ID | Legal Name | Contact` bound the ID as the vendor's name, because
