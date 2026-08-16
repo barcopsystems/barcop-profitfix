@@ -454,7 +454,7 @@ S.LaborStaffRoster = {
         const map = (state === 'map');
         const head = this.container.querySelector('[data-collapse-key="lc-staff-roster"]');
         if (head) head.style.display = map ? 'none' : 'flex';
-        ['sr-mode-toggle', 'sr-list-region'].forEach(id => {
+        ['sr-mode-toggle', 'sr-list-region', 'sr-imp-result'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.style.display = map ? 'none' : '';
         });
