@@ -182,7 +182,13 @@ S.InventoryVendors = {
     this.container.innerHTML = '<div class="screen">'
       + (this._vendorReview
           ? this.vendorReviewHTML()
-          : this.addFormCard() + this.pendingSectionHTML() + listSection) + '</div>';
+          /* ⛔ ONE REGION, SO THE MAPPING STEP CAN PUT IT AWAY. The argument is the one written
+             above for the confirm screen and it is just as true while the columns are being
+             matched: this page promises nothing is saved until you press Add, and the list under
+             it carries Edit and Delete, which write on the press. Same page, same buttons.
+             ⚠ A WRAPPER, NOT A RE-RENDER — `mountImporter`'s hook toggles `display` on it, because
+             re-rendering from inside the mount throws away the file the operator just dropped. */
+          : this.addFormCard() + '<div id="iv-list-region">' + this.pendingSectionHTML() + listSection + '</div>') + '</div>';
     this.wireList();
   },
 
@@ -252,7 +258,7 @@ S.InventoryVendors = {
     return '<div class="card form-card">'
       + App.collapsibleCardTitle('ic-vendors', this._setupFor ? 'Set Up ' + this._setupFor : 'Add a Vendor')
       + '<div class="collapse-body">'
-      + '<div class="seg-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
+      + '<div class="seg-toggle" id="iv-mode-toggle">' + segBtn('manual', 'Enter Manually') + segBtn('import', 'Import File') + '</div>'
       + modeBody
       + '</div></div>'
       + actionRow;
@@ -399,6 +405,26 @@ S.InventoryVendors = {
       subject: 'Vendors',
       dropSub: 'Needs a column for vendor name. Rep, phone, email, delivery days, terms, account number, order minimum, delivery fee, and free-delivery-over come in too if your file has them.',
       actionsEl: '#iv-imp-actions',
+      /* ⛔ THE MAPPER TAKES THE PAGE (Kyle, walking this door 2026-08-15): *"mapping inside the
+         add a vendor card header with toggle buttons"*. The head and the Enter Manually / Import
+         File toggle were still offering a different way to enter a vendor over the top of a file
+         already dropped, and the list below still carried Edit and Delete.
+         ⚠ THE HEAD IS ADDRESSED BY ITS COLLAPSE KEY, not by a new id and not by a wrapper:
+         `style.css` styles it as `.form-card > .card-title`, a DIRECT-CHILD selector, so wrapping
+         it would strip the head band's margins. That attribute is what the collapse system
+         already identifies it by, which makes it the durable handle.
+         ⚠ IT COMES BACK AS `flex` — the helper renders the head as an inline flex row, and a bare
+         reset would drop its title and chevron off one line. Cancel re-mounts and fires 'drop'.
+         ⚠ HIDDEN, NOT RE-RENDERED: this fires from inside `CSVMapper.mount`. */
+      onState: state => {
+        const map = (state === 'map');
+        const head = this.container.querySelector('[data-collapse-key="ic-vendors"]');
+        if (head) head.style.display = map ? 'none' : 'flex';
+        ['iv-mode-toggle', 'iv-list-region'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = map ? 'none' : '';
+        });
+      },
       fields: [
         // ⚠ REQUIRED. `Vendor ID | Legal Name | Contact` bound the ID as the vendor's name, because
         // `name` is EXACT_ONLY and "Legal Name" had no candidate. Precise spellings lead.
