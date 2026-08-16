@@ -193,7 +193,16 @@ S.RevenueMenuEngineering = {
       this._wirePmixReview();
       return;
     }
-    this.container.innerHTML = '<div class="screen">' + (priced ? this.coversImportHtml() : '') + this.classificationHtml() + '</div>';
+    /* ⛔ ONE REGION, SO THE MAPPING STEP CAN PUT IT AWAY. The argument is the one written above
+       for the confirm screen and it is just as true while the columns are being matched: the board
+       carries Reprice, Mark Live, Cancel Plan and the batch apply, every one of which writes on the
+       press. Same page, same buttons.
+       ⚠ A WRAPPER, NOT A RE-RENDER — `mountCoversImport`'s hook toggles `display` on it, because
+       re-rendering from inside the mount throws away the file the operator just dropped.
+       ⚠ SAFE FOR THE PDF: `exportListPDF` resolves `me-export-root` with getElementById, so nesting
+       it one level deeper changes nothing. */
+    this.container.innerHTML = '<div class="screen">' + (priced ? this.coversImportHtml() : '')
+      + '<div id="me-board-region">' + this.classificationHtml() + '</div>' + '</div>';
     const c = this.container;
     c.querySelectorAll('.me-reprice').forEach(b => b.addEventListener('click', () => this.openReprice(b.dataset.id)));
     c.querySelectorAll('.me-marklive').forEach(b => b.addEventListener('click', () => this.markLive(b.dataset.id)));
@@ -871,7 +880,9 @@ S.RevenueMenuEngineering = {
                    + ' skipped with no item name, usually a subtotal or section line in the export.') : '');
     }
     return '<div class="card form-card no-print">'
-      + '<div class="card-title" style="display:flex;align-items:center;gap:10px;"><span>Re-import Units Sold</span>' + App.freqTag('As needed') + '</div>'
+      + '<div class="card-title" id="me-cov-head" style="display:flex;align-items:center;gap:10px;"><span>Re-import Units Sold</span>' + App.freqTag('As needed') + '</div>'
+      // Shown only while the columns are being matched, in place of the head above it.
+      + '<div class="card-title" id="me-imp-head" style="display:none;">Import your units sold</div>'
       + '<div id="me-cov-csv"></div>' + flash
       + '</div>'
       + '<div id="me-cov-actions" style="margin:16px 0 24px;"></div>';
@@ -885,6 +896,27 @@ S.RevenueMenuEngineering = {
       subject: 'Product Mix',
       dropSub: 'One row per item with units sold for the week. Bar Cop matches each row to a menu item by name and refreshes its weekly units sold.',
       actionsEl: '#me-cov-actions',
+      /* ⛔ THE MAPPER TAKES THE PAGE (Kyle, walking this door 2026-08-16, straight after the staff
+         roster): *"ok menu engineering same thing.."*.
+         ⚠ "SAME THING" IS NOT THE SAME SHAPE. This door has NO mode toggle to hide, and its head is
+         a plain `.card-title` with no `data-collapse-key`, so it is addressed by an id the way
+         `ic-spot-check` does rather than by the collapse attribute `ic-vendors` uses.
+         ⚠ THE HEAD IS NOT RE-WORDED, because it carries a cadence tag that has to come back
+         untouched on Cancel. The header is a SECOND `.card-title`, hidden until the mapper is up.
+         ⚠ IT COMES BACK AS `flex` — the head is an inline flex row holding its title and that tag,
+         and a bare reset would drop them off one line. Cancel re-mounts and fires 'drop'.
+         ⛔ THE BOARD GOES WITH IT: see the region comment in `draw()`.
+         ⚠ HIDDEN, NOT RE-RENDERED: this fires from inside `CSVMapper.mount`, so a re-render here
+         would rebuild `#me-cov-csv` and throw away the file just dropped. */
+      onState: state => {
+        const map = (state === 'map');
+        const head = document.getElementById('me-cov-head');
+        if (head) head.style.display = map ? 'none' : 'flex';
+        const board = document.getElementById('me-board-region');
+        if (board) board.style.display = map ? 'none' : '';
+        const impHead = document.getElementById('me-imp-head');
+        if (impHead) impHead.style.display = map ? '' : 'none';
+      },
       fields: PosIngest.FIELDS.pmix,
       confirmLabel: 'Update Units Sold',
       /* ⛔ THE MAPPER NO LONGER COMMITS. It hands the file to the confirm screen, which is where the
