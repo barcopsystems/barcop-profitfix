@@ -553,16 +553,19 @@ S.InventoryLocations = {
       + '<div class="f"><label>New Location Name</label>'
       + '<input type="text" id="il-dup-name" class="form-input" value="' + esc(suggested) + '" autocomplete="off"/></div>'
       + '<div id="il-dup-err" style="color:var(--red);font-size:12px;display:none;margin-top:8px;"></div>'
-      + '<div style="margin-top:18px;display:flex;gap:8px;">'
-      + '<button class="btn btn-primary" id="il-dup-go">Duplicate</button>'
-      + '<button class="btn btn-ghost" id="il-dup-cancel">Cancel</button></div>'
+      /* ⛔ NO CANCEL BUTTON. The corner X that openModal draws IS the dismissal, on all 70
+         modal sites in the app. A button that only closes duplicates it and competes with the
+         one real action. A labelled exit earns its place only when leaving MEANS something,
+         like Back to Edit on the delivery confirm, which also passes noX so the X cannot
+         make that choice ambiguous. Pinned by verify-modal-dismiss-one-way. */
+      + '<div style="margin-top:18px;">'
+      + '<button class="btn btn-primary" id="il-dup-go">Duplicate</button></div>'
       + '</div>',
       { id: 'il-dup', maxWidth: 460 });
     // openModal inserts synchronously, so these resolve without waiting a tick.
     const inp = document.getElementById('il-dup-name');
     if (inp) { inp.focus(); inp.select();
       inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this.saveDuplicate(id); } }); }
-    document.getElementById('il-dup-cancel')?.addEventListener('click', () => App.closeModal('il-dup'));
     document.getElementById('il-dup-go')?.addEventListener('click', () => this.saveDuplicate(id));
   },
 
