@@ -547,8 +547,12 @@ S.InventoryLocations = {
     let suggested = src.name + ' 2', n = 2;
     while (this.locations().some(l => l.name.toLowerCase() === suggested.toLowerCase())) { n++; suggested = src.name + ' ' + n; }
     const held = this.productCount(src.name);
+    /* ⛔ THE CARD WRAPPER IS WHAT GIVES A MODAL ITS SURFACE. Without `card form-card` the
+       content sits straight on the overlay and the page reads through it — which is exactly
+       what shipped. Same shell as triageModalHTML on this screen. */
     App.openModal(
-      '<div class="card-title">Duplicate ' + esc(src.name) + '</div>'
+      '<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">Duplicate ' + esc(src.name) + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Creates a new location holding the same '
       + held + ' product' + (held === 1 ? '' : 's') + '. Adjust it after, nothing about ' + esc(src.name) + ' changes.</div>'
       + '<div class="f"><label>New Location Name</label>'
@@ -556,7 +560,8 @@ S.InventoryLocations = {
       + '<div id="il-dup-err" style="color:var(--red);font-size:12px;display:none;margin-top:8px;"></div>'
       + '<div style="margin-top:18px;display:flex;gap:8px;">'
       + '<button class="btn btn-primary" id="il-dup-go">Duplicate</button>'
-      + '<button class="btn btn-ghost" id="il-dup-cancel">Cancel</button></div>',
+      + '<button class="btn btn-ghost" id="il-dup-cancel">Cancel</button></div>'
+      + '</div>',
       { id: 'il-dup', maxWidth: 460 });
     // openModal inserts synchronously, so these resolve without waiting a tick.
     const inp = document.getElementById('il-dup-name');
