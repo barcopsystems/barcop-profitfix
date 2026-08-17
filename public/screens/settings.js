@@ -3701,18 +3701,19 @@ S.HubSettings = {
     const LC_BASE_HOURS = {
       'Maria G.':   42,   'Jake T.':    22,   'Ashley B.':  14,   'Devin R.':   11,
       'Luis V.':    41,   'Sam P.':     24,   'Hector M.':  15,   'Tonya B.':    9,
-      /* ⛔⛔⛔ NO TIP-CREDIT EMPLOYEE CROSSES 40, AND THAT IS A DELIBERATE SEED CHOICE.
-         Bar Cop prices an overtime hour at 1.5x the CASH wage. That is correct for everyone
-         paid at or above the full minimum — Maria/Jake/Ashley at $7.25 take no tip credit, so
-         1.5 x $7.25 is right — and it is WRONG for a $2.13 server: under FLSA their OT rate is
-         1.5 x the full minimum LESS the tip credit ($5.76), not 1.5 x $2.13 ($3.20).
-         Recomputing that is payroll-processor territory and Kyle ruled it out of scope, so the
-         seed must not put a tipped-cash-wage employee into overtime — otherwise the demo prints
-         a figure that is $2.56 light on a payroll worksheet. Jessica ran 41 h in the first cut
-         and did exactly that, live. Overtime lives on Maria (Bartender, full minimum) and Luis
-         (Line Cook, $15): two people, two departments, both priced correctly.
-         🔧 verify-tip-credit-seed.js C5 refuses any tip-credit employee over 40. */
-      'Jessica M.': 38,   'Marcus T.':  24,   'Brianna K.': 17,   'Priya N.':   16,
+      /* ⭐⭐⭐ A TIP-CREDIT SERVER IS IN OVERTIME ON PURPOSE, AND THAT IS ONLY HONEST BECAUSE THE
+         APP NOW PRICES IT CORRECTLY. Bar Cop used to pay an OT hour at 1.5x the CASH wage —
+         right for anyone at or above the full minimum (Maria at $7.25 takes no tip credit, so
+         1.5 x $7.25 is correct), WRONG for a $2.13 server, whose federal rate is 1.5 x the full
+         minimum LESS the tip credit: $5.76, not $3.20.
+         ⚠ FOR ABOUT AN HOUR THIS TABLE READ 38 INSTEAD OF 41 — I had moved her out of overtime
+         so the demo would stop DISPLAYING the wrong figure. That is bending the seed around a
+         broken function, which is the thing this project keeps paying for. The function was then
+         fixed (`App.otHourlyPremium`), and the seed goes back to what an operator's week actually
+         looks like: overtime on three people across three departments, one of them a server.
+         🔧 verify-tip-credit-seed.js C5 is now the COUPLING: the seed may show a tip-credit
+         employee in overtime only while the FLSA helper is in place to price it. */
+      'Jessica M.': 41,   'Marcus T.':  24,   'Brianna K.': 17,   'Priya N.':   16,
       'Owen L.':    10,   'Tara W.':     7,   'Diego S.':    5
     };
     /* ⚠ THE CEILING ON THIS TABLE IS `SCHED_PLAN`, NOT TASTE. Build Schedule prices the
