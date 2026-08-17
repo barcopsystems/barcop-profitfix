@@ -110,6 +110,7 @@ S.InventoryLocations = {
       { h: 'The Numbers Up Top', p: ['The strip across the top reads Locations, Products Placed, and Need a Location at a glance. Locations is how many active spots you run. Products Placed is how many products sit in at least one of them. Need a Location turns amber when products are sitting nowhere and would count as zero, so chase that number down to nothing before you run a count.'] },
       { h: 'Products That Need A Location', p: ['A product not yet placed anywhere is flagged at the top of this screen as Need a Location, because it will not be counted until it has one. Tap Assign Products, pick where they live, and check them off. This is the quick way to place a batch you just imported.'] },
       { h: 'A Product Can Live In Several Places', p: ['Stock the same product in more than one location and it shows up at each during a count. The first location you put it in becomes its home for ordering, which is the Primary Location the Add Product form fills in.'] },
+      { h: 'More Than One Open Bottle In A Spot', p: ['A count holds one open bottle per product per location, so a bar running two or three speed rails off the same well needs each rail as its own location. Name them Rail 1, Rail 2 and Rail 3, and every rail gets its own full and open count instead of you guessing at a blended level. Use Duplicate on the location row to copy a rail\'s whole product list into the next one, then adjust. It is also how you find out which station is pouring heavy, because the variance reads per rail instead of averaging the whole bar into one number.'] },
       { h: 'Archive And Restore', p: ['Archive on a location pulls it out of counts and the order flow but keeps it, so a closed-down well or a seasonal patio bar is never gone for good. Archived spots drop into an Archived list at the bottom; hit Restore to bring one back with its products intact, or Delete Permanently to remove it for good. Products that lived only there go back to Need a Location until you place them somewhere active.'] }
     ]);
   },
@@ -243,6 +244,7 @@ S.InventoryLocations = {
           + '<td>' + n + ' product' + (n === 1 ? '' : 's') + '</td>'
           + '<td><div class="row-actions">'
           + '<button class="btn btn-ghost btn-sm il-edit" data-id="' + l.id + '">Edit</button>'
+          + '<button class="btn btn-ghost btn-sm il-dup" data-id="' + l.id + '">Duplicate</button>'
           + '<button class="btn btn-ghost btn-sm il-archive" data-id="' + l.id + '">Archive</button>'
           + '</div></td></tr>';
       }).join('');
@@ -397,6 +399,7 @@ S.InventoryLocations = {
       const save = ev.target.closest('#il-new-save');
       const open = ev.target.closest('.il-open');
       const edit = ev.target.closest('.il-edit');
+      const dup  = ev.target.closest('.il-dup');
       const arch = ev.target.closest('.il-archive');
       const un   = ev.target.closest('.il-unarchive');
       const dperm = ev.target.closest('.il-delperm');
@@ -404,6 +407,7 @@ S.InventoryLocations = {
       if (save)       this.saveNewLocation();
       else if (open)  this.openEdit(open.dataset.id);
       else if (edit)  this.openEdit(edit.dataset.id);
+      else if (dup)   this.openDuplicate(dup.dataset.id);
       else if (arch)  this.setArchived(arch.dataset.id, true);
       else if (un)    this.setArchived(un.dataset.id, false);
       else if (dperm) this.deletePermanently(dperm.dataset.id);
@@ -526,6 +530,81 @@ S.InventoryLocations = {
       App.restoreRows(_undoProd);
       if (btn) { btn.disabled = false; btn.textContent = 'Save Location'; }
       fail('Save failed. Try again.');
+    }
+  },
+
+  /* ── Duplicate a location ───────────────────────────────────────────────────
+     A bar running two or three speed rails needs the SAME product list in each, and building
+     that by hand is why people give up and count the rails as one spot. That matters because
+     a count row is keyed product@@location and holds ONE open bottle, so three rails sharing a
+     well can only be counted honestly if each rail is its own location.
+     ⛔ PRODUCTS REFERENCE A LOCATION BY NAME, never by id (see productCount / App.productLocations),
+     so the copy adds the NEW NAME to every product the source holds. Nothing is keyed off the id. */
+  openDuplicate(id) {
+    const src = this.locationById(id);
+    if (!src) return;
+    // Suggest a free name rather than opening on a duplicate the operator has to fix.
+    let suggested = src.name + ' 2', n = 2;
+    while (this.locations().some(l => l.name.toLowerCase() === suggested.toLowerCase())) { n++; suggested = src.name + ' ' + n; }
+    const held = this.productCount(src.name);
+    App.openModal(
+      '<div class="card-title">Duplicate ' + esc(src.name) + '</div>'
+      + '<div style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Creates a new location holding the same '
+      + held + ' product' + (held === 1 ? '' : 's') + '. Adjust it after, nothing about ' + esc(src.name) + ' changes.</div>'
+      + '<div class="f"><label>New Location Name</label>'
+      + '<input type="text" id="il-dup-name" class="form-input" value="' + esc(suggested) + '" autocomplete="off"/></div>'
+      + '<div id="il-dup-err" style="color:var(--red);font-size:12px;display:none;margin-top:8px;"></div>'
+      + '<div style="margin-top:18px;display:flex;gap:8px;">'
+      + '<button class="btn btn-primary" id="il-dup-go">Duplicate</button>'
+      + '<button class="btn btn-ghost" id="il-dup-cancel">Cancel</button></div>',
+      { id: 'il-dup', maxWidth: 460 });
+    // openModal inserts synchronously, so these resolve without waiting a tick.
+    const inp = document.getElementById('il-dup-name');
+    if (inp) { inp.focus(); inp.select();
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this.saveDuplicate(id); } }); }
+    document.getElementById('il-dup-cancel')?.addEventListener('click', () => App.closeModal('il-dup'));
+    document.getElementById('il-dup-go')?.addEventListener('click', () => this.saveDuplicate(id));
+  },
+
+  /* ⚠ FOLLOWS saveNewLocation'S SHAPE EXACTLY, including the two things that were paid for
+     there: the product cascade fires ONLY if the location row itself landed (S63), or the
+     server ends up holding products naming a shelf that does not exist; and on failure the
+     row is pulled back out with dropRows (S20), because putRecord's revert re-seats the very
+     object it was handed rather than splicing it, which would leave the un-saved name
+     blocking the operator from retyping it. */
+  async saveDuplicate(id) {
+    if (this._savingDup) return;
+    const src = this.locationById(id);
+    if (!src) return;
+    const err = document.getElementById('il-dup-err');
+    const show = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    const name = (document.getElementById('il-dup-name')?.value || '').trim();
+    if (!name) { show('Location name required.'); return; }
+    if (this.locations().some(l => l.name.toLowerCase() === name.toLowerCase())) { show('A location with that name already exists.'); return; }
+
+    // The set to carry over is read off the SOURCE NAME, which is the only thing products know.
+    const want = new Set(this.products().filter(p => App.productLocations(p).includes(src.name)).map(p => p.id));
+    this._savingDup = true;
+    const btn = document.getElementById('il-dup-go');
+    if (btn) { btn.disabled = true; btn.textContent = 'Duplicating...'; }
+
+    const loc = { id: App.uid(), name, archived: false, service_bar: !!src.service_bar, sort_order: this._nextLocSeq() };
+    this.locations().push(loc);
+    const _undoProd = [];
+    const touched = this._reconcileProducts(name, want, _undoProd);
+    const ok = await App.putRecord('ic', 'location', loc);
+    if (ok) {
+      if (touched.length && !(await App.putRecordsBulk('ic', 'product', touched))) App.restoreRows(_undoProd);
+      this._savingDup = false;
+      App.closeModal('il-dup');
+      // Same landing as a new location: drop into the copy so it can be adjusted at once.
+      this.openEdit(loc.id);
+    } else {
+      App.dropRows(this.locations(), [loc]);
+      App.restoreRows(_undoProd);
+      this._savingDup = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Duplicate'; }
+      show('Save failed. Try again.');
     }
   },
 

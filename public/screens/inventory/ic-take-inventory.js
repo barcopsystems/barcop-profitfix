@@ -116,6 +116,7 @@ S.InventoryTakeInventory = {
       { h: 'Pick Your Locations', p: ['Set the date and who is counting up top, then pick where. Most operators count one location at a time and come back for the rest later. Pick a single location for a quick section count, or pick several to run a full inventory in one session. You count and finalize each location\'s products together. Hit Worksheet to print a blank count sheet in your shelf order, so you can pencil in full and open on the floor before you key the numbers in.'] },
       { h: 'How To Enter Each Product', p: [
         'Liquor, wine, and bottled mixers use the fill slider. Set the number of full bottles, then drag the slider to the level of the open bottle. Draft beer uses the same slider shaped like a keg.',
+        'The slider holds ONE open bottle per product in a location. If a spot has two or three open bottles of the same product, like a bar with more than one speed rail, set each rail up as its own location so every one gets its own full and open count. Duplicate on the Locations screen copies a rail\'s product list into the next one.',
         'Bottle beer is counted by the case. Enter full cases and any loose bottles, and Bar Cop shows the running total in cases as you type.',
         'Food and dry goods use a plain number in the product\'s own unit, like pounds, cases, or each.'
       ] },
