@@ -398,7 +398,8 @@ S.LaborReports = {
     // Include the weekly OT premium (0.5x over 40/wk) so the Week lens Actual Labor
     // Cost / Labor % foots to gross and matches the Range lens, which already adds it.
     const otWk = this.otPremiums(weekActuals);
-    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + salWk.total + otWk.total;
+    const mkWk = App.tipMakeupForRows ? App.tipMakeupForRows(weekActuals).total : 0;
+    const actCost = weekActuals.reduce((t, a) => t + (a.cost || 0), 0) + salWk.total + otWk.total + mkWk;
 
     const sched = this.scheduleCovering(ws);
     const schedHours = sched ? (sched.total_hours || 0) : null;
@@ -581,7 +582,10 @@ S.LaborReports = {
 
     const ot = this.otPremiums(this.actuals(), rFrom, rTo);
     const totHours = rows.reduce((t, a) => t + (a.hours || 0), 0);
-    const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0) + salRange.total + ot.total;
+    // ALL rows with the window, never the filtered set: a week cut by the range edge is not
+    // the week the minimum was tested over.
+    const mkRange = App.tipMakeupInWindow ? App.tipMakeupInWindow(this.actuals(), rFrom, rTo).total : 0;
+    const totCost = rows.reduce((t, a) => t + (a.cost || 0), 0) + salRange.total + ot.total + mkRange;
     // Avg Wage is a WAGE: straight-time hourly pay over hourly hours, on the same basis
     // as the By Staff column below (straight / hours). Dividing totCost by totHours put
     // fixed salary and the OT premium in the numerator against hours salaried managers

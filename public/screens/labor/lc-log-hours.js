@@ -296,6 +296,7 @@ S.LaborLogHours = {
     const _to   = _r.to   || _dates[_dates.length - 1] || '';
     if (_from && _to && App.salariedCost) totCost += App.salariedCost(_from, _to).total || 0;
     totCost += (App.otPremiumInWindow ? App.otPremiumInWindow(this.actuals(), _from, _to).total : 0);
+    totCost += (App.tipMakeupInWindow ? App.tipMakeupInWindow(this.actuals(), _from, _to).total : 0);
 
     let below;
     if (all.length === 0) {

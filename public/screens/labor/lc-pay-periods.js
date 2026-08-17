@@ -543,29 +543,10 @@ S.LaborPayPeriods = {
     else this.renderList();
   },
 
-  // Sum tip-pool shares for a staff member in a given week. Reads
-  // lc_tip_pools where shift_id is set to a shift in the range; falls back
-  // to date-keyed pools for off-shift entries. Used by the tip credit
-  // compliance check.
+  /* ⛔ ONE IMPLEMENTATION, IN App. It used to live here, but the labor rollups across a
+     dozen files need the same number and a screen object is not reachable from app.js.
+     Moved rather than copied: a second copy is exactly what drifts. */
   tipShareForStaffInWeek(staffId, weekStart, weekEnd) {
-    const pools = ((App.laborData && App.laborData.lc_tip_pools) || []);
-    const shifts = ((App.shiftData && App.shiftData.sc_shifts) || []);
-    let total = 0;
-    pools.forEach(p => {
-      const inRange = (p.date && p.date >= weekStart && p.date <= weekEnd)
-        || (p.shift_id && shifts.find(s => s.id === p.shift_id && s.date >= weekStart && s.date <= weekEnd));
-      if (!inRange) return;
-      (p.participants || []).forEach(part => {
-        if (part.staff_id === staffId) total += parseFloat(part.share) || 0;
-      });
-    });
-    if (total > 0) return total;
-    // No pool share for this person this week — fall back to their own logged
-    // tips so a house that logs tips without saving a pool split still gets a
-    // real tip-credit number instead of a false $0 / "Below Min" flag. Uses NET
-    // tips (after tip-out paid, plus tip-out received) so the figure is honest.
-    const tips = ((App.laborData && App.laborData.lc_tips) || []);
-    return tips.reduce((s, t) => (t.staff_id === staffId && t.date >= weekStart && t.date <= weekEnd)
-      ? s + App.netTips(t) : s, 0);
+    return App.tipShareForStaffInWeek(staffId, weekStart, weekEnd);
   }
 };
