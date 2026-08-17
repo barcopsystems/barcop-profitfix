@@ -17,6 +17,13 @@
    name, position, regular hours, OT hours, regular wage, OT wage, gross. */
 
 S.LaborPayPeriods = {
+  /* ⛔ ONE COLGROUP FOR BOTH CARDS. Open and Closed are read as a single running list, so
+     their columns have to sit on the same verticals. Left to itself each table sizes to its
+     OWN content and they step sideways, worst on the action column: Open carries View plus
+     Close & Lock, Closed carries Reopen. Percentages, not pixels, so it survives the card
+     getting narrower. The action column is sized for the two-button case, which is the wider
+     of the two. Same device and the same reason as c-trapped's COLS. */
+  COLS: '<colgroup><col style="width:25%"><col style="width:12%"><col style="width:13%"><col style="width:15%"><col style="width:13%"><col style="width:22%"></colgroup>',
   detailWeekStart: null,
 
   actuals()  { return ((App.laborData && App.laborData.lc_actuals)     || []); },
@@ -215,11 +222,11 @@ S.LaborPayPeriods = {
       + '<div class="sh" style="margin:0;">Open Periods</div>'
       + '<div class="no-print" style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="pp-open-export">Export PDF</button></div></div>';
     if (openWeeks.length === 0) {
-      openCard += '<div class="card" id="pp-open-card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      openCard += '<div class="card" id="pp-open-card" style="overflow-x:auto;"><table class="row-list">' + this.COLS + '<thead><tr>'
         + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
         + '</tr></thead><tbody><tr><td colspan="6" style="color:var(--t3);">No open periods. Every week in range is closed and locked.</td></tr></tbody></table></div>';
     } else {
-      openCard += '<div class="card" id="pp-open-card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      openCard += '<div class="card" id="pp-open-card" style="overflow-x:auto;"><table class="row-list">' + this.COLS + '<thead><tr>'
         + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Entries</th><th></th>'
         + '</tr></thead><tbody>' + openWeeks.map(openRow).join('') + '</tbody></table></div>';
     }
@@ -247,7 +254,7 @@ S.LaborPayPeriods = {
           + '</tr>';
       };
       closedCard = '<div class="sh" style="margin:24px 0 10px;">Closed Periods</div>'
-        + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+        + '<div class="card" style="overflow-x:auto;"><table class="row-list">' + this.COLS + '<thead><tr>'
         + '<th>Week</th><th>Hours</th><th>OT Hours</th><th>Gross</th><th>Closed</th><th></th>'
         + '</tr></thead><tbody>' + closedWeeks.slice(0, App.listLimit('lc', 'pay_period')).map(closedRow).join('') + '</tbody></table></div>'
         + App.showOlderBar('lc', 'pay_period', closedWeeks, false);
