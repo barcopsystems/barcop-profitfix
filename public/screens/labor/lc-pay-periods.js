@@ -338,11 +338,16 @@ S.LaborPayPeriods = {
         + '<div class="calc-item"><div class="calc-label">Regular Cost</div><div class="calc-val lg">' + App.fmtCurrency(agg.totals.regular_cost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">OT Pay</div><div class="calc-val lg ' + (agg.totals.ot_cost > 0 ? 'warn' : '') + '">' + App.fmtCurrency(agg.totals.ot_cost) + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Gross</div><div class="calc-val lg">' + App.fmtCurrency(agg.totals.gross) + '</div></div>'
-      + '</div></div>';
+      + '</div>'
+      /* The tip-credit note sits INSIDE the stat box, under the numbers, in secondary grey
+         (Kyle, 2026-08-17). It was red and floating below the card. The row it summarises is
+         already marked on the table, so a second red line above it was the same alarm twice —
+         and this is a note about the period, which is what this box is. */
+      + (belowMinCount > 0
+          ? '<div style="font-size:11px;color:var(--t2);font-weight:700;margin:14px 0 0;">' + belowMinCount + ' tipped employee' + (belowMinCount === 1 ? '' : 's') + ' fell below state minimum wage this week. ' + App.fmtCurrency(belowMinOwed) + ' owed in makeup pay before payroll runs.</div>'
+          : '')
+      + '</div>';
 
-    const warnLine = belowMinCount > 0
-      ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin:14px 0 0;">' + belowMinCount + ' tipped employee' + (belowMinCount === 1 ? '' : 's') + ' fell below state minimum wage this week. ' + App.fmtCurrency(belowMinOwed) + ' owed in makeup pay before payroll runs.</div>'
-      : '';
 
     const breakdownHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
       + '<div class="sh" style="margin:0;">Pay Period &middot; ' + this.fmtDate(weekStart) + ' &ndash; ' + this.fmtDate(agg.weekEnd) + '</div>'
@@ -355,7 +360,7 @@ S.LaborPayPeriods = {
     // Close & Lock (open) or Reopen (closed) lives bottom-left, under the breakdown.
     const actionRow = titleAction ? '<div class="no-print" style="margin:18px 0 24px;display:flex;gap:8px;">' + titleAction + '</div>' : '';
 
-    this.container.innerHTML = '<div class="screen">' + periodCard + warnLine + breakdownHeading + tableCard + actionRow + '</div>';
+    this.container.innerHTML = '<div class="screen">' + periodCard + breakdownHeading + tableCard + actionRow + '</div>';
 
     document.getElementById('pp-export-pdf')?.addEventListener('click', () => App.exportPDF({ title: 'Pay Period', root: this.container }));
     document.getElementById('pp-close-detail')?.addEventListener('click', () => this.closePeriod(weekStart));
