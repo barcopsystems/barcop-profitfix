@@ -343,8 +343,12 @@ S.LaborPayPeriods = {
          (Kyle, 2026-08-17). It was red and floating below the card. The row it summarises is
          already marked on the table, so a second red line above it was the same alarm twice —
          and this is a note about the period, which is what this box is. */
+      /* ⚠ NORMAL WEIGHT, not 700. I kept the bold when the colour changed on minimal-scope
+         grounds; Kyle: *"that bold text is hard to read.. just make it normal grey text"*. Bold
+         grey at 11px is the worst of both — it still shouts, and the heavier strokes close up
+         the counters at that size. The row it summarises carries the emphasis. */
       + (belowMinCount > 0
-          ? '<div style="font-size:11px;color:var(--t2);font-weight:700;margin:14px 0 0;">' + belowMinCount + ' tipped employee' + (belowMinCount === 1 ? '' : 's') + ' fell below state minimum wage this week. ' + App.fmtCurrency(belowMinOwed) + ' owed in makeup pay before payroll runs.</div>'
+          ? '<div style="font-size:11px;color:var(--t2);margin:14px 0 0;">' + belowMinCount + ' tipped employee' + (belowMinCount === 1 ? '' : 's') + ' fell below state minimum wage this week. ' + App.fmtCurrency(belowMinOwed) + ' owed in makeup pay before payroll runs.</div>'
           : '')
       + '</div>';
 
