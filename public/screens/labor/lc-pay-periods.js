@@ -114,7 +114,7 @@ S.LaborPayPeriods = {
       // rate, so it is backward-compatible.
       const wage         = r.hours > 0 ? (r.cost / r.hours) : (r.wage || 0);
       const regularCost  = regularHours * wage;
-      const otCost       = otHours * wage * 1.5;
+      const otCost       = otHours * App.otHourlyPay(wage);
       return { ...r, wage, regular_hours: regularHours, ot_hours: otHours, regular_cost: regularCost, ot_cost: otCost, gross: regularCost + otCost };
     });
     const totals = rows.reduce((t, r) => {
@@ -155,7 +155,8 @@ S.LaborPayPeriods = {
     App.showHelpModal('How Pay Periods Work', [
       { p: ['Pay Periods rolls each week, Monday through Sunday, into a payroll-ready summary: total hours, overtime, and gross pay for everyone who worked. The last 12 weeks are listed, newest first.'] },
       { h: 'Closing A Period', p: ['When a week is final, Close and Lock it. That locks every logged-hours entry in the week so Log Hours stops accepting edits, and saves a permanent record of what was paid. Reopen it any time you need to fix something, then close it again.'] },
-      { h: 'Overtime', p: ['Hours over ' + App.OT_THRESHOLD + ' in a week are treated as overtime and paid at time and a half in the gross figure. Salaried staff are exempt, so they carry a fixed weekly salary and never show overtime. If someone worked two roles at different rates that week, overtime prices off their average rate for the week.'] },
+      { h: 'Overtime', p: ['Hours over ' + App.OT_THRESHOLD + ' in a week are treated as overtime in the gross figure. Salaried staff are exempt, so they carry a fixed weekly salary and never show overtime. If someone worked two roles at different rates that week, overtime prices off their average rate for the week.',
+        'For anyone paid at or above your state minimum wage, an overtime hour is time and a half. For a tipped employee paid below it on a tip credit, overtime is worked out on the minimum wage rather than on their cash wage, which is what federal rules require, so their overtime hour is worth more than one and a half times the cash rate. Bar Cop does not file payroll; check the figure with whoever runs yours.'] },
       { h: 'Tip Credit Check', p: ['For tipped positions, the View screen compares each person\'s effective hourly, their wages plus tip-pool share divided by hours, against your state minimum wage and flags anyone who came up short so you can make up the difference before payroll runs. Set your state minimum in App Settings, under Business Profile. This is a planning aid, not legal or payroll advice. Verify the wage and tip-credit rules for your jurisdiction.'] },
       { h: 'Payroll Export', p: ['Payroll Export turns any period into a formatted workbook or a clean import file for whoever runs your payroll. Open Payroll Export from the sidebar and pick the period there; it carries the same numbers you closed here.'] }
     ]);

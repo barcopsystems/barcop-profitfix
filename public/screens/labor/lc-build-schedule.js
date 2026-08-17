@@ -316,7 +316,7 @@ S.LaborBuildSchedule = {
     const OT = App.OT_THRESHOLD || 40;
     Object.keys(byStaff).forEach(sid => {
       const h = byStaff[sid];
-      if (h > OT && byStaffCost[sid] > 0) cost += (h - OT) * (byStaffCost[sid] / h) * 0.5;
+      if (h > OT && byStaffCost[sid] > 0) cost += (h - OT) * App.otHourlyPremium(byStaffCost[sid] / h);
     });
     cost += this.salariedWeekCost(this.draft.week_start);
     return { hours, cost, byDay, byStaff, conflicts, offConflicts };
