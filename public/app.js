@@ -10349,6 +10349,106 @@ const App = {
     // report an OT Hours column alongside the dollars.
     return { total: total, hours: otHours, byStaff: byStaff };
   },
+  /* ── TIP-CREDIT MAKEUP PAY ────────────────────────────────────────────────────
+     A tipped employee whose CASH WAGE plus TIPS lands under the state minimum is owed the
+     difference. That makeup is real money the business pays, so it belongs in labor cost
+     everywhere labor cost is reported, not only on the Pay Periods screen.
+     ⛔ IT IS THE SECOND ADJUSTMENT THAT LIVES OUTSIDE lc_actuals. Those rows store straight
+     time only (cost = hours x wage); the 0.5x OT premium is added at every weekly rollup and
+     this is added the same way, in the same places, keyed by App.otStaffKey so both land on
+     the same staff bucket. Miss a rollup and the P&L understates labor, which is the
+     direction nobody reports.
+     ⚠ STRAIGHT TIME, NOT GROSS. The effective rate is (straight cost + tips) / hours. Gross
+     carries the 1.5x premium and would inflate the rate, hiding a shortfall for anyone who
+     worked overtime — the same reason the Pay Periods test is written this way.
+     ⚠ IT NEVER JUDGES OFF MISSING TIPS. No tips recorded for the week means the real rate is
+     unknowable, so it returns nothing rather than inventing a shortfall.
+     ⛔ NOT APPLIED TO A SCHEDULE. lc-build-schedule plans a future week whose tips do not
+     exist yet; makeup there would be a guess, so that rollup deliberately does not add it. */
+  tipShareForStaffInWeek(staffId, weekStart, weekEnd) {
+    const pools = ((this.laborData && this.laborData.lc_tip_pools) || []);
+    const shifts = ((this.shiftData && this.shiftData.sc_shifts) || []);
+    let total = 0;
+    pools.forEach(p => {
+      const inRange = (p.date && p.date >= weekStart && p.date <= weekEnd)
+        || (p.shift_id && shifts.find(s => s.id === p.shift_id && s.date >= weekStart && s.date <= weekEnd));
+      if (!inRange) return;
+      (p.participants || []).forEach(part => {
+        if (part.staff_id === staffId) total += parseFloat(part.share) || 0;
+      });
+    });
+    if (total > 0) return total;
+    // No pool split saved this week: fall back to the person's own logged NET tips, so a
+    // house that logs tips without splitting a pool still gets a real number rather than a
+    // false $0 that would read as a shortfall.
+    const tips = ((this.laborData && this.laborData.lc_tips) || []);
+    return tips.reduce((s, t) => (t.staff_id === staffId && t.date >= weekStart && t.date <= weekEnd)
+      ? s + this.netTips(t) : s, 0);
+  },
+  // Bucket rows into staff-weeks the way both premium helpers do, then hand each whole week
+  // to the caller. Shared so makeup and its window variant cannot drift apart.
+  _tipMakeupBuckets(rows, start, end) {
+    const wk = {};
+    (rows || []).forEach(a => {
+      if (!a || !a.date || this.isSalaried(a.staff_id)) return;
+      const ws = this.weekStartFor ? this.weekStartFor(a.date) : (a.date || '');
+      const key = this.otStaffKey(a) + '|' + ws;
+      if (!wk[key]) wk[key] = { staff: this.otStaffKey(a), sid: a.staff_id, ws: ws, hours: 0, cost: 0, inHours: 0 };
+      const h = a.hours || 0;
+      wk[key].hours += h;
+      wk[key].cost  += (a.cost || 0);
+      const d = String(a.date).slice(0, 10);
+      if ((!start || d >= start) && (!end || d <= end)) wk[key].inHours += h;
+    });
+    return wk;
+  },
+  // The makeup owed for one staff-week, or 0. Returns 0 for every reason the Pay Periods
+  // screen refuses to judge, so the two can never disagree about who is short.
+  _makeupForBucket(b, min) {
+    if (!b || b.hours <= 0 || !b.sid) return 0;
+    if (!this.isTipped(b.sid)) return 0;
+    // setDate, never a ms offset: an offset shifts an hour across DST and rolls the day.
+    const d = new Date(b.ws + 'T00:00:00');
+    if (isNaN(d.getTime())) return 0;
+    d.setDate(d.getDate() + 6);
+    const tips = this.tipShareForStaffInWeek(b.sid, b.ws, this.ymdLocal(d));
+    if (!(tips > 0)) return 0;
+    const eff = (b.cost + tips) / b.hours;
+    return eff < min ? (min - eff) * b.hours : 0;
+  },
+  tipMakeupForRows(rows) {
+    const min = parseFloat(((this.laborData && this.laborData.settings) || {}).state_min_wage);
+    if (isNaN(min) || min <= 0) return { total: 0, byStaff: {} };
+    const wk = this._tipMakeupBuckets(rows);
+    let total = 0; const byStaff = {};
+    Object.keys(wk).forEach(k => {
+      const m = this._makeupForBucket(wk[k], min);
+      if (m <= 0) return;
+      total += m;
+      byStaff[wk[k].staff] = (byStaff[wk[k].staff] || 0) + m;
+    });
+    return { total: total, byStaff: byStaff };
+  },
+  /* A window that cuts weeks always under-counts, same as overtime: the slice of a short week
+     inside a calendar month is not the week the minimum is tested over. Bucket whole weeks,
+     compute the makeup for the WEEK, then allocate by that week's share of hours in the
+     window. A window covering whole weeks allocates 1.0 and returns exactly what
+     tipMakeupForRows does. PASS ALL ROWS — pre-filtering is the bug. */
+  tipMakeupInWindow(rows, start, end) {
+    const min = parseFloat(((this.laborData && this.laborData.settings) || {}).state_min_wage);
+    if (isNaN(min) || min <= 0) return { total: 0, byStaff: {} };
+    const wk = this._tipMakeupBuckets(rows, start, end);
+    let total = 0; const byStaff = {};
+    Object.keys(wk).forEach(k => {
+      const b = wk[k];
+      if (b.inHours <= 0 || b.hours <= 0) return;
+      const m = this._makeupForBucket(b, min) * (b.inHours / b.hours);
+      if (m <= 0) return;
+      total += m;
+      byStaff[b.staff] = (byStaff[b.staff] || 0) + m;
+    });
+    return { total: total, byStaff: byStaff };
+  },
   // Weekly salary cost for ONE staff member (annual_salary / 52), or 0 when the
   // staff member is not salaried or has no salary on file. Used by per-staff
   // and per-day rollups (Daily View, Weekly Summary, Pay Periods).

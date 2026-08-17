@@ -468,6 +468,7 @@ window.CashEngine = {
       // straight time, so without this the forecast disagrees with the schedule the
       // operator is looking at, exactly on the weeks someone is posted into overtime.
       cost += App.otPremiumForRows ? App.otPremiumForRows(rows).total : 0;
+      cost += App.tipMakeupForRows ? App.tipMakeupForRows(rows).total : 0;
       cost += App.salariedCost ? App.salariedCost(ws, this._addDays(ws, 6)).total : 0;
       return { cost, source: 'scheduled' };
     }
@@ -498,6 +499,7 @@ window.CashEngine = {
     // cut weeks at each edge against 40, they never reached it, and the estimate this
     // feeds (runway, the stress test, the lender PDF) always ran light.
     cost += App.otPremiumInWindow ? App.otPremiumInWindow(actuals, start, end).total : 0;
+    cost += App.tipMakeupInWindow ? App.tipMakeupInWindow(actuals, start, end).total : 0;
     // Divide by the WEEKS actually logged, not a flat 4. With < 4 weeks of history the old /4
     // understated labor by up to 4x — and understating an outflow OVERSTATES cash (runway, low
     // point, "Can I Afford It", the lender PDF), the one direction this file fears most. Its sibling
