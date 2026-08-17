@@ -261,13 +261,52 @@ S.LaborBuildSchedule = {
   },
 
   // ── Shift math + conflicts ──────────────────────────────────────────────────
+  /* ⛔ A SHIFT IS PRICED BY THE ROLE IT IS WORKED IN, NOT BY WHOSE ROW IT SITS ON
+     (2026-08-17). This used to call `wageForStaffOn`, which only ever answers for a person's
+     PRIMARY position — so a cross-trained bartender picking up a server shift was costed at
+     her bar rate. Log Hours already prices the same hours through `wageForStaffPosition` when
+     the operator picks the secondary role, so the two screens disagreed by construction and
+     Schedule History showed a variance nobody caused.
+     ⚠ `wageForStaffPosition` falls back to `wageForStaffOn` for the primary, so a single-role
+     person is byte-for-byte unchanged. */
   shiftCalc(sh) {
     const staff = this.staffById(sh.staff_id);
     const hours = this.hoursOf(sh.start, sh.end);
     const wkDate = this.draft.week_start || App.todayLocal();
     if (staff && App.isSalaried(staff)) return { staff, hours, wage: 0, cost: 0, salaried: true };
-    const wage = staff ? (App.wageForStaffOn ? App.wageForStaffOn(staff.id, wkDate) : (staff.wage || 0)) : 0;
-    return { staff, hours, wage, cost: hours * wage };
+    const posId = sh.position_id || (staff && staff.position_id) || '';
+    const wage = staff ? App.wageForStaffPosition(staff, posId, wkDate) : 0;
+    return { staff, hours, wage, cost: hours * wage, position_id: posId };
+  },
+  /* The roles a person can be scheduled in, primary first. Deliberately the SAME rule Log
+     Hours uses — a secondary position that differs from the primary AND carries a positive
+     wage — because a picker that offers a role Log Hours will not accept is a door to a shift
+     nobody can cost. Read off lc-log-hours so the two cannot drift apart. */
+  _hasSecondary(staffId) {
+    const s = this.staffById(staffId);
+    return !!(s && s.secondary_position_id && s.secondary_position_id !== s.position_id
+              && (parseFloat(s.secondary_wage) || 0) > 0);
+  },
+  roleOptionsFor(staffId, selectedPosId) {
+    const s = this.staffById(staffId);
+    if (!s) return '';
+    const nameOf = id => { const p = this.positionById(id); return p ? p.name : ''; };
+    const opts = [];
+    if (s.position_id) opts.push({ id: s.position_id, label: nameOf(s.position_id) || 'Primary' });
+    if (s.secondary_position_id && s.secondary_position_id !== s.position_id) {
+      opts.push({ id: s.secondary_position_id, label: nameOf(s.secondary_position_id) || 'Secondary' });
+    }
+    if (!opts.length) return '';
+    const sel = (selectedPosId != null && selectedPosId !== '') ? selectedPosId : s.position_id;
+    return opts.map(o => '<option value="' + esc(o.id) + '"' + (o.id === sel ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('');
+  },
+  // The role label to badge on a block — blank when it is the person's primary, so the grid
+  // only ever calls out the exception.
+  shiftRoleTag(sh) {
+    const s = this.staffById(sh.staff_id);
+    if (!s || !sh.position_id || sh.position_id === s.position_id) return '';
+    const p = this.positionById(sh.position_id);
+    return p ? p.name : '';
   },
   salariedWeekCost(weekStart) {
     if (!weekStart) return 0;
@@ -504,10 +543,15 @@ S.LaborBuildSchedule = {
             const border = flagged ? 'var(--red)' : 'var(--gold-tint-bord)';
             const blockBg = flagged ? 'var(--surface)' : 'var(--gold-tint)';
             const flagNote = conflict ? ' · overlap' : (offReason ? ' · off' : '');
+            /* A shift worked in the SECONDARY role names it on the block. Blank for a primary
+               shift, so the grid only ever calls out the exception — a manager reading the week
+               can see at a glance that Tuesday is a floor shift, without opening it. */
+            const roleTag = this.shiftRoleTag(sh);
             cellInner += '<div class="bs-block" data-idx="' + i + '" title="' + (offReason ? esc(offReason) : 'Click to edit') + '"'
               + ' style="cursor:pointer;border:1px solid ' + border + ';border-radius:4px;padding:3px 5px;margin-bottom:3px;background:' + blockBg + ';">'
               + '<div style="font-size:11px;color:var(--t1);font-weight:600;">' + esc(this._fmtTime(sh.start)) + '–' + esc(this._fmtTime(sh.end)) + '</div>'
               + '<div style="font-size:9px;color:' + (flagged ? 'var(--red)' : 'var(--t3)') + ';">' + (sal ? 'salaried' : c.hours.toFixed(1) + 'h') + flagNote + '</div>'
+              + (roleTag ? '<div style="font-size:9px;color:var(--gold);font-weight:700;">' + esc(roleTag) + '</div>' : '')
               + '</div>';
           });
           const offTag = (offReason && !items.length) ? '<div title="' + esc(offReason) + '" style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--red);text-align:center;opacity:.85;">Off</div>' : '';
@@ -657,9 +701,11 @@ S.LaborBuildSchedule = {
           const border = flagged ? 'var(--red)' : 'var(--gold-tint-bord)';
           const blockBg = flagged ? 'var(--surface)' : 'var(--gold-tint)';
           const flagNote = conflict ? ' · overlap' : (offReason ? ' · off' : '');
+          const roleTag = this.shiftRoleTag(sh);      // same rule as the desktop grid
           blocks += '<div class="bs-mblock" data-staff="' + esc(s.id) + '" data-day="' + esc(day) + '" data-idx="' + i + '" style="cursor:pointer;border:1px solid ' + border + ';border-radius:4px;padding:5px 8px;background:' + blockBg + ';">'
             + '<div style="font-size:12px;color:var(--t1);font-weight:600;">' + esc(this._fmtTime(sh.start)) + '–' + esc(this._fmtTime(sh.end)) + '</div>'
-            + '<div style="font-size:9px;color:' + (flagged ? 'var(--red)' : 'var(--t3)') + ';">' + (sal ? 'salaried' : c.hours.toFixed(1) + 'h') + flagNote + '</div></div>';
+            + '<div style="font-size:9px;color:' + (flagged ? 'var(--red)' : 'var(--t3)') + ';">' + (sal ? 'salaried' : c.hours.toFixed(1) + 'h') + flagNote + '</div>'
+            + (roleTag ? '<div style="font-size:9px;color:var(--gold);font-weight:700;">' + esc(roleTag) + '</div>' : '') + '</div>';
         });
         const offBadge = offReason ? ' <span title="' + esc(offReason) + '" style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--red);">Off</span>' : '';
         rows += '<div style="display:flex;align-items:flex-start;gap:12px;border-top:1px solid var(--b2);padding:9px 0;">'
@@ -823,8 +869,18 @@ S.LaborBuildSchedule = {
     const offBanner = offReason
       ? '<div style="border:1px solid var(--red);border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:var(--red);font-weight:600;">' + esc(offReason) + '. Scheduling a shift here will flag it.</div>'
       : '';
+    /* ⭐ THE ROLE PICKER, and only for someone who actually has a second role. A cross-trained
+       bartender covering the floor is scheduled AS a server here, so the shift is costed at her
+       server rate and Schedule History stops showing a variance she did not cause. Single-role
+       staff see nothing new — the same rule Log Hours uses to decide whether to show its own
+       Role picker, so a role offered here is always one Log Hours will accept. */
+    const roleField = (!sal && this._hasSecondary(staffId))
+      ? '<div class="f" style="margin-bottom:14px;"><label>Role</label><select id="bs-m-role">'
+          + this.roleOptionsFor(staffId, sh.position_id) + '</select></div>'
+      : '';
     const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + esc(staff.name || 'Staff') + ' &middot; ' + esc(day) + '</div>'
       + offBanner
+      + roleField
       + '<div class="form-row" style="margin-bottom:14px;">'
       + this._timeSelectFields('bs-m-start', sh.start, 'Start')
       + '</div>'
@@ -846,7 +902,13 @@ S.LaborBuildSchedule = {
       if (!start || !end) { calcEl.textContent = ''; return; }
       const h = this.hoursOf(start, end);
       if (sal) { calcEl.textContent = h.toFixed(1) + ' hrs · salaried (no hourly cost)'; return; }
-      const wage = App.wageForStaffOn ? App.wageForStaffOn(staff.id, this.draft.week_start) : (staff.wage || 0);
+      /* Price the ROLE that is currently picked, not the person's primary — otherwise the
+         operator changes Role, watches the figure sit still, and saves a shift that costs
+         something other than what the pop-up told them. The `change` listener below is bound
+         to every select in the modal, so the picker re-runs this for free. */
+      const roleEl = document.getElementById('bs-m-role');
+      const posId = roleEl ? (roleEl.value || staff.position_id || '') : (sh.position_id || staff.position_id || '');
+      const wage = App.wageForStaffPosition(staff, posId, this.draft.week_start);
       calcEl.textContent = h.toFixed(1) + ' hrs · ' + App.fmtCurrency(h * wage) + (wage ? ' @ ' + App.fmtCurrency(wage) + '/hr' : '');
     };
     updateCalc();
@@ -862,8 +924,13 @@ S.LaborBuildSchedule = {
       const cb = document.getElementById('bs-m-event'), sel = document.getElementById('bs-m-event-sel');
       if (cb) event = cb.checked ? cb.dataset.eid : '';
       else if (sel) event = sel.value || '';
-      if (editing) { this.draft.shifts[idx] = { staff_id: staffId, day, start, end, event }; }
-      else { this.draft.shifts.push({ staff_id: staffId, day, start, end, event }); }
+      /* The role the shift is worked in. Absent picker (single-role staff, or salaried) means
+         the primary, which is what every shift written before this field existed also means —
+         so an old draft reads identically rather than costing at $0. */
+      const roleEl = document.getElementById('bs-m-role');
+      const position_id = roleEl ? (roleEl.value || staff.position_id || '') : (sh.position_id || staff.position_id || '');
+      if (editing) { this.draft.shifts[idx] = { staff_id: staffId, day, start, end, event, position_id }; }
+      else { this.draft.shifts.push({ staff_id: staffId, day, start, end, event, position_id }); }
       this.saveDraft(); App.closeModal('bs-shift-modal'); this.draw();
     });
   },
@@ -1099,7 +1166,11 @@ S.LaborBuildSchedule = {
       otRows.push({ staff_id: sh.staff_id, date: d.week_start, hours: c.hours, cost: c.cost });
       return {
         staff_id: sh.staff_id, name: c.staff ? c.staff.name : '',
-        position_id: c.staff ? c.staff.position_id : '',
+        /* The role the shift was WORKED in, which shiftCalc already resolved (and priced).
+           Stamping the person's primary here made a saved schedule disagree with the shift it
+           came from: the cost was the secondary rate, the position said otherwise, and anything
+           reading a posted schedule by position bucketed her into the wrong department. */
+        position_id: c.position_id || (c.staff ? c.staff.position_id : ''),
         day: sh.day, start: sh.start, end: sh.end,
         hours: c.hours, wage: c.wage, cost: c.cost,
         event: sh.event || ''
