@@ -39,7 +39,6 @@ S.InventoryLocations = {
                         // if a re-entry hits an early return (e.g. the operator navigated away so the
                         // name input is gone), the happy-path reset is skipped and the flag would
                         // strand true, silently disabling the prompt for the rest of the session.
-  DEFAULTS: ['Front Bar', 'Back Bar', 'Walk-In Cooler', 'Dry Storage', 'Office Storage'],
 
   locations() {
     if (!App.inventoryData) App.inventoryData = {};
@@ -103,7 +102,6 @@ S.InventoryLocations = {
   showHowTo() {
     App.showHelpModal('How Locations Work', [
       { p: ['Locations are the places you keep product: your bars, coolers, and storerooms. Set them up here, then assign which products live in each one. Take Inventory walks you through one location at a time, counting the products you put there in the order you arrange them.'] },
-      { h: 'Start With The Suggested Spots', p: ['Brand new with no locations yet? Hit add the suggested defaults to drop in a Front Bar, Back Bar, Walk-In Cooler, Dry Storage, and Office Storage in one tap. Rename or delete any that do not fit, then assign products. It saves you typing out the obvious spots before you can count anything.'] },
       { h: 'Add A Location', p: ['Name the spot, then check off the products stored there. Use the category tabs to jump straight to liquor, wine, beer, or food so you are not scrolling past everything else. To build a bar or cooler fast, hit Select all in a category. Your checks carry across the tabs and the running count shows how many you have picked. Save and you drop right into arranging it.'] },
       { h: 'Mark Your Service Bars', p: ['Check Location with Register (for spot check) on any spot that has a register and pours for guests, like your Front Bar or a patio well. That flag is what makes a location show up as a bar station when you run a Spot Check on a single shift. A stockroom or cooler stays unchecked. You can set it on a new location or toggle it later from the location\'s edit screen.'] },
       { h: 'Arrange For Counting', p: ['Open a location to add or pull products and drag them by the grip handle into the order they sit on the shelf or rail. Counting follows that order, so the count sheet matches the way you actually walk the room.'] },
@@ -232,8 +230,7 @@ S.InventoryLocations = {
 
     let listSection;
     if (!locs.length) {
-      listSection = '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No locations yet. Add one above, or '
-        + '<button class="btn btn-ghost btn-sm" id="il-add-defaults">add the suggested defaults</button>.</div></div>';
+      listSection = '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No locations yet. Add one above to get started.</div></div>';
     } else {
       const rows = active.map(l => {
         const n = this.productCount(l.name);
@@ -403,7 +400,6 @@ S.InventoryLocations = {
       const arch = ev.target.closest('.il-archive');
       const un   = ev.target.closest('.il-unarchive');
       const dperm = ev.target.closest('.il-delperm');
-      const addD = ev.target.closest('#il-add-defaults');
       if (save)       this.saveNewLocation();
       else if (open)  this.openEdit(open.dataset.id);
       else if (edit)  this.openEdit(edit.dataset.id);
@@ -411,7 +407,6 @@ S.InventoryLocations = {
       else if (arch)  this.setArchived(arch.dataset.id, true);
       else if (un)    this.setArchived(un.dataset.id, false);
       else if (dperm) this.deletePermanently(dperm.dataset.id);
-      else if (addD)  this.addDefaults();
     };
     // Checkbox toggles accumulate into the running set so checks survive tab swaps.
     this.container.onchange = ev => {
@@ -1221,23 +1216,7 @@ S.InventoryLocations = {
     await App.removeRecord('ic', 'location', id);   // location removed -> row deleted
     this.renderList();
   },
-
-  async addDefaults() {
-    const have = this.locations().map(l => l.name.toLowerCase());
-    let seq = this._nextLocSeq();
-    const add = this.DEFAULTS.filter(n => !have.includes(n.toLowerCase()))
-      .map(n => ({ id: App.uid(), name: n, archived: false, sort_order: seq++ }));
-    // ⚠ putRecordsBulk NEVER touches memory (unlike putRecord, which upserts the row into the list
-    // itself). The bulk-write conversion deleted the `this.locations().push(...add)` that used to sit
-    // here and replaced it with a dropRows that could not bite, so the five shelves reached the
-    // server and THE SCREEN NEVER CHANGED — same empty state, same button. A second click re-filtered
-    // against a still-empty list and minted five MORE with fresh ids. Three clicks, fifteen shelves,
-    // and a count sheet listing Front Bar three times.
-    // Write FIRST, put them in memory only once the server has them: a failed write then leaves
-    // nothing behind on screen and there is nothing to drop.
-    if (add.length && await App.putRecordsBulk('ic', 'location', add)) this.locations().push(...add);
-    this.renderList();
-  },
+
 
   // Sort a location's products by their per-location sequence, then by name.
   sortedProductsForLocation(locationName) {
