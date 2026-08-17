@@ -10285,6 +10285,39 @@ const App = {
       .some(p => p && p.status === 'Closed' && p.week_start === ws);
   },
 
+  /* ⛔⛔⛔ THE OVERTIME PREMIUM IS HALF THE **REGULAR RATE**, AND FOR A TIPPED EMPLOYEE THAT
+     IS NOT THEIR CASH WAGE (2026-08-17).
+     Under the FLSA, an employer taking a tip credit still owes overtime on the employee's
+     REGULAR rate, which is at least the full minimum wage — not on the $2.13 cash wage. The
+     cash actually due for an overtime hour is `1.5 x minimum - tipCredit`, where
+     `tipCredit = minimum - cashWage`. That rearranges to `cashWage + 0.5 x minimum`, so with
+     straight time already booked at the cash wage, the PREMIUM owed is `0.5 x minimum`.
+     For anyone paid at or above the minimum the tip credit is zero and this collapses to the
+     familiar `0.5 x wage`, byte-for-byte what it always was — which is why routing every
+     caller through here moves no existing number except a tipped employee's.
+     ⚠ MEASURED LIVE before this existed: a $2.13 server with one overtime hour was priced at
+     $3.20 where the FLSA figure is $5.76, on the Pay Periods payroll worksheet.
+     ⚠ `state_min_wage` unset returns the old behaviour exactly, so an account that has not
+     configured it is never silently given a different number.
+     ⛔ NEVER re-derive this at a call site — four of them had their own copy of the OT math
+     and two disagreed ([[labor-cost-model]]). */
+  otMinWage() {
+    const s = (this.laborData && this.laborData.settings) || {};
+    const m = parseFloat(s.state_min_wage);
+    return (isFinite(m) && m > 0) ? m : 0;
+  },
+  // The premium owed on ONE overtime hour, given the rate that hour was logged at
+  // (a blended per-week rate for a cross-trained employee).
+  otHourlyPremium(loggedRate) {
+    const w = parseFloat(loggedRate) || 0;
+    return 0.5 * Math.max(this.otMinWage(), w);
+  },
+  // The full cash owed for ONE overtime hour: straight time plus that premium.
+  otHourlyPay(loggedRate) {
+    const w = parseFloat(loggedRate) || 0;
+    return w + this.otHourlyPremium(w);
+  },
+
   otPremiumForRows(rows) {
     const OT = this.OT_THRESHOLD || 40;
     const wk = {};
@@ -10301,7 +10334,7 @@ const App = {
       const b = wk[k];
       const otH = Math.max(0, b.hours - OT);
       if (otH <= 0 || b.hours <= 0) return;
-      const prem = otH * (b.cost / b.hours) * 0.5;
+      const prem = otH * this.otHourlyPremium(b.cost / b.hours);
       total += prem;
       byStaff[b.staff] = (byStaff[b.staff] || 0) + prem;
     });
@@ -10340,7 +10373,7 @@ const App = {
       const otH = Math.max(0, b.hours - OT);
       if (otH <= 0 || b.hours <= 0 || b.inHours <= 0) return;
       const share = b.inHours / b.hours;
-      const prem = otH * (b.cost / b.hours) * 0.5 * share;
+      const prem = otH * this.otHourlyPremium(b.cost / b.hours) * share;
       total += prem;
       otHours += otH * share;
       byStaff[b.staff] = (byStaff[b.staff] || 0) + prem;

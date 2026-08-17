@@ -26,7 +26,7 @@
      total_rev   = round(covers x check_avg)
      bar_rev     = round(total_rev x bar_share)        food_rev  = total_rev - bar_rev
      bar_cogs    = round(bar_rev  x bar_pour_pct)      food_cogs = round(food_rev x food_cost_pct)
-     total_labor = round(total_rev x labor_pct_blended)
+     total_labor = round(total_rev x labor_index_pct)   // the HOURS index, not a reported labor %
      bar_labor   = round(total_labor x bar_labor_share) food_labor = total_labor - bar_labor
      prime_cost_pct = (bar_cogs + food_cogs + bar_labor + food_labor) / total_rev
    Control-module sample data must compute back to these figures. */
@@ -35,7 +35,7 @@
   var BAR_SHARE       = 0.625;  // bar's share of total revenue
   var BAR_LABOR_SHARE = 0.61;   // bar department's share of total labor dollars
 
-  // Each row: [covers, check_avg, bar_pour_pct, food_cost_pct, labor_pct_blended, loose, spike]
+  // Each row: [covers, check_avg, bar_pour_pct, food_cost_pct, labor_index_pct, loose, spike]
   // wk = row index + 1 (row 0 is the oldest week). loose = the pre-Bar-Cop /
   // onboarding weeks before discipline takes hold; it drives the void/comp,
   // cash-variance, and walked-tab seeds (more events, looser authorization when
@@ -107,7 +107,18 @@
       wk: i + 1, covers: covers, check_avg: check_avg,
       total_rev: total_rev, bar_rev: bar_rev, food_rev: food_rev,
       bar_cogs: bar_cogs, food_cogs: food_cogs, bar_labor: bar_labor, food_labor: food_labor,
-      bar_pour_pct: pour, food_cost_pct: food, labor_pct_blended: laborPct,
+      /* ⛔ `labor_index_pct` IS NOT THE DEMO'S LABOR %, AND IT USED TO BE CALLED AS IF IT WERE
+         (renamed 2026-08-17, T1). It was `labor_pct_blended` — the same name the app uses for a
+         REPORTED figure — back when the seed split these labor dollars across the crew and the
+         reported number therefore equalled it. It no longer does: hours are declared in
+         settings.js `LC_BASE_HOURS`, cost is hours x wage, and the reported labor % is
+         RECONCILED from the shipped rows (24.1% on the current week against the 28.6% this
+         column carries). What this still does, and all it does, is INDEX the hours week to week
+         so the story falls the way the profile describes.
+         ⚠ Nothing outside this file reads it: every consumer of `labor_pct_blended` reads the
+         reconciled value off `revenue_weeks` / `weeks`. Keeping the old name here meant anyone
+         opening the profile would take 28.6% for the demo's labor cost, and be wrong. */
+      bar_pour_pct: pour, food_cost_pct: food, labor_index_pct: laborPct,
       prime_cost_pct: +prime.toFixed(1), loose: loose, spike: spike
     };
   }
