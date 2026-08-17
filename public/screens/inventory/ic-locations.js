@@ -712,7 +712,12 @@ S.InventoryLocations = {
       + '<div class="card-title">Editing ' + esc(l.name) + '</div>'
       + '<div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">'
         + '<div class="f" style="width:300px;max-width:100%;margin:0;"><label>Location Name</label><input type="text" id="il-name" value="' + esc(nameVal) + '"/></div>'
-        + '<button class="btn btn-ghost" id="il-update-name" style="flex:0 0 auto;">Update</button>'
+        /* ⚠ THE 6px IS DERIVED, NOT PICKED. The row is align-items:flex-end, so the button's
+           BOTTOM lands on the input's bottom. Measured on the live build: the input box is
+           34px and a .btn-sm is 22px, so its centre sits 11px up against the input's 17px,
+           and lifting it by (34-22)/2 = 6px puts the two centres on the same line. It was
+           3.5px low before. If .f input padding or .btn-sm ever changes, re-measure this. */
+        + '<button class="btn btn-ghost btn-sm" id="il-update-name" style="flex:0 0 auto;margin-bottom:6px;">Update</button>'
         + '<span id="il-name-err" style="color:var(--red);font-size:12px;align-self:center;display:none;"></span>'
       + '</div>'
       + '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--t1);cursor:pointer;">'
@@ -1216,7 +1221,7 @@ S.InventoryLocations = {
     await App.removeRecord('ic', 'location', id);   // location removed -> row deleted
     this.renderList();
   },
-
+
 
   // Sort a location's products by their per-location sequence, then by name.
   sortedProductsForLocation(locationName) {
