@@ -1280,12 +1280,32 @@ window.CashEngine = {
     });
     return t;
   },
+  /* ⛔⛔⛔ THIS IS THE PAYROLL-TAX BASE, SO IT HAS TO BE **ALL** WAGES (fixed 2026-08-17).
+     It used to sum `lc_actuals.cost` and stop, which is STRAIGHT TIME ONLY and misses three
+     things the business genuinely pays:
+       · SALARIED pay — a salaried manager's rows are logged at cost 0 by design (coverage
+         hours, pay comes from App.salariedCost), so the GM was contributing NOTHING.
+       · the OT PREMIUM — `lc_actuals` never store it ([[labor-cost-model]]).
+       · TIP-CREDIT MAKEUP — the second adjustment living outside `lc_actuals`.
+     MEASURED on the Anchor: $3,264.75 of straight time against ~$4,610 of real wages, so the
+     payroll-tax hold ran ~29% light and Safe to Spend read HIGH. Under-holding money you owe
+     is the direction nobody reports, which is exactly why it survived.
+     ⚠ THE WINDOW CUTS WEEKS. `_taxPeriodBounds` is month-to-date or quarter-to-date, so the OT
+     and makeup figures MUST come from the `InWindow` variants over ALL rows — handing a
+     pre-filtered set to the whole-week helpers always under-counts, because the slice of a
+     45-hour week inside the window is under 40 on its own and draws nothing.
+     ⚠ Bare calls, not guarded: a guard here would silently go back to under-holding
+     ([[the-loop]] #40). 🔧 verify-payroll-tax-base.js. */
   _wagesBetween(s, e) {
+    const rows = (App.laborData && App.laborData.lc_actuals) || [];
     let t = 0;
-    ((App.laborData && App.laborData.lc_actuals) || []).forEach(a => {
+    rows.forEach(a => {
       const d = String(a.date || '').slice(0, 10); if (!d || d < s || d > e) return;
       t += (parseFloat(a.cost) || 0);
     });
+    t += App.otPremiumInWindow(rows, s, e).total || 0;
+    t += App.tipMakeupInWindow(rows, s, e).total || 0;
+    t += App.salariedCost(s, e).total || 0;
     return t;
   },
 
