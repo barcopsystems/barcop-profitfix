@@ -120,7 +120,18 @@
 
     bar_share: BAR_SHARE,                 // bar's share of total revenue
     kitchen_share_of_food_labor: 0.5,     // food_labor splits kitchen/floor 50/50
-    wages: { bar: 16, kitchen: 15, floor: 14 },
+    /* ⛔ THESE ARE CASH WAGES, AND TWO OF THEM ARE TIP-CREDIT WAGES (T1, 2026-08-17).
+       `floor` is the federal tipped cash wage ($2.13) and `bar` is the federal minimum
+       ($7.25) — most bars pay bartenders minimum and servers the tipped rate. That makes
+       the seeded crew CHEAPER than a straight-wage crew, which is the whole point: the
+       tip-credit check, the makeup dollars and the Pay Periods warning all have something
+       true to work on.
+       ⛔ NOTHING MAY DERIVE HOURS BY DIVIDING DOLLARS BY THESE. The seed used to do
+       exactly that (`weekHours = deptDollars / st.wage`), so dropping floor to $2.13 handed
+       every server 6.6x the HOURS instead of a lower COST. Hours are declared in
+       settings.js `LC_BASE_HOURS` and cost is hours x wage, never the other way round.
+       🔧 verify-tip-credit-seed.js A1. */
+    wages: { bar: 7.25, kitchen: 15, floor: 2.13 },
 
     // The trend first breaks toward target in week 3, when the first fixes land.
     // Documentary only — the discipline seeds key off each week's `loose` flag.
