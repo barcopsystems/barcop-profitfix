@@ -473,10 +473,13 @@ S.LaborBuildSchedule = {
          a chevron and a pointer. The clickable element is INLINE-flex so the chevron sits
          beside the word rather than at the far end of an eight-column row. */
       const depClosed = this._closedDepts.indexOf(dep) >= 0;
-      body += '<tr><td colspan="' + (days.length + 1) + '" style="padding:10px 8px 4px;">'
+      body += '<tr><td colspan="' + (days.length + 1) + '" style="padding:10px 8px;border-top:1px solid var(--b2);">'
         + '<div class="bs-dept-head' + (depClosed ? ' collapsed' : '') + '" data-dept="' + esc(dep) + '"'
         + ' style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">'
-        + esc(dep) + '<span class="card-chevron" aria-hidden="true">&#9662;</span></div></td></tr>';
+        + esc(dep) + '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
+        /* The head count reads off the SAME array the rows are drawn from, so it can never
+           disagree with what opening the section shows. Useful precisely when shut. */
+        + '<span class="bs-dept-n">' + groups[dep].length + '</span></div></td></tr>';
       /* ⛔ A CLOSED SECTION RENDERS NO ROWS AT ALL, rather than hiding them with display:none.
          It matches Close The Week's lane bodies, and it means no click handler is ever bound
          to a cell nobody can see. It changes NOTHING about the numbers: computeTotals() walks
@@ -517,10 +520,10 @@ S.LaborBuildSchedule = {
     });
 
     // Per-day footer (coverage)
-    let footer = '<tr><td style="padding:8px;font-size:10px;letter-spacing:1px;color:var(--t3);text-align:right;border-top:1px solid var(--b1);">Day total</td>';
+    let footer = '<tr><td style="padding:14px 8px 8px;font-size:10px;letter-spacing:1px;color:var(--t3);text-align:right;border-top:1px solid var(--b2);">Day total</td>';
     days.forEach(day => {
       const dd = T.byDay[day];
-      footer += '<td style="padding:6px;text-align:center;border-top:1px solid var(--b1);border-left:1px solid var(--b2);">'
+      footer += '<td style="padding:14px 6px 6px;text-align:center;border-top:1px solid var(--b2);border-left:1px solid var(--b2);">'
         + '<div style="font-size:12px;color:var(--t1);font-weight:600;">' + dd.hours.toFixed(1) + 'h</div>'
         + '<div style="font-size:9px;color:var(--t4);">' + dd.count + ' shift' + (dd.count === 1 ? '' : 's') + '</div></td>';
     });
