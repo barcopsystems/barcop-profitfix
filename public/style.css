@@ -1645,7 +1645,10 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    colour and the 0.18s rotate are the same control the rest of the app uses; these two
    lines only teach it this head. inline-flex keeps the chevron beside the word instead of
    at the far end of the colspan. */
-.bs-dept-head{display:inline-flex;align-items:center;gap:7px;cursor:pointer;}
+.bs-dept-head{display:flex;align-items:center;gap:7px;cursor:pointer;}
+/* margin-left:auto pushes the count to the right edge of the colspan without needing a
+   spacer element, and it is why the head is flex rather than inline-flex now. */
+.bs-dept-n{margin-left:auto;font-size:9px;font-weight:600;letter-spacing:1px;color:var(--t4);}
 .bs-dept-head:hover .card-chevron{color:var(--gold);}
 .bs-dept-head.collapsed .card-chevron{transform:rotate(-90deg);}
 /* Weekly-cockpit step-row chevrons (Profit/Revenue/Cash/Inventory/Labor/Shift/Events/Books)
