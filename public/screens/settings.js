@@ -3334,18 +3334,18 @@ S.HubSettings = {
       wage_history:[], off_days:[], created_at:new Date().toISOString()
     });
     const lcStaff = [
-      mkStaff('Maria G.',   'Bartender', 16,   320),
-      mkStaff('Jake T.',    'Bartender', 16,   210),
-      mkStaff('Ashley B.',  'Bartender', 16,   150),
+      mkStaff('Maria G.',   'Bartender', 7.25, 320),
+      mkStaff('Jake T.',    'Bartender', 7.25, 210),
+      mkStaff('Ashley B.',  'Bartender', 7.25, 150),
       mkStaff('Devin R.',   'Barback',   12,   135),
       mkStaff('Luis V.',    'Line Cook', 15,   400),
       mkStaff('Sam P.',     'Line Cook', 15,   240),
       mkStaff('Hector M.',  'Line Cook', 15,   165),
       mkStaff('Tonya B.',   'Prep Cook', 13.5, 95),
-      mkStaff('Jessica M.', 'Server',    14,   360),
-      mkStaff('Marcus T.',  'Server',    14,   250),
-      mkStaff('Brianna K.', 'Server',    14,   175),
-      mkStaff('Priya N.',   'Server',    14,   110),
+      mkStaff('Jessica M.', 'Server',    2.13, 360),
+      mkStaff('Marcus T.',  'Server',    2.13, 250),
+      mkStaff('Brianna K.', 'Server',    2.13, 175),
+      mkStaff('Priya N.',   'Server',    2.13, 110),
       mkStaff('Owen L.',    'Host',      12.5, 80),
       mkStaff('Tara W.',    'Busser',    11,   90),
       mkStaff('Diego S.',   'Busser',    11,   55),
@@ -3682,9 +3682,52 @@ S.HubSettings = {
     // dinner and late night, the kitchen to lunch and dinner, the floor to the
     // brunch/lunch/dinner stretch. Rotating by (person + day) gives each staffer
     // a believable week instead of the same daypart five days running.
-    const lcAllocate = (staff, weights, deptDollars, baseAgo, dayparts) => {
+    /* ⛔⛔⛔ HOURS ARE DECLARED, NOT DERIVED FROM PAY (T1, 2026-08-17).
+       This table used to not exist: the allocator computed
+       `weekHours = (deptDollars * weight) / st.wage`, i.e. it split a DOLLAR budget and
+       divided by the person's wage. That is backwards, and it only became visible when
+       servers moved to the $2.13 tipped cash wage — dividing by 2.13 instead of 14 handed
+       every server 6.6x the HOURS (~200 a week) rather than a lower COST. A schedule is a
+       fact about how many people you need on the floor; what they are paid is a separate
+       fact. So: HOURS here, cost = hours x wage, never the reverse.
+       ⭐ The numbers are one real week for a bar this size (7 days, ~500 covers, 62/38
+       bar/food). Three people cross 40 — one bartender, one cook, one server — which is
+       what makes the Overtime Watch card and the Hub's overtime alert true rather than
+       decorative, and it is deliberately spread across three departments so no single
+       schedule change makes the whole feature go dark.
+       ⚠ Each figure divides into 5 clean daily entries at 0.1 precision (42/5 = 8.4), so
+       what the Log Hours grid shows sums back to exactly this.
+       🔧 verify-tip-credit-seed.js C1-C4 pins the overtime spread and the server weeks. */
+    const LC_BASE_HOURS = {
+      'Maria G.':   42,   'Jake T.':    22,   'Ashley B.':  14,   'Devin R.':   11,
+      'Luis V.':    41,   'Sam P.':     24,   'Hector M.':  15,   'Tonya B.':    9,
+      'Jessica M.': 41,   'Marcus T.':  24,   'Brianna K.': 17,   'Priya N.':   16,
+      'Owen L.':    10,   'Tara W.':     7,   'Diego S.':    5
+    };
+    /* ⚠ THE CEILING ON THIS TABLE IS `SCHED_PLAN`, NOT TASTE. Build Schedule prices the
+       PLANNED week off SCHED_PLAN (408.5 h for this roster) and Schedule History compares
+       it to what was actually logged; the seed's own note further down records that
+       "scheduled >= actual is realistic", because a plan covers the full crew and real
+       weeks come in under it. The first cut of this table totalled 425.5 h and INVERTED
+       that — the demo would have shown a bar chronically running over its own schedule.
+       298 crew + 45 GM + 32.5 AM = 375.5 against 401.0 planned, ~6% under, which is the
+       right side and a believable margin rather than a rounding error.
+       ⚠ Re-derive BOTH numbers if either SCHED_PLAN or this table moves — and derive the
+       planned figure, never estimate it: the AM plans 32.5 h (5 x 6.5), not the 40 an
+       eyeball gives you, and that one guess put the first cut on the wrong side.
+       🔧 verify-seed-crew.js measures both off the source and refuses if actual >= planned. */
+    /* The week-over-week story now lives in the HOURS, which is where an operator actually
+       moves it. The ANCHOR's labor dollars are the INDEX (not the budget): they stay near
+       flat across the thirteen weeks while revenue climbs, so the same crew carries a
+       growing room — labor % falls and RPLH rises without anybody being cut. That is the
+       Bar Cop story, and it is the honest one. */
+    const lcHoursScale = (a) => {
+      const cur = ANCHL.current(), curTot = cur.bar_labor + cur.food_labor;
+      return curTot > 0 ? (a.bar_labor + a.food_labor) / curTot : 1;
+    };
+    const lcAllocate = (staff, scale, baseAgo, dayparts) => {
       staff.forEach((st, i) => {
-        const weekHours = (deptDollars * (weights[i] || 0)) / st.wage;
+        const weekHours = (LC_BASE_HOURS[st.name] || 0) * scale;
         for (let d = 0; d < 5; d++) {
           const h = +(weekHours / 5).toFixed(1);
           if (h <= 0) continue;
@@ -3723,36 +3766,113 @@ S.HubSettings = {
     // for revenue_weeks.total_hours: a live re-confirm reads laborFeed(), which sums
     // every lc_actuals hour in the week (salaried managers included, by its own
     // comment). See the reconcile pass right below the loop.
-    const seededHrs = {}, seededOT = {};
+    /* ⛔ THREE THINGS COME OFF THE SHIPPED ROWS, NOT OFF THE ANCHOR BUDGET, and the third
+       is new at T1. `lc_actuals` store STRAIGHT TIME ONLY, so the OT premium AND tip-credit
+       makeup pay both live outside them and BOTH have to be added at every weekly rollup
+       ([[labor-cost-model]]). The seed is a weekly rollup like any other: miss either one
+       and a live re-confirm — which adds both — disagrees with the seeded week on the same
+       money. `seededCost` is what makes the stored week foot to the crew that actually
+       worked instead of to a budget nobody was paid. */
+    /* The tipped crew, resolved from lcPositions rather than the `lcTipped` further down —
+       this block now runs BEFORE that declaration, and it has to, because the makeup figure
+       computed in the labor loop below reads these pools. */
+    const poolTippedIds = new Set(lcPositions.filter(p => ['Bartender', 'Barback', 'Server', 'Busser'].includes(p.name)).map(p => p.id));
+    const poolTipped = lcStaff.filter(st => poolTippedIds.has(st.position_id));
+    // ── Tip pools — three recent close-outs, split by hours, linked to shifts.
+    // Phase 3: shift_id ties each pool to the closing shift so Books Form 8027
+    // pulls per-employee taxable allocations from the pool split (not the raw
+    // tip log), and Tip History can group by shift.
+    /* ⛔⛔⛔ THE POOL IS WHAT THE TIP-CREDIT CHECK ACTUALLY READS (T1, 2026-08-17).
+       `App.tipShareForStaffInWeek` prefers a POOL split whenever a pool exists in the week
+       and only falls back to the person's own logged tips when there is none. So the pool —
+       not `lc_tips` — decides who clears `state_min_wage` once servers are on the $2.13
+       tipped cash wage. The old seed split every pool by a FLAT 5 h (server) / 7 h (everyone
+       else), which handed all four servers the same dollars regardless of the hours they
+       actually worked: measured at $2.13, that put ALL FOUR under the minimum, not one.
+       ⭐ TWO CLOSE-OUTS A WEEK, WHICH IS WHAT A BAR ACTUALLY RUNS, and it is what makes the
+       one shortfall honest rather than staged: the NIGHT pool carries the week's real money
+       and splits by hours worked; the DAY pool is the weekday-lunch close-out and is thin.
+       Priya N. is the newest server and works lunches only, so she draws from the small pool
+       and her cash + tips land UNDER $7.25/h. That is exactly the case tip-credit makeup
+       exists to catch, and it is the only one in the seed.
+       ⚠ Seeded per SEEDED WEEK, not on a hand-written day list: `tipShareForStaffInWeek`
+       treats every pool in the week as that week's tips, so a week with no pool silently
+       falls back to the raw log and can invent a second shortfall nobody designed.
+       🔧 verify-tip-credit-seed.js B5 pins "exactly one", with the margin on the other nine. */
+    const TIP_POOL_RATE = 15;                                   // $ per tipped hour, night close-out
+    const TIP_DAY_CREW  = { 'Priya N.': 16, 'Tara W.': 3 };     // the weekday-lunch close-out
+    const TIP_DAY_POOL  = 70;                                   // and what it comes to
+    const mkPool = (dayAgo, amount, crew, shiftType) => {
+      const poolDate = dateStr(dayAgo);
+      const parts = Object.keys(crew).map(nm => {
+        const st = lcStaff.find(s => s.name === nm);
+        return st ? { staff_id:st.id, name:st.name, hours:crew[nm] } : null;
+      }).filter(Boolean);
+      const totH = parts.reduce((s, p) => s + p.hours, 0) || 1;
+      let handed = 0;
+      parts.forEach((p, i) => {
+        p.share = (i === parts.length - 1) ? +(amount - handed).toFixed(2)
+                                           : +(amount * p.hours / totH).toFixed(2);
+        handed = +(handed + p.share).toFixed(2);
+      });
+      return { id:uid(),
+        shift_id:    App.tipShiftKey(poolDate, shiftType),
+        date:        poolDate,
+        shift_type:  shiftType,
+        method:      'hours',
+        pool_amount: amount,
+        total_hours: totH,
+        participants: parts,
+        created_at:  daysAgoISO(dayAgo) };
+    };
+    // The night crew is every tipped person EXCEPT the lunch server, at the hours they
+    // actually worked that week — so the split is genuinely "by hours" and stays true when
+    // LC_BASE_HOURS moves. Scaled per week by the same index the hours use.
+    const lcTipPools = [];
+    const seedPoolsFor = (baseAgo, scale) => {
+      const night = {};
+      poolTipped.forEach(st => {
+        if (st.name === 'Priya N.') return;                     // lunch only — the day pool below
+        const h = +((LC_BASE_HOURS[st.name] || 0) * scale).toFixed(1);
+        if (h > 0) night[st.name] = h;
+      });
+      const nightH = Object.keys(night).reduce((s, n) => s + night[n], 0);
+      if (nightH > 0) lcTipPools.push(mkPool(baseAgo + 1, +(nightH * TIP_POOL_RATE).toFixed(2), night, 'Dinner'));
+      const day = {};
+      Object.keys(TIP_DAY_CREW).forEach(n => { const h = +(TIP_DAY_CREW[n] * scale).toFixed(1); if (h > 0) day[n] = h; });
+      if (Object.keys(day).length) lcTipPools.push(mkPool(baseAgo + 2, +(TIP_DAY_POOL * scale).toFixed(2), day, 'Lunch'));
+    };
+    ANCHL.weeks.forEach(a => seedPoolsFor(sunOff + ANCHS.endAgo(a), lcHoursScale(a)));
+    // The current week gets its own close-outs, same as it gets its own hours.
+    const poolCurL = ANCHL.weeks.reduce((m, a) => (ANCHS.endAgo(a) < ANCHS.endAgo(m) ? a : m), ANCHL.weeks[0]);
+    if (poolCurL) seedPoolsFor(sunOff - 7, lcHoursScale(poolCurL));
+    App.laborData.lc_tip_pools = lcTipPools;
+
+    const seededHrs = {}, seededOT = {}, seededMakeup = {}, seededCost = {};
     ANCHL.weeks.forEach(a => {
-      const baseAgo  = sunOff + ANCHS.endAgo(a);
-      const totLab   = a.bar_labor + a.food_labor;
-      const barSal   = totLab > 0 ? weeklySalaried * (a.bar_labor / totLab) : 0;
-      const foodSal  = weeklySalaried - barSal;
-      // The AM's position is in the Bar department, so laborCost books her pay to BAR.
-      // Carve her out of the BAR budget to match, and leave the food budget whole for
-      // the crew. The bar/food hourly ratio is unchanged either way (the same $780 just
-      // sits on the other side), so the GM's salary still splits 61/39 and both
-      // departments still foot their seeded labor exactly.
-      const foodCrew = Math.max(0, a.food_labor - foodSal);
+      const baseAgo    = sunOff + ANCHS.endAgo(a);
+      const wkScale    = lcHoursScale(a);
       const rowsBefore = lcActuals.length;
-      // Bar weights are deliberately top-heavy: Maria is the seeded shift lead and runs
-      // a real full-time week (44.1 h) while the other three are part-time (22-26 h).
-      // That is what a bar this size actually staffs, AND it is the demo's only genuine
-      // overtime: she crosses 40 by 4.1 h, so the Hub's "Overtime projected" alert and
-      // Overtime Watch have something true to show. An even spread across four
-      // bartenders leaves nobody over 40 and those screens go dark. The weights sum to
-      // 1.00, so the bar budget still foots either way.
-      lcAllocate(lcBar,     [0.40, 0.24, 0.20, 0.16],       Math.max(0, a.bar_labor - barSal - amWeekly), baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
-      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       foodCrew * 0.5, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
-      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], foodCrew * 0.5, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      lcAllocate(lcBar,     wkScale, baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
+      lcAllocate(lcKitchen, wkScale, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
+      lcAllocate(lcFloor,   wkScale, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
       seedLeaders(baseAgo);
       const wkRows = lcActuals.slice(rowsBefore);
       seededHrs[a.wk] = +wkRows.reduce((s, r) => s + (r.hours || 0), 0).toFixed(1);
+      // Straight time, split the way this-week.laborCost splits it: by the position's
+      // department, so the AM's pay lands on BAR and everything else on FOOD.
+      const barPosIds = new Set(lcPositions.filter(p => p.department === 'Bar').map(p => p.id));
+      let sBar = 0, sFood = 0;
+      wkRows.forEach(r => { if (barPosIds.has(r.position_id)) sBar += (r.cost || 0); else sFood += (r.cost || 0); });
+      seededCost[a.wk] = { bar: +sBar.toFixed(2), food: +sFood.toFixed(2) };
       // The OT premium is NEVER stored in lc_actuals (they are straight time only), so
       // every weekly rollup has to add it. Read it off the rows through the canonical
       // helper, never re-implement the reg/OT wage math ([[labor-cost-model]]).
       seededOT[a.wk] = App.otPremiumForRows ? +(App.otPremiumForRows(wkRows).total || 0).toFixed(2) : 0;
+      // ⭐ THE SECOND ADJUSTMENT, added at T1. A tipped employee whose cash wage plus tip
+      // share lands under state_min_wage is owed the difference, and that is real money the
+      // business pays. Same helper the ten live rollups call — never a local re-implementation.
+      seededMakeup[a.wk] = App.tipMakeupForRows ? +(App.tipMakeupForRows(wkRows).total || 0).toFixed(2) : 0;
     });
 
     // ── Reconcile revenue_weeks to the rows that actually shipped ──────────────
@@ -3804,10 +3924,29 @@ S.HubSettings = {
       // that shape — the premium lands on Bar/Food by their share of the week's labor,
       // exactly as this-week.laborCost splits it (and as salary is split above).
       // Round each side BEFORE summing, so what the sheet prints is what the total adds.
-      if (ot > 0 && pw.bar && pw.food) {
-        const bL = pw.bar.labor || 0, fL = pw.food.labor || 0, h = bL + fL;
-        if (h > 0) { pw.bar.labor = +(bL + ot * (bL / h)).toFixed(2); pw.food.labor = +(fL + ot * (fL / h)).toFixed(2); }
-        else { pw.food.labor = +(fL + ot).toFixed(2); }
+      /* ⛔⛔⛔ THE WEEK'S LABOR IS WHAT THE CREW COST, NOT WHAT THE BUDGET SAID (T1).
+         `pw.bar.labor` used to be `a.bar_labor` straight off the ANCHOR — a DOLLAR budget
+         that the seeded rows were then reverse-engineered to fit. Once hours became the
+         declared fact and servers moved to the $2.13 tipped cash wage, the crew stopped
+         costing what the budget said, and Books would have overstated labor against the
+         people who actually worked. So it is derived here, the same way every live rollup
+         derives it and in the same order:
+             straight time off the rows  +  salary  +  OT premium  +  tip-credit makeup
+         ⚠ BOTH adjustments, not just the premium. `lc_actuals` hold straight time only and
+         there are TWO things living outside them now ([[labor-cost-model]]); wiring one and
+         not the other is how the seed and a live re-confirm end up disagreeing about one
+         week's labor. 🔧 verify-tip-credit-seed.js D1/D2/D3. */
+      const rc = seededCost[pw.week_num];
+      const mk = seededMakeup[pw.week_num] || 0;
+      if (rc && pw.bar && pw.food) {
+        const strTot = rc.bar + rc.food;
+        // Split salary and both adjustments across Bar/Food by that week's straight-time
+        // share, which is how this-week.laborCost splits them. The AM already sits on Bar
+        // because her POSITION is in the Bar department, so nothing is carved by hand.
+        const bShare  = strTot > 0 ? rc.bar / strTot : 0.5;
+        const overlay = WEEKLY_GM_SALARY + ot + mk;
+        pw.bar.labor  = +(rc.bar  + overlay * bShare).toFixed(2);
+        pw.food.labor = +(rc.food + overlay * (1 - bShare)).toFixed(2);
         // The department labor % is derived from that same money (confirm-week barLabPct
         // / foodLabPct), so it has to follow or the record disagrees with itself.
         if (bRev > 0) pw.bar.labor_pct  = pw.bar.labor  / bRev * 100;
@@ -3842,13 +3981,10 @@ S.HubSettings = {
     const curL = ANCHL.weeks.reduce((m, a) => (ANCHS.endAgo(a) < ANCHS.endAgo(m) ? a : m), ANCHL.weeks[0]);
     const curLBase = sunOff - 7;
     if (curL) {
-      const cTot      = curL.bar_labor + curL.food_labor;
-      const cBarSal   = cTot > 0 ? weeklySalaried * (curL.bar_labor / cTot) : 0;
-      const cFoodSal  = weeklySalaried - cBarSal;
-      const cFoodCrew = Math.max(0, curL.food_labor - cFoodSal);   // AM sits on the bar, as above
-      lcAllocate(lcBar,     [0.40, 0.24, 0.20, 0.16],       Math.max(0, curL.bar_labor - cBarSal - amWeekly), curLBase, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
-      lcAllocate(lcKitchen, [0.30, 0.27, 0.24, 0.19],       cFoodCrew * 0.5, curLBase, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
-      lcAllocate(lcFloor,   [0.20, 0.18, 0.17, 0.16, 0.13, 0.08, 0.08], cFoodCrew * 0.5, curLBase, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      const cScale = lcHoursScale(curL);
+      lcAllocate(lcBar,     cScale, curLBase, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
+      lcAllocate(lcKitchen, cScale, curLBase, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
+      lcAllocate(lcFloor,   cScale, curLBase, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
       seedLeaders(curLBase);
     }
     App.laborData.lc_actuals   = lcActuals;
@@ -4056,27 +4192,11 @@ S.HubSettings = {
     });
     App.laborData.lc_tips = lcTips;
 
-    // ── Tip pools — three recent close-outs, split by hours, linked to shifts.
-    // Phase 3: shift_id ties each pool to the closing shift so Books Form 8027
-    // pulls per-employee taxable allocations from the pool split (not the raw
-    // tip log), and Tip History can group by shift.
-    const mkPool = (d, amount) => {
-      const poolDate = dateStr(d);
-      const parts = lcTipped.map(st => ({ staff_id:st.id, name:st.name,
-        hours:posNameOf(st.position_id) === 'Server' ? 5 : 7 }));
-      const totH = parts.reduce((s, p) => s + p.hours, 0);
-      parts.forEach(p => p.share = +(amount * p.hours / totH).toFixed(2));
-      return { id:uid(),
-        shift_id:    App.tipShiftKey(poolDate, ''),
-        date:        poolDate,
-        shift_type:  '',
-        method:      'hours',
-        pool_amount: amount,
-        total_hours: totH,
-        participants: parts,
-        created_at:  daysAgoISO(d) };
-    };
-    App.laborData.lc_tip_pools = [ mkPool(4, 980), mkPool(11, 1120), mkPool(18, 1040), mkPool(25, 1075), mkPool(33, 990), mkPool(46, 1150), mkPool(60, 1020) ];
+    /* ── Tip pools are seeded ABOVE the labor weeks loop (T1, 2026-08-17). They have to be:
+       `seededMakeup` calls App.tipMakeupForRows in that loop, makeup is measured against each
+       person's tip share, and tip share reads `lc_tip_pools`. Built here, the store was still
+       empty when the loop ran, so every tipped person scored $0 tips and all four $2.13 servers
+       read as owed makeup. Search LC_BASE_HOURS to find them. */
 
     // ── Call-out log ──
     const lcCO = (st, d, type, covered, by) => ({ id:uid(), date:dateStr(d), staff_id:st.id,
