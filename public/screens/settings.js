@@ -1594,7 +1594,7 @@ S.HubSettings = {
         id:uid(), week_num:a.wk, period_end:dateStr(sunOff + window.ANCHOR.endAgo(a)),
         bar_revenue:a.bar_rev, floor_revenue:a.food_rev, covers:a.covers, check_avg:a.check_avg,
         total_labor_cost:totalLabor, hourly_labor_cost:+hourlyLabor.toFixed(2), total_hours:+hours.toFixed(1),
-        labor_pct_blended:a.labor_pct_blended, hourly_labor_pct:+(hourlyLabor / a.total_rev * 100).toFixed(2),
+        hourly_labor_pct:+(hourlyLabor / a.total_rev * 100).toFixed(2),
         rplh_blended:+(a.total_rev / hours).toFixed(2),
         notes:'', saved_at:new Date().toISOString()
       };
