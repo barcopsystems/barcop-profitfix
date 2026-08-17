@@ -1734,7 +1734,15 @@ S.HubBooks = {
       if (pname && byPos[pname]) byPos[pname].wages += prem;
       if (byStaff[sid]) byStaff[sid].wages += prem;
     });
+    const mkPrem = App.tipMakeupInWindow ? App.tipMakeupInWindow(allActuals, monthStart, monthEnd) : { total: 0, byStaff: {} };
+    Object.keys(mkPrem.byStaff || {}).forEach(sid => {
+      const mk = mkPrem.byStaff[sid] || 0;
+      const pname = posBySid[sid];
+      if (pname && byPos[pname]) byPos[pname].wages += mk;
+      if (byStaff[sid]) byStaff[sid].wages += mk;
+    });
     totalWages += otPrem.total;
+    totalWages += mkPrem.total;
 
     // Salaried (exempt) management is paid a fixed weekly salary with no
     // lc_actuals rows, so without this Total Wages Paid and Labor % of Revenue

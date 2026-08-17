@@ -611,6 +611,7 @@ S.AuditTracker = {
       // lc_actuals hold straight time only, so add the weekly overtime premium or the
       // audit scores labor low on any week someone crossed 40 hours.
       laborCost += App.otPremiumForRows ? App.otPremiumForRows(actuals).total : 0;
+      laborCost += App.tipMakeupForRows ? App.tipMakeupForRows(actuals).total : 0;
       // Add fixed salaried (exempt) cost over the span the windowed actuals cover.
       const dts = actuals.map(a => a.date).filter(Boolean).sort();
       if (dts.length) laborCost += App.salariedCost(dts[0], dts[dts.length - 1]).total;

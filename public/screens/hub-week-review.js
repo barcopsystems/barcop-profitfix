@@ -509,7 +509,8 @@ S.WeekReview = {
     const wkHours = wkActuals.reduce((t, a) => t + (a.hours || 0), 0);
     const salCost = (App.salariedCost ? App.salariedCost(wkStart, endCap).total : 0) || 0;
     const otPrem = App.otPremiumForRows ? App.otPremiumForRows(wkActuals).total : 0;   // 0.5x over 40/wk, not stored in a.cost
-    const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost + otPrem;
+    const mkPrem = App.tipMakeupForRows ? App.tipMakeupForRows(wkActuals).total : 0;   // tipped-minimum makeup, also not in a.cost
+    const wkCost = wkActuals.reduce((t, a) => t + (a.cost || 0), 0) + salCost + otPrem + mkPrem;
     const weekRevenue = ((App.shiftData && App.shiftData.sc_shifts) || [])
       .filter(s => this._inWeek(s.date)).reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
     const laborPct = weekRevenue > 0 ? (wkCost / weekRevenue * 100) : null;

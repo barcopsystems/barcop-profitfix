@@ -697,6 +697,7 @@ S.HubYearEnd = {
       const otM = App.otPremiumInWindow(allActuals, mStart, mEnd);
       const mOt = otM.hours;
       mWages += otM.total;
+      mWages += App.tipMakeupInWindow ? App.tipMakeupInWindow(allActuals, mStart, mEnd).total : 0;
       // Salaried (exempt) staff: fixed monthly salary (annual/52 by the weeks
       // the month spans), no overtime.
       mWages += App.salariedCost(mStart, mEnd).total;

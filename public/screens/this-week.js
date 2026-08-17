@@ -177,6 +177,13 @@ S.ThisWeek = {
       else { food += otPrem; }
       any = true;   // a real premium means real labor this week, same as salary below
     }
+    const mkPrem = App.tipMakeupForRows ? App.tipMakeupForRows(wkRows).total : 0;
+    if (mkPrem > 0) {
+      const h = bar + food;
+      if (h > 0) { bar += mkPrem * (bar / h); food += mkPrem * (food / h); }
+      else { food += mkPrem; }
+      any = true;
+    }
     // Salaried (exempt) pay is fixed weekly labor on top of hourly wages, same as
     // Revenue's feed. Bar Cop can stand behind it (annual / 52), so it belongs in the
     // week's labor. Split across Bar and Food by their share of this week's hourly
