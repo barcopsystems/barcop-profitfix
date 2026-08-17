@@ -11,6 +11,10 @@ S.LaborBuildSchedule = {
   draft: null,
   editId: null,
   DRAFT_KEY: 'lc_sched_draft',
+  /* Departments the operator has collapsed. Lives HERE and not in the DOM: draw() rebuilds
+     the whole grid through container.innerHTML on every edit, so markup state would be
+     thrown away the moment a shift was added and every section would slam shut. */
+  _closedDepts: null,
 
   get DAYS() { return App.DAYS_MON_FIRST || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; },
   DEPT_ORDER: ['Bar', 'Kitchen', 'Front of House', 'Management'],
@@ -454,9 +458,31 @@ S.LaborBuildSchedule = {
     this.activeStaff().forEach(s => { const dep = this.deptOf(s.id); (groups[dep] = groups[dep] || []).push(s); });
     const orderedDepts = this.DEPT_ORDER.filter(x => groups[x]).concat(Object.keys(groups).filter(x => this.DEPT_ORDER.indexOf(x) < 0));
 
+    /* ⭐ FIRST LANDING OPENS EXACTLY ONE, never none (Kyle). After that the operator owns it
+       and may close all of them if they want to; only the DEFAULT is guaranteed.
+       ⛔ AND THE SET IS PRUNED EVERY DRAW. A department only exists while some active staff
+       member sits in a position carrying it, so renaming a position or deactivating the last
+       person in one would otherwise leave a name stuck in the closed list forever, and if it
+       ever came back it would return collapsed for no reason the operator could see. */
+    if (!this._closedDepts) this._closedDepts = orderedDepts.slice(1);
+    this._closedDepts = this._closedDepts.filter(x => orderedDepts.indexOf(x) >= 0);
+
     let body = '';
     orderedDepts.forEach(dep => {
-      body += '<tr><td colspan="' + (days.length + 1) + '" style="padding:10px 8px 4px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">' + esc(dep) + '</td></tr>';
+      /* ⚠ THE HEADER KEEPS ITS OWN LOOK. Same 9px gold caps as before; the only additions are
+         a chevron and a pointer. The clickable element is INLINE-flex so the chevron sits
+         beside the word rather than at the far end of an eight-column row. */
+      const depClosed = this._closedDepts.indexOf(dep) >= 0;
+      body += '<tr><td colspan="' + (days.length + 1) + '" style="padding:10px 8px 4px;">'
+        + '<div class="bs-dept-head' + (depClosed ? ' collapsed' : '') + '" data-dept="' + esc(dep) + '"'
+        + ' style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">'
+        + esc(dep) + '<span class="card-chevron" aria-hidden="true">&#9662;</span></div></td></tr>';
+      /* ⛔ A CLOSED SECTION RENDERS NO ROWS AT ALL, rather than hiding them with display:none.
+         It matches Close The Week's lane bodies, and it means no click handler is ever bound
+         to a cell nobody can see. It changes NOTHING about the numbers: computeTotals() walks
+         draft.shifts and never reads the DOM, so day totals, labor hours, cost, %, RPLH and
+         the warning box below the grid are all identical open or shut. */
+      if (depClosed) return;
       groups[dep].sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(s => {
         const sal = App.isSalaried(s);
         const wageLabel = sal ? 'Salary' : (s.wage != null ? App.fmtCurrency(s.wage) + '/hr' : '');
@@ -679,6 +705,20 @@ S.LaborBuildSchedule = {
     document.getElementById('bs-from-last')?.addEventListener('click', () => this.startFromLastWeek());
     document.getElementById('bs-export')?.addEventListener('click', () => this.exportSchedulePDF());
     document.getElementById('bs-worksheet')?.addEventListener('click', () => this.printWorksheet());
+
+    /* Department headers. Each toggles on its own, deliberately NOT an accordion: building
+       coverage means reading Kitchen against Front of House, and closing one to open another
+       would fight that. Re-draws rather than toggling a class, because the rows for a closed
+       section are not in the document at all. */
+    this.container.querySelectorAll('.bs-dept-head').forEach(h => {
+      h.addEventListener('click', () => {
+        const dep = h.dataset.dept;
+        if (!dep || !this._closedDepts) return;
+        const at = this._closedDepts.indexOf(dep);
+        if (at >= 0) this._closedDepts.splice(at, 1); else this._closedDepts.push(dep);
+        this.draw();
+      });
+    });
 
     // Grid cell clicks: edit a block, or add to a cell.
     this.container.querySelectorAll('.bs-cell').forEach(cell => {
