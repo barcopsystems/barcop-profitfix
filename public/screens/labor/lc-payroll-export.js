@@ -171,7 +171,9 @@ S.LaborPayrollExport = {
         // acts on. Mirror the Pay Periods screen: prompt for tips instead of accusing.
         if (!stateMinValid) status = 'No state minimum wage set';
         else if (tipShare <= 0) status = 'Tips not recorded';
-        else if (effHourly < stateMin) status = 'BELOW: $' + (stateMin - effHourly).toFixed(2) + '/hr owed';
+        // Dollars first, the rate after: a bookkeeper pays an amount, not a rate.
+        else if (effHourly < stateMin) status = 'BELOW: $' + ((stateMin - effHourly) * r.hours).toFixed(2)
+          + ' owed ($' + (stateMin - effHourly).toFixed(2) + '/hr short)';
         else status = 'OK';
       }
       return {

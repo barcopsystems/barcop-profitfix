@@ -279,6 +279,8 @@ S.LaborPayPeriods = {
     const stateMin = parseFloat((App.laborData?.settings || {}).state_min_wage);
     const stateMinValid = !isNaN(stateMin) && stateMin > 0;
     let belowMinCount = 0;
+    // Dollars, not just a count: the operator has to pay a number, and the app knows it.
+    let belowMinOwed = 0;
     const rows = agg.rows.sort((a, b) => b.gross - a.gross).map(r => {
       const pos = this.positionById(r.position_id);
       // Salaried (exempt) staff are never subject to the tipped-minimum cash-wage
@@ -296,7 +298,12 @@ S.LaborPayPeriods = {
       // tips instead of firing a confident "owed" accusation off missing data.
       const tipsRecorded = tipShare > 0;
       const below = isTipped && stateMinValid && tipsRecorded && r.hours > 0 && effectiveHourly < stateMin;
-      if (below) belowMinCount++;
+      /* What is actually OWED for the week, not the per-hour gap. Same arithmetic the
+         operator would do by hand: the shortfall per hour across the hours worked, which is
+         also stateMin*hours - straightPay - tipShare. Straight-time hours on purpose, matching
+         the test above — the OT premium is not part of the tipped-minimum comparison. */
+      const makeup = below ? (stateMin - effectiveHourly) * r.hours : 0;
+      if (below) { belowMinCount++; belowMinOwed += makeup; }
       const tipCell = !isTipped
         ? '<span style="color:var(--t4);font-size:11px;">Non-Tipped</span>'
         : !stateMinValid
@@ -304,7 +311,7 @@ S.LaborPayPeriods = {
           : !tipsRecorded
             ? '<span style="color:var(--t3);font-size:11px;">Tips not recorded</span>'
             : below
-              ? '<span style="color:var(--red);font-weight:700;" title="Effective $' + effectiveHourly.toFixed(2) + '/hr, state min $' + stateMin.toFixed(2) + '">Below Min &middot; $' + (stateMin - effectiveHourly).toFixed(2) + '/hr owed</span>'
+              ? '<span style="color:var(--red);font-weight:700;" title="Effective $' + effectiveHourly.toFixed(2) + '/hr against a state minimum of $' + stateMin.toFixed(2) + ', short $' + (stateMin - effectiveHourly).toFixed(2) + '/hr across ' + r.hours.toFixed(1) + ' hours">Below Min &middot; ' + App.fmtCurrency(makeup) + ' owed</span>'
               : '<span style="color:var(--green);font-weight:700;">OK &middot; $' + effectiveHourly.toFixed(2) + '/hr</span>';
       return '<tr>'
         + '<td><div class="val">' + esc(r.name) + '</div>'
@@ -333,7 +340,7 @@ S.LaborPayPeriods = {
       + '</div></div>';
 
     const warnLine = belowMinCount > 0
-      ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin:14px 0 0;">' + belowMinCount + ' tipped employee' + (belowMinCount === 1 ? '' : 's') + ' fell below state minimum wage this week. Make up the difference before payroll runs.</div>'
+      ? '<div style="font-size:11px;color:var(--red);font-weight:700;margin:14px 0 0;">' + belowMinCount + ' tipped employee' + (belowMinCount === 1 ? '' : 's') + ' fell below state minimum wage this week. ' + App.fmtCurrency(belowMinOwed) + ' owed in makeup pay before payroll runs.</div>'
       : '';
 
     const breakdownHeading = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;">'
