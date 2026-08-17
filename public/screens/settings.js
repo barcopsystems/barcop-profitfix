@@ -3773,9 +3773,9 @@ S.HubSettings = {
        and a live re-confirm — which adds both — disagrees with the seeded week on the same
        money. `seededCost` is what makes the stored week foot to the crew that actually
        worked instead of to a budget nobody was paid. */
-    /* The tipped crew, resolved from lcPositions rather than the `lcTipped` further down —
-       this block now runs BEFORE that declaration, and it has to, because the makeup figure
-       computed in the labor loop below reads these pools. */
+    /* The tipped crew, resolved straight off lcPositions. This block runs BEFORE the tip log
+       is built — it has to, because the makeup figure computed in the labor loop below reads
+       these pools, and the log is now derived from them. */
     const poolTippedIds = new Set(lcPositions.filter(p => ['Bartender', 'Barback', 'Server', 'Busser'].includes(p.name)).map(p => p.id));
     const poolTipped = lcStaff.filter(st => poolTippedIds.has(st.position_id));
     // ── Tip pools — three recent close-outs, split by hours, linked to shifts.
@@ -3802,7 +3802,14 @@ S.HubSettings = {
     const TIP_POOL_RATE = 15;                                   // $ per tipped hour, night close-out
     const TIP_DAY_CREW  = { 'Priya N.': 16, 'Tara W.': 3 };     // the weekday-lunch close-out
     const TIP_DAY_POOL  = 70;                                   // and what it comes to
-    const mkPool = (dayAgo, amount, crew, shiftType) => {
+    /* ⛔ DAY-ONLY, BECAUSE THAT IS ALL A LIVE USER CAN WRITE. `lc-tip-log.js` saves every pool
+       as `App.tipShiftKey(this._addDate, '')` with `shift_type: ''` — its own comment says
+       "tips log per day now, no service-period split", and the form has no period selector.
+       Seeding 'Dinner'/'Lunch' here would have produced a record the operator cannot
+       reproduce, which is the seed-honesty violation archetype ([[seed-honesty-audit]]).
+       The two close-outs a week are told apart by their DATE instead, which is exactly how
+       the real door tells them apart. */
+    const mkPool = (dayAgo, amount, crew) => {
       const poolDate = dateStr(dayAgo);
       const parts = Object.keys(crew).map(nm => {
         const st = lcStaff.find(s => s.name === nm);
@@ -3816,9 +3823,9 @@ S.HubSettings = {
         handed = +(handed + p.share).toFixed(2);
       });
       return { id:uid(),
-        shift_id:    App.tipShiftKey(poolDate, shiftType),
+        shift_id:    App.tipShiftKey(poolDate, ''),
         date:        poolDate,
-        shift_type:  shiftType,
+        shift_type:  '',
         method:      'hours',
         pool_amount: amount,
         total_hours: totH,
@@ -3837,10 +3844,10 @@ S.HubSettings = {
         if (h > 0) night[st.name] = h;
       });
       const nightH = Object.keys(night).reduce((s, n) => s + night[n], 0);
-      if (nightH > 0) lcTipPools.push(mkPool(baseAgo + 1, +(nightH * TIP_POOL_RATE).toFixed(2), night, 'Dinner'));
+      if (nightH > 0) lcTipPools.push(mkPool(baseAgo + 1, +(nightH * TIP_POOL_RATE).toFixed(2), night));
       const day = {};
       Object.keys(TIP_DAY_CREW).forEach(n => { const h = +(TIP_DAY_CREW[n] * scale).toFixed(1); if (h > 0) day[n] = h; });
-      if (Object.keys(day).length) lcTipPools.push(mkPool(baseAgo + 2, +(TIP_DAY_POOL * scale).toFixed(2), day, 'Lunch'));
+      if (Object.keys(day).length) lcTipPools.push(mkPool(baseAgo + 2, +(TIP_DAY_POOL * scale).toFixed(2), day));
     };
     ANCHL.weeks.forEach(a => seedPoolsFor(sunOff + ANCHS.endAgo(a), lcHoursScale(a)));
     // The current week gets its own close-outs, same as it gets its own hours.
@@ -4156,38 +4163,65 @@ S.HubSettings = {
     // Bartender 2%; Barback + Busser pay 0 and only receive). Earners log sales +
     // tip_out_paid; the collected pool splits across the support crew by hours so
     // Collected == Distributed (the last support row absorbs the rounding remainder).
+    /* ⛔⛔⛔ THE LOG IS BUILT FROM THE POOLS, BECAUSE ONE WORKSHEET PRINTS BOTH (T1).
+       Books' Form 8027 takes "Total Reported Tips" from `lc_tips` and the per-employee
+       allocation table from `lc_tip_pools`, side by side. They were seeded independently and
+       had never agreed: MEASURED over the seeded span, the old pools came to $7,375 against
+       $18,373 of logged tips (40%), and the T1 re-tune would have pushed that to 216% — a
+       $21,269 contradiction on a TAX worksheet. Different quantities are allowed to differ
+       ([[the-loop]] #57), but these two are not different quantities: what the earners report
+       COLLECTING is the money the pool DISTRIBUTES, which is the reconciliation the Tip Log
+       already promises ("Collected == Distributed").
+       ⭐ SO THERE IS ONE SOURCE NOW. Each pool is the close-out, and every tip row is derived
+       from it: an earner logs GROSS (their own share plus the tip-out they hand over), support
+       logs what they RECEIVE, and `sales` is derived from the tip-out so the position config's
+       declared percentages (Server 3%, Bartender 2%) are TRUE of the seeded rows rather than
+       merely stated next to them.
+       ⚠ Rows carry the POOL's date and shift_type, so `App.tipShiftKey` gives log and pool the
+       same `shift_id` and Form 8027's per-shift grouping lines up instead of double-listing.
+       🔧 verify-tip-credit-seed.js E1-E4 pins the reconciliation, per week and in total. */
     const TIPOUT_PCT = { 'Server': 3, 'Bartender': 2 };
-    const lcTipped = lcStaff.filter(st => ['Bartender','Barback','Server','Busser'].includes(posNameOf(st.position_id)));
     const isEarnerRole = r => r === 'Server' || r === 'Bartender';
     const lcTips = [];
-    [3, 5, 8, 11, 14, 18, 22, 27, 33, 40, 47, 54, 61, 68, 75].forEach(d => {
-      const tipDate = dateStr(d);
-      const shiftId = App.tipShiftKey(tipDate, '');   // per-day key (the Tip Log logs per day now)
-      const built = lcTipped.map(st => {
+    lcTipPools.forEach(pool => {
+      const parts = (pool.participants || []).map(p => {
+        const st = lcStaff.find(s => s.id === p.staff_id) || {};
         const role = posNameOf(st.position_id);
-        const earner = isEarnerRole(role);
-        const base = role === 'Bartender' ? 135 : 100;
-        const cash = earner ? Math.round(base * (0.30 + rnd() * 0.22)) : 0;
-        const card = earner ? Math.round(base * (0.92 + rnd() * 0.40)) : 0;
-        const sales = earner ? Math.round((role === 'Bartender' ? 1450 : 1150) + rnd() * 450) : 0;
-        const paid = earner ? Math.round(sales * (TIPOUT_PCT[role] || 0) / 100 * 100) / 100 : 0;
-        return { st, role, earner, cash, card, sales, paid, received:0, hours: role === 'Server' ? 5 : 7 };
-      });
-      const collected = +built.reduce((s, r) => s + r.paid, 0).toFixed(2);
-      const sup = built.filter(r => !r.earner);
-      const totSupH = sup.reduce((s, r) => s + r.hours, 0) || 1;
+        return { st, role, earner: isEarnerRole(role), share: p.share || 0, hours: p.hours || 0 };
+      }).filter(p => p.st.id);
+      const earners = parts.filter(p => p.earner);
+      const support = parts.filter(p => !p.earner);
+      const earnTot = earners.reduce((s, p) => s + p.share, 0);
+      const supTot  = +support.reduce((s, p) => s + p.share, 0).toFixed(2);
+      // The tip-out is the support crew's share, handed over by the earners in proportion to
+      // what each of them took. Sum(paid) === supTot by construction, and the last earner
+      // absorbs the rounding remainder so the reconciliation is exact to the cent.
       let handed = 0;
-      sup.forEach((r, i) => {
-        r.received = (i === sup.length - 1) ? +(collected - handed).toFixed(2)
-                                            : Math.round(collected * (r.hours / totSupH) * 100) / 100;
-        handed += r.received;
+      earners.forEach((p, i) => {
+        p.paid = (i === earners.length - 1) ? +(supTot - handed).toFixed(2)
+                                            : +(supTot * (earnTot > 0 ? p.share / earnTot : 0)).toFixed(2);
+        handed = +(handed + p.paid).toFixed(2);
+        p.gross = +(p.share + p.paid).toFixed(2);
+        // Sales that make the DECLARED tip-out percentage true, not merely plausible.
+        const pct = TIPOUT_PCT[p.role] || 0;
+        p.sales = pct > 0 ? Math.round(p.paid / (pct / 100)) : 0;
+        // A bar this size runs card-heavy; the split is fixed, not random, so the seed is
+        // reproducible and Form 8027's charged-tips line is a stable number.
+        p.cash = +(p.gross * 0.30).toFixed(2);
+        p.card = +(p.gross - p.cash).toFixed(2);
       });
-      built.forEach(r => {
-        lcTips.push({ id:uid(), date:tipDate, shift_id:shiftId, staff_id:r.st.id, name:r.st.name,
-          position_id:r.st.position_id, shift_type:'',
-          cash_tips:r.cash, card_tips:r.card, total_tips:r.cash + r.card,
-          sales:r.sales, tip_out_paid:r.paid, tip_out_received:r.received,
-          hours:r.hours, notes:'', created_at:daysAgoISO(d) });
+      support.forEach(p => { p.paid = 0; p.gross = 0; p.cash = 0; p.card = 0; p.sales = 0; });
+      parts.forEach(p => {
+        lcTips.push({ id:uid(), date:pool.date, shift_id:pool.shift_id, staff_id:p.st.id, name:p.st.name,
+          position_id:p.st.position_id, shift_type:pool.shift_type,
+          cash_tips:p.cash, card_tips:p.card, total_tips:+(p.cash + p.card).toFixed(2),
+          sales:p.sales, tip_out_paid:p.paid, tip_out_received:p.earner ? 0 : p.share,
+          /* Stamped off the pool's OWN date at close-out time, not `new Date()`: thirteen
+             identical stamps make `App.byCreation`'s tiebreak meaningless the day a duplicate
+             appears, which is the same reasoning the seeded week's `saved_at` carries.
+             ⛔ `toISOString()` is right for the VALUE here — this is a timestamp, not a YMD,
+             so [[local-date-convention]]'s ban on `toISOString().slice(0,10)` does not apply. */
+          hours:p.hours, notes:'', created_at:new Date(pool.date + 'T23:00:00').toISOString() });
       });
     });
     App.laborData.lc_tips = lcTips;
