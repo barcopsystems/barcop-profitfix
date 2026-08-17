@@ -74,6 +74,7 @@ S.RevenueThisWeek = {
     // Overtime premium (0.5x on weekly hours over 40) is NOT in a.cost (straight
     // time only), so add it or labor % and RPLH understate labor on overtime weeks.
     cost += App.otPremiumForRows ? App.otPremiumForRows(wkRows).total : 0;
+    cost += App.tipMakeupForRows ? App.tipMakeupForRows(wkRows).total : 0;
     // Salaried (exempt) labor is a fixed weekly cost on top of hourly wages.
     const sal = App.salariedCost(start, periodEnd);
     cost += sal.total;

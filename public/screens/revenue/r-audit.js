@@ -545,6 +545,7 @@ S.RevenueAudit = {
       // or Total Labor Period contradicts labor_pct_blended (which is OT-inclusive,
       // coming off the saved revenue_weeks) inside the same audit.
       laborCost += App.otPremiumForRows ? App.otPremiumForRows(actuals).total : 0;
+      laborCost += App.tipMakeupForRows ? App.tipMakeupForRows(actuals).total : 0;
       // Fixed salaried (exempt) cost over the SAME window, not the whole history.
       laborCost += App.salariedCost(winStart, winEnd).total;
       cd.labor_cost = Math.round(laborCost);
