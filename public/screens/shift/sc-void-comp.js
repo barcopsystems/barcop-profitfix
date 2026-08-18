@@ -556,7 +556,17 @@ S.ShiftVoidComp = {
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
     };
     // The id follows the caller's own class, so the helper stays general and the hook has a handle.
-    return '<div id="' + cls + '-toggle" style="display:inline-flex;gap:6px;margin-bottom:18px;">'
+    /* ⛔ THE SHARED CLASS, NOT A HAND-ROLLED INLINE STYLE (Kyle, 2026-08-17: the two buttons
+       "are touching and not spaced correctly"). This was the only mode toggle in the app that
+       wrote its own `display:inline-flex;gap:6px` inline; the other eight use `.seg-toggle`.
+       That mattered because `onState` below resets these with `el.style.display = ''` when the
+       mapper closes — which CLEARS an inline display rather than restoring it, so the div fell
+       back to `block`, `gap` does nothing on a block, and the buttons sat flush. It fires on
+       mount, so it was broken from first paint. With the display in CSS the reset reverts to
+       `flex` correctly, and the toggle picks up the shared mobile stacking rule for free.
+       ⚠ Population measured before changing anything: iv-/sr-/rsc-mode-toggle all already use
+       the class and are unaffected. 🔧 verify-void-comp-toggle-spacing.js */
+    return '<div class="seg-toggle" id="' + cls + '-toggle">'
       + segBtn('import', 'Import File') + segBtn('manual', 'Enter Manually') + '</div>';
   },
 
