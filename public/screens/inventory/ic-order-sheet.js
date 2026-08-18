@@ -150,7 +150,15 @@ S.InventoryOrderSheet = {
         if (dd < since.day) return;                    // the count already saw this delivery
         if (dd === since.day && t <= since.ts) return; // same day, and the count was taken after it
         // Delivery qty is stored in the same container unit as on-hand and par (cases for bottle beer).
-        out[pid] = (out[pid] || 0) + (App.unitsFromDeliveryLine ? App.unitsFromDeliveryLine(li) : (parseFloat(li.qty) || 0));
+        // `opts.measure: 'value'` asks the same question in DOLLARS instead — what those units cost
+        // on the invoice. Trapped Cash needs it because units received since a count have no
+        // count-recorded price, and it values the shelf at what was PAID (T13). The RETURN SHAPE
+        // never changes — always `{ pid: number }` — so a caller that forgets the flag gets a
+        // different number, never a different type.
+        out[pid] = (out[pid] || 0) + ((opts && opts.measure === 'value')
+          ? (li.extended != null ? (parseFloat(li.extended) || 0)
+                                 : (parseFloat(li.qty) || 0) * (parseFloat(li.price_per_unit) || 0))
+          : (App.unitsFromDeliveryLine ? App.unitsFromDeliveryLine(li) : (parseFloat(li.qty) || 0)));
       });
     });
     return out;
