@@ -2527,15 +2527,55 @@ S.HubSettings = {
       [21, 1.3743], [28, 1.2062], [35, 1.2538], [42, 1.1901], [49, 1.2264],
       [56, 1.1607], [63, 1.1889]
     ];
+    /* ── A FEW THINGS THIS BAR CARRIES MORE OF THAN IT NEEDS ──────────────────────
+       Trapped Cash has two halves and only one of them had a story. Dead Stock read
+       $2,405 of premium bottles nobody pours; OVERSTOCK read $16.80 of to-go boxes,
+       because the seed's whole arc is a bar that stopped ordering and is running
+       LOW — 90 lines sit BELOW par. So the screen that exists to show cash sitting
+       on the shelf showed cardboard.
+       ⛔ THE SEED BENDS TO THE APP, NEVER THE REVERSE (Kyle, and it is the question
+       he asks about every seed change). Nothing in `trapped()` moved for this. A
+       product lands on Overstock when it still MOVES and its on-hand is above par by
+       $15 or more; a product with no usage is DEAD FIRST and can never be over. So
+       these are ordinary movers the bar simply keeps too much of.
+       ⭐ WHY THE HOLD IS ADDED TO EVERY COUNT, NOT JUST THE LATEST. Usage is
+       `start + purchases - end`, so raising the newest count alone would convert
+       usage into on-hand: the item drifts toward DEAD, and the seed's own
+       beginning-plus-purchases-minus-ending tie-out to the booked COGS breaks. Held
+       flat across the whole chain, every window's usage is byte-identical and the
+       tie-out is untouched — measured before and after on the deployed demo, COGS
+       $5,205.37 both ways. It also reads as the truth about a real bar: this one has
+       always carried a bit more of these than it needs.
+       ⚠ ADDED AT THE PICK, so every row is built by `icCountItem` and carries the
+       fulls/partial (and cases/loose for bottle beer) the Take Inventory form would
+       write. Patching `total` afterwards would leave those stale and produce a
+       record the form could never have produced ([[seed-roundtrip-verification]]).
+       ⚠ PARS ARE ALIGNED FURTHER DOWN AND STAY RIGHT: `computeSuggestion` reads
+       USAGE, which this does not move, so par still equals the suggestion and
+       Dynamic Pars does not tell the operator to raise a par on something the
+       Trapped Cash page is telling them they have too much of. */
+    const icHeldOver = {
+      // draft: two taps that were over-ordered and are not turning
+      'Live Oak Hefeweizen': 2, "Real Ale Fireman's 4": 2,
+      // liquor: the back-bar call brands
+      'Don Julio Blanco': 3, 'Grey Goose': 3, 'Woodford Reserve': 3, 'Tanqueray': 2,
+      // wine
+      'Champagne': 3, 'Pinot Noir': 4, 'Malbec': 4,
+      // bottle beer, held by the case
+      'Stella Artois': 4
+    };
+    const icHeldByIdx = {};
+    icProducts.forEach((p, i) => { if (icHeldOver[p.name]) icHeldByIdx[i] = icHeldOver[p.name]; });
+    const icHold = i => (icHeldByIdx[i] || 0);
     App.inventoryData.ic_counts = [
       // day 14 is part of the same solved chain — it used to be extrapolated
       // (`[1] + ([1] - [0])`), which spiked it to $15,922 and gave the week after
       // it only $615 of usage.
-      mkCount(14, i => +(icTotals[i][1] * 1.3910).toFixed(2)),
-      mkCount(7,  i => icTotals[i][1]),
-      mkCount(0,  i => icTotals[i][0]),
+      mkCount(14, i => +(icTotals[i][1] * 1.3910 + icHold(i)).toFixed(2)),
+      mkCount(7,  i => +(icTotals[i][1] + icHold(i)).toFixed(2)),
+      mkCount(0,  i => +(icTotals[i][0] + icHold(i)).toFixed(2)),
       ...icOlderWeeks.map(([d, m], k) =>
-        mkCount(d, i => +(icTotals[i][1] * m).toFixed(2), icOlderCounters[k % icOlderCounters.length]))
+        mkCount(d, i => +(icTotals[i][1] * m + icHold(i)).toFixed(2), icOlderCounters[k % icOlderCounters.length]))
     ];
 
     // Deliveries — all dated 8+ days back so none fall inside the last count
