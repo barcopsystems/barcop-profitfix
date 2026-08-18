@@ -73,7 +73,17 @@ S.InventoryOrderSheet = {
   // keeps such an item VISIBLE and one click from being ordered.
   // Per PRODUCT, not per file: a count can skip products, so each product's on-hand can come from a
   // different (older) count, and what matters is everything received after THAT product's count.
-  receivedSinceCount() {
+  // `opts.landedOnOrBefore` ('YYYY-MM-DD', optional) narrows the answer to receipts
+  // that have SETTLED — those that landed on or before that day. Trapped Cash passes
+  // it (CashEngine.settledReceipts) because a truck that arrived yesterday is stock
+  // you bought for the weekend, not cash you are sitting on; the ORDER SHEET passes
+  // nothing and is unchanged, because when you are deciding what to buy, everything
+  // on the shelf counts however new it is. Two different questions of one store, so
+  // ONE reader answers both and the two can never drift ([[lessons-paid-for]] #85).
+  // ⚠ The gate reads the SAME stamp the ordering test below uses, so the narrowed
+  // answer is always a SUBSET of the full one — Trapped Cash cannot credit a unit
+  // this sheet does not.
+  receivedSinceCount(opts) {
     // A count and a delivery on the SAME DAY cannot be ordered by date alone, and getting it wrong
     // now MOVES THE SUGGESTION rather than just a note. Prefer a real created_at on both sides.
     // When one is missing, assume the COUNT came first (an operator counts before service and takes
@@ -98,9 +108,15 @@ S.InventoryOrderSheet = {
       });
     });
     const out = {};
+    const landedOnOrBefore = (opts && opts.landedOnOrBefore) || '';
     ((App.inventoryData && App.inventoryData.ic_deliveries) || []).forEach(dv => {
       const t = ts(dv, true);
       if (!t) return;
+      // Per DELIVERY, so an old truck settles while this morning's does not. Compared
+      // on the DAY, because "has this sat a week" is a business-day question and the
+      // two stamp shapes (a UTC created_at, or the local date at end of day) share
+      // only their first ten characters.
+      if (landedOnOrBefore && String(t).slice(0, 10) > landedOnOrBefore) return;
       (dv.line_items || []).forEach(li => {
         const pid = li && li.product_id;
         if (!pid) return;
