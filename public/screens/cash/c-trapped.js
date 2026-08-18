@@ -17,6 +17,7 @@ S.CashTrapped = {
     App.showHelpModal('How Trapped Cash Works', [
       { p: ['Trapped cash is working capital sitting on your shelf instead of in your account. Bar Cop reads it off your counts and ranks every product by the dollars you can free, so you work the biggest ones first.'] },
       { h: 'Two Kinds', p: ['Dead stock is product that did not move at all between your last two counts. Its full on-hand value is cash sitting still, and a spoilage risk. Overstock is product you are holding above its par; the cash in the extra is money you spent ahead of when you needed to. Each product counts once, as whichever it is.'] },
+      { h: 'Stock You Received But Have Not Counted', p: ['A delivery does not move your on-hand until you count it, so a bar that keeps taking trucks in without recounting can be sitting on stock this page cannot see. Bar Cop folds a delivery in once it has sat ' + CashEngine.receiptSettleDays() + ' days with no count, and the row shows the working: what you counted, and what landed after it. A truck that came in this week is stock you bought for the weekend, not cash you are stuck with, so it is left out until it has sat a while.'] },
       { h: 'What To Do', p: ['For dead stock, move it: feature it, put it on a special, work it into a cocktail, or eighty-six it and stop reordering. For overstock, cut the par so you stop buying ahead of your real usage. The buttons take you straight to Dynamic Pars and the movement report.'] },
       { h: 'It Sharpens As You Count', p: ['This reads off your last two counts, so the more regularly you count the cleaner it gets. A product with only one count does not have the usage history to call dead, so count on a schedule and the trapped number gets honest fast.'] }
     ]);
@@ -39,11 +40,24 @@ S.CashTrapped = {
     // Singular at exactly one (F19) — the same door every inventory screen uses.
     const ohTxt = esc(App.qtyUnit(ohNum, unit))
       + (it.kind === 'over' && it.par != null ? ' <span style="color:var(--t4);">/ par ' + (Math.round(it.par * 10) / 10) + '</span>' : '');
+    /* ⭐ SHOW THE WORKING WHEN A DELIVERY IS IN THE FIGURE (T11). On Hand is the
+       POSITION now, counted plus what has settled on the shelf since, so on those
+       rows it deliberately disagrees with the number the operator wrote down. A
+       figure they cannot check is how a true number still loses trust, so the row
+       says where it came from, exactly as the Order Sheet does on the same data.
+       Muted like the "/ par" hint beside it rather than the Order Sheet's gold:
+       the gold on this row means dollars you can free, and it is already spoken
+       for by the To Free cell. */
+    const recvNote = (it.received_since > 0)
+      ? '<div style="font-size:10px;color:var(--t4);margin-top:2px;">'
+        + esc(App.qtyUnit(Math.round((it.counted || 0) * 10) / 10, unit)) + ' counted + '
+        + esc(App.qtyUnit(Math.round(it.received_since * 10) / 10, unit)) + ' received since</div>'
+      : '';
     return '<tr>'
       + '<td data-label="Product"><span style="color:var(--t1);">' + esc(it.name) + '</span></td>'
       + '<td data-label="Category">' + esc(it.p.category || '-') + '</td>'
       + '<td data-label="Vendor">' + esc(it.p.vendor || '-') + '</td>'
-      + '<td data-label="On Hand" class="val">' + ohTxt + '</td>'
+      + '<td data-label="On Hand" class="val">' + ohTxt + recvNote + '</td>'
       + '<td data-label="Tied Up" class="val">' + App.fmtCurrency(it.tied) + '</td>'
       + '<td data-label="To Free" class="num" style="color:var(--gold);font-weight:600;">' + App.fmtCurrency(it.free) + '</td>'
       + '</tr>';

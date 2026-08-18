@@ -90,7 +90,7 @@ S.CashAudit = {
       // Tests the SAME denominator the S1 score divides by. Test a different one and
       // readiness promises a section the audit then scores null (see the audit-ui
       // projected-vs-post-run badge, same trap).
-      safe(() => E.trapped().hasData && E.onHand().value > 0, false),   // S1 Capital Efficiency
+      safe(() => { const t = E.trapped(); return t.hasData && t.shelfValue > 0; }, false),   // S1 Capital Efficiency
       safe(() => E.cashCycle().hasData, false),                              // S2 Cash Conversion Cycle
       safe(() => E.survivalForecast(13).hasData, false),                     // S3 Liquidity & Runway
       safe(() => E.vendors().length > 0, false)                             // S4 Payment Terms
@@ -129,7 +129,14 @@ S.CashAudit = {
     // construction, so the share is always real. Average inventory stays where it
     // belongs: turns and GMROI on c-capital, a different question (how hard the cash
     // works over time), on a deliberately different basis.
-    const invValue = E.onHand().value;
+    // ⭐ THE SHELF `trapped` ITSELF MEASURED AGAINST (2026-08-18, T11). Trapped Cash
+    // now counts stock RECEIVED but not yet counted once it has settled a week, and
+    // a second read of onHand() does not contain those receipts — so dividing by one
+    // would have made the numerator and denominator two different shelves, and the
+    // score would fall for a reason that is not laziness. `trapped.shelfValue` comes
+    // out of the same pass that built the number above it, and equals onHand().value
+    // exactly when nothing has settled.
+    const invValue = trapped.shelfValue;
     let s1 = null;
     if (trapped.hasData && invValue > 0) s1 = clamp(100 - (trapped.total / invValue) * 130);
     const lazyCats = cap.rows.filter(r => r.gmroi != null && r.gmroi < 1.5).map(r => r.cat);
