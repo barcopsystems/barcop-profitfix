@@ -84,44 +84,71 @@ S.InventoryOrderSheet = {
   // answer is always a SUBSET of the full one — Trapped Cash cannot credit a unit
   // this sheet does not.
   receivedSinceCount(opts) {
-    // A count and a delivery on the SAME DAY cannot be ordered by date alone, and getting it wrong
-    // now MOVES THE SUGGESTION rather than just a note. Prefer a real created_at on both sides.
-    // When one is missing, assume the COUNT came first (an operator counts before service and takes
-    // deliveries during it) so the delivery is credited. That is also the safer default here:
-    // over-crediting surfaces in the just-received strip, under-crediting silently re-orders stock
-    // already on the shelf. created_at is UTC and `date` is the local business day, so a same-day
-    // comparison is a heuristic either way — which is why the strip exists.
+    // ⭐ ORDERED BY THE BUSINESS DAY. `created_at` BREAKS A SAME-DAY TIE AND NOTHING ELSE
+    // (T12, 2026-08-18). A count and a delivery on the same day cannot be ordered by date
+    // alone, and getting it wrong MOVES THE SUGGESTION rather than just a note — so a real
+    // `created_at` decides that tie. It used to decide EVERY comparison, which is a
+    // different rule and a defect: Receive Delivery renders a free `<input type="date">`
+    // and stamps `created_at` at write time, so an operator logging a truck they forgot
+    // ("that came in last Friday") writes a record dated in the past and stamped now.
+    // MEASURED on the shipped reader: a truck dated 8 days ago typed at 07:18, against a
+    // count taken at 04:18 the same morning, was credited with 5 units the count had
+    // already seen — the sheet then suppresses a real reorder and the bar runs dry, which
+    // is the failure this file calls the worse one.
+    // ⭐ ONE-SIDED, and measured rather than assumed: a COUNT cannot be back-dated
+    // (`ic-take-inventory` has no date input at all and dates every count `todayLocal()`;
+    // an edit preserves the original `date` and `created_at`). So only a delivery can
+    // disagree with its own stamp, and only in that one direction.
+    // ⚠ WHEN A STAMP IS MISSING, assume the COUNT came first (an operator counts before
+    // service and takes deliveries during it) so the delivery is credited. That is the
+    // safer default: over-crediting surfaces in the just-received strip, under-crediting
+    // silently re-orders stock already on the shelf.
     const ts = (rec, endOfDay) => {
       const c = rec && rec.created_at ? String(rec.created_at) : '';
       if (/^\d{4}-\d{2}-\d{2}T/.test(c)) return c;
       const d = String((rec && rec.date) || '').slice(0, 10);
       return d ? d + (endOfDay ? 'T23:59:59' : 'T00:00:00') : '';
     };
-    const lastCounted = {};   // product_id -> newest stamp that product was actually counted
+    // The DAY the thing happened on. `date` is the business day and wins; `created_at` is
+    // only a fallback for a record that has no date at all. Deliberately the opposite
+    // preference to `ts()` above, which answers a different question (when was it typed).
+    const day = rec => {
+      const d = String((rec && rec.date) || '').slice(0, 10);
+      if (d) return d;
+      const c = rec && rec.created_at ? String(rec.created_at) : '';
+      return /^\d{4}-\d{2}-\d{2}T/.test(c) ? c.slice(0, 10) : '';
+    };
+    const lastCounted = {};   // product_id -> { day, ts } of the newest count that measured it
     ((App.inventoryData && App.inventoryData.ic_counts) || []).forEach(cnt => {
-      const t = ts(cnt, false);
-      if (!t) return;
+      const cd = day(cnt), t = ts(cnt, false);
+      if (!cd || !t) return;
       (cnt.items || []).forEach(it => {
         // `counted === false` never sets on-hand, so it must not count as "you counted this" here.
         if (!it || it.counted === false || !it.product_id) return;
-        if (!lastCounted[it.product_id] || t > lastCounted[it.product_id]) lastCounted[it.product_id] = t;
+        const prev = lastCounted[it.product_id];
+        // Newest by DAY, then by stamp — the same ordering the delivery test below uses,
+        // or "the newest count" and "is this after the count" could disagree.
+        if (!prev || cd > prev.day || (cd === prev.day && t > prev.ts)) {
+          lastCounted[it.product_id] = { day: cd, ts: t };
+        }
       });
     });
     const out = {};
     const landedOnOrBefore = (opts && opts.landedOnOrBefore) || '';
     ((App.inventoryData && App.inventoryData.ic_deliveries) || []).forEach(dv => {
-      const t = ts(dv, true);
-      if (!t) return;
-      // Per DELIVERY, so an old truck settles while this morning's does not. Compared
-      // on the DAY, because "has this sat a week" is a business-day question and the
-      // two stamp shapes (a UTC created_at, or the local date at end of day) share
-      // only their first ten characters.
-      if (landedOnOrBefore && String(t).slice(0, 10) > landedOnOrBefore) return;
+      const dd = day(dv), t = ts(dv, true);
+      if (!dd || !t) return;
+      // Per DELIVERY, so an old truck settles while this morning's does not — and judged on
+      // the day the stock LANDED, not the day it was typed, because "has this sat a week" is
+      // a question about the shelf.
+      if (landedOnOrBefore && dd > landedOnOrBefore) return;
       (dv.line_items || []).forEach(li => {
         const pid = li && li.product_id;
         if (!pid) return;
         const since = lastCounted[pid];
-        if (!since || t <= since) return;   // counted at/after the delivery: already reflected in on-hand
+        if (!since) return;                            // never counted: nothing to be "since"
+        if (dd < since.day) return;                    // the count already saw this delivery
+        if (dd === since.day && t <= since.ts) return; // same day, and the count was taken after it
         // Delivery qty is stored in the same container unit as on-hand and par (cases for bottle beer).
         out[pid] = (out[pid] || 0) + (App.unitsFromDeliveryLine ? App.unitsFromDeliveryLine(li) : (parseFloat(li.qty) || 0));
       });
