@@ -70,28 +70,6 @@ S.CashForecast = {
       + this.scenarioCard(fc, base)
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;"><div class="sh" style="margin:0;">Your Cash Across the Quarter</div>'
       + '<button class="btn btn-ghost btn-sm no-print" id="cf-export">Export for Lender</button></div>'
-      /* ⚠ `no-print` ON PURPOSE — THIS BOX IS THE SCREEN CARRIER ONLY. It briefly rendered into
-         the lender PDF (via `pdf-fine`) and Kyle killed it on sight: it landed between the
-         section heading and the operator's own numbers, and *"they couldn't give that to a
-         lender like that."* He is right — a disclaimer wedged into the middle of a bank document
-         reads as amateur. The PDF carries the same substance in its FOOTER, which now wraps and
-         reserves its own space (see App.exportPDF). Screen box + wrapped footer = both carriers,
-         neither one interrupting the document. */
-      + '<div class="no-print" style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin:0 0 16px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
-        /* ⭐⭐⭐ WHAT IT CAN AND CANNOT SEE, IN THE BOX THAT IS ALREADY THERE (Kyle, 2026-08-06:
-           *"the forecast has the heads up box.. just add to that statement what it can and cannot
-           see"*). No new element, so no design ratchet moves, and it sits where the operator is
-           already being told to check the figures.
-           ⛔ THE SENTENCE THAT MATTERS IS THE SECOND ONE. Sales and labor both fall back to your own
-           history when nothing is declared — `revenueForWeek` replays your recent weeks and
-           `laborForWeek` returns a trailing average. Bills and cash outflows have NO such fallback:
-           they are a schedule of commitments, and a commitment Bar Cop has not seen happen twice
-           contributes exactly zero. That asymmetry is invisible on screen and it is the whole reason
-           an operator can read a confident forecast that is missing their own rent. */
-        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop builds this forecast from what you log and from assumptions about your own averages. It is a software tool, not a CPA, accountant, or lender. This is a worksheet, not an audited financial statement, and a projection rather than a guarantee, so your actual results will vary. Review and verify every figure before you hand it to a bank.</div>'
-        + '<div style="font-size:11px;color:var(--t2);line-height:1.6;margin-top:8px;">Sales and payroll carry forward from your own recent weeks even if you tell Bar Cop nothing else. Bills and cash outflows do not: they are counted only once Bar Cop has seen the same one happen at least twice, so anything new to you takes a month or two to appear here. Until then it is not in these numbers.</div>'
-      + '</div>'
       + this.forecastCard(fc, opening)
       + this.billsCard()
       + this.eventsCard()
@@ -131,11 +109,33 @@ S.CashForecast = {
   },
 
   // ── The quarter: running-balance chart over the 13-week table, one card ───────
+  /* ⭐ THE NOTICE LIVES INSIDE THE CARD, UNDER THE LAST DATA ROW (Kyle, 2026-08-17: *"move the
+     heads up banner inside the cash across the quarter card at the bottom under the last data
+     row... and shorten the text"*). It used to sit between the section heading and the
+     operator's own numbers, which is the same complaint he made about the lender PDF: a
+     disclaimer wedged in front of the figures reads as amateur and pushes the chart down the
+     page. Under the table it is read after the numbers, which is when it means anything.
+     ⚠ TWO SENTENCES, ONE PARAGRAPH. It was two stacked blocks with a line break between them.
+     ⛔ THE SECOND SENTENCE IS THE ONE THAT MATTERS and it survives the shortening: sales and
+     labor fall back to your own history when nothing is declared (`revenueForWeek` replays
+     recent weeks, `laborForWeek` returns a trailing average) while bills and cash outflows have
+     NO such fallback. A commitment Bar Cop has not seen twice contributes exactly zero, which is
+     how an operator reads a confident forecast that is missing their own rent.
+     ⚠ `no-print`, and the FULL legal text still ships on the lender PDF's own footer (see
+     exportForLender below), which is the copy that actually leaves the building. Shortening the
+     screen carrier does not shorten the document. 🔧 verify-forecast-headsup-placement.js */
+  headsUpNote() {
+    return '<div class="no-print" style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin:16px 0 0;">'
+      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
+      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop builds this from what you log and your own averages: a projection, not an audited statement, so verify every figure before you hand it to a bank. Bills and cash outflows only count once Bar Cop has seen the same one happen twice, so anything new to you is not in these numbers yet.</div>'
+      + '</div>';
+  },
   forecastCard(fc, opening) {
     return '<div class="card">'
       + (opening != null ? '<div style="margin-bottom:14px;">' + this.curve(fc) + '</div>' : '')
       + this.lowLine(fc, opening)
       + this.tableInner(fc, opening)
+      + this.headsUpNote()
       + '</div>';
   },
 
