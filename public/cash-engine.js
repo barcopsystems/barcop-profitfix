@@ -100,7 +100,17 @@ window.CashEngine = {
        The screen's help quotes this same call, so the copy cannot drift from the
        rule it describes ([[lessons-paid-for]] #82). */
     const landedOnOrBefore = this._addDays(App.todayLocal(), -this.receiptSettleDays());
-    return S.InventoryOrderSheet.receivedSinceCount({ landedOnOrBefore: landedOnOrBefore }) || {};
+    const OS = S.InventoryOrderSheet;
+    /* BOTH FACTS TOGETHER, from one reader asked twice. Trapped Cash needs the UNITS
+       (to compare against par) and the DOLLARS (because it values the shelf at what
+       was paid, and units that arrived since the count have no count-recorded price).
+       Returned as one map so a caller cannot take the quantity and price it at
+       today's cost, which is the defect T13 closed. */
+    const units = OS.receivedSinceCount({ landedOnOrBefore: landedOnOrBefore }) || {};
+    const value = OS.receivedSinceCount({ landedOnOrBefore: landedOnOrBefore, measure: 'value' }) || {};
+    const out = {};
+    Object.keys(units).forEach(pid => { out[pid] = { units: units[pid] || 0, value: value[pid] || 0 }; });
+    return out;
   },
 
   // ── Average inventory over the recent counts ──────────────────────────────
@@ -155,16 +165,41 @@ window.CashEngine = {
        have?" two different ways, and splitting it per branch would put a third
        answer inside a single function. */
     const settled = this.settledReceipts();
+    /* ⭐ VALUED AT WHAT YOU PAID, NOT AT TODAY'S PRICE (T13, Kyle's ruling 2026-08-18).
+       This used to price the shelf at `App.unitCost(p)`, the product record's CURRENT
+       cost — so a vendor raising a price moved the Cash Recovery headline, the Hub
+       tile and the audit share while not one bottle moved. Measured on the live demo:
+       Dom Pérignon up 20% after the count took the figure $2,405 -> $2,590, while the
+       Stock Report, which values the count at the cost recorded on it, did not move.
+       Trapped cash is capital ALREADY LAID OUT, so the honest basis is what was paid.
+       That is also the basis the Stock Report, Books and COGS use, so the two pages
+       now agree by construction instead of by luck. */
+    const perp = App._perpetualInventory();
     const items = [];
     let dead = 0, overPar = 0, settledValue = 0;
+    Object.keys(settled).forEach(pid => { settledValue += (settled[pid].value || 0); });
     Object.keys(oh).forEach(pid => {
       const p = this.productById(pid); if (!p) return;
       const counted = oh[pid] || 0;
-      const recvd = settled[pid] || 0;
+      const s = settled[pid] || { units: 0, value: 0 };
+      const recvd = s.units || 0;
       const qty = counted + recvd; if (!(qty > 0)) return;
-      const uc = App.unitCost(p) || 0;
-      settledValue += recvd * uc;
-      const tied = qty * uc;
+      /* What the COUNT recorded this stock as worth. `_perpetualInventory` already
+         carries it (each count item's own `value`, at the cost on that count). The
+         fallbacks are for older rows that never stored one: the count item's unit
+         cost first, and only then the product record, which is today's behaviour and
+         the last resort rather than the first. */
+      const rec = perp[pid] || {};
+      let paid = rec.value || 0;
+      if (!(paid > 0) && counted > 0) {
+        const rate = (rec.unitCost != null && !isNaN(rec.unitCost)) ? rec.unitCost : (App.unitCost(p) || 0);
+        paid = counted * rate;
+      }
+      // Units that arrived since the count carry the price on their own invoice.
+      const tied = paid + (s.value || 0);
+      // The excess is priced at what THIS shelf cost per unit, so a mixed shelf of
+      // counted and received stock cannot be revalued by whichever cost you pick.
+      const uc = qty > 0 ? tied / qty : 0;
       const used = base && base[pid] ? Math.max(0, base[pid].rawUsed) : null;
       const par = parseFloat(p.par_level);
       // Dead is decided FIRST and wins: a product with zero usage lists as dead,
