@@ -742,7 +742,8 @@ S.WeekReview = {
      a product call, not a refactor. */
   _inventoryFigures() {
     const inv = (App.inventoryData) || {};
-    const productById = id => (inv.ic_products || []).find(p => p.id === id);
+    // `productById` lived here only to feed the hand-rolled dead-stock loop; that
+    // loop is now `CashEngine.trapped()`, which resolves its own products.
     const asc = [...(inv.ic_counts || [])].sort(App.cmpOldest);
     const latest = asc.length ? asc[asc.length - 1] : null;
     const prev = asc.length >= 2 ? asc[asc.length - 2] : null;
@@ -753,14 +754,24 @@ S.WeekReview = {
       ? Object.values(base).reduce((s, b) => s + (b.unitCost != null ? Math.max(0, b.rawUsed) * b.unitCost : 0), 0)
       : null;
 
-    const perp = App._perpetualInventory();
-    const deadAll = base ? Object.keys(perp).filter(pid => {
-      const p = productById(pid);
-      const oh = perp[pid].onHand;
-      if (!p || !(oh > 0)) return false;
-      const used = base[pid] ? Math.max(0, base[pid].rawUsed) : 0;
-      return used <= 0.001 && oh * (App.unitCost(p) || 0) >= 15;
-    }).length : 0;
+    /* ⛔ ONE DOOR FOR DEAD STOCK, exactly as the note below says for below par
+       (2026-08-18, T11). This was a hand-rolled second copy of `CashEngine.trapped()`'s
+       dead-stock test and the two had ALREADY drifted before anything was changed
+       today: this loop read `base[pid] ? … : 0`, so a product with NO usage record at
+       all scored `used = 0` and counted as dead, while `trapped()` requires a real
+       usage reading (`used !== null`) — which is what this app's own help promises,
+       that a product with only one count has no history to call dead on. T11 would
+       have widened the gap a second way, because `trapped()` now measures POSITION
+       (counted plus receipts that have settled) and this copy read the count alone.
+       Same question, same moment, so it has to be the same answer: the header two
+       paragraphs down already lists `deadAll` as an as-of-now figure ([[the-loop]]
+       #54 — the moment a number appears on two screens, the test is the AGREEMENT).
+       ⚠ BARE, like `CashEngine.bills()` and for the same reason: a guarded fallback
+       would print "0 dead-stock items" if the engine were missing, and a silent zero
+       on this cell reads as "nothing is tying up cash", which is the opposite of the
+       truth ([[the-loop]] #40). `cash-engine.js` is a plain script tag and this runs
+       on render, not at load. */
+    const deadAll = CashEngine.trapped().items.filter(it => it.kind === 'dead').length;
 
     /* ⛔ ONE DOOR FOR BELOW PAR. This is the Order Sheet's own plan, never a second below-par loop:
        the cockpit once carried its own copy and the two drifted twice (a vendor already received
