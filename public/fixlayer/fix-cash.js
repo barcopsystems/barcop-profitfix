@@ -86,8 +86,25 @@ FIX.cash = [
            at ...", so it is where the sentence above can actually be acted on. */
         { kind: 'action', target: 'c-forecast', targetLabel: 'Cash Forecast',
           title: 'Spot any tight week',
-          detail: 'Find the week where cash out beats cash in. A quarterly bill on a slow week, the same week as a big order, is what catches you short.' },
-        { kind: 'action', target: 'books', targetLabel: 'Books',
+          detail: 'Find the week where cash out beats cash in. A quarterly bill on a slow week, the same week as a big order, is what catches you short. Nothing to tick here: this row reads the forecast live and clears itself once no week is short.' },
+        /* ⛔ NO BUTTON, AND THAT IS THE POINT (Kyle, 2026-08-17). This step used to carry a target
+           of 'books', which opens MONTH-END BOOKS — a monthly P&L you cannot reschedule anything
+           on. Kyle: *"move a payment or hold an order and send them to a page that shows dropped
+           bills that have already been paid?"*
+           ⭐ THE HONEST ANSWER IS THAT THERE IS NO DESTINATION. Measured what the forecast projects
+           money OUT from (projectedBills, outflowsBetween, projectedTaxRemittances,
+           recurringPurchases, laborForWeek) and then where each is edited: All Money Out is a
+           LEDGER of what has already been logged, and nothing in the app lists upcoming payments as
+           something you can move. Moving a payment is calling the vendor and paying on the due date;
+           holding an order is not placing it Tuesday. Those happen in the world, and Bar Cop sees
+           them afterwards when the data reflects them.
+           ⚠ REPOINTING IT AT ALL MONEY OUT WOULD HAVE BEEN THE SAME MISTAKE IN A NEW COSTUME:
+           picking a page whose NAME matches the words instead of asking what the operator DOES
+           there ([[the-loop]] #47). That was my first recommendation and Kyle refused it.
+           ⚠ The convention already existed here: 'Confirm the week is covered' below and 'Take
+           early-pay discounts worth taking' under Pay on Terms carry no button for this same
+           reason. 🔧 verify-cash-fix-step-doors.js */
+        { kind: 'action',
           title: 'Move a payment or hold an order to cover it',
           detail: 'Slide a bill to its due date, hold a big buy a week, or lean out a slow shift so the tight week clears. Small moves, made early, beat scrambling on Friday.' },
         { kind: 'action',
@@ -112,7 +129,9 @@ FIX.cash = [
         { kind: 'action', target: 'ic-vendors', targetLabel: 'List Vendors',
           title: 'Set payment terms on each vendor',
           detail: 'On each vendor record, set the terms they actually give you, net 7, 15, or 30. Bar Cop uses it to flag anything you are paying faster than you have to.' },
-        { kind: 'action', target: 'books', targetLabel: 'Books',
+        /* ⛔ NO BUTTON, same reason as 'Move a payment' above: paying on the due date rather than
+           the day it lands is a real-world behaviour, not a screen. It pointed at Month-End Books. */
+        { kind: 'action',
           title: 'Hold every bill to its due date',
           detail: 'Pay on the due date, not the day it lands. Until then the cash is yours, not theirs.' },
         { kind: 'action',
