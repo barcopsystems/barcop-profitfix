@@ -52,6 +52,57 @@ window.CashEngine = {
     return { oh, value };
   },
 
+  /* ── Receipts that have SETTLED onto the shelf ─────────────────────────────
+     ⛔ THE DEFECT THIS CLOSES (2026-08-18, Kyle, reproduced live on the demo).
+     `onHand()` above reads `_perpetualInventory()`, which is `ic_counts` +
+     `ic_dispositions` ONLY — A DELIVERY NEVER MOVES ON-HAND. So a bar that
+     over-received and had not recounted saw nothing on Trapped Cash: ABW Pearl
+     Snap counted 0.5 against a par of 1 with 3 kegs received, and the test
+     `0.5 > 1` was simply false. The Order Sheet had already solved the same
+     problem from the other side (`position = oh + receivedSinceCount()`, or it
+     re-orders everything that just landed) and this file never got the memo.
+     Two screens asked one store how much stock there is and answered
+     differently.
+
+     ⭐ ONE IMPLEMENTATION, NOT A SECOND COPY. The reader is the Order Sheet's,
+     per PRODUCT, and it already handles the same-day count-versus-delivery tie.
+     Reached BARE and deliberately so: a guarded `os && os.receivedSinceCount`
+     would mean "if the order sheet has not loaded, go quietly back to reporting
+     trapped cash off the count alone" — the silent-wrong-number trade this
+     codebase gets wrong most often ([[the-loop]] #40), and it is exactly the
+     defect above. `bills()` reaches `S.HubOperatingExpenses` bare for the same
+     reason. Both files are plain script tags in index.html, and nothing here
+     runs at load time.
+
+     ⚠ WHY A DELAY, and Kyle chose this knowingly over plain position: a
+     Thursday delivery for a busy weekend would read as trapped cash on Friday
+     and be gone by Sunday, so every truck would raise a flag and the card that
+     exists to find real problems would start crying wolf. A receipt only counts
+     once it has sat about a week with no count. Bought-too-much stays flagged;
+     stocked-up-for-the-weekend does not.
+
+     ⭐⭐ THE SAFETY ARGUMENT IS THAT THIS IS A PURE NARROWING. The settle test
+     runs on the SAME stamp `receivedSinceCount` already orders by, so the set
+     it returns is always a SUBSET of what the Order Sheet credits. Trapped Cash
+     can therefore never claim a unit the Order Sheet does not, whatever either
+     rule becomes later — it cannot invent stock. Pinned as `D1` in
+     verify-trapped-reads-position.js.
+
+     ⚠ AND THE HONEST LIMIT: nothing subtracts what is POURED between counts, so
+     a settled receipt is an UPPER bound on what is still on that shelf. That is
+     why the window exists and why the screen shows its working rather than a
+     bare number — the operator has to be able to check it. */
+  receiptSettleDays() { return 7; },
+  settledReceipts() {
+    /* A METHOD, not a `SETTLE_DAYS:` property. Every slicer in the harness suite
+       lifts METHODS, so a data property beside a member it feeds is invisible to
+       all of them and reads `undefined` in every fixture (integrity #16/#26).
+       The screen's help quotes this same call, so the copy cannot drift from the
+       rule it describes ([[lessons-paid-for]] #82). */
+    const landedOnOrBefore = this._addDays(App.todayLocal(), -this.receiptSettleDays());
+    return S.InventoryOrderSheet.receivedSinceCount({ landedOnOrBefore: landedOnOrBefore }) || {};
+  },
+
   // ── Average inventory over the recent counts ──────────────────────────────
   // A single count catches one moment, usually the pre-delivery low, which makes
   // turns and GMROI read far too high. The textbook basis for capital efficiency
@@ -97,26 +148,45 @@ window.CashEngine = {
   //    counts (a dead item is counted as dead, not also as over-par). ─────────
   trapped() {
     const base = this.usageBase();
-    const { oh } = this.onHand();
+    const { oh, value } = this.onHand();
+    /* ⭐ POSITION, not the last count: what was counted PLUS what has settled on
+       the shelf since. Read ONCE, here, and used by BOTH branches below — the
+       whole point of this item is that one screen must not answer "how much do I
+       have?" two different ways, and splitting it per branch would put a third
+       answer inside a single function. */
+    const settled = this.settledReceipts();
     const items = [];
-    let dead = 0, overPar = 0;
+    let dead = 0, overPar = 0, settledValue = 0;
     Object.keys(oh).forEach(pid => {
       const p = this.productById(pid); if (!p) return;
-      const qty = oh[pid]; if (!(qty > 0)) return;
+      const counted = oh[pid] || 0;
+      const recvd = settled[pid] || 0;
+      const qty = counted + recvd; if (!(qty > 0)) return;
       const uc = App.unitCost(p) || 0;
+      settledValue += recvd * uc;
       const tied = qty * uc;
       const used = base && base[pid] ? Math.max(0, base[pid].rawUsed) : null;
       const par = parseFloat(p.par_level);
+      // Dead is decided FIRST and wins: a product with zero usage lists as dead,
+      // never also as over-par, so nothing is counted twice.
       if (base && used !== null && used <= 0.001 && tied >= 15) {
         dead += tied;
-        items.push({ p, name: p.name, kind: 'dead', free: tied, tied, oh: qty });
+        items.push({ p, name: p.name, kind: 'dead', free: tied, tied, oh: qty, counted, received_since: recvd });
       } else if (!isNaN(par) && par > 0 && qty > par) {
         const excess = (qty - par) * uc;
-        if (excess >= 15) { overPar += excess; items.push({ p, name: p.name, kind: 'over', free: excess, tied, oh: qty, par }); }
+        if (excess >= 15) { overPar += excess; items.push({ p, name: p.name, kind: 'over', free: excess, tied, oh: qty, counted, received_since: recvd, par }); }
       }
     });
     items.sort((a, b) => b.free - a.free);
-    return { total: dead + overPar, dead, overPar, items, hasData: !!base };
+    /* `shelfValue` is the shelf THIS number was measured against, and it exists so
+       c-audit's S1 can stay a SHARE. S1 scores `100 - (trapped / shelf) * 130`; if
+       the numerator gains settled receipts and the denominator is read separately
+       off `onHand()`, the ratio silently stops being a share and the score drops
+       for a reason that is not laziness. Reported from the same pass that built
+       the numerator, so the two can never disagree ([[the-loop]] #54 — when a
+       number appears twice, the test is the AGREEMENT). With nothing settled it
+       is byte-identical to `onHand().value`, which is the control (pin H1). */
+    return { total: dead + overPar, dead, overPar, items, shelfValue: value + settledValue, hasData: !!base };
   },
 
   // ── Over-ordering: how many weeks of inventory you are sitting on versus a
@@ -1805,6 +1875,14 @@ window.CashEngine = {
     });
     return m;
   },
+  /* ⚠ THE HISTORICAL SERIES STAYS ON COUNTS ALONE, AND THAT IS NOT AN OVERSIGHT.
+     `trapped()` above folds in receipts that have settled since the last count,
+     because it answers "what is stuck on the shelf RIGHT NOW" and a delivery never
+     moves on-hand. This one answers "what was trapped AT that count" — and at the
+     instant of a count there are no uncounted receipts for anything the count
+     measured, so position and count are the same number here by construction.
+     Only the right-now read, taken between counts, can diverge. Pinned as block K
+     in verify-trapped-reads-position.js so the two are not collapsed later. */
   _trappedFrom(oh, base) {
     let dead = 0, overPar = 0;
     Object.keys(oh).forEach(pid => {
