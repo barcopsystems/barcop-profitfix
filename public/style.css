@@ -464,8 +464,23 @@ input,select,textarea{color-scheme:dark;}
    so this outweighs the plain `.card` above. It sits here anyway so the two read together.
    ⚠ THE ONE RISK, STATED: this is defined by SHAPE, not by a marker. A stat strip dropped into a
    headerless card that is not meant to be a stat box would take the colour too. Nothing like that
-   exists today across the 12 screens walked; `verify-card-head-band` block SB holds the line. */
-.card:has(.calc-item):not(:has(.card-title)){background:var(--stat);}
+   exists today across the 12 screens walked; `verify-card-head-band` block SB holds the line.
+   ⛔⛔ AND THE RISK LANDED, 2026-08-18, Kyle on the Order Sheet: the Create Custom Order card read
+   `--stat` while the Suggested Order cards beside it read `--surface`. Both are the same card
+   (`.os-vcard`) and both carry a Line Items / Order Total strip; the suggested one is headed with
+   the vendor's NAME, and the custom one cannot be, because its vendor is a PICKER. So the only
+   difference between them was the head, and the head is exactly what this selector keys on.
+   MEASURED LIVE on the deployed build: custom rgb(19,27,33) = --stat, suggested rgb(15,22,27) =
+   --surface. An ORDER CARD IS A FORM THAT ENDS IN A TOTAL, never a box of stats, so it is
+   excluded BY KIND — the one class both order cards already carry.
+   ⛔ `:not(.form-card)` WAS THE OBVIOUS FIX AND IT IS WRONG. Week History's summary is
+   `class="card form-card"`, headless, and holds five stats and a caption — a real stat box, and
+   `verify-card-head-band` SB7 exists to assert it. Measured live: it keeps --stat under the
+   exclusion below, and would have LOST it under a form-card one.
+   ⚠ WHAT IS NOT FIXED HERE, and it is on THE LIST as `T14`: the selector still cannot say Kyle's
+   word ONLY (*"any box that border wraps stat numbers only"*). Excluding every headless card that
+   also holds an input or a table moves 23 candidate boxes, which is a design walk, not this fix. */
+.card:has(.calc-item):not(:has(.card-title)):not(.os-vcard){background:var(--stat);}
 .card:last-child{margin-bottom:0;}
 /* An external actions row (CSVMapper's Import/Cancel target) drops its margin while
    empty — in the dropzone state nothing renders there, so its spacing shouldn't push
