@@ -20,7 +20,7 @@ S.HubBooksHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What is the Books section?',
-        a: 'Your back office. It turns what you already log in Bar Cop into the files your accountant or bookkeeper needs: a Weekly P&L Brief, the Month-End Books file, and an Annual Review. All Money Out is where every bill and cash outflow gets logged, and Break-Even reads those costs back as the sales you need each week. Nothing here asks you to re-enter numbers you have already logged.' },
+        a: 'Your back office. It turns what you already log in Bar Cop into the files your accountant or bookkeeper needs: a Weekly P&L Brief, the Month-End Books file, and an Annual Review. All Money Out is the record of every bill and cash outflow, logged on Close Books and read back here, and Break-Even turns those costs into the sales you need each week. Nothing here asks you to re-enter numbers you have already logged.' },
       { q: 'What is on the Close Books page?',
         a: 'A progress card and three steps, in order: log this month\'s money out, make sure the weeks are all in, then generate Month-End Books. Each step opens the screen that does the job and goes green off your own records, so a step cannot claim something your data does not show. Work them top to bottom and the month is closed.' },
       { q: 'Is this a substitute for an accountant?',
@@ -40,7 +40,7 @@ S.HubBooksHelp = {
     ]},
     { t: 'Connections', qa: [
       { q: 'Where do the numbers come from?',
-        a: 'Revenue from Shift Control, COGS from your Inventory counts, labor from Labor Control, comps from the void and comp log, plus everything you log in All Money Out. Books is aggregation and formatting, not a second place to capture data.' },
+        a: 'Revenue from Shift Control, COGS from your Inventory counts, labor from Labor Control, comps from the void and comp log, plus every bill and cash outflow you log on Close Books. Books is aggregation and formatting, not a second place to capture data.' },
       { q: 'Why does the count-based COGS not match the income statement?',
         a: 'They are two honest views. The income statement sums your weekly numbers; the inventory valuation does the Schedule C math (beginning plus purchases minus ending count). The count-based figure is the more accurate physical cost of goods. Give your accountant both; the Month-End file includes them side by side.' }
     ]}

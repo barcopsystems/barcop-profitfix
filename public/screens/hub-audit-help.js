@@ -24,13 +24,13 @@ S.HubAuditHelp = {
       { q: 'How often do I run it?',
         a: 'As often as you want. There is no lock and no countdown. Bar Cop saves one audit a day, so a fresh read is always a click away, and the landing shows a live data badge for what level it would come out at right now. It scores your trailing 30 days, so the window stays wide enough for each measure to mean something. Most operators run it with their weekly close to keep the trend on a steady rhythm, but that is your call, not a rule.' },
       { q: 'Do I have to enter anything to run it?',
-        a: 'No. The Bar Cop Audit reads entirely from your Control systems, so there is nothing to upload. Log your counts, shifts, cash, schedules, and hours as normal and the audit scores what it can. Anything without enough behind it shows Not Enough Data instead of guessing.' }
+        a: 'No. The Bar Cop Audit reads entirely from your Control systems, so there is nothing to upload. Log your counts, shifts, cash, schedules, and hours as normal and the audit scores what it can. Anything without enough behind it shows N/A instead of guessing.' }
     ]},
     { t: 'The Score', qa: [
       { q: 'What are the six sub-scores?',
         a: 'Operational Discipline (are daily and weekly procedures getting done), Cash Integrity (variance trend, drawer counts, cash drops), Inventory Execution (count frequency and discrepancy resolution), Labor Hygiene (schedule adherence, callouts, overtime, certifications), Recovery Action (are you acting on the gaps your audits surfaced), and Operational Consistency (how steady your weekly numbers are). Each is built only from real records.' },
-      { q: 'Why does a sub-score say Not Enough Data?',
-        a: 'Because that area does not have enough logged behind it to score honestly yet. One signal is not enough to claim a confident number, so the sub-score stays Not Enough Data and drops out of the overall until the data fills in. It is the honest answer, not a failing grade. Keep logging and it fills in.' },
+      { q: 'Why does a sub-score say N/A?',
+        a: 'Because that area does not have enough logged behind it to score honestly yet. One signal is not enough to claim a confident number, so the sub-score reads N/A and drops out of the overall until the data fills in. The overall itself says Not Enough Data Yet when fewer than three of the six are covered. It is the honest answer, not a failing grade. Keep logging and it fills in.' },
       { q: 'How is the overall score figured?',
         a: 'It averages only the sub-scores that actually have data, and it needs at least three of the six covered before it shows an overall at all. A score off one or two thin signals would say almost nothing, so Bar Cop holds the overall until it can stand behind it.' }
     ]},
@@ -42,7 +42,7 @@ S.HubAuditHelp = {
     ]},
     { t: 'History', qa: [
       { q: 'Where do past audits go?',
-        a: 'Every Bar Cop Audit is kept. The Audit History page in the sidebar lists them newest first, and View opens the full detail of any past one so you can see how a score moved and what was flagged at the time.' },
+        a: 'Every Bar Cop Audit is kept. The Audit History list at the bottom of the audit landing shows them newest first, and View opens the full detail of any past one so you can see how a score moved and what was flagged at the time.' },
       { q: 'What does the score trend tell me?',
         a: 'Whether the operation is tightening up or slipping. One audit is a snapshot; a line of them is the real story. Running it on a steady rhythm, most operators do it with their weekly close, keeps that line honest. A steady climb means your procedures are sticking. A drop is an early warning before it shows up in the money.' }
     ]}
