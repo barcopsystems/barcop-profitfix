@@ -2923,7 +2923,7 @@ const App = {
     ] },
     'settings-targets': { title: 'How Recovery Targets Work', sections: [
       { h: 'What this page is', p: [
-        'Every target here sets the line your real numbers get measured against across the Profit and Revenue systems: the audits, the dashboards, This Week, and the Fix steps. Hit the target and the number reads green. Miss it and Bar Cop flags the gap and prices what it is worth to close.',
+        'Every target here sets the line your real numbers get measured against across the Profit and Revenue systems: the audits, the Hub, your confirmed week, and the Fix steps. Hit the target and the number reads green. Miss it and Bar Cop flags the gap and prices what it is worth to close.',
         'Industry defaults are pre-filled so you have a working line on day one. Set each one to your own goal as you learn your numbers. Each section saves on its own with its Save Data button.'
       ] },
       { h: 'Profit targets', p: [
