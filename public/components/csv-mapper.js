@@ -3,7 +3,9 @@
 /* ── CSV Mapper — reusable column-mapping import component ────────────────────
    Used for POS sales imports (Variance Report) and timeclock imports (Labor
    Control). Reads CSV / XLSX, auto-detects columns, lets the user remap, and
-   remembers the mapping per file format (header signature) in localStorage.
+   remembers the mapping per file format (header signature) on the ACCOUNT
+   (App.acctGet / App.acctSet -> account_state), so a mapping saved on one
+   machine is already there on the next one the operator logs into.
 
    CSVMapper.mount(containerEl, {
      fields:       [{ key, label, required, match:[keywords] }],
@@ -20,7 +22,11 @@ const CSVMapper = {
   // auto-mapped wrong once stayed wrong on every later drop, and fixing _autoMap
   // alone would never have reached those operators. Cost of the reset is one
   // re-pick on files where the columns were chosen by hand.
-  _LS: 'csv_mappings_v2',
+  // The NAME says where this lives, because it used to say the wrong place: it is a key into
+  // the ACCOUNT-synced blob (App.acctGet / App.acctSet), never a per-device store.
+  // THE VALUE IS LOAD-BEARING. Operators have mappings saved under this exact string, so
+  // changing it silently orphans every saved column mapping on every import door in the app.
+  _ACCT_KEY: 'csv_mappings_v2',
 
   mount(container, opts) {
     container.innerHTML =
@@ -340,8 +346,8 @@ const CSVMapper = {
   },
 
   _sig(headers) { return headers.map(h => String(h).toLowerCase().trim()).join('|'); },
-  _savedMaps()  { return App.acctGet(this._LS, {}); },   // account-synced (App.data): saved import maps follow the user across devices
-  _saveMap(sig, map) { const all = { ...this._savedMaps() }; all[sig] = map; App.acctSet(this._LS, all); },
+  _savedMaps()  { return App.acctGet(this._ACCT_KEY, {}); },   // account-synced (App.data): saved import maps follow the user across devices
+  _saveMap(sig, map) { const all = { ...this._savedMaps() }; all[sig] = map; App.acctSet(this._ACCT_KEY, all); },
 
   // Two passes ACROSS ALL FIELDS, exact first. Running exact-then-fuzzy per field
   // let an earlier field's fuzzy guess eat a header a later field named exactly:
