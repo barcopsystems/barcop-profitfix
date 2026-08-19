@@ -1864,9 +1864,13 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   border:1px solid var(--b1);background:var(--input);color:var(--t1);
   font-size:22px;font-weight:700;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  transition:border-color 0.1s,color 0.1s;
+  transition:background-color 0.1s;
 }
-.bs-minus:hover, .bs-plus:hover { border-color:var(--gold); color:var(--gold); }
+/* Hover fills the button instead of outlining it in gold (Kyle, 2026-08-19). `--c4` is the token
+   for exactly this: its own declaration reads "accent splash — active section pills, active
+   sidebar row, ICON-BUTTON HOVER". Nothing else moves, so the +/- pair no longer competes with the
+   gold the level and the total use to mean "this has a reading in it". */
+.bs-minus:hover, .bs-plus:hover { background:var(--c4); }
 
 /* The level input shows the same visible border + dark fill on every viewport
    so the keyboard-entry path is obvious without a hidden tap-on-value gesture.
