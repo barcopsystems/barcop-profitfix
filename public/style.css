@@ -103,6 +103,12 @@
   --r:  4px;
   --r2: 3px;
   --sp: 28px;
+  /* The scrollbar's real reserved width, written here by App.measureScrollbarWidth at boot.
+     ⛔ THE 0 DEFAULT IS LOAD-BEARING: the padded containers subtract this from padding-right, so if
+     the measurement never runs the spacing must come out exactly as it is today rather than
+     narrower. Never hardcode a number here — it is 10px in Chrome, not the 6px the
+     `::-webkit-scrollbar` rule asks for, because `*{scrollbar-width:thin}` overrides that. */
+  --sbw: 0px;
 
   --sidebar-w:      220px;
   --sidebar-w-coll: 52px;
@@ -2242,4 +2248,36 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 @media(max-width:900px){
   .hub-gs{display:block;}
   .hub-gs>.hub-gs-step{display:block;margin-bottom:14px;}
+}
+
+/* ══ THE PAGE MUST NOT MOVE WHEN A SCROLLBAR APPEARS (T26) ══════════════════════════════════
+   MEASURED on the shipped build, both states, both widths:
+     1366 (cap not binding): short page 28 / 28, scrolling page 28 / 38 — the right gap grows 10
+     1700 (cap binding):     the whole centred column SHIFTS 5px left when the scrollbar arrives
+   One cause, two symptoms: the scrollbar takes its width out of the content box.
+
+   ⛔ BOTH OBVIOUS FIXES WERE TRIED BEFORE AND BOTH WERE WRONG, and the note above `.content`
+   records why. `scrollbar-gutter: stable` alone reserves the width on the right FOREVER, so every
+   page ends up with a permanently wider right gap. `both-edges` equalises by reserving on the LEFT
+   too, which widens BOTH margins — Kyle: "no i didn't want the left side wider .. the left and top
+   stay as they were .. i wanted the right side not as wide."
+
+   ⭐ SO DO BOTH HALVES: reserve the gutter permanently so nothing can ever move, then give that
+   exact width back off padding-RIGHT so the visual gap returns to the 28px it already was.
+   Measured in the live page before this shipped: jump 0/0 and 28/28 at 1366 AND 1700.
+
+   ⛔ @supports IS NOT DECORATION. Without the feature the gutter is never reserved, so subtracting
+   from the padding would make the right gap NARROWER than the left. `--sbw` defaulting to 0 is the
+   same guard from the other end.
+   ⛔ min-width:769px IS NOT DECORATION EITHER. The ≤768px rules re-set this padding and come later,
+   so an unscoped gutter would leave mobile reserving 10px with no compensation — a permanent
+   14 / 24. Mobile stays exactly as it is.
+   ⚠ `.wr-screen` renders as `class="screen wr-screen"` and re-sets padding with a SHORTHAND, so it
+   overrides `.screen` and has to be named here or Week Review alone stays wrong. `.page` has ZERO
+   renderers and is deliberately left out. */
+@supports (scrollbar-gutter: stable) {
+  @media (min-width:769px) {
+    .content { scrollbar-gutter: stable; }
+    .screen, .wr-screen, .hub-grid { padding-right: calc(var(--sp) - var(--sbw)); }
+  }
 }

@@ -57,7 +57,35 @@ const App = {
     return this.saveKey('account_state');   // return the save promise so a migrate-on-read can defer its localStorage cleanup until the write is CONFIRMED
   },
 
+  /* ⭐ THE SCROLLBAR'S REAL WIDTH, MEASURED ONCE AT BOOT (T26). `scrollbar-gutter: stable` reserves
+     this much on the right forever so the page cannot move when a scrollbar appears, and the padded
+     containers give the same width back off padding-right so the visual gap stays the 28px it
+     already was. Both halves need the number and CSS has no way to tell you it.
+     ⚠ MEASURED, NEVER ASSUMED, and the probe deliberately inherits the app's own scrollbar styling:
+     `style.css` asks for a 6px `::-webkit-scrollbar`, but `*{scrollbar-width:thin}` overrides that
+     in Chrome and the real reservation is 10px. Reading it live means the compensation follows the
+     styling instead of drifting from it the moment either changes.
+     ⛔ 0 ON ANY FAILURE, NEVER A NEGATIVE, and `--sbw` also defaults to 0 in the stylesheet. The
+     containers SUBTRACT this, so a wrong or missing value must land on "exactly as it is today"
+     rather than on a right gap narrower than the left. */
+  measureScrollbarWidth() {
+    let w = 0;
+    try {
+      const p = document.createElement('div');
+      p.style.cssText = 'position:absolute;top:-9999px;left:-9999px;width:100px;height:100px;overflow-y:scroll;';
+      document.documentElement.appendChild(p);
+      w = Math.max(0, p.offsetWidth - p.clientWidth);
+      p.remove();
+    } catch (e) { w = 0; }
+    try { document.documentElement.style.setProperty('--sbw', w + 'px'); } catch (e) {}
+    return w;
+  },
+
   async init() {
+    // Before the first await, so the value is in place before anything renders. `init` is the one
+    // entry BOTH a real login and `?demo=1` take, so there is no second start-up path that could
+    // quietly miss it ([[the-loop]] #101).
+    this.measureScrollbarWidth();
     await DB.init();
     // A crash used to paint a raw stack trace over the operator's screen and report it NOWHERE,
     // so Kyle only ever learned about a failure if a customer stopped work and filled in the bug
