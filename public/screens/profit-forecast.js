@@ -167,8 +167,8 @@ S.ProfitForecast = {
 
     // ── Heads Up: assumptions + disclaimer (standard opaque gold-tint box) ──
     const opexNote = rr.opexLogged ? ''
-      : rr.opexShort ? ' You have under a month of operating costs logged, not enough history to project them honestly yet, so this shows profit before operating costs. It fills in as more bills land under Accounting, Operating Expenses.'
-      : ' No operating costs are logged yet, so this shows profit before operating costs; add rent, utilities, and the like under Accounting, Operating Expenses, for a true net profit.';
+      : rr.opexShort ? ' You have under a month of operating costs logged, not enough history to project them honestly yet, so this shows profit before operating costs. It fills in as more bills land on Close Books.'
+      : ' No operating costs are logged yet, so this shows profit before operating costs; log rent, utilities, and the like on Close Books, under Accounting, for a true net profit.';
     const assumeTxt = 'Projected from your last ' + rr.nW + ' week' + (rr.nW === 1 ? '' : 's') + ': about ' + money(rr.avgWeeklyRev) + ' a week in sales at a ' + pctTxt(rr.primePctCurrent) + ' prime cost'
       + (rr.opexLogged ? ', plus about ' + money(rr.avgWeeklyOpex) + ' a week in operating costs.' : '.')
       + opexNote
@@ -196,7 +196,7 @@ S.ProfitForecast = {
       { p: ['A look ahead at your profit, projected from the weeks you have already confirmed. It runs two scenarios side by side: where you land at your current pace, and where you would land at your cost targets. The gap between them is what cleaning up is worth.'] },
       { h: 'How the Projection Is Built', p: ['Bar Cop takes your recent weekly sales and prime cost percentage, holds them forward across the window you pick, and subtracts your operating costs (the same expenses Books uses). It is a run-rate estimate from real history, not a promise. Pick Next Month, Quarter, 6 Months, or Year.'] },
       { h: 'Current Pace vs Your Targets', p: ['Current Pace uses your recent prime cost. At Your Targets swaps in your target prime cost from App Settings. The Target Upside up top is the profit difference, the money on the table if you hit your targets. That is exactly what Profit Fix is for. If you are already running better than your targets, that tile reads Ahead of Target and shows by how much instead, which is usually a sign your targets are due a look in App Settings.'] },
-      { h: 'Reaching True Profit', p: ['Profit here is sales minus prime cost minus operating costs. If you have not logged operating costs yet, it shows profit before operating costs and tells you so. Log them under Accounting, Operating Expenses, to get the full net number.'] },
+      { h: 'Reaching True Profit', p: ['Profit here is sales minus prime cost minus operating costs. If you have not logged operating costs yet, it shows profit before operating costs and tells you so. Log them on Close Books, under Accounting: drop a bank or card statement, or type one in by hand.'] },
       { h: 'Honesty', p: ['Every figure is a projection in whole dollars, built from your own averages. It needs a few weeks of history before it will show. It is a planning tool, not financial advice.'] }
     ]);
   }
