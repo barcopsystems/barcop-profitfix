@@ -195,9 +195,9 @@ FIX.profit = [
         { kind: 'result', target: 'audit-tracker', targetLabel: 'Profit Audit',
           title: 'Find which part moved when it is over',
           detail: 'When prime cost is over, open the Profit Audit. Pour and Bar Cost, Food Cost, and the labor sections each carry their own score and dollar gap. Decide whether the gap calls for an investigation today or a corrective action this week.' },
-        { kind: 'result', target: 'this-week', targetLabel: 'This Week',
+        { kind: 'result', target: 'week-history', targetLabel: 'Week History',
           title: 'Check spike against trend',
-          detail: 'In This Week, read prime cost across the past weeks. Before you act, check whether this is a one-week spike from a bulk buy or a payroll correction, or a trend that has been building.' },
+          detail: 'In Week History, read prime cost across the past weeks. Before you act, check whether this is a one-week spike from a bulk buy or a payroll correction, or a trend that has been building.' },
         { kind: 'result', target: 'weekly-pnl', targetLabel: 'Weekly P&L Brief',
           title: 'Pull your weekly P&L',
           detail: 'Each week, open your Weekly P&L Brief under Accounting. Bar Cop builds it from the weeks you confirm: revenue, COGS, labor, and prime cost broken out by bar and food, ready to file or hand your bookkeeper. Four of these are your month.' },
@@ -208,9 +208,9 @@ FIX.profit = [
     },
 
     commonMistakes: [
-      'Reading a week you never confirmed. Confirm it in This Week first.',
+      'Reading a week you never confirmed. Confirm it on Close The Week first.',
       'Judging a week that is only half logged. A full period of COGS against partial sales reads high until the shifts and counts are in.',
-      'Taking one week\'s spike as a trend. A bulk buy or a payroll correction throws a single week; This Week shows whether it is holding.',
+      'Taking one week\'s spike as a trend. A bulk buy or a payroll correction throws a single week; Week History shows whether it is holding.',
       'Waiting for month-end to look. A 30-day lag is 30 days of loss before you see it, and 30 more before you know a fix worked.'
     ]
   }
