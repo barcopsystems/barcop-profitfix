@@ -119,7 +119,7 @@ S.HubSettings = {
 
   // Taxes, Payroll & Wage — the cross-section financial settings (sales tax rate,
   // how you file, payroll burden, state minimum wage). Entered once here. Tax and
-  // payroll read the same CashEngine keys (stored on this device); the minimum
+  // payroll read the same CashEngine keys (stored on the account); the minimum
   // wage lives in Labor's data store, where the Pay Periods tip-credit check,
   // Payroll Export, and the Bar Cop Audit all read it.
   secTaxes() {
@@ -188,7 +188,7 @@ S.HubSettings = {
   },
 
   // ── Write one section's fields into the live stores; return the App.data keys
-  // to persist ([] = nothing to push, e.g. Taxes writes device-local + Labor),
+  // to persist ([] = nothing to push, e.g. Taxes writes through CashEngine + Labor),
   // or null when validation fails (Service Periods) so the caller aborts. ──────
   // ── NUMERIC BOUNDS (SET-5) ────────────────────────────────────────────────────────────
   // Returns '' when every number in the section is allowed, or the operator-facing refusal
@@ -274,8 +274,8 @@ S.HubSettings = {
       if (s.bar_name && App.markSetupDone) App.markSetupDone('gs_profile');
       return ['settings'];
     } else if (which === 'tax') {
-      // Cross-section financial settings live on this device via CashEngine,
-      // not in App.data, so there are no App.data keys to push.
+      // Cross-section financial settings go through CashEngine, which writes them with
+      // App.acctSet. That saves `account_state` itself, so there are no keys to return.
       if (window.CashEngine) {
         CashEngine.setSalesTaxRate(document.getElementById('hs-tax')?.value || '');
         CashEngine.setTaxFrequency(document.getElementById('hs-freq')?.value || 'monthly');
@@ -421,13 +421,16 @@ S.HubSettings = {
     if (m) { m.style.color = color || 'var(--gold)'; m.textContent = text; m.style.display = 'block'; }
   },
 
-  // Build the full-account backup object (all four blobs + device-local cash config).
+  // Build the full-account backup object (all four blobs + a legacy cash-config block).
   // Shared by the file export, the automatic server snapshot, and the "Back up now" button
   // so all three capture the exact same shape (which _applyBackup restores).
   _buildBackup() {
-    // Cash Recovery config lives device-local (CashEngine/localStorage), NOT in the four
-    // data objects below, so capture it explicitly or a restore to a fresh device would
-    // silently drop the opening balance, tax, credit line, gift-card liability and reserve.
+    // ⚠ THE `cashConfig` BLOCK BELOW IS FOR OLDER BACKUP FILES, NOT FOR TODAY'S DATA.
+    // Cash Recovery config is written with App.acctSet, so it rides inside `data` as part of
+    // App.data.account_state and the line that takes the core blob whole already captures it.
+    // The explicit copy stays so a backup taken BEFORE that move, when these really were
+    // pre-sync keys, still restores the opening balance, tax, credit line, gift-card
+    // liability and reserve. `_applyBackup` re-applies it after the blobs and says so there.
     const CE = window.CashEngine;
     return {
       _backup: 'barcop',
@@ -905,11 +908,11 @@ S.HubSettings = {
     // current week's posted schedule.
     try { localStorage.removeItem('lc_sched_draft'); } catch (e) {}
 
-    // Cash Recovery device-local config (opening balance, tax rate, reserve). These
-    // live on the device, not in App.data, so the sample sets them here to light up
-    // the survival forecast, Cash Position, and Safe to Spend. The Anchor runs a
-    // realistic operating balance for a roughly $1M bar: profitable but cash-tight,
-    // the exact bar Cash Recovery is built for.
+    // Cash Recovery config (opening balance, tax rate, reserve). These are written with
+    // App.acctSet into account_state rather than set straight onto App.data, so the sample
+    // goes through the setters here to light up the survival forecast, Cash Position, and
+    // Safe to Spend. The Anchor runs a realistic operating balance for a roughly $1M bar:
+    // profitable but cash-tight, the exact bar Cash Recovery is built for.
     // Through CashEngine's setters so these land on the account-scoped keys (the
     // demo scopes to 'demo'); writing raw keys would leak across bars / signups.
     try {
@@ -4944,8 +4947,8 @@ S.HubSettings = {
     // account_state, so the stamps are already gone before this line runs. Kept as a belt-and-braces
     // account clear via the real helper, which is what the false comment always meant to do.
     this._clearCockpitStamps();
-    // Cash Recovery device-local config also lives in localStorage. Clear it too,
-    // or a wiped account keeps the seeded opening balance, tax rate, and reserve
+    // Cash Recovery config has to be cleared too, or a wiped account keeps the
+    // seeded opening balance, tax rate, and reserve
     // and reads as if the opening balance is already set (Cash Audit step 1 checks
     // off, Cash Position pre-fills). A real fresh signup never has these.
     // Cash config now lives on account-scoped keys, so clear it through the
