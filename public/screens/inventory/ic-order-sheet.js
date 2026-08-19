@@ -604,7 +604,10 @@ S.InventoryOrderSheet = {
     };
 
     const btn = this.container.querySelector('.os-co-actions .os-co-create');
-    if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
+    // Same takeover as createOrder: this button is gated by recalcVendor now, and the panel
+    // stays live across the await, so without the marker a keystroke would hand it back
+    // mid-write and a second press would write a second order.
+    if (btn) { btn.dataset.writing = '1'; btn.disabled = true; btn.textContent = 'Creating...'; }
     const ok = await App.putRecord('ic', 'order', rec);
     if (ok) {
       this.customOpen = false;
@@ -612,7 +615,7 @@ S.InventoryOrderSheet = {
       this.renderMain();
       this.scrollContentTop();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Create Order'; }
+      if (btn) { delete btn.dataset.writing; btn.disabled = false; btn.textContent = 'Create Order'; }
       fail('Could not create the order. Try again.');
     }
   },
@@ -871,6 +874,20 @@ S.InventoryOrderSheet = {
     return this.container.querySelector('.os-create-row[data-vendor="' + this.selEsc(vendor) + '"]');
   },
 
+  /* ⛔ THE PRIMARY BUTTON OF A GIVEN CARD, AND IT MUST START FROM THE CARD. The Custom
+     Order panel is an `.os-vcard` as well, and onCustomVendorChange writes the picked
+     vendor into its `data-vendor` — so resolving a button from the vendor NAME reached the
+     SUGGESTED card's action row instead, and a recalc of the empty panel disabled a real
+     Create Order sitting on 36 below-par lines. Measured on the live build, not reasoned.
+     Two cards can carry the same vendor; only one of them owns each button. */
+  _goButtonFor(card) {
+    if (card.classList && card.classList.contains('os-custom')) {
+      return this.container.querySelector('.os-co-actions .os-co-create');
+    }
+    const row = (card.dataset && card.dataset.vendor) ? this._createRow(card.dataset.vendor) : null;
+    return row ? row.querySelector('.os-create') : null;
+  },
+
   recalcVendor(card) {
     let total = 0, count = 0, qtyTotal = 0;
     card.querySelectorAll('.os-line').forEach(line => {
@@ -900,10 +917,9 @@ S.InventoryOrderSheet = {
        there had exactly one outcome, the refusal "Set an order quantity above zero first."
        Now it sits inactive until the operator types the deliberate override, and comes live
        the moment they do. Same disable-and-dim as the audit readiness button (wireFirstAudit).
-       An edit card's row holds Update Order, and the custom panel has no row of this kind at
-       all, so both correctly find nothing here. */
-    const actRow = (card.dataset && card.dataset.vendor) ? this._createRow(card.dataset.vendor) : null;
-    const goBtn = actRow ? actRow.querySelector('.os-create') : null;
+       An edit card's row holds Update Order, not Create Order, so it correctly finds nothing
+       here and is left alone; the custom panel resolves its OWN button (Kyle's T22). */
+    const goBtn = this._goButtonFor(card);
     if (goBtn && !(goBtn.dataset && goBtn.dataset.writing)) {
       const live = count > 0;
       goBtn.disabled = !live;
