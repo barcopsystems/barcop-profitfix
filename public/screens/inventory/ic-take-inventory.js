@@ -779,13 +779,13 @@ S.InventoryTakeInventory = {
           + '</div>';
       } else if (isPourable) {
         countInput = '<div style="display:flex;justify-content:center;margin:0;">'
-          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: App.sliderShape(p) })
+          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: App.sliderShape(p), counted: isCounted })
           + '</div>';
       } else if (isFoodSlider) {
         const un = App.productUnit(p) || 'unit';
         const unPl = /(?:s|x|ch|sh)$/i.test(un) ? un + 'es' : un + 's';
         countInput = '<div style="display:flex;justify-content:center;margin:0;">'
-          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: App.sliderShape(p), noun: un, nounPl: unPl })
+          + BottleSlider.html(p.id, { value: c.value, fulls: c.fulls, category: p.category, shape: App.sliderShape(p), noun: un, nounPl: unPl, counted: isCounted })
           + '</div>';
       } else if (isPackFood) {
         const un = App.productUnit(p) || 'unit';
@@ -877,7 +877,12 @@ S.InventoryTakeInventory = {
       BottleSlider.mount(p.id, (v) => {
         const key = p.id + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
-        const empty = !(v.value > 0) && !(v.fulls > 0);
+        /* ⭐ A TYPED ZERO IN THE SLIDER'S OWN BOX COUNTS, exactly like a typed zero in the cells on
+           the card below it (Kyle, T25b). `source` is what tells them apart: 'type' is a deliberate
+           answer whatever the number, 'clear' is that answer being deleted, and a gesture counts
+           only if it lands on something. The slider computes the same verdict for its own DISPLAY
+           and the pin asserts the two agree, so they cannot drift. */
+        const empty = !(v.source === 'type') && !(v.value > 0) && !(v.fulls > 0);
         this.draft.counts[key] = empty
           ? { notes: prev.notes || '' }
           : { value: v.value, fulls: v.fulls, notes: prev.notes || '' };
