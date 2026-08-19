@@ -125,7 +125,7 @@ S.HubUserAccounts = {
        like everyone else, so the same column serves them, and this is the only thing that ever
        fills it. Blank is allowed and CLEARS it, falling the whole app back to the email. */
     const nameBody = '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
-      +   '<div class="f" style="width:260px;"><label>Your Name</label><input class="suf" type="text" id="ua-myname" placeholder="Shown to your team" autocomplete="off"/></div>'
+      +   '<div class="f" style="width:220px;"><label>Your Name</label><input class="suf" type="text" id="ua-myname" placeholder="Shown to your team" autocomplete="off"/></div>'
       + '</div>'
       + '<div style="margin-top:12px;"><button class="btn btn-ghost" id="ua-myname-btn">Save Name</button></div>'
       + '<div id="ua-myname-msg" style="font-size:12px;margin-top:8px;display:none;"></div>';
@@ -224,7 +224,10 @@ S.HubUserAccounts = {
     // the GROUP: one card chrome serves two pages, so the word on it is a claim about
     // which one you are on ([[the-loop]] #79). "Signed in as" belongs to Your Account
     // alone — on Data and Backup it would be answering a question nobody asked.
-    const accountHeader = '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px;">'
+    // The gap under this block is the same on BOTH pages: 6px when the Signed-in-as line
+    // follows and carries its own 16px, 16px when the title is the whole header.
+    const headGap = (showAccount && userEmail) ? '6' : '16';
+    const accountHeader = '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:' + headGap + 'px;">'
       + (showData ? 'Data and Backup' : 'Your Account') + '</div>'
       + ((showAccount && userEmail) ? '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px;">Signed in as <span id="ua-signed-in-as" style="color:var(--t1);font-weight:600;">' + esc(userEmail) + '</span></div>' : '');
     const accountCard = '<div class="card form-card" style="margin-bottom:16px;">' + accountHeader + cardInner + '</div>';
@@ -505,9 +508,8 @@ S.HubUserAccounts = {
       + '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;'
       + 'color:var(--t3);margin-bottom:8px;">Close This Bar</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:10px;">'
-      + 'Deleting removes this bar and everything in it: your counts, shifts, labor, recipes, books, '
-      + 'and every backup. It cannot be undone. Cancel your subscription under Manage Billing first '
-      + 'so you are not billed again.</div>'
+      + 'Deletes this bar and everything in it, backups included. It cannot be undone. '
+      + 'Cancel your subscription under Manage Billing first.</div>'
       + '<button class="btn btn-danger" id="ua-delete-bar">Delete This Bar</button></div>');
     document.getElementById('ua-delete-bar')?.addEventListener('click', () => this._deleteBarFlow());
   },
@@ -732,17 +734,25 @@ S.HubUserAccounts = {
       return;
     }
     const fmt = ts => { const d = new Date(ts); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
-    el.innerHTML = '<table class="pnl-list" style="width:100%;"><tbody>' + rows.map(r => {
+    /* ⛔ A DIVIDED LIST, NOT A STACK OF PILLS (Kyle, 2026-08-19) — AND `.pnl-list` IS NOT
+       TOUCHED TO GET THERE. That class is the Income Statement's row look and hub-books.js
+       rents it twice, so restyling it for this one caller would repaint a page nobody asked
+       about ([[lessons-paid-for]] #11 — a class is a contract). The override is inline and
+       scoped to these rows: no fill, no radius, flush with the card text, and a divider
+       between each pair — n-1, so the last row does not double up with the panel edge. */
+    el.innerHTML = '<table class="pnl-list" style="width:100%;border-spacing:0;"><tbody>' + rows.map((r, i) => {
       const when = fmt(r.created_at);
       const tag = r.reason === 'manual' ? ' <span style="color:var(--t3);">(manual)</span>' : '';
-      return '<tr><td style="font-size:12px;color:var(--t1);">' + esc(when) + tag + '</td>'
+      const cell = 'background:transparent;border-radius:0;padding:11px 0;'
+        + (i === rows.length - 1 ? '' : 'border-bottom:1px solid var(--b2);');
+      return '<tr><td style="' + cell + 'font-size:12px;color:var(--t1);">' + esc(when) + tag + '</td>'
         // Delete is offered on MANUAL restore points only. The automatic dailies are the safety
         // net — they age out under retention rather than being removable by hand.
         // ⚠ SET-2: no Restore or Delete in the demo. This list paints AFTER render()'s
         // demoLockScreen has run, so a disabled attribute could never be applied to these —
         // not rendering the controls at all is the only version that is actually read-only.
         // Restore is destructive on a real account, which is why it gets the stronger treatment.
-        + '<td style="text-align:right;"><div class="row-actions" style="justify-content:flex-end;">'
+        + '<td style="' + cell + 'text-align:right;"><div class="row-actions" style="justify-content:flex-end;">'
         + (App.demoMode ? '<span style="font-size:11px;color:var(--t3);">Restore</span>'
             : '<button class="btn btn-ghost btn-sm ua-snap-restore" data-id="' + esc(r.id) + '" data-when="' + esc(when) + '">Restore</button>')
         + (r.reason === 'manual' && !App.demoMode
