@@ -20,9 +20,9 @@ S.HubBooksHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What is the Books section?',
-        a: 'Your back office. The Accounting pages turn what you already log in Bar Cop into the files your accountant or bookkeeper needs: a Weekly P&L Brief, the Month-End Books file, and an Annual Review. The Operations pages track the things that keep the doors open: permits, licenses, and operating expenses. Nothing here asks you to re-enter numbers you have already logged.' },
-      { q: 'What is on the overview?',
-        a: 'The current month rolled up from your weekly records (revenue, prime cost, gross profit), your year-to-date bottom line, recent months, anything coming due, and a link to every Books page through the Quick Actions. The figures are built from the same data as the Month-End Books file, so they agree.' },
+        a: 'Your back office. It turns what you already log in Bar Cop into the files your accountant or bookkeeper needs: a Weekly P&L Brief, the Month-End Books file, and an Annual Review. All Money Out is where every bill and cash outflow gets logged, and Break-Even reads those costs back as the sales you need each week. Nothing here asks you to re-enter numbers you have already logged.' },
+      { q: 'What is on the Close Books page?',
+        a: 'A progress card and three steps, in order: log this month\'s money out, make sure the weeks are all in, then generate Month-End Books. Each step opens the screen that does the job and goes green off your own records, so a step cannot claim something your data does not show. Work them top to bottom and the month is closed.' },
       { q: 'Is this a substitute for an accountant?',
         a: 'No. Bar Cop is a software tool, not a CPA or tax preparer. Everything here is built to hand to your accountant, who should review and verify it before you file anything or close your books. The outputs are worksheets, not filed statements.' }
     ]},
@@ -33,18 +33,14 @@ S.HubBooksHelp = {
         a: 'Your weekly revenue, COGS, and labor as an Excel file you can hand to a bookkeeper or open in QuickBooks, Xero, or any spreadsheet. Pick a range (last week, last four, the quarter, year to date, or custom) and download. It is the lighter, more frequent companion to the Month-End Books file.' },
       { q: 'What is the Annual Review?',
         a: 'The annual roll-up: the full year in one place for tax season, plus the current year so far for a read on how things are going. Like everything in Books, it is built from what you logged and meant for your accountant to verify.' },
+      { q: 'What goes in All Money Out?',
+        a: 'The bills that are not COGS or labor (wages and salaries both live in Labor Control, not here): rent, utilities, insurance, marketing, professional fees, software, and the rest, by category. Logging them is what lets the Month-End income statement show a real operating income instead of stopping at prime cost. Bar Cop works out which bills recur by watching what you actually log, and a bill that stops showing up stops being projected. Set the Due Date to when the bill is actually due, since that is what the P&L timing runs from; the Date Submitted field just records when you logged it and stays on today. For a bill that moves around month to month, use Repeat to copy last month forward and set the new amount. You can also switch the form to Import File and drop a CSV or Excel export. Every dollar that leaves the business is logged here, including repairs and 3rd-party platform fees, so there is one place to look and nothing is counted twice.' },
       { q: 'What is Break-Even?',
         a: 'Break-Even is the sales you need each week to cover your costs, the one number that decides whether a week made money. Bar Cop builds it from your fixed costs (recurring operating expenses plus salaried pay) and your variable rate (product and hourly labor as a share of sales), then shows how last week tracked against the line, with a what-if sandbox to test a price or cost change before you commit. Open it from the Break-Even link in the Books sidebar or its tile on the Hub.' }
     ]},
-    { t: 'Operations', qa: [
-      { q: 'How does Licensing work?',
-        a: 'Enter each permit or license with its next renewal date and Bar Cop tracks it, flagging it as the date nears: due soon within 30 days, more urgent within 14, and expired once it passes. Anything due soon or expired shows on your Hub under Needs Attention, so a lapse never sneaks up on you. When you renew one, click Mark Renewed to advance the date. It records the renewal only, no money: the fee comes in with the rest of your money out on Close Books and lands on the Licenses and Permits line from there. Bar Cop tracks the dates you enter; it does not verify a permit is valid with any agency, and it is not legal advice.' },
-      { q: 'What goes in Operating Expenses?',
-        a: 'The bills that are not COGS or labor (wages and salaries both live in Labor Control, not here): rent, utilities, insurance, marketing, professional fees, software, and the rest, by category. Logging them is what lets the Month-End income statement show a real operating income instead of stopping at prime cost. Bar Cop works out which bills recur by watching what you actually log, and a bill that stops showing up stops being projected. Set the Due Date to when the bill is actually due, since that is what the P&L timing runs from; the Date Submitted field just records when you logged it and stays on today. For a bill that moves around month to month, use Repeat to copy last month forward and set the new amount. You can also switch the form to Import File and drop a CSV or Excel export. Every dollar that leaves the business is logged here, including repairs and 3rd-party platform fees, so there is one place to look and nothing is counted twice.' }
-    ]},
     { t: 'Connections', qa: [
       { q: 'Where do the numbers come from?',
-        a: 'Revenue from Shift Control, COGS from your Inventory counts, labor from Labor Control, comps from the void and comp log, plus the operating expenses and permit costs you enter here. Books is aggregation and formatting, not a second place to capture data.' },
+        a: 'Revenue from Shift Control, COGS from your Inventory counts, labor from Labor Control, comps from the void and comp log, plus everything you log in All Money Out. Books is aggregation and formatting, not a second place to capture data.' },
       { q: 'Why does the count-based COGS not match the income statement?',
         a: 'They are two honest views. The income statement sums your weekly numbers; the inventory valuation does the Schedule C math (beginning plus purchases minus ending count). The count-based figure is the more accurate physical cost of goods. Give your accountant both; the Month-End file includes them side by side.' }
     ]}
