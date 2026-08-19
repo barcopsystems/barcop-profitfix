@@ -57,7 +57,8 @@ S.InventoryOrderSheet = {
       { h: 'More Actions On A Placed Order', p: ['On an Already Ordered row, the ... button opens a menu with three moves. Export PDF gives you a purchase order to print or attach to a vendor email. Edit Order pulls that placed order back onto the page as an editable card so you can fix a quantity or add a line, then Update Order writes it back to the same order. Cancel Order removes it and returns those items to your Order Sheet so you can reorder.'] },
       { h: 'Suggested Orders', p: ['Each vendor card lists their products sitting under par, with what you have on hand, your par, and a suggested order quantity. Adjust any quantity, add a product the count missed with Add Item, then Create Order. Bottle beer is ordered by the case. If a vendor card or the Order Status shows that some pars look off versus your real usage, the Dynamic Pars link takes you to tune them, because the suggested quantities are only as sharp as the pars behind them.'] },
       { h: 'Sending The Order', p: ['Once you create an order it moves to Already Ordered up top. Email to Vendor opens your email client with the order written out and addressed to the vendor on file, and marks it Submitted. The order also sits in Order History.'] },
-      { h: 'What Counts As On Hand', p: ['Your on hand figure is what you counted plus anything that has landed since. When a delivery has come in since your count, the row shows the working in gold: what you counted, what arrived, and where that leaves you. A product you counted under par that has since been delivered is already covered, so it stays off the sheet and you do not order it twice. A count and a delivery are matched on the business day they happened, so a truck logged for Tuesday counts against Tuesday whatever day you got round to entering it.'] },
+      { h: 'What Counts As On Hand', p: ['Your on hand figure is what you counted plus anything that has landed since. When a delivery has come in since your count, the row shows the working in gold: what you counted, what arrived, and where that leaves you. A product you counted under par that has since been delivered is already covered, so it drops out of Suggested Orders and you do not order it twice; it moves down to Just Received, where you can still see it. A count and a delivery are matched on the business day they happened, so a truck logged for Tuesday counts against Tuesday whatever day you got round to entering it.'] },
+      { h: 'Just Received', p: ['Just Received holds the products that were under par at your last count but have had a delivery land since, which already covers them. Bar Cop is not suggesting them, so every quantity there starts at zero and Create Order stays inactive until you type one in. They are listed rather than hidden because nothing subtracts what you pour between counts: if the bar has already poured through what landed, order anyway and the button comes live. Otherwise leave them and confirm the real number at your next count.'] },
       { h: 'Order Minimums', p: ['If a vendor has an Order Minimum set on their vendor page, each vendor card shows your running order against it, right beside Add Item, and turns amber when you are short, for example "$70 under the $250 minimum" (or a count like "2 cases under the 5 cases minimum" for a case minimum). Add more of that vendor’s below-par items to clear it in one delivery instead of paying twice. A delivery fee or free-delivery-over amount shows here too. Order Status up top counts how many vendors are currently under minimum. You are only ever warned, so you can still create a short order if you need to.'] },
       { h: 'Create A Custom Order', p: ['Need an off-cycle order, like a party order or a one-time buy without waiting on a count? Hit Create Custom Order on the right side of the Order Status card. The build card opens up: pick the vendor, add the products and quantities, and create it the same way. Hit Cancel Custom Order on that same link to close it back up.'] },
       { h: 'Closing The Loop', p: ['When the delivery shows up, go to Receive Delivery and match it to the open order. The line items pre-fill, you confirm against the invoice, and Bar Cop marks the order Received.'] }
@@ -281,9 +282,11 @@ S.InventoryOrderSheet = {
       const jrOnly = Object.keys(jrAll).sort()
         .filter(v => !(data.groups[v] || []).length && v !== this._editVendor && !this.openOrderForVendor(v));
       if (jrOnly.length) {
-        vendorHtml += '<div class="sh" style="margin:24px 0 4px;">Just Received &middot; Confirm At Your Next Count</div>'
-          + '<div style="font-size:12px;color:var(--t3);margin:0 0 10px;">These were under par at your last count, but deliveries since have covered them, '
-          + 'so Bar Cop is not suggesting them. If you have already poured through what landed, order anyway.</div>'
+        // NO EXPLAINER ON THE CARD ([[help-model]], and Kyle has said it more than once): the
+        // sentence that used to sit here is now the `Just Received` topic in showHowTo. The
+        // heading takes the same bottom margin as Suggested Orders, which it only lost because
+        // a paragraph used to follow it.
+        vendorHtml += '<div class="sh" style="margin:24px 0 10px;">Just Received &middot; Confirm At Your Next Count</div>'
           + jrOnly.map(v => this.justReceivedCard(v, (jrAll[v] || []).map(l => Object.assign({}, l, { just_received: true })))).join('');
       }
     }
@@ -861,6 +864,13 @@ S.InventoryOrderSheet = {
       + '</div>';
   },
 
+  /* ⛔ ONE DOOR TO A CARD'S ACTION ROW. createOrder, updateOrder and the enable gate below
+     all address it, and a button the gate calls live has to be the button createOrder then
+     reads — two hand-rolled copies of a selector are two things to keep in step. */
+  _createRow(vendor) {
+    return this.container.querySelector('.os-create-row[data-vendor="' + this.selEsc(vendor) + '"]');
+  },
+
   recalcVendor(card) {
     let total = 0, count = 0, qtyTotal = 0;
     card.querySelectorAll('.os-line').forEach(line => {
@@ -883,6 +893,23 @@ S.InventoryOrderSheet = {
     if (cEl) cEl.textContent = count;
     if (tEl) tEl.textContent = App.fmtCurrency(total);
     this._updateMinReadout(card, total, qtyTotal);
+    /* ⛔ THE BUTTON MAY ONLY OFFER WHAT createOrder WOULD ACCEPT. `count` is the shared
+       _readLine verdict, i.e. the exact set collectLines builds the order from, so the
+       control and the write cannot disagree. It matters most on a just-received card:
+       lineRowHTML renders every one of those quantities at zero on purpose, so the button
+       there had exactly one outcome, the refusal "Set an order quantity above zero first."
+       Now it sits inactive until the operator types the deliberate override, and comes live
+       the moment they do. Same disable-and-dim as the audit readiness button (wireFirstAudit).
+       An edit card's row holds Update Order, and the custom panel has no row of this kind at
+       all, so both correctly find nothing here. */
+    const actRow = (card.dataset && card.dataset.vendor) ? this._createRow(card.dataset.vendor) : null;
+    const goBtn = actRow ? actRow.querySelector('.os-create') : null;
+    if (goBtn && !(goBtn.dataset && goBtn.dataset.writing)) {
+      const live = count > 0;
+      goBtn.disabled = !live;
+      goBtn.style.opacity = live ? '' : '0.5';
+      goBtn.style.cursor = live ? '' : 'default';
+    }
   },
 
   // ── Vendor order minimums / delivery fees ──────────────────────────────────
@@ -1048,7 +1075,7 @@ S.InventoryOrderSheet = {
   async createOrder(vendor) {
     const card = this.container.querySelector('.os-vcard[data-vendor="' + this.selEsc(vendor) + '"]');
     if (!card) return;
-    const actions = this.container.querySelector('.os-create-row[data-vendor="' + this.selEsc(vendor) + '"]');
+    const actions = this._createRow(vendor);
     const err = actions ? actions.querySelector('.os-verr') : null;
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
 
@@ -1077,7 +1104,12 @@ S.InventoryOrderSheet = {
     };
 
     const btn = actions ? actions.querySelector('.os-create') : null;
-    if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
+    /* ⛔ THE CARD STAYS LIVE ACROSS THIS AWAIT. recalcVendor now owns whether this button is
+       enabled, so without a takeover marker a keystroke in any quantity cell mid-write would
+       re-enable a button reading "Creating..." and a second press would write a SECOND order
+       for the same delivery. Cleared on the failure path; the success path rebuilds the
+       button entirely through renderMain, so it cannot leak. */
+    if (btn) { btn.dataset.writing = '1'; btn.disabled = true; btn.textContent = 'Creating...'; }
     const ok = await App.putRecord('ic', 'order', rec);
     if (ok) {
       this._created[vendor] = true;
@@ -1085,7 +1117,7 @@ S.InventoryOrderSheet = {
       this.renderMain();
       this.scrollContentTop();
     } else {
-      if (btn) { btn.disabled = false; btn.textContent = 'Create Order'; }
+      if (btn) { delete btn.dataset.writing; btn.disabled = false; btn.textContent = 'Create Order'; }
       fail('Could not create the order. Try again.');
     }
   },
@@ -1174,7 +1206,7 @@ S.InventoryOrderSheet = {
   async updateOrder(vendor) {
     const card = this.container.querySelector('.os-vcard[data-vendor="' + this.selEsc(vendor) + '"]');
     if (!card) return;
-    const actions = this.container.querySelector('.os-create-row[data-vendor="' + this.selEsc(vendor) + '"]');
+    const actions = this._createRow(vendor);
     const err = actions ? actions.querySelector('.os-verr') : null;
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const order = this.orders().find(o => o.id === card.dataset.orderId);
