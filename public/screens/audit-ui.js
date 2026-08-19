@@ -101,8 +101,14 @@ const AuditUI = {
       : q.full
         ? 'Run it now and you get a <strong style="color:' + q.color + ';">Full data</strong> audit. Bar Cop has everything this reads.'
         : 'Run it now and you get a <strong style="color:' + q.color + ';">' + esc(q.label) + '</strong> audit. Fill in the rest below to move it up.';
+    // The steps read as a LIST on the card, not a stack of tinted boxes: no fill, no
+    // radius, no side padding, and a divider between each pair (n-1 for n steps, so the
+    // last row does not double up with the card edge). `fix-panel.js`'s activity rows
+    // are the same shape and `at-arow` below is this file's own. ⚠ The token is --b2,
+    // the app's divider (115 sites), NOT --row-div, which its own style.css comment
+    // scopes to rows sitting on a tinted fill — which these no longer do.
     const rows = steps.map((s, i) =>
-      '<div class="au-fa-step"' + (s.done || !s.go ? '' : ' data-go="' + s.go + '"') + ' style="display:flex;align-items:center;gap:13px;padding:12px 14px;margin-top:8px;background:var(--zone);border-radius:8px;' + (s.done || !s.go ? '' : 'cursor:pointer;') + '">'
+      '<div class="au-fa-step"' + (s.done || !s.go ? '' : ' data-go="' + s.go + '"') + ' style="display:flex;align-items:center;gap:13px;padding:12px 0;' + (i < steps.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + (s.done || !s.go ? '' : 'cursor:pointer;') + '">'
       + (s.done
           ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
           : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;">' + (i + 1) + '</span>')
