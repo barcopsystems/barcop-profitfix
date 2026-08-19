@@ -91,6 +91,13 @@ const BottleSlider = {
        the screen ([[the-loop]] #55). */
     const uncountable = opts.counted !== undefined;
     const counted = uncountable ? !!opts.counted : true;
+    /* ⛔ WHAT MAKES THIS CONTROL COUNT IS A PROPERTY OF THE SCREEN, AND THE TWO ANSWERS ARE BOTH
+       RIGHT. Take Inventory counts on VALUE: an empty slider means "not counted yet", because Out
+       of Stock is its confirmed zero. Spot Check counts on TOUCH: it has NO Out of Stock, so the
+       slider at zero is the only way to record a bottle that came back EMPTY, and un-counting it
+       would make the commonest post-shift reading impossible to enter. `ic-spot-check` already
+       decided this for itself with `_touched`, and this just follows it. */
+    const countsOnTouch = !!opts.countsOnTouch;
     const clip = 'bsclip-' + id;
     // Shape: a keg outline for Draft Beer, a bottle outline otherwise. The
     // fill/level mechanic is identical — only the silhouette and the noun
@@ -105,7 +112,8 @@ const BottleSlider = {
     const outline = shp.outline;
 
     return '<div class="bs" data-bs="' + esc(String(id)) + '" data-top="' + rng.top + '" data-bot="' + rng.bot + '" '
-      + 'data-uncountable="' + (uncountable ? '1' : '') + '" data-col="' + col + '" tabindex="0" '
+      + 'data-uncountable="' + (uncountable ? '1' : '') + '" data-counts-on-touch="' + (countsOnTouch ? '1' : '') + '" '
+      + 'data-col="' + col + '" tabindex="0" '
       + 'style="display:flex;flex-direction:column;align-items:center;gap:10px;outline:none;user-select:none;-webkit-tap-highlight-color:transparent;">'
 
       + '<div class="bs-fulls-row" style="display:flex;align-items:center;gap:10px;">'
@@ -152,6 +160,7 @@ const BottleSlider = {
     const rng = { top, bot };
     // T25b: only a caller that passed `counted` may show the uncounted state (see `html`).
     const uncountable = root.dataset.uncountable === '1';
+    const countsOnTouch = root.dataset.countsOnTouch === '1';
     const col = root.dataset.col || 'var(--gold)';
     const startFulls = parseInt(root.querySelector('.bs-fulls').textContent) || 0;
     const inst = this._inst[id] = {
@@ -178,7 +187,12 @@ const BottleSlider = {
        something. The screen derives its own record from this; `counted` below is the DISPLAY state
        and the harness pins that the two agree. */
     const apply = (skipInputWrite, source) => {
-      if (uncountable) inst.counted = (source === 'type') || inst.value > 0 || inst.fulls > 0;
+      // Every `apply` call site is inside an event handler, so reaching here IS the operator
+      // interacting. That is what makes `countsOnTouch` a one-line rule rather than a flag to keep.
+      if (uncountable) {
+        inst.counted = countsOnTouch ? true
+          : ((source === 'type') || inst.value > 0 || inst.fulls > 0);
+      }
       const fill = root.querySelector('.bs-fill');
       const handle = root.querySelector('.bs-handle');
       const valEl = root.querySelector('.bs-val');
