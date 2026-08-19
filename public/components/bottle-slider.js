@@ -81,6 +81,16 @@ const BottleSlider = {
     const value = this._snap(opts.value != null ? opts.value : 0);
     const fulls = Math.max(0, parseInt(opts.fulls) || 0);
     const col = this.colorFor(opts.category || 'Liquor');
+    /* ⭐ THE UNCOUNTED DISPLAY IS OPT-IN, AND THAT IS A REACH DECISION, NOT A STYLE ONE (T25b).
+       Take Inventory owns a COUNTED / NOT COUNTED state and passes `counted`, so an untouched
+       slider reads like the typed cells beside it: an empty box behind a grey `0.00` placeholder,
+       with the level and the total muted until there is an actual reading.
+       ⛔ SPOT CHECK PASSES NOTHING AND IS UNTOUCHED. It has no uncounted concept at all -- a zero
+       there is a real pre-shift reading -- so blanking its box would say "you have not answered"
+       about an answer the operator just gave. One control, two screens, and reach is a property of
+       the screen ([[the-loop]] #55). */
+    const uncountable = opts.counted !== undefined;
+    const counted = uncountable ? !!opts.counted : true;
     const clip = 'bsclip-' + id;
     // Shape: a keg outline for Draft Beer, a bottle outline otherwise. The
     // fill/level mechanic is identical — only the silhouette and the noun
@@ -94,7 +104,8 @@ const BottleSlider = {
     const clipD = shp.clip;
     const outline = shp.outline;
 
-    return '<div class="bs" data-bs="' + esc(String(id)) + '" data-top="' + rng.top + '" data-bot="' + rng.bot + '" tabindex="0" '
+    return '<div class="bs" data-bs="' + esc(String(id)) + '" data-top="' + rng.top + '" data-bot="' + rng.bot + '" '
+      + 'data-uncountable="' + (uncountable ? '1' : '') + '" data-col="' + col + '" tabindex="0" '
       + 'style="display:flex;flex-direction:column;align-items:center;gap:10px;outline:none;user-select:none;-webkit-tap-highlight-color:transparent;">'
 
       + '<div class="bs-fulls-row" style="display:flex;align-items:center;gap:10px;">'
@@ -119,13 +130,14 @@ const BottleSlider = {
 
       + '<div style="text-align:center;">'
       +   '<input class="bs-val" type="number" step="0.01" min="0" max="1" inputmode="decimal" '
-      +     'aria-label="Open bottle level (0 to 1)" value="' + value.toFixed(2) + '" '
-      +     'style="color:' + col + ';"/>'
+      +     'aria-label="Open bottle level (0 to 1)" value="' + (counted ? value.toFixed(2) : '') + '" '
+      +     'placeholder="0.00" style="color:' + col + ';"/>'
       +   '<div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:4px;">Open ' + noun + '</div>'
       + '</div>'
 
       + '<div style="font-size:11px;font-weight:700;color:var(--t2);">Total on hand: '
-      +   '<span class="bs-total" style="color:' + col + ';">' + this._fmt(fulls + value) + '</span></div>'
+      +   '<span class="bs-total" style="color:' + (counted ? col : 'var(--t3)') + ';">'
+      +     (counted ? this._fmt(fulls + value) : '0.00') + '</span></div>'
 
       + '</div>';
   },
@@ -138,9 +150,16 @@ const BottleSlider = {
     const top = parseFloat(root.dataset.top) || this.SHAPES.bottle.range.top;
     const bot = parseFloat(root.dataset.bot) || this.SHAPES.bottle.range.bot;
     const rng = { top, bot };
+    // T25b: only a caller that passed `counted` may show the uncounted state (see `html`).
+    const uncountable = root.dataset.uncountable === '1';
+    const col = root.dataset.col || 'var(--gold)';
+    const startFulls = parseInt(root.querySelector('.bs-fulls').textContent) || 0;
     const inst = this._inst[id] = {
       value: this._snap(parseFloat(valInput && valInput.value) || 0),
-      fulls: parseInt(root.querySelector('.bs-fulls').textContent) || 0,
+      fulls: startFulls,
+      // An empty box with no full bottles is the "nothing entered yet" state. Anything else is a
+      // reading. Screens that never opt in are always counted, exactly as before.
+      counted: !uncountable || String((valInput && valInput.value) ?? '').trim() !== '' || startFulls > 0,
       onChange: onChange || function(){},
       // Suppresses the input change handler during programmatic value writes
       // (drag, arrow keys, +/-) so we do not feed our own writes back through
@@ -153,7 +172,13 @@ const BottleSlider = {
     // input alone. Used by the input handler so we do not stomp on a
     // partial entry like "." or "0.2" while the operator is still typing
     // the rest of the number.
-    const apply = (skipInputWrite) => {
+    /* `source` says WHAT the operator did, because a gesture and a keystroke are different kinds of
+       evidence (Kyle, T25b): 'type' is a deliberate answer even when it is zero, 'clear' is the
+       answer being taken back, and 'gesture' (drag, tap, arrows, +/-) counts only if it lands on
+       something. The screen derives its own record from this; `counted` below is the DISPLAY state
+       and the harness pins that the two agree. */
+    const apply = (skipInputWrite, source) => {
+      if (uncountable) inst.counted = (source === 'type') || inst.value > 0 || inst.fulls > 0;
       const fill = root.querySelector('.bs-fill');
       const handle = root.querySelector('.bs-handle');
       const valEl = root.querySelector('.bs-val');
@@ -161,10 +186,20 @@ const BottleSlider = {
       const totalEl = root.querySelector('.bs-total');
       if (fill)   { fill.setAttribute('y', this._fillY(inst.value, rng)); fill.setAttribute('height', this._fillH(inst.value, rng)); }
       if (handle) { handle.setAttribute('y1', this._fillY(inst.value, rng)); handle.setAttribute('y2', this._fillY(inst.value, rng)); }
-      if (valEl && !skipInputWrite) { inst._writing = true; valEl.value = inst.value.toFixed(2); inst._writing = false; }
+      if (valEl && !skipInputWrite) {
+        inst._writing = true;
+        // Blank, not "0.00": an empty box is what puts the grey placeholder back, which is the
+        // whole visual signal that nothing has been entered yet.
+        valEl.value = inst.counted ? inst.value.toFixed(2) : '';
+        inst._writing = false;
+      }
       if (fullsEl) fullsEl.textContent = inst.fulls;
-      if (totalEl) totalEl.textContent = this._fmt(inst.fulls + inst.value);
-      inst.onChange({ value: inst.value, fulls: inst.fulls, total: inst.fulls + inst.value });
+      if (totalEl) {
+        totalEl.textContent = inst.counted ? this._fmt(inst.fulls + inst.value) : '0.00';
+        totalEl.style.color = inst.counted ? col : 'var(--t3)';
+      }
+      inst.onChange({ value: inst.value, fulls: inst.fulls, total: inst.fulls + inst.value,
+                      source: source || 'gesture', counted: inst.counted });
     };
 
     const valueFromY = (clientY) => {
@@ -223,23 +258,26 @@ const BottleSlider = {
     if (valInput) {
       valInput.addEventListener('input', () => {
         if (inst._writing) return;
-        const raw = parseFloat(valInput.value);
-        if (isNaN(raw)) {
-          // Empty or just "." -- keep the slider where it is and let the
-          // operator keep typing. They will commit a valid number on blur.
-          return;
-        }
-        // Clamp to 0-1 but do NOT round to 2 decimals here -- rounding mid-
-        // type is what stole keystrokes on the previous build.
+        const rawStr = String(valInput.value ?? '');
+        /* ⭐ EMPTY AND MID-TYPE ARE DIFFERENT THINGS, and only measuring the RAW string tells them
+           apart. An emptied box is the operator deleting their answer, so it un-counts (T25b).
+           A non-empty box that does not parse -- "." or "-" partway through a number -- is nobody
+           saying anything yet, so it is left alone, which is what the original comment here was
+           protecting: rounding or rewriting mid-type is what stole keystrokes on an earlier build. */
+        if (!rawStr.trim()) { inst.value = 0; apply(true, 'clear'); return; }
+        const raw = parseFloat(rawStr);
+        if (isNaN(raw)) return;
+        // Clamp to 0-1 but do NOT round to 2 decimals here.
         inst.value = Math.max(0, Math.min(1, raw));
-        apply(true);
+        apply(true, 'type');
       });
       valInput.addEventListener('blur', () => {
-        // Snap to 2 decimals and write the canonical formatted value back.
-        // If the operator left the field empty or with garbage, fall back to
-        // whatever inst.value last resolved to (zero on a fresh slider).
+        // An empty box stays empty so the placeholder shows; anything else snaps to 2 decimals and
+        // the canonical value is written back. Blur must carry the same source as the typing did,
+        // or leaving a deliberately typed 0.00 would un-count it on the way out.
+        if (!String(valInput.value ?? '').trim()) { inst.value = 0; apply(true, 'clear'); return; }
         inst.value = this._snap(inst.value);
-        apply();
+        apply(false, 'type');
       });
       valInput.addEventListener('focus', () => { valInput.select(); });
     }
