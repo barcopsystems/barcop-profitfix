@@ -8,7 +8,7 @@
    any outstanding gift cards), minus the reserve you should keep. The Safe to
    Spend card shows the whole subtraction so you can see where every dollar goes.
    Reads CashEngine. Tax rate and filing frequency are set in Business Profile;
-   the reserve target and gift card balance are set here on this device. */
+   the reserve target and gift card balance are set here and kept on your account. */
 
 S.CashPosition = {
   showHowTo() {

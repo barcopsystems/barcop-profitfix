@@ -7,7 +7,7 @@
    a running balance with the low-point week, your runway, and the line where you
    would go negative. The stress lever models a slow season and answers "can I
    afford it" for a hire, a buy, or a draw. Reads CashEngine.survivalForecast; the
-   only input is your cash on hand, kept on this device. Organized as: a cash
+   only input is your cash on hand, kept on your account. Organized as: a cash
    position card (balance in, survival stats out), the quarter (chart + table in
    one card), the stress test, then the money coming in and the bills going out. */
 
