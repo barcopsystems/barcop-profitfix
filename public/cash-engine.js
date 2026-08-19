@@ -1161,10 +1161,13 @@ window.CashEngine = {
   // ── True Available Cash: the money that is actually yours and safe to spend.
   //    Your balance, minus the money that isn't yours (the tax you collected and
   //    owe, plus tips held), minus the reserve you should keep. Config is light
-  //    and kept on this device. ──────────────────────────────────────────────
-  // Cash config is PER BAR, but it lives device-local in localStorage. Scope
-  // every key by the active account (or 'demo') so a browser that held one bar's
-  // numbers — or the demo's — never leaks them into another bar or a fresh
+  //    and lives on the account. ─────────────────────────────────────────────
+  // Cash config is stored with App.acctGet / App.acctSet, so it lands in
+  // App.data.account_state and follows the operator to whatever machine they sign in on.
+  // ⚠ THE SCOPED KEY BELOW IS NOT WHERE IT LIVES. `_acctScope` and `_key` now serve
+  // `_migCfg` ALONE, the one-time read of the pre-sync key an existing operator may still
+  // be carrying. Scoping that lookup by the active account (or 'demo') is what stops a
+  // browser holding one bar's old numbers from handing them to another bar or to a fresh
   // signup. A brand-new account has no scoped key, so it reads clean defaults.
   _acctScope() {
     // ⚠ BARE `App`, NOT `window.App` (S320). Same defect as pos-ingest: `App` is a top-level `const`
