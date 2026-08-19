@@ -122,16 +122,16 @@ FIX.revenue = [
 
     process: {
       steps: [
-        { kind: 'result', target: 'r-this-week', targetLabel: 'This Week',
+        { kind: 'result', target: 'week-history', targetLabel: 'Week History',
           title: 'Read your weekly RPLH every Monday',
-          detail: 'Every Monday, open This Week and read RPLH for the last saved week next to its labor percent. Flag any week where RPLH is below target even when labor percent looks fine.' },
+          detail: 'Every Monday, open Week History and read RPLH for the last saved week next to its labor percent. Flag any week where RPLH is below target even when labor percent looks fine.' },
         { kind: 'action', target: 'settings', targetLabel: 'Settings',
           title: 'Set targets off your own 13-week baseline',
           detail: 'After one quarter of data, set each shift\'s RPLH target in Settings at roughly 12% above its own 13-week average. Lean on a concept benchmark only until you have that quarter.' },
         { kind: 'action', target: 'lc-build-schedule', targetLabel: 'Build Schedule',
           title: 'Build the schedule to the RPLH target',
           detail: 'In Build Schedule, staff to the Target Hours and dollar labor budget the forecast sets. Watch projected RPLH and budget-left as you assign hours.' },
-        { kind: 'result', target: 'r-this-week', targetLabel: 'This Week',
+        { kind: 'result', target: 'week-history', targetLabel: 'Week History',
           title: 'Diagnose every below-target week',
           detail: 'When RPLH comes in below target, find the cause. Hours over budget: fix it in next week\'s schedule. Revenue under what the staffing should produce: fix it in the pre-shift briefing. Do not cut the schedule on a check average miss.' }
       ]

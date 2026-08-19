@@ -32,9 +32,9 @@ FIX.profit = [
         { kind: 'action',
           title: 'Spot-check pour accuracy on the floor',
           detail: 'Set a jigger in front of each bartender and have them free-pour what they think is an ounce, then check it against the jigger. A 0.2 oz over-pour on a 1,000-drink-a-month bartender is real money no shift-level number catches. Coach anyone heavy to count their pour on the spot, and back it with the signed pour standard below.' },
-        { kind: 'result', target: 'this-week', targetLabel: 'This Week',
+        { kind: 'result', target: 'week-history', targetLabel: 'Week History',
           title: 'Review the trend every week',
-          detail: 'Once a week, open This Week and read pour cost against target across your saved weeks. Watch whether it is holding or drifting.' },
+          detail: 'Once a week, open Week History and read the Pour Cost column down your saved weeks against your target. Watch whether it is holding or drifting.' },
         { kind: 'reference', doc: 'pour-standards', targetLabel: 'Measured Pour Standards Policy',
           title: 'Put a written pour standard in place',
           detail: 'Download the Measured Pour Standards Policy, set your pour sizes, and have every staff member sign it before the effective date.' }
@@ -118,9 +118,9 @@ FIX.profit = [
         { kind: 'reference', doc: 'portion-audit', targetLabel: 'Portion Control Audit',
           title: 'Run portion control audits',
           detail: 'Use the Portion Control Audit form on at least two stations a week at varied times, against the portion spec on each recipe card. Treat what you find as training, not discipline.' },
-        { kind: 'result', target: 'this-week', targetLabel: 'This Week',
+        { kind: 'result', target: 'week-history', targetLabel: 'Week History',
           title: 'Review the trend with the kitchen manager',
-          detail: 'Each week, open This Week with the kitchen manager and read food cost against target with the dollar gap. Cross-check it against the past week\'s Waste and Spill Log and portion audit findings, and set one action with a named owner.' },
+          detail: 'Each week, open Week History with the kitchen manager and read the Food Cost column down your saved weeks against your target. Cross-check it against the past week\'s Waste and Spill Log and portion audit findings, and set one action with a named owner.' },
         { kind: 'action', target: 'recipe-cost-analysis', targetLabel: 'Recipe Summary',
           title: 'Reprice the items above target',
           detail: 'When food cost is above target, open Recipe Summary, sorted over-target first. Work an item right there to fix its recipe or reprice it in place.' }
@@ -186,9 +186,9 @@ FIX.profit = [
 
     process: {
       steps: [
-        { kind: 'action', target: 'this-week', targetLabel: 'This Week',
+        { kind: 'action', target: 'week-close', targetLabel: 'Close The Week',
           title: 'Confirm the week\'s inputs',
-          detail: 'Open This Week. Net sales come from Shift Control, labor from Labor Control, and COGS from Inventory Control, already filled in. Confirm them.' },
+          detail: 'Open Close The Week. Net sales come from Shift Control, labor from Labor Control, and COGS from Inventory Control, already filled in. Confirm them.' },
         { kind: 'result', target: 'week-history', targetLabel: 'Week History',
           title: 'Read prime cost every Monday',
           detail: 'Every Monday, open Week History and read prime cost (total COGS plus labor over net sales) against your concept target. Read it weekly, not monthly. A 30-day lag is 30 days of loss before you see it.' },
