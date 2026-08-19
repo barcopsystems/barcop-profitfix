@@ -122,7 +122,7 @@ S.InventoryTakeInventory = {
       ] },
       { h: 'It Saves As You Go', p: ['Your count saves to this device automatically. If you close the tab or lose signal partway through, come back and pick up where you left off. Nothing is final until you submit.'] },
       { h: 'Review And Submit', p: ['When you reach the end, Bar Cop shows a review of every product, its total, and its value, and flags anything you did not count. Go back and fix anything that looks off, then submit. Submitting writes a finalized count that you cannot change by accident.'] },
-      { h: 'What The Count Feeds', p: ['Every finalized count powers your dashboard, the usage and variance reports, dynamic par suggestions, and your cost of goods. Two counts let Bar Cop measure what you used between them, so count on a regular schedule, like every week, to keep the numbers sharp.'] }
+      { h: 'What The Count Feeds', p: ['Every finalized count powers the usage and variance reports, dynamic par suggestions, the Order Sheet, and your cost of goods. Two counts let Bar Cop measure what you used between them, so count on a regular schedule, like every week, to keep the numbers sharp.'] }
     ]);
   },
 
