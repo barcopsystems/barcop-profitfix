@@ -195,18 +195,23 @@ S.InventorySpotCheck = {
     ]);
   },
 
-  spInputHTML(slotId, p, vals) {
+  /* `entered` is whether the operator has TOUCHED this stage (see the note in `lineHTML`). An
+     untouched control renders empty behind its placeholder and stays neutral; a touched one shows
+     its number, zero included, because a counted zero here is a real reading. It is NEVER derived
+     from the value. */
+  spInputHTML(slotId, p, vals, entered) {
     vals = vals || {};
+    const shown = v => (entered && v != null ? v : '');
     if (this._isCaseBeer(p)) {
       return '<div class="form-row" style="gap:10px;">'
-        + '<div class="f" style="width:104px;"><label>Cases</label><div class="fw"><input class="suf sp-cases" data-slot="' + slotId + '" type="number" min="0" step="1" value="' + (vals.cases || 0) + '" style="height:42px;text-align:center;"/><span class="suf">cs</span></div></div>'
-        + '<div class="f" style="width:110px;"><label>Loose</label><div class="fw"><input class="suf sp-loose" data-slot="' + slotId + '" type="number" min="0" step="1" value="' + (vals.loose || 0) + '" style="height:42px;text-align:center;"/><span class="suf">btl</span></div></div>'
+        + '<div class="f" style="width:104px;"><label>Cases</label><div class="fw"><input class="suf sp-cases" data-slot="' + slotId + '" type="number" min="0" step="1" value="' + shown(vals.cases) + '" placeholder="0" style="height:42px;text-align:center;"/><span class="suf">cs</span></div></div>'
+        + '<div class="f" style="width:110px;"><label>Loose</label><div class="fw"><input class="suf sp-loose" data-slot="' + slotId + '" type="number" min="0" step="1" value="' + shown(vals.loose) + '" placeholder="0" style="height:42px;text-align:center;"/><span class="suf">btl</span></div></div>'
         + '</div>';
     }
     if (this._isPourable(p)) {
-      return BottleSlider.html(slotId, { value: vals.value || 0, fulls: vals.fulls || 0, category: p.category, shape: App.sliderShape(p) });
+      return BottleSlider.html(slotId, { value: vals.value || 0, fulls: vals.fulls || 0, category: p.category, shape: App.sliderShape(p), counted: !!entered, countsOnTouch: true });
     }
-    return '<div class="f" style="width:170px;"><label>Count</label><div class="fw"><input class="suf sp-num" data-slot="' + slotId + '" type="number" min="0" step="0.1" value="' + (vals.value || 0) + '" style="height:42px;text-align:center;"/><span class="suf">' + esc(App.unitAbbr(App.productUnit(p)) || 'units') + '</span></div></div>';
+    return '<div class="f" style="width:170px;"><label>Count</label><div class="fw"><input class="suf sp-num" data-slot="' + slotId + '" type="number" min="0" step="0.1" value="' + shown(vals.value) + '" placeholder="0" style="height:42px;text-align:center;"/><span class="suf">' + esc(App.unitAbbr(App.productUnit(p)) || 'units') + '</span></div></div>';
   },
   spMount(slotId, p, onChange) {
     if (!this._isCaseBeer(p) && this._isPourable(p)) { BottleSlider.mount(slotId, onChange); return; }
@@ -290,6 +295,17 @@ S.InventorySpotCheck = {
   },
   lineHTML(lid, p, ld) {
     ld = ld || {};
+    /* ⛔ THE PLACEHOLDER STATE KEYS ON `_touched`, NEVER ON THE VALUE, and the reason is written in
+       full above `collectState`: a count of ZERO IS A REAL MEASUREMENT here. A post-shift bottle
+       that came back empty reads {fulls:0,value:0}, exactly like one nobody counted, and this
+       screen has NO Out of Stock button -- the slider at zero is the only way to record an empty
+       bottle. Inferring "not counted" from the number would therefore make an emptied bottle
+       impossible to record and refuse to finish the check, which is the bug that comment exists to
+       prevent. Take Inventory can key on the value because Out of Stock is its confirmed zero;
+       Spot Check cannot ([[the-loop]] #55 — reach is a property of the screen). */
+    const t = (this._touched && this._touched[lid]) || {};
+    const preEntered  = !!(t.pre  || ld.pre_entered);
+    const postEntered = !!(t.post || ld.post_entered);
     return '<div class="card sp-line" data-lid="' + lid + '" data-pid="' + p.id + '" data-vd="0" style="margin-bottom:12px;">'
       + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
         + '<span style="flex:1;font-size:15px;font-weight:700;color:var(--t1);">' + esc(p.name) + '</span>'
@@ -299,11 +315,11 @@ S.InventorySpotCheck = {
       + '<div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">'
         + '<div style="flex:1;min-width:220px;">'
           + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;text-align:center;">Pre-Shift Count</div>'
-          + '<div style="display:flex;justify-content:center;">' + this.spInputHTML('sp-pre-' + lid, p, ld.pre) + '</div>'
+          + '<div style="display:flex;justify-content:center;">' + this.spInputHTML('sp-pre-' + lid, p, ld.pre, preEntered) + '</div>'
         + '</div>'
         + '<div style="flex:1;min-width:220px;">'
           + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;text-align:center;">Post-Shift Count</div>'
-          + '<div style="display:flex;justify-content:center;">' + this.spInputHTML('sp-post-' + lid, p, ld.post) + '</div>'
+          + '<div style="display:flex;justify-content:center;">' + this.spInputHTML('sp-post-' + lid, p, ld.post, postEntered) + '</div>'
         + '</div>'
       + '</div>'
       + '<div style="display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:22px;">'
