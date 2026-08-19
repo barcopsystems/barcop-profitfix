@@ -55,7 +55,7 @@ S.CashBridge = {
       + (br.hasData
           ? this.headline(br, b) + controlRow + this.waterfall(br)
           : '<div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">The bridge reads your profit off your weekly numbers. Once you confirm your weeks for ' + esc(b.label) + ' in Confirm the Week, it fills in here.</div></div>')
-      + '<div class="no-print" style="font-size:11px;color:var(--t3);margin-top:16px;">Log draws, loan payments, capital buys, and tax in Books under Cash Outflows. This page reads them back as the bridge.</div>'
+      + '<div class="no-print" style="font-size:11px;color:var(--t3);margin-top:16px;">Log draws, loan payments, capital buys, and tax on Close Books with Log Type set to Cash Outflow. This page reads them back as the bridge.</div>'
       + '</div>';
     this.wire();
   },
@@ -142,7 +142,7 @@ S.CashBridge = {
     // `other` is a real type in Books (hub-cash-outflows TYPES) and outflowsInPeriod has
     // always folded it into co.total, so Cash You Kept was already net of it. It just had
     // no row, so the visible lines did not sum to the result underneath them.
-    if (co.other > 0) rows += row('Other cash out', -co.other, 'Logged in Books under Cash Outflows');
+    if (co.other > 0) rows += row('Other cash out', -co.other, 'Logged on Close Books as a cash outflow');
     rows += '<div style="height:1px;background:var(--row-div);margin:4px 0;"></div>';
     rows += row('Cash you actually kept', br.cashKept, '', true);
     // PDF-only table (the on-screen waterfall is styled divs the exporter skips).
