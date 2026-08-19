@@ -2786,7 +2786,7 @@ const App = {
        TEXT that describes it. The help is the one nobody does, and a topic left behind here would
        still be reachable by any caller passing that action to `openHubFullPage`. */
     'week-close': { title: 'How Closing The Week Works', sections: [
-      { h: 'What this is', p: ['The one place a week gets closed. It reads what you have already logged, tells you what the week still needs, and then you confirm it. There is nothing to tick off: every line is read from your real records, so it cannot say the sales are in when they are not.'] },
+      { h: 'What this is', p: ['The one place a week gets closed. It reads what you have already logged, tells you what the week still needs, and then you confirm it. Every line is read from your real records, so it cannot say the sales are in when they are not.'] },
       { h: 'What the week needs', p: ['Sales and hours are what the numbers are built from. Tips, cash over and short, and catering fill in when you have them, and a week closes fine without any of the three. Anything marked optional is not a gap.'] },
       { h: 'Getting the hours in', p: ['Import file on the Hours row opens a drop zone for your weekly timeclock export. Bar Cop reads the file, matches each row to your roster and rates, and shows you every row with what it worked out before anything is saved. Take out anything you do not want, then press the button to add them. Re-dropping the same file will not double-count, and a week that arrives in two files is fine. Open takes you to Log Hours if you would rather type them in.'] },
       { h: 'Cost of goods', p: ['If your counts happen to span this week, Bar Cop prices the cost of goods from them and says so. If they do not, you type it on the confirm. Counting weekly is not required, and Bar Cop will never book a month of usage onto one week.'] },
@@ -2831,7 +2831,7 @@ const App = {
     'books-home': { title: 'How Close Books Works', sections: [
       { h: 'What this page is', p: ['Your month-end close, worked top to bottom. Three steps in order, and the page turns a month of logged data into the file your accountant works from. Use the month selector at the top to close last month while you are standing in this one.'] },
       { h: 'The three steps', p: ['1. Log this month\'s money out: every bill and every cash outflow, typed in or dropped from a bank or card statement. 2. Make sure the weeks are all in, because revenue on the income statement is your confirmed weeks. 3. Generate Month-End Books, which builds the workbook.'] },
-      { h: 'Nothing to mark done', p: ['There is no Mark Done button and nothing to tick. Each step goes green off your own data: step 1 when money out is logged for the month you are on, step 2 when every one of that month\'s weeks is confirmed, step 3 when the workbook has been generated for it. That means a step cannot claim something your records do not show, and it un-ticks itself if the data goes away. Close The Week works the same way.'] },
+      { h: 'How a step goes green', p: ['Each step goes green off your own data: step 1 when money out is logged for the month you are on, step 2 when every one of that month\'s weeks is confirmed, step 3 when the workbook has been generated for it. That means a step cannot claim something your records do not show, and it un-ticks itself if the data goes away. Close The Week works the same way.'] },
       { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing runs from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
       { h: 'Dropping a statement', p: ['On the money out step, switch the Add form to Import File and drop a CSV or Excel export from your bank or card. Map the columns once (date and amount are required) and Bar Cop remembers it. The file then stops on a check screen that takes the page: every row is listed with where it is going, grouped by category, with anything already logged held back and anything that is not an operating expense held back in its own card so it cannot be double counted. Nothing is saved until you press Add on that screen.'] }
     ] },
@@ -2859,7 +2859,7 @@ const App = {
     ] },
     'permits': { title: 'How Licensing Works', sections: [
       { h: 'What this page is', p: ['Tracks your permits and licenses by renewal date so none of them lapse. Add each one with its type, next renewal date and recurrence, and Bar Cop watches the calendar for you. Find it in Shift Control, under Incidents and Maintenance.'] },
-      { h: 'How the statuses work', p: ['A renewal more than 30 days out is On Track. Within 30 days is due soon and within 14 is more urgent, both flagged amber; once the date passes it is Expired, in red. Anything due soon or expired shows under Needs Attention here and under Coming Due on the Books overview. Use the chips to filter the list by status.'] },
+      { h: 'How the statuses work', p: ['A renewal more than 30 days out is On Track. Within 30 days is due soon and within 14 is more urgent, both flagged amber; once the date passes it is Expired, in red. Anything due soon or expired shows under Needs Attention here and on your Hub. Use the chips to filter the list by status.'] },
       /* ⚠ THIS PROMISED THE RENEWAL WOULD LOG THE COST "so your bookkeeper does not enter it twice",
          and it was doing the opposite: the row it wrote carried the permit's TYPE as its vendor, so
          the same fee off a bank statement imported as a second row. Build piece 5 closed that door. */
@@ -2904,7 +2904,7 @@ const App = {
          Repeat to copy last month forward". `Repeat` was one of the three row actions deleted on
          2026-08-06 — measured, the word does not appear in this screen's live code at all, only in
          the comment recording its removal. The help outlived the control by two days. */
-      { h: 'Recurring bills', p: ['Nothing to tick and no schedule to fill in. Bar Cop works out which bills recur by watching what you actually log: drop two months of statements on Close Books and it picks up rent, insurance and your subscriptions on its own, and projects them onto your Cash Forecast. A bill that stops showing up stops being projected, so cancelling a service needs no extra step.'] },
+      { h: 'Recurring bills', p: ['Bar Cop works out which bills recur by watching what you actually log: drop two months of statements on Close Books and it picks up rent, insurance and your subscriptions on its own, and projects them onto your Cash Forecast. A bill that stops showing up stops being projected, so cancelling a service needs no extra step.'] },
       /* ⚠ AND THIS ONE WAS FALSE ON BOTH HALVES. Repairs stopped living in Shift Control at Phase 2
          item 12 and platform fees stopped living in the weekly numbers at build piece 2. It told the
          operator to keep two real deductions OFF the log that Books reads. */
