@@ -999,7 +999,7 @@ S.LaborStaffRoster = {
       + '<thead><tr><th>Certification</th><th>Issuer</th><th>Issued</th><th>Expires</th><th>Status</th><th></th></tr></thead>';
     if (list.length === 0) {
       return '<div class="card" style="overflow-x:auto;margin-top:24px;">' + head
-        + '<tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days on the dashboard.</td></tr></tbody></table></div>' + addBtn;
+        + '<tbody><tr><td colspan="6" style="color:var(--t3);padding:12px 8px;">No certifications on file yet. Add cert types and expiration dates, and Bar Cop will flag any expiring within 30 days in the Certs column on your roster.</td></tr></tbody></table></div>' + addBtn;
     }
     const rows = list.map(c => {
       const status = this.certStatus(c);
