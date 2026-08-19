@@ -179,15 +179,19 @@ const BottleSlider = {
       if (Math.abs(clientY - startY) > 5) moved = true;
       if (moved) { inst.value = this._snap(valueFromY(clientY)); apply(); }
     };
+    /* ⛔ A TOUCH THAT NEVER MOVED IS NOT AN ANSWER (T25). This used to nudge the value by 0.01 on
+       a tap with no drag, and `apply()` fires `onChange` unconditionally, so a thumb brushing the
+       control while scrolling a shelf on a phone committed a count. At zero the nudge clamped
+       straight back to zero, so the number did not even change and the product still became
+       counted-at-zero -- which the usage reader then bills as a whole bottle poured.
+       ⭐ The nudge is not lost work: this control already carries a numeric box for an exact value
+       and arrow-key support for fine adjustment, both of which are deliberate in a way a tap is
+       not. Nothing in the suite pinned the tap-nudge and no help text described it. */
     const finish = (clientY) => {
       if (!dragging) return;
       dragging = false;
-      if (!moved) {
-        const r = svg.getBoundingClientRect();
-        inst.value = this._snap(inst.value + (clientY < r.top + r.height / 2 ? 0.01 : -0.01));
-      } else {
-        inst.value = this._snap(inst.value);
-      }
+      if (!moved) return;
+      inst.value = this._snap(inst.value);
       apply();
     };
     const onMM = e => move(e.clientY);
