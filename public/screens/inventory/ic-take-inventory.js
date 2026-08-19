@@ -766,10 +766,10 @@ S.InventoryTakeInventory = {
       if (isCaseBeer) {
         countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin:0;">'
             + '<div class="f" style="width:140px;flex-shrink:0;"><label>Cases</label>'
-              + '<div class="fw"><input class="suf ti-cases" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.cases != null ? c.cases : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">cases</span></div>'
+              + '<div class="fw"><input class="suf ti-cases" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.cases != null ? c.cases : '') + '" placeholder="0" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">cases</span></div>'
             + '</div>'
             + '<div class="f" style="width:140px;flex-shrink:0;"><label>Loose Bottles</label>'
-              + '<div class="fw"><input class="suf ti-loose" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.loose != null ? c.loose : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">btl</span></div>'
+              + '<div class="fw"><input class="suf ti-loose" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.loose != null ? c.loose : '') + '" placeholder="0" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">btl</span></div>'
             + '</div>'
             + '<div style="align-self:center;font-size:11px;color:var(--t3);">'
               + (p.case_size + ' btl/case')
@@ -791,10 +791,10 @@ S.InventoryTakeInventory = {
         const un = App.productUnit(p) || 'unit';
         countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin:0;">'
             + '<div class="f" style="width:140px;flex-shrink:0;"><label>Full</label>'
-              + '<div class="fw"><input class="suf ti-fulls" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.fulls != null ? c.fulls : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">' + esc(un) + '</span></div>'
+              + '<div class="fw"><input class="suf ti-fulls" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.fulls != null ? c.fulls : '') + '" placeholder="0" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">' + esc(un) + '</span></div>'
             + '</div>'
             + '<div class="f" style="width:140px;flex-shrink:0;"><label>Loose Pieces</label>'
-              + '<div class="fw"><input class="suf ti-looseea" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.loose != null ? c.loose : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">ea</span></div>'
+              + '<div class="fw"><input class="suf ti-looseea" type="number" min="0" step="1" data-pid="' + p.id + '" value="' + (c.loose != null ? c.loose : '') + '" placeholder="0" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">ea</span></div>'
             + '</div>'
             + '<div style="align-self:center;font-size:11px;color:var(--t3);">'
               + p.pack_size + ' ea/' + esc(un)
@@ -805,7 +805,7 @@ S.InventoryTakeInventory = {
       } else {
         countInput = '<div class="form-row" style="gap:14px;justify-content:center;margin:0;">'
           + '<div class="f" style="width:220px;flex-shrink:0;"><label>Count</label>'
-            + '<div class="fw"><input class="suf ti-num" type="number" min="0" step="0.1" data-pid="' + p.id + '" value="' + (c.value != null ? c.value : 0) + '" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">' + esc(App.productUnit(p) || 'units') + '</span></div>'
+            + '<div class="fw"><input class="suf ti-num" type="number" min="0" step="0.1" data-pid="' + p.id + '" value="' + (c.value != null ? c.value : '') + '" placeholder="0" style="height:44px;font-size:18px;text-align:center;"/><span class="suf">' + esc(App.productUnit(p) || 'units') + '</span></div>'
           + '</div></div>';
       }
       // Compact card: one-line header (name + category), the input always
@@ -859,14 +859,32 @@ S.InventoryTakeInventory = {
       if (isCaseBeer) return; // case + loose inputs handled below, not the slider
       const foodSlider = (p.category === 'Food' || p.category === 'Misc') && this._countStyle(p) === 'slider';
       if (!(p.container_size_oz && p.pour_size_oz) && !foodSlider) return; // food/dry: number/loose input, wired below
+      /* ⛔ AN EMPTY SLIDER IS NOT A COUNT (T25). This used to mark the product counted on ANY
+         interaction and there was no way back, so sliding to zero -- or a thumb brushing the
+         control on a phone -- left a CONFIRMED ZERO on a bottle nobody had counted. Measured on
+         the real `computeUsagePair`: starting 1, ending 0, rawUsed 1, so a $32 bottle booked $32
+         of pour cost it never poured and showed a 100% variance. That function's own header names
+         the hazard and guards it with `counted === false`; this wrote `counted: true`, so it
+         walked straight past the guard.
+         ⭐ THE UNCOUNTED SHAPE IS THE FILE'S OWN, not a new one: `{ notes }` with NO numeric field
+         is exactly what the S250 edit path rebuilds a skipped product as, and `_hasCount` tests
+         those four numeric fields, so the progress bar, the review banner, the saved record and
+         COGS all follow from this one write.
+         ⚠ Out of Stock is unchanged and still writes a COUNTED zero. That is the difference the
+         operator now has: an empty slider means "not counted yet", the button means "I looked, it
+         is empty". A typed zero in the cells below still counts too -- a keystroke is deliberate
+         where a gesture is not. */
       BottleSlider.mount(p.id, (v) => {
         const key = p.id + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
-        this.draft.counts[key] = { value: v.value, fulls: v.fulls, notes: prev.notes || '' };
+        const empty = !(v.value > 0) && !(v.fulls > 0);
+        this.draft.counts[key] = empty
+          ? { notes: prev.notes || '' }
+          : { value: v.value, fulls: v.fulls, notes: prev.notes || '' };
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
-        this.setCardCounted(p.id, true);
+        this.setCardCounted(p.id, !empty);
       });
     });
     // Case + loose inputs for bottle beer products with case_size set.
@@ -884,16 +902,26 @@ S.InventoryTakeInventory = {
            Pinned by verify-count-inputs-clamped.js. */
         const cases = Math.max(0, parseInt(card.querySelector('.ti-cases')?.value) || 0);
         const loose = Math.max(0, parseInt(card.querySelector('.ti-loose')?.value) || 0);
+        /* ⛔ BOTH CELLS EMPTY IS NOT A COUNT (T25). `parseInt('') || 0` is 0, so clearing a cell
+           back to its placeholder used to write a CONFIRMED zero and leave the product counted --
+           the operator taking their answer back, recorded as an answer. A TYPED zero still counts:
+           a keystroke is deliberate where an emptied cell is not.
+           ⚠ The two clamped reads above are left EXACTLY as they are on purpose.
+           `verify-count-inputs-clamped` keys its unclamped-read detector on
+           `parseInt(card.querySelector(...`, so lifting them into locals would take that shape out
+           of its vocabulary and blind it to the next unclamped read somebody writes. */
+        const blank = !String(card.querySelector('.ti-cases')?.value ?? '').trim()
+                   && !String(card.querySelector('.ti-loose')?.value ?? '').trim();
         const caseSize = parseFloat(card.dataset.caseSize) || 0;
         const echo = card.querySelector('.ti-echo');
         if (echo) echo.textContent = '= ' + (cases + (caseSize ? loose / caseSize : 0)).toFixed(2) + ' cases';
         const key = pid + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
-        this.draft.counts[key] = { cases, loose, notes: prev.notes || '' };
+        this.draft.counts[key] = blank ? { notes: prev.notes || '' } : { cases, loose, notes: prev.notes || '' };
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
-        this.setCardCounted(pid, true);
+        this.setCardCounted(pid, !blank);
       });
     });
     // Food / Misc pack items: full units + loose pieces, echoed as a decimal of
@@ -905,6 +933,10 @@ S.InventoryTakeInventory = {
         if (!card) return;
         const fulls = Math.max(0, parseInt(card.querySelector('.ti-fulls')?.value) || 0);
         const loose = Math.max(0, parseInt(card.querySelector('.ti-looseea')?.value) || 0);
+        // Both cells empty is not a count (T25) — same rule as the case+loose pair above, and the
+        // clamped reads are left in place for the same reason.
+        const blank = !String(card.querySelector('.ti-fulls')?.value ?? '').trim()
+                   && !String(card.querySelector('.ti-looseea')?.value ?? '').trim();
         const packSize = parseFloat(card.dataset.packSize) || 0;
         const echo = card.querySelector('.ti-echo-pack');
         if (echo) {
@@ -913,11 +945,11 @@ S.InventoryTakeInventory = {
         }
         const key = pid + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
-        this.draft.counts[key] = { fulls, loose, notes: prev.notes || '' };
+        this.draft.counts[key] = blank ? { notes: prev.notes || '' } : { fulls, loose, notes: prev.notes || '' };
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
-        this.setCardCounted(pid, true);
+        this.setCardCounted(pid, !blank);
       });
     });
     // Food / dry-goods plain number input.
@@ -926,11 +958,15 @@ S.InventoryTakeInventory = {
         const pid = inp.dataset.pid;
         const key = pid + '@@' + grp.location;
         const prev = this.draft.counts[key] || {};
-        this.draft.counts[key] = { value: Math.max(0, parseFloat(inp.value) || 0), fulls: 0, notes: prev.notes || '' };
+        // An emptied cell is not a count (T25). One cell here, so blank is just this one.
+        const blank = !String(inp.value ?? '').trim();
+        this.draft.counts[key] = blank
+          ? { notes: prev.notes || '' }
+          : { value: Math.max(0, parseFloat(inp.value) || 0), fulls: 0, notes: prev.notes || '' };
         this.draft._locStep = this.locStep;
         this.saveDraft();
         this.updateProgress();
-        this.setCardCounted(pid, true);
+        this.setCardCounted(pid, !blank);
       });
     });
     this.container.querySelectorAll('.ti-note').forEach(inp => {
