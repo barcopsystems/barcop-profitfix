@@ -17,7 +17,7 @@ S.WeekHistory = {
   showHowTo() {
     App.showHelpModal('How Week History Works', [
       { p: ['Every week you have confirmed, newest first, in one table. It joins your Profit numbers and your Revenue numbers for the same week, so one row is the whole picture of how that week actually went.'] },
-      { h: 'What The Columns Mean', p: ['Revenue is the week\'s total sales including catering. Prime Cost is COGS plus labor against total sales, the one number that says whether the week paid. Check Avg is food and beverage sales per cover. Labor % is total labor, hourly plus salaried, against total sales. RPLH is revenue per labor hour. Reading down the list is how you see a trend instead of a single week.'] },
+      { h: 'What The Columns Mean', p: ['Revenue is the week\'s total sales including catering. Prime Cost is COGS plus labor against total sales, the one number that says whether the week paid. Pour Cost is your bar COGS against bar sales and Food Cost is your food COGS against food sales, the two halves of the COGS side, so you can see which one moved when prime cost does. Check Avg is food and beverage sales per cover. Labor % is total labor, hourly plus salaried, against total sales. RPLH is revenue per labor hour. Reading down the list is how you see a trend instead of a single week.'] },
       { h: 'Fixing A Week', p: ['Edit on any row re-opens that week in the same Confirm the Week popup you closed it with, prefilled with what you saved. Correct a figure and confirm again, and everything downstream, your audits, your Fix systems, and Books, follows the corrected number. A week you never closed shows up here too if Shift has sales imported for it, so you can catch one you missed and confirm it late.'] },
       { h: 'One Set Of Records', p: ['Open Week History from the Week group in the rail, beside Close and Review. One set of weekly records sits behind it, so a week you correct here is corrected everywhere at the same moment: your Profit numbers, your Revenue numbers, your audits and your Books.'] }
     ]);
@@ -125,7 +125,10 @@ S.WeekHistory = {
       if (!x.p) {
         return '<tr>'
           + '<td data-label="Week"><div class="val">' + esc(this.wk(x.pe)) + '</div><div style="font-size:10px;color:var(--t3);">Not confirmed</div></td>'
-          + '<td data-label="Revenue">-</td><td data-label="Prime Cost">-</td><td data-label="Check Avg">-</td><td data-label="Labor %">-</td><td data-label="RPLH">-</td>'
+          /* ⛔ THE UNCONFIRMED ROW GAINS THE SAME TWO CELLS. A column added to the header alone
+             runs every row below it one short and the background stops before the right edge
+             ([[lessons-paid-for]] #123, which Kyle caught in one screenshot). */
+          + '<td data-label="Revenue">-</td><td data-label="Prime Cost">-</td><td data-label="Pour Cost">-</td><td data-label="Food Cost">-</td><td data-label="Check Avg">-</td><td data-label="Labor %">-</td><td data-label="RPLH">-</td>'
           + '<td data-label="" class="no-print"><button class="btn btn-primary btn-sm" data-confirm="' + esc(x.pe) + '" style="white-space:nowrap;">Confirm</button></td>'
           + '</tr>';
       }
@@ -134,6 +137,17 @@ S.WeekHistory = {
         + '<td data-label="Week"><div class="val">' + esc(this.wk(x.pe)) + '</div></td>'
         + '<td data-label="Revenue">' + money0(this.totalRev(x)) + '</td>'
         + '<td data-label="Prime Cost">' + (p.prime_cost_pct != null ? p.prime_cost_pct.toFixed(1) + '%' : '-') + '</td>'
+        /* ⭐ POUR AND FOOD COST, Kyle's call 2026-08-18. Two Profit Fix steps say "read pour cost /
+           food cost against target across your saved weeks" and pointed at the retired This Week;
+           nothing in the app showed either across weeks, so the columns come here and the steps
+           point at this table. The figures are ALREADY on the record — `bar.cost_pct` and
+           `food.cost_pct`, written by Confirm the Week — so nothing new is computed or stored.
+           ⚠ Measured on the live seed FIRST: `bar_pour_cost_pct` / `food_cost_pct` at the TOP of a
+           week record are undefined on all 13 weeks (that spelling is the TARGETS object, not the
+           week), while `bar.cost_pct` reads 22.8 and `food.cost_pct` 32.9. Reading the wrong one
+           would have shipped two columns of dashes. */
+        + '<td data-label="Pour Cost">' + ((p.bar && p.bar.cost_pct != null) ? p.bar.cost_pct.toFixed(1) + '%' : '-') + '</td>'
+        + '<td data-label="Food Cost">' + ((p.food && p.food.cost_pct != null) ? p.food.cost_pct.toFixed(1) + '%' : '-') + '</td>'
         + '<td data-label="Check Avg">' + (r.check_avg ? App.fmtCurrency(r.check_avg) : '-') + '</td>'
         + '<td data-label="Labor %">' + (r.labor_pct_blended ? r.labor_pct_blended.toFixed(1) + '%' : '-') + '</td>'
         + '<td data-label="RPLH">' + (r.rplh_blended ? App.fmtCurrency(r.rplh_blended) : '-') + '</td>'
@@ -145,7 +159,7 @@ S.WeekHistory = {
 
     const table = '<div class="sh" style="margin:0 0 10px;">Week History</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
-      + '<th>Week</th><th>Revenue</th><th>Prime Cost</th><th>Check Avg</th><th>Labor %</th><th>RPLH</th><th></th>'
+      + '<th>Week</th><th>Revenue</th><th>Prime Cost</th><th>Pour Cost</th><th>Food Cost</th><th>Check Avg</th><th>Labor %</th><th>RPLH</th><th></th>'
       + '</tr></thead><tbody>' + body + '</tbody></table></div>' + showOlder;
 
     this.container.innerHTML = '<div class="screen">' + summary + table + '</div>';
