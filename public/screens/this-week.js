@@ -12,7 +12,11 @@
    WHAT IS LEFT IS THE FEED. Every member here is reached from another file, or by
    one that is:
      icCOGS, laborCost, cateringFromBookings  -> components/confirm-week.js
-     currentWeekEnd                           -> app.js (the interception fallback)
+     (currentWeekEnd was cut 2026-08-19, T21: its stated reason was false. app.js's
+      interception falls back to App.nextSunday(), never to this file, and nothing in
+      public/ ever called it. It read as live only because r-this-week.js carried a
+      same-named member and the retired-code ratchet counts qualified references across
+      the whole corpus without asking which object.)
      COGS_WEEK_TOL, offsiteBookings, offsiteEventStaffKeys
                                               -> reached only BY the four above
    !! Those last three have no external caller and read like render support, which is
@@ -197,8 +201,6 @@ S.ThisWeek = {
     }
     return any ? { bar, food } : { bar: 0, food: 0 };
   },
-
-  currentWeekEnd() { return App.nextSunday ? App.nextSunday() : App.todayLocal(); },
 
   // The Events line for this week, read straight from the Events section. Offsite
   // jobs ONLY: an in-house event runs inside a normal shift, so its revenue is
