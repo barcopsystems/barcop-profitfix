@@ -4874,7 +4874,7 @@ const App = {
     }
     if (!S.HubOperatingExpenses.isCashOnlyCategory(v)) return '';
     return '"' + v + '" is how Bar Cop labels money that leaves the bank but is not an operating '
-      + 'cost. Log those on Cash Outflows instead, or pick a different name.';
+      + 'cost. Log those on Close Books with Log Type set to Cash Outflow instead, or pick a different name.';
   },
   listAddOption(key, val) {
     val = (val == null ? '' : String(val)).trim();
