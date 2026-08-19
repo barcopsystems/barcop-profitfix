@@ -42,8 +42,8 @@ S.ShiftDrawers = {
 
   showHowTo() {
     App.showHelpModal('How Registers Work', [
-      { p: ['Every register in your operation lives here: the main bar register, a service bar well, each floor register. Cash Drop and the Variance Log pull from this list, so every cash event lands on the same register name instead of "Bar 1" one night and "Front Bar" the next.'] },
-      { h: 'Adding a Register', p: ['Give it a clear name and set a default opening bank if it normally opens with the same starting cash. That default pre-fills the opening bank when you start a shift on the register, so you are not retyping it every day.'] },
+      { p: ['Every register in your operation lives here: the main bar register, a service bar well, each floor register. Cash Control and Cash History pull from this list, so every cash event lands on the same register name instead of "Bar 1" one night and "Front Bar" the next.'] },
+      { h: 'Adding a Register', p: ['Give it a clear name and set a default opening bank if it normally opens with the same starting cash. Cash Control then shows that figure on the register tile as its standard bank, so anyone counting the drawer can see what it should have opened with.'] },
       { h: 'Cash Tolerance', p: ['Each register carries its own cash tolerance: how far its drawer can be off at a reconcile before Bar Cop flags it Over or Short. A busy main bar is harder to count tight than a slow service well, so set the number that fits the register. The default is $10. The reconcile on Cash Control and the weekly POS cash import both read the matched register\'s tolerance.'] },
       { h: 'Archiving', p: ['Retire a register you no longer use with Archive. It drops out of the dropdowns but stays on past records, so your history stays intact. Restore it any time to bring it back.'] }
     ]);

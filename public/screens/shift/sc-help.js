@@ -58,7 +58,7 @@ S.ShiftHelp = {
       { q: 'How does Bar Cop catch comp abuse?',
         a: 'By comp volume per server, not by whether a manager name was typed (that is a POS-native control). The per-server read lives on Sales Integrity in Profit Recovery: drop your POS per-server sales report and Bar Cop benchmarks each server\'s comp, discount, void, and refund dollars against the floor and flags the outliers, the bartender giving away rounds. The Void and Comp Log here is the operational record, what got comped and the loss total; Sales Integrity is the pattern read. Authorized By stays on the form as an optional record of who cleared a comp, but it does not drive any flag.' },
       { q: 'What is the Maintenance Log for?',
-        a: 'Broken equipment, facility issues, and operational problems that need attention. Each entry has a priority (Urgent, High, Normal, Low) and a status (Open, In Progress, Resolved). Assigned To suggests staff from your roster but takes free text for an outside vendor like an HVAC tech or a plumber. Urgent open items show up as alerts on the Hub Dashboard so a problem from Saturday night carries to Sunday manager until it gets resolved.' },
+        a: 'Broken equipment, facility issues, and operational problems that need attention. Each entry has a priority (Urgent, High, Normal, Low) and a status (Open, In Progress, Resolved). Assigned To suggests staff from your roster but takes free text for an outside vendor like an HVAC tech or a plumber. An Urgent item that is not Resolved shows up on your Hub under Needs Attention, so a problem from Saturday night carries to Sunday\'s manager until someone closes it out.' },
       { q: 'What is the Walked Tabs log?',
         a: 'Customers who leave without paying, mis-billed checks, lost-check write-offs. Real dollar losses that used to evaporate into "I think we lost about $73 somewhere on Saturday." Log the server, the amount, the reason (Walked, Mis-bill, Refused to Pay, Lost Check, Other), and the manager who absorbed it. The log attributes the loss to the right server and shift instead of the weekly total, and builds a server trend over time.' },
       { q: 'What is the Incident Log for?',
@@ -80,7 +80,7 @@ S.ShiftHelp = {
       { q: 'What flows from Shift Control to Revenue Recovery?',
         a: 'Two connections. Your imported sales feed the revenue line on your confirmed week (the same weekly sum, broken out as bar and floor). Covers from the import feed the cover count on your confirmed week and the check-average that drives Server Check and the Check Average screen.' },
       { q: 'What flows from Shift Control to the Hub?',
-        a: 'Maintenance entries marked Urgent and Open flow to the Hub Dashboard alerts so they stay visible across shift changes until resolved, and the Hub reads your logged shifts to show how the current week is tracking.' }
+        a: 'Maintenance entries marked Urgent flow to your Hub under Needs Attention and stay visible across shift changes until they are Resolved, and the Hub reads your logged shifts to show how the current week is tracking.' }
     ]}
   ],
 
