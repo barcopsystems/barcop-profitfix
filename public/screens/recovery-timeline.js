@@ -25,7 +25,7 @@ S.RecoveryTimeline = {
   PHASES: [
     { key: 'diagnose', name: 'Diagnose', when: 'Day one', desc: 'Upload your POS, run your audits, read your Forecast. You see your opportunity, what is on the table, right away.' },
     { key: 'build',    name: 'Build',    when: 'Weeks 1 to 4', desc: 'Set up and work the systems. Bar Cop watches the disciplines and builds your baseline. No recovery dollars yet, and it tells you so.' },
-    { key: 'measure',  name: 'Measure',  when: 'Around day 30', desc: 'Enough data. Your first recovery number shows, up or down, and the Bar Cop Audit unlocks.' },
+    { key: 'measure',  name: 'Measure',  when: 'Around day 30', desc: 'Enough data. Your first recovery number shows, up or down, and your audits start scoring on real weeks.' },
     { key: 'live',     name: 'Live',     when: 'Week 8 and on', desc: 'The number matures and tracks every week. A slip re-surfaces the system so you catch it.' }
   ],
 
