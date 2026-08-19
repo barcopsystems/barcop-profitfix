@@ -13,7 +13,7 @@ S.EventsHelp = {
 
   showHowTo() {
     App.showHelpModal('Events Help and FAQ', [
-      { p: ['This page is the full Help and FAQ for Events: how to get started, the booking lifecycle, quotes and deposits, the run sheet and agreement, the calendar and regulars, and how Events feeds This Week, the audits, Books, your Cash Forecast, and Labor scheduling.'] },
+      { p: ['This page is the full Help and FAQ for Events: how to get started, the booking lifecycle, quotes and deposits, the run sheet and agreement, the calendar and regulars, and how Events feeds your confirmed week, the audits, Books, your Cash Forecast, and Labor scheduling.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "deposit", "quote", or "regular" lands you on the right answer fast.'] },
       { h: 'Directions For A Specific Screen', p: ['Every working screen in Events carries its own directions. Open the screen you have a question about, like Event Booking or the Event Calendar, and tap this same info i button at the top for the step-by-step. This FAQ covers the why and how it all connects.'] }
     ]);
@@ -22,9 +22,9 @@ S.EventsHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What does the Events section do?',
-        a: 'Events is where you run the demand side of the business: parties, buyouts, catering, your regulars, and the dates you plan around. A booking is worked from the first phone call to the paid invoice, with its own profit and loss. It is a feeder, like the Control sections, so the revenue and labor from your events flow into This Week, the audits, Books, and your Cash Forecast without you typing the numbers twice. The info "i" on any Events screen explains how that screen works.' },
-      { q: 'What does the Events landing show me?',
-        a: 'Your events at a glance. Where You Stand up top is the revenue you have booked, your open pipeline, the deposits you are owed, and your win rate. Below it, your bookings are the running work that keeps the pipeline moving: work your open leads, collect the deposits due, prep the run sheets for events in the next two weeks, and close out the P&L on completed events. Each step stays open until you do the work and mark it done, your own checkmark; it reopens on its own when something new lands in it, a new lead, a deposit due, or an event to prep or close, so the cockpit never goes stale. The Get Started box and the steps both show before you have any data, so it is clear from the first visit how it works.' },
+        a: 'Events is where you run the demand side of the business: parties, buyouts, catering, your regulars, and the dates you plan around. A booking is worked from the first phone call to the paid invoice, with its own profit and loss. It is a feeder, like the Control sections, so the revenue and labor from your events flow into your confirmed week, the audits, Books, and your Cash Forecast without you typing the numbers twice. The info "i" on any Events screen explains how that screen works.' },
+      { q: 'What does Events open on?',
+        a: 'Events opens on Event Booking. A strip across the top reads your open pipeline, anything sitting stale for three days or more, your pipeline value including tax, what is booked in the next 30 days, and the deposits you are owed. Under it, New Booking logs a fresh lead in a few seconds, and the pipeline below lists every booking on its stage. That is the running work: chase your open leads, collect the deposits due, prep the run sheets for events coming up, and close out the P&L on the ones that ran. Worksheet prints a blank inquiry pad to keep by the phone.' },
       { q: 'Where do I start?',
         a: 'Log your first booking when a lead comes in, even if all you have is a name and a date. Build a couple of packages on Price Packages so your quotes prefill. Add your regulars so birthday and anniversary outreach has a home. Then use the Event Calendar to see what is coming. None of it has to be perfect on day one; the value builds as you log.' },
       { q: 'Do I need every screen?',
@@ -36,7 +36,7 @@ S.EventsHelp = {
       { q: 'How is a quote priced?',
         a: 'Pick a Rate Card package to prefill the price, or open the Catering Calculator to price per head against a target food cost. Bar Cop builds the quote underneath: the food and beverage subtotal (per head times guests, or your F&B minimum, whichever is higher), then your service charge and your tax on top, to one quoted total. Set the service charge and tax once on the booking; the breakdown shows on the booking, the emailed quote, and the Quote PDF, so the number you send matches the invoice.' },
       { q: 'How do deposits and balances work?',
-        a: 'Once a booking is Booked, log the deposit you took and mark it paid. The balance is the quoted total minus the deposit, due on the event date. Deposits still owed roll up on the pipeline and the dashboard, and the balances on your booked events show as money coming in on your Cash Forecast, by event date, so your cash plan stays real.' },
+        a: 'Once a booking is Booked, log the deposit you took and mark it paid. The balance is the quoted total minus the deposit, due on the event date. Deposits still owed roll up into Deposits Due on the Event Booking strip, and the balances on your booked events show as money coming in on your Cash Forecast, by event date, so your cash plan stays real.' },
       { q: 'What is the Run Sheet?',
         a: 'The Run Sheet is what the kitchen and floor work the event off: the timeline, the food and bar, allergies and dietary, the room setup, AV and rentals, the guaranteed headcount and when the final count is due, and who runs point on site. Open it from a booking, fill it in once the event is booked, and Print Run Sheet hands the team a clean copy.' },
       { q: 'What is the Event Agreement?',
@@ -60,7 +60,7 @@ S.EventsHelp = {
     ]},
     { t: 'Connections', qa: [
       { q: 'What does Events feed into the rest of Bar Cop?',
-        a: 'Offsite catering revenue rolls into This Week as catering, which carries through to the Revenue and Profit audits and to Books and the Annual Review. Your booked event balances show as money coming in on the Cash Forecast, and the staff you check as working an event feed their labor into its Event P&L. A booked event also raises that week\'s Revenue Forecast, so Build Schedule budgets labor for the extra business. So the work you do here keeps the weekly numbers, the books, the cash plan, and the schedule current.' },
+        a: 'Offsite catering revenue rolls into your confirmed week as catering, which carries through to the Revenue and Profit audits and to Books and the Annual Review. Your booked event balances show as money coming in on the Cash Forecast, and the staff you check as working an event feed their labor into its Event P&L. A booked event also raises that week\'s Revenue Forecast, so Build Schedule budgets labor for the extra business. So the work you do here keeps the weekly numbers, the books, the cash plan, and the schedule current.' },
       { q: 'How does staffing an event work?',
         a: 'There is no separate event scheduler. From a booking, Schedule Staff for this Event jumps to Build Schedule on the event date, and you check the "Working [event]" box on each person working it. Only those hours land on the Event P&L. Catering and offsite gigs use the Event shift so an odd-time job fits the schedule.' },
       { q: 'Why is Events its own section instead of part of Revenue?',

@@ -814,7 +814,7 @@ S.EventsRegulars = {
       // regular with NO visit ever logged is no longer counted as quiet — and neither the new tile
       // nor the new chip was mentioned anywhere here, so the operator had nothing telling them
       // which of the two counts is the win-back sheet.
-      { h: 'Gone Quiet', p: ['A regular whose last visit was more than ' + this.QUIET_DAYS + ' days ago flags as quiet. Work that chip as your win-back list, and log a last visit when they come in to keep it honest.',
+      { h: 'Gone Quiet', p: ['A regular whose last visit was ' + this.QUIET_DAYS + ' days ago or longer flags as quiet. Work that chip as your win-back list, and log a last visit when they come in to keep it honest.',
         'No Visit Logged is a separate count, and it is different work: those are regulars you have never logged a visit for, so Bar Cop cannot say whether they have gone quiet or were in last night. Open them and set a last visit, and they start counting properly.'] },
       { h: 'Importing', p: ['Drop a CSV or Excel file and map the columns once. Only Name is required; phone, email, birthday, anniversary, drink preferences, and last visit come in if your file has them, and anything missing imports blank to fill later.',
         'Then Bar Cop lists every row in the file and what will happen to it: who is going in, who is already in your book, rows repeated in the file, and any birthday, anniversary or last visit it could not read. Nothing is saved until you press Add on that screen, and you can take any row out before you do.'] }
