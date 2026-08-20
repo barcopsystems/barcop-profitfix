@@ -2933,6 +2933,26 @@ S.InventoryProducts = {
     if (status === 'unplaced') return 'Pick a category to add it';
     return this._ROUTE_ROW_NOTE[status] || '';
   },
+  /* ⭐ THE FILE COLUMN NAMES THE FIELD IT SHOWS, AND ONE HELPER FEEDS BOTH THE HEADER AND THE CELL
+     (T27, Kyle reading the review). The header used to say "In Your File", which distinguished
+     nothing: Product, Brand and Size are all in the file too, so it was true of four columns while
+     naming one field. Worse, the app already called that field Sub-Category in three other places,
+     TWO of them on this same screen -- `ROUTE_CANDIDATES` offers it as a group-by by that name, and
+     `importFieldsForCategory` labelled it that when the operator mapped the column minutes earlier.
+     ⛔ AND MISC IS WHY THIS IS NOT A RENAME. `importFieldsForCategory` REMOVES `sub_category` for a
+     Misc import and swaps in the structured `misc_type` tag. The review never swapped with it, so a
+     Misc file rendered an EMPTY column on every row under a header promising content, while the
+     value the operator did give sat collected and unshown. Renaming alone would have sharpened that
+     question rather than answered it.
+     ⚠ KEYED ON THE SAME CONDITION THE MAPPER USES, deliberately. Whatever the mapper collected is
+     what the review shows, so the two cannot drift and a later change to the Misc branch fails in
+     `verify-route-col-names-its-field` instead of quietly reprinting a blank column. */
+  _routeFileCol() {
+    return (this._routing && this._routing.cardCat) === 'Misc'
+      ? { key: 'misc_type',    label: 'Misc Type' }
+      : { key: 'sub_category', label: 'Sub-Category' };
+  },
+
   _routeRowHtml(row, status, restorable) {
     const r = this._routing;
     const size = String(row.container_size_oz || row.case_size || '').trim();
@@ -2956,7 +2976,7 @@ S.InventoryProducts = {
       + '<td>' + esc(row.name || '') + '</td>'
       + '<td>' + esc(row.brand || '') + '</td>'
       + '<td>' + esc(size) + '</td>'
-      + '<td>' + esc(row.sub_category || '') + '</td>'
+      + '<td>' + esc(row[this._routeFileCol().key] || '') + '</td>'
       + '<td><div style="font-size:12px;color:var(--t2);">' + esc(note) + '</div></td>'
       + '<td><div class="row-actions"><button type="button" class="btn btn-ghost btn-sm '
         + (restorable ? 'ip-rt-pb' : 'ip-rt-rm')
@@ -2986,7 +3006,8 @@ S.InventoryProducts = {
       + '</div>';
     const table = '<div style="padding:0 16px 16px;overflow-x:auto;">'
       + '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._routeColgroup()
-      + '<thead><tr><th></th><th>Product</th><th>Brand</th><th>Size</th><th>In Your File</th>'
+      + '<thead><tr><th></th><th>Product</th><th>Brand</th><th>Size</th>'
+      + '<th>' + esc(this._routeFileCol().label) + '</th>'
       + '<th>What Happens</th><th></th></tr></thead>'
       + '<tbody>' + rows.map(row => this._routeRowHtml(row, (status || {})[row._rid], restorable)).join('') + '</tbody></table></div>';
     /* ⚠ THE `--bg` FILL THAT WAS HERE IS GONE, and it was here for about an hour. Kyle asked for
