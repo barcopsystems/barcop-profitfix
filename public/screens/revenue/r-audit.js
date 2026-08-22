@@ -239,7 +239,7 @@ S.RevenueAudit = {
 
     this.container.innerHTML = '<div class="screen" id="ra-audit-view">'
       + AuditUI.viewHero(audit, 'Revenue Audit', 'ra', 5)
-      + AuditUI.recoverStrip(audit)
+      + AuditUI.recoverStrip(audit, 'revenue')
       + AuditUI.actionsArea(audit, 'revenue', 'ra')
       + sections
       + '</div>';
