@@ -45,9 +45,23 @@ S.Week = {
      cannot be ticked is the defect [[lessons-paid-for]] #39 describes. */
   LEGACY: { close: 'week-close', review: 'week-review', history: 'week-history' },
 
-  open(tab) {
+  /* ⭐⭐ ONE MAP, AND IT LIVES HERE. `open` takes EITHER a tab key (`'close'`) or one of the legacy
+     screen ids (`'week-close'`) and resolves it itself, so `_protoGlobalClick` can hand it whatever
+     id it was given and stays a one-liner.
+     ⛔ THE FIRST VERSION PUT AN id→tab MAP IN `app.js` AS WELL, which is one fact written twice —
+     exactly the drift this suite exists to catch. The pin caught it: it went looking for a spelling
+     the code did not have, and the honest fix was to delete the second map rather than teach the
+     assertion about it. Add a fourth tab and only `TABS` + `LEGACY` change. */
+  _resolve(which) {
+    if (!which) return this.tab;
+    if (this.LEGACY[which]) return which;                                   // already a tab key
+    const hit = Object.keys(this.LEGACY).find(k => this.LEGACY[k] === which);
+    return hit || this.tab;                                                 // 'week' and anything unknown land where we are
+  },
+
+  open(which) {
     if (App._hubBlocked && App._hubBlocked('week-close')) return;
-    if (tab && this.LEGACY[tab]) this.tab = tab;
+    this.tab = this._resolve(which);
     App.openHubFullPage('The Week', (mount) => { this.container = mount; this.render(mount); }, 'week');
   },
 
