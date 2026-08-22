@@ -1407,6 +1407,11 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    (white text + icon), and the rail row is the OTHER door to this same menu -- the two ways in
    should not read as two different kinds of thing. */
 .tn-title-sec:hover{color:var(--w);}
+/* A section that carries its own tab bar has no overlay menu, so its name up here is a LABEL and
+   must not advertise itself as a control: no pointer, no hover lift. The class is still shared so
+   the two read identically at rest. */
+.tn-title-plain{cursor:default;}
+.tn-title-plain:hover{color:var(--t2);}
 /* ⛔ --b1, not --b-edge. --b-edge is #14222A, a CARD border read against a card fill; on the top
    bar's darker --bg it was effectively invisible. --b1 is rgba(255,255,255,0.15), the app's token
    for a line that is meant to be SEEN.
@@ -2281,3 +2286,38 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
     .screen, .wr-screen, .hub-grid { padding-right: calc(var(--sp) - var(--sbw)); }
   }
 }
+
+/* ══ SECTION TABS ══════════════════════════════════════════════════════════════════════════
+   The section's groups, permanently on screen, in place of the overlay menu that opened on a
+   rail click and closed again on selection.
+   ⛔ KYLE'S RULES, AND THEY ARE DELIBERATELY NOT THE SIDEBAR'S: no gold bar under the active
+   tab, no hover background on a row, the label stays --t1 and only the ICON goes gold on hover,
+   and the menu sits on --bg. That is why these are NEW class names: applying any of it to
+   .nav-item would restyle the section sidebar, and the MOBILE DRAWER parses that same markup.
+   ⛔ DESKTOP ONLY for now (Kyle: "do not change mobile menu"), so the bar is hidden at the
+   phone breakpoint and the drawer is left exactly as it was. */
+.section-tabs{position:relative;background:var(--bg);}
+.section-tabs[hidden]{display:none;}
+.st-bar{display:flex;align-items:center;gap:2px;padding:0 var(--sp);border-bottom:1px solid var(--b-edge);}
+.st-tab{background:none;border:0;padding:13px 14px;font-size:13px;font-weight:600;line-height:1;
+  color:var(--t2);cursor:pointer;font-family:inherit;transition:color .12s;}
+.st-tab:hover{color:var(--t1);}
+/* Active reads as GOLD TEXT, never a bar. The rail already says "active" in gold, so the bar is
+   borrowing the app's own convention rather than inventing a second one. */
+.st-tab.st-on{color:var(--gold);}
+.st-gap{flex:1;}
+.st-help{background:none;border:0;padding:9px 10px;cursor:pointer;color:var(--t3);display:flex;
+  align-items:center;transition:color .12s;}
+.st-help:hover{color:var(--gold);}
+.st-help .nav-icon{width:16px;height:16px;}
+.st-drop{position:absolute;top:100%;margin-top:-1px;background:var(--bg);border:1px solid var(--b-edge);
+  border-radius:0 0 8px 8px;padding:6px;min-width:200px;z-index:120;}
+.st-row{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;
+  padding:8px 12px;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;}
+/* No hover fill anywhere in here, by instruction. The only thing that moves is the icon. */
+.st-row:hover{background:none;}
+.st-ic{display:flex;align-items:center;color:var(--t3);transition:color .12s;}
+.st-ic .nav-icon{width:16px;height:16px;}
+.st-row:hover .st-ic{color:var(--gold);}
+.st-lb{color:var(--t1);}
+@media (max-width:768px){.section-tabs{display:none;}}

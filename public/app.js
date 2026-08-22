@@ -2889,11 +2889,26 @@ const App = {
        Enter or Space. A real button gets both keys, the tab stop and the `:focus-visible` ring for
        free, and `#tn-help` two nodes along is the same trick — a button reset to look like bare
        text. Kyle asked for a control here; this is what a control is in this codebase. */
+    /* ⭐ A SECTION WITH A TAB BAR SHOWS ONLY ITS NAME UP HERE (Kyle: *"the top bar where it
+       currently has the section | section page i help.. just becomes the section i help"*). The
+       group is on the tab bar and the screen names itself on the page, so repeating it in the bar
+       is the third spelling of the same fact.
+       ⛔ SCOPED TO THOSE SECTIONS, NOT GLOBAL. The other eight have no tab bar, so dropping the
+       page name there would leave the operator with nothing in the chrome telling them where they
+       are — a regression bought for a section that has not changed. */
+    const barred = secKey && typeof SectionTabs !== 'undefined' && SectionTabs.on(secKey);
+    /* ⛔ AND IT STOPS BEING A BUTTON. The section name opens the overlay menu, which a barred
+       section no longer has — so with the short-circuit in place, pressing it would have JUMPED
+       the operator to Take Inventory from wherever they were. Clicking the name of the section you
+       are already in should never move you. The tabs are the menu now, so this is a label. */
     el.innerHTML = (sec
-        ? '<button type="button" class="tn-title-sec" data-rail-sec="' + esc(secKey) + '"'
-          + ' title="Open the ' + esc(sec) + ' menu">' + esc(sec) + '</button><span class="tn-sep"></span>'
+        ? (barred
+            ? '<span class="tn-title-sec tn-title-plain">' + esc(sec) + '</span>'
+            : '<button type="button" class="tn-title-sec" data-rail-sec="' + esc(secKey) + '"'
+              + ' title="Open the ' + esc(sec) + ' menu">' + esc(sec) + '</button>'
+              + '<span class="tn-sep"></span>')
         : '')
-      + '<span class="tn-pg">' + esc(page) + '</span>';
+      + (barred ? '' : '<span class="tn-pg">' + esc(page) + '</span>');
   },
 
   /* The module title is written by nine different branches of `navigate`, several of which return
@@ -2980,6 +2995,12 @@ const App = {
        ⚠ BEFORE the fallback below, deliberately: that fallback navigates INTO the section, so
        checking after it would hand a blocked member the very screen this is refusing. */
     if (!this._railSectionAllowed(key)) { this.showNoAccess(); return; }
+    /* ⭐ A SECTION WITH A TAB BAR HAS NO OVERLAY MENU. The rail row navigates straight in and the
+       section's groups are on screen from then on, which is the whole point: the overlay showed the
+       shape of the section and then took it away again the moment you chose a row.
+       ⚠ AFTER the access gate, deliberately, for the same reason the gate is first — this
+       navigates INTO the section, so checking after it would hand a blocked member the screen. */
+    if (typeof SectionTabs !== 'undefined' && SectionTabs.on(key)) { this.jumpToSection(key); return; }
     const nav = document.getElementById('rail-menu-nav');
     const hubCtx = this._RAIL_HUB_CTX[key];
     /* ⛔ NO DEAD END. If the overlay is not on the page for any reason, fall back to navigating
@@ -3873,6 +3894,12 @@ const App = {
     const title = document.getElementById('topbar-title')?.textContent || id;
     this._recordLocation({ mode: 'app', module: this._activeModule, screen: id, label: title });
     const v = this._VIEW_STAMP[id]; if (v) this.stampFixView(v);
+    /* The section tab bar re-renders on EVERY navigate, not just on a section swap, because the lit
+       tab has to follow the screen however the operator got there — a Fix step, a Hub row or an
+       audit action item all land here without touching the bar. `SectionTabs.render` is a no-op for
+       any section it is not enabled for, so this costs nothing on the other eight. */
+    try { if (typeof SectionTabs !== 'undefined') SectionTabs.render(this._activeModule, id); }
+    catch (e) { console.error('section tabs render failed', e); }
   },
 
   // Profit Fix view-tracking: stamp the day a "review/read this screen" target
