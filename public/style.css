@@ -2287,37 +2287,44 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   }
 }
 
-/* ══ SECTION TABS ══════════════════════════════════════════════════════════════════════════
-   The section's groups, permanently on screen, in place of the overlay menu that opened on a
-   rail click and closed again on selection.
-   ⛔ KYLE'S RULES, AND THEY ARE DELIBERATELY NOT THE SIDEBAR'S: no gold bar under the active
-   tab, no hover background on a row, the label stays --t1 and only the ICON goes gold on hover,
-   and the menu sits on --bg. That is why these are NEW class names: applying any of it to
-   .nav-item would restyle the section sidebar, and the MOBILE DRAWER parses that same markup.
-   ⛔ DESKTOP ONLY for now (Kyle: "do not change mobile menu"), so the bar is hidden at the
-   phone breakpoint and the drawer is left exactly as it was. */
-.section-tabs{position:relative;background:var(--bg);}
-.section-tabs[hidden]{display:none;}
-.st-bar{display:flex;align-items:center;gap:2px;padding:0 var(--sp);border-bottom:1px solid var(--b-edge);}
-.st-tab{background:none;border:0;padding:13px 14px;font-size:13px;font-weight:600;line-height:1;
-  color:var(--t2);cursor:pointer;font-family:inherit;transition:color .12s;}
-.st-tab:hover{color:var(--t1);}
-/* Active reads as GOLD TEXT, never a bar. The rail already says "active" in gold, so the bar is
-   borrowing the app's own convention rather than inventing a second one. */
-.st-tab.st-on{color:var(--gold);}
-.st-gap{flex:1;}
-.st-help{background:none;border:0;padding:9px 10px;cursor:pointer;color:var(--t3);display:flex;
-  align-items:center;transition:color .12s;}
-.st-help:hover{color:var(--gold);}
-.st-help .nav-icon{width:16px;height:16px;}
-.st-drop{position:absolute;top:100%;margin-top:-1px;background:var(--bg);border:1px solid var(--b-edge);
-  border-radius:0 0 8px 8px;padding:6px;min-width:200px;z-index:120;}
+/* ══ SECTION LINKS ═════════════════════════════════════════════════════════════════════════
+   A section's groups live IN THE TOP BAR beside its name, so the app gains no extra band of
+   chrome for six words. The page below carries its own header: the screen name with the app's
+   one help "i" beside it, left aligned.
+   ⛔ NEW CLASS NAMES ONLY. The sidebar's own rules must not move: the MOBILE DRAWER parses that
+   same markup, and Kyle asked for desktop only.
+   ⛔ NO ICONS anywhere in here, by instruction, and no hover fill. */
+/* ⛔ position:relative, and NO overflow:hidden. The drop-down is absolutely positioned inside this
+   element, so it needs the containing block — and `overflow:hidden` (which I wrote first, out of
+   habit, to stop the links wrapping) would have CLIPPED the menu out of existence. */
+.sec-links{position:relative;display:flex;align-items:center;gap:2px;margin-left:14px;min-width:0;flex-wrap:nowrap;}
+.sec-links[hidden]{display:none;}
+.st-link{background:none;border:0;padding:4px 9px;font-family:inherit;font-size:13px;font-weight:600;
+  line-height:1;color:var(--t2);cursor:pointer;white-space:nowrap;transition:color .12s;}
+.st-link:hover{color:var(--w);}
+/* Active is gold TEXT, never a bar under it. The rail already says "active" in gold; this borrows
+   the app's own convention instead of inventing a second one. */
+.st-link.st-on{color:var(--gold);}
+.st-drop{position:absolute;top:100%;margin-top:0;background:var(--bg);border:1px solid var(--b-edge);
+  border-radius:8px;padding:5px;min-width:186px;z-index:130;}
+/* Icons stay ON the drop-down rows (Kyle: the top-bar links are what he wanted bare). No hover
+   fill anywhere: the only thing that moves is the icon going gold, which is the sidebar's own
+   hover behaviour and the reason the icons are worth keeping here. */
 .st-row{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;
-  padding:8px 12px;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;}
-/* No hover fill anywhere in here, by instruction. The only thing that moves is the icon. */
-.st-row:hover{background:none;}
-.st-ic{display:flex;align-items:center;color:var(--t3);transition:color .12s;}
+  padding:7px 12px;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;
+  color:var(--t1);white-space:nowrap;transition:color .12s;}
+.st-row:hover{background:none;color:var(--gold);}
+.st-row-on{color:var(--gold);}
+.st-ic{display:flex;align-items:center;flex-shrink:0;color:var(--t3);transition:color .12s;}
 .st-ic .nav-icon{width:16px;height:16px;}
-.st-row:hover .st-ic{color:var(--gold);}
-.st-lb{color:var(--t1);}
-@media (max-width:768px){.section-tabs{display:none;}}
+.st-row:hover .st-ic,.st-row-on .st-ic{color:var(--gold);}
+
+/* The page header. Left aligned, the screen name and the one "i". */
+.page-head{display:flex;align-items:center;gap:7px;padding:20px var(--sp) 0;background:var(--bg);}
+.page-head[hidden]{display:none;}
+.ph-title{font-family:var(--f-disp);font-weight:700;font-size:21px;letter-spacing:.3px;
+  color:var(--t1);margin:0;line-height:1.2;}
+.page-head .tn-iconbtn{flex-shrink:0;}
+
+/* Desktop only for now (Kyle: "do not change mobile menu"): the drawer keeps doing the job. */
+@media (max-width:768px){.sec-links{display:none;}.page-head{display:none;}}

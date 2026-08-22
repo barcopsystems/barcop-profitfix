@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/bar-graph-icon.png?v=1"/>
 <link rel="apple-touch-icon" href="assets/bar-graph-icon.png?v=1"/>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=348"/>
+<link rel="stylesheet" href="style.css?v=350"/>
 <style>
 @media print {
   /* Flip the dark theme to a light, readable theme for print.
@@ -219,6 +219,9 @@
            drift from the name the screen set. -->
       <div class="tn-page">
         <h1 class="tn-title" id="tn-title"></h1>
+        <!-- A section's groups, beside its name. Filled by SectionTabs from the section's own
+             navHTML(); hidden for every section it is not enabled for and on mobile. -->
+        <div class="sec-links" id="sec-links" hidden></div>
         <button class="tn-iconbtn" id="tn-help" type="button" title="Directions for this page">
           <svg viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="5.7" r="0.75" fill="currentColor"/><path d="M8.5 7.9v3.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         </button>
@@ -320,9 +323,9 @@
       <div id="topbar-group-dashboard" style="display:none;"></div>
       <div class="topbar-right" id="topbar-actions"></div>
     </header>
-    <!-- The section's groups, permanently on screen. Filled by SectionTabs.render() from the
-         section's own navHTML(), hidden for every section it is not enabled for. -->
-    <div class="section-tabs" id="section-tabs" hidden></div>
+    <!-- The page's own header: the screen's name, left aligned, with the app's ONE help "i" MOVED
+         into it (never a second copy). Filled by SectionTabs.render(). -->
+    <div class="page-head" id="page-head" hidden></div>
     <main class="content" id="content-area"></main>
   </div>
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
@@ -524,7 +527,7 @@
 <script src="screens/cash/c-bridge.js?v=25"></script>
 <script src="screens/cash/c-help.js?v=8"></script>
 <script src="components/bottle-slider.js?v=19"></script>
-<script src="components/section-tabs.js?v=1"></script>
+<script src="components/section-tabs.js?v=3"></script>
 <script src="components/csv-mapper.js?v=47"></script>
 <script src="components/pos-ingest.js?v=75"></script>
 <script src="components/import-confirm.js?v=16"></script>
