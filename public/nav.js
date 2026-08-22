@@ -13,14 +13,6 @@ const ProfitNav = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Profit Forecast</span>
       </div>
-      <div class="nav-item" data-screen="recovery-playbook" id="nav-recovery-playbook">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 4C7 2.9 4.7 2.6 2.7 3.1v9c2-.5 4.3-.2 5.8.9 1.5-1.1 3.8-1.4 5.8-.9v-9C12.3 2.6 10 2.9 8.5 4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 4v9" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Profit Playbook</span>
-      </div>
-      <div class="nav-item" data-screen="profit-fix" id="nav-profit-fix">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M10.8 2.5a3 3 0 0 0-4 4l-4.3 4.3 2 2L8.8 8.5a3 3 0 0 0 4-4l-2 2-2-2 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Profit Fix</span>
-      </div>
       <div class="nav-section">Leaks</div>
       <div class="nav-item" data-screen="sales-integrity" id="nav-sales-integrity">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11.2 11.2L15 15" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 7.8l1.6 1.6L10 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -73,14 +65,6 @@ const Revenue = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Revenue Forecast</span>
       </div>
-      <div class="nav-item" data-screen="r-playbook" id="nav-r-playbook">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 4C7 2.9 4.7 2.6 2.7 3.1v9c2-.5 4.3-.2 5.8.9 1.5-1.1 3.8-1.4 5.8-.9v-9C12.3 2.6 10 2.9 8.5 4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 4v9" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Revenue Playbook</span>
-      </div>
-      <div class="nav-item" data-screen="r-fix" id="nav-r-fix">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M10.8 2.5a3 3 0 0 0-4 4l-4.3 4.3 2 2L8.8 8.5a3 3 0 0 0 4-4l-2 2-2-2 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Revenue Fix</span>
-      </div>
       <div class="nav-section">Menu and Pricing</div>
       <div class="nav-item" data-screen="r-menu-items" id="nav-r-menu-items">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 8h6M5.5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -132,14 +116,6 @@ const Cash = {
       <div class="nav-item" data-screen="c-forecast" id="nav-c-forecast">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Cash Forecast</span>
-      </div>
-      <div class="nav-item" data-screen="c-playbook" id="nav-c-playbook">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 4C7 2.9 4.7 2.6 2.7 3.1v9c2-.5 4.3-.2 5.8.9 1.5-1.1 3.8-1.4 5.8-.9v-9C12.3 2.6 10 2.9 8.5 4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 4v9" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Cash Playbook</span>
-      </div>
-      <div class="nav-item" data-screen="c-fix" id="nav-c-fix">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M10.8 2.5a3 3 0 0 0-4 4l-4.3 4.3 2 2L8.8 8.5a3 3 0 0 0 4-4l-2 2-2-2 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Cash Fix</span>
       </div>
       <div class="nav-section">Free Up Cash</div>
       <div class="nav-item" data-screen="c-purchasing" id="nav-c-purchasing">
