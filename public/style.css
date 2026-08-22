@@ -1362,22 +1362,29 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* The top bar's logo is the MOBILE slot only — the rail owns it on desktop and the rail is hidden
    under 768px, so without this the logo would simply disappear on a phone. */
 .tn-logo-mobile{display:none;}
-/* The page's own name plus the one help "i", at the left of the bar. */
+/* The page's own name and, on a section that has them, its group links — at the left of the bar.
+   ⚠ THE HELP "i" IS NOT IN HERE ANY MORE (2026-08-22, moved beside The Rail 2026-08-23). This line
+   said "plus the one help i" for a chat after it left, which is how its styling rules went on
+   pointing at a parent the button no longer had. */
 .tn-page{display:flex;align-items:center;gap:16px;min-width:0;flex-shrink:1;}
 /* ⭐ DESKTOP: the "i" is the ICON, not a button. No fill, no border, no box — it turns gold on
    hover like every other "this is live" mark in the app. The chrome button treatment stays on
-   MOBILE, where it sits beside the burger and needs to read as a tap target (restored below). */
-.tn-page #tn-help{
+   MOBILE, where it sits beside the burger and needs to read as a tap target (restored below).
+   ⛔⛔ SCOPED TO `.tn-right`, WHERE THE BUTTON ACTUALLY LIVES. This rule and its phone twin were
+   both written as `.tn-page #tn-help`, and the button left `.tn-page` for `.tn-right` on
+   2026-08-22 — so BOTH silently stopped applying and the "i" fell back to `.tn-iconbtn`'s filled
+   box. That box is what Kyle asked to see gone on 2026-08-23; the treatment he wanted had been
+   sitting here the whole time, pointed at a parent the button no longer had.
+   ⚠ A dead rule is worse than a missing one: the next person picks the obvious parent and inherits
+   a treatment nobody can see is still there. This stylesheet already paid for that at `.tn-sec`.
+   ⛔ THE DIVIDER IS RETIRED WITH IT. `.tn-page #tn-help::before` drew the rule between the page
+   NAME and the "i". There is no page name beside it any more, and Kyle asked for *"just the i help
+   circle icon"* — the surviving pair is `.tn-sep` and `.sec-links::before`, pinned as agreeing. */
+.tn-right #tn-help{
   width:auto;height:auto;background:none;border:0;border-radius:0;padding:0;
-  position:relative;color:var(--t3);
+  color:var(--t3);
 }
-.tn-page #tn-help:hover{background:none;color:var(--gold);}
-/* The divider between the page name and the "i". A pseudo-element rather than a span so the height
-   is controlled (18px, not the full row) and no markup carries a purely decorative node. */
-.tn-page #tn-help::before{
-  content:'';position:absolute;left:-8px;top:50%;transform:translateY(-50%);
-  width:1px;height:18px;background:var(--b1);   /* same token as .tn-sep, or the two bar dividers drift */
-}
+.tn-right #tn-help:hover{background:none;color:var(--gold);}
 /* #tn-global is empty since the rail took the global links; keep the node, drop its 16px gap. */
 /* 14px, down from 15. The title carries a section prefix now, so it is a longer string in the same
    space, and the smaller size is what keeps it from crowding the bar. */
@@ -1441,7 +1448,9 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    pick. The prefix is `.tn-title-sec` now, and this is deleted rather than left lying there.
    ⚠ `.tn-row2`, `.tn-row2-right`, `.tn-grp-label`, `.tn-global` and `.tn-glink` are dead the same
    way (0 JS references, measured). Flagged to Kyle rather than swept up here. */
-#tn-acct{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;}
+/* ⛔ `#tn-acct` IS DELETED (2026-08-23). It hosted the relocated multi-bar switcher in `.tn-right`;
+   the switcher moved to the Hub greeting and nothing else ever went in it, so the node went with
+   the rule rather than being left as an empty flex child claiming a gap slot. */
 .tn-mobile-burger{display:none;width:33px;height:33px;align-items:center;justify-content:center;background:var(--c3);border:1px solid transparent;border-radius:var(--r2);color:var(--t2);cursor:pointer;flex-shrink:0;transition:background .12s,color .12s;}
 .tn-mobile-burger:hover{background:var(--c4);color:var(--w);}
 .tn-iconbtn svg,.tn-mobile-burger svg{width:16px;height:16px;}
@@ -1558,16 +1567,13 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
      boot; relocating it would mean re-parenting a wired node on every resize. The drawer
      builds its own button and calls the same BarCopBriefing.open(). */
   .tn-rail{display:none;}
-  /* ⛔ THE 16px GAP BETWEEN THE "i" AND THE BURGER, and it is TWO gaps, not one wide one.
-     MEASURED on the pushed build at 375px: 8px is the ROW gap between .tn-page and
-     .tn-right, and the other 8px is .tn-right own gap around #tn-acct — which sits there
-     with two children and ZERO width, so it renders nothing and still claims a gap slot.
-     An invisible flex item is still a flex item.
-     ⭐ HIDING IT COSTS NOTHING ON A PHONE: the group-dashboard child is already display:none
-     here, and the multi-bar switcher lives in the MENU HEAD (openMobileNav renders
-     .mnav-loc-sel whenever there is more than one bar), so the top bar is not the only
-     door to it. That is what makes this safe rather than a control quietly disappearing. */
-  #tn-acct{display:none;}
+  /* ⛔ THE `#tn-acct{display:none}` RULE IS GONE WITH ITS NODE (2026-08-23). It was here because an
+     invisible flex item is still a flex item: the box sat in `.tn-right` with two zero-width
+     children and claimed an 8px gap slot between the "i" and the burger. The node is deleted now,
+     so the gap it caused cannot come back and there is nothing left to hide.
+     ⭐ THE PHONE NEVER LOSES THE SWITCHER, WHICH IS WHAT MADE ALL OF THIS SAFE: the multi-bar
+     picker lives in the MENU HEAD (openMobileNav renders `.mnav-loc-sel` whenever there is more
+     than one bar), so the top bar was never its only door here. */
   .tn-page{order:2;margin-left:auto;}
   .tn-right{order:3;margin-left:0;}
   /* ⛔ THE "i" AND THE BURGER ARE TWO SEPARATE FLEX CHILDREN OF .tn-row1, so the space between them
@@ -1576,17 +1582,22 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .tn-row1{gap:8px;}
   .tn-page{gap:8px;}
   /* Mobile keeps the chrome-button treatment: beside the burger the "i" has to read as a tap
-     target, and there is no page name for a divider to divide. */
-  .tn-page #tn-help{
+     target, and there is no page name for a divider to divide.
+     ⛔ RE-POINTED TO `.tn-right` WITH ITS DESKTOP TWIN, 2026-08-23. Fixing only the desktop rule
+     would have left the phone taking the desktop reset — a 16px hit area beside a 33px burger,
+     which is the half of this change nobody would see on a laptop. Same specificity as the base
+     rule and later in the file, so it wins inside the query and nowhere else. */
+  .tn-right #tn-help{
     width:33px;height:33px;background:var(--c3);border:1px solid transparent;
     border-radius:var(--r2);padding:0;color:var(--t2);
   }
-  .tn-page #tn-help:hover{background:var(--c4);color:var(--w);}
-  .tn-page #tn-help::before{display:none;}
+  .tn-right #tn-help:hover{background:var(--c4);color:var(--w);}
   .tn-mobile-burger{display:flex;}
   #tn-settings{display:none;}   /* App Settings lives in the burger menu on mobile */
   #tn-signout{display:none;}    /* and so does Sign Out — the drawer renders _PROTO_SIGNOUT */
-  #tn-acct #topbar-group-dashboard{display:none !important;}
+  /* `#tn-acct #topbar-group-dashboard{display:none !important}` went with `#tn-acct`. The group
+     dashboard was retired long ago and `renderAccountSwitcher` already hides its slots on every
+     run, so nothing here has to say it a second time. */
   /* The shared nav replaces the old header on mobile and the burger opens the
      drawer, so hide the old topbar everywhere so it does not double up. */
   body.chrome-on .topbar{display:none;}
@@ -1994,14 +2005,29 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;
   white-space:nowrap;transition:color .12s;}
 .tn-signout:hover{color:var(--w);}
-/* The bar switcher, only where it sits in the top bar. .at-qsel is the switcher's own class (its
-   only two references are in renderAccountSwitcher) but the height is scoped anyway, so a future
-   reuse of the class elsewhere cannot inherit a top-bar measurement. */
-/* ⚠ Padding and type size are scoped to the TOP BAR only. `.at-qsel`'s own 12px/`7px 26px 7px 10px`
-   is right where a quick-select sits in a page body; up here it made the bar name 173px wide next
-   to an 82px button. 11px matches the button's scale and takes it to 154px. The 20px on the right
-   still clears the chevron, which `.at-qsel` paints at `right 8px center`. */
-.tn-right .at-qsel{height:var(--tb-ctl-h);padding:0 20px 0 8px;font-size:11px;}
+/* ⛔ `.tn-right .at-qsel` IS GONE (2026-08-23). It sized the multi-bar picker for the top bar, and
+   the picker no longer goes there — *"that needs moved out of the top bar and replace the bar name
+   on the hub.. and it only goes there."* The scoping DECISION it recorded is the part worth
+   keeping, so it is repeated below at the new host rather than dropped: `.at-qsel`'s own
+   12px/`7px 26px 7px 10px` is right for a quick-select in a page body and wrong everywhere it is
+   borrowed, so every host states its own measurements.
+   ⭐ THE GREETING'S PICKER READS AS THE GREETING. It replaces a 19px/700 bar name in a sentence, so
+   it takes that type rather than chrome type, and it carries no fill or border: the operator is
+   reading a headline, not filling in a form. The chevron is what says it is a control, and
+   `.at-qsel` already paints one at `right 8px center`, so the right padding has to clear it.
+   ⚠ font-family/size are stated, NOT inherited, because `.at-qsel` sets its own 12px Barlow and a
+   bare `inherit` on the size alone would leave the select fighting the greeting on weight. */
+/* ⚠ NOT `display:flex`. The greeting is a SENTENCE — "Good afternoon, " and the bar are one line of
+   running text, and a flex container would turn the text node and the picker into two flex items,
+   which is a layout change to the single-bar Hub nobody asked for. Normal flow plus a baseline
+   alignment on the select keeps both states reading identically. */
+.hub-greet .at-qsel{
+  height:auto;padding:0 22px 0 4px;font-size:19px;font-weight:700;line-height:inherit;
+  vertical-align:baseline;background-color:transparent;border:0;border-radius:0;color:inherit;
+  background-position:right 6px center;max-width:100%;
+}
+.hub-greet .at-qsel:hover{color:var(--gold);}
+.hub-greet .at-qsel:focus{border-color:transparent;outline:none;}
 .mnav-barname{font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;color:var(--t1);}
 
 /* Backdrop sits behind the sidebar overlay. Real div (not pseudo) so we can
@@ -2305,7 +2331,10 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   padding-left:7px;margin-left:0;min-width:0;flex-wrap:nowrap;}
 .sec-links[hidden]{display:none;}
 /* The vertical rule between the section icon and its groups. A pseudo-element so no decorative
-   node lives in the markup, and 18px rather than full height, matching the "i" divider above. */
+   node lives in the markup, and 18px rather than full height.
+   ⚠ IT MATCHES `.tn-sep`, the section|page rule — this used to say "the 'i' divider above" and that
+   one was retired on 2026-08-23 with the page-name treatment of the help icon. The two survivors
+   are pinned as AGREEING (verify-topbar-chrome A1/A2), so the token and the height cannot drift. */
 .sec-links::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
   width:1px;height:18px;background:var(--b1);}
 .st-link{background:none;border:0;padding:4px 9px;font-family:inherit;font-size:13px;font-weight:600;

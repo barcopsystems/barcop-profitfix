@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/bar-graph-icon.png?v=1"/>
 <link rel="apple-touch-icon" href="assets/bar-graph-icon.png?v=1"/>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="style.css?v=352"/>
+<link rel="stylesheet" href="style.css?v=353"/>
 <style>
 @media print {
   /* Flip the dark theme to a light, readable theme for print.
@@ -224,19 +224,30 @@
         <div class="sec-links" id="sec-links" hidden></div>
       </div>
       <div class="tn-right">
-        <!-- The app's ONE help "i" ([[help-model]]). It sat beside the page name until 2026-08-22;
-             Kyle moved it here next to Sign Out when the page-name slot went away. Still one node,
-             never a per-page copy. -->
+        <!-- Sign Out, left of the help "i" and The Rail (Kyle, 2026-08-16). Text only, no icon.
+             It used to sit at the foot of the rail; the rail no longer renders it. The PHONE keeps
+             its own in the burger drawer, which is generated from `_PROTO_SIGNOUT`, so this is a
+             move rather than a second copy.
+             ⚠ IT IS MOVING AGAIN (Kyle, 2026-08-23: *"leave the sign out link there for now.. but
+             it will be moving later"*), so nothing here should be built on it staying. -->
+        <button class="tn-signout" id="tn-signout" type="button">Sign Out</button>
+        <!-- The app's ONE help "i" ([[help-model]]). Still one node, never a per-page copy.
+             ⭐ IMMEDIATELY LEFT OF THE RAIL (Kyle, 2026-08-23): *"the i help icon goes next to the
+             rail button (to the left of it) and get rid of the background around it .. just the i
+             help circle icon that turns gold on hover."* Nothing may be inserted between these two.
+             ⛔ THE `.tn-iconbtn` CLASS IS STILL ON IT AND THAT IS DELIBERATE — it is what the PHONE
+             wants (a 33px tap target beside the burger). Desktop overrides it in `.tn-right
+             #tn-help`; the media query hands the chrome treatment back. Dropping the class would
+             fix the desktop box by taking the phone's hit area with it. -->
         <button class="tn-iconbtn" id="tn-help" type="button" title="Directions for this page">
           <svg viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="5.7" r="0.75" fill="currentColor"/><path d="M8.5 7.9v3.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         </button>
-        <!-- Sign Out, left of the switcher and The Rail (Kyle, 2026-08-16). Text only, no icon.
-             It used to sit at the foot of the rail; the rail no longer renders it. The PHONE keeps
-             its own in the burger drawer, which is generated from `_PROTO_SIGNOUT`, so this is a
-             move rather than a second copy. -->
-        <button class="tn-signout" id="tn-signout" type="button">Sign Out</button>
-        <div id="tn-acct"></div>
-        <!-- THE RAIL — one whole-bar read, on every page. Static markup like #tn-acct, so nothing
+        <!-- ⛔ `#tn-acct` IS GONE (Kyle, 2026-08-23): *"currently when there is a multi unit bar the
+             bar selector is in the top bar.. that needs moved out of the top bar and replace the bar
+             name on the hub.. and it only goes there."* The switcher's only home is the Hub greeting
+             now. The NODE went rather than being emptied, because an invisible flex item still
+             claims a gap slot — this file's own phone media query says exactly that about it. -->
+        <!-- THE RAIL — one whole-bar read, on every page. Static markup, so nothing
              has to rebuild it on navigation; App wires it once at boot. -->
         <button class="btn btn-primary tn-rail" id="tn-rail" type="button" title="A read on how the bar is doing">The Rail</button>
         <button class="tn-mobile-burger" id="tn-mobile-burger" type="button" title="Menu">
@@ -460,7 +471,7 @@
 <script>var S = {};</script>
 <script src="sample-profile.js?v=6"></script>
 <script src="nav.js?v=126"></script>
-<script src="screens/hub.js?v=287"></script>
+<script src="screens/hub.js?v=288"></script>
 <script src="screens/hub-bar-cop-audit.js?v=73"></script>
 <script src="screens/hub-audit-help.js?v=8"></script>
 <script src="screens/hub-books-help.js?v=15"></script>
@@ -603,6 +614,6 @@
      sweep goes red instead. -->
 <script src="https://js.stripe.com/v3/"></script>
 <script src="db.js?v=169"></script>
-<script src="app.js?v=902"></script>
+<script src="app.js?v=903"></script>
 </body>
 </html>

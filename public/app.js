@@ -1936,37 +1936,42 @@ const App = {
     // Cache for the mobile drawer's location chip (built synchronously).
     this._acctList = accounts || [];
     this._acctActiveId = activeId;
-    // Both topbars (module + hub) have their own switcher slot -- populate both
+    /* ⛔⛔ THE TOP BAR CARRIES NOTHING NOW, AT EVERY UNIT COUNT (Kyle, 2026-08-23): *"currently when
+       there is a multi unit bar the bar selector is in the top bar.. that needs moved out of the top
+       bar and replace the bar name on the hub.. and it only goes there."*
+       The 2026-08-14 rule ("one bar puts nothing up there, several bars put the picker up there")
+       is superseded on its second half only: one bar still puts nothing up there, and several bars
+       now put nothing up there either. Both slots are HIDDEN rather than emptied, because an empty
+       flex box still claims its gap. */
     ['topbar-account-switcher', 'hub-topbar-account-switcher'].forEach(slotId => {
       const slot = document.getElementById(slotId);
-      if (!slot) return;
-      const active = accounts.find(a => a.id === activeId) || accounts[0];
-      if (!active) { slot.style.display = 'none'; slot.innerHTML = ''; return; }
-      slot.style.cssText = 'display:flex;align-items:center;';
-      /* ⛔ ONE BAR: NOTHING GOES IN THE TOP HEADER (Kyle, 2026-08-14, walking the Hub): *"i just
-         don't want the bars name in the top header next to the rail button.. at all on any page...
-         and the only time something gets placed in the top header next to the rail button it is a
-         multi location the drop selector."* An operator with one bar already knows whose bar they
-         are in, so the name was chrome that bought nothing — and it dragged a vertical divider
-         along with it. The picker earns the spot because it is a CONTROL, not a label.
-         ⚠ THE SLOT IS HIDDEN, NOT JUST EMPTIED. An empty flex box still occupies the gap between
-         the date and The Rail, and the `.tn-barname::before` divider Kyle asked to see gone hangs
-         off the span, so the span has to be absent rather than blank. */
-      if (!isMulti) {
-        slot.style.display = 'none';
-        slot.innerHTML = '';
-        return;
-      }
+      if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
+    });
+
+    /* ⭐ THE HUB GREETING IS THE PICKER'S ONE HOME. *"single unit the hub stays as is.. multi unit
+       the good afternoon, 'bar name' becomes.. good afternoon, Bar drop down selector."*
+       ⛔⛔ THIS ONLY EVER *UPGRADES* THE SLOT, IT NEVER CLEARS IT. `S.Hub.render` writes the bar
+       NAME into this slot itself and runs BEFORE this member (see `showHub`), so for a single bar
+       the correct behaviour is to leave it completely alone. Writing an empty string here on the
+       not-multi path would blank the greeting on every single-location account — and it would do
+       the same on a FAILED account lookup, which is the exact hazard the `_acctListErr` guard above
+       exists for. Doing nothing is the safe default in both cases.
+       ⚠ NO INLINE `style=` ON THE SELECT. An inline declaration beats every stylesheet rule and is
+       invisible to a CSS review; the greeting's type is owned by `.hub-greet .at-qsel` so Kyle can
+       retune it in DevTools like everything else. */
+    const active = accounts.find(a => a.id === activeId) || accounts[0];
+    const greet = document.getElementById('hub-greet-account-switcher');
+    if (greet && active && isMulti) {
       const options = accounts.map(a => {
         const sel = a.id === active.id ? ' selected' : '';
         return '<option value="' + esc(a.id) + '"' + sel + '>' + esc(a.name) + '</option>';
       }).join('');
-      slot.innerHTML = '<select class="acct-switcher at-qsel" style="font-weight:600;">' + options + '</select>';
-      slot.querySelector('.acct-switcher').addEventListener('change', (ev) => {
+      greet.innerHTML = '<select class="acct-switcher at-qsel" aria-label="Switch bar">' + options + '</select>';
+      greet.querySelector('.acct-switcher').addEventListener('change', (ev) => {
         const newId = ev.target.value;
         if (newId && newId !== active.id) DB.setActiveAccount(newId);
       });
-    });
+    }
     // Group Dashboard removed. Keep the slots empty so nothing renders.
     ['topbar-group-dashboard', 'hub-topbar-group-dashboard'].forEach(slotId => {
       const slot = document.getElementById(slotId);
@@ -3266,21 +3271,21 @@ const App = {
         el.addEventListener('click', () => App.toggleRailMenu(el.dataset.railSec)));
       this._markRailOpen();
     }
-    /* Relocate the account/location switcher + group dashboard into the top bar (once).
-       renderAccountSwitcher fills them BY ID, so moving the nodes is safe — and it is why #tn-acct
-       is static markup rather than something this function rebuilds. The container moved from the
-       deleted row 2 up into .tn-right; the ids did not, so nothing else had to change. */
-    const acct = document.getElementById('tn-acct');
-    if (acct) {
-      ['topbar-account-switcher', 'topbar-group-dashboard'].forEach(id => {
-        const node = document.getElementById(id);
-        if (node && node.parentElement !== acct) acct.appendChild(node);
-      });
-    }
+    /* ⛔ THE SWITCHER RELOCATION IS GONE (Kyle, 2026-08-23). This used to lift
+       `topbar-account-switcher` and `topbar-group-dashboard` out of the old hidden `.topbar` and
+       into `#tn-acct` in the visible bar, because a multi-bar picker had to live up here. It does
+       not any more: *"that needs moved out of the top bar and replace the bar name on the hub.. and
+       it only goes there."* `renderAccountSwitcher` now hides both of those slots at every unit
+       count and fills `hub-greet-account-switcher` instead, so there is nothing to relocate and
+       `#tn-acct` itself is deleted from index.html.
+       ⚠ THE OLD SLOTS ARE HIDDEN BY THE MEMBER, NOT LEFT TO THEIR PARENT. `.topbar` is only
+       display:none under 768px and for `_CONVERTED` screens, so on a desktop non-converted page it
+       still paints — leaving those slots to "whatever their parent does" would put the picker back
+       on screen in the one place nobody would look for it. */
     /* THE RAIL — the one whole-bar read, reachable from every page.
        ⚠ WIRED ONCE, GUARDED BY A FLAG, because this function runs on every navigation and a second
-       listener would open two stacked modals. The node is static markup in index.html (like
-       #tn-acct), so it survives every render and there is nothing to re-bind. */
+       listener would open two stacked modals. The node is static markup in index.html, so it
+       survives every render and there is nothing to re-bind. */
     const railBtn = document.getElementById('tn-rail');
     if (railBtn && !railBtn._wired) {
       railBtn._wired = true;
