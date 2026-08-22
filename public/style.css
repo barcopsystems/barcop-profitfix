@@ -709,6 +709,30 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .ch-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--t3);padding:10px 2px;margin-bottom:-1px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer;}
 .ch-tab:hover{color:var(--t2);}
 .ch-tab.on{color:var(--t1);border-bottom-color:var(--focus);}
+/* ⛔⛔ ONE `.screen` PER PAGE, AND THE WEEK'S TABBED HOST BROKE THAT (Kyle, 2026-08-23, on the pushed
+   build: *"the content area isn't wide enough.. should be flush on both sides with the tab menu..
+   and there is too much space between the tab menu and the content"*).
+   `S.Week` wraps the tab strip in a `.screen`, and all three panels — Close, Review and History —
+   render their OWN `.screen` inside it. So `padding: var(--sp) var(--sp) 56px` was applied TWICE:
+   28px of extra inset on each side, 28px of extra gap under the strip, and `max-width:var(--page-w)`
+   plus `margin:0 auto` resolved twice, which is why the content sat narrower than the tabs above it
+   rather than flush with them. `ic-report-usage`, the strip this is copied from, renders its tabs
+   and its content inside a SINGLE `.screen` — that is the shape being restored.
+   ⭐ THE PANELS ARE NOT EDITED. Three files each own a `.screen` for their standalone life, and this
+   is the one context where that wrapper is a second copy; neutralising it at the host keeps each
+   screen renderable on its own and leaves the fix in one place.
+   ⚠ THE ID IS LOAD-BEARING, NOT DECORATION. `.wr-screen` (Week in Review) re-sets padding with a
+   SHORTHAND and sits later in this file, so a class-only override would lose to it. `#wk-panel >
+   .screen` carries an id, so it wins on specificity wherever it sits. Same for the scrollbar
+   compensation rule further down, which also names `.screen` and `.wr-screen`. */
+/* ⛔ `max-width:100%`, NEVER `max-width:none` — and `verify-rail-menu-overlay` caught me writing the
+   second one. Kyle's rule is ONE page width with nothing opting out (*"i want all pages to be the
+   same fixed width now"*), and three pages had each opted out differently before it was pinned. My
+   `none` was arguably safe, because the HOST's `.screen` still caps the page at `var(--page-w)` —
+   but "arguably safe" is exactly what the other three opt-outs looked like, and a blanket ban that
+   starts taking exceptions stops being a ban. `100%` says the honest thing anyway: this wrapper
+   fills its parent rather than declaring itself uncapped. */
+#wk-panel > .screen{padding:0;max-width:100%;width:100%;margin:0;}
 
 /* ══ METRIC CARDS ══ */
 .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
