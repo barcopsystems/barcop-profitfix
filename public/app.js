@@ -2529,13 +2529,19 @@ const App = {
      `verify-nav-rail-reachability` asserts exactly that against the tables rather than trusting
      that the two lists were kept in step (integrity #11: a control wired under one spelling and
      rendered under another is a dead row that looks alive). */
-  _PROTO_GLOBAL:   [['hub','Hub'],['audit','Audits'],['events','Events'],['books','Books']],
-  /* THE WEEK GROUP, above Control because it is the only thing in the rail with a deadline. The
-     week is ONE job in three tenses and they now sit together: Close it, Review what it was, and
-     look back at History. Review moved out of `_PROTO_GLOBAL` and History off the Profit and
-     Revenue section menus, where it had been duplicated. */
-  _PROTO_WEEK:     [['week-close','Close'],['week-review','Review'],['week-history','History']],
-  _PROTO_CONTROL:  [['inventory','Inventory'],['labor','Labor'],['shift','Shift']],
+  /* ⭐⭐⭐ THE RAIL IS BECOMING ONE FLAT LIST, AND THIS TABLE IS WHERE IT ASSEMBLES (Kyle,
+     2026-08-23): *"when it is done there will be no groups on the rail menu.. only the main links
+     in one list.. but we are doing one section at a time.. so as a section gets done.. we will move
+     the link up to where it goes."* So the groups below are not the design any more — they are what
+     is LEFT of the old design, shrinking as each section lands. Expect this list to grow and the
+     others to empty; do not "tidy" the remaining groups into a structure, they are a queue. */
+  _PROTO_GLOBAL:   [['hub','Hub'],['inventory','Inventory'],['week','The Week'],['audit','Audits'],['events','Events'],['books','Books']],
+  /* ⛔ `_PROTO_WEEK` IS GONE (2026-08-23). Close, Review and History were three rows for one job in
+     three tenses; they are now three TABS on one page (`S.Week`) behind the single "The Week" row
+     above. The three ids still resolve — they are tab targets now — so nothing that linked to them
+     had to be re-pointed. Deleting the table rather than emptying it is deliberate: an empty table
+     still gets rendered as a group and draws its divider. */
+  _PROTO_CONTROL:  [['labor','Labor'],['shift','Shift']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   /* ⛔ SIGN OUT LEFT THE RAIL ON 2026-08-16 (Kyle: *"move it from the side bar and put like in the
      images"*). It now sits in the TOP NAV, left of the account switcher and The Rail, as plain
@@ -2552,7 +2558,11 @@ const App = {
   _PROTO_BOTTOM:   [['settings','Settings']],
   _PROTO_SIGNOUT:  [['signout','Sign Out']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'week-review', 'week-close': 'week-close', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books' },
+  /* ⭐ ALL THREE WEEK ACTIONS LIGHT THE SAME ROW NOW. They used to map to themselves, one rail row
+     each; there is one row, so `week` is the answer for every one of them — otherwise opening a page
+     through an old id would light nothing and the operator would be on a page the rail says they
+     are not on. */
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week': 'week', 'week-review': 'week', 'week-close': 'week', 'week-history': 'week', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books' },
   /* ⛔⛔ AND EVERY SETTINGS PAGE WAS MISSING FROM THAT MAP — nine of them. Found while checking the
      new title: Settings read no section prefix, and the same lookup drives the rail highlight, so
      **the Settings row never lit up either** on any of its own pages.
@@ -2569,7 +2579,9 @@ const App = {
   // full-width dashboard mode (Blueprint); 'audit'/'books' = those context
   // sidebars; missing = the default Hub sidebar. Settings gets its own in the
   // next phase of the nav sweep.
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week-review': 'none', 'week-close': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings' },
+  /* ⚠ `week` IS 'none' LIKE THE TWO PAGES IT REPLACES — full width, no hub sidebar. Anything else
+     and the tabbed page would open with a sidebar its three panels were never laid out for. */
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week': 'none', 'week-review': 'none', 'week-close': 'none', 'week-history': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -2790,22 +2802,29 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-fix', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'week-history', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
+  _CONVERTED: new Set(['profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-fix', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
-    if (g === 'week-review') return (window.S && S.WeekReview) ? S.WeekReview.open() : null;
-    if (g === 'week-close')  return (window.S && S.WeekClose)  ? S.WeekClose.open()  : null;
-    /* ⛔ HISTORY IS A MODULE SCREEN, NOT A HUB PAGE — the only row in the rail that is. So it routes
-       through `openScreen`, which swaps the module shell FIRST and then navigates; a bare
-       `navigate` would render it into `#content-area` while the hub shell is the visible one, which
-       is the dead-link defect the overlay had. `openScreen` reads `DB.SCREEN_GROUPS` to know which
-       module to swap to and to answer `canAccess`, so the id MUST be registered there. */
-    /* ⛔ AND THE RAIL MARK HAS TO BE PUT BACK AFTERWARDS. `openScreen` calls `showApp(module)`, which
-       re-renders the rail with the MODULE as its context — so opening History would light up the
-       PROFIT row (its module), not the row the operator just clicked. `openScreen` is synchronous,
-       so re-marking on the next line is the whole fix. Navigating on to any profit screen re-renders
-       with 'profit' and clears it, which is correct. */
-    if (g === 'week-history') { this.openScreen('week-history'); return this._renderProtoTopnav('week-history'); }
+    /* ⭐⭐ THE WEEK — ONE ROW, THREE TABS (Kyle, 2026-08-23). Close, Review and History became one
+       tabbed page (`S.Week`), so the rail carries a single "The Week" row that lands on Close.
+       ⛔⛔ THE THREE OLD IDS ARE KEPT ALIVE AS TAB TARGETS, AND THAT IS THE WHOLE SAFETY OF THIS
+       CHANGE. Measured before any edit: `week-close` has 34 inbound references across 15 files,
+       `week-review` 12 across 5, `week-history` 26 across 7, plus 64 harness files. Re-pointing 72
+       call sites is how a change like this ships dead links by the dozen ([[the-loop]] #24 — a blind
+       find-and-replace would have shipped nineteen at once last time). Every existing link keeps its
+       id and simply lands on the tab it always meant.
+       ⚠ HISTORY USED TO BE THE ODD ONE OUT and this is where that ended: it was the only MODULE
+       screen in the rail, routed through `openScreen` so the module shell swapped first, and it had
+       to have its rail mark repainted afterwards because `showApp` re-rendered the rail as PROFIT.
+       None of that applies now — it is a tab on a hub page like its two siblings, so it is out of
+       `_CONVERTED` and the repaint is gone with it. */
+    /* ⚠ THE ID GOES STRAIGHT THROUGH. `S.Week.open` resolves a tab key OR a legacy screen id
+       itself, off its own `LEGACY` map — the one place that pairing is written. An id→tab map here
+       as well would be the same fact in two files, which is how the tab a link opens and the tab it
+       claims to open drift apart. */
+    if (g === 'week' || g === 'week-close' || g === 'week-review' || g === 'week-history') {
+      return (window.S && S.Week) ? S.Week.open(g) : null;
+    }
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
     if (g === 'books') return (window.S && S.HubBooksHome)   ? S.HubBooksHome.open()   : null;
     if (g === 'events') return this.jumpToSection('events');
@@ -2865,7 +2884,7 @@ const App = {
 
   // The rail label for a key, from the same four tables the rail itself renders.
   _railLabelOf(key) {
-    const tables = [this._PROTO_GLOBAL, this._PROTO_WEEK, this._PROTO_CONTROL, this._PROTO_RECOVERY, this._PROTO_BOTTOM, this._PROTO_SIGNOUT];
+    const tables = [this._PROTO_GLOBAL, this._PROTO_CONTROL, this._PROTO_RECOVERY, this._PROTO_BOTTOM, this._PROTO_SIGNOUT];
     for (const t of tables) for (const [k, l] of (t || [])) if (k === key) return l;
     return null;
   },
@@ -3220,7 +3239,13 @@ const App = {
      icons alone — a row with no icon would simply vanish there. `_RAIL_IC` maps the rail's own keys
      onto that map. Every key here is now a straight pass-through except the three Week rows; the
      one entry that needed translating (`flowmap` → `blueprint`) went with the Workflow page. */
-  _RAIL_IC: { hub: 'hub', 'week-review': 'review', 'week-close': 'dash', 'week-history': 'history',
+  /* ⚠ `week` KEEPS CLOSE'S MARK (`dash`) because that is the tab the row lands on — the least
+     surprising thing for an operator who has been clicking "Close" there. The icon vocabulary is
+     fixed (`_NAV_SECTION_IC` has 17 entries and none of them is a calendar), so this is a pick from
+     what exists rather than a design decision; it is one word to change if Kyle wants another.
+     ⚠ The three OLD keys stay: they are still the ids every existing link uses, and `_railLabelOf`
+     and the mobile drawer both read this map by id. */
+  _RAIL_IC: { hub: 'hub', week: 'dash', 'week-review': 'review', 'week-close': 'dash', 'week-history': 'history',
               audit: 'audit', events: 'events', books: 'books',
               inventory: 'inventory', labor: 'labor', shift: 'shift',
               profit: 'profit', revenue: 'revenue', cash: 'cash',
@@ -3257,8 +3282,6 @@ const App = {
       rail.innerHTML =
           '<div class="rail-group">' + this._PROTO_GLOBAL.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
-        + '<div class="rail-group"><div class="rail-grp-label">Week</div>'
-        +   this._PROTO_WEEK.map(r).join('') + '</div>'
         + '<div class="rail-group"><div class="rail-grp-label">Control</div>'
         +   this._PROTO_CONTROL.map(r).join('') + '</div>'
         + '<div class="rail-group"><div class="rail-grp-label">Recovery</div>'
@@ -3572,7 +3595,6 @@ const App = {
          which is the whole point of comparing against the rendered overlay rather than the raw
          sidebar builder — the builder output matches NEITHER menu. */
       { label: 'Go to', items: App._PROTO_GLOBAL.map(([k, l]) => railRow(k, l)) },
-      railGroup('Week', App._PROTO_WEEK),
       railGroup('Control', App._PROTO_CONTROL),
       railGroup('Recovery', App._PROTO_RECOVERY),
       // App Settings is off in the live demo, same as the desktop gear.
@@ -3784,7 +3806,17 @@ const App = {
        `S.WeekClose.open()` — two doors to one page drift apart ([[the-list]] step 1b).
        ⚠ WHY IT SITS WITH `settings` AND NOT LOWER: the comment above already gives the reason. These
        short-circuit BEFORE `showApp`, or the module shell flashes up behind a hub page. */
-    if (id === 'week-close') { this._protoGlobalClick('week-close'); return; }
+    /* ⭐ ALL FOUR WEEK IDS THROUGH THE ONE DOOR (2026-08-23). `week-close` was intercepted alone;
+       Review reached its page through `navigate` and History through `_CONVERTED` + the module
+       router. History has now LEFT `_CONVERTED`, so without naming it here `openScreen('week-history')`
+       falls through to the module router and renders "Coming soon." — the `hub-permits` defect
+       arriving through a DELETION rather than an addition.
+       ⚠ THIS LINE EXISTS TWICE ON PURPOSE, in `openScreen` AND in `navigate`. `_enter` uses the
+       second one, so teaching only the first fixes the audit rows and leaves every Hub row dead
+       ([[the-loop]] #24). Both were measured before this edit rather than assumed. */
+    if (id === 'week' || id === 'week-close' || id === 'week-review' || id === 'week-history') {
+      this._protoGlobalClick(id); return;
+    }
     // Hub Accounting deliverables a fix step can deep-link to.
     if (id === 'weekly-pnl') { if (window.S && S.Reports && S.Reports._openQboModal) S.Reports._openQboModal(); return; }
     if (id === 'books') { if (window.S && S.HubBooks && S.HubBooks.open) S.HubBooks.open(); return; }
@@ -9357,7 +9389,17 @@ const App = {
        would have fixed the audit rows and left the Hub's own rows saying "Coming soon.", which is
        exactly the shape of the defect this whole sweep is about: one door fixed, its twin missed
        ([[the-loop]] step 0.5 — find the twin before you fix). */
-    if (id === 'week-close') { this._protoGlobalClick('week-close'); return; }
+    /* ⭐ ALL FOUR WEEK IDS THROUGH THE ONE DOOR (2026-08-23). `week-close` was intercepted alone;
+       Review reached its page through `navigate` and History through `_CONVERTED` + the module
+       router. History has now LEFT `_CONVERTED`, so without naming it here `openScreen('week-history')`
+       falls through to the module router and renders "Coming soon." — the `hub-permits` defect
+       arriving through a DELETION rather than an addition.
+       ⚠ THIS LINE EXISTS TWICE ON PURPOSE, in `openScreen` AND in `navigate`. `_enter` uses the
+       second one, so teaching only the first fixes the audit rows and leaves every Hub row dead
+       ([[the-loop]] #24). Both were measured before this edit rather than assumed. */
+    if (id === 'week' || id === 'week-close' || id === 'week-review' || id === 'week-history') {
+      this._protoGlobalClick(id); return;
+    }
     // Retire the old standalone "This Week" / "Revenue This Week" write screens.
     // Confirm the Week is the single weekly-close writer: it writes BOTH the profit
     // `week` and the revenue_week with the correct hourly-labor split and catering

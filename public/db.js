@@ -538,7 +538,14 @@ const DB = {
        ⛔⛔ THIS IS A REAL PERMISSIONS CHANGE AND IT FAILS CLOSED, WHICH IS THE SAFE DIRECTION: no
        stored membership carries a `week` key, so every existing member loses these three pages until
        the owner grants Week. That is deliberate — the alternative is inventing access nobody chose. */
-    'week-close':'week','week-review':'week','week-history':'week',
+    /* ⚠ `week` IS THE TABBED PAGE ITSELF (2026-08-23) and the other three are its tabs, kept as
+       live ids because 72 places in the app still link by them. All four are the SAME area, so a
+       member granted Week gets the page and every tab on it — which is what the three already meant
+       when they were three rail rows. An id missing from this map is unreachable: `openScreen` asks
+       it twice, through `canAccess` and `_moduleOf`, before `navigate` ever sees the id
+       ([[the-loop]] #149 — deleting the other registrations is what makes the load-bearing one look
+       like a leftover). */
+    'week':'week','week-close':'week','week-review':'week','week-history':'week',
     // Revenue Recovery
     'r-this-week':'revenue','r-forecast':'revenue',
     'r-audit':'revenue','r-fix':'revenue','r-server-check':'revenue','r-menu-items':'revenue',
