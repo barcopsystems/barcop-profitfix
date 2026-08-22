@@ -1145,7 +1145,7 @@ S.Hub = {
          ⭐ BREAK-EVEN IS UNCHANGED: `S.HubBreakEven.open()` is a Hub page that survives.
          🔧 Pinned by `verify-hub-destinations` C2, which resolves every destination in this file
          against the app's real router. */
-      + heroTile('profit-fix', "S.Hub._enterFix('profit',null)", 'Open the Profit Fix system', 'Total Opportunity',
+      + heroTile('audit-tracker', "S.Hub._enterRecovery('profit')", 'Open the Profit Audit', 'Total Opportunity',
              anyAudit ? App.fmtCurrency(totalOpp,0) : 'No data',
              /* ⚠ `--t1`, NOT `--w`. Kyle, 2026-08-10: *"change all white text and numbers to a light
                 grey though so it is easier on the eyes."* Pure white out-shines the gold hero on a
@@ -1155,12 +1155,12 @@ S.Hub = {
              /* Kyle: *"shorten the 'on the table to recover a month' text.. too long."* */
              anyAudit ? 'To recover a month' : 'Run an audit to surface this')
       + statDiv
-      + heroTile('r-fix', "S.Hub._enterFix('revenue',null)", 'Open the Revenue Fix system', 'Recovered',
+      + heroTile('r-audit', "S.Hub._enterRecovery('revenue')", 'Open the Revenue Audit', 'Recovered',
              recoveryTotal.dollars > 0 ? App.fmtCurrency(recoveryTotal.dollars, 0) : '$0',
              recoveryTotal.dollars > 0 ? 'var(--gold)' : 'var(--t4)',
              recoveryTotal.dollars > 0 ? recoveryTotal.fixes + ' measured fix' + (recoveryTotal.fixes === 1 ? '' : 'es') : 'Mark a fix to start')
       + statDiv
-      + heroTile('c-fix', "S.Hub._enterFix('cash',null)", 'Open the Cash Fix system', 'Trapped Cash',
+      + heroTile('c-audit', "S.Hub._enterRecovery('cash')", 'Open the Cash Audit', 'Trapped Cash',
              trapped.hasData ? App.fmtCurrency(trappedCash, 0) : 'No data',
              trapped.hasData ? (trappedCash > 0 ? 'var(--t1)' : 'var(--green)') : 'var(--t4)',
              trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
@@ -1356,7 +1356,9 @@ S.Hub = {
       const d = PA_DEST[it.gap];
       return d
         ? 'S.Hub._enter(\'' + d.screen + '\',\'' + d.mod + '\')'
-        : 'S.Hub._enterFix(\'' + it.mod + '\',' + (it.gap ? '\'' + it.gap + '\'' : 'null') + ')';
+        /* ⚠ The gap id is no longer passed: `_enterRecovery` lands on the module's AUDIT, which
+           lists every gap it surfaced, so the focus had nothing left to consume. */
+        : 'S.Hub._enterRecovery(\'' + it.mod + '\')';
     };
     /* ── DO THIS FIRST: ONE THING ────────────────────────────────────────────
        This was a ranked list of eight in a scroll box. One item is calmer AND more useful: the app
@@ -2007,15 +2009,27 @@ S.Hub = {
     App.navigate(screen);
   },
 
-  // Deep-link from the weekly readout into a module's Fix screen at a gap-area.
-  _enterFix(module, gapId) {
-    const scr = module === 'revenue' ? 'r-fix'
-              : module === 'cash' ? 'c-fix'
-              : 'profit-fix';
-    // Gate BEFORE showApp (see _enter) so a locked Fix screen never swaps the shell.
+  /* Deep-link from the Hub's money tiles and the weekly readout into a module's RECOVERY page.
+     ⛔⛔ THAT PAGE IS THE AUDIT NOW, NOT A FIX SCREEN (Kyle, 2026-08-23). The Fix systems are being
+     taken out of the operator's view — measured first: their checklist writes nothing any consumer
+     reads, and the recovered dollars are computed by `Recovery.compute` from confirmed weeks, not
+     from anything a step does. The audits are where the recovery numbers live now.
+     ⭐ ONE ACCESSOR, FOUR CALL SITES. Re-pointing here moves all three hero tiles and the readout
+     row at once; the alternative was four hand-typed destinations, which is the drift the original
+     comment on this member was already warning about.
+     ⚠ RENAMED. It was `_enterFix`, and a name that says Fix while opening an audit is a false claim
+     in the loudest possible place — every reader of every call site takes it on trust
+     ([[lessons-paid-for]] #99, where the wrong fact was in a constant's NAME).
+     ⚠ THE `gapId` ARGUMENT IS GONE. It set `App._fixFocus`, which only a Fix screen ever read. The
+     audits list every gap they surfaced, so landing on the page IS landing on the gap; carrying a
+     focus nothing consumes would be a field written and never read ([[the-loop]] #25). */
+  _enterRecovery(module) {
+    const scr = module === 'revenue' ? 'r-audit'
+              : module === 'cash' ? 'c-audit'
+              : 'audit-tracker';
+    // Gate BEFORE showApp (see _enter) so a locked audit never swaps the shell.
     if (!App.canAccess(scr)) { App.showNoAccess(); return; }
     App.showApp(module || 'profit');
-    if (gapId) App._fixFocus = gapId;
     App.navigate(scr);
   },
 
@@ -2277,7 +2291,11 @@ S.Hub = {
         sev: gap > 3 ? 'bad' : 'warn',
         label: 'Prime cost over target', value: lw.prime_cost_pct.toFixed(1) + '% / ' + primeT + '%',
         text: 'Prime cost is tracking at ' + lw.prime_cost_pct.toFixed(1) + '%, ' + gap.toFixed(1) + ' points over your ' + primeT + '% target. Hold this pace and the month closes about ' + App.fmtCurrency(monthlyOver, 0) + ' over.',
-        screen: 'profit-fix', mod: 'profit'
+        /* ⚠ THE PROFIT AUDIT, NOT THE FIX SYSTEM (2026-08-23). This row names prime cost over
+           target, and the audit is where that reading is surfaced and explained — it renders a
+           prime-cost context card for exactly this. The Fix system it used to open is leaving the
+           operator's view, and a row that names an item has to land on that item. */
+        screen: 'audit-tracker', mod: 'profit'
       });
     }
 

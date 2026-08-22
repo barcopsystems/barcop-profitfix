@@ -403,10 +403,17 @@ const AuditUI = {
   actionsArea(audit, gapModule, pfx) {
     const actionItems = (audit.action_items || []).map((a,i) => {
       const txt = a.action || a || '';
-      const gid = a.gap_id || (window.FixPanel ? FixPanel.inferGapId(txt, gapModule) : null);
-      const btn = gid
-        ? '<button class="' + pfx + '-fix-btn" data-gap="' + esc(gid) + '" style="flex-shrink:0;background:transparent;border:1px solid var(--b1);color:var(--t2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:6px 11px;border-radius:3px;cursor:pointer;align-self:center;">Fix This</button>'
-        : '';
+      /* ⛔⛔ THE "FIX THIS" BUTTON IS GONE (Kyle, 2026-08-23). It opened the module's Fix system
+         focused on this gap, and the Fix systems are leaving the operator's view — so the control
+         had no destination left. A button whose target no longer lets the operator DO the thing is
+         the defect, not the target ([[lessons-paid-for]] #83): the honest move is to remove the
+         button, not to find a page whose name is close enough.
+         ⭐ REMOVED HERE, ONCE. This is the shared renderer for all THREE audits, so one cut takes
+         every copy — three per-screen patches would have left the next audit to grow its own.
+         ⚠ `gid` and `FixPanel.inferGapId` went with it: they existed only to address this button.
+         An action item still carries its `gap_id` in the record for `_scoreRecoveryAction`, which
+         reads the audit's own `action_items` and never needed the button. */
+      const btn = '';
       return '<div class="at-arow" style="display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--b2);align-items:center;">'
         + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:700;color:var(--t3);width:28px;flex-shrink:0;align-self:center;">' + (i+1) + '</div>'
         + '<div style="flex:1;"><div style="font-size:13px;color:var(--t1);line-height:1.6;">' + esc(txt) + '</div>'
