@@ -2288,28 +2288,32 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 }
 
 /* ══ SECTION LINKS ═════════════════════════════════════════════════════════════════════════
-   A section's groups live IN THE TOP BAR beside its name, so the app gains no extra band of
-   chrome for six words. The page below carries its own header: the screen name with the app's
-   one help "i" beside it, left aligned.
-   ⛔ NEW CLASS NAMES ONLY. The sidebar's own rules must not move: the MOBILE DRAWER parses that
-   same markup, and Kyle asked for desktop only.
-   ⛔ NO ICONS anywhere in here, by instruction, and no hover fill. */
-/* ⛔ position:relative, and NO overflow:hidden. The drop-down is absolutely positioned inside this
-   element, so it needs the containing block — and `overflow:hidden` (which I wrote first, out of
-   habit, to stop the links wrapping) would have CLIPPED the menu out of existence. */
-.sec-links{position:relative;display:flex;align-items:center;gap:2px;margin-left:14px;min-width:0;flex-wrap:nowrap;}
+   A section's groups live IN THE TOP BAR beside its icon. The page below carries its own
+   header: the screen name, the one help "i", and a rule under it.
+   ⛔ NEW CLASS NAMES ONLY, and CHECKED against what the app already owns: `tn-sections` turned
+   out to be a RETIRED name a pin still guards, and `page-head` is a live screen-level class
+   whose `justify-content:space-between` is what threw the "i" to the far right. Both were found
+   by measuring, not by reading. */
+
+/* ⛔ STRETCHED TO THE BAR'S FULL HEIGHT. The links' own box ended at y=36 while the bar ended at
+   52, so a menu opening under the links left a 16px dead strip that closed it on the way down. */
+.sec-links{position:relative;align-self:stretch;display:flex;align-items:center;gap:2px;
+  padding-left:14px;margin-left:14px;min-width:0;flex-wrap:nowrap;}
 .sec-links[hidden]{display:none;}
+/* The vertical rule between the section icon and its groups. A pseudo-element so no decorative
+   node lives in the markup, and 18px rather than full height, matching the "i" divider above. */
+.sec-links::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:1px;height:18px;background:var(--b1);}
 .st-link{background:none;border:0;padding:4px 9px;font-family:inherit;font-size:13px;font-weight:600;
-  line-height:1;color:var(--t2);cursor:pointer;white-space:nowrap;transition:color .12s;}
+  line-height:1;color:var(--t2);cursor:default;white-space:nowrap;transition:color .12s;}
 .st-link:hover{color:var(--w);}
-/* Active is gold TEXT, never a bar under it. The rail already says "active" in gold; this borrows
-   the app's own convention instead of inventing a second one. */
 .st-link.st-on{color:var(--gold);}
-.st-drop{position:absolute;top:100%;margin-top:0;background:var(--bg);border:1px solid var(--b-edge);
-  border-radius:8px;padding:5px;min-width:186px;z-index:130;}
-/* Icons stay ON the drop-down rows (Kyle: the top-bar links are what he wanted bare). No hover
-   fill anywhere: the only thing that moves is the icon going gold, which is the sidebar's own
-   hover behaviour and the reason the icons are worth keeping here. */
+
+/* ⛔ FIXED, AND OFF `body`. `#proto-topnav` is 52px tall with overflow:hidden, so a menu inside it
+   was clipped away entirely — it never went "behind" anything and no z-index would have helped.
+   z-index clears the nav's 120. `top` is set in JS from the bar's own bottom edge. */
+.st-drop{position:fixed;background:var(--bg);border:1px solid var(--b-edge);border-top:0;
+  border-radius:0 0 8px 8px;padding:5px;min-width:196px;z-index:200;}
 .st-row{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;
   padding:7px 12px;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;
   color:var(--t1);white-space:nowrap;transition:color .12s;}
@@ -2319,12 +2323,24 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .st-ic .nav-icon{width:16px;height:16px;}
 .st-row:hover .st-ic,.st-row-on .st-ic{color:var(--gold);}
 
-/* The page header. Left aligned, the screen name and the one "i". */
-.page-head{display:flex;align-items:center;gap:7px;padding:20px var(--sp) 0;background:var(--bg);}
-.page-head[hidden]{display:none;}
-.ph-title{font-family:var(--f-disp);font-weight:700;font-size:21px;letter-spacing:.3px;
-  color:var(--t1);margin:0;line-height:1.2;}
-.page-head .tn-iconbtn{flex-shrink:0;}
+/* The section ICON in place of its name, same size as a rail icon. */
+.tn-secicon{display:flex;align-items:center;color:var(--gold);flex-shrink:0;}
+.tn-secicon .nav-icon,.tn-secicon svg{width:17px;height:17px;}
 
-/* Desktop only for now (Kyle: "do not change mobile menu"): the drawer keeps doing the job. */
-@media (max-width:768px){.sec-links{display:none;}.page-head{display:none;}}
+/* ── THE PAGE HEADER ── title, the one "i" beside it, a rule under, and NOT much air. */
+.sec-head{display:flex;align-items:center;gap:7px;width:100%;max-width:var(--page-w);
+  margin:0 auto;padding:16px var(--sp) 9px;border-bottom:1px solid var(--b-edge);background:var(--bg);}
+.sec-head[hidden]{display:none;}
+.ph-title{font-family:var(--f-disp);font-weight:700;font-size:17px;letter-spacing:.3px;
+  color:var(--t1);margin:0;line-height:1.2;}
+/* Bare icon, no chrome box: the "i" reads as a mark, not a button, exactly as it does in the
+   top bar. Without this it falls back to .tn-iconbtn and picks the --c3 tile back up. */
+.sec-head .tn-iconbtn{width:auto;height:auto;background:none;border:0;border-radius:0;padding:0;
+  color:var(--t3);flex-shrink:0;}
+.sec-head .tn-iconbtn:hover{background:none;color:var(--gold);}
+.sec-head .tn-iconbtn::before{display:none;}
+/* ⛔ AND THE SCREEN GIVES UP ITS OWN TOP PADDING. `.screen` adds var(--sp) on top of the header's
+   padding, which is where the canyon between the rule and the content came from. */
+#sec-head:not([hidden]) ~ .content .screen{padding-top:16px;}
+
+@media (max-width:768px){.sec-links{display:none;}.sec-head{display:none;}}

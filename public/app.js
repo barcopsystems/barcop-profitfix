@@ -2901,9 +2901,21 @@ const App = {
        section no longer has — so with the short-circuit in place, pressing it would have JUMPED
        the operator to Take Inventory from wherever they were. Clicking the name of the section you
        are already in should never move you. The tabs are the menu now, so this is a label. */
+    /* ⭐ A BARRED SECTION SHOWS ITS ICON, NOT ITS NAME (Kyle: *"replace the section name with the
+       section icon.. so section icon then vertical divider then menu"*). The icon comes from the
+       SAME `_RAIL_IC` → `_NAV_SECTION_IC` pair the rail row uses, so the bar and the rail can never
+       show two different marks for one section. The divider is drawn by `.sec-links::before`, which
+       keeps it attached to the links rather than floating between two independent nodes. */
+    const secIcon = barred ? (this._NAV_SECTION_IC[this._RAIL_IC[secKey]] || '') : '';
     el.innerHTML = (sec
         ? (barred
-            ? '<span class="tn-title-sec tn-title-plain">' + esc(sec) + '</span>'
+            /* ⚠ `_NAV_SECTION_IC` holds the svg's INNER content, not a whole element — the rail
+               wraps it in `<svg class="rail-icon" viewBox="0 0 17 17">`. Same wrapper here, or the
+               markup renders as nothing at all. Falls back to the section's NAME if the map ever
+               loses the key, so the bar can never go blank. */
+            ? '<span class="tn-secicon" title="' + esc(sec) + '" aria-label="' + esc(sec) + '">'
+              + (secIcon ? '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + secIcon + '</svg>'
+                         : esc(sec)) + '</span>'
             : '<button type="button" class="tn-title-sec" data-rail-sec="' + esc(secKey) + '"'
               + ' title="Open the ' + esc(sec) + ' menu">' + esc(sec) + '</button>'
               + '<span class="tn-sep"></span>')
