@@ -3238,6 +3238,14 @@ const App = {
     /* Remembered because `_markRailOpen` has to know what the mark reverts TO when a menu closes
        without navigating. Every caller already passes the right value; this just keeps it. */
     this._railCtx = context;
+    /* ⛔⛔⛔ THE SECTION LINKS ARE DRIVEN FROM HERE, NOT FROM `navigate`, AND THAT IS THE FIX FOR
+       "the menu is showing up on a lot of other pages". `_afterNavigate` only fires for MODULE
+       screens; Books, Close The Week and every other hub-shell page is opened by `openHubFullPage`
+       and never reaches it — so the Inventory links stayed on the bar over Books. This runs on
+       EVERY shell render, hub pages included, and `context` is the rail's own idea of where the
+       operator is, which is the only thing that knows about both kinds of page. */
+    try { if (typeof SectionTabs !== 'undefined') SectionTabs.render(context, this._currentScreenId); }
+    catch (e) { console.error('section links render failed', e); }
     const rail = document.getElementById('rail-nav');
     if (rail) {
       const r = ([k, l]) => this._railRow(k, l, context);
@@ -3906,12 +3914,13 @@ const App = {
     const title = document.getElementById('topbar-title')?.textContent || id;
     this._recordLocation({ mode: 'app', module: this._activeModule, screen: id, label: title });
     const v = this._VIEW_STAMP[id]; if (v) this.stampFixView(v);
-    /* The section tab bar re-renders on EVERY navigate, not just on a section swap, because the lit
-       tab has to follow the screen however the operator got there — a Fix step, a Hub row or an
-       audit action item all land here without touching the bar. `SectionTabs.render` is a no-op for
-       any section it is not enabled for, so this costs nothing on the other eight. */
-    try { if (typeof SectionTabs !== 'undefined') SectionTabs.render(this._activeModule, id); }
-    catch (e) { console.error('section tabs render failed', e); }
+    /* Re-render on EVERY navigate, not just on a section swap, because the lit link has to follow
+       the screen however the operator got there — a Fix step, a Hub row or an audit action item all
+       land here without touching the bar.
+       ⚠ `_railCtx`, not `_activeModule`: the rail's context is the one field that knows about hub
+       pages too, and keying on the module is what let the Inventory links survive onto Books. */
+    try { if (typeof SectionTabs !== 'undefined') SectionTabs.render(this._railCtx, id); }
+    catch (e) { console.error('section links render failed', e); }
   },
 
   // Profit Fix view-tracking: stamp the day a "review/read this screen" target

@@ -2297,8 +2297,12 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 
 /* ⛔ STRETCHED TO THE BAR'S FULL HEIGHT. The links' own box ended at y=36 while the bar ended at
    52, so a menu opening under the links left a 16px dead strip that closed it on the way down. */
+/* ⛔ EQUAL AIR EITHER SIDE OF THE RULE. It read lopsided because .tn-page's own 16px flex gap
+   sat on the LEFT of the divider while only the padding sat on the right — 30 against 14. The
+   margin goes to zero so the flex gap is the left measure, and the padding is set to 16 MINUS the
+   link's own 9px inset so the first word lands 16px off the rule too. */
 .sec-links{position:relative;align-self:stretch;display:flex;align-items:center;gap:2px;
-  padding-left:14px;margin-left:14px;min-width:0;flex-wrap:nowrap;}
+  padding-left:7px;margin-left:0;min-width:0;flex-wrap:nowrap;}
 .sec-links[hidden]{display:none;}
 /* The vertical rule between the section icon and its groups. A pseudo-element so no decorative
    node lives in the markup, and 18px rather than full height, matching the "i" divider above. */
@@ -2307,7 +2311,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .st-link{background:none;border:0;padding:4px 9px;font-family:inherit;font-size:13px;font-weight:600;
   line-height:1;color:var(--t2);cursor:default;white-space:nowrap;transition:color .12s;}
 .st-link:hover{color:var(--w);}
-.st-link.st-on{color:var(--gold);}
+/* Active is WHITE, not gold (Kyle, walking it). Gold is left to the icons. */
+.st-link.st-on{color:var(--w);}
 
 /* ⛔ FIXED, AND OFF `body`. `#proto-topnav` is 52px tall with overflow:hidden, so a menu inside it
    was clipped away entirely — it never went "behind" anything and no z-index would have helped.
@@ -2317,8 +2322,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .st-row{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;
   padding:7px 12px;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;
   color:var(--t1);white-space:nowrap;transition:color .12s;}
-.st-row:hover{background:none;color:var(--gold);}
-.st-row-on{color:var(--gold);}
+.st-row:hover{background:none;color:var(--w);}
+.st-row-on{color:var(--w);}
 .st-ic{display:flex;align-items:center;flex-shrink:0;color:var(--t3);transition:color .12s;}
 .st-ic .nav-icon{width:16px;height:16px;}
 .st-row:hover .st-ic,.st-row-on .st-ic{color:var(--gold);}
@@ -2327,20 +2332,4 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .tn-secicon{display:flex;align-items:center;color:var(--gold);flex-shrink:0;}
 .tn-secicon .nav-icon,.tn-secicon svg{width:17px;height:17px;}
 
-/* ── THE PAGE HEADER ── title, the one "i" beside it, a rule under, and NOT much air. */
-.sec-head{display:flex;align-items:center;gap:7px;width:100%;max-width:var(--page-w);
-  margin:0 auto;padding:16px var(--sp) 9px;border-bottom:1px solid var(--b-edge);background:var(--bg);}
-.sec-head[hidden]{display:none;}
-.ph-title{font-family:var(--f-disp);font-weight:700;font-size:17px;letter-spacing:.3px;
-  color:var(--t1);margin:0;line-height:1.2;}
-/* Bare icon, no chrome box: the "i" reads as a mark, not a button, exactly as it does in the
-   top bar. Without this it falls back to .tn-iconbtn and picks the --c3 tile back up. */
-.sec-head .tn-iconbtn{width:auto;height:auto;background:none;border:0;border-radius:0;padding:0;
-  color:var(--t3);flex-shrink:0;}
-.sec-head .tn-iconbtn:hover{background:none;color:var(--gold);}
-.sec-head .tn-iconbtn::before{display:none;}
-/* ⛔ AND THE SCREEN GIVES UP ITS OWN TOP PADDING. `.screen` adds var(--sp) on top of the header's
-   padding, which is where the canyon between the rule and the content came from. */
-#sec-head:not([hidden]) ~ .content .screen{padding-top:16px;}
-
-@media (max-width:768px){.sec-links{display:none;}.sec-head{display:none;}}
+@media (max-width:768px){.sec-links{display:none;}}
