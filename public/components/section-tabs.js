@@ -1,37 +1,32 @@
 'use strict';
 
-/* ══ SECTION TABS ══════════════════════════════════════════════════════════════════════════════
-   A permanent horizontal bar of a section's GROUPS, each opening its own screens, replacing the
-   overlay menu that opened on a rail click and closed again the moment you picked a row.
+/* ══ SECTION LINKS ═════════════════════════════════════════════════════════════════════════════
+   A section's GROUPS, in the top bar beside the section name, each opening its own screens. The
+   page below gets its own header: the screen's name with the help "i" beside it, left aligned.
 
-   ⭐⭐ THE POINT IS ORIENTATION, NOT WIDTH. `#rail-menu` was never a permanent second column — it
-   is an overlay that closes on selection, so the content was always full width. What it cost was
-   the section's SHAPE: eighteen Inventory screens in six groups, all of it invisible until you
-   opened a menu, and invisible again the moment you chose. The bar keeps the groups on screen.
+   ⭐⭐ WHY IT IS NOT A SECOND SIDEBAR OR A SECOND ROW. `#rail-menu` was an overlay that showed the
+   section's shape and took it away again the moment you picked a row; a tab strip under the top bar
+   was a whole extra band of chrome for six words. In the bar there is no new row at all.
 
    ⛔⛔⛔ EVERY GROUP AND ROW IS DERIVED FROM `navHTML()`, NEVER HAND-KEPT. That one source already
    feeds the section sidebar AND the mobile drawer (`groupsOf` in app.js parses the same markup the
-   same way). A second list of the same fact is how a nav row goes missing from one surface and not
-   the other, and this codebase has paid for a hand-kept list more than once. Add a screen to
-   `nav.js` and it appears here, in the sidebar and in the drawer together or not at all.
+   same way). Add a screen to `nav.js` and it appears in all three or in none.
 
-   ⛔ MOBILE IS UNTOUCHED, BY CONSTRUCTION. This reads `navHTML()` and never writes it, adds no
-   class to `.nav-item`, and renders into its own host. The drawer keeps parsing exactly what it
-   parsed before.
+   ⛔ MOBILE IS UNTOUCHED, BY CONSTRUCTION: this reads `navHTML()` and never writes it, adds no rule
+   to `.nav-item`, and both hosts are hidden at the phone breakpoint.
 
-   ⛔ NEW CLASSES ONLY, NEVER A RESTYLE OF `.nav-item`. Kyle's rules for this bar are the opposite
-   of the sidebar's: no hover background, the label stays `--t1`, only the ICON goes gold on hover.
-   Applying that to `.nav-item` would change the sidebar and therefore the mobile drawer.
+   ⛔ ONE HELP "i" IN THE APP ([[help-model]]). The page header does not RENDER a second one — it
+   MOVES the existing `#tn-help` node into itself. Two info buttons is exactly the drift that rule
+   exists to prevent, and a copy would have gone stale the first time the real one changed.
 
-   ⚠ V1 IS INVENTORY ONLY, by Kyle's call: build one section, adjust the design, then roll it out
-   so every section stays cohesive. `ENABLED` is the whole switch. */
+   ⚠ V1 IS INVENTORY ONLY, by Kyle's call: build one section, settle the design, then roll it out. */
 
 const SectionTabs = {
 
   ENABLED: { inventory: true },
 
-  /* The group whose rows become the right-hand Help icon rather than a tab of their own. Support
-     is one row repeated in all seven section sidebars; it does not deserve a seventh tab. */
+  /* Support is one row repeated in all seven section sidebars. It is not a group anybody browses,
+     and Kyle is folding the FAQs into one global page, so it is kept out of the bar entirely. */
   ASIDE_GROUP: 'Support',
 
   on(module) { return !!this.ENABLED[module]; },
@@ -43,9 +38,8 @@ const SectionTabs = {
     return '';
   },
 
-  /* Parse the section's own sidebar markup into groups. Deliberately the SAME walk the mobile
-     drawer does: `.nav-section` opens a group, `.nav-item` adds a row to it. A row with no
-     `data-screen` is an action (Report a Bug), not a destination, and is skipped here. */
+  /* The same walk the mobile drawer does: `.nav-section` opens a group, `.nav-item` adds a row.
+     A row with no `data-screen` is an action (Report a Bug), not a destination. */
   groupsFor(module) {
     const html = this._srcFor(module);
     if (!html) return [];
@@ -62,8 +56,9 @@ const SectionTabs = {
         const screen = el.getAttribute('data-screen');
         if (!screen) return;
         const lab = el.querySelector('.nav-label');
-        const ic  = el.querySelector('.nav-icon');
+        const ic = el.querySelector('.nav-icon');
         if (!cur) { cur = { name: '', rows: [] }; out.push(cur); }
+        // The icon rides along for the DROP-DOWN rows only; the top-bar links are text alone.
         cur.rows.push({
           screen: screen,
           label: lab ? (lab.textContent || '').trim() : screen,
@@ -71,91 +66,110 @@ const SectionTabs = {
         });
       }
     });
-    return out.filter(g => g.rows.length);
+    return out.filter(g => g.rows.length && g.name !== this.ASIDE_GROUP);
   },
 
-  /* Which tab owns a screen. This is what lights the right tab when an operator arrives from a Fix
-     step, a Hub row or an audit action item rather than from the bar itself. Derived, so a screen
-     that moves group in `nav.js` moves tab here with no second edit. */
   tabOf(module, screen) {
     const gs = this.groupsFor(module);
-    for (let i = 0; i < gs.length; i++) {
-      if (gs[i].rows.some(r => r.screen === screen)) return i;
-    }
+    for (let i = 0; i < gs.length; i++) if (gs[i].rows.some(r => r.screen === screen)) return i;
     return -1;
   },
 
-  host() { return document.getElementById('section-tabs'); },
+  labelOf(module, screen) {
+    const gs = this.groupsFor(module);
+    for (const g of gs) for (const r of g.rows) if (r.screen === screen) return r.label;
+    return '';
+  },
+
+  linkHost() { return document.getElementById('sec-links'); },
+  headHost() { return document.getElementById('page-head'); },
 
   close() {
-    const h = this.host();
+    const h = this.linkHost();
     if (!h) return;
     const d = h.querySelector('.st-drop');
     if (d) d.remove();
-    Array.from(h.querySelectorAll('.st-tab')).forEach(t => t.classList.remove('st-open'));
+    Array.from(h.querySelectorAll('.st-link')).forEach(t => t.classList.remove('st-open'));
+    this._openTab = -1;
   },
 
-  /* Render for the active module. Called on every navigate so the lit tab follows the screen.
-     ⚠ Rebuilt rather than patched: the groups come from `navHTML()`, which is itself rebuilt per
-     render, so patching would need a diff of two things that are already cheap to make. */
   render(module, screen) {
-    const h = this.host();
+    this._screen = screen;
+    this._renderLinks(module, screen);
+    this._renderHead(module, screen);
+  },
+
+  _renderLinks(module, screen) {
+    const h = this.linkHost();
     if (!h) return;
     if (!this.on(module)) { h.innerHTML = ''; h.hidden = true; return; }
-
     const groups = this.groupsFor(module);
     if (!groups.length) { h.innerHTML = ''; h.hidden = true; return; }
-    // The screen this bar is currently showing. Held here so the click handler never has to ask
-    // App for it (see the note in _wire).
-    this._screen = screen;
 
     h.innerHTML = '';
     h.hidden = false;
     const active = this.tabOf(module, screen);
 
-    const bar = document.createElement('div');
-    bar.className = 'st-bar';
-
     groups.forEach((g, i) => {
-      if (g.name === this.ASIDE_GROUP) return;
       const t = document.createElement('button');
       t.type = 'button';
-      t.className = 'st-tab' + (i === active ? ' st-on' : '');
+      t.className = 'st-link' + (i === active ? ' st-on' : '');
       t.textContent = g.name || 'More';
       t.setAttribute('data-tab', String(i));
-      bar.appendChild(t);
+      h.appendChild(t);
     });
 
-    /* Help sits at the right end as an icon, not a tab. Its row is whatever the Support group
-       holds, so it cannot drift from the sidebar's own Help destination. */
-    const hg = groups.find(g => g.name === this.ASIDE_GROUP);
-    if (hg && hg.rows.length) {
-      const sp = document.createElement('span');
-      sp.className = 'st-gap';
-      bar.appendChild(sp);
-      const hb = document.createElement('button');
-      hb.type = 'button';
-      hb.className = 'st-help';
-      hb.setAttribute('aria-label', hg.rows[0].label || 'Help');
-      hb.title = hg.rows[0].label || 'Help';
-      hb.setAttribute('data-screen', hg.rows[0].screen);
-      hb.innerHTML = hg.rows[0].icon;
-      bar.appendChild(hb);
-    }
+    this._wire(h);
 
-    h.appendChild(bar);
-    this._wire(h, module, groups);
+    /* ⛔⛔ RE-OPEN THE DROP AFTER A REBUILD, AND THIS IS THE BUG KYLE FOUND BY WALKING IT.
+       The first version created the drop and THEN navigated. `navigate` calls `_afterNavigate`,
+       which calls this render, which clears `innerHTML` — so the menu was built and destroyed in
+       the same press and no drop-down ever appeared on any link you were not already inside.
+       Holding the open group across the rebuild is what makes the two orders agree. */
+    if (this._openTab >= 0 && groups[this._openTab]) {
+      const t = h.querySelector('.st-link[data-tab="' + this._openTab + '"]');
+      if (t) this._openDrop(h, t, groups[this._openTab]);
+    }
   },
 
-  _openDrop(h, tabEl, group) {
-    this.close();
-    tabEl.classList.add('st-open');
+  /* The page's own header: the screen's name, left aligned, with the app's ONE help "i" beside it.
+     The name comes from the same `navHTML()` row the link menu is built from, so the header and the
+     menu can never disagree about what a screen is called. */
+  _renderHead(module, screen) {
+    const h = this.headHost();
+    if (!h) return;
+    const tnHelp = document.getElementById('tn-help');
+    if (!this.on(module)) {
+      h.innerHTML = '';
+      h.hidden = true;
+      if (tnHelp && tnHelp.parentElement === h) {
+        const page = document.querySelector('.tn-page');
+        if (page) page.appendChild(tnHelp);
+      }
+      return;
+    }
+    const name = this.labelOf(module, screen);
+    h.innerHTML = '';
+    h.hidden = false;
+    const t = document.createElement('h2');
+    t.className = 'ph-title';
+    t.textContent = name || '';
+    h.appendChild(t);
+    // MOVED, never copied: one info button in the app.
+    if (tnHelp) h.appendChild(tnHelp);
+  },
+
+  _openDrop(h, linkEl, group) {
+    const old = h.querySelector('.st-drop');
+    if (old) old.remove();
+    Array.from(h.querySelectorAll('.st-link')).forEach(t => t.classList.remove('st-open'));
+    linkEl.classList.add('st-open');
     const d = document.createElement('div');
     d.className = 'st-drop';
     group.rows.forEach(r => {
       const row = document.createElement('button');
       row.type = 'button';
-      row.className = 'st-row';
+      row.className = 'st-row' + (r.screen === this._screen ? ' st-row-on' : '');
       row.setAttribute('data-screen', r.screen);
       if (r.icon) {
         const ic = document.createElement('span');
@@ -164,13 +178,12 @@ const SectionTabs = {
         row.appendChild(ic);
       }
       const lb = document.createElement('span');
-      lb.className = 'st-lb';
       lb.textContent = r.label;
       row.appendChild(lb);
       d.appendChild(row);
     });
     h.appendChild(d);
-    d.style.left = Math.max(0, tabEl.offsetLeft) + 'px';
+    d.style.left = Math.max(0, linkEl.offsetLeft) + 'px';
   },
 
   _go(screen) {
@@ -179,47 +192,53 @@ const SectionTabs = {
     App.navigate(screen);
   },
 
-  _wire(h, module, groups) {
+  _wire(h) {
     if (h._stWired) return;
     h._stWired = true;
 
     h.addEventListener('click', (e) => {
-      const help = e.target.closest && e.target.closest('.st-help');
-      if (help) { this._go(help.getAttribute('data-screen')); return; }
-
       const row = e.target.closest && e.target.closest('.st-row');
       if (row) { this._go(row.getAttribute('data-screen')); return; }
 
-      const tab = e.target.closest && e.target.closest('.st-tab');
-      if (!tab) return;
-      const gs = this.groupsFor(App._activeModule);
-      const g = gs[Number(tab.getAttribute('data-tab'))];
+      const link = e.target.closest && e.target.closest('.st-link');
+      if (!link) return;
+      const groups = this.groupsFor(App._activeModule);
+      const idx = Number(link.getAttribute('data-tab'));
+      const g = groups[idx];
       if (!g || !g.rows.length) return;
-      /* Kyle's rule, and it is what keeps the common path at two clicks: the tab NAVIGATES to its
-         first screen and shows the siblings at the same time. Take Inventory stays exactly as far
-         away as it is today; only its siblings cost a third click. */
-      if (tab.classList.contains('st-open')) { this.close(); return; }
-      this._openDrop(h, tab, g);
-      /* ⛔ LAND ONLY IF YOU ARE NOT ALREADY IN THIS GROUP, and the test is the whole GROUP, not the
-         group's first screen. Comparing against the first screen alone throws an operator sitting
-         on Count History back to Take Inventory just for opening the menu they are already inside.
-         ⛔⛔ AND IT READS THE SCREEN THIS COMPONENT WAS HANDED, not a private field on App. Two
-         earlier versions reached into App: `_activeScreen`, which does not exist at all, then
-         `_currentScreenId`, which does exist but is assigned at runtime and never declared — and
-         `verify-app-member-refs` failed the gate on it, correctly. `render(module, screen)` is
-         already told the screen; a component that is given a fact should not go looking for it. */
+      /* Land on the group's first screen, but only if you are not already inside the group —
+         clicking the group you are already in must not move you off the page you are reading. */
       const here = g.rows.some(r => r.screen === this._screen);
+      this._openTab = idx;
       if (!here) App.navigate(g.rows[0].screen);
     });
 
-    /* Close on an outside click and on Escape. A hover-opened menu is wrong on the tablet people
-       actually count on, so this is click-driven throughout. */
-    document.addEventListener('click', (e) => {
-      if (!h.contains(e.target)) this.close();
+    /* ⭐ THE MENU OPENS ON HOVER (Kyle's call). Click is left doing one job only: navigating. */
+    h.addEventListener('mouseover', (e) => {
+      const link = e.target.closest && e.target.closest('.st-link');
+      if (!link) return;
+      const idx = Number(link.getAttribute('data-tab'));
+      if (this._openTab === idx && h.querySelector('.st-drop')) return;
+      const groups = this.groupsFor(App._activeModule);
+      const g = groups[idx];
+      if (!g || !g.rows.length) return;
+      this._openTab = idx;
+      this._openDrop(h, link, g);
     });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') this.close();
+
+    /* ⛔ CONTAINMENT, NOT GEOMETRY. The drop is absolutely positioned so it hangs BELOW the host's
+       box — the pointer moving from a link down into the menu has already left that box, and a
+       plain mouseleave would shut the menu on the way to it. `contains` asks the DOM tree instead,
+       and the drop is a child of the host, so the move reads as staying put.
+       ⚠ The drop must also sit flush (`margin-top:0`), or the pointer crosses a dead gap where
+       relatedTarget is neither the host nor the drop and it closes anyway. */
+    h.addEventListener('mouseleave', (e) => {
+      if (e.relatedTarget && h.contains(e.relatedTarget)) return;
+      this.close();
     });
+
+    document.addEventListener('click', (e) => { if (!h.contains(e.target)) this.close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.close(); });
   }
 };
 
