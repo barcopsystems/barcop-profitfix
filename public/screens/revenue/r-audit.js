@@ -246,16 +246,6 @@ S.RevenueAudit = {
 
     AuditUI.attachOutlook('ra', audit, 'revenue');
     this.container.querySelector('.ra-export-btn')?.addEventListener('click', () => this.exportPDF(audit));
-    this.container.querySelectorAll('.ra-fix-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const gap = btn.dataset.gap;
-        // Events is its own section now (dropped from the Revenue Fix rail), so
-        // the Events and Private Dining action jumps to the Events booking
-        // pipeline instead of falling back to the first Fix system.
-        if (gap === 'events-catering') { App.openScreen('ev-bookings'); return; }
-        App._fixFocus = gap; App.navigate('r-fix');
-      });
-    });
   },
 
   // renderNarrative() removed 2026-05-28 with the single-page audit refactor.
