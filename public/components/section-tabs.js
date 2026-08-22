@@ -1,8 +1,8 @@
 'use strict';
 
 /* ══ SECTION LINKS ═════════════════════════════════════════════════════════════════════════════
-   A section's GROUPS, in the top bar beside the section name, each opening its own screens. The
-   page below gets its own header: the screen's name with the help "i" beside it, left aligned.
+   A section's GROUPS, in the top bar beside the section ICON, each opening its own screens on
+   hover. The links themselves never navigate; only a row inside a menu does.
 
    ⭐⭐ WHY IT IS NOT A SECOND SIDEBAR OR A SECOND ROW. `#rail-menu` was an overlay that showed the
    section's shape and took it away again the moment you picked a row; a tab strip under the top bar
@@ -15,9 +15,10 @@
    ⛔ MOBILE IS UNTOUCHED, BY CONSTRUCTION: this reads `navHTML()` and never writes it, adds no rule
    to `.nav-item`, and both hosts are hidden at the phone breakpoint.
 
-   ⛔ ONE HELP "i" IN THE APP ([[help-model]]). The page header does not RENDER a second one — it
-   MOVES the existing `#tn-help` node into itself. Two info buttons is exactly the drift that rule
-   exists to prevent, and a copy would have gone stale the first time the real one changed.
+   ⚠ NO PAGE HEADER. One was built (screen name + the help "i" + a rule under it) and Kyle cut it
+   after walking it: the screen already names itself, so it was a third spelling of the same fact.
+   The help "i" moved to the top bar beside Sign Out and is still the app's ONE info button
+   ([[help-model]]) — one node in `index.html`, never a per-page copy.
 
    ⚠ V1 IS INVENTORY ONLY, by Kyle's call: build one section, settle the design, then roll it out. */
 
@@ -75,21 +76,40 @@ const SectionTabs = {
     return -1;
   },
 
-  labelOf(module, screen) {
-    const gs = this.groupsFor(module);
-    for (const g of gs) for (const r of g.rows) if (r.screen === screen) return r.label;
-    return '';
-  },
+  /* ⚠ `labelOf` LIVED HERE AND WENT WITH THE PAGE HEADER. It existed only to name the screen in
+     that header; once the header was cut it had no caller, and `verify-no-retired-code` failed the
+     gate on it the same run. Retiring a feature is the render call, the orphaned helpers AND the
+     help text ([[the-loop]] #61) — the ratchet caught the helper I walked past. */
 
   linkHost() { return document.getElementById('sec-links'); },
-  headHost() { return document.getElementById('sec-head'); },
 
-  close() {
+  /* Take the menu off the page without forgetting WHICH group was open. `_openDrop` needs this:
+     calling the full `close()` from there reset `_openTab` to -1 immediately after the caller had
+     set it, so the re-open-after-rebuild never fired and the menu vanished on navigation again. */
+  _teardown() {
+    clearTimeout(this._closeT);
     if (this._drop) { this._drop.remove(); this._drop = null; }
     const h = this.linkHost();
     if (h) Array.from(h.querySelectorAll('.st-link')).forEach(t => t.classList.remove('st-open'));
+  },
+
+  close() {
+    this._teardown();
     this._openTab = -1;
   },
+
+  /* ⛔⛔ A GRACE PERIOD ON THE WAY OUT, AND IT IS NOT A NICETY — IT IS THE FIX FOR "the drop down
+     goes away before you can click a link" (Kyle, walking the pushed build). The menu is a fixed
+     element hung off `body` while the links live in the bar, so the pointer travelling between them
+     leaves one box before it enters the other, and any gap at all — a rounding, a border, a
+     diagonal path — lands it on the page and shuts the menu mid-journey.
+     ⭐ Chasing that with pixels is a losing game; every layout change re-opens it. Closing on a
+     short timer that any re-entry cancels makes the menu forgiving of the whole class. */
+  _scheduleClose() {
+    clearTimeout(this._closeT);
+    this._closeT = setTimeout(() => this.close(), 220);
+  },
+  _cancelClose() { clearTimeout(this._closeT); },
 
   /* Is this node part of the menu? The drop hangs off BODY now, so "still inside" spans two
      separate subtrees and cannot be answered by one `contains`. */
@@ -102,7 +122,6 @@ const SectionTabs = {
   render(module, screen) {
     this._screen = screen;
     this._renderLinks(module, screen);
-    this._renderHead(module, screen);
   },
 
   _renderLinks(module, screen) {
@@ -138,33 +157,6 @@ const SectionTabs = {
     }
   },
 
-  /* The page's own header: the screen's name, left aligned, with the app's ONE help "i" beside it.
-     The name comes from the same `navHTML()` row the link menu is built from, so the header and the
-     menu can never disagree about what a screen is called. */
-  _renderHead(module, screen) {
-    const h = this.headHost();
-    if (!h) return;
-    const tnHelp = document.getElementById('tn-help');
-    if (!this.on(module)) {
-      h.innerHTML = '';
-      h.hidden = true;
-      if (tnHelp && tnHelp.parentElement === h) {
-        const page = document.querySelector('.tn-page');
-        if (page) page.appendChild(tnHelp);
-      }
-      return;
-    }
-    const name = this.labelOf(module, screen);
-    h.innerHTML = '';
-    h.hidden = false;
-    const t = document.createElement('h2');
-    t.className = 'ph-title';
-    t.textContent = name || '';
-    h.appendChild(t);
-    // MOVED, never copied: one info button in the app.
-    if (tnHelp) h.appendChild(tnHelp);
-  },
-
   /* ⛔⛔⛔ THE MENU HANGS OFF `body`, NOT OFF THE BAR, AND THAT IS THE FIX FOR "it goes behind the
      page". It was never a stacking problem: `#proto-topnav` is `height:var(--navh)` with
      `overflow:hidden`, so a child hanging below 52px was CLIPPED OUT OF EXISTENCE. No z-index
@@ -174,7 +166,7 @@ const SectionTabs = {
      divider line whatever the link's height happens to be — which is what Kyle asked for and is
      also what removes the dead gap the pointer used to cross on its way down. */
   _openDrop(linkEl, group) {
-    this.close();
+    this._teardown();
     linkEl.classList.add('st-open');
     const d = document.createElement('div');
     d.className = 'st-drop';
@@ -198,7 +190,8 @@ const SectionTabs = {
       const row = e.target.closest && e.target.closest('.st-row');
       if (row) this._go(row.getAttribute('data-screen'));
     });
-    d.addEventListener('mouseleave', (e) => { if (!this._inMenu(e.relatedTarget)) this.close(); });
+    d.addEventListener('mouseenter', () => this._cancelClose());
+    d.addEventListener('mouseleave', (e) => { if (!this._inMenu(e.relatedTarget)) this._scheduleClose(); });
     document.body.appendChild(d);
     const r = linkEl.getBoundingClientRect();
     const nav = document.getElementById('proto-topnav');
@@ -224,6 +217,7 @@ const SectionTabs = {
     h.addEventListener('mouseover', (e) => {
       const link = e.target.closest && e.target.closest('.st-link');
       if (!link) return;
+      this._cancelClose();
       const idx = Number(link.getAttribute('data-tab'));
       if (this._openTab === idx && this._drop) return;
       const groups = this.groupsFor(App._activeModule);
@@ -239,7 +233,7 @@ const SectionTabs = {
        travelling down never crosses dead space between the link and the menu. Without that the
        menu shuts on the way to itself. */
     h.addEventListener('mouseleave', (e) => {
-      if (!this._inMenu(e.relatedTarget)) this.close();
+      if (!this._inMenu(e.relatedTarget)) this._scheduleClose();
     });
 
     document.addEventListener('click', (e) => { if (!this._inMenu(e.target)) this.close(); });
