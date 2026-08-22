@@ -1761,9 +1761,21 @@ S.Hub = {
     const sectionStrip = this._sectionStrip(this._stripMetrics());
 
     const dateLine = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    /* ⭐ THE BAR NAME IN THE GREETING IS A SLOT, NOT A STRING (Kyle, 2026-08-23): *"single unit the
+       hub stays as is.. multi unit the good afternoon, 'bar name' becomes.. good afternoon, Bar
+       drop down selector."* The multi-bar picker used to live in the top bar and does not go there
+       at all any more — `#hub-greet-account-switcher` is its only home.
+       ⛔ IT RENDERS THE NAME BY DEFAULT AND IS *UPGRADED* IN PLACE. `App.renderAccountSwitcher` runs
+       AFTER this render (see `showApp`/`showHub`) and swaps a picker in only when the operator has
+       more than one bar — so a single-location account, the demo, and a FAILED account lookup all
+       keep the name that is already correct on screen. Rendering an empty slot and waiting for the
+       async member to fill it would flash blank on every Hub load and stay blank on the one failure
+       where it matters.
+       ⚠ The note lives out here rather than as an HTML comment inside the template: this is a
+       template literal, and a backticked identifier inside it terminates the string. */
     const hubGrid = `<div class="hub-grid" style="display:grid;gap:18px;padding-bottom:18px;">
           <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-            <div style="font-size:19px;font-weight:700;color:${hbGrey};">${esc(this._greeting())}, ${esc(barName)}</div>
+            <div class="hub-greet" style="font-size:19px;font-weight:700;color:${hbGrey};">${esc(this._greeting())}, <span id="hub-greet-account-switcher" class="hub-greet-bar">${esc(barName)}</span></div>
             <div style="font-size:12px;color:var(--t3);">${esc(dateLine)}</div>
           </div>
           <div class="hub-grid-tiles">${topCard}</div>
