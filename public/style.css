@@ -2348,7 +2348,15 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* ⛔ FIXED, AND OFF `body`. `#proto-topnav` is 52px tall with overflow:hidden, so a menu inside it
    was clipped away entirely — it never went "behind" anything and no z-index would have helped.
    z-index clears the nav's 120. `top` is set in JS from the bar's own bottom edge. */
-.st-drop{position:fixed;background:var(--bg);border:1px solid var(--b-edge);border-top:0;
+/* ⭐ THE MENU IS A PANEL, SO IT DOES NOT SHARE THE PAGE'S FILL (Kyle, 2026-08-23: *"on the drop down
+   part of the menus.. make the background #1E2B34"*). It was `var(--bg)` — the same colour as the
+   page behind it — so it only read as a menu because of its border.
+   ⛔ `--c4`, NEVER THE LITERAL #1E2B34. Two tokens carry that exact value: `--c4` ("accent splash —
+   active section pills, active sidebar row, icon-button hover") and `--sel-active-bg` ("active
+   selector pill / chip background"). A drop-down panel is neither a chip nor a selection, so `--c4`
+   is the one that means this; picking by VALUE would have been a coin toss between them and would
+   have frozen the panel to whatever the chip colour does next. */
+.st-drop{position:fixed;background:var(--c4);border:1px solid var(--b-edge);border-top:0;
   border-radius:0 0 8px 8px;padding:5px;min-width:196px;z-index:200;}
 .st-row{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;
   padding:7px 12px;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;
