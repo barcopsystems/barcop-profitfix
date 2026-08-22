@@ -386,17 +386,70 @@ const AuditUI = {
       + '</div></div>';
   },
 
+  /* ⭐⭐ WHAT HAS ALREADY COME BACK, read straight off the same engine the Fix systems used
+     (Kyle, 2026-08-23: *"on the audit landing pages.. we create a section that shows the recovered
+     amounts the fix systems currently do and when they run a new audit that section is updated in
+     real time"*). The Fix screens are out of the operator's view; this is where the figure lives now.
+     ⛔ NOT A SECOND ENGINE. Profit and Revenue come from `Recovery.moduleSummary`, Cash from
+     `CashEngine.freed()` — the exact members the two Fix screens read. Recomputing any of it here
+     would be a second implementation of a money number, which is the drift the suite exists to catch.
+     ⚠ CASH IS GENUINELY A DIFFERENT ENGINE, not an oversight: `recovery.js` never mentions cash, and
+     `CashEngine.freed()` measures trapped cash against its own first readings. */
+  _recoveredFor(moduleKey) {
+    if (!moduleKey) return null;
+    if (moduleKey === 'cash') {
+      const f = (window.CashEngine && CashEngine.freed) ? CashEngine.freed() : null;
+      if (!f) return null;
+      return { label: 'Cash Freed To Date', dollars: f.dollars || 0, building: !!f.building };
+    }
+    const s = (window.Recovery && Recovery.moduleSummary) ? Recovery.moduleSummary(moduleKey) : null;
+    if (!s) return null;
+    return { label: 'Recovered To Date', dollars: s.recovered || 0, building: s.withFigure === 0, measuring: s.measuring || 0 };
+  },
+
+  /* ⭐ THE ITEM AND ITS CAPTION ARE SHARED, because two strips render them: this file's
+     `recoverStrip` (Profit and Revenue) and `c-audit`'s own `cashStrip`, which carries Cash's
+     different three figures. Cash needed the same number and the same honesty line; a second copy of
+     either is how the two drift into saying different things about one figure. */
+  recoveredItem(moduleKey) {
+    const rec = this._recoveredFor(moduleKey);
+    if (!rec) return '';
+    /* ⚠ "Building" rather than $0. A bar inside its first weeks has not failed to recover anything —
+       there is nothing to measure against yet, and a hard $0 reads as the opposite ([[the-loop]] #72:
+       a count is only an all-clear if it could have counted anything). */
+    const val = rec.building ? 'Building' : App.fmtCurrency(rec.dollars, 0);
+    return '<div class="calc-item"><div class="calc-label">' + esc(rec.label) + '</div>'
+      + '<div class="calc-val lg ' + (rec.building ? '' : 'good') + '">' + val + '</div></div>';
+  },
+  /* ⛔ SAY WHAT IT MEASURES. This figure is the improvement in the metric since the measurement clock
+     started, whatever caused it — a tightened pour, a supplier price drop, a good season. On a Fix
+     screen it sat under work the operator had just been doing, which flattered it; on the audit it
+     reads as the audit's own result. A displayed number has to be true for the label it carries
+     ([[output-honesty]]), so the basis is stated rather than implied. */
+  recoveredBasis(moduleKey) {
+    const rec = this._recoveredFor(moduleKey);
+    if (!rec || rec.building) return '';
+    return '<div style="font-size:11px;color:var(--t3);margin-top:10px;line-height:1.5;">'
+      + esc(rec.label) + ' is the measured change in these numbers since Bar Cop started watching '
+      + 'them. It counts every improvement, whatever caused it.</div>';
+  },
+
   // ── Full view: total recoverable stat strip (money hero) ───────────────────
-  recoverStrip(audit) {
+  recoverStrip(audit, moduleKey) {
     const d = audit.raw || audit;
     const totalMonthly = (audit.action_items||[]).reduce((s,a) => s+(a.monthly_impact||0), 0);
     const hasWeekly = !!d.WEEKLY_GAP_AMT;
-    if (!(totalMonthly > 0) && !hasWeekly) return '';
-    const calcItem = (label, val) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg good">' + val + '</div></div>';
+    const rec = this._recoveredFor(moduleKey);
+    /* ⚠ THE RECOVERED FIGURE KEEPS THE STRIP ALIVE ON ITS OWN. The old early-return asked only about
+       OPPORTUNITY, so a bar that had closed its gaps — nothing left on the table, real money already
+       back — would have rendered no strip at all and lost the one number it had earned. */
+    if (!(totalMonthly > 0) && !hasWeekly && !rec) return '';
+    const calcItem = (label, val, cls) => '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || 'good') + '">' + val + '</div></div>';
     return '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
       + (totalMonthly > 0 ? calcItem('Recoverable / Month', App.fmtCurrency(totalMonthly)) + calcItem('Annualized', App.fmtCurrency(totalMonthly*12)) : '')
       + (hasWeekly ? calcItem('Weekly Gap', esc(String(d.WEEKLY_GAP_AMT))) : '')
-      + '</div></div>';
+      + this.recoveredItem(moduleKey)
+      + '</div>' + this.recoveredBasis(moduleKey) + '</div>';
   },
 
   // ── Full view: Action Items heading row (+ Outlook mount) + ranked list ────
