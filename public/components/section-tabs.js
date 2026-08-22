@@ -82,15 +82,21 @@ const SectionTabs = {
   },
 
   linkHost() { return document.getElementById('sec-links'); },
-  headHost() { return document.getElementById('page-head'); },
+  headHost() { return document.getElementById('sec-head'); },
 
   close() {
+    if (this._drop) { this._drop.remove(); this._drop = null; }
     const h = this.linkHost();
-    if (!h) return;
-    const d = h.querySelector('.st-drop');
-    if (d) d.remove();
-    Array.from(h.querySelectorAll('.st-link')).forEach(t => t.classList.remove('st-open'));
+    if (h) Array.from(h.querySelectorAll('.st-link')).forEach(t => t.classList.remove('st-open'));
     this._openTab = -1;
+  },
+
+  /* Is this node part of the menu? The drop hangs off BODY now, so "still inside" spans two
+     separate subtrees and cannot be answered by one `contains`. */
+  _inMenu(node) {
+    if (!node) return false;
+    const h = this.linkHost();
+    return !!((h && h.contains(node)) || (this._drop && this._drop.contains(node)));
   },
 
   render(module, screen) {
@@ -128,7 +134,7 @@ const SectionTabs = {
        Holding the open group across the rebuild is what makes the two orders agree. */
     if (this._openTab >= 0 && groups[this._openTab]) {
       const t = h.querySelector('.st-link[data-tab="' + this._openTab + '"]');
-      if (t) this._openDrop(h, t, groups[this._openTab]);
+      if (t) this._openDrop(t, groups[this._openTab]);
     }
   },
 
@@ -159,10 +165,16 @@ const SectionTabs = {
     if (tnHelp) h.appendChild(tnHelp);
   },
 
-  _openDrop(h, linkEl, group) {
-    const old = h.querySelector('.st-drop');
-    if (old) old.remove();
-    Array.from(h.querySelectorAll('.st-link')).forEach(t => t.classList.remove('st-open'));
+  /* ⛔⛔⛔ THE MENU HANGS OFF `body`, NOT OFF THE BAR, AND THAT IS THE FIX FOR "it goes behind the
+     page". It was never a stacking problem: `#proto-topnav` is `height:var(--navh)` with
+     `overflow:hidden`, so a child hanging below 52px was CLIPPED OUT OF EXISTENCE. No z-index
+     could have rescued it. Measured live before changing anything: the links' box ended at y=36
+     and the bar at y=52.
+     ⭐ Anchored to the BAR'S OWN BOTTOM EDGE rather than the link's, so it opens on the top bar's
+     divider line whatever the link's height happens to be — which is what Kyle asked for and is
+     also what removes the dead gap the pointer used to cross on its way down. */
+  _openDrop(linkEl, group) {
+    this.close();
     linkEl.classList.add('st-open');
     const d = document.createElement('div');
     d.className = 'st-drop';
@@ -182,8 +194,18 @@ const SectionTabs = {
       row.appendChild(lb);
       d.appendChild(row);
     });
-    h.appendChild(d);
-    d.style.left = Math.max(0, linkEl.offsetLeft) + 'px';
+    d.addEventListener('click', (e) => {
+      const row = e.target.closest && e.target.closest('.st-row');
+      if (row) this._go(row.getAttribute('data-screen'));
+    });
+    d.addEventListener('mouseleave', (e) => { if (!this._inMenu(e.relatedTarget)) this.close(); });
+    document.body.appendChild(d);
+    const r = linkEl.getBoundingClientRect();
+    const nav = document.getElementById('proto-topnav');
+    const top = nav ? nav.getBoundingClientRect().bottom : r.bottom;
+    d.style.left = Math.round(r.left) + 'px';
+    d.style.top = Math.round(top) + 'px';
+    this._drop = d;
   },
 
   _go(screen) {
@@ -196,48 +218,31 @@ const SectionTabs = {
     if (h._stWired) return;
     h._stWired = true;
 
-    h.addEventListener('click', (e) => {
-      const row = e.target.closest && e.target.closest('.st-row');
-      if (row) { this._go(row.getAttribute('data-screen')); return; }
-
-      const link = e.target.closest && e.target.closest('.st-link');
-      if (!link) return;
-      const groups = this.groupsFor(App._activeModule);
-      const idx = Number(link.getAttribute('data-tab'));
-      const g = groups[idx];
-      if (!g || !g.rows.length) return;
-      /* Land on the group's first screen, but only if you are not already inside the group —
-         clicking the group you are already in must not move you off the page you are reading. */
-      const here = g.rows.some(r => r.screen === this._screen);
-      this._openTab = idx;
-      if (!here) App.navigate(g.rows[0].screen);
-    });
-
-    /* ⭐ THE MENU OPENS ON HOVER (Kyle's call). Click is left doing one job only: navigating. */
+    /* ⛔ THE GROUP LINKS ARE NOT CLICKABLE (Kyle's call). They open their menu on hover and do
+       nothing else; only a row inside the menu navigates. A link that both opened a menu and moved
+       you was two jobs on one control, and the move happened before you had read the menu. */
     h.addEventListener('mouseover', (e) => {
       const link = e.target.closest && e.target.closest('.st-link');
       if (!link) return;
       const idx = Number(link.getAttribute('data-tab'));
-      if (this._openTab === idx && h.querySelector('.st-drop')) return;
+      if (this._openTab === idx && this._drop) return;
       const groups = this.groupsFor(App._activeModule);
       const g = groups[idx];
       if (!g || !g.rows.length) return;
       this._openTab = idx;
-      this._openDrop(h, link, g);
+      this._openDrop(link, g);
     });
 
-    /* ⛔ CONTAINMENT, NOT GEOMETRY. The drop is absolutely positioned so it hangs BELOW the host's
-       box — the pointer moving from a link down into the menu has already left that box, and a
-       plain mouseleave would shut the menu on the way to it. `contains` asks the DOM tree instead,
-       and the drop is a child of the host, so the move reads as staying put.
-       ⚠ The drop must also sit flush (`margin-top:0`), or the pointer crosses a dead gap where
-       relatedTarget is neither the host nor the drop and it closes anyway. */
+    /* ⛔ CONTAINMENT, NOT GEOMETRY, and it now spans TWO subtrees: the links live in the bar and
+       the menu hangs off `body`, so "am I still in the menu" cannot be one `contains` any more.
+       ⚠ The link host stretches to the bar's full height (`align-self:stretch`) so the pointer
+       travelling down never crosses dead space between the link and the menu. Without that the
+       menu shuts on the way to itself. */
     h.addEventListener('mouseleave', (e) => {
-      if (e.relatedTarget && h.contains(e.relatedTarget)) return;
-      this.close();
+      if (!this._inMenu(e.relatedTarget)) this.close();
     });
 
-    document.addEventListener('click', (e) => { if (!h.contains(e.target)) this.close(); });
+    document.addEventListener('click', (e) => { if (!this._inMenu(e.target)) this.close(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.close(); });
   }
 };
