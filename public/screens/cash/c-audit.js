@@ -494,7 +494,6 @@ S.CashAudit = {
 
     AuditUI.attachOutlook('ca', audit, 'cash');
     this.container.querySelector('.ca-export-btn')?.addEventListener('click', () => this.exportPDF(audit));
-    this.container.querySelectorAll('.ca-fix-btn').forEach(btn => btn.addEventListener('click', () => { App._fixFocus = btn.dataset.gap; App.navigate('c-fix'); }));
   },
 
   // The opportunity hero spans the disciplines: the one-time cash you can free,
