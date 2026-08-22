@@ -123,8 +123,21 @@ S.WeekClose = {
        whoever assigns first, and a default written in the render is not a default, it is a lock).
        ⚠ NOTHING OPENS WHEN NOTHING IS OWED: with every row ready the filter is empty and this is
        null, which is the all-closed state the confirmed week should land in. */
-    this._openLane = this._firstOwed(this.rows(this.state()));
+    this._prepare();
     App.openHubFullPage('Close The Week', (mount) => { this.container = mount; this.render(mount); }, 'week-close');
+  },
+
+  /* ⭐ THE LANDING RULE, LIFTED OUT OF `open()` SO A SECOND HOST CAN ASK FOR IT.
+     `S.Week` renders this screen into a tab panel and must not go back through
+     `openHubFullPage` to do it — that would re-enter the shell it is already
+     inside. Extracting the rule rather than copying the line into the host is the
+     point: this is the ONLY place that decides which row a landing opens, so the
+     tab and the standalone door cannot drift apart on it.
+     ⚠ STILL NOT IN `render`, for the reason the note above gives — `_openLane` is
+     a plain property, so assigning it during a repaint would reinstate itself on
+     every render and the operator could never close a row. */
+  _prepare() {
+    this._openLane = this._firstOwed(this.rows(this.state()));
   },
 
   /* ⭐ ONE MEMBER STATES THE RULE, because three places now ask it: landing (`open`), a landed
