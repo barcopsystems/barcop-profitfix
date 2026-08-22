@@ -2007,27 +2007,29 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .tn-signout:hover{color:var(--w);}
 /* ⛔ `.tn-right .at-qsel` IS GONE (2026-08-23). It sized the multi-bar picker for the top bar, and
    the picker no longer goes there — *"that needs moved out of the top bar and replace the bar name
-   on the hub.. and it only goes there."* The scoping DECISION it recorded is the part worth
-   keeping, so it is repeated below at the new host rather than dropped: `.at-qsel`'s own
-   12px/`7px 26px 7px 10px` is right for a quick-select in a page body and wrong everywhere it is
-   borrowed, so every host states its own measurements.
-   ⭐ THE GREETING'S PICKER READS AS THE GREETING. It replaces a 19px/700 bar name in a sentence, so
-   it takes that type rather than chrome type, and it carries no fill or border: the operator is
-   reading a headline, not filling in a form. The chevron is what says it is a control, and
-   `.at-qsel` already paints one at `right 8px center`, so the right padding has to clear it.
-   ⚠ font-family/size are stated, NOT inherited, because `.at-qsel` sets its own 12px Barlow and a
-   bare `inherit` on the size alone would leave the select fighting the greeting on weight. */
-/* ⚠ NOT `display:flex`. The greeting is a SENTENCE — "Good afternoon, " and the bar are one line of
-   running text, and a flex container would turn the text node and the picker into two flex items,
-   which is a layout change to the single-bar Hub nobody asked for. Normal flow plus a baseline
-   alignment on the select keeps both states reading identically. */
+   on the hub.. and it only goes there."*
+   ⭐ THE CLOSED CONTROL READS AS THE GREETING, AND KYLE KEPT IT: *"it's fine like that having the
+   name like that as the drop down.. just the drop down needs to be styled like the site.. not in
+   white background."* So the name stays 19px/700 in the sentence; only the OPEN list was wrong.
+   ⛔⛔ THE WHITE LIST WAS `background-color:transparent`, AND NO STYLESHEET REVIEW WOULD SHOW IT.
+   Chrome paints a select's native popup from the CONTROL's own background; transparent gives it
+   nothing to work from and it falls back to the light default — a white list with a blue highlight,
+   in a dark app, however dark the closed control looks. `color-scheme:dark` alone did not save it.
+   ⭐⭐ AND THE FIX COSTS NOTHING VISUALLY, BECAUSE THE TOKENS WERE MEASURED FIRST: `--bg` and
+   `--input` are both #0C1216, and `.content` behind this greeting is `var(--bg)` — so a REAL fill
+   of `var(--bg)` is pixel-identical to transparent here while giving the popup a colour to paint.
+   ⚠ `--bg`, not `--input`: the honest claim is "the same surface this sits on", and the two tokens
+   being equal today is a fact about the palette, which Kyle retunes live.
+   ⚠ AND THE OPTIONS NEED THEIR OWN TYPE or they inherit 19px/700 and the list renders enormous.
+   `.il-copysel option` already does exactly this a few hundred lines up — same reason, same shape. */
 .hub-greet .at-qsel{
   height:auto;padding:0 22px 0 4px;font-size:19px;font-weight:700;line-height:inherit;
-  vertical-align:baseline;background-color:transparent;border:0;border-radius:0;color:inherit;
+  vertical-align:baseline;background-color:var(--bg);border:0;border-radius:0;color:inherit;
   background-position:right 6px center;max-width:100%;
 }
+.hub-greet .at-qsel option{background:var(--surface);color:var(--t1);font-size:13px;font-weight:600;}
 .hub-greet .at-qsel:hover{color:var(--gold);}
-.hub-greet .at-qsel:focus{border-color:transparent;outline:none;}
+.hub-greet .at-qsel:focus{outline:none;}
 .mnav-barname{font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;color:var(--t1);}
 
 /* Backdrop sits behind the sidebar overlay. Real div (not pseudo) so we can
