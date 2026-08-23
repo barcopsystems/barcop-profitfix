@@ -54,7 +54,7 @@
      is exactly what having three of them buys. Do not "tidy" them into one. */
   --stat:      #202C36;
   --c3:        #111E26;                /* 3rd navy: menu borders/accents + secondary (icon) button backgrounds in the chrome */
-  --c4:        #1E2B34;                /* 4th navy: accent splash — active section pills, active sidebar row, icon-button hover */
+  --c4:        #23323D;                /* 4th navy: accent splash — active section pills, active sidebar row, icon-button hover */
   --hover:     rgba(255,255,255,0.02);
   --nav-act:   #162C3C;
 
