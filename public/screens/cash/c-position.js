@@ -136,7 +136,7 @@ S.CashPosition = {
             : '<div style="font-size:12px;color:var(--green);margin-top:10px;">Fully reserved. Your cushion covers ' + CashEngine.reserveWeeks() + ' weeks of fixed costs with no sales.</div>');
     return '<div class="sh" style="margin:24px 0 10px;">Your Reserve</div>'
       + '<div class="card">' + body
-      /* ⛔ THIS CONTROL WAS WRONG TWICE, AND THE SECOND DIAGNOSIS REPLACED THE FIRST. It shipped as
+      /* ⛔ THIS CONTROL HAS BEEN WRONG TWICE AND ITS DESTINATION HAS NOW MOVED A THIRD TIME. It shipped as
          **"Free Trapped Cash" pointing at `c-trapped`** — a read-only report that writes nothing and
          whose own controls are two more navigations plus Export PDF. So the label promised a result
          no click of it delivers, the same class as the Inventory step's "Create Order" button that
@@ -150,9 +150,15 @@ S.CashPosition = {
          (`fixLabel: 'Free Trapped Cash system'`, `screen: 'c-fix'`, `focus: 'free-trapped'`).
          Sending someone who has been told to act to a page that only reports is the same defect one
          level up: the control still cannot produce what the sentence promises.
-         ⚠ `data-focus` is not decoration. Cash Fix opens on whichever system it judges needs work
-         first, so without it a reserve-short bar can land on a different gap entirely. */
-      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-fix" data-focus="free-trapped">Cash Fix</button></div></div>';
+         ⛔⛔ AND THE SYSTEM IT POINTED AT IS GONE (2026-08-22, the Fix systems left the app). The
+         argument above turned on `c-fix` being the one place that WALKS the operator through
+         freeing it, so `c-trapped` reporting rather than acting was the lesser page. With no Fix
+         system in the product that comparison has no second term: Trapped Cash names the money
+         AND carries the two controls that move it (Stock Report, Dynamic Pars), which is the
+         closest the app now gets to doing what the sentence says. Kyle's call.
+         ⚠ `data-focus` went with it. It existed so Cash Fix would open ON the free-trapped gap;
+         Trapped Cash IS that subject, so there is nothing left to focus. */
+      + '<div style="margin-top:14px;"><button class="btn btn-ghost btn-sm" data-go="c-trapped">Trapped Cash</button></div></div>';
   },
 
   resetForm() {
@@ -173,14 +179,9 @@ S.CashPosition = {
     this.container.onclick = ev => {
       if (ev.target.closest('#cp-save') || ev.target.closest('#cp-reset')) return;
       const go = ev.target.closest('[data-go]');
-      /* `App._fixFocus` is the app's one-shot for "open the Fix screen ON this gap" — set it, then
-         navigate, and the Fix screen's render consumes and clears it. Six screens already deliver a
-         focus this way (`recovery-playbook` off `dataset.focus`, `c-audit`/`audit-tracker`/`r-audit`
-         off `dataset.gap`, `fix-panel` twice). Without it, Cash Fix opens on whichever system it
-         decides needs work first, which on a bar whose reserve is short need not be the one the
-         operator just pressed. Reading the existing convention rather than inventing a second one
-         ([[the-loop]] #95 — grep the mechanism's NAME across the tree before designing anything). */
-      if (go && go.dataset.focus) App._fixFocus = go.dataset.focus;
+      /* ⛔ `App._fixFocus` WENT WITH THE FIX SCREENS. It was a one-shot meaning "open the Fix
+         screen ON this gap", and only a Fix screen ever read it. This was its last writer
+         outside the deleted set, so setting it would have written a field nothing consumes. */
       if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };
   }
