@@ -8,12 +8,14 @@ const ProfitNav = {
            revenue, cash audits get removed from the current recovery menus.. all 4 audit pages now
            live in one place .. the Audits link on the rail." The SCREEN is untouched and
            audit-tracker still resolves from every inbound link; only this nav row went.
-           NO BACKTICKS IN HERE: this markup is inside a template literal, so one would end it. -->
-      <div class="nav-section">Analysis</div>
-      <div class="nav-item" data-screen="profit-forecast" id="nav-profit-forecast">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Profit Forecast</span>
-      </div>
+           NO BACKTICKS IN HERE: this markup is inside a template literal, so one would end it.
+           THE PROFIT FORECAST ROW MOVED TO THE BOOKS SECTION (Kyle, T48, 2026-08-23): the Books bar
+           carries a Forecasts drop-down holding Cash, Profit and Revenue Forecast, and a page listed
+           in two menus makes _railSectionForScreen resolve on first match and jump the rail. The
+           SCREEN is untouched, it still renders out of this module's branch in navigate, and every
+           inbound link still resolves; the Analysis group went with it because a group of none is
+           not a group. Its PERMISSION area moved to books, which is a real change and is pinned in
+           verify-area-access-doors block G. -->
       <div class="nav-section">Leaks</div>
       <div class="nav-item" data-screen="sales-integrity" id="nav-sales-integrity">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11.2 11.2L15 15" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 7.8l1.6 1.6L10 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -59,12 +61,11 @@ const ProfitNav = {
 const Revenue = {
   navHTML() {
     return `
-      <!-- ⛔ The Revenue Audit row moved to the Audits section, 2026-08-22. Screen untouched. -->
-      <div class="nav-section">Analysis</div>
-      <div class="nav-item" data-screen="r-forecast" id="nav-r-forecast">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Revenue Forecast</span>
-      </div>
+      <!-- ⛔ The Revenue Audit row moved to the Audits section, 2026-08-22. Screen untouched.
+           ⛔ The Revenue Forecast row moved to the Books section, T48, 2026-08-23, into the
+              Forecasts drop-down beside Cash and Profit Forecast. Screen untouched, still rendered
+              from this module's branch in navigate; only the row and its now-empty Analysis group
+              went. Its permission area moved to books with it (verify-area-access-doors block G). -->
       <div class="nav-section">Menu and Pricing</div>
       <div class="nav-item" data-screen="r-menu-items" id="nav-r-menu-items">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 8h6M5.5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -108,12 +109,16 @@ const Revenue = {
 const Cash = {
   navHTML() {
     return `
-      <!-- ⛔ The Cash Audit row moved to the Audits section, 2026-08-22. Screen untouched. -->
-      <div class="nav-section">Analysis</div>
-      <div class="nav-item" data-screen="c-forecast" id="nav-c-forecast">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Cash Forecast</span>
-      </div>
+      <!-- ⛔ The Cash Audit row moved to the Audits section, 2026-08-22. Screen untouched.
+           ⛔⛔ FOUR MORE ROWS MOVED TO THE BOOKS SECTION, T48, 2026-08-23: Cash Forecast into the
+              Forecasts drop-down, and Capital Efficiency, Cash Position and Cash Bridge into the
+              Cash drop-down beside Break-Even. All four SCREENS are untouched and still render out
+              of this module's branch in navigate; only the rows moved, and their permission area
+              moved with them (verify-area-access-doors block G).
+           ⭐ THIS IS THE CHANGE THAT ENDS THIS SECTION. What is left below is Purchasing and Trapped
+              Cash, which Kyle has said go to Inventory, and Experiments, which wants a Tools section
+              that does not exist yet. The Analysis group went because a group of none is not a
+              group; Free Up Cash keeps its name while it still holds the two it was named for. -->
       <div class="nav-section">Free Up Cash</div>
       <div class="nav-item" data-screen="c-purchasing" id="nav-c-purchasing">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l6 3v7l-6 3-6-3V5l6-3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
@@ -122,18 +127,6 @@ const Cash = {
       <div class="nav-item" data-screen="c-trapped" id="nav-c-trapped">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="6.5" width="12" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.2 6.5V4.8a3.3 3.3 0 0 1 6.6 0V6.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="10.3" r="1.4" stroke="currentColor" stroke-width="1.2"/></svg>
         <span class="nav-label">Trapped Cash</span>
-      </div>
-      <div class="nav-item" data-screen="c-capital" id="nav-c-capital">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 14.5V8M7 14.5V4M11.5 14.5V10M2.5 14.5h12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 3.5l2.5-1.5 1 2.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Capital Efficiency</span>
-      </div>
-      <div class="nav-item" data-screen="c-position" id="nav-c-position">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="4.5" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7.2h13" stroke="currentColor" stroke-width="1.2"/><path d="M11 10.3h2.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Cash Position</span>
-      </div>
-      <div class="nav-item" data-screen="c-bridge" id="nav-c-bridge">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 11c2-5 11-5 13 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2 11v2.5M15 11v2.5M6.5 9v4.5M10.5 9v4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-        <span class="nav-label">Cash Bridge</span>
       </div>
       <div class="nav-section">Experiments</div>
       <div class="nav-item" data-screen="c-experiments" id="nav-c-experiments">

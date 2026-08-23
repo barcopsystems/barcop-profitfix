@@ -3479,7 +3479,15 @@ const App = {
   },
 
   _NAV_GROUP_IC: {
-    'Analysis':'<circle cx="7" cy="7" r="4.3" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2l4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    /* ⛔ 'Analysis' WENT WITH THE GROUPS IT NAMED (T48, 2026-08-23). Profit, Revenue and Cash each
+       opened with an "Analysis" group holding that section's forecast; all three forecasts moved
+       into the Books bar and all three groups went with them, so this key stopped naming anything
+       the tree can emit. Removed in the edit that orphaned it ([[the-loop]] #105 — retiring a
+       feature orphans its helpers in the SAME edit, and the ratchet is what remembers otherwise).
+       ⚠ MEASURED, NOT ASSUMED: 12 of the 29 keys in this table name nothing today. Ten of those
+       pre-date T48 and are left alone deliberately — deleting one of twelve is tidiness, not a fix,
+       and the population is on THE LIST as its own item. This one is here because this change made
+       it a ghost. */
     'Weekly':'<rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
     'Leaks':'<path d="M8.5 2.2C8.5 2.2 4 7.4 4 10.4a4.5 4.5 0 0 0 9 0C13 7.4 8.5 2.2 8.5 2.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
     'Menu and Pricing':'<path d="M7.8 2.2H3.2a1 1 0 0 0-1 1v4.6a1 1 0 0 0 .3.7l6 6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4l-6-6a1 1 0 0 0-.7-.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="5.4" r="1" fill="currentColor"/>',
@@ -3503,7 +3511,14 @@ const App = {
     'Free Up Cash':'<rect x="2.5" y="6.5" width="12" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.2 6.5V4.8a3.3 3.3 0 0 1 6.6 0V6.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="10.3" r="1.4" stroke="currentColor" stroke-width="1.2"/>',
     'Cash Flow':'<path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
     'Checklists':'<path d="M7 4.5h7.5M7 8.5h7.5M7 12.5h7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 4l1 1 1.6-1.9M2.5 8l1 1 1.6-1.9M2.5 12l1 1 1.6-1.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
-    'Accounting':'<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5M6 12.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+    /* ⚠ RENAMED WITH ITS GROUP, NOT LEFT BEHIND (T48, 2026-08-23). Books' "Accounting" heading
+       became "Statements" when the section's groups became its bar links, and the phone drawer takes
+       an accordion header's mark from THIS table by the group's NAME (`GIC[g.group] || ''`) — so
+       renaming the group and not the key drops the icon off that header silently. Same three rows,
+       same icon, new name. Found by the reader sweep, not by looking at the phone
+       ([[lessons-paid-for]] #111 — the plan names what you change, only a sweep of who READS it
+       names what breaks). Pinned by `verify-section-tabs` N1. */
+    'Statements':'<rect x="3" y="2.5" width="11" height="12" rx="0.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.5h11M6 8.5h5M6 10.5h5M6 12.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
     'Settings':'<path d="M3 5h5M11.5 5h2.5M3 12h2.5M10 12h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="9.5" cy="5" r="1.7" stroke="currentColor" stroke-width="1.3"/><circle cx="6.5" cy="12" r="1.7" stroke="currentColor" stroke-width="1.3"/>',
     'Account':'<circle cx="8.5" cy="6" r="2.8" stroke="currentColor" stroke-width="1.3"/><path d="M3 14.5c0-2.7 2.5-4.5 5.5-4.5s5.5 1.8 5.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
     'Bookings':'<rect x="2.5" y="3.5" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 6.5h12M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 10h6M5.5 12h3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',

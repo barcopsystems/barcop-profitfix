@@ -537,7 +537,7 @@ const DB = {
        testing ([[the-loop]] #149 — a permission-gated path is pinned, not walked). */
     'vendor-tracker':'inventory','vendor-watch':'inventory',
     'vendor-scorecard':'inventory','vendor-discrepancy':'inventory',
-    'profit-forecast':'profit','help':'_always',
+    'help':'_always',
     /* ⭐⭐⭐ THE WEEK GROUP IS ITS OWN AREA (Kyle, 2026-08-12: "the week section that includes it's
        3 pages close, review, history.. i would think needs added"). It is the rail group with a
        deadline, and before this it was answered THREE different ways:
@@ -559,12 +559,12 @@ const DB = {
        like a leftover). */
     'week':'week','week-close':'week','week-review':'week','week-history':'week',
     // Revenue Recovery
-    'r-this-week':'revenue','r-forecast':'revenue',
+    'r-this-week':'revenue',
     'r-audit':'revenue','r-server-check':'revenue','r-menu-items':'revenue',
     'r-menu-engineering':'revenue','r-menu-planning':'revenue',
     'r-dog-test':'revenue','r-experiments':'revenue','r-help':'_always',
     // Cash Recovery
-    'c-audit':'cash','c-trapped':'cash','c-purchasing':'cash','c-capital':'cash','c-forecast':'cash','c-position':'cash','c-bridge':'cash','c-experiments':'cash','c-help':'_always',
+    'c-audit':'cash','c-trapped':'cash','c-purchasing':'cash','c-experiments':'cash','c-help':'_always',
     // Events
     'ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always',
@@ -577,6 +577,26 @@ const DB = {
        than its own; Annual Review had no gate at all and was reachable by anyone. */
     'hub-books':'books','hub-breakeven':'books',
     'hub-operating-expenses':'books','hub-year-end':'books',
+    /* ⛔⛔⛔ THE SIX PAGES THE BOOKS BAR TOOK (Kyle, T48, 2026-08-23). The Books section's Cash and
+       Forecasts drop-downs hold four Cash Recovery screens and the Profit and Revenue forecasts, and
+       those rows LEFT their own module menus in the same edit — so after T48 the Books nav is the
+       only menu in the app that offers them. Leaving the area behind ships both failure modes at
+       once: a member granted Books opens six rows that refuse, and a member granted Cash keeps four
+       pages no menu can reach.
+       ⚠ THIS IS A REAL PERMISSION CHANGE AND IT FAILS CLOSED, which is the safe direction. A member
+       scoped to Cash-only loses Capital Efficiency, Cash Position, Cash Bridge and Cash Forecast;
+       Profit-only loses the Profit Forecast; Revenue-only loses the Revenue Forecast. Kyle took the
+       same call for Vendor Tracker: the nav is the filing system and the area follows it.
+       ⛔⛔ AND THE MODULE DOES NOT MOVE WITH IT. `App._moduleOf` still answers cash / profit /
+       revenue for all six, because `navigate` renders them out of those branches — the prefix rule
+       does it for the four `c-` ids and the `profit` default for the other two, so NOTHING goes in
+       `_MODULE_EXCEPTIONS`. Area and module are different questions here on purpose.
+       ⛔ Neither half is visible to owner-and-demo testing (`canAccessLevel` returns 'edit' for the
+       demo and `isOwner()` short-circuits), so it is pinned rather than walked — both directions,
+       plus the control that Purchasing and Trapped Cash did NOT move: `verify-area-access-doors`
+       block G ([[the-loop]] #149). */
+    'c-capital':'books','c-position':'books','c-bridge':'books','c-forecast':'books',
+    'profit-forecast':'books','r-forecast':'books',
     // Operations Audit (the cross-section meta-audit — its own grantable area)
     'bar-cop-audit':'audit'
   },
