@@ -369,14 +369,6 @@ S.SalesIntegrity = {
 
   // Six-step investigation a Sales Integrity flag opens in Loss Prevention. Server
   // and cash focused (the product-pour steps stay on the Loss Prevention side).
-  INVESTIGATION_STEPS: [
-    { title: 'Pull the shift sales reports', detail: 'Gather this server\'s sales reports for the flagged window so the pattern is in front of you.' },
-    { title: 'Confirm the outlier against the floor', detail: 'Recompute the flagged metric against the team and the server\'s own history. A one-off busy night is not a pattern.' },
-    { title: 'Watch the drawer', detail: 'Reconcile this server\'s register at close, unannounced, for the next several shifts.' },
-    { title: 'Review the void and no-sale timing', detail: 'Pull the timestamps. Voids and no-sales clustered at shift end or right after a cash sale are the tell.' },
-    { title: 'Talk to the server and the shift', detail: 'Ask the server and others who worked those shifts what was going on before drawing a conclusion.' },
-    { title: 'Document the finding', detail: 'Write the finding and resolution before closing, even if inconclusive.' }
-  ],
 
   reviews() {
     if (!App.data) App.data = {};
@@ -1437,11 +1429,6 @@ S.SalesIntegrity = {
     this.container = container;
     if (actions) actions.innerHTML = '';
     this.draw();
-    const pend = App._pendingInvestigation;
-    if (pend && pend.sku && !pend.productId) {
-      App._pendingInvestigation = null;
-      S.TheftRisk.openInvestigationModal(null, pend.sku, { stepsDef: this.INVESTIGATION_STEPS, onClose: () => this.draw() });
-    }
   },
 
   /* ⚠⚠ AFTER AN IMPORT, SHOW THAT IMPORT — never "whichever review wins a sort". The screen used to
@@ -1796,16 +1783,6 @@ S.SalesIntegrity = {
     // it made the answer depend on which screen happened to be mounted, and a card rendered before
     // anything was stored fell back to "no date", which re-opened the stale-Resolved hole.
     const revDate = String(reviewDate || '').slice(0, 10);
-    const invList = (App.data.variance_investigations || []).filter(i => i.sku === x.name + ' (sales)');
-    const invOpen = invList.some(i => i.status !== 'resolved');
-    /* ⚠ AND IT FAILS CLOSED, NOT OPEN. `!revDate ||` meant a review with no date (a restored or
-       legacy record) treated ANY old resolved case as current — the exact stale-Resolved hole this
-       parameter was added to close, re-opened by its own guard. With no date to compare, Bar Cop
-       cannot know the case is current, so it does not claim it is. */
-    const invResolved = !invOpen && !!revDate && invList.some(i => i.status === 'resolved'
-      && String(i.opened_date || i.date || '').slice(0, 10) >= revDate);
-    const invLabel = invOpen ? 'Reviewing' : invResolved ? 'Resolved' : 'Open Investigation';
-    const invStyle = invResolved ? 'color:var(--green);' : (invOpen ? 'background:var(--gold-tint);border:1px solid var(--gold-tint-bord);' : '');
 
     return '<div style="background:var(--zone);border-radius:8px;padding:16px 18px;margin-bottom:10px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">'
@@ -1816,7 +1793,6 @@ S.SalesIntegrity = {
       +   '</div>'
       + '</div>'
       + '<div style="margin-top:8px;">' + rows + '</div>'
-      + '<div class="no-print" style="margin-top:12px;"><button class="btn btn-ghost btn-sm si-investigate" data-name="' + esc(x.name) + '" data-staff="' + esc(x.staff_id || '') + '" style="' + invStyle + '">' + invLabel + '</button></div>'
       + '</div>';
   },
 
@@ -1852,8 +1828,6 @@ S.SalesIntegrity = {
   wire() {
     document.getElementById('si-export')?.addEventListener('click', () => this.printReview(this._viewing || this.latestReview()));
     this.container.onclick = ev => {
-      const inv = ev.target.closest('.si-investigate');
-      if (inv) { this.openInvestigation(inv.dataset.name, inv.dataset.staff); return; }
       const view = ev.target.closest('.si-view');
       const del = ev.target.closest('.si-del');
       const row = ev.target.closest('.si-hist-row');
@@ -1871,9 +1845,7 @@ S.SalesIntegrity = {
     App.pushView(() => {
       this.container.innerHTML = '<div class="screen">' + this.renderReport(r) + '</div>';
       document.getElementById('si-export')?.addEventListener('click', () => this.printReview(r));
-      // Back is the floating nav from pushView. .si-investigate is handled by the
-      // delegated container.onclick from wire() (no per-button listener, or it
-      // would double-fire and open two cases).
+      // Back is the floating nav from pushView.
     });
   },
 
@@ -1889,18 +1861,6 @@ S.SalesIntegrity = {
      LANDING from `latestReview()` and clears `_viewing`, so opening an investigation from a PAST
      review and closing it silently swapped the operator onto the current one — with the floating
      Back button still lit, which makes it look deliberate. Re-render whichever view is on screen. */
-  openInvestigation(name, staffId) {
-    const viewing = this._viewing;
-    S.TheftRisk.openInvestigationModal(null, name + ' (sales)', {
-      stepsDef: this.INVESTIGATION_STEPS,
-      staffId: staffId || '',
-      onClose: () => {
-        if (viewing) { this._viewing = viewing; this.container.innerHTML = '<div class="screen">' + this.renderReport(viewing) + '</div>';
-          document.getElementById('si-export')?.addEventListener('click', () => this.printReview(viewing)); return; }
-        this.draw();
-      }
-    });
-  },
 
   // ── PDF ─────────────────────────────────────────────────────────────────────
   async printReview(review) {
@@ -2028,7 +1988,7 @@ S.SalesIntegrity = {
    Also "labour" → "labor", matching the signal's own label (the spelling class this file has
    already recorded once). */
 'There is one exception and it is deliberately narrow. A single reading can list somebody when it runs five times the rest of the floor and the money behind it is real: a meaningful share of that server\'s own sales for voids, comps and discounts or refunds, or at least ten drawer opens for no-sales. When no colleague reported that column at all there is nothing to compare against, and the size of the number alone decides. Cash mix, check averages, sales per labor hour, drawer shorts and walkouts are never enough on their own, however far off they look. A cash-heavy or a slow station explains the first three, and a bartender who runs short once or twice is a training problem.', 'Every rate you see is measured against the rest of the team with that server left out, so their own numbers never soften the comparison, and so are the dollar figures on voids, comps and refunds: those are what the server ran ABOVE what the rest of the floor would predict. Drawer shorts and walked tabs are different — those dollars come straight from your own Shift Control records rather than from a comparison, so nothing is subtracted from them. They cover only the days that server appears on in this file, so if your report misses a night, the shortages logged that night are not counted here either. Dollars are shown only where they can be worked out honestly, so a listed server can show none at all. Bar Cop does not tell you what any of it means. It tells you which numbers do not line up and what the gap is worth, and the next step is yours.'] },
-      { h: 'Working a flag', p: ['A flag is a lead, not a verdict. Open Investigation starts a six-step case over in Loss Prevention so you work it the same way you work any variance: watch the drawer, pull the void timestamps, talk to the shift, document the finding. Export PDF saves the review for an owner or partner. Confirm before you act on anyone.'] }
+      { h: 'Working a flag', p: ['A flag is a lead, not a verdict. Work it the way you would work any variance: watch the drawer, pull the void timestamps, talk to the shift. Export PDF saves the review for an owner or partner. Confirm before you act on anyone.'] }
     ]);
   }
 };
