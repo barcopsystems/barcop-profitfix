@@ -401,15 +401,6 @@ S.InventoryVarianceReport = {
     this.posRows = null;
     this._unmatchedCollapsed = null;
     this.draw();
-    const pend = App._pendingInvestigation;
-    if (pend && pend.productId && !pend.spotCheckId) {
-      App._pendingInvestigation = null;
-      // Land on the report + run the flag came from (or the latest run), then open the modal.
-      let run = pend.vrRunId ? this.runs().find(r => r.id === pend.vrRunId) : null;
-      if (!run) run = this.runsSorted()[0] || null;
-      if (run) { this.loadRun(run); this.tab = (pend.vrTab && pend.vrTab !== 'history') ? pend.vrTab : 'sales'; this.draw(); }
-      S.TheftRisk.openInvestigationModal(pend.productId, pend.sku || '', { onClose: () => this.draw() });
-    }
   },
 
   draw() {
@@ -1036,10 +1027,6 @@ S.InventoryVarianceReport = {
       const r = this.runs().find(x => x.id === row.dataset.id);
       if (r) { this.loadRun(r); this.tab = 'sales'; this.draw(); this.scrollTop(); }
     }));
-    this.container.querySelectorAll('.vr-review').forEach(b => b.addEventListener('click', ev => {
-      ev.stopPropagation();
-      S.TheftRisk.openInvestigationModal(b.dataset.pid, b.dataset.name, { subtitle: b.dataset.reason, vrTab: this.tab, vrRunId: this._viewRunId, onClose: () => this.draw() });
-    }));
   },
 
   // ── Period scroller (single pill over the saved runs, like the cockpit) ─────
@@ -1105,31 +1092,38 @@ S.InventoryVarianceReport = {
   },
   // Plain-English "why flagged" line shown as the investigation popup subtitle,
   // e.g. "Aperol is running 3.5% over your 2% variance standard."
-  flagReason(key, pct, unitVar, name) {
-    const t = this.thresholds()[key] || { flag: 10 };
-    const who = name || 'This product';
-    if (t.bottles != null) {
-      const off = Math.abs(unitVar || 0);
-      const lim = parseFloat(t.bottles) || 1;
-      return who + ' is ' + this.n(off) + ' unit' + (off === 1 ? '' : 's') + ' off, past your ' + lim + '-unit variance standard.';
-    }
-    return who + ' is running ' + Math.abs(pct || 0).toFixed(1) + '% over your ' + (parseFloat(t.flag) || 0) + '% variance standard.';
-  },
   // The last column is action-only: a right-aligned Review / Reviewing / Resolved
   // button that opens a variance investigation for that product in Profit Recovery.
   // An in-tolerance ("OK") row shows nothing at all — no status text, no button.
+  /* ⛔ NO REVIEW BUTTON AND NO INVESTIGATION (Kyle, 2026-08-23): *"instead of putting a 'Review'
+     button on high variances i would rather just a amber or red text warning.. the manager can
+     check it out on their own just like with the sales integrity.. i don't think either needs a
+     popup checklist"*. An in-tolerance row still shows nothing at all. */
   badge(key, pct, unitVar, pid, name) {
     if (!pid) return '';
-    const s = this.status(key, pct, unitVar);
-    const list = (App.data.variance_investigations || []).filter(i => i.product_id === pid);
-    const open = list.some(i => i.status !== 'resolved');
-    const resolved = !open && list.some(i => i.status === 'resolved');
-    if (!open && !resolved && s.label !== 'Flag') return '';   // OK, nothing to review
-    const reason = this.flagReason(key, pct, unitVar, name);
-    const label = open ? 'Reviewing' : resolved ? 'Resolved' : 'Review';
-    const style = (resolved ? 'color:var(--green);' : 'background:var(--gold-tint);') + 'white-space:nowrap;';
-    return '<div style="text-align:right;"><button type="button" class="vr-review btn btn-ghost btn-sm" data-pid="' + esc(pid)
-      + '" data-name="' + esc(name || '') + '" data-reason="' + esc(reason) + '" style="' + style + '">' + label + '</button></div>';
+    const lvl = this.level(key, pct, unitVar);
+    if (!lvl) return '';
+    return '<div style="text-align:right;color:' + (lvl === 'High' ? 'var(--red)' : 'var(--amber)')
+      + ';font-weight:700;white-space:nowrap;">' + lvl + '</div>';
+  },
+  /* ⭐ TWO WORDS OFF ONE NUMBER, AND IT IS THE OPERATOR'S OWN. `Over` is past the standard they
+     set for this category; `High` is past twice it. Deriving the second band from the first means
+     it scales with their tolerance and there is no new setting to keep in step — and no magic
+     number fitted to whatever fixture was in front of me ([[the-loop]] #28/#30). It reads the same
+     `thresholds()` the flag has always used, so the two can never disagree. */
+  level(key, pct, unitVar) {
+    const t = this.thresholds()[key] || { flag: 10 };
+    if (t.bottles != null) {
+      const off = Math.abs(unitVar || 0);
+      const lim = parseFloat(t.bottles) || 1;
+      if (off >= lim * 2 - 1e-6) return 'High';
+      return off >= lim - 1e-6 ? 'Over' : '';
+    }
+    const p = Math.abs(pct || 0);
+    const lim = parseFloat(t.flag) || 0;
+    if (!lim) return '';
+    if (p > lim * 2) return 'High';
+    return p > lim ? 'Over' : '';
   },
   cur(v) { return v == null ? '<span style="color:var(--t4);">-</span>' : App.fmtBal(v); },   // fmtBal so a negative sales variance prints "-$X", not "$-X" (== fmtCurrency for non-negatives)
   pct(v) { if (v == null) return '<span style="color:var(--t4);">-</span>'; const x = Number(v.toFixed(1)) === 0 ? 0 : v; return x.toFixed(1) + '%'; },

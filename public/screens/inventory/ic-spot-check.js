@@ -259,12 +259,6 @@ S.InventorySpotCheck = {
     this.posMode = 'manual';
     this._posMsg = null;        // a fill report belongs to one visit, like the importer itself
     this.renderMain();
-    const pend = App._pendingInvestigation;
-    if (pend && pend.spotCheckId) {
-      App._pendingInvestigation = null;
-      App.pushView(() => this.renderDetail(pend.spotCheckId));
-      S.TheftRisk.openInvestigationModal(pend.productId, pend.sku || '', { source: 'spot-check', spotCheckId: pend.spotCheckId, onClose: () => this.renderDetail(pend.spotCheckId) });
-    }
   },
 
   // The service bars (a register is there), marked in Set Locations. A spot check
@@ -1306,12 +1300,16 @@ S.InventorySpotCheck = {
       const cu = (it.category === 'Bottle Beer') ? 'btls' : App.unitAbbr(App.productUnit(p || { category: it.category }));
       const cus = cu ? ' ' + cu : '';
       const sw = (it.category === 'Bottle Beer') ? 'btls' : 'pours';
-      const invList = it.product_id ? (App.data.variance_investigations || []).filter(i => i.product_id === it.product_id) : [];
-      const invOpen = invList.some(i => i.status !== 'resolved');
-      const invResolved = !invOpen && invList.some(i => i.status === 'resolved');
-      const action = (it.product_id && (it.flagged || invOpen || invResolved))
-        ? '<button class="btn btn-ghost btn-sm sp-review" data-pid="' + esc(it.product_id) + '" data-name="' + esc(it.name) + '" style="' + (invResolved ? 'color:var(--green);' : 'background:var(--gold-tint);') + '">' + (invOpen ? 'Reviewing' : invResolved ? 'Resolved' : 'Review') + '</button>'
-        : '';
+      /* ⛔ NO REVIEW BUTTON (Kyle, 2026-08-23). Same two words as the Variance report, off the
+         SAME number: `flag_pct` is the percent the operator set on this check, and the row was
+         flagged against it at count time. `High` is past twice that. The percent is re-derived
+         the way the counting screen derives it, rather than a second rule that can drift. */
+      const spThr = (c.flag_pct != null && !isNaN(c.flag_pct)) ? Number(c.flag_pct) : 5;
+      const spPct = (it.pos_sold > 0) ? Math.abs(it.variance_pours || 0) / it.pos_sold * 100
+        : (Math.abs(it.variance_pours || 0) > 0 ? 100 : 0);
+      const action = !it.flagged ? ''
+        : (spPct >= spThr * 2 ? '<span style="color:var(--red);font-weight:700;">High</span>'
+                              : '<span style="color:var(--amber);font-weight:700;">Over</span>');
       // A product that was on the check but never counted is LABELLED, not printed as a row of
       // zeros. Same treatment as a skipped product in Count History.
       const skipped = !!it.not_counted;
@@ -1351,8 +1349,6 @@ S.InventorySpotCheck = {
 
     this.container.onclick = ev => {
       if (ev.target.closest('#sp-export')) { App.exportPDF({ title: 'Spot Check', root: this.container }); return; }
-      const inv = ev.target.closest('.sp-review');
-      if (inv) { ev.stopPropagation(); S.TheftRisk.openInvestigationModal(inv.dataset.pid, inv.dataset.name, { source: 'spot-check', spotCheckId: id, onClose: () => this.renderDetail(id) }); }
     };
   },
 
