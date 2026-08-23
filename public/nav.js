@@ -624,14 +624,14 @@ const Floor = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="4.5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5V3.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Over and Short</span>
         </div>
-      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-walked-tabs">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 14.5l3.5-8 3 4 3.5-6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13.5" cy="4.5" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Walked Tabs</span>
-        </div>
       <div class="nav-section">Records</div>
       <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-incidents">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M7.4 3.2 1.9 12.8a1.25 1.25 0 0 0 1.1 1.9h11a1.25 1.25 0 0 0 1.1-1.9L9.6 3.2a1.25 1.25 0 0 0-2.2 0z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v2.8M8.5 11.8v.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Incidents</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-walked-tabs">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 14.5l3.5-8 3 4 3.5-6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13.5" cy="4.5" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Walked Tabs</span>
         </div>
       <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-maintenance">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M10.8 2.5a3 3 0 0 0-4 4l-4.3 4.3 2 2L8.8 8.5a3 3 0 0 0 4-4l-2 2-2-2 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
@@ -654,6 +654,10 @@ const Floor = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 6.5v4l7 3V3.5l-7 3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M3 6.5H2.2A.7.7 0 0 0 1.5 7.2v2.6a.7.7 0 0 0 .7.7H3M12 6c1 .5 1 4 0 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Pre-Shift Briefing</span>
         </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-training">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2.5l6 2.7-6 2.7-6-2.7 6-2.7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 7v3.5c0 1.1 1.8 2 4 2s4-0.9 4-2V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.5 5.2v3.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Staff Training</span>
+        </div>
       <div class="nav-section">Setup</div>
       <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-drawers">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="5" width="13" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5 5V3.5h7V5M5.5 9h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -666,10 +670,6 @@ const Floor = {
       <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-staff-roster">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Staff Roster</span>
-        </div>
-      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-training">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2.5l6 2.7-6 2.7-6-2.7 6-2.7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 7v3.5c0 1.1 1.8 2 4 2s4-0.9 4-2V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.5 5.2v3.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Training</span>
         </div>
     `;
   }

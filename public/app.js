@@ -2589,22 +2589,26 @@ const App = {
      the link up to where it goes."* So the groups below are not the design any more — they are what
      is LEFT of the old design, shrinking as each section lands. Expect this list to grow and the
      others to empty; do not "tidy" the remaining groups into a structure, they are a queue. */
-  _PROTO_GLOBAL:   [['hub','Hub'],['inventory','Inventory'],['week','The Week'],['audit','Audits'],['events','Events'],['books','Books']],
+  /* ⭐ THE FLOOR SITS UNDER AUDITS (Kyle, 2026-08-23). It arrived in `_PROTO_CONTROL` because it
+     replaced Labor and Shift in their own slot; one look at it and he moved it up here, which
+     emptied the Control group and retired it. */
+  _PROTO_GLOBAL:   [['hub','Hub'],['inventory','Inventory'],['week','The Week'],['audit','Audits'],['floor','The Floor'],['events','Events'],['books','Books']],
   /* ⛔ `_PROTO_WEEK` IS GONE (2026-08-23). Close, Review and History were three rows for one job in
      three tenses; they are now three TABS on one page (`S.Week`) behind the single "The Week" row
      above. The three ids still resolve — they are tab targets now — so nothing that linked to them
      had to be re-pointed. Deleting the table rather than emptying it is deliberate: an empty table
      still gets rendered as a group and draws its divider. */
-  /* ⛔⛔⛔ LABOR AND SHIFT ARE GONE FROM THE RAIL (Kyle, 2026-08-23): *"a new rail menu link 'The
-     Floor' ... and it merges shift and labor into one section.. this gets rid of labor and shift
-     sections all together"*. One row now, in the slot both of them used to hold.
+  /* ⛔⛔⛔ `_PROTO_CONTROL` IS DELETED, NOT EMPTIED (Kyle, 2026-08-23: *"the floor link goes under
+     audits in rail menu and control goes away"*). It held Labor and Shift; The Floor replaced both,
+     then moved up into `_PROTO_GLOBAL`, and the group had nothing left in it.
+     ⚠ EMPTYING IT WOULD HAVE SHIPPED A CHROME DEFECT: the rail renders each table as a `.rail-group`
+     with its own `.rail-grp-label`, so an empty array still draws the word "Control" over nothing.
+     `_PROTO_WEEK` was deleted for exactly this reason. Every reader went with it — `_railLabelOf`'s
+     table list, the rail render, and the mobile drawer's `railGroup('Control', …)`.
      ⭐ THE MODULES SURVIVE. `navigate` still branches on `labor` and `shift` and renders every one
      of those screens; what died is the rail ROW and the menu, not the shell. `_moduleOf` and
      `App.STAFF_TILES` still say the old words on purpose, exactly as they do for the six pages the
-     Books bar took — the filing system moved, the renderer did not.
-     ⚠ AND THE TABLE IS NOT LEFT EMPTY. `_PROTO_WEEK` was DELETED rather than emptied because an
-     empty table still renders as a group and draws its divider; this one keeps a row, so it stays. */
-  _PROTO_CONTROL:  [['floor','The Floor']],
+     Books bar took — the filing system moved, the renderer did not. */
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   /* ⛔ SIGN OUT LEFT THE RAIL ON 2026-08-16 (Kyle: *"move it from the side bar and put like in the
      images"*). It now sits in the TOP NAV, left of the account switcher and The Rail, as plain
@@ -2977,7 +2981,7 @@ const App = {
 
   // The rail label for a key, from the same four tables the rail itself renders.
   _railLabelOf(key) {
-    const tables = [this._PROTO_GLOBAL, this._PROTO_CONTROL, this._PROTO_RECOVERY, this._PROTO_BOTTOM, this._PROTO_SIGNOUT];
+    const tables = [this._PROTO_GLOBAL, this._PROTO_RECOVERY, this._PROTO_BOTTOM, this._PROTO_SIGNOUT];
     for (const t of tables) for (const [k, l] of (t || [])) if (k === key) return l;
     return null;
   },
@@ -3314,7 +3318,7 @@ const App = {
      already knew which destination it was rendering.
 
      ⛔ A ROW IS EITHER A PLACE OR A CONTAINER, NEVER BOTH. `_PROTO_GLOBAL` and `_PROTO_BOTTOM` rows
-     navigate on click. `_PROTO_CONTROL` and `_PROTO_RECOVERY` rows own a section MENU, so they open
+     navigate on click. `_PROTO_RECOVERY` rows own a section MENU, so they open
      the overlay and go nowhere — clicking Inventory must not drag the operator off the page they
      are reading just because they wanted to look at the menu. `data-rail-sec` marks the second kind
      so stage 2's overlay can find them; until it lands they fall back to jumpToSection, so no
@@ -3486,8 +3490,6 @@ const App = {
       rail.innerHTML =
           '<div class="rail-group">' + this._PROTO_GLOBAL.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
-        + '<div class="rail-group"><div class="rail-grp-label">Control</div>'
-        +   this._PROTO_CONTROL.map(r).join('') + '</div>'
         + '<div class="rail-group"><div class="rail-grp-label">Recovery</div>'
         +   this._PROTO_RECOVERY.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
@@ -3861,7 +3863,6 @@ const App = {
          which is the whole point of comparing against the rendered overlay rather than the raw
          sidebar builder — the builder output matches NEITHER menu. */
       { label: 'Go to', items: App._PROTO_GLOBAL.map(([k, l]) => railRow(k, l)) },
-      railGroup('Control', App._PROTO_CONTROL),
       railGroup('Recovery', App._PROTO_RECOVERY),
       // App Settings is off in the live demo, same as the desktop gear.
       ...(App.demoMode ? [] : [railGroup('Settings', App._PROTO_BOTTOM)]),
