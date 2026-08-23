@@ -206,6 +206,24 @@ S.Hub = {
     if (action === 'permits')            return S.HubPermits?.open?.();
     if (action === 'report-bug')         return (S.HubReportBug.openModal || S.HubReportBug.open).call(S.HubReportBug);
     if (action === 'contact-support')    return (S.HubSupport.openModal || S.HubSupport.open).call(S.HubSupport);
+    /* ⛔⛔⛔ THE WEEK'S THREE PAGES, AND LEAVING THEM OUT SHIPPED THREE DEAD LINKS (Kyle, 2026-08-23:
+       *"again the review and history links do not work"*). The section-links bar routes a row that
+       carries a `data-hub-action` through HERE, so a bar row whose action this table does not name
+       falls past every branch, returns undefined, and does nothing at all. Close looked alive only
+       because the rail row had already landed the operator on it.
+       ⭐ DELEGATED, NOT DUPLICATED: `_protoGlobalClick` is the door the rail presses for these ids
+       and it resolves all four through `S.Week.open`. A second copy of that resolution here is the
+       drift this table's own header warns about. */
+    if (action === 'week' || action === 'week-close' || action === 'week-review' || action === 'week-history') {
+      return App._protoGlobalClick(action);
+    }
+    /* ⛔⛔ AND AN UNKNOWN ACTION IS NOW LOUD. Falling off the end of this table is EXACTLY how three
+       links shipped dead twice in two days, and it is invisible: no throw, no console line, a row
+       that simply does nothing on click. `verify-section-tabs` block K now refuses any action an
+       enabled section's bar can emit that this table does not answer — this line is the runtime half
+       of that, so a door added tomorrow reports itself instead of going quiet
+       ([[lessons-paid-for]] #120 — rendering is downstream of reaching). */
+    console.error('routeSidebarAction: no route for action "' + action + '"');
   },
 
   /* `target` is optional and defaults to the Hub shell's own sidebar, which is every caller that
