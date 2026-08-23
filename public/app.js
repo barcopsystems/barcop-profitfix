@@ -9878,9 +9878,9 @@ const App = {
     // The three legacy vendor ids deep-link straight into the merged Vendor
     // Tracker on the matching tab; the nav uses 'vendor-tracker' (lands Scorecard).
     if (S.VendorTracker) {
-      if (id === 'vendor-watch') S.VendorTracker.tab = 'watch';
-      else if (id === 'vendor-discrepancy') S.VendorTracker.tab = 'discrepancies';
-      else if (id === 'vendor-scorecard' || id === 'vendor-tracker') S.VendorTracker.tab = 'scorecard';
+      if (id === 'vendor-watch') S.VendorTracker.page = 'watch';
+      else if (id === 'vendor-discrepancy') S.VendorTracker.page = 'discrepancies';
+      else if (id === 'vendor-scorecard' || id === 'vendor-tracker') S.VendorTracker.page = 'scorecard';
     }
 
     const screen = screens[id];
