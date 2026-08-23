@@ -19,7 +19,7 @@
    canonical store: the opex entry carries a note pointing back to the
    permit so the connection is visible.
 
-   Bar Cop Audit reads App.data.permits_compliance to surface upcoming
+   Operations Audit reads App.data.permits_compliance to surface upcoming
    renewals in Top Operational Exposures. */
 
 S.HubPermits = {

@@ -121,7 +121,7 @@ S.HubSettings = {
   // how you file, payroll burden, state minimum wage). Entered once here. Tax and
   // payroll read the same CashEngine keys (stored on the account); the minimum
   // wage lives in Labor's data store, where the Pay Periods tip-credit check,
-  // Payroll Export, and the Bar Cop Audit all read it.
+  // Payroll Export, and the Operations Audit all read it.
   secTaxes() {
     const rate   = (window.CashEngine && CashEngine.salesTaxRate)  ? CashEngine.salesTaxRate()  : 0;
     const freq   = (window.CashEngine && CashEngine.taxFrequency)  ? CashEngine.taxFrequency()  : 'monthly';
@@ -3347,7 +3347,7 @@ S.HubSettings = {
 
     // State minimum wage — Texas (matches the federal $7.25). Set in App Settings
     // under Business Profile (Taxes, Payroll & Wage). Drives the tip-credit check
-    // on Pay Periods and the Bar Cop Audit's wage-policy component (which reads as
+    // on Pay Periods and the Operations Audit's wage-policy component (which reads as
     // "not configured" until this is set).
     if (!App.laborData.settings) App.laborData.settings = {};
     App.laborData.settings.state_min_wage = 7.25;
@@ -3628,7 +3628,7 @@ S.HubSettings = {
 
     // Pre-Shift Briefings — a realistic run of daily line-ups over the last few
     // weeks (not every single day, so the discipline read stays honest, not a flat
-    // 100). Feeds the Pre-Shift Briefing history + the Bar Cop Audit opt-in read.
+    // 100). Feeds the Pre-Shift Briefing history + the Operations Audit opt-in read.
     // Each briefing carries its service period. A couple of days hold two (a Happy
     // Hour and a Dinner line-up), so the per-period model shows in the history.
     const briefSeed = [
@@ -4523,7 +4523,7 @@ S.HubSettings = {
     await App.saveShift();               // config only (settings, drawers, checklist templates)
     const seedSc = await App.seedEventStores('sc');     // shift event logs -> sc_events rows
 
-    // ── Bar Cop Audit — the Hub executive audit across the first 90 days ───────
+    // ── Operations Audit — the Hub executive audit across the first 90 days ───────
     // Three monthly snapshots on the cadence: the first runs at day 30 (the engine
     // needs 30 days of logged data), then day 60 and day 90. The day-30 audit has
     // only a few weeks of history, so two sub-scores that need a longer trend

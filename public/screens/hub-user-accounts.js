@@ -37,7 +37,7 @@ S.HubUserAccounts = {
     { key: 'cash',      label: 'Cash Recovery' },
     { key: 'events',    label: 'Events' },
     { key: 'books',     label: 'Books' },
-    { key: 'audit',     label: 'Bar Cop Audit' }
+    { key: 'audit',     label: 'Operations Audit' }
   ],
 
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
