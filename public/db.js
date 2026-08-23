@@ -518,7 +518,9 @@ const DB = {
     // Shift
     'sc-cash-history':'shift','sc-cash-control':'shift','sc-drawers':'shift',
     'sc-checklists':'shift','sc-checklist-templates':'shift',
-    'sc-void-comp':'shift','sc-maintenance':'shift','sc-incidents':'shift','sc-waste':'shift','sc-walked-tabs':'shift',
+    // ⛔ `sc-void-comp` and `sc-waste` are INVENTORY now (Kyle, 2026-08-23) — see the moved-ids block
+    //   below. Both feed Inventory's Variance Report, so the area follows where they are filed.
+    'sc-maintenance':'shift','sc-incidents':'shift','sc-walked-tabs':'shift',
     'sc-help':'_always',
     // Profit Recovery
     'this-week':'profit','audit-tracker':'profit',
@@ -535,6 +537,18 @@ const DB = {
        ⛔ MUST AGREE WITH `App._MODULE_EXCEPTIONS`, which is the twin decision (the SHELL). Pinned
        by `verify-vendors-in-inventory` C3, because neither half is visible to owner-and-demo
        testing ([[the-loop]] #149 — a permission-gated path is pinned, not walked). */
+    /* ⭐⭐ FOUR MORE MOVED INTO INVENTORY, 2026-08-23. Purchasing and Trapped Cash came out of Cash;
+       the Void/Comp and Waste/Spill logs came out of Shift. **REAL PERMISSION CHANGE and it fails
+       closed**, which is the safe direction: a member scoped to Cash-only loses Purchasing and
+       Trapped Cash, one scoped to Shift-only loses the two logs, and a member with Inventory gains
+       all four. That is what "the nav is the filing system and the area follows it" costs, and it is
+       the same call Kyle took for Vendor Tracker and again for the Books bar.
+       ⛔ THE MODULE MOVED WITH IT HERE, unlike the Books bar. These four are rendered by Inventory's
+       own branch now, so `App._MODULE_EXCEPTIONS` says `inventory` too and the two must AGREE —
+       `verify-inventory-absorbs` asks both of every id in that table, plus the title, the render
+       registration and the STAFF_TILES landing. */
+    'c-purchasing':'inventory','c-trapped':'inventory',
+    'sc-void-comp':'inventory','sc-waste':'inventory',
     'vendor-tracker':'inventory','vendor-watch':'inventory',
     'vendor-scorecard':'inventory','vendor-discrepancy':'inventory',
     'help':'_always',
@@ -564,7 +578,10 @@ const DB = {
     'r-menu-engineering':'revenue','r-menu-planning':'revenue',
     'r-dog-test':'revenue','r-experiments':'revenue','r-help':'_always',
     // Cash Recovery
-    'c-audit':'cash','c-trapped':'cash','c-purchasing':'cash','c-experiments':'cash','c-help':'_always',
+    /* ⛔ Trapped Cash and Purchasing are INVENTORY now (Kyle, 2026-08-23) — listed with the other
+       moved ids below, beside the four vendor pages, so the whole set is read in one place. What is
+       left of this area is the audit and Experiments. */
+    'c-audit':'cash','c-experiments':'cash','c-help':'_always',
     // Events
     'ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always',

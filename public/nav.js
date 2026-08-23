@@ -119,15 +119,17 @@ const Cash = {
               Cash, which Kyle has said go to Inventory, and Experiments, which wants a Tools section
               that does not exist yet. The Analysis group went because a group of none is not a
               group; Free Up Cash keeps its name while it still holds the two it was named for. -->
-      <div class="nav-section">Free Up Cash</div>
-      <div class="nav-item" data-screen="c-purchasing" id="nav-c-purchasing">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l6 3v7l-6 3-6-3V5l6-3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Purchasing</span>
-      </div>
-      <div class="nav-item" data-screen="c-trapped" id="nav-c-trapped">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="6.5" width="12" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.2 6.5V4.8a3.3 3.3 0 0 1 6.6 0V6.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="10.3" r="1.4" stroke="currentColor" stroke-width="1.2"/></svg>
-        <span class="nav-label">Trapped Cash</span>
-      </div>
+      <!-- ⛔⛔⛔ AND THE LAST TWO LEFT FOR INVENTORY (Kyle, 2026-08-23): Purchasing under Ordering,
+           Trapped Cash leading Reports. THE HEADING WENT WITH THEM rather than being left over an
+           empty group: an empty nav-section renders as a bare rule, a divider over nothing, and
+           "Free Up Cash" named exactly the two rows that are gone.
+           ⭐ THIS SECTION IS NOW EXPERIMENTS AND HELP. Kyle has already said Experiments wants a
+           Tools section that does not exist yet, at which point the Cash rail row has nothing left
+           to hold. Worth knowing before anything else is filed here.
+           ⚠ AND ITS RAIL ROW ALREADY LANDS SOMEWHERE ELSE: _SECTION_DASH.cash is c-audit, which
+           belongs to the Audits section, so pressing Cash on the rail opens its overlay rather than
+           navigating. That is pre-existing and unchanged by this move.
+           NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
       <div class="nav-section">Experiments</div>
       <div class="nav-item" data-screen="c-experiments" id="nav-c-experiments">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2v4.2L3 12.5a1.2 1.2 0 0 0 1 1.8h9a1.2 1.2 0 0 0 1-1.8L10.5 6.2V2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2h6M5.2 9.5h6.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -237,6 +239,18 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 12V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v7" stroke="currentColor" stroke-width="1.3"/><path d="M2 12h13M6.5 8h4M5.5 10h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Dynamic Pars</span>
       </div>
+      <!-- PURCHASING MOVED HERE FROM CASH RECOVERY (Kyle, 2026-08-23): "purchasing moves under
+           dynamic pars". It belongs under Ordering rather than Reports because it answers the
+           question you ask WHILE ordering, are you buying ahead of your sales, and its own header
+           says the order is placed in the Order Sheet two rows up. It reads CashEngine and writes
+           nothing. The SCREEN did not move file; what moved is the menu, the shell (_MODULE_EXCEPTIONS),
+           the render registration (icTitles/icScreens) and the permission area (SCREEN_GROUPS), all
+           four of which have to travel together or navigate lands on "Coming soon."
+           NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
+      <div class="nav-item" data-screen="c-purchasing" id="nav-c-purchasing">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l6 3v7l-6 3-6-3V5l6-3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 5l6 3 6-3M8.5 8v7" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Purchasing</span>
+      </div>
       <!-- VENDORS MOVED HERE FROM PROFIT (Kyle, 2026-08-23): "Vendors will become a link in the top
            bar right after ordering.. and it will be a drop down link like the others.. that has the
            three vendor tracker pages.. so the drop down is Scorecard, Price Changes,
@@ -267,7 +281,28 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2.2l6.3 11a.8.8 0 0 1-.7 1.2H2.9a.8.8 0 0 1-.7-1.2l6.3-11z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 6.5v3.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.7" fill="currentColor"/></svg>
         <span class="nav-label">Discrepancies</span>
       </div>
-      <div class="nav-section">Operations</div>
+      <!-- OPERATIONS BECAME "LOGS" AND GAINED THE TWO SHIFT LOGS (Kyle, 2026-08-23): "operations
+           gets changed to Logs and Void/Comp Logs and Waste/Spills Log get moved there in 1st and
+           2nd position in list above the current 3 .. so they are in a more prominent place that a
+           user might log them more often".
+           EVERY ROW HERE IS LITERALLY A LOG, so the group finally says what it holds; "Operations"
+           named nothing and collided with Shift's own group of that name.
+           AND THE MEASUREMENT IS STRONGER THAN THE PROMINENCE ARGUMENT: Inventory's own Variance
+           Report reads BOTH sc_waste and sc_void_comps. Waste is subtracted from "used" so real
+           waste does not read as theft variance, and a comp that links an inventory product does
+           the same. They were already inventory-variance inputs; the nav was what was out of step.
+           WHAT DOES NOT CHANGE: sc_void_comps still feeds Theft Risk and the Profit Audit. Moving a
+           nav row does not move a consumer, exactly as with the four audits.
+           NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
+      <div class="nav-section">Logs</div>
+      <div class="nav-item" data-screen="sc-void-comp" id="nav-sc-void-comp">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 2.5h9v12l-2-1.3-2.5 1.3-2.5-1.3-2 1.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 6.5l4 4M10.5 6.5l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Void and Comp Log</span>
+      </div>
+      <div class="nav-item" data-screen="sc-waste" id="nav-sc-waste">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 5h11M5 5l1 9h5l1-9M7 3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Waste / Spill Log</span>
+      </div>
       <div class="nav-item" data-screen="ic-transfers" id="nav-ic-transfers">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 5.5h10l-2.5-2.5M14.5 11.5h-10l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Transfer Log</span>
@@ -280,7 +315,19 @@ const Inventory = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5.5 2.5h6L13 6v8.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6l1.5-3.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 9.5h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Empties Log</span>
       </div>
+      <!-- TRAPPED CASH MOVED HERE FROM CASH RECOVERY (Kyle, 2026-08-23): "trapped cash moves into
+           reports as the 1st one in the list". It is a pure read, its own header says it diagnoses
+           and writes nothing, and it is ranked by the dollars you can free, so it leads a group of
+           reads.
+           AND THE STOCK REPORT LOST ITS DEAD STOCK TAB IN THE SAME EDIT: "the dead stock tab gets
+           taken out of the stock report section so no duplicate". The two agreed to the cent, same
+           five products, and that only became visible once they sat in one menu. One question, one
+           row. NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
       <div class="nav-section">Reports</div>
+      <div class="nav-item" data-screen="c-trapped" id="nav-c-trapped">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="6.5" width="12" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.2 6.5V4.8a3.3 3.3 0 0 1 6.6 0V6.5" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="10.3" r="1.4" stroke="currentColor" stroke-width="1.2"/></svg>
+        <span class="nav-label">Trapped Cash</span>
+      </div>
       <div class="nav-item" data-screen="ic-report-usage" id="nav-ic-report-usage">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Usage Report</span>
@@ -418,14 +465,15 @@ const Shift = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 14.5l3.5-8 3 4 3.5-6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13.5" cy="4.5" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Walked Tabs</span>
       </div>
-      <div class="nav-item" data-screen="sc-void-comp" id="nav-sc-void-comp">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 2.5h9v12l-2-1.3-2.5 1.3-2.5-1.3-2 1.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 6.5l4 4M10.5 6.5l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Void and Comps</span>
-      </div>
-      <div class="nav-item" data-screen="sc-waste" id="nav-sc-waste">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 5h11M5 5l1 9h5l1-9M7 3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Waste and Spills</span>
-      </div>
+      <!-- ⛔ VOID AND COMPS + WASTE AND SPILLS LEFT FOR INVENTORY'S "Logs" GROUP (Kyle, 2026-08-23).
+           Both write against inventory products and BOTH are read by Inventory's own Variance
+           Report, so they were already inventory-variance inputs and this menu was the thing out of
+           step. The SCREENS are untouched and every inbound link still resolves; their shell, render
+           registration, permission area and STAFF_TILES landing all moved with the rows.
+           ⚠ THIS GROUP IS DOWN TO ONE ROW. "Operations" over a single "Walked Tabs" is a heading
+           that names less than the row under it; Kyle has not ruled on renaming or folding it into
+           the unnamed group below, so it is left as it is rather than guessed at.
+           NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
       <!-- ⭐⭐ THE TRACKERS THAT HOLD NO MONEY, IN KYLE'S ORDER, BEHIND THEIR OWN DIVIDER.
            He asked for it exactly: "after waste and spills put another divider line... then have
            put links in this order Incidents then Maintenance... then Licensing."

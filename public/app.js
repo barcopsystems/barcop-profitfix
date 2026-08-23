@@ -2100,8 +2100,15 @@ const App = {
     { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-control',      moduleName:'Shift Control' },
     { group:'checklists',          label:'Run Checklists',               module:'shift', screen:'sc-checklists',        moduleName:'Shift Control' },
     { group:'preshift',            label:'Pre-Shift Briefing',       module:'shift',     screen:'sc-preshift',          moduleName:'Shift Control' },
-    { group:'void-comp',           label:'Void / Comp Log',          module:'shift',     screen:'sc-void-comp',         moduleName:'Shift Control' },
-    { group:'waste',               label:'Waste / Spill Log',        module:'shift',     screen:'sc-waste',             moduleName:'Shift Control' },
+    /* ⛔⛔⛔ THESE TWO SAY `inventory` NOW, AND IT IS THE HALF OF THE MOVE NOBODY CAN WALK.
+       `staffLanding()` returns `{ module, screen }` for a NON-ADMIN member and the shell is opened
+       from THIS field. Leave it saying 'shift' after the screens move and a staff user whose first
+       accessible page is one of these lands in the Shift shell on a screen only the Inventory branch
+       can draw, which renders "Coming soon." Neither the owner nor the demo can meet it, because
+       both short-circuit every gate ([[the-loop]] #149; #124 — moving an id between module blocks
+       leaves every piece of per-id logic behind in the old block's path). */
+    { group:'void-comp',           label:'Void / Comp Log',          module:'inventory', screen:'sc-void-comp',         moduleName:'Inventory Control' },
+    { group:'waste',               label:'Waste / Spill Log',        module:'inventory', screen:'sc-waste',             moduleName:'Inventory Control' },
     { group:'maintenance',         label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' },
     { group:'maintenance',         label:'Licensing',                module:'shift',     screen:'sc-licensing',         moduleName:'Shift Control' },
     { group:'incident',            label:'Incident Log',             module:'shift',     screen:'sc-incidents',         moduleName:'Shift Control' },
@@ -3501,6 +3508,17 @@ const App = {
     'Ordering':'<path d="M2 2.5h2l1.7 8h7l1.6-6H5.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="14" r="1.2" stroke="currentColor" stroke-width="1.3"/>',
     'Receiving':'<rect x="1.5" y="5" width="9" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 7.5h2.5l2 2.5v2h-4.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.5" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="13" r="1.3" stroke="currentColor" stroke-width="1.3"/>',
     'Operations':'<circle cx="8.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 2v1.5M8.5 13.5V15M2 8.5h1.5M13.5 8.5H15M3.8 3.8l1.1 1.1M12.1 12.1l1.1 1.1M3.8 13.2l1.1-1.1M12.1 4.9l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    /* ⭐⭐ ADDED WITH THE GROUP IT NAMES (Kyle, 2026-08-23: Inventory's "Operations" became "Logs").
+       ⛔ RENAMING A GROUP DROPS ITS PHONE ICON, SILENTLY — the drawer keys an accordion header off
+       this table BY NAME and `GIC[g.group] || ''` fails soft, so the header just loses its mark and
+       nothing says so. `N1` caught this rename within a minute of it being made, which is the second
+       time that pin has paid for itself ([[lessons-paid-for]] #132).
+       ⚠ ADDED, NOT RENAMED: Shift still has an "Operations" group of its own, so the gear above is
+       still live and moving it would have taken Shift's mark instead.
+       ⭐ THE MARK IS THE APP'S OWN LOG-LINES ICON, lifted from the `History` key rather than drawn —
+       three ruled lines with bullets is what this codebase already uses for a list of past records,
+       and `History` names no group today, so nothing is taken from anything. */
+    'Logs':'<path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/>',
     'Reports':'<rect x="3" y="2" width="11" height="13" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M6 11V8M8.5 11V6M11 11v-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
     'Setup':'<path d="M10.8 2.6a3.4 3.4 0 0 0-4 4.4l-4.3 4.3 2.2 2.2 4.3-4.3a3.4 3.4 0 0 0 4.4-4l-2 2-1.5-.4-.4-1.5 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
     'Scheduling':'<rect x="2" y="3" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7h13M5.5 2v3M11.5 2v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M6 10h2M9.5 10h1.5M6 12.5h2M9.5 12.5h1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
@@ -3952,7 +3970,21 @@ const App = {
      `verify-vendors-in-inventory` C3 asserts the two answer the same word for every id here. */
   _MODULE_EXCEPTIONS: {
     'vendor-tracker': 'inventory', 'vendor-scorecard': 'inventory',
-    'vendor-watch': 'inventory', 'vendor-discrepancy': 'inventory'
+    'vendor-watch': 'inventory', 'vendor-discrepancy': 'inventory',
+    /* ⭐⭐ FOUR MORE MOVED INTO INVENTORY (Kyle, 2026-08-23): Purchasing under Ordering, Trapped Cash
+       leading Reports, and the Void/Comp and Waste/Spill logs leading the renamed "Logs" group.
+       ⛔ THESE IDS CARRY A `c-` AND `sc-` PREFIX, so WITHOUT AN ENTRY HERE `_moduleOf` sends them to
+       Cash and Shift and `_enter` swaps to a shell whose branch cannot draw them: "Coming soon."
+       ⛔⛔ AND FIVE THINGS MOVE, NOT TWO. The shell (here), the permission area
+       (`DB.SCREEN_GROUPS`), the title and the RENDER registration (`icTitles`/`icScreens`, and out
+       of the cash/shift maps so one page has one home), and `App.STAFF_TILES`, whose `module` field
+       decides where a NON-ADMIN member lands — leave that saying 'shift' and a staff user opens the
+       Shift shell on a screen only Inventory can render. That last one is invisible to owner and
+       demo testing, so it is pinned rather than walked ([[the-loop]] #149).
+       🔧 `verify-inventory-absorbs` asks all five of EVERY id in this table, derived, so the vendor
+       pages are covered by the same block and the next move is covered the day it ships. */
+    'c-purchasing': 'inventory', 'c-trapped': 'inventory',
+    'sc-void-comp': 'inventory', 'sc-waste': 'inventory'
   },
 
   _moduleOf(id) {
@@ -9747,8 +9779,8 @@ const App = {
         'hub':           ['Recovery Hub', ''],
         'c-experiments': ['Experiments', ''],
         'c-audit':       ['Cash Audit', 'Weekly Score and Progress'],
-        'c-trapped':     ['Trapped Cash', 'Cash Recovery'],
-        'c-purchasing':  ['Purchasing', 'Cash Recovery'],
+        // ⛔ Trapped Cash and Purchasing left for INVENTORY, 2026-08-23 — registered there now, and
+        //   out of here so one page renders from one shell whatever door the operator came through.
         'c-capital':     ['Capital Efficiency', 'Cash Recovery'],
         'c-forecast':    ['Cash Forecast', 'Cash Recovery'],
         'c-position':    ['Cash Position', 'Cash Recovery'],
@@ -9758,8 +9790,6 @@ const App = {
       const cashScreens = {
         'c-experiments': S.RecoveryExperiments,
         'c-audit':       S.CashAudit,
-        'c-trapped':     S.CashTrapped,
-        'c-purchasing':  S.CashPurchasing,
         'c-capital':     S.CashCapital,
         'c-forecast':    S.CashForecast,
         'c-position':    S.CashPosition,
@@ -9797,6 +9827,13 @@ const App = {
         'ic-report-usage':     ['Usage Report', 'Inventory Control'],
         'ic-report-variance':  ['Variance Report', 'Inventory Control'],
         'ic-report-stock':     ['Stock Report', 'Inventory Control'],
+        /* ⭐ MOVED IN FROM CASH AND SHIFT (Kyle, 2026-08-23). The SUBTITLE moves with the page: it
+           says which section you are in, and these are Inventory pages now. Their files did not
+           move and their screen objects are unchanged; what moved is where the app files them. */
+        'c-purchasing':        ['Purchasing', 'Inventory Control'],
+        'c-trapped':           ['Trapped Cash', 'Inventory Control'],
+        'sc-void-comp':        ['Void and Comp Log', 'Inventory Control'],
+        'sc-waste':            ['Waste / Spill Log', 'Inventory Control'],
         /* ⛔⛔⛔ THE VENDOR PAGES MOVED HERE FROM THE PROFIT BLOCK ON 2026-08-23, AND WITHOUT THIS
            THE THREE NEW NAV LINKS RENDER "Coming soon." `navigate` keeps a SEPARATE screen map per
            module and only ever consults the ACTIVE one, so re-pointing the nav row, `_moduleOf` and
@@ -9833,6 +9870,13 @@ const App = {
         'ic-report-usage':    S.InventoryUsageReport,
         'ic-report-variance': S.InventoryVarianceReport,
         'ic-report-stock':    S.InventoryStockReport,
+        // Moved in from Cash and Shift (see the note in icTitles above). The objects are untouched;
+        // only which module's map holds them changed, and they are out of the old maps so a page
+        // cannot render from two shells depending on where the operator came from.
+        'c-purchasing':       S.CashPurchasing,
+        'c-trapped':          S.CashTrapped,
+        'sc-void-comp':       S.ShiftVoidComp,
+        'sc-waste':           S.ShiftWaste,
         // Moved out of the Profit block with the section (see the note in icTitles above).
         'vendor-tracker':     S.VendorTracker,
         'vendor-scorecard':   S.VendorTracker,
@@ -9855,8 +9899,8 @@ const App = {
         'hub':                   ['Recovery Hub', ''],
         'sc-cash-control':       ['Cash Control', 'Shift Control'],
         'sc-cash-history':       ['Cash History', 'Shift Control'],
-        'sc-void-comp':          ['Void and Comp Log', 'Shift Control'],
-        'sc-waste':              ['Waste / Spill Log', 'Shift Control'],
+        // ⛔ The Void/Comp and Waste/Spill logs left for INVENTORY's "Logs" group, 2026-08-23. Both
+        //   feed Inventory's own Variance Report, so that is where they were always filed in fact.
         'sc-maintenance':        ['Maintenance Log', 'Shift Control'],
         'sc-incidents':          ['Incidents', 'Shift Control'],
         'sc-licensing':          ['Licensing', 'Shift Control'],
@@ -9869,8 +9913,6 @@ const App = {
       const scScreens = {
         'sc-cash-control': S.ShiftCashControl,
         'sc-cash-history': S.ShiftCashHistory,
-        'sc-void-comp': S.ShiftVoidComp,
-        'sc-waste': S.ShiftWaste,
         'sc-maintenance': S.ShiftMaintenance,
         'sc-incidents': S.ShiftIncidents,
         // ⭐ build piece 5: the permits tracker moved out of the Books shell into Shift Control.
