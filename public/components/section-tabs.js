@@ -33,7 +33,7 @@ const SectionTabs = {
      ⚠ IT IS THE FIRST SECTION HERE WHOSE RAIL ROW IS A PLAIN `_PROTO_GLOBAL` GO ROW rather than a
      module section or a hub-sidebar section — `_protoGlobalClick('week')` is its door, and
      `verify-section-tabs` H1 admits that as the third kind. */
-  ENABLED: { inventory: true, audit: true, week: true },
+  ENABLED: { inventory: true, audit: true, week: true, events: true },
 
   /* Support is one row repeated in all seven section sidebars. It is not a group anybody browses,
      and Kyle is folding the FAQs into one global page, so it is kept out of the bar entirely. */
