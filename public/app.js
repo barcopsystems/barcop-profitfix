@@ -2299,6 +2299,11 @@ const App = {
       if (key === 'profit'    && typeof ProfitNav !== 'undefined') return ProfitNav.html();
       if (key === 'revenue'   && typeof Revenue   !== 'undefined') return Revenue.navHTML();
       if (key === 'cash'      && typeof Cash      !== 'undefined') return Cash.navHTML();
+      /* ⭐ THE WEEK JOINED 2026-08-23. Its three links come from the section's own object, the same
+         way every module section supplies its own — there is no hub SIDEBAR for The Week (all three
+         pages are `'none'` in `_HUB_SIDEBAR_OF_ACTION`, full width), so a `_weekSidebarHTML` in
+         hub.js would have been a name for something that never renders. */
+      if (key === 'week'  && typeof window !== 'undefined' && window.S && window.S.Week) return window.S.Week.navHTML();
       if (key === 'audit'     && H) return H._auditSidebarHTML();
       if (key === 'books'     && H) return H._booksSidebarHTML();
       if (key === 'settings'  && H) return H._settingsSidebarHTML();
@@ -2939,7 +2944,17 @@ const App = {
        so the click needs the rail key. Deriving both from the SAME `_railCtx` in the same statement
        is what makes it impossible for the bar to name one section and open another — the agreement
        is structural rather than something a second lookup has to keep in step. */
-    const secKey = (!force && this._railHasMenu(this._railCtx)) ? this._railCtx : null;
+    /* ⭐⭐ A SECTION IS ONE THAT OWNS A MENU **OR** A BAR (widened 2026-08-23, for The Week).
+       `_railHasMenu` answers "does this rail row open an overlay", which was the same question as
+       "is this a section" right up until a section got a top-bar nav instead of an overlay. The Week
+       has three links in the bar and no overlay at all, so the old test called it a plain page and
+       the bar's own section ICON never rendered beside its links.
+       ⛔ THE RAIL ROW IS UNCHANGED BY THIS, deliberately. `_railRow` still asks `_railHasMenu`, so
+       The Week stays a `data-rail-go` row that navigates straight to Close — which is what it does
+       today and what keeps it away from the section short-circuit that shipped the dead Audits row
+       ([[lessons-paid-for]] #120). This widening is scoped to the TITLE, nothing else. */
+    const barred0 = typeof SectionTabs !== 'undefined' && SectionTabs.on(this._railCtx);
+    const secKey = (!force && (this._railHasMenu(this._railCtx) || barred0)) ? this._railCtx : null;
     const sec = secKey ? this._railLabelOf(secKey) : null;
     /* ⛔ `tn-title-sec`, NOT `tn-sec`. That name belonged to row 2's clickable section pills, whose
        CSS outlived the markup — so the prefix picked up their padding, hover fill and pointer
