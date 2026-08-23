@@ -22,7 +22,7 @@
      body buys a header that previously did nothing.
      ⚠ MEASURED FIRST: every rule filled with --surface carries its own border, so nothing loses its
      edge when the fill drops. Revert = put #08131A back here, one value, no other change. */
-  --surface:   #0F161B;
+  --surface:   #12191E;
   /* The card's header band, which is the ONLY thing that used to be --surface and must NOT follow
      it down — the whole point of the change is that the header becomes visible against the body. */
   --card-head: #12191E;
