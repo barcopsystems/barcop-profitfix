@@ -27,7 +27,13 @@ const SectionTabs = {
   /* ⭐ AUDITS JOINED 2026-08-22 (Kyle: *"the rail Audits goes to a top bar menu like inventory does
      with 4 links"*). ONE LINE, because T33 removed the hardcoded `module === 'inventory'` from
      `_srcFor` — before that, adding a key here made `on()` true while the bar hid itself. */
-  ENABLED: { inventory: true, audit: true },
+  /* ⭐ THE WEEK JOINED 2026-08-23 (Kyle: *"make a top bar nav.. Close, Review, History.. no drop
+     downs on these"*). Three groups of one row, so all three render as links that NAVIGATE and take
+     the hand cursor, exactly like the four Audits links.
+     ⚠ IT IS THE FIRST SECTION HERE WHOSE RAIL ROW IS A PLAIN `_PROTO_GLOBAL` GO ROW rather than a
+     module section or a hub-sidebar section — `_protoGlobalClick('week')` is its door, and
+     `verify-section-tabs` H1 admits that as the third kind. */
+  ENABLED: { inventory: true, audit: true, week: true },
 
   /* Support is one row repeated in all seven section sidebars. It is not a group anybody browses,
      and Kyle is folding the FAQs into one global page, so it is kept out of the bar entirely. */
