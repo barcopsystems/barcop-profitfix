@@ -17,7 +17,7 @@ S.CashBridge = {
     App.showHelpModal('How the Cash Bridge Works', [
       { p: ['The question that haunts a profitable operator: I made money on paper, so why is the account always tight? This is the answer. Profit is not cash. Pick a period with the chips and the bridge takes your profit for that stretch and shows every place the money went instead of into the bank.'] },
       { h: 'Where Profit Goes', p: ['Four things eat profit without showing up as a cost. Money goes into more inventory when you buy more than you use. Owner draws come straight out of cash. Loan principal is a payment, not an expense. Capital buys are paid in cash but written off slowly. Add the tax you remit and you have the whole gap.'] },
-      { h: 'Where The Outflows Come From', p: ['You log the draws, loan payments, capital buys, and tax remittances on Close Books, under Accounting, by setting Log Type to Cash Outflow and picking the Kind. This page reads them back. Recurring ones carry forward every month until you stop them. Operating bills like rent and utilities go in the same way with Log Type set to Operating Expense, and they land on your income statement rather than here.'] },
+      { h: 'Where The Outflows Come From', p: ['You log the draws, loan payments, capital buys, and tax remittances on Money Out, by setting Log Type to Cash Outflow and picking the Kind. This page reads them back. Recurring ones carry forward every month until you stop them. Operating bills like rent and utilities go in the same way with Log Type set to Operating Expense, and they land on your income statement rather than here.'] },
       { h: 'Cash You Kept', p: ['Profit, minus what went into inventory, draws, loans, capital, and tax, is the cash that actually stayed. When that number is far below your profit, this screen tells you exactly which line to work on.'] }
     ]);
   },
@@ -55,7 +55,7 @@ S.CashBridge = {
       + (br.hasData
           ? this.headline(br, b) + controlRow + this.waterfall(br)
           : '<div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">The bridge reads your profit off your weekly numbers. Once you confirm your weeks for ' + esc(b.label) + ' in Confirm the Week, it fills in here.</div></div>')
-      + '<div class="no-print" style="font-size:11px;color:var(--t3);margin-top:16px;">Log draws, loan payments, capital buys, and tax on Close Books with Log Type set to Cash Outflow. This page reads them back as the bridge.</div>'
+      + '<div class="no-print" style="font-size:11px;color:var(--t3);margin-top:16px;">Log draws, loan payments, capital buys, and tax on Money Out with Log Type set to Cash Outflow. This page reads them back as the bridge.</div>'
       + '</div>';
     this.wire();
   },
@@ -142,7 +142,7 @@ S.CashBridge = {
     // `other` is a real type in Books (hub-cash-outflows TYPES) and outflowsInPeriod has
     // always folded it into co.total, so Cash You Kept was already net of it. It just had
     // no row, so the visible lines did not sum to the result underneath them.
-    if (co.other > 0) rows += row('Other cash out', -co.other, 'Logged on Close Books as a cash outflow');
+    if (co.other > 0) rows += row('Other cash out', -co.other, 'Logged on Money Out as a cash outflow');
     rows += '<div style="height:1px;background:var(--row-div);margin:4px 0;"></div>';
     rows += row('Cash you actually kept', br.cashKept, '', true);
     // PDF-only table (the on-screen waterfall is styled divs the exporter skips).
