@@ -1,9 +1,9 @@
 'use strict';
 
 /* ── Inventory Control — Vendor Tracker ─────────────────────────────────────────
-   The merged vendor cost-control center. Three tabs, all reading the same
-   vendor data (ic_deliveries, ic_products cost_history, ic_vendors,
-   vendor_discrepancies):
+   The vendor cost-control center. THREE PAGES, one per row of the Vendors
+   drop-down, all reading the same vendor data (ic_deliveries, ic_products
+   cost_history, ic_vendors, vendor_discrepancies):
 
      Scorecard      — per-vendor rollup (spend, price drift, short counts,
                       open / recovered credits, days-to-credit, a status read)
@@ -12,12 +12,17 @@
      Discrepancies  — the working log: file a discrepancy, request the credit,
                       mark it resolved with what you actually got back
 
-   Replaces the old vendor-watch / vendor-scorecard / vendor-discrepancy screens
-   (those three ids deep-link straight to the matching tab). One store, multiple
-   doors ([[two-doors-same-data]]); read-only diagnostics + one working log. */
+   One object serving vendor-scorecard / vendor-watch / vendor-discrepancy: the
+   id selects which body renders, and each is a page of its own in the Vendors
+   drop-down. It was one screen with a tab bar until 2026-08-23, when Kyle moved
+   the section into Inventory and cut the tabs (*"the drop down goes to that
+   specific page only.. no tabs there anymore"*). One store, multiple doors
+   ([[two-doors-same-data]]); read-only diagnostics + one working log. */
 
 S.VendorTracker = {
-  tab: 'scorecard',   // 'scorecard' | 'watch' | 'discrepancies'
+  /* Which page is on screen. Set by app.js's deep-link block from the screen id,
+     never by anything the operator clicks — there is no tab bar to click. */
+  page: 'scorecard',   // 'scorecard' | 'watch' | 'discrepancies'
   range: '90',        // scorecard window: '30' | '90' | '180' | '365' | 'all'
 
   // ── Shared data helpers ─────────────────────────────────────────────
@@ -44,7 +49,7 @@ S.VendorTracker = {
   },
 
   draw() {
-    // Prerequisite: no vendors set up at all → guided setup (every tab needs them).
+    // Prerequisite: no vendors set up at all → guided setup (all three pages need them).
     if (!this.vendors().length) {
       App.setupCard(this.container, {
         title: 'Vendor Tracker',
@@ -60,23 +65,28 @@ S.VendorTracker = {
       return;
     }
 
-    const tabBar = '<div class="ch-tabs no-print">'
-      + [['scorecard', 'Scorecard'], ['watch', 'Price Changes'], ['discrepancies', 'Discrepancies']]
-        .map(([k, l]) => '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-vtab="' + k + '">' + l + '</button>').join('')
-      + '</div>';
-
+    /* ⛔⛔⛔ NO TAB BAR. Kyle, 2026-08-23, looking at the pushed build: *"they are still on tabs...
+       they need to be like all the other pages.. the drop down goes to that specific page only.. no
+       tabs there anymore."* The three ids are three PAGES now, each reached from its own row in the
+       Vendors drop-down, and `page` is set by app.js's deep-link block before this runs.
+       ⭐ NOTHING REPLACES THE BAR, AND THAT IS THE POINT. Measured on the deployed build before
+       cutting it: Order Sheet opens straight into its first section with no page title, and
+       `#tn-title` is empty on every Inventory page because a barred section shows its ICON rather
+       than a page name. The page is named by the marked bar link plus the drop-down row you
+       pressed. Building a header here would re-add the exact thing Kyle cut when the section links
+       shipped ([[app-nav-section-links]]).
+       ⚠ THE FIELD IS `page`, NOT `tab`. There are no tabs, and a property still called `tab` would
+       assert a mechanism that does not exist — the loudest place to leave a false fact
+       ([[lessons-paid-for]] #99). */
     let body;
-    if (this.tab === 'watch') body = this.watchBody();
-    else if (this.tab === 'discrepancies') body = this.discrepanciesBody();
+    if (this.page === 'watch') body = this.watchBody();
+    else if (this.page === 'discrepancies') body = this.discrepanciesBody();
     else body = this.scorecardBody();
 
-    this.container.innerHTML = '<div class="screen">' + tabBar + body + '</div>';
+    this.container.innerHTML = '<div class="screen">' + body + '</div>';
 
-    this.container.querySelectorAll('.ch-tab[data-vtab]').forEach(b =>
-      b.addEventListener('click', () => { this.tab = b.dataset.vtab; this.draw(); }));
-
-    if (this.tab === 'watch') this.wireWatch();
-    else if (this.tab === 'discrepancies') this.wireDiscrepancies();
+    if (this.page === 'watch') this.wireWatch();
+    else if (this.page === 'discrepancies') this.wireDiscrepancies();
     else this.wireScorecard();
   },
 
@@ -93,8 +103,8 @@ S.VendorTracker = {
   },
 
   // Shared day-based range chips (the Scorecard's set) + an Export button, used
-  // on all three tabs. Filters by inRange(); 'all' = no cutoff. this.range is
-  // shared, so the window carries across tabs.
+  // on all three pages. Filters by inRange(); 'all' = no cutoff. this.range is
+  // shared, so the window carries across them.
   RANGES: [['30', 'Last 30 Days'], ['90', 'Last 90 Days'], ['180', 'Last 6 Months'], ['365', 'Last 12 Months'], ['all', 'All Time']],
   rangeFilterRow(exportId) {
     const chips = App.filterChips(this.range, this.RANGES.map(([v, label]) => ({ v, label })), 'vt-range-chip');
@@ -104,7 +114,7 @@ S.VendorTracker = {
   },
 
   // ════════════════════════════════════════════════════════════════════
-  //  SCORECARD TAB
+  //  SCORECARD PAGE
   // ════════════════════════════════════════════════════════════════════
   /* ⚠⚠ THIS ONE WAS NOT JUST A LABEL — THE NUMERATOR AND THE DENOMINATOR DISAGREED. `today - days`
      with an inclusive `>=` admits days+1 of deliveries, while `_rangeDays` below returns the CHIP'S
@@ -124,7 +134,7 @@ S.VendorTracker = {
     return App.inWindow(parseInt(this.range, 10) || 90)(date);
   },
 
-  /* The window, in words, for the PDF header. All THREE tabs export and all three read the same
+  /* The window, in words, for the PDF header. All THREE pages export and all three read the same
      `this.range`, so this is one method rather than three copies — three copies of the same
      decision is exactly how they drift. It matters most on the Scorecard, where Total Spend,
      Net Price Drift and Recovered are all range-filtered dollars: without it the document
@@ -147,7 +157,7 @@ S.VendorTracker = {
     // Annualized DOLLARS, not a sum of per-unit price deltas. A $/bottle change plus a
     // $/case change plus a $/keg change is a number with no unit, and it was printed as
     // currency next to Total Spend and divided by it for driftPct, so the High status
-    // could never fire. Price Changes one tab over already does it right
+    // could never fire. The Price Changes page already does it right
     // (delta x annualUsage), so the SAME data read $4,200/yr there and $47 here.
     // annualUsage is resolved lazily, once per product, and only for products this
     // vendor actually moved a price on.
@@ -263,7 +273,7 @@ S.VendorTracker = {
   },
 
   // ════════════════════════════════════════════════════════════════════
-  //  PRICE CHANGES TAB  (from Vendor Watch)
+  //  PRICE CHANGES PAGE  (vendor-watch)
   // ════════════════════════════════════════════════════════════════════
   priceChanges() {
     const out = [];
@@ -351,7 +361,7 @@ S.VendorTracker = {
   },
 
   // ════════════════════════════════════════════════════════════════════
-  //  DISCREPANCIES TAB  (the working log)
+  //  DISCREPANCIES PAGE  (the working log)
   // ════════════════════════════════════════════════════════════════════
   // ── Follow-up + aging. A credit sits in Credit Requested until the vendor
   //    responds. Bar Cop cannot see their inbox, so it tracks YOUR side: when you
@@ -433,8 +443,8 @@ S.VendorTracker = {
     return stats + filterRow + body;
   },
 
-  // View-only, like the Scorecard and Price Changes tabs. Discrepancies are filed
-  // and worked in Inventory (Receive Delivery / Delivery History); this tab is the
+  // View-only, like the Scorecard and Price Changes pages. Discrepancies are filed
+  // and worked in Inventory (Receive Delivery / Delivery History); this page is the
   // read-only rollup for diagnostics and the recovery math.
   wireDiscrepancies() {
     this.container.querySelectorAll('.vt-range-chip').forEach(b =>
@@ -517,7 +527,7 @@ S.VendorTracker = {
 
   // ── Shared discrepancy modal (Receive Delivery + Delivery History) ─────────
   // File a claim and chase it to credit/resolution in place, against the SAME
-  // vendor_discrepancies record the Discrepancies tab reads — no page leave.
+  // vendor_discrepancies record the Discrepancies page reads — no page leave.
   // opts: { discrepancyId, prefill, onClose, onFiled }. [[two-doors-same-data]]
   openDiscrepancyModal(opts) {
     opts = opts || {};
@@ -774,10 +784,10 @@ S.VendorTracker = {
   // ── Help ──────────────────────────────────────────────────────────────
   showHowTo() {
     App.showHelpModal('How Vendor Tracker Works', [
-      { p: ['One place to keep your vendors honest. Three tabs read the same delivery, price, and discrepancy data: a per-vendor Scorecard, the line-by-line Price Changes, and the Discrepancies log where you chase credits.'] },
+      { p: ['One place to keep your vendors honest. Three pages read the same delivery, price, and discrepancy data: a per-vendor Scorecard, the line-by-line Price Changes, and the Discrepancies log. Pick one from the Vendors menu.'] },
       { h: 'Scorecard', p: ['Each vendor rolled up over the range you pick: total spend, net price drift, short counts, open and recovered credits, and average days to a credit. Vendors causing the most pain sort to the top, with a status read of High, Watch, or Clean. Take this into your quarterly vendor review and ask for a price match on every line that drifted up. Export PDF saves the rollup.'] },
       { h: 'Price Changes', p: ['Every per-line price change captured automatically when a delivery is received in Inventory Control, with the annual cost of each increase based on that product\'s usage rate. Read-only; the data comes from receiving deliveries.'] },
-      { h: 'Discrepancies', p: ['A read-only rollup of every credit claim you are owed, open and resolved, with its status, how long it has waited, and what you have recovered, for the recovery math. You do not work claims here. They are filed and chased over in Inventory: flag the line when you receive a delivery in Receive Delivery (or open a saved one in Delivery History), then work the Credits to Chase list under the Receive Delivery form to request the credit, log a follow-up, and mark it resolved. This tab is just the picture of where all your vendor credits stand.'] }
+      { h: 'Discrepancies', p: ['A read-only rollup of every credit claim you are owed, open and resolved, with its status, how long it has waited, and what you have recovered, for the recovery math. You do not work claims here. They are filed and chased over in Inventory: flag the line when you receive a delivery in Receive Delivery (or open a saved one in Delivery History), then work the Credits to Chase list under the Receive Delivery form to request the credit, log a follow-up, and mark it resolved. This page is just the picture of where all your vendor credits stand.'] }
     ]);
   }
 };
