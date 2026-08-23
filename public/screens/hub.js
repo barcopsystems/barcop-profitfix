@@ -71,24 +71,56 @@ S.Hub = {
       cashout: '<circle cx="8.5" cy="8.5" r="6.3" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5.3v6.4M10.1 6.6H7.7a1.15 1.15 0 0 0 0 2.3H9.3a1.15 1.15 0 0 1 0 2.3H6.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/>',
       history: '<path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/>',
       breakeven: '<path d="M2 12.5l4-4 3 2 5.5-6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 8.5h13" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="2 2"/>',
+      /* ⭐ THE FOUR THAT CAME OVER FROM CASH AND THE THREE FORECASTS (T48). These SVGs were MOVED
+         out of `nav.js` in the same edit, not copied: those rows are gone from the Cash, Profit and
+         Revenue menus, so there is no second spelling left to drift from.
+         ⚠ ALL THREE FORECASTS GENUINELY SHARE ONE MARK, and they always did — they simply never sat
+         next to each other before. Kept as they are, because the icon set is a design call and
+         design is walked one change at a time. */
+      capital: '<path d="M2.5 14.5V8M7 14.5V4M11.5 14.5V10M2.5 14.5h12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 3.5l2.5-1.5 1 2.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
+      position: '<rect x="2" y="4.5" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7.2h13" stroke="currentColor" stroke-width="1.2"/><path d="M11 10.3h2.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      bridge:  '<path d="M2 11c2-5 11-5 13 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2 11v2.5M15 11v2.5M6.5 9v4.5M10.5 9v4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
+      forecast: '<path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       support: '<path d="M2.5 3.8h12v7.5H7.8l-3 2.3v-2.3H2.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M5.3 6.6h6.4M5.3 8.7h4.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
     };
-    const row = (action, name, iconKey) =>
-      '<div class="nav-item" data-hub-action="' + action + '">'
+    /* ⚠ `extra` JOINED THIS HELPER FOR T48, matching `_auditSidebarHTML`'s signature exactly. A row
+       that opens a screen in ANOTHER module carries `data-mod` + `data-screen` and the `enter`
+       action; `routeSidebarAction` then runs `_enter(screen, mod)`, which swaps the shell before
+       navigating. Without `data-mod` that call is `showApp(undefined)` and the page never renders
+       ([[lessons-paid-for]] #146 — `navigate` is module-internal and the wrong door ships dead
+       links). Existing callers pass nothing and are byte-identical. */
+    const row = (action, name, iconKey, extra) => {
+      const attrs = (extra || []).map(([k, v]) => ' ' + k + '="' + v + '"').join('');
+      return '<div class="nav-item" data-hub-action="' + action + '"' + attrs + '>'
         + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + ic[iconKey] + '</svg>'
         + '<span class="nav-label">' + name + '</span></div>';
-    /* ⭐⭐ KYLE'S ORDER (build piece 5): *"licensing goes away and move 'Money Out' right above
-       'Break Even' so it is Money Out .. the Break-Even then divider then the three books links."*
-       Money Out and Break-Even are one pair now — where the money went, and what it takes to cover
-       it — and the divider below them opens the Accounting group. The "Operations" heading went with
-       Licensing: a group of one is not a group. */
-    /* ⛔ NO DIVIDER ABOVE THE FIRST ROW (Kyle, 2026-08-12: *"remove the divider line between it and
-       the money out link"*). An empty `nav-section` renders as a rule, and this one sat between the
-       Close Books leaf and Money Out — separating a page from the first thing you do on it. The
-       dividers that remain each open a NAMED group (Accounting, Support), which is what they are
-       for; a rule with nothing above it is decoration. */
+    };
+    /* ⭐⭐⭐ THE BOOKS BAR — MONEY OUT · STATEMENTS · CASH · FORECASTS (Kyle, T48, 2026-08-23).
+       `SectionTabs` makes ONE top-bar link per GROUP, so every heading below IS a link and the four
+       words here are the whole operator-visible change. Money Out holds a single destination, which
+       renders as a link that NAVIGATES and takes the hand cursor; the other three open on hover.
+       ⭐ HE CHOSE "STATEMENTS" OVER "REPORTS" because Inventory's bar already carries a Reports
+       link, and two links called the same thing in two sections is how an operator learns that a
+       word means nothing.
+       ⛔⛔ THE GROUP NAME IS THE BAR AND THE ROW LABEL IS THE MENU, AND THEY ARE ALLOWED TO DIFFER.
+       "Money Out" is the word Kyle uses; "All Money Out" is what that page calls itself in its own
+       header and help, so the ROW keeps it — the same split Events uses ("Bookings" over "Event
+       Booking"). Renaming the PAGE is a separate call and his to make.
+       ⛔⛔⛔ SIX ROWS CAME FROM THREE OTHER SECTIONS AND LEFT THEM IN THE SAME EDIT. Capital
+       Efficiency, Cash Position, Cash Bridge and Cash Forecast are out of the Cash menu; Profit
+       Forecast and Revenue Forecast are out of theirs. Listed in two menus at once,
+       `_railSectionForScreen` resolves on FIRST MATCH and would silently throw the operator into
+       Books from the other section's own menu — so the removal is half the change, not tidying.
+       ⚠ THE PERMISSION AREA MOVED WITH THEM (`DB.SCREEN_GROUPS`), the MODULE deliberately did not:
+       `navigate` still renders all six out of the cash, profit and revenue branches. Pinned by
+       `verify-area-access-doors` block G, because a scoped member is the only identity that can
+       meet it and neither the owner nor the demo can ([[the-loop]] #149).
+       ⚠ THIS ENDS THE CASH SECTION. What is left there is Purchasing and Trapped Cash, both of
+       which Kyle has said go to Inventory, and Experiments, which wants a Tools section that does
+       not exist yet. Until then a "Cash" drop-down inside Books sits beside a Cash rail row; that
+       resolves when Cash dies and is live in between, which he has taken. */
     return ''
       /* ⭐⭐⭐ BUILD ORDER D — THREE ROWS OVER ONE STORE BECOME ONE. Phase 1 migrated every cash
          outflow into the expense ledger, item 19 stage 1 gave the log a kind chip that shows bills
@@ -105,8 +137,8 @@ S.Hub = {
          ⚠ Those two were `_writePair` / `_deletePair` until build order E, when they wrote a second
          store as well. `verify-money-out-one-row.js` C2/C4 pin that they exist and are still reached
          from here, so this note cannot go stale again without the gate saying so. */
+      + '<div class="nav-section">Money Out</div>'
       + row('operating-expenses', 'All Money Out', 'expense')
-      + row('breakeven', 'Break-Even', 'breakeven')
       /* ⛔ LICENSING LEFT THIS SIDEBAR (build piece 5). It is a Shift Control screen now — see
          `nav.js`. Kyle: *"it has nothing to do with books really."* Correct once it holds no money:
          nothing in Books reads a permit record, and its two real consumers are the Hub's alert panel
@@ -114,10 +146,30 @@ S.Hub = {
          ⚠ THE BOOKS LANDING KEEPS EVERY PERMIT LINK IT HAD — the due count, the "clear the N flagged"
          next move, the Licensing button and the get-started step. A quick link crossing sections is
          normal here; the Audit sidebar jump-links into Recovery the same way. */
-      + '<div class="nav-section">Accounting</div>'
+      /* ⚠ "Accounting" BECAME "Statements" (T48). The heading was never a bar link before, so the
+         word only ever appeared as a rule in the sidebar; now it is what an operator reads across
+         the top and it has to name what is behind it. The three rows are unchanged. */
+      + '<div class="nav-section">Statements</div>'
       + row('weekly-pnl', 'Weekly P&L Brief', 'report')
       + row('books', 'Month-End Books', 'books')
       + row('year-end', 'Annual Review', 'calendar')
+      /* ⭐ BREAK-EVEN OPENS THE CASH GROUP because it is the only one of the four that is already a
+         Books page (`hub-breakeven`); the other three are Cash module screens reached through
+         `enter`. Kyle's order, taken as he gave it. */
+      + '<div class="nav-section">Cash</div>'
+      + row('breakeven', 'Break-Even', 'breakeven')
+      + row('enter', 'Capital Efficiency', 'capital',  [['data-mod', 'cash'], ['data-screen', 'c-capital']])
+      + row('enter', 'Cash Position',      'position', [['data-mod', 'cash'], ['data-screen', 'c-position']])
+      + row('enter', 'Cash Bridge',        'bridge',   [['data-mod', 'cash'], ['data-screen', 'c-bridge']])
+      /* ⚠ THE ROW LABELS KEEP THE LONG NAMES. "Cash Forecast" / "Profit Forecast" / "Revenue
+         Forecast" are what this app's help, its audit copy and its own page headers call these
+         three, so shortening them in the menu would leave a dozen operator-facing sentences naming
+         screens by words the app no longer shows — the same reason Events kept "Event Booking"
+         under a group called "Bookings". The GROUP is Kyle's word; the rows are the app's. */
+      + '<div class="nav-section">Forecasts</div>'
+      + row('enter', 'Cash Forecast',    'forecast', [['data-mod', 'cash'],    ['data-screen', 'c-forecast']])
+      + row('enter', 'Profit Forecast',  'forecast', [['data-mod', 'profit'],  ['data-screen', 'profit-forecast']])
+      + row('enter', 'Revenue Forecast', 'forecast', [['data-mod', 'revenue'], ['data-screen', 'r-forecast']])
       + '<div class="nav-section">Support</div>'
       + row('books-help', 'Help and FAQ', 'help')
       + row('report-bug', 'Report a Bug', 'bug');
