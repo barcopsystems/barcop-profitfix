@@ -258,7 +258,7 @@ S.InventoryEmpties = {
       + '<td><div class="fw"><span class="pre">$</span><input class="form-input pre eml-deposit" type="number" min="0" step="0.01" value="' + (row.deposit_amount != null && row.deposit_amount !== '' ? esc(String(row.deposit_amount)) : '') + '" placeholder="0.05" style="width:100%;"/></div></td>'
       + '<td><select class="form-input eml-disp" style="width:100%;">' + this.dispositionOptions(row.disposition || '') + '</select></td>'
       + '<td class="eml-val val" style="font-size:12px;">-</td>'
-      + '<td><button class="btn btn-danger btn-sm eml-del" type="button">Delete</button></td>'
+      + '<td style="text-align:right;"><button class="btn btn-danger btn-sm eml-del" type="button">Delete</button></td>'
       + '</tr>';
   },
 

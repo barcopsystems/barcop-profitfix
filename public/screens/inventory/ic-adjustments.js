@@ -291,7 +291,7 @@ S.InventoryAdjustments = {
       + '<td><select class="form-input ajl-reason" style="width:100%;">' + this.reasonOptions(reason) + '</select></td>'
       + '<td><select class="form-input ajl-dir" style="width:100%;"><option value="out"' + (dir === 'out' ? ' selected' : '') + '>Loss</option><option value="in"' + (dir === 'in' ? ' selected' : '') + '>Found</option></select></td>'
       + '<td class="ajl-val val" style="font-size:12px;">-</td>'
-      + '<td><button class="btn btn-danger btn-sm ajl-del" type="button">Delete</button></td>'
+      + '<td style="text-align:right;"><button class="btn btn-danger btn-sm ajl-del" type="button">Delete</button></td>'
       + '</tr>';
   },
 

@@ -241,7 +241,7 @@ S.InventoryTransfers = {
       + '<td><select class="form-input trl-unit" style="width:100%;">' + this.unitOptions(cat, unitDefault) + '</select></td>'
       + '<td><select class="form-input trl-from" style="width:100%;">' + this.fromOptions(row.product_id ? this.productById(row.product_id) : null, row.from_location || '') + '</select></td>'
       + '<td><select class="form-input trl-to" style="width:100%;">' + this.toOptions(row.from_location || '', row.to_location || '') + '</select></td>'
-      + '<td><button class="btn btn-danger btn-sm trl-del" type="button">Delete</button></td>'
+      + '<td style="text-align:right;"><button class="btn btn-danger btn-sm trl-del" type="button">Delete</button></td>'
       + '</tr>';
   },
 
