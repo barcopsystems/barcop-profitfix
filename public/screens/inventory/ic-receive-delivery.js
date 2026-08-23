@@ -1093,7 +1093,15 @@ S.InventoryReceiveDelivery = {
     const disputeLine = disputesFiled > 0
       ? '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-top:8px;">'
         + disputesFiled + ' disputed price change' + (disputesFiled === 1 ? '' : 's')
-        + ' filed as a vendor discrepancy &middot; follow up in Profit Recovery</div>'
+        /* ⛔⛔ THIS DESTINATION WAS WRONG BEFORE VENDOR TRACKER EVER MOVED, and the move is only how
+           it surfaced (2026-08-23). It read "follow up in Profit Recovery", which sent the operator
+           off this page to a READ-ONLY rollup. You do not work a claim there: this screen's own help
+           says a filed claim "drops into the Credits to Chase list below this form", and Vendor
+           Tracker's own source says discrepancies "are filed and worked in Inventory". The working
+           list is `#rd-chase`, rendered directly under this message.
+           ⭐ Ask what the operator DOES, not which page name matches the words
+           ([[lessons-paid-for]] #47/#83). */
+        + ' filed as a vendor discrepancy &middot; follow up in Credits to Chase below</div>'
       : '';
     let priceLine = '';
     if (applied > 0) {
