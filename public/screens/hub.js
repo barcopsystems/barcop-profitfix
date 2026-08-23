@@ -2481,7 +2481,12 @@ S.Hub = {
       sev: 'warn',
       label: 'Vendor prices rose', value: incCount + ' items · 45d',
       text: 'Vendor prices rose on ' + incCount + ' items in deliveries over the last 45 days. Verify these against quoted sheets before they stick.',
-      screen: 'vendor-watch', mod: 'profit'
+      /* ⚠ `mod` IS HARDCODED HERE, so `App._moduleOf` cannot rescue this one. Moved with the screen
+         on 2026-08-23 when Vendor Tracker left Profit for Inventory. Every other caller of these
+         ids resolves the shell through `openScreen`; this row carries it inline, which is exactly
+         the kind of second spelling that gets left behind ([[lessons-paid-for]] #111 — sweep who
+         READS it, not what you moved). Pinned by `verify-vendors-in-inventory` D1. */
+      screen: 'vendor-watch', mod: 'inventory'
     });
 
     // 6. Loss Prevention flags (last 7 days), in two honest tiers so red stays

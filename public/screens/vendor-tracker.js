@@ -1,6 +1,6 @@
 'use strict';
 
-/* ── Profit Recovery — Vendor Tracker ─────────────────────────────────────────
+/* ── Inventory Control — Vendor Tracker ─────────────────────────────────────────
    The merged vendor cost-control center. Three tabs, all reading the same
    vendor data (ic_deliveries, ic_products cost_history, ic_vendors,
    vendor_discrepancies):
