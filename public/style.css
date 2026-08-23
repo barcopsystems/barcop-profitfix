@@ -25,9 +25,9 @@
   --surface:   #0F161B;
   /* The card's header band, which is the ONLY thing that used to be --surface and must NOT follow
      it down — the whole point of the change is that the header becomes visible against the body. */
-  --card-head: #0F161B;
+  --card-head: #12191E;
   --input:     #0C1216;
-  --panel:     #0F161B;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
+  --panel:     #12191E;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
   /* ⭐⭐ THE DATA ROW FILL, AND NOW IT REALLY IS THE ONLY ONE (Kyle, 2026-08-14: *"every data row
      that uses this color i need it consolidated into one root color"*).
      Un-box language: rows sit just lighter than --surface so they lift off the header band, which
@@ -41,7 +41,7 @@
      ⚠ CHANGE THIS LINE AND EVERY DATA ROW IN THE APP MOVES. That is the point of it. Panels, boxes,
      plan options, tiles and progress tracks are a DIFFERENT job and read --gold-tint, which holds
      the same value today and can be moved on its own. */
-  --zone:      #131B21;
+  --zone:      #19232B;
   /* ⭐⭐ THE STAT BOX FILL (Kyle, 2026-08-14): *"any box that border wraps stat numbers only... no
      header."* Those boxes are plain `.card`s, so they took `--surface` and could not be retuned
      without dragging every real card with them. This is the token that splits them.
@@ -52,7 +52,7 @@
      ⚠ It now holds the SAME VALUE as `--zone` and `--gold-tint`. Three tokens, one value, three
      different jobs — a stat box, a data row and a panel can still be moved apart at any time, which
      is exactly what having three of them buys. Do not "tidy" them into one. */
-  --stat:      #131B21;
+  --stat:      #19232B;
   --c3:        #111E26;                /* 3rd navy: menu borders/accents + secondary (icon) button backgrounds in the chrome */
   --c4:        #1E2B34;                /* 4th navy: accent splash — active section pills, active sidebar row, icon-button hover */
   --hover:     rgba(255,255,255,0.02);
