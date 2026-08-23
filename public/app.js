@@ -9577,6 +9577,29 @@ const App = {
     if (content) content.scrollTop = 0;
     if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
 
+    /* ⛔⛔⛔ WHICH VENDOR PAGE TO RENDER, DECIDED BEFORE THE MODULE DISPATCH — AND IT HAS TO BE HERE.
+       Kyle, 2026-08-23, on the pushed build: *"price changes and discrepancies links do not change
+       to those pages it stays on scorecard page."* Reproduced by clicking, live: `_currentScreenId`
+       moved to `vendor-watch` and `vendor-discrepancy` correctly while `S.VendorTracker.page` stayed
+       `'scorecard'` on every press.
+       ⭐ THE CAUSE IS POSITION, NOT LOGIC. This block used to sit in the PROFIT fall-through, 133
+       lines below the Inventory branch's `return`. The moment the four vendor ids moved into the
+       Inventory screen map, the only path that reaches them stopped reaching this — so the screen
+       rendered with whatever `page` already held, which is its default.
+       ⛔ IT IS A FACT ABOUT THE ID, NOT ABOUT THE MODULE, so it belongs above every module branch.
+       Copying it into the Inventory block would have worked today and drifted the first time a
+       vendor page is reached from anywhere else ([[the-loop]] #149 — enumerate every registration
+       for an id and say what each one is FOR).
+       ⚠ AND MY PIN COULD NOT SEE IT: it asserted this block SAYS the right thing and that the three
+       ids map to three different values. Neither is a claim that the block RUNS. Existence is not
+       reachability ([[lessons-paid-for]] #107), and rendering is downstream of reaching (#120).
+       Now pinned by ORDER: this must sit above the first `_activeModule` branch. */
+    if (S.VendorTracker) {
+      if (id === 'vendor-watch') S.VendorTracker.page = 'watch';
+      else if (id === 'vendor-discrepancy') S.VendorTracker.page = 'discrepancies';
+      else if (id === 'vendor-scorecard' || id === 'vendor-tracker') S.VendorTracker.page = 'scorecard';
+    }
+
     // Events module screens
     if (this._activeModule === 'events') {
       const evTitles = {
@@ -9875,14 +9898,10 @@ const App = {
     document.getElementById('topbar-title').textContent = title;
     document.getElementById('topbar-sub').textContent = sub;
 
-    // The three legacy vendor ids deep-link straight into the merged Vendor
-    // Tracker on the matching tab; the nav uses 'vendor-tracker' (lands Scorecard).
-    if (S.VendorTracker) {
-      if (id === 'vendor-watch') S.VendorTracker.page = 'watch';
-      else if (id === 'vendor-discrepancy') S.VendorTracker.page = 'discrepancies';
-      else if (id === 'vendor-scorecard' || id === 'vendor-tracker') S.VendorTracker.page = 'scorecard';
-    }
-
+    /* ⛔ THE VENDOR PAGE SELECTOR MOVED OUT OF HERE on 2026-08-23 and now runs above the module
+       dispatch. It sat in this Profit fall-through, which the Inventory branch returns long before
+       reaching — so all three drop-down rows rendered the Scorecard. See the block above the Events
+       branch for the whole story; there must not be a second copy down here. */
     const screen = screens[id];
     if (screen) { this._activeScreenObj = screen; screen.render(content, actions); }
     else content.innerHTML = '<div class="screen"><p style="color:var(--t3);">Coming soon.</p></div>';
