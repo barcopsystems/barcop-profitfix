@@ -36,7 +36,7 @@ S.HubAuditHelp = {
     ]},
     { t: 'The Recovery Audits', qa: [
       { q: 'How is this different from my Profit, Revenue, and Cash audits?',
-        a: 'Those three are diagnostic: each scores its own area and hands you a Fix System to recover the money. The Bar Cop Audit sits above them as the operational read. The sidebar links to all three so you can reach them in one place, but each opens in its own Recovery section right next to its Fix System, where the work happens.' },
+        a: 'Those three are diagnostic: each scores its own area and ranks the money to recover. The Bar Cop Audit sits above them as the operational read. The sidebar links to all three so you can reach them in one place, and each opens in its own Recovery section.' },
       { q: 'Does running a recovery audit affect my Bar Cop Audit?',
         a: 'Yes. Running your recovery audits on time and acting on what they surface both feed the Bar Cop Audit, through the Recovery Action and Operational Discipline sub-scores. An operation that diagnoses and fixes scores higher than one that lets gaps sit.' }
     ]},

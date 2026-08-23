@@ -1654,7 +1654,7 @@ S.Hub = {
       + '<div style="flex:1;min-width:220px;">'
       +   hbSh('Do this first')
       +   doFirst + '</div>'
-      + '<button class="btn btn-ghost btn-sm" onclick="' + paiGo(first.item) + '">Open the fix</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="' + paiGo(first.item) + '">Open the audit</button>'
       + '</div>';
 
     // ── Band 3: biggest gain and worst drag, in the audit's own vocabulary ──
