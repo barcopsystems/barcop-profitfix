@@ -449,7 +449,7 @@ S.HubPermits = {
 
     const html = '<div class="card form-card narrow-form" style="margin:0;">'
       + '<div class="card-title">Mark Renewed</div>'
-      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(rec.name || '(unnamed permit)') + '. This advances the renewal date and advances the renewal date. Log what you paid with the rest of your money out, on Close Books.</div>'
+      + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">' + esc(rec.name || '(unnamed permit)') + '. This advances the renewal date and advances the renewal date. Log what you paid with the rest of your money out, on Money Out.</div>'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f"><label>Renewed On</label><input type="date" id="hp-r-renewed" value="' + today + '"/></div>'
       +   '<div class="f"><label>Next Renewal Date</label><input type="date" id="hp-r-next" value="' + esc(suggestedNext) + '"/></div>'

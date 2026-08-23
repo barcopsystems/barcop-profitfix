@@ -197,7 +197,7 @@ S.Hub = {
     if (action === 'user-team')          return S.HubUserAccounts.open('team');
     if (action === 'user-accounts')      return S.HubUserAccounts.open();
     if (action === 'bar-cop-audit')      return S.HubBarCopAudit?.open?.();
-    if (action === 'books-home')         return S.HubBooksHome?.open?.();
+    if (action === 'books-home')         return S.HubOperatingExpenses?.open?.();
     if (action === 'breakeven')          return S.HubBreakEven?.open?.();
     if (action === 'books')              return S.HubBooks.open();
     if (action === 'weekly-pnl')         return S.Reports?._openQboModal?.();
@@ -239,7 +239,13 @@ S.Hub = {
     // the module sidebars). Each maps to its section landing's activeAction.
     const CHECKLIST_ICON = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
     const MSTYLE = {
-      books:    { id: 'nav-books-home',    action: 'books-home', leafLabel: 'Close Books', leafIcon: CHECKLIST_ICON },
+      /* ⚠ "All Money Out", NOT "Money Out". The page's own header is `All Money Out` and its help is
+         `How All Money Out Works`, so a leaf saying anything else makes three names for one page —
+         which `verify-help-describes-its-own-page` A5 caught the moment I wrote the short form.
+         Kyle has been calling it "Money Out" in conversation; that is a rename of the PAGE and his
+         call, not something to do by half while retiring another one ([[lessons-paid-for]] #48 —
+         pin the agreement, and the words are his). */
+      books:    { id: 'nav-operating-expenses', action: 'operating-expenses', leafLabel: 'All Money Out', leafIcon: CHECKLIST_ICON },
       // No landing leaf: the Bar Cop Settings page is retired, so this section opens straight
       // onto its own pages, the same way Audits does.
       settings: { keepSupport: true },
@@ -1199,7 +1205,7 @@ S.Hub = {
              trapped.hasData ? (trappedCash > 0 ? 'var(--t1)' : 'var(--green)') : 'var(--t4)',
              trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
       + statDiv
-      + heroTile('hub-books-home', "S.HubBreakEven.open()", 'Open Break-Even', 'Break-Even', beVal, beCol, beSub)
+      + heroTile('hub-breakeven', "S.HubBreakEven.open()", 'Open Break-Even', 'Break-Even', beVal, beCol, beSub)
       // The four figures above are dollars (the money line); the Operations Audit is
       // a health score, not money, so a flex spacer pushes it to the right under
       // the Briefing button — money line left, operation-health read right. The

@@ -393,7 +393,7 @@ S.HubOperatingExpenses = {
        The bills ARE Books data, so a member without Books access should be refused here for
        the same reason they are refused on the P&L. Demo and any session before the role
        resolves still pass — _hubBlocked returns false when there is no role. */
-    if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
+    if (App._hubBlocked && App._hubBlocked('hub-operating-expenses')) return;   // Books area gate
     // ⚠ THE PAGE HAS ONE NAME. The sidebar row has said Money Out since the one-ledger rebuild and
     // this header still said Operating Expenses, which is the old name for half of what is on it.
     App.openHubFullPage('All Money Out', (mount) => {
@@ -1162,7 +1162,26 @@ S.HubOperatingExpenses = {
        quantity. `_byCatRows()` is the one walk; the card renders it and the stat card sums it. Two
        computations of one number is the $108,820.04-under-$69,820.04 shape, and pinning either
        figure instead of the EQUALITY is what let it happen ([[the-loop]] #54/#109). */
-    this.container.innerHTML = '<div class="screen">' + this._tabBarHtml() + this._renderCurrent() + this._renderHistory() + '</div>';
+    /* ⭐⭐⭐ THE ENTRY CARD IS ON THIS PAGE NOW, ABOVE THE TABS (Kyle, 2026-08-23: *"just putting the
+       expenses drop file/manual entry card at the top of the money out page.. so it is all on one
+       page.. and then just get rid of the close books page all together"* / *"it goes on top of
+       money out above the page tabs.. and it goes to the normal on page drop file card like in the
+       shift check card"*).
+       ⛔ THIS REVERSES A RULE HE SET ON 2026-08-12 — *"you don't log money out in money out.. that is
+       the history"* — and it is his to reverse. What does NOT change is that there is exactly ONE
+       door; it moved from Close Books to here. `verify-money-out-one-door` is re-pointed at that
+       property rather than at the old page's name ([[lessons-paid-for]] #48/#94).
+       ⭐ `_addCardHtml({})` IS THE FULL-SCREEN SHAPE, which is the card shell + collapse Kyle
+       pointed at on the Shift Check screen. No new markup and no new colour: the shape already
+       existed for this screen, it was simply never rendered here.
+       ⛔⛔ AND IT STILL TAKES THE PAGE OVER ON A DROP. `_addCardHtml` already returns the confirm
+       screen INSTEAD of the card once `_expenseReview` is set — its own comment says the confirm
+       replaces the whole card rather than sitting inside it, because a collapsed card would hide the
+       Add button. So suppressing the tabs and the two panels below is all the takeover needs: a bank
+       month runs to hundreds of rows across a dozen sections and must not be read through a page. */
+    const reviewing = !!this._expenseReview;
+    this.container.innerHTML = '<div class="screen">' + this._addCardHtml({})
+      + (reviewing ? '' : this._tabBarHtml() + this._renderCurrent() + this._renderHistory()) + '</div>';
     /* ⭐⭐ BUILD ORDER B — THE WAY TO THE ONE DOOR. This screen no longer takes an entry, so without
        a control it is a page the operator has always used to log a bill with nothing on it: the
        feature would read as LOST rather than moved ([[the-loop]] #106 — a control that tells the
@@ -1173,10 +1192,12 @@ S.HubOperatingExpenses = {
        and this line was already calling it with an empty string.
        ⚠ WIRED AGAINST `document`, NOT `this.container` — the topbar is the hub's, outside our mount.
        `hub-bar-cop-audit` does the same thing the same way. */
-    if (App.setHubTopbarActions) {
-      App.setHubTopbarActions('<button class="btn btn-ghost btn-sm" id="oex-go-enter">Enter Money Out</button>');
-      document.getElementById('oex-go-enter')?.addEventListener('click', () => this._goEnterMoneyOut());
-    }
+    /* ⛔ THE "Enter Money Out" TOPBAR BUTTON IS GONE (2026-08-23). It existed for one reason: this
+       page could not take an entry, so it sent the operator to Close Books' first step. The entry
+       card is at the top of this page now and Close Books is deleted, so the button had no job and
+       no destination — a control kept past its reason is the dead-end class this suite keeps finding
+       ([[lessons-paid-for]] #105). The slot is cleared rather than left holding stale markup. */
+    if (App.setHubTopbarActions) App.setHubTopbarActions('');
     this._wireTabs();
     this._wireCurrent();
     // ⛔ BOTH, or every control the history half draws — the range chips, Show Older, Export — is on
@@ -1223,12 +1244,10 @@ S.HubOperatingExpenses = {
      "Enter Money Out" and lands somewhere else, which is the shape S330b's guard-loop was made of.
      Setting it before `open()` is the destination's own contract: the field is only defaulted when
      it is null ([[the-loop]] #102 — read the contract, the existing callers are the spec). */
-  _goEnterMoneyOut() {
-    const BH = S.HubBooksHome;
-    if (!BH) return;
-    BH._openStep = 'expenses';
-    BH.open();
-  },
+  /* ⛔ `_goEnterMoneyOut` WAS DELETED 2026-08-23 with the topbar button that was its only caller. It
+     opened Close Books on its expenses step, and both the button and the page are gone: the entry
+     card is at the top of this screen now. Retiring a control is the render call, the orphaned
+     helper AND the help text ([[the-loop]] #61) — this is the helper. */
 
   /* ⛔ `renderHistory(mount)` AND `_historyStats()` WERE DELETED HERE, with the Expense History
      route (2026-08-06). Build order D merged this screen's three sidebar rows into one Money Out
@@ -1354,9 +1373,12 @@ S.HubOperatingExpenses = {
      ⭐ IT ALSO SERVES A LAYOUT CHANGE, which is why it is named for the HOST rather than for the
      write: opening or closing the import takeover swaps the four step rows for the drop panel, and
      that decision belongs to the cockpit, so the cockpit has to re-render to make it. */
+  /* ⚠ THE HOST SPECIAL CASE IS GONE (2026-08-23). This asked Close Books to repaint itself, because
+     the entry card used to be mounted inside that page's first step and a repaint of the card alone
+     would have left the steps around it stale. There is one host now — this screen — so every caller
+     falls through to `_rerender`. Kept as a member rather than inlined at its seven call sites: it
+     is the one place that answers "repaint whoever owns me", and the next host will want it. */
   _rerenderHost() {
-    const BH = S.HubBooksHome;
-    if (this._view === 'moneyout' && BH && BH.container) return BH.render(BH.container);
     this._rerender();
   },
 

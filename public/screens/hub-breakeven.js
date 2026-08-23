@@ -19,7 +19,7 @@ S.HubBreakEven = {
   COLS: '<colgroup><col style="width:31%"><col style="width:23%"><col style="width:23%"><col style="width:23%"></colgroup>',
 
   open() {
-    if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;   // Books area gate
+    if (App._hubBlocked && App._hubBlocked('hub-operating-expenses')) return;   // Books area gate
     App.openHubFullPage('Break-Even', (mount) => { this.container = mount; this._wf = null; this._wfTouched = false; this.render(mount); }, 'breakeven');
   },
 
@@ -255,7 +255,7 @@ S.HubBreakEven = {
            CONSUMER; a page's name tells you nothing about what it lets you DO).
            ⚠ `books-home` needed an `openScreen` route added for this to work at all — it was a hub
            action only, so a `data-go` at it hit "Coming soon." */
-        steps: [{ title: 'Log your money out', desc: 'Drop your bank statement, or enter your bills by hand, on Close Books. Those are the nut this number is built on.', btn: 'Close Books', screen: 'books-home', done: false }]
+        steps: [{ title: 'Log your money out', desc: 'Drop your bank statement, or enter your bills by hand, at the top of Money Out. Those are the nut this number is built on.', btn: 'Money Out', screen: 'operating-expenses', done: false }]
       });
       return;
     }

@@ -1195,9 +1195,19 @@ S.WeekReview = {
   },
 
   // ── Books (monthly close) ───────────────────────────────────────────────────
+  /* ⛔⛔ THESE TWO WERE BORROWED FROM `S.HubBooksHome` AND THAT PAGE IS GONE (2026-08-23). This
+     section read `BH._money` / `BH._pct` and opened `if (!BH) return ''` — so deleting Close Books
+     would have emptied a whole Week in Review card with nothing in the console to say why. Found by
+     sweeping who READS the page rather than by reading the delete list, which is the sweep that
+     names what breaks ([[lessons-paid-for]] #111 — the same shape as `weeklyReadout` reading
+     `window.FIX` through the Fix retirement).
+     ⭐ RE-HOMED, NOT RE-IMPLEMENTED: both were one-line formatters over `App.fmtBal`, so they come
+     here verbatim and this section now depends on nothing outside itself. */
+  _money(v) { return (v == null || isNaN(v)) ? '-' : App.fmtBal(Number(v)); },
+  _pct(v)   { return (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%'; },
+
   _booksSection() {
-    const BH = S.HubBooksHome;
-    if (!BH) return '';
+    const BH = this;
     if (!((App.data && App.data.weeks) || []).length) return null;
 
     /* ⛔⛔⛔ THE FIGURES BELONG TO THE REVIEWED WEEK'S OWN MONTH, AND THEY USED TO BELONG TO JULY.
