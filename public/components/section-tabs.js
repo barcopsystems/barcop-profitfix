@@ -32,11 +32,16 @@ const SectionTabs = {
 
   on(module) { return !!this.ENABLED[module]; },
 
+  /* ⛔⛔ THIS WAS THE SECOND IMPLEMENTATION, AND IT MADE `ENABLED` A HALF-SWITCH (T33, fixed
+     2026-08-22). It hardcoded `module === 'inventory'`, so turning a second section on made
+     `on()` true while `groupsFor` returned [] and the bar hid itself — a SILENT no-op, which is
+     worse than a broken menu because nothing says so and the next reader blames the feature.
+     ⭐ `App.navHTMLFor` is the one resolver, the same table the mobile drawer reads. Adding a
+     section is now `ENABLED` alone, which is what that flag always looked like it meant.
+     ⚠ STILL GATED: `ENABLED` is unchanged, so this is inert today and Inventory is still the only
+     section with a bar. Removing the trap is not rolling anything out. */
   _srcFor(module) {
-    try {
-      if (module === 'inventory' && typeof Inventory !== 'undefined') return Inventory.navHTML();
-    } catch (e) { console.error('SectionTabs: nav source failed', e); }
-    return '';
+    return (typeof App !== 'undefined' && App.navHTMLFor) ? App.navHTMLFor(module) : '';
   },
 
   /* The same walk the mobile drawer does: `.nav-section` opens a group, `.nav-item` adds a row.
