@@ -26,7 +26,7 @@
   /* The card's header band, which is the ONLY thing that used to be --surface and must NOT follow
      it down — the whole point of the change is that the header becomes visible against the body. */
   --card-head: #161E24;
-  --input:     #0C1216;
+  --input:     #11171B;
   --panel:     #161E24;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
   /* ⭐⭐ THE DATA ROW FILL, AND NOW IT REALLY IS THE ONLY ONE (Kyle, 2026-08-14: *"every data row
      that uses this color i need it consolidated into one root color"*).
