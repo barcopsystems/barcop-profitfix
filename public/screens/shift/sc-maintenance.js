@@ -3,7 +3,7 @@
 /* ── Shift Control — Maintenance Log (writes sc_maintenance) ──────────────────
    A status tracker for equipment and facility issues: what broke, priority,
    status (Open → In Progress → Resolved), and NOTHING else. It holds no money and no resolution
-   date: a repair cost is entered once with the rest of the money out, on Close The Books. Open and urgent items
+   date: a repair cost is entered once with the rest of the money out, on Money Out. Open and urgent items
    feed the Hub alert strip so nothing gets lost between shifts. Same page shape
    as the other Shift logs: inline collapsible form on the landing, filter card
    with a status filter, bare list, the issue form again in a focused pop-up to
@@ -46,7 +46,7 @@ S.ShiftMaintenance = {
     App.showHelpModal('How the Maintenance Log Works', [
       { p: ['Equipment breaks and falls through the cracks between shifts. Log it here and it carries forward until someone fixes it. Anything marked Urgent shows up on your Hub under Needs Attention until it is Resolved, so the next manager sees it.'] },
       { h: 'Log an issue', p: ['Capture what broke, where, how urgent it is, and a short description. Assign it to a staff member or an outside vendor (an HVAC tech, a plumber), whoever is handling the fix.'] },
-      { h: 'Work it to closed', p: ['Move the status from Open to In Progress to Resolved as the repair happens. Mark it Resolved when it is fixed and it drops to the bottom of the list, so the open work stays up top. The status is the whole record of what broke and whether it is fixed. What a repair COST is entered once, with the rest of your money out, on Close Books.'] },
+      { h: 'Work it to closed', p: ['Move the status from Open to In Progress to Resolved as the repair happens. Mark it Resolved when it is fixed and it drops to the bottom of the list, so the open work stays up top. The status is the whole record of what broke and whether it is fixed. What a repair COST is entered once, with the rest of your money out, on Money Out.'] },
       { h: 'Filter and Export', p: ['Use the range chips or a custom date range to narrow the list to this week or this month. Open work always sorts to the top, urgent first, with resolved issues below. Export PDF saves the filtered list, and Worksheet prints a blank sheet to mark issues by hand during the shift.'] }
     ]);
   },
@@ -94,7 +94,7 @@ S.ShiftMaintenance = {
          place is the entire point of the rebuild. Kyle, looking at the result: *"that is the complete
          opposite of what i asked for."* He was right.
          This screen tracks WHAT BROKE and WHETHER IT IS FIXED. It SHOWS repair spend by reading the
-         one expense ledger. The money is entered once, with the rest of it, on Close The Books.
+         one expense ledger. The money is entered once, with the rest of it, on Money Out.
          ⚠ Kyle then took the Repair Cost STAT and COLUMN off this page too, and Date Resolved with
          them: a tracker shows what broke and whether it is fixed. The status is the whole record of
          that, and a second date to keep in step was one more thing to maintain for no answer. */
