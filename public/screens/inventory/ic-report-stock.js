@@ -2,9 +2,9 @@
 
 /* ── Inventory Control — Stock Report (reads ic_counts + ic_deliveries) ───────
    What you have and where your cash sits, from a chosen count: value by
-   category, by location, versus the prior count, ranked high/low, plus dead
-   stock (value on hand that did not move). Rankings by usage and consumption
-   live in the Usage Report.
+   category, by location, versus the prior count, ranked high/low. Rankings by
+   usage and consumption live in the Usage Report; product that did not move at
+   all lives in Trapped Cash, which is the one place that read is offered now.
 
    Tabbed shell mirrors Labor Tip History: a .ch-tabs switcher over a stats
    card, a Filter heading with Export, the controls-only filter card, then the
@@ -14,9 +14,19 @@
 S.InventoryStockReport = {
   tab: 'category',
   countId: null,
+  /* ⛔⛔ THE DEAD STOCK TAB WENT 2026-08-23 (Kyle: *"the dead stock tab gets taken out of the stock
+     report section so no duplicate"*). Trapped Cash moved into this same Reports group and the two
+     answered the identical question — measured previously as the SAME five products at $2,405.00 on
+     both sides. That duplication was invisible while they lived in different sections; putting them
+     one menu apart is what made it a thing an operator would see twice.
+     ⭐ ONE QUESTION, ONE ROW. Trapped Cash is the survivor because it ranks by the dollars you can
+     free and carries overstock as well, so it is the fuller read of the two.
+     ⚠ RETIRING A VIEW IS THREE GREPS ([[the-loop]] #61): the tab, the renderer it was the only
+     caller of (`tabDead`, deleted below), and the HELP TEXT that described it. The third is the one
+     nobody does, and a stale how-to is a defect in its own right. */
   TABS: [
     ['category', 'By Category'], ['location', 'By Location'], ['vsprior', 'vs Last Count'],
-    ['highest', 'Highest Value'], ['lowest', 'Lowest Value'], ['dead', 'Dead Stock']
+    ['highest', 'Highest Value'], ['lowest', 'Lowest Value']
   ],
 
   countsAsc() {
@@ -42,7 +52,7 @@ S.InventoryStockReport = {
   },
   // A count stores one item line PER product PER location. Roll them up to one
   // entry per product (summed value + on-hand) for the per-product views
-  // (Products tile, By Category, Highest/Lowest, Dead Stock); By Location keeps
+  // (Products tile, By Category, Highest/Lowest); By Location keeps
   // the raw per-line data so each location shows its own share.
   // The items of a count that were actually COUNTED. A skipped product stores counted:false with
   // total:0, meaning "I did not touch this shelf" — carrying it here made it a real $0 product in
@@ -109,7 +119,7 @@ S.InventoryStockReport = {
       { p: ['The Stock Report is a snapshot of what you are holding and what it is worth, taken from one of your counts. It answers one question: where is my cash sitting right now.'] },
       { h: 'Pick A Count', p: ['Use the arrows up top to step through your counts, or the Latest button to jump to your most recent. The whole page reflects that snapshot.'] },
       { h: 'Where Your Cash Sits', p: ['By Category and By Location show how your stock value splits up, so you see how much is tied up in liquor versus food, or in the walk-in versus the back bar. vs Last Count shows whether your stock value is creeping up, which usually means over-ordering.'] },
-      { h: 'Highest, Lowest, And Dead', p: ['Highest and Lowest Value rank the products holding the most and least cash on hand. Dead Stock is the one to watch: product you are holding value in that did not move at all this period. That is dead cash and spoilage risk, your cue to stop re-ordering it or cut it.'] }
+      { h: 'Highest And Lowest', p: ['Highest and Lowest Value rank the products holding the most and least cash on hand. For product that is not moving at all, open Trapped Cash: it ranks dead stock and overstock together by the dollars you can free.'] }
     ]);
   },
 
@@ -201,7 +211,6 @@ S.InventoryStockReport = {
       case 'vsprior':  return this.tabVsPrior(latest, prior);
       case 'highest':  return this.tabRank(this.itemsByProduct(items), true);
       case 'lowest':   return this.tabRank(this.itemsByProduct(items), false);
-      case 'dead':     return this.tabDead(latest, prior);
       default:         return this.tabGroup(this.itemsByProduct(items), it => it.category || 'Uncategorized', 'Category');
     }
   },
@@ -264,26 +273,11 @@ S.InventoryStockReport = {
     return this.dataCard(headers, body);
   },
 
-  tabDead(latest, prior) {
-    if (!prior) return this.note('Dead stock needs a prior count to measure movement. Pick a count that has one before it.');
-    const base = App.computeUsagePair(prior, latest, this.deliveries());
-    const items = this.itemsByProduct(this.countedItems(latest)).map(it => {
-      const p = this.productById(it.product_id) || {};
-      const b = base[it.product_id];
-      // Only products counted in BOTH periods have measurable usage; a product
-      // absent from the prior count can't be called dead, so leave it out.
-      const used = b ? Math.max(0, b.rawUsed) : null;
-      return { product: p, name: it.name, category: it.category, total: it.total, value: this.itemValue(it), used };
-    }).filter(x => x.value > 0 && x.used != null && x.used <= 0.001).sort((a, b) => b.value - a.value);
-    if (!items.length) return this.note('No dead stock. Everything you are holding value in moved this period.', 'var(--green)');
-    const total = items.reduce((s, x) => s + x.value, 0);
-    const deadLine = '<div class="card"><div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
-      + this.statItem('Dead Cash On Hand', App.fmtCurrency(total), 'warn') + '</div></div>';
-    const body = items.map(x => '<tr><td><div class="val">' + esc(x.name) + '</div>'
-      + '<div style="font-size:10px;color:var(--t3);">' + esc(x.category || '') + '</div></td>'
-      + '<td>' + this.qtyU(x.product, x.total) + '</td>'
-      + '<td>' + x.used.toFixed(1) + '</td>'
-      + '<td class="val" style="color:var(--red);">' + App.fmtCurrency(x.value) + '</td></tr>').join('');
-    return deadLine + this.dataCard('<th>Product</th><th>On Hand</th><th>Used</th><th>Tied-Up Value</th>', body);
-  }
+  /* ⛔ `tabDead` WAS DELETED WITH ITS TAB, 2026-08-23. The tab was its only caller, so leaving the
+     renderer behind would have made it unreachable code that reads as live to every grep — the
+     class `verify-no-retired-code` exists to catch and [[the-loop]] #105 says to handle in the SAME
+     edit as the retirement, not the next sweep.
+     ⭐ NOTHING WAS LOST WITH IT. Trapped Cash answers the same question off the same
+     `computeUsagePair` base, and it carries overstock as well, so the read survives in one place
+     rather than two. */
 };
