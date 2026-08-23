@@ -267,7 +267,7 @@ S.RevenueServerCheck = {
   //    always-on New form (rsc) and the Edit modal (rscm) never clash. ──────────
   formBody(f, targetCA, p, narrow) {
     const hasServers = this.staff().some(s => s.status !== 'Inactive' && App.isService && App.isService(s));
-    const serverOpts = App.staffOptions(f.server || '', { audience: 'service', placeholder: hasServers ? 'Select server...' : 'Add Bar or Front of House staff in Labor Control' });
+    const serverOpts = App.staffOptions(f.server || '', { audience: 'service', placeholder: hasServers ? 'Select server...' : 'Add Bar or Front of House staff under The Floor, in Setup' });
     /* ⚠⚠ EDITING AN IMPORTED CHECK SILENTLY REWROTE ITS SHIFT. `selected` was set only on an EXACT
        match and nothing preserved an off-list value — so a check imported carrying whatever the POS
        calls the daypart ("Happy Hour") rendered with NO option selected, the browser fell back to
