@@ -1803,7 +1803,10 @@ const App = {
       document.body.classList.remove('hub-dashboard');  // a sub-page is open → show the sidebar
       if (window.S && S.Hub && S.Hub.renderSidebar) S.Hub.renderSidebar(_sideCtx);
     }
-    this._renderProtoTopnav(this._globalOfAction(activeAction));  // highlight this page's rail row
+    /* ⚠ `activeAction` IS ALSO THE BAR'S MARK KEY. A hub page never sets `_currentScreenId`, so
+       without it the section links light whatever module screen was open last (see the note on
+       `_renderProtoTopnav`). It is the same key the hub sidebar's own row is marked with. */
+    this._renderProtoTopnav(this._globalOfAction(activeAction), activeAction);  // highlight this page's rail row
     const content = document.querySelector('.hub-app .content');
     if (!content) {
       this.openHubOverlay(renderFn);
@@ -3257,6 +3260,38 @@ const App = {
      ⭐ AND IT MATCHES THE MOBILE DRAWER EXACTLY, which was the tell that it is the right line:
      openMobileNav gives Hub / Map / Review leaf rows that navigate, and drills these same ten. */
   _RAIL_HUB_CTX: { audit: 'audit', books: 'books', settings: 'settings' },
+
+  /* ⭐⭐⭐ WHICH RAIL SECTION OWNS THIS SCREEN, WHEN THE ANSWER IS NOT THE MODULE IT LIVES IN.
+     ⛔⛔ THE DEFECT IT CLOSES (Kyle, 2026-08-23): *"profit, revenue, and cash links when clicked go
+     to the audit page.. but the top bar menu is gone and it defaults to their recovery sections...
+     these three audits no longer live in recovery they live in audits."* Measured on the deployed
+     build: the bar's Profit link landed `audit-tracker` correctly and left `_railCtx` on 'profit',
+     the rail marking Profit, `#sec-links` hidden, and the top bar's left side empty. Three of the
+     four audits threw the operator out of the section they were browsing, on arrival.
+     ⭐ THE CAUSE IS AN ORDER, NOT A TABLE. `_enter` runs `showApp(mod)` first and `showApp` draws
+     the top nav from `_activeModule` — at which point the destination is not known yet, so the bar
+     is drawn for the module and never redrawn for the page.
+     ⛔ SO THE FACT BELONGS TO THE SCREEN, NOT THE DOOR. These three ids are reached from several
+     places (`_enter`, `_enterRecovery` from the Hub's money tiles and the weekly readout, audit
+     action items, the rail overlay). A fact written by one of N doors is not written, so it is
+     resolved from the id at the one point every module navigation passes through.
+     ⛔⛔ DERIVED FROM THE NAV, NEVER HAND-TYPED. A screen belongs to a section when that section's
+     own nav names it, off the same `navHTMLFor` source the bar, the sidebar and the drawer already
+     read. A hand-kept list of "which screens are really audits" is the second copy that drifts.
+     ⚠ HUB SECTIONS ONLY, AND THAT BOUND IS THE POINT. A MODULE section's screens live in that
+     module, so `_activeModule` already answers correctly for them and this must stay inert — the
+     Audits section is the one whose pages come from three OTHER modules. Pinned as `verify-section-
+     tabs` I7 with `ic-take-inventory` as the control. */
+  _railSectionForScreen(id) {
+    if (!id || typeof SectionTabs === 'undefined') return '';
+    const en = SectionTabs.ENABLED || {};
+    for (const k in en) {
+      if (!en[k] || !this._RAIL_HUB_CTX[k]) continue;
+      const gs = SectionTabs.groupsFor(k);
+      for (let i = 0; i < gs.length; i++) if (gs[i].rows.some(r => r.screen === id)) return k;
+    }
+    return '';
+  },
   _railHasMenu(k) {
     // ⛔ MEMBERSHIP, NOT "HAS A LANDING SCREEN" — see the note on `_SECTION_DASH`. Reading that map
     // here meant a section lost its whole menu the moment its landing screen was retired.
@@ -3312,7 +3347,14 @@ const App = {
       + '<span class="rail-label">' + esc(label) + '</span></div>';
   },
 
-  _renderProtoTopnav(context) {
+  /* ⛔⛔ `markKey` IS WHICH BAR LINK TO LIGHT, AND A HUB PAGE HAS TO BE ABLE TO NAME ITSELF
+     (2026-08-23). This passed `_currentScreenId` and nothing else. That field is set by `navigate`,
+     so ONLY a module screen ever writes it — on the Operations audit it holds whichever module
+     audit was open last. MEASURED live: land on Operations first and no link is marked at all;
+     open Profit, come back to Operations, and **Profit stays marked while Operations is on
+     screen.** `groupsFor` already keys a screen-less row on its hub ACTION, so one argument
+     addresses both kinds of destination and the caller passes whichever it owns. */
+  _renderProtoTopnav(context, markKey) {
     /* Remembered because `_markRailOpen` has to know what the mark reverts TO when a menu closes
        without navigating. Every caller already passes the right value; this just keeps it. */
     this._railCtx = context;
@@ -3322,7 +3364,7 @@ const App = {
        and never reaches it — so the Inventory links stayed on the bar over Books. This runs on
        EVERY shell render, hub pages included, and `context` is the rail's own idea of where the
        operator is, which is the only thing that knows about both kinds of page. */
-    try { if (typeof SectionTabs !== 'undefined') SectionTabs.render(context, this._currentScreenId); }
+    try { if (typeof SectionTabs !== 'undefined') SectionTabs.render(context, markKey || this._currentScreenId); }
     catch (e) { console.error('section links render failed', e); }
     const rail = document.getElementById('rail-nav');
     if (rail) {
@@ -3996,8 +4038,22 @@ const App = {
        land here without touching the bar.
        ⚠ `_railCtx`, not `_activeModule`: the rail's context is the one field that knows about hub
        pages too, and keying on the module is what let the Inventory links survive onto Books. */
-    try { if (typeof SectionTabs !== 'undefined') SectionTabs.render(this._railCtx, id); }
-    catch (e) { console.error('section links render failed', e); }
+    /* ⛔⛔⛔ AND THIS IS THE FIRST POINT THE DESTINATION IS KNOWN, WHICH IS WHY THE FIX LIVES HERE
+       (Kyle, 2026-08-23: the three module audits *"no longer live in recovery they live in
+       audits"*). `_enter` runs `showApp(mod)` BEFORE `navigate`, so by the time we get here the
+       rail has already been drawn for the module — with the Audits bar hidden and the Profit row
+       lit. Asking the screen which section owns it, here, fixes every door onto those three ids at
+       once instead of the one Kyle happened to press.
+       ⚠ SILENT FOR EVERY OTHER SCREEN. `_railSectionForScreen` answers only for hub sections that
+       are switched on, so an Inventory or Labor screen returns '' and this stays exactly as it was
+       ([[the-loop]] #88 — walk the control, the input that must change nothing). */
+    try {
+      if (typeof SectionTabs !== 'undefined') {
+        const sec = this._railSectionForScreen(id);
+        if (sec && sec !== this._railCtx) this._renderProtoTopnav(sec, id);
+        else SectionTabs.render(this._railCtx, id);
+      }
+    } catch (e) { console.error('section links render failed', e); }
   },
 
   showAuth() {

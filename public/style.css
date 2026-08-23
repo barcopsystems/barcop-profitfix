@@ -2366,6 +2366,17 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 .st-link{background:none;border:0;padding:4px 9px;font-family:inherit;font-size:13px;font-weight:600;
   line-height:1;color:var(--t2);cursor:default;white-space:nowrap;transition:color .12s;}
 .st-link:hover{color:var(--w);}
+/* ⛔⛔ A LINK THAT NAVIGATES SHOWS THE HAND (Kyle, 2026-08-23: *"the 4 audit links in top bar need
+   the pointer hand on mouseover.. not the pointer.. these are links not drop down menus"*). The rule
+   above was written when every link opened a menu, so it gave the arrow to all of them, and the four
+   Audits links are destinations.
+   ⭐ THE DISCRIMINATOR IS ALREADY IN THE MARKUP: `_renderLinks` stamps `data-solo` on exactly the
+   links that navigate, so this states the rule structurally and any future solo link in any section
+   is covered the day it ships — no per-section class and no JS change.
+   ⛔ THE ARROW STAYS ON A GROUP LINK, deliberately. It opens a menu and does not move you, which is
+   the same line Kyle draws in the sentence above. Inventory has no solo group, so nothing there
+   moves (measured: all six of its groups hold 2 or more rows). */
+.st-link[data-solo]{cursor:pointer;}
 /* Active is WHITE, not gold (Kyle, walking it). Gold is left to the icons. */
 .st-link.st-on{color:var(--w);}
 
