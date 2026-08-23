@@ -122,7 +122,7 @@ S.CashRecon = {
         title: 'Over and Short',
         lead: 'Your drawer counts and cash drops flow here from Shift Control. Once a few shifts are reconciled, this shows which cashier and which register keep coming up short. Set up a register and run a shift to start the picture.',
         steps: [
-          { title: 'Set up a register', desc: 'Add your registers in Shift Control so drawers can be counted.', btn: 'Set Up Registers', screen: 'sc-drawers', done: false },
+          { title: 'Set up a register', desc: 'Add your registers under The Floor, in Setup, so drawers can be counted.', btn: 'Set Up Registers', screen: 'sc-drawers', done: false },
           { title: 'Reconcile your drawers', desc: 'Count drawers and log over/short in Cash Control. Those land here.', btn: 'Go to Cash Control', screen: 'sc-cash-control', done: false }
         ]
       });
