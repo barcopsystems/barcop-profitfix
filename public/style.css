@@ -91,10 +91,10 @@
 
   --w:         #ffffff;
   --t1:        rgba(200,216,232,0.94);
-  --t2:        rgba(200,216,232,0.66);
-  --t3:        rgba(255,255,255,0.45);
-  --t4:        rgba(255,255,255,0.25);
-  --b1:        rgba(255,255,255,0.15);
+  --t2:        rgba(200,216,232,0.76);
+  --t3:        rgba(255,255,255,0.55);
+  --t4:        rgba(255,255,255,0.35);
+  --b1:        rgba(255,255,255,0.25);
   --b2:        #202C36;                /* Divider/separator lines — same as the card border (--b-edge). */
   --track:     rgba(255,255,255,0.06); /* The old --b2: faint fill behind progress bars / pips (NOT a divider). */
   --b-edge:    #202C36;                /* Card / outer + chrome border color (border only; --c3 backgrounds stay #111E26) */
