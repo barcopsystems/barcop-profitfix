@@ -1,108 +1,129 @@
 'use strict';
 
 /* ── THE WEEK ─────────────────────────────────────────────────────────────────
-   One page, three tabs: Close The Week, Week in Review, Week History. Kyle,
-   2026-08-23: *"turning week close, review and history into one tabbed page...
-   the rail menu will become one link 'the week' and land on the 1st tab that is
-   close the week, then week in review and then week history."*
+   THREE PAGES — Close The Week, Week in Review, Week History — reached from the
+   section's three top-bar links and from nothing else on the page. Kyle,
+   2026-08-23: *"make a top bar nav.. Close, Review, History.. no drop downs on
+   these.. but get rid of the tabs and have each link go to the specific page..
+   again no more tabs on the pages.. only navigate from the top bar links."*
 
-   ⛔⛔ THE THREE WERE NOT THE SAME KIND OF PAGE, and that is the whole difficulty.
-   `week-close` and `week-review` went through `App.openHubFullPage` (the hub
-   shell); `week-history` was a MODULE screen in `_CONVERTED`, rendering into
-   `#content-area`. A tabbed page needs ONE host, so History changes shells. The
-   hub full-page is the host because two of the three already used it, it gives a
-   titled full-width mount, and it is what Books and Audits use.
+   ⚠ IT WAS ONE TABBED PAGE FOR A DAY, and the host is what survives that. The
+   tab strip is gone; `open(which)` still resolves any of the four week ids and
+   mounts that page, which is the whole reason this file exists.
 
-   ⭐⭐ THE THREE OLD IDS STAY ALIVE AS TAB TARGETS, AND THAT IS WHAT MAKES THIS
+   ⛔⛔ THE THREE ARE NOT THE SAME KIND OF PAGE, and that is the difficulty this
+   host absorbs. `week-close` and `week-review` went through `App.openHubFullPage`
+   (the hub shell); `week-history` was a MODULE screen in `_CONVERTED`, rendering
+   into `#content-area`. One host means History uses the hub shell, which is what
+   Books and Audits use and what two of the three already used.
+
+   ⭐⭐ EVERY OLD ID STAYS ALIVE AS A PAGE TARGET, AND THAT IS WHAT MAKES THIS
    SAFE. Measured before a line was written: `week-close` has 34 inbound
    references across 15 files, `week-review` 12 across 5, `week-history` 26
    across 7, plus SIXTY-FOUR harness files. Re-pointing 72 call sites is how a
    change like this ships three dead links; instead `openScreen('week-close')`
-   and friends open THIS page on the right tab, so every existing link keeps
-   working and lands where it always did.
+   and friends open the page they always did.
 
-   ⛔ THIS FILE OWNS NO WEEK LOGIC. Each tab mounts the SHIPPED screen object
+   ⛔ THIS FILE OWNS NO WEEK LOGIC. Each page mounts the SHIPPED screen object
    into the panel — `S.WeekClose`, `S.WeekReview`, `S.WeekHistory` render
    themselves exactly as before. A second implementation of any of them is the
    drift the suite exists to catch; this is a host, nothing more.
 
    ⚠ ONE GATE, because db.js files all three under the same area (`'week'`). It
-   is asked in `open()` rather than per tab for that reason — and it is asked at
+   is asked in `open()` rather than per page for that reason — and it is asked at
    all because `week-close` shipped with NO access gate until 2026-08-12.        */
 
 S.Week = {
 
   /* ⭐ THE ORDER IS THE ASK: close, then review, then history. The rail row lands
-     on the first one. Keys are short; the LABELS are what the operator reads. */
-  TABS: [['close', 'Close The Week'], ['review', 'Week in Review'], ['history', 'Week History']],
+     on the first one. Keys are short; the LABELS are what the operator reads.
+     ⚠ TWO LABELS PER PAGE, AND THEY ARE DIFFERENT ON PURPOSE (Kyle, 2026-08-23:
+     *"make a top bar nav.. Close, Review, History"*). The short word is the
+     top-bar link; the long one is the page's own name, used for the hub page
+     title and the back-link breadcrumb. Both come from here so they cannot
+     drift, and adding a fourth page still changes only this table + LEGACY. */
+  PAGES: [['close', 'Close The Week', 'Close'], ['review', 'Week in Review', 'Review'], ['history', 'Week History', 'History']],
 
-  tab: 'close',
+  page: 'close',
   container: null,
 
-  /* Which legacy screen id each tab answers to. Used by the routing in app.js so
-     the old ids resolve here, and by `_stamp` so the "you visited this" marks the
+  /* Which screen id each page answers to. Used by the routing in app.js so
+     every id resolves here, and by `_stamp` so the "you visited this" marks the
      Fix steps read keep working — those are keyed on the OLD ids and a step that
      cannot be ticked is the defect [[lessons-paid-for]] #39 describes. */
   LEGACY: { close: 'week-close', review: 'week-review', history: 'week-history' },
 
-  /* ⭐⭐ ONE MAP, AND IT LIVES HERE. `open` takes EITHER a tab key (`'close'`) or one of the legacy
+  /* ⭐⭐ ONE MAP, AND IT LIVES HERE. `open` takes EITHER a page key (`'close'`) or one of the
      screen ids (`'week-close'`) and resolves it itself, so `_protoGlobalClick` can hand it whatever
      id it was given and stays a one-liner.
-     ⛔ THE FIRST VERSION PUT AN id→tab MAP IN `app.js` AS WELL, which is one fact written twice —
+     ⛔ THE FIRST VERSION PUT AN id→page MAP IN `app.js` AS WELL, which is one fact written twice —
      exactly the drift this suite exists to catch. The pin caught it: it went looking for a spelling
      the code did not have, and the honest fix was to delete the second map rather than teach the
-     assertion about it. Add a fourth tab and only `TABS` + `LEGACY` change. */
+     assertion about it. Add a fourth page and only `PAGES` + `LEGACY` change. */
   _resolve(which) {
-    if (!which) return this.tab;
-    if (this.LEGACY[which]) return which;                                   // already a tab key
+    if (!which) return this.page;
+    if (this.LEGACY[which]) return which;                                   // already a page key
     const hit = Object.keys(this.LEGACY).find(k => this.LEGACY[k] === which);
-    return hit || this.tab;                                                 // 'week' and anything unknown land where we are
+    return hit || this.page;                                                // 'week' and anything unknown land where we are
   },
 
+  /* ⭐⭐⭐ THE SECTION'S THREE LINKS, DERIVED FROM `PAGES` AND NOTHING ELSE. `App.navHTMLFor('week')`
+     hands this to `SectionTabs`, which makes one top-bar link per GROUP — so three groups of one
+     row each gives three links, and a group holding a single destination renders as a link that
+     NAVIGATES rather than one that opens a menu. That is exactly what Kyle asked for
+     (2026-08-23: *"Close, Review, History.. no drop downs on these.. but get rid of the tabs and
+     have each link go to the specific page"*), and it is the same shape the four Audits links use.
+     ⭐ THE ICONS COME OFF THE RAIL'S OWN VOCABULARY (`App._RAIL_IC` → `App._NAV_SECTION_IC`), so the
+     bar and the rail cannot show two different marks for the same page. A second set of SVGs here
+     is exactly the drift the one-nav-source rule exists to stop.
+     ⚠ THE ROWS CARRY `data-hub-action`, NOT `data-screen`: all three are hub full-pages, and
+     `SectionTabs._goRow` routes an action through `S.Hub.routeSidebarAction`, which already knows
+     these ids. `groupsFor` keys a screen-less row on its action, so the active mark works too.
+     ⚠ MOBILE IS UNTOUCHED, MEASURED NOT ASSUMED: the drawer's `railRow('week')` falls to its LEAF
+     branch and never asks for this markup, because 'week' is neither `_isSection` nor one of the
+     three hub-sidebar keys. The phone still shows one row that opens Close. */
+  navHTML() {
+    const IC = (typeof App !== 'undefined' && App._NAV_SECTION_IC) || {};
+    const ICKEY = { close: 'dash', review: 'review', history: 'history' };
+    return this.PAGES.map(([k, , link]) => {
+      const id = this.LEGACY[k];
+      return '<div class="nav-section">' + esc(link) + '</div>'
+        + '<div class="nav-item" data-hub-action="' + esc(id) + '" id="nav-' + esc(id) + '">'
+        + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + (IC[ICKEY[k]] || '') + '</svg>'
+        + '<span class="nav-label">' + esc(link) + '</span></div>';
+    }).join('');
+  },
+
+  /* ⭐ THE PAGE'S OWN NAME AND ITS OWN ACTION GO TO THE HOST. Both were the constant `'The Week'` /
+     `'week'` while this was one tabbed page, which was right then and is wrong now: the action is
+     what `_renderProtoTopnav` marks the bar link with, so a constant would leave the same link lit
+     whichever page you opened. `_GLOBAL_OF_ACTION` already maps all three ids to 'week', so the
+     rail still marks The Week, and `_HUB_SIDEBAR_OF_ACTION` already has all three at 'none', so
+     they stay full width with no hub sidebar. */
   open(which) {
     if (App._hubBlocked && App._hubBlocked('week-close')) return;
-    this.tab = this._resolve(which);
-    App.openHubFullPage('The Week', (mount) => { this.container = mount; this.render(mount); }, 'week');
+    this.page = this._resolve(which);
+    const row = this.PAGES.find(t => t[0] === this.page) || this.PAGES[0];
+    App.openHubFullPage(row[1], (mount) => { this.container = mount; this.render(mount); }, this.LEGACY[this.page]);
   },
 
+  /* ⛔⛔⛔ NO TAB BAR. Kyle, 2026-08-23: *"get rid of the tabs and have each link go to the specific
+     page.. again no more tabs on the pages.. only navigate from the top bar links."* The three
+     pages are reached from the section's three top-bar links and from nothing else on the page.
+     ⭐ NOTHING REPLACES IT. Measured on the deployed build before cutting: every other page in a
+     barred section opens straight into its own content, and the top bar shows the section ICON
+     rather than a page name. The page is named by the marked link. */
   render(mount) {
     if (!mount) return;
-    mount.innerHTML = '<div class="screen">' + this.tabBar() + '<div id="wk-panel"></div></div>';
-    this._wire(mount);
+    mount.innerHTML = '<div class="screen"><div id="wk-panel"></div></div>';
     this._mountPanel();
-  },
-
-  /* The app's own tab strip (`ic-report-usage`, Tip History). NOT a second one:
-     `.ch-tabs`/`.ch-tab`/`.on` are already styled in style.css and this is the
-     look Kyle pointed at. */
-  tabBar() {
-    return '<div class="ch-tabs no-print">'
-      + this.TABS.map(([k, label]) =>
-          '<button class="ch-tab' + (this.tab === k ? ' on' : '') + '" data-tab="' + esc(k) + '">'
-          + esc(label) + '</button>').join('')
-      + '</div>';
-  },
-
-  /* ⛔ ASSIGNED, NOT ADDED. `render` runs on every tab switch, so `addEventListener`
-     would stack a handler per switch and one click would fire N times. The panel's
-     own screen sets its handler on `#wk-panel`, which is INSIDE this mount, so a
-     row click bubbles up here and is ignored by the `.ch-tab` test. */
-  _wire(mount) {
-    mount.onclick = (ev) => {
-      const t = ev.target.closest && ev.target.closest('.ch-tab');
-      if (!t) return;
-      const k = t.getAttribute('data-tab');
-      if (!k || k === this.tab) return;      // re-rendering the tab you are on throws away its state
-      this.tab = k;
-      this.render(this.container);
-    };
   },
 
   _panel() { return document.getElementById('wk-panel'); },
 
   /* ⚠ EACH SCREEN IS HANDED THE PANEL AS ITS OWN CONTAINER, so its internal
      re-renders (an import landing, a week stepper) replace the PANEL's markup and
-     leave the tab strip alone. That is why the strip is a sibling of the panel
+     leave the panel alone. That is why the panel is its own node inside the mount
      rather than part of what the screens draw into. */
   _mountPanel() {
     const p = this._panel();
@@ -114,32 +135,32 @@ S.Week = {
        design change.
        ⭐ THE REAL QUESTION IS WHAT A CATCH WOULD HIDE ([[the-loop]] #90 inverted). These three
        screens already throw uncaught when opened standalone, and an uncaught throw is what reaches
-       the error digest; swallowing it here would make a broken tab QUIETER than the same broken
+       the error digest; swallowing it here would make a broken page QUIETER than the same broken
        page is today. The app's own convention for a failed sub-render is `console.error` and
        nothing on screen (`app.js` section links, twice). Matching the status quo beats inventing. */
-      if (this.tab === 'close' && S.WeekClose) {
+      if (this.page === 'close' && S.WeekClose) {
         /* `_prepare()` is Close's own landing rule — open the first row still
            owed. It lives in that file, lifted out of its `open()` so this host
            can ask for it without going back through `openHubFullPage`. */
         if (S.WeekClose._prepare) S.WeekClose._prepare();
         S.WeekClose.container = p;
         S.WeekClose.render(p);
-      } else if (this.tab === 'review' && S.WeekReview) {
+      } else if (this.page === 'review' && S.WeekReview) {
         S.WeekReview.container = p;
         S.WeekReview.render(p);
-      } else if (this.tab === 'history' && S.WeekHistory) {
+      } else if (this.page === 'history' && S.WeekHistory) {
         // Module-screen signature: (container, actions). There is no actions bar here.
         S.WeekHistory.render(p, null);
       }
   },
 
-  /* The one info "i" answers for whichever tab is open, so the directions match
+  /* The one info "i" answers for whichever PAGE is open, so the directions match
      what is on screen rather than the page's name ([[help-model]]). */
   showHowTo() {
-    const o = this.tab === 'review' ? S.WeekReview : this.tab === 'history' ? S.WeekHistory : S.WeekClose;
+    const o = this.page === 'review' ? S.WeekReview : this.page === 'history' ? S.WeekHistory : S.WeekClose;
     if (o && o.showHowTo) return o.showHowTo();
     if (App.showHelpModal) App.showHelpModal('How The Week Works', [
-      { p: ['Close the week, review what it was, and look back at every week you have confirmed. Three tabs, one record.'] }
+      { p: ['Close the week, review what it was, and look back at every week you have confirmed. Three pages, one record.'] }
     ]);
   }
 };
