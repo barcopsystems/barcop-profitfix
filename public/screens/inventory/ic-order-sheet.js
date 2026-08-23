@@ -880,12 +880,41 @@ S.InventoryOrderSheet = {
      SUGGESTED card's action row instead, and a recalc of the empty panel disabled a real
      Create Order sitting on 36 below-par lines. Measured on the live build, not reasoned.
      Two cards can carry the same vendor; only one of them owns each button. */
+  /* ⛔⛔⛔ AND IT NOW ACTUALLY DOES START FROM THE CARD, WHICH IS WHAT THE LINE ABOVE HAS ALWAYS
+     CLAIMED (Kyle, 2026-08-23: *"on inventory ordering .. edit order .. i am getting this screen"* —
+     the generic error card, reproduced live and confirmed by the error digest as
+     *"Cannot read properties of undefined (reading 'querySelector') [ic-order-history]"*).
+     ⛔ THE CAUSE IS A BORROWED MEMBER MEETING AN ASSUMPTION THAT WAS SAFE AT ITS OLD REACH.
+     `ic-order-history` renders the edit card itself and drives it with FIVE members lifted off this
+     screen — `editVendorCardHTML`, `addBlankLine`, `onLineProductChange`, `recalcVendor` and
+     `saveOrderEdit`. `recalcVendor` ends by asking for the card's primary button, and both branches
+     here went through `this.container`, which is set by THIS screen's `render()` and by nothing
+     else. Open Order History without having opened the Order Sheet first and it is `undefined`, so
+     pressing Edit Order threw and the whole screen fell to the error boundary
+     ([[lessons-paid-for]] #58 — widening a mechanism's reach invalidates what was safe at its old
+     reach; the diff that does it adds CALL SITES rather than logic, which reads as low risk).
+     ⭐ MEASURED, NOT ASSUMED, IN BOTH DIRECTIONS. The transitive closure of those five members is 26
+     methods and EXACTLY TWO read `this.container` — `_goButtonFor` and the `_createRow` it calls —
+     so the fault is contained to this one path and the other four borrowed members are safe. And the
+     action row is the card's IMMEDIATE NEXT SIBLING in both shapes, measured on the live build for
+     every card on the page, not read off the builder.
+     ⭐⭐ RESOLVING FROM THE SIBLING IS ALSO STRICTLY MORE CORRECT THAN THE VENDOR LOOKUP IT REPLACES.
+     The note above warns that two cards can carry the same vendor because `onCustomVendorChange`
+     writes the picked vendor into the custom panel's `data-vendor`; a name lookup had to work around
+     that, and a sibling cannot collide by construction. The class is still checked, so an EDIT
+     card — whose next sibling is not an action row at all — correctly finds nothing and is left
+     alone, which is the behaviour the comment below already describes.
+     ⚠ `_createRow` KEEPS ITS `this.container`, deliberately: its other two callers are `createOrder`
+     and `updateOrder`, which only ever run on this screen with the container set, and making a
+     helper that is REQUIRED for correctness fail soft would turn a loud break into a silent wrong
+     answer ([[the-loop]] #40). */
   _goButtonFor(card) {
+    const row = card && card.nextElementSibling;
+    if (!row || !row.classList) return null;
     if (card.classList && card.classList.contains('os-custom')) {
-      return this.container.querySelector('.os-co-actions .os-co-create');
+      return row.classList.contains('os-co-actions') ? row.querySelector('.os-co-create') : null;
     }
-    const row = (card.dataset && card.dataset.vendor) ? this._createRow(card.dataset.vendor) : null;
-    return row ? row.querySelector('.os-create') : null;
+    return row.classList.contains('os-create-row') ? row.querySelector('.os-create') : null;
   },
 
   recalcVendor(card) {
