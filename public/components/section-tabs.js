@@ -40,7 +40,7 @@ const SectionTabs = {
      and Revenue navs in the same edit. That is why this one also moved their PERMISSION areas
      (`DB.SCREEN_GROUPS`) and deliberately did not move their MODULE — `navigate` still renders all
      six from the branch they always lived in. */
-  ENABLED: { inventory: true, audit: true, week: true, events: true, books: true, floor: true },
+  ENABLED: { inventory: true, audit: true, week: true, events: true, books: true, floor: true, menus: true },
 
   /* Support is one row repeated in all seven section sidebars. It is not a group anybody browses,
      and Kyle is folding the FAQs into one global page, so it is kept out of the bar entirely. */
