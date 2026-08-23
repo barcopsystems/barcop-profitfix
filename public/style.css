@@ -15,7 +15,7 @@
      MEASURED live across the Hub, Week in Review, Workflow, Books, Order Sheet and Menu
      Engineering: outer 1320, inner 1264, left edge 164 on all six. */
   --page-w:    1320px;
-  --bg:        #11171B;
+  --bg:        #0F1417;
   /* ⛔⛔ CARD FILL = PAGE FILL (2026-08-08, Kyle's call, reversible by one value).
      It was #08131A against a #070E15 page — a difference of 1, 5, 5, which is barely a fill at all.
      The card is defined by its BORDER and its header band now, and the tone it used to spend on the
