@@ -53,7 +53,7 @@
      different jobs — a stat box, a data row and a panel can still be moved apart at any time, which
      is exactly what having three of them buys. Do not "tidy" them into one. */
   --stat:      #202C36;
-  --c3:        #111E26;                /* 3rd navy: menu borders/accents + secondary (icon) button backgrounds in the chrome */
+  --c3:        #283642;                /* 3rd navy: menu borders/accents + secondary (icon) button backgrounds in the chrome */
   --c4:        #283642;                /* 4th navy: accent splash — active section pills, active sidebar row, icon-button hover */
   --hover:     rgba(255,255,255,0.02);
   --nav-act:   #162C3C;
