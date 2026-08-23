@@ -13,7 +13,7 @@
 
    Replaces the equivalent Outlook plumbing that used to live inside the
    killed audit-diff.js Compare Other Audits modal. All four audits (Profit,
-   Revenue, Cash, Bar Cop Audit) call AuditOutlook.attach() from inside
+   Revenue, Cash, Operations Audit) call AuditOutlook.attach() from inside
    their audit detail header card. */
 
 window.AuditOutlook = {

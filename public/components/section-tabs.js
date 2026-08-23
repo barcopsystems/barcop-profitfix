@@ -24,7 +24,10 @@
 
 const SectionTabs = {
 
-  ENABLED: { inventory: true },
+  /* ⭐ AUDITS JOINED 2026-08-22 (Kyle: *"the rail Audits goes to a top bar menu like inventory does
+     with 4 links"*). ONE LINE, because T33 removed the hardcoded `module === 'inventory'` from
+     `_srcFor` — before that, adding a key here made `on()` true while the bar hid itself. */
+  ENABLED: { inventory: true, audit: true },
 
   /* Support is one row repeated in all seven section sidebars. It is not a group anybody browses,
      and Kyle is folding the FAQs into one global page, so it is kept out of the bar entirely. */
@@ -60,13 +63,40 @@ const SectionTabs = {
         out.push(cur);
       } else if (el.classList.contains('nav-item')) {
         const screen = el.getAttribute('data-screen');
-        if (!screen) return;
+        /* ⛔⛔ A ROW IS A DESTINATION IF IT CAN BE ROUTED, NOT ONLY IF IT NAMES A SCREEN.
+           This read "no data-screen means it is an action (Report a Bug), not a destination" —
+           true of every row it had ever seen, because Inventory's rows are all module screens. The
+           Operations audit is a HUB page: it opens through `data-hub-action="bar-cop-audit"` and
+           carries no screen id, so the old rule dropped the very page the Audits bar exists for.
+           ⭐ MEASURED WHAT WIDENING ADMITS before doing it ([[lessons-paid-for]] #58 — widening a
+           mechanism's reach invalidates the assumptions that were safe at its old reach): SEVEN
+           rows across three sections, and every one opens a page. The modal-only actions (Report a
+           Bug, Contact Support, Help and FAQ) all sit in the Support group, which is dropped
+           wholesale by `ASIDE_GROUP` and never reaches the bar at all.
+           ⚠ SIX OF THE SEVEN ARE IN BOOKS AND SETTINGS, which are not switched on, so this is inert
+           for them until Kyle walks those sections. Today it admits exactly one row: the Operations
+           audit. */
+        const hubAction = el.getAttribute('data-hub-action') || '';
+        if (!screen && !hubAction) return;
         const lab = el.querySelector('.nav-label');
         const ic = el.querySelector('.nav-icon');
         if (!cur) { cur = { name: '', rows: [] }; out.push(cur); }
         // The icon rides along for the DROP-DOWN rows only; the top-bar links are text alone.
         cur.rows.push({
-          screen: screen,
+          /* ⛔⛔ THE DOOR TRAVELS WITH THE ROW (2026-08-22). A screen id alone was enough while the
+             only section was Inventory, where every row is a module screen in the ACTIVE module and
+             `navigate` reaches it. The Audits section is not that: `hub-bar-cop-audit` is a HUB page
+             opened by `S.HubBarCopAudit.open()`, and the other three are module screens in THREE
+             DIFFERENT modules. Handing any of them to `navigate` lands nowhere
+             ([[lessons-paid-for]] #146 — `navigate` is module-internal, and the wrong door shipped
+             three dead links last time; #24 — a hub page is not a module screen). */
+          hubAction: hubAction,
+          mod: el.getAttribute('data-mod') || '',
+          /* ⚠ A SCREEN-LESS ROW STILL NEEDS AN IDENTITY. `tabOf` and the active mark compare
+             `r.screen` against the current screen id, so a row routed by action falls back to its
+             action as its key. That keeps one field doing one job instead of every reader learning
+             about two. */
+          screen: screen || hubAction,
           label: lab ? (lab.textContent || '').trim() : screen,
           icon: ic ? ic.outerHTML : ''
         });
@@ -126,6 +156,9 @@ const SectionTabs = {
 
   render(module, screen) {
     this._screen = screen;
+    /* The context this bar was drawn for. `_wire`'s handlers run long after `render` returns and
+       cannot re-derive it — see the note in `_wire` on why `_activeModule` is the wrong source. */
+    this._ctx = module;
     this._renderLinks(module, screen);
   },
 
@@ -146,6 +179,14 @@ const SectionTabs = {
       t.className = 'st-link' + (i === active ? ' st-on' : '');
       t.textContent = g.name || 'More';
       t.setAttribute('data-tab', String(i));
+      /* ⭐⭐ A GROUP WITH ONE DESTINATION IS A LINK, NOT A MENU (Kyle, 2026-08-22: four audit links
+         "each going to the corresponding audit landing page"). A drop-down holding a single row is
+         theatre: it makes the operator press twice to reach the only thing behind it.
+         ⚠ THIS DOES NOT BEND THE "CLICK NEVER NAVIGATES" RULE, IT RESPECTS ITS REASON. Kyle wrote
+         that rule because *"a link that both opened a menu and moved you was two jobs on one
+         control"*. A solo link opens no menu, so there is only ever one job. Inventory is unchanged:
+         every one of its groups holds several screens, so every one of its links still opens. */
+      if (g.rows.length === 1) t.setAttribute('data-solo', g.rows[0].screen);
       h.appendChild(t);
     });
 
@@ -180,6 +221,8 @@ const SectionTabs = {
       row.type = 'button';
       row.className = 'st-row' + (r.screen === this._screen ? ' st-row-on' : '');
       row.setAttribute('data-screen', r.screen);
+      if (r.hubAction) row.setAttribute('data-hub-action', r.hubAction);
+      if (r.mod) row.setAttribute('data-mod', r.mod);
       if (r.icon) {
         const ic = document.createElement('span');
         ic.className = 'st-ic';
@@ -193,7 +236,7 @@ const SectionTabs = {
     });
     d.addEventListener('click', (e) => {
       const row = e.target.closest && e.target.closest('.st-row');
-      if (row) this._go(row.getAttribute('data-screen'));
+      if (row) this._goRow(row);
     });
     d.addEventListener('mouseenter', () => this._cancelClose());
     d.addEventListener('mouseleave', (e) => { if (!this._inMenu(e.relatedTarget)) this._scheduleClose(); });
@@ -206,11 +249,36 @@ const SectionTabs = {
     this._drop = d;
   },
 
-  _go(screen) {
+  /* ⛔⛔⛔ ROUTE BY THE ROW'S OWN DOOR. `_go` used to hand every screen id to `App.navigate`, which
+     is MODULE-INTERNAL: it branches on `_activeModule` and only consults a module's map once that
+     module is active. Fine while Inventory was the only section, where every row is a screen in the
+     module you are already in. Not fine for Audits, whose four rows are one HUB page and three
+     module screens in three DIFFERENT modules ([[lessons-paid-for]] #146/#24).
+     ⭐ AND IT DELEGATES RATHER THAN RE-IMPLEMENTING. `S.Hub.routeSidebarAction` already knows how
+     to route a sidebar row and says so in its own comment: *"One implementation, so a new action
+     reaches both surfaces the day it is added rather than the day somebody remembers the second
+     copy."* A third copy of that table here is exactly the drift the suite exists to catch.
+     ⚠ INVENTORY'S PATH IS BYTE-IDENTICAL. Its rows carry no `data-hub-action`, so they still take
+     `App.navigate(screen)` — the settled, walked behaviour. Only a row that HAS a door uses it. */
+  _goRow(row) {
+    if (!row) return;
+    const action = row.getAttribute('data-hub-action') || '';
+    const screen = row.getAttribute('data-screen') || '';
     this.close();
-    if (typeof App === 'undefined' || !screen) return;
-    App.navigate(screen);
+    if (typeof App === 'undefined') return;
+    if (action && typeof S !== 'undefined' && S.Hub && S.Hub.routeSidebarAction) {
+      const el = document.createElement('div');
+      el.className = 'nav-item';
+      el.setAttribute('data-hub-action', action);
+      if (screen) el.setAttribute('data-screen', screen);
+      const mod = row.getAttribute('data-mod');
+      if (mod) el.setAttribute('data-mod', mod);
+      S.Hub.routeSidebarAction(el);
+      return;
+    }
+    if (screen) App.navigate(screen);
   },
+
 
   _wire(h) {
     if (h._stWired) return;
@@ -219,13 +287,40 @@ const SectionTabs = {
     /* ⛔ THE GROUP LINKS ARE NOT CLICKABLE (Kyle's call). They open their menu on hover and do
        nothing else; only a row inside the menu navigates. A link that both opened a menu and moved
        you was two jobs on one control, and the move happened before you had read the menu. */
+    /* A solo link is a destination, so it takes a real click. Group links still do nothing here. */
+    h.addEventListener('click', (e) => {
+      const link = e.target.closest && e.target.closest('.st-link');
+      if (!link) return;
+      const solo = link.getAttribute('data-solo');
+      if (!solo) return;
+      const groups = this.groupsFor(this._ctx || App._activeModule);
+      const g = groups[Number(link.getAttribute('data-tab'))];
+      const r = g && g.rows[0];
+      if (!r) return;
+      const el = document.createElement('div');
+      el.setAttribute('data-screen', r.screen);
+      if (r.hubAction) el.setAttribute('data-hub-action', r.hubAction);
+      if (r.mod) el.setAttribute('data-mod', r.mod);
+      this._goRow(el);
+    });
+
     h.addEventListener('mouseover', (e) => {
       const link = e.target.closest && e.target.closest('.st-link');
       if (!link) return;
       this._cancelClose();
+      /* ⛔ A SOLO LINK OPENS NOTHING. It navigates on click (see `_renderLinks`), so hovering it
+         must not build a one-row menu the operator then has to press through. */
+      if (link.getAttribute('data-solo')) { this.close(); return; }
       const idx = Number(link.getAttribute('data-tab'));
       if (this._openTab === idx && this._drop) return;
-      const groups = this.groupsFor(App._activeModule);
+      /* ⛔⛔ THE SAME CONTEXT THE RENDER USED, NOT `_activeModule` (fixed 2026-08-22). `_renderLinks`
+         is called with the RAIL's context, which is the only thing that knows about hub-shell pages
+         as well as module screens — that was the fix for "the menu survived onto Books". This
+         handler read `App._activeModule` instead, a DIFFERENT source that is stale on any hub page,
+         so the Audits bar would have opened Inventory's groups or none at all. Inventory never
+         exposed it because for a module section the two agree. Two spellings of "where am I" is how
+         they drift ([[the-loop]] #54 — when two things answer the same question, they must agree). */
+      const groups = this.groupsFor(this._ctx || App._activeModule);
       const g = groups[idx];
       if (!g || !g.rows.length) return;
       this._openTab = idx;
