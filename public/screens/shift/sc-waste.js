@@ -196,7 +196,7 @@ S.ShiftWaste = {
       + '<td class="wll-unit" style="color:var(--t2);font-size:12px;">' + this.unitCellHtml(p, row.unit) + '</td>'
       + '<td class="wll-cost val" style="font-size:12px;">-</td>'
       + '<td><select class="form-input wll-reason" style="width:100%;">' + this.reasonOptions(row.reason || '') + '</select></td>'
-      + '<td><button class="btn btn-danger btn-sm wll-del" type="button">Delete</button></td>'
+      + '<td style="text-align:right;"><button class="btn btn-danger btn-sm wll-del" type="button">Delete</button></td>'
       + '</tr>';
   },
 

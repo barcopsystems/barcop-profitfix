@@ -610,7 +610,7 @@ S.ShiftVoidComp = {
       + '<td><input class="form-input vcl-units" type="number" min="0" step="0.01" value="' + (row.units != null && row.units !== '' ? esc(String(row.units)) : '') + '" placeholder="1" style="width:100%;"/></td>'
       + '<td><select class="form-input vcl-server" style="width:100%;">' + App.staffOptions(row.server_id || '', { placeholder: 'Select staff...', audience: 'service' }) + '</select></td>'
       + '<td><select class="form-input vcl-reason" style="width:100%;">' + this.reasonOptions(type, row.reason || '') + '</select></td>'
-      + '<td><button class="btn btn-danger btn-sm vcl-del" type="button">Delete</button></td>'
+      + '<td style="text-align:right;"><button class="btn btn-danger btn-sm vcl-del" type="button">Delete</button></td>'
       + '</tr>';
   },
 
