@@ -19,10 +19,12 @@ const ProfitNav = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11.2 11.2L15 15" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 7.8l1.6 1.6L10 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Sales Integrity</span>
       </div>
-      <div class="nav-item" data-screen="vendor-tracker" id="nav-vendor-tracker">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 8.2V3.2A.7.7 0 0 1 3.2 2.5H8.2L14.2 8.5 8.5 14.2 2.5 8.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="5.4" r="1" stroke="currentColor" stroke-width="1.2"/></svg>
-        <span class="nav-label">Vendor Tracker</span>
-      </div>
+      <!-- VENDOR TRACKER LEFT PROFIT ON 2026-08-23 and is now the Vendors group in Inventory, three
+           rows instead of one (Kyle: "so it no longer is in profit at all"). The four ids are
+           unchanged and every inbound link still resolves; what moved is the menu, the shell and the
+           permission area. Pinned by verify-vendors-in-inventory A7, which asserts the ABSENCE here
+           rather than merely dropping the row, so the removal is watched (the-loop #139).
+           NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
       <div class="nav-item" data-screen="recipe-cost-analysis" id="nav-recipe-cost-analysis">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Recipe Summary</span>
@@ -224,6 +226,36 @@ const Inventory = {
       <div class="nav-item" data-screen="ic-par-suggestions" id="nav-ic-par-suggestions">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 12V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v7" stroke="currentColor" stroke-width="1.3"/><path d="M2 12h13M6.5 8h4M5.5 10h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Dynamic Pars</span>
+      </div>
+      <!-- VENDORS MOVED HERE FROM PROFIT (Kyle, 2026-08-23): "Vendors will become a link in the top
+           bar right after ordering.. and it will be a drop down link like the others.. that has the
+           three vendor tracker pages.. so the drop down is Scorecard, Price Changes,
+           Discrepancies... so it no longer is in profit at all."
+           THE POSITION IS PART OF THE ASK, not a detail: immediately after Ordering, because these
+           three read what receiving produces. The screen's own help already said so. Price changes
+           are captured when a delivery is received, and discrepancies are filed in Receive Delivery
+           and chased from Delivery History. The nav had it filed under Profit's "Leaks".
+           THREE ROWS MEANS IT IS A DROP-DOWN. SectionTabs only makes a link navigate on click when
+           its group holds ONE destination, so this opens a menu and keeps the arrow, which is what
+           "like the others" means.
+           ONE SOURCE, THREE SURFACES: this markup is the top-bar drop-down, the section sidebar AND
+           the mobile drawer. The ids are unchanged, so every existing inbound link still lands; what
+           moved is the menu, the shell (App._moduleOf) and the permission area (DB.SCREEN_GROUPS),
+           and those three have to move together.
+           NO BACKTICKS IN THIS COMMENT, EVER. It lives inside a template literal, so one backtick
+           here ends the literal and takes the whole nav file down with it. -->
+      <div class="nav-section">Vendors</div>
+      <div class="nav-item" data-screen="vendor-scorecard" id="nav-vendor-scorecard">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 8.2V3.2A.7.7 0 0 1 3.2 2.5H8.2L14.2 8.5 8.5 14.2 2.5 8.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="5.4" r="1" stroke="currentColor" stroke-width="1.2"/></svg>
+        <span class="nav-label">Scorecard</span>
+      </div>
+      <div class="nav-item" data-screen="vendor-watch" id="nav-vendor-watch">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 11.5l4-4 3 3 5.5-6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 4.5h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Price Changes</span>
+      </div>
+      <div class="nav-item" data-screen="vendor-discrepancy" id="nav-vendor-discrepancy">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2.2l6.3 11a.8.8 0 0 1-.7 1.2H2.9a.8.8 0 0 1-.7-1.2l6.3-11z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 6.5v3.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.7" fill="currentColor"/></svg>
+        <span class="nav-label">Discrepancies</span>
       </div>
       <div class="nav-section">Operations</div>
       <div class="nav-item" data-screen="ic-transfers" id="nav-ic-transfers">

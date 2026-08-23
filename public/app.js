@@ -3856,7 +3856,30 @@ const App = {
   },
 
   // Which module a screen id belongs to (by prefix; profit screens have none)
+  /* ⭐⭐⭐ THE PREFIX CONVENTION HAS EXCEPTIONS, AND THEY GO HERE, NAMED. A screen whose id carries no
+     section prefix falls to the `profit` DEFAULT at the bottom — which is exactly why the four
+     vendor ids counted as Profit screens for as long as they did, without anybody deciding it.
+     ⛔⛔ Kyle moved Vendor Tracker into Inventory on 2026-08-23 (*"so it no longer is in profit at
+     all"*), and the nav row alone would NOT have moved it: `openScreen` resolves the shell through
+     here, so the Operations Audit's two discrepancy action items would still have swapped the
+     operator into the Profit shell to show an Inventory page.
+     ⚠ RENAMING THE IDS TO `ic-*` WAS THE OTHER OPTION AND IT IS WORSE. It would drag `DB._areaOf`,
+     `_CONVERTED`, `screens`, `titles`, two audit action items and one Hub row along by side effect,
+     and ids are not user-visible, so it is a large blast radius for no operator gain
+     ([[lessons-paid-for]] #23 — a rename is a text edit, bound it and read every hit).
+     ⛔⛔⛔ THIS MAP MUST AGREE WITH `DB.SCREEN_GROUPS`, which is the twin decision (the PERMISSION
+     area, not the shell). Move one and not the other and you ship either a page that opens and then
+     refuses, or one a member may use and cannot reach — and neither is visible to owner-and-demo
+     testing, because `canAccessLevel` returns 'edit' for demo and `isOwner()` short-circuits.
+     `verify-vendors-in-inventory` C3 asserts the two answer the same word for every id here. */
+  _MODULE_EXCEPTIONS: {
+    'vendor-tracker': 'inventory', 'vendor-scorecard': 'inventory',
+    'vendor-watch': 'inventory', 'vendor-discrepancy': 'inventory'
+  },
+
   _moduleOf(id) {
+    const ex = this._MODULE_EXCEPTIONS[id];
+    if (ex) return ex;
     if (/^ic-/.test(id)) return 'inventory';
     if (/^lc-/.test(id)) return 'labor';
     if (/^sc-/.test(id)) return 'shift';
@@ -9673,6 +9696,21 @@ const App = {
         'ic-report-usage':     ['Usage Report', 'Inventory Control'],
         'ic-report-variance':  ['Variance Report', 'Inventory Control'],
         'ic-report-stock':     ['Stock Report', 'Inventory Control'],
+        /* ⛔⛔⛔ THE VENDOR PAGES MOVED HERE FROM THE PROFIT BLOCK ON 2026-08-23, AND WITHOUT THIS
+           THE THREE NEW NAV LINKS RENDER "Coming soon." `navigate` keeps a SEPARATE screen map per
+           module and only ever consults the ACTIVE one, so re-pointing the nav row, `_moduleOf` and
+           `SCREEN_GROUPS` still left every one of them landing in a shell whose map had never heard
+           of the id ([[lessons-paid-for]] #24/#146 — `navigate` is module-internal, and a hub page
+           is not a module screen).
+           ⭐ `verify-hub-destinations` C2 caught it on the first gate run, naming
+           `vendor-watch/inventory` exactly. Three dead links, and nothing else in the suite would
+           have said a word.
+           ⚠ ONE SCREEN, FOUR IDS: the id selects the TAB (see the deep-link block further down), so
+           all four resolve to the same object and share its page name. */
+        'vendor-tracker':      ['Vendor Tracker', 'Inventory Control'],
+        'vendor-scorecard':    ['Vendor Tracker', 'Inventory Control'],
+        'vendor-watch':        ['Vendor Tracker', 'Inventory Control'],
+        'vendor-discrepancy':  ['Vendor Tracker', 'Inventory Control'],
         'ic-help':             ['Help and FAQ', 'Inventory Control'],
       };
       const icScreens = {
@@ -9694,6 +9732,11 @@ const App = {
         'ic-report-usage':    S.InventoryUsageReport,
         'ic-report-variance': S.InventoryVarianceReport,
         'ic-report-stock':    S.InventoryStockReport,
+        // Moved out of the Profit block with the section (see the note in icTitles above).
+        'vendor-tracker':     S.VendorTracker,
+        'vendor-scorecard':   S.VendorTracker,
+        'vendor-watch':       S.VendorTracker,
+        'vendor-discrepancy': S.VendorTracker,
         'ic-help':            S.InventoryHelp,
       };
       const [icTitle, icSub] = icTitles[id] || [id, ''];
@@ -9801,10 +9844,12 @@ const App = {
       'profit-forecast':['Profit Forecast', ''],
       'recipe-cost-analysis':['Recipe Summary', ''],
       'profit-experiments':['Experiments', ''],
-      'vendor-tracker': ['Vendor Tracker', ''],
-      'vendor-watch':  ['Vendor Tracker', ''],
-      'vendor-scorecard': ['Vendor Tracker', ''],
-      'vendor-discrepancy': ['Vendor Tracker', ''],
+      /* ⛔ THE FOUR VENDOR IDS LEFT THIS MAP ON 2026-08-23 and live in the Inventory block above
+         (Kyle: "so it no longer is in profit at all"). Removing them from BOTH module maps rather
+         than leaving a copy behind is the point: a duplicate registration is what lets a stale
+         `showApp('profit')` caller keep working and hide that it is pointing at the wrong section
+         ([[the-loop]] #149 — enumerate every registration for an id and say what each survivor is
+         FOR). Every caller now resolves the shell through `_moduleOf`, which answers 'inventory'. */
       'theft-risk':    ['Loss Prevention', ''],
       'sales-integrity': ['Sales Integrity', 'Shift Sales Review'],
       'cash-recon':    ['Over and Short', ''],
@@ -9818,10 +9863,7 @@ const App = {
       'profit-forecast':S.ProfitForecast,
       'recipe-cost-analysis':S.RecipeCostAnalysis,
       'profit-experiments':S.RecoveryExperiments,
-      'vendor-tracker': S.VendorTracker,
-      'vendor-watch':  S.VendorTracker,
-      'vendor-scorecard': S.VendorTracker,
-      'vendor-discrepancy': S.VendorTracker,
+      // The four vendor ids moved to the Inventory block (see the note in the Profit titles above).
       'theft-risk':    S.TheftRisk,
       'sales-integrity': S.SalesIntegrity,
       'cash-recon':    S.CashRecon,

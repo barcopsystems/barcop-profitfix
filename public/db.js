@@ -523,8 +523,20 @@ const DB = {
     // Profit Recovery
     'this-week':'profit','audit-tracker':'profit',
     'cash-recon':'profit','theft-risk':'profit','sales-integrity':'profit',
-    'recipe-cost-analysis':'profit','profit-experiments':'profit','vendor-tracker':'profit',
-    'vendor-watch':'profit','vendor-scorecard':'profit','vendor-discrepancy':'profit',
+    'recipe-cost-analysis':'profit','profit-experiments':'profit',
+    /* ⛔⛔ THE FOUR VENDOR IDS ARE INVENTORY AS OF 2026-08-23 (Kyle moved Vendor Tracker out of
+       Profit: *"so it no longer is in profit at all"*). They carry no prefix, so without these
+       entries `_areaOf` returns its `profit` default and a manager scoped to Inventory would see
+       the three new Vendors links and be refused by every one of them.
+       ⚠ THIS IS A REAL PERMISSION CHANGE, not bookkeeping: a member with Profit but not Inventory
+       loses these pages, and one with Inventory gains them. That is what the move means, and it
+       matches where the data comes from — price changes are captured when a delivery is received
+       and discrepancies are filed in Receive Delivery.
+       ⛔ MUST AGREE WITH `App._MODULE_EXCEPTIONS`, which is the twin decision (the SHELL). Pinned
+       by `verify-vendors-in-inventory` C3, because neither half is visible to owner-and-demo
+       testing ([[the-loop]] #149 — a permission-gated path is pinned, not walked). */
+    'vendor-tracker':'inventory','vendor-watch':'inventory',
+    'vendor-scorecard':'inventory','vendor-discrepancy':'inventory',
     'profit-forecast':'profit','help':'_always',
     /* ⭐⭐⭐ THE WEEK GROUP IS ITS OWN AREA (Kyle, 2026-08-12: "the week section that includes it's
        3 pages close, review, history.. i would think needs added"). It is the rail group with a
