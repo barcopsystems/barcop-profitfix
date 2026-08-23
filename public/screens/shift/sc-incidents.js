@@ -141,7 +141,7 @@ S.ShiftIncidents = {
     });
 
     const formCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-incidents', 'Log an Incident', '<button class="btn btn-ghost btn-sm no-print" id="in-print-blank" type="button">Worksheet</button>')
+      + App.collapsibleCardTitle('sc-incidents', 'Record Incident', '<button class="btn btn-ghost btn-sm no-print" id="in-print-blank" type="button">Worksheet</button>')
       + '<div class="collapse-body">'
       + this.formFields(null, 'in-')
       + '</div></div>'

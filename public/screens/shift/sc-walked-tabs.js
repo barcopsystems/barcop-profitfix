@@ -123,7 +123,7 @@ S.ShiftWalkedTabs = {
     const totalLoss = filtered.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
 
     const formCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-walked-tabs', 'Log a Walked Tab')
+      + App.collapsibleCardTitle('sc-walked-tabs', 'Record Walked Tab')
       + '<div class="collapse-body">'
       + this.formFields(null)
       + '</div></div>'

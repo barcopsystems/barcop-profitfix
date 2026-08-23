@@ -146,7 +146,7 @@ S.ShiftMaintenance = {
     });
 
     const formCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-maintenance', 'Log Maintenance Issue', '<button class="btn btn-ghost btn-sm no-print" id="mt-print-blank" type="button">Worksheet</button>')
+      + App.collapsibleCardTitle('sc-maintenance', 'Record Maintenance Issue', '<button class="btn btn-ghost btn-sm no-print" id="mt-print-blank" type="button">Worksheet</button>')
       + '<div class="collapse-body">'
       + this.formFields(null, 'mt-')
       + '</div></div>'
