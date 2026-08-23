@@ -115,7 +115,7 @@ S.ShiftVoidComp = {
 
   showHowTo() {
     App.showHelpModal('How the Void and Comp Log Works', [
-      { p: ['Voids and comps are your exception transactions. Logging every one feeds the loss total on Loss Prevention and the Bar Cop Audit, and keeps Books honest on comp cost. For the per-server read, who comps far more than the rest of the floor, drop your POS per-server report on Sales Integrity in Profit Recovery.'] },
+      { p: ['Voids and comps are your exception transactions. Logging every one feeds the loss total on Loss Prevention and the Operations Audit, and keeps Books honest on comp cost. For the per-server read, who comps far more than the rest of the floor, drop your POS per-server report on Sales Integrity in Profit Recovery.'] },
       { h: 'One record, the dollar amount', p: ['A void or comp is logged by the amount, not item by item. Comp a whole table\'s meal and you log one line for the total. The amount is what matters. The item is optional.'] },
       { h: 'Enter the whole shift at once', p: ['Set the date and shift up top, then add a line for each void or comp off your sheet or POS list. Authorized By up top applies to your comps. Add Line for another, and Save All writes them in one shot, no running to Bar Cop every time one happens. Need a check number, a custom item, or a note on one? Save it, then Edit that row.'] },
       { h: 'Void vs Comp', p: ['A void reverses a sale that should not have been rung (wrong item, rung in error). A comp is a sale you gave away.'] },
@@ -700,7 +700,7 @@ S.ShiftVoidComp = {
   },
 
   async confirmDel(id) {
-    // K3 — name the record. A void or comp feeds Loss Prevention, the Bar Cop Audit and the Books
+    // K3 — name the record. A void or comp feeds Loss Prevention, the Operations Audit and the Books
     // comp split, so "Delete this?" is the weakest sentence on the screen.
     const r = this.records().find(x => x && x.id === id);
     const subject = r
