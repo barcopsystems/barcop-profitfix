@@ -95,7 +95,7 @@
   --t3:        rgba(255,255,255,0.55);
   --t4:        rgba(255,255,255,0.35);
   --b1:        rgba(255,255,255,0.25);
-  --b2:        #11171B;                /* Divider/separator lines — same as the card border (--b-edge). */
+  --b2:        #202C36;                /* Divider/separator lines — same as the card border (--b-edge). */
   --track:     rgba(255,255,255,0.06); /* The old --b2: faint fill behind progress bars / pips (NOT a divider). */
   --b-edge:    #202C36;                /* Card / outer + chrome border color (border only; --c3 backgrounds stay #111E26) */
   --row-div:   #202C36;                /* Divider line between #0D181E data rows — opaque so it reads identically no matter what sits behind it (data-card tables + .ing-tbl batch-builder line tables) */
