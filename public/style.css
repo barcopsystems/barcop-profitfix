@@ -75,7 +75,7 @@
      rather than repeating its hex, so there is no second copy of the value to drift. */
   --step-open: var(--gold-tint);           /* open cockpit step background. */
   --sel-active-bg: #283642;                /* active selector pill / chip background (filter chips, date-range pills, segmented toggles, week selector). A touch lighter than the panel fill so the active choice pops. */
-  --red:       #C03828;
+  --red:       #DA4D3E;
   --red-bg:    rgba(192,56,40,0.13);
   --red-soft:  rgba(192,56,40,0.72);    /* Tier-2 red for status indicators (off-target scores, off-target metric values) so the full --red can be reserved for true attention/action signals */
   --steel:     #4888A8;
