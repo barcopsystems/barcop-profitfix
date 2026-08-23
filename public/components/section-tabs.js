@@ -33,7 +33,14 @@ const SectionTabs = {
      ⚠ IT IS THE FIRST SECTION HERE WHOSE RAIL ROW IS A PLAIN `_PROTO_GLOBAL` GO ROW rather than a
      module section or a hub-sidebar section — `_protoGlobalClick('week')` is its door, and
      `verify-section-tabs` H1 admits that as the third kind. */
-  ENABLED: { inventory: true, audit: true, week: true, events: true },
+  /* ⭐⭐⭐ BOOKS JOINED 2026-08-23 (Kyle, T48: *"Money Out, Statements, Cash, Forecasts"* — one solo
+     link and three drop-downs). It is the FIRST section that TAKES pages rather than borrowing
+     them: Audits left the three module audits registered in their own menus, so nobody lost a
+     route, while Books' Cash and Forecasts menus hold six screens that came out of the Cash, Profit
+     and Revenue navs in the same edit. That is why this one also moved their PERMISSION areas
+     (`DB.SCREEN_GROUPS`) and deliberately did not move their MODULE — `navigate` still renders all
+     six from the branch they always lived in. */
+  ENABLED: { inventory: true, audit: true, week: true, events: true, books: true },
 
   /* Support is one row repeated in all seven section sidebars. It is not a group anybody browses,
      and Kyle is folding the FAQs into one global page, so it is kept out of the bar entirely. */
