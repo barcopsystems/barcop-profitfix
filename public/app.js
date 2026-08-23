@@ -2274,6 +2274,40 @@ const App = {
      the menu door: the screen and the write point the identical walk at different targets so they
      cannot describe different outcomes. A second menu builder for the overlay is exactly how the
      overlay ends up offering a page the sidebar dropped. */
+  /* ⭐⭐⭐ THE ONE NAV-SOURCE RESOLVER. Section id -> that section's sidebar markup, for every
+     surface that needs the markup rather than the render: the mobile drawer, the section-links bar
+     in the top nav, and anything added next. Ten keys, and a key it does not know returns '' so a
+     caller can tell "no source" from "empty source".
+     ⛔ IT EXISTS BECAUSE THERE WERE TWO. `SectionTabs._srcFor` hardcoded `module === 'inventory'`,
+     so flipping `SectionTabs.ENABLED` for a second section made the bar hide itself in silence —
+     the switch looked like the whole switch and was half of it (T33).
+     ⚠ NOT THE SAME FUNCTION AS `_renderNav` BELOW, and they must not be merged. That one takes a
+     TARGET and writes into it, covers the seven MODULE keys only, and DEFAULTS to Profit; the rail
+     overlay sends audit/books/settings to `S.Hub.renderSidebar` instead, so it never sees them.
+     Merging would change what an unknown module renders ([[lessons-paid-for]] #51/#57).
+     ⚠ `window.S`, not a bare `S`: this member is lifted by harnesses that do not declare it. */
+  navHTMLFor(key) {
+    const H = (typeof window !== 'undefined' && window.S) ? window.S.Hub : null;
+    try {
+      if (key === 'inventory' && typeof Inventory !== 'undefined') return Inventory.navHTML();
+      if (key === 'labor'     && typeof Labor     !== 'undefined') return Labor.navHTML();
+      if (key === 'shift'     && typeof Shift     !== 'undefined') return Shift.navHTML();
+      if (key === 'events'    && typeof Events    !== 'undefined') return Events.navHTML();
+      if (key === 'profit'    && typeof ProfitNav !== 'undefined') return ProfitNav.html();
+      if (key === 'revenue'   && typeof Revenue   !== 'undefined') return Revenue.navHTML();
+      if (key === 'cash'      && typeof Cash      !== 'undefined') return Cash.navHTML();
+      if (key === 'audit'     && H) return H._auditSidebarHTML();
+      if (key === 'books'     && H) return H._booksSidebarHTML();
+      if (key === 'settings'  && H) return H._settingsSidebarHTML();
+    } catch (e) {
+      /* ⚠ REPORTED, NOT SWALLOWED. The version this replaces had a bare `catch (e) {}`, so a
+         throwing section rendered an empty menu with nothing in the console to say why. */
+      console.error('navHTMLFor(' + key + ') failed', e);
+    }
+    return '';
+  },
+
+  /* ⚠ THE MODULE-SCOPED TWIN, and the difference is deliberate — see `navHTMLFor` above. */
   _renderNav(module, target) {
     const nav = target || document.getElementById('sidebar-nav');
     if (!nav) return;
@@ -3500,18 +3534,11 @@ const App = {
       };
       if (r[p.action]) r[p.action]();
     };
-    const navHtml = (k) => { try {
-      if (k === 'inventory') return Inventory.navHTML();
-      if (k === 'labor')     return Labor.navHTML();
-      if (k === 'shift')     return Shift.navHTML();
-      if (k === 'events')    return Events.navHTML();
-      if (k === 'profit')    return ProfitNav.html();
-      if (k === 'revenue')   return Revenue.navHTML();
-      if (k === 'cash')      return Cash.navHTML();
-      if (k === 'audit')     return S2.Hub._auditSidebarHTML();
-      if (k === 'books')     return S2.Hub._booksSidebarHTML();
-      if (k === 'settings')  return S2.Hub._settingsSidebarHTML();
-    } catch (e) {} return ''; };
+    /* ⭐ ONE DOOR. This was the ten-key resolver and it is now the caller of it — `App.navHTMLFor`
+       is the same table, moved up so the section-links bar reads the SAME source instead of keeping
+       a one-key copy of it (T33). Behaviour is unchanged for this caller; the errors are logged now
+       rather than swallowed. */
+    const navHtml = (k) => App.navHTMLFor(k);
 
     // Build the nav tree as nodes for a drill-in (push) menu. A node has groups
     // of rows; a leaf row navigates, a parent row pushes its child node. Only one
