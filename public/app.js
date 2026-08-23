@@ -2604,7 +2604,7 @@ const App = {
      each; there is one row, so `week` is the answer for every one of them — otherwise opening a page
      through an old id would light nothing and the operator would be on a page the rail says they
      are not on. */
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week': 'week', 'week-review': 'week', 'week-close': 'week', 'week-history': 'week', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books' },
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week': 'week', 'week-review': 'week', 'week-close': 'week', 'week-history': 'week', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books' },
   /* ⛔⛔ AND EVERY SETTINGS PAGE WAS MISSING FROM THAT MAP — nine of them. Found while checking the
      new title: Settings read no section prefix, and the same lookup drives the rail highlight, so
      **the Settings row never lit up either** on any of its own pages.
@@ -2623,7 +2623,7 @@ const App = {
   // next phase of the nav sweep.
   /* ⚠ `week` IS 'none' LIKE THE TWO PAGES IT REPLACES — full width, no hub sidebar. Anything else
      and the tabbed page would open with a sidebar its three panels were never laid out for. */
-  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week': 'none', 'week-review': 'none', 'week-close': 'none', 'week-history': 'none', 'books-home': 'books', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings' },
+  _HUB_SIDEBAR_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week': 'none', 'week-review': 'none', 'week-close': 'none', 'week-history': 'none', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'settings': 'settings', 'settings-profile': 'settings', 'settings-targets': 'settings', 'user-accounts': 'settings', 'user-account': 'settings', 'user-data': 'settings', 'user-team': 'settings', 'audit-help': 'audit', 'books-help': 'books', 'settings-help': 'settings' },
 
   // Page directions for the nav "i" button on Hub-shell pages. Those pages open
   // via openHubFullPage (not navigate), so they never register an
@@ -2689,13 +2689,7 @@ const App = {
        the exact opposite of true for the one step an operator does the most work in.
        ⛔ AND THE FORM AND IMPORTER SECTIONS BELONG HERE, not on Money Out. The one-ledger rebuild
        moved the add card onto this page and left the help behind on the ledger it came from. */
-    'books-home': { title: 'How Close Books Works', sections: [
-      { h: 'What this page is', p: ['Your month-end close, worked top to bottom. Three steps in order, and the page turns a month of logged data into the file your accountant works from. Use the month selector at the top to close last month while you are standing in this one.'] },
-      { h: 'The three steps', p: ['1. Log this month\'s money out: every bill and every cash outflow, typed in or dropped from a bank or card statement. 2. Make sure the weeks are all in, because revenue on the income statement is your confirmed weeks. 3. Generate Month-End Books, which builds the workbook.'] },
-      { h: 'How a step goes green', p: ['Each step goes green off your own data: step 1 when money out is logged for the month you are on, step 2 when every one of that month\'s weeks is confirmed, step 3 when the workbook has been generated for it. That means a step cannot claim something your records do not show, and it un-ticks itself if the data goes away. Close The Week works the same way.'] },
-      { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing runs from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
-      { h: 'Dropping a statement', p: ['On the money out step, switch the Add form to Import File and drop a CSV or Excel export from your bank or card. Map the columns once (date and amount are required) and Bar Cop remembers it. The file then stops on a check screen that takes the page: every row is listed with where it is going, grouped by category, with anything already logged held back and anything that is not an operating expense held back in its own card so it cannot be double counted. Nothing is saved until you press Add on that screen.'] }
-    ] },
+    
     'weekly-pnl': { title: 'How the Weekly P&L Brief Works', sections: [
       { h: 'What this page is', p: ['Builds your weekly revenue, COGS, and labor into an Excel file you can hand to a bookkeeper or open in QuickBooks, Xero, or any spreadsheet. It is the lighter, more frequent companion to the Month-End Books file.'] },
       { h: 'How to use it', p: ['Pick a range: the last completed week, the last four, the last thirteen for a quarter, year to date, all saved weeks, or a custom range. Click Download File to save it. What is in the file is listed on the page.'] },
@@ -2724,7 +2718,7 @@ const App = {
       /* ⚠ THIS PROMISED THE RENEWAL WOULD LOG THE COST "so your bookkeeper does not enter it twice",
          and it was doing the opposite: the row it wrote carried the permit's TYPE as its vendor, so
          the same fee off a bank statement imported as a second row. Build piece 5 closed that door. */
-      { h: 'Marking one renewed', p: ['When you renew a permit, click Mark Renewed and set the next renewal date (Bar Cop suggests it from the recurrence). That is all this page does. What the renewal cost is a bill like any other: it comes in with your statement on Close Books, or you type it there once, and it lands on the Licenses and Permits line of your P&L.'] },
+      { h: 'Marking one renewed', p: ['When you renew a permit, click Mark Renewed and set the next renewal date (Bar Cop suggests it from the recurrence). That is all this page does. What the renewal cost is a bill like any other: it comes in with your statement on Money Out, or you type it there once, and it lands on the Licenses and Permits line of your P&L.'] },
       { h: 'Good to know', p: ['Bar Cop tracks the dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements and deadlines with your issuing agency.'] }
     ] },
     /* ⛔⛔ RENAMED AND NARROWED 2026-08-08. The sidebar has said Money Out since the one-ledger
@@ -2736,7 +2730,7 @@ const App = {
        `books-home`, where the controls actually are. What is left is the LEDGER, which is what this
        page now is: three tabs, the stat strip, By Category and the log. */
     'operating-expenses': { title: 'How All Money Out Works', sections: [
-      { h: 'What this page is', p: ['The record of everything that left the bank: the bills that are not COGS or labor (wages and salaries both live in Labor Control, not here) plus the cash outflows that are not a cost of running the bar. You log it on Close Books; this page is where it all lives afterwards, and it is what feeds the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
+      { h: 'What this page is', p: ['The record of everything that left the bank: the bills that are not COGS or labor (wages and salaries both live in Labor Control, not here) plus the cash outflows that are not a cost of running the bar. You log it on the card at the top of this page; the tabs below are where it all lives afterwards, and it is what feeds the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
       /* ⚠ THIS SECTION DESCRIBED A PAGE THAT NO LONGER EXISTS, in four separate claims. It promised
          month cards for "this month and next", a Recurring/Variable split inside each, next month's
          recurring bills listed as Expected before they post, and Expense History as its own sidebar
@@ -2765,11 +2759,22 @@ const App = {
          Repeat to copy last month forward". `Repeat` was one of the three row actions deleted on
          2026-08-06 — measured, the word does not appear in this screen's live code at all, only in
          the comment recording its removal. The help outlived the control by two days. */
-      { h: 'Recurring bills', p: ['Bar Cop works out which bills recur by watching what you actually log: drop two months of statements on Close Books and it picks up rent, insurance and your subscriptions on its own, and projects them onto your Cash Forecast. A bill that stops showing up stops being projected, so cancelling a service needs no extra step.'] },
+      { h: 'Recurring bills', p: ['Bar Cop works out which bills recur by watching what you actually log: drop two months of statements on Money Out and it picks up rent, insurance and your subscriptions on its own, and projects them onto your Cash Forecast. A bill that stops showing up stops being projected, so cancelling a service needs no extra step.'] },
       /* ⚠ AND THIS ONE WAS FALSE ON BOTH HALVES. Repairs stopped living in Shift Control at Phase 2
          item 12 and platform fees stopped living in the weekly numbers at build piece 2. It told the
          operator to keep two real deductions OFF the log that Books reads. */
-      { h: 'Good to know', p: ['Every dollar that leaves the business is logged here, including repairs and 3rd-party platform fees. One log, one place to look, nothing counted twice.'] }
+      { h: 'Good to know', p: ['Every dollar that leaves the business is logged here, including repairs and 3rd-party platform fees. One log, one place to look, nothing counted twice.'] },
+      /* ⭐⭐ THESE TWO CAME BACK FROM `books-home` WITH THE CARD (2026-08-23), VERBATIM. The topic they
+         lived in described a page that no longer exists, but these two sections describe the FORM and
+         the IMPORTER — and the form is at the top of this page now. The old topic's own comment said
+         *"the form and importer sections belong here, not on Money Out"* because the card had moved
+         the other way at the one-ledger rebuild; that reason expired the moment the card came back, so
+         it is re-derived rather than inherited ([[the-loop]] #137/#138).
+         ⚠ MOVED, NOT REWRITTEN. A replacement sentence is a new claim and gets the measurement the old
+         one failed ([[lessons-paid-for]] #117); these are true as they stand. The one word that had to
+         change is "On the money out step", which named a step that is gone. */
+      { h: 'Two dates on the form', p: ['Date Submitted is just when you logged the bill and always stays on today, so you never touch it. Due Date is the one that matters: it is when the bill is actually due, and it is what the P&L timing runs from. When you bulk-enter your bills at setup, set each Due Date to the real due date, not today.'] },
+      { h: 'Dropping a statement', p: ['On the card at the top of this page, switch the Add form to Import File and drop a CSV or Excel export from your bank or card. Map the columns once (date and amount are required) and Bar Cop remembers it. The file then stops on a check screen that takes the page: every row is listed with where it is going, grouped by category, with anything already logged held back and anything that is not an operating expense held back in its own card so it cannot be double counted. Nothing is saved until you press Add on that screen.'] }
     ] },
     /* !! THE 'cash-outflows' HELP TOPIC WAS DELETED HERE (2026-08-06). It was the info-button
        topic for the retired standalone Cash Outflows page and it died with the page. Cash
@@ -2868,7 +2873,7 @@ const App = {
       return (window.S && S.Week) ? S.Week.open(g) : null;
     }
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
-    if (g === 'books') return (window.S && S.HubBooksHome)   ? S.HubBooksHome.open()   : null;
+    if (g === 'books') return (window.S && S.HubOperatingExpenses) ? S.HubOperatingExpenses.open() : null;
     if (g === 'events') return this.jumpToSection('events');
     /* Settings and Sign Out joined the router when they moved off the top bar into the rail's
        bottom group. Settings keeps the gear button's exact rule rather than a second copy of it:
@@ -3662,7 +3667,7 @@ const App = {
       const items = [];
       /* ⚠ THE ID IS FOR THE HIGHLIGHT, so it names where the row goes. The `Close The Week` branch
          that used to live here went with the six duplicate rows it served. */
-      const homeId = App._SECTION_DASH[key] || ({ books: 'books-home' })[key] || '';
+      const homeId = App._SECTION_DASH[key] || ({ books: 'operating-expenses' })[key] || '';
       if (homeFn) items.push({ label: homeLabel || 'Dashboard', icon: IC.dash, home: true, id: homeId, go: homeFn });
       sgs.forEach(g => {
         if (g.pages.length === 1) {
@@ -3710,8 +3715,8 @@ const App = {
          ships instead of the day somebody remembers this list ([[the-loop]] #147 — a hand-kept list
          breaks every time the product legitimately changes). */
       if (navHtml(k)) {
-        const home = k === 'books' ? () => S2.HubBooksHome && S2.HubBooksHome.open() : null;
-        return drill(label, k, home, home ? 'Close Books' : null, icon,
+        const home = k === 'books' ? () => S2.HubOperatingExpenses && S2.HubOperatingExpenses.open() : null;
+        return drill(label, k, home, home ? 'Money Out' : null, icon,
           k === 'settings' ? 'App Settings' : null);
       }
       /* ⭐ ONE DOOR. `_protoGlobalClick` is what the rail presses, so Hub / Close / Review / History
@@ -3992,7 +3997,7 @@ const App = {
        dispatches through `data-go` → `openScreen`, so without this the button was a dead end.
        ⚠ Money Out is READ-ONLY HISTORY; the entry card mounts inside Close Books' first step. Any
        control that says "log your money out" belongs here, not there. */
-    if (id === 'books-home') { if (window.S && S.HubBooksHome && S.HubBooksHome.open) S.HubBooksHome.open(); return; }
+    if (id === 'books-home') { if (window.S && S.HubOperatingExpenses) S.HubOperatingExpenses.open(); return; }
     /* ⛔ NO 'cash-outflows' ROUTE. The standalone Cash Outflows page was the pre-rebuild screen; Cash
        Outflows is a TAB on Money Out now, over the same ledger. Its last door was the "Go There"
        button on the Money Out add form, deleted with that prompt, and the page it opened disagreed
@@ -4918,7 +4923,7 @@ const App = {
     }
     if (!S.HubOperatingExpenses.isCashOnlyCategory(v)) return '';
     return '"' + v + '" is how Bar Cop labels money that leaves the bank but is not an operating '
-      + 'cost. Log those on Close Books with Log Type set to Cash Outflow instead, or pick a different name.';
+      + 'cost. Log those on Money Out with Log Type set to Cash Outflow instead, or pick a different name.';
   },
   listAddOption(key, val) {
     val = (val == null ? '' : String(val)).trim();

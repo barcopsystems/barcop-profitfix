@@ -575,7 +575,7 @@ const DB = {
        `hub-operating-expenses` and `hub-year-end` both resolved to 'profit'. Money Out only gated
        correctly because its own `open()` passes `'hub-books-home'` as the representative id rather
        than its own; Annual Review had no gate at all and was reachable by anyone. */
-    'hub-books':'books','hub-books-home':'books','hub-breakeven':'books',
+    'hub-books':'books','hub-breakeven':'books',
     'hub-operating-expenses':'books','hub-year-end':'books',
     // Operations Audit (the cross-section meta-audit — its own grantable area)
     'bar-cop-audit':'audit'
