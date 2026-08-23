@@ -104,7 +104,7 @@ function profitNarrative(d) {
         ? `Nothing is sitting uncollected. Your exposure now is any invoice that goes in without a price check, not the ones you caught.`
         : `About ${money(d.S5_EXPOSURE_MONTHLY)} a month of spend is exposed to overcharges you are not verifying. It is an estimate, not a measured leak.`;
     o.S5_TOOL = cred
-      ? `Chase the filed credits in Vendor Tracker, and match every new invoice to its price sheet before you pay it.`
+      ? `Chase the filed credits in Credits to Chase under Receive Delivery, and match every new invoice to its price sheet before you pay it.`
       : `Match every invoice to its PO and price sheet in Receive Delivery, and flag the drift the day it lands.`;
   }
 
