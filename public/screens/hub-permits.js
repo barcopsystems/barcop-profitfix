@@ -185,7 +185,7 @@ S.HubPermits = {
       + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop tracks the dates you enter. It does not verify them and is not legal advice. Confirm requirements and deadlines with your issuing agency.</div>'
       + '</div>';
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('hpa-add', 'Add Permit')
+      + App.collapsibleCardTitle('hpa-add', 'Record Permit')
       + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       +   '<div class="f" style="flex:1 1 120px;min-width:100px;"><label>Name</label><input type="text" id="hpa-name" placeholder="Texas Mixed Beverage Permit"/></div>'
