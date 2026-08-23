@@ -18,7 +18,7 @@ S.CashTrapped = {
       { p: ['Trapped cash is working capital sitting on your shelf instead of in your account. Bar Cop reads it off your counts and ranks every product by the dollars you can free, so you work the biggest ones first.'] },
       { h: 'Two Kinds', p: ['Dead stock is product that did not move at all between your last two counts. Its full on-hand value is cash sitting still, and a spoilage risk. Overstock is product you are holding above its par; the cash in the extra is money you spent ahead of when you needed to. Each product counts once, as whichever it is.'] },
       { h: 'Stock You Received But Have Not Counted', p: ['A delivery does not move your on-hand until you count it, so a bar that keeps taking trucks in without recounting can be sitting on stock this page cannot see. Bar Cop folds a delivery in once it has sat ' + CashEngine.receiptSettleDays() + ' days with no count, and the row shows the working: what you counted, and what landed after it. A truck that came in this week is stock you bought for the weekend, not cash you are stuck with, so it is left out until it has sat a while.'] },
-      { h: 'What To Do', p: ['For dead stock, move it: feature it, put it on a special, work it into a cocktail, or eighty-six it and stop reordering. For overstock, cut the par so you stop buying ahead of your real usage. The buttons take you straight to Dynamic Pars and the movement report.'] },
+      { h: 'What To Do', p: ['For dead stock, move it: feature it, put it on a special, work it into a cocktail, or eighty-six it and stop reordering. For overstock, cut the par so you stop buying ahead of your real usage. Dynamic Pars is under Ordering when you are ready to reset them.'] },
       { h: 'It Sharpens As You Count', p: ['This reads off your last two counts, so the more regularly you count the cleaner it gets. A product with only one count does not have the usage history to call dead, so count on a schedule and the trapped number gets honest fast.'] }
     ]);
   },
@@ -97,18 +97,20 @@ S.CashTrapped = {
       + this.statItem('Dead Stock', App.fmtCurrency(t.dead))
       + this.statItem('Above Par', App.fmtCurrency(t.overPar)));
 
-    /* ⚠ THE HELP PROMISED THESE AND THE SCREEN DID NOT HAVE THEM. "What To Do" says outright:
-       "The buttons take you straight to Dynamic Pars and the movement report" — and this page
-       rendered exactly one control, Export PDF, with zero data-go anywhere. So the only
-       diagnose-then-act screen in Free Up Cash was a dead end: read what is trapped, then find
-       the fix screens yourself. The copy described the right design; the screen was the part
-       that was missing ([[the-loop]] #65 — when the copy and the code disagree, check which
-       one is actually wrong). Dead stock goes to the Stock Report's Dead Stock view, overstock
-       to Dynamic Pars, which is exactly the split the two tables below already make. */
-    const actBtns = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px;" class="no-print">'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-report-stock">Stock Report</button>'
-      + '<button class="btn btn-ghost btn-sm" data-go="ic-par-suggestions">Dynamic Pars</button>'
-      + '</div>';
+    /* ⛔⛔ THE STOCK REPORT AND DYNAMIC PARS BUTTONS WENT 2026-08-23 (Kyle: *"on trapped cash..
+       remove the stock report and dynamic par buttons at the bottom"*). They were added when this
+       page lived in Cash Recovery and the two screens they opened were in a different section
+       entirely, so a jump was worth a control.
+       ⭐ THIS PAGE IS AN INVENTORY PAGE NOW. Both destinations are one row away in the same top bar
+       — Dynamic Pars sits in Ordering and the Stock Report two rows below this one in Reports — so
+       the buttons duplicated the nav rather than saving a journey.
+       ⛔ AND ONE OF THEM HAD ALREADY BECOME A WRONG DESTINATION. It opened the Stock Report "for the
+       Dead Stock view", and that tab was deleted in the same move that brought Trapped Cash here,
+       precisely because the two answered the same question. A control kept past its reason is the
+       dead-end class this suite keeps finding ([[lessons-paid-for]] #105).
+       ⚠ THE `data-go` HANDLER WENT WITH THEM — these two were its only users on this screen, and a
+       listener with nothing to listen for is the orphan half of the same rule. Export PDF keeps its
+       own branch. */
     const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="ct-export">Export PDF</button>';
 
     const dead = t.items.filter(it => it.kind === 'dead');
@@ -118,13 +120,10 @@ S.CashTrapped = {
       + stats
       + this.section('Dead Stock', dead, 'No dead stock right now. Every product moved.', exportBtn)
       + this.section('Overstock', over, 'Nothing above par right now.')
-      + '<div style="margin-top:18px;">' + actBtns + '</div>'
       + '</div>';
 
     this.container.onclick = ev => {
       if (ev.target.closest('#ct-export')) { App.exportPDF({ title: 'Trapped Cash', root: this.container }); return; }
-      const go = ev.target.closest('[data-go]');
-      if (go && go.dataset.go) { App.openScreen(go.dataset.go); return; }
     };
   }
 };
