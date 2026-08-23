@@ -17,20 +17,12 @@ const ProfitNav = {
            not a group. Its PERMISSION area moved to books, which is a real change and is pinned in
            verify-area-access-doors block G. -->
       <div class="nav-section">Leaks</div>
-      <div class="nav-item" data-screen="sales-integrity" id="nav-sales-integrity">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11.2 11.2L15 15" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 7.8l1.6 1.6L10 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Sales Integrity</span>
-      </div>
       <!-- VENDOR TRACKER LEFT PROFIT ON 2026-08-23 and is now the Vendors group in Inventory, three
            rows instead of one (Kyle: "so it no longer is in profit at all"). The four ids are
            unchanged and every inbound link still resolves; what moved is the menu, the shell and the
            permission area. Pinned by verify-vendors-in-inventory A7, which asserts the ABSENCE here
            rather than merely dropping the row, so the removal is watched (the-loop #139).
            NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
-      <div class="nav-item" data-screen="recipe-cost-analysis" id="nav-recipe-cost-analysis">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Recipe Summary</span>
-      </div>
       <div class="nav-item" data-screen="theft-risk" id="nav-theft-risk">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 5v4.5c0 3.5 5.5 5.5 5.5 5.5s5.5-2 5.5-5.5v-4.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2L12 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Loss Prevention</span>
@@ -62,27 +54,6 @@ const Revenue = {
               Forecasts drop-down beside Cash and Profit Forecast. Screen untouched, still rendered
               from this module's branch in navigate; only the row and its now-empty Analysis group
               went. Its permission area moved to books with it (verify-area-access-doors block G). -->
-      <div class="nav-section">Menu and Pricing</div>
-      <div class="nav-item" data-screen="r-menu-items" id="nav-r-menu-items">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 8h6M5.5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Menu Builder</span>
-      </div>
-      <div class="nav-item" data-screen="r-menu-planning" id="nav-r-menu-planning">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 3.5h12M2.5 7h12M2.5 10.5h7M2.5 14h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 11.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Menu Rundown</span>
-      </div>
-      <div class="nav-item" data-screen="r-menu-engineering" id="nav-r-menu-engineering">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.7-2-3.7 2 .7-4.3-3.1-3 4.3-.6L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Menu Engineering</span>
-      </div>
-      <div class="nav-item" data-screen="r-dog-test" id="nav-r-dog-test">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2.5v3.8L3.3 12a1.2 1.2 0 0 0 1.1 1.8h8.2a1.2 1.2 0 0 0 1.1-1.8L10.5 6.3V2.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2.5h6M5.6 10h5.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Dog Test Tracker</span>
-      </div>
-      <div class="nav-item" data-screen="r-server-check" id="nav-r-server-check">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Server Check</span>
-      </div>
       <div class="nav-section">Experiments</div>
       <div class="nav-item" data-screen="r-experiments" id="nav-r-experiments">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2v4.2L3 12.5a1.2 1.2 0 0 0 1 1.8h9a1.2 1.2 0 0 0 1-1.8L10.5 6.2V2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2h6M5.2 9.5h6.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -624,6 +595,15 @@ const Floor = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="4.5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5V3.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
         <span class="nav-label">Over and Short</span>
         </div>
+      <div class="nav-section">Sales</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="revenue" data-screen="r-server-check">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Server Check</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="profit" data-screen="sales-integrity">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11.2 11.2L15 15" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 7.8l1.6 1.6L10 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Integrity Check</span>
+        </div>
       <div class="nav-section">Records</div>
       <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-incidents">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M7.4 3.2 1.9 12.8a1.25 1.25 0 0 0 1.1 1.9h11a1.25 1.25 0 0 0 1.1-1.9L9.6 3.2a1.25 1.25 0 0 0-2.2 0z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v2.8M8.5 11.8v.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -670,6 +650,60 @@ const Floor = {
       <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-staff-roster">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Staff Roster</span>
+        </div>
+    `;
+  }
+};
+
+/* ── MENUS ────────────────────────────────────────────────────────────────────────────────────
+   Kyle, 2026-08-23: *"menus on the rail above Events with the top bar menu as Builder, Rundown,
+   Engineering, Summary, Dog Test"*. The last of the Revenue and Profit pages to get a home, and
+   the reason they got their own section rather than a Tools drawer is measurable: these five are
+   AUDIT INPUTS, not extras. `server/audit-compute.js` reads `menu_items` (Builder writes it),
+   `revenue_price_log` (the repricing log) and `menu_dog_tests` (Dog Test writes it) to score
+   Revenue S3 Menu Performance, and runs `recipeCoverage(menuItems, …)` — Summary's subject — in
+   the Profit audit. Two scored sections and part of a third read stores only these pages write.
+
+   ⭐ EVERY GROUP HOLDS ONE ROW, SO EVERY BAR LINK IS SOLO: it navigates on click and takes the
+   hand cursor, rather than opening a one-row menu the operator has to press through. Kyle's own
+   rule, from the Audits section.
+   ⚠ THE GROUP NAME IS THE BAR WORD AND THE ROW LABEL IS THE PAGE. They differ on purpose — the
+   bar reads Builder · Rundown · Engineering · Summary · Dog Test, while the phone drawer lists
+   ROWS, and somebody looking for "Menu Builder" on a phone should find that. Books set this.
+
+   ⛔⛔ THESE FIVE LEFT THE PROFIT AND REVENUE NAVS IN THE SAME EDIT. A page listed in two menus
+   makes `_railSectionForScreen` resolve on FIRST MATCH and silently redraw the bar as the wrong
+   section, so the removal is half the change rather than tidying.
+   ⚠ NO PERMISSION AREA MOVED. Four of the five are `revenue` and Summary is `profit`;
+   `_railSectionAllowed` derives a section's areas from this markup, so holding EITHER opens the
+   section and the refusal happens per page. */
+const Menus = {
+  navHTML() {
+    return `
+      <div class="nav-section">Builder</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="revenue" data-screen="r-menu-items">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 8h6M5.5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Menu Builder</span>
+        </div>
+      <div class="nav-section">Rundown</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="revenue" data-screen="r-menu-planning">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 3.5h12M2.5 7h12M2.5 10.5h7M2.5 14h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 11.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Menu Rundown</span>
+        </div>
+      <div class="nav-section">Engineering</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="revenue" data-screen="r-menu-engineering">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.7-2-3.7 2 .7-4.3-3.1-3 4.3-.6L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Menu Engineering</span>
+        </div>
+      <div class="nav-section">Summary</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="profit" data-screen="recipe-cost-analysis">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13l4-5 3 3 3.5-6 2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Recipe Summary</span>
+        </div>
+      <div class="nav-section">Dog Test</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="revenue" data-screen="r-dog-test">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2.5v3.8L3.3 12a1.2 1.2 0 0 0 1.1 1.8h8.2a1.2 1.2 0 0 0 1.1-1.8L10.5 6.3V2.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2.5h6M5.6 10h5.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Dog Test Tracker</span>
         </div>
     `;
   }

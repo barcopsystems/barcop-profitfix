@@ -2311,6 +2311,7 @@ const App = {
          nothing here has to know that — this resolver answers "what is this section's markup" and
          nothing else, which is why the bar, the sidebar and the phone drawer can all read it. */
       if (key === 'floor'     && typeof Floor     !== 'undefined') return Floor.navHTML();
+      if (key === 'menus'     && typeof Menus     !== 'undefined') return Menus.navHTML();
       /* ⭐ THE WEEK JOINED 2026-08-23. Its three links come from the section's own object, the same
          way every module section supplies its own — there is no hub SIDEBAR for The Week (all three
          pages are `'none'` in `_HUB_SIDEBAR_OF_ACTION`, full width), so a `_weekSidebarHTML` in
@@ -2592,7 +2593,7 @@ const App = {
   /* ⭐ THE FLOOR SITS UNDER AUDITS (Kyle, 2026-08-23). It arrived in `_PROTO_CONTROL` because it
      replaced Labor and Shift in their own slot; one look at it and he moved it up here, which
      emptied the Control group and retired it. */
-  _PROTO_GLOBAL:   [['hub','Hub'],['inventory','Inventory'],['week','The Week'],['audit','Audits'],['floor','The Floor'],['events','Events'],['books','Books']],
+  _PROTO_GLOBAL:   [['hub','Hub'],['inventory','Inventory'],['week','The Week'],['audit','Audits'],['floor','The Floor'],['menus','Menus'],['events','Events'],['books','Books']],
   /* ⛔ `_PROTO_WEEK` IS GONE (2026-08-23). Close, Review and History were three rows for one job in
      three tenses; they are now three TABS on one page (`S.Week`) behind the single "The Week" row
      above. The three ids still resolve — they are tab targets now — so nothing that linked to them
@@ -2916,6 +2917,23 @@ const App = {
       let first = null;
       try {
         (SectionTabs.groupsFor('floor') || []).forEach(gr => gr.rows.forEach(r => {
+          if (!first && r.screen && this.canAccess(r.screen)) first = r;
+        }));
+      } catch (e) { first = null; }
+      if (first) return S.Hub._enter(first.screen, first.mod);
+      return this.showNoAccess();
+    }
+    /* ⭐ MENUS LANDS ON BUILDER, the first link in its own bar. Same shape as The Floor: `_enter`
+       rather than `navigate`, because these pages live in the revenue and profit modules and
+       `navigate` is module-internal. The fallback is the same too — Summary is a `profit` page and
+       the other four are `revenue`, so a member holding only one of those areas must still get into
+       the section rather than meeting a refusal on the rail row. */
+    if (g === 'menus') {
+      if (!(window.S && S.Hub && S.Hub._enter)) return null;
+      if (this.canAccess('r-menu-items')) return S.Hub._enter('r-menu-items', 'revenue');
+      let first = null;
+      try {
+        (SectionTabs.groupsFor('menus') || []).forEach(gr => gr.rows.forEach(r => {
           if (!first && r.screen && this.canAccess(r.screen)) first = r;
         }));
       } catch (e) { first = null; }
@@ -3333,7 +3351,7 @@ const App = {
      modules, so `_activeModule` cannot answer "where am I" for them and `_railSectionForScreen`
      has to. A MODULE section must never appear here or the resolver starts moving rail rows nobody
      asked about (pinned as the `ic-take-inventory` control). */
-  _RAIL_HUB_CTX: { audit: 'audit', books: 'books', settings: 'settings', floor: 'floor' },
+  _RAIL_HUB_CTX: { audit: 'audit', books: 'books', settings: 'settings', floor: 'floor', menus: 'menus' },
 
   /* ⭐⭐⭐ WHICH RAIL SECTION OWNS THIS SCREEN, WHEN THE ANSWER IS NOT THE MODULE IT LIVES IN.
      ⛔⛔ THE DEFECT IT CLOSES (Kyle, 2026-08-23): *"profit, revenue, and cash links when clicked go
@@ -3448,7 +3466,7 @@ const App = {
                  says that where the clock (Shift's) said only "now". The `labor` and `shift` keys
                  stay in `_NAV_SECTION_IC` because the phone drawer and the module shells still read
                  them. Design is Kyle's, one change at a time, so this is a reuse and not a choice. */
-              inventory: 'inventory', floor: 'labor', labor: 'labor', shift: 'shift',
+              inventory: 'inventory', floor: 'labor', menus: 'menus', labor: 'labor', shift: 'shift',
               profit: 'profit', revenue: 'revenue', cash: 'cash',
               settings: 'settings', signout: 'signout' },
 
@@ -3540,6 +3558,11 @@ const App = {
      'review' key, because Review and Audits sit adjacent in the rail and reading as the same icon
      is worse there than the inconsistency. Shared map, explicit choices, no drift. */
   _NAV_SECTION_IC: {
+    /* ⚠ `menus` is Menu Builder's OWN row mark, lifted rather than drawn (2026-08-23). This table
+       had nothing that reads as a menu, and reusing `revenue` would have put two rail rows on one
+       mark for as long as the Revenue row survives. Design is Kyle's, one change at a time, so this
+       is a reuse of something the app already ships and not a choice made on his behalf. */
+    menus:'<path d="M3.5 2.5h7l3.5 3.5v8.5h-10.5v-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10.5 2.5v3.5h3.5M5.5 8h6M5.5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
     hub:'<rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/>',
     /* `blueprint` was Workflow's icon and had exactly one reader, `_RAIL_IC`'s flowmap entry. Both
        went with the page on 2026-08-11 — an icon nothing can name is dead weight in a map every
