@@ -3070,7 +3070,21 @@ const App = {
        shape of the section and then took it away again the moment you chose a row.
        ⚠ AFTER the access gate, deliberately, for the same reason the gate is first — this
        navigates INTO the section, so checking after it would hand a blocked member the screen. */
-    if (typeof SectionTabs !== 'undefined' && SectionTabs.on(key)) { this.jumpToSection(key); return; }
+    if (typeof SectionTabs !== 'undefined' && SectionTabs.on(key)) {
+      /* ⛔⛔⛔ TWO KINDS OF SECTION, TWO DOORS — AND THIS LINE SHIPPED WITH ONE (fixed 2026-08-22,
+         Kyle found it in one click: *"audit rail link doesn't work"*). A MODULE section lands
+         through `jumpToSection`, which resolves `_SECTION_DASH`; a HUB section has no entry there
+         and `jumpToSection` returns silently, which is a rail row that does nothing at all.
+         ⚠ THE FALLBACK TEN LINES DOWN ALREADY MAKES THIS EXACT BRANCH and its comment already
+         warns about this exact failure. I read that comment while adding the Audits section and
+         still handed a hub key to the module door — naming a hazard is not checking for it
+         ([[lessons-paid-for]] #18). MEASURED live: `_SECTION_DASH` has no 'audit' key, so the row
+         was dead from the moment the section was switched on.
+         ⚠ STILL AFTER THE ACCESS GATE, deliberately: both doors navigate INTO the section, so a
+         blocked member must be refused before either one runs. */
+      if (this._RAIL_HUB_CTX[key]) this._protoGlobalClick(key); else this.jumpToSection(key);
+      return;
+    }
     const nav = document.getElementById('rail-menu-nav');
     const hubCtx = this._RAIL_HUB_CTX[key];
     /* ⛔ NO DEAD END. If the overlay is not on the page for any reason, fall back to navigating
