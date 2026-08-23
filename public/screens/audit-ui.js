@@ -103,8 +103,9 @@ const AuditUI = {
         : 'Run it now and you get a <strong style="color:' + q.color + ';">' + esc(q.label) + '</strong> audit. Fill in the rest below to move it up.';
     // The steps read as a LIST on the card, not a stack of tinted boxes: no fill, no
     // radius, no side padding, and a divider between each pair (n-1 for n steps, so the
-    // last row does not double up with the card edge). `fix-panel.js`'s activity rows
-    // are the same shape and `at-arow` below is this file's own. ⚠ The token is --b2,
+    // last row does not double up with the card edge). `at-arow` below is this file's own
+    // and is the same shape. ⚠ The comparison used to name `fix-panel.js` as the other
+    // example; that file went with the Fix systems. ⚠ The token is --b2,
     // the app's divider (115 sites), NOT --row-div, which its own style.css comment
     // scopes to rows sitting on a tinted fill — which these no longer do.
     const rows = steps.map((s, i) =>

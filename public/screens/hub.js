@@ -1008,7 +1008,11 @@ S.Hub = {
       if (!audit) return;
       (audit.action_items || []).forEach(it => {
         if (it && it.action) {
-          const gid = it.gap_id || (window.FixPanel ? FixPanel.inferGapId(it.action, mod) : null);
+          /* ⚠ THE `FixPanel.inferGapId` FALLBACK WENT WITH THE FIX LAYER, AND IT WAS INERT.
+             Every one of the 19 action-item push sites across the three audits tags `gap_id`
+             explicitly. An audit stored before the field existed now resolves null, `PA_DEST`
+             misses, and `paiGo` lands on the module's audit — a real page, not a dead end. */
+          const gid = it.gap_id || null;
           itemRows.push({ action: it.action, impact: it.monthly_impact || 0, sys: sysName, mod: mod, gap: gid });
         }
       });
@@ -2196,7 +2200,12 @@ S.Hub = {
      loss computes from real data. Cash's opportunity is a one-time trapped
      amount, not a weekly leak, so it lives on the Cash screens, not here. */
   weeklyReadout() {
-    if (!window.Recovery || !window.FIX) return { items: [], total: 0, leakTotal: 0, oppTotal: 0 };
+    /* ⛔ THE GAP LIST MOVED. This read `window.FIX`, which the three fixlayer files built, and
+       returned an empty readout without it — so deleting them would have emptied this block in
+       silence, on The Rail's briefing, which is on every page. `Recovery.START_GAPS` is the same
+       list at its permanent home: measured before the swap, profit 5 of 5 and revenue 6 of 6 ids
+       identical, and the only property read off a gap here is `id`. */
+    if (!window.Recovery || !Recovery.START_GAPS) return { items: [], total: 0, leakTotal: 0, oppTotal: 0 };
     const seen = {};
     const items = [];
     // Split honestly (decision 2): a cost gap is a recoverable LEAK; everything
@@ -2206,7 +2215,7 @@ S.Hub = {
 
     // Profit + Revenue — live metric-based
     [['profit'], ['revenue']].forEach(([mod]) => {
-      (FIX[mod] || []).forEach(g => {
+      (Recovery.START_GAPS[mod] || []).forEach(g => {
         if ((Recovery.COMPOSITE_GAPS || []).indexOf(g.id) !== -1) return;   // skip composite (double-count)
         const imp = Recovery.gapImpact(g.id);
         if (!imp || imp.onTarget || !(imp.dollars > 0)) return;

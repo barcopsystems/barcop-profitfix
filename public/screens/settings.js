@@ -1152,16 +1152,6 @@ S.HubSettings = {
       if (led) App.data.operating_expenses.push(led);
     });
 
-    // Pre-stamp the Fix view-tracking so the Cash Fix systems read on track from
-    // the first look, the way a bar that has run Bar Cop for 90 days would: the
-    // operator has been reviewing Trapped Cash, Purchasing, the Forecast, Dynamic
-    // Pars, and vendor terms recently. A real user's stamps fill in as they
-    // navigate to each screen.
-    App.data.fix_views = Object.assign({}, App.data.fix_views, {
-      'c-trapped': dateStr(2), 'c-purchasing': dateStr(3), 'c-forecast': dateStr(2),
-      'ic-par-suggestions': dateStr(4), 'ic-vendors': dateStr(12)
-    });
-
     // Permits and licenses: a realistic Austin bar/restaurant set so the page
     // shows the full status spread (on track, due soon, expired) and the Needs
     // Attention surface. Renewal dates are relative to today (dateStr negative =

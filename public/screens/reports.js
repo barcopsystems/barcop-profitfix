@@ -16,7 +16,6 @@ S.Reports = {
        opener on Reports, not a registered screen — the same representative-id shape the other
        three Books doors already use. */
     if (App._hubBlocked && App._hubBlocked('hub-books-home')) return;
-    if (App.stampFixView) App.stampFixView('weekly-pnl');
     const weeks=(App.data.weeks||[]).slice().sort((a,b)=>new Date(a.period_end||0)-new Date(b.period_end||0));
     App.openHubFullPage('Weekly P&L Brief', (mount) => {
       if (App.setHubTopbarActions) App.setHubTopbarActions('');

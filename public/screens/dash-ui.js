@@ -1,10 +1,12 @@
 'use strict';
-// Shared layout for the Recovery dashboards (Profit/Revenue/Cash). Holds only
-// the layout skeleton + generic panels; each screen supplies its own content
-// (the Recovery Scoreboard hero + leak rows come from FixPanel; forecast,
-// insights, and audit data are per-module). Same move as AuditUI, so a layout
-// change is made once here and lifts every Recovery dashboard. (dashboard.js
-// migrates onto this next; Revenue uses it now.)
+// Shared layout for the Recovery screens. Holds only the layout skeleton and
+// generic panels; each screen supplies its own content. Same move as AuditUI, so
+// a layout change is made once here and lifts every screen that uses it.
+// ⚠ THE HEADER NAMED TWO THINGS THAT NO LONGER EXIST (corrected 2026-08-22): the
+// Recovery Scoreboard hero and leak rows came from `FixPanel`, deleted with the Fix
+// systems, and `dashboard.js` went at 1c, so "migrates onto this next" described a
+// file that had already been gone for months. A comment naming a plan is the kind
+// that rots silently, because nothing ever fails when it stops being true.
 const DashUI = {
 
   // Equal-height two-column row (the Control-dashboard pattern).
