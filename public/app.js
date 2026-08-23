@@ -3622,7 +3622,19 @@ const App = {
     const GIC = App._NAV_GROUP_IC;
     const pageItem = (p) => ({ label: p.label, id: p.screen || p.action, icon: p.icon || '', go: () => routePage(p) });
     // Mobile-only label remaps (do NOT touch the desktop sidebars).
-    const GROUP_REMAP = { audit: { 'By Recovery System': 'Recovery Audits' }, events: { 'Bookings': 'Scheduling' } };
+    /* ⛔ EMPTIED 2026-08-23, AND BOTH ENTRIES WERE GHOSTS I LEFT BEHIND. A remap only applies to a
+       MULTI-PAGE group (`sectionNode` reads it in the accordion branch; a one-row group becomes a
+       leaf and never consults it), so both keys had stopped naming anything real:
+       · `audit: 'By Recovery System'` — that group was replaced by Operations/Profit/Revenue/Cash
+         when the Audits section was built, and the exemption outlived it by two days.
+       · `events: 'Bookings'` — still a group name, but it holds ONE row now, so the branch that
+         would rename it never runs.
+       ⭐ An exemption that names nothing real is the shape that made three harnesses fire during the
+       Fix retirement ([[lessons-paid-for]] #115). Pinned by `verify-section-tabs` L, which refuses
+       any remap key that is not a real multi-page group in that section's own nav — so the next one
+       cannot outlive its reason. The table stays (empty) because the mechanism is still correct and
+       a future regroup may want it. */
+    const GROUP_REMAP = {};
     const PAGE_REMAP  = {};
     // A section node lists its sub-groups as single-open ACCORDIONS (they expand
     // inline) plus any leaf pages. Leaf rows (Dashboard, single-page groups, Help)
