@@ -74,13 +74,19 @@ S.Hub = {
       /* ⭐ THE FOUR THAT CAME OVER FROM CASH AND THE THREE FORECASTS (T48). These SVGs were MOVED
          out of `nav.js` in the same edit, not copied: those rows are gone from the Cash, Profit and
          Revenue menus, so there is no second spelling left to drift from.
-         ⚠ ALL THREE FORECASTS GENUINELY SHARE ONE MARK, and they always did — they simply never sat
-         next to each other before. Kept as they are, because the icon set is a design call and
-         design is walked one change at a time. */
+         ⛔ THE THREE FORECASTS NO LONGER SHARE ONE MARK (Kyle, 2026-08-23: *"give each of the
+         forecasts a unique/different icon"*). They always shared it, and it never showed because
+         they lived in three different menus; putting them in one drop-down is what made three
+         identical rows visible. **The three marks are the app's OWN system icons for Profit, Revenue
+         and Cash**, lifted from `_auditSidebarHTML` a few lines up rather than drawn — the Audits
+         menu already tells an operator which of the three a row belongs to with exactly these, so
+         the Forecasts menu now reads the same way instead of teaching a second vocabulary. */
       capital: '<path d="M2.5 14.5V8M7 14.5V4M11.5 14.5V10M2.5 14.5h12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 3.5l2.5-1.5 1 2.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
       position: '<rect x="2" y="4.5" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7.2h13" stroke="currentColor" stroke-width="1.2"/><path d="M11 10.3h2.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
       bridge:  '<path d="M2 11c2-5 11-5 13 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2 11v2.5M15 11v2.5M6.5 9v4.5M10.5 9v4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
-      forecast: '<path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      fcCash:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 4.7v7.6M10.6 6.3c-.4-.6-1.2-1-2.1-1-1.2 0-2.1.6-2.1 1.6 0 2.1 4.3 1.1 4.3 3.2 0 1-.9 1.6-2.2 1.6-1 0-1.8-.4-2.2-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
+      fcProfit:  '<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+      fcRevenue: '<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
       help:    '<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
       bug:     '<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
       support: '<path d="M2.5 3.8h12v7.5H7.8l-3 2.3v-2.3H2.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M5.3 6.6h6.4M5.3 8.7h4.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
@@ -167,9 +173,9 @@ S.Hub = {
          screens by words the app no longer shows — the same reason Events kept "Event Booking"
          under a group called "Bookings". The GROUP is Kyle's word; the rows are the app's. */
       + '<div class="nav-section">Forecasts</div>'
-      + row('enter', 'Cash Forecast',    'forecast', [['data-mod', 'cash'],    ['data-screen', 'c-forecast']])
-      + row('enter', 'Profit Forecast',  'forecast', [['data-mod', 'profit'],  ['data-screen', 'profit-forecast']])
-      + row('enter', 'Revenue Forecast', 'forecast', [['data-mod', 'revenue'], ['data-screen', 'r-forecast']])
+      + row('enter', 'Cash Forecast',    'fcCash',    [['data-mod', 'cash'],    ['data-screen', 'c-forecast']])
+      + row('enter', 'Profit Forecast',  'fcProfit',  [['data-mod', 'profit'],  ['data-screen', 'profit-forecast']])
+      + row('enter', 'Revenue Forecast', 'fcRevenue', [['data-mod', 'revenue'], ['data-screen', 'r-forecast']])
       + '<div class="nav-section">Support</div>'
       + row('books-help', 'Help and FAQ', 'help')
       + row('report-bug', 'Report a Bug', 'bug');
