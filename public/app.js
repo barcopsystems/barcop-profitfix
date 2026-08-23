@@ -2802,7 +2802,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['profit-forecast', 'profit-fix', 'audit-tracker', 'recovery-playbook', 'r-playbook', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-fix', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-fix', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-playbook', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
+  _CONVERTED: new Set(['profit-forecast', 'audit-tracker', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     /* ⭐⭐ THE WEEK — ONE ROW, THREE TABS (Kyle, 2026-08-23). Close, Review and History became one
@@ -3950,7 +3950,6 @@ const App = {
   _afterNavigate(id) {
     const title = document.getElementById('topbar-title')?.textContent || id;
     this._recordLocation({ mode: 'app', module: this._activeModule, screen: id, label: title });
-    const v = this._VIEW_STAMP[id]; if (v) this.stampFixView(v);
     /* Re-render on EVERY navigate, not just on a section swap, because the lit link has to follow
        the screen however the operator got there — a Fix step, a Hub row or an audit action item all
        land here without touching the bar.
@@ -3958,26 +3957,6 @@ const App = {
        pages too, and keying on the module is what let the Inventory links survive onto Books. */
     try { if (typeof SectionTabs !== 'undefined') SectionTabs.render(this._railCtx, id); }
     catch (e) { console.error('section links render failed', e); }
-  },
-
-  // Profit Fix view-tracking: stamp the day a "review/read this screen" target
-  // was opened, so the Fix steps that are reviews (not records) can verify
-  // against it. Keyed to the screen the operator actually lands on.
-  /* ⛔⛔ `'dashboard'` CAME OUT AT 1c AND `audit-tracker` / `week-history` WENT IN (2026-08-11).
-     Three Profit Fix steps read `view:dashboard` — "read your actual pour cost", "read your actual
-     food cost", "read prime cost every Monday" — and the only screen that could stamp that key was
-     the Profit cockpit, now deleted. ⚠ THEY WERE ALREADY BROKEN BEFORE THE DELETION: their buttons
-     have long opened `audit-tracker` and `week-history`, and neither was registered here, so doing
-     what the step said stamped nothing and the step never ticked. Kyle found it by using the app.
-     ⭐ THE RULE THIS TABLE HAS TO KEEP: a watched `view:` step is satisfiable ONLY if the screen its
-     own button opens stamps the key that step reads. Pinned by `verify-fix-view-steps-satisfiable`,
-     which walks all three Fix areas and fails on any step whose button cannot tick it. */
-  _VIEW_STAMP: { 'audit-tracker': 'audit-tracker', 'week-history': 'week-history', 'theft-risk': 'theft-risk', 'vendor-tracker': 'vendor-tracker', 'vendor-watch': 'vendor-tracker', 'vendor-scorecard': 'vendor-tracker', 'vendor-discrepancy': 'vendor-tracker', 'r-menu-engineering': 'r-menu-engineering', 'lc-overtime-watch': 'lc-overtime-watch', 'lc-reports': 'lc-reports', 'c-trapped': 'c-trapped', 'c-purchasing': 'c-purchasing', 'c-forecast': 'c-forecast', 'ic-par-suggestions': 'ic-par-suggestions', 'ic-vendors': 'ic-vendors' },
-  stampFixView(key) {
-    if (!this.data) return;
-    this.data.fix_views = this.data.fix_views || {};
-    const t = this.todayLocal();
-    if (this.data.fix_views[key] !== t) { this.data.fix_views[key] = t; this.saveKey('fix_views'); }
   },
 
   showAuth() {
@@ -9509,8 +9488,6 @@ const App = {
       const revTitles = {
         'hub':                    ['Recovery Hub', ''],
         'r-audit':            ['Revenue Audit', 'Monthly Score and Progress'],
-        'r-playbook':         ['Revenue Playbook', 'The Strategy Behind the Fix'],
-        'r-fix':                  ['Revenue Fix', 'Fix Process and Guidance'],
         'r-experiments':          ['Experiments', ''],
         'r-forecast':             ['Revenue Forecast', 'Plan Next Week'],
         'week-history':           ['Week History', 'Weekly Recovery'],
@@ -9523,8 +9500,6 @@ const App = {
       };
       const revScreens = {
         'r-audit':            S.RevenueAudit,
-        'r-playbook':         S.RecoveryPlaybook,
-        'r-fix':              S.RevenueFix,
         'r-experiments':      S.RecoveryExperiments,
         'r-forecast':         S.RevenueForecast,
         'week-history':       S.WeekHistory,
@@ -9551,8 +9526,6 @@ const App = {
         'hub':           ['Recovery Hub', ''],
         'c-experiments': ['Experiments', ''],
         'c-audit':       ['Cash Audit', 'Weekly Score and Progress'],
-        'c-playbook':    ['Cash Playbook', 'The Strategy Behind the Fix'],
-        'c-fix':         ['Cash Fix', 'Fix Process and Guidance'],
         'c-trapped':     ['Trapped Cash', 'Cash Recovery'],
         'c-purchasing':  ['Purchasing', 'Cash Recovery'],
         'c-capital':     ['Capital Efficiency', 'Cash Recovery'],
@@ -9564,8 +9537,6 @@ const App = {
       const cashScreens = {
         'c-experiments': S.RecoveryExperiments,
         'c-audit':       S.CashAudit,
-        'c-playbook':    S.RecoveryPlaybook,
-        'c-fix':         S.CashFix,
         'c-trapped':     S.CashTrapped,
         'c-purchasing':  S.CashPurchasing,
         'c-capital':     S.CashCapital,
@@ -9741,9 +9712,7 @@ const App = {
       'sales-integrity': ['Sales Integrity', 'Shift Sales Review'],
       'cash-recon':    ['Over and Short', ''],
       'help':          ['Help and FAQ', ''],
-      'audit-tracker': ['Profit Audit', 'Monthly Score & Progress'],
-      'recovery-playbook': ['Profit Playbook', 'The Strategy Behind the Fix'],
-      'profit-fix':    ['Profit Fix', 'Fix Process and Guidance']
+      'audit-tracker': ['Profit Audit', 'Monthly Score & Progress']
     };
 
     const screens = {
@@ -9760,9 +9729,7 @@ const App = {
       'sales-integrity': S.SalesIntegrity,
       'cash-recon':    S.CashRecon,
       'help':          S.Help,
-      'audit-tracker': S.AuditTracker,
-      'recovery-playbook': S.RecoveryPlaybook,
-      'profit-fix':    S.ProfitFix
+      'audit-tracker': S.AuditTracker
     };
 
     const [title, sub] = titles[id] || [id, ''];
