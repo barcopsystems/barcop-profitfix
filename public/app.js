@@ -3601,9 +3601,23 @@ const App = {
            MODAL rather than a page and the desktop door already decides that. */
         'report-bug':         () => S2.HubReportBug && (S2.HubReportBug.openModal || S2.HubReportBug.open).call(S2.HubReportBug),
         'contact-support':    () => S2.HubSupport && (S2.HubSupport.openModal || S2.HubSupport.open).call(S2.HubSupport),
-        'help':               () => S2.HubHelp && S2.HubHelp.open()
+        'help':               () => S2.HubHelp && S2.HubHelp.open(),
+        /* ⛔⛔⛔ THE WEEK'S THREE PAGES. Added 2026-08-23 with the drawer drill, and this map's own
+           comment above predicted it word for word: a row that could not be REACHED does not need a
+           route, right up until it can. The moment The Week stopped being a leaf, three rows arrived
+           at a router that had never heard of them — the third time in three days that a bar or
+           drawer row met a router with no branch for it.
+           ⭐ DELEGATED to the same door the rail presses, never a fourth copy of the resolution. */
+        'week':               () => App._protoGlobalClick('week'),
+        'week-close':         () => App._protoGlobalClick('week-close'),
+        'week-review':        () => App._protoGlobalClick('week-review'),
+        'week-history':       () => App._protoGlobalClick('week-history')
       };
       if (r[p.action]) r[p.action]();
+      /* ⛔ AND AN UNROUTED ROW IS LOUD NOW, for the same reason `routeSidebarAction` reports one:
+         `if (r[p.action])` failing is completely silent, the sheet has already closed, and the row
+         just reads as dead. Every one of these has reached Kyle rather than the error digest. */
+      else if (p.action) console.error('routePage: no route for action "' + p.action + '"');
     };
     /* ⭐ ONE DOOR. This was the ten-key resolver and it is now the caller of it — `App.navHTMLFor`
        is the same table, moved up so the section-links bar reads the SAME source instead of keeping
@@ -3684,7 +3698,18 @@ const App = {
       const icon = IC[App._RAIL_IC[k]] || '';
       // Sections drill into their own pages; everything else is a leaf that goes straight there.
       if (App._isSection(k)) return drill(label, k, null, null, icon);
-      if (k === 'audit' || k === 'books' || k === 'settings') {
+      /* ⛔⛔⛔ A ROW DRILLS IF IT HAS PAGES, AND THIS WAS A HAND-KEPT TRIO UNTIL 2026-08-23 (Kyle, on
+         the phone: *"the week goes straight to the close the week page.. with no way to reach the
+         other two pages"*). It read `k === 'audit' || k === 'books' || k === 'settings'`, so The Week
+         fell to the LEAF branch and opened Close with no route to Review or History anywhere on a
+         phone. That was survivable while the three were TABS on one page — the tabs were the phone's
+         way through — and it stopped being survivable the moment the tabs were cut.
+         ⭐ DERIVED NOW: `navHtml(k)` is the one nav-source resolver, so a key with pages drills and a
+         key without stays a leaf. Hub and Sign Out resolve to '' and are unaffected; Books keeps its
+         landing row and Settings its panel title. A section switched on tomorrow drills the day it
+         ships instead of the day somebody remembers this list ([[the-loop]] #147 — a hand-kept list
+         breaks every time the product legitimately changes). */
+      if (navHtml(k)) {
         const home = k === 'books' ? () => S2.HubBooksHome && S2.HubBooksHome.open() : null;
         return drill(label, k, home, home ? 'Close Books' : null, icon,
           k === 'settings' ? 'App Settings' : null);
