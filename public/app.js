@@ -4265,12 +4265,18 @@ const App = {
      call it — harmless, and it keeps a mid-session action recorded promptly. */
   _startFixBaselines() {
     try {
-      if (!DB._dataReady) return;                 // same gate the screens' own _autoStart uses
-      // Idempotent by construction: ensureBaseline only writes when it LOWERS a gap's start date,
-      // and each _autoStart re-checks fix_log before adding a row.
-      [(window.S && S.ProfitFix), (window.S && S.RevenueFix)].forEach(scr => {
-        if (scr && typeof scr._autoStart === 'function') scr._autoStart();
-      });
+      if (!DB._dataReady) return;                 // same gate the machinery has always used
+      /* ⛔⛔ THIS USED TO REACH INTO THE TWO FIX SCREENS — `S.ProfitFix._autoStart()` and
+         `S.RevenueFix._autoStart()`. Those screens are being deleted, and the baseline they wrote is
+         what `Recovery.compute` measures "Recovered to date" FROM: without it every gap reads
+         `untracked` and the figure the audits now display silently goes to $0.
+         ⭐ SO THE MACHINERY MOVED TO `recovery.js`, beside `ensureBaseline`, which was always its
+         only consumer. An equality proof ran both implementations over one fixture and compared the
+         durable baselines and the auto `fix_log` rows: IDENTICAL, 11 and 11 ([[the-loop]] #110 — a
+         migration is safe only when the new answer IS the old answer, not when it looks right).
+         ⚠ Still idempotent: `ensureBaseline` writes only when it LOWERS a gap's date, and the log
+         row is skipped when the gap already has one. */
+      if (window.Recovery && typeof Recovery.startBaselines === 'function') Recovery.startBaselines();
     } catch (e) { /* best-effort; a baseline backfill must never block boot */ }
   },
 

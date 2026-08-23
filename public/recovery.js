@@ -64,6 +64,126 @@ window.Recovery = {
     App.acctSet('fix_baselines', next);
     return true;
   },
+  /* ══ STARTING THE MEASUREMENT CLOCK ═══════════════════════════════════════════════════════════
+     ⛔⛔⛔ THIS LIVED ON THE FIX SCREENS AND THE FIX SCREENS ARE BEING DELETED. `_autoStart` on
+     `S.ProfitFix` and `S.RevenueFix` is what wrote every durable baseline, and `App._startFixBaselines()`
+     called it by name at load. Without it `compute()` returns `untracked` for every gap and
+     "Recovered to date" silently goes to $0 — the exact figure the audits now display. So it moves
+     HERE, beside `ensureBaseline`, which is the only thing that ever consumed it.
+     ⭐ WHAT DID NOT COME WITH IT: the step lists, the per-step cadences (`maxDays`, `every`), the
+     `setup`/`state` step kinds and every `view:` watcher. `firstAction` never looked at any of them —
+     it keeps `recur` signals that are not `view:` — so they were UI, and they die with the UI.
+     ⚠ DERIVED FROM THE SHIPPED TABLES, NOT TRANSCRIBED. 11 gaps, 22 signals, and an equality proof
+     ran both implementations over one fixture and compared the baselines and the auto log rows
+     before this replaced anything ([[the-loop]] #110). */
+  START_GAPS: {
+    profit: [
+      { id: 'pour-cost', name: 'Pour Cost', signals: ['count', 'variancereport', 'week'] },
+      { id: 'theft-loss', name: 'Theft and Loss', signals: ['voidcomp', 'salesreview', 'drawer', 'delivery', 'spotcheck'] },
+      { id: 'food-cost', name: 'Food Cost', signals: ['count', 'waste', 'week'] },
+      { id: 'vendor-control', name: 'Vendor Control', signals: ['order', 'delivery'] },
+      { id: 'prime-cost', name: 'Prime Cost', signals: ['week'] }
+    ],
+    revenue: [
+      { id: 'menu-engineering', name: 'Menu Engineering', signals: ['dogtest'] },
+      { id: 'pricing', name: 'Pricing', signals: ['pricelog'] },
+      { id: 'labor-scheduling', name: 'Labor Cost and Scheduling', signals: ['schedule'] },
+      { id: 'rplh', name: 'Labor Productivity (RPLH)', signals: ['week', 'schedule'] },
+      { id: 'check-average', name: 'Check Average and Upsell', signals: ['servercheck', 'briefing'] },
+      { id: 'server-performance', name: 'Server Performance', signals: ['servercheck'] }
+    ]
+  },
+
+  /* ⛔⛔ PER MODULE, NEVER MERGED — `week` IS IN BOTH AND MEANS DIFFERENT THINGS. Profit's reads
+     `App.data.weeks`; Revenue's reads `App.data.revenue_weeks`. One flat table would have made
+     Revenue measure Profit's weeks, and every revenue baseline would start on the wrong date with
+     nothing on screen looking wrong. It is the only colliding key, which is exactly why it would
+     have been missed. */
+  START_SIGNALS: {
+    profit: {
+      count:          () => (App.inventoryData && App.inventoryData.ic_counts)         || [],
+      voidcomp:       () => (App.shiftData     && App.shiftData.sc_void_comps)         || [],
+      drawer:         () => (App.shiftData     && App.shiftData.sc_variances)          || [],
+      delivery:       () => (App.inventoryData && App.inventoryData.ic_deliveries)     || [],
+      spotcheck:      () => (App.completedSpotChecks ? App.completedSpotChecks() : []),
+      variancereport: () => (App.inventoryData && App.inventoryData.ic_variance_runs)  || [],
+      order:          () => (App.inventoryData && App.inventoryData.ic_orders)         || [],
+      waste:          () => (App.shiftData     && App.shiftData.sc_waste)              || [],
+      salesreview:    () => (App.data          && App.data.sales_reviews)              || [],
+      week:           () => (App.data          && App.data.weeks)                      || []
+    },
+    revenue: {
+      week:        () => (App.data && App.data.revenue_weeks)         || [],
+      servercheck: () => (App.data && App.data.revenue_server_checks) || [],
+      /* ⚠ A FILE DROP IS NOT A PRICE ROLLOUT, and this filter is load-bearing. The menu importer
+         logs every reprice a file carried through the same logger, so an unfiltered read let
+         dropping a price list start the pricing clock without anybody looking at pricing. DENY the
+         import by name rather than allow-listing the good sources: there are several today plus a
+         `'menu'` default plus legacy rows with no source, and an allow-list would go dark on each. */
+      pricelog:    () => ((App.data && App.data.revenue_price_log) || [])
+                           .filter(r => r && r.source !== 'menu-items-import'),
+      dogtest:     () => (App.data && App.data.menu_dog_tests)        || [],
+      schedule:    () => (App.laborData && App.laborData.lc_schedules) || [],
+      briefing:    () => (App.shiftData && App.shiftData.sc_briefings) || []
+    }
+  },
+
+  // The earliest dated row a signal can offer. Same date vocabulary the screens used, because a
+  // record here may carry any of four spellings depending on which store it came from.
+  _firstSignalDate(moduleKey, signal) {
+    const fn = (this.START_SIGNALS[moduleKey] || {})[signal];
+    if (!fn) return null;
+    let earliest = null;
+    (fn() || []).forEach(r => {
+      if (!r) return;
+      const d = r.period_end || r.date
+        || (r.run_at ? App.ymdLocal(new Date(r.run_at)) : '')
+        || (r.created_at ? App.ymdLocal(new Date(r.created_at)) : '');
+      if (d) { const ds = String(d).slice(0, 10); if (!earliest || ds < earliest) earliest = ds; }
+    });
+    return earliest;
+  },
+
+  // The day the clock starts for a gap: the first REAL activity behind it, never a page view.
+  firstActionFor(moduleKey, gap) {
+    let first = null;
+    (gap.signals || []).forEach(sig => {
+      const d = this._firstSignalDate(moduleKey, sig);
+      if (d && (!first || d < first)) first = d;
+    });
+    return first;
+  },
+
+  /* Start (or backfill) every gap's baseline. Called by `App._startFixBaselines()` at load.
+     ⚠ IDEMPOTENT BY CONSTRUCTION: `ensureBaseline` only writes when it LOWERS a gap's date, and the
+     log row is skipped when the gap already has one — so running this on every load does not churn
+     account_state or mint duplicate rows.
+     ⚠ THE GATE IS THE SAME ONE THE SCREENS USED: never write from before the initial load has
+     confirmed the account, or a fresh device can overwrite a real row with a default. */
+  startBaselines() {
+    if (typeof App === 'undefined' || !App.data) return;
+    if (typeof DB !== 'undefined' && !DB._dataReady) return;
+    if (!Array.isArray(App.data.fix_log)) App.data.fix_log = [];
+    Object.keys(this.START_GAPS).forEach(moduleKey => {
+      this.START_GAPS[moduleKey].forEach(gap => {
+        const start = this.firstActionFor(moduleKey, gap);
+        /* Promote the EARLIEST of this gap's first action and any existing log row, so a fix already
+           running gets its true start captured before that row can age out of the 24-month window. */
+        const existing = (App.data.fix_log || [])
+          .filter(e => e && e.gap_id === gap.id && e.module === moduleKey)
+          .map(e => e.date).filter(Boolean).sort()[0];
+        const baseline = [start, existing].filter(Boolean).sort()[0];
+        if (baseline) this.ensureBaseline(moduleKey, gap.id, gap.name, baseline);
+        if ((App.data.fix_log || []).some(e => e && e.gap_id === gap.id && e.module === moduleKey)) return;
+        if (!start) return;
+        App.putRecord('core', 'fix_log', {
+          id: App.uid(), module: moduleKey, gap_id: gap.id, gap_name: gap.name,
+          date: start, logged_at: new Date().toISOString(), auto: true
+        }, { quiet: true });
+      });
+    });
+  },
+
   // Every active fix as one synthetic entry per gap, from the UNION of durable baselines and the
   // windowed fix_log — so a gap keeps scoring after its log row ages out. moduleKey null = all.
   // Composite gaps are excluded here, matching the old _oneFixPerGap callers.
