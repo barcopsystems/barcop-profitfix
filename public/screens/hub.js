@@ -6,8 +6,8 @@ S.Hub = {
   WEEKLY_CUTOFF: 8,
   _sidebarCollapsed: false,
 
-  // ── Bar Cop Audit context sidebar ─────────────────────────────────────────
-  // The Hub shell's sidebar is context-aware. The Bar Cop Audit pages get this
+  // ── Operations Audit context sidebar ─────────────────────────────────────────
+  // The Hub shell's sidebar is context-aware. The Operations Audit pages get this
   // dedicated sidebar instead of the old grab-bag: Overall + quick-links into
   // each Recovery section's own audit page + History + Support. The three
   // Recovery-audit rows use data-hub-action "enter", so clicking one hands the
@@ -30,12 +30,24 @@ S.Hub = {
         + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + ic[iconKey] + '</svg>'
         + '<span class="nav-label">' + name + '</span></div>';
     };
+    /* ⭐⭐⭐ FOUR GROUPS OF ONE, AND THE GROUP NAMES ARE THE BAR'S LINKS (Kyle, 2026-08-22:
+       *"a top bar menu like inventory does with 4 links.. Operations, Profit, Revenue, and Cash..
+       each going to the corresponding audit landing page"*). `SectionTabs` makes one top-bar link
+       per GROUP, so the group name IS the link. A group holding a single destination renders as a
+       link that navigates rather than one that opens a one-row menu.
+       ⛔ ALL FOUR AUDITS LIVE HERE NOW AND NOWHERE ELSE. Their rows came out of the Profit, Revenue
+       and Cash menus in the same edit, which is the other half of what Kyle asked for: *"all 4
+       audit pages now live in one place."* The SCREENS are untouched — only the nav rows moved, so
+       every existing inbound link still resolves.
+       ⚠ THE OLD GROUPING WAS "Audit" + "By Recovery System", which would have made TWO links. */
     return ''
-      + '<div class="nav-section">Audit</div>'
-      + row('bar-cop-audit', 'Bar Cop Audit', 'audit', [])
-      + '<div class="nav-section">By Recovery System</div>'
+      + '<div class="nav-section">Operations</div>'
+      + row('bar-cop-audit', 'Operations Audit', 'audit', [])
+      + '<div class="nav-section">Profit</div>'
       + row('enter', 'Profit Audit',  'profit',  [['data-mod', 'profit'],  ['data-screen', 'audit-tracker']])
+      + '<div class="nav-section">Revenue</div>'
       + row('enter', 'Revenue Audit', 'revenue', [['data-mod', 'revenue'], ['data-screen', 'r-audit']])
+      + '<div class="nav-section">Cash</div>'
       + row('enter', 'Cash Audit', 'cash', [['data-mod', 'cash'], ['data-screen', 'c-audit']])
       + '<div class="nav-section">Support</div>'
       + row('audit-help', 'Help and FAQ', 'help', [])
@@ -213,7 +225,7 @@ S.Hub = {
       // No landing leaf: the Bar Cop Settings page is retired, so this section opens straight
       // onto its own pages, the same way Audits does.
       settings: { keepSupport: true },
-      // Audits has no Dashboard leaf (the Bar Cop Audit page IS its landing, now
+      // Audits has no Dashboard leaf (the Operations Audit page IS its landing, now
       // a flat link); it only renames the recovery-audits group.
       audit:    { remaps: { groups: { 'By Recovery System': 'Recovery Audits' } } }
     };
@@ -559,7 +571,7 @@ S.Hub = {
     return h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
   },
 
-  /* ── THE CLIMB: the Bar Cop Audit's whole history in two numbers ────────────────────────────
+  /* ── THE CLIMB: the Operations Audit's whole history in two numbers ────────────────────────────
      ⛔⛔ READ THE RIGHT STORE. There are FOUR audit stores and they are easy to confuse: `audits` is
      the PROFIT audit, `revenue_audits`, `cash_audits`, and `bar_cop_audits` is the meta one whose
      score is the "75" on screen. I built the first version of this band off `audits` and told Kyle
@@ -1047,7 +1059,7 @@ S.Hub = {
     // blanked to a dash and the click routed to the no-access notice — the Hub
     // grid never reflows, the section just reads as unavailable. For non-staff
     // (Owner/Admin/Viewer) canAccess is always true, so nothing changes. A null
-    // screen = a management-only page (Bar Cop Audit) locked to all Staff.
+    // screen = a management-only page (Operations Audit) locked to all Staff.
     const lockArea = (scr) => scr ? !App.canAccess(scr) : ((window.DB && DB.role && DB.role()) === 'staff');
     const heroTile = (scr, openJs, title, label, big, bigColor, sub) => {
       const lk = lockArea(scr);
@@ -1059,7 +1071,7 @@ S.Hub = {
 
     // Top row answers the three owner questions: money available, money gotten
     // back, operation health. Opportunity (white) · Recovered (gold = the hero,
-    // proven dollars) · Bar Cop Audit (the operation-health score). The recovery
+    // proven dollars) · Operations Audit (the operation-health score). The recovery
     // scores + trend now live only in the Audit Scores panel below.
     const recoveryTotal = window.Recovery ? Recovery.total() : { dollars: 0, fixes: 0 };
     const bcA      = last(data.bar_cop_audits || []);
@@ -1116,7 +1128,7 @@ S.Hub = {
     const rvCurrent= (wkMods.find(m => m.name === 'Revenue') || {}).current;
 
     // ── Top card: the money line (Opportunity · Recovered · Trapped Cash ·
-    //    Break-Even) on the left, the Bar Cop Audit health score pushed right. ──
+    //    Break-Even) on the left, the Operations Audit health score pushed right. ──
     const beSum = (S.HubBreakEven && S.HubBreakEven.summary) ? S.HubBreakEven.summary() : { hasData: false };
     const beVal = beSum.hasData ? App.fmtCurrency(beSum.breakEven, 0) : 'No data';
     const beCol = beSum.hasData ? (beSum.ok ? 'var(--green)' : 'var(--red)') : 'var(--t4)';
@@ -1170,13 +1182,13 @@ S.Hub = {
              trapped.hasData ? (trappedCash > 0 ? 'Cash to free on the shelves' : 'Shelves are working') : 'Count to surface this')
       + statDiv
       + heroTile('hub-books-home', "S.HubBreakEven.open()", 'Open Break-Even', 'Break-Even', beVal, beCol, beSub)
-      // The four figures above are dollars (the money line); the Bar Cop Audit is
+      // The four figures above are dollars (the money line); the Operations Audit is
       // a health score, not money, so a flex spacer pushes it to the right under
       // the Briefing button — money line left, operation-health read right. The
       // cell's width is matched to the Briefing button after mount (see below) so
       // the divider lines up flush with the button's left edge.
       /* ⛔ THE BAR COP AUDIT TILE CAME OUT OF THIS BAND, AND THE WALK IS WHAT FOUND IT. The climb
-         panel directly underneath is now the Bar Cop Audit read — first score, today's score, the
+         panel directly underneath is now the Operations Audit read — first score, today's score, the
          gain and the three recovery audits — so the live page carried the heading "BAR COP AUDIT"
          TWICE, eight inches apart, showing 75 both times. The band is the MONEY line: four dollar
          figures, nothing else. `bcScore` / `softScore` / `bcNextTxt` still feed The Rail and the
@@ -1257,7 +1269,7 @@ S.Hub = {
               s.screen, s.mod)
       +   '</div>'
       /* ⛔ ONE BORDERED BOX, BUILT FROM TWO GRID ITEMS. Kyle wants the text under each chip wrapped
-         like the Bar Cop Audit card: border only, no fill. It cannot be a single element, because
+         like the Operations Audit card: border only, no fill. It cannot be a single element, because
          the rows are what align the divider across four columns of different-length copy — a
          wrapper spanning both rows would lay its own contents out independently and the dividers
          would go ragged again.
@@ -1495,7 +1507,7 @@ S.Hub = {
       + navItem('report-bug',      'Report a Bug', 'bug',  []);
 
     // Cache the default (grab-bag) sidebar nav so renderSidebar() can restore it
-    // after a context sidebar (e.g. Bar Cop Audit) was swapped in.
+    // after a context sidebar (e.g. Operations Audit) was swapped in.
     this._grabBagNavHTML = sidebarNav;
 
     const collapsedClass = this._sidebarCollapsed ? ' sidebar-collapsed' : '';
@@ -1558,7 +1570,7 @@ S.Hub = {
         + '<div style="font-size:10px;color:var(--t4);margin-top:2px;">'
         + (m.date ? 'Run ' + esc(shortDate(m.date) || m.date) : 'Never run') + '</div></div>';
     };
-    const climbBlock = hbSh('Bar Cop Audit')
+    const climbBlock = hbSh('Operations Audit')
       + (climb
         /* ⛔ THE RULE BETWEEN THE TWO SCORES IS A GRADIENT, AND THAT IS WHAT MAKES THE SPACE WORK.
            Kyle: *"the line going between the 40 and the 75 isn't anything like the image you showed..
@@ -1906,7 +1918,7 @@ S.Hub = {
     if (App.setActiveHubNav) App.setActiveHubNav('hub-home');
 
     /* ⛔ THE BRIEFING MOUNT AND ITS ALIGNMENT PASS ARE GONE WITH THE BUTTON. The rAF block sized the
-       Bar Cop Audit cell's right margin to the Briefing button's width so the two right edges lined
+       Operations Audit cell's right margin to the Briefing button's width so the two right edges lined
        up; with no button to measure it would have shifted the cell by the slot's zero width, which
        is a silent layout change rather than an error. Delete the measurement with the thing it
        measured. */

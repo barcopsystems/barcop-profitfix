@@ -99,7 +99,7 @@ S.HubGroupDashboard = {
     const lastR = this._latest(rWeeks, 'period_end');
     const barRev = lastW?.bar?.revenue || 0;
     const foodRev = lastW?.food?.revenue || 0;
-    // Bar Cop Audit — the executive monthly score across the whole operation.
+    // Operations Audit — the executive monthly score across the whole operation.
     // Latest audit per account; null if the bar has not run one yet.
     const bcaAudits = Array.isArray(d.bar_cop_audits) ? d.bar_cop_audits : [];
     const lastBCA   = this._latest(bcaAudits, 'date');
@@ -165,7 +165,7 @@ S.HubGroupDashboard = {
     }
     const numCell = 'font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:700;white-space:nowrap;';
     const header = '<thead><tr>'
-      + '<th>Bar</th><th>Bar Cop Audit</th><th>Weekly Revenue</th><th>Pour Cost</th>'
+      + '<th>Bar</th><th>Operations Audit</th><th>Weekly Revenue</th><th>Pour Cost</th>'
       + '<th>Food Cost</th><th>Prime Cost</th><th>Labor %</th>'
       + '</tr></thead>';
     const rows = accounts.map(a => {

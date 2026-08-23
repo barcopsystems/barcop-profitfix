@@ -1,9 +1,9 @@
 'use strict';
 
-/* ── Bar Cop Audit — Hub-level executive weekly operational audit ───────────
+/* ── Operations Audit — Hub-level executive weekly operational audit ───────────
    The owner-operator's weekly read on the entire operation. Distinct from
    the three recovery audits (Profit, Revenue, Cash) which answer
-   "what's broken, where to fix" with financial outcomes. Bar Cop Audit
+   "what's broken, where to fix" with financial outcomes. Operations Audit
    answers a different question: "is the operation being run well, is there
    discipline." Uses Control data and cross-cutting operational metadata,
    not the recovery audit content.
@@ -43,7 +43,7 @@ S.HubBarCopAudit = {
     return App.data.bar_cop_audits;
   },
 
-  // Cross-system navigation from Bar Cop Audit deep-links. Hands off to
+  // Cross-system navigation from Operations Audit deep-links. Hands off to
   // S.Hub._enter to load the operator into the correct system sidebar.
   _navTo(screen) {
     if (!screen) return;
@@ -64,8 +64,8 @@ S.HubBarCopAudit = {
   // shows "BAR COP AUDIT | Back to Dashboard" mirroring the module shell
   // pattern. Sidebar stays mounted + interactive on the left.
   open() {
-    if (App._hubBlocked && App._hubBlocked('bar-cop-audit')) return;   // gated by the Bar Cop Audit area
-    App.openHubFullPage('Bar Cop Audit', (mount) => {
+    if (App._hubBlocked && App._hubBlocked('bar-cop-audit')) return;   // gated by the Operations Audit area
+    App.openHubFullPage('Operations Audit', (mount) => {
       this.container = mount;
       this._viewingId = null;
       this.renderMain();
@@ -88,7 +88,7 @@ S.HubBarCopAudit = {
     const ymd = String(dateStr).slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
     // Bounded at BOTH ends (S217). This tested only the floor, so a checklist, count, spot check or
-    // drop typed with a future date counted toward the Bar Cop Audit score straight away — and
+    // drop typed with a future date counted toward the Operations Audit score straight away — and
     // every component here is a completion RATIO, so a phantom row raises the grade.
     return App.inWindow(days)(ymd);
   },
@@ -853,7 +853,7 @@ S.HubBarCopAudit = {
       patterns:         this._recurringPatterns(),
       recovery_snapshot: this._recoveryActivitySnapshot(),
       // Mirror the recovery audit shape so AuditOutlook can reuse the same
-      // helper without special-casing Bar Cop Audit.
+      // helper without special-casing Operations Audit.
       // Only covered sub-scores become sections, so the Data Quality badge reads
       // true coverage (all-null must read Limited, not Full). sub_scores above keeps
       // all six keys so the N/A rings still render.
@@ -893,13 +893,13 @@ S.HubBarCopAudit = {
   },
 
   // ── Render: landing ─────────────────────────────────────────────────────
-  // Uses the shared AuditUI helpers so the Bar Cop Audit landing is identical to
+  // Uses the shared AuditUI helpers so the Operations Audit landing is identical to
   // the Profit / Revenue / Cash audits: request card, merged Latest-Audit card
   // with the six sub-scores as the section rows, the 12-month score-history bars,
   // and the Audit History data-card. This audit reads from logged data (no upload),
   // so the request card shows only a countdown when locked, and the history hides
   // the Data Quality (upload tier) column.
-  // The data slices the Bar Cop Audit reads across the whole operation, one per
+  // The data slices the Operations Audit reads across the whole operation, one per
   // sub-score. Each auto-checks off once Bar Cop has it, or taps through to the
   // step that fills it.
   _readinessSteps() {
@@ -940,7 +940,7 @@ S.HubBarCopAudit = {
     const desc = 'Bar Cop scores how disciplined your whole operation runs off your own logged data. Reads your trailing 30 days. Run it whenever you want a fresh read.';
 
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.readinessCard({ pfx: 'bca', title: 'Bar Cop Audit', desc,
+      + AuditUI.readinessCard({ pfx: 'bca', title: 'Operations Audit', desc,
           steps: this._readinessSteps(), sectionsReady: this._sectionsReady(), hasLatest: !!latest })
       + (latest ? AuditUI.landingCard(latest, audits[1], this.SECTION_NAMES, 'bca') : '')
       + (audits.length > 1 ? AuditUI.historyCard(audits, 'bar_cop_audit', 'bca', { sectionCount: this.SECTION_NAMES.length }) : '')
@@ -1096,7 +1096,7 @@ S.HubBarCopAudit = {
     // (their recoverable-strip slot), then Top Operational Exposures (this audit's
     // "what to act on"), the six sub-scores, and Recurring Patterns.
     this.container.innerHTML = '<div class="screen">'
-      + AuditUI.viewHero(audit, 'Bar Cop Audit', 'bca', this.SECTION_NAMES.length)
+      + AuditUI.viewHero(audit, 'Operations Audit', 'bca', this.SECTION_NAMES.length)
       + naNote
       + recoveryStrip
       + exposureCard
@@ -1123,7 +1123,7 @@ S.HubBarCopAudit = {
     }
   },
 
-  // ── Export the Bar Cop Audit as a data-driven PDF ───────────────────────
+  // ── Export the Operations Audit as a data-driven PDF ───────────────────────
   // Rebuilds the same content the detail page renders (overall health, the
   // six sub-scores with their breakdowns, top exposures, recurring patterns,
   // recovery activity snapshot, recovery-audit reference) via the shared
@@ -1140,9 +1140,9 @@ S.HubBarCopAudit = {
     const scoreLabel = overallNA ? 'Not Enough Data Yet' : App.scoreLabel(overall);
     const venue     = audit.bar_name || (App.data?.settings?.bar_name) || 'Your Operation';
 
-    const b = App._pdfBuilder('Bar Cop Audit');
+    const b = App._pdfBuilder('Operations Audit');
     b.header({
-      right: 'Bar Cop Audit',
+      right: 'Operations Audit',
       meta: this._fmtDate(audit.date) + '  ·  Operational Health '
             + (overallNA ? 'N/A' : overall)
     });
@@ -1226,6 +1226,6 @@ S.HubBarCopAudit = {
         ds = '' + dt.getFullYear() + p(dt.getMonth() + 1) + p(dt.getDate());
       }
     }
-    await b.save(App.pdfFileName('Bar Cop Audit', ds));
+    await b.save(App.pdfFileName('Operations Audit', ds));
   }
 };

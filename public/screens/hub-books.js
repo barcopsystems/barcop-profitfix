@@ -910,7 +910,7 @@ S.HubBooks = {
   // Disclaimer split into 3 short lines so each fits in a merged-row cell
   // without depending on wrap-text style (community SheetJS does not write
   // style). Reads from App.deliverableFooter() so every Bar Cop deliverable
-  // (Books, Year-End, Weekly P&L Brief, Bar Cop Audit PDF) shares one
+  // (Books, Year-End, Weekly P&L Brief, Operations Audit PDF) shares one
   // canonical disclaimer.
   _disclaimerLines() {
     return App.deliverableFooter().disclaimerLines;

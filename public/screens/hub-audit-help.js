@@ -1,30 +1,30 @@
 'use strict';
 
-/* ── Bar Cop Audit — Help and FAQ ─────────────────────────────────────────────
+/* ── Operations Audit — Help and FAQ ─────────────────────────────────────────────
    The Audit section's knowledge layer, same underline tab switcher + live
    search as the Control / Recovery / Events help pages. Per-page how-tos live on
    each page's info "i" panel; this covers the why: what the audit measures, the
    rhythm, and how it relates to the recovery audits. Hub-shell screen, opens
-   with the Bar Cop Audit sidebar. */
+   with the Operations Audit sidebar. */
 
 S.HubAuditHelp = {
   tab: 0,
   query: '',
 
   open() {
-    App.openHubFullPage('Bar Cop Audit Help', (mount) => {
+    App.openHubFullPage('Operations Audit Help', (mount) => {
       this.container = mount; this.tab = 0; this.query = ''; this.draw();
     }, 'audit-help');
   },
 
   SECTIONS: [
     { t: 'Getting Started', qa: [
-      { q: 'What is the Bar Cop Audit?',
-        a: 'It is your read on how well the whole operation is being run, scored from the data you already log across Inventory, Labor, and Shift Control. It answers a different question than the recovery audits. Profit, Revenue, and Cash tell you where money is leaking and how to fix it. The Bar Cop Audit tells you whether the operation has discipline: are procedures followed, is cash tight, is inventory under control, are you acting on what Bar Cop surfaced.' },
+      { q: 'What is the Operations Audit?',
+        a: 'It is your read on how well the whole operation is being run, scored from the data you already log across Inventory, Labor, and Shift Control. It answers a different question than the recovery audits. Profit, Revenue, and Cash tell you where money is leaking and how to fix it. The Operations Audit tells you whether the operation has discipline: are procedures followed, is cash tight, is inventory under control, are you acting on what Bar Cop surfaced.' },
       { q: 'How often do I run it?',
         a: 'As often as you want. There is no lock and no countdown. Bar Cop saves one audit a day, so a fresh read is always a click away, and the landing shows a live data badge for what level it would come out at right now. It scores your trailing 30 days, so the window stays wide enough for each measure to mean something. Most operators run it with their weekly close to keep the trend on a steady rhythm, but that is your call, not a rule.' },
       { q: 'Do I have to enter anything to run it?',
-        a: 'No. The Bar Cop Audit reads entirely from your Control systems, so there is nothing to upload. Log your counts, shifts, cash, schedules, and hours as normal and the audit scores what it can. Anything without enough behind it shows N/A instead of guessing.' }
+        a: 'No. The Operations Audit reads entirely from your Control systems, so there is nothing to upload. Log your counts, shifts, cash, schedules, and hours as normal and the audit scores what it can. Anything without enough behind it shows N/A instead of guessing.' }
     ]},
     { t: 'The Score', qa: [
       { q: 'What are the six sub-scores?',
@@ -36,13 +36,13 @@ S.HubAuditHelp = {
     ]},
     { t: 'The Recovery Audits', qa: [
       { q: 'How is this different from my Profit, Revenue, and Cash audits?',
-        a: 'Those three are diagnostic: each scores its own area and ranks the money to recover. The Bar Cop Audit sits above them as the operational read. The sidebar links to all three so you can reach them in one place, and each opens in its own Recovery section.' },
-      { q: 'Does running a recovery audit affect my Bar Cop Audit?',
-        a: 'Yes. Running your recovery audits on time and acting on what they surface both feed the Bar Cop Audit, through the Recovery Action and Operational Discipline sub-scores. An operation that diagnoses and fixes scores higher than one that lets gaps sit.' }
+        a: 'Those three are diagnostic: each scores its own area and ranks the money to recover. The Operations Audit sits above them as the operational read. All four live in the Audits section: the top bar carries Operations, Profit, Revenue and Cash, so you can move between them without leaving the page.' },
+      { q: 'Does running a recovery audit affect my Operations Audit?',
+        a: 'Yes. Running your recovery audits on time and acting on what they surface both feed the Operations Audit, through the Recovery Action and Operational Discipline sub-scores. An operation that diagnoses and fixes scores higher than one that lets gaps sit.' }
     ]},
     { t: 'History', qa: [
       { q: 'Where do past audits go?',
-        a: 'Every Bar Cop Audit is kept. The Audit History list at the bottom of the audit landing shows them newest first, and View opens the full detail of any past one so you can see how a score moved and what was flagged at the time.' },
+        a: 'Every Operations Audit is kept. The Audit History list at the bottom of the audit landing shows them newest first, and View opens the full detail of any past one so you can see how a score moved and what was flagged at the time.' },
       { q: 'What does the score trend tell me?',
         a: 'Whether the operation is tightening up or slipping. One audit is a snapshot; a line of them is the real story. Running it on a steady rhythm, most operators do it with their weekly close, keeps that line honest. A steady climb means your procedures are sticking. A drop is an early warning before it shows up in the money.' }
     ]}
