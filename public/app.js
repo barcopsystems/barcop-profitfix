@@ -2306,6 +2306,11 @@ const App = {
       if (key === 'profit'    && typeof ProfitNav !== 'undefined') return ProfitNav.html();
       if (key === 'revenue'   && typeof Revenue   !== 'undefined') return Revenue.navHTML();
       if (key === 'cash'      && typeof Cash      !== 'undefined') return Cash.navHTML();
+      /* ⭐ THE FLOOR joined 2026-08-23 and it is the first section whose pages come from THREE
+         other modules. Its rows carry their own door (`data-hub-action="enter"` + `data-mod`), so
+         nothing here has to know that — this resolver answers "what is this section's markup" and
+         nothing else, which is why the bar, the sidebar and the phone drawer can all read it. */
+      if (key === 'floor'     && typeof Floor     !== 'undefined') return Floor.navHTML();
       /* ⭐ THE WEEK JOINED 2026-08-23. Its three links come from the section's own object, the same
          way every module section supplies its own — there is no hub SIDEBAR for The Week (all three
          pages are `'none'` in `_HUB_SIDEBAR_OF_ACTION`, full width), so a `_weekSidebarHTML` in
@@ -2590,7 +2595,16 @@ const App = {
      above. The three ids still resolve — they are tab targets now — so nothing that linked to them
      had to be re-pointed. Deleting the table rather than emptying it is deliberate: an empty table
      still gets rendered as a group and draws its divider. */
-  _PROTO_CONTROL:  [['labor','Labor'],['shift','Shift']],
+  /* ⛔⛔⛔ LABOR AND SHIFT ARE GONE FROM THE RAIL (Kyle, 2026-08-23): *"a new rail menu link 'The
+     Floor' ... and it merges shift and labor into one section.. this gets rid of labor and shift
+     sections all together"*. One row now, in the slot both of them used to hold.
+     ⭐ THE MODULES SURVIVE. `navigate` still branches on `labor` and `shift` and renders every one
+     of those screens; what died is the rail ROW and the menu, not the shell. `_moduleOf` and
+     `App.STAFF_TILES` still say the old words on purpose, exactly as they do for the six pages the
+     Books bar took — the filing system moved, the renderer did not.
+     ⚠ AND THE TABLE IS NOT LEFT EMPTY. `_PROTO_WEEK` was DELETED rather than emptied because an
+     empty table still renders as a group and draws its divider; this one keeps a row, so it stays. */
+  _PROTO_CONTROL:  [['floor','The Floor']],
   _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
   /* ⛔ SIGN OUT LEFT THE RAIL ON 2026-08-16 (Kyle: *"move it from the side bar and put like in the
      images"*). It now sits in the TOP NAV, left of the account switcher and The Rail, as plain
@@ -2720,7 +2734,7 @@ const App = {
       { h: 'What If', p: ['The what-if is a sandbox. Move your weekly sales, cut the nut, or trim the variable rate and watch break-even and your profit move, so you can see what a price change or a rent cut actually buys you before you commit. Hit Reset to snap back to your real numbers.'] }
     ] },
     'permits': { title: 'How Licensing Works', sections: [
-      { h: 'What this page is', p: ['Tracks your permits and licenses by renewal date so none of them lapse. Add each one with its type, next renewal date and recurrence, and Bar Cop watches the calendar for you. Find it in Shift Control, under Incidents and Maintenance.'] },
+      { h: 'What this page is', p: ['Tracks your permits and licenses by renewal date so none of them lapse. Add each one with its type, next renewal date and recurrence, and Bar Cop watches the calendar for you. Find it under The Floor, in Records.'] },
       { h: 'How the statuses work', p: ['A renewal more than 30 days out is On Track. Within 30 days is due soon and within 14 is more urgent, both flagged amber; once the date passes it is Expired, in red. Anything due soon or expired shows under Needs Attention here and on your Hub. Use the chips to filter the list by status.'] },
       /* ⚠ THIS PROMISED THE RENEWAL WOULD LOG THE COST "so your bookkeeper does not enter it twice",
          and it was doing the opposite: the row it wrote carried the permit's TYPE as its vendor, so
@@ -2878,6 +2892,31 @@ const App = {
        claims to open drift apart. */
     if (g === 'week' || g === 'week-close' || g === 'week-review' || g === 'week-history') {
       return (window.S && S.Week) ? S.Week.open(g) : null;
+    }
+    /* ⭐⭐⭐ THE FLOOR LANDS ON BUILD SCHEDULE (Kyle, 2026-08-23: *"so the build schedule is the
+       default page the user always lands on when clicking 'the floor' rail link"*). It goes through
+       `_enter` rather than `navigate` because this section's pages live in other modules and
+       `navigate` is module-internal — the wrong door here is three dead links, twice paid for.
+       ⛔⛔ AND IT MUST NOT DEAD-END A SHIFT-ONLY MEMBER. The landing is a LABOR page, so merging
+       Shift into this section would otherwise refuse the whole thing to somebody who could use
+       Shift Control yesterday: `_enter` gates on the screen, and the rail row is their only way in.
+       So it falls through to the first row in BAR ORDER they can open, and refuses only when they
+       can open none of them. The order comes from the section's own nav, so there is no second list
+       to keep in step, and the common case is still exactly what Kyle asked for.
+       ⚠ THE FALLBACK IS NOT A PREFERENCE ENGINE. It does not remember, rank or guess — it takes the
+       first door that opens, which is the same rule an operator reading the bar left to right would
+       apply themselves. */
+    if (g === 'floor') {
+      if (!(window.S && S.Hub && S.Hub._enter)) return null;
+      if (this.canAccess('lc-build-schedule')) return S.Hub._enter('lc-build-schedule', 'labor');
+      let first = null;
+      try {
+        (SectionTabs.groupsFor('floor') || []).forEach(gr => gr.rows.forEach(r => {
+          if (!first && r.screen && this.canAccess(r.screen)) first = r;
+        }));
+      } catch (e) { first = null; }
+      if (first) return S.Hub._enter(first.screen, first.mod);
+      return this.showNoAccess();
     }
     if (g === 'audit') return (window.S && S.HubBarCopAudit) ? S.HubBarCopAudit.open() : null;
     if (g === 'books') return (window.S && S.HubOperatingExpenses) ? S.HubOperatingExpenses.open() : null;
@@ -3286,7 +3325,11 @@ const App = {
      have made Events navigate and Audits navigate purely because of where they were listed.
      ⭐ AND IT MATCHES THE MOBILE DRAWER EXACTLY, which was the tell that it is the right line:
      openMobileNav gives Hub / Map / Review leaf rows that navigate, and drills these same ten. */
-  _RAIL_HUB_CTX: { audit: 'audit', books: 'books', settings: 'settings' },
+  /* ⭐ `floor` is a HUB-style section for the same reason `audit` is: its pages live in other
+     modules, so `_activeModule` cannot answer "where am I" for them and `_railSectionForScreen`
+     has to. A MODULE section must never appear here or the resolver starts moving rail rows nobody
+     asked about (pinned as the `ic-take-inventory` control). */
+  _RAIL_HUB_CTX: { audit: 'audit', books: 'books', settings: 'settings', floor: 'floor' },
 
   /* ⭐⭐⭐ WHICH RAIL SECTION OWNS THIS SCREEN, WHEN THE ANSWER IS NOT THE MODULE IT LIVES IN.
      ⛔⛔ THE DEFECT IT CLOSES (Kyle, 2026-08-23): *"profit, revenue, and cash links when clicked go
@@ -3339,10 +3382,49 @@ const App = {
      member reaches Your Account through it to change their own password (`_openSettingsForRole`
      routes them straight there, and `hub-user-accounts` refuses every other group). Blocking this
      menu would lock a member out of their own credentials. */
+  /* ⛔⛔⛔ A SECTION IS OPEN IF THE MEMBER CAN REACH ANY PAGE IN IT, and that stopped being the
+     same question as `areaAllowed(key)` the day a section's pages came from more than one area.
+     THE DEFECT IT CLOSES, before it could ship: this function reads the RAIL KEY as an AREA KEY.
+     The Floor merges Labor and Shift, nobody holds a `floor` key, and `_permissions['floor']` is
+     undefined — so every scoped member would have been refused the whole section while the owner
+     and the demo sailed through, because both short-circuit every gate. That is the class of defect
+     that cannot be walked ([[lessons-paid-for]] #136).
+     ⭐ DERIVED FROM THE SECTION'S OWN NAV, never a hand-kept map of "which areas is this section
+     really made of" — the same source `_railSectionForScreen`, the bar, the sidebar and the phone
+     drawer already read, so a row moving between sections carries its area question with it.
+     ⭐ AND IT IS PROVABLY INERT FOR EVERY SECTION THAT SHIPPED BEFORE THIS. Measured first: every
+     other section's nav resolves to exactly its own area key plus `_always`, so `some()` over that
+     set is the same answer `areaAllowed(key)` gave. The ONE deliberate exception is Audits, whose
+     nav spans profit, revenue, cash and audit: a Profit-only member can now open that rail row and
+     reach the Profit Audit, where before the row refused them. Nobody gains a PAGE — every per-page
+     gate is untouched — they gain the menu that offers the page they already owned.
+     ⛔ THE FALLBACK IS NOT A CONVENIENCE. A section whose nav this cannot read (no markup, an
+     unparsed shape) must answer exactly as it did yesterday rather than quietly opening: an empty
+     derived set means "I could not measure", never "no areas required" ([[the-loop]] #23 — a claim
+     about every member of an empty set is vacuously true, and that is the dangerous direction). */
+  /* ⛔⛔ THE AREA WALK IS A LOCAL, NOT A SIBLING METHOD, AND THAT IS NOT A STYLE CHOICE. Three
+     harnesses LIFT `_railSectionAllowed` and run it on their own bare `App` object; the moment it
+     called a sibling, all three died with `this._sectionAreas is not a function` — one of them
+     threw and printed no summary at all, which `_gate.js` can only see as "the suite got shorter".
+     A helper that only its own member reads goes INSIDE that member, every time
+     ([[the-loop]] #16/#120, and #13's "a new App.* helper breaks every harness stub at once"). */
   _railSectionAllowed(key) {
     if (key === 'settings') return true;
     if (!window.DB || !DB.areaAllowed) return true;
-    return DB.areaAllowed(key);
+    // Which permission areas the pages in this section's own menu actually resolve to.
+    const areas = [];
+    if (typeof SectionTabs !== 'undefined' && SectionTabs.groupsFor && DB._areaOf) {
+      try {
+        SectionTabs.groupsFor(key).forEach(g => g.rows.forEach(r => {
+          if (!r.screen) return;
+          const a = DB._areaOf(r.screen);
+          // '_always' is the help marker, readable by anyone, so it can never be the reason a
+          // section opens — counting it would open every menu that carries a Help row.
+          if (a && a !== '_always' && areas.indexOf(a) < 0) areas.push(a);
+        }));
+      } catch (e) { areas.length = 0; }
+    }
+    return areas.length ? areas.some(a => DB.areaAllowed(a)) : DB.areaAllowed(key);
   },
 
   /* Every rail row carries an icon, from the SHARED section map, because the collapsed rail is
@@ -3357,7 +3439,12 @@ const App = {
      and the mobile drawer both read this map by id. */
   _RAIL_IC: { hub: 'hub', week: 'dash', 'week-review': 'review', 'week-close': 'dash', 'week-history': 'history',
               audit: 'audit', events: 'events', books: 'books',
-              inventory: 'inventory', labor: 'labor', shift: 'shift',
+              /* ⚠ The Floor reuses the CREW mark that Labor Control carried, rather than new art:
+                 it is the section of the schedule, the pay and the checklists, and the people mark
+                 says that where the clock (Shift's) said only "now". The `labor` and `shift` keys
+                 stay in `_NAV_SECTION_IC` because the phone drawer and the module shells still read
+                 them. Design is Kyle's, one change at a time, so this is a reuse and not a choice. */
+              inventory: 'inventory', floor: 'labor', labor: 'labor', shift: 'shift',
               profit: 'profit', revenue: 'revenue', cash: 'cash',
               settings: 'settings', signout: 'signout' },
 

@@ -35,10 +35,6 @@ const ProfitNav = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 5v4.5c0 3.5 5.5 5.5 5.5 5.5s5.5-2 5.5-5.5v-4.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2L12 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Loss Prevention</span>
       </div>
-      <div class="nav-item" data-screen="cash-recon" id="nav-cash-recon">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="4.5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5V3.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
-        <span class="nav-label">Over and Short</span>
-      </div>
       <div class="nav-section">Experiments</div>
       <div class="nav-item" data-screen="profit-experiments" id="nav-profit-experiments">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2v4.2L3 12.5a1.2 1.2 0 0 0 1 1.8h9a1.2 1.2 0 0 0 1-1.8L10.5 6.2V2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2h6M5.2 9.5h6.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -522,6 +518,159 @@ const Shift = {
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
         <span class="nav-label">Report a Bug</span>
       </div>
+    `;
+  }
+};
+
+/* ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────
+   Kyle, 2026-08-23: *"a new rail menu link 'The Floor' ... and it merges shift and labor into one
+   section.. plus some pages added from the recovery sections.. this gets rid of labor and shift
+   sections all together"*. Six drop-downs in his order: Schedules, Pay, The Safe, Records,
+   Checklists, Setup. The rail row lands on Build Schedule.
+
+   ⛔⛔⛔ EVERY ROW CARRIES `data-hub-action="enter"` PLUS `data-mod`, and both halves are load-
+   bearing. This section's pages live in THREE other modules (labor, shift and profit), so
+   `navigate` cannot reach them: it branches on `_activeModule` and only consults that module's
+   own map. `_enter(screen, mod)` swaps the shell first. Without `data-mod` that call is
+   `showApp(undefined)` and the page never renders. This is the Audits and Books precedent, and
+   the wrong door has shipped dead links twice.
+
+   ⛔⛔ THE MODULE DELIBERATELY DOES NOT MOVE. `navigate` still renders every one of these out of
+   the labor, shift and profit branches, and `App.STAFF_TILES` still names the module a non-admin
+   member lands in. Area and module are different questions, exactly as they are for the six pages
+   the Books bar took.
+
+   ⛔ AND THE PERMISSION AREAS DO NOT MOVE EITHER, on purpose. A labor page still needs `labor`
+   and a shift page still needs `shift`, so the grant split an operator can make today survives
+   until Kyle moves the permission grain deliberately. `_railSectionAllowed` derives a section's
+   allowed set from this markup, so holding EITHER area opens the section and the refusal happens
+   per page, which is what he asked for: *"they click on the floor and see the same full top bar
+   menu.. but a click on any link other than in the schedule drop down gives them the no access
+   pop up"*.
+
+   ⚠ NO `id="nav-<screen>"` ON THESE ROWS. Labor's and Shift's own navHTML still render those ids
+   into the (hidden) module sidebar and `updateNav` resolves the active row with `getElementById`,
+   which takes the first match in document order. This markup is only ever parsed into a DETACHED
+   div today, and leaving the attribute off keeps that safe if it is ever attached.
+
+   ⚠ ONE MARK CHANGED, AND IT WAS FORCED. The plain list icon is the app's shared HISTORY mark:
+   seven rows carry it, which is fine while they sit in seven menus. The Pay menu gathers two of
+   them, and no two rows in one drop-down may share a mark (Kyle's rule from the three forecasts).
+   `lc-reports` takes the bar-chart mark `ic-report-variance` already owns rather than any new art:
+   that screen IS the labor reports page and the glyph was used exactly once.
+
+   ⚠ NO SUPPORT GROUP. Kyle, 2026-08-23: *"we are creating a global help page.. so both stay.. just
+   not anywhere on the app yet"* — `lc-help` and `sc-help` stay registered and reachable by id, and
+   neither is filed here. The bar drops Support wholesale anyway (`ASIDE_GROUP`). */
+const Floor = {
+  navHTML() {
+    return `
+      <div class="nav-section">Schedules</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-build-schedule">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Build Schedule</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-schedule-history">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
+        <span class="nav-label">Schedule History</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-overtime-watch">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="9" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 6v3.2l2.2 1.3M6.5 2.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Overtime Watch</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-time-off">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 2v3M11.5 2v3M2 8h13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M6.5 11.5l4-2.5M6.5 9l4 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span class="nav-label">Time Off Log</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-callout-log">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L15.5 14.5H1.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v3.4M8.5 12v.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Call-Out Log</span>
+        </div>
+      <div class="nav-section">Pay</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-log-hours">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Log Hours</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-reports">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Labor History</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-tip-log">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2v13M5.5 5h5a2 2 0 0 1 0 4H6a2 2 0 0 0 0 4h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Tip Tracking</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-tip-history">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
+        <span class="nav-label">Tip History</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-pay-periods">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="3.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 7h13M6 11h2M10 11h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Pay Periods</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-payroll-export">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 2.5h6l3 3v9H4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 2.5v3h3M8.5 7.5v4.5M6.5 10l2 2 2-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Payroll Export</span>
+        </div>
+      <div class="nav-section">The Safe</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-cash-control">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4h12v9h-12z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8.5" cy="8.5" r="2.2" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5h0.7M11.3 8.5H12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Cash Control</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-cash-history">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M5 4.5h9M5 8.5h9M5 12.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="2.6" cy="4.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="8.5" r="0.7" fill="currentColor"/><circle cx="2.6" cy="12.5" r="0.7" fill="currentColor"/></svg>
+        <span class="nav-label">Cash History</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="profit" data-screen="cash-recon">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="4.5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5V3.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.3"/><circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Over and Short</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-walked-tabs">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3.5 14.5l3.5-8 3 4 3.5-6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13.5" cy="4.5" r="1.3" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Walked Tabs</span>
+        </div>
+      <div class="nav-section">Records</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-incidents">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M7.4 3.2 1.9 12.8a1.25 1.25 0 0 0 1.1 1.9h11a1.25 1.25 0 0 0 1.1-1.9L9.6 3.2a1.25 1.25 0 0 0-2.2 0z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7v2.8M8.5 11.8v.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Incidents</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-maintenance">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M10.8 2.5a3 3 0 0 0-4 4l-4.3 4.3 2 2L8.8 8.5a3 3 0 0 0 4-4l-2 2-2-2 2-2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Maintenance</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-licensing">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2.2 3 4.4v4.1c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V4.4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.3 8.4l1.7 1.7 3-3.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Licensing</span>
+        </div>
+      <div class="nav-section">Checklists</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-checklists">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2.5" y="2.5" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2 4-4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="nav-label">Run Checklists</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-checklist-templates">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="5" y="5" width="9.5" height="9.5" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 11.5V3.8A1.3 1.3 0 0 1 3.8 2.5H11.5" stroke="currentColor" stroke-width="1.3"/></svg>
+        <span class="nav-label">Build Checklists</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-preshift">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 6.5v4l7 3V3.5l-7 3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M3 6.5H2.2A.7.7 0 0 0 1.5 7.2v2.6a.7.7 0 0 0 .7.7H3M12 6c1 .5 1 4 0 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Pre-Shift Briefing</span>
+        </div>
+      <div class="nav-section">Setup</div>
+      <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-drawers">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><rect x="2" y="5" width="13" height="8" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5 5V3.5h7V5M5.5 9h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Add Registers</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-positions">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="5.5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M3 14.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Add Positions</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-staff-roster">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="6" cy="6" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M1.8 14c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.5 4.2a2.4 2.4 0 0 1 0 4.6M12 14c0-2.4-1.3-3.9-3-4.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Staff Roster</span>
+        </div>
+      <div class="nav-item" data-hub-action="enter" data-mod="labor" data-screen="lc-training">
+        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2.5l6 2.7-6 2.7-6-2.7 6-2.7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 7v3.5c0 1.1 1.8 2 4 2s4-0.9 4-2V7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.5 5.2v3.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="nav-label">Training</span>
+        </div>
     `;
   }
 };
