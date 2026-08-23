@@ -565,7 +565,7 @@ const DB = {
        than its own; Annual Review had no gate at all and was reachable by anyone. */
     'hub-books':'books','hub-books-home':'books','hub-breakeven':'books',
     'hub-operating-expenses':'books','hub-year-end':'books',
-    // Bar Cop Audit (the cross-section meta-audit — its own grantable area)
+    // Operations Audit (the cross-section meta-audit — its own grantable area)
     'bar-cop-audit':'audit'
   },
 
@@ -2078,7 +2078,7 @@ const DB = {
       event_regulars:   [],
       event_calendar:   [],
       getting_started_events: {},
-      // Hub — Bar Cop Audit history (executive monthly audits at Hub level)
+      // Hub — Operations Audit history (executive monthly audits at Hub level)
       bar_cop_audits: [],
       // Hub — Operating Expenses Log (per-entry expense capture, feeds Books)
       operating_expenses: [],

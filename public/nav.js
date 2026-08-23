@@ -4,11 +4,12 @@
 const ProfitNav = {
   html() {
     return `
+      <!-- THE PROFIT AUDIT ROW MOVED TO THE AUDITS SECTION (Kyle, 2026-08-22): "the profit,
+           revenue, cash audits get removed from the current recovery menus.. all 4 audit pages now
+           live in one place .. the Audits link on the rail." The SCREEN is untouched and
+           audit-tracker still resolves from every inbound link; only this nav row went.
+           NO BACKTICKS IN HERE: this markup is inside a template literal, so one would end it. -->
       <div class="nav-section">Analysis</div>
-      <div class="nav-item" data-screen="audit-tracker" id="nav-audit-tracker">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Profit Audit</span>
-      </div>
       <div class="nav-item" data-screen="profit-forecast" id="nav-profit-forecast">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Profit Forecast</span>
@@ -56,11 +57,8 @@ const ProfitNav = {
 const Revenue = {
   navHTML() {
     return `
+      <!-- ⛔ The Revenue Audit row moved to the Audits section, 2026-08-22. Screen untouched. -->
       <div class="nav-section">Analysis</div>
-      <div class="nav-item" data-screen="r-audit" id="nav-r-audit">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Revenue Audit</span>
-      </div>
       <div class="nav-item" data-screen="r-forecast" id="nav-r-forecast">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Revenue Forecast</span>
@@ -108,11 +106,8 @@ const Revenue = {
 const Cash = {
   navHTML() {
     return `
+      <!-- ⛔ The Cash Audit row moved to the Audits section, 2026-08-22. Screen untouched. -->
       <div class="nav-section">Analysis</div>
-      <div class="nav-item" data-screen="c-audit" id="nav-c-audit">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l2 2L12 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Cash Audit</span>
-      </div>
       <div class="nav-item" data-screen="c-forecast" id="nav-c-forecast">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 11l3-3.5 2.5 2.5L11 5.5l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 14h12M3 2v2M8.5 2v2M14 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         <span class="nav-label">Cash Forecast</span>

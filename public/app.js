@@ -1769,7 +1769,7 @@ const App = {
   // Profit Recovery system).
   //
   // Call signature:
-  //   App.openHubFullPage('Bar Cop Audit', mount => renderFn(mount), 'bar-cop-audit');
+  //   App.openHubFullPage('Operations Audit', mount => renderFn(mount), 'bar-cop-audit');
   //
   // The third arg is the sidebar action key (data-hub-action) so we can
   // light up the matching nav item. Back to Dashboard re-renders the Hub
@@ -1793,7 +1793,7 @@ const App = {
     const wrapVisible = wrap && wrap.style.display !== 'none';
     if (!wrapVisible) this.showHub();
     // Sidebar context: Blueprint (and any 'none' page) keeps the full-width
-    // dashboard mode (no sidebar); Bar Cop Audit mounts its own context
+    // dashboard mode (no sidebar); Operations Audit mounts its own context
     // sidebar; everything else falls back to the default Hub sidebar.
     const _sideCtx = this._HUB_SIDEBAR_OF_ACTION[activeAction] || 'grabbag';
     this._curHubSection = (_sideCtx === 'audit' || _sideCtx === 'books' || _sideCtx === 'settings') ? _sideCtx : null;
@@ -2000,7 +2000,7 @@ const App = {
     return (window.DB && DB.screenAllowed) ? DB.screenAllowed(screenId) : true;
   },
 
-  // Hub-level pages (Books, Bar Cop Audit, Settings, Workflow) open directly via
+  // Hub-level pages (Books, Operations Audit, Settings, Workflow) open directly via
   // openHubFullPage, bypassing the screen router's access check — so they gate
   // here. Returns true (and bounces a Staff member back to their hub) when the
   // page isn't allowed. `screen` = a representative screen to area-check via
@@ -2013,14 +2013,14 @@ const App = {
     // Demo (and any session before the membership role resolves) is full access,
     // the same way canAccessLevel opens up when no role is set. Without this the
     // demo user is blocked from every management page (Workflow, Settings, Team,
-    // Bar Cop Audit), since they are neither owner nor admin.
+    // Operations Audit), since they are neither owner nor admin.
     if (!role) return false;
     if (screen) {
       // Area-scoped hub page (e.g. Books): the member's permission grid is the
       // gate for BOTH admin and staff, so a restricted admin is held out too.
       if (this.canAccess(screen)) return false;
     } else {
-      // Management-only page (Settings, Team, Bar Cop Audit, Workflow): an admin
+      // Management-only page (Settings, Team, Operations Audit, Workflow): an admin
       // configures the bar, so they pass; staff are blocked.
       if (role === 'admin') return false;
     }
@@ -2626,7 +2626,7 @@ const App = {
     'hub': { title: 'How the Hub Works', sections: [
       { h: 'What this is', p: ['Your home screen. The Hub answers one question: are you running the bar better than you were? Every band on it is about movement, not a snapshot, and every number is a door into the screen behind it.'] },
       { h: 'The money line', p: ['Four figures across the top. Total Opportunity is every dollar your audits have surfaced that you have not closed yet. Recovered, in gold, is the proven dollars you have put back, counted only after Bar Cop has measured that gap moving. Trapped Cash is the dead and overstocked inventory you could free. Break-Even is the sales you need to clear your costs. The first three open the audit that found that money.'] },
-      { h: 'Your Bar Cop Audit', p: ['The left panel is the whole history in two numbers: your first score, today\'s score, and the points between them. Under it sit the three Recovery audits, Profit, Revenue and Cash, each with the date it last ran. A score that has never run reads as a dash, not a zero.'] },
+      { h: 'Your Operations Audit', p: ['The left panel is the whole history in two numbers: your first score, today\'s score, and the points between them. Under it sit the three Recovery audits, Profit, Revenue and Cash, each with the date it last ran. A score that has never run reads as a dash, not a zero.'] },
       { h: 'Where you were, where you are', p: ['A fixed two-week comparison. Prime cost, labor, check average and weekly sales, each shown as the reading two weeks ago against the reading now. Green means the number moved the way you want it to, which is not always up: labor falling is good, check average falling is not. The headline turns the prime cost move into dollars a month. Under about a hundred dollars a month it says you are holding steady instead, because twenty-five dollars a week is not a result.'] },
       { h: 'Do this first', p: ['The single biggest money move across all your audits, with what it is worth and a button into the fix. One item, not a list: Bar Cop has already done the ranking, so it tells you the answer. Before your first audit this space is your Get Started steps instead.'] },
       { h: 'Your biggest gain and worst drag', p: ['The operating number that moved furthest in your favour over the same two weeks, and the one that moved furthest against you, each with what the move is worth a week at your current volume. Bar pour cost, food cost, labor, check average, voids and comps, and overtime all compete for the two slots, so the card names whichever actually moved the money. Two weeks where nothing slipped shows no drag, which is the truth rather than a hole in the page.'] },
@@ -2653,7 +2653,7 @@ const App = {
       { h: 'Why some numbers read a dash', p: ['The Recovery sections (Profit, Revenue, Cash) only produce cost and margin numbers once the week is confirmed, which rolls up that week\'s revenue, cost of goods and labor. If a week was never confirmed those cells read a dash and the card says so. You can still confirm a past week from Close The Week and the numbers fill in. A dash is an honest blank, never a made-up number.'] },
       { h: 'Export', p: ['Export PDF saves the week as a one-page report, named for the week it covers so two weeks never overwrite each other.'] }
     ] },
-    'bar-cop-audit': { title: 'How the Bar Cop Audit Works', sections: [
+    'bar-cop-audit': { title: 'How the Operations Audit Works', sections: [
       { h: 'What this is', p: [
         'Your read on how well the whole operation is being run, separate from the Profit, Revenue, and Cash audits that hunt for dollars to recover. This one answers a different question: is the place being run with discipline. It scores entirely from the data you already log across Inventory, Shift, and Labor Control, so there is nothing to upload. Run it whenever you want a fresh read.',
         'The Operational Health score up top is the average of the six sub-scores that have enough data behind them. It needs at least three of the six covered to show a number; below that it reads N/A and fills in as you log more.'
@@ -2670,7 +2670,7 @@ const App = {
       { h: 'Recovery Activity', p: ['The stat strip under the score tracks whether the recovery loop is moving: gaps surfaced by your latest audits, fixes you logged in the last 30 days, dollars recovered to date, and fixes still being measured before their result is in.'] },
       { h: 'Top Operational Exposures', p: ['The action list: the cross-system items worth handling now, worst first. Red is act-now (a high-priority maintenance item, an aging vendor credit, a permit about to lapse), amber is a watch. Open jumps you to the exact screen to work it. Bar Cop Briefing is a short written read of the whole audit, and Export PDF saves it.'] },
       { h: 'Recurring Patterns', p: ['Problems that keep showing up over a rolling 90 days: the same cashier short again and again, voids stacking on one shift type, chronic shrinkage on one product, a vendor with repeated discrepancies, or labor blowing out on the same day of week. Each names the pattern and a screen to act on it.'] },
-      { h: 'Landing and history', p: ['The landing holds the Generate button (run it whenever you want a fresh read; it scores your trailing 30 days), a live data badge showing what level the audit would come out at right now, the latest audit with its six section scores, and the Audit History list of past runs to reopen. Bar Cop keeps one audit a day so you can watch the trend. The sidebar links across to your Profit, Revenue, and Cash audits, each in its own Recovery section.'] }
+      { h: 'Landing and history', p: ['The landing holds the Generate button (run it whenever you want a fresh read; it scores your trailing 30 days), a live data badge showing what level the audit would come out at right now, the latest audit with its six section scores, and the Audit History list of past runs to reopen. Bar Cop keeps one audit a day so you can watch the trend. The top bar carries all four audits, Operations, Profit, Revenue and Cash, so you can move straight between them.'] }
     ] },
     /* ⛔⛔⛔ REWRITTEN 2026-08-08 FROM THE PAGE, NOT FROM THE PLAN (Kyle: *"the close the books and
        the money out page i help text is both wrong"*). Every one of the three sections below
@@ -2799,7 +2799,7 @@ const App = {
     ] },
     'user-data': { title: 'How Data and Backup Works', sections: [
       { h: 'What this page is', p: ['Everything that gets your data out of Bar Cop and back in. Because a backup is the whole account, this page is the account owner only. Admins and staff never see it.'] },
-      { h: 'Your own copy', p: ['Export Backup writes the entire account to one file: settings, targets, weekly numbers, all three Recovery Audits, your Bar Cop Audits, recipes, the fix log, your money out log, Permits, and every Inventory, Labor and Shift record. Keep it offsite. Restore from Backup reads that same file back to recover your data or move it to another account.'] },
+      { h: 'Your own copy', p: ['Export Backup writes the entire account to one file: settings, targets, weekly numbers, all three Recovery Audits, your Operations Audits, recipes, the fix log, your money out log, Permits, and every Inventory, Labor and Shift record. Keep it offsite. Restore from Backup reads that same file back to recover your data or move it to another account.'] },
       { h: 'Automatic backups', p: ['Bar Cop saves a full backup of this bar on its own, about once a day, so there is always a recent point to fall back to without you remembering anything. Pick a date in the list and Restore rolls the whole account back to how it stood then.'] },
       { h: 'Restore points you take yourself', p: ['Create Restore Point saves the account as it is right now. Take one before anything big: a price change across the menu, a bulk import, a first inventory count. Those are the only ones you can delete by hand, because the automatic dailies are the safety net and must not be crowded out.'] },
       { h: 'How far back it goes', p: ['Bar Cop keeps the last 30 automatic daily backups and the last 10 restore points you took yourself, each in its own pool so a busy day of manual saves can never push the dailies off the end.'] },
@@ -2808,13 +2808,13 @@ const App = {
     'user-team': { title: 'How Team Members Work', sections: [
       { h: 'What this page is', p: ['Where you invite the rest of your management, choose which areas each person can use, and manage who has access. Owners and admins only. Bar Cop is a manager tool: your floor staff work off printed worksheets, so the people you invite here are other managers and your bookkeeper, not every employee.'] },
       { h: 'The three roles', p: ['Owner is you, or whoever holds the card. Full access to everything, holds billing, and controls the whole team. Admin runs the bar day to day: they get the areas you grant plus your bar settings (Business Profile and Recovery Targets), but never billing. Staff gets only the areas you grant, plus their own password.'] },
-      { h: 'Access by area', p: ['Every area is either No Access or Full Access. Full Access means the person can see and change everything in that area; No Access hides it completely, on the Hub and in the menus. The areas are Inventory, Labor, Shift, Profit, Revenue, Cash, Events, Books, and the Bar Cop Audit. There is no read-only setting: either they run an area or they do not see it.'] },
+      { h: 'Access by area', p: ['Every area is either No Access or Full Access. Full Access means the person can see and change everything in that area; No Access hides it completely, on the Hub and in the menus. The areas are Inventory, Labor, Shift, Profit, Revenue, Cash, Events, Books, and the Operations Audit. There is no read-only setting: either they run an area or they do not see it.'] },
       { h: 'Inviting', p: ['Enter an email, pick Admin or Staff, and switch each area to Full Access or No Access. Send Invite emails a link to set a password; if they already have a Bar Cop login they join your team with no email. Bar Cop never asks for SSNs, bank details, or anything you would not keep in a binder.'] },
       { h: 'What an admin can hand out', p: ['An admin can build their own team, but only within their own reach: they can invite Staff (not other admins), can only offer areas they hold themselves, and can only manage the people they personally invited. Anyone you invited, the admins included, stays under your control alone. So you set an admin\'s ceiling once and everything they can grant flows from it.'] },
       { h: 'Managing members', p: ['Everyone on the account lists below, with a Pending tag until they accept. Only the owner changes roles from the dropdown, or hands off the account with Make Owner. Edit Access re-opens the area grid for a member; Remove takes them off and cuts access on the spot. You cannot change your own access or remove yourself.'] }
     ] },
-    'audit-help': { title: 'Bar Cop Audit Help', sections: [
-      { p: ['The full Help and FAQ for the Bar Cop Audit: what it measures, when to run it, and how it relates to your Profit, Revenue, and Cash audits.'] },
+    'audit-help': { title: 'Operations Audit Help', sections: [
+      { p: ['The full Help and FAQ for the Operations Audit: what it measures, when to run it, and how it relates to your Profit, Revenue, and Cash audits.'] },
       { h: 'Finding an answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question at once.'] },
       { h: 'Directions for a specific page', p: ['Open the page you have a question about and tap this same info i button for its step-by-step. This FAQ covers the why.'] }
     ] },
@@ -7805,7 +7805,7 @@ const App = {
   // Every menu item currently over its cost target (drives the cockpit count).
   /* ⚠⚠ ARCHIVED ITEMS ARE EXCLUDED, AND THIS WAS THE ODD ONE OUT (I6, fixed 2026-07-30).
      `menuItems()` returns the RAW array — archived included — and `menuItemPct` has no notion of
-     archived, so a Cut item counted here. Menu Engineering, the Bar Cop Audit and Menu Rundown all
+     archived, so a Cut item counted here. Menu Engineering, the Operations Audit and Menu Rundown all
      filter `!archived` already (r-menu-engineering:119/151, and its own comment at :566 says "A Cut
      item is archived and never reaches this list").
      THE COST: this is the ONE door for the count (profit-fix:140 and r-fix:128 both say "One door
@@ -10948,7 +10948,7 @@ const App = {
   // ── Deliverable footer + disclaimer (legal protection helper) ───────────
   // Single source for the disclaimer text + workbook Subject metadata + PDF
   // footer HTML used across every Bar Cop deliverable: Books, Year-End,
-  // Weekly P&L Brief, Bar Cop Audit PDF, and any
+  // Weekly P&L Brief, Operations Audit PDF, and any
   // future operator-facing export. Centralizing means the legal language
   // stays in lockstep when it gets edited.
   //
@@ -10958,8 +10958,8 @@ const App = {
   //     f.disclaimerLines  // array of 3 short strings, one per sheet footer row
   //     f.workbookSubject  // single-line string for wb.Props.Subject
   //
-  //   For PDF/HTML consumers (Bar Cop Audit PDF):
-  //     html += App.deliverableFooter({ kind: 'pdf-html', tagline: 'Bar Cop Audit' });
+  //   For PDF/HTML consumers (Operations Audit PDF):
+  //     html += App.deliverableFooter({ kind: 'pdf-html', tagline: 'Operations Audit' });
   //     returns a styled <div class="footer">...</div> block.
   //
   // opts.barName        — defaults to App.data.settings.bar_name or 'Bar Cop'
