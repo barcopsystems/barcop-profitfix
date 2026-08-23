@@ -85,12 +85,17 @@ S.Week = {
   navHTML() {
     const IC = (typeof App !== 'undefined' && App._NAV_SECTION_IC) || {};
     const ICKEY = { close: 'dash', review: 'review', history: 'history' };
-    return this.PAGES.map(([k, , link]) => {
+    /* ⚠ TWO SURFACES, TWO LABELS, AND BOTH ARE KYLE'S WORDS. The GROUP name is the top-bar link, so
+       it carries the short word he named there ("Close"). The ROW label is what the mobile drawer
+       and the section sidebar show, and on the phone he asked for the full page names on the second
+       menu page: *"Close the week, Week in Review, Week History."* Both come out of `PAGES`, so they
+       cannot drift from each other or from the page title `open()` hands the host. */
+    return this.PAGES.map(([k, title, link]) => {
       const id = this.LEGACY[k];
       return '<div class="nav-section">' + esc(link) + '</div>'
         + '<div class="nav-item" data-hub-action="' + esc(id) + '" id="nav-' + esc(id) + '">'
         + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + (IC[ICKEY[k]] || '') + '</svg>'
-        + '<span class="nav-label">' + esc(link) + '</span></div>';
+        + '<span class="nav-label">' + esc(title) + '</span></div>';
     }).join('');
   },
 
