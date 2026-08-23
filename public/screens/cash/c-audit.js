@@ -506,7 +506,13 @@ S.CashAudit = {
       + calc('Cash to Free', App.fmtCurrency(audit.cash_to_free || 0), 'good')
       + calc('Cash Locked', d.CYCLE_DAYS != null ? Math.round(d.CYCLE_DAYS) + 'd' : '-', (d.CYCLE_DAYS != null && d.CYCLE_DAYS > 30) ? 'warn' : '')
       + calc('Tight Weeks', d.TIGHT_WEEKS != null ? String(d.TIGHT_WEEKS) : '-', d.TIGHT_WEEKS > 0 ? 'warn' : '')
-      + '</div></div>';
+      /* ⭐ CASH FREED TO DATE JOINS THE STRIP (Kyle, 2026-08-23). It used to live on the Cash Fix
+         screen, which is leaving the operator's view. Rendered through `AuditUI.recoveredItem` and
+         not re-implemented here: Cash reads `CashEngine.freed()` while Profit and Revenue read
+         `Recovery.moduleSummary`, and one shared accessor is what stops the three audits drifting
+         into saying different things about the same kind of figure. */
+      + AuditUI.recoveredItem('cash')
+      + '</div>' + AuditUI.recoveredBasis('cash') + '</div>';
   },
 
   async exportPDF(audit) {
