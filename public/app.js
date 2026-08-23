@@ -3715,8 +3715,14 @@ const App = {
          ships instead of the day somebody remembers this list ([[the-loop]] #147 — a hand-kept list
          breaks every time the product legitimately changes). */
       if (navHtml(k)) {
-        const home = k === 'books' ? () => S2.HubOperatingExpenses && S2.HubOperatingExpenses.open() : null;
-        return drill(label, k, home, home ? 'Money Out' : null, icon,
+        /* ⛔ THE BOOKS LANDING ROW WENT 2026-08-23, SAME REASON AS THE DESKTOP LEAF. It opened Close
+           Books, which was not one of the section's own rows. That page is deleted and the landing is
+           All Money Out — already the first row this drill lists — so keeping a home would repeat one
+           row on the phone. Events lost its landing row for exactly this in August.
+           ⚠ The mechanism stays: `sectionNode` still pushes a home `if (homeFn)`, and the next
+           section with a landing page that is NOT one of its rows will want it. */
+        const home = null;
+        return drill(label, k, home, null, icon,
           k === 'settings' ? 'App Settings' : null);
       }
       /* ⭐ ONE DOOR. `_protoGlobalClick` is what the rail presses, so Hub / Close / Review / History
