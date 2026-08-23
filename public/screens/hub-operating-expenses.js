@@ -357,7 +357,20 @@ S.HubOperatingExpenses = {
      screen has not had for a long time: declared, and read in exactly zero places tree-wide. A field
      that is written and never read is a fix that never shipped, or in this case a feature that never
      left ([[the-loop]] #25). No slicer can see a data property, so nothing would ever have told us. */
-  _entryMode:      'manual',   // manual | import — the FULL Money Out screen's add form
+  /* ⭐⭐ IMPORT IS THE LANDING MODE (Kyle, 2026-08-23: *"on money out.. the import file should be the
+     default selected on landing.. it the first toggle but it defaults on enter manually option"*).
+     ⛔ THE COMMENT BELOW USED TO ARGUE THE OPPOSITE — *"flipping it would open the Money Out page on
+     a drop zone nobody asked for"* — and that was correct on 2026-08-07, when the import DOOR was
+     Close Books' step 1 and this page was read-only history. Close Books is deleted and the entry
+     card is on this page now, so the reason expired with the page it was about ([[the-loop]] #138 —
+     re-derive a warning against the code, not against the step it used to name).
+     ⛔⛔ AND A DEFAULT IS DECIDED BY WHOEVER ASSIGNS FIRST, NOT BY THE DECLARATION
+     ([[lessons-paid-for]] #14). Two paths reset this field by hand — the takeover's Cancel and a
+     landed import — so flipping only the declaration would have left it inert on both: the operator
+     would land on Import once and be dropped to the manual form by their own first import. Both are
+     re-pointed at the same word, and `verify-money-out-one-door` refuses any literal
+     `_entryMode = 'manual'` coming back, which is the census rather than three copies to keep. */
+  _entryMode:      'import',   // manual | import — the FULL Money Out screen's add form
   /* ⭐⭐ THE STEP HAS ITS OWN MODE, AND IT DEFAULTS TO IMPORT (Kyle, 2026-08-07).
      `null`/'import' = the drop zone, 'manual' = the typed form. Deliberately a SECOND field rather
      than a new default on `_entryMode`: that one is the full screen's, and flipping it would open
@@ -1179,9 +1192,25 @@ S.HubOperatingExpenses = {
        replaces the whole card rather than sitting inside it, because a collapsed card would hide the
        Add button. So suppressing the tabs and the two panels below is all the takeover needs: a bank
        month runs to hundreds of rows across a dozen sections and must not be read through a page. */
-    const reviewing = !!this._expenseReview;
-    this.container.innerHTML = '<div class="screen">' + this._addCardHtml({})
-      + (reviewing ? '' : this._tabBarHtml() + this._renderCurrent() + this._renderHistory()) + '</div>';
+    /* ⛔⛔⛔ THE TAKEOVER IS TWO STAGES, AND ONLY THE SECOND ONE WAS COVERED (Kyle, 2026-08-23:
+       *"after a file is dropped the map you columns should not still be under the add expense/toggle
+       buttons.. it should take over the page on file drop"*). `_expenseReview` is the CONFIRM stage;
+       between the drop and the confirm sits the column MAPPER, which had no flag here at all — so a
+       dropped file rendered inside the Add Expense card with the tab bar and both panels still under
+       it. The comment above says *"suppressing the tabs and the two panels below is all the takeover
+       needs"*, and that was true of the stage it was looking at and false of the one before it.
+       ⭐ THE MAPPER STAGE USES THE SHAPE THAT ALREADY EXISTED. `_addCardHtml({ inline: true })` is
+       documented three members down as *"the TAKEOVER — the drop sits in its own card ... because it
+       is page content again rather than a step body"*: no ADD EXPENSE header, no collapse, no mode
+       chips, and the Cancel that CSVMapper draws beside Import is the way back. Nothing new is
+       built; the live page simply never asked for it.
+       ⚠ THE CONFIRM STAGE IS DELIBERATELY LEFT ALONE — `{}` not `{ inline: true }` — because inline
+       changes the confirm's own margin (`0 0 4px` against `16px 0 24px`) and that screen ships as it
+       is. Two stages, one suppression, two shells. */
+    const mapping = this.moneyOutTakeover() && !this._expenseReview;
+    const takingOver = mapping || !!this._expenseReview;
+    this.container.innerHTML = '<div class="screen">' + this._addCardHtml(mapping ? { inline: true } : {})
+      + (takingOver ? '' : this._tabBarHtml() + this._renderCurrent() + this._renderHistory()) + '</div>';
     /* ⭐⭐ BUILD ORDER B — THE WAY TO THE ONE DOOR. This screen no longer takes an entry, so without
        a control it is a page the operator has always used to log a bill with nothing on it: the
        feature would read as LOST rather than moved ([[the-loop]] #106 — a control that tells the
@@ -1303,8 +1332,9 @@ S.HubOperatingExpenses = {
      mapper replaces the drop zone. No new hook was needed; four other screens already use it. */
   _onImportState(state) {
     if (state !== 'map') return;
-    // Only from the STEP, and only while it is still inline — never re-enter once taken over.
-    if (this._view !== 'moneyout' || this.moneyOutTakeover()) return;
+    // Only from a surface that HOSTS the entry card, and only while it is still inline — never
+    // re-enter once taken over. This read `_view !== 'moneyout'`, which no live path ever sets.
+    if (!this._entrySurface() || this.moneyOutTakeover()) return;
     const node = document.getElementById('oexa-csv');
     if (!node) return;
     /* ⛔⛔⛔ CARRY THE ACTIONS SLOT TOO, OR THE IMPORT BUTTON IS GONE AND THE FILE IS A DEAD END.
@@ -1323,6 +1353,22 @@ S.HubOperatingExpenses = {
     this._moTakeover = true;
     this._rerenderHost();
   },
+
+  /* ⭐⭐⭐ DOES THIS SURFACE HOST THE ENTRY CARD, AND THEREFORE TAKE THE PAGE OVER ON A DROP?
+     ⛔ THE DEFECT IT CLOSES (Kyle, 2026-08-23): *"after a file is dropped the map you columns should
+     not still be under the add expense/toggle buttons.. it should take over the page on file drop..
+     we went through all the drop files and fixed these so it isn't something new."* He is right that
+     it is not new — **the takeover machinery was already built and complete**, it was simply wired
+     to a page that no longer exists. `_onImportState` and `_wireCurrent` both asked
+     `_view === 'moneyout'`, and the ONLY writer of that value sits inside `renderMoneyOut`, which is
+     reachable from nothing (`T49`). So the escalation returned early on every real drop and the
+     mapper rendered inside the Add Expense card with the tabs and both panels still under it.
+     ⭐ SAME FIXPOINT SHAPE AS THE `expense-history` ROUTE ([[lessons-paid-for]] #140): a branch whose
+     own guard is written only by code that is already dead reads as live to every grep.
+     ⚠ ONE RESOLVER, TWO SURFACES, which is the shape `_entryModeFor` already sets in this file.
+     The dead page keeps answering so nothing about `T49` has to be decided today; the LIVE page
+     (`renderMain`, `_view === 'current'`) is what this adds. */
+  _entrySurface() { return this._view === 'current' || this._view === 'moneyout'; },
 
   moneyOutTakeover() {
     /* ⚠ READS THE FIELD, NOT THE RESOLVER. Calling `_entryModeFor` here broke three hand-built stubs
@@ -1623,8 +1669,18 @@ S.HubOperatingExpenses = {
       /* ⭐ CHIPS → TEXT → DROP, copied from `sc-dashboard.workspace('import')`. The line sits UNDER
          the chips and belongs to the MODE, so switching to Enter Manually swaps it for one about
          typing rather than dropping. */
-      bodyInner = (inline && !stepBody ? '' : segToggle)
-        + (stepBody ? intro('One file, the whole month. Drop your bank or card statement and Bar Cop reads every line off it: bills and cash outflows both. Re-importing replaces rows already in.') : '')
+      /* ⭐⭐ THE EXPLAINER RENDERS WHEREVER THE CHIPS DO (Kyle, 2026-08-23: *"under the import/enter
+         toggle buttons a short to the point explainer text on both the import and enter manually
+         screens"*, pointing at the Server Check door). It was gated on `stepBody`, i.e. on Close
+         Books' step — **and that page is deleted, so both of these sentences were dead copy**: the
+         Money Out page has never shown either one. The words are unchanged and they are his; only
+         the gate moved, from "is this the step" to "are the chips on screen".
+         ⛔ NOT IN THE TAKEOVER, for the same reason the chips are not: there the mapper is the whole
+         page and it prints its own heading, so a line about dropping a file sits over a file already
+         dropped. One condition drives both, so they cannot drift apart. */
+      const withChips = !(inline && !stepBody);
+      bodyInner = (withChips ? segToggle : '')
+        + (withChips ? intro('One file, the whole month. Drop your bank or card statement and Bar Cop reads every line off it: bills and cash outflows both. Re-importing replaces rows already in.') : '')
         + '<div id="oexa-csv"></div>';
       /* ⛔ NO CANCEL IN THE STEP (Kyle, 2026-08-07). Cancel is the way OUT of the takeover, which is
          the only place there is anything to back out of. In the step the chips are the way out, and
@@ -1637,8 +1693,10 @@ S.HubOperatingExpenses = {
          gives it OUR meaning: leave the takeover, do not just reset the file. */
       addButtons = '<div id="oexa-imp-actions" style="margin:0 0 ' + (inline ? '0' : '24px') + ';"></div>';
     } else {
+      // ⭐ THE MANUAL HALF OF THE SAME ASK. The chips always render on this branch, so the line
+      //   always does too — see the note on the import branch above.
       bodyInner = segToggle
-        + (stepBody ? intro('No statement to drop? Key it in by hand. Pick the log type first: an operating expense lands on your income statement, a cash outflow does not. Then the amount, and save.') : '')
+        + intro('No statement to drop? Key it in by hand. Pick the log type first: an operating expense lands on your income statement, a cash outflow does not. Then the amount, and save.')
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
         +   '<div class="f" style="width:150px;"><label>Date Submitted</label><input type="date" value="' + App.todayLocal() + '" disabled title="When you logged this. Always today."/></div>'
         +   '<div class="f" style="width:150px;"><label>Due Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
@@ -1908,7 +1966,7 @@ S.HubOperatingExpenses = {
        nothing, which is the fixture saying the condition does no work ([[the-loop]] #20 — when a fix
        makes a state unreachable, assert the unreachability rather than guarding it twice). Block F
        is that assertion. */
-    if (this._carryCsv && this._view === 'moneyout') {
+    if (this._carryCsv && this._entrySurface()) {
       /* ⛔ BOTH NODES, OR THE IMPORT BUTTON DOES NOT COME ACROSS. `#oexa-csv` holds the mapper;
          `#oexa-imp-actions` holds the button that commits it. Carrying one and rebuilding the other
          is what left a dropped file with nothing but Cancel. See `_onImportState`. */
@@ -2016,7 +2074,9 @@ S.HubOperatingExpenses = {
       onCancel: () => {
         this._expenseReview = null; this._stepMode = null;
         this._carryCsv = null; this._carryActs = null;
-        this._entryMode = 'manual'; this._moTakeover = false;
+        // ⭐ BACK TO THE LANDING MODE, which is Import (see `_entryMode`). Resetting to 'manual' here
+        // made the declared default inert for anyone who ever opened the importer and backed out.
+        this._entryMode = 'import'; this._moTakeover = false;
         this._rerenderHost();
       },
       onComplete: rows => this._openExpenseReview(rows)
@@ -3559,7 +3619,9 @@ S.HubOperatingExpenses = {
     /* ⛔ THE CONFIRM SCREEN CLEARS ON SUCCESS AND ONLY ON SUCCESS. The refusal returned above with
        every row still up; this line is the only one that knows the write landed. */
     this._expenseReview = null;
-    this._entryMode = 'manual';
+    // ⭐ BACK TO THE LANDING MODE, which is Import (see `_entryMode`). This read 'manual', so the
+    // operator's own first successful import dropped them onto the typed form afterwards.
+    this._entryMode = 'import';
     // ⭐ AND THE TAKEOVER CLOSES ON A LANDED IMPORT, so the operator comes back to the four steps
     // with step 1 now reading the bills that just went in, rather than being left on a spent drop
     // zone. The import banner rides back with them; `_addCardHtml` consumes it on that render.
