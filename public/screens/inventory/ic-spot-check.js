@@ -191,7 +191,7 @@ S.InventorySpotCheck = {
       { h: 'Count Before And After', p: ['Set the pre-shift count when the shift starts and the post-shift count when it ends. Liquor and wine use the fill slider, bottle beer is cases plus loose, and draft uses the keg slider. Your check auto-saves to this device, so take the pre-counts at open and come back to finish at close.'] },
       { h: 'Restocked And POS Sold', p: ['If you brought more up from storage mid-shift, enter it under Restocked so the used number stays honest. Then enter what the register rang for each product, or drop that register\'s POS sales report and Bar Cop fills it in by matching product names.'] },
       { h: 'Reading The Result', p: ['Bar Cop works out what physically left the bottle from your counts and compares it to what the register rang. Anything off by more than your Flag at % setting, in either direction, flags red. Over means more left the bar than was sold, the classic sign of overpouring, give-aways, or theft. Under means less left the bottle than was rung in, which points to short pours that skimp the guest. Set Flag at % up top to your own tolerance; it remembers what you set.'] },
-      { h: 'After You Save', p: ['Saved checks land in Spot Check History, where View opens the full breakdown. Hit Review on a flagged product and the investigation opens right here, working the same record Loss Prevention reads. A check feeds Loss Prevention and the Bar Cop Audit once both sittings are in, so finish the post-shift count and the register numbers and it starts counting.'] }
+      { h: 'After You Save', p: ['Saved checks land in Spot Check History, where View opens the full breakdown. Hit Review on a flagged product and the investigation opens right here, working the same record Loss Prevention reads. A check feeds Loss Prevention and the Operations Audit once both sittings are in, so finish the post-shift count and the register numbers and it starts counting.'] }
     ]);
   },
 
@@ -1152,7 +1152,7 @@ S.InventorySpotCheck = {
       if (!p) return;
       // A line with nothing entered is stored as what it is: a product that was ON the check and
       // never counted. Every measured field stays null so the detail view dashes it out the way
-      // Count History does, and it carries no variance — so it cannot reach the Bar Cop Audit's
+      // Count History does, and it carries no variance — so it cannot reach the Operations Audit's
       // shrink figure, and it cannot cancel a REAL overpour on another bottle down to a clean check.
       // pos_sold is deliberately KEPT: "the register rang 30 and nobody counted the bottle" is the
       // useful half of the record, and it is the thing that tells the operator what they missed.
