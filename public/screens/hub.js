@@ -239,13 +239,21 @@ S.Hub = {
     // the module sidebars). Each maps to its section landing's activeAction.
     const CHECKLIST_ICON = '<svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
     const MSTYLE = {
-      /* ⚠ "All Money Out", NOT "Money Out". The page's own header is `All Money Out` and its help is
-         `How All Money Out Works`, so a leaf saying anything else makes three names for one page —
-         which `verify-help-describes-its-own-page` A5 caught the moment I wrote the short form.
-         Kyle has been calling it "Money Out" in conversation; that is a rename of the PAGE and his
-         call, not something to do by half while retiring another one ([[lessons-paid-for]] #48 —
-         pin the agreement, and the words are his). */
-      books:    { id: 'nav-operating-expenses', action: 'operating-expenses', leafLabel: 'All Money Out', leafIcon: CHECKLIST_ICON },
+      /* ⛔⛔ NO LANDING LEAF FOR BOOKS ANY MORE, AND IT WOULD BE A DUPLICATE ROW (2026-08-23).
+         The leaf existed to reach Close Books, which is NOT in this sidebar — legitimate. That page
+         is deleted and the section's landing is All Money Out, which is ALREADY this sidebar's first
+         row. Re-pointing the leaf at it put "All Money Out" in the overlay TWICE, which I saw only
+         by opening the menu on the pushed build.
+         ⚠ MY OWN SURVEY SAID THIS SIDEBAR HELD ONLY "Accounting" AND "Support" — it split the markup
+         on `<div class="nav-section">` and therefore could not see the two rows that sit ABOVE the
+         first heading. A parser that starts at the first heading is blind to everything before it
+         ([[lessons-paid-for]] #7 — suspect the probe; #54 — ask what the markup does before the
+         point you started reading).
+         ⭐ THE EVENTS PRECEDENT IS EXACTLY THIS: its landing leaf pointed at `ev-bookings`, which the
+         row below already opened, and the fix was to drop the leaf rather than rename it.
+         ⚠ `{}` NOT REMOVED: `ms` must stay truthy or the section loses its flat-list treatment and
+         its Report-a-Bug filtering. `if (ms.id)` is what guards the leaf. */
+      books:    {},
       // No landing leaf: the Bar Cop Settings page is retired, so this section opens straight
       // onto its own pages, the same way Audits does.
       settings: { keepSupport: true },
