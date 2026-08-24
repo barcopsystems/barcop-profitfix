@@ -40,11 +40,45 @@ const SectionTabs = {
      and Revenue navs in the same edit. That is why this one also moved their PERMISSION areas
      (`DB.SCREEN_GROUPS`) and deliberately did not move their MODULE — `navigate` still renders all
      six from the branch they always lived in. */
-  ENABLED: { inventory: true, audit: true, week: true, events: true, books: true, floor: true, menus: true },
+  ENABLED: { inventory: true, audit: true, week: true, events: true, books: true, floor: true, menus: true, settings: true },
 
   /* Support is one row repeated in all seven section sidebars. It is not a group anybody browses,
-     and Kyle is folding the FAQs into one global page, so it is kept out of the bar entirely. */
+     and Kyle is folding the FAQs into one global page, so it is kept out of the bar entirely.
+     ⛔⛔ IT DOES NOT APPLY TO A `FLAT` SECTION, AND SETTINGS IS WHY. In the other seven sections the
+     Support group is Help repeated, so dropping it costs nothing. In SETTINGS it is the only home
+     Contact Support and Report a Bug have, and a section with a tab bar has no overlay to fall back
+     to — measured with the flag on: the overlay renders at opacity 0, translated -190px, with ZERO
+     rows in it. Applying this to Settings would have taken Contact Support off the desktop
+     completely, on the same day the phone drawer already hides it in the demo. */
   ASIDE_GROUP: 'Support',
+
+  /* ⭐⭐⭐ A FLAT SECTION IS SEVEN LINKS, NOT THREE MENUS — AND THE MARKUP DOES NOT MOVE.
+     Kyle, 2026-08-24: *"just make the menu... Profile, Targets, Account, Backup, Team, Support,
+     Bugs"* and, twice, *"settings on mobile stays as it is right now."*
+     ⛔⛔ THOSE TWO PULL AGAINST EACH OTHER, AND THAT IS THE WHOLE REASON THIS TABLE EXISTS. The bar
+     is derived from `App.navHTMLFor(module)`, which for settings IS `_settingsSidebarHTML()` — the
+     same markup the PHONE DRAWER renders. Rewriting it into seven one-row groups would have given
+     the bar its seven links and silently rebuilt the phone menu in the same edit. So the markup is
+     untouched and the bar re-shapes it on the way out: one row per group (which is what stamps
+     `data-solo`, so each navigates and takes the hand cursor), his order, his shorter words.
+     ⭐ ROLE GATING COMES FREE, WHICH IS WHY THIS MAPS ACTIONS RATHER THAN LISTING ROWS. Backup is
+     owner-only and Team is admin-only, and the sidebar builder already omits them; a row the markup
+     did not emit simply is not there to be re-labelled. Hardcoding seven rows here would have
+     handed every member all seven, and NEITHER the owner nor the demo could ever have seen it
+     ([[the-loop]] #149 — a permission-gated path is invisible to owner-and-demo testing).
+     ⚠ HELP AND FAQ IS DELIBERATELY ABSENT. Kyle: *"help again will be a global help page later."*
+     It stays in the phone menu, because that markup is the one thing that must not move. */
+  FLAT: {
+    settings: [
+      ['settings-profile', 'Profile'],
+      ['settings-targets', 'Targets'],
+      ['user-account',     'Account'],
+      ['user-data',        'Backup'],
+      ['user-team',        'Team'],
+      ['contact-support',  'Support'],
+      ['report-bug',       'Bugs']
+    ]
+  },
 
   on(module) { return !!this.ENABLED[module]; },
 
@@ -115,6 +149,22 @@ const SectionTabs = {
         });
       }
     });
+    /* ⭐ THE FLAT RE-SHAPE. Everything above is untouched: the same walk over the same markup, so
+       whatever the sidebar decided about this member's role has already happened. All this does is
+       pick the rows out by ACTION, put them in Kyle's order, give them his shorter words, and hand
+       back one group each so the renderer stamps them solo.
+       ⚠ `filter` BEFORE `map`, deliberately: a row the markup withheld (Backup from a non-owner,
+       Team from a non-admin) must vanish, not render as an undefined link. */
+    const flat = this.FLAT && this.FLAT[module];
+    if (flat) {
+      const byAction = {};
+      out.forEach(g => g.rows.forEach(r => { byAction[r.hubAction || r.screen] = r; }));
+      return flat.filter(([action]) => !!byAction[action])
+                 .map(([action, label]) => ({
+                   name: label,
+                   rows: [Object.assign({}, byAction[action], { label: label })]
+                 }));
+    }
     return out.filter(g => g.rows.length && g.name !== this.ASIDE_GROUP);
   },
 
