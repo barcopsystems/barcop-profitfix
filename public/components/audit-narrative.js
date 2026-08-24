@@ -64,7 +64,7 @@ function profitNarrative(d) {
       + (d.S3_WASTE_TOTAL != null ? `, and ${money(d.S3_WASTE_TOTAL)} of waste is logged` : '')
       + `. You can only catch shrink you count for, and that dollar already sits inside your pour and food cost above.`;
     o.S3_TOOL = bad
-      ? `Count weekly, run the variance report every count, and work the biggest negative lines in Loss Prevention.`
+      ? `Count weekly, run the variance report every count, and work its biggest negative lines.`
       : `Hold the weekly count and the variance report. That is what keeps the shrink honest.`;
   }
 
@@ -80,7 +80,7 @@ function profitNarrative(d) {
       ? `${d.S4_VOIDS_NO_APPROVAL_PCT > 0 ? `${pct1(d.S4_VOIDS_NO_APPROVAL_PCT)} of those voids went through with no manager approval. ` : ''}${d.S4_WALKED_TABS_TOTAL ? `${money(d.S4_WALKED_TABS_TOTAL)} walked out in unpaid tabs. ` : ''}${d.S4_SALES_INTEGRITY_FLAGS ? `${d.S4_SALES_INTEGRITY_FLAGS} server${d.S4_SALES_INTEGRITY_FLAGS === 1 ? '' : 's'} flagged in Sales Integrity. ` : ''}Call it ${money(d.S4_MONTHLY_GAP)} a month in excess to tighten.`
       : `${d.S4_DRAWER_RECON && /^Yes/.test(d.S4_DRAWER_RECON) ? 'Drawers are reconciling. ' : ''}${d.S4_WALKED_TABS_TOTAL ? `${money(d.S4_WALKED_TABS_TOTAL)} walked out in unpaid tabs. ` : ''}This is a controlled cash path.`;
     o.S4_TOOL = hot
-      ? `Require a manager code on every void and comp, and watch the volume by server in Loss Prevention.`
+      ? `Require a manager code on every void and comp, and watch the volume by server on Sales Integrity.`
       : `Keep logging every void against the server who rang it so a pattern cannot hide.`;
   }
 
