@@ -3829,6 +3829,11 @@ const App = {
     // Parse a section's sidebar HTML into its sub-groups, each with its pages, so
     // the mobile menu keeps the COUNTS / ORDERING / … structure and is never one
     // giant flat list.
+    /* Every section FAQ row, in both spellings the nav uses: `ic-help` / `ev-help` arrive as a
+       `data-screen`, `books-help` / `audit-help` / `settings-help` as a `data-hub-action`. Named
+       once so there is a single definition to check, and used at exactly one place (row admission
+       in `groupsOf`) so it can never reach the rail rows the drawer's root is built from. */
+    const FAQ_ROW = /(^|-)help$/;
     const groupsOf = (htmlFn, keepSupport) => {
       const out = [];
       try {
@@ -3848,6 +3853,36 @@ const App = {
                about those. It was WRONG about Settings, where the Support group actually lives, and
                filtering it there left a phone with no route to support at all. One place, and this
                is the one. */
+            /* ⛔⛔⛔ NO SECTION FAQ REACHES THE PHONE, IN ANY SECTION (Kyle, 2026-08-24: *"the mobile
+               menu should not have any help links/pages.. in any section... just the guide page on
+               the main menu... if the help pages were removed from the desktop menus.. why wouldn't
+               they be removed from the mobile menu too? it is the exact same app"*).
+               ⭐ THE DESKTOP ALREADY DROPPED THEM and this is the phone catching up, not a new rule:
+               a section with a tab bar loses its whole Support group through
+               `SectionTabs.ASIDE_GROUP`, and Settings' FLAT table maps seven of its eight actions
+               with Help deliberately left out. The drawer reads the SAME `navHTML` and kept them, so
+               five sections carried a FAQ row nothing on a desktop can reach — measured on the
+               pushed build: inventory, audit, events, books, settings.
+               ⛔ BOTH SPELLINGS, AND THAT IS THE WHOLE DIFFICULTY. A hub section writes its FAQ as
+               `data-hub-action="books-help"`; a module section writes `data-screen="ic-help"`. A
+               filter that knew one would have left Events and Inventory carrying theirs and reported
+               a clean bill ([[lessons-paid-for]] #118 — a corpus is what it reads, a pattern is what
+               it can SEE). Measured against the shipped nav before it was written: exactly five rows
+               match, all of them labelled "Help and FAQ", and NOTHING else in the tree ends in
+               `-help`, so it cannot over-reach.
+               ⚠ NOT INSIDE `!keepSupport`. Settings loses its FAQ too — "in any section" — and it is
+               the one section that keeps Contact Support and Report a Bug, which this must not touch.
+               ⭐ AND IT SITS HERE, AT ROW ADMISSION, SO THE EMPTY GROUP GOES WITH IT FOR FREE:
+               `groupsOf` already ends `return out.filter(g => g.pages.length)`. On four of the five
+               the FAQ was the ONLY row left in Support once Report a Bug is dropped below, so
+               filtering the row anywhere further downstream would leave a divider over nothing —
+               the exact chrome defect `_PROTO_WEEK` and `_PROTO_CONTROL` were DELETED, not emptied,
+               to avoid. Measured live: the Inventory drill ended `divider · Help`.
+               ⛔ THIS IS THE FAQ PAGES ONLY, NEVER THE "i" (Kyle, same message). The top-bar help
+               icon is the directions for the screen in front of you and is a different mechanism
+               entirely; it is untouched by this and by everything in this member. */
+            const k0 = el.dataset.hubAction || el.dataset.screen || '';
+            if (FAQ_ROW.test(k0)) return;
             if (!keepSupport) {
               if (el.dataset.nav === 'report-bug') return;
               const a0 = el.dataset.hubAction || '';
@@ -3949,7 +3984,12 @@ const App = {
       const sgs = groupsOf(() => navHtml(key), key === 'settings');
       const gr = GROUP_REMAP[key] || {};
       const pr = PAGE_REMAP[key] || {};
-      const mkPage = (p) => { const it = pageItem(p); if (pr[it.label]) it.label = pr[it.label]; if (it.label === 'Help and FAQ') it.label = 'Help'; return it; };
+      /* ⚠ THE "Help and FAQ" -> "Help" RELABEL WENT WITH THE ROWS IT SERVED (2026-08-24). It existed
+         so a long FAQ label did not wrap in a drill panel; `groupsOf` now refuses every FAQ row
+         before it can reach here, so that line could only ever be dead code. A retirement orphans
+         its helpers in the SAME edit ([[lessons-paid-for]] #105) — leaving it would be one more
+         thing reading as live to the next person who greps for how the drawer names its help. */
+      const mkPage = (p) => { const it = pageItem(p); if (pr[it.label]) it.label = pr[it.label]; return it; };
       const items = [];
       /* ⚠ THE ID IS FOR THE HIGHLIGHT, so it names where the row goes. The `Close The Week` branch
          that used to live here went with the six duplicate rows it served. */
