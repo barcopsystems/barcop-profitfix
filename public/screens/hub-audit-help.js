@@ -20,11 +20,11 @@ S.HubAuditHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'What is the Operations Audit?',
-        a: 'It is your read on how well the whole operation is being run, scored from the data you already log across Inventory, Labor, and Shift Control. It answers a different question than the recovery audits. Profit, Revenue, and Cash tell you where money is leaking and how to fix it. The Operations Audit tells you whether the operation has discipline: are procedures followed, is cash tight, is inventory under control, are you acting on what Bar Cop surfaced.' },
+        a: 'It is your read on how well the whole operation is being run, scored from the data you already log across Inventory, Labor, and The Floor. It answers a different question than the recovery audits. Profit, Revenue, and Cash tell you where money is leaking and how to fix it. The Operations Audit tells you whether the operation has discipline: are procedures followed, is cash tight, is inventory under control, are you acting on what Bar Cop surfaced.' },
       { q: 'How often do I run it?',
         a: 'As often as you want. There is no lock and no countdown. Bar Cop saves one audit a day, so a fresh read is always a click away, and the landing shows a live data badge for what level it would come out at right now. It scores your trailing 30 days, so the window stays wide enough for each measure to mean something. Most operators run it with their weekly close to keep the trend on a steady rhythm, but that is your call, not a rule.' },
       { q: 'Do I have to enter anything to run it?',
-        a: 'No. The Operations Audit reads entirely from your Control systems, so there is nothing to upload. Log your counts, shifts, cash, schedules, and hours as normal and the audit scores what it can. Anything without enough behind it shows N/A instead of guessing.' }
+        a: 'No. The Operations Audit reads entirely from what you already log, so there is nothing to upload. Log your counts, shifts, cash, schedules, and hours as normal and the audit scores what it can. Anything without enough behind it shows N/A instead of guessing.' }
     ]},
     { t: 'The Score', qa: [
       { q: 'What are the six sub-scores?',

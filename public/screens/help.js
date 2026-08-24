@@ -1,39 +1,43 @@
 'use strict';
 
-/* ── Profit Recovery — Help and FAQ ───────────────────────────────────────────
-   The in-app knowledge layer for Profit Recovery. Same underline tab switcher +
-   live search used by Inventory, Labor, and Shift Help. Per-screen how-tos live
-   on each page's info "i" panel now, so this is trimmed to the non-page material:
-   orientation, the audit and fix workflow, how recovery is measured, the weekly
-   numbers, the loss/cash/vendor diagnosis views, and how Profit Recovery reads
-   from the Control systems. Content tracks the current Profit Recovery. */
+/* ── The Profit audit — Help and FAQ ───────────────────────────────────────────
+   The in-app knowledge layer for the Profit audit, gathered onto the global Help
+   page under the Run Audit tab. Same underline tab switcher + live search as every
+   other FAQ here. Per-screen how-tos live on each page's info "i" panel, so this is
+   the non-page material: orientation, the audit workflow, how recovery is measured,
+   the weekly numbers, and the loss, cash and vendor views.
+   ⚠ THE OLD SECTION VOCABULARY IS GONE FROM THIS FILE (2026-08-24). It described
+   Profit Recovery reading from three Control systems, none of which an operator can
+   see any more. `verify-help-names-live-sections` is what keeps it out: it derives
+   the live names from the NAV, so a section Kyle renames fails the gate instead of
+   quietly rotting the way this file did for weeks. */
 
 S.Help = {
   tab: 0,
   query: '',
 
   showHowTo() {
-    App.showHelpModal('Profit Recovery Help and FAQ', [
-      { p: ['This page is the full Help and FAQ for Profit Recovery: how to get started, the audit and fix workflow, how recovered dollars are measured, the weekly numbers, the loss, cash, and vendor views, and how Profit Recovery reads from your Control systems.'] },
+    App.showHelpModal('Profit Help and FAQ', [
+      { p: ['This page is the full Help and FAQ for the Profit audit: how to get started, the audit and fix workflow, how recovered dollars are measured, the weekly numbers, the loss, cash, and vendor views, and how the Profit audit reads from the rest of the app.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "recovery", "audit", or "prime" lands you on the right answer fast.'] },
-      { h: 'Directions For A Specific Screen', p: ['Every working screen in Profit Recovery carries its own directions. Open the screen you have a question about, like Confirm the Week or the Profit Audit, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
+      { h: 'Directions For A Specific Screen', p: ['Every working screen carries its own directions. Open the screen you have a question about, like Confirm the Week or the Profit Audit, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
     ]);
   },
 
   SECTIONS: [
     { t: 'Getting Started', qa: [
-      { q: 'What does Profit Recovery do?',
-        a: 'Profit Recovery is where the dollar leaks in your operation get found and fixed. The Profit Audit scores you across pour and bar cost, food cost, shrink and waste, theft and cash loss, and vendor cost control, with prime cost shown as context, and puts a dollar figure on each gap. The audit ranks them biggest first and names the work. The Hub tracks what you have recovered and where you are still leaking. All of it reads from the three Control systems (Inventory, Labor, Shift), so you log operations once there and the diagnosis runs on it. The info "i" at the top of any Profit screen explains how that screen works.' },
+      { q: 'What does the Profit audit do?',
+        a: 'The Profit audit is where the dollar leaks in your operation get found and fixed. The Profit Audit scores you across pour and bar cost, food cost, shrink and waste, theft and cash loss, and vendor cost control, with prime cost shown as context, and puts a dollar figure on each gap. The audit ranks them biggest first and names the work. The Hub tracks what you have recovered and where you are still leaking. All of it reads from the sections you already log in, so you log the operation once and the diagnosis runs on it. The info "i" at the top of any Profit screen explains how that screen works.' },
       { q: 'Where do I start?',
         a: 'Run your first Profit Audit on day one for a baseline. Set your cost targets in App Settings first so every gap has a real number to measure against, and if you have not closed a week yet the audit asks for last week\'s sales when you generate. Then open the Profit Forecast to see your profit at your current pace versus your targets, which is the day-one read on what is on the table. After that, take the biggest gap on the Hub and work its fix, and confirm each week in Close The Week as it closes. The recovery numbers build from there.' },
       { q: 'Do I need every screen?',
-        a: 'No. The value comes from a few things: your Control data feeding the cost numbers, a Profit Audit for the baseline, and confirming each week in Close The Week. Recipe Summary and Over and Short are read-only diagnosis views that come alive as Control data builds. You do not enter data in them; they read what you already logged in Control.' },
+        a: 'No. The value comes from a few things: your logged data feeding the cost numbers, a Profit Audit for the baseline, and confirming each week in Close The Week. Recipe Summary and Over and Short are read-only diagnosis views that come alive as your logged data builds. You do not enter data in them; they read what you already logged.' },
       { q: 'What can I get on day one, before I have weeks of data?',
-        a: 'The Profit Audit runs day one off the Control data you already have. There is nothing to upload. If you have not closed a week yet, it asks for this week\'s bar and food sales when you hit Generate and works from that. The Profit Forecast projects your profit forward from your first confirmed weeks. The realized recovery number on the Hub needs about four weeks of logged weeks before it turns on: your own first three weeks set the baseline and it needs at least one more to measure against. Until then the Hub shows your audit opportunity.' }
+        a: 'The Profit audit runs day one off the data you already have. There is nothing to upload. If you have not closed a week yet, it asks for this week\'s bar and food sales when you hit Generate and works from that. The Profit Forecast projects your profit forward from your first confirmed weeks. The realized recovery number on the Hub needs about four weeks of logged weeks before it turns on: your own first three weeks set the baseline and it needs at least one more to measure against. Until then the Hub shows your audit opportunity.' }
     ]},
     { t: 'Audit and Fix', qa: [
       { q: 'How does the Profit Audit work?',
-        a: 'It scores five sections purely from data you already keep: your Control numbers and the weeks you close. There is no form to fill in and nothing self-reported. It ranks the gaps by monthly dollar impact, and the more you log the more it covers. If you have not closed a week yet, it asks once for last week\'s sales so the first run still has real numbers. Run it whenever you want a fresh read.' },
+        a: 'It scores five sections purely from data you already keep: the numbers you log and the weeks you close. There is no form to fill in and nothing self-reported. It ranks the gaps by monthly dollar impact, and the more you log the more it covers. If you have not closed a week yet, it asks once for last week\'s sales so the first run still has real numbers. Run it whenever you want a fresh read.' },
       { q: 'Why did a section come back N/A?',
         a: 'Because there was nothing to grade it on honestly. A cost section needs a cost percentage, and theft and loss needs real void, comp, or cash data or a documented control. With nothing there, Bar Cop leaves the section out rather than inventing a score. It fills in as you log more.' },
       { q: 'What is the Bar Cop Briefing?',
@@ -49,13 +53,13 @@ S.Help = {
       { q: 'Why does the recovery number show nothing at first?',
         a: 'Because there is nothing to measure against yet. A gap sets its baseline from your own first three weeks after the fix starts, and it needs at least one more week on top of that before a figure means anything, so about four weeks. Until then the Where You Stand band on the Hub teaches the loop, run the audit, pick a gap, work the fix, and shows your audit opportunity, which is what is on the table and never counted as money already won.' },
       { q: 'Why do some gaps show a dollar figure and others do not?',
-        a: 'Pour cost and food cost have a weekly cost percentage Bar Cop can measure, so they carry a live dollar a year at your current pace. Theft and loss and vendor control do not reduce to a clean weekly metric, so they read as a Review row you tap to work on their own screen rather than a fake dollar. Labor is part of prime cost, but it is worked in Revenue Recovery, not here.' },
+        a: 'Pour cost and food cost have a weekly cost percentage Bar Cop can measure, so they carry a live dollar a year at your current pace. Theft and loss and vendor control do not reduce to a clean weekly metric, so they read as a Review row you tap to work on their own screen rather than a fake dollar. Labor is part of prime cost, but it is worked under The Floor, not here.' },
       { q: 'Opportunity versus recovered, what is the difference?',
         a: 'Opportunity is what is on the table, from your audit and your forecast, a forward number. Recovered is what you have actually won back, measured from your logged weeks looking backward. Bar Cop never shows opportunity as money already in the register.' },
     ]},
     { t: 'The Weekly Numbers', qa: [
       { q: 'What is Confirm the Week for?',
-        a: 'It is the weekly confirm, and step one of your Close The Week. Bar Cop pulls the week in from Control: revenue from Shift, COGS from Inventory, labor from Labor. You read the money picture, confirm the grid, and save. You almost never type a raw number, you confirm one. Refresh from Control re-pulls the numbers if a shift or count landed after you opened the week, and asks before overwriting anything you edited by hand.' },
+        a: 'It is the weekly confirm, and step one of your Close The Week. Bar Cop pulls the week in for you: revenue from the days you logged, COGS from your Inventory counts, labor from your hours. You read the money picture, confirm the grid, and save. You almost never type a raw number, you confirm one. Refresh re-pulls the numbers if a shift or count landed after you opened the week, and asks before overwriting anything you edited by hand.' },
       { q: 'What is prime cost and why is it the headline?',
         a: 'Prime cost is COGS plus labor as a percentage of sales, the two costs you control day to day. It is the single number that tells you whether the operation is healthy, so it leads the weekly close and your Hub. The labor in prime cost is your hourly floor labor; salaried management is a fixed cost that lands in Books, not here. It sits on the Close The Week cost strip beside the two that feed it: Bar Pour Cost, your beverage COGS against bar sales, and Food Cost, your food COGS against food sales. Each carries its own target, so you can see which side of the house moved before you go looking.' },
       { q: 'What do Check Avg, Labor %, and RPLH mean?',
@@ -63,7 +67,7 @@ S.Help = {
       { q: 'What does the Profit Forecast do, and what are Projected Sales and Target Upside?',
         a: 'It projects your profit forward from the weeks you have already confirmed, two ways side by side: at your current pace, and at your cost targets. Projected Sales is your recent weekly sales held forward across the window you pick, so it is a run rate off your own history, not a goal. Target Upside is the profit difference between the two columns, the money on the table if you hit your targets. If you are already running better than your targets that tile reads Ahead of Target and shows by how much, which usually means your targets are due a look in App Settings. Every figure is a projection built from your own averages, an estimate to plan against, not a guarantee.' },
       { q: 'How does variance work?',
-        a: 'Variance is the gap between what your inventory says you poured and what your POS says you sold. A positive variance means more product left the shelf than was rung in. The usual causes are over-pouring, unrung drinks, or product walking out. Inventory Control\'s Variance Report ranks products by variance dollars so you know where to start; Spot Check is the per-shift version.' }
+        a: 'Variance is the gap between what your inventory says you poured and what your POS says you sold. A positive variance means more product left the shelf than was rung in. The usual causes are over-pouring, unrung drinks, or product walking out. Inventory\'s Variance Report ranks products by variance dollars so you know where to start; Spot Check is the per-shift version.' }
     ]},
     { t: 'Loss, Cash, and Vendors', qa: [
       { q: 'Where do loss signals show up?',
@@ -75,19 +79,19 @@ S.Help = {
       { q: 'What is Over and Short, and what are Short Rate and Out of Tolerance?',
         a: 'The cash diagnosis: who and what is repeatedly off. It rolls up your drawer counts by cashier and by register, so a bartender who comes up short most shifts surfaces instead of you scrolling a chronological list. Net Over / Short is the range\'s overs and shorts added together, so a cashier who runs $20 over one night and $20 under the next nets to zero and reads Clean, which is why the count and the rate sit beside it. Short Rate is the share of that person\'s or register\'s counts that came up short. Out of Tolerance is how many counts missed by more than the cash tolerance you set on the drawer, in either direction, because a drawer that runs consistently over is as much a signal as one that runs short. A cashier or register only gets ranked once there are enough counts to read a real pattern. Shift Cash History is the log of when; this is the read on who and what to act on.' },
       { q: 'What does Vendor Tracker do?',
-        a: 'Three pages under Vendors in Inventory. Scorecard is the per-vendor read: spend, price drift, short counts, open and recovered credits. Price Changes is every delivery line where the price moved, annualized to a real dollar using your usage. Discrepancies is a read-only rollup of open and recovered credits, their age, and what is still due. It is fed automatically from Inventory Control deliveries. An overcharge is the money a vendor billed you above the price you agreed, and Open Overcharge is the total still sitting unrecovered across your open claims. You file a discrepancy and chase the credit over in Inventory Control, at the dock in Receive Delivery or the Credits to Chase worklist there; the Discrepancies page is the read on where each one stands.' },
+        a: 'Three pages under Vendors in Inventory. Scorecard is the per-vendor read: spend, price drift, short counts, open and recovered credits. Price Changes is every delivery line where the price moved, annualized to a real dollar using your usage. Discrepancies is a read-only rollup of open and recovered credits, their age, and what is still due. It is fed automatically from Inventory deliveries. An overcharge is the money a vendor billed you above the price you agreed, and Open Overcharge is the total still sitting unrecovered across your open claims. You file a discrepancy and chase the credit over in Inventory, at the dock in Receive Delivery or the Credits to Chase worklist there; the Discrepancies page is the read on where each one stands.' },
       { q: 'What is Recipe Summary?',
-        a: 'A read-only diagnostic that ranks every menu item with a recipe by its cost percentage against target, worst first. Ingredient costs flow from your live Inventory Control prices, so when a vendor price moves the recipe cost updates on its own. You edit a recipe on Menu Builder in Revenue Recovery; this screen is the read.' }
+        a: 'A read-only diagnostic that ranks every menu item with a recipe by its cost percentage against target, worst first. Ingredient costs flow from your live Inventory prices, so when a vendor price moves the recipe cost updates on its own. You edit a recipe on Menu Builder under Menus; this screen is the read.' }
     ]},
     { t: 'Connections', qa: [
-      { q: 'What flows from Inventory Control into Profit Recovery?',
+      { q: 'What flows from Inventory into the Profit audit?',
         a: 'Your counts feed This Week COGS and the Profit Audit cost sections. Deliveries feed Vendor Tracker price changes and period COGS. Flagged delivery lines feed Vendor Tracker discrepancies. Spot checks and confirmed-theft adjustments raise Needs Attention rows on the Hub. All of it is read-only on the Recovery side and always on, so you set the data once in Inventory and it stays current here.' },
-      { q: 'What flows from Shift Control into Profit Recovery?',
-        a: 'Shift revenue is This Week\'s total revenue, the single source. Cash drops and drawer counts feed Over and Short and the audit\'s cash section. Loss-bearing voids and comps feed the audit\'s exception read. Staff meal and shift drink are policy expense, not loss, so they do not inflate anything.' },
-      { q: 'What flows from Labor Control into Profit Recovery?',
-        a: 'Your logged hours are This Week\'s labor line and half of prime cost; Inventory counts are the other half. Bar Cop counts hourly floor labor in prime cost and leaves salaried management to Books as a fixed cost, so the prime number reflects the labor you flex day to day.' },
+      { q: 'What flows from the shift and the safe into the Profit audit?',
+        a: 'Shift revenue is the confirmed week\'s total revenue, the single source. Cash drops and drawer counts feed Over and Short and the audit\'s cash section. Loss-bearing voids and comps feed the audit\'s exception read. Staff meal and shift drink are policy expense, not loss, so they do not inflate anything.' },
+      { q: 'What flows from your hours into the Profit audit?',
+        a: 'Your logged hours are the confirmed week\'s labor line and half of prime cost; Inventory counts are the other half. Bar Cop counts hourly floor labor in prime cost and leaves salaried management to Books as a fixed cost, so the prime number reflects the labor you flex day to day.' },
       { q: 'Why do my Profit numbers not match my POS exactly?',
-        a: 'Two usual reasons. Bar Cop reads net sales, after voids and comps, from Shift Control, while your POS export may show gross. And timing: Bar Cop sums shifts by the day they happened, while your POS report may use a different daypart or fiscal cutoff. Log every shift on the day it happened and confirm the week here, and the two line up.' }
+        a: 'Two usual reasons. Bar Cop reads net sales, after voids and comps, from The Floor, while your POS export may show gross. And timing: Bar Cop sums shifts by the day they happened, while your POS report may use a different daypart or fiscal cutoff. Log every shift on the day it happened and confirm the week here, and the two line up.' }
     ]}
   ],
 
@@ -101,7 +105,7 @@ S.Help = {
 
   draw() {
     const search = '<div class="f" style="max-width:420px;margin-bottom:8px;">'
-      + '<input type="text" id="help-search" placeholder="Search Profit Recovery help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
+      + '<input type="text" id="help-search" placeholder="Search the Profit audit help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
     const tabs = '<div class="ch-tabs no-print">'
       + this.SECTIONS.map((s, i) => '<button class="ch-tab' + (this.tab === i ? ' on' : '') + '" data-tab="' + i + '">' + esc(s.t) + '</button>').join('')
       + '</div>';
