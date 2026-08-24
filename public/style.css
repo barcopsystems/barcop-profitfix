@@ -656,7 +656,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .mp-stat-val{font-size:16px;font-weight:700;color:var(--t1);line-height:1;}
 .mp-brief p{font-size:12px;line-height:1.6;color:var(--t2);margin:0 0 8px;}
 .mp-brief p:last-child{margin-bottom:12px;}
-.mp-move{background:#0F1A21;border-radius:var(--r2);padding:12px 14px;margin-top:auto;min-height:104px;display:flex;flex-direction:column;gap:10px;}
+.mp-move{background:#202C36;border-radius:var(--r2);padding:12px 14px;margin-top:auto;min-height:104px;display:flex;flex-direction:column;gap:10px;}
 .mp-move-txt{flex:1;font-size:12px;line-height:1.6;color:var(--t2);}
 .mp-move-lbl{font-weight:700;color:var(--t1);}
 .mp-act{align-self:flex-start;cursor:pointer;font-size:12px;font-weight:600;color:var(--t1);user-select:none;}
