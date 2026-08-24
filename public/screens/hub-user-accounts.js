@@ -366,6 +366,10 @@ S.HubUserAccounts = {
     }
     /* One `.pnl-list` row per section — the data-row pill used on the App Settings landing — with
        the section name on the left and its checkboxes wrapping on the right. */
+    /* The widest row decides the grid for EVERY row — one Full Access box plus the most bar links
+       any single section has. Measured off what this granter can actually hand out, so a scoped
+       admin seeing fewer links still gets columns that line up. */
+    const cols = sections.reduce((n, s) => Math.max(n, this._grantableGroups(s).length + 1), 1);
     html += '<table class="pnl-list"><tbody>';
     let granted = 0;
     sections.forEach(sec => {
@@ -375,14 +379,30 @@ S.HubUserAccounts = {
       const cur = stored ? stored[sec.key] : undefined;
       const full = cur === true;
       const ticked = Array.isArray(cur) ? cur : [];
+      /* ⭐ `bc-check` IS PREPENDED HERE, NOT WRITTEN AT THE CALL SITES. That is the app's own
+         checkbox — green fill with a DARK tick, and its comment already says "reusable on any
+         interactive box" — so this needed no new CSS at all, just the class the rest of the app
+         uses (Kyle: *"the checkmarks need to be the green with dark text like the rest of the
+         app"*). Prepending keeps the call sites reading `'ua-perm-full'` / `'ua-perm-grp'`, which
+         is what `collectPerms`, `_wirePermsGrid` and the pins all address. */
       const box = (cls, extra, on, label) =>
-        '<label style="display:inline-flex;align-items:center;gap:5px;margin:0 10px 4px 0;font-size:12px;color:var(--t2);white-space:nowrap;cursor:pointer;">'
-          + '<input type="checkbox" class="' + cls + '"' + extra + (on ? ' checked' : '') + '>'
+        '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--t2);'
+          + 'white-space:nowrap;cursor:pointer;min-width:0;">'
+          + '<input type="checkbox" class="bc-check ' + cls + '"' + extra + (on ? ' checked' : '') + '>'
           + esc(label) + '</label>';
       html += '<tr class="ua-perm-sec" data-key="' + esc(sec.key) + '">'
-        + '<td style="font-size:13px;color:var(--t1);white-space:nowrap;vertical-align:top;padding-top:8px;">' + esc(sec.label) + '</td>'
+        + '<td style="font-size:13px;color:var(--t1);white-space:nowrap;vertical-align:top;padding-top:9px;">' + esc(sec.label) + '</td>'
         + '<td style="text-align:left;">'
-        +   '<div style="display:flex;flex-wrap:wrap;align-items:center;">'
+        /* ⛔ A GRID WITH A FIXED COLUMN COUNT, NOT A WRAPPING FLEX ROW (Kyle: *"every row's
+           checkmark box is in a straight column down"*). The old row was `flex-wrap`, so each box
+           started wherever the previous label happened to end and no two rows lined up — Inventory
+           has seven groups and The Week has three, so the columns drifted further apart the further
+           down you read.
+           ⭐ THE TRACK COUNT IS DERIVED FROM THE WIDEST SECTION, not typed: every row lays out on
+           the SAME template, which is the only thing that makes the columns line up across rows.
+           Add a group to any section tomorrow and every row re-aligns on its own. */
+        +   '<div style="display:grid;grid-template-columns:repeat(' + cols + ',minmax(86px,1fr));'
+        +     'gap:9px 16px;align-items:center;">'
         +     box('ua-perm-full', '', full, 'Full Access')
         +     allowed.map(n => box('ua-perm-grp', ' data-group="' + esc(n) + '"', full || ticked.indexOf(n) > -1, n)).join('')
         +   '</div>'
@@ -537,22 +557,40 @@ S.HubUserAccounts = {
   _wirePermsGrid(root) {
     if (!root || root._permsWired) return;
     root._permsWired = true;
-    const sync = (row) => {
+    /* ⛔⛔ PAINTING AND TOGGLING ARE TWO DIFFERENT JOBS, AND MERGING THEM WAS THE BUG (Kyle, walking
+       the pushed build: *"if i check full access.. and then uncheck it.. all of the sections are
+       then checked off still.. all check marks should be removed with the uncheck"*). One `sync`
+       did both: it ticked every box when Full went on and, going off, only re-ENABLED them — so the
+       ticks it had just made stayed behind and the control was not reversible. My own note called
+       that "the least surprising place to land"; it is not, and a checkbox that cannot be undone is
+       the wrong answer whatever the reasoning was.
+       ⛔ AND THE SPLIT IS NOT COSMETIC — CLEARING ON PAINT WOULD WIPE A PARTIAL GRANT. `paint` runs
+       once on render, where a member with `books: ['Statements']` arrives with that box already
+       ticked and Full unticked. If the initial pass cleared on "Full is off", the owner would open
+       Edit Access and find every existing tick gone. So paint NEVER touches a tick; only a real
+       press does ([[lessons-paid-for]] #74 — a render that mutates the state it has read). */
+    const paint = (row) => {
       const full = row.querySelector('.ua-perm-full');
       if (!full) return;
       row.querySelectorAll('.ua-perm-grp').forEach(cb => {
-        if (full.checked) cb.checked = true;
         cb.disabled = full.checked;
         if (cb.style) cb.style.opacity = full.checked ? '0.55' : '';
       });
     };
-    root.querySelectorAll('.ua-perm-sec').forEach(sync);
+    const toggle = (row) => {
+      const full = row.querySelector('.ua-perm-full');
+      if (!full) return;
+      // A real toggle, both ways: on ticks every link, off clears every one of them.
+      row.querySelectorAll('.ua-perm-grp').forEach(cb => { cb.checked = full.checked; });
+      paint(row);
+    };
+    root.querySelectorAll('.ua-perm-sec').forEach(paint);
     root.addEventListener('change', (ev) => {
       const t = ev.target;
       if (!t || !t.classList) return;
       const row = t.closest ? t.closest('.ua-perm-sec') : null;
       if (!row) return;
-      if (t.classList.contains('ua-perm-full')) sync(row);
+      if (t.classList.contains('ua-perm-full')) toggle(row);
     });
   },
 
@@ -1399,7 +1437,11 @@ S.HubUserAccounts = {
       + '<div class="card-actions">'
       +   '<button class="btn btn-primary" id="ua-perms-save">Save Permissions</button>'
       + '</div></div>';
-    const overlay = App.openModal(html, { id, maxWidth: 560 });
+    /* ⚠ 980, NOT 560. The grid lays every section on one shared template so the boxes line up in
+       straight columns, and the widest section is eight tracks — at 560 those tracks fall under
+       their own labels and the alignment the grid exists for is lost. The page-level invite grid
+       already had the room; this modal did not. */
+    const overlay = App.openModal(html, { id, maxWidth: 980 });
     /* ⛔ THE SECOND DOOR. The invite form has wired this grid since it existed and this modal never
        did — harmless while the grid was dropdowns with no behaviour, and a dead Full Access box the
        moment it grew one. Both doors, one call ([[lessons-paid-for]] #63). */
