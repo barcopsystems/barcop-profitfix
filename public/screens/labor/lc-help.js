@@ -1,7 +1,7 @@
 'use strict';
 
-/* ── Labor Control — Help and FAQ ─────────────────────────────────────────────
-   The in-app knowledge layer for Labor Control: orientation, the decisions and
+/* ── The Floor — Help and FAQ ─────────────────────────────────────────────
+   The in-app knowledge layer for The Floor: orientation, the decisions and
    judgment calls, cross-system connections, and troubleshooting. One topic at a
    time on the same underline tab switcher used elsewhere, plus a live search box
    that filters questions across every topic. Per-screen step-by-step directions
@@ -14,18 +14,18 @@ S.LaborHelp = {
 
   showHowTo() {
     App.showHelpModal('Labor Help and FAQ', [
-      { p: ['This page is the Help and FAQ for Labor Control: how to get started, the roster and wages, certs and coaching, tips and tip credit, payroll, and how Labor feeds Revenue, Profit, Shift, and Accounting. It covers the why and how it all connects.'] },
+      { p: ['This page is the Help and FAQ for The Floor: how to get started, the roster and wages, certs and coaching, tips and tip credit, payroll, and how Labor feeds Revenue, Profit, Shift, and Accounting. It covers the why and how it all connects.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "overtime" or "tip credit" lands you on the right answer fast.'] },
-      { h: 'Directions For A Specific Screen', p: ['Every working screen in Labor Control carries its own step-by-step directions. Open the screen you have a question about, like Build Schedule or Log Hours, and tap this same info i button at the top to read the how-to for that page. This FAQ covers the why; the per-screen i covers the how.'] }
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in The Floor carries its own step-by-step directions. Open the screen you have a question about, like Build Schedule or Log Hours, and tap this same info i button at the top to read the how-to for that page. This FAQ covers the why; the per-screen i covers the how.'] }
     ]);
   },
 
   SECTIONS: [
     { t: 'Getting Started', qa: [
-      { q: 'What does Labor Control do?',
-        a: 'Labor Control is where everything operational about your team lives: positions and wages, the staff roster, certifications, training and onboarding records, the schedule, actual hours worked, tips, overtime, pay periods, call-outs, and a coaching log per person. It is one of three Control systems (Inventory, Labor, Shift) that capture your daily operations. Revenue Recovery reads your roster and your hours; Profit Recovery reads your hours for prime cost. Set the labor data once here and Recovery stays current without you typing the same numbers twice.' },
+      { q: 'What does The Floor do?',
+        a: 'The Floor is where everything operational about your team lives: positions and wages, the staff roster, certifications, training and onboarding records, the schedule, actual hours worked, tips, overtime, pay periods, call-outs, and a coaching log per person. The Revenue audit reads your roster and your hours; the Profit audit reads your hours for prime cost. Set the labor data once here and Recovery stays current without you typing the same numbers twice.' },
       { q: 'Where do I start?',
-        a: 'Four steps get Labor Control producing real numbers. First, set up your Positions (bartender, server, line cook) with a department, a default wage, and the tipped setting where it applies. Second, build the Staff Roster, assigning each person a position and capturing any certifications. Third, build the first week in Build Schedule. Fourth, log the hours people actually worked in Log Hours, by hand or by import. Each screen carries its own step-by-step directions on the info "i", and Labor opens to a guided empty state until your roster and first week are in.' },
+        a: 'Four steps get The Floor producing real numbers. First, set up your Positions (bartender, server, line cook) with a department, a default wage, and the tipped setting where it applies. Second, build the Staff Roster, assigning each person a position and capturing any certifications. Third, build the first week in Build Schedule. Fourth, log the hours people actually worked in Log Hours, by hand or by import. Each screen carries its own step-by-step directions on the info "i", and Labor opens to a guided empty state until your roster and first week are in.' },
       { q: 'Do I have to follow that order?',
         a: 'Mostly. Positions have to exist before the roster, since you cannot assign someone to a role that does not exist, and the roster has to exist before Build Schedule, since you cannot schedule an empty roster. Build Schedule and Log Hours run independently once the first two are in place. Skipping the foundation just produces empty schedules and orphaned hour logs.' }
     ]},
@@ -63,19 +63,19 @@ S.LaborHelp = {
       { q: 'What if my pay period is bi-weekly instead of weekly?',
         a: 'Pay Periods runs weekly because the week grain matches Bar Cop\'s shift and revenue rollups. For bi-weekly payroll, run Payroll Export for two consecutive weeks and combine them, or hand both files to your payroll provider. Closing weeks one at a time keeps the lock tight, so a single bad shift in week one does not unlock all of week two.' },
       { q: 'Why do my labor numbers not match my payroll provider exactly?',
-        a: 'Two common reasons. Labor Control tracks hours at the staff wage; payroll adds payroll taxes, employer benefits, and bonuses on top, so total labor cost usually runs 10 to 15 percent higher than wages alone. And timing: Bar Cop closes Monday to Sunday weeks, so if your pay period runs on other dates the two will not line up week to week. Compare a stretch that covers whole Bar Cop weeks, or hand your provider the Payroll Export for each week the period covers.' },
+        a: 'Two common reasons. The Floor tracks hours at the staff wage; payroll adds payroll taxes, employer benefits, and bonuses on top, so total labor cost usually runs 10 to 15 percent higher than wages alone. And timing: Bar Cop closes Monday to Sunday weeks, so if your pay period runs on other dates the two will not line up week to week. Compare a stretch that covers whole Bar Cop weeks, or hand your provider the Payroll Export for each week the period covers.' },
       { q: 'How does Bar Cop handle overtime?',
         a: 'Hours over 40 in a week are treated as overtime. For anyone paid at or above your state minimum wage that is time and a half. For a tipped employee on a tip credit, the premium is worked out on the minimum wage rather than on their cash wage, which is what federal rules require, so their overtime hour is worth more than one and a half times the cash rate. You see it in three places: a live Overtime Watch note while you build the schedule, listing anyone at or near 40 so you can catch it before you post; the Overtime Watch screen, which reads your posted schedules; and the Pay Periods gross, where the premium is applied. Salaried staff are exempt and never accrue overtime, so a salaried but non-exempt employee should be set to Hourly instead. Bar Cop uses a 40-hour weekly threshold; some states also have daily overtime rules, so verify the rules for your jurisdiction with your payroll provider.' }
     ]},
     { t: 'Connections', qa: [
-      { q: 'What flows from Labor Control to Revenue Recovery?',
+      { q: 'What flows from The Floor to the Revenue audit?',
         a: 'Three connections, all read-only on the Revenue side, all always on. Logged hours feed the labor cost line on your confirmed week. The same hours feed This Week\'s RPLH, which divides revenue by labor hours. And the Staff Roster, your active Bar and Front of House staff specifically, feeds the Server Check roster. Set the labor data once here and Revenue stays current.' },
-      { q: 'What flows from Labor Control to Profit Recovery?',
-        a: 'Logged hours feed the labor line on your confirmed week and the prime cost calculation, which combines labor and COGS as a percentage of revenue. Prime cost is the single most important number in a healthy operation, and Labor Control owns half of it. The other half comes from Inventory Control counts.' },
-      { q: 'What flows from Labor Control to Shift Control?',
-        a: 'The staff roster is the source for the staff dropdowns across Shift Control: the optional Authorized By on the void and comp log, performed-by on cash drops, and completed-by on checklists. Tip logs and tip pools also draw their crew from the roster.' },
-      { q: 'What flows from Labor Control into Accounting?',
-        a: 'The Books Month-End workbook reads Labor Control for the Labor Cost Analysis sheet (hours and wages by position and by staff) and for the Form 8027 Worksheet (per-employee tips, preferring the saved tip-pool split when a pool exists for the shift). Payroll Export builds the payroll file for direct handoff to your payroll provider. Set the labor data right here and every accounting deliverable lines up automatically.' }
+      { q: 'What flows from The Floor to the Profit audit?',
+        a: 'Logged hours feed the labor line on your confirmed week and the prime cost calculation, which combines labor and COGS as a percentage of revenue. Prime cost is the single most important number in a healthy operation, and The Floor owns half of it. The other half comes from Inventory counts.' },
+      { q: 'What does the staff roster feed?',
+        a: 'The roster is the source for every staff dropdown in the app: the optional Authorized By on the void and comp log, performed-by on cash drops, and completed-by on checklists. Tip logs and tip pools also draw their crew from the roster.' },
+      { q: 'What flows from The Floor into Accounting?',
+        a: 'The Books Month-End workbook reads The Floor for the Labor Cost Analysis sheet (hours and wages by position and by staff) and for the Form 8027 Worksheet (per-employee tips, preferring the saved tip-pool split when a pool exists for the shift). Payroll Export builds the payroll file for direct handoff to your payroll provider. Set the labor data right here and every accounting deliverable lines up automatically.' }
     ]}
   ],
 
@@ -89,7 +89,7 @@ S.LaborHelp = {
 
   draw() {
     const search = '<div class="f" style="max-width:420px;margin-bottom:8px;">'
-      + '<input type="text" id="help-search" placeholder="Search Labor Control help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
+      + '<input type="text" id="help-search" placeholder="Search The Floor help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
     const tabs = '<div class="ch-tabs no-print">'
       + this.SECTIONS.map((s, i) => '<button class="ch-tab' + (this.tab === i ? ' on' : '') + '" data-tab="' + i + '">' + esc(s.t) + '</button>').join('')
       + '</div>';
