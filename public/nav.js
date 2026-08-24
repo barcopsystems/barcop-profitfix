@@ -16,22 +16,24 @@ const ProfitNav = {
            inbound link still resolves; the Analysis group went with it because a group of none is
            not a group. Its PERMISSION area moved to books, which is a real change and is pinned in
            verify-area-access-doors block G. -->
-      <div class="nav-section">Leaks</div>
-      <!-- VENDOR TRACKER LEFT PROFIT ON 2026-08-23 and is now the Vendors group in Inventory, three
+      <!-- ⛔⛔⛔ LOSS PREVENTION AND EXPERIMENTS ARE DELETED (Kyle, 2026-08-24: "yes delete all
+           recovery.. experiments.. loss prevention"). The Leaks group went with theft-risk and the
+           Experiments group went with profit-experiments, because an empty nav-section renders as a
+           bare rule, a divider over nothing. Both SCREENS are deleted too, along with the loss
+           investigations store and the three experiment stores.
+           THE ABSENCE IS ASSERTED, NOT MERELY SHIPPED, same as the vendor rows below: a removal
+           nothing watches comes back unnoticed (the-loop #139).
+           NO CODE IDENTIFIERS IN THIS COMMENT, AND THAT IS DELIBERATE: an HTML comment inside a
+           template literal is INVISIBLE to deComment(src, false), which is how most harnesses read
+           this file, so naming a store or a table here would make every census counting those
+           tokens read my prose as live code (integrity #2, the most repeated slip in this suite).
+           VENDOR TRACKER LEFT PROFIT ON 2026-08-23 and is now the Vendors group in Inventory, three
            rows instead of one (Kyle: "so it no longer is in profit at all"). The four ids are
            unchanged and every inbound link still resolves; what moved is the menu, the shell and the
-           permission area. Pinned by verify-vendors-in-inventory A7, which asserts the ABSENCE here
-           rather than merely dropping the row, so the removal is watched (the-loop #139).
+           permission area. Pinned by verify-vendors-in-inventory A7.
+           THIS NAV IS NOW SUPPORT ONLY, and its rail row went with the Recovery rail table. It stays
+           registered exactly as Labor and Shift did when The Floor replaced them at T67.
            NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
-      <div class="nav-item" data-screen="theft-risk" id="nav-theft-risk">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M8.5 2L3 5v4.5c0 3.5 5.5 5.5 5.5 5.5s5.5-2 5.5-5.5v-4.5L8.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 8.5l2 2L12 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Loss Prevention</span>
-      </div>
-      <div class="nav-section">Experiments</div>
-      <div class="nav-item" data-screen="profit-experiments" id="nav-profit-experiments">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2v4.2L3 12.5a1.2 1.2 0 0 0 1 1.8h9a1.2 1.2 0 0 0 1-1.8L10.5 6.2V2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2h6M5.2 9.5h6.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Experiments</span>
-      </div>
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="help" id="nav-help">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
@@ -54,11 +56,13 @@ const Revenue = {
               Forecasts drop-down beside Cash and Profit Forecast. Screen untouched, still rendered
               from this module's branch in navigate; only the row and its now-empty Analysis group
               went. Its permission area moved to books with it (verify-area-access-doors block G). -->
-      <div class="nav-section">Experiments</div>
-      <div class="nav-item" data-screen="r-experiments" id="nav-r-experiments">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2v4.2L3 12.5a1.2 1.2 0 0 0 1 1.8h9a1.2 1.2 0 0 0 1-1.8L10.5 6.2V2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2h6M5.2 9.5h6.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Experiments</span>
-      </div>
+      <!-- ⛔⛔ THE EXPERIMENTS GROUP IS DELETED (Kyle, 2026-08-24). Its row was r-experiments and the
+           heading went with it, because an empty nav-section renders as a bare rule over nothing.
+           The screen, the shared experiment-tracker component and this module's experiment store are
+           all deleted; the ABSENCE is asserted rather than merely shipped.
+           THIS NAV IS NOW SUPPORT ONLY, and its rail row went with the Recovery rail table. It stays
+           registered exactly as Labor and Shift did when The Floor replaced them at T67.
+           NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="r-help" id="nav-r-help">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>
@@ -82,26 +86,27 @@ const Cash = {
               Cash drop-down beside Break-Even. All four SCREENS are untouched and still render out
               of this module's branch in navigate; only the rows moved, and their permission area
               moved with them (verify-area-access-doors block G).
-           ⭐ THIS IS THE CHANGE THAT ENDS THIS SECTION. What is left below is Purchasing and Trapped
-              Cash, which Kyle has said go to Inventory, and Experiments, which wants a Tools section
-              that does not exist yet. The Analysis group went because a group of none is not a
-              group; Free Up Cash keeps its name while it still holds the two it was named for. -->
+           ⭐ THAT CHANGE ARRIVED. Purchasing and Trapped Cash went to Inventory, and the last row
+              here went at T69 pass 3b on 2026-08-24, so this nav is Support only and its rail row
+              is gone. The Analysis group went earlier because a group of none is not a group. -->
       <!-- ⛔⛔⛔ AND THE LAST TWO LEFT FOR INVENTORY (Kyle, 2026-08-23): Purchasing under Ordering,
            Trapped Cash leading Reports. THE HEADING WENT WITH THEM rather than being left over an
            empty group: an empty nav-section renders as a bare rule, a divider over nothing, and
            "Free Up Cash" named exactly the two rows that are gone.
-           ⭐ THIS SECTION IS NOW EXPERIMENTS AND HELP. Kyle has already said Experiments wants a
-           Tools section that does not exist yet, at which point the Cash rail row has nothing left
-           to hold. Worth knowing before anything else is filed here.
+           ⭐ THIS SECTION IS NOW HELP ONLY, and its rail row is gone. It stays registered exactly
+           as Labor and Shift did when The Floor replaced them. Worth knowing before anything else
+           is filed here.
            ⚠ AND ITS RAIL ROW ALREADY LANDS SOMEWHERE ELSE: _SECTION_DASH.cash is c-audit, which
            belongs to the Audits section, so pressing Cash on the rail opens its overlay rather than
            navigating. That is pre-existing and unchanged by this move.
            NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
-      <div class="nav-section">Experiments</div>
-      <div class="nav-item" data-screen="c-experiments" id="nav-c-experiments">
-        <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M6.5 2v4.2L3 12.5a1.2 1.2 0 0 0 1 1.8h9a1.2 1.2 0 0 0 1-1.8L10.5 6.2V2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 2h6M5.2 9.5h6.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Experiments</span>
-      </div>
+      <!-- ⛔⛔ THE EXPERIMENTS GROUP IS DELETED (Kyle, 2026-08-24). Its row was c-experiments and the
+           heading went with it, because an empty nav-section renders as a bare rule over nothing.
+           The screen, the shared experiment-tracker component and this module's experiment store are
+           all deleted; the ABSENCE is asserted rather than merely shipped.
+           THIS NAV IS NOW SUPPORT ONLY, and its rail row went with the Recovery rail table. It stays
+           registered exactly as Labor and Shift did when The Floor replaced them at T67.
+           NO BACKTICKS IN THIS COMMENT: it is inside a template literal. -->
       <div class="nav-section">Support</div>
       <div class="nav-item" data-screen="c-help" id="nav-c-help">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/></svg>

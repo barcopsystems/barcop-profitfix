@@ -2610,7 +2610,22 @@ const App = {
      of those screens; what died is the rail ROW and the menu, not the shell. `_moduleOf` and
      `App.STAFF_TILES` still say the old words on purpose, exactly as they do for the six pages the
      Books bar took — the filing system moved, the renderer did not. */
-  _PROTO_RECOVERY: [['profit','Profit'],['revenue','Revenue'],['cash','Cash']],
+  /* ⛔⛔⛔ `_PROTO_RECOVERY` IS DELETED TOO (Kyle, 2026-08-24: *"yes delete all recovery.. experiments
+     .. loss prevention"*), and for the same reason as the two above: once Loss Prevention and
+     Experiments went, Profit held one row, Revenue held one row and Cash held one row, and every one
+     of them was that module's Help page. DELETED, NOT EMPTIED, or the rail draws "Recovery" over
+     nothing. The same five readers went with it: the table, `_railLabelOf`'s list, the rail render
+     (with one of its two dividers), the drawer's `railGroup('Recovery', ...)` and a comment.
+     ⭐ THE ENGINE IS NOT THE RAIL BLOCK, AND THIS IS THE ONE PLACE THE INSTRUCTION COULD BE READ TWO
+     WAYS. `recovery.js` computes "Recovered to date" from CONFIRMED WEEKS and feeds the Hub money
+     tiles, the briefing and the audits, so deleting it would silently send that headline to $0 on
+     the page a prospect looks at ([[lessons-paid-for]] #110, the exact trap the sequencing warned
+     about). What was named is the rail SECTION. `Recovery.total()` stays, and `_enterRecovery` stays
+     and opens the AUDITS, which is where the recovery numbers live now.
+     ⭐ THE NAV OBJECTS STAY, EXACTLY AS `T67` LEFT LABOR AND SHIFT. `ProfitNav`, `Revenue` and `Cash`
+     keep their Help row and stay in `SECTIONS`; nothing asks `navHTMLFor` for those keys any more
+     because no rail row emits them. Measured before the cut: ZERO screens registered under profit /
+     revenue / cash are left unclaimed by some section's nav. */
   /* ⛔ SIGN OUT LEFT THE RAIL ON 2026-08-16 (Kyle: *"move it from the side bar and put like in the
      images"*). It now sits in the TOP NAV, left of the account switcher and The Rail, as plain
      text with no icon — `#tn-signout` in index.html, wired beside `#tn-rail`.
@@ -2875,7 +2890,7 @@ const App = {
   },
   // Pages rebuilt in the un-box language carry their own page header, so the old
   // topbar title bar is hidden for them (see navigate). Grows page by page.
-  _CONVERTED: new Set(['profit-forecast', 'audit-tracker', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-experiments', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'theft-risk', 'sales-integrity', 'cash-recon', 'profit-experiments', 'help', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-position', 'c-bridge', 'c-capital', 'c-experiments', 'c-help']),
+  _CONVERTED: new Set(['profit-forecast', 'audit-tracker', 't-playbook', 'r-audit', 't-audit', 't-presence', 't-this-week', 't-forecast', 't-fix', 't-dashboard', 't-help', 'r-forecast', 'r-server-check', 'r-menu-items', 'r-menu-planning', 'r-menu-engineering', 'r-price-calc', 'r-dog-test', 'r-help', 'recipe-cost-analysis', 'vendor-tracker', 'vendor-watch', 'vendor-scorecard', 'vendor-discrepancy', 'sales-integrity', 'cash-recon', 'help', 'ev-bookings', 'ev-calendar', 'ev-regulars', 'ev-pricing', 'ev-help', 'sc-drawers', 'sc-cash-control', 'sc-cash-history', 'sc-walked-tabs', 'sc-void-comp', 'sc-waste', 'sc-maintenance', 'sc-incidents', 'sc-licensing', 'sc-checklists', 'sc-checklist-templates', 'sc-preshift', 'sc-help', 'lc-build-schedule', 'lc-schedule-history', 'lc-log-hours', 'lc-pay-periods', 'lc-payroll-export', 'lc-tip-log', 'lc-tip-pool', 'lc-tip-history', 'lc-reports', 'lc-overtime-watch', 'lc-callout-log', 'lc-time-off', 'lc-positions', 'lc-staff-roster', 'lc-training', 'lc-help', 'ic-take-inventory', 'ic-count-history', 'ic-spot-check', 'ic-receive-delivery', 'ic-delivery-history', 'ic-order-sheet', 'ic-order-history', 'ic-par-suggestions', 'ic-transfers', 'ic-adjustments', 'ic-empties', 'ic-report-usage', 'ic-report-variance', 'ic-report-stock', 'ic-product-setup', 'ic-locations', 'ic-vendors', 'ic-prep-batches', 'ic-help', 'c-trapped', 'c-purchasing', 'c-forecast', 'c-audit', 'c-position', 'c-bridge', 'c-capital', 'c-help']),
   _protoGlobalClick(g) {
     if (g === 'hub')     return this.showHub();
     /* ⭐⭐ THE WEEK — ONE ROW, THREE TABS (Kyle, 2026-08-23). Close, Review and History became one
@@ -2999,7 +3014,7 @@ const App = {
 
   // The rail label for a key, from the same four tables the rail itself renders.
   _railLabelOf(key) {
-    const tables = [this._PROTO_GLOBAL, this._PROTO_RECOVERY, this._PROTO_BOTTOM, this._PROTO_SIGNOUT];
+    const tables = [this._PROTO_GLOBAL, this._PROTO_BOTTOM, this._PROTO_SIGNOUT];
     for (const t of tables) for (const [k, l] of (t || [])) if (k === key) return l;
     return null;
   },
@@ -3330,14 +3345,14 @@ const App = {
     this.showAuth();
   },
   /* ── The rail (2026-08-08) ────────────────────────────────────────────────────────────────────
-     Renders the four rail tables into #rail-nav, marks the one entry that matches `context`, and
+     Renders the three rail tables into #rail-nav, marks the one entry that matches `context`, and
      wires each row. Same signature and same three callers it has always had (showHub,
      openHubFullPage, showApp), because `context` was already the right argument: every caller
      already knew which destination it was rendering.
 
-     ⛔ A ROW IS EITHER A PLACE OR A CONTAINER, NEVER BOTH. `_PROTO_GLOBAL` and `_PROTO_BOTTOM` rows
-     navigate on click. `_PROTO_RECOVERY` rows own a section MENU, so they open
-     the overlay and go nowhere — clicking Inventory must not drag the operator off the page they
+     ⛔ A ROW IS EITHER A PLACE OR A CONTAINER, NEVER BOTH. A row carrying `data-rail-go` navigates
+     on click; a row carrying `data-rail-sec` owns a section MENU, so it opens
+     the overlay and goes nowhere — clicking Inventory must not drag the operator off the page they
      are reading just because they wanted to look at the menu. `data-rail-sec` marks the second kind
      so stage 2's overlay can find them; until it lands they fall back to jumpToSection, so no
      destination is unreachable mid-build. */
@@ -3507,9 +3522,6 @@ const App = {
       const r = ([k, l]) => this._railRow(k, l, context);
       rail.innerHTML =
           '<div class="rail-group">' + this._PROTO_GLOBAL.map(r).join('') + '</div>'
-        + '<div class="rail-divider"></div>'
-        + '<div class="rail-group"><div class="rail-grp-label">Recovery</div>'
-        +   this._PROTO_RECOVERY.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
         + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>';
       rail.querySelectorAll('.rail-item[data-rail-go]').forEach(el =>
@@ -3886,7 +3898,6 @@ const App = {
          which is the whole point of comparing against the rendered overlay rather than the raw
          sidebar builder — the builder output matches NEITHER menu. */
       { label: 'Go to', items: App._PROTO_GLOBAL.map(([k, l]) => railRow(k, l)) },
-      railGroup('Recovery', App._PROTO_RECOVERY),
       // App Settings is off in the live demo, same as the desktop gear.
       ...(App.demoMode ? [] : [railGroup('Settings', App._PROTO_BOTTOM)]),
       /* ⛔ SIGN OUT WAS MISSING FROM THE PHONE ENTIRELY (Kyle, 2026-08-12). This drawer is generated
@@ -8076,14 +8087,16 @@ const App = {
     const openOrders = (Array.isArray(inv.ic_orders) ? inv.ic_orders : []).filter(o =>
       o && o.status !== 'Received' && Array.isArray(o.line_items)
       && o.line_items.some(li => li && li.product_id && idSet.has(li.product_id)));
-    // Open loss investigations (theft-risk) are keyed by product_id and are a first-class store, so
-    // deleting the product out from under an OPEN one used to read as "nothing uses this". A resolved
-    // investigation is closed history and does not block. (See theft-risk investigationLiveData: a
-    // deleted product leaves that investigation's live count/spot-check wiring with nothing to read.)
-    const investigations = (Array.isArray(this.data && this.data.variance_investigations) ? this.data.variance_investigations : [])
-      .filter(iv => iv && iv.status !== 'resolved' && iv.product_id && idSet.has(iv.product_id));
-    const total = menuItems.length + prepBatches.length + openOrders.length + investigations.length;
-    return { menuItems, prepBatches, openOrders, investigations, total, any: total > 0 };
+    /* ⛔ THE FOURTH REFERENCE KIND WENT WITH LOSS PREVENTION (2026-08-24). An OPEN loss investigation
+       used to block deleting the product it named, read off `variance_investigations`. That store is
+       gone, so this guard is back to the three things that can still reference a product.
+       ⚠ IT WOULD HAVE GONE QUIET, NOT BROKEN, WHICH IS WHY IT IS CUT RATHER THAN LEFT: the refusal
+       card renders each kind through `line(n, …)`, which returns '' at zero, so a permanently empty
+       fourth kind renders nothing and NOTHING would have reported it ([[lessons-paid-for]] #134).
+       This member was not on the retirement plan at all; only a sweep of who READS the store found
+       it (#111). The refusal card loses one row and keeps the other three. */
+    const total = menuItems.length + prepBatches.length + openOrders.length;
+    return { menuItems, prepBatches, openOrders, total, any: total > 0 };
   },
 
   // Menu items that use this PREP BATCH as a recipe ingredient (source:'batch'). The batch twin of
@@ -8890,7 +8903,11 @@ const App = {
       data: () => App.data,
       kinds: {
         week: 'weeks',
-        variance_investigation: 'variance_investigations',
+        /* ⛔ `variance_investigation: 'variance_investigations'` WENT WITH LOSS PREVENTION
+           (2026-08-24), and unregistering the kind is what actually drops the store: it stops
+           loading at login, `putRecord` has nowhere to land, and `_configBlob` has no such array to
+           strip, so `App.data.variance_investigations` simply never exists. Same mechanism as the
+           `cash_outflow` removal documented below. */
         sales_review: 'sales_reviews',
         vendor_discrepancy: 'vendor_discrepancies', audit: 'audits', cash_audit: 'cash_audits',
         /* ⛔ `cash_outflow: 'cash_outflows'` WAS REMOVED HERE (build order E). Unregistering the kind
@@ -8935,12 +8952,14 @@ const App = {
         event_rate_card: 'event_rate_cards',
         event_regular: 'event_regulars',
         event_calendar_entry: 'event_calendar',
-        // Experiment tracker (shared across Profit / Revenue / Cash). Row-per-record,
-        // NONWINDOWED so the operator's experiments always load. Keys kept *_initiatives
-        // (and bare `initiatives` for Revenue) for back-compat.
-        profit_initiative: 'profit_initiatives',
-        revenue_initiative: 'initiatives',
-        cash_initiative: 'cash_initiatives',
+        /* ⛔ THE THREE EXPERIMENT STORES WENT WITH EXPERIMENTS (2026-08-24): `profit_initiatives`,
+           bare `initiatives` (Revenue, the back-compat spelling) and `cash_initiatives`.
+           ⚠ THREE, NOT ONE, AND THE PLAN SAID ONE. `initiative-tracker.js` declared all three as
+           separate `dataKey`s — that is what its header meant by "multi-instance" — so a delete list
+           written from the Profit store alone would have left two live stores with no reader, two
+           seeds writing into them, and two Week in Review recap lines counting them
+           ([[lessons-paid-for]] #111: the plan names what dies, only a reader sweep names what
+           breaks). Unregistering the kind is what drops each store, same as above. */
         // Fix System activity feed (row-per-record, NONWINDOWED). fix_progress (the
         // per-gap checkbox map) stays in the blob; only the append-only feed moves.
         fix_activity: 'fix_activity',
@@ -9852,7 +9871,6 @@ const App = {
       const revTitles = {
         'hub':                    ['Recovery Hub', ''],
         'r-audit':            ['Revenue Audit', 'Monthly Score and Progress'],
-        'r-experiments':          ['Experiments', ''],
         'r-forecast':             ['Revenue Forecast', 'Plan Next Week'],
         'week-history':           ['Week History', 'Weekly Recovery'],
         'r-server-check':         ['Server Check', ''],
@@ -9864,7 +9882,6 @@ const App = {
       };
       const revScreens = {
         'r-audit':            S.RevenueAudit,
-        'r-experiments':      S.RecoveryExperiments,
         'r-forecast':         S.RevenueForecast,
         'week-history':       S.WeekHistory,
         'r-server-check':     S.RevenueServerCheck,
@@ -9888,7 +9905,6 @@ const App = {
     if (this._activeModule === 'cash') {
       const cashTitles = {
         'hub':           ['Recovery Hub', ''],
-        'c-experiments': ['Experiments', ''],
         'c-audit':       ['Cash Audit', 'Weekly Score and Progress'],
         // ⛔ Trapped Cash and Purchasing left for INVENTORY, 2026-08-23 — registered there now, and
         //   out of here so one page renders from one shell whatever door the operator came through.
@@ -9899,7 +9915,6 @@ const App = {
         'c-help':        ['Help and FAQ', ''],
       };
       const cashScreens = {
-        'c-experiments': S.RecoveryExperiments,
         'c-audit':       S.CashAudit,
         'c-capital':     S.CashCapital,
         'c-forecast':    S.CashForecast,
@@ -10097,14 +10112,12 @@ const App = {
       'week-history':  ['Week History', 'Weekly Recovery'],
       'profit-forecast':['Profit Forecast', ''],
       'recipe-cost-analysis':['Recipe Summary', ''],
-      'profit-experiments':['Experiments', ''],
       /* ⛔ THE FOUR VENDOR IDS LEFT THIS MAP ON 2026-08-23 and live in the Inventory block above
          (Kyle: "so it no longer is in profit at all"). Removing them from BOTH module maps rather
          than leaving a copy behind is the point: a duplicate registration is what lets a stale
          `showApp('profit')` caller keep working and hide that it is pointing at the wrong section
          ([[the-loop]] #149 — enumerate every registration for an id and say what each survivor is
          FOR). Every caller now resolves the shell through `_moduleOf`, which answers 'inventory'. */
-      'theft-risk':    ['Loss Prevention', ''],
       'sales-integrity': ['Sales Integrity', 'Shift Sales Review'],
       'cash-recon':    ['Over and Short', ''],
       'help':          ['Help and FAQ', ''],
@@ -10116,9 +10129,7 @@ const App = {
       'week-history':  S.WeekHistory,
       'profit-forecast':S.ProfitForecast,
       'recipe-cost-analysis':S.RecipeCostAnalysis,
-      'profit-experiments':S.RecoveryExperiments,
       // The four vendor ids moved to the Inventory block (see the note in the Profit titles above).
-      'theft-risk':    S.TheftRisk,
       'sales-integrity': S.SalesIntegrity,
       'cash-recon':    S.CashRecon,
       'help':          S.Help,
@@ -10848,9 +10859,10 @@ const App = {
      every window at once (measured: a single 2027 row moved a Last-7-Days team average from $35.00
      to $56.67, and diluted the Revenue audit's comp rate to 5% against a truth of 10%).
      ⚠ AS OF 2026-07-27 ONLY TWO CALLERS BOUND THE TOP — r-server-check's scorecard and r-audit's S4
-     window, the two that were measured. theft-risk's brief, cash-engine's vendor scorecard and
-     hub's price re-drift are still open at the top (S217 on THE LIST). ⚠ The Events dashboard's win
-     rate used to be on that list and went with the screen when it was deleted 2026-08-12.
+     window, the two that were measured. cash-engine's vendor scorecard and hub's price re-drift are
+     still open at the top (S217 on THE LIST). ⚠ Two more used to be on that list and went with their
+     screens: the Events dashboard's win rate (deleted 2026-08-12) and theft-risk's brief (deleted
+     2026-08-24 with Loss Prevention). Retiring a feature shortens this list; it does not clear it.
      Stated as a measurement with its scope, not as an all-clear.
      ⚠ Compare DATE STRINGS, not Date objects. Building the cutoff from `new Date()` keeps the
      current time of day, so a row stamped earlier in the day on the boundary date falls out and

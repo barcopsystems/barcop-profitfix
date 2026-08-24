@@ -524,8 +524,8 @@ const DB = {
     'sc-help':'_always',
     // Profit Recovery
     'this-week':'profit','audit-tracker':'profit',
-    'cash-recon':'profit','theft-risk':'profit','sales-integrity':'profit',
-    'recipe-cost-analysis':'profit','profit-experiments':'profit',
+    'cash-recon':'profit','sales-integrity':'profit',
+    'recipe-cost-analysis':'profit',
     /* ⛔⛔ THE FOUR VENDOR IDS ARE INVENTORY AS OF 2026-08-23 (Kyle moved Vendor Tracker out of
        Profit: *"so it no longer is in profit at all"*). They carry no prefix, so without these
        entries `_areaOf` returns its `profit` default and a manager scoped to Inventory would see
@@ -576,12 +576,12 @@ const DB = {
     'r-this-week':'revenue',
     'r-audit':'revenue','r-server-check':'revenue','r-menu-items':'revenue',
     'r-menu-engineering':'revenue','r-menu-planning':'revenue',
-    'r-dog-test':'revenue','r-experiments':'revenue','r-help':'_always',
+    'r-dog-test':'revenue','r-help':'_always',
     // Cash Recovery
     /* ⛔ Trapped Cash and Purchasing are INVENTORY now (Kyle, 2026-08-23) — listed with the other
        moved ids below, beside the four vendor pages, so the whole set is read in one place. What is
        left of this area is the audit and Experiments. */
-    'c-audit':'cash','c-experiments':'cash','c-help':'_always',
+    'c-audit':'cash','c-help':'_always',
     // Events
     'ev-bookings':'events','ev-calendar':'events',
     'ev-regulars':'events','ev-pricing':'events','ev-help':'_always',
@@ -2092,7 +2092,6 @@ const DB = {
       menu_items: [],
       weeks: [],
       vendor_discrepancies: [],
-      variance_investigations: [],
       sales_reviews: [],
       audits: [],
       getting_started_profit: {},
