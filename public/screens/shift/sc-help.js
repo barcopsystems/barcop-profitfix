@@ -1,15 +1,15 @@
 'use strict';
 
-/* ── Shift Control — Help and FAQ ─────────────────────────────────────────────
-   The in-app knowledge layer for Shift Control. One topic at a time on the same
+/* ── The Floor — Help and FAQ ─────────────────────────────────────────────
+   The in-app knowledge layer for The Floor. One topic at a time on the same
    underline tab switcher used by Cash History, plus a live search
    box that filters questions across every topic. Per-screen step-by-step
    directions live in each screen's nav "i" panel (showHowTo), so this FAQ stays
    on orientation, the why, cross-system connections, and troubleshooting, not the
-   how-to. Content tracks the current Shift Control: the weekly cockpit (the POS
+   how-to. Content tracks the current The Floor: the weekly cockpit (the POS
    sales import), Cash Control and Cash History, the operations logs, the unified
    Checklists screen, the registers reference,
-   and how Shift Control feeds Profit, Revenue, Inventory, and the Hub. */
+   and how The Floor feeds Profit, Revenue, Inventory, and the Hub. */
 
 S.ShiftHelp = {
   tab: 0,
@@ -17,16 +17,16 @@ S.ShiftHelp = {
 
   showHowTo() {
     App.showHelpModal('Shift Help and FAQ', [
-      { p: ['This page is the full Help and FAQ for Shift Control: importing your weekly POS sales, cash control and reconciliation, the operations logs (voids, comps, walked tabs, maintenance, incidents), checklists, the pre-shift briefing, and how Shift feeds the rest of Bar Cop.'] },
+      { p: ['This page is the full Help and FAQ for The Floor: importing your weekly POS sales, cash control and reconciliation, the operations logs (voids, comps, walked tabs, maintenance, incidents), checklists, the pre-shift briefing, and how Shift feeds the rest of Bar Cop.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "drawer" or "comp" lands you on the right answer fast.'] },
-      { h: 'Directions For A Specific Screen', p: ['Every working screen in Shift Control carries its own directions. Open the screen you have a question about, like Cash Control or the Void and Comp Log, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in The Floor carries its own directions. Open the screen you have a question about, like Cash Control or the Void and Comp Log, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
     ]);
   },
 
   SECTIONS: [
     { t: 'Getting Started', qa: [
-      { q: 'What does Shift Control do?',
-        a: 'Shift Control captures the operating week: your imported POS sales (revenue and covers), cash drops, the safe log, drawer variances, voids and comps, maintenance issues, walked tabs, floor incidents, your opening and closing checklists, and your pre-shift line-ups. It is one of three Control systems (Inventory, Labor, Shift) that capture daily operations. Your imported sales are the single source for the weekly revenue number every Recovery system reads. Cash data feeds Over and Short and the Profit Audit. Voids and comps feed the Operations Audit. Run Shift Control well and the rest of Bar Cop produces honest numbers without you typing the same data twice.' },
+      { q: 'What does The Floor do?',
+        a: 'The Floor captures the operating week: your imported POS sales (revenue and covers), cash drops, the safe log, drawer variances, voids and comps, maintenance issues, walked tabs, floor incidents, your opening and closing checklists, and your pre-shift line-ups. Your sales are the single source for the weekly revenue number every audit and every statement reads. Cash data feeds Over and Short and the Profit audit. Voids and comps feed the Operations Audit. Run it well and the rest of Bar Cop produces honest numbers without you typing the same data twice.' },
       { q: 'Where do I start?',
         a: 'A little setup, then a weekly habit. To set up, build your opening and closing checklists on Build Checklists and add your registers on Add Registers. Then each week, open Close The Week and import this week\'s POS sales: one "sales by day" export, dropped once, lands the whole week.' },
       { q: 'How do I add or fix a past week?',
@@ -36,17 +36,17 @@ S.ShiftHelp = {
       { q: 'How do I get my sales into Bar Cop?',
         a: 'On Close The Week, the first step is Import this week\'s sales. Pull a "sales by day" report from your POS for the week and drop it: one file, one row per day. Bar Cop reads the whole week at once and lands each day\'s bar revenue, food revenue, and covers. Re-importing a week replaces those days so it never double-counts. No daily entry and no live shift to run; the POS is the system of record for sales and Bar Cop ingests it once a week.' },
       { q: 'Why does the sales import matter so much?',
-        a: 'It is the single source of weekly revenue for Bar Cop. Your confirmed week fills its revenue and covers straight from the imported days, so you confirm the week instead of typing it. Covers feed the check-average in Revenue Recovery and the Server Check screen. Import every week and the numbers downstream stay honest without manual override.' }
+        a: 'It is the single source of weekly revenue for Bar Cop. Your confirmed week fills its revenue and covers straight from the imported days, so you confirm the week instead of typing it. Covers feed the check average on the Revenue audit and the Server Check screen. Import every week and the numbers downstream stay honest without manual override.' }
     ]},
     { t: 'Cash Control', qa: [
       { q: 'Where do I enter cash activity?',
         a: 'On Cash Control. It is the one place you log drops, safe moves, and drawer counts, with a shared bill counter that totals the denominations for you. Past entries are read-only on Cash History, split into Cash Drops, Safe Log, and Variances tabs. Enter on Cash Control, review on Cash History.' },
       { q: 'What is a cash drop?',
-        a: 'Cash pulled from a register and moved to the safe during or at the end of a shift. Log each one on Cash Control with the register, who pulled it, and the amount. The denomination grid counts the bills and coins and fills the amount for you, so the count is documented along with the total. Drops feed Over and Short in Profit Recovery as the running picture of cash control for the period.' },
+        a: 'Cash pulled from a register and moved to the safe during or at the end of a shift. Log each one on Cash Control with the register, who pulled it, and the amount. The denomination grid counts the bills and coins and fills the amount for you, so the count is documented along with the total. Drops feed Over and Short under The Floor as the running picture of cash control for the period.' },
       { q: 'How does the Safe Log work?',
         a: 'A running ledger of cash moving in and out of the safe: drops in, banks issued and returned, deposits prepared, paid-outs. Every entry carries a running balance, so at any moment you know what the safe should hold. Count the safe against that balance at least daily. A safe that does not balance against the log is a problem the log surfaces immediately.' },
       { q: 'What is a variance, and where does it come from?',
-        a: 'At close, the expected cash from the POS is compared against the cash actually counted. The difference is the variance, created when you reconcile a drawer in Cash Control, or entered by hand if needed. The tolerance is set per register on Add Registers (default $10), so a busy main bar can run a wider tolerance than a slow service well. Anything outside that register\'s tolerance flags Over or Short, and a drawer with nothing counted shows Not Counted instead of a false Within Tolerance. Over and Short in Profit Recovery and the Profit Audit both read this.' },
+        a: 'At close, the expected cash from the POS is compared against the cash actually counted. The difference is the variance, created when you reconcile a drawer in Cash Control, or entered by hand if needed. The tolerance is set per register on Add Registers (default $10), so a busy main bar can run a wider tolerance than a slow service well. Anything outside that register\'s tolerance flags Over or Short, and a drawer with nothing counted shows Not Counted instead of a false Within Tolerance. Over and Short under The Floor and the Profit audit both read this.' },
       { q: 'What do the variance colors mean?',
         a: 'Within tolerance is green. Short, meaning less cash than expected, is red. Over, meaning more cash than expected, is amber. A drawer that was never counted shows grey as Not Counted. Cash History records every variance and the Operations Audit counts the out-of-tolerance ones, so a bartender consistently short across shifts is a pattern Bar Cop surfaces without you tracking it on paper.' }
     ]},
@@ -56,7 +56,7 @@ S.ShiftHelp = {
       { q: 'What goes in the Void and Comp Log?',
         a: 'Every voided ticket and every comped item, logged by the dollar amount (a whole comped table is one line, not one per item). The item is optional, picked from the menu-and-inventory dropdown when you want the link or left off. The Reason carries the classification: customer-facing comps such as service recovery, goodwill, regular or VIP, and promo are loss and feed the Operations Audit, while Staff Meal and Shift Drink are policy expense tracked as cost in Books and the Annual Review. Enter a whole shift at once in the batch builder, or edit a single row to add a check number or a note. The log feeds the Operations Audit\'s void and comp checks; for the per-server pattern, Sales Integrity reads comps off your POS report.' },
       { q: 'How does Bar Cop catch comp abuse?',
-        a: 'By comp volume per server, not by whether a manager name was typed (that is a POS-native control). The per-server read lives on Sales Integrity in Profit Recovery: drop your POS per-server sales report and Bar Cop benchmarks each server\'s comp, discount, void, and refund dollars against the floor and flags the outliers, the bartender giving away rounds. The Void and Comp Log here is the operational record, what got comped and the loss total; Sales Integrity is the pattern read. Authorized By stays on the form as an optional record of who cleared a comp, but it does not drive any flag.' },
+        a: 'By comp volume per server, not by whether a manager name was typed (that is a POS-native control). The per-server read lives on Integrity Check under The Floor: drop your POS per-server sales report and Bar Cop benchmarks each server\'s comp, discount, void, and refund dollars against the floor and flags the outliers, the bartender giving away rounds. The Void and Comp Log here is the operational record, what got comped and the loss total; Sales Integrity is the pattern read. Authorized By stays on the form as an optional record of who cleared a comp, but it does not drive any flag.' },
       { q: 'What is the Maintenance Log for?',
         a: 'Broken equipment, facility issues, and operational problems that need attention. Each entry has a priority (Urgent, High, Normal, Low) and a status (Open, In Progress, Resolved). Assigned To suggests staff from your roster but takes free text for an outside vendor like an HVAC tech or a plumber. An Urgent item that is not Resolved shows up on your Hub under Needs Attention, so a problem from Saturday night carries to Sunday\'s manager until someone closes it out.' },
       { q: 'What is the Walked Tabs log?',
@@ -75,11 +75,11 @@ S.ShiftHelp = {
         a: 'The line-up sheet you read to the floor before doors, one per service period. Pick the period at the top (Lunch, Happy Hour, Dinner, and so on, from your configured service periods) and Bar Cop builds that briefing from live data: your check-average target, the day\'s cover forecast, a Featured Items list pre-filled with your best-margin, high-volume sellers from Menu Engineering, and your upsell sequence. Swap or remove any featured item that does not fit the period, add your own from the menu, write one line of focus for the shift, and read it at line-up or tap Export Briefing for a paper copy. A bar that runs lunch and dinner holds a separate briefing for each; a one-service bar sees no period picker. The upsell sequence is yours to customize, and logging is optional: Mark Briefing Held feeds the Operations Audit\'s operational discipline only once you start using it, and never counts against a bar that does not.' }
     ]},
     { t: 'Connections', qa: [
-      { q: 'What flows from Shift Control to Profit Recovery?',
+      { q: 'What flows from The Floor to the Profit audit?',
         a: 'Four connections, all read-only on the Recovery side. Your imported sales feed the revenue line on your confirmed week, the weekly sum of the imported days. Cash drops and variances feed Over and Short as a diagnosis view. Cash variance feeds the Profit Audit cash section. Voids and comps feed the Operations Audit\'s void and comp checks, and per-server comp and void abuse is read on Sales Integrity from your POS per-server report. POS revenue is imported, not calculated, and it enters once a week here via the sales import.' },
-      { q: 'What flows from Shift Control to Revenue Recovery?',
+      { q: 'What flows from The Floor to the Revenue audit?',
         a: 'Two connections. Your imported sales feed the revenue line on your confirmed week (the same weekly sum, broken out as bar and floor). Covers from the import feed the cover count on your confirmed week and the check-average that drives Server Check and the Check Average screen.' },
-      { q: 'What flows from Shift Control to the Hub?',
+      { q: 'What flows from The Floor to the Hub?',
         a: 'Maintenance entries marked Urgent flow to your Hub under Needs Attention and stay visible across shift changes until they are Resolved, and the Hub reads your logged shifts to show how the current week is tracking.' }
     ]}
   ],
@@ -94,7 +94,7 @@ S.ShiftHelp = {
 
   draw() {
     const search = '<div class="f" style="max-width:420px;margin-bottom:8px;">'
-      + '<input type="text" id="help-search" placeholder="Search Shift Control help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
+      + '<input type="text" id="help-search" placeholder="Search The Floor help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
     const tabs = '<div class="ch-tabs no-print">'
       + this.SECTIONS.map((s, i) => '<button class="ch-tab' + (this.tab === i ? ' on' : '') + '" data-tab="' + i + '">' + esc(s.t) + '</button>').join('')
       + '</div>';
