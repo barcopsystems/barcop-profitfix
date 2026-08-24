@@ -2661,14 +2661,34 @@ const App = {
   // ⚠ WORKFLOW IS GONE FROM BOTH MENUS (Kyle, 2026-08-10: that page is being deleted). Removed here
   // rather than in each menu, so the rail and the mobile drawer — which now reads these same tables
   // — drop it together instead of one at a time.
-  _PROTO_BOTTOM:   [['settings','Settings']],
-  _PROTO_SIGNOUT:  [['signout','Sign Out']],
+  /* ⭐⭐⭐ HELP JOINS SETTINGS IN THE BOTTOM GROUP (Kyle, 2026-08-24: *"that global help page will go
+     on the rail menu under settings .. Help with an icon"*). It is the app's ONE global FAQ, and
+     giving it a rail row is what finally gives it a door: MEASURED on the deployed build before this
+     edit, ALL ELEVEN help FAQs were unreachable — every section nav still names a help row, and the
+     eight sections with a top BAR drop the whole Support group through `ASIDE_GROUP`, while labor,
+     shift, profit, revenue and cash stopped being rail rows entirely.
+     ⭐ THE ICON NEEDED NO NEW ART — `_NAV_SECTION_IC.help` has been in the shared map all along.
+     ⛔ AND THE ROW WOULD HAVE BEEN DEAD WITHOUT A ROUTER BRANCH. `_protoGlobalClick` did not answer
+     `help`; a rail row whose key nothing answers renders perfectly and does nothing on click, which
+     is the class that shipped four times in four days. The branch is in `_protoGlobalClick` below,
+     and `_HUB_SIDEBAR_OF_ACTION` gained a `help` entry so the row can LIGHT on its own page. */
+  _PROTO_BOTTOM:   [['settings','Settings'],['help','Help']],
+  /* ⚠ "LOG OUT", NOT "SIGN OUT" (Kyle, same message). One word in one table, and it moves the rail
+     row AND the phone drawer's row, because both are generated from here. That is the agreement
+     working: the auth screen this control lands on already reads "LOG IN TO BAR COP", so the rail
+     now uses the same word the destination does. */
+  _PROTO_SIGNOUT:  [['signout','Log Out']],
   // Maps an openHubFullPage activeAction to the global top-nav link to highlight.
   /* ⭐ ALL THREE WEEK ACTIONS LIGHT THE SAME ROW NOW. They used to map to themselves, one rail row
      each; there is one row, so `week` is the answer for every one of them — otherwise opening a page
      through an old id would light nothing and the operator would be on a page the rail says they
      are not on. */
-  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week': 'week', 'week-review': 'week', 'week-close': 'week', 'week-history': 'week', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books' },
+  /* ⚠ `'help': 'help'` ADDED 2026-08-24 WITH THE RAIL ROW, and it is not optional chrome. This map
+     is what lets a HUB page light its own rail row: `_currentScreenId` is written only by
+     `navigate`, so a page opened through `openHubFullPage` cannot name itself and its row can never
+     be marked ([[lessons-paid-for]] #121). Without the entry the operator would sit on the Help page
+     with the rail insisting they are somewhere else. */
+  _GLOBAL_OF_ACTION: { 'bar-cop-audit': 'audit', 'breakeven': 'books', 'week': 'week', 'week-review': 'week', 'week-close': 'week', 'week-history': 'week', 'books': 'books', 'weekly-pnl': 'books', 'year-end': 'books', 'operating-expenses': 'books', 'help': 'help' },
   /* ⛔⛔ AND EVERY SETTINGS PAGE WAS MISSING FROM THAT MAP — nine of them. Found while checking the
      new title: Settings read no section prefix, and the same lookup drives the rail highlight, so
      **the Settings row never lit up either** on any of its own pages.
@@ -2986,6 +3006,14 @@ const App = {
        Staff cannot reach Settings, but they still need Your Account to change their password, so
        they land there. Two spellings of one access rule is how they drift apart. */
     if (g === 'settings') return this._openSettingsForRole();
+    /* ⛔⛔ THE HELP ROW'S BRANCH, AND IT IS THE HALF THAT MAKES THE ROW REAL (2026-08-24). A key in
+       `_PROTO_BOTTOM` with no answer here renders a perfect row that does nothing on click, silently
+       — the defect that reached Kyle four times in four days and the reason both routers now log an
+       unhandled action instead of falling off the end.
+       ⭐ IT DELEGATES TO THE SCREEN'S OWN OPENER, never a second copy of the mounting. `S.HubHelp.open`
+       already calls `openHubFullPage('Help and FAQ', …, 'help')`, so the page, its title and the
+       action that lights the rail row all stay in one place. */
+    if (g === 'help')     return (window.S && S.HubHelp) ? S.HubHelp.open() : null;
     if (g === 'signout')  return this._signOut();
   },
 
@@ -3506,7 +3534,10 @@ const App = {
                  them. Design is Kyle's, one change at a time, so this is a reuse and not a choice. */
               inventory: 'inventory', floor: 'labor', menus: 'menus', labor: 'labor', shift: 'shift',
               profit: 'profit', revenue: 'revenue', cash: 'cash',
-              settings: 'settings', signout: 'signout' },
+              /* ⚠ `help` ADDED 2026-08-24 with the rail row. The mark already existed in
+                 `_NAV_SECTION_IC` (a question mark in a circle) and had no reader until now, which
+                 is why this is a pass-through like every other entry rather than a new drawing. */
+              settings: 'settings', help: 'help', signout: 'signout' },
 
   _railRow(k, label, context) {
     const isSection = this._railHasMenu(k);
