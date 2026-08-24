@@ -199,7 +199,7 @@ S.InventorySpotCheck = {
          ⚠ THE REPLACEMENT IS A NEW CLAIM AND WAS MEASURED (#117): walked on the deployed build
          2026-08-24, a saved check's flagged rows read amber `Over` and red `High`, both off the
          check's own `flag_pct`. */
-      { h: 'After You Save', p: ['Saved checks land in Spot Check History, where View opens the full breakdown. A flagged product reads Over past the Flag at % you set on that check, and High past twice it. A check feeds Loss Prevention and the Operations Audit once both sittings are in, so finish the post-shift count and the register numbers and it starts counting.'] }
+      { h: 'After You Save', p: ['Saved checks land in Spot Check History, where View opens the full breakdown. A flagged product reads Over past the Flag at % you set on that check, and High past twice it. A check feeds the Operations Audit once both sittings are in, so finish the post-shift count and the register numbers and it starts counting.'] }
     ]);
   },
 

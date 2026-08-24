@@ -1829,7 +1829,12 @@ S.InventoryProducts = {
     return line(refs.menuItems.length, 'menu item', 'menu items', names(refs.menuItems, 'name'))
       + line(refs.prepBatches.length, 'prep batch', 'prep batches', names(refs.prepBatches, 'name'))
       + line(refs.openOrders.length, 'open order', 'open orders', names(refs.openOrders, 'vendor'))
-      + line((refs.investigations || []).length, 'open loss investigation', 'open loss investigations', names(refs.investigations || [], 'sku'))
+      /* ⛔ THE FOURTH ROW WENT WITH LOSS PREVENTION (2026-08-24). It read "N open loss
+         investigations" off `refs.investigations`, and `App.productReferences` no longer returns
+         that key. ⚠ IT WOULD HAVE GONE QUIET RATHER THAN BROKEN, which is exactly why it is cut:
+         `line(0, …)` returns '' and `(refs.investigations || [])` guards the missing key, so this
+         would have rendered nothing forever and nothing would have reported it
+         ([[lessons-paid-for]] #134). The guard keeps its other three kinds. */
       + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-top:10px;">'
       + 'Your count, delivery, waste and spot-check history also mentions '
       + (count === 1 ? 'it' : 'them') + '. That is a record of what happened and is never changed.'

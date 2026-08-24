@@ -5,8 +5,8 @@
    + live search used by Labor Help, Shift Help, Cash History, and the reports.
    Per-screen how-tos live on each page's info "i" panel now, so this is trimmed
    to the non-page material: orientation, setup decisions, the count/variance
-   model, ordering judgment, and how Inventory feeds Profit Recovery, Accounting,
-   and Loss Prevention. Content tracks the current Inventory Control. */
+   model, ordering judgment, and how Inventory feeds Profit Recovery and Accounting.
+   Content tracks the current Inventory Control. */
 
 S.InventoryHelp = {
   tab: 0,
@@ -14,7 +14,7 @@ S.InventoryHelp = {
 
   showHowTo() {
     App.showHelpModal('Inventory Help and FAQ', [
-      { p: ['This page is the full Help and FAQ for Inventory Control: how to get started, the count and variance model, ordering and par judgment, the operations logs, and how Inventory feeds Profit Recovery, Accounting, and Loss Prevention.'] },
+      { p: ['This page is the full Help and FAQ for Inventory Control: how to get started, the count and variance model, ordering and par judgment, the operations logs, and how Inventory feeds Profit Recovery and Accounting.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "variance" or "par" lands you on the right answer fast.'] },
       { h: 'Directions For A Specific Screen', p: ['Every working screen in Inventory Control carries its own directions. Open the screen you have a question about, like Take Inventory or Receive Delivery, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
     ]);
@@ -39,9 +39,9 @@ S.InventoryHelp = {
       { q: 'Why does the physical count stay separate from my POS?',
         a: 'Because the gap between the two is the whole point. Your physical count is the truth of what is actually on the shelf. Your POS sales are what was rung in. Variance is the difference, and that difference is where over-pouring, waste, and theft live. That is why Bar Cop never lets you import a POS or perpetual on-hand number into a count: if the count just mirrored what the register thought you had, variance would always read zero and the leak would be invisible. POS sales data is welcome on the expected side (the Variance Report and Spot Check both use it), but the count itself stays an independent physical truth.' },
       { q: 'How does the Variance Report decide what is OK and what gets flagged?',
-        a: 'You set the threshold. Under Set Variance Standards you tell Bar Cop how much variance you are willing to live with per category, and anything inside that reads OK while anything past it reads Flag. The verdict is always re-derived from your current standards, so tightening a threshold re-judges every past period and your history reflects the bar you run today, not the settings you had months ago. The same standards drive the Quick Variance Check on the landing too. Known comps and waste are pulled out before the comparison, so only unexplained loss shows. A flag opens a Review investigation right on the spot, working the same record Loss Prevention reads, when the pattern is worth chasing.' },
+        a: 'You set the threshold. Under Set Variance Standards you tell Bar Cop how much variance you are willing to live with per category, and anything inside that reads OK while anything past it reads Flag. The verdict is always re-derived from your current standards, so tightening a threshold re-judges every past period and your history reflects the bar you run today, not the settings you had months ago. The same standards drive the Quick Variance Check on the landing too. Known comps and waste are pulled out before the comparison, so only unexplained loss shows. A flagged line reads Over past your standard, and High past twice it, so you can see at a glance which ones are worth chasing.' },
       { q: 'What is a Spot Check really for?',
-        a: 'It reads variance on a single shift without a full inventory: a quick pre-shift and post-shift count on a few high-risk products (well spirits, draft, premium pours) compared against what the POS rang for that shift, scoped to one bar or register. One shift on its own is noise. The value is the pattern: the same product or the same person coming up short again and again. Spot Check results feed Loss Prevention in Profit Recovery, which is where that pattern surfaces.' }
+        a: 'It reads variance on a single shift without a full inventory: a quick pre-shift and post-shift count on a few high-risk products (well spirits, draft, premium pours) compared against what the POS rang for that shift, scoped to one bar or register. One shift on its own is noise. The value is the pattern: the same product or the same person coming up short again and again. A flagged check raises a Needs Attention row on the Hub, which is where that pattern surfaces.' }
     ]},
     { t: 'Ordering and Receiving', qa: [
       { q: 'What if my par levels are wrong?',
@@ -55,7 +55,7 @@ S.InventoryHelp = {
       { q: 'When should I use the Adjustment Log instead of editing a count?',
         a: 'Always the Adjustment Log. Editing a count to "fix" a loss destroys the count history and erases the reason the stock is gone, so the shrinkage just disappears and nobody knows why. The Adjustment Log keeps the count honest and attributes every documented loss to a real cause (Damage, Theft, Expiration, Found, Other). Your bookkeeper, your insurance adjuster, and your future self all benefit when the shrinkage trail has reasons attached.' },
       { q: 'Do transfers and adjustments change my product totals?',
-        a: 'A transfer does not. Moving a case from the stockroom to the front bar changes where the product lives, not how much you have, so nothing leaves the building and your totals hold. An adjustment does change the total, because it is a documented loss out of inventory or found stock back in. Both exist for accountability: they give you a record of every bottle that moved or went missing, and they feed Loss Prevention and the clean record your bookkeeper expects.' },
+        a: 'A transfer does not. Moving a case from the stockroom to the front bar changes where the product lives, not how much you have, so nothing leaves the building and your totals hold. An adjustment does change the total, because it is a documented loss out of inventory or found stock back in. Both exist for accountability: they give you a record of every bottle that moved or went missing, and they feed the Operations Audit and the clean record your bookkeeper expects.' },
       { q: 'Why bother logging empties?',
         a: 'Two reasons. Some jurisdictions legally require a log of recyclable or redeemable container disposition, and where bottle deposits apply, the Empties Log tallies the deposit value owed back to you across a period. It does not touch your inventory math, it is a compliance and money-recovery record, with a printable take-along sheet so the work happens during the shift and the totals get entered after close.' },
       { q: 'What are Prep Batches for?',
@@ -63,9 +63,9 @@ S.InventoryHelp = {
     ]},
     { t: 'Connections', qa: [
       { q: 'What flows from Inventory Control to Profit Recovery?',
-        a: 'Several connections, all read-only on the Recovery side and always on. Your products are the master list Profit Recovery reads. Counts feed the cost of goods on your confirmed week and the Profit Audit cost sections. Deliveries feed Vendor Tracker and period COGS. Flagged delivery lines become the vendor credit claims you chase in Receive Delivery, with the rollup in Vendor Tracker. Spot Checks and confirmed-theft adjustments feed Loss Prevention. Below-par counts feed the Hub alerts. Set the inventory data once here and all of it stays current.' },
-      { q: 'What feeds Loss Prevention from Inventory?',
-        a: 'Three signals. Spot Check variance flags, where physical pours sold do not match what the POS rang. Adjustment Log entries marked Theft within the last 90 days. And variance investigations you open from a flagged line on the Variance Report or a Spot Check, worked right where you flag them. The more honestly those get logged, the sharper Loss Prevention reads, because it is only as good as the data underneath it.' },
+        a: 'Several connections, all read-only on the Recovery side and always on. Your products are the master list Profit Recovery reads. Counts feed the cost of goods on your confirmed week and the Profit Audit cost sections. Deliveries feed Vendor Tracker and period COGS. Flagged delivery lines become the vendor credit claims you chase in Receive Delivery, with the rollup in Vendor Tracker. Spot Checks and confirmed-theft adjustments raise Needs Attention rows on the Hub. Below-par counts feed the Hub alerts. Set the inventory data once here and all of it stays current.' },
+      { q: 'What does Inventory feed on the theft side?',
+        a: 'Two signals, and each one raises its own Needs Attention row on the Hub. Spot Check variance flags, where the physical pours sold do not match what the POS rang. And Adjustment Log entries marked Theft. Variance lines past your standard read Over, and past twice it read High, on the Variance Report itself. The more honestly those get logged, the sharper that read is, because it is only as good as the data underneath it.' },
       { q: 'What flows from Inventory Control into Accounting?',
         a: 'Every inventory-driven sheet in the bookkeeper handoff. Month-End Books pulls purchases and COGS into the Income Statement, your beginning and ending counts plus deliveries into Inventory Valuation, and the same usage math the Variance Report uses into Variance and Shrinkage. Weekly P&L pulls the same numbers at a weekly grain. None of it is hand-keyed: if your counts and deliveries are current, your books are too.' },
       { q: 'Why do not my used numbers match my POS sales exactly?',
