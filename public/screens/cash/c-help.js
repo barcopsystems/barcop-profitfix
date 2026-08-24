@@ -1,7 +1,7 @@
 'use strict';
 
-/* ── Cash Recovery — Help and FAQ ─────────────────────────────────────────────
-   The knowledge layer for Cash Recovery. Same tab switcher + live search the
+/* ── The Cash audit — Help and FAQ ─────────────────────────────────────────────
+   The knowledge layer for the Cash audit. Same tab switcher + live search the
    other Help pages use. Per-screen how-tos live on each page's info "i" panel,
    so this covers the why and how it connects: what cash recovery is, the two
    halves (trapped cash + cash timing), and how it reads off Control and Books
@@ -13,20 +13,20 @@ S.CashHelp = {
 
   showHowTo() {
     App.showHelpModal('Cash Help and FAQ', [
-      { p: ['This page is the full Help and FAQ for Cash Recovery: what it is, the two halves (cash trapped on your shelves and the timing of cash in versus out), and how it reads off your Control data and your bills without you entering anything twice.'] },
+      { p: ['This page is the full Help and FAQ for the Cash audit: what it is, the two halves (cash trapped on your shelves and the timing of cash in versus out), and how it reads off what you already log and your bills without you entering anything twice.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question at once.'] },
-      { h: 'Directions For A Specific Screen', p: ['Every working screen in Cash Recovery carries its own directions on the info i button at the top. Open the screen you have a question about and tap it. This FAQ covers the why and how it connects.'] }
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in Books carries its own directions on the info i button at the top. Open the screen you have a question about and tap it. This FAQ covers the why and how it connects.'] }
     ]);
   },
 
   SECTIONS: [
     { t: 'Getting Started', qa: [
-      { q: 'What is Cash Recovery?',
-        a: 'Cash Recovery is the third lever Bar Cop watches alongside Profit and Revenue. Profit is your margin, the cost of every pour and plate. Revenue is your top line, what you ring. Cash is your liquidity, the money actually in your account. The three are different jobs: a bottle of premium scotch can have a perfect margin and still be a cash problem if it sits on the shelf for six months tying up money you could use elsewhere. Plenty of bars are profitable on paper and still run tight, and Cash Recovery is where you catch it.' },
+      { q: 'What is the Cash audit?',
+        a: 'The Cash audit is the third lever Bar Cop watches alongside Profit and Revenue. Profit is your margin, the cost of every pour and plate. Revenue is your top line, what you ring. Cash is your liquidity, the money actually in your account. The three are different jobs: a bottle of premium scotch can have a perfect margin and still be a cash problem if it sits on the shelf for six months tying up money you could use elsewhere. Plenty of bars are profitable on paper and still run tight, and the Cash audit is where you catch it.' },
       { q: 'What are the two halves?',
         a: 'Trapped cash and cash timing. Trapped cash is working capital stuck on the shelf, dead stock that does not move and overstock you ordered past what you use. Cash timing is the flow week to week, the bills, buys, and labor going out against the sales coming in, so you spot a tight day before it bites. Close The Week covers both: Where You Stand up top is your trapped cash, and the steps walk the weekly money routine.' },
       { q: 'Do I have to enter anything new?',
-        a: 'Almost nothing. Cash Recovery reads off data you already keep: your inventory counts, your orders and deliveries, your bills in Books, your schedule. The one thing worth setting is payment terms on each vendor (net 7, 15, 30) so Bar Cop can flag bills you are paying faster than you have to. Everything else is computed.' }
+        a: 'Almost nothing. The Cash audit reads off data you already keep: your inventory counts, your orders and deliveries, your bills in Books, your schedule. The one thing worth setting is payment terms on each vendor (net 7, 15, 30) so Bar Cop can flag bills you are paying faster than you have to. Everything else is computed.' }
     ]},
     { t: 'Trapped Cash', qa: [
       { q: 'How does Bar Cop decide what is trapped?',
@@ -66,13 +66,13 @@ S.CashHelp = {
     ]},
     { t: 'Connections', qa: [
       { q: 'How is Cash different from Books?',
-        a: 'Books is your ledger, it records what happened: the bills, the P&L, the bank reconciliation, accurate and backward looking. Cash Recovery is the forward action layer: it reads your bills and your inventory to tell you what to do next about liquidity, free this trapped cash, hold that payment, watch this tight day. It reads Books, it does not keep the books. Same relationship Profit Recovery already has with your numbers.' },
+        a: 'Books is your ledger, it records what happened: the bills, the P&L, the bank reconciliation, accurate and backward looking. The Cash audit is the forward action layer: it reads your bills and your inventory to tell you what to do next about liquidity, free this trapped cash, hold that payment, watch this tight day. It reads Books, it does not keep the books. Same relationship the Profit audit already has with your numbers.' },
       { q: 'What are Capital Efficiency and the Cash Bridge for?',
         a: 'They are the deeper reads, off the weekly routine, for when you want them. Capital Efficiency shows how hard the cash in each category works: turns is how many times a year you cycle it, and Bar Cop calls each category earns its shelf, fair, or lazy capital. The Cash Bridge answers where the profit went, taking the profit you earned and walking it down through inventory, owner draws, loan payments and tax to the cash you actually kept.' },
       { q: 'What does the Cash audit score?',
         a: 'Four things, all read off your own data, scored 0 to 100 against a target of 70. Capital Efficiency is how much of your shelf cash is lazy. The Cash Conversion Cycle is how long your money stays locked. Liquidity and Runway is whether the thirteen weeks ahead hold. Payment Terms is how much of your buying is on terms and how long you actually hold your cash. It also flags cross-cutting risks the four scores do not isolate, like spending money you are holding for the state. Run it at the end of your weekly close and it updates where to work next.' },
-      { q: 'What feeds Cash Recovery from the rest of Bar Cop?',
-        a: 'Your inventory counts and unit costs drive trapped cash and weeks on hand. Your orders and deliveries drive the purchasing read. Your bills in Books and your vendor payment terms drive the week-ahead and pay-on-terms. Your schedule and revenue forecast drive the cash timing. Set the data once in Control and Books and Cash Recovery stays current on its own.' }
+      { q: 'What feeds the Cash audit from the rest of Bar Cop?',
+        a: 'Your inventory counts and unit costs drive trapped cash and weeks on hand. Your orders and deliveries drive the purchasing read. Your bills in Books and your vendor payment terms drive the week-ahead and pay-on-terms. Your schedule and revenue forecast drive the cash timing. Set the data once as you go and the Cash audit stays current on its own.' }
     ]}
   ],
 
@@ -86,7 +86,7 @@ S.CashHelp = {
 
   draw() {
     const search = '<div class="f" style="max-width:420px;margin-bottom:8px;">'
-      + '<input type="text" id="help-search" placeholder="Search Cash Recovery help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
+      + '<input type="text" id="help-search" placeholder="Search the Cash audit help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
     const tabs = '<div class="ch-tabs no-print">'
       + this.SECTIONS.map((s, i) => '<button class="ch-tab' + (this.tab === i ? ' on' : '') + '" data-tab="' + i + '">' + esc(s.t) + '</button>').join('')
       + '</div>';
