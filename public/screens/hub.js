@@ -2584,22 +2584,52 @@ S.Hub = {
     // as theft to act on; softer signals (drawer shorts, flagged spot checks) are
     // Watch, worded as items to review rather than theft. Comp-volume-by-server is
     // a windowed pattern, surfaced on the Loss Prevention page, not in this stream.
-    if (window.S && S.TheftRisk && S.TheftRisk.recentFlags) {
+    /* 6. LOSS-PREVENTION FLAGS, LAST 7 DAYS, SPLIT INTO THE THREE SIGNALS THEY ARE MADE OF.
+       ⛔⛔ THIS USED TO CALL `S.TheftRisk.recentFlags` AND SEND BOTH ROWS TO THAT PAGE. Kyle
+       retired Loss Prevention on 2026-08-23, so the function and the destination both went — and
+       a count with no page to open is worse than no count. Deleting the alert outright would
+       have been a loss he did not ask for, and re-pointing both rows at one screen was not
+       available either: the old "soft" row MERGED drawer shorts with flagged spot checks, two
+       different stores, so no single destination could be honest for it.
+       ⭐ SO EACH SIGNAL LANDS WHERE AN OPERATOR CAN ACT ON IT: a confirmed theft adjustment on
+       the Adjustment Log, a drawer short on Over and Short, a flagged spot check on Spot Check.
+       Ask what the operator DOES there, never which page name matches the words
+       ([[lessons-paid-for]] #47/#83, and [[fix-wrong-destinations]]).
+       ⚠ SEVERE STAYS ITS OWN TIER. Red is reserved for a confirmed theft adjustment; a short or
+       a flagged check is worded as something to review, not as theft. That distinction was the
+       whole point of the two tiers and it survives the split. */
+    {
       const wk7 = new Date(); wk7.setDate(wk7.getDate() - 6);
-      const flags = S.TheftRisk.recentFlags(iso(wk7));
-      const severe = flags.filter(f => f.severe).length;
-      const soft = flags.length - severe;
-      if (severe > 0) out.push({
+      const since = iso(wk7);
+      const inWk = d => { const s = d ? String(d).slice(0, 10) : ''; return s && s >= since; };
+      const theft = ((App.inventoryData && App.inventoryData.ic_adjustments) || [])
+        .filter(a => a.reason === 'Theft' && inWk((a.date_time || '').slice(0, 10))).length;
+      const shorts = ((App.shiftData && App.shiftData.sc_variances) || [])
+        .filter(v => v.status === 'Short' && inWk(v.date)).length;
+      /* One entry per flagged CHECK, never per flagged LINE. A check that flagged five products
+         announced five separate things to review before this rule was written. */
+      const spots = (App.completedSpotChecks() || [])
+        .filter(c => inWk(c.date) && (c.items || []).some(it => it.flagged)).length;
+      if (theft > 0) out.push({
         sev: 'bad',
-        label: 'Theft flags to act on', value: String(severe),
-        text: severe + ' theft flag' + (severe === 1 ? '' : 's') + ' in the last 7 days that need action now. Investigate them in Loss Prevention.',
-        screen: 'theft-risk', mod: 'profit'
+        label: 'Theft flags to act on', value: String(theft),
+        text: theft + ' adjustment' + (theft === 1 ? '' : 's') + ' logged as theft in the last 7 days. '
+          + 'Work them off the Adjustment Log.',
+        screen: 'ic-adjustments', mod: 'inventory'
       });
-      if (soft > 0) out.push({
+      if (shorts > 0) out.push({
         sev: 'warn',
-        label: 'Loss-prevention flags', value: soft + ' to review',
-        text: soft + ' item' + (soft === 1 ? '' : 's') + ' flagged for review in Loss Prevention over the last 7 days. Check anything that does not add up.',
-        screen: 'theft-risk', mod: 'profit'
+        label: 'Drawer shorts to review', value: String(shorts),
+        text: shorts + ' drawer count' + (shorts === 1 ? '' : 's') + ' came up short in the last 7 days. '
+          + 'Over and Short groups them by cashier and by register.',
+        screen: 'cash-recon', mod: 'profit'
+      });
+      if (spots > 0) out.push({
+        sev: 'warn',
+        label: 'Spot checks to review', value: String(spots),
+        text: spots + ' spot check' + (spots === 1 ? '' : 's') + ' flagged a product in the last 7 days. '
+          + 'Check anything that does not add up.',
+        screen: 'ic-spot-check', mod: 'inventory'
       });
     }
 
