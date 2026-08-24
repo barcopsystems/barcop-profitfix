@@ -1252,7 +1252,7 @@ S.HubUserAccounts = {
 
   _teamModal(opts) {
     const m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
     const box = document.createElement('div');
     const maxWidth = opts.wide ? '700px' : '420px';
     box.style.cssText = 'background:var(--surface);border:1px solid var(--b1);border-radius:6px;padding:28px;max-width:' + maxWidth + ';width:100%;max-height:85vh;overflow-y:auto;';
