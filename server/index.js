@@ -1760,9 +1760,61 @@ const PERM_RANK = { view: 1, edit: 2 };
 // Clamp a requested permissions object to what the granting admin may hand out:
 // drop any area the admin lacks, and cap each level to the admin's own. The
 // owner grants freely (no clamp).
+// ⛔⛔⛔ THE v2 SHAPE HAD TO BE TAUGHT HERE OR THE WHOLE FEATURE WOULD HAVE SHIPPED DEAD, AND
+// SILENTLY. Both endpoints sanitised with `Object.entries(permissions).filter(([k,v]) => v ===
+// 'edit')`, which is exactly right for the old `{ area: 'edit' }` shape and throws away every key of
+// the new one: `v: 2` is not 'edit' and `sections` is an object, so the whole grant reduced to `{}`.
+// The client would have sent a correct object, the request would have returned ok, and every member
+// would have been stored with NO access — a failure with no error anywhere in it, on the one screen
+// nobody can walk (the owner short-circuits every gate). Found by reading the consumer rather than
+// by testing the sender ([[lessons-paid-for]] #32 — read the CONSUMER, not the producer).
+// ⚠ DEPLOY THIS WITH THE CLIENT. A client on v2 against a server on the old sanitiser stores empty
+// permissions; a server on v2 with an old client is harmless (the legacy branch still runs).
+function cleanPermissions(permissions) {
+  if (!permissions || typeof permissions !== 'object') return {};
+  if (permissions.v === 2) {
+    const src = (permissions.sections && typeof permissions.sections === 'object') ? permissions.sections : {};
+    const sections = {};
+    for (const [key, val] of Object.entries(src)) {
+      if (typeof key !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(key)) continue;
+      if (val === true) { sections[key] = true; continue; }          // FULL, and full stays full
+      if (Array.isArray(val)) {
+        const groups = val.filter(g => typeof g === 'string' && g.length > 0 && g.length <= 60);
+        if (groups.length) sections[key] = groups;
+      }
+    }
+    // The marker is always written, even with nothing ticked: `{v:2,sections:{}}` means "granted
+    // nothing" and an unmarked object means "never migrated". Collapsing the two would make a
+    // member with no access indistinguishable from one nobody has touched.
+    return { v: 2, sections };
+  }
+  return Object.fromEntries(Object.entries(permissions).filter(([, v]) => v === 'edit'));
+}
+
 function clampPermsToGranter(requested, granterPerms, granterIsOwner) {
   if (granterIsOwner) return requested || {};
   const own = granterPerms || {};
+  // v2: a non-owner may only pass on the sections and bar links they themselves hold, so an admin
+  // cannot widen their own reach through the invite form. Same rule as the old area clamp, one
+  // level finer.
+  if (requested && requested.v === 2) {
+    const ownIsV2 = own.v === 2 && own.sections && typeof own.sections === 'object';
+    const out = { v: 2, sections: {} };
+    for (const [sec, val] of Object.entries(requested.sections || {})) {
+      const mine = ownIsV2 ? own.sections[sec] : (own[sec] ? true : undefined);
+      if (!mine) continue;                       // cannot grant a section they lack
+      if (mine === true) { out.sections[sec] = val; continue; }      // holds it all, passes anything
+      if (!Array.isArray(mine)) continue;
+      // The granter holds only some links: FULL is capped down to their own list rather than
+      // refused, so the grantee gets the most the granter is entitled to give.
+      if (val === true) { out.sections[sec] = mine.slice(); continue; }
+      if (Array.isArray(val)) {
+        const capped = val.filter(g => mine.indexOf(g) > -1);
+        if (capped.length) out.sections[sec] = capped;
+      }
+    }
+    return out;
+  }
   const out = {};
   for (const [area, lvl] of Object.entries(requested || {})) {
     const mine = own[area];
@@ -1810,11 +1862,7 @@ app.post('/api/invite-user', async (req, res) => {
     // Permissions: optional JSON object { areaKey: 'view' | 'edit' } for Admin and
     // Staff members. Sanitized so only known levels are stored (No Access is simply
     // the area's absence, so it is filtered out here).
-    const cleanPerms = (permissions && typeof permissions === 'object')
-      ? Object.fromEntries(
-          Object.entries(permissions).filter(([k, v]) => v === 'edit')
-        )
-      : {};
+    const cleanPerms = cleanPermissions(permissions);
 
     // Verify the requester via their JWT (don't trust client-supplied user IDs)
     const authHeader = req.headers.authorization || '';
@@ -2290,11 +2338,7 @@ app.post('/api/update-member-permissions', async (req, res) => {
     if (!accountId || !membershipId) {
       return res.status(400).json({ error: 'accountId and membershipId required' });
     }
-    const cleanPerms = (permissions && typeof permissions === 'object')
-      ? Object.fromEntries(
-          Object.entries(permissions).filter(([k, v]) => v === 'edit')
-        )
-      : {};
+    const cleanPerms = cleanPermissions(permissions);
 
     const authHeader = req.headers.authorization || '';
     const jwt = authHeader.replace(/^Bearer\s+/, '');
