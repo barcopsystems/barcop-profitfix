@@ -16,6 +16,16 @@
      Engineering: outer 1320, inner 1264, left edge 164 on all six. */
   --page-w:    1320px;
   --bg:        #11171B;
+  /* ⛔⛔ THE POPUP BACKDROP, AND IT IS A TOKEN BECAUSE IT WAS A LITERAL THAT WENT STALE (Kyle,
+     2026-08-24: *"the opaque background on a popup like the no access popup or any popup form is
+     this weird blue color now... needs to be made to match the new background/input field color"*).
+     Three popups hardcoded `rgba(6,11,17,0.88)` — rgb(6,11,17), which was the page fill once and is
+     BLUER AND DARKER than `--bg` #11171B = rgb(17,23,27). So every retune of the palette moved the
+     app and left the backdrop behind, and the gap read as a blue cast over the whole screen.
+     ⭐ IT IS THE SAME COLOUR AS `--bg`, AT 88%. Written as rgba because a backdrop needs alpha and a
+     hex token cannot carry one — but the three numbers are `--bg`'s own, so retuning `--bg` means
+     retuning this line beside it rather than hunting three inline strings in app.js. */
+  --overlay:   rgba(17,23,27,0.88);
   /* ⛔⛔ CARD FILL = PAGE FILL (2026-08-08, Kyle's call, reversible by one value).
      It was #08131A against a #070E15 page — a difference of 1, 5, 5, which is barely a fill at all.
      The card is defined by its BORDER and its header band now, and the tone it used to spend on the
@@ -942,6 +952,22 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   .pnl-list{font-size:10px;}
   .pnl-list thead th{padding:0 9px 8px;}
   .pnl-list tbody td{padding:8px 9px;}
+}
+/* ── Team permission grid: one shared template so the boxes line up between rows ──────────────
+   Every row lays out on the SAME track count (`--pcols`, the widest section, set inline by
+   `renderPermsGrid`) — that is the only thing that puts each checkbox in a straight column down
+   the screen, which is what Kyle asked for. A width on any one box cannot do it. */
+.ua-perm-boxes{display:grid;grid-template-columns:repeat(var(--pcols,8),minmax(86px,1fr));
+  gap:9px 16px;align-items:center;}
+/* ⛔⛔ AND IT STACKS BEFORE IT CAN PUSH THE PAGE WIDE. Eight tracks at an 86px floor is ~700px, so
+   on a phone the grid overflowed and took the WHOLE PAGE sideways with it, not just this card.
+   Below 900 the columns collapse to two and the row stacks its label above its boxes; `minmax(0,…)`
+   rather than a floor, because a minimum width is exactly what caused the overflow. */
+@media (max-width:900px){
+  .ua-perm-boxes{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;}
+  .ua-perm-sec td{display:block;width:100%;}
+  .ua-perm-sec td:first-child{padding-bottom:2px;border-radius:6px 6px 0 0;}
+  .ua-perm-sec td:last-child{border-radius:0 0 6px 6px;}
 }
 /* No trailing divider under the last ranked action item in the card. */
 .at-arow:last-child{border-bottom:none!important;}
@@ -2408,8 +2434,28 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    selector pill / chip background"). A drop-down panel is neither a chip nor a selection, so `--c4`
    is the one that means this; picking by VALUE would have been a coin toss between them and would
    have frozen the panel to whatever the chip colour does next. */
-.st-drop{position:fixed;background:var(--c4);border:1px solid var(--b-edge);border-top:0;
+/* ⛔ `--bg`, NOT `--c4` (Kyle, 2026-08-24: *"the background color #11171B with the edge border"*).
+   #11171B IS `--bg`, so this is the token and not a literal — checked before writing it, because a
+   hex pasted here is a colour that stops following the palette the day he retunes it. The panel
+   used to be `--c4` (the accent splash), which sat lighter than everything around it; on the page
+   fill with the edge border it reads as part of the bar it hangs from. */
+.st-drop{position:fixed;background:var(--bg);border:1px solid var(--b-edge);border-top:0;
   border-radius:0 0 8px 8px;padding:5px;min-width:196px;z-index:200;}
+/* ⛔⛔⛔ THE GOLD CHEVRON, AND IT HAD TO FIT INSIDE THE BAR (Kyle: *"a gold chevron that shows up
+   under the menu link pointing down to the menu that is open below it... stays active as long as
+   the drop down menu is open and goes away when a menu closes"*).
+   ⚠ MEASURED FIRST, BECAUSE `#proto-topnav` IS `overflow:hidden` AND CLIPS ANYTHING BELOW 52px —
+   the trap that made the whole drop-down invisible once and could not be fixed with z-index
+   ([[lessons-paid-for]] #102). The link's bottom measures **36** against the bar's **52**, so there
+   are 16px of bar underneath it: the chevron sits at 45-50 and is inside the clip, while the panel
+   opens at 52. It fills the gap rather than hanging into it.
+   ⭐ NO JS AT ALL. `_openDrop` already adds `.st-open` to the link and `_teardown` already removes
+   it from every link, so the "stays while open, goes when it closes" half was built the day the
+   menus were — this is the class finally rendering something. */
+.st-link{position:relative;}
+.st-link.st-open::after{content:'';position:absolute;left:50%;transform:translateX(-50%);
+  top:calc(100% + 9px);width:0;height:0;border-left:5px solid transparent;
+  border-right:5px solid transparent;border-top:5px solid var(--gold);pointer-events:none;}
 .st-row{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;
   padding:7px 12px;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;
   color:var(--t1);white-space:nowrap;transition:color .12s;}

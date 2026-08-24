@@ -2044,7 +2044,7 @@ const App = {
     if (document.getElementById('no-access-modal')) return;
     const overlay = document.createElement('div');
     overlay.id = 'no-access-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,11,17,0.88);z-index:9600;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:9600;display:flex;align-items:center;justify-content:center;padding:20px;';
     overlay.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:6px;padding:24px 28px;max-width:400px;width:100%;text-align:center;">'
       + '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:10px;">You don\'t have access to this section</div>'
       + '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:20px;">Request access from the owner.</div>'
@@ -4960,7 +4960,7 @@ const App = {
     // Near-opaque navy scrim (the --bg family) so the popup reads as nested in the
     // app's darkest canvas — navy-on-navy, like the on-page forms — not a navy card
     // stranded on a translucent black wash.
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:' + layer + ';background:rgba(6,11,17,0.88);'
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:' + layer + ';background:var(--overlay);'
       + 'display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:32px 16px;';
     // The corner X (thin icon, inside the card's top-right) is the universal close,
     // shown by default. Pass opts.noX only to force a deliberate choice (e.g. the
@@ -11471,7 +11471,7 @@ const App = {
     return new Promise(resolve => {
       const overlay = document.createElement('div');
       // z defaults to 9500; callers layering over the plan gate (9700) pass higher.
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,11,17,0.88);z-index:' + (opts.z || 9500) + ';display:flex;align-items:center;justify-content:center;padding:20px;';
+      overlay.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:' + (opts.z || 9500) + ';display:flex;align-items:center;justify-content:center;padding:20px;';
       /* ⚠ `white-space:pre-line` so a message that carries its own line breaks renders as written.
          MEASURED before adding it: not one of the app's 94 `message:` strings contains a newline,
          and `pre-line` collapses runs of whitespace exactly as `normal` does — so every existing
