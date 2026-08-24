@@ -1,23 +1,61 @@
 'use strict';
 
-/* ── Hub Help and FAQ — platform-wide help, not module-specific ────────────
-   A Hub-owned view (map Section 1). Covers cross-system questions: what
-   Bar Cop is, how the three layers fit together, account, data, and getting
-   unstuck. System-specific help lives in each Recovery and Control system's
-   own Help screen. Renders into the Hub container, never the module app shell. */
-S.HubHelp = {
+/* ── THE GLOBAL HELP AND FAQ — ONE PAGE, EVERY SECTION ────────────────────────
+   Kyle, 2026-08-24: *"we need to create the global help page.. combining all the section FAQs
+   into one main one.. with the 1st part pointing to the i help icon in the top bar for specific
+   page help... that global help page will go on the rail menu under settings .. Help with an
+   icon."*
 
-  // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
-  // shows "HELP AND FAQ | Back to Dashboard".
+   ⛔⛔⛔ MEASURED BEFORE THIS PAGE EXISTED: ALL ELEVEN FAQs IN THE APP WERE UNREACHABLE. Every
+   section nav still names a help row, and none of them reaches a screen — the eight sections with
+   a top BAR drop the whole Support group through `SectionTabs.ASIDE_GROUP`, and labor, shift,
+   profit, revenue and cash stopped being rail rows entirely. 53 topics and 214 questions of
+   operator copy, roughly 21,000 words, with no door in front of any of it.
+
+   ⭐⭐⭐ THIS PAGE READS THEM, IT DOES NOT COPY THEM. Every sibling FAQ stays exactly where it is
+   and stays the one home of its own copy; `SOURCES` below names the objects and this page gathers
+   their `SECTIONS` at render time. Copying 21,000 words into a twelfth file would have created a
+   second home for every answer, and two homes for one sentence is the drift this codebase has
+   watched happen four times. Nothing here has to be kept in step: edit a section FAQ and this
+   page shows the edit.
+
+   ⭐ THE TABS ARE DERIVED FROM THE RAIL, NOT FROM THE OLD SIDEBAR. Each tab is a row an operator
+   can actually see today. Three of the eleven sources no longer have a rail row of their own and
+   are filed where their PAGES now live: the Profit FAQ under Run Audit (it is audit material),
+   the Cash one under Books (its pages moved there), and Labor + Shift together under The Floor
+   (which replaced both). Those three placements are the only judgement calls in this file and
+   they are one table edit to change.
+
+   ⚠ THE SHELL IS THE ONE THE SIBLINGS ALREADY USE, copied from `S.Help` rather than invented:
+   a live search box, the `.ch-tabs` underline switcher, and `App.helpFooter()`. 214 questions
+   with no search is not a page anybody can use, and the app already had the answer to that.
+   The search spans EVERY tab, which is the one thing only a combined page can do. */
+S.HubHelp = {
+  tab: 0,
+  query: '',
+
+  // Full-page Hub screen, reached from the rail's Help row. The third argument is what lights
+  // that row: a hub page cannot name itself, so `openHubFullPage` passes the action through.
   open() {
     App.openHubFullPage('Help and FAQ', (mount) => this.render(mount), 'help');
   },
 
-  render(container) {
-    const sections = [
+  /* ⭐ THE FIRST THING ON THE PAGE, AND KYLE NAMED IT: this FAQ answers how Bar Cop works and how
+     the parts connect; the "i" in the top bar answers how the SCREEN IN FRONT OF YOU works. Two
+     different questions, and an operator who does not know the second one exists will read this
+     whole page looking for a step-by-step that lives one button away. */
+  INTRO: [
+    'Looking for directions on the screen you are on? Use the "i" button at the top of the page. Every working screen in Bar Cop carries its own step-by-step on that button: what to enter, what the numbers mean, and what to do next on that page.',
+    'This page is the rest of it. How Bar Cop works, how the sections feed each other, what each number is built from, and what to do when something does not look right. Pick a section along the top, or type a word in the search box to pull every matching answer from every section at once.'
+  ],
+
+  /* This page's OWN cross-system questions: the ones that belong to no single section. Held as a
+     property like every sibling FAQ so `SOURCES` can gather it the same way as the rest, rather
+     than the local it used to be inside render(). */
+  SECTIONS: [
       { t: 'About Bar Cop', qa: [
         { q: 'What is Bar Cop?',
-          a: 'Bar Cop runs your operation in three layers. Capture is the three Control systems where you log what actually happened: Inventory Control for product counts and deliveries, Labor Control for schedules and hours, Shift Control for shift revenue and cash. Diagnose is the three Recovery systems and the Operations Audit. Recovery reads your Control data, surfaces the dollar leaks, and ranks the action items by annual impact. The Operations Audit is the executive weekly read on the whole operation. Fix is the Fix Process inside each Recovery system. Pick a gap, follow the ordered steps, mark it implemented when the work is done. Bar Cop tracks every recovered dollar against the baseline, so Where You Stand shows what the fix was worth. Capture, diagnose, fix. That is the loop.' },
+          a: 'Bar Cop runs your operation in three layers. Capture is the three Control systems where you log what actually happened: Inventory Control for product counts and deliveries, Labor Control for schedules and hours, Shift Control for shift revenue and cash. Diagnose is the three Recovery systems and the Operations Audit. Recovery reads your Control data, surfaces the dollar leaks, and ranks the action items by annual impact. The Operations Audit is the executive weekly read on the whole operation. Fix is the work itself, and it happens on the floor rather than in an app. The audits rank the gaps biggest dollar first and name what to do about each one. You go and do it, then confirm each week as it closes. Bar Cop measures the change against your own baseline, so the Hub shows what has actually come back rather than what was promised. Capture, diagnose, fix. That is the loop.' },
         { q: 'How do the six systems fit together?',
           a: 'The three Control systems log the operation. The three Recovery systems read that log and score it. No double entry. Anything you count in Inventory Control feeds the Profit Audit and the Recovery systems. Anything you schedule and pay in Labor Control feeds the Revenue Audit and the labor cost line on every weekly review. Shift revenue and cash variance from Shift Control feed both Profit and Revenue. The Hub pulls every number into one cross-system view so you can see the full picture without opening six different screens.' },
         { q: 'Where do I start?',
@@ -100,27 +138,104 @@ S.HubHelp = {
         { q: 'I want a feature that does not exist yet.',
           a: 'Use Report a Bug in the Support section and describe the feature instead of a problem. Tell us what you are trying to do, what would help, and how often you would use it. Every note gets read by the team that builds Bar Cop, and operator suggestions drive most of what gets built next. Specific requests with a real use case land louder than abstract wishlists.' }
       ]}
-    ];
+    ],
 
-    const sectionsHtml = sections.map(sec => {
-      const items = sec.qa.map(f =>
-        '<div style="border-bottom:1px solid var(--b2);padding:14px 0;">'
-        + '<div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:6px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">' + esc(f.q) + '</div>'
-        + '<div style="font-size:12px;color:var(--t2);line-height:1.7;display:none;">' + esc(f.a) + '</div>'
-        + '</div>'
-      ).join('');
-      return '<div class="card" style="margin-bottom:14px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">' + esc(sec.t) + '</div>'
-        + items
-        + '</div>';
-    }).join('');
+  /* ⛔ THE ONE TABLE THAT DECIDES THE PAGE. Label an operator recognises, then the objects whose
+     `SECTIONS` fill that tab. A missing object is skipped rather than throwing, because a help
+     page that goes blank when one script fails to load is worse than one that is short. */
+  SOURCES: [
+    ['Bar Cop',   ['HubHelp']],
+    ['Inventory', ['InventoryHelp']],
+    ['Run Audit', ['HubAuditHelp', 'Help']],
+    ['The Floor', ['LaborHelp', 'ShiftHelp']],
+    ['Menus',     ['RevenueHelp']],
+    ['Events',    ['EventsHelp']],
+    ['Books',     ['HubBooksHelp', 'CashHelp']],
+    ['Settings',  ['HubSettingsHelp']]
+  ],
 
-    container.scrollTop = 0;
-    container.innerHTML =
-      '<div class="screen">'
-      + sectionsHtml
+  /* Resolve SOURCES into flat, tagged Q&A per tab. Each answer keeps its own topic heading, so a
+     tab that gathers two sources still reads as the grouped FAQ it came from. */
+  groups() {
+    return this.SOURCES.map(([label, names]) => {
+      const qa = [];
+      names.forEach(n => {
+        const o = (typeof S !== 'undefined') ? S[n] : null;
+        const secs = (o && Array.isArray(o.SECTIONS)) ? o.SECTIONS : [];
+        secs.forEach(sec => (sec.qa || []).forEach(it => qa.push({ topic: sec.t, q: it.q, a: it.a })));
+      });
+      return { label: label, qa: qa };
+    }).filter(g => g.qa.length);
+  },
+
+  render(container) {
+    this.container = container;
+    this.tab = 0;
+    this.query = '';
+    this.draw();
+  },
+
+  draw() {
+    const gs = this.groups();
+    const intro = '<div class="card" style="margin-bottom:14px;">'
+      + this.INTRO.map(t => '<div class="pdf-para" style="font-size:12.5px;color:var(--t2);line-height:1.7;margin-bottom:8px;">' + esc(t) + '</div>').join('')
       + '</div>';
-
+    const search = '<div class="f" style="max-width:420px;margin-bottom:8px;">'
+      + '<input type="text" id="help-search" placeholder="Search all of Bar Cop help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
+    const tabs = '<div class="ch-tabs no-print">'
+      + gs.map((g, i) => '<button class="ch-tab' + (this.tab === i ? ' on' : '') + '" data-tab="' + i + '">' + esc(g.label) + '</button>').join('')
+      + '</div>';
+    this.container.scrollTop = 0;
+    this.container.innerHTML = '<div class="screen">' + intro + search + tabs
+      + '<div id="help-body">' + this.bodyHtml() + '</div>' + App.helpFooter() + '</div>';
+    this.wire();
     if (App.setHubTopbarActions) App.setHubTopbarActions('');
+  },
+
+  // The active tab, or — when the search box has text — every match across EVERY section, each
+  // tagged with the section it came from. That cross-section search is the whole point of one page.
+  bodyHtml() {
+    const gs = this.groups();
+    const q = this.query.trim().toLowerCase();
+    if (q) {
+      const hits = [];
+      gs.forEach(g => g.qa.forEach(it => {
+        if (it.q.toLowerCase().includes(q) || it.a.toLowerCase().includes(q)) hits.push({ tag: g.label + ' · ' + it.topic, q: it.q, a: it.a });
+      }));
+      if (!hits.length) return '<div style="padding:18px 2px;color:var(--t3);font-size:13px;">No help topics match that search. Try a different word.</div>';
+      return hits.map(h => this.qaHtml(h.q, h.a, h.tag)).join('');
+    }
+    const g = gs[this.tab] || gs[0];
+    if (!g) return '<div style="padding:18px 2px;color:var(--t3);font-size:13px;">Help is still loading.</div>';
+    let last = '';
+    return g.qa.map(it => {
+      const head = (it.topic && it.topic !== last) ? (last = it.topic, it.topic) : '';
+      return this.qaHtml(it.q, it.a, head);
+    }).join('');
+  },
+
+  qaHtml(q, a, topic) {
+    return '<div style="border-bottom:1px solid var(--b2);padding:16px 0;">'
+      + (topic ? '<div class="sh" style="margin-bottom:7px;">' + esc(topic) + '</div>' : '')
+      + '<div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:7px;">' + esc(q) + '</div>'
+      + '<div style="font-size:12.5px;color:var(--t2);line-height:1.7;">' + esc(a) + '</div>'
+      + '</div>';
+  },
+
+  wire() {
+    this.container.onclick = ev => {
+      const tab = ev.target.closest('.ch-tab');
+      if (tab) {
+        this.tab = parseInt(tab.dataset.tab, 10) || 0;
+        this.query = '';
+        this.draw();
+      }
+    };
+    const search = document.getElementById('help-search');
+    if (search) search.addEventListener('input', e => {
+      this.query = e.target.value || '';
+      const body = document.getElementById('help-body');
+      if (body) body.innerHTML = this.bodyHtml();
+    });
   }
 };
