@@ -191,7 +191,15 @@ S.InventorySpotCheck = {
       { h: 'Count Before And After', p: ['Set the pre-shift count when the shift starts and the post-shift count when it ends. Liquor and wine use the fill slider, bottle beer is cases plus loose, and draft uses the keg slider. Your check auto-saves to this device, so take the pre-counts at open and come back to finish at close.'] },
       { h: 'Restocked And POS Sold', p: ['If you brought more up from storage mid-shift, enter it under Restocked so the used number stays honest. Then enter what the register rang for each product, or drop that register\'s POS sales report and Bar Cop fills it in by matching product names.'] },
       { h: 'Reading The Result', p: ['Bar Cop works out what physically left the bottle from your counts and compares it to what the register rang. Anything off by more than your Flag at % setting, in either direction, flags red. Over means more left the bar than was sold, the classic sign of overpouring, give-aways, or theft. Under means less left the bottle than was rung in, which points to short pours that skimp the guest. Set Flag at % up top to your own tolerance; it remembers what you set.'] },
-      { h: 'After You Save', p: ['Saved checks land in Spot Check History, where View opens the full breakdown. Hit Review on a flagged product and the investigation opens right here, working the same record Loss Prevention reads. A check feeds Loss Prevention and the Operations Audit once both sittings are in, so finish the post-shift count and the register numbers and it starts counting.'] }
+      /* ⛔ THE REVIEW BUTTON AND THE INVESTIGATION WENT AT `T69` PASS 2 (Kyle, 2026-08-23) AND THIS
+         SENTENCE OUTLIVED THEM. It promised *"Hit Review on a flagged product and the investigation
+         opens right here"* on a screen with no Review button and no modal behind it, live on the
+         pushed build. Copy describing a deleted feature is FALSE, not a wording preference
+         ([[lessons-paid-for]] #116), and it is the third grep that nobody does.
+         ⚠ THE REPLACEMENT IS A NEW CLAIM AND WAS MEASURED (#117): walked on the deployed build
+         2026-08-24, a saved check's flagged rows read amber `Over` and red `High`, both off the
+         check's own `flag_pct`. */
+      { h: 'After You Save', p: ['Saved checks land in Spot Check History, where View opens the full breakdown. A flagged product reads Over past the Flag at % you set on that check, and High past twice it. A check feeds Loss Prevention and the Operations Audit once both sittings are in, so finish the post-shift count and the register numbers and it starts counting.'] }
     ]);
   },
 
@@ -258,6 +266,18 @@ S.InventorySpotCheck = {
     this._restoreTouched();
     this.posMode = 'manual';
     this._posMsg = null;        // a fill report belongs to one visit, like the importer itself
+    /* Cross-screen focus, the same shape the roster honours for `App._staffFocus`: the Hub's
+       "Spot checks to review" row names checks that are already SAVED, so it lands on HISTORY,
+       where they are, rather than on this blank new check. ONE-SHOT -- cleared here by the
+       reader, so the next ordinary visit opens a new check as it always has.
+       ⚠ THROUGH `App.pushView`, which is what `#sp-history` already uses: `navigate` has just
+       reset the view stack with this screen as its base, so the floating back button returns to
+       the new-check form instead of leaving the operator with no way out of History. */
+    if (App._spotCheckFocus) {
+      App._spotCheckFocus = null;
+      App.pushView(() => this.renderHistory());
+      return;
+    }
     this.renderMain();
   },
 
