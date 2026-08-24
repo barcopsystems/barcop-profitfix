@@ -1,10 +1,10 @@
 'use strict';
 
-/* ── Revenue Recovery — Help and FAQ ──────────────────────────────────────────
-   The in-app knowledge layer for Revenue Recovery. Same underline tab switcher +
+/* ── The Revenue audit — Help and FAQ ──────────────────────────────────────────
+   The in-app knowledge layer for the Revenue audit. Same underline tab switcher +
    live search as the other section Help pages. Per-screen how-tos live on each
    page's info "i" panel, so this is trimmed to the non-page material: orientation,
-   how Revenue reads from Control, and the cross-cutting decisions. */
+   how the Revenue audit reads from the rest of the app, and the cross-cutting decisions. */
 
 S.RevenueHelp = {
   tab: 0,
@@ -12,7 +12,7 @@ S.RevenueHelp = {
 
   showHowTo() {
     App.showHelpModal('Revenue Help and FAQ', [
-      { p: ['This page is the full Help and FAQ for Revenue Recovery: how to get started, how Revenue reads from your Control systems, and the judgment calls behind the numbers.'] },
+      { p: ['This page is the full Help and FAQ for the Revenue audit: how to get started, how the Revenue audit reads from the rest of the app, and the judgment calls behind the numbers.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "RPLH", "audit", or "covers" lands you on the right answer fast.'] },
       { h: 'Directions For A Specific Screen', p: ['Every working screen in Revenue carries its own directions. Open the screen you have a question about, like Confirm the Week or Menu Engineering, and tap this same info i button at the top for the step-by-step. This FAQ covers the why and how it all connects.'] }
     ]);
@@ -21,9 +21,9 @@ S.RevenueHelp = {
   SECTIONS: [
     { t: 'Getting Started', qa: [
       { q: 'Where do I start?',
-        a: 'For Revenue: enter your menu in Menu Builder, then let Labor and Shift Control feed your hours, covers, and revenue. Revenue Recovery comes alive once your menu is priced and your first weeks of Shift and Labor data have populated the cover counts and revenue totals. The info "i" on any Revenue screen explains how that screen works.' },
-      { q: 'What is Revenue Recovery, and how is it different from Profit Recovery?',
-        a: 'Profit Recovery is about cost control: pour cost, food cost, theft, vendor pricing, prime cost. Revenue Recovery is about what your team actually collects from every guest. Two operations can run the same food costs and completely different revenues depending on how well their servers sell, how well their menu is priced, and how efficiently labor is scheduled against volume. Revenue Recovery tracks check average by server, RPLH against forecast, and menu contribution margin by item. One question: how much money are you capable of making versus how much you are actually making.' },
+        a: 'For Revenue: enter your menu in Menu Builder, then let The Floor feed your hours, covers, and revenue. The Revenue audit comes alive once your menu is priced and your first weeks of Floor data have populated the cover counts and revenue totals. The info "i" on any Revenue screen explains how that screen works.' },
+      { q: 'What is the Revenue audit, and how is it different from the Profit audit?',
+        a: 'The Profit audit is about cost control: pour cost, food cost, theft, vendor pricing, prime cost. The Revenue audit is about what your team actually collects from every guest. Two operations can run the same food costs and completely different revenues depending on how well their servers sell, how well their menu is priced, and how efficiently labor is scheduled against volume. The Revenue audit tracks check average by server, RPLH against forecast, and menu contribution margin by item. One question: how much money are you capable of making versus how much you are actually making.' },
       { q: 'Do I need every screen?',
         a: 'No. Start with three and you have most of the value: Menu Builder (your priced catalog), Revenue Forecast (next week\'s revenue and cover goals, projected for you automatically so the schedule has a number to build against), and Server Check (per-server check average tracking). Add Menu Engineering once your item list is built, and the Dog Test Tracker for items you are deciding whether to cut. The Revenue Audit works with whatever data exists.' }
     ]},
@@ -33,7 +33,7 @@ S.RevenueHelp = {
       { q: 'How do I price my menu?',
         a: 'Menu Engineering is the pricing engine and the one door that changes a price. It sorts each item against the other items in its own category (a soda is judged against sodas, not steaks), suggests a price that hits your target cost percent rounded up to a real menu number, and shows the weekly upside. You reprice as a plan first, model the volume you expect to lose, and mark it live when you actually roll it out. The reprice step also shows Weekly Impact, the weekly dollars the new price adds or costs you at the volume you expect after the change, so you see the trade before you commit. Dogs route to the Dog Test instead of a blind price bump.' },
       { q: 'What is Menu Mix?',
-        a: 'Menu Mix is one item\'s share of the weekly units sold in the group it is read against, printed as a percent on every Menu Rundown tile. An item at 20% is one of every five things sold in that group. It is a popularity read, not a money read, which is why a high Menu Mix on a thin-margin item is exactly what makes a Plowhorse worth repricing. Every item with a units-sold figure counts toward the group total, costed or not, so an item you have not costed yet still shows its share. Units sold refresh from the product mix report you drop at the Shift weekly close.' },
+        a: 'Menu Mix is one item\'s share of the weekly units sold in the group it is read against, printed as a percent on every Menu Rundown tile. An item at 20% is one of every five things sold in that group. It is a popularity read, not a money read, which is why a high Menu Mix on a thin-margin item is exactly what makes a Plowhorse worth repricing. Every item with a units-sold figure counts toward the group total, costed or not, so an item you have not costed yet still shows its share. Units sold refresh from the product mix report you drop when you close the week.' },
       { q: 'What happens when I keep or cut a Dog?',
         a: 'A Dog is low margin and low volume in its category. Rather than pull it on a hunch, the Dog Test gives it ninety days in a better slot with a rewritten description and tracks whether volume moves. Keep It leaves the item live and tags it Kept back in Menu Engineering so it stops flagging. Cut It archives the item: it drops off Menu Engineering and your menu list but is not deleted. Archived items sit at the bottom of Menu Builder, where you can restore one back onto the menu or delete it for good.' },
       { q: 'What is Forecast Accuracy, and what do Average Error and Matched Weeks mean?',
@@ -46,16 +46,16 @@ S.RevenueHelp = {
         a: 'Because they are different jobs with different levers. Cutting labor cost and lifting check average both add to profit, but blending them into one "recovery" figure hides which one is actually moving and lets a win on one side paper over a loss on the other. Bar Cop keeps cost savings (labor) and revenue growth (check average, menu, servers) separate, and every figure is computed from your real data.' }
     ]},
     { t: 'Connections', qa: [
-      { q: 'What flows from Shift Control into Revenue Recovery?',
-        a: 'Shift revenue (bar plus floor) feeds Confirm the Week\'s total revenue and RPLH, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every shift in Shift Control on the day it happened and Confirm the Week sums it for you, so you confirm a week instead of typing it. A per-server sales report dropped at the Shift weekly close fills your Server Check scorecard, and a product-mix report refreshes Menu Engineering units sold, off the same sitting.' },
-      { q: 'What flows from Labor Control into Revenue Recovery?',
+      { q: 'What flows from the shift into the Revenue audit?',
+        a: 'Shift revenue (bar plus floor) feeds the confirmed week\'s total revenue and RPLH, and the Server Scorecard sales totals. Covers per shift feed the check average math. Log every day as it happens and Close The Week sums it for you, so you confirm a week instead of typing it. A per-server sales report dropped when you close the week fills your Server Check scorecard, and a product-mix report refreshes Menu Engineering units sold, off the same sitting.' },
+      { q: 'What flows from your roster and hours into the Revenue audit?',
         a: 'Your staff roster auto-syncs to Server Check, so there is no duplicate server list to maintain. Logged hours feed This Week\'s RPLH and labor cost. Tip pool participant shares feed the Server Scorecard\'s Tips percent column, with the raw Tip Tracking entries as the fallback for shifts without a saved pool.' },
-      { q: 'What flows from Inventory Control into Revenue Recovery?',
-        a: 'Product prices flow into Menu Builder: a recipe-based cost auto-updates whenever you change a product price in Inventory Control, so menu costs never go stale. Menu Inventory items (Beer, Wine, NA) link directly to an inventory product for their cost, and the Variance Report reads any Pour Size override you set on a Menu Item for multi-size matching.' },
+      { q: 'What flows from Inventory into the Revenue audit?',
+        a: 'Product prices flow into Menu Builder: a recipe-based cost auto-updates whenever you change a product price in Inventory, so menu costs never go stale. Menu Inventory items (Beer, Wine, NA) link directly to an inventory product for their cost, and the Variance Report reads any Pour Size override you set on a Menu Item for multi-size matching.' },
       { q: 'How does a price change get tracked?',
         a: 'Menu Engineering is the one place a menu price changes now. Repricing an item first saves a planned price you can model against volume; Mark Live is the moment it becomes real, sets the price, and logs the change with its date. Editing a price directly on a Menu Item logs it the same way. Pricing is tracked as a logged change, not a recovered-dollar figure, because a raise only pays if volume holds. The Pricing Review Log at the bottom of Menu Engineering checks the real weekly margin swing against what you predicted once three weeks of covers land. Covers come from your weekly product-mix import.' },
       { q: 'Why do my Revenue numbers not match my POS exactly?',
-        a: 'Two common reasons. First, Bar Cop reads net sales (after voids and comps) from Shift Control, while your POS export may show gross. Second, timing: Bar Cop sums shifts by their date, while your POS report may use a different daypart or fiscal cutoff. Log every shift on the day it happened and let Confirm the Week sum from there.' }
+        a: 'Two common reasons. First, Bar Cop reads net sales (after voids and comps) from The Floor, while your POS export may show gross. Second, timing: Bar Cop sums shifts by their date, while your POS report may use a different daypart or fiscal cutoff. Log every shift on the day it happened and let Confirm the Week sum from there.' }
     ]}
   ],
 
