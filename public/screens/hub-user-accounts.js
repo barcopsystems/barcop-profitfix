@@ -401,8 +401,18 @@ S.HubUserAccounts = {
            ⭐ THE TRACK COUNT IS DERIVED FROM THE WIDEST SECTION, not typed: every row lays out on
            the SAME template, which is the only thing that makes the columns line up across rows.
            Add a group to any section tomorrow and every row re-aligns on its own. */
-        +   '<div style="display:grid;grid-template-columns:repeat(' + cols + ',minmax(86px,1fr));'
-        +     'gap:9px 16px;align-items:center;">'
+        /* ⛔⛔ THE TRACK COUNT RIDES ON A CUSTOM PROPERTY, NOT ON AN INLINE TEMPLATE, AND THAT IS
+           WHAT LETS IT STACK (Kyle, on the pushed build: *"it doesn't stack at all so it breaks
+           outside on mobile and causes entire mobile screen to scroll"*). Eight tracks at a 86px
+           minimum is ~700px, so on a 375px phone the grid pushed the whole PAGE wide — not just the
+           card, the page, which is the worst version of an overflow because every screen behind it
+           scrolls sideways too.
+           ⭐ AN INLINE `grid-template-columns` CANNOT BE OVERRIDDEN BY A MEDIA QUERY without
+           `!important`, because inline beats every stylesheet rule ([[lessons-paid-for]] #95 — an
+           inline style on a layout element beats every media query and is invisible to a stylesheet
+           review). Passing the COUNT as `--pcols` keeps the derivation here, where the sections are
+           known, and leaves the template in `style.css` where a breakpoint can reach it. */
+        +   '<div class="ua-perm-boxes" style="--pcols:' + cols + ';">'
         +     box('ua-perm-full', '', full, 'Full Access')
         +     allowed.map(n => box('ua-perm-grp', ' data-group="' + esc(n) + '"', full || ticked.indexOf(n) > -1, n)).join('')
         +   '</div>'

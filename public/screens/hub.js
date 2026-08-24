@@ -1925,10 +1925,23 @@ S.Hub = {
         .hub-app .hd-metric{background:var(--surface);padding:8px 10px;border:1px solid var(--b-edge);border-radius:var(--r);cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
-        .hub-app .hd-row:hover{background:var(--hover);}
         .hub-app .hd-arow{background:var(--zone);}
-        .hub-app .hd-arow:hover{background:#0F1A21;}
-        .hub-app .hd-step:hover{background:#13212A;}
+        /* ⛔⛔ NO ROW CHANGES COLOUR ON HOVER (Kyle, 2026-08-24: "on the hub both the needs
+           attention and done this week rows highlight this weird color on mouseover... that needs
+           removed on both. no rows should change background color on mouseover.")
+           ⭐ IT WAS ONE RULE CAUSING BOTH, WHICH IS WHY IT LOOKED IDENTICAL IN THE TWO CARDS: the
+           hbRow builder makes every row in Needs Attention AND in Done This Week, and both come out
+           as .hd-arow. So there was one hover to delete, not two.
+           ⛔ AND BOTH WERE LITERAL HEXES IN A SCREEN FILE (#0F1A21 and #13212A), which is the one
+           thing the colour system forbids outright: they cannot follow the palette when Kyle
+           retunes it, so a hover that looked right once drifts away from every surface around it
+           and reads as a weird tint (color-system-locked). .hd-step was DEAD besides: nothing in
+           this file renders that class, so its rule only ever styled nothing.
+           ⚠ NO BACKTICKS ANYWHERE IN THIS COMMENT, AND THAT IS NOT A STYLE CHOICE: this block sits
+           inside a TEMPLATE LITERAL, so a backtick ends the string and takes the whole file with it.
+           It did exactly that on the first write of this note.
+           ⚠ .hd-row above is dead too (no markup uses it) and is left alone deliberately: it is a
+           cursor, not a colour, and deleting it is not what was asked for. */
         .hub-app .hd-prow{border-top:1px solid var(--b2);}
         .hub-app .hd-prow:first-child{border-top:none;}
         @media (max-width:768px){.hub-app .hub-stat-div{display:none;}}
