@@ -105,9 +105,22 @@ S.Week = {
      whichever page you opened. `_GLOBAL_OF_ACTION` already maps all three ids to 'week', so the
      rail still marks The Week, and `_HUB_SIDEBAR_OF_ACTION` already has all three at 'none', so
      they stay full width with no hub sidebar. */
+  /* ⛔⛔⛔ EACH PAGE ASKS ITS OWN QUESTION (2026-08-24). This gated every one of the three on
+     `week-close`, so Close, Review and History — three separate links in The Week's bar — shared a
+     single permission. Harmless while a grant was per AREA (all three are `week`) and a hole the
+     moment Kyle asked for per-link checkboxes: tick History without Close and Close still opens,
+     because there is nothing behind it to refuse. Same shape as the four Books pages fixed in the
+     same pass ([[lessons-paid-for]] #128).
+     ⭐ RESOLVED FIRST, GATED ON THE RESULT, ASSIGNED LAST. `LEGACY` is already the one table pairing
+     a page key with its screen id, so the gate reads the same source the router and the title do and
+     a fourth page is covered the day it is added — no second list. Assigning `this.page` only after
+     the gate matters: a refused open must not leave the object pointing at a page the member was
+     just told they cannot have.
+     ⚠ THE AREA IS UNCHANGED FOR ALL THREE, which is what makes this inert for today's grants. */
   open(which) {
-    if (App._hubBlocked && App._hubBlocked('week-close')) return;
-    this.page = this._resolve(which);
+    const page = this._resolve(which);
+    if (App._hubBlocked && App._hubBlocked(this.LEGACY[page] || 'week-close')) return;
+    this.page = page;
     const row = this.PAGES.find(t => t[0] === this.page) || this.PAGES[0];
     App.openHubFullPage(row[1], (mount) => { this.container = mount; this.render(mount); }, this.LEGACY[this.page]);
   },

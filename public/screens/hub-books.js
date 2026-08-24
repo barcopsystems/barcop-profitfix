@@ -29,7 +29,13 @@ S.HubBooks = {
   // shows "MONTH-END BOOKS | Back to Dashboard". Action buttons live next to
   // the Close Month dropdown inside the picker card.
   open() {
-    if (App._hubBlocked && App._hubBlocked('hub-operating-expenses')) return;   // Books area gate
+    /* ⛔ ITS OWN ID, NOT MONEY OUT'S (2026-08-24). This asked `_hubBlocked('hub-operating-expenses')`
+       — a different page's question — which was harmless while a grant was per AREA (both are
+       `books`) and became a hole the moment permissions went per bar GROUP: Month-End sits under
+       Statements and Money Out under Money Out, so the two must be refusable separately.
+       `hub-books` was already registered as a `books` screen and had no reader, so the area answer
+       is byte-identical and only the granularity changed ([[lessons-paid-for]] #128). */
+    if (App._hubBlocked && App._hubBlocked('hub-books')) return;   // Books area gate, own id
     App.openHubFullPage('Month-End Books', (mount) => this._render(mount), 'books');
   },
 

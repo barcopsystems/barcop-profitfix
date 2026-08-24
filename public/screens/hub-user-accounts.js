@@ -8,37 +8,36 @@
 
 S.HubUserAccounts = {
 
-  // Permissions are granted by OPERATING AREA (matching how the whole app is
-  // organized), each set to No Access or Full Access: the member's permissions
-  // object holds { area: 'edit' } for every area they can use, and a missing area
-  // means No Access. Owner grants "Inventory" once instead of toggling 40 screens.
-  // THERE IS NO READ-ONLY TIER. It was dropped as unenforceable across every screen
-  // for a trusted team (db.js, the permission-system note). This comment used to
-  // describe two checkboxes per member (Access + Allow Edit/Delete) AND a three-level
-  // View / Add / Edit & Delete scale, neither of which was ever built, and it
-  // contradicted itself in the same breath. This file is where the next person will
-  // come to learn the access model, so it says only what ships.
-  // No pre-selected defaults: every area starts at No Access on a new invite, so
-  // nobody is over-permissioned by accident.
-  AREAS: [
-    /* ⭐ WEEK IS FIRST because the grid follows the rail's own order — Control, then Recovery,
-       then the global sections — and Week sits above Control in the rail.
-       ⛔ ADDING AN AREA FAILS CLOSED: no stored membership carries a `week` key, so every
-       existing member loses Close / Review / History until the owner grants it here. That is
-       the safe direction and it is deliberate — the alternative is inventing access nobody
-       chose. `verify-area-access-doors` F1 pins that every area the app ENFORCES appears in
-       this list, because an area that cannot be granted is a permanent lockout. */
-    { key: 'week',      label: 'Week' },
-    { key: 'inventory', label: 'Inventory Control' },
-    { key: 'labor',     label: 'Labor Control' },
-    { key: 'shift',     label: 'Shift Control' },
-    { key: 'profit',    label: 'Profit Recovery' },
-    { key: 'revenue',   label: 'Revenue Recovery' },
-    { key: 'cash',      label: 'Cash Recovery' },
-    { key: 'events',    label: 'Events' },
-    { key: 'books',     label: 'Books' },
-    { key: 'audit',     label: 'Operations Audit' }
-  ],
+  // Permissions are granted per SECTION and, inside a section, per TOP-BAR MENU LINK: the owner
+  // ticks Full Access to give the whole section, or ticks only the links that member should have.
+  // The stored object is { v: 2, sections: { inventory: true, floor: ['Schedules', 'Pay'] } } —
+  // `true` means FULL and keeps meaning full, so a link added to that section later is included
+  // without anyone re-granting; an array means those links and no others, so a member given one
+  // link never silently gains the next one. A section that is absent is No Access.
+  // THERE IS NO READ-ONLY TIER. It was dropped as unenforceable across every screen for a trusted
+  // team (db.js, the permission-system note), and nothing here reintroduces one: a link is ticked
+  // or it is not. This comment used to describe two checkboxes per member (Access + Allow Edit/
+  // Delete) AND a three-level View / Add / Edit & Delete scale, neither of which was ever built.
+  // This file is where the next person will come to learn the access model, so it says only what
+  // ships. No pre-selected defaults: every section starts at No Access on a new invite, so nobody
+  // is over-permissioned by accident.
+  // ⚠ MEMBERSHIPS SAVED BEFORE THIS carry the older per-AREA shape and `db.js` still honours it, so
+  // nobody loses access until the owner opens Edit Access and saves. Settings is not in the grid at
+  // all: it is role-routed, because every member reaches Your Account to change their own password.
+  /* ⛔⛔⛔ THE `AREAS` TABLE IS RETIRED (2026-08-24). It was the hand-kept list of nine operating
+     areas behind the old No Access / Full Access dropdown, and the grid is per SECTION and per BAR
+     LINK now, derived from `SectionTabs.groupsFor` — so it drove nothing at all.
+     ⭐ IT IS DELETED RATHER THAN LEFT, and the reason is the labels: by the end it offered
+     **Labor Control, Shift Control, Profit Recovery, Revenue Recovery and Cash Recovery** — five
+     sections retired days earlier — while offering no row for The Floor or Menus, which are live.
+     Dead data whose every reader is gone still reads as live to the next person who opens the
+     file, and a hand-kept list of section names is the exact thing that rotted ~21,000 words of
+     help under a green gate ([[lessons-paid-for]] #139, and #105 — a retirement orphans its
+     helpers in the SAME edit).
+     ⚠ THE AREA MODEL ITSELF IS NOT DEAD AND MUST NOT BE CUT WITH IT: `db.js` still honours the
+     legacy `{ area: edit }` shape for every membership saved before this change, so nobody loses
+     access until the owner re-grants them. What died is the UI that GRANTED areas, not the gate
+     that still reads them. */
 
   // Full-page Hub screen. Sidebar stays mounted, content area swaps, topbar
   // shows the page name | Back to Dashboard.
@@ -282,53 +281,145 @@ S.HubUserAccounts = {
   // { area: 'edit' } (empty {} = all No Access). A non-owner admin only sees the
   // areas they themselves hold (they can't grant an area they don't have); the
   // owner sees all areas.
+  /* ── THE GRANTABLE UNITS: ONE ROW PER SECTION, ONE CHECKBOX PER BAR LINK ─────────────────────
+     Kyle, 2026-08-24: *"a row for each section with checkboxes for each page in each section... a
+     row for Inventory: Full Access, Counts, Receiving, Ordering, Vendors, Logs, Reports, Setup."*
+     Those seven ARE `SectionTabs.groupsFor('inventory')`, in that order — measured before this was
+     written, not matched to it afterwards. So the grid is DERIVED from the same source the top bar
+     renders and the gate resolves, and a group added to a section becomes a checkbox, a bar link
+     and a permission on the same day.
+     ⛔⛔ THE LIST IT REPLACES IS WHY THIS IS DERIVED. `AREAS` was hand-kept, and by the time it was
+     replaced it offered **Labor Control, Shift Control, Profit Recovery, Revenue Recovery and Cash
+     Recovery** — five sections that have not existed for days — while offering no row at all for The
+     Floor or Menus, which do. The owner was picking from a menu of the wrong app. A guard against
+     rot may not depend on somebody remembering ([[lessons-paid-for]] #139).
+     ⭐ RAIL ORDER AND RAIL LABELS, off `_PROTO_GLOBAL`, so the grid names sections with the exact
+     words the operator reads in the menu. Renaming a rail row renames it here for free.
+     ⛔ SETTINGS IS ABSENT ON PURPOSE and it is the one section Kyle called out: every member reaches
+     Your Account to change their own password, Data and Backup is owner-only and Team Members
+     admin-only. It is ROLE-routed, and a checkbox for it would be a way to lock somebody out of
+     their own credentials. */
+  _permSections() {
+    const out = [];
+    /* ⛔⛔⛔ `typeof App`, NEVER `window.App` — AND THIS SHIPPED AS A DEAD GUARD FOR ONE GATE RUN.
+       `app.js` declares `const App = {…}` at top level and a top-level `const` never becomes a
+       property of `window`, so `window.App &&` is PERMANENTLY FALSE: this returned `[]` every time
+       and the permission grid would have rendered completely empty, on the one screen nobody can
+       walk. `window.DB` is fine and is the idiom everywhere else in this file only because `db.js`
+       ends with an explicit `window.DB = DB;` — the difference is one line in another file, which is
+       exactly why the rule is about the DECLARATION and not the spelling ([[lessons-paid-for]]
+       #13/#35). Caught by `verify-no-window-app-guard` and `verify-week-close` J6, which exist
+       because this same mistake once left the Confirm the Week button dead for days. */
+    const rail = (typeof App !== 'undefined' && App._PROTO_GLOBAL) || [];
+    rail.forEach(pair => {
+      const key = pair[0], label = pair[1];
+      if (key === 'hub' || key === 'settings') return;
+      if (typeof SectionTabs === 'undefined' || !SectionTabs.ENABLED || !SectionTabs.ENABLED[key]) return;
+      let groups = [];
+      try { groups = (SectionTabs.groupsFor(key) || []).map(g => g.name).filter(Boolean); } catch (e) { groups = []; }
+      if (!groups.length) return;   // a section with no bar links has nothing to grant
+      out.push({ key: key, label: label, groups: groups });
+    });
+    return out;
+  },
+
+  /* Which groups the GRANTER may hand out. An owner may grant anything; anybody else may only pass
+     on what they hold, so an admin cannot quietly widen their own reach through the invite form.
+     Reads `DB.sectionAllowed` rather than poking at the permission object, so the one owner of the
+     shape stays the one owner of it. */
+  _grantableGroups(sec) {
+    const isOwner = App.demoMode || !!(window.DB && DB.isOwner && DB.isOwner());
+    if (isOwner) return sec.groups.slice();
+    if (!(window.DB && DB.sectionAllowed && DB.sectionAllowed(sec.key))) return [];
+    const mine = (window.DB && DB.permissions) ? DB.permissions() : {};
+    if (!(DB._isV2 && DB._isV2(mine))) return sec.groups.slice();   // legacy granter: the whole area
+    const g = mine.sections[sec.key];
+    if (g === true) return sec.groups.slice();
+    return Array.isArray(g) ? sec.groups.filter(n => g.indexOf(n) > -1) : [];
+  },
+
   renderPermsGrid(currentPerms, mode) {
     const perms = currentPerms || {};
     // SET-2: the demo counts as owner here too, or `grantable` comes out empty and the whole
     // grid collapses to "You do not have access to any areas you can grant" — which is what a
     // prospect saw instead of the nine-area permission table, i.e. the single most explanatory
     // screen in the section. Same predicate as the sidebar, render() and open('data').
-    const isOwner = App.demoMode || !!(window.DB && DB.isOwner && DB.isOwner());
-    const myPerms = (window.DB && DB.permissions) ? DB.permissions() : {};
-    const LEVELS = [
-      { v: '',     t: 'No Access' },
-      { v: 'edit', t: 'Full Access' }
-    ];
+    const sections = this._permSections();
+    const stored = (window.DB && DB._isV2 && DB._isV2(perms)) ? (perms.sections || {}) : null;
     let html = '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:0 0 6px;">Permissions</div>';
     if (mode !== 'edit') {   // the Edit Access popup carries no explainer text
-      html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.5;">Choose which areas this member can use. Full Access = see and change everything in that area. No Access = the area is hidden from them.</div>';
+      html += '<div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.5;">Tick Full Access to give a whole section, or tick only the menu links this member should have. Anything left unticked is hidden from them.</div>';
     }
-    const grantable = this.AREAS.filter(a => isOwner || myPerms[a.key]);
-    if (!grantable.length) {
-      html += '<div style="font-size:12px;color:var(--t3);line-height:1.5;">You do not have access to any areas you can grant. Ask the owner to expand your access first.</div>';
+    /* ⚠ AND THE OWNER IS TOLD WHEN THEY ARE LOOKING AT AN OLDER GRANT. A membership saved before
+       this change carries the area shape, which has no per-link answer to pre-tick — so the boxes
+       come up empty and saving REPLACES what the member had. That is the honest behaviour, and
+       silently showing an empty grid over somebody who currently has access is not: nothing else on
+       this screen would tell the owner they are about to narrow them. Nobody is moved until the
+       owner saves, so an untouched member keeps exactly what they hold today. */
+    if (mode === 'edit' && perms && Object.keys(perms).length && !stored) {
+      html += '<div style="font-size:11px;color:var(--gold);margin-bottom:12px;line-height:1.5;">'
+        + 'This member is still on the older section-wide access. Their current access stays exactly as it is until you save here. What you tick below replaces it.</div>';
+    }
+    if (!sections.length) {
+      html += '<div style="font-size:12px;color:var(--t3);line-height:1.5;">You do not have access to any sections you can grant. Ask the owner to expand your access first.</div>';
       return html;
     }
-    // Each area is its own #0D181E data-row pill (the .pnl-list row look used on
-    // the App Settings landing): area label left, the access dropdown right.
+    /* One `.pnl-list` row per section — the data-row pill used on the App Settings landing — with
+       the section name on the left and its checkboxes wrapping on the right. */
     html += '<table class="pnl-list"><tbody>';
-    grantable.forEach((a) => {
-      const cur = perms[a.key] ? 'edit' : '';   // any stored access = Full
-      const opts = LEVELS
-        .map(l => '<option value="' + l.v + '"' + (cur === l.v ? ' selected' : '') + '>' + l.t + '</option>').join('');
-      html += '<tr>'
-        + '<td style="font-size:13px;color:var(--t1);">' + esc(a.label) + '</td>'
-        + '<td style="text-align:right;"><select class="ua-perm-level" data-key="' + esc(a.key) + '" style="width:155px;">' + opts + '</select></td>'
-        + '</tr>';
+    let granted = 0;
+    sections.forEach(sec => {
+      const allowed = this._grantableGroups(sec);
+      if (!allowed.length) return;   // nothing this granter can pass on for that section
+      granted++;
+      const cur = stored ? stored[sec.key] : undefined;
+      const full = cur === true;
+      const ticked = Array.isArray(cur) ? cur : [];
+      const box = (cls, extra, on, label) =>
+        '<label style="display:inline-flex;align-items:center;gap:5px;margin:0 10px 4px 0;font-size:12px;color:var(--t2);white-space:nowrap;cursor:pointer;">'
+          + '<input type="checkbox" class="' + cls + '"' + extra + (on ? ' checked' : '') + '>'
+          + esc(label) + '</label>';
+      html += '<tr class="ua-perm-sec" data-key="' + esc(sec.key) + '">'
+        + '<td style="font-size:13px;color:var(--t1);white-space:nowrap;vertical-align:top;padding-top:8px;">' + esc(sec.label) + '</td>'
+        + '<td style="text-align:left;">'
+        +   '<div style="display:flex;flex-wrap:wrap;align-items:center;">'
+        +     box('ua-perm-full', '', full, 'Full Access')
+        +     allowed.map(n => box('ua-perm-grp', ' data-group="' + esc(n) + '"', full || ticked.indexOf(n) > -1, n)).join('')
+        +   '</div>'
+        + '</td></tr>';
     });
     html += '</tbody></table>';
+    if (!granted) {
+      return html.replace('<table class="pnl-list"><tbody></tbody></table>',
+        '<div style="font-size:12px;color:var(--t3);line-height:1.5;">You do not have access to any sections you can grant. Ask the owner to expand your access first.</div>');
+    }
     return html;
   },
 
-  // Read the per-area dropdowns into a permissions object { area: level }.
-  // root scopes the query so the invite form and the edit modal never mix.
+  /* Read the grid into the stored shape: `{ v: 2, sections: { inventory: true, floor: ['Pay'] } }`.
+     `root` scopes the query so the invite form and the edit modal never read each other's boxes.
+     ⭐⭐ FULL ACCESS IS STORED AS `true`, NOT AS THE LIST OF GROUPS THAT HAPPEN TO EXIST TODAY. That
+     is Kyle's ruling — *"store as full"* — and it is the difference between a manager keeping the
+     whole of Inventory when an eighth group ships and quietly missing it. Writing the expanded list
+     would look identical on the day it is saved and diverge silently later, which is the worst
+     shape a permission can have.
+     ⛔ AND THE MARKER IS ALWAYS WRITTEN, even when nothing is ticked. `{ v: 2, sections: {} }` means
+     "granted nothing" and reads as v2; an object with no marker means "saved before this existed"
+     and takes the legacy branch. Dropping the marker on an empty grid would make a member with no
+     access indistinguishable from a member nobody has migrated ([[lessons-paid-for]] #113). */
   collectPerms(root) {
     const scope = root || document;
-    const out = {};
-    scope.querySelectorAll('.ua-perm-level').forEach(sel => {
-      const key = sel.dataset.key;
-      if (key && sel.value) out[key] = sel.value;
+    const sections = {};
+    scope.querySelectorAll('.ua-perm-sec').forEach(row => {
+      const key = row.dataset.key;
+      if (!key) return;
+      const full = row.querySelector('.ua-perm-full');
+      if (full && full.checked) { sections[key] = true; return; }
+      const on = [];
+      row.querySelectorAll('.ua-perm-grp').forEach(cb => { if (cb.checked && cb.dataset.group) on.push(cb.dataset.group); });
+      if (on.length) sections[key] = on;
     });
-    return out;
+    return { v: 2, sections: sections };
   },
 
   // ── Wiring ────────────────────────────────────────────────────────────────
@@ -432,7 +523,38 @@ S.HubUserAccounts = {
 
   // The area dropdowns are self-contained (each is one control), so there is no
   // cross-checkbox wiring to do. Kept as a no-op so existing callers are safe.
-  _wirePermsGrid(root) {},
+  /* ⭐ FULL ACCESS DRIVES THE ROW. Ticking it ticks and disables every link in that section, so the
+     control says what it means: you are giving the whole thing, including links added later.
+     Unticking hands the individual boxes back with the section's links still ticked, which is the
+     least surprising place to land — the owner is narrowing from full, not starting from nothing.
+     ⛔ DELEGATED ON `root`, NOT BOUND PER CHECKBOX. The grid's markup is re-rendered whenever the
+     invite role changes, so a listener on each box dies with it and the control works exactly once
+     — the shape that passes a single test and is dead in real use. `root` survives.
+     ⚠ AND IT IS CALLED BY BOTH DOORS. The invite form and the Edit Access modal each render this
+     grid; wiring one leaves the other's Full Access box inert, which is the two-doors-one-mechanism
+     miss this codebase keeps paying for ([[lessons-paid-for]] #63 — a fact written by one of N
+     doors is not written). */
+  _wirePermsGrid(root) {
+    if (!root || root._permsWired) return;
+    root._permsWired = true;
+    const sync = (row) => {
+      const full = row.querySelector('.ua-perm-full');
+      if (!full) return;
+      row.querySelectorAll('.ua-perm-grp').forEach(cb => {
+        if (full.checked) cb.checked = true;
+        cb.disabled = full.checked;
+        if (cb.style) cb.style.opacity = full.checked ? '0.55' : '';
+      });
+    };
+    root.querySelectorAll('.ua-perm-sec').forEach(sync);
+    root.addEventListener('change', (ev) => {
+      const t = ev.target;
+      if (!t || !t.classList) return;
+      const row = t.closest ? t.closest('.ua-perm-sec') : null;
+      if (!row) return;
+      if (t.classList.contains('ua-perm-full')) sync(row);
+    });
+  },
 
   _teamRoleChange() {
     // Both Admin and Staff carry an owner-set area grid now, so the grid shows
@@ -1278,6 +1400,10 @@ S.HubUserAccounts = {
       +   '<button class="btn btn-primary" id="ua-perms-save">Save Permissions</button>'
       + '</div></div>';
     const overlay = App.openModal(html, { id, maxWidth: 560 });
+    /* ⛔ THE SECOND DOOR. The invite form has wired this grid since it existed and this modal never
+       did — harmless while the grid was dropdowns with no behaviour, and a dead Full Access box the
+       moment it grew one. Both doors, one call ([[lessons-paid-for]] #63). */
+    this._wirePermsGrid(overlay);
     document.getElementById('ua-perms-save')?.addEventListener('click', async () => {
       const btn = document.getElementById('ua-perms-save');
       // Scope to this modal so we read only its dropdowns, not the invite grid.

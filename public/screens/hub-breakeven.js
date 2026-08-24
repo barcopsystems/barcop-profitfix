@@ -19,7 +19,11 @@ S.HubBreakEven = {
   COLS: '<colgroup><col style="width:31%"><col style="width:23%"><col style="width:23%"><col style="width:23%"></colgroup>',
 
   open() {
-    if (App._hubBlocked && App._hubBlocked('hub-operating-expenses')) return;   // Books area gate
+    /* ⛔ ITS OWN ID, NOT MONEY OUT'S (2026-08-24) — Break-Even sits in the Books bar's Cash group and
+       Money Out in its own, so per-group permissions have to be able to refuse one without the
+       other. `hub-breakeven` was already a registered `books` screen with no reader, so the AREA
+       answer does not move ([[lessons-paid-for]] #128). */
+    if (App._hubBlocked && App._hubBlocked('hub-breakeven')) return;   // Books area gate, own id
     App.openHubFullPage('Break-Even', (mount) => { this.container = mount; this._wf = null; this._wfTouched = false; this.render(mount); }, 'breakeven');
   },
 

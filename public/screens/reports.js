@@ -12,10 +12,17 @@ S.Reports = {
     /* ⛔ NO ACCESS GATE HERE EITHER until 2026-08-12. This is the Books overlay's "Weekly P&L
        Brief" row: it renders its own hub page, so nothing upstream refused it and a member with
        Books = No Access could read the bar's P&L.
-       ⚠ It gates on `hub-books-home` rather than an id of its own because this door is a MODAL
-       opener on Reports, not a registered screen — the same representative-id shape the other
-       three Books doors already use. */
-    if (App._hubBlocked && App._hubBlocked('hub-operating-expenses')) return;
+       ⚠ It USED to gate on another page's id because this door is a MODAL opener on Reports rather
+       than a registered screen — the same representative-id shape the other three Books doors used.
+       ⛔ IT HAS ITS OWN NOW (2026-08-24), and the reason is a product decision, not tidiness. Weekly
+       P&L Brief sits in the Books bar's **Statements** group and Money Out in its own, so once
+       permissions are granted per bar GROUP the two have to be refusable separately — sharing an id
+       means a Statements checkbox that cannot refuse anybody ([[lessons-paid-for]] #128).
+       ⭐ `hub-weekly-pnl` is registered in `SCREEN_GROUPS` as `books` in the same edit. Registering
+       it is not optional: `_areaOf` has no `hub-` prefix rule, so an unregistered hub id falls
+       through to the final `return 'profit'` and this page would silently become a PROFIT page —
+       which is the exact defect the comment above records being fixed in August. */
+    if (App._hubBlocked && App._hubBlocked('hub-weekly-pnl')) return;
     const weeks=(App.data.weeks||[]).slice().sort((a,b)=>new Date(a.period_end||0)-new Date(b.period_end||0));
     App.openHubFullPage('Weekly P&L Brief', (mount) => {
       if (App.setHubTopbarActions) App.setHubTopbarActions('');
