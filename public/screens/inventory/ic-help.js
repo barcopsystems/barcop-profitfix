@@ -1,12 +1,12 @@
 'use strict';
 
-/* ── Inventory Control — Help and FAQ ─────────────────────────────────────────
-   The in-app knowledge layer for Inventory Control. Same underline tab switcher
+/* ── Inventory — Help and FAQ ─────────────────────────────────────────
+   The in-app knowledge layer for Inventory. Same underline tab switcher
    + live search used by Labor Help, Shift Help, Cash History, and the reports.
    Per-screen how-tos live on each page's info "i" panel now, so this is trimmed
    to the non-page material: orientation, setup decisions, the count/variance
-   model, ordering judgment, and how Inventory feeds Profit Recovery and Accounting.
-   Content tracks the current Inventory Control. */
+   model, ordering judgment, and how Inventory feeds the Profit audit and Accounting.
+   Content tracks the current Inventory. */
 
 S.InventoryHelp = {
   tab: 0,
@@ -14,16 +14,16 @@ S.InventoryHelp = {
 
   showHowTo() {
     App.showHelpModal('Inventory Help and FAQ', [
-      { p: ['This page is the full Help and FAQ for Inventory Control: how to get started, the count and variance model, ordering and par judgment, the operations logs, and how Inventory feeds Profit Recovery and Accounting.'] },
+      { p: ['This page is the full Help and FAQ for Inventory: how to get started, the count and variance model, ordering and par judgment, the operations logs, and how Inventory feeds the Profit audit and Accounting.'] },
       { h: 'Finding An Answer', p: ['Pick a topic along the top, or type a word in the search box to pull every matching question across all topics at once. A search for "variance" or "par" lands you on the right answer fast.'] },
-      { h: 'Directions For A Specific Screen', p: ['Every working screen in Inventory Control carries its own directions. Open the screen you have a question about, like Take Inventory or Receive Delivery, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
+      { h: 'Directions For A Specific Screen', p: ['Every working screen in Inventory carries its own directions. Open the screen you have a question about, like Take Inventory or Receive Delivery, and tap this same info i button at the top to read the step-by-step for that page. This FAQ covers the why and how it all connects; the per-screen i covers the how-to.'] }
     ]);
   },
 
   SECTIONS: [
     { t: 'Getting Started', qa: [
-      { q: 'What does Inventory Control do?',
-        a: 'Inventory Control is where the operational reality of your bar and kitchen gets logged: every product you stock, every count, every delivery, every order. It is one of three Control systems (Inventory, Labor, Shift) that capture daily operations. Every Recovery system that needs cost data reads from here, so you set the product and count data once and the rest of Bar Cop stays current without you typing the same numbers twice. The info "i" at the top of any Inventory screen explains exactly how that screen works.' },
+      { q: 'What does Inventory do?',
+        a: 'Inventory is where the operational reality of your bar and kitchen gets logged: every product you stock, every count, every delivery, every order. Every audit that needs cost data reads from here, so you set the product and count data once and the rest of Bar Cop stays current without you typing the same numbers twice. The info "i" at the top of any Inventory screen explains exactly how that screen works.' },
       { q: 'Where do I start?',
         a: 'Set up the foundation in order: first your storage locations, then your vendors, then your products (each product gets a vendor, a home location, a size, a unit cost, and a menu price). Open each location and drag its products into the order you actually walk the shelf so counts follow the room instead of the alphabet. Then take your first count and receive your first delivery, and the reports start working. Each screen carries its own step-by-step directions on the info "i", and every section opens to a guided empty state that walks you through setup in context.' },
       { q: 'Does the setup order matter?',
@@ -62,16 +62,16 @@ S.InventoryHelp = {
         a: 'Prep Batches are the things you make in-house from other products: a frozen margarita mix, a simple syrup, a marinara base. You build the recipe once, the ingredients plus the yield and the serving size, and Bar Cop works out the cost per serving off your current product costs. Any menu item can then use the batch as an ingredient, so a cocktail built on your house mix carries the real mix cost without you re-entering anything. When an ingredient price moves, every batch and every menu item that uses it updates on its own. It is reference data you set up once, not something you log each shift.' }
     ]},
     { t: 'Connections', qa: [
-      { q: 'What flows from Inventory Control to Profit Recovery?',
-        a: 'Several connections, all read-only on the Recovery side and always on. Your products are the master list Profit Recovery reads. Counts feed the cost of goods on your confirmed week and the Profit Audit cost sections. Deliveries feed Vendor Tracker and period COGS. Flagged delivery lines become the vendor credit claims you chase in Receive Delivery, with the rollup in Vendor Tracker. Spot Checks and confirmed-theft adjustments raise Needs Attention rows on the Hub. Below-par counts feed the Hub alerts. Set the inventory data once here and all of it stays current.' },
+      { q: 'What flows from Inventory to the Profit audit?',
+        a: 'Several connections, all read-only on the Recovery side and always on. Your products are the master list the Profit audit reads. Counts feed the cost of goods on your confirmed week and the Profit Audit cost sections. Deliveries feed Vendor Tracker and period COGS. Flagged delivery lines become the vendor credit claims you chase in Receive Delivery, with the rollup in Vendor Tracker. Spot Checks and confirmed-theft adjustments raise Needs Attention rows on the Hub. Below-par counts feed the Hub alerts. Set the inventory data once here and all of it stays current.' },
       { q: 'What does Inventory feed on the theft side?',
         a: 'Two signals, and each one raises its own Needs Attention row on the Hub. Spot Check variance flags, where the physical pours sold do not match what the POS rang. And Adjustment Log entries marked Theft. Variance lines past your standard read Over, and past twice it read High, on the Variance Report itself. The more honestly those get logged, the sharper that read is, because it is only as good as the data underneath it.' },
-      { q: 'What flows from Inventory Control into Accounting?',
+      { q: 'What flows from Inventory into Accounting?',
         a: 'Every inventory-driven sheet in the bookkeeper handoff. Month-End Books pulls purchases and COGS into the Income Statement, your beginning and ending counts plus deliveries into Inventory Valuation, and the same usage math the Variance Report uses into Variance and Shrinkage. Weekly P&L pulls the same numbers at a weekly grain. None of it is hand-keyed: if your counts and deliveries are current, your books are too.' },
       { q: 'Why do not my used numbers match my POS sales exactly?',
         a: 'They are not supposed to, and the gap is the point. Used product comes from your physical counts; POS sales come from the register. The difference is variance, and a healthy bar still carries a small one. Known comps and waste explain part of it, which is why logging those matters. What is left after comps and waste is the real signal: over-pouring, giveaways, or theft. The job is not to make the two numbers equal, it is to keep the unexplained gap small and watch it over time.' },
-      { q: 'Do I have to use Profit Recovery to get value out of Inventory Control?',
-        a: 'No. On its own you still get an organized product master, structured weekly counts, delivery and price history, variance reporting, automated reorder sheets, vendor orders emailed straight from Order History, and the full bookkeeper handoff at month-end. The payoff is bigger when Recovery is reading the data, because that is where the dollar-quantified leaks and the Audit live, but Inventory Control earns its keep standalone.' }
+      { q: 'Do I have to use the Profit audit to get value out of Inventory?',
+        a: 'No. On its own you still get an organized product master, structured weekly counts, delivery and price history, variance reporting, automated reorder sheets, vendor orders emailed straight from Order History, and the full bookkeeper handoff at month-end. The payoff is bigger once the audits are reading the data, because that is where the dollar-quantified leaks and the Audit live, but Inventory earns its keep standalone.' }
     ]}
   ],
 
@@ -85,7 +85,7 @@ S.InventoryHelp = {
 
   draw() {
     const search = '<div class="f" style="max-width:420px;margin-bottom:8px;">'
-      + '<input type="text" id="help-search" placeholder="Search Inventory Control help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
+      + '<input type="text" id="help-search" placeholder="Search Inventory help..." autocomplete="off" value="' + esc(this.query) + '"/></div>';
     const tabs = '<div class="ch-tabs no-print">'
       + this.SECTIONS.map((s, i) => '<button class="ch-tab' + (this.tab === i ? ' on' : '') + '" data-tab="' + i + '">' + esc(s.t) + '</button>').join('')
       + '</div>';
