@@ -286,12 +286,24 @@ const SectionTabs = {
       row.setAttribute('data-screen', r.screen);
       if (r.hubAction) row.setAttribute('data-hub-action', r.hubAction);
       if (r.mod) row.setAttribute('data-mod', r.mod);
-      if (r.icon) {
-        const ic = document.createElement('span');
-        ic.className = 'st-ic';
-        ic.innerHTML = r.icon;
-        row.appendChild(ic);
-      }
+      /* ⛔ THE ROWS CARRY NO ICON (Kyle, 2026-08-24: *"i think i want to see what the drop downs
+         look like without the icons and also the drop down width is already around 30px too wide
+         with the icons so probably 50px without."*). His eye was right twice: measured across all
+         17 panels the eight enabled sections can emit, the widest needs 170px against a 196px
+         min-width (26 too wide), and 144px without icons (52 too wide). `.st-drop`'s min-width
+         moved to 144 in the same edit — the two are one change, because taking the icon out of a
+         panel whose width is pinned by a min-width would have changed nothing an operator can see.
+         ⚠ THE ALIGNMENT BELOW NEEDS NO EDIT AND THAT IS WHY IT WAS WRITTEN THAT WAY. It measures
+         where the label actually landed rather than summing the icon, its gap and two paddings out
+         of the CSS, so removing 26px of them self-corrects on the next open ([[lessons-paid-for]]
+         #70). Verified live afterwards, not assumed.
+         ⏳ `r.icon` IS STILL BUILT AND IS NOW READ BY NOTHING IN THE APP — a PARKED field, not a
+         leftover, and Kyle has the ruling. He asked to LOOK at this; the field is what makes
+         putting the icons back these four lines instead of a re-derivation. `verify-section-tabs`
+         U7b holds the debt open so it cannot go quiet, and B3/N2 still prove the rows carry
+         DISTINCT marks, so a restore cannot ship a menu showing the same mark twice. The three
+         `.st-ic` rules in style.css went with the render, because a CSS rule nothing can match is
+         dead where a parked field is reversible. */
       const lb = document.createElement('span');
       lb.textContent = r.label;
       row.appendChild(lb);
