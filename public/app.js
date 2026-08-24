@@ -685,10 +685,13 @@ const App = {
       // so the last content never hides behind it and the sticky top nav is untouched.
       'body.demo #app{height:calc(100vh - 40px);}'
       + 'body.demo #hub-wrapper{bottom:40px !important;}'
-      // SET-2: App Settings is VISIBLE in the demo now (read-only), so the gear stays. A
+      // SET-2: App Settings is VISIBLE in the demo (read-only), so nothing here hides its door. A
       // prospect who cannot find Business Profile, Team Members or Data and Backup has no way
       // to know Bar Cop has them. App.demoLockScreen disables the controls; each write handler
       // still refuses on its own (see there — a disabled button is not a guard).
+      // ⚠ THE DOOR IS THE RAIL ROW. This line used to read "so the gear stays"; the gear existed
+      // for one push (2026-08-24) and the sentence outlived it by minutes, which is the whole
+      // reason a comment naming a specific CONTROL is worth less than one naming the property.
       + 'body.demo #signout-btn,body.demo #hub-signout{display:none;}'   // no account to sign out of in the demo; visitor just closes the tab
       + '#demo-banner{position:fixed;bottom:0;left:0;right:0;height:40px;z-index:200;'
       + 'display:flex;align-items:center;gap:14px;padding:0 16px;background:#1E2B34;'
@@ -755,15 +758,14 @@ const App = {
        toggle replaced in stage 5. Dead wiring for a dead button for a dead mode. */
     const tnBurger = document.getElementById('tn-mobile-burger');
     if (tnBurger) tnBurger.onclick = () => App.openMobileNav();
-    /* ⭐⭐ THE TOP BAR'S SETTINGS GEAR IS BACK, ALONGSIDE the rail row rather than replacing it
-       (Kyle, 2026-08-24). Three doors now: the gear, the rail row, and the phone's burger drawer.
-       ⭐ THIS WIRING NEVER MOVED, AND THAT IS WHY THE GEAR NEEDED NO NEW CODE. The lookup was left
-       guarded when the button was removed at the rail redesign, so re-adding the markup was enough
-       to bring it back live. `_openSettingsForRole` is still the ONE implementation every door
-       calls, which is what keeps the Staff rule (a staff member lands on their own account, not on
-       Business Profile) in a single place instead of a copy per door. */
-    const tnSettings = document.getElementById('tn-settings');
-    if (tnSettings) tnSettings.onclick = () => this._openSettingsForRole();
+    /* ⛔ THE TOP BAR'S SETTINGS GEAR IS GONE AGAIN (Kyle, 2026-08-24, one push after asking for it:
+       *"the gear icon in the top bar between the i help and the rail button needs removed.. it only
+       stays on rail menu"*). The LOOKUP GOES WITH THE MARKUP THIS TIME. Leaving it was defensible
+       once — a guarded `getElementById` for a node that does not exist is silent — and it is exactly
+       what made the gear "need no new code" when it came back, which reads like a feature and is
+       really a leftover sitting there looking load-bearing ([[the-loop]] #149: a cleanup is judged
+       by what it leaves behind looking like). Settings has two doors now, the rail row and the
+       phone's burger drawer, and both still call `_openSettingsForRole()`. */
     const tnHelp = document.getElementById('tn-help');
     if (tnHelp) tnHelp.onclick = () => this.openPageHelp();
     /* ⛔ THE TOP-BAR DATE IS GONE. Kyle, 2026-08-10: *"still need to remove the date from the main
@@ -2596,7 +2598,13 @@ const App = {
   /* ⭐ THE FLOOR SITS UNDER AUDITS (Kyle, 2026-08-23). It arrived in `_PROTO_CONTROL` because it
      replaced Labor and Shift in their own slot; one look at it and he moved it up here, which
      emptied the Control group and retired it. */
-  _PROTO_GLOBAL:   [['hub','Hub'],['inventory','Inventory'],['week','The Week'],['audit','Audits'],['floor','The Floor'],['menus','Menus'],['events','Events'],['books','Books']],
+  /* ⚠ `audit` READS "Run Audit", NOT "Audits" (Kyle, 2026-08-24). One word in one table, and it
+     moves THREE surfaces because they all ask `_railLabelOf`: the rail row, that row's `title` (the
+     only thing a collapsed row has), and the top bar's section icon tooltip and aria-label. That is
+     the design working — the menu and the bar cannot disagree about what a section is called — and
+     it is worth knowing before renaming any other row here. Measured on the live bar first: the
+     Audits section shows its ICON ONLY up there, so nothing visible in the top bar changed. */
+  _PROTO_GLOBAL:   [['hub','Hub'],['inventory','Inventory'],['week','The Week'],['audit','Run Audit'],['floor','The Floor'],['menus','Menus'],['events','Events'],['books','Books']],
   /* ⛔ `_PROTO_WEEK` IS GONE (2026-08-23). Close, Review and History were three rows for one job in
      three tenses; they are now three TABS on one page (`S.Week`) behind the single "The Week" row
      above. The three ids still resolve — they are tab targets now — so nothing that linked to them
@@ -2629,15 +2637,27 @@ const App = {
      keep their Help row and stay in `SECTIONS`; nothing asks `navHTMLFor` for those keys any more
      because no rail row emits them. Measured before the cut: ZERO screens registered under profit /
      revenue / cash are left unclaimed by some section's nav. */
-  /* ⛔ SIGN OUT LEFT THE RAIL ON 2026-08-16 (Kyle: *"move it from the side bar and put like in the
-     images"*). It now sits in the TOP NAV, left of the account switcher and The Rail, as plain
-     text with no icon — `#tn-signout` in index.html, wired beside `#tn-rail`.
-     ⭐ THE TABLE STAYS, AND THAT IS THE POINT: the phone's burger drawer is generated from these
-     same tables, and `_PROTO_SIGNOUT` not being read is exactly how Sign Out went missing from
-     mobile entirely once before. The rail stops rendering it; nothing else changes.
-     ⚠ The old reasoning here was about keeping it off the rail's Settings row by a mis-click —
-     that concern is answered by it no longer being in the rail at all. 🔧 `verify-signout-
-     reachable` now holds one way out per screen size, because nothing pinned the desktop one. */
+  /* ⛔⛔ SIGN OUT IS BACK IN THE RAIL, UNDER SETTINGS, BEHIND A DIVIDER, WITH AN ICON (Kyle,
+     2026-08-24: *"under the settings link put another divider and move the sign out link under that
+     divider with an icon"*). That is the THIRD home this one control has had — the rail's foot, then
+     the top nav, now a group of its own — so nothing anywhere should be built on where it sits.
+     ⛔ THE TOP-NAV BUTTON WENT WITH IT, all four pieces: the markup, the wiring, its own stylesheet
+     rule and its phone `display:none`. A move that leaves any of those behind is how a desktop ends
+     up with two ways out and a rule dressing a node nobody renders.
+     ⚠⚠ AND THIS NOTE DELIBERATELY DOES NOT SPELL THE RETIRED ID, the same way the top-bar date's
+     note does not spell its own. `verify-signout-reachable` block D sweeps for it, and a comment
+     that names the thing a sweep is looking for is counted as a survivor (integrity #2). D reads
+     de-commented source, so this is belt and braces rather than the only guard.
+     ⭐ THE ONE THING THAT HAS NEVER MOVED IS THIS TABLE, AND THAT IS THE POINT: the phone's burger
+     drawer is generated from these same tables, and `_PROTO_SIGNOUT` not being read is exactly how
+     Sign Out went missing from mobile entirely once before.
+     ⭐ THE ICON NEEDED NO NEW ART — `_RAIL_IC.signout` and `_NAV_SECTION_IC.signout` both survived
+     every move and still resolve. Measured before the edit rather than assumed: the shipped
+     `_railRow('signout', …)` renders 272 characters of real icon markup.
+     ⚠ THE ORIGINAL REASON THE ROW IS SPECIAL STILL STANDS and is what the divider buys: this is the
+     only row that ENDS THE SESSION rather than going somewhere, so it must never sit flush under
+     Settings. 🔧 `verify-signout-reachable` holds one way out per screen size and pins the
+     SEPARATION rather than which of the three spellings provides it. */
   // ⚠ WORKFLOW IS GONE FROM BOTH MENUS (Kyle, 2026-08-10: that page is being deleted). Removed here
   // rather than in each menu, so the rail and the mobile drawer — which now reads these same tables
   // — drop it together instead of one at a time.
@@ -3524,18 +3544,25 @@ const App = {
     if (rail) {
       const r = ([k, l]) => this._railRow(k, l, context);
       rail.innerHTML =
-          /* ⭐⭐ SETTINGS HAS TWO DESKTOP DOORS ON PURPOSE (Kyle, 2026-08-24: *"the settings link
-             stays where it currently is on the rail"*, after the gear was already placed). The rail
-             row is unchanged and the top bar gained a gear; both are wanted.
-             ⭐ THEY CANNOT DRIFT, AND THAT IS WHAT MAKES TWO DOORS SAFE HERE RATHER THAN THE USUAL
-             LIABILITY. `_protoGlobalClick('settings')` and `#tn-settings.onclick` both call
-             `_openSettingsForRole()`, so the landing and the Staff rule (a staff member lands on
-             their own account, never on Business Profile) have ONE implementation between them.
-             Pinned as such, because two doors to one place is exactly the shape that grows a second
-             copy of the rule the first time either one is touched. */
+          /* ⛔ SETTINGS IS BACK TO ONE DESKTOP DOOR (Kyle, 2026-08-24: *"the gear icon in the top
+             bar between the i help and the rail button needs removed.. it only stays on rail
+             menu"*). The gear lived here for one push; the rail row is the desktop door again, and
+             the phone still reaches Settings through the burger drawer.
+             ⭐ THE STAFF RULE IS UNAFFECTED because it never lived in either door: both called
+             `_openSettingsForRole()`, and that is still the ONE implementation deciding where a
+             member lands. Removing a door removes a caller, not the rule.
+             ⛔⛔ AND SIGN OUT IS THE THIRD GROUP, BEHIND ITS OWN DIVIDER (same message: *"under the
+             settings link put another divider and move the sign out link under that divider with an
+             icon"*). It is the only row that ENDS THE SESSION rather than going somewhere, so the
+             divider is not decoration — it is what keeps it from sitting flush under Settings, one
+             mis-click from taking an operator out mid-shift. Pinned as the SEPARATION in
+             `verify-signout-reachable`, never as the line, because this is the third spelling that
+             property has had and each of the previous two fired on the change it existed to permit. */
           '<div class="rail-group">' + this._PROTO_GLOBAL.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
-        + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>';
+        + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>'
+        + '<div class="rail-divider"></div>'
+        + '<div class="rail-group">' + this._PROTO_SIGNOUT.map(r).join('') + '</div>';
       rail.querySelectorAll('.rail-item[data-rail-go]').forEach(el =>
         el.addEventListener('click', () => { App.closeRailMenu(); App._protoGlobalClick(el.dataset.railGo); }));
       rail.querySelectorAll('.rail-item[data-rail-sec]').forEach(el =>
@@ -3562,13 +3589,10 @@ const App = {
       railBtn._wired = true;
       railBtn.addEventListener('click', () => BarCopBriefing.open());
     }
-    /* Sign Out, wired the same way and guarded for the same reason: this function runs on every
-       navigation, and a second listener on THIS control would fire two sign-outs. */
-    const soBtn = document.getElementById('tn-signout');
-    if (soBtn && !soBtn._wired) {
-      soBtn._wired = true;
-      soBtn.addEventListener('click', () => App._signOut());
-    }
+    /* ⛔ SIGN OUT'S TOP-NAV WIRING IS GONE WITH ITS BUTTON (Kyle, 2026-08-24 — it is a rail row
+       again). It needed the `_wired` flag because this function runs on every navigation and a
+       second listener would have fired two sign-outs; the rail row needs no such guard, because the
+       rail's rows are rebuilt by this same render and their listeners go with the old markup. */
   },
 
   // Section sub-group (drop-down) icons, keyed by the ORIGINAL sub-group name.

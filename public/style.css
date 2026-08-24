@@ -1134,14 +1134,24 @@ body.chrome-on #app{margin-left:var(--rail-w);}
 body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
 
 .rail-nav{padding:14px 0;display:flex;flex-direction:column;}
-.rail-group{display:flex;flex-direction:column;}
-/* THE FOOT OF THE RAIL. Sign Out is the one row that ends the session rather than going
-   somewhere, so it must never sit flush under Settings. It used to buy that with a divider
-   line; it buys it with distance now, which is the bigger separation of the two. The auto
-   margin collapses to nothing when the rail overflows, so on a short viewport Sign Out just
-   scrolls with everything else rather than covering a row. The divider below it belongs to
-   .rail-collapse (its border-top), which is why there is no line of its own here. */
-.rail-end{margin-top:auto;}
+/* ⭐ 5px BETWEEN ROWS, NOT MORE PADDING INSIDE THEM (Kyle, 2026-08-24: *"from the hub to books..
+   put a little more breathing room between each of the rail links"*). MEASURED live before the
+   change: nine rows, 31px each, gap 0 — they sat flush.
+   ⛔⛔ IT HAS TO BE `gap` AND NOT `.rail-item` PADDING, and that is the whole reason for this note.
+   The rail's rhythm is pinned as an AGREEMENT in `verify-rail-menu-overlay`: a divider must sit
+   evenly between the word above it and the word below, and "above" is `.rail-item`'s own bottom
+   padding plus the divider's top margin. Growing the padding moves one side of that and the pin
+   fires on a correct change. `gap` sits BETWEEN items, so the last row's distance to the divider is
+   untouched and the agreement stays both green and TRUE.
+   ⚠ The single-row groups (Settings, Sign Out) have no internal gap to grow, which is right: they
+   are already separated by dividers, and this is a rule about the run of links. */
+.rail-group{display:flex;flex-direction:column;gap:5px;}
+/* ⛔ `.rail-end` IS DELETED (2026-08-24). It pinned Sign Out to the FOOT of the rail with
+   `margin-top:auto`, and it had already been dead for a chat — Sign Out left the rail entirely on
+   2026-08-16 and nothing in `public/` has carried the class since. It is back in the rail now, but
+   directly under Settings behind a divider rather than at the foot, so the rule would still match
+   nothing while its comment described a layout the app does not have. Deleted rather than left,
+   because an expired justification reads as a live design decision to whoever finds it next. */
 .rail-divider{height:0;border-top:1px solid var(--b-edge);margin:14px 14px;}
 .rail-grp-label{
   font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
@@ -1404,17 +1414,15 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    ⛔ THE DIVIDER IS RETIRED WITH IT. `.tn-page #tn-help::before` drew the rule between the page
    NAME and the "i". There is no page name beside it any more, and Kyle asked for *"just the i help
    circle icon"* — the surviving pair is `.tn-sep` and `.sec-links::before`, pinned as agreeing. */
-/* ⭐ THE GEAR JOINS THE "i" HERE RATHER THAN GETTING A RULE OF ITS OWN (2026-08-24). Both are bare
-   icons in the same slot doing the same job, so one selector keeps them from drifting apart the
-   next time either is touched. Adding a second rule is how the two ended up looking different
-   last time a node moved in this bar. */
-.tn-right #tn-help,
-.tn-right #tn-settings{
+/* ⛔ THE GEAR LEFT THIS SELECTOR WITH ITS BUTTON (2026-08-24). It shared the rule for one push, on
+   the argument that two bare icons in one slot should not be free to drift; the node is gone, so
+   the selector goes rather than sitting here dressing nothing. The "i" is unchanged — this is a
+   selector removal, not a rewrite, so a live control cannot be restyled by a cleanup. */
+.tn-right #tn-help{
   width:auto;height:auto;background:none;border:0;border-radius:0;padding:0;
   color:var(--t3);
 }
-.tn-right #tn-help:hover,
-.tn-right #tn-settings:hover{background:none;color:var(--gold);}
+.tn-right #tn-help:hover{background:none;color:var(--gold);}
 /* #tn-global is empty since the rail took the global links; keep the node, drop its 16px gap. */
 /* 14px, down from 15. The title carries a section prefix now, so it is a longer string in the same
    space, and the smaller size is what keeps it from crowding the bar. */
@@ -1622,11 +1630,13 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
     border-radius:var(--r2);padding:0;color:var(--t2);
   }
   .tn-right #tn-help:hover{background:var(--c4);color:var(--w);}
-  /* No phone twin for the gear: it is hidden below this breakpoint (see `#tn-settings` a few
-     lines down), because Settings on a phone stays in the burger drawer. */
   .tn-mobile-burger{display:flex;}
-  #tn-settings{display:none;}   /* App Settings lives in the burger menu on mobile */
-  #tn-signout{display:none;}    /* and so does Sign Out — the drawer renders _PROTO_SIGNOUT */
+  /* ⛔ THE TWO `display:none` OVERRIDES HERE ARE GONE WITH THE BUTTONS THEY HID (2026-08-24). One
+     dressed the Settings gear, one dressed the top-bar Sign Out, and neither node exists any more —
+     both live in the rail now, and the whole rail is `display:none !important` below this
+     breakpoint, so the phone reaches each of them through the burger drawer exactly as before.
+     A hide rule for a node nobody renders is the same leftover as a class that outlives its node,
+     and it reads to the next person as though the control is still up there. */
   /* `#tn-acct #topbar-group-dashboard{display:none !important}` went with `#tn-acct`. The group
      dashboard was retired long ago and `renderAccountSwitcher` already hides its slots on every
      run, so nothing here has to say it a second time. */
@@ -2031,12 +2041,11 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    name. 0 vertical (the height owns that, and .btn already centres by flex) and 12px each side:
    MEASURED 94px wide -> 82px, with the 11px uppercase label still clearing its own box. */
 .tn-rail{height:var(--tb-ctl-h);padding:0 12px;}
-/* Sign Out: a text link, not a button. No fill, no border, no icon — it sits on the same control
-   row as the switcher and The Rail, so it takes their height and the top nav's own muted colour. */
-.tn-signout{height:var(--tb-ctl-h);padding:0 6px;background:none;border:0;color:var(--t2);
-  font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;
-  white-space:nowrap;transition:color .12s;}
-.tn-signout:hover{color:var(--w);}
+/* ⛔ SIGN OUT'S TOP-BAR RULE IS GONE WITH ITS BUTTON (2026-08-24). It is a rail row again, so it
+   takes `.rail-item` like every other row and needs nothing here. A class that outlives the node it
+   dressed is the leftover this bar has already produced twice — the retired section pills, whose
+   CSS leaked into the title prefix, and the gear's own bare-icon rule, which matched nothing for a
+   chat after the button moved. Deleted rather than left. */
 /* ⛔ `.tn-right .at-qsel` IS GONE (2026-08-23). It sized the multi-bar picker for the top bar, and
    the picker no longer goes there — *"that needs moved out of the top bar and replace the bar name
    on the hub.. and it only goes there."*
