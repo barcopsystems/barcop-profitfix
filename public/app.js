@@ -2672,7 +2672,20 @@ const App = {
      `help`; a rail row whose key nothing answers renders perfectly and does nothing on click, which
      is the class that shipped four times in four days. The branch is in `_protoGlobalClick` below,
      and `_HUB_SIDEBAR_OF_ACTION` gained a `help` entry so the row can LIGHT on its own page. */
-  _PROTO_BOTTOM:   [['settings','Settings'],['help','Help']],
+  /* ⚠ THE ROW READS "GUIDE", NOT "HELP" (Kyle, 2026-08-24: *"in rail menu change 'help' to 'Guide'
+     with a different icon"*). One word in one table, and it moves BOTH surfaces at once, because the
+     rail row, that row's `title` and the phone drawer's row are all generated from here — the same
+     agreement `audit` → "Run Audit" demonstrated above.
+     ⛔ THE KEY STAYS `help`, AND THAT IS DELIBERATE. The key is what `_protoGlobalClick`,
+     `_GLOBAL_OF_ACTION` and the phone drawer's `routePage` map all resolve; renaming it would be
+     four more edits, and a rail row whose key nothing answers renders perfectly and does nothing on
+     click — the class that reached Kyle four times in four days. The LABEL is the operator's word,
+     the KEY is the wiring, and only one of the two was asked to change.
+     ⭐ WHY THE WORD MATTERED: "Help" already named two other things — the top-bar "i", which gives
+     the directions for the screen in front of you, and the ten per-section FAQs. Three different
+     things under one word is what this fixes. `verify-global-help` A2b pins that the row is NOT
+     called "Help" without pinning what it IS called, so renaming it again costs nothing. */
+  _PROTO_BOTTOM:   [['settings','Settings'],['help','Guide']],
   /* ⚠ "LOG OUT", NOT "SIGN OUT" (Kyle, same message). One word in one table, and it moves the rail
      row AND the phone drawer's row, because both are generated from here. That is the agreement
      working: the auth screen this control lands on already reads "LOG IN TO BAR COP", so the rail
@@ -3135,7 +3148,37 @@ const App = {
               + ' title="Open the ' + esc(sec) + ' menu">' + esc(sec) + '</button>'
               + '<span class="tn-sep"></span>')
         : '')
-      + (barred ? '' : '<span class="tn-pg">' + esc(page) + '</span>');
+    /* ⛔⛔ A PAGE WITH NO SECTION SHOWS NOTHING UP HERE (Kyle, 2026-08-24: *"get rid of the help and
+       faq page title and also the hub page title"*). Those were the only two pages rendering a bare
+       page name, and they rendered it because they belong to no section — so the honest rule is the
+       property, not their two ids.
+       ⭐ MEASURED BEFORE IT WAS WRITTEN, on the deployed build: all 11 rail rows plus 24 inner
+       section pages walked, and EXACTLY TWO showed a bare `tn-pg` — the Hub and Help. Every other
+       page is a barred section rendering its icon alone. So "no section" and "the two he named" are
+       the same set today, and naming the two ids instead would have been a hand-kept list of what to
+       suppress ([[lessons-paid-for]] #139).
+       ⚠ THE `!page` GUARD ABOVE IS UNTOUCHED AND MUST STAY. The Hub still passes its own name in, so
+       `page` is still truthy and a shell mid-swap still cannot blank the bar; the name is computed
+       exactly as it was and simply is not painted. Removing the `force` argument as "now unused"
+       would reintroduce the stale-title defect it was added for.
+       ⚠ AND ONLY THE MIRROR CHANGES. `#topbar-title` and `.hub-app .topbar .topbar-title` are still
+       written by their own nine call sites — both measure 0x0 under chrome-on, and one of them is
+       read back for the PDF export title, so neither may be quietened.
+       ⛔⛔⛔ IT KEYS ON `secKey`, NOT ON `sec`, AND THAT DISTINCTION IS THE WHOLE SAFETY OF IT. `sec`
+       is the LABEL, and `_railLabelOf` returns null for a section that no longer has a rail row —
+       measured: `profit`, `revenue`, `cash`, `labor` and `shift` are all still sections by
+       `_isSection` while their rail rows were deleted at T67/T69, so all five have a menu and NO
+       label. Written as `!sec` this would have blanked the bar for every one of them instead of
+       showing the page name, which is a regression on five module keys bought for a change about
+       two pages. `!secKey` asks the question actually being asked — IS THERE A SECTION — so a
+       section whose label goes missing degrades to exactly what it renders today.
+       ⭐ AND IT WAS CAUGHT BY MEASURING, NOT BY READING. 54 real landings were walked (11 rail rows,
+       24 inner section pages, 9 hub and week pages, 10 Hub alert rows) and not one of them lands on
+       those five, because `_railSectionForScreen` re-points every reachable screen to a barred
+       section. So `!sec` would have shipped green and unreachable — and "unreachable today" is the
+       thing that stops being true quietly ([[lessons-paid-for]] #61). Make it impossible, not
+       unreached. */
+      + ((barred || !secKey) ? '' : '<span class="tn-pg">' + esc(page) + '</span>');
   },
 
   /* The module title is written by nine different branches of `navigate`, several of which return
@@ -3671,7 +3714,26 @@ const App = {
     profit:'<path d="M2 13h11M4 13V8M7.5 13V4M11 13V9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
     revenue:'<path d="M2 13l4-5 3 3 4.5-7M10 4h4v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
     cash:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 4.7v7.6M10.6 6.3c-.4-.6-1.2-1-2.1-1-1.2 0-2.1.6-2.1 1.6 0 2.1 4.3 1.1 4.3 3.2 0 1-.9 1.6-2.2 1.6-1 0-1.8-.4-2.2-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
-    help:'<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 6.5a1.5 1.5 0 0 1 3 0c0 1-1.5 1.5-1.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8.5" cy="12" r="0.6" fill="currentColor"/>',
+    /* ⚠ AN OPEN BOOK, NOT THE QUESTION MARK (Kyle, 2026-08-24: *"change 'help' to 'Guide' with a
+       different icon"*). The old mark was a `?` in a circle, which is the universal sign for
+       "support", and the row is not support any more — it is the manual.
+       ⛔ THE KEY IS STILL `help` BECAUSE `_RAIL_IC` MAPS THE RAIL KEY, NOT THE LABEL. Renaming it to
+       `guide` would mean re-pointing `_RAIL_IC` and two assertions for no behaviour change; the mark
+       a key resolves is allowed to change without the key moving.
+       ⚠ MEASURED AGAINST THE OTHER TEN RAIL MARKS BEFORE DRAWING IT, because two rail rows on one
+       mark is two rows nobody can tell apart once the rail is collapsed to icons: the closest
+       neighbour is `books`, a PORTRAIT rectangle with a top band and two short rules, which reads as
+       a ledger. This is wide and low with a centre spine and two page blocks — a different
+       silhouette at 17px, which is the size that decides it. `verify-global-help` B5 is the census
+       that keeps every rail mark distinct from now on.
+       ⚠ AND IT WAS DRAWN TWICE, BECAUSE THE FIRST ONE WAS MEASURABLY TOO SMALL. Rendered against
+       the other ten rail marks it came back **10 x 10** where the set runs 11-13 wide and 10.6-13
+       tall, so it would have read light beside `books` and `settings` on either side of it. This one
+       measures **12.6 x 10.8, inset 2.2/2.8**, which sits between `books` (11x12) and `hub` (13x13).
+       A mark is only right at the size it ships at, and that is a measurement, not an opinion.
+       ⏳ DESIGN IS KYLE'S AND HE ASKED FOR "a different icon" WITHOUT NAMING ONE, so this is a pick
+       from what the mark has to say, not a decision made on his behalf. Flagged for veto: one line. */
+    help:'<path d="M8.5 4.4C7 3.3 5 2.8 2.2 2.8v9.2c2.8 0 4.8.5 6.3 1.6 1.5-1.1 3.5-1.6 6.3-1.6V2.8c-2.8 0-4.8.5-6.3 1.6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M8.5 4.4v9.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
     bug:'<ellipse cx="8.5" cy="9" rx="3.5" ry="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 9H2.5M14.5 9H12M5.5 5L4 3.5M11.5 5L13 3.5M5.5 13L4 14.5M11.5 13L13 14.5M8.5 4.5V3M7 4a2 2 0 0 1 3 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>',
     dash:'<path d="M2.5 4.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 4h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 8.7l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8.5h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M2.5 13.2l1.2 1.2 2-2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 13h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
   },
@@ -3965,8 +4027,25 @@ const App = {
          which is the whole point of comparing against the rendered overlay rather than the raw
          sidebar builder — the builder output matches NEITHER menu. */
       { label: 'Go to', items: App._PROTO_GLOBAL.map(([k, l]) => railRow(k, l)) },
-      // App Settings is off in the live demo, same as the desktop gear.
-      ...(App.demoMode ? [] : [railGroup('Settings', App._PROTO_BOTTOM)]),
+      /* ⛔⛔⛔ THE DEMO PHONE GETS THIS GROUP TOO (Kyle, 2026-08-24: *"both links Settings and Guide
+         should be on the mobile demo.. settings in the demo is locked so a demo user can't change
+         anything.. but we want them to be able to see it just like on the demo desktop"*).
+         This line used to read `...(App.demoMode ? [] : [railGroup(...)])` and its comment said
+         *"App Settings is off in the live demo, same as the desktop gear."* BOTH halves had gone
+         false: the gear was deleted on 2026-08-24, and App Settings has been VISIBLE and read-only
+         in the demo since SET-2 — `_mountDemoBanner`'s own note says so, and the rail renders this
+         same table in the demo with no guard at all. So the phone was the one surface still
+         enforcing a rule the rest of the app had dropped, and MEASURED at 375px on the deployed
+         build the demo drawer had NINE rows and neither Settings nor the guide among them.
+         ⭐ WHY IT IS SAFE TO OPEN, AND IT IS MEASURED RATHER THAN ASSUMED: the demo lock is not on
+         the DOOR, it is on the screen and on every write. `App.demoLockScreen` disables the controls
+         at render (`settings.js`, `hub-user-accounts.js`) and `App.demoBlock` refuses inside each
+         write handler, with `DB._demo` under both. A new door therefore cannot expose a write, which
+         is the question this had to answer before the guard came off ([[lessons-paid-for]] #68 — a
+         flag that reconfigures a screen for one audience is a claim only that audience can reach
+         it). `verify-demo-settings-readonly` block P is the census that keeps it true: every row
+         this group can reach must land somewhere disabled, refused, or classified read-only. */
+      railGroup('Settings', App._PROTO_BOTTOM),
       /* ⛔ SIGN OUT WAS MISSING FROM THE PHONE ENTIRELY (Kyle, 2026-08-12). This drawer is generated
          from the rail tables, and `_PROTO_SIGNOUT` — which the rail renders as its own group at the
          foot — was simply never added to the list, so there was NO way to sign out on mobile.
