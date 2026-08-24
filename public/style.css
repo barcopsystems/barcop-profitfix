@@ -2439,31 +2439,62 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    hex pasted here is a colour that stops following the palette the day he retunes it. The panel
    used to be `--c4` (the accent splash), which sat lighter than everything around it; on the page
    fill with the edge border it reads as part of the bar it hangs from. */
+/* ⛔⛔ 196 WAS PADDING EVERY PANEL OUT, AND KYLE'S EYE WAS INSIDE 2px BOTH TIMES (2026-08-24:
+   *"the drop down width is already around 30px too wide with the icons so probably 50px without"*).
+   MEASURED, NOT ESTIMATED: the real `.st-drop` markup was built off-screen for all 17 multi-row
+   groups the eight enabled sections can emit, against this stylesheet, with min-width defeated.
+   Widest WITH icons 170 (Inventory's Logs group, "Void and Comp Log") — 26 narrower than 196.
+   Widest WITHOUT icons 144 — 52 narrower. He said ~30 and ~50.
+   ⭐ IT IS THE WIDEST PANEL'S OWN CONTENT WIDTH, WHICH IS WHY THE MIN-WIDTH EXISTS AT ALL: every
+   panel renders the same width instead of each sizing to its own longest row, and now the widest
+   one exactly fits rather than every one of them being padded out to clear it.
+   ⚠ A NUMBER FITTED TO TODAY'S LONGEST LABEL IS A SCHEDULED FALSE ALARM ([[lessons-paid-for]] #51),
+   so it is not left to somebody to remember: `verify-section-tabs` U6 re-derives the longest label
+   any enabled section can emit and goes RED if one grows past what this was measured against. A
+   longer label then makes its panel wider than its siblings, which is cosmetic and loud, not
+   silent. */
 .st-drop{position:fixed;background:var(--bg);border:1px solid var(--b-edge);border-top:0;
-  border-radius:0 0 8px 8px;padding:5px;min-width:196px;z-index:200;}
+  border-radius:0 0 8px 8px;padding:5px;min-width:144px;z-index:200;}
 /* ⛔⛔⛔ THE GOLD CHEVRON, AND IT HAD TO FIT INSIDE THE BAR (Kyle: *"a gold chevron that shows up
    under the menu link pointing down to the menu that is open below it... stays active as long as
    the drop down menu is open and goes away when a menu closes"*).
    ⚠ MEASURED FIRST, BECAUSE `#proto-topnav` IS `overflow:hidden` AND CLIPS ANYTHING BELOW 52px —
    the trap that made the whole drop-down invisible once and could not be fixed with z-index
    ([[lessons-paid-for]] #102). The link's bottom measures **36** against the bar's **52**, so there
-   are 16px of bar underneath it: the chevron sits at 45-50 and is inside the clip, while the panel
-   opens at 52. It fills the gap rather than hanging into it.
+   are 16px of bar underneath it. It fills that gap rather than hanging into it.
+   ⛔⛔⛔ AND "IT FITS" IS NOT "IT IS PLACED" — 9px SAT IT ON THE BORDER (Kyle, 2026-08-24: *"the gold
+   chevron is sitting on the top bar border.. so either it needs moved up more under the menu
+   link"*). At 9 the chevron ran 45-50 and the bar's border band is 51-52, so it had ONE pixel of
+   air below it against NINE above. Both facts the old note stated were true and it still read
+   wrong, because the claim that matters is where it sits IN the gap, not whether it clears the clip.
+   ⭐ THE BAND IS 36 TO 51 (the border sits INSIDE --navh; box-sizing is border-box, and the rule
+   above says so), which is 15px. A 5px chevron centred in it leaves 5 either side, so the offset
+   is 5: the chevron runs 41-46. Every one of those numbers is DERIVED — `verify-section-tabs` U3b0
+   re-computes them out of --navh, the border width, the link's padding and font size and the
+   chevron's own border widths, so nudging any of them moves the chevron instead of stranding it
+   against an edge again. U3d asserts the balance, and it went RED on the 9px build before this.
    ⭐ NO JS AT ALL. `_openDrop` already adds `.st-open` to the link and `_teardown` already removes
    it from every link, so the "stays while open, goes when it closes" half was built the day the
    menus were — this is the class finally rendering something. */
 .st-link{position:relative;}
 .st-link.st-open::after{content:'';position:absolute;left:50%;transform:translateX(-50%);
-  top:calc(100% + 9px);width:0;height:0;border-left:5px solid transparent;
+  top:calc(100% + 5px);width:0;height:0;border-left:5px solid transparent;
   border-right:5px solid transparent;border-top:5px solid var(--gold);pointer-events:none;}
 .st-row{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;
   padding:7px 12px;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;
   color:var(--t1);white-space:nowrap;transition:color .12s;}
 .st-row:hover{background:none;color:var(--w);}
 .st-row-on{color:var(--w);}
-.st-ic{display:flex;align-items:center;flex-shrink:0;color:var(--t3);transition:color .12s;}
-.st-ic .nav-icon{width:16px;height:16px;}
-.st-row:hover .st-ic,.st-row-on .st-ic{color:var(--gold);}
+/* ⛔ THE THREE `.st-ic` RULES WENT WITH THE ICONS (Kyle, 2026-08-24, asked to see the drop-downs
+   without them). They were: the flex box + resting `--t3`, a 16px `.nav-icon` size, and the gold
+   hover — the last one written for his own earlier request, *"the icon change gold on link
+   mouseover with the white text change."* Nothing emits `.st-ic` any more, and a rule that can
+   never match is dead where the parked `r.icon` field in section-tabs.js is reversible.
+   ⚠ `verify-section-tabs` C5g pinned that gold hover and correctly went RED here; it is retired
+   against this note rather than made to pass, because its subject left by instruction and a pin
+   kept alive over a rule nothing can match is the shape that stays green while meaning nothing
+   ([[lessons-paid-for]] #94/#131). Restoring the icons restores these three rules and C5g with
+   them; `.st-row`'s `gap:10px` is left in place and is inert with one child. */
 
 /* The section ICON in place of its name, same size as a rail icon. */
 .tn-secicon{display:flex;align-items:center;color:var(--gold);flex-shrink:0;}

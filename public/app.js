@@ -633,7 +633,7 @@ const App = {
   _showDemoWelcome() {
     const m = document.createElement('div');
     m.id = 'demo-welcome';
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9600;display:flex;align-items:center;justify-content:center;padding:24px;';
+    m.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:9600;display:flex;align-items:center;justify-content:center;padding:24px;';
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:10px;padding:32px 30px;max-width:460px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,0.5);">'
       + '<div style="margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
       + '<div style="font-size:18px;font-weight:800;color:var(--w);margin-bottom:12px;">Welcome to the Bar Cop Live Demo</div>'
@@ -728,7 +728,7 @@ const App = {
     const title = opts.title || 'Settings Is Read-Only in the Demo';
     const body  = opts.body  || 'Look around every Settings page you like. Changing them takes your own bar, with your own numbers in it.';
     const m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px;';
+    m.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px;';
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:8px;padding:30px;max-width:430px;text-align:center;">'
       + '<div style="font-size:15px;font-weight:800;color:var(--w);margin-bottom:10px;">' + esc(title) + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:22px;">' + esc(body) + '</div>'
@@ -1395,7 +1395,7 @@ const App = {
     if (document.getElementById('welcome-gate')) return;
     const m = document.createElement('div');
     m.id = 'welcome-gate';
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.74);z-index:9700;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:9700;display:flex;align-items:center;justify-content:center;padding:20px;';
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:30px;max-width:420px;width:100%;">'
       + '<div style="text-align:center;margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
       + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">You\'re All Set</div>'
@@ -1475,7 +1475,7 @@ const App = {
       + '<span>' + label + '</span>' + (note ? '<span style="font-size:11px;color:var(--gold);">' + note + '</span>' : '') + '</div>';
     const m = document.createElement('div');
     m.id = 'plan-gate';
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.74);z-index:9700;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:9700;display:flex;align-items:center;justify-content:center;padding:20px;';
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:30px;max-width:420px;width:100%;">'
       + '<div style="text-align:center;margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
       + '<div style="font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--w);text-align:center;margin-bottom:6px;">' + heading + '</div>'
@@ -1618,7 +1618,7 @@ const App = {
     }
     const modal = document.createElement('div');
     modal.id = 'checkout-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9800;display:flex;justify-content:center;overflow-y:auto;padding:24px 16px;';
+    modal.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:9800;display:flex;justify-content:center;overflow-y:auto;padding:24px 16px;';
     // margin:auto on a flex child centers it when it fits and falls back to
     // top-aligned + scrollable when the form is taller than the viewport.
     modal.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:8px;padding:20px;max-width:520px;width:100%;margin:auto;">'
@@ -1728,6 +1728,21 @@ const App = {
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'hub-modal';
+      /* ⛔⛔ THIS ONE STAYS OFF `--overlay`, AND IT IS THE ONE CASE WHERE THE TOKEN IS WRONG.
+         I moved it with the other seven and then read what it is for: the comment above says the
+         dashboard *"stays visible underneath with a blur filter so the operator never loses their
+         context"* — this is a SHOW-THROUGH overlay, not a hide-the-page scrim.
+         ⭐ THE ARITHMETIC DECIDES IT, not taste. `--overlay` is rgba(17,23,27,0.88) and the page
+         behind is `--bg` #11171B = rgb(17,23,27) — the same three numbers — so the scrim composites
+         to EXACTLY `--bg`. The panel it frames is also `--bg`. Panel and backdrop would be the
+         identical colour with only a 1px border between them, which is the precise state Kyle
+         rejected for the drop-down a day earlier (*"it only read as a menu because of its border"*).
+         The blur would be invisible too, so the sentence above would stop being true.
+         At 0.55 black the page composites to ~rgb(8,10,12) and the `--bg` panel reads against it.
+         ⚠ NAMED, NOT SKIPPED: `verify-design-code` COLOUR-1 exempts it explicitly and COLOUR-1y
+         asserts the exemption still names something real, so it cannot rot into a free pass
+         ([[lessons-paid-for]] #115). Kyle rules on whether a show-through scrim earns its own token;
+         inventing a second one is a design call and design is walked one change at a time. */
       modal.style.cssText = 'position:fixed;inset:0;z-index:200;display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;background:rgba(0,0,0,0.55);';
       document.body.appendChild(modal);
       modal.addEventListener('click', (ev) => {
@@ -6881,7 +6896,7 @@ const App = {
 
     const m = document.createElement('div');
     m.className = 'help-overlay';
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;opacity:0;transition:opacity .18s ease;';
+    m.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const box = document.createElement('div');
     box.className = 'help-panel';
     box.style.cssText = 'position:fixed;top:0;right:0;height:100%;width:420px;max-width:92vw;background:var(--surface);border-left:1px solid var(--b1);box-shadow:-10px 0 30px rgba(0,0,0,0.4);z-index:9001;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease;';
