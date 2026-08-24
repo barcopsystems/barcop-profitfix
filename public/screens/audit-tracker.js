@@ -466,11 +466,11 @@ S.AuditTracker = {
     if (d.S2_MONTHLY_GAP > 0) items.push({ action: 'Reduce food cost. $' + Math.round(d.S2_MONTHLY_GAP) + '/month gap vs target.', monthly_impact: d.S2_MONTHLY_GAP, gap_id: 'food-cost' });
     // S3 Shrink is diagnostic: its dollar already lives inside the pour and food
     // gaps above, so it surfaces the where (monthly_impact 0, never re-added).
-    if (d.S3_INV_VARIANCE_DOLLAR > 0 && (d.S3_INV_VARIANCE_PCT == null || d.S3_INV_VARIANCE_PCT > 2)) items.push({ action: 'Work your inventory variance. $' + Math.round(d.S3_INV_VARIANCE_DOLLAR) + ' of product was used but never rung this period. Count weekly, run the variance report, and chase the biggest negative lines in Loss Prevention.', monthly_impact: 0, gap_id: 'theft-loss' });
+    if (d.S3_INV_VARIANCE_DOLLAR > 0 && (d.S3_INV_VARIANCE_PCT == null || d.S3_INV_VARIANCE_PCT > 2)) items.push({ action: 'Work your inventory variance. $' + Math.round(d.S3_INV_VARIANCE_DOLLAR) + ' of product was used but never rung this period. Count weekly, run the variance report, and chase its biggest negative lines.', monthly_impact: 0, gap_id: 'theft-loss' });
     if (/monthly|not counted/i.test(d.S3_COUNT_FREQ || '')) items.push({ action: 'Count more often. Inventory is running ' + String(d.S3_COUNT_FREQ).toLowerCase() + '. You cannot catch shrink you do not count for. Move to a weekly count.', monthly_impact: 0, gap_id: 'theft-loss' });
     // S4 Theft: void/comp excess is a real distinct dollar.
     if (d.S4_MONTHLY_GAP > 0) items.push({ action: 'Address void and comp rate. $' + Math.round(d.S4_MONTHLY_GAP) + '/month in excess.', monthly_impact: d.S4_MONTHLY_GAP, gap_id: 'theft-loss' });
-    if (d.S4_SALES_INTEGRITY_FLAGS > 0) items.push({ action: 'Work your Sales Integrity flags. ' + d.S4_SALES_INTEGRITY_FLAGS + ' server' + (d.S4_SALES_INTEGRITY_FLAGS === 1 ? '' : 's') + ' flagged as an outlier worth a closer look. Open the investigation in Loss Prevention.', monthly_impact: 0, gap_id: 'theft-loss' });
+    if (d.S4_SALES_INTEGRITY_FLAGS > 0) items.push({ action: 'Work your Sales Integrity flags. ' + d.S4_SALES_INTEGRITY_FLAGS + ' server' + (d.S4_SALES_INTEGRITY_FLAGS === 1 ? '' : 's') + ' flagged as an outlier worth a closer look. Check their voids, comps and no-sale opens against the rest of the floor.', monthly_impact: 0, gap_id: 'theft-loss' });
     // S5 Vendor exposure is an ESTIMATE (a few percent of spend), so it stays out
     // of the recoverable headline; filed-but-uncollected credits are real dollars
     // but a one-time recovery, also monthly_impact 0.

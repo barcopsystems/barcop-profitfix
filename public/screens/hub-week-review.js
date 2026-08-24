@@ -928,13 +928,14 @@ S.WeekReview = {
     const audWk     = (dat.audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10)));
     const revWk     = (dat.sales_reviews || []).filter(r => this._inWeek(r.date || r.created_at));
     const discWkR   = (dat.vendor_discrepancies || []).filter(d => this._inWeek(d.date || d.filed_at || d.created_at));
-    const investWkR = (dat.variance_investigations || []).filter(i => this._inWeek(i.opened_date || i.date));
     const auditsWk = audWk.length;
-    /* ⛔ SAME DEFECT AS LABOR'S TIME-OFF COUNT: `status === 'Active'` is a fact about TODAY, and it
-       was printed under "Done This Week". An experiment started in June was being reported as this
-       week's work. A recap counts what STARTED in the week; the running total is current state and
-       belongs on the Hub, which is the page that answers "what now". */
-    const expNew = (dat.profit_initiatives || []).filter(e => this._inWeek(e.start_date || e.created_at));
+    /* ⛔ THE INVESTIGATION AND EXPERIMENT LINES WENT AT T69 PASS 3b (Kyle, 2026-08-24). Their two
+       stores are unregistered, so both filters would have run over an array that never exists and
+       printed nothing forever, which reads as a bar that did no recovery work rather than as a
+       feature that was removed. The producers are cut WITH their lines: a `const` computed and
+       read nowhere is the shape a fix that never shipped leaves behind ([[the-loop]] #25).
+       ⚠ THE RULE THE OLD COMMENT CARRIED IS STILL LIVE ON EVERY OTHER LINE IN THIS RECAP: a recap
+       counts what STARTED in the week, never what is Active today, which is a fact about now. */
 
     const did = [];
     audWk.forEach(a => did.push(this._n('Profit audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
@@ -954,9 +955,6 @@ S.WeekReview = {
       did.push(this._n(discWkR.length + ' vendor ' + this._plu(discWkR.length, 'discrepancy', 'discrepancies')) + ' filed'
         + (over ? ', ' + this._m0(over) + ' overcharged' : '') + '.');
     }
-    if (investWkR.length) did.push(this._n(investWkR.length + ' variance ' + this._plu(investWkR.length, 'investigation')) + ' opened.');
-    if (expNew.length) did.push(this._n(expNew.length + ' ' + this._plu(expNew.length, 'experiment')) + ' started'
-      + (expNew.length <= this._few() ? ': ' + this._join(expNew.map(e => this._nm(e.name))) : '') + '.');
     const activity = this._didList(did);
     const costCell = (i, label) => {
       const r = costRows ? costRows[i] : null;
@@ -1008,8 +1006,6 @@ S.WeekReview = {
     const dogWkR   = (dat.menu_dog_tests || []).filter(t => this._inWeek(t.start_date || t.created_at));
     const checkWkR = (dat.revenue_server_checks || []).filter(c => this._inWeek(c.date || c.created_at));
     const auditsWk = audWk.length;
-    // Started in the week, not running today — see the note on the Profit card.
-    const expNew = (dat.initiatives || []).filter(e => this._inWeek(e.start_date || e.created_at));
 
     const did = [];
     audWk.forEach(a => did.push(this._n('Revenue audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
@@ -1032,8 +1028,6 @@ S.WeekReview = {
         + (who.length && who.length <= this._few() ? ' ' + this._join(who) + '.' : '')
         + (sales ? ' ' + this._m0(sales) + ' across ' + covs + ' ' + this._plu(covs, 'cover') + '.' : ''));
     }
-    if (expNew.length) did.push(this._n(expNew.length + ' ' + this._plu(expNew.length, 'experiment')) + ' started'
-      + (expNew.length <= this._few() ? ': ' + this._join(expNew.map(e => this._nm(e.name))) : '') + '.');
     const activity = this._didList(did);
     const mCell = (i, label) => {
       const m = metrics[i];
@@ -1080,8 +1074,6 @@ S.WeekReview = {
     const dat = App.data || {};
     const audWk = (dat.cash_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10)));
     const auditsWk = audWk.length;
-    // Started in the week, not running today — see the note on the Profit card.
-    const expNew = (dat.cash_initiatives || []).filter(e => this._inWeek(e.start_date || e.created_at));
     const outWk = (CashEngine.cashOutflows() || []).filter(o => this._inWeek(o.date || o.created_at));
 
     const runwayLabel = r => r == null ? '13+ wks' : r === 0 ? 'This wk' : r + ' wk' + (r === 1 ? '' : 's');
@@ -1091,8 +1083,6 @@ S.WeekReview = {
       + (a.overall_score != null ? ', scored ' + a.overall_score : '') + '.'));
     if (outWk.length) did.push(this._n(outWk.length + ' cash ' + this._plu(outWk.length, 'outflow')) + ' logged, '
       + this._m0(outWk.reduce((t, o) => t + (Number(o.amount) || 0), 0)) + '.');
-    if (expNew.length) did.push(this._n(expNew.length + ' ' + this._plu(expNew.length, 'experiment')) + ' started'
-      + (expNew.length <= this._few() ? ': ' + this._join(expNew.map(e => this._nm(e.name))) : '') + '.');
     const activity = this._didList(did);
     const results = this._resRow([
       this._res('Trapped Cash', trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-', (trapped.hasData && trapped.total > 0) ? 'var(--amber)' : 'var(--t1)'),

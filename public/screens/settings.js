@@ -1746,48 +1746,8 @@ S.HubSettings = {
     });
     App.data.revenue_server_checks = rSC;
 
-    // ── Revenue Initiative Tracker — operator-typed experiments, each watching a
-    // metric that genuinely moved across the recovery arc, so the 8-week-before vs
-    // 8-week-after lift computes to a real, believable number (a win, in gold).
-    // Mid-window start dates give each one weeks on both sides of the change.
-    App.data.initiatives = [
-      { id:uid(), name:'New Cocktail Menu', start_date:dateStr(45), type:'Menu Change', metric:'check_avg',
-        hypothesis:'Launched eight new craft cocktails to lift the bar check average.', status:'Active', created_at:daysAgoISO(45) },
-      { id:uid(), name:'Tighter Weeknight Scheduling', start_date:dateStr(52), type:'Operational Change', metric:'labor_pct',
-        hypothesis:'Cut one floor position Monday through Wednesday and cross-trained the bar to the well.', status:'Active', created_at:daysAgoISO(52) },
-      { id:uid(), name:'Weeknight Happy Hour Extension', start_date:dateStr(31), type:'Promotion', metric:'revenue',
-        hypothesis:'Pushed happy hour to 7pm Tuesday through Thursday to lift weeknight revenue.', status:'Active', created_at:daysAgoISO(31) },
-      { id:uid(), name:'Daily Pre-Shift Briefings', start_date:dateStr(70), type:'Service Change', metric:'check_avg',
-        hypothesis:'Added a daily pre-shift upsell briefing on every dinner shift.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(8) }
-    ];
-
-    // ── Profit Initiative Tracker — cost experiments, each watching a cost
-    // percentage that fell across the recovery arc, so the 8-week before/after
-    // lift reads as a real win (a drop, in gold, since lower is better).
-    App.data.profit_initiatives = [
-      { id:uid(), name:'Re-Spec\'d Well Pours to 1.25oz', start_date:dateStr(52), type:'Pour Spec', metric:'pour_pct',
-        hypothesis:'Dropped every well pour from a free pour to a 1.25oz jigger and re-trained the bar.', status:'Active', created_at:daysAgoISO(52) },
-      { id:uid(), name:'Portion Control on Top Plates', start_date:dateStr(45), type:'Portion Control', metric:'food_pct',
-        hypothesis:'Put scales on the line and locked portions on the five highest-cost plates.', status:'Active', created_at:daysAgoISO(45) },
-      { id:uid(), name:'Switched Liquor Distributor', start_date:dateStr(38), type:'Vendor Change', metric:'pour_pct',
-        hypothesis:'Moved the well and rail to a new distributor at a better case price.', status:'Active', created_at:daysAgoISO(38) },
-      { id:uid(), name:'Cut Prep Over-Production', start_date:dateStr(70), type:'Operational Change', metric:'food_pct',
-        hypothesis:'Tightened prep pars so the kitchen stopped over-producing and dumping at close.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(9) }
-    ];
-
-    // ── Cash Experiments — liquidity changes, each watching a cash metric that
-    // improved across the recovery arc (trapped cash and the cash cycle both fell,
-    // runway grew), so the 8-week before/after lift reads as a real win. Measured
-    // off the weekly cash_audits series.
-    App.data.cash_initiatives = [
-      { id:uid(), name:'Moved Top Vendors to Net-30', start_date:dateStr(45), type:'Payment Terms', metric:'cycle',
-        hypothesis:'Negotiated net-30 with the three biggest vendors to hold cash longer and shorten the cash cycle.', status:'Active', created_at:daysAgoISO(45) },
-      { id:uid(), name:'Ran Down Dead Stock', start_date:dateStr(52), type:'Dead Stock', metric:'trapped',
-        hypothesis:'Cleared slow-moving premium bottles and overstock to pull cash off the shelf.', status:'Active', created_at:daysAgoISO(52) },
-      { id:uid(), name:'Cut Liquor Par Levels', start_date:dateStr(70), type:'Par / Ordering', metric:'runway',
-        hypothesis:'Lowered pars on slow movers and moved to weekly ordering, freeing cash and extending the runway.', status:'Completed', created_at:daysAgoISO(70), completed_at:daysAgoISO(9) }
-    ];
-
+    // The three experiment seeds went with Experiments at T69 pass 3b (2026-08-24). Their kinds are
+    // unregistered, so seeding them would write into an array the app no longer loads.
     // ════════════════════════════════════════════════════════════════════
     //  EVENTS — the Anchor's bookings pipeline, regulars book, rate card, and
     //  planning calendar. One unified booking record per party (lead -> quote
@@ -3248,32 +3208,7 @@ S.HubSettings = {
       { id:uid(), module:'revenue', gap_id:'rplh',            gap_name:'Labor Productivity (RPLH)',  ...fxAt(18) },
     ]);
 
-    // ── Variance Investigations ──
-    App.data.variance_investigations = [
-      { id:uid(), product_id:findProdId("Tito's Handmade Vodka"), sku:"Tito's Handmade Vodka", opened_date:dateStr(38),
-        status:'resolved', resolved_date:dateStr(24),
-        steps:[
-          { done:true, finding:'Count sheets pulled. One 1L bottle was missed in the back well on the period-open count.' },
-          { done:true, finding:'Theoretical usage recalculated. The gap closed to under 2% once the missed bottle was added back.' },
-          { done:true, finding:'Variance traced to two consecutive Friday late shifts.' },
-          { done:true, finding:'Bar manager confirmed a keg-line spill on one of those shifts that was never logged.' },
-          { done:true, finding:'Mid-shift count run the following Friday came back clean.' },
-          { done:true, finding:'Closed as a counting error plus one unlogged spill. No theft indicated.' },
-        ],
-        resolution:'Counting error plus an unlogged spill. Added a spill line to the closing checklist so breakage gets recorded from here on.' },
-      { id:uid(), product_id:findProdId('Espolòn Tequila Blanco'), sku:'Espolòn Tequila Blanco', opened_date:dateStr(9),
-        status:'open',
-        steps:[
-          { done:true, finding:'Count sheets pulled. No obvious missed bottles this time.' },
-          { done:true, finding:'Theoretical usage still runs about 9% above POS sales after a recheck.' },
-          { done:true, finding:'Variance concentrated on Thursday and Saturday PM shifts.' },
-          { done:false, finding:'' },
-          { done:false, finding:'' },
-          { done:false, finding:'' },
-        ],
-        resolution:'' },
-    ];
-
+    // The Variance Investigations seed went with Loss Prevention at T69 pass 3b (2026-08-24).
     // Sales Integrity — four weekend server-sales reports run through the live
     // engine so the demo lands on a real review with a history below it. The
     // planted bad actor is Brianna K. (the same server the comp pattern
