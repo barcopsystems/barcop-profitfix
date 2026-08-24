@@ -3462,6 +3462,56 @@ const App = {
      asked about (pinned as the `ic-take-inventory` control). */
   _RAIL_HUB_CTX: { audit: 'audit', books: 'books', settings: 'settings', floor: 'floor', menus: 'menus' },
 
+  /* ── THE PERMISSION MAP: WHICH BAR LINK OWNS THIS SCREEN ─────────────────────────────────────
+     Built here and handed to `DB.registerSectionMap` because the source is the NAV, and the nav is
+     app-side. `db.js` owns what a grant MEANS; this owns what the units ARE. One source for the
+     bar, the drawer, the permission grid and the gate, so a group added to a section becomes a
+     checkbox and a gate on the same day ([[the-loop]] #147 — a hand-kept list breaks every time the
+     product legitimately changes, and the permission AREAS list is the one that already did: it
+     still offers "Labor Control", "Shift Control" and three Recovery sections that do not exist).
+     ⛔⛔ THE GATE ID IS NOT ALWAYS THE ROW'S ID, AND THAT IS THE WHOLE DIFFICULTY. A module row
+     carries `data-screen` and is asked about directly. A HUB row carries an ACTION, and the page it
+     opens gates on its own registered id — measured, every one of them is `hub-` + the action
+     (`operating-expenses` -> `hub-operating-expenses`, `weekly-pnl` -> `hub-weekly-pnl`, and so on
+     for `books`, `year-end`, `breakeven`). So the rule is derived rather than a five-entry table
+     somebody has to maintain: prefer the `hub-` form WHEN IT IS A REGISTERED SCREEN, else the id
+     itself. Getting this wrong makes those pages ungrantable, which fails closed and is invisible
+     to owner-and-demo testing ([[lessons-paid-for]] #118/#128/#149).
+     ⛔ SETTINGS IS EXCLUDED ON PURPOSE. It is ROLE-routed, not section-granted: every member reaches
+     Your Account to change their own password, Data and Backup is owner-only and Team Members
+     admin-only. Giving it checkboxes would create a way to lock somebody out of their own
+     credentials. Kyle drew this line himself. */
+  _permissionUnits() {
+    const out = {};
+    if (typeof SectionTabs === 'undefined' || !SectionTabs.ENABLED) return out;
+    Object.keys(SectionTabs.ENABLED).forEach(sec => {
+      if (!SectionTabs.ENABLED[sec] || sec === 'settings') return;
+      let groups = [];
+      try { groups = SectionTabs.groupsFor(sec) || []; } catch (e) { groups = []; }
+      groups.forEach(g => {
+        (g.rows || []).forEach(r => {
+          const id = this._gateIdOf(r);
+          if (!id) return;
+          const at = sec + '/' + (g.name || '');
+          (out[id] = out[id] || []);
+          if (out[id].indexOf(at) < 0) out[id].push(at);
+        });
+      });
+    });
+    return out;
+  },
+
+  /* The id the GATE will be asked for this row. See the note above for why the `hub-` form wins
+     when it is registered — and why it must be CHECKED against the registry rather than assumed:
+     `_areaOf` has no `hub-` rule, so an unregistered id falls through to its `profit` default. */
+  _gateIdOf(row) {
+    const raw = (row && (row.screen || row.action)) || '';
+    if (!raw) return null;
+    const hub = 'hub-' + raw;
+    if (window.DB && DB.SCREEN_GROUPS && DB.SCREEN_GROUPS[hub]) return hub;
+    return raw;
+  },
+
   /* ⭐⭐⭐ WHICH RAIL SECTION OWNS THIS SCREEN, WHEN THE ANSWER IS NOT THE MODULE IT LIVES IN.
      ⛔⛔ THE DEFECT IT CLOSES (Kyle, 2026-08-23): *"profit, revenue, and cash links when clicked go
      to the audit page.. but the top bar menu is gone and it defaults to their recovery sections...
@@ -3541,6 +3591,17 @@ const App = {
      ([[the-loop]] #16/#120, and #13's "a new App.* helper breaks every harness stub at once"). */
   _railSectionAllowed(key) {
     if (key === 'settings') return true;
+    /* ⭐⭐ A v2 MEMBER IS ASKED THE SECTION DIRECTLY, because under per-section permissions the
+       section IS the unit — there is nothing to derive. The whole area-derivation below exists only
+       because a grant used to be per AREA while a section's pages come from several of them; that
+       question stops being asked the moment the grant is per section.
+       ⛔ AND IT MUST COME FROM `DB`, NOT FROM READING `_permissions` HERE. The rail asking one way
+       and the screens another is precisely the divergence `areaAllowed`'s own comment warns about,
+       and it would show up as a menu that opens onto pages that all refuse — which is the shape
+       Kyle reported on Books in August. One owner of the permission shape, two callers. */
+    if (window.DB && DB.sectionAllowed && DB._isV2 && DB._isV2(DB.permissions && DB.permissions())) {
+      return DB.sectionAllowed(key);
+    }
     if (!window.DB || !DB.areaAllowed) return true;
     // Which permission areas the pages in this section's own menu actually resolve to.
     const areas = [];
@@ -12138,6 +12199,15 @@ function wireAuth() {
   // Mirror the page name into the top bar. Wired once, after the static nodes exist.
   App._wirePageTitle();
 }
+
+/* ⭐ THE PERMISSION UNITS ARE REGISTERED AT PARSE TIME, NOT AT BOOT, AND THAT IS DELIBERATE.
+   `db.js` loads before this file, so `DB` exists here; registering a FUNCTION rather than a built
+   map means nothing is computed until the first gate asks, by which point every nav source is
+   loaded. Putting it inside the DOMContentLoaded block instead would tie a permission decision to a
+   boot path — and `startDemo()` skips `boot()`, which is exactly how a start-up call once reached
+   only one of the two ways this app produces a ready session ([[lessons-paid-for]] #101). At parse
+   time there is only one path. */
+if (typeof DB !== 'undefined' && DB.registerSectionMap) DB.registerSectionMap(() => App._permissionUnits());
 
 /* ── Boot ── */
 document.addEventListener('DOMContentLoaded', () => {

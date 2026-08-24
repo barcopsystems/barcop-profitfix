@@ -592,7 +592,18 @@ const DB = {
        `hub-operating-expenses` and `hub-year-end` both resolved to 'profit'. Money Out only gated
        correctly because its own `open()` passes `'hub-books-home'` as the representative id rather
        than its own; Annual Review had no gate at all and was reachable by anyone. */
-    'hub-books':'books','hub-breakeven':'books',
+    /* ⛔⛔⛔ AND EVERY ONE OF THEM ASKS ITS OWN QUESTION NOW (2026-08-24). Until today four of the
+       five Books bar links all called `_hubBlocked('hub-operating-expenses')` — All Money Out,
+       Weekly P&L Brief, Month-End Books and Break-Even — so three different bar GROUPS shared one
+       gate. That was harmless while a grant was per AREA (all four are `books` either way) and it
+       became a real hole the moment Kyle asked for per-GROUP checkboxes: tick Statements without
+       Money Out and all three still open, because nothing behind them can refuse. A dormant defect
+       made live by a product decision ([[lessons-paid-for]] #128 — a page's id acting as the gate
+       proxy for pages that are not it, and #44 — "harmless" is true until its condition changes).
+       ⭐ THE AREA IS UNCHANGED FOR ALL FIVE, which is what makes this step provably inert: a member
+       holding Books today keeps exactly what they had. Only the GRANULARITY the gate can express
+       moved. `verify-area-access-doors` H2 is the census that keeps it that way. */
+    'hub-books':'books','hub-breakeven':'books','hub-weekly-pnl':'books',
     'hub-operating-expenses':'books','hub-year-end':'books',
     /* ⛔⛔⛔ THE SIX PAGES THE BOOKS BAR TOOK (Kyle, T48, 2026-08-23). The Books section's Cash and
        Forecasts drop-downs hold four Cash Recovery screens and the Profit and Revenue forecasts, and
@@ -634,12 +645,91 @@ const DB = {
     return 'profit';   // Profit screens carry no common prefix
   },
 
+  /* ── PER-SECTION, PER-BAR-LINK PERMISSIONS (v2) ──────────────────────────────────────────────
+     Kyle, 2026-08-24: *"a row for each section with checkboxes for each page in each section...
+     they could check the full access option and that entire section is full access... or they could
+     check individual section top bar menu links.. and only those specific menu links in the section
+     are accessible."*
+
+     THE STORED SHAPE, and the `v` is not decoration:
+        { v: 2, sections: { inventory: true, floor: ['Schedules', 'Pay'] } }
+     `true` = FULL ACCESS, and Kyle's ruling is that full means full FOREVER — a group added to that
+     section later is included, without anyone re-granting. An ARRAY is the opposite and deliberately
+     so: those bar links and no others, so a member given Counts alone never silently gains a new
+     group the day it ships.
+     ⛔⛔ THE VERSION MARKER EXISTS BECAUSE THE KEYS COLLIDE. The old shape was `{ inventory: 'edit' }`
+     keyed by AREA, and five of those words — inventory, week, audit, events, books — are also
+     SECTION keys. Read without a marker, a stored `books` AREA grant would silently become a Books
+     SECTION grant, and the Books section took six pages from the cash, profit and revenue areas at
+     T48 — so that member would gain Capital Efficiency, Cash Position, Cash Bridge and three
+     forecasts that nobody granted them. Widening access silently is the one direction nobody
+     reports ([[lessons-paid-for]] #113 — do not ask what a field CONTAINS, ask what code elsewhere
+     DOES when it sees it).
+     ⭐ SO AN UNMARKED OBJECT FAILS CLOSED, which is the agreed direction: every existing member
+     loses access until the owner re-grants once, exactly as adding the Week area did.
+     ⚠ ADDITIVE FOR NOW. Nothing writes `v: 2` until the Team Members grid does, so today every
+     stored membership takes the legacy branch below and this is inert — the irreversible step is
+     last and separately provable ([[lessons-paid-for]] #110/#111). */
+  _isV2(p) { return !!(p && p.v === 2 && p.sections && typeof p.sections === 'object'); },
+
+  /* The screen -> "section/group" map, built from the NAV by app.js and registered here. It is not
+     a table in this file on purpose: the bar links ARE the permission units, so the grid, the bar
+     and the gate all have to read one source or they drift ([[the-loop]] #147). Lazy and memoised
+     because it depends only on the nav, which is static — no boot-order dependency, which is what
+     made the demo miss `_startFixBaselines` ([[lessons-paid-for]] #101). */
+  _sectionMapFn: null,
+  _sectionMapCache: null,
+  registerSectionMap(fn) { this._sectionMapFn = fn; this._sectionMapCache = null; },
+  sectionMap() {
+    if (this._sectionMapCache) return this._sectionMapCache;
+    if (typeof this._sectionMapFn !== 'function') return null;
+    try {
+      const m = this._sectionMapFn();
+      this._sectionMapCache = (m && Object.keys(m).length) ? m : null;
+    } catch (e) {
+      console.error('permissions: the section map failed to build', e);   // reported, never swallowed
+      this._sectionMapCache = null;
+    }
+    return this._sectionMapCache;
+  },
+
+  /* Can this member use this SECTION at all — the question the rail asks, one level up from a
+     screen. Answers for both shapes so the rail and the screens can never disagree about who is
+     allowed in, which is the divergence `areaAllowed`'s own comment warns about. */
+  sectionAllowed(key) {
+    if (!this._role) return true;      // demo / not yet resolved — open, same as canAccessLevel
+    if (this.isOwner()) return true;
+    const p = this._permissions || {};
+    if (!this._isV2(p)) return !!p[key];                       // legacy: the area of the same name
+    const g = p.sections[key];
+    return g === true || (Array.isArray(g) && g.length > 0);
+  },
+
   canAccessLevel(screen) {
     if (!this._role) return 'edit';  // not yet resolved (e.g., demo mode) — open
     if (this.SCREEN_GROUPS[screen] === '_always') return 'view';  // help — always readable
     if (this.isOwner()) return 'edit';        // Owner = full access to everything
+    const p = this._permissions || {};
+    if (this._isV2(p)) {
+      const map = this.sectionMap();
+      /* ⚠ FAILS OPEN, DELIBERATELY, AND IT IS THE HOUSE CONVENTION. `!this._role` above already
+         opens for the same reason: a missing map means a script did not load, in which case the app
+         is broken anyway, and locking a paying customer's manager out of everything is worse than a
+         window that only exists when nothing works. Reported loudly so it cannot be silent. */
+      if (!map) { console.error('permissions: no section map registered — failing open'); return 'edit'; }
+      const places = map[screen] || [];
+      for (let i = 0; i < places.length; i++) {
+        const at = places[i].indexOf('/');
+        const sec = at < 0 ? places[i] : places[i].slice(0, at);
+        const grp = at < 0 ? '' : places[i].slice(at + 1);
+        const g = p.sections[sec];
+        if (g === true) return 'edit';                                  // FULL — future groups too
+        if (Array.isArray(g) && g.indexOf(grp) > -1) return 'edit';     // this bar link, ticked
+      }
+      return null;   // on no granted bar link — including a screen no bar names at all
+    }
     const area = this._areaOf(screen);
-    return (this._permissions || {})[area] ? 'edit' : null;   // granted = Full Access, else No Access
+    return p[area] ? 'edit' : null;   // legacy: granted = Full Access, else No Access
   },
 
   screenAllowed(screen) { return this.canAccessLevel(screen) !== null; },
