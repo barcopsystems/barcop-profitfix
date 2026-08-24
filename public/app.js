@@ -755,10 +755,13 @@ const App = {
        toggle replaced in stage 5. Dead wiring for a dead button for a dead mode. */
     const tnBurger = document.getElementById('tn-mobile-burger');
     if (tnBurger) tnBurger.onclick = () => App.openMobileNav();
-    /* ⚠ The top bar's settings gear is GONE as of the rail redesign — Settings is a row in the
-       rail's bottom group on desktop and lives in the burger drawer on mobile, so a third door
-       would be a third place to keep the Staff rule in step. The lookup stays guarded because
-       `_openSettingsForRole` is still the one implementation both remaining doors call. */
+    /* ⭐⭐ THE TOP BAR'S SETTINGS GEAR IS BACK, ALONGSIDE the rail row rather than replacing it
+       (Kyle, 2026-08-24). Three doors now: the gear, the rail row, and the phone's burger drawer.
+       ⭐ THIS WIRING NEVER MOVED, AND THAT IS WHY THE GEAR NEEDED NO NEW CODE. The lookup was left
+       guarded when the button was removed at the rail redesign, so re-adding the markup was enough
+       to bring it back live. `_openSettingsForRole` is still the ONE implementation every door
+       calls, which is what keeps the Staff rule (a staff member lands on their own account, not on
+       Business Profile) in a single place instead of a copy per door. */
     const tnSettings = document.getElementById('tn-settings');
     if (tnSettings) tnSettings.onclick = () => this._openSettingsForRole();
     const tnHelp = document.getElementById('tn-help');
@@ -3521,6 +3524,15 @@ const App = {
     if (rail) {
       const r = ([k, l]) => this._railRow(k, l, context);
       rail.innerHTML =
+          /* ⭐⭐ SETTINGS HAS TWO DESKTOP DOORS ON PURPOSE (Kyle, 2026-08-24: *"the settings link
+             stays where it currently is on the rail"*, after the gear was already placed). The rail
+             row is unchanged and the top bar gained a gear; both are wanted.
+             ⭐ THEY CANNOT DRIFT, AND THAT IS WHAT MAKES TWO DOORS SAFE HERE RATHER THAN THE USUAL
+             LIABILITY. `_protoGlobalClick('settings')` and `#tn-settings.onclick` both call
+             `_openSettingsForRole()`, so the landing and the Staff rule (a staff member lands on
+             their own account, never on Business Profile) have ONE implementation between them.
+             Pinned as such, because two doors to one place is exactly the shape that grows a second
+             copy of the rule the first time either one is touched. */
           '<div class="rail-group">' + this._PROTO_GLOBAL.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
         + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>';

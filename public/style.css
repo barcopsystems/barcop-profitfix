@@ -1404,11 +1404,17 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    ⛔ THE DIVIDER IS RETIRED WITH IT. `.tn-page #tn-help::before` drew the rule between the page
    NAME and the "i". There is no page name beside it any more, and Kyle asked for *"just the i help
    circle icon"* — the surviving pair is `.tn-sep` and `.sec-links::before`, pinned as agreeing. */
-.tn-right #tn-help{
+/* ⭐ THE GEAR JOINS THE "i" HERE RATHER THAN GETTING A RULE OF ITS OWN (2026-08-24). Both are bare
+   icons in the same slot doing the same job, so one selector keeps them from drifting apart the
+   next time either is touched. Adding a second rule is how the two ended up looking different
+   last time a node moved in this bar. */
+.tn-right #tn-help,
+.tn-right #tn-settings{
   width:auto;height:auto;background:none;border:0;border-radius:0;padding:0;
   color:var(--t3);
 }
-.tn-right #tn-help:hover{background:none;color:var(--gold);}
+.tn-right #tn-help:hover,
+.tn-right #tn-settings:hover{background:none;color:var(--gold);}
 /* #tn-global is empty since the rail took the global links; keep the node, drop its 16px gap. */
 /* 14px, down from 15. The title carries a section prefix now, so it is a longer string in the same
    space, and the smaller size is what keeps it from crowding the bar. */
@@ -1616,6 +1622,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
     border-radius:var(--r2);padding:0;color:var(--t2);
   }
   .tn-right #tn-help:hover{background:var(--c4);color:var(--w);}
+  /* No phone twin for the gear: it is hidden below this breakpoint (see `#tn-settings` a few
+     lines down), because Settings on a phone stays in the burger drawer. */
   .tn-mobile-burger{display:flex;}
   #tn-settings{display:none;}   /* App Settings lives in the burger menu on mobile */
   #tn-signout{display:none;}    /* and so does Sign Out — the drawer renders _PROTO_SIGNOUT */
