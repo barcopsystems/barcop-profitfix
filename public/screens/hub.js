@@ -2165,6 +2165,24 @@ S.Hub = {
     if (filter) S.HubPermits._filter = filter;
     S.HubPermits.open();
   },
+  /* ⭐ THE SAME RULE AS THE TWO ABOVE, THIRD INSTANCE. "Spot checks to review" names checks that
+     are already SAVED, and `ic-spot-check.render()` opens a blank NEW check, so the plain screen
+     landing put the operator in front of an empty form with the thing they pressed for two
+     presses away. The screen's HISTORY view is where those checks live and it already exists --
+     `#sp-history` opens it through `App.pushView` -- so this reuses a door the destination owns
+     rather than inventing one, exactly as `_enterStaff` and `_enterPermits` do.
+     ⚠ ONE-SHOT, CLEARED BY THE READER, which is this app's convention for a cross-screen focus
+     (`App._staffFocus`, `App._menuItemFocus`, `App._evBookingFocus` all work this way). A focus
+     that outlived its visit would send an operator to History every time they opened the screen
+     to take a check ([[the-loop]] #25 -- grep who NULLS a field, not just who reads it).
+     ⚠ GATE BEFORE `showApp`, same as `_enter` and `_enterRecovery`: a locked target must show the
+     notice without swapping the section shell behind it. */
+  _enterSpotChecks() {
+    if (!App.canAccess('ic-spot-check')) { App.showNoAccess(); return; }
+    App._spotCheckFocus = true;
+    App.showApp('inventory');
+    App.navigate('ic-spot-check');
+  },
 
   /* ── The Hub's data reads, lifted OUT of render() so The Rail can use them ──────────────────
      ⛔ WHY THESE ARE MEMBERS AND NOT LOCALS ANY MORE. The Rail button sits in the TOP BAR, so it
@@ -2629,7 +2647,13 @@ S.Hub = {
         label: 'Spot checks to review', value: String(spots),
         text: spots + ' spot check' + (spots === 1 ? '' : 's') + ' flagged a product in the last 7 days. '
           + 'Check anything that does not add up.',
-        screen: 'ic-spot-check', mod: 'inventory'
+        /* ⛔ ITS OWN DOOR, BECAUSE THE SCREEN DEFAULT IS A BLANK NEW CHECK. Walked on the deployed
+           build 2026-08-24: pressing this row landed on PRODUCTS 0 · FLAGGED 0 · TOTAL VARIANCE
+           $0.00 with the flagged check two more presses away. Its two siblings above were walked
+           on the same pass and are honest -- the Adjustment Log renders the named adjustment in
+           view, Over and Short reads OUT OF TOLERANCE 1 -- so only this one needed a door.
+           Same rule, and the same remedy, as the permit and certification rows below. */
+        screen: 'ic-spot-check', mod: 'inventory', go: 'S.Hub._enterSpotChecks()'
       });
     }
 
