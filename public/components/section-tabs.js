@@ -309,6 +309,23 @@ const SectionTabs = {
     const top = nav ? nav.getBoundingClientRect().bottom : r.bottom;
     d.style.left = Math.round(r.left) + 'px';
     d.style.top = Math.round(top) + 'px';
+    /* ⛔⛔ THE ROW TEXT LINES UP WITH THE LINK TEXT ABOVE IT (Kyle, 2026-08-24: *"the drop down text
+       aligned with the menu link text above it"*). Left-aligning the PANEL to the link put the row
+       text ~34px to the right of it, because the panel's padding, the row's padding, the icon and
+       its gap all sit before the first character.
+       ⭐ MEASURED, NOT CALCULATED FROM THE CSS. The offset is the sum of four separate declarations
+       in `style.css`; adding them up here would freeze this to today's values and break silently the
+       next time any one of them is nudged — a locator keyed on something allowed to change
+       ([[lessons-paid-for]] #70). Reading where the label actually landed self-corrects instead.
+       ⚠ CLAMPED AT THE VIEWPORT EDGE, because the first link in a section is close enough to the
+       left that the correction can push the panel off-screen. */
+    const lbl = d.querySelector('.st-row > span:last-child');
+    if (lbl) {
+      const padL = parseFloat(getComputedStyle(linkEl).paddingLeft) || 0;
+      const want = r.left + padL;                       // where the LINK's text starts
+      const got = lbl.getBoundingClientRect().left;     // where the ROW's text landed
+      if (got !== want) d.style.left = Math.max(6, Math.round(r.left + (want - got))) + 'px';
+    }
     this._drop = d;
   },
 
