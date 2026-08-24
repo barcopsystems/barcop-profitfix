@@ -73,7 +73,7 @@
      by the border and the chevron. The token stays — it is the one line to try another value, and
      it keeps "the open step" separate from the sixty other panel fills. It points AT --gold-tint
      rather than repeating its hex, so there is no second copy of the value to drift. */
-  --step-open: var(--gold-tint);           /* open cockpit step background. */
+  --step-open: #161E24;           /* open cockpit step background. */
   --sel-active-bg: #283642;                /* active selector pill / chip background (filter chips, date-range pills, segmented toggles, week selector). A touch lighter than the panel fill so the active choice pops. */
   --red:       #DA4D3E;
   --red-bg:    rgba(192,56,40,0.13);
