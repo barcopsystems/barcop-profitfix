@@ -69,6 +69,22 @@ S.HubPermits = {
   open() {
     App.openScreen('sc-licensing');
   },
+  /* ⛔⛔⛔ WITHOUT THIS THE "i" ON THIS PAGE OPENED THE GLOBAL HELP AND FAQ, OVER A TOPIC THAT WAS
+     ALREADY WRITTEN (Kyle, 2026-08-25: *"permits/licensing also missing its i help page"*). It was
+     not missing. `App._HUB_HELP['permits']` — "How Licensing Works", four sections, and current
+     enough to say "Find it under The Floor, in Records" — had NO READER: this screen is reached
+     through `openScreen('sc-licensing')`, so `navigate` sets `_activeScreenObj` to THIS object, and
+     `openPageHelp` asks it for `showHowTo`. There was none, so it fell through. The copy existed and
+     nothing could open it ([[lessons-paid-for]] #134/#107 — a page that changes how it is reached
+     leaves its help live, correct and dark).
+     ⭐ IT READS THE ONE TOPIC RATHER THAN CARRYING A SECOND COPY. Two spellings of one help page is
+     the drift this codebase keeps paying for, and the phone drawer already routes `permits` here.
+     ⚠ BARE, no `&&` guard: `_hubHelpShim` returning null would mean the topic was deleted, and a
+     help button that silently does nothing is worse than one that throws where the error digest can
+     see it ([[the-loop]] #40). `verify-permits-tracker-only` asserts the topic exists. */
+  showHowTo() {
+    App._hubHelpShim('permits').showHowTo();
+  },
   /* The Shift Control mount, same signature every screen in that module uses. `open()` above routes
      here; `App.navigate` sets the container and calls this. */
   render(container, actions) {
