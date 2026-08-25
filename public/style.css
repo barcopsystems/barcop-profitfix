@@ -1274,9 +1274,15 @@ body.chrome-on #app{margin-left:var(--rail-w);}
 body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
 
 .rail-nav{padding:14px 0;display:flex;flex-direction:column;}
-/* ⭐ 5px BETWEEN ROWS, NOT MORE PADDING INSIDE THEM (Kyle, 2026-08-24: *"from the hub to books..
-   put a little more breathing room between each of the rail links"*). MEASURED live before the
-   change: nine rows, 31px each, gap 0 — they sat flush.
+/* ⭐ 3px BETWEEN ROWS, NOT MORE PADDING INSIDE THEM. THE WALK, IN ORDER, BECAUSE BOTH DIRECTIONS
+   HAVE NOW BEEN TRIED: rows sat FLUSH at gap 0 · Kyle, 2026-08-24: *"put a little more breathing
+   room between each of the rail links"* → 5px · Kyle, 2026-08-25: *"reduce the space between the
+   links just a little.. they were spaced out some last chat.. but i think it is just a little too
+   much space now"* → 3px. Recording the whole walk rather than just the current number, so the next
+   person to nudge it knows 0 reads flush and 5 reads loose and does not rediscover both.
+   ⭐ MEASURED LIVE AT EVERY CANDIDATE before choosing, on the pushed build: gap 5 = 36px pitch and
+   19px between words · 4 = 35/18 · **3 = 34/17** · 2 = 33/16. "A little" is 2px off the pitch; 4 was
+   not perceptible and 2 gives back most of what he asked for the day before.
    ⛔⛔ IT HAS TO BE `gap` AND NOT `.rail-item` PADDING, and that is the whole reason for this note.
    The rail's rhythm is pinned as an AGREEMENT in `verify-rail-menu-overlay`: a divider must sit
    evenly between the word above it and the word below, and "above" is `.rail-item`'s own bottom
@@ -1285,7 +1291,7 @@ body.chrome-on #hub-wrapper{left:var(--rail-w) !important;}
    untouched and the agreement stays both green and TRUE.
    ⚠ The single-row groups (Settings, Sign Out) have no internal gap to grow, which is right: they
    are already separated by dividers, and this is a rule about the run of links. */
-.rail-group{display:flex;flex-direction:column;gap:5px;}
+.rail-group{display:flex;flex-direction:column;gap:3px;}
 /* ⛔ `.rail-end` IS DELETED (2026-08-24). It pinned Sign Out to the FOOT of the rail with
    `margin-top:auto`, and it had already been dead for a chat — Sign Out left the rail entirely on
    2026-08-16 and nothing in `public/` has carried the class since. It is back in the rail now, but
