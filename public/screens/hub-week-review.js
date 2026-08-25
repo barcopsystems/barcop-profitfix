@@ -351,8 +351,12 @@ S.WeekReview = {
         { key: 'books',     name: 'Books',     build: this._booksSection } ] }
     ];
   },
-  _bandHead(label) {
-    return '<div class="wr-band">' + esc(label) + '</div>';
+  /* ⚠ `right` IS OPTIONAL AND ONLY ONE BAND EVER GETS IT. The band is a flex row now so the Export
+     PDF button can sit on the same line as the heading, right-aligned; every other band passes
+     nothing and renders exactly as it did. */
+  _bandHead(label, right) {
+    return '<div class="wr-band">' + esc(label)
+      + (right ? '<span class="wr-band-act">' + right + '</span>' : '') + '</div>';
   },
   /* ⛔⛔ THE LANDING RULE LIVES HERE AND NOT IN `render`, AND THAT IS THE WHOLE REASON IT IS ITS OWN
      MEMBER. `render` runs on every toggle, so deciding the open row there would re-open Inventory on
@@ -1566,10 +1570,27 @@ S.WeekReview = {
           this._res('Month Revenue', BH._money(mRev)),
           this._res('Month Income', BH._money(mInc), mInc < 0 ? 'var(--red)' : 'var(--t1)')
         ])
-      : this._didRow(missingWks > 0
-          ? esc(mLabel) + ' has <b>' + missingWks + '</b> ' + this._plu(missingWks, 'week')
-            + ' still to confirm. Its figures show here once ' + (missingWks === 1 ? 'it is' : 'they are') + ' in.'
-          : esc(mLabel) + ' is not over yet. Its figures show here once the month ends, with every week in it confirmed.');
+      /* ⛔⛔ THE DIRECTIVE SITS WITH THE STATE IT ANSWERS, NOT UNDER THE FINDINGS (Kyle, 2026-08-25:
+         *"that needs to be higher.. like in the what it turned up section or something.. not at the
+         bottom under carrying into next week items"*). He is right, and the reason is that they are
+         one thought: the first line says why the month's figures are absent and the second says what
+         to do about it. Parked at the foot of the card it read as a finding, sitting under the amber
+         and red pills that DO mean something is wrong — and a monthly routine is not a finding, which
+         is the whole reason it was written as a plain row rather than a pill.
+         ⚠ AND IT LEAVES WITH THE FIGURES. Once the month is settled the band prints real numbers and
+         there is nothing left to tell anybody to do, so the directive is simply absent rather than
+         hanging around advising work that is finished. */
+      : this._didList([
+          missingWks > 0
+            ? esc(mLabel) + ' has <b>' + missingWks + '</b> ' + this._plu(missingWks, 'week')
+              + ' still to confirm. Its figures show here once ' + (missingWks === 1 ? 'it is' : 'they are') + ' in.'
+            : esc(mLabel) + ' is not over yet. Its figures show here once the month ends, with every week in it confirmed.',
+          /* ⭐ THE THREE STEPS ARE BOOKS HELP'S OWN, IN ITS ORDER: log the money out, get the weeks
+             in, generate the pack. Directives, not teaching ([[writing-style]]), and every one of
+             them is something an operator can actually go and do — unlike "close the month-end
+             books", which this replaced and which is not an action this app has. */
+          'Get your bills and cash outflows in before the month ends, and confirm every week. Then generate Month-End Books.'
+        ]);
 
     /* ⛔ "<Month> books not closed yet" is GONE: its only evidence was the `generate` tick, and
        nothing durable records that the month-end pack was produced (the localStorage stamp is the
@@ -1597,15 +1618,23 @@ S.WeekReview = {
     else if (sf.hasData && sf.tightWeeks > 0) open.push({ t: '<b>' + sf.tightWeeks + '</b> tight week' + (sf.tightWeeks === 1 ? '' : 's') + ' in the next 13', sev: 'amber' });
     if (pos.hasOpening && pos.safe != null && pos.safe < 0) open.push({ t: 'Safe-to-spend is negative, into money already spoken for', sev: 'red' });
 
-    const toClose = settled
-      ? this._openList(open, 'Nothing left to close on ' + esc(mLabel) + '.')
-      /* ⛔ THE SECOND HALF SAID "then close the month-end books" AND THERE IS NO SUCH ACTION — see
-         the note on the band above. The routine itself is real and worth stating; what was false was
-         naming a step the app does not have and implying this card watches it.
-         ⭐ THE THREE STEPS ARE BOOKS HELP'S OWN, IN ITS OWN ORDER: log the money out, get the weeks
-         in, generate the pack. Directives, not teaching ([[writing-style]]), and every one of them
-         is something an operator can actually go and do. */
-      : (this._openList(open, '') + this._didRow('Get your bills and cash outflows in before the month ends, and confirm every week. Then generate Month-End Books.'));
+    /* ⛔⛔ THE BAND IS "CARRYING INTO NEXT WEEK", LIKE EVERY OTHER CARD (Kyle, 2026-08-25: *"on books
+       still the 'To Close' section.. shouldn't that be carrying into next week like the rest of
+       them.. the books card title says 2 carrying into next week"*). He is right and the card
+       contradicted itself out loud: the accordion head counts what is carrying over, and the band
+       holding those very items was headed something else. One fact, two names, six inches apart.
+       ⚠ THE BOOKS-SPECIFIC EMPTY LINE SURVIVES THE RENAME. `emptyMsg` exists because this card
+       closes a MONTH, so the shared "Clean week." would be wrong here whatever the band is called. */
+    /* ⛔⛔ AND THE EMPTY LINE HAD TO BECOME STATE-AWARE, WHICH THE RENAME EXPOSED. Unifying the band
+       meant the settled message reached the UNSETTLED case, where it reads "Nothing left to close on
+       August 2026" about a month that cannot be closed yet — a false all-clear, and exactly the kind
+       of sentence this page had its accusations removed for. Caught by H4 going red, not by reading.
+       ⭐ "Nothing carrying over." for a month still in flight, the month named only once it really is
+       closable. The shared default ("Clean week.") is wrong on this card either way: Books closes a
+       MONTH, which is why `emptyMsg` exists at all. */
+    const carrying = this._openList(open, settled
+      ? 'Nothing left to close on ' + esc(mLabel) + '.'
+      : 'Nothing carrying over.');
 
     /* ⚠ ITS OWN BAND, AND THE LABEL SAYS THE BASIS. Runway and safe-to-spend are a position as it
        stands TODAY, while the band above them reports a finished MONTH — two different clocks, and
@@ -1631,12 +1660,12 @@ S.WeekReview = {
         + '  Current position: Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-')
         + ', Safe to Spend ' + (pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-')
         + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-'),
-      open: this._stripTags(this._tidy(toClose)) });
+      open: this._stripTags(this._tidy(carrying)) });
     return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
       { label: settled ? 'What It Turned Up &middot; ' + esc(mLabel) : 'What It Turned Up', html: results },
       { label: 'Where The Cash Stands &middot; Today', html: cashCells },
-      { label: 'To Close', html: toClose }
+      { label: 'Carrying Into Next Week', html: carrying }
     ], { open: open, did: did });
   },
 
@@ -1683,10 +1712,16 @@ S.WeekReview = {
     const pill = '<span style="display:inline-flex;align-items:center;border:1px solid var(--b-edge);background:var(--sel-active-bg);border-radius:7px;padding:5px 14px;font-size:12px;font-weight:800;letter-spacing:0.5px;color:var(--t1);white-space:nowrap;">'
       + esc(range) + (atLatest ? '<span style="color:var(--gold);font-weight:800;font-size:11px;margin-left:6px;">LAST WEEK</span>' : '') + '</span>';
     const nowBtn = atLatest ? '' : '<button class="btn btn-ghost btn-sm wr-now" style="margin-left:4px;">Last Week</button>';
+    /* ⛔ THE WEEK SELECTOR LEADS THE PAGE AND THE EXPORT RIDES THE FIRST BAND (Kyle, 2026-08-25:
+       *"move the week selector above the stat box and the export pdf button on to the same row as
+       'what fed the week' card title still right side aligned"*). The selector decides WHICH week
+       every figure below it describes, so it belongs above the figures rather than between them and
+       the page title; and the export is an action on the whole recap, not on the week picker.
+       ⚠ THE TOP MARGIN GOES WITH IT. It carried `24px` because it sat under the stat box; as the
+       first thing on the page that gap would be doubling the screen's own padding. */
     const exportBtn = '<button class="btn btn-ghost btn-sm no-print" id="wr-export">Export PDF</button>';
-    const selectorRow = '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:24px 0 10px;">'
-      + '<div style="display:inline-flex;align-items:center;gap:8px;">' + prevBtn + pill + nextBtn + nowBtn + '</div>'
-      + exportBtn + '</div>';
+    const selectorRow = '<div class="no-print" style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;">'
+      + prevBtn + pill + nextBtn + nowBtn + '</div>';
 
     this._pdf = [];   // section payloads, collected as each section builds, for the PDF
     /* ⛔⛔ THE ROWS AND THEIR ORDER COME FROM `_plan()`, NEVER FROM A LIST TYPED HERE. The eight
@@ -1697,15 +1732,24 @@ S.WeekReview = {
        a bar that runs no events — and a heading over an empty space reads as a section that failed
        rather than one that was never used. Same reason `_PROTO_CONTROL` was deleted from the rail
        rather than emptied ([[lessons-paid-for]] #51's neighbour). */
+    /* ⚠ THE EXPORT GOES ON THE FIRST BAND THAT ACTUALLY RENDERS, NOT ON `_plan()[0]`. A section with
+       no data returns null and its band is never drawn, so keying the button to the first entry in
+       the table would hide it entirely for a bar that runs no inventory — and the export is about
+       the whole recap, not about that one band. If NOTHING renders there is nothing to export and
+       its absence is correct; the wiring is `?.`-guarded for exactly that. */
+    let exportPlaced = false;
     const bands = this._plan().map(g => {
       // `.call(this, …)` because `build` is the function itself — see `_plan`.
       const rows = g.rows.map(r => r.build.call(this, r.key, r.name)).filter(Boolean).join('');
-      return rows ? this._bandHead(g.band) + rows : '';
+      if (!rows) return '';
+      const head = this._bandHead(g.band, exportPlaced ? '' : exportBtn);
+      exportPlaced = true;
+      return head + rows;
     }).join('');
 
     mount.innerHTML = '<div class="screen wr-screen">'
-      + this._topCard()
       + selectorRow
+      + this._topCard()
       + '<div class="wr-grid">' + bands + '</div>'
       + '</div>';
 
