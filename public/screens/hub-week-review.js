@@ -30,6 +30,7 @@
 S.WeekReview = {
   container: null,
   _wkStart: null,   // Monday (ymd) of the selected week; null = this week
+  _openSec: 'inventory',   // which section row is expanded; null = every row closed. See `_prepare`.
 
   open() {
     /* ⛔ WAS `_hubBlocked()` — the MANAGEMENT-ONLY question, which only asks "is this person an
@@ -37,6 +38,8 @@ S.WeekReview = {
        while Close beside it had no gate at all and History was filed under Profit: three pages
        in one rail group, three different answers. They are the Week area now. */
     if (App._hubBlocked && App._hubBlocked('week-review')) return;
+    // Landing on the page opens Inventory, whatever row was left open last time. See `_prepare`.
+    this._prepare();
     App.openHubFullPage('Week in Review', (mount) => { this.container = mount; this.render(mount); }, 'week-review');
   },
 
@@ -226,36 +229,151 @@ S.WeekReview = {
      app's own bar for "due" is 7 days. Judged against the data's own dates, so it has no shelf life
      ([[the-loop]] #135). ONE helper, three callers, so Profit, Revenue and Cash cannot drift apart
      on it ([[the-loop]] #54). */
+  /* ⭐ IT HANDS BACK THE RECORD NOW, NOT ONLY THE GAP (2026-08-25). The Run Audit card prints each
+     audit's SCORE as it stood when the week closed, beside the line saying how stale that run was.
+     Two walks of the same store to answer one question is how the cell and the warning end up
+     describing different runs ([[the-loop]] #54); this is additive, so every existing caller reads
+     exactly what it always did. */
   _auditGap(records) {
     const end = this._wkE();
-    const last = (records || [])
-      .map(a => String((a && (a.date || a.generated_at)) || '').slice(0, 10))
-      .filter(d => d && d <= end).sort().pop();
-    if (!last) return { ever: false, days: null, stale: true };
-    const days = Math.round((new Date(end + 'T00:00:00').getTime() - new Date(last + 'T00:00:00').getTime()) / 86400000);
-    return { ever: true, days: days, stale: days >= 7 };
+    const inRange = (records || [])
+      .map(a => ({ a: a, d: String((a && (a.date || a.generated_at)) || '').slice(0, 10) }))
+      .filter(x => x.d && x.d <= end)
+      .sort((p, q) => (p.d < q.d ? -1 : p.d > q.d ? 1 : 0));
+    const last = inRange[inRange.length - 1];
+    if (!last) return { ever: false, days: null, stale: true, rec: null, date: '' };
+    const days = Math.round((new Date(end + 'T00:00:00').getTime() - new Date(last.d + 'T00:00:00').getTime()) / 86400000);
+    return { ever: true, days: days, stale: days >= 7, rec: last.a, date: last.d };
   },
   /* Section shell: header (the section name, full-bleed divider) then inset-divided blocks.
      ⛔ NO STATUS CHIP AND NO FOOTER LINK. The chip counted manual ticks and the link opened one of
      the six cockpits being deleted — seven of the twenty-three remaining cockpit references in the
      whole app were this one line. A recap does not need eight doors on it. */
-  _sectionCard(name, blocks) {
+  /* ⛔⛔⛔ THE SECTIONS ARE ACCORDION ROWS NOW, ONE PER RAIL SECTION (Kyle, 2026-08-25: *"not two
+     cards per row like it is now.. i'm thinking setup like close the week.. where each section can
+     be opened and closed with the first inventory section always open by default when landing on
+     the page"*). Same shell as Close The Week's step rows, same shared `*-step-head` chevron rules
+     in style.css, so the glyph, its rotation and the gold hover come from one place rather than a
+     second accordion being invented here ([[the-loop]] #95: grep for the mechanism before building
+     one).
+     ⚠ ONE DELIBERATE DIFFERENCE FROM CLOSE THE WEEK, AND IT IS THE POINT OF THE PAGE. Close numbers
+     its rows because they are things still OWED; nothing on a recap is owed. So the mark is a
+     COUNT of what is carrying into next week, or a green check when nothing is — the same red /
+     amber vocabulary the Carrying band inside already uses, hoisted so a collapsed page can be
+     scanned for the rows worth opening.
+     ⚠ THE HEAD NOTE IS DERIVED, NEVER TYPED. Three states and each is a fact the card already has:
+     something carrying over, nothing carrying over, or nothing logged at all. A section that did no
+     work says so once and is not accused of anything ([[the-loop]] #61 — this page had its
+     accusations removed and they must not come back in a summary line). */
+  _sectionCard(key, name, blocks, meta) {
+    const m = meta || {};
+    const items = m.open || [], did = m.did || [];
+    const reds = items.filter(o => o && o.sev === 'red').length;
+    const isOpen = this._openSec === key;
+    const dot = (col, txt) => '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;'
+      + 'display:flex;align-items:center;justify-content:center;background:' + col + ';color:var(--bg);'
+      + 'font-size:12px;font-weight:800;">' + txt + '</span>';
+    const mark = items.length
+      ? dot(reds ? 'var(--red)' : 'var(--amber)', String(items.length))
+      : dot('var(--green)', '&#10003;');
+    /* ⛔⛔ THE THIRD STATE MUST NOT REPEAT THE BAND'S OWN SENTENCE, AND MY FIRST VERSION DID. It read
+       "Nothing logged this week" — byte for byte what `_didList` prints inside the card when a
+       section logged nothing — so the same fact appeared twice on one row, and it silently made
+       `verify-week-review-recap` G5 VACUOUS: that assertion searches the card for that phrase, and
+       the head satisfied it whether or not the band still said anything at all. Only the mutation
+       run found it, by going inert ([[the-loop]] integrity #32 — an assertion anchored on a phrase
+       the file already contains is green before you start, and here I added the phrase).
+       ⚠ THE HEAD SUMMARISES, THE BAND STATES. Different words for different jobs. */
+    const note = m.note || (items.length
+      ? items.length + ' carrying into next week'
+      : (did.length ? 'Nothing open' : 'No activity this week'));
     const idiv = '<div class="wr-idiv"></div>';
-    /* ⛔ THE SAME HEADER BAND THE REST OF THE APP USES (Kyle: *"make the headers on the 8 section
-       cards normal header height like close the week header height"*). MEASURED on the shipped
-       build: `.ck-head` is 34px (11/22 padding, a 9px uppercase label) and `.wr-head` was 51px
-       (15/20 padding, a 17px Barlow Condensed title). Matching the HEIGHT means matching the
-       TREATMENT — at 17px the line box alone is 21px, so no padding change gets to 34.
-       ⚠ ONE DEVIATION FROM `.ck-head`, DELIBERATE: the label keeps `--t1` rather than `--t3`. That
-       band is a page banner with one instance on screen; this one names one of eight cards sitting
-       beside `--t3` band labels inside the card, and at the same grey the card would have no name. */
-    const header = '<div class="wr-head" style="display:flex;align-items:center;gap:12px;min-width:0;">'
-      + '<span style="font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t1);">' + esc(name) + '</span>'
-      + '</div>';
     const body = blocks.map(b => '<div class="wr-block">' + this._eyebrow(b.label) + b.html + '</div>').join(idiv);
-    return '<div class="card" style="padding:0 !important;overflow:hidden;margin:0;display:flex;flex-direction:column;">'
-      + header + '<div style="flex:1 1 auto;">' + body + '</div></div>';
+    /* ⚠ THE CLASS AND THE SELECTOR MOVE TOGETHER OR EVERY ROW IS DEAD ON CLICK. `wr-step-head` is
+       what `render` binds to, and `verify-week-review-accordion` parses the class out of this markup
+       and the selector out of that line and asserts the two against each other, because a node
+       harness cannot click ([[the-loop]] integrity #11 — the defect that killed all six Close The
+       Week rows under a green gate). */
+    /* ⛔ THE SHELL IS CLOSE THE WEEK'S, BYTE FOR BYTE, AND IT IS DELIBERATELY NOT A `.card`. Its rows
+       are a plain bordered box, so this inherits none of the `.card` / `.card.collapsed` padding
+       contract — which is the contract Kyle already had to report once, when a collapsed card showed
+       21px of the wrong colour below its band. Here the head IS the whole box when closed, by
+       construction, so there is nothing that can sit under it ([[lessons-paid-for]] #106 — when a
+       reference implementation exists, copy its RENDER, not just its mechanism). */
+    const bg = isOpen ? 'var(--step-open)' : (items.length ? 'var(--surface)' : 'var(--input)');
+    return '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;margin-bottom:10px;">'
+      + '<div class="wr-step-head' + (isOpen ? '' : ' collapsed') + '" data-sec="' + esc(key) + '"'
+      +   ' style="display:flex;align-items:center;gap:13px;padding:14px 20px;cursor:pointer;">'
+      +   mark
+      +   '<div style="flex:1;min-width:0;">'
+      +     '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(name) + '</div>'
+      +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + esc(note) + '</div>'
+      +   '</div>'
+      +   '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
+      + '</div>'
+      + (isOpen ? '<div class="wr-secbody">' + body + '</div>' : '')
+      + '</div>';
   },
+
+  /* ⭐⭐⭐ ONE ROW PER RAIL SECTION, IN THE GUIDE'S BUILD ORDER, UNDER THE GUIDE'S OWN THREE BEATS.
+     The eight cards this replaced were the six modules and two hubs the app had in July; five of
+     those eight are not sections any anymore. MEASURED off `SectionTabs.groupsFor` on the live build
+     rather than remembered: the rail's parts are Inventory, The Week, Run Audit, The Floor, Menus,
+     Events and Books, and `hub-help.js` — the Guide — states what each one is built on. Inventory is
+     the foundation; The Floor and Events FEED the week; Run Audit, Menus and Books READ finished
+     weeks. That dependency is the page's three bands.
+     ⛔ THIS IS A DATA TABLE WEARING A METHOD, DELIBERATELY. Every slicer in the harness suite lifts
+     METHODS by name, so a `SECTIONS:` sibling would be `undefined` inside every fixture and each
+     lifted render would silently take the empty path — which is exactly what `_FEW: 3` did on this
+     very file until it was turned into `_few()` ([[lessons-paid-for]] #26). The tell is writing
+     `NAME:` at object level.
+     ⛔⛔⛔ `build` HOLDS THE FUNCTION, NOT ITS NAME, AND THE FIRST VERSION HELD THE NAME. That version
+     dispatched `this[r.build]()` off a string — and string dispatch is invisible to
+     `verify-no-retired-code`, which counts QUALIFIED references. MEASURED on the first gate run: it
+     reported EVERY member of this file as newly unreached, `_booksSection` included, because the
+     seven builders read as dead and a member wrongly seeded as dead poisons everything it calls
+     ([[lessons-paid-for]] #43). A wall of red that names nothing is the tell (#100).
+     ⭐ THE FIX IS THE DESIGN, NOT AN EXEMPTION IN THE DETECTOR. A real reference is visible to the
+     ratchet AND fails loudly: a mistyped name here is a TypeError on the next render, where the
+     string version silently dropped a whole section off the page and looked fine
+     ([[the-loop]] #90 — remove the window, do not police it). */
+  _plan() {
+    return [
+      { band: 'What fed the week', rows: [
+        { key: 'inventory', name: 'Inventory', build: this._inventorySection },
+        { key: 'floor',     name: 'The Floor', build: this._floorSection },
+        { key: 'events',    name: 'Events',    build: this._eventsSection } ] },
+      { band: 'The week itself', rows: [
+        { key: 'week',      name: 'The Week',  build: this._weekSection } ] },
+      { band: 'What the week fed', rows: [
+        { key: 'audit',     name: 'Run Audit', build: this._auditSection },
+        { key: 'menus',     name: 'Menus',     build: this._menusSection },
+        { key: 'books',     name: 'Books',     build: this._booksSection } ] }
+    ];
+  },
+  _bandHead(label) {
+    return '<div class="wr-band">' + esc(label) + '</div>';
+  },
+  /* ⛔⛔ THE LANDING RULE LIVES HERE AND NOT IN `render`, AND THAT IS THE WHOLE REASON IT IS ITS OWN
+     MEMBER. `render` runs on every toggle, so deciding the open row there would re-open Inventory on
+     every click and no row could ever be closed. Close The Week hit exactly this and solved it the
+     same way — `_prepare()`, lifted out of `open()` so `week.js` can ask for it when it mounts the
+     panel without going back through `openHubFullPage`. This page is reached BOTH ways (the rail row
+     and the section bar's Review link go through the host; a deep link goes through `open`), so both
+     doors call it or the landing is right through one of them and wrong through the other
+     ([[lessons-paid-for]] #59 — walk the door the operator uses, not the one you can reach). */
+  _prepare() {
+    const first = (this._plan()[0] || { rows: [] }).rows[0];
+    this._openSec = first ? first.key : null;
+  },
+
+  /* ⛔ `.wr-head` IS RETIRED (2026-08-25). It was the 34px `--card-head` band on the top of each
+     section card, matched to `.ck-head` so a card head was the app's standard header. The sections
+     are accordion ROWS now and their head is a CONTROL — a mark, a name, a state line and a chevron
+     — not a card band, so the band class has no element left to reach. Removed from the stylesheet
+     rather than left behind: dead CSS reads as a slot something is supposed to fill, and
+     `verify-card-head-band` keeps `wr-head` in its registry AT ZERO so it cannot come back silently
+     ([[harness-review-like-code]] #70 — invert or re-point, never delete the row). */
 
   // ── The week's money headline (from the confirmed week, matched by Sunday) ───
   _weekMoney() {
@@ -343,9 +461,17 @@ S.WeekReview = {
   },
 
   // ── Inventory ───────────────────────────────────────────────────────────────
-  _inventorySection() {
-    // No cockpit alias and no absence guard, for the reason written on the Profit card.
+  /* ⛔⛔ THIS CARD GREW, AND EVERY ARRIVAL CAME FROM THE NAV RATHER THAN FROM AN OPINION. Measured
+     off `SectionTabs.groupsFor('inventory')` on the live build: the Voids / Comps Log, the Waste /
+     Spill Log, the Vendor Discrepancies page and Trapped Cash are all INVENTORY rows now — Kyle
+     moved them there — while this recap still filed voids and waste under Shift, discrepancies under
+     Profit and trapped cash under Cash. A recap that files a record somewhere the operator cannot
+     navigate to is telling them the wrong place to go ([[lessons-paid-for]] #83: ask what the
+     operator DOES there, not which old page name matches). */
+  _inventorySection(key, name) {
+    // No cockpit alias and no absence guard, for the reason written on the Week card.
     const inv = (App.inventoryData) || {};
+    const shf = (App.shiftData) || {};
     const products = (inv.ic_products || []).filter(p => p.active !== false);
     if (!products.length || !(inv.ic_counts || []).length) return null;
 
@@ -355,6 +481,13 @@ S.WeekReview = {
        list — so the page moved another screen's week selector to change three values it then threw
        away. Measured before cutting, not assumed. */
     const st = this._inventoryFigures();
+    /* Trapped Cash is an Inventory ▸ Reports row now.
+       ⚠ BARE, like the `CashEngine.trapped()` call in `_inventoryFigures` twenty lines down and for
+       the reason written there: a guarded fallback on a helper that is required for CORRECTNESS
+       turns a loud failure into a quiet wrong number, which is the trade this codebase gets wrong
+       most often ([[the-loop]] #40). My first version read `window.CashEngine && …` and would have
+       printed a dash for trapped cash on any load where the engine was late. */
+    const trap = CashEngine.trapped();
 
     /* ⭐ THE RECORDS, NOT THEIR COUNTS. Every one of these used to be `.length` and the whole point
        of the rewrite is the detail that was being thrown away on the next line. */
@@ -365,6 +498,11 @@ S.WeekReview = {
     const cAdj    = (inv.ic_adjustments || []).filter(a => this._inWeek(a.date_time || a.created_at));
     const cXfer   = (inv.ic_transfers || []).filter(t => this._inWeek(t.date_time || t.created_at));
     const wkOrders = cOrders.length;
+    // Inventory ▸ Logs and Inventory ▸ Vendors, read the same way every other line on this card is.
+    const cVC     = (shf.sc_void_comps || []).filter(r => this._inWeek(r.date));
+    const cWaste  = (shf.sc_waste || []).filter(r => this._inWeek(r.date));
+    const cDisc   = ((App.data && App.data.vendor_discrepancies) || [])
+      .filter(d => this._inWeek(d.date || d.filed_at || d.created_at));
 
     const did = [];
     if (cCounts.length) {
@@ -437,6 +575,33 @@ S.WeekReview = {
         : '';
       did.push(this._n(cXfer.length + ' ' + this._plu(cXfer.length, 'transfer')) + ' made.' + each);
     }
+    /* ⚠ THE THREE SENTENCES BELOW ARE LIFTED WHOLE, NOT REWRITTEN. They were already correct on the
+       Shift and Profit cards; what changed is which card they belong to. Re-typing a working
+       sentence is how the same fact ends up with two spellings ([[lessons-paid-for]] #131). */
+    if (cVC.length) {
+      const voidTot = cVC.filter(r => r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
+      const compTot = cVC.filter(r => r.type === 'Comp').reduce((t, r) => t + (r.amount || 0), 0);
+      const topVC = this._topOf(cVC, r => r.amount || 0) || (cVC.length === 1 ? cVC[0] : null);
+      const bits = topVC ? ['Biggest was ' + this._amt(topVC.amount),
+        this._nm(topVC.item) ? 'on ' + this._nm(topVC.item) : '',
+        this._nm(topVC.server) ? 'by ' + this._nm(topVC.server) : '',
+        this._day(topVC.date)].filter(Boolean) : [];
+      did.push(this._n(cVC.length + ' ' + this._plu(cVC.length, 'void or comp', 'voids and comps')) + ', ' + this._m0(voidTot + compTot) + '.'
+        + (bits.length ? ' ' + bits.join(' ')
+            + (this._nm(topVC.reason) ? ' (' + this._nm(topVC.reason).toLowerCase() + ')' : '') + '.' : ''));
+    }
+    if (cWaste.length) {
+      const cost = cWaste.reduce((t, r) => t + (r.cost || 0), 0);
+      const top = this._topOf(cWaste, r => r.cost || 0) || (cWaste.length === 1 ? cWaste[0] : null);
+      did.push(this._n(cWaste.length + ' waste ' + this._plu(cWaste.length, 'entry', 'entries')) + (cost ? ', ' + this._m0(cost) : '') + '.'
+        + (top && this._nm(top.product_name) ? ' Most of it ' + this._nm(top.product_name)
+            + (this._nm(top.reason) ? ' (' + this._nm(top.reason).toLowerCase() + ')' : '') + '.' : ''));
+    }
+    if (cDisc.length) {
+      const over = cDisc.reduce((t, d) => t + (d.overcharge || 0), 0);
+      did.push(this._n(cDisc.length + ' vendor ' + this._plu(cDisc.length, 'discrepancy', 'discrepancies')) + ' filed'
+        + (over ? ', ' + this._m0(over) + ' overcharged' : '') + '.');
+    }
     const activity = this._didList(did);
     /* ⛔ OVER TARGET IS NOT A CELL HERE ANY MORE. Kyle, 2026-08-11: *"in the inventory what it turned
        up get rid of the over target stat all together.. it just stays in the carrying into next
@@ -454,7 +619,14 @@ S.WeekReview = {
          this card means something ([[dashboard-discipline]]). Below Par is what still needs
          ordering; Ordered is what was ordered — the two read as a pair. */
       this._res('Ordered This Week', App.fmtCurrency(ordTot, 0)),
-      this._res('Dead Stock', String(st.deadAll), st.deadAll > 0 ? 'var(--red)' : 'var(--t1)')
+      this._res('Dead Stock', String(st.deadAll), st.deadAll > 0 ? 'var(--red)' : 'var(--t1)'),
+      /* ⛔ TRAPPED CASH CAME OFF THE CASH CARD (2026-08-25). `c-trapped` is an INVENTORY ▸ Reports
+         row now, and it answers the same question as the two cells beside it: what is your money
+         doing on the shelf. It sat under a Cash heading here while the operator's only door to it
+         was in Inventory. Same reader as before — `CashEngine.trapped()` — so the figure does not
+         move, only the card it is filed on. */
+      this._res('Trapped Cash', trap.hasData ? App.fmtCurrency(trap.total, 0) : '-',
+        (trap.hasData && trap.total > 0) ? 'var(--amber)' : 'var(--t1)')
     ]);
     /* ⛔ "Variance flags never reviewed this week" is GONE, not un-gated: its only evidence was the
        `review` checkbox, and nothing in the app records that a human looked at a flag. An item with
@@ -465,12 +637,18 @@ S.WeekReview = {
     if (st.reorderCount > 0 && wkOrders === 0) open.push({ t: '<b>' + st.reorderCount + '</b> item' + (st.reorderCount === 1 ? '' : 's') + ' below par and no order placed all week', sev: 'red' });
     if (st.deadAll > 0) open.push({ t: '<b>' + st.deadAll + '</b> dead-stock item' + (st.deadAll === 1 ? '' : 's') + ' tying up cash', sev: 'amber' });
     if (st.parOff > 0) open.push({ t: '<b>' + st.parOff + '</b> par' + (st.parOff === 1 ? '' : 's') + ' off versus real usage', sev: 'amber' });
-    if (st.menuOver > 0) open.push({ t: '<b>' + st.menuOver + '</b> menu item' + (st.menuOver === 1 ? '' : 's') + ' over cost target', sev: 'amber' });
+    /* ⛔ "N menu items over cost target" LEFT THIS CARD FOR MENUS (2026-08-25). `menuItemsOverTarget`
+       is a MENU fact — it compares an item's price against its cost target — and Menus is a section
+       with its own rail row and its own five pages. It was here because Inventory owns the product
+       COSTS that feed it, which is a reason to link the two, not a reason to file the finding under
+       the wrong door. `_inventoryFigures().menuOver` still computes it; the Menus card reads it.
+       ⭐ TRAPPED CASH ARRIVES IN ITS PLACE, off the Cash card, for the mirror reason. */
+    if (trap.hasData && trap.total > 0) open.push({ t: '<b>' + App.fmtCurrency(trap.total, 0) + '</b> still trapped on the shelf', sev: 'amber' });
 
     // The PDF carries the same sentences the screen shows. Paper and page say one thing.
-    (this._pdf || (this._pdf = [])).push({ name: 'Inventory', activity: this._didPlain(did),
+    (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
       // ⛔ W3: the PDF is the artefact that leaves the building, so it names the basis too.
-      results: 'Current stock: Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Dead Stock ' + st.deadAll + '; Ordered this week ' + App.fmtCurrency(ordTot, 0),
+      results: 'Current stock: Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Dead Stock ' + st.deadAll + ', Trapped Cash ' + (trap.hasData ? App.fmtCurrency(trap.total, 0) : '-') + '; Ordered this week ' + App.fmtCurrency(ordTot, 0),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
     /* ⛔ W3: EVERY CELL NAMES ITS OWN BASIS NOW. Three of these four are figures about TODAY —
        `Below Par` is the Order Sheet's plan as it stands, `Dead Stock` is what is tying up cash
@@ -480,16 +658,45 @@ S.WeekReview = {
        ⭐ THE PAGE ALREADY HAD THE ANSWER: Cash and Events both suffix the band when its figures are
        current state (`· Current Position`, `· Current Pipeline`). Inventory joins them, and the one
        genuinely week-true cell says so in its own label rather than being tarred by the suffix. */
-    return this._sectionCard('Inventory', [
+    return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
       { label: 'What It Turned Up &middot; Current Stock', html: results },
       { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ]);
+    ], { open: open, did: did });
   },
 
-  // ── Labor ───────────────────────────────────────────────────────────────────
-  _laborSection() {
-    // No cockpit alias and no absence guard, for the reason written on the Profit card.
+  /* ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────
+     ⛔⛔⛔ LABOR AND SHIFT WERE TWO CARDS AND THE FLOOR IS ONE SECTION (Kyle, 2026-08-23: *"the floor
+     link goes under audits in rail menu and control goes away"*). `_PROTO_CONTROL` was DELETED, not
+     emptied, and The Floor took both modules' pages; this recap was still printing a LABOR card and
+     a SHIFT card for a bar whose rail has neither word on it.
+     ⭐ WHAT THE MERGE IS NOT: it is not two cards stacked. Measured against the section's own nav —
+     Schedules, Pay, The Safe, Sales, Records, Checklists, Setup — voids/comps and waste are NOT here
+     any more (they are Inventory ▸ Logs) and neither is the sales log, so the merged card is
+     genuinely smaller than the two it replaces rather than the sum of them.
+     ⭐⭐ AND THE SERVER CHECKS CAME HOME. `r-server-check` and `sales-integrity` are The Floor ▸
+     Sales; they were split across the old Profit and Revenue cards, which is two cards reporting one
+     pair of screens.
+     ⛔⛔ ONE MORE THING MOVED OFF THIS CARD AND IT MATTERS MOST: Net Sales, Covers and Check Avg.
+     They are `sc_shifts` — and NOTHING in The Floor's nav writes `sc_shifts`. The sales lane that
+     does is on CLOSE THE WEEK, so the week's takings belong to The Week card. That also ends the
+     page printing Net Sales twice under two headings ([[the-loop]] #54).
+     ⚠ THE LABOR % LABEL IS LOAD-BEARING AND IT IS NOT A STYLE CHOICE. [[labor-cost-model]] locks
+     THREE deliberate labor bases that are NOT meant to match, and this one — cost over raw
+     `sc_shifts` revenue — is the operational read, which that file says must be labelled "% of floor
+     sales" so it is never mistaken for the P&L number. This page dropped the qualifier and printed
+     "Labor 24.1%" in its header beside "Labor % 24.9%" on this card. Both are right; only the label
+     was wrong ([[the-loop]] #57 — different quantities are allowed to differ, the fix is the label).
+  */
+  /* ⭐⭐ THE CARD IS ONE, THE READERS ARE TWO, AND THAT IS DELIBERATE. The Floor's pages sit in two
+     stores — `lc_*` (schedules, hours, tips, staff) and `sc_*` (the safe, drawers, records) — and
+     each half has its own day-one gate: a bar can run The Floor for its checklists and never log an
+     hour. Composing two readers keeps each gate honest, where one merged body would have to answer
+     for both at once and would go dark on a bar that only uses half the section.
+     ⚠ NEITHER HALF RETURNS MARKUP. They hand back `{ did, open, cells }` so `_floorSection` decides
+     the card, which is the only place that knows the row's key and name. A half that rendered its
+     own card would be the two-cards-stacked shape the merge exists to end. */
+  _floorLabor() {
     const lab = (App.laborData) || {};
     if (!(lab.lc_staff || []).length || !(lab.lc_actuals || []).length) return null;
 
@@ -555,14 +762,26 @@ S.WeekReview = {
     }
     if (toNew) did.push(this._n(toNew + ' time-off ' + this._plu(toNew, 'request')) + ' raised.');
     if (schedBuilt) did.push(this._n('Next week\'s schedule') + ' was built.');
-    const activity = this._didList(did);
-    const results = this._resRow([
+    const cells = [
       this._res('Labor Cost', App.fmtCurrency(wkCost, 0)),
-      this._res('Labor %', laborPct != null ? laborPct.toFixed(1) + '%' : '-', (laborPct != null && laborPct > target) ? 'var(--amber)' : 'var(--t1)'),
+      /* ⛔⛔⛔ "% OF FLOOR SALES", NOT A BARE "LABOR %", AND THE RULE IS LOCKED RATHER THAN CHOSEN.
+         [[labor-cost-model]] THE DENOMINATORS names THREE labor percentages on three deliberate
+         bases and says in as many words that they are NOT meant to match: `labor_pct_blended` over
+         TOTAL SALES, `hourly_labor_pct` over bar+food, and this one — cost over the raw
+         `sc_shifts` takings — which that file calls the operational live-vs-confirmed view and
+         instructs to label *"% of floor sales"* so it is not mistaken for the P&L number. The
+         instruction ends *"Keep the label if you touch it."*
+         MEASURED ON THE PUSHED BUILD: this page's header read LABOR 24.1% (the confirmed week's
+         blended figure) while this cell read LABOR % 24.9% — same denominator that week, numerators
+         $4,613.78 against $4,774.66, the difference being the OT premium and tip-credit makeup that
+         `lc_actuals` does not store. Both numbers are correct and the page said nothing about which
+         question either one answered ([[the-loop]] #57 — different quantities may differ; the fix is
+         the label, never the arithmetic). */
+      this._res('Labor % (floor sales)', laborPct != null ? laborPct.toFixed(1) + '%' : '-', (laborPct != null && laborPct > target) ? 'var(--amber)' : 'var(--t1)'),
       this._res('Hours', wkHours.toFixed(1)),
       this._res('RPLH', rplh != null ? App.fmtCurrency(rplh) : '-'),
       this._res('OT Risk', String(otRisk), otRisk > 0 ? 'var(--amber)' : 'var(--t1)')
-    ]);
+    ];
     /* ⭐ THE SCHEDULE ITEM ALREADY HAD A DATA HALF, so dropping the tick half cost nothing:
        `schedBuilt` asks the store whether a schedule exists for the week AFTER the one under
        review, which is the actual fact the sentence claims. */
@@ -574,18 +793,18 @@ S.WeekReview = {
     if (expired > 0) open.push({ t: '<b>' + expired + '</b> certification' + (expired === 1 ? '' : 's') + ' expired', sev: 'red' });
     if (expiring > 0) open.push({ t: '<b>' + expiring + '</b> certification' + (expiring === 1 ? '' : 's') + ' expiring within 30 days', sev: 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Labor', activity: this._didPlain(did),
-      results: 'Labor Cost ' + App.fmtCurrency(wkCost, 0) + ', Labor % ' + (laborPct != null ? laborPct.toFixed(1) + '%' : '-') + ', Hours ' + wkHours.toFixed(1) + ', RPLH ' + (rplh != null ? App.fmtCurrency(rplh) : '-') + ', OT Risk ' + otRisk,
-      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
-    return this._sectionCard('Labor', [
-      { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up', html: results },
-      { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ]);
+    // The paper says what the screen says, including the qualifier on the labor percentage.
+    return { did: did, open: open, cells: cells,
+      plain: 'Labor Cost ' + App.fmtCurrency(wkCost, 0) + ', Labor % (floor sales) ' + (laborPct != null ? laborPct.toFixed(1) + '%' : '-') + ', Hours ' + wkHours.toFixed(1) + ', RPLH ' + (rplh != null ? App.fmtCurrency(rplh) : '-') + ', OT Risk ' + otRisk };
   },
 
-  // ── Shift ───────────────────────────────────────────────────────────────────
-  _shiftSection() {
+  /* ── The Floor's second half: the safe, the drawers and the shift records ─────────────────────
+     ⛔ THE SALES HALF LEFT THIS READER. Net Sales, Covers, Check Avg and the day-by-day sales
+     sentence were here because `sc_shifts` was the Shift cockpit's own store. Nothing in The Floor's
+     nav writes `sc_shifts` — the sales lane that does is on CLOSE THE WEEK — so they are the WEEK's
+     numbers and `_weekSection` reads them now. Voids/comps and waste left for the same kind of
+     reason: they are Inventory ▸ Logs rows. What is left is exactly what The Floor's own pages own. */
+  _floorShift() {
     const sh = (App.shiftData) || {};
     if (!(sh.sc_shifts || []).length) return null;
 
@@ -598,35 +817,29 @@ S.WeekReview = {
        the SAME window. `verify-week-review-owns-its-week` block W asserts the round trip across
        seventy consecutive days, plus the off-by-one control — [[the-loop]] #54: when two things
        answer one question, pin the EQUALITY, never either side. */
+    /* ⚠ THE SALES, VOIDS/COMPS AND WASTE READS ARE GONE FROM HERE, NOT JUST THEIR SENTENCES. A
+       `const` that is computed and read by nothing is the shape a half-finished move leaves behind,
+       and it reads to the next person as a feature that was built and never wired
+       ([[the-loop]] #25). `days` survives because the "cash was never reconciled" guard needs to
+       know the bar traded at all. */
     const wkS = (sh.sc_shifts || []).filter(s => this._inWeek(s.date));
-    const rev = wkS.reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
-    const covers = wkS.reduce((t, s) => t + (s.covers || 0), 0);
-    const checkAvg = covers > 0 ? rev / covers : null;
-    const wkVC = (sh.sc_void_comps || []).filter(r => this._inWeek(r.date));
-    const voidTot = wkVC.filter(r => r.type === 'Void').reduce((t, r) => t + (r.amount || 0), 0);
-    const compTot = wkVC.filter(r => r.type === 'Comp').reduce((t, r) => t + (r.amount || 0), 0);
+    const days = wkS.length;
     const wkVar = (sh.sc_variances || []).filter(v => this._inWeek(v.date));
     const netVar = wkVar.reduce((t, v) => t + (v.variance || 0), 0);
     const shorts = wkVar.filter(v => v.status === 'Short').length;
     const overs = wkVar.filter(v => v.status === 'Over').length;
     const reconN = wkVar.length;
-    const days = wkS.length;
-    const vcN = wkVC.length;
-    const wasteRows = (sh.sc_waste || []).filter(r => this._inWeek(r.date));
     const walkRows = (sh.sc_walked_tabs || []).filter(r => this._inWeek(r.date));
-    const wasteN = wasteRows.length;
     const walkedN = walkRows.length;
-    // Named only when one day genuinely beats every other — see `_topOf`.
-    const bestDay = this._topOf(wkS, s => parseFloat(s.total_revenue) || 0);
+    // Named only when one genuinely beats every other — see `_topOf`.
     const worstVar = this._topOf(wkVar.filter(v => (v.variance || 0) < 0), v => -(v.variance || 0))
       || (wkVar.filter(v => (v.variance || 0) < 0).length === 1 ? wkVar.filter(v => (v.variance || 0) < 0)[0] : null);
-    const topVC = this._topOf(wkVC, r => r.amount || 0) || (wkVC.length === 1 ? wkVC[0] : null);
 
+    /* ⛔ THE DAY-BY-DAY SALES SENTENCE MOVED TO THE WEEK. It reads `sc_shifts`, and the only thing in
+       the app that writes `sc_shifts` is Close The Week's sales lane — so "7 days of sales logged,
+       $19,150 on 500 covers" is a fact about the WEEK being closed, not about the section. Leaving
+       it here is what put Net Sales on two cards under two headings. */
     const did = [];
-    if (days) did.push(this._n(days + ' ' + this._plu(days, 'day')) + ' of sales logged, ' + this._m0(rev)
-      + ' on ' + covers + ' ' + this._plu(covers, 'cover') + '.'
-      + (bestDay ? ' Best night' + this._on(bestDay.date) + ', ' + this._m0(bestDay.total_revenue)
-          + (bestDay.covers ? ' on ' + bestDay.covers + ' covers' : '') + '.' : ''));
     if (reconN) {
       const clean = reconN - shorts - overs;
       did.push(this._n(reconN + ' drawer ' + this._plu(reconN, 'reconcile')) + ', '
@@ -635,26 +848,9 @@ S.WeekReview = {
         + (worstVar ? ' Worst was ' + this._nm(worstVar.drawer) + this._on(worstVar.date) + ', '
             + App.fmtBal(worstVar.variance, 0) + this._by(worstVar.cashier) + '.' : ''));
     }
-    /* ⚠ COMPOSED FROM PARTS AND JOINED, NOT CONCATENATED WITH SPACES BUILT IN. The first version
-       glued the clauses together with its own separators and printed "Biggest was $120.00  Tue,
-       Aug 4." — a DOUBLE SPACE where the blank server dropped out. The pin's own `got=` showed it.
-       Every optional clause is a list entry now, so dropping one cannot leave its spacing behind. */
-    if (vcN) {
-      const bits = topVC ? ['Biggest was ' + this._amt(topVC.amount),
-        this._nm(topVC.item) ? 'on ' + this._nm(topVC.item) : '',
-        this._nm(topVC.server) ? 'by ' + this._nm(topVC.server) : '',
-        this._day(topVC.date)].filter(Boolean) : [];
-      did.push(this._n(vcN + ' ' + this._plu(vcN, 'void or comp', 'voids and comps')) + ', ' + this._m0(voidTot + compTot) + '.'
-        + (bits.length ? ' ' + bits.join(' ')
-            + (this._nm(topVC.reason) ? ' (' + this._nm(topVC.reason).toLowerCase() + ')' : '') + '.' : ''));
-    }
-    if (wasteN) {
-      const cost = wasteRows.reduce((t, r) => t + (r.cost || 0), 0);
-      const top = this._topOf(wasteRows, r => r.cost || 0) || (wasteN === 1 ? wasteRows[0] : null);
-      did.push(this._n(wasteN + ' waste ' + this._plu(wasteN, 'entry', 'entries')) + (cost ? ', ' + this._m0(cost) : '') + '.'
-        + (top && this._nm(top.product_name) ? ' Most of it ' + this._nm(top.product_name)
-            + (this._nm(top.reason) ? ' (' + this._nm(top.reason).toLowerCase() + ')' : '') + '.' : ''));
-    }
+    /* ⛔ THE VOIDS/COMPS AND WASTE SENTENCES MOVED TO INVENTORY, whole and unedited, because the Voids
+       / Comps Log and the Waste / Spill Log are INVENTORY ▸ Logs rows now. The composed-from-parts
+       note that used to live here went with the sentence it describes. */
     /* ⚠ NAME THEM OR TOTAL THEM, NEVER BOTH. The first version printed the total AND then named each
        one, so a single walked tab read "1 walked tab, $41. $41 Tue, Aug 4 by Marcus T." — the same
        figure twice in one sentence. At one row the total IS the row. */
@@ -675,11 +871,7 @@ S.WeekReview = {
             ? this._join(walkRows.map(r => this._amt(r.amount) + this._on(r.date) + this._by(r.server)))
             : this._m0(amt)) + '.');
     }
-    const activity = this._didList(did);
-    const results = this._resRow([
-      this._res('Net Sales', App.fmtCurrency(rev, 0)),
-      this._res('Covers', String(covers)),
-      this._res('Check Avg', checkAvg != null ? App.fmtCurrency(checkAvg) : '-'),
+    const cells = [
       /* ⛔⛔⛔ A WEEK NOBODY COUNTED A DRAWER IN MUST NEVER READ "$0.00 OVER/SHORT". `netVar` is a
          bare reduce over the week's variance records, so zero records reduce to 0 — and 0 printed
          in neutral is indistinguishable from a genuinely square week. That is the invariant
@@ -693,9 +885,10 @@ S.WeekReview = {
          `fmtSigned(...).sign` for exactly this reason; both readings now agree. */
       this._res('Over / Short',
         reconN ? (App.fmtSigned(netVar, 0).sign > 0 ? '+' : '') + App.fmtBal(netVar, 0) : 'Not counted',
-        reconN ? (App.fmtSigned(netVar, 0).sign < 0 ? 'var(--red)' : 'var(--t1)') : 'var(--t3)'),
-      this._res('Voids + Comps', App.fmtCurrency(voidTot + compTot, 0))
-    ]);
+        reconN ? (App.fmtSigned(netVar, 0).sign < 0 ? 'var(--red)' : 'var(--t1)') : 'var(--t3)')
+      /* ⛔ VOIDS + COMPS IS NOT A CELL HERE ANY MORE. Same move as the sentence above it — the log is
+         an Inventory row — and it was also the second place this page printed that total. */
+    ];
     /* ⛔ "Loss flags never reviewed this week" is GONE — its only evidence was the `review` tick.
        ⭐ "Cash not reconciled" KEPT, on its data half alone, plus the guard the tick used to supply
        by accident: a week the bar never traded has nothing to reconcile, and accusing it of a
@@ -706,17 +899,75 @@ S.WeekReview = {
     if (walkedN > 0) open.push({ t: '<b>' + walkedN + '</b> walked tab' + (walkedN === 1 ? '' : 's') + ' this week', sev: 'amber' });
     if (permDue > 0) open.push({ t: '<b>' + permDue + '</b> permit/license item' + (permDue === 1 ? '' : 's') + ' need attention', sev: permExpired > 0 ? 'red' : 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Shift', activity: this._didPlain(did),
-      // ⚠ THE PDF SAYS WHAT THE SCREEN SAYS. Same guard, same rounded sign — this line is the one
-      // that gets handed to somebody, so a "$0.00" here for an uncounted week is the same lie in a
-      // document ([[the-loop]] #54: the moment a quantity is printed twice, the test is that they agree).
-      results: 'Net Sales ' + App.fmtCurrency(rev, 0) + ', Covers ' + covers + ', Check Avg ' + (checkAvg != null ? App.fmtCurrency(checkAvg) : '-') + ', Over/Short ' + (reconN ? (App.fmtSigned(netVar, 0).sign > 0 ? '+' : '') + App.fmtBal(netVar, 0) : 'Not counted') + ', Voids+Comps ' + App.fmtCurrency(voidTot + compTot, 0),
+    // ⚠ THE PDF SAYS WHAT THE SCREEN SAYS. Same guard, same rounded sign — this line is the one
+    // that gets handed to somebody, so a "$0.00" here for an uncounted week is the same lie in a
+    // document ([[the-loop]] #54: the moment a quantity is printed twice, the test is that they agree).
+    return { did: did, open: open, cells: cells,
+      plain: 'Over/Short ' + (reconN ? (App.fmtSigned(netVar, 0).sign > 0 ? '+' : '') + App.fmtBal(netVar, 0) : 'Not counted') };
+  },
+
+  /* ── The Floor's third half: the Sales pages ──────────────────────────────────────────────────
+     ⛔⛔ SERVER CHECK AND INTEGRITY REVIEW ARE ONE PAIR OF SCREENS AND THIS PAGE REPORTED THEM ON TWO
+     DIFFERENT CARDS. `sales_reviews` (the Integrity Review's filed report) was on the Profit card and
+     `revenue_server_checks` was on the Revenue card — two deleted sections between them, for two
+     rows sitting side by side under The Floor ▸ Sales.
+     ⚠ ITS OWN GATE, for the reason the header on `_floorLabor` gives: these two stores are neither
+     `lc_*` nor `sc_*`, so a bar that runs checks without logging hours or drawers still gets its
+     lines, and a bar that does neither adds nothing rather than an empty heading. */
+  _floorSales() {
+    const dat = App.data || {};
+    const revWk  = (dat.sales_reviews || []).filter(r => this._inWeek(r.date || r.created_at));
+    const chkWk  = (dat.revenue_server_checks || []).filter(c => this._inWeek(c.date || c.created_at));
+    if (!revWk.length && !chkWk.length) return null;
+
+    const did = [];
+    if (chkWk.length) {
+      const sales = chkWk.reduce((t, c) => t + (c.sales || 0), 0);
+      const covs = chkWk.reduce((t, c) => t + (c.covers || 0), 0);
+      const who = [...new Set(chkWk.map(c => this._nm(c.server_name)).filter(Boolean))];
+      did.push(this._n(chkWk.length + ' server ' + this._plu(chkWk.length, 'check')) + ' run'
+        + this._on(chkWk[0].date) + '.'
+        + (who.length && who.length <= this._few() ? ' ' + this._join(who) + '.' : '')
+        + (sales ? ' ' + this._m0(sales) + ' across ' + covs + ' ' + this._plu(covs, 'cover') + '.' : ''));
+    }
+    revWk.forEach(r => {
+      const s = r.summary || {};
+      did.push(this._n('Integrity review') + ' filed' + this._on(r.date || r.created_at) + '.'
+        + (s.reviewed ? ' ' + s.reviewed + ' ' + this._plu(s.reviewed, 'server') + ' checked, '
+            + (s.flagged || 0) + ' flagged' + (s.high ? ', ' + s.high + ' high risk' : '')
+            + (s.exposure ? ', ' + this._amt(s.exposure) + ' exposed' : '') + '.' : ''));
+    });
+    /* ⭐ THE CARRY-OVER IS THE EXPOSURE, AND IT IS DERIVED FROM THE FILED REPORT rather than
+       re-scored here. A second implementation of the integrity engine on a recap page is exactly the
+       drift this codebase keeps paying for. */
+    const high = revWk.reduce((t, r) => t + ((r.summary || {}).high || 0), 0);
+    const exposure = revWk.reduce((t, r) => t + ((r.summary || {}).exposure || 0), 0);
+    const open = [];
+    if (high > 0) open.push({ t: '<b>' + high + '</b> server' + (high === 1 ? '' : 's') + ' flagged high risk'
+      + (exposure ? ', ' + this._m0(exposure) + ' exposed' : ''), sev: 'red' });
+    return { did: did, open: open, cells: [], plain: '' };
+  },
+
+  /* ── THE FLOOR, composed ──────────────────────────────────────────────────────────────────────
+     ⚠ THE ORDER OF THE HALVES IS THE SECTION'S OWN BAR ORDER — Schedules and Pay, then The Safe and
+     the Records, then Sales — so the card reads the way the top bar reads. There is no ranking in
+     it; `_openList` still sorts the carry-over items red first across all three
+     ([[lessons-paid-for]] #70's neighbour: the order decides what survives the five-item cap). */
+  _floorSection(key, name) {
+    const parts = [this._floorLabor(), this._floorShift(), this._floorSales()].filter(Boolean);
+    if (!parts.length) return null;
+    const did = parts.flatMap(p => p.did || []);
+    const open = parts.flatMap(p => p.open || []);
+    const cells = parts.flatMap(p => p.cells || []);
+    const activity = this._didList(did);
+    (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
+      results: parts.map(p => p.plain).filter(Boolean).join(', ') || 'Nothing measured',
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
-    return this._sectionCard('Shift', [
+    return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up', html: results },
+      { label: 'What It Turned Up', html: this._resRow(cells) },
       { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ]);
+    ], { open: open, did: did });
   },
 
   /* ── The six inventory figures this card prints ───────────────────────────────────────────────
@@ -896,222 +1147,226 @@ S.WeekReview = {
     ];
   },
 
-  // ── Profit (Recovery) ───────────────────────────────────────────────────────
-  _profitSection() {
-    /* ⛔ NO `S.Dashboard` ALIAS AND NO `if (!PD) return ''` GUARD ANY MORE. That guard blanked the
-       whole card whenever the Profit cockpit file was absent, and after 1c it is absent forever, so
-       keeping it would have retired this card silently. Nothing here needs that file: `savedWeek`
-       and `_costRows` were already taking everything they use as arguments. */
-    if (!((App.data && App.data.weeks) || []).length && !((App.data && App.data.audits) || []).length) return null;
-
-    /* ⛔ TWO CURRENT-STATE FIGURES CAME OFF THIS CARD IN THE SAME EDIT, for one reason written
-       here in the file already: a number about today does not belong under a past week's heading.
-         · `Recoverable/yr` was gated on "is this the current week", which this page can no longer
-           be, so the cell could only ever print a dash — a dead gate is not a safe gate.
-         · "Biggest leak not worked" was that same class PLUS a tick: `_topLeak` ranks
-           `Recovery.gapImpact` as it stands TODAY, and `!done.leaks` was the checkbox.
-       The Hub is the page that answers "what should I work on now"; this one answers "what did that
-       week do". */
-    /* ⭐⭐ THE BORROW IS GONE, AND IT WAS DEAD CODE. This block used to save the Profit cockpit's
-       `_weekEnd`, overwrite it with the reviewed week, call two members and put it back. MEASURED:
-       nothing inside the try block ever read that field. `savedWeek(pe)` takes the period_end as an
-       argument and `_costRows(w)` takes the week RECORD, so the whole save-set-restore moved a
-       value nothing consulted. A page that reads data has no business writing another screen's
-       state, and a `finally` is not a guarantee — anything throwing between the two lines leaves
-       that screen parked on a week its own operator never chose. */
+  /* ── THE WEEK ─────────────────────────────────────────────────────────────────────────────────
+     ⭐⭐⭐ THIS CARD IS NEW, AND IT IS THE ONE THE PAGE WAS MISSING. The Week is a rail section with
+     three pages of its own — Close, Review, History — and the recap of a week had no card for the
+     week itself: its cost percentages sat on a PROFIT card, its check average on a REVENUE card and
+     its takings on a SHIFT card, two of those three named after sections the app has deleted.
+     ⭐ EVERY FIGURE HERE COMES OFF THE WEEK RECORD OR THE WEEK'S OWN SALES LOG, which is what makes
+     it the week's card rather than a summary of other cards: `weeks` and `revenue_weeks` are written
+     by Confirm the Week, and `sc_shifts` by Close The Week's sales lane. Nothing on it is a fact
+     about today.
+     ⛔⛔ AND IT IS DELIBERATELY NOT A SECOND COPY OF THE HEADER. The stat box at the top of the page
+     answers "what did you sign off" — Net Sales, Prime Cost, Labor — so this card carries the week
+     numbers that headline does NOT: covers, check average, the two component costs and revenue per
+     labor hour. Before this, Net Sales was printed twice, Prime Cost twice and Check Average twice,
+     each pair under a different heading with nothing saying they were the same figure
+     ([[the-loop]] #54 — the moment a quantity appears twice, the test is that they agree, and the
+     cheaper fix is that it appears once).
+     ⚠ THE TWO HELPERS ARE READ BY LABEL, NEVER BY POSITION. `_metricsRows` returns three rows and
+     this card wants two of them; `metrics[0]` / `metrics[2]` would break silently the day anyone
+     reorders that table, which is a defect this suite has already paid for
+     ([[lessons-paid-for]] #70). */
+  _weekSection(key, name) {
+    const sh = (App.shiftData) || {};
     const w = this._savedProfitWeek(this._wkE());
+    const rw = this._savedRevenueWeek(this._wkE());
+    const wkS = (sh.sc_shifts || []).filter(s => this._inWeek(s.date));
+    if (!w && !rw && !wkS.length) return null;
+
     const costRows = w ? this._costRows(w) : null;
     const overCount = costRows ? costRows.filter(r => r.over).length : 0;
-
-    // Real recovery activity logged this week (records dated in the window).
-    const dat = App.data || {};
-    const audWk     = (dat.audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10)));
-    const revWk     = (dat.sales_reviews || []).filter(r => this._inWeek(r.date || r.created_at));
-    const discWkR   = (dat.vendor_discrepancies || []).filter(d => this._inWeek(d.date || d.filed_at || d.created_at));
-    const auditsWk = audWk.length;
-    /* ⛔ THE INVESTIGATION AND EXPERIMENT LINES WENT AT T69 PASS 3b (Kyle, 2026-08-24). Their two
-       stores are unregistered, so both filters would have run over an array that never exists and
-       printed nothing forever, which reads as a bar that did no recovery work rather than as a
-       feature that was removed. The producers are cut WITH their lines: a `const` computed and
-       read nowhere is the shape a fix that never shipped leaves behind ([[the-loop]] #25).
-       ⚠ THE RULE THE OLD COMMENT CARRIED IS STILL LIVE ON EVERY OTHER LINE IN THIS RECAP: a recap
-       counts what STARTED in the week, never what is Active today, which is a fact about now. */
+    const metrics = this._metricsRows(rw || {});
+    const metric = lab => metrics.find(m => m.label === lab) || null;
+    const rev = wkS.reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
+    const covers = wkS.reduce((t, s) => t + (s.covers || 0), 0);
+    const days = wkS.length;
+    // Named only when one day genuinely beats every other — see `_topOf`.
+    const bestDay = this._topOf(wkS, s => parseFloat(s.total_revenue) || 0);
 
     const did = [];
-    audWk.forEach(a => did.push(this._n('Profit audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
-      + (a.overall_score != null ? ', scored ' + a.overall_score : '') + '.'
-      + ((a.action_items || []).length ? ' ' + a.action_items.length + ' action '
-          + this._plu(a.action_items.length, 'item') + ' worth '
-          + this._m0((a.action_items || []).reduce((s, x) => s + (x.monthly_impact || 0), 0) * 12) + '/yr.' : '')));
-    revWk.forEach(r => {
-      const s = r.summary || {};
-      did.push(this._n('Sales review') + ' filed' + this._on(r.date || r.created_at) + '.'
-        + (s.reviewed ? ' ' + s.reviewed + ' ' + this._plu(s.reviewed, 'server') + ' checked, '
-            + (s.flagged || 0) + ' flagged' + (s.high ? ', ' + s.high + ' high risk' : '')
-            + (s.exposure ? ', ' + this._amt(s.exposure) + ' exposed' : '') + '.' : ''));
-    });
-    if (discWkR.length) {
-      const over = discWkR.reduce((t, d) => t + (d.overcharge || 0), 0);
-      did.push(this._n(discWkR.length + ' vendor ' + this._plu(discWkR.length, 'discrepancy', 'discrepancies')) + ' filed'
-        + (over ? ', ' + this._m0(over) + ' overcharged' : '') + '.');
-    }
+    if (days) did.push(this._n(days + ' ' + this._plu(days, 'day')) + ' of sales logged, ' + this._m0(rev)
+      + ' on ' + covers + ' ' + this._plu(covers, 'cover') + '.'
+      + (bestDay ? ' Best night' + this._on(bestDay.date) + ', ' + this._m0(bestDay.total_revenue)
+          + (bestDay.covers ? ' on ' + bestDay.covers + ' covers' : '') + '.' : ''));
+    /* ⭐ CONFIRMING THE WEEK IS A THING THE OPERATOR DID, so it gets a line like every other thing
+       they did. It is the one act this whole section exists for and the recap never said it out
+       loud — the page only ever mentioned the close by ACCUSING somebody of skipping it. */
+    if (w) did.push(this._n('The week') + ' was confirmed.');
     const activity = this._didList(did);
+
     const costCell = (i, label) => {
       const r = costRows ? costRows[i] : null;
       const has = r && r.val != null;
       return this._res(label, has ? r.val.toFixed(1) + '%' : '-', has ? (r.over ? 'var(--red)' : 'var(--green)') : 'var(--t1)');
     };
-    const results = this._resRow([
-      costCell(0, 'Bar Pour'), costCell(1, 'Food Cost'), costCell(2, 'Prime Cost')
-    ]);
+    const mCell = (lab, label) => {
+      const m = metric(lab);
+      const col = (m && m.good != null) ? (m.good ? 'var(--green)' : 'var(--red)') : 'var(--t1)';
+      return this._res(label, m ? m.value : '-', col);
+    };
+    const cells = [
+      this._res('Covers', String(covers)),
+      mCell('Check Average', 'Check Avg'),
+      costCell(0, 'Bar Pour'),
+      costCell(1, 'Food Cost'),
+      mCell('Revenue / Labor Hour', 'Rev / Labor Hr')
+    ];
 
-    /* ⭐ "the week was never confirmed" IS THE ONE DERIVED FACT IN THE WHOLE STEP SET, and it
-       survives — asked straight of the record now (`!w`) instead of through `stepDone`, which was
-       only ever passing this same answer through. Nothing was lost by cutting the ticks. */
-    const ag = this._auditGap(dat.audits);
+    /* ⭐ "the week was never confirmed" IS THE ONE DERIVED FACT THAT SURVIVED THE TICK REMOVAL, and
+       it belongs here rather than on two other cards. It used to be pushed by BOTH the Profit and
+       the Revenue card, so an unconfirmed week said the same thing twice in two places. */
     const open = [];
     if (!w) open.push({ t: 'This week was never confirmed, so its cost numbers stayed blank', sev: 'red' });
     if (w && overCount > 0) {
       const names = costRows.filter(r => r.over).map(r => r.label.toLowerCase());
       open.push({ t: '<b>' + overCount + '</b> of 3 costs over target (' + names.join(', ') + ')', sev: overCount >= 2 ? 'red' : 'amber' });
     }
-    if (!ag.ever) open.push({ t: 'No Profit audit had been run by the end of this week', sev: 'amber' });
-    else if (ag.stale) open.push({ t: 'Profit audit was <b>' + ag.days + '</b> days old when this week closed', sev: 'amber' });
 
     const pcv = i => (costRows && costRows[i] && costRows[i].val != null) ? (costRows[i].val.toFixed(1) + '%') : '-';
-    (this._pdf || (this._pdf = [])).push({ name: 'Profit', activity: this._didPlain(did),
-      results: 'Bar Pour ' + pcv(0) + ', Food ' + pcv(1) + ', Prime ' + pcv(2),
+    (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
+      results: 'Covers ' + covers + ', Check Avg ' + ((metric('Check Average') || {}).value || '-')
+        + ', Bar Pour ' + pcv(0) + ', Food ' + pcv(1)
+        + ', Rev/Labor Hr ' + ((metric('Revenue / Labor Hour') || {}).value || '-'),
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
-    return this._sectionCard('Profit', [
+    return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up', html: results },
+      { label: 'What It Turned Up', html: this._resRow(cells) },
       { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ]);
+    ], { open: open, did: did });
   },
 
-  // ── Revenue (Recovery) ──────────────────────────────────────────────────────
-  _revenueSection() {
-    // No cockpit alias and no absence guard, for the reason written on the Profit card.
-    if (!((App.data && App.data.revenue_weeks) || []).length && !((App.data && App.data.revenue_audits) || []).length) return null;
-
-    // Same two current-state figures came off this card as off Profit's — see the note there.
-    // The borrow here was dead in the same way: neither member ever read `_weekEnd`.
-    const w = this._savedRevenueWeek(this._wkE());
-    const metrics = this._metricsRows(w || {});
-    const offCount = metrics.filter(m => m.good === false).length;
-
+  /* ── RUN AUDIT ────────────────────────────────────────────────────────────────────────────────
+     ⭐⭐⭐ FOUR AUDITS, ONE SECTION, AND THE FIRST OF THEM HAD NEVER BEEN ON THIS PAGE AT ALL.
+     MEASURED on the pushed build: `bar_cop_audits` — the Operations Audit — holds 13 records, one of
+     them inside the reviewed week, scored 76 with 7 action items, and this recap read the other
+     three stores and not that one. Run Audit's own bar lists Operations FIRST. Meanwhile Profit,
+     Revenue and Cash each had a full CARD named after a section the app deleted, and the only
+     content any of them had left was an audit.
+     ⛔ THE STORE NAMES ARE THE APP'S AND ARE NOT TIDIED HERE. `audits` is the Profit audit;
+     `bar_cop_audits` is Operations. Renaming either is a data migration, not a recap change, and a
+     field's meaning belongs to the code that already writes it ([[lessons-paid-for]] #63). The table
+     below is the one place the pairing is written.
+     ⚠ AN AUDIT A BAR HAS NEVER RUN AT ALL RAISES NOTHING. Day one has no audits by definition, and a
+     recap that opens by listing four things you have never done is the accusation this page had
+     removed. Staleness is only asked of an audit that exists. */
+  _auditSection(key, name) {
     const dat = App.data || {};
-    const audWk   = (dat.revenue_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10)));
-    const priceWkR = (dat.revenue_price_log || []).filter(p => this._inWeek(p.date || p.created_at || p.changed_at));
-    const dogWkR   = (dat.menu_dog_tests || []).filter(t => this._inWeek(t.start_date || t.created_at));
-    const checkWkR = (dat.revenue_server_checks || []).filter(c => this._inWeek(c.date || c.created_at));
-    const auditsWk = audWk.length;
+    const AUD = [
+      { label: 'Operations', store: 'bar_cop_audits' },
+      { label: 'Profit',     store: 'audits' },
+      { label: 'Revenue',    store: 'revenue_audits' },
+      { label: 'Cash',       store: 'cash_audits' }
+    ];
+    const reads = AUD.map(a => {
+      const rows = dat[a.store] || [];
+      return { label: a.label, rows: rows,
+        wk: rows.filter(r => this._inWeek((r.date || r.generated_at || '').slice(0, 10))),
+        gap: this._auditGap(rows) };
+    });
+    if (!reads.some(r => r.rows.length)) return null;
 
     const did = [];
-    audWk.forEach(a => did.push(this._n('Revenue audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
-      + (a.overall_score != null ? ', scored ' + a.overall_score : '') + '.'));
-    if (priceWkR.length) {
-      const each = priceWkR.length <= this._few()
-        ? ' ' + this._join(priceWkR.map(p => this._nm(p.item_name)
+    reads.forEach(r => r.wk.forEach(a => {
+      const items = (a.action_items || []);
+      const yr = items.reduce((s, x) => s + (x.monthly_impact || 0), 0) * 12;
+      did.push(this._n(r.label + ' audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
+        + (a.overall_score != null ? ', scored ' + a.overall_score : '') + '.'
+        + (items.length ? ' ' + items.length + ' action ' + this._plu(items.length, 'item')
+            + (yr ? ' worth ' + this._m0(yr) + '/yr' : '') + '.' : ''));
+    }));
+    const activity = this._didList(did);
+
+    /* ⭐ THE SCORE AS IT STOOD WHEN THE WEEK CLOSED, not as it stands today. `_auditGap` already
+       walks each store to the newest record on or before the week's end for the staleness line; it
+       hands back that RECORD now so the cell and the warning cannot disagree about which run they
+       are describing ([[the-loop]] #54, one walk not two).
+       ⚠ NEUTRAL, NO COLOUR. A score is a number, and colour on this page means "something is wrong
+       here" ([[dashboard-discipline]]). What is wrong is staleness, and that is said in words below
+       rather than painted onto a figure that is only ever as good as the day it was run. */
+    const cells = reads.map(r => this._res(r.label,
+      (r.gap.rec && r.gap.rec.overall_score != null) ? String(r.gap.rec.overall_score) : '-'));
+
+    const open = [];
+    reads.forEach(r => {
+      if (!r.rows.length) return;
+      if (!r.gap.ever) open.push({ t: 'No ' + r.label + ' audit had been run by the end of this week', sev: 'amber' });
+      else if (r.gap.stale) open.push({ t: r.label + ' audit was <b>' + r.gap.days + '</b> days old when this week closed', sev: 'amber' });
+    });
+
+    (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
+      results: reads.map(r => r.label + ' ' + ((r.gap.rec && r.gap.rec.overall_score != null) ? r.gap.rec.overall_score : '-')).join(', '),
+      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
+    return this._sectionCard(key, name, [
+      { label: 'Done This Week', html: activity },
+      { label: 'What It Turned Up &middot; Scores At Week End', html: this._resRow(cells) },
+      { label: 'Carrying Into Next Week', html: this._openList(open) }
+    ], { open: open, did: did });
+  },
+
+  /* ── MENUS ────────────────────────────────────────────────────────────────────────────────────
+     ⭐⭐ A SECTION WITH FIVE PAGES AND NO CARD. Menus is a rail row — Builder, Rundown, Engineering,
+     Recipe Summary, Dog Test — and its week showed up in two other places: the price log and the dog
+     tests were on the REVENUE card, and "N menu items over cost target" was on the INVENTORY card.
+     Inventory owns the product COSTS that feed a menu item, which is a reason the two are linked and
+     not a reason to file a menu finding under Inventory.
+     ⛔ UNGRADEABLE ITEMS ARE DELIBERATELY NOT A CELL HERE, AND THIS IS THE MEASUREMENT THAT DECIDED
+     IT. [[the-loop]] #72 says a "N problems" count must print what it could not evaluate beside it,
+     which is exactly what `App.menuItemsUngradeable()` is for. Measured on the live seed it returns
+     28 — and every one of them is a beer, a wine or an NA item, because `menuTargetPct` returns null
+     for those categories BY DESIGN. Printing "28 ungradeable" would manufacture an alarm out of a
+     deliberate rule ([[lessons-paid-for]] #91 — a reading that looks like a hole in the data, where
+     the app is right). The count belongs where a target CAN be set, which is not this recap. */
+  _menusSection(key, name) {
+    const dat = App.data || {};
+    const items = App.menuItems ? App.menuItems().filter(it => it && !it.archived) : [];
+    if (!items.length) return null;
+
+    const priceWk = (dat.revenue_price_log || []).filter(p => this._inWeek(p.date || p.created_at || p.changed_at));
+    const dogWk   = (dat.menu_dog_tests || []).filter(t => this._inWeek(t.start_date || t.created_at));
+    const over    = App.menuItemsOverTarget ? App.menuItemsOverTarget().length : 0;
+
+    const did = [];
+    if (priceWk.length) {
+      const each = priceWk.length <= this._few()
+        ? ' ' + this._join(priceWk.map(p => this._nm(p.item_name)
             + (p.old_price != null && p.new_price != null ? ' ' + this._amt(p.old_price) + ' to ' + this._amt(p.new_price) : ''))) + '.'
         : '';
-      did.push(this._n(priceWkR.length + ' price ' + this._plu(priceWkR.length, 'change')) + ' made.' + each);
+      did.push(this._n(priceWk.length + ' price ' + this._plu(priceWk.length, 'change')) + ' made.' + each);
     }
-    if (dogWkR.length) did.push(this._n(dogWkR.length + ' dog ' + this._plu(dogWkR.length, 'test')) + ' started'
-      + (dogWkR.length <= this._few() ? ' on ' + this._join(dogWkR.map(t => this._nm(t.item_name))) : '') + '.');
-    if (checkWkR.length) {
-      const sales = checkWkR.reduce((t, c) => t + (c.sales || 0), 0);
-      const covs = checkWkR.reduce((t, c) => t + (c.covers || 0), 0);
-      const who = [...new Set(checkWkR.map(c => this._nm(c.server_name)).filter(Boolean))];
-      did.push(this._n(checkWkR.length + ' server ' + this._plu(checkWkR.length, 'check')) + ' run'
-        + this._on(checkWkR[0].date) + '.'
-        + (who.length && who.length <= this._few() ? ' ' + this._join(who) + '.' : '')
-        + (sales ? ' ' + this._m0(sales) + ' across ' + covs + ' ' + this._plu(covs, 'cover') + '.' : ''));
-    }
+    if (dogWk.length) did.push(this._n(dogWk.length + ' dog ' + this._plu(dogWk.length, 'test')) + ' started'
+      + (dogWk.length <= this._few() ? ' on ' + this._join(dogWk.map(t => this._nm(t.item_name))) : '') + '.');
     const activity = this._didList(did);
-    const mCell = (i, label) => {
-      const m = metrics[i];
-      const col = (m && m.good != null) ? (m.good ? 'var(--green)' : 'var(--red)') : 'var(--t1)';
-      return this._res(label, m ? m.value : '-', col);
-    };
-    const results = this._resRow([
-      mCell(0, 'Check Avg'), mCell(1, 'Labor %'), mCell(2, 'Rev / Labor Hr')
-    ]);
 
-    const ag = this._auditGap(dat.revenue_audits);
+    /* ⚠ THESE TWO ARE FACTS ABOUT TODAY, not about the finished week, so the band says so in its own
+       label the same way Inventory's and Books' do. A menu is priced as it stands; there is no
+       weekly snapshot of it to read back ([[lessons-paid-for]] #89's neighbour — say the basis). */
+    const cells = [
+      /* ⚠ "MENU ITEMS", NOT "PRICED ITEMS", AND THE DIFFERENCE IS HONESTY. This counts every
+         non-archived item on the menu — an item with no price on it is in that number — so calling
+         them priced would be a claim the figure does not support ([[output-honesty]]: every
+         displayed number must be true, including what its label says it is). */
+      this._res('Menu Items', String(items.length)),
+      this._res('Over Cost Target', String(over), over > 0 ? 'var(--amber)' : 'var(--t1)'),
+      this._res('Price Changes', String(priceWk.length))
+    ];
+
     const open = [];
-    if (!w) open.push({ t: 'This week was never confirmed, so its numbers stayed blank', sev: 'red' });
-    if (w && offCount > 0) {
-      const names = metrics.filter(m => m.good === false).map(m => m.label.toLowerCase());
-      open.push({ t: '<b>' + offCount + '</b> off target (' + names.join(', ') + ')', sev: offCount >= 2 ? 'red' : 'amber' });
-    }
-    if (!ag.ever) open.push({ t: 'No Revenue audit had been run by the end of this week', sev: 'amber' });
-    else if (ag.stale) open.push({ t: 'Revenue audit was <b>' + ag.days + '</b> days old when this week closed', sev: 'amber' });
+    if (over > 0) open.push({ t: '<b>' + over + '</b> menu item' + (over === 1 ? '' : 's') + ' over cost target', sev: 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Revenue', activity: this._didPlain(did),
-      results: 'Check Avg ' + metrics[0].value + ', Labor % ' + metrics[1].value + ', Rev/Labor Hr ' + metrics[2].value,
+    (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
+      // ⚠ The paper says what the screen says, down to the noun — see the cell's own note.
+      results: 'Current menu: ' + items.length + ' menu items, ' + over + ' over cost target; '
+        + priceWk.length + ' price change' + (priceWk.length === 1 ? '' : 's') + ' this week',
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
-    return this._sectionCard('Revenue', [
+    return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up', html: results },
+      { label: 'What It Turned Up &middot; Current Menu', html: this._resRow(cells) },
       { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ]);
+    ], { open: open, did: did });
   },
-
-  // ── Cash (Recovery; numbers are a live position, not per-week) ──────────────
-  /* ⭐⭐ THE ONLY SECTION THAT NOW READS NOTHING FROM A DYING COCKPIT. `S.CashDashboard` was here for
-     one reason — `stepDone()` — so cutting the ticks cut the dependency with it. The other five
-     module sections still read their cockpit for real DATA (`ID.computeState`, `LD.actuals`,
-     `SD.shifts`, `PD.savedWeek`/`_costRows`, `RD.metricsRows`), which is the extraction 1c still
-     needs and is tracked as its own piece of work. */
-  _cashSection() {
-    if (!window.CashEngine) return '';
-    const trapped = CashEngine.trapped ? CashEngine.trapped() : { hasData: false };
-    const sf = CashEngine.survivalForecast ? CashEngine.survivalForecast(13) : { hasData: false };
-    const pos = CashEngine.position ? CashEngine.position() : { hasOpening: false };
-    if (!trapped.hasData && !sf.hasData) return null;
-
-    const dat = App.data || {};
-    const audWk = (dat.cash_audits || []).filter(a => this._inWeek((a.date || a.generated_at || '').slice(0, 10)));
-    const auditsWk = audWk.length;
-    const outWk = (CashEngine.cashOutflows() || []).filter(o => this._inWeek(o.date || o.created_at));
-
-    const runwayLabel = r => r == null ? '13+ wks' : r === 0 ? 'This wk' : r + ' wk' + (r === 1 ? '' : 's');
-
-    const did = [];
-    audWk.forEach(a => did.push(this._n('Cash audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
-      + (a.overall_score != null ? ', scored ' + a.overall_score : '') + '.'));
-    if (outWk.length) did.push(this._n(outWk.length + ' cash ' + this._plu(outWk.length, 'outflow')) + ' logged, '
-      + this._m0(outWk.reduce((t, o) => t + (Number(o.amount) || 0), 0)) + '.');
-    const activity = this._didList(did);
-    const results = this._resRow([
-      this._res('Trapped Cash', trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-', (trapped.hasData && trapped.total > 0) ? 'var(--amber)' : 'var(--t1)'),
-      this._res('Runway', (sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-', (sf.hasOpening && sf.runway != null) ? 'var(--red)' : 'var(--t1)'),
-      this._res('Safe to Spend', pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-', (pos.hasOpening && pos.safe < 0) ? 'var(--red)' : 'var(--t1)'),
-      this._res('Tightest Week', (sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-', (sf.lowPoint && sf.lowPoint.balance < 0) ? 'var(--red)' : 'var(--t1)')
-    ]);
-
-    const ag = this._auditGap(dat.cash_audits);
-    const open = [];
-    if (trapped.hasData && trapped.total > 0) open.push({ t: '<b>' + App.fmtCurrency(trapped.total, 0) + '</b> still trapped on the shelf', sev: 'amber' });
-    if (sf.hasOpening && sf.runway != null && sf.runway <= 4) open.push({ t: 'Cash runs thin, about ' + runwayLabel(sf.runway) + ' of runway', sev: 'red' });
-    else if (sf.hasData && sf.tightWeeks > 0) open.push({ t: '<b>' + sf.tightWeeks + '</b> tight week' + (sf.tightWeeks === 1 ? '' : 's') + ' in the next 13', sev: 'amber' });
-    if (pos.hasOpening && pos.safe != null && pos.safe < 0) open.push({ t: 'Safe-to-spend is negative, into money already spoken for', sev: 'red' });
-    if (!ag.ever) open.push({ t: 'No Cash audit had been run by the end of this week', sev: 'amber' });
-    else if (ag.stale) open.push({ t: 'Cash audit was <b>' + ag.days + '</b> days old when this week closed', sev: 'amber' });
-
-    (this._pdf || (this._pdf = [])).push({ name: 'Cash', activity: this._didPlain(did),
-      results: 'Current position: Trapped Cash ' + (trapped.hasData ? App.fmtCurrency(trapped.total, 0) : '-') + ', Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-') + ', Safe to Spend ' + (pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-') + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-'),
-      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
-    return this._sectionCard('Cash', [
-      { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up &middot; Current Position', html: results },
-      { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ]);
-  },
-
   // ── Events (pipeline, not a weekly close) ───────────────────────────────────
-  _eventsSection() {
+  _eventsSection(key, name) {
     /* ⛔ `S.EventsBookings`, NOT the deleted `S.EventsDashboard` (2026-08-12). This guard is the
        reason the deletion had to be measured rather than swept: it returns '' rather than throwing,
        so pointing it at a screen that no longer exists would have removed this whole section from
@@ -1174,14 +1429,14 @@ S.WeekReview = {
     if (st.noRunSheet.length) open.push({ t: '<b>' + st.noRunSheet.length + '</b> upcoming event' + (st.noRunSheet.length === 1 ? '' : 's') + ' need a run sheet', sev: 'amber' });
     if (st.completedOpen.length) open.push({ t: '<b>' + st.completedOpen.length + '</b> completed event' + (st.completedOpen.length === 1 ? '' : 's') + ' to close out', sev: 'amber' });
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Events', activity: this._didPlain(did),
+    (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
       results: 'Booked ' + ED._money(st.bookedRev) + ', Pipeline ' + ED._money(st.pipeline) + ', Deposits Due ' + ED._money(st.depositsDue) + ', Win Rate ' + st.conv,
       open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
-    return this._sectionCard('Events', [
+    return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
       { label: 'What It Turned Up &middot; Current Pipeline', html: results },
       { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ]);
+    ], { open: open, did: did });
   },
 
   // ── Books (monthly close) ───────────────────────────────────────────────────
@@ -1196,9 +1451,26 @@ S.WeekReview = {
   _money(v) { return (v == null || isNaN(v)) ? '-' : App.fmtBal(Number(v)); },
   _pct(v)   { return (v == null || isNaN(v)) ? '-' : (v * 100).toFixed(1) + '%'; },
 
-  _booksSection() {
+  /* ⛔⛔ BOOKS TOOK THE CASH POSITION, AND IT TOOK IT FROM A CARD NAMED AFTER A DELETED SECTION.
+     Measured off the section's own nav: Break-Even, Capital Efficiency, Cash Position, Cash Bridge,
+     Cash Forecast, Profit Forecast and Revenue Forecast are all BOOKS rows now. The recap was
+     printing runway and safe-to-spend under a CASH heading whose only door had been deleted, and
+     printing the SAME cash-outflow line on both that card and this one — one week's outflows counted
+     once and reported twice, ten inches apart.
+     ⚠ TRAPPED CASH DID NOT COME HERE. It went to Inventory, because `c-trapped` is an Inventory ▸
+     Reports row. The old Cash card's four figures split across two sections and neither half is a
+     judgement call — each followed the page its operator can actually open. */
+  _booksSection(key, name) {
     const BH = this;
     if (!((App.data && App.data.weeks) || []).length) return null;
+    /* ⚠ BARE, for the reason `_inventoryFigures` writes out below: an optional guard on a helper
+       required for correctness reverts to a quiet dash instead of failing ([[the-loop]] #40), and
+       this member already calls `CashEngine.cashOutflows()` bare further down. `hasData` /
+       `hasOpening` are the ENGINE's own "is there enough to answer" flags and they are what decide
+       whether a figure prints or a dash does — that is the honest empty state, not a missing file. */
+    const sf = CashEngine.survivalForecast(13);
+    const pos = CashEngine.position();
+    const runwayLabel = r => r == null ? '13+ wks' : r === 0 ? 'This wk' : r + ' wk' + (r === 1 ? '' : 's');
 
     /* ⛔⛔⛔ THE FIGURES BELONG TO THE REVIEWED WEEK'S OWN MONTH, AND THEY USED TO BELONG TO JULY.
        Kyle, 2026-08-11: *"what it turned up is i assuming still listing july numbers.. when the week
@@ -1298,20 +1570,41 @@ S.WeekReview = {
        reporting, and the only thing it can report is a month that never got a bill in it. */
     const open = [];
     if (settled && billsMonth === 0) open.push({ t: 'No bills were ever logged for ' + esc(mLabel), sev: 'amber' });
+    /* ⭐ THE CASH WARNINGS CAME ACROSS WITH THE FIGURES, worded exactly as they were. They belong in
+       the same list as the month's, because both answer "what does this week leave you owing". */
+    if (sf.hasOpening && sf.runway != null && sf.runway <= 4) open.push({ t: 'Cash runs thin, about ' + runwayLabel(sf.runway) + ' of runway', sev: 'red' });
+    else if (sf.hasData && sf.tightWeeks > 0) open.push({ t: '<b>' + sf.tightWeeks + '</b> tight week' + (sf.tightWeeks === 1 ? '' : 's') + ' in the next 13', sev: 'amber' });
+    if (pos.hasOpening && pos.safe != null && pos.safe < 0) open.push({ t: 'Safe-to-spend is negative, into money already spoken for', sev: 'red' });
+
     const toClose = settled
       ? this._openList(open, 'Nothing left to close on ' + esc(mLabel) + '.')
-      : this._didRow('Get all your bills and cash outflows in before the month ends, then close the month-end books.');
+      : (this._openList(open, '') + this._didRow('Get all your bills and cash outflows in before the month ends, then close the month-end books.'));
 
-    (this._pdf || (this._pdf = [])).push({ name: 'Books', activity: this._didPlain(did),
-      results: settled
+    /* ⚠ ITS OWN BAND, AND THE LABEL SAYS THE BASIS. Runway and safe-to-spend are a position as it
+       stands TODAY, while the band above them reports a finished MONTH — two different clocks, and
+       the page already had the convention for saying so (`· Current Position`, `· Current Stock`).
+       Stuffing them into one band would have put a live figure under a month heading, which is the
+       exact defect Kyle reported on this card once already. */
+    const cashCells = this._resRow([
+      this._res('Runway', (sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-', (sf.hasOpening && sf.runway != null) ? 'var(--red)' : 'var(--t1)'),
+      this._res('Safe to Spend', pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-', (pos.hasOpening && pos.safe < 0) ? 'var(--red)' : 'var(--t1)'),
+      this._res('Tightest Week', (sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-', (sf.lowPoint && sf.lowPoint.balance < 0) ? 'var(--red)' : 'var(--t1)')
+    ]);
+
+    (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
+      results: (settled
         ? 'Op Income YTD ' + BH._money(yInc) + ', Margin ' + BH._pct(yMargin) + ', ' + mLabel + ' Revenue ' + BH._money(mRev) + ', ' + mLabel + ' Income ' + BH._money(mInc)
-        : mLabel + ' is still open, so its figures are not in yet.',
+        : mLabel + ' is still open, so its figures are not in yet.')
+        + '  Current position: Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-')
+        + ', Safe to Spend ' + (pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-')
+        + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-'),
       open: this._stripTags(this._tidy(toClose)) });
-    return this._sectionCard('Books', [
+    return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
       { label: settled ? 'What It Turned Up &middot; ' + esc(mLabel) : 'What It Turned Up', html: results },
+      { label: 'Where The Cash Stands &middot; Today', html: cashCells },
       { label: 'To Close', html: toClose }
-    ]);
+    ], { open: open, did: did });
   },
 
   render(mount) {
@@ -1363,18 +1656,44 @@ S.WeekReview = {
       + exportBtn + '</div>';
 
     this._pdf = [];   // section payloads, collected as each section builds, for the PDF
-    const sections = [this._inventorySection(), this._laborSection(), this._shiftSection(), this._profitSection(), this._revenueSection(), this._cashSection(), this._eventsSection(), this._booksSection()].filter(Boolean).join('');
+    /* ⛔⛔ THE ROWS AND THEIR ORDER COME FROM `_plan()`, NEVER FROM A LIST TYPED HERE. The eight
+       hardcoded calls this replaced were the reason the page could go stale without anything saying
+       so: five of the eight named sections the app no longer has, and three sections it DOES have
+       (The Week, Run Audit, Menus) had no row at all, because nothing tied this list to the rail.
+       ⚠ A BAND WITH NOTHING UNDER IT IS NOT DRAWN. A section with no data returns null — day one, or
+       a bar that runs no events — and a heading over an empty space reads as a section that failed
+       rather than one that was never used. Same reason `_PROTO_CONTROL` was deleted from the rail
+       rather than emptied ([[lessons-paid-for]] #51's neighbour). */
+    const bands = this._plan().map(g => {
+      // `.call(this, …)` because `build` is the function itself — see `_plan`.
+      const rows = g.rows.map(r => r.build.call(this, r.key, r.name)).filter(Boolean).join('');
+      return rows ? this._bandHead(g.band) + rows : '';
+    }).join('');
 
     mount.innerHTML = '<div class="screen wr-screen">'
       + this._topCard()
       + selectorRow
-      + '<div class="wr-grid">' + sections + '</div>'
+      + '<div class="wr-grid">' + bands + '</div>'
       + '</div>';
 
     mount.querySelectorAll('.wr-arrow').forEach(a =>
       a.addEventListener('click', () => this._step(parseInt(a.dataset.step, 10))));
     mount.querySelector('.wr-now')?.addEventListener('click', () => { this._wkStart = this._maxMonday(); this.render(mount); });
     document.getElementById('wr-export')?.addEventListener('click', () => this._exportPDF());
+    /* ⛔⛔⛔ THE SELECTOR AND THE CLASS ARE ONE FACT. `_sectionCard` renders `class="wr-step-head"`
+       and this line binds to it; changing one without the other is six rows that draw perfectly and
+       do nothing on click, which is what shipped on Close The Week under a green gate
+       ([[the-loop]] integrity #11). `verify-week-review-accordion` parses the class out of the
+       rendered row and the selector out of this line and asserts they agree, because a node harness
+       cannot click.
+       ⚠ CLICKING THE OPEN ROW CLOSES IT. Kyle asked for rows that open AND close, so this is a
+       toggle, not a radio — and `_openSec` is allowed to be null. `_prepare` is what puts Inventory
+       back on the next landing; nothing here re-opens anything. */
+    mount.querySelectorAll('.wr-step-head').forEach(el => el.addEventListener('click', () => {
+      const k = el.dataset.sec;
+      this._openSec = (this._openSec === k) ? null : k;
+      this.render(this.container);
+    }));
   },
 
   _stripTags(s) { return String(s == null ? '' : s).replace(/<[^>]*>/g, ''); },

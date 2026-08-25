@@ -60,11 +60,33 @@ S.Week = {
      exactly the drift this suite exists to catch. The pin caught it: it went looking for a spelling
      the code did not have, and the honest fix was to delete the second map rather than teach the
      assertion about it. Add a fourth page and only `PAGES` + `LEGACY` change. */
+  /* Does this argument name a PAGE (a page key or one of the legacy screen ids), or the SECTION?
+     The two get different landings, so the question is asked once, here, off `LEGACY` — the same
+     table `_resolve` and the gate already read. */
+  _namesAPage(which) {
+    return !!(which && (this.LEGACY[which] || Object.keys(this.LEGACY).some(k => this.LEGACY[k] === which)));
+  },
+  /* ⛔⛔⛔ THE SECTION KEY LANDS ON THE SECTION'S FIRST PAGE, NOT ON WHERE YOU WERE (Kyle,
+     2026-08-25: *"the week rail menu link is the only link when you click it does not automatically
+     land on the 1st top bar link by default.. so if i click on history and leave the page and then
+     click the week again.. it lands still on history.. it should always land on close the week"*).
+     This line read `return hit || this.page;` and its own comment said so out loud — *"'week' and
+     anything unknown land where we are"* — which is right for a bare re-open and wrong for the rail
+     row, because the rail hands this the SECTION key. Reproduced by RUNNING the shipped member
+     against an object parked on history: `_resolve('week')` came back 'history'.
+     ⭐ THE OTHER SIX SECTIONS NEVER HAD THIS, and the reason is worth knowing: their landing is
+     decided in `_protoGlobalClick` itself (The Floor names `lc-build-schedule`, Menus names
+     `r-menu-items`, Audits and Books name their opener). The Week is the only section that delegates
+     the choice to a page object, which is the one place last-page-viewed state lives.
+     ⭐ DERIVED FROM `PAGES`, NEVER TYPED. The landing is the first LINK in the section's own bar, so
+     reordering that table moves the landing with it and there is no second fact to keep in step.
+     ⚠ A BARE `_resolve()` STILL STAYS PUT. That is the re-open contract and it is the one case the
+     old fallback was genuinely right about; only a NAMED thing that is not a page moves. */
   _resolve(which) {
     if (!which) return this.page;
     if (this.LEGACY[which]) return which;                                   // already a page key
     const hit = Object.keys(this.LEGACY).find(k => this.LEGACY[k] === which);
-    return hit || this.page;                                                // 'week' and anything unknown land where we are
+    return hit || this.PAGES[0][0];                                         // the SECTION key, and anything unknown, lands on the first page
   },
 
   /* ⭐⭐⭐ THE SECTION'S THREE LINKS, DERIVED FROM `PAGES` AND NOTHING ELSE. `App.navHTMLFor('week')`
@@ -117,8 +139,23 @@ S.Week = {
      the gate matters: a refused open must not leave the object pointing at a page the member was
      just told they cannot have.
      ⚠ THE AREA IS UNCHANGED FOR ALL THREE, which is what makes this inert for today's grants. */
+  /* ⛔⛔ AND POINTING THE SECTION KEY AT CLOSE WOULD OTHERWISE HAND A SCOPED MEMBER A DEAD RAIL ROW.
+     The gate below asks about the page that was resolved, so a member granted Review but not Close
+     would press The Week and be refused every time, while the Review link in the bar beside it works
+     — a control that renders perfectly and does nothing, and one NEITHER the owner NOR the demo can
+     ever meet ([[the-loop]] #149: a permission-gated path is invisible to owner-and-demo testing).
+     ⭐ THIS IS NOT A NEW MECHANISM. `_protoGlobalClick` already does exactly this twice, for The
+     Floor and for Menus: land on the named page, and if that one is refused take the first row in
+     BAR ORDER they can open. Same rule, applied to the one section whose landing is resolved inside
+     the page object rather than in the router.
+     ⛔ SCOPED TO A SECTION-LEVEL ASK, DELIBERATELY. A direct link to a page a member may not have
+     must still REFUSE; falling through there would open a page their grant does not include. */
   open(which) {
-    const page = this._resolve(which);
+    let page = this._resolve(which);
+    if (!this._namesAPage(which) && App._hubBlocked && App._hubBlocked(this.LEGACY[page])) {
+      const first = this.PAGES.map(t => t[0]).find(k => !App._hubBlocked(this.LEGACY[k]));
+      if (first) page = first;
+    }
     if (App._hubBlocked && App._hubBlocked(this.LEGACY[page] || 'week-close')) return;
     this.page = page;
     const row = this.PAGES.find(t => t[0] === this.page) || this.PAGES[0];
@@ -164,6 +201,12 @@ S.Week = {
         S.WeekClose.container = p;
         S.WeekClose.render(p);
       } else if (this.page === 'review' && S.WeekReview) {
+        /* Same contract as Close's `_prepare()` above and for the same reason: Review's landing rule
+           (open the Inventory row, whatever was left open last visit) cannot live in its `render`,
+           which runs on every accordion toggle. Both doors into the page ask for it — this host, and
+           `S.WeekReview.open` for a deep link — or the landing is right through one and wrong
+           through the other ([[lessons-paid-for]] #59). */
+        if (S.WeekReview._prepare) S.WeekReview._prepare();
         S.WeekReview.container = p;
         S.WeekReview.render(p);
       } else if (this.page === 'history' && S.WeekHistory) {
