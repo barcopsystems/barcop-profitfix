@@ -634,7 +634,7 @@ const App = {
     const m = document.createElement('div');
     m.id = 'demo-welcome';
     m.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:9600;display:flex;align-items:center;justify-content:center;padding:24px;';
-    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:10px;padding:32px 30px;max-width:460px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,0.5);">'
+    m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:10px;padding:32px 30px;max-width:460px;text-align:center;box-shadow:0 8px 24px var(--panel-shadow);">'
       + '<div style="margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
       + '<div style="font-size:18px;font-weight:800;color:var(--w);margin-bottom:12px;">Welcome to the Bar Cop Live Demo</div>'
       + '<div style="font-size:13.5px;color:var(--t2);line-height:1.7;margin-bottom:24px;">This is a real bar loaded with real numbers, so you can see exactly how Bar Cop runs the place. Open any section, run an audit, change a price, count some stock, change whatever you want. Nothing here saves and nothing breaks. When you are ready to run your own place, hit <b style="color:var(--gold);">Set Up My Bar</b> down in the corner. Now go dig around.</div>'
@@ -1750,7 +1750,7 @@ const App = {
       });
     }
     // Build a fresh panel each open so prior content is cleared
-    modal.innerHTML = '<div class="hub-modal-panel" style="background:var(--bg);border:1px solid var(--b1);border-radius:8px;max-width:920px;width:100%;max-height:calc(100vh - 80px);overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,0.55);"></div>';
+    modal.innerHTML = '<div class="hub-modal-panel" style="background:var(--bg);border:1px solid var(--b-edge);border-radius:8px;max-width:920px;width:100%;max-height:calc(100vh - 80px);overflow-y:auto;position:relative;box-shadow:0 8px 24px var(--panel-shadow);"></div>';
     const panel = modal.querySelector('.hub-modal-panel');
     modal.style.display = 'flex';
     // Install Esc-to-close once
@@ -4179,7 +4179,7 @@ const App = {
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const panel = document.createElement('div');
     panel.id = 'tn-mnav';
-    panel.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:var(--navh);width:100%;background:var(--surface);border-top:1px solid var(--b1);box-shadow:0 -8px 30px rgba(0,0,0,0.45);z-index:9001;transform:translateY(100%);transition:transform .24s ease;display:flex;flex-direction:column;overflow:hidden;';
+    panel.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:var(--navh);width:100%;background:var(--surface);border-top:1px solid var(--b-edge);box-shadow:0 -8px 24px var(--panel-shadow);z-index:9001;transform:translateY(100%);transition:transform .24s ease;display:flex;flex-direction:column;overflow:hidden;';
     const close = () => { panel.style.transform = 'translateY(100%)'; ov.style.opacity = '0'; setTimeout(() => { ov.remove(); panel.remove(); }, 240); };
     const fire = (fn) => { close(); setTimeout(() => { try { fn(); } catch (e) {} }, 30); };
 
@@ -6899,7 +6899,7 @@ const App = {
     m.style.cssText = 'position:fixed;inset:0;background:var(--overlay);z-index:9000;opacity:0;transition:opacity .18s ease;';
     const box = document.createElement('div');
     box.className = 'help-panel';
-    box.style.cssText = 'position:fixed;top:0;right:0;height:100%;width:420px;max-width:92vw;background:var(--surface);border-left:1px solid var(--b1);box-shadow:-10px 0 30px rgba(0,0,0,0.4);z-index:9001;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease;';
+    box.style.cssText = 'position:fixed;top:0;right:0;height:100%;width:420px;max-width:92vw;background:var(--surface);border-left:1px solid var(--b-edge);box-shadow:-8px 0 24px var(--panel-shadow);z-index:9001;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease;';
     box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--b2);flex-shrink:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--t3);">' + title + '</div>'
       + '<button class="btn btn-ghost btn-sm" data-help-close>Close</button></div>'

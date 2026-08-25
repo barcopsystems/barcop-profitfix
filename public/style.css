@@ -48,6 +48,23 @@
      become MORE transparent than the value he confirmed. Raising passes, lowering fails — the same
      repair `verify-control-border-visible` T2 needed ([[lessons-paid-for]] #133). */
   --overlay:   rgba(17,23,27,0.96);
+  /* ⛔⛔ THE POPUP PANEL SHADOW, AND IT IS A TOKEN FOR THE SAME REASON `--overlay` IS (Kyle,
+     2026-08-24: *"the left side drop shadow on it and also on the welcome do demo popup is way too
+     much shadow and too dark now.. not sure if any other popup are the same"*).
+     ⭐ HE ASKED THE RIGHT QUESTION AND THE ANSWER WAS SIX. Censused every `box-shadow` in the tree
+     (27 of them) and read the heavy ones: FOUR live popup panels carried their own hand-written
+     value, all different — the demo welcome at `0 30px 70px rgba(0,0,0,0.5)` (a 70px blur), the hub
+     overlay at 0.55, the phone sheet at 0.45, the help slide-out at 0.4. Four sites, four opinions,
+     nothing holding them together, which is exactly how they drifted this dark.
+     ⭐ ONE VALUE NOW, AND IT IS THE ALPHA — the geometry stays per panel because a right-hand
+     slide-out and a centred card genuinely cast in different directions, but every one uses a 24px
+     blur, an 8px offset and THIS colour. Retuning the darkness of every popup in the app is one line
+     here rather than four inline strings in `app.js`.
+     ⚠ 0.22 is a starting point, not a measurement — there is no "correct" shadow to derive, and
+     [[color-system-policing]] says Kyle walks a design value himself. It is roughly half the alpha
+     and a third of the blur of what he rejected. `verify-popup-panel-chrome` pins the AGREEMENT
+     (all four on this token, same blur) and never the number, so he can move it freely. */
+  --panel-shadow: rgba(0,0,0,0.22);
   /* ⛔⛔ CARD FILL = PAGE FILL (2026-08-08, Kyle's call, reversible by one value).
      It was #08131A against a #070E15 page — a difference of 1, 5, 5, which is barely a fill at all.
      The card is defined by its BORDER and its header band now, and the tone it used to spend on the
