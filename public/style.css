@@ -741,6 +741,30 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .ch-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--t3);padding:10px 2px;margin-bottom:-1px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer;}
 .ch-tab:hover{color:var(--t2);}
 .ch-tab.on{color:var(--t1);border-bottom-color:var(--focus);}
+/* ⛔⛔ A TAB STRIP AT THE TOP OF A PAGE SAT 10px LOWER THAN A CARD DOES (Kyle, 2026-08-24: *"all the
+   pages that have text/tab menus at the top... have a bigger gap between the text and the top bar
+   border than all the other pages with a card/stat box as the first thing on the page.. the gap of
+   these needs to be shortened to the same gap that a card has"*).
+   ⭐ MEASURED, AND THE 10 IS NOT A GUESS — IT IS THE TAB'S OWN TOP PADDING. `.screen` pads `--sp`
+   (28px) and both start there: a card's visible top edge IS its box, so it reads at 28. A tab has no
+   fill and no border on top, so what the eye reads is its TEXT, which sits 10px further down inside
+   `padding:10px 2px`. Live on the pushed build: card 28, tab text 38, on all six affected screens.
+   ⛔ THE PADDING ITSELF MUST NOT CHANGE. It is what puts the active underline 10px under the word,
+   which is the agreement with the top-bar link mark (`verify-section-tabs` U3d). So the strip is
+   pulled up by that amount instead, and only where it is the FIRST thing on the page.
+   ⭐⭐ SCOPED BY SHAPE, NOT BY A LIST OF SCREENS ([[lessons-paid-for]] #72). `.screen > .ch-tabs:
+   first-child` is exactly "the tab strip is what you meet at the top", so a screen built tomorrow is
+   covered the day it ships and a strip sitting MID-page is untouched. MEASURED that it separates the
+   two populations rather than being assumed to: it matches `ic-report-stock`, `ic-report-usage`,
+   `ic-report-variance` (in its report state), `lc-reports`, `lc-tip-history` and `sc-cash-history`,
+   and does NOT match `r-menu-items` (strip at 224), `hub-operating-expenses` (358), `ic-locations`
+   or `ic-product-setup` — all four of which open on a card and keep their strip where it is.
+   ⚠ `ev-calendar` looked like one and is NOT: its month scroller is a filled chip, so its visible
+   top is its BOX and it already reads 28, same as a card. Measured before excluding it.
+   ⚠ IT WORKS AT THE MOBILE BREAKPOINT WITHOUT A SECOND RULE, because the correction is the tab's own
+   padding rather than a figure derived from `--sp`: below 900 `.screen` pads 16 and the strip still
+   sits exactly 10px proud of it. */
+.screen > .ch-tabs:first-child{margin-top:-10px;}
 /* ⛔⛔ ONE `.screen` PER PAGE, AND THE WEEK'S TABBED HOST BROKE THAT (Kyle, 2026-08-23, on the pushed
    build: *"the content area isn't wide enough.. should be flush on both sides with the tab menu..
    and there is too much space between the tab menu and the content"*).
