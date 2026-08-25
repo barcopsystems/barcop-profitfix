@@ -2771,13 +2771,33 @@ const App = {
       { h: 'Cost of goods', p: ['If your counts happen to span this week, Bar Cop prices the cost of goods from them and says so. If they do not, you type it on the confirm. Counting weekly is not required, and Bar Cop will never book a month of usage onto one week.'] },
       { h: 'Confirming', p: ['Confirm the Week saves the week\'s figures. Anything missing reads as blank, so you can confirm now and fill the rest in later. Once it is confirmed the button reopens the same form so you can correct it.'] }
     ] },
+    /* ⛔⛔⛔ REWRITTEN 2026-08-25 WITH THE PAGE (Kyle: *"make sure the i help is correct now"*). Two of
+       its six sections described an app that no longer exists: "Read a section" listed *"the Recovery
+       work: audits run, sales reviews, discrepancies filed, investigations opened, and experiments
+       running"*, and "Why some numbers read a dash" opened *"The Recovery sections (Profit, Revenue,
+       Cash)"*. MEASURED against the rebuilt page: it emits ZERO occurrences of investigation,
+       experiment, sales review or Recovery, and Profit / Revenue / Cash are not sections — the two
+       lines that produced investigations and experiments were cut at T69 when their stores turned
+       out to be unregistered.
+       ⚠ AND `verify-help-not-stale` COULD NOT HAVE CAUGHT IT, WHICH IS THE PART WORTH KNOWING. That
+       ratchet derives its banned vocabulary from what the nav renders and proves each word is absent
+       before banning it — and Profit, Revenue and Cash are all still live words, as the names of
+       three of the four AUDITS. This is the same word in a different ROLE ("the Recovery sections"
+       against "the Revenue audit"), which no vocabulary sweep can see. Pinned by
+       `verify-week-review-accordion` block I against the page's OWN section table instead.
+       ⭐ EVERY CLAIM BELOW IS READ OFF THE RENDERED PAGE, not from the plan: seven rows, the three
+       band names, the three band labels inside a row, and the four cards that suffix a band because
+       its figures are about today rather than about the finished week. */
     'week-review': { title: 'How Week in Review Works', sections: [
-      { h: 'What this is', p: ['The recap of a week that has finished. Section by section it reads what your team logged, what those records turned up, and what is carrying into the week after, so you can read one page and see how the week actually went.'] },
+      { h: 'What this is', p: ['The recap of a week that has finished. One row for each part of the business, reading what your team logged, what those records turned up, and what is carrying into the week after, so you can read one page and see how the week actually went.'] },
       { h: 'It only shows finished weeks', p: ['The most recent week you can open is the one that just ended, and the arrows step back from there. A week still being lived has only half its records in it, so a recap of it would report a bar that looks like it did nothing about a week nobody has finished. It opens on the last week you confirmed.'] },
-      { h: 'Read a section', p: ['Done This Week is the raw activity that got logged, counts, deliveries, hours, tips, sales days, plus the Recovery work: audits run, sales reviews, discrepancies filed, investigations opened, and experiments running. What It Turned Up is the result those records produced. Carrying Into Next Week is what the week left open.'] },
-      { h: 'Everything here is a record', p: ['Every figure and every carried-over item comes from something Bar Cop actually has on file for that week, never from a box anyone ticked. If a week left nothing open, it says so.'] },
-      { h: 'Why some numbers read a dash', p: ['The Recovery sections (Profit, Revenue, Cash) only produce cost and margin numbers once the week is confirmed, which rolls up that week\'s revenue, cost of goods and labor. If a week was never confirmed those cells read a dash and the card says so. You can still confirm a past week from Close The Week and the numbers fill in. A dash is an honest blank, never a made-up number.'] },
-      { h: 'Export', p: ['Export PDF saves the week as a one-page report, named for the week it covers so two weeks never overwrite each other.'] }
+      { h: 'Open a row to read it', p: ['Every row opens and closes. Inventory is open when you land; click any other heading to open it and click it again to shut it. The mark on the left is what that part of the business left open, so you can scan the closed page and see which rows are worth opening. A green tick means nothing is carrying over.'] },
+      { h: 'The three groups', p: ['What fed the week is the work that produced the week\'s records: Inventory, The Floor and Events. The week itself is the close, where sales, hours and your count came together. What the week fed is what reads finished weeks back: Run Audit, Menus and Books. That is the same order the Guide builds them in.'] },
+      { h: 'Read a row', p: ['Done This Week is the activity that got logged, written out: counts and spot checks, deliveries and orders, hours and tips, the days you traded, drawer counts, bookings, bills. What It Turned Up is the result those records produced. Carrying Into Next Week is what that part of the business left open, worst first.'] },
+      { h: 'Everything here is a record', p: ['Every figure and every carried-over item comes from something Bar Cop actually has on file for that week, never from a box anyone ticked. If a row logged nothing all week it says so once, instead of listing what did not happen.'] },
+      { h: 'Some figures are about today, not the week', p: ['A few numbers cannot be pinned to a finished week because they only exist as they stand right now: what is below par, what is trapped on the shelf, your event pipeline, your menu, your runway. Those bands say so in their own heading, with Current Stock, Current Pipeline, Current Menu or Today after the label. Everything without that suffix belongs to the week you are reading.'] },
+      { h: 'Why some numbers read a dash', p: ['The Week card carries the cost percentages, and they only exist once that week is confirmed, which rolls up its revenue, cost of goods and labor. If a week was never confirmed those cells read a dash and the card says so. You can still confirm a past week from Close The Week and the numbers fill in. A dash is an honest blank, never a made-up number.'] },
+      { h: 'Export', p: ['Export PDF saves the week as a one-page report, named for the week it covers so two weeks never overwrite each other. It sits on the first group heading.'] }
     ] },
     'bar-cop-audit': { title: 'How the Operations Audit Works', sections: [
       { h: 'What this is', p: [
