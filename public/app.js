@@ -10220,7 +10220,7 @@ const App = {
            move and their screen objects are unchanged; what moved is where the app files them. */
         'c-purchasing':        ['Purchasing', 'Inventory Control'],
         'c-trapped':           ['Trapped Cash', 'Inventory Control'],
-        'sc-void-comp':        ['Void and Comp Log', 'Inventory Control'],
+        'sc-void-comp':        ['Voids / Comps Log', 'Inventory Control'],
         'sc-waste':            ['Waste / Spill Log', 'Inventory Control'],
         /* ⛔⛔⛔ THE VENDOR PAGES MOVED HERE FROM THE PROFIT BLOCK ON 2026-08-23, AND WITHOUT THIS
            THE THREE NEW NAV LINKS RENDER "Coming soon." `navigate` keeps a SEPARATE screen map per

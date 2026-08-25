@@ -269,7 +269,7 @@ const Inventory = {
       <div class="nav-section">Logs</div>
       <div class="nav-item" data-screen="sc-void-comp" id="nav-sc-void-comp">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M4 2.5h9v12l-2-1.3-2.5 1.3-2.5-1.3-2 1.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 6.5l4 4M10.5 6.5l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="nav-label">Void and Comp Log</span>
+        <span class="nav-label">Voids / Comps Log</span>
       </div>
       <div class="nav-item" data-screen="sc-waste" id="nav-sc-waste">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><path d="M3 5h11M5 5l1 9h5l1-9M7 3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>

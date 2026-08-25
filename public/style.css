@@ -2505,8 +2505,14 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    *"the drop down width is already around 30px too wide with the icons so probably 50px without"*).
    MEASURED, NOT ESTIMATED: the real `.st-drop` markup was built off-screen for all 17 multi-row
    groups the eight enabled sections can emit, against this stylesheet, with min-width defeated.
-   Widest WITH icons 170 (Inventory's Logs group, "Void and Comp Log") — 26 narrower than 196.
+   Widest WITH icons 170 (Inventory's Logs group) — 26 narrower than 196.
    Widest WITHOUT icons 144 — 52 narrower. He said ~30 and ~50.
+   ⚠ 144 -> 141 ON 2026-08-24, AND THE RENAME IS THE WHOLE REASON. Both numbers above were measured
+   against "Void and Comp Log"; Kyle renamed that row to "Voids / Comps Log", which is the same 17
+   characters and 3px NARROWER, so the widest panel in the app is now 141. Re-measured with the same
+   probe rather than left at 144 with silent slack, so `verify-section-tabs` U6 can stay an exact
+   equality against the measurement instead of a number nothing derives ([[lessons-paid-for]] #99 — a
+   figure in a comment that no longer matches what was measured is a false fact with a name on it).
    ⭐ IT IS THE WIDEST PANEL'S OWN CONTENT WIDTH, WHICH IS WHY THE MIN-WIDTH EXISTS AT ALL: every
    panel renders the same width instead of each sizing to its own longest row, and now the widest
    one exactly fits rather than every one of them being padded out to clear it.
@@ -2516,7 +2522,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    longer label then makes its panel wider than its siblings, which is cosmetic and loud, not
    silent. */
 .st-drop{position:fixed;background:var(--bg);border:1px solid var(--b-edge);border-top:0;
-  border-radius:0 0 8px 8px;padding:5px;min-width:144px;z-index:200;}
+  border-radius:0 0 8px 8px;padding:5px;min-width:141px;z-index:200;}
 /* ⛔⛔⛔ THE GOLD CHEVRON, AND IT HAD TO FIT INSIDE THE BAR (Kyle: *"a gold chevron that shows up
    under the menu link pointing down to the menu that is open below it... stays active as long as
    the drop down menu is open and goes away when a menu closes"*).
