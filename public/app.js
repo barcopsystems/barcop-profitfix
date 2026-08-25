@@ -2896,24 +2896,24 @@ const App = {
        ever be opened by code that no longer exists. */
     'settings-profile': { title: 'How the Business Profile Works', sections: [
       { h: 'What this page is', p: ['Your operation\'s identity: bar name and location, your taxes and wage settings, and the service periods you run. One-time setup you revisit when something changes. Save it all with the one Save Data button below the card.'] },
-      { h: 'Taxes and payroll', p: ['Set your sales tax rate, how often you file (monthly or quarterly), and your payroll tax percentage once here. Cash, Books, and Events all read them, so you enter them in one place: the Month-End Sales Tax worksheet uses your rate, and Cash Position uses them to size the money you have collected but already owe.'] },
-      { h: 'Service periods', p: ['Turn on the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. These set every shift-type field across Bar Cop, across the schedule and the Recovery daypart breakdowns. Add a custom one if your venue runs something different.'] }
+      { h: 'Taxes and payroll', p: ['Set your sales tax rate, how often you file (monthly or quarterly), and your payroll tax percentage once here. Books, The Floor, and Events all read them, so you enter them in one place: the Month-End Sales Tax worksheet uses your rate, Cash Position uses it to size the money you have collected but already owe, and the Pay pages use your state minimum wage.'] },
+      { h: 'Service periods', p: ['Turn on the dayparts you run, like Brunch, Lunch, Dinner, and Late Night. These set every shift-type field across Bar Cop, across the schedule and the daypart breakdowns. Add a custom one if your venue runs something different.'] }
     ] },
-    'settings-targets': { title: 'How Recovery Targets Work', sections: [
+    'settings-targets': { title: 'How Targets Work', sections: [
       { h: 'What this page is', p: [
-        'Every target here sets the line your real numbers get measured against across the Profit and Revenue systems: the audits, the Hub, and your confirmed week. Hit the target and the number reads green. Miss it and Bar Cop flags the gap and prices what it is worth to close.',
+        'Every target here sets the line your real numbers get measured against across the Profit and Revenue audits, the Hub, and your confirmed week. Hit the target and the number reads green. Miss it and Bar Cop flags the gap and prices what it is worth to close.',
         'Industry defaults are pre-filled so you have a working line on day one. Set each one to your own goal as you learn your numbers. Each section saves on its own with its Save Data button.'
       ] },
       { h: 'Profit targets', p: [
         'Bar Pour Cost %: your liquor, beer, and wine cost as a share of bar sales. The lower the number, the more you keep on every pour. Most bars run 18 to 24 percent; the default is 22. Bar Cop grades your real pour cost against this on the Profit Audit and flags the categories running over.',
         'Food Cost %: your food cost as a share of food sales. Full-service kitchens usually run 28 to 35 percent; the default is 32. Set it to the margin your menu is priced for.',
-        'Labor Cost %: total labor, hourly and salary, as a share of total sales. Most full-service operations target 28 to 32 percent; the default is 30. This is the line Labor Control and the schedule build toward.',
+        'Labor Cost %: total labor, hourly and salary, as a share of total sales. Most full-service operations target 28 to 32 percent; the default is 30. This is the line the schedule builds toward.',
         'Prime Cost %: pour cost plus food cost plus labor, the one number that decides whether the doors stay open. Keep it under 60 to 65 percent of sales; the default is 60. Get prime cost right and the rest of the P&L usually follows.'
       ] },
       { h: 'Revenue targets', p: [
         'Check Average: the average guest check you are aiming for. Bar Cop measures your real check average against it and sizes the upsell opportunity in dollars. Raise it as your menu and service push add-ons.',
         'Lunch, Dinner, and Bar RPLH: revenue per labor hour, the sales each worked labor hour brings in, set separately for each daypart since a slow lunch and a packed bar are not the same job. Build Schedule uses these to set target hours, so a higher RPLH target tightens the schedule.',
-        'Event Close Rate: the share of event inquiries you turn into booked events. The Events system grades your booking pipeline against it. Set it to the close rate your sales process should hold.'
+        'Event Close Rate: the share of event inquiries you turn into booked events. Events grades your booking pipeline against it. Set it to the close rate your sales process should hold.'
       ] }
     ] },
     'user-account': { title: 'How Your Account Works', sections: [
