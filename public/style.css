@@ -1646,9 +1646,25 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    ⚠ THE ICON IS `--t2`, NOT `--gold`. `.tn-secicon` is gold because a SECTION mark is the app's
    navigation colour; this is a control, not a place, and gold here would read as the section icon
    of a section called Log Out. */
+/* ⛔⛔ 13px, AND IT IS THE ONE PLACE THIS DOES **NOT** BORROW `.tn-title-sec` (Kyle, 2026-08-25:
+   *"log out text is too big.. should be same size as the top bar menu text.."* — it rendered 14px
+   against the bar links' 13px).
+   ⭐ `.tn-title-sec` says `font-size:inherit` for a stated reason: `.tn-title` owns 14px and the
+   section prefix must not fork it, *"or the section and the page name drift apart"*. That is right
+   for a control sitting BESIDE the page name. Log Out is not a page title and has nothing beside it
+   — on the Hub it is the only thing in this slot — so inheriting bound it to a relationship it is
+   not in. The text it actually sits among is the bar's menu links ([[lessons-paid-for]] #63: a
+   value's meaning belongs to whatever already owns it, not to whoever borrows the shape later).
+   ⚠ 13px MATCHES A CONVENTION RATHER THAN INVENTING ONE. It is `.st-link`'s own literal and the
+   `body` base, and there is no font-size token anywhere in this stylesheet — minting one for a
+   single control would be a second system for two rules (#137: the app already writes this value
+   in the sibling rule, so the odd one out was the one inheriting).
+   🔧 `verify-signout-reachable` H1 pins the AGREEMENT — both sizes read out of this file and
+   compared — so a type pass that moves the bar links moves this or fails, and no assertion anywhere
+   names the number (#48/#133). */
 .tn-logout{display:inline-flex;align-items:center;gap:7px;color:var(--t2);font-weight:600;
   flex-shrink:0;background:none;border:0;padding:0;margin:0;cursor:pointer;
-  font-family:inherit;font-size:inherit;line-height:inherit;transition:color .12s;}
+  font-family:inherit;font-size:13px;line-height:inherit;transition:color .12s;}
 .tn-logout .nav-icon{width:16px;height:16px;}
 .tn-logout:hover{color:var(--w);}
 /* Not pure white. Against the grey section prefix, --w read as a jump rather than a hierarchy;
