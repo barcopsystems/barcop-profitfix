@@ -2978,8 +2978,27 @@ const App = {
     'user-team': { title: 'How Team Members Work', sections: [
       { h: 'What this page is', p: ['Where you invite the rest of your management, choose which areas each person can use, and manage who has access. Owners and admins only. Bar Cop is a manager tool: your floor staff work off printed worksheets, so the people you invite here are other managers and your bookkeeper, not every employee.'] },
       { h: 'The three roles', p: ['Owner is you, or whoever holds the card. Full access to everything, holds billing, and controls the whole team. Admin runs the bar day to day: they get the areas you grant plus your bar settings (Business Profile and Recovery Targets), but never billing. Staff gets only the areas you grant, plus their own password.'] },
-      { h: 'Access by area', p: ['Every area is either No Access or Full Access. Full Access means the person can see and change everything in that area; No Access hides it completely, on the Hub and in the menus. The areas are Inventory, Labor, Shift, Profit, Revenue, Cash, Events, Books, and the Operations Audit. There is no read-only setting: either they run an area or they do not see it.'] },
-      { h: 'Inviting', p: ['Enter an email, pick Admin or Staff, and switch each area to Full Access or No Access. Send Invite emails a link to set a password; if they already have a Bar Cop login they join your team with no email. Bar Cop never asks for SSNs, bank details, or anything you would not keep in a binder.'] },
+      /* ⛔⛔⛔ REWRITTEN 2026-08-25 (Kyle: *"settings team i help was never updated after the
+         permissions changes and still talks about sections no longer in the app"*). It was wrong
+         twice, and the second one matters more than the names.
+         · THE LIST WAS THE OLD MODULE SET: *"Inventory, Labor, Shift, Profit, Revenue, Cash, Events,
+           Books, and the Operations Audit"*. MEASURED off `_permSections()` on the live build, the
+           grid offers SEVEN: Inventory, The Week, Run Audit, The Floor, Menus, Events, Books. Labor
+           and Shift are one section now, Profit / Revenue / Cash are GROUPS inside Run Audit rather
+           than areas of their own, and The Week and Menus were missing from the help entirely.
+         · AND IT SAID ACCESS WAS BINARY: *"Every area is either No Access or Full Access."* It is
+           not. The grid grants a whole section OR the individual menu links inside it — the page's
+           own explainer says so on screen: *"Tick Full Access to give a whole section, or tick only
+           the menu links this member should have."* Telling an owner their only choice is all-or-
+           nothing is telling them to over-grant.
+         ⚠ WHAT DID NOT CHANGE, CHECKED RATHER THAN ASSUMED: there is still no read-only level
+         (`sectionAllowed` is a boolean and `canAccessLevel` returns 'edit'), and "Business Profile"
+         and "Recovery Targets" are still the real nav labels, so the roles paragraph stands.
+         ⚠ THE COPY IS STATIC AND THE PIN IS DERIVED: `verify-week-review-accordion` block T reads
+         `_permSections()` and refuses a list that has drifted from it, so the next section Kyle adds
+         fails here instead of going stale for weeks. */
+      { h: 'Access by section', p: ['Access is granted section by section, and you can go finer than a whole one. Tick Full Access to hand over everything in a section, or tick only the menu links that person should have; anything left unticked is hidden from them, on the Hub and in the menus. The sections are Inventory, The Week, Run Audit, The Floor, Menus, Events and Books. There is no read-only setting: a link they can open is a link they can use.'] },
+      { h: 'Inviting', p: ['Enter an email, pick Admin or Staff, then tick Full Access on the sections they run and just the menu links they need on the rest. Send Invite emails a link to set a password; if they already have a Bar Cop login they join your team with no email. Bar Cop never asks for SSNs, bank details, or anything you would not keep in a binder.'] },
       { h: 'What an admin can hand out', p: ['An admin can build their own team, but only within their own reach: they can invite Staff (not other admins), can only offer areas they hold themselves, and can only manage the people they personally invited. Anyone you invited, the admins included, stays under your control alone. So you set an admin\'s ceiling once and everything they can grant flows from it.'] },
       { h: 'Managing members', p: ['Everyone on the account lists below, with a Pending tag until they accept. Only the owner changes roles from the dropdown, or hands off the account with Make Owner. Edit Access re-opens the area grid for a member; Remove takes them off and cuts access on the spot. You cannot change your own access or remove yourself.'] }
     ] },
