@@ -114,7 +114,7 @@ S.ShiftVoidComp = {
   },
 
   showHowTo() {
-    App.showHelpModal('How the Void and Comp Log Works', [
+    App.showHelpModal('How the Voids / Comps Log Works', [
       { p: ['Voids and comps are your exception transactions. Logging every one feeds the Operations Audit and keeps Books honest on comp cost. For the per-server read, who comps far more than the rest of the floor, drop your POS per-server report on Sales Integrity, under Sales on The Floor.'] },
       { h: 'One record, the dollar amount', p: ['A void or comp is logged by the amount, not item by item. Comp a whole table\'s meal and you log one line for the total. The amount is what matters. The item is optional.'] },
       { h: 'Enter the whole shift at once', p: ['Set the date and shift up top, then add a line for each void or comp off your sheet or POS list. Authorized By up top applies to your comps. Add Line for another, and Save All writes them in one shot, no running to Bar Cop every time one happens. Need a check number, a custom item, or a note on one? Save it, then Edit that row.'] },
@@ -360,7 +360,7 @@ S.ShiftVoidComp = {
         this.renderList();
         return;
       }
-      if (ev.target.closest('#vc-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Void and Comp Log', root: this.container, lists: [['sc', 'void_comp']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
+      if (ev.target.closest('#vc-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Voids / Comps Log', root: this.container, lists: [['sc', 'void_comp']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#vc-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#vcb-add')) { this.addLine(); return; }
       if (ev.target.closest('#vcb-save')) { this.saveBatch(); return; }
