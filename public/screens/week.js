@@ -159,7 +159,13 @@ S.Week = {
     if (App._hubBlocked && App._hubBlocked(this.LEGACY[page] || 'week-close')) return;
     this.page = page;
     const row = this.PAGES.find(t => t[0] === this.page) || this.PAGES[0];
-    App.openHubFullPage(row[1], (mount) => { this.container = mount; this.render(mount); }, this.LEGACY[this.page]);
+    /* ⭐⭐ THE FOURTH ARGUMENT IS WHAT MAKES `showHowTo` BELOW REACHABLE, AND IT WAS DARK UNTIL NOW.
+       Close and Review have `_HUB_HELP` topics so their "i" resolves through the shim; History does
+       NOT, so `_activeScreenObj` was set to null and the button fell through to the global Help and
+       FAQ — over a screen whose own `showHowTo` is four sections long and whose header says it exists
+       precisely so that button is not dead. Handing the host in lets the shim win where a topic
+       exists and this object answer where one does not ([[lessons-paid-for]] #134). */
+    App.openHubFullPage(row[1], (mount) => { this.container = mount; this.render(mount); }, this.LEGACY[this.page], this);
   },
 
   /* ⛔⛔⛔ NO TAB BAR. Kyle, 2026-08-23: *"get rid of the tabs and have each link go to the specific
@@ -216,7 +222,17 @@ S.Week = {
   },
 
   /* The one info "i" answers for whichever PAGE is open, so the directions match
-     what is on screen rather than the page's name ([[help-model]]). */
+     what is on screen rather than the page's name ([[help-model]]).
+     ⛔⛔⛔ THIS WAS UNREACHABLE UNTIL 2026-08-25 AND I NEARLY DELETED IT AS DEAD CODE. It had zero
+     callers, `verify-no-retired-code` could not see it (a same-named member on dozens of objects
+     certifies it live — [[the-loop]] #151), and every measurement said the "i" resolved to
+     `_hubHelpShim` instead. All of that was true and the conclusion was still wrong: the member is
+     CORRECT and was never REACHED, because `openHubFullPage` overwrote `_activeScreenObj`
+     unconditionally. Deleting it would have removed the one thing standing between Week History and
+     a dead help button ([[lessons-paid-for]] #152 — "delete it, its last caller is gone" is a
+     hypothesis; #114 — the pin you almost retire is the tell that something MOVED rather than died).
+     ⚠ IT IS LIVE FOR HISTORY ONLY, and that is not a bug. Close and Review have `_HUB_HELP` topics
+     and the shim wins for them, so this is the fallback for the one page that carries its own. */
   showHowTo() {
     const o = this.page === 'review' ? S.WeekReview : this.page === 'history' ? S.WeekHistory : S.WeekClose;
     if (o && o.showHowTo) return o.showHowTo();
