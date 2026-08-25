@@ -3185,7 +3185,26 @@ const App = {
        burger lives in it), so `.tn-logout` is hidden under the same 768px query that hides the rail.
        Doing it in JS would have meant a width check that goes stale on rotate. */
     const GUIDE_KEY = 'help';
-    if (!force && this._railCtx === 'hub') {
+    /* ⛔⛔⛔ THIS BRANCH KEYS ON `_railCtx` AND MAY NEVER READ `force` AGAIN (T99, 2026-08-25). It
+       shipped one day as `if (!force && this._railCtx === 'hub')` and Kyle found it in one look:
+       *"no logout link on the hub."* `force` is the page NAME for the one page with no
+       `#topbar-title` to mirror, and the Hub is the ONE caller that supplies it — so `!force` was
+       false exactly where this branch had to fire, the bar painted EMPTY, and with the rail row
+       already gone a desktop operator had no way to log out at all.
+       ⭐ THE PROXY WAS THE BUG, NOT THE ARGUMENT. `!force` was standing in for "this is not the
+       Hub", which held only while the Hub was the only page that named itself — it encoded the
+       CALLER LIST where the question is WHICH PAGE IS THIS. Asking `_railCtx` asks the thing being
+       decided, so a second self-naming page cannot switch this off just by arriving.
+       ⚠ THE NAME SUPPLY IS DELIBERATELY UNTOUCHED, AND IT IS WHAT `force` IS ACTUALLY FOR:
+       `page = force || this._pageNameFromNav()` with `if (!page) return` above is what stops a shell
+       mid-swap blanking the bar. Deleting the parameter would have removed the symptom and reopened
+       that defect; the fix is narrower than that on purpose.
+       🔧 PINNED BY RUNNING, NOT BY GREPPING. `verify-signout-reachable` block G executes this member
+       at the arity `showHub` really uses, DERIVED from the call sites — because a source-text grep
+       (A2/A4) and a fixture that called it with no argument at all (`verify-rail-menu-overlay`
+       PT1/PT1b) were both green over this the whole time ([[lessons-paid-for]] #62: a pin taken at a
+       convenient arity certifies the bug). */
+    if (this._railCtx === 'hub') {
       const outIc = this._NAV_SECTION_IC[this._RAIL_IC.signout] || '';
       el.innerHTML = '<button type="button" class="tn-logout" data-rail-go="signout"'
         + ' title="Log Out" aria-label="Log Out">'
