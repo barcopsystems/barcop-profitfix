@@ -2700,7 +2700,12 @@ const App = {
      the directions for the screen in front of you, and the ten per-section FAQs. Three different
      things under one word is what this fixes. `verify-global-help` A2b pins that the row is NOT
      called "Help" without pinning what it IS called, so renaming it again costs nothing. */
-  _PROTO_BOTTOM:   [['settings','Settings'],['help','Guide']],
+  /* ⚠ "The Guide", not "Guide" (Kyle, 2026-08-25). One word in one table again, and it still moves
+     the rail row, that row's title and the phone drawer's row together. The KEY stays `help` for the
+     same reason it did the first time: it is what four routers resolve, and the label is the
+     operator's word. `verify-global-help` A2b pins that the row is not called "Help" WITHOUT pinning
+     what it is called, so this rename costs nothing there — which is the shape working. */
+  _PROTO_BOTTOM:   [['settings','Settings'],['help','The Guide']],
   /* ⚠ "LOG OUT", NOT "SIGN OUT" (Kyle, same message). One word in one table, and it moves the rail
      row AND the phone drawer's row, because both are generated from here. That is the agreement
      working: the auth screen this control lands on already reads "LOG IN TO BAR COP", so the rail
@@ -3149,7 +3154,33 @@ const App = {
        SAME `_RAIL_IC` → `_NAV_SECTION_IC` pair the rail row uses, so the bar and the rail can never
        show two different marks for one section. The divider is drawn by `.sec-links::before`, which
        keeps it attached to the links rather than floating between two independent nodes. */
+    /* ⛔⛔ THE GUIDE SHOWS ITS ICON ALONE (Kyle, 2026-08-25: *"when on the guide page.. put just the
+       guide icon up in the top bar just like the other top bar menus have the page icons.. no
+       vertical divider since there is no menu.. just the icon"*).
+       ⚠ IT IS SCOPED TO THIS ONE KEY ON PURPOSE, AND I LOOKED FOR A PROPERTY FIRST. Measured live:
+       the Guide and the HUB are structurally identical here — both have `_railHasMenu` false, both
+       are un-barred, and BOTH have a mark in `_NAV_SECTION_IC`. So "a rail row with an icon and no
+       menu shows its icon" would put a mark on the Hub too, and Kyle asked for the Hub to be bare
+       the day before (*"get rid of ... the hub page title"*). There is no property that separates
+       them; this is a decision about one page, so it is written as one and said out loud rather than
+       dressed up as a rule ([[lessons-paid-for]] #139 — a hand-kept list is a smell, but inventing a
+       property the app does not have is worse).
+       ⭐ NO DIVIDER COMES FOR FREE. The rule is drawn by `.sec-links::before`, which hangs off the
+       LINKS container — and the Guide is un-barred, so `SectionTabs` renders no links and there is
+       nothing for the rule to attach to. Nothing had to be suppressed.
+       ⭐ AND IT REUSES `.tn-secicon` AND THE SAME `_RAIL_IC` -> `_NAV_SECTION_IC` PAIR the rail row
+       reads, so the bar and the rail can never show two different marks for the Guide — the same
+       agreement every barred section already has. */
+    const GUIDE_KEY = 'help';
+    const guideIcon = (!force && this._railCtx === GUIDE_KEY)
+      ? (this._NAV_SECTION_IC[this._RAIL_IC[GUIDE_KEY]] || '') : '';
     const secIcon = barred ? (this._NAV_SECTION_IC[this._RAIL_IC[secKey]] || '') : '';
+    if (guideIcon) {
+      el.innerHTML = '<span class="tn-secicon" title="' + esc(this._railLabelOf(GUIDE_KEY) || 'The Guide') + '"'
+        + ' aria-label="' + esc(this._railLabelOf(GUIDE_KEY) || 'The Guide') + '">'
+        + '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + guideIcon + '</svg></span>';
+      return;
+    }
     el.innerHTML = (sec
         ? (barred
             /* ⚠ `_NAV_SECTION_IC` holds the svg's INNER content, not a whole element — the rail
