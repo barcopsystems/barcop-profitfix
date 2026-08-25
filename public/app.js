@@ -2700,12 +2700,13 @@ const App = {
      the directions for the screen in front of you, and the ten per-section FAQs. Three different
      things under one word is what this fixes. `verify-global-help` A2b pins that the row is NOT
      called "Help" without pinning what it IS called, so renaming it again costs nothing. */
-  /* ⚠ "The Guide", not "Guide" (Kyle, 2026-08-25). One word in one table again, and it still moves
-     the rail row, that row's title and the phone drawer's row together. The KEY stays `help` for the
-     same reason it did the first time: it is what four routers resolve, and the label is the
-     operator's word. `verify-global-help` A2b pins that the row is not called "Help" WITHOUT pinning
-     what it is called, so this rename costs nothing there — which is the shape working. */
-  _PROTO_BOTTOM:   [['settings','Settings'],['help','The Guide']],
+  /* ⚠ "Guide" — reverted from "The Guide" the same day (Kyle, 2026-08-25). Third label this row has
+     worn in two days; the KEY has never moved, which is the whole reason each rename is one word in
+     one table and reaches the rail row, its title and the phone drawer together.
+     ⭐ AND NOTHING IN THE SUITE FIRED ON ANY OF THE THREE. `verify-global-help` A2b pins that the row
+     is not called "Help" without pinning what it IS called, and the mutation anchors that used to
+     quote this line now DERIVE it. That is the shape working: a rename should cost nothing. */
+  _PROTO_BOTTOM:   [['settings','Settings'],['help','Guide']],
   /* ⚠ "LOG OUT", NOT "SIGN OUT" (Kyle, same message). One word in one table, and it moves the rail
      row AND the phone drawer's row, because both are generated from here. That is the agreement
      working: the auth screen this control lands on already reads "LOG IN TO BAR COP", so the rail
@@ -3171,7 +3172,29 @@ const App = {
        ⭐ AND IT REUSES `.tn-secicon` AND THE SAME `_RAIL_IC` -> `_NAV_SECTION_IC` PAIR the rail row
        reads, so the bar and the rail can never show two different marks for the Guide — the same
        agreement every barred section already has. */
+    /* ⛔⛔ LOG OUT LIVES IN THE BAR ON THE HUB, DESKTOP ONLY (Kyle, 2026-08-25). It came off the rail
+       in `_railHTML`; this is where it went. The Hub is the one page that renders nothing else on
+       this side, so it is the only place a control can sit here without displacing a section icon.
+       ⭐ IT DELEGATES, NEVER RE-IMPLEMENTS. The rail row was `data-rail-go="signout"` wired to
+       `_protoGlobalClick`, and this button calls the SAME entry point — so the confirm, the session
+       teardown and the redirect stay in one implementation and cannot drift from the phone drawer's
+       copy of the row ([[lessons-paid-for]] #63 — a fact written by one of N doors is not written).
+       ⭐ A REAL <button>, not a span with a listener, for the reason `.tn-title-sec` two branches
+       down already states: a real button gets Enter, Space, the tab stop and the focus ring free.
+       ⚠ DESKTOP-ONLY IS ENFORCED IN CSS, NOT HERE. `#proto-topnav` still renders on a phone (the
+       burger lives in it), so `.tn-logout` is hidden under the same 768px query that hides the rail.
+       Doing it in JS would have meant a width check that goes stale on rotate. */
     const GUIDE_KEY = 'help';
+    if (!force && this._railCtx === 'hub') {
+      const outIc = this._NAV_SECTION_IC[this._RAIL_IC.signout] || '';
+      el.innerHTML = '<button type="button" class="tn-logout" data-rail-go="signout"'
+        + ' title="Log Out" aria-label="Log Out">'
+        + (outIc ? '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + outIc + '</svg>' : '')
+        + '<span>Log Out</span></button>';
+      /* No listener here on purpose — `_wirePageTitle`'s delegated handler on the static `#tn-title`
+         host catches `.tn-logout`, exactly as it already catches the section button. */
+      return;
+    }
     const guideIcon = (!force && this._railCtx === GUIDE_KEY)
       ? (this._NAV_SECTION_IC[this._RAIL_IC[GUIDE_KEY]] || '') : '';
     const secIcon = barred ? (this._NAV_SECTION_IC[this._RAIL_IC[secKey]] || '') : '';
@@ -3254,6 +3277,16 @@ const App = {
            render writes both, and reading the element keeps it that way if navigation ever becomes
            async: the click opens the section whose NAME the operator actually pressed. */
         if (btn) App.toggleRailMenu(btn.dataset.railSec);
+        /* ⛔⛔ LOG OUT RIDES THE SAME DELEGATED LISTENER (2026-08-25, when it moved off the rail).
+           My first version bound a listener inside `_syncPageTitle` right after writing the markup.
+           That works, but it is the pattern the comment above this block exists to warn against —
+           the slot's innerHTML is rewritten on every navigation, so a per-render bind is one
+           refactor away from being a control that dies one screen in. One listener on the static
+           host, `closest` off the click, nothing to re-bind.
+           ⭐ AND IT DELEGATES TO `_protoGlobalClick`, the same door the rail row used, so the
+           confirm and the session teardown stay in ONE implementation shared with the phone
+           drawer's copy of the row ([[lessons-paid-for]] #63). */
+        if (e.target.closest('.tn-logout')) App._protoGlobalClick('signout');
       });
     }
     this._syncPageTitle();
@@ -3739,11 +3772,22 @@ const App = {
              mis-click from taking an operator out mid-shift. Pinned as the SEPARATION in
              `verify-signout-reachable`, never as the line, because this is the third spelling that
              property has had and each of the previous two fired on the change it existed to permit. */
+          /* ⛔⛔ SIGN OUT LEFT THE RAIL ON 2026-08-25 (Kyle: *"get rid of the divider under guide and
+             move logout to the top bar on the hub only... this is desktop only.. on mobile.. log out
+             stays where it is under divider under guide link"*). The divider under Guide went with
+             it — it existed to hold Sign Out off Settings, and with the row gone it separated
+             nothing.
+             ⭐ THIS IS DESKTOP-ONLY BY CONSTRUCTION, NOT BY A FLAG. `#proto-rail` is
+             `display:none !important` under `@media (max-width:768px)`, and the phone builds a
+             SEPARATE drawer from these same tables — `railGroup('Session', App._PROTO_SIGNOUT)`.
+             Two renderers, one table: editing this one cannot reach the phone, which is exactly
+             what he asked for. `_PROTO_SIGNOUT` therefore STAYS (verify-signout-reachable E1/E3).
+             ⚠ AND THE WAY OUT MOVED RATHER THAN VANISHING: `_syncPageTitle` renders it in the top
+             bar on the Hub. A desktop operator on any other page now reaches Log Out via the Hub —
+             two clicks instead of one, which is Kyle's call and is flagged, not assumed. */
           '<div class="rail-group">' + this._PROTO_GLOBAL.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
-        + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>'
-        + '<div class="rail-divider"></div>'
-        + '<div class="rail-group">' + this._PROTO_SIGNOUT.map(r).join('') + '</div>';
+        + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>';
       rail.querySelectorAll('.rail-item[data-rail-go]').forEach(el =>
         el.addEventListener('click', () => { App.closeRailMenu(); App._protoGlobalClick(el.dataset.railGo); }));
       rail.querySelectorAll('.rail-item[data-rail-sec]').forEach(el =>

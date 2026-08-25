@@ -1635,6 +1635,22 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    weeks while this line asserted otherwise. It is pinned now (verify-topbar-chrome A1), because a
    comment cannot keep two values in step and this one was quietly wrong the whole time. */
 .tn-sep{width:1px;height:18px;background:var(--b1);flex-shrink:0;}
+/* ⛔⛔ LOG OUT IN THE BAR, ON THE HUB, DESKTOP ONLY (Kyle, 2026-08-25: *"move logout to the top bar
+   on the hub only... this is desktop only.. on mobile.. log out stays where it is"*). It came off
+   the rail, where it had sat behind a divider since 2026-08-12.
+   ⭐ IT BORROWS `.tn-title-sec`'s SHAPE ON PURPOSE — same grey, same weight, white on hover, a real
+   button reset to look like bare text. The bar already has exactly one convention for a text control
+   on this side and inventing a second look for the one page that has no section icon would read as
+   a different kind of thing ([[lessons-paid-for]] #101 — grep what the app already owns before
+   naming a class, and reuse the shape rather than the class so a card decision cannot capture it).
+   ⚠ THE ICON IS `--t2`, NOT `--gold`. `.tn-secicon` is gold because a SECTION mark is the app's
+   navigation colour; this is a control, not a place, and gold here would read as the section icon
+   of a section called Log Out. */
+.tn-logout{display:inline-flex;align-items:center;gap:7px;color:var(--t2);font-weight:600;
+  flex-shrink:0;background:none;border:0;padding:0;margin:0;cursor:pointer;
+  font-family:inherit;font-size:inherit;line-height:inherit;transition:color .12s;}
+.tn-logout .nav-icon{width:16px;height:16px;}
+.tn-logout:hover{color:var(--w);}
 /* Not pure white. Against the grey section prefix, --w read as a jump rather than a hierarchy;
    --t1 is the app's own "primary text" and still clearly the brighter of the two. */
 .tn-pg{color:var(--t1);overflow:hidden;text-overflow:ellipsis;}
@@ -1757,6 +1773,15 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
      re-create the mismatch the moment either one moved. */
   .hub-grid{padding-left:14px;padding-right:14px;}
   #proto-rail{display:none !important;}
+  /* ⛔⛔ AND LOG OUT GOES WITH IT. On a phone the rail is hidden and the burger DRAWER is the menu,
+     which renders Sign Out from `_PROTO_SIGNOUT` in its own group behind its own divider — so
+     showing it in the bar as well would be the same control twice, three inches apart. Kyle: *"on
+     mobile.. log out stays where it is under divider under guide link.. so no change on mobile."*
+     ⭐ IT IS THE SAME QUERY THAT HIDES THE RAIL, DELIBERATELY. The two facts are one fact — the bar
+     control exists because the rail row left, so the width where the rail comes back is exactly the
+     width where the bar control must go. Two separate breakpoints would be two things to keep in
+     step, and `verify-signout-reachable` F3 asserts they are the same number. */
+  .tn-logout{display:none !important;}
   body.chrome-on #app{margin-left:0;}
   body.chrome-on #hub-wrapper{left:0 !important;}
   /* With no rail, the bar goes back to full width and takes the logo back with it. The page NAME is
