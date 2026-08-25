@@ -1804,7 +1804,10 @@ const App = {
   // to next (a half-entered count sheet, in the worst case found).
   _mountSeq: 0,
 
-  openHubFullPage(title, renderFn, activeAction) {
+  /* `helpOwner` is OPTIONAL and only matters for a page with no `_HUB_HELP` topic: hand in the object
+     that owns the page's directions and the "i" reaches them instead of the global FAQ. Every
+     existing three-argument caller behaves exactly as it did. */
+  openHubFullPage(title, renderFn, activeAction, helpOwner) {
     // Backward-compat: caller can pass just renderFn if title is unused.
     if (typeof title === 'function') { renderFn = title; title = ''; }
     ++this._mountSeq;
@@ -1888,7 +1891,23 @@ const App = {
     this._syncPageTitle();
     // Point the nav "i" page-help at this Hub-shell page's directions (null =
     // fall back to the full Help and FAQ); clears any stale module screen.
-    this._activeScreenObj = this._hubHelpShim(activeAction);
+    /* ⛔⛔⛔ A HUB PAGE WITH NO TOPIC MUST NOT BLANK THE "i" OVER A SCREEN THAT HAS ITS OWN
+       DIRECTIONS (2026-08-25). This assigned the shim unconditionally, so an action with no
+       `_HUB_HELP` entry set `_activeScreenObj` to NULL and `openPageHelp` fell through to the global
+       FAQ — even when the screen being mounted had a perfectly good `showHowTo` of its own.
+       ⭐ MEASURED, POPULATION OF ONE: every `openHubFullPage` action tree-wide against the 18 topics
+       that exist. `help`, `report-bug` and `contact-support` have no directions of their own, so the
+       FAQ is the right answer for them. WEEK HISTORY is the only page where real help went dark —
+       `S.WeekHistory.showHowTo` is four sections long and its own header says it exists precisely so
+       this button is not dead, yet nothing could reach it once the page moved onto the hub shell
+       ([[lessons-paid-for]] #134: a retired page leaves live code quiet, and quiet reads as never
+       built; #107: existence is not reachability).
+       ⚠ THE ORDER MATTERS AND SO DOES THE EXPLICIT NULL. The shim wins where a topic exists, so
+       nothing that works today changes; and where neither resolves this must still CLEAR the field,
+       or a page with no help would answer the "i" with the PREVIOUS page's directions, which is worse
+       than the fallback it replaced. */
+    this._activeScreenObj = this._hubHelpShim(activeAction)
+      || ((helpOwner && typeof helpOwner.showHowTo === 'function') ? helpOwner : null);
     // Hand the screen the content element directly so .screen wrapper
     // padding behaves identically to module screens.
     content.innerHTML = '';
