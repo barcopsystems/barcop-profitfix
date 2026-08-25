@@ -22,10 +22,32 @@
      Three popups hardcoded `rgba(6,11,17,0.88)` — rgb(6,11,17), which was the page fill once and is
      BLUER AND DARKER than `--bg` #11171B = rgb(17,23,27). So every retune of the palette moved the
      app and left the backdrop behind, and the gap read as a blue cast over the whole screen.
-     ⭐ IT IS THE SAME COLOUR AS `--bg`, AT 88%. Written as rgba because a backdrop needs alpha and a
-     hex token cannot carry one — but the three numbers are `--bg`'s own, so retuning `--bg` means
-     retuning this line beside it rather than hunting three inline strings in app.js. */
-  --overlay:   rgba(17,23,27,0.88);
+     ⭐ IT IS THE SAME COLOUR AS `--bg`. Written as rgba because a backdrop needs alpha and a hex
+     token cannot carry one — but the three numbers are `--bg`'s own, so retuning `--bg` means
+     retuning this line beside it rather than hunting inline strings in app.js.
+     ⛔⛔ 0.88 -> 0.96 (Kyle, 2026-08-24, on the pushed build: *"it is to transparent... needs to be
+     way less transparent where the user can barely see something behind it.. right now i can see
+     and read everything easily.. which is probably why the color still looks real bad"*).
+     MEASURED, NOT ADJUSTED BY EYE. Composited against this same fill, pure white text reads:
+         0.88 -> rgb(46,51,54)  contrast 1.41   (comfortably readable on a big bold number)
+         0.94 -> rgb(31,37,41)  contrast 1.17
+         0.96 -> rgb(27,32,36)  contrast 1.10   (shapes, not words — "barely see something")
+         0.98 -> rgb(22,28,32)  contrast 1.05   (effectively nothing left)
+     0.96 cuts what gets through from 12% to 4%, which is the "way less" he asked for, and stops
+     short of hiding the page entirely, which is the "barely see SOMETHING" half.
+     ⛔⛔⛔ AND THE SECOND HALF OF HIS SENTENCE IS NOT AN ALPHA PROBLEM, SO DO NOT CHASE IT WITH ONE.
+     Because this token carries `--bg`'s OWN rgb, the page BACKGROUND composites to rgb(17,23,27) at
+     EVERY alpha, 0.88 and 0.99 alike — it never darkens by a single value. So the screen can never
+     read as "dimmed", only as "the same page with faded content", and raising the alpha cannot
+     change that. If it still looks wrong after this, the lever is the COLOUR (a scrim darker than
+     the page), not the opacity — and that is Kyle's call, because he asked for this colour by name:
+     *"needs to be made to match the new background/input field color."* Changing it here would undo
+     an instruction, which is the trap a pin fell into once already ([[lessons-paid-for]] #94).
+     ⚠ PINNED AS A FLOOR, NEVER AN EQUALITY (`verify-design-code` COLOUR-1d). He retunes live, so a
+     pin demanding 0.96 would fire on the next nudge; what is recorded is that the backdrop may not
+     become MORE transparent than the value he confirmed. Raising passes, lowering fails — the same
+     repair `verify-control-border-visible` T2 needed ([[lessons-paid-for]] #133). */
+  --overlay:   rgba(17,23,27,0.96);
   /* ⛔⛔ CARD FILL = PAGE FILL (2026-08-08, Kyle's call, reversible by one value).
      It was #08131A against a #070E15 page — a difference of 1, 5, 5, which is barely a fill at all.
      The card is defined by its BORDER and its header band now, and the tone it used to spend on the
