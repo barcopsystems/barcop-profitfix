@@ -3172,48 +3172,17 @@ const App = {
        ⭐ AND IT REUSES `.tn-secicon` AND THE SAME `_RAIL_IC` -> `_NAV_SECTION_IC` PAIR the rail row
        reads, so the bar and the rail can never show two different marks for the Guide — the same
        agreement every barred section already has. */
-    /* ⛔⛔ LOG OUT LIVES IN THE BAR ON THE HUB, DESKTOP ONLY (Kyle, 2026-08-25). It came off the rail
-       in `_railHTML`; this is where it went. The Hub is the one page that renders nothing else on
-       this side, so it is the only place a control can sit here without displacing a section icon.
-       ⭐ IT DELEGATES, NEVER RE-IMPLEMENTS. The rail row was `data-rail-go="signout"` wired to
-       `_protoGlobalClick`, and this button calls the SAME entry point — so the confirm, the session
-       teardown and the redirect stay in one implementation and cannot drift from the phone drawer's
-       copy of the row ([[lessons-paid-for]] #63 — a fact written by one of N doors is not written).
-       ⭐ A REAL <button>, not a span with a listener, for the reason `.tn-title-sec` two branches
-       down already states: a real button gets Enter, Space, the tab stop and the focus ring free.
-       ⚠ DESKTOP-ONLY IS ENFORCED IN CSS, NOT HERE. `#proto-topnav` still renders on a phone (the
-       burger lives in it), so `.tn-logout` is hidden under the same 768px query that hides the rail.
-       Doing it in JS would have meant a width check that goes stale on rotate. */
+    /* ⛔⛔ LOG OUT IS NOT IN THIS BAR ANY MORE (Kyle, 2026-08-25: *"move the log out down to where it
+       currently is"*). It lived here for one day, between coming off the rail at T98 and going back
+       to the rail's FOOT when the collapse was retired and freed that slot. The Hub renders nothing
+       on this side again, which is what he asked for at T92 (*"get rid of ... the hub page title"*).
+       ⭐ WHAT THE ONE DAY COST IS WORTH KEEPING: the branch shipped as `if (!force && _railCtx ===
+       'hub')`, and `showHub` is the ONE of five call sites that passes an argument — so it was
+       switched off on the only page it was for, and a desktop had no way out at all under a green
+       gate. `!force` was a proxy for the CALLER LIST where the question is WHICH PAGE IS THIS
+       ([[lessons-paid-for]] #140). Two such proxies survive below on `secKey` and `guideIcon`,
+       measured redundant and ratcheted by `verify-signout-reachable` G6 so a third cannot appear. */
     const GUIDE_KEY = 'help';
-    /* ⛔⛔⛔ THIS BRANCH KEYS ON `_railCtx` AND MAY NEVER READ `force` AGAIN (T99, 2026-08-25). It
-       shipped one day as `if (!force && this._railCtx === 'hub')` and Kyle found it in one look:
-       *"no logout link on the hub."* `force` is the page NAME for the one page with no
-       `#topbar-title` to mirror, and the Hub is the ONE caller that supplies it — so `!force` was
-       false exactly where this branch had to fire, the bar painted EMPTY, and with the rail row
-       already gone a desktop operator had no way to log out at all.
-       ⭐ THE PROXY WAS THE BUG, NOT THE ARGUMENT. `!force` was standing in for "this is not the
-       Hub", which held only while the Hub was the only page that named itself — it encoded the
-       CALLER LIST where the question is WHICH PAGE IS THIS. Asking `_railCtx` asks the thing being
-       decided, so a second self-naming page cannot switch this off just by arriving.
-       ⚠ THE NAME SUPPLY IS DELIBERATELY UNTOUCHED, AND IT IS WHAT `force` IS ACTUALLY FOR:
-       `page = force || this._pageNameFromNav()` with `if (!page) return` above is what stops a shell
-       mid-swap blanking the bar. Deleting the parameter would have removed the symptom and reopened
-       that defect; the fix is narrower than that on purpose.
-       🔧 PINNED BY RUNNING, NOT BY GREPPING. `verify-signout-reachable` block G executes this member
-       at the arity `showHub` really uses, DERIVED from the call sites — because a source-text grep
-       (A2/A4) and a fixture that called it with no argument at all (`verify-rail-menu-overlay`
-       PT1/PT1b) were both green over this the whole time ([[lessons-paid-for]] #62: a pin taken at a
-       convenient arity certifies the bug). */
-    if (this._railCtx === 'hub') {
-      const outIc = this._NAV_SECTION_IC[this._RAIL_IC.signout] || '';
-      el.innerHTML = '<button type="button" class="tn-logout" data-rail-go="signout"'
-        + ' title="Log Out" aria-label="Log Out">'
-        + (outIc ? '<svg class="nav-icon" viewBox="0 0 17 17" fill="none">' + outIc + '</svg>' : '')
-        + '<span>Log Out</span></button>';
-      /* No listener here on purpose — `_wirePageTitle`'s delegated handler on the static `#tn-title`
-         host catches `.tn-logout`, exactly as it already catches the section button. */
-      return;
-    }
     const guideIcon = (!force && this._railCtx === GUIDE_KEY)
       ? (this._NAV_SECTION_IC[this._RAIL_IC[GUIDE_KEY]] || '') : '';
     const secIcon = barred ? (this._NAV_SECTION_IC[this._RAIL_IC[secKey]] || '') : '';
@@ -3296,57 +3265,30 @@ const App = {
            render writes both, and reading the element keeps it that way if navigation ever becomes
            async: the click opens the section whose NAME the operator actually pressed. */
         if (btn) App.toggleRailMenu(btn.dataset.railSec);
-        /* ⛔⛔ LOG OUT RIDES THE SAME DELEGATED LISTENER (2026-08-25, when it moved off the rail).
-           My first version bound a listener inside `_syncPageTitle` right after writing the markup.
-           That works, but it is the pattern the comment above this block exists to warn against —
-           the slot's innerHTML is rewritten on every navigation, so a per-render bind is one
-           refactor away from being a control that dies one screen in. One listener on the static
-           host, `closest` off the click, nothing to re-bind.
-           ⭐ AND IT DELEGATES TO `_protoGlobalClick`, the same door the rail row used, so the
-           confirm and the session teardown stay in ONE implementation shared with the phone
-           drawer's copy of the row ([[lessons-paid-for]] #63). */
-        if (e.target.closest('.tn-logout')) App._protoGlobalClick('signout');
+        /* ⚠ THE `.tn-logout` BRANCH THAT SAT HERE WENT WITH THE CONTROL (2026-08-25). Log Out is a
+           rail row again, wired by the rail's own `data-rail-go` loop, so a second handler here
+           would be a door to a button nothing renders ([[the-loop]] #61 — retiring a feature means
+           the render call AND the helpers whose only caller it was). */
       });
     }
     this._syncPageTitle();
   },
 
-  /* ── Collapsing the rail to icons ─────────────────────────────────────────────────────────────
-     Kyle: "the collapse is good for once a user knows them by heart and then want a little more
-     room." That only means anything if it STICKS, so it is remembered per device. It is a display
-     preference with no account behind it, which is exactly what localStorage is for
-     ([[localstorage-survives-reseed]]) — and it must not ride on the bar's data, or switching bars
-     would silently re-expand the menu.
-     ⭐⭐ THE WHOLE COLLAPSE IS ONE VARIABLE. Every piece of chrome already positions off
-     `var(--rail-w)`: the top bar's left edge, both shells' offsets, the overlay and its backdrop.
-     Re-pointing that one token moves all five together, so there is no list of places to keep in
-     step and nothing can be forgotten. */
-  _RAIL_COLLAPSE_KEY: 'bc_rail_collapsed',
-
-  railCollapsed() {
-    try { return localStorage.getItem(this._RAIL_COLLAPSE_KEY) === '1'; } catch (e) { return false; }
-  },
-
-  applyRailCollapsed(on) {
-    document.body.classList.toggle('rail-collapsed', !!on);
-    const btn = document.getElementById('rail-collapse');
-    if (btn) {
-      btn.title = on ? 'Expand the menu' : 'Collapse the menu';
-      const lab = btn.querySelector('.rail-label');
-      if (lab) lab.textContent = 'Collapse';
-    }
-    try { localStorage.setItem(this._RAIL_COLLAPSE_KEY, on ? '1' : '0'); } catch (e) {}
-  },
-
-  toggleRailCollapsed() {
-    const next = !this.railCollapsed();
-    this.applyRailCollapsed(next);
-    /* ⛔ CLOSE THE SECTION MENU ON THE WAY. The overlay is positioned at `left:var(--rail-w)`, so
-       collapsing under an open menu slides it 68px left while the operator is reading it. Nothing
-       breaks, but the page jumps for no reason the operator asked for. */
-    this.closeRailMenu();
-  },
-
+  /* ⛔⛔ THE RAIL COLLAPSE IS RETIRED (Kyle, 2026-08-25: *"retire the collapse"*), and it was
+     MEASURED rather than argued. `--sidebar-w-coll` (52px) is inherited from the OLD 220px sidebar,
+     where collapsing saved 168px. The rail redesign took the expanded width to 120px, so the same
+     feature saved 68px — and the content area is capped at `max-width:1320px`, so on the deployed
+     build it bought 68px at a 1280 viewport, **10px at 1440, and ZERO at 1450 and above**. The rail
+     redesign had already delivered most of what collapsing was for, and nobody re-asked whether the
+     leftover still earned its keep ([[lessons-paid-for]] #82 — when the thing a workaround was
+     shaped around changes, re-read the workaround).
+     ⭐ WHAT WENT WITH IT: `railCollapsed`, `applyRailCollapsed`, `toggleRailCollapsed`,
+     `_RAIL_COLLAPSE_KEY`, the boot apply in `_wireRailMenu`, the `#rail-collapse` button, and ten
+     `body.rail-collapsed` rules. `--sidebar-w-coll` STAYS — it still has readers on the old sidebar
+     ([[the-loop]] #149: when you delete N of M registrations, read what each survivor is for).
+     ⚠ THE `bc_rail_collapsed` LOCALSTORAGE KEY IS LEFT BEHIND ON DEVICES THAT SET IT. Nothing reads
+     it now, so it is inert; a migration to delete it would be a write to every device to tidy a
+     string nobody looks at. Said out loud rather than left implicit. */
   _railOpen: null,
 
   toggleRailMenu(key) {
@@ -3474,11 +3416,6 @@ const App = {
   },
 
   _wireRailMenu() {
-    const col = document.getElementById('rail-collapse');
-    if (col) col.addEventListener('click', () => App.toggleRailCollapsed());
-    // Apply the remembered state at boot, BEFORE the first paint of a page, so the rail does not
-    // render wide and then snap narrow.
-    this.applyRailCollapsed(this.railCollapsed());
     const bd = document.getElementById('rail-menu-backdrop');
     if (bd) bd.addEventListener('click', () => App.closeRailMenu());
     /* Close AFTER the nav's own handler has run, so the navigation is never racing the teardown.
@@ -3807,10 +3744,37 @@ const App = {
           '<div class="rail-group">' + this._PROTO_GLOBAL.map(r).join('') + '</div>'
         + '<div class="rail-divider"></div>'
         + '<div class="rail-group">' + this._PROTO_BOTTOM.map(r).join('') + '</div>';
-      rail.querySelectorAll('.rail-item[data-rail-go]').forEach(el =>
-        el.addEventListener('click', () => { App.closeRailMenu(); App._protoGlobalClick(el.dataset.railGo); }));
-      rail.querySelectorAll('.rail-item[data-rail-sec]').forEach(el =>
-        el.addEventListener('click', () => App.toggleRailMenu(el.dataset.railSec)));
+      /* ⛔⛔ LOG OUT IS THE RAIL'S FOOT, PINNED BELOW THE SCROLLING NAV (Kyle, 2026-08-25:
+         *"retire the collapse.. and move the log out down to where it currently is.. same divider
+         line above log out"*). It took the slot the Collapse button held, which is why it is a
+         separate host rather than a third group in the nav: MEASURED on the deployed build, the
+         Guide row ended at y=445 and the Collapse button sat at y=722 — **277px apart**. A third
+         `.rail-group` inside `#rail-nav` would have put it directly under Guide, which is where it
+         was before T98 and is not what he asked for.
+         ⭐ THE DIVIDER HE ASKED FOR IS THE FOOT'S OWN `border-top`, the same 1px `--b-edge` line
+         the Collapse button carried — not a `.rail-divider` element. So the nav still contains
+         EXACTLY ONE `.rail-divider` (the Settings/Guide split) and `verify-settings-section`'s
+         assertion about that sequence is untouched.
+         ⭐⭐ IT RENDERS FROM `_PROTO_SIGNOUT`, THE TABLE THE PHONE DRAWER ALSO READS. Hardcoding a
+         button in index.html would have been a SECOND spelling of one control, which is the drift
+         this pair has already had once ([[lessons-paid-for]] #63 — a fact written by one of N doors
+         is not written). Two renderers, one table, exactly as before.
+         ⚠ `_markRailOpen` STAYS SCOPED TO `#rail-nav`, DELIBERATELY. It marks the active section,
+         and `signout` is never a section or a `_railCtx` — so the foot row can never be marked, and
+         widening the query would only create a state that must never occur. */
+      const foot = document.getElementById('rail-foot');
+      if (foot) foot.innerHTML = '<div class="rail-group">' + this._PROTO_SIGNOUT.map(r).join('') + '</div>';
+      /* ⛔ BOTH HOSTS GET WIRED. The rows are rebuilt on every render, so the listeners die with the
+         nodes they were bound to and cannot stack — the same reason the nav's own wiring is safe. */
+      const wireRows = (host) => {
+        if (!host) return;
+        host.querySelectorAll('.rail-item[data-rail-go]').forEach(el =>
+          el.addEventListener('click', () => { App.closeRailMenu(); App._protoGlobalClick(el.dataset.railGo); }));
+        host.querySelectorAll('.rail-item[data-rail-sec]').forEach(el =>
+          el.addEventListener('click', () => App.toggleRailMenu(el.dataset.railSec)));
+      };
+      wireRows(rail);
+      wireRows(foot);
       this._markRailOpen();
     }
     /* ⛔ THE SWITCHER RELOCATION IS GONE (Kyle, 2026-08-23). This used to lift

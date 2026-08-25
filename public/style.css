@@ -1237,38 +1237,35 @@ body.chrome-on #proto-rail{
   border-bottom:1px solid var(--b-edge);
 }
 .rail-logo img{height:22px;width:auto;display:block;}
-/* ⛔ SCOPED TO .rail-logo, AND THAT IS THE WHOLE BUG. As `.rail-logo-icon{display:none}` it lost to
-   `.rail-logo img{display:block}` on specificity — one class beats one class, but the img rule also
-   carries an element selector (0,1,1 against 0,1,0). So the bar-graph mark rendered beside the
-   wordmark and the logo read as duplicated. The collapsed rules never showed it because they are
-   `body.rail-collapsed …` (0,2,0) and already won. */
-.rail-logo .rail-logo-icon{display:none;}
-.rail-collapse{
-  display:flex;align-items:center;gap:10px;padding:10px 14px;flex-shrink:0;
-  background:none;border:0;border-top:1px solid var(--b-edge);width:100%;
-  cursor:pointer;font-family:inherit;text-align:left;
-}
-/* No fill here either. The collapse control is a rail row like any other and a lone filled row at
-   the bottom would be the only box left in the column. */
-.rail-collapse:hover .rail-icon,.rail-collapse:hover .rail-label{color:var(--w);}
-
-/* ── COLLAPSED: icons only ────────────────────────────────────────────────────────────────────
-   ⭐ ONE TOKEN MOVES EVERYTHING. The top bar's left edge, both shell offsets, the overlay and its
-   backdrop all position off var(--rail-w), so re-pointing it here slides all five together and
-   there is no list of call sites to keep in step. --sidebar-w-coll is the width the old sidebar's
-   own collapsed mode already used; reusing it keeps one number for "a rail with icons only". */
-body.rail-collapsed{ --rail-w: var(--sidebar-w-coll); }
-body.rail-collapsed .rail-logo{justify-content:center;padding:0;}
-body.rail-collapsed .rail-logo-full{display:none;}
-body.rail-collapsed .rail-logo-icon{display:block;height:20px;}
-body.rail-collapsed .rail-item,
-body.rail-collapsed .rail-collapse{justify-content:center;padding:9px 0;gap:0;}
-body.rail-collapsed .rail-label{display:none;}
-/* The group headings are words, so they have nothing to show at 52px. The DIVIDERS stay: they are
-   the only thing left telling Control from Recovery from the bottom group. */
-body.rail-collapsed .rail-grp-label{display:none;}
-body.rail-collapsed .rail-divider{margin:10px 10px;}
-body.rail-collapsed .rail-collapse svg{transform:rotate(180deg);}
+/* ⛔ `.rail-logo .rail-logo-icon{display:none}` IS DELETED WITH THE MARK IT HID (2026-08-25). It
+   existed to keep the bar-graph icon out of the way until the rail collapsed, and the only rule that
+   ever revealed it was `body.rail-collapsed .rail-logo-icon{display:block}`. Both the rule and the
+   `<img>` are gone, so there is nothing left to hide.
+   ⚠ The specificity note it carried is worth keeping as a fact about THIS rule set: `.rail-logo img`
+   is (0,1,1) and beats a bare (0,1,0) class, which is why anything added inside `.rail-logo` that
+   needs hiding must be scoped to the parent rather than styled on its own class. */
+/* ⛔⛔ THE RAIL'S FOOT, WHICH IS WHERE LOG OUT LIVES (Kyle, 2026-08-25: *"retire the collapse.. and
+   move the log out down to where it currently is.. same divider line above log out"*).
+   ⭐ THE DIVIDER HE ASKED FOR IS THIS `border-top`, not a `.rail-divider` element — it is the exact
+   line the retired Collapse button carried, same 1px, same `--b-edge`. Keeping it as a border means
+   `#rail-nav` still holds EXACTLY ONE `.rail-divider` (the Settings/Guide split), which is what
+   `verify-signout-reachable` A6 counts.
+   ⭐ THE PADDING IS MEASURED, NOT CHOSEN. `.rail-collapse` was `padding:10px 14px` with the icon and
+   label inside it, so its text sat 10px below the border. Here the ROW brings its own `7px 14px`
+   (`.rail-item`), so 3px on the foot reproduces that 10px exactly, top and bottom, and the
+   horizontal inset comes from the row like every other rail row.
+   ⚠ NO FILL AND NO HOVER RULE OF ITS OWN: the row inside is a `.rail-item`, so it already hovers
+   white text and icon like every other rail row. A second treatment here would be the competing
+   states the rail deliberately does not have. */
+.rail-foot{flex-shrink:0;border-top:1px solid var(--b-edge);padding:3px 0;}
+/* ⛔ `.rail-collapse` AND EVERY `body.rail-collapsed` RULE ARE DELETED (2026-08-25). The collapse
+   was retired because it was sized for chrome that no longer exists: `--sidebar-w-coll` (52px) came
+   from the OLD 220px sidebar, where collapsing saved 168px. At the rail's 120px it saved 68px, and
+   with the content area capped at max-width:1320px it bought 68px at a 1280 viewport, 10px at 1440
+   and NOTHING at 1450 and above — measured on the deployed build.
+   ⚠ `--sidebar-w-coll` ITSELF STAYS: `.app.proto.sidebar-collapsed` and the old `.sidebar` still
+   read it. Deleting the rule that borrowed it is not the same as deleting the token
+   ([[the-loop]] #149 — read what each surviving registration is for). */
 body.demo.chrome-on #proto-rail{bottom:40px;}
 /* Both shells step aside for it. The rail is fixed, so this is the only thing holding content off
    it — no page sets its own left offset, which is what keeps --rail-w the single source of the
@@ -1635,38 +1632,11 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    weeks while this line asserted otherwise. It is pinned now (verify-topbar-chrome A1), because a
    comment cannot keep two values in step and this one was quietly wrong the whole time. */
 .tn-sep{width:1px;height:18px;background:var(--b1);flex-shrink:0;}
-/* ⛔⛔ LOG OUT IN THE BAR, ON THE HUB, DESKTOP ONLY (Kyle, 2026-08-25: *"move logout to the top bar
-   on the hub only... this is desktop only.. on mobile.. log out stays where it is"*). It came off
-   the rail, where it had sat behind a divider since 2026-08-12.
-   ⭐ IT BORROWS `.tn-title-sec`'s SHAPE ON PURPOSE — same grey, same weight, white on hover, a real
-   button reset to look like bare text. The bar already has exactly one convention for a text control
-   on this side and inventing a second look for the one page that has no section icon would read as
-   a different kind of thing ([[lessons-paid-for]] #101 — grep what the app already owns before
-   naming a class, and reuse the shape rather than the class so a card decision cannot capture it).
-   ⚠ THE ICON IS `--t2`, NOT `--gold`. `.tn-secicon` is gold because a SECTION mark is the app's
-   navigation colour; this is a control, not a place, and gold here would read as the section icon
-   of a section called Log Out. */
-/* ⛔⛔ 13px, AND IT IS THE ONE PLACE THIS DOES **NOT** BORROW `.tn-title-sec` (Kyle, 2026-08-25:
-   *"log out text is too big.. should be same size as the top bar menu text.."* — it rendered 14px
-   against the bar links' 13px).
-   ⭐ `.tn-title-sec` says `font-size:inherit` for a stated reason: `.tn-title` owns 14px and the
-   section prefix must not fork it, *"or the section and the page name drift apart"*. That is right
-   for a control sitting BESIDE the page name. Log Out is not a page title and has nothing beside it
-   — on the Hub it is the only thing in this slot — so inheriting bound it to a relationship it is
-   not in. The text it actually sits among is the bar's menu links ([[lessons-paid-for]] #63: a
-   value's meaning belongs to whatever already owns it, not to whoever borrows the shape later).
-   ⚠ 13px MATCHES A CONVENTION RATHER THAN INVENTING ONE. It is `.st-link`'s own literal and the
-   `body` base, and there is no font-size token anywhere in this stylesheet — minting one for a
-   single control would be a second system for two rules (#137: the app already writes this value
-   in the sibling rule, so the odd one out was the one inheriting).
-   🔧 `verify-signout-reachable` H1 pins the AGREEMENT — both sizes read out of this file and
-   compared — so a type pass that moves the bar links moves this or fails, and no assertion anywhere
-   names the number (#48/#133). */
-.tn-logout{display:inline-flex;align-items:center;gap:7px;color:var(--t2);font-weight:600;
-  flex-shrink:0;background:none;border:0;padding:0;margin:0;cursor:pointer;
-  font-family:inherit;font-size:13px;line-height:inherit;transition:color .12s;}
-.tn-logout .nav-icon{width:16px;height:16px;}
-.tn-logout:hover{color:var(--w);}
+/* ⛔ `.tn-logout` IS DELETED (2026-08-25). Log Out lived in this bar for one day, between coming off
+   the rail at T98 and going back to the rail's FOOT when the collapse was retired and freed that
+   slot. Three rules and a phone override went with it — a class outliving the node it dressed is
+   this bar's signature leftover (the retired section pills leaked into the title prefix for a whole
+   chat), and `verify-signout-reachable` block D is what makes that audible. */
 /* Not pure white. Against the grey section prefix, --w read as a jump rather than a hierarchy;
    --t1 is the app's own "primary text" and still clearly the brighter of the two. */
 .tn-pg{color:var(--t1);overflow:hidden;text-overflow:ellipsis;}
@@ -1788,16 +1758,14 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
      number (set in hub.js's injected mobile style), not the card system's. Using --sp here would
      re-create the mismatch the moment either one moved. */
   .hub-grid{padding-left:14px;padding-right:14px;}
+  /* ⭐⭐ AND LOG OUT GOES WITH THE RAIL, WHICH IS THE WHOLE POINT OF PUTTING IT BACK IN THERE. The
+     row is `#rail-foot` inside `#proto-rail`, so this one `display:none` hides the rail AND its way
+     out in a single rule — there is no second breakpoint to keep in step, which is what the retired
+     `.tn-logout` override needed (`verify-signout-reachable` F3 existed only to compare the two).
+     The phone keeps its own Sign Out: the burger DRAWER builds it from `_PROTO_SIGNOUT`, the same
+     table the foot renders. Kyle: *"on mobile.. log out stays where it is.. so no change on
+     mobile."* Two renderers, one table, and one breakpoint instead of two. */
   #proto-rail{display:none !important;}
-  /* ⛔⛔ AND LOG OUT GOES WITH IT. On a phone the rail is hidden and the burger DRAWER is the menu,
-     which renders Sign Out from `_PROTO_SIGNOUT` in its own group behind its own divider — so
-     showing it in the bar as well would be the same control twice, three inches apart. Kyle: *"on
-     mobile.. log out stays where it is under divider under guide link.. so no change on mobile."*
-     ⭐ IT IS THE SAME QUERY THAT HIDES THE RAIL, DELIBERATELY. The two facts are one fact — the bar
-     control exists because the rail row left, so the width where the rail comes back is exactly the
-     width where the bar control must go. Two separate breakpoints would be two things to keep in
-     step, and `verify-signout-reachable` F3 asserts they are the same number. */
-  .tn-logout{display:none !important;}
   body.chrome-on #app{margin-left:0;}
   body.chrome-on #hub-wrapper{left:0 !important;}
   /* With no rail, the bar goes back to full width and takes the logo back with it. The page NAME is
