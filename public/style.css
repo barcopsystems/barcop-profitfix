@@ -1509,8 +1509,15 @@ body.hub-dashboard .hub-app .content{padding-left:0;padding-right:0;}
 /* The three beats the rows are grouped under (what fed the week / the week itself / what the week
    fed). Same 9px uppercase treatment as the band labels INSIDE a card, one step brighter and with
    air above it, because this one groups cards rather than naming a block. */
-.wr-band{font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin:22px 0 9px;}
-.wr-grid > .wr-band:first-child{margin-top:6px;}
+/* ⚠ A FLEX ROW, so the Export PDF button can share the first band's line, right-aligned (Kyle,
+   2026-08-25). `min-height` is the button's own height, so the band carrying it is not taller than
+   the two that do not and the rows below all start where they would have. */
+.wr-band{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:26px;
+  font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin:22px 0 9px;}
+.wr-grid > .wr-band:first-child{margin-top:0;}
+/* The button carries its own margins from `.btn`; this cancels them so it centres on the band. */
+.wr-band-act{display:inline-flex;align-items:center;}
+.wr-band-act .btn{margin:0;}
 /* The open row's body. The head owns the row when it is closed, so this line is the only thing that
    separates the two when it is open. */
 .wr-secbody{border-top:1px solid var(--b-edge);}
