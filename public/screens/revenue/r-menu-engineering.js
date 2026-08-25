@@ -103,7 +103,7 @@ S.RevenueMenuEngineering = {
     App.showHelpModal('How Menu Engineering Works', [
       { p: ['Menu Engineering is your pricing engine. For every priced item it does two things: it sorts the item into Stars, Plowhorses, Puzzles, or Dogs against the other items in its own category, and it names the move plus the number behind it. It needs at least four complete items in a category to rank it; finish any Incomplete ones in Menu Builder.'] },
       { h: 'Ranked by Category', p: ['Each item is measured against its own category, not the whole menu, so entrees compete with entrees and beverages with beverages. Margins run very differently across categories, and a soda was never going to out-earn a steak, so pooling them would brand half your menu Dogs for no reason. A category needs at least four priced items to form a fair group; smaller ones sit under Too Few to Rank.'] },
-      { h: 'Keeping Units Sold Current', p: ['Everything here runs on each item\'s weekly units sold, so the page is only as accurate as those numbers. Units sold refresh on their own when you drop your product mix report at the Shift weekly close, matched to each menu item by name. The file stops on a check screen first, one line per menu item, and nothing is saved until you press Update there. If you need to refresh them between closes, the Re-import Units Sold drop at the top of this page takes the same product mix export on demand. Keep them current and the classification, the suggested prices, and the pricing checks all stay honest.'] },
+      { h: 'Keeping Units Sold Current', p: ['Everything here runs on each item\'s weekly units sold, so the page is only as accurate as those numbers. The Re-import Units Sold drop at the top of this page takes your product mix export and matches each row to a menu item by name. The file stops on a check screen first, one line per menu item, and nothing is saved until you press Update there. Keep them current and the classification, the suggested prices, and the pricing checks all stay honest.'] },
       { h: 'The Suggested Price', p: ['For any item running over its target cost percent, Bar Cop shows the price that brings it back to target, the item cost divided by your target cost percent, and the weekly dollars that move with it if volume holds. It only ever suggests a raise, never a cut. The Weekly Upside up top is what repricing every over-target item to target would add each week.'] },
       { h: 'The Move, Wired Up', p: ['Plowhorses and any over-target item get a Reprice step that prices to target and lets you adjust before you commit. Dogs go to a 90-day Dog Test, the rework-or-cut path. Stars and Puzzles carry their move, feature or promote, so you push them on the floor.'] },
       { h: 'Planned vs Live', p: ['A reprice saves as a Planned price first, because changing a number here is not the same as changing your real menu, you might be planning a whole overhaul. The item shows the plan next to your current live price. When the new prices actually roll out, hit Mark Live. That is the moment Bar Cop logs the change and starts tracking it, so Recovery always reflects your real menu, never a plan on paper.'] },
@@ -802,10 +802,15 @@ S.RevenueMenuEngineering = {
 
   // ── Re-import covers from a POS sales-mix (PMIX) export ───────────────────────
   // Per-item covers drive the whole page (classification, suggested prices, the
-  // pricing checks). Covers normally refresh when the product-mix report drops at
-  // the Shift weekly close; this on-page drop is the between-closes door to
-  // re-import just covers. Matches each row to a menu item by name and upserts
+  // pricing checks). Matches each row to a menu item by name and upserts
   // weekly_covers. Directions live in the nav-i help (Keeping Units Sold Current).
+  /* ⛔⛔ THIS IS THE ONLY DOOR, and the comment used to say it was the "between-closes" one — a
+     second door to a first door that does not exist. MEASURED 2026-08-25: `PosIngest.build('pmix', …)`
+     is called in THIS FILE AND NOWHERE ELSE, the week close's four lanes are sales / hours / tips /
+     cash, and neither `week-close.js` nor `sc-import-lane.js` mentions pmix at all. The help said the
+     same thing to the operator, which is worse: it sent them to a close that cannot take the file.
+     Found while sweeping the identical false claim off Server Check ([[lessons-paid-for]] #116 —
+     copy describing a mechanism the app does not have is a defect, not a wording preference). */
   coversImportHtml() {
     const fl = this._coversFlash; this._coversFlash = null;
     let flash = '';

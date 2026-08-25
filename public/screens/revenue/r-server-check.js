@@ -3,9 +3,11 @@
 /* ── Revenue Recovery — Server Check + Server Scorecard ───────────────────────
    One screen owns server-side performance end-to-end. A window selector (on the
    scorecard heading row) drives the stat strip + per-server scorecard + the
-   Server Shift list. Top is the stat strip, then the New Shift Check form (logs
-   one server's covers and sales, with auto staff_id + shift_id capture), then the
+   Server Shift list. Top is the New Server Check form (logs one server's covers
+   and sales, with auto staff_id + shift_id capture), then the stat strip, then the
    per-server Scorecard (data-card, exportable), then the Server Shift list.
+   ⚠ THAT ORDER IS KYLE'S, 2026-08-25: *"drop file card, stat box, selector chips/server card"* —
+   the door an operator came to USE sits above the read of what is already logged.
 
    Roster comes from lc_staff via App.staffOptions (audience 'service'). Comps
    flow in from sc_void_comps via staff_id; tips from lc_tip_pools / lc_tips via
@@ -21,7 +23,7 @@ S.RevenueServerCheck = {
      selected and open"*). A per-server sales report is a recurring POS export, so the file is the
      ordinary way in; typing one check by hand is the exception. The roster and the vendor list are
      setup data and stay manual-first, which is why this is a per-door decision and not a rule. */
-  _entryMode: 'import',   // New Shift Check card: 'import' drop (default) or 'manual' form
+  _entryMode: 'import',   // New Server Check card: 'import' drop (default) or 'manual' form
   /* The confirm screen's state, and it lives HERE rather than in the DOM so a redraw cannot lose the
      operator's file: `{ rows, open, removed, useFile }`. Null means no import is being confirmed, and
      `draw()` reads it to decide whether the page is the cockpit or the check screen. */
@@ -229,7 +231,7 @@ S.RevenueServerCheck = {
     App.showHelpModal('How Server Check Works', [
       { p: ['Log each server\'s covers and sales for a shift; Bar Cop turns it into a check average and tracks every server against your target. Comps pull in from the Voids / Comps Log and tips from Tip Tracking, so you never enter the same number twice.'] },
       { h: 'The Window', p: ['The chips set the window for the scorecard and the Server Shift list: the last 7, 30 or 90 days, or all time. The team average, top performer, who is trending down, and the spread top to bottom all reflect the window you pick.'] },
-      { h: 'Logging a Check', p: ['Pick the date, shift and server, enter covers and total sales, and the check average shows live against target before you save. An open shift for that date and service period links automatically. If your POS exports a per-server sales report, you can skip the hand entry: drop it right here on this page or at your Shift weekly close and every server\'s covers and sales land at once. The file stops on a check screen first, one row per line in your export, and nothing is saved until you press Add there. Worksheet prints a blank sheet to capture checks on paper during service and enter after close. Every logged check lists in the Server Shift log below: Edit loads one back into the form to correct it, and Delete removes a row.'] },
+      { h: 'Logging a Check', p: ['Pick the date, shift and server, enter covers and total sales, and the check average shows live against target before you save. An open shift for that date and service period links automatically. If your POS exports a per-server sales report, you can skip the hand entry: drop it right here on this page and every server\'s covers and sales land at once. The file stops on a check screen first, one row per line in your export, and nothing is saved until you press Add there. Worksheet prints a blank sheet to capture checks on paper during service and enter after close. Every logged check lists in the Server Shift log below: Edit loads one back into the form to correct it, and Delete removes a row.'] },
       { h: 'The Scorecard', p: ['Per server: check average against target and against the team, covers, sales, comps and tips as a percent of sales, and a trend arrow comparing the last 7 days to the prior 7. TOP and DOWN call out the leader and anyone slipping. Add a coaching note on any row to log it on that server in Labor Control.'] }
     ]);
   },
@@ -305,25 +307,45 @@ S.RevenueServerCheck = {
       + '</div>';
   },
 
-  // ── New Shift Check form (always-on, top of page; editing happens in a modal) ─
+  // ── New Server Check form (always-on, top of page; editing happens in a modal) ─
   // Standard Enter Manually / Import File toggle: manual logs one check, import
-  // drops a per-server file (same one the Shift close accepts) for the whole team.
+  // drops a per-server file for the whole team.
+  /* ⛔⛔ "New SERVER Check", not "New Shift Check" (Kyle, 2026-08-25). The page is Server Check and
+     every row it writes is one server's shift, so "Shift" here named the wrong noun and collided
+     with the Shift section besides.
+     ⛔⛔⛔ AND THE "you can also drop it at your Shift weekly close" SENTENCE IS DELETED BECAUSE IT
+     IS FALSE, not because it is long. MEASURED: `PosIngest.build('server', …)` is called in THIS
+     FILE AND NOWHERE ELSE in `public/`, and the week close's sales lane is
+     `{ obj: 'ShiftLane', key: 'import', mount: 'mountImport' }`, whose body builds
+     `PosIngest.build('sales', …)`. A daily sales file and a per-server file are different builders
+     writing different stores. **This page is the only door that writes `revenue_server_checks` from
+     an import.** Copy describing a mechanism the app does not have is a defect, not a wording
+     preference ([[lessons-paid-for]] #116), and the same false sentence was live in four other
+     places — the help topic, the empty state, this file's own header comment, and
+     `sales-integrity`'s help. All five fixed together, because one rule missing from N doors gets
+     one sweep, not one patch (#94/#133). */
   renderForm(targetCA) {
     const seg = this._checkSeg();
     if (this._entryMode === 'import') {
       return '<div class="card form-card">'
-        + App.collapsibleCardTitle('rsc-newcheck', 'New Shift Check')
+        + App.collapsibleCardTitle('rsc-newcheck', 'New Server Check')
         // Shown only while the columns are being matched, in place of the head above it.
         + '<div class="card-title" id="rsc-imp-head" style="display:none;">Import your server checks</div>'
         + '<div class="collapse-body">' + seg
-          + '<div id="rsc-imp-lead" style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop a per-server sales export to build the whole team\'s scorecard at once, one row per server with covers and total sales. You can also drop it at your Shift weekly close.</div>'
+          + '<div id="rsc-imp-lead" style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Drop a per-server sales export to build the whole team\'s scorecard at once, one row per server with covers and total sales.</div>'
           + '<div id="rsc-imp-csv"></div>' + this._impFlashHtml() + '</div>'
         + '</div>'
         + '<div id="rsc-imp-actions" style="margin:16px 0 24px;"></div>';
     }
+    /* ⭐ THE MANUAL SIDE GETS ITS OWN LEAD (Kyle, 2026-08-25: *"it needs the same short straight to
+       the point explainer text for the manual entry as the drop file option has"*). Same slot, same
+       type, same length as the import lead, and it names what THIS mode does rather than repeating
+       the page: one server, one shift, and the check average lands before you commit. */
     return '<div class="card form-card">'
-      + App.collapsibleCardTitle('rsc-newcheck', 'New Shift Check')
-      + '<div class="collapse-body">' + seg + this.formBody(this._form, targetCA, 'rsc') + '</div>'
+      + App.collapsibleCardTitle('rsc-newcheck', 'New Server Check')
+      + '<div class="collapse-body">' + seg
+        + '<div id="rsc-man-lead" style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Log one server\'s covers and total sales for a shift. The check average lands against your target before you save.</div>'
+        + this.formBody(this._form, targetCA, 'rsc') + '</div>'
       + '</div>'
       + '<div data-collapse-group="rsc-newcheck" style="margin:16px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="rsc-submit">Log Check</button>'
@@ -378,7 +400,7 @@ S.RevenueServerCheck = {
         + '</div>'
       : '';
     if (!sc.rows.length) {
-      return headingRow + exclNote + '<div class="card"><div style="text-align:center;padding:22px;color:var(--t4);">No server data in this range. Log a shift check above, or drop a per-server sales report here or at your Shift weekly close, to build the scorecard.</div></div>';
+      return headingRow + exclNote + '<div class="card"><div style="text-align:center;padding:22px;color:var(--t4);">No server data in this range. Log a check above, or drop a per-server sales report, to build the scorecard.</div></div>';
     }
     const rows = sc.rows.map((r, i) => {
       const vsT = r.checkAvg - targetCA;
@@ -502,9 +524,16 @@ S.RevenueServerCheck = {
        what is being imported into and carries no write control.
        ⚠ A WRAPPER, NOT A RE-RENDER — `mountServerImport`'s hook toggles `display` on it, because
        re-rendering from inside the mount throws away the file the operator just dropped. */
+    /* ⭐ THE DOOR COMES FIRST, THEN THE NUMBERS IT FEEDS (Kyle, 2026-08-25: *"move the stat box under
+       the drop file card.. so drop file card, stat box, selector chips/server card"*). The stat strip
+       is a READ of what is already logged; the form is the thing an operator came here to DO. It is
+       still outside `#rsc-list-region` for the reason above — it carries no write control and it is
+       the context the import lands in — so putting it away with the scorecard would be wrong.
+       ⚠ THE CONFIRM-SCREEN BRANCH ABOVE KEEPS THE STRIP ON TOP, deliberately: there is no form there
+       (the review has taken the page), so there is nothing for it to sit under. */
     this.container.innerHTML = '<div class="screen">'
-      + this.statStrip(scorecard, targetCA)
       + this.renderForm(targetCA)
+      + this.statStrip(scorecard, targetCA)
       + '<div id="rsc-list-region">'
         + this.scorecardSection(scorecard, targetCA)
         + this.logSection(log, targetCA)
