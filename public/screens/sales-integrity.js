@@ -1441,7 +1441,21 @@ S.SalesIntegrity = {
     this._viewing = null;
     const latest = (showId && this.reviews().find(r => r && r.id === showId)) || this.latestReview();
     const importCard = '<div class="card form-card">'
-      + '<div class="card-title" id="si-card-head" style="display:flex;align-items:center;gap:10px;"><span>Sales Integrity Review</span>' + App.freqTag('As needed') + '</div>'
+      /* ⭐ "Integrity Review", AND THE FREQUENCY TAG GOES WITH IT (Kyle, 2026-08-25: *"change 'sales
+         integrity review as needed' drop file card title to just 'Integrity Review'"*). The page is
+         reached from a Sales drop-down that already says Sales, so the word was the third spelling
+         of the same fact; and "As needed" is what every drop on this page already is.
+         ⚠ THE PDF KEEPS ITS FULLER NAME. `App.pdfFileName('Sales Integrity Review')` is a document
+         handed to somebody outside this screen, where the extra word is the only context they get —
+         and `verify-week-review-urgency-and-period` names it as a per-day SNAPSHOT by that exact
+         string. Flagged rather than changed on my own initiative. */
+      /* ⚠ THE INLINE `display:flex` STAYS EVEN THOUGH THE TAG BESIDE IT WENT. `onState` restores this
+         head with `head.style.display = map ? 'none' : 'flex'`, so the element's own declaration and
+         the restore have to agree — dropping it here would leave the JS forcing a value the markup
+         no longer declares, which is #84's trap from the other end (a display written in one place
+         and reset in another). One span in a flex row renders identically, and the row is ready if
+         anything joins the title again. */
+      + '<div class="card-title" id="si-card-head" style="display:flex;align-items:center;gap:10px;"><span>Integrity Review</span></div>'
       // Shown only while the columns are being matched, in place of the head above it.
       + '<div class="card-title" id="si-imp-head" style="display:none;">Import your server sales</div>'
       + '<div id="si-csv"></div><div id="si-imp-result"></div>'
@@ -1965,7 +1979,7 @@ S.SalesIntegrity = {
       /* ⚠ THE DATE COLUMN WAS NAMED NOWHERE IN THE WHOLE SCREEN, and it is the one that switches on
          BOTH capture signals — drawer shorts (weight 3, strong) and walkouts. Measured: the same
          file with and without a Date column gave 1 flagged / $361 exposure versus 0 / $0. */
-      { h: 'Drop the report', p: ['Pull a per-server sales summary for a shift or a week from your POS and drop it in the box up top. Map the columns once and Bar Cop remembers it. The only column it must have is the server name; most of the others unlock a signal, so the richer the export, the sharper the read. Net Sales earns its place several times over — the void, comp, refund and check-average reads are all measured against it. Include the Date column if your export has one: it is what lets Bar Cop line the report up with the drawer shortages and walked tabs you have already logged, and drawer shortages are one of the strongest tells it has. A server with too few checks to judge fairly is set aside, not flagged.', 'This is the deep theft read and wants a richer export than the weekly one, with the register and cash columns. Your basic per-server covers and sales already import at the Shift weekly close and show up in Server Check, so use that for check averages and this for the theft patterns.'] },
+      { h: 'Drop the report', p: ['Pull a per-server sales summary for a shift or a week from your POS and drop it in the box up top. Map the columns once and Bar Cop remembers it. The only column it must have is the server name; most of the others unlock a signal, so the richer the export, the sharper the read. Net Sales earns its place several times over — the void, comp, refund and check-average reads are all measured against it. Include the Date column if your export has one: it is what lets Bar Cop line the report up with the drawer shortages and walked tabs you have already logged, and drawer shortages are one of the strongest tells it has. A server with too few checks to judge fairly is set aside, not flagged.', 'This is the deep theft read and wants a richer export than the weekly one, with the register and cash columns. Your basic per-server covers and sales drop on Server Check under the same Sales menu, so use that for check averages and this for the theft patterns.'] },
       /* ⚠ THE "or a strong tell is severe" CLAUSE WAS UNREACHABLE and said the opposite of the rule.
          `severity` is `clean` below TWO independent flags, full stop — measured, a server at 60
          no-sale opens against a floor of 1 raised that flag and still read clean, and the screen
