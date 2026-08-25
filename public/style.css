@@ -77,6 +77,20 @@
   --card-head: #161E24;
   --input:     #11171B;
   --panel:     #161E24;                /* Raised content panels (Mark Fix Implemented, Quick Reference, Hub Key Metrics) */
+  /* ⛔ THE SECTION DROP-DOWN'S OWN FILL, AND IT IS A NEW TOKEN BECAUSE IT IS A NEW COLOUR (Kyle,
+     2026-08-25: *"try background #324450 and the border around the drop down #11171B"*). #324450 is
+     nowhere else in the palette — the nearest are `--selection` #3A4F5E and `--c3`/`--c4` #283642 —
+     so there was nothing to borrow, and pasting the hex into the rule would put a colour outside the
+     block where Kyle actually retunes ([[color-system-locked]]; `verify-section-tabs` C5d refuses a
+     literal in that rule outright).
+     ⭐ ITS OWN TOKEN RATHER THAN A SHARED ONE, DELIBERATELY. The menu has now been `--c4`, `--bg` and
+     `--panel` in three days as he walks it; every one of those tied it to a surface that means
+     something else, so each move dragged an unrelated decision along. Naming the thing it actually
+     is means the next nudge is one line here and touches nothing else.
+     ⚠ THE BORDER IS `--bg`, i.e. DARKER than the fill — an inversion of every other panel in the
+     app, which sits lighter than its edge. That is his call and it works because the two are far
+     apart; what is pinned is that they STAY apart, never the values (U2). */
+  --menu-panel: #324450;
   /* ⭐⭐ THE DATA ROW FILL, AND NOW IT REALLY IS THE ONLY ONE (Kyle, 2026-08-14: *"every data row
      that uses this color i need it consolidated into one root color"*).
      Un-box language: rows sit just lighter than --surface so they lift off the header band, which
@@ -2601,7 +2615,7 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    shared #1E2B34 ([[lessons-paid-for]] #133).
    ⭐ AND C5e GETS STRONGER FOR FREE: the panel is no longer the page fill, so it is distinguishable
    by its own colour again instead of resting entirely on the edge border. */
-.st-drop{position:fixed;background:var(--panel);border:1px solid var(--b-edge);border-top:0;
+.st-drop{position:fixed;background:var(--menu-panel);border:1px solid var(--bg);border-top:0;
   border-radius:0 0 8px 8px;padding:5px;min-width:141px;z-index:200;}
 /* ⛔⛔ THE GOLD CHEVRON IS RETIRED — IT IS AN UNDERLINE NOW (Kyle, 2026-08-24: *"not really liking
    the gold chevron with drop down menu.. let's try underling the menu links with the same underline
