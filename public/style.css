@@ -2523,6 +2523,31 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    silent. */
 .st-drop{position:fixed;background:var(--bg);border:1px solid var(--b-edge);border-top:0;
   border-radius:0 0 8px 8px;padding:5px;min-width:141px;z-index:200;}
+/* ⛔⛔ THE GOLD CHEVRON IS RETIRED — IT IS AN UNDERLINE NOW (Kyle, 2026-08-24: *"not really liking
+   the gold chevron with drop down menu.. let's try underling the menu links with the same underline
+   used with the page tabs."*).
+   ⭐⭐ "THE SAME UNDERLINE" WAS MEASURED OFF THE REAL PAGE TABS, NOT EYEBALLED. `.ch-tab` is the
+   switcher he means (Usage Report, Cash History, Tip History), and the live active tab reads:
+       border-bottom: 2px solid var(--focus)   ·   inactive: 2px TRANSPARENT, so nothing resizes
+       padding-bottom 10px, i.e. the rule sits 10px under the text
+       the strip carries its own 1px --b-edge line and `margin-bottom:-1px` drops the 2px onto it
+   So what is copied is the WIDTH, the TOKEN and the 10px GAP — `verify-section-tabs` U3 asserts the
+   agreement with `.ch-tab.on` rather than the value, because `--focus` is Kyle's to retune and a pin
+   naming the colour fires on the change it should permit ([[lessons-paid-for]] #48/#133).
+   ⭐ IT STAYS A PSEUDO-ELEMENT rather than becoming a real border-bottom, and that is deliberate: a
+   border on `.st-link` grows the box 2px, and the link is vertically centred in the bar, so every
+   link's text would shift a pixel. The `::after` changes nothing about layout. `.st-link` is already
+   `position:relative` and `_openDrop` already adds and removes `.st-open`, so the whole mechanism
+   was already here — this rule only changes what it draws.
+   ⚠ 6px OF OFFSET, NOT 10: the link carries 4px of its own bottom padding, so `100% + 6` puts the
+   rule 10px under the TEXT, which is the number the page tabs actually use. Measured: link box
+   15-36 with its text at 19-32, so the rule lands at 42-44.
+   ⚠ AND IT STILL HAS TO CLEAR THE CLIP — `#proto-topnav` is `overflow:hidden` at 52px, the trap that
+   once hid the whole drop-down and cannot be fixed with z-index ([[lessons-paid-for]] #102). 44 is
+   inside 51. U3b asserts it, derived from the stylesheet rather than typed.
+   ⚠ THE RULE SPANS THE LINK'S PADDED BOX, not just the word — which is exactly what a real
+   `border-bottom` would do on a `.ch-tab`, so it is the same look and not a choice I made.
+   Historical, for the chevron this replaces: */
 /* ⛔⛔⛔ THE GOLD CHEVRON, AND IT HAD TO FIT INSIDE THE BAR (Kyle: *"a gold chevron that shows up
    under the menu link pointing down to the menu that is open below it... stays active as long as
    the drop down menu is open and goes away when a menu closes"*).
@@ -2545,9 +2570,8 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    it from every link, so the "stays while open, goes when it closes" half was built the day the
    menus were — this is the class finally rendering something. */
 .st-link{position:relative;}
-.st-link.st-open::after{content:'';position:absolute;left:50%;transform:translateX(-50%);
-  top:calc(100% + 5px);width:0;height:0;border-left:5px solid transparent;
-  border-right:5px solid transparent;border-top:5px solid var(--gold);pointer-events:none;}
+.st-link.st-open::after{content:'';position:absolute;left:0;right:0;
+  top:calc(100% + 6px);height:2px;background:var(--focus);pointer-events:none;}
 .st-row{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;
   padding:7px 12px;cursor:pointer;font-family:inherit;font-size:13px;text-align:left;
   color:var(--t1);white-space:nowrap;transition:color .12s;}
