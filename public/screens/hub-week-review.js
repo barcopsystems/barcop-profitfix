@@ -1538,9 +1538,27 @@ S.WeekReview = {
       + this._m0(outRows.reduce((t, o) => t + (Number(o.amount) || 0), 0)) + '.');
     if (reportsWk) did.push(this._n(reportsWk + ' ' + this._plu(reportsWk, 'report')) + ' run.');
     const activity = this._didList(did);
-    /* Once the month is closed the figures are real and they say WHICH month, out loud, in the band
-       label. Until then the band holds the sentence rather than a number, which is what Kyle asked
-       for: *"once books are closed what it turned up stats will show here."* */
+    /* ⛔⛔⛔ IT SAID "once the month-end books are closed" AND NOTHING IN THIS APP RECORDS THAT
+       (Kyle, 2026-08-25: *"what are you using to determine if a month end books are closed.. what
+       criteria are you using now to determine that is done?"*). The honest answer was NOTHING.
+       MEASURED on the pushed build: `settled` asks two things and neither is an action the operator
+       takes — the month must be EARLIER than this one, and `_weeksComplete(mKey).complete` must
+       hold, which is "no gaps among the weeks that end in it". Swept the tree: **ZERO writers** of a
+       month-closed fact, no store, no field. The only trace of a month-end run is a localStorage
+       timestamp with no month on it, which cannot answer the question and which nothing reads for
+       it. And `hub-books.js` has no close action at all — its members GENERATE a pack.
+       ⛔ SO THE SENTENCE PROMISED A GATE THE CARD CANNOT SEE. Measured live: August's four weeks
+       were ALREADY all confirmed and the only thing outstanding was the calendar, while this line
+       sent the operator off to close books that would not have moved the card
+       ([[lessons-paid-for]] #116 — copy describing a mechanism the app does not have is FALSE, and
+       false is not a matter of taste).
+       ⭐ IT NAMES THE ONE THAT IS ACTUALLY OUTSTANDING, because the card knows which. A month still
+       running and a month with two weeks missing are different problems with different fixes, and
+       only the second one is anything the operator can act on today.
+       ⚠ THE VOCABULARY IS THE APP'S OWN. Books Help already states this routine correctly —
+       *"make sure the weeks are all in, then generate Month-End Books"* — so this reuses "weeks are
+       in" rather than inventing a third way to say it. */
+    const missingWks = Number(wc.missing) || 0;
     const results = settled
       ? this._resRow([
           this._res('Op Income YTD', BH._money(yInc), yInc < 0 ? 'var(--red)' : 'var(--t1)'),
@@ -1548,7 +1566,10 @@ S.WeekReview = {
           this._res('Month Revenue', BH._money(mRev)),
           this._res('Month Income', BH._money(mInc), mInc < 0 ? 'var(--red)' : 'var(--t1)')
         ])
-      : this._didRow(esc(mLabel) + ' is still open. Its figures show here once the month-end books are closed.');
+      : this._didRow(missingWks > 0
+          ? esc(mLabel) + ' has <b>' + missingWks + '</b> ' + this._plu(missingWks, 'week')
+            + ' still to confirm. Its figures show here once ' + (missingWks === 1 ? 'it is' : 'they are') + ' in.'
+          : esc(mLabel) + ' is not over yet. Its figures show here once the month ends, with every week in it confirmed.');
 
     /* ⛔ "<Month> books not closed yet" is GONE: its only evidence was the `generate` tick, and
        nothing durable records that the month-end pack was produced (the localStorage stamp is the
@@ -1578,7 +1599,13 @@ S.WeekReview = {
 
     const toClose = settled
       ? this._openList(open, 'Nothing left to close on ' + esc(mLabel) + '.')
-      : (this._openList(open, '') + this._didRow('Get all your bills and cash outflows in before the month ends, then close the month-end books.'));
+      /* ⛔ THE SECOND HALF SAID "then close the month-end books" AND THERE IS NO SUCH ACTION — see
+         the note on the band above. The routine itself is real and worth stating; what was false was
+         naming a step the app does not have and implying this card watches it.
+         ⭐ THE THREE STEPS ARE BOOKS HELP'S OWN, IN ITS OWN ORDER: log the money out, get the weeks
+         in, generate the pack. Directives, not teaching ([[writing-style]]), and every one of them
+         is something an operator can actually go and do. */
+      : (this._openList(open, '') + this._didRow('Get your bills and cash outflows in before the month ends, and confirm every week. Then generate Month-End Books.'));
 
     /* ⚠ ITS OWN BAND, AND THE LABEL SAYS THE BASIS. Runway and safe-to-spend are a position as it
        stands TODAY, while the band above them reports a finished MONTH — two different clocks, and
@@ -1594,7 +1621,13 @@ S.WeekReview = {
     (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
       results: (settled
         ? 'Op Income YTD ' + BH._money(yInc) + ', Margin ' + BH._pct(yMargin) + ', ' + mLabel + ' Revenue ' + BH._money(mRev) + ', ' + mLabel + ' Income ' + BH._money(mInc)
-        : mLabel + ' is still open, so its figures are not in yet.')
+        /* ⚠ THE PAPER SAYS WHAT THE SCREEN SAYS, INCLUDING WHICH OF THE TWO IS OUTSTANDING. This
+           read "is still open, so its figures are not in yet" — vaguer than the screen and, like it,
+           silent about the real reason. The PDF is the artefact somebody reads without the app in
+           front of them, so it is the one that can least afford to be vague (step 0.6). */
+        : mLabel + (missingWks > 0
+            ? ' has ' + missingWks + ' ' + this._plu(missingWks, 'week') + ' still to confirm, so its figures are not in yet.'
+            : ' is not over yet, so its figures are not in yet.'))
         + '  Current position: Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-')
         + ', Safe to Spend ' + (pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-')
         + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-'),
