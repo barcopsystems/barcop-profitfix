@@ -49,9 +49,21 @@ S.HubSettings = {
       const help = 'font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:11px;';
       const EXPLAIN = {
         service: 'Tap on the service periods you run and set the times.',
-        tax:     'Set these once. Cash, Books, and Labor read them.',
-        profit:  'Your cost goals. Profit Recovery measures your actuals against them.',
-        revenue: 'Your sales goals. Revenue Recovery measures your actuals against them.'
+        /* ⛔ THESE THREE NAMED SECTIONS THAT NO LONGER EXIST (Kyle, 2026-08-24, reading the pages:
+           *"in settings both profile and targets still have text about sections no longer in the
+           app"*). "Cash" and "Labor" stopped being sections at T67, and Profit/Revenue Recovery went
+           with the Fix systems.
+           ⭐ THE REPLACEMENTS ARE MEASURED, NOT RENAMED BY EYE — a replacement sentence is a NEW
+           claim and gets the same measurement the old one failed ([[lessons-paid-for]] #117).
+           Readers of the tax/wage fields, grepped: `salesTaxRate` -> `hub-books` and `c-position`
+           (both BOOKS pages now) and `ev-bookings` (EVENTS); `state_min_wage` -> `lc-pay-periods`
+           and `lc-payroll-export` (both THE FLOOR) plus the Operations audit. So the three that read
+           them are Books, The Floor and Events.
+           ⭐ And what grades the targets is the AUDIT, which this page's own "i" already says:
+           *"Bar Cop grades your real pour cost against this on the Profit Audit."* */
+        tax:     'Set these once. Books, The Floor, and Events read them.',
+        profit:  'Your cost goals. The Profit audit measures your actuals against them.',
+        revenue: 'Your sales goals. The Revenue audit measures your actuals against them.'
       };
       const parts = secs.map((s, i) =>
         '<div class="auth-inputs" data-section="' + s.id + '" style="text-align:left;margin-bottom:' + (i === secs.length - 1 ? '0' : '16px') + ';">'
@@ -495,7 +507,7 @@ S.HubSettings = {
       : 'an unknown date';
     const ok = await App.confirm({
       title: 'Restore the backup from ' + when + '?',
-      message: 'This replaces every record currently in your account: settings, weekly numbers, audits, and all Inventory, Labor, and Shift Control data. It cannot be undone.',
+      message: 'This replaces every record currently in your account: settings, weekly numbers, audits, and everything in Inventory and The Floor. It cannot be undone.',
       confirmText: 'Restore',
       cancelText: 'Cancel'
     });
@@ -815,7 +827,7 @@ S.HubSettings = {
   async restoreSnapshot(id, whenLabel) {
     const ok = await App.confirm({
       title: 'Restore your account to ' + (whenLabel || 'this backup') + '?',
-      message: 'This replaces every record currently in your account with that backup: settings, weekly numbers, audits, and all Inventory, Labor, and Shift Control data. It cannot be undone.',
+      message: 'This replaces every record currently in your account with that backup: settings, weekly numbers, audits, and everything in Inventory and The Floor. It cannot be undone.',
       confirmText: 'Restore', cancelText: 'Cancel'
     });
     if (!ok) return;
@@ -4691,9 +4703,9 @@ S.HubSettings = {
             d('Inventory counts completed', '1 of 4 expected weekly', 25),
             d('Spot checks completed', '1 of 4 expected weekly', 25),
             d('Shifts logged', '12 shifts in window', 40),
-            d('Profit Recovery audit on time', 'Current', 100),
-            d('Revenue Recovery audit on time', 'Current', 100),
-            d('Cash Recovery audit on time', 'Current', 100),
+            d('Profit audit on time', 'Current', 100),
+            d('Revenue audit on time', 'Current', 100),
+            d('Cash audit on time', 'Current', 100),
             d('Maintenance backlog cleared', '4 open over 14 days', 20) ],
           [ d('Cash variance trend (lower is better)', '0.62% of revenue handled', 38),
             d('Drawer counts per operating day', '8 counts on 14 operating days', 57),
@@ -4740,9 +4752,9 @@ S.HubSettings = {
             d('Inventory counts completed', '2 of 4 expected weekly', 50),
             d('Spot checks completed', '1 of 4 expected weekly', 25),
             d('Shifts logged', '17 shifts in window', 57),
-            d('Profit Recovery audit on time', 'Current', 100),
-            d('Revenue Recovery audit on time', 'Current', 100),
-            d('Cash Recovery audit on time', 'Current', 100),
+            d('Profit audit on time', 'Current', 100),
+            d('Revenue audit on time', 'Current', 100),
+            d('Cash audit on time', 'Current', 100),
             d('Maintenance backlog cleared', '2 open over 14 days', 60) ],
           [ d('Cash variance trend (lower is better)', '0.50% of revenue handled', 50),
             d('Drawer counts per operating day', '14 counts on 22 operating days', 64),
@@ -4821,7 +4833,7 @@ S.HubSettings = {
     if (!(App.isDevAccount && App.isDevAccount())) return;
     const ok = await App.confirm({
       title: 'Clear all data?',
-      message: 'This permanently erases ALL data in your account: every weekly record, audit, recipe, and all Inventory, Labor, and Shift Control data. Your settings and targets are kept. This cannot be undone.',
+      message: 'This permanently erases ALL data in your account: every weekly record, audit, recipe, and everything in Inventory and The Floor. Your settings and targets are kept. This cannot be undone.',
       confirmText: 'Clear all data',
       cancelText: 'Cancel'
     });
