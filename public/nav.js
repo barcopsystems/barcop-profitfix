@@ -607,7 +607,7 @@ const Floor = {
         </div>
       <div class="nav-item" data-hub-action="enter" data-mod="profit" data-screen="sales-integrity">
         <svg class="nav-icon" viewBox="0 0 17 17" fill="none"><circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11.2 11.2L15 15" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M5.5 7.8l1.6 1.6L10 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="nav-label">Integrity Check</span>
+        <span class="nav-label">Integrity Review</span>
         </div>
       <div class="nav-section">Records</div>
       <div class="nav-item" data-hub-action="enter" data-mod="shift" data-screen="sc-incidents">
