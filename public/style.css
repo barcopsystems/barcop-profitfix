@@ -2589,7 +2589,19 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    any enabled section can emit and goes RED if one grows past what this was measured against. A
    longer label then makes its panel wider than its siblings, which is cosmetic and loud, not
    silent. */
-.st-drop{position:fixed;background:var(--bg);border:1px solid var(--b-edge);border-top:0;
+/* ⛔⛔ `--panel`, NOT `--bg` (Kyle, 2026-08-25: *"let's try the drop down menu background color as
+   #161E24"*). It was `--bg` #11171B on his previous call; this steps it one shade off the page again,
+   but as a token rather than the `--c4` accent it started as.
+   ⭐⭐ THE TOKEN IS PICKED BY MEANING, NOT BY VALUE, AND THAT MATTERS HERE BECAUSE **THREE** TOKENS
+   HOLD #161E24. Choosing on the hex would be a coin toss that freezes this menu to whatever the
+   other two do next. `--surface` is the CARD fill. `--card-head` is a card's header band and its own
+   comment says it must NOT follow `--surface` down — borrowing it would tie a menu to a decision
+   about card headers. `--panel` says *"Raised content panels"*, which is exactly what a drop-down
+   hanging off the bar is. Same reasoning that picked `--c4` over `--sel-active-bg` when two tokens
+   shared #1E2B34 ([[lessons-paid-for]] #133).
+   ⭐ AND C5e GETS STRONGER FOR FREE: the panel is no longer the page fill, so it is distinguishable
+   by its own colour again instead of resting entirely on the edge border. */
+.st-drop{position:fixed;background:var(--panel);border:1px solid var(--b-edge);border-top:0;
   border-radius:0 0 8px 8px;padding:5px;min-width:141px;z-index:200;}
 /* ⛔⛔ THE GOLD CHEVRON IS RETIRED — IT IS AN UNDERLINE NOW (Kyle, 2026-08-24: *"not really liking
    the gold chevron with drop down menu.. let's try underling the menu links with the same underline
