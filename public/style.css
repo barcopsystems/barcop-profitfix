@@ -1500,17 +1500,32 @@ body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
    Source order agrees with it now, which means both reasons have to fail before the gap comes back. */
 .hub-app .content > .hub-grid:first-child{margin-top:-5px;}
 body.hub-dashboard .hub-app .content{padding-left:0;padding-right:0;}
-.wr-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-@media (max-width:960px){.wr-grid{grid-template-columns:1fr;}}
+/* ⛔ ONE COLUMN, NOT TWO (Kyle, 2026-08-25: *"not two cards per row like it is now.. i'm thinking
+   setup like close the week"*). The sections are accordion ROWS now — one open at a time, the rest
+   collapsed to a head — and a two-column grid of accordions puts the row you just opened beside a
+   closed one and reflows everything under it on every click. The rows carry their own 10px bottom
+   margin, the same way Close The Week's do, so there is no gap here to keep in step with them. */
+.wr-grid{display:block;}
+/* The three beats the rows are grouped under (what fed the week / the week itself / what the week
+   fed). Same 9px uppercase treatment as the band labels INSIDE a card, one step brighter and with
+   air above it, because this one groups cards rather than naming a block. */
+.wr-band{font-size:9px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:var(--t3);margin:22px 0 9px;}
+.wr-grid > .wr-band:first-child{margin-top:6px;}
+/* The open row's body. The head owns the row when it is closed, so this line is the only thing that
+   separates the two when it is open. */
+.wr-secbody{border-top:1px solid var(--b-edge);}
 /* `.wr-tophead` went with the stats box's header band on 2026-08-11 — the card carries the three
    figures and nothing else now, so there was no element left for the rule to reach. */
 .wr-topstats{padding:20px 22px;}
-/* The eight Week In Review SECTION card headers (Inventory, Labor, Shift, Profit, Revenue, Cash,
-   Events, Books). Same box as `.ck-head`, so a section card's head is the app's standard header
-   band and not a taller one-off. Measured before and after: 51px -> 34px, identical to Close The
-   Week's. Its title used to be a 17px Barlow Condensed line, which is exactly why the first
-   card-head census missed it. */
-.wr-head{padding:11px 22px;border-bottom:1px solid var(--b2);background:var(--card-head);}
+/* ⛔ `.wr-head` IS RETIRED (2026-08-25). It was the `--card-head` band on the top of each of the
+   eight Week In Review section cards, matched to `.ck-head` so a card head was the app's standard
+   header. The sections are accordion ROWS now and their head is a CONTROL — a mark, a name, a state
+   line and a chevron — so the band class has no element left to reach. Removed rather than left
+   behind: dead CSS reads as a slot something is supposed to fill, and it is the class a future
+   reader would reach for when adding a head to this page.
+   ⚠ `verify-card-head-band` keeps `wr-head` in its registry AT ZERO and asserts the rule is gone
+   from this stylesheet, exactly as it already does for the retired `wr-tophead` — a removal nothing
+   watches is a removal that comes back ([[harness-review-like-code]] #70). */
 /* ⛔ NOT A HEAD, AND IT USED TO BORROW ONE. The "this week is not confirmed yet" explainer sits
    UNDER the top stat row, inside the same card — it is a note, not the card's header. It reused
    the top head's class purely for the padding and the divider, so filling that class filled this
@@ -1530,7 +1545,9 @@ body.hub-dashboard .hub-app .content{padding-left:0;padding-right:0;}
   .wr-screen{padding:16px 14px 40px;}
   .wr-vdiv{display:none;}
   .wr-statrow{column-gap:22px;}
-  .wr-topstats,.wr-head,.wr-block{padding-left:15px;padding-right:15px;}
+  /* `.wr-head` left this list with the class itself (2026-08-25). `.wr-step-head` takes its place:
+     the accordion row's head is the thing that has to track the page's phone padding now. */
+  .wr-topstats,.wr-step-head,.wr-block{padding-left:15px;padding-right:15px;}
   .wr-idiv{margin-left:15px;margin-right:15px;}
 }
 /* Hub "Where You Stand" card is hand-built (not a .card), so it needs its own
@@ -1921,8 +1938,13 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
    chevron simply never highlights. `.ip-rt-head` (the product-import confirm screen) was
    built to reuse `.card.collapsed` for the ROTATION, which needed no CSS at all, and the
    hover colour was the half that does. Kyle caught it on the live screen. */
-.pf-step-head:hover .card-chevron,.c-step-head:hover .card-chevron,.ic-step-head:hover .card-chevron,.lc-step-head:hover .card-chevron,.sc-step-head:hover .card-chevron,.ek-step-head:hover .card-chevron,.bk-step-head:hover .card-chevron,.wc-step-head:hover .card-chevron,.ip-rt-head:hover .card-chevron{color:var(--gold);}
-.pf-step-head.collapsed .card-chevron,.c-step-head.collapsed .card-chevron,.ic-step-head.collapsed .card-chevron,.lc-step-head.collapsed .card-chevron,.sc-step-head.collapsed .card-chevron,.ek-step-head.collapsed .card-chevron,.bk-step-head.collapsed .card-chevron,.wc-step-head.collapsed .card-chevron{transform:rotate(-90deg);}
+/* ⚠ `.wr-step-head` JOINED 2026-08-25, one entry in each of the two lines below rather than a second
+   accordion rule of its own. Week in Review's section rows are the same control as Close The Week's
+   step rows, so the glyph, the 0.18s rotation and the gold hover come from the one place every other
+   accordion in the app already reads ([[lessons-paid-for]] #101 — grep what the app already owns
+   before naming a class). */
+.pf-step-head:hover .card-chevron,.c-step-head:hover .card-chevron,.ic-step-head:hover .card-chevron,.lc-step-head:hover .card-chevron,.sc-step-head:hover .card-chevron,.ek-step-head:hover .card-chevron,.bk-step-head:hover .card-chevron,.wc-step-head:hover .card-chevron,.wr-step-head:hover .card-chevron,.ip-rt-head:hover .card-chevron{color:var(--gold);}
+.pf-step-head.collapsed .card-chevron,.c-step-head.collapsed .card-chevron,.ic-step-head.collapsed .card-chevron,.lc-step-head.collapsed .card-chevron,.sc-step-head.collapsed .card-chevron,.ek-step-head.collapsed .card-chevron,.bk-step-head.collapsed .card-chevron,.wc-step-head.collapsed .card-chevron,.wr-step-head.collapsed .card-chevron{transform:rotate(-90deg);}
 .card.collapsed .collapse-body{display:none;}
 /* ⛔ A COLLAPSED CARD IS THE BAND AND NOTHING ELSE (Kyle, 2026-08-14, on Spot Check and every other
    card with a chevron): *"when you hide the section the background gets halved in the closed card
