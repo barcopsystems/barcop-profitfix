@@ -1437,7 +1437,34 @@ body.chrome-on .hub-app .sidebar-nav{padding:12px 0;}
    padding, centred. The host's own 24px side padding is dropped on the dashboard only, or the two
    paddings stack and the Hub's content sits 20px inside everything else. Measured: left edge 164
    on the Hub and on every other page. */
+/* ⛔⛔ THE HUB'S GREETING READ 5px LOWER THAN A CARD EDGE, AND KYLE HAD THE NUMBER EXACTLY (2026-08-24:
+   *"hub text sits 5px lower than a card edge"*). Same class as the tab strip at `.ch-tabs`, different
+   cause: a card's visible top IS its border, while the greeting is bare text whose glyphs start
+   partway down their own line box.
+   ⭐ MEASURED FROM THE FONT'S OWN METRICS, NOT GUESSED. The greeting is 19px/700 Barlow with
+   `line-height:normal`; `TextMetrics` on the live build gives fontAscent 19, fontDescent 4, used
+   line-height 23 and an INK ascent of 14. CSS puts the baseline at `(23-23)/2 + 19 = 19` below the
+   line box top, so the first ink lands at `19 - 14 = ` **5px** in. Element top 28 from the bar, ink
+   at 33, card edge at 28. Exactly his 5.
+   ⚠ MY OWN FIRST PROBE SAID 2px AND IT WAS MEASURING THE WRONG THING — a canvas `fillText` with
+   `textBaseline:'top'` starts at the EM BOX, which skips the half-leading a DOM line box adds. He
+   was right and the instrument was wrong ([[lessons-paid-for]] #73 — when a population is defined by
+   how something LOOKS, the person looking at it is the instrument).
+   ⛔ IT MUST NOT BE FIXED ON `.hub-app .content`. That padding is shared by every hub-shell page —
+   Settings, Books, the Audits, Week Review — and every one of those opens on a CARD, which is
+   already correct at 28. Trimming the shared padding would pull five right pages wrong to fix one.
+   `.hub-grid` is rendered only by `hub.js` (grepped) and is the Hub's whole body, so the correction
+   lands on the Hub alone.
+   ⚠ THE 5 IS A FONT-METRIC CONSTANT, NOT A SPACING CHOICE, so it does NOT track `--sp`: on a phone
+   the padding drops to 16 and the greeting still starts 5px inside its line box. One rule covers
+   both. `verify-hub-greeting-gap` pins the type it was measured against, so changing the greeting's
+   size or weight fails LOUDLY instead of quietly re-opening the gap. */
 .hub-grid{max-width:var(--page-w);margin:0 auto;padding-left:var(--sp);padding-right:var(--sp);}
+/* ⚠ BELOW `.hub-grid`, DELIBERATELY. That rule sets `margin:0 auto` — a SHORTHAND, so it writes
+   margin-top:0. This selector already outranks it (0,4,0 against 0,1,0) so it would win either way,
+   but a correction that depends only on a specificity count is one refactor from silently losing.
+   Source order agrees with it now, which means both reasons have to fail before the gap comes back. */
+.hub-app .content > .hub-grid:first-child{margin-top:-5px;}
 body.hub-dashboard .hub-app .content{padding-left:0;padding-right:0;}
 .wr-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 @media (max-width:960px){.wr-grid{grid-template-columns:1fr;}}
