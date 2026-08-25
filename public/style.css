@@ -959,6 +959,28 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    the screen, which is what Kyle asked for. A width on any one box cannot do it. */
 .ua-perm-boxes{display:grid;grid-template-columns:repeat(var(--pcols,8),minmax(86px,1fr));
   gap:9px 16px;align-items:center;}
+/* ⛔⛔⛔ THE MIDDLE BAND, AND THE 900px BREAKPOINT ON ITS OWN LEFT A 200px HOLE (Kyle, 2026-08-24:
+   *"the permissions rows still go outside the content card until they hit the mobile breaking
+   point."*). Eight tracks at an 86px floor is 8x86 + 7x16 = **800px** of grid, and a row's other
+   furniture (the label cell and the cell padding) measures 111 more, so the table demands 911. The
+   card's inner width measures `viewport - 178` (1280 -> 1102 and 1000 -> 822, both exactly 178), so
+   the 8-track grid only fits from about **1089px up** — and it was declared all the way down to
+   901. MEASURED on the pushed build at a 1000px viewport: the boxes end **94px past the card's
+   right edge**, tracks pinned at their floor.
+   ⛔ THE FLOOR IS NOT THE PLACE TO FIX IT. The widest box ("Engineering") needs 85px of its own, so
+   86 is an honest minimum and lowering it would clip a label. The answer is FEWER TRACKS in the band
+   eight cannot fit, which keeps the one property this grid exists for: every row on the SAME track
+   count, so the checkboxes line up in a straight column down the screen.
+   ⭐ FOUR, and it is derived rather than picked: four tracks need 4x86 + 3x16 + 111 + 178 = 681px
+   and the band starts at 901, which is 220px of headroom; six would need 885 against a band that
+   starts at 901 and is one comment away from being wrong again. Four also divides the widest section
+   (eight links) into two clean rows instead of a ragged 6+2.
+   ⚠ THIS BLOCK MUST STAY ABOVE THE 900px ONE — same specificity, so the later rule wins below 900.
+   🔧 `verify-perms-grid` B2g walks every band the stylesheet declares and checks it at its OWN
+   NARROWEST width, which is the only place a band can fail. It went RED on 8-tracks-from-901. */
+@media (max-width:1140px){
+  .ua-perm-boxes{grid-template-columns:repeat(4,minmax(86px,1fr));}
+}
 /* ⛔⛔ AND IT STACKS BEFORE IT CAN PUSH THE PAGE WIDE. Eight tracks at an 86px floor is ~700px, so
    on a phone the grid overflowed and took the WHOLE PAGE sideways with it, not just this card.
    Below 900 the columns collapse to two and the row stacks its label above its boxes; `minmax(0,…)`
@@ -966,8 +988,26 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 @media (max-width:900px){
   .ua-perm-boxes{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;}
   .ua-perm-sec td{display:block;width:100%;}
-  .ua-perm-sec td:first-child{padding-bottom:2px;border-radius:6px 6px 0 0;}
-  .ua-perm-sec td:last-child{border-radius:0 0 6px 6px;}
+  /* ⛔⛔⛔ THESE TWO CARRY `.pnl-list tbody tr` FOR ONE REASON: WITHOUT IT THEY LOSE AND HAVE NEVER
+     ONCE APPLIED. Kyle, on the pushed build: *"the top left and bottom right corners are rounded the
+     top right and bottom left corners are square and two little like notches on left and right side
+     close to the top."* Every word of that is the HORIZONTAL pill rounding still winning:
+         `.pnl-list tbody td:first-child`  ->  (0,2,2)
+         `.ua-perm-sec td:first-child`     ->  (0,2,1)
+     Equal on classes and pseudo-classes, and the base rule carries one more ELEMENT (`tbody`), so it
+     took the cells and the override was dead text. Measured live at 375: the label cell computed
+     `TL 6 / TR 0 / BR 0 / BL 6` and the boxes cell `TL 0 / TR 6 / BR 6 / BL 0`. Stack those and the
+     block reads rounded top-left, square top-right, square bottom-left, rounded bottom-right, with a
+     notch on each side where the two meet — near the top, because the label cell is short.
+     ⭐ `.pnl-list tbody tr.ua-perm-sec td:first-child` is (0,3,3) and wins outright. Raising the rank
+     to match the rule it has to beat is the fix; `!important` would have worked today and would take
+     the next legitimate rule down with it.
+     ⚠ The padding moves in here too, so it cannot lose the same fight later.
+     🔧 `verify-perms-grid` B2f pins the RANK, not the presence — B2d/B2e were green throughout,
+     because a rule that exists and loses is invisible to a check that only asks whether it is
+     there ([[the-loop]] #11). */
+  .pnl-list tbody tr.ua-perm-sec td:first-child{padding-bottom:2px;border-radius:6px 6px 0 0;}
+  .pnl-list tbody tr.ua-perm-sec td:last-child{border-radius:0 0 6px 6px;}
 }
 /* No trailing divider under the last ranked action item in the card. */
 .at-arow:last-child{border-bottom:none!important;}
