@@ -297,13 +297,25 @@ const SectionTabs = {
          where the label actually landed rather than summing the icon, its gap and two paddings out
          of the CSS, so removing 26px of them self-corrects on the next open ([[lessons-paid-for]]
          #70). Verified live afterwards, not assumed.
-         ⏳ `r.icon` IS STILL BUILT AND IS NOW READ BY NOTHING IN THE APP — a PARKED field, not a
-         leftover, and Kyle has the ruling. He asked to LOOK at this; the field is what makes
-         putting the icons back these four lines instead of a re-derivation. `verify-section-tabs`
-         U7b holds the debt open so it cannot go quiet, and B3/N2 still prove the rows carry
-         DISTINCT marks, so a restore cannot ship a menu showing the same mark twice. The three
-         `.st-ic` rules in style.css went with the render, because a CSS rule nothing can match is
-         dead where a parked field is reversible. */
+         ⛔⛔ SETTLED 2026-08-24: *"icons stay off."* And the field STAYS, which is not where I
+         expected to land — I had it registered as parked debt to delete on exactly this ruling.
+         ⭐ THE REASON IS THAT THE ICONS ARE NOT DEAD, ONLY THIS SURFACE'S USE OF THEM IS. The mobile
+         drawer draws the same marks from the same `nav.js` markup through its own parse in
+         `App.groupsOf`, so *"no two rows in one group show the same mark"* is a LIVE property that
+         a phone still displays — and Kyle asked for it by name (*"give each of the forecasts a
+         unique/different icon"*). Four assertions prove it, and this field is the only structured
+         group-and-row view any of them has: `verify-section-tabs` B3/N2/N2a and `verify-the-floor`
+         J1. Deleting it would delete the evidence for a property that still ships.
+         ⛔ THAT IS [[lessons-paid-for]] #152 EXACTLY — before deleting a member whose last APP
+         caller you just removed, grep the HARNESS folder too; dev-only code is still a caller, and
+         a control is the one kind that looks like nothing. #152 also says to write the NEW reason
+         at the member rather than leave an expired one, which is what this note is.
+         ⚠ RE-POINTING THOSE FOUR TO PARSE THE MARKUP THEMSELVES IS A HARNESS PROJECT, NOT A
+         MID-TURN EDIT ([[the-loop]] #123): block N has no nav sources of its own and would have to
+         duplicate block K's hand-kept `SRC_FOR`, which is already registered debt. Not worth
+         trading one real dependency for a copied map.
+         ⚠ The three `.st-ic` rules in style.css DID go with the render, because a CSS rule nothing
+         can match is dead outright — no reader, harness or otherwise. */
       const lb = document.createElement('span');
       lb.textContent = r.label;
       row.appendChild(lb);
