@@ -153,10 +153,10 @@
   --amber-bg:  rgba(154,93,52,0.12);
 
   --w:         #ffffff;
-  --t1:        rgba(200,216,232,0.94);
-  --t2:        rgba(200,216,232,0.76);
-  --t3:        rgba(255,255,255,0.55);
-  --t4:        rgba(255,255,255,0.35);
+  --t1:        rgba(200,216,232,0.95);
+  --t2:        rgba(200,216,232,0.85);
+  --t3:        rgba(255,255,255,0.65);
+  --t4:        rgba(255,255,255,0.45);
   --b1:        rgba(255,255,255,0.25);
   --b2:        #202C36;                /* Divider/separator lines — same as the card border (--b-edge). */
   --track:     rgba(255,255,255,0.06); /* The old --b2: faint fill behind progress bars / pips (NOT a divider). */
