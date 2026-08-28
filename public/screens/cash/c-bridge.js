@@ -55,7 +55,13 @@ S.CashBridge = {
       + (br.hasData
           ? this.headline(br, b) + controlRow + this.waterfall(br)
           : '<div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">The bridge reads your profit off your weekly numbers. Once you confirm your weeks for ' + esc(b.label) + ' in Confirm the Week, it fills in here.</div></div>')
-      + '<div class="no-print" style="font-size:11px;color:var(--t3);margin-top:16px;">Log draws, loan payments, capital buys, and tax on Money Out with Log Type set to Cash Outflow. This page reads them back as the bridge.</div>'
+      /* ⛔ THE INLINE EXPLAINER IS GONE, IN BOTH STATES (Kyle, 2026-08-27: *"shouldn't be there on
+         empty state or with data.. so remove it on both"*). It sat OUTSIDE the hasData ternary, so
+         it printed under the page whether or not there was anything to read.
+         ⭐ NOTHING WAS LOST. `showHowTo`'s "Where The Outflows Come From" section already carries
+         the same instruction in fuller form (it names the Kind picker, says recurring ones carry
+         forward, and contrasts Operating Expense), and the nav "i" is where a page's directions
+         live ([[help-model]] — no instructional prose on a card, it goes in showHowTo). */
       + '</div>';
     this.wire();
   },
