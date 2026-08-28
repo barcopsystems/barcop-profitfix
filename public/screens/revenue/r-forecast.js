@@ -52,11 +52,36 @@ S.RevenueForecast = {
       + (sub ? '<div style="font-size:11px;color:var(--t3);margin-top:3px;">' + sub + '</div>' : '') + '</div>';
     const sub = (ws, f) => (f.events_total || 0) > 0 ? 'includes ' + this.fmt(f.events_total) + ' events' : this.weekRangeLabel(ws);
     return '<div class="card" style="margin-bottom:14px;"><div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">'
-      + stat('This Week', this.fmt(f0.total || 0), sub(thisMon, f0))
-      + stat('Next Week', this.fmt(f1.total || 0), sub(nextMon, f1))
-      + stat('Cover Goal', String(f0.total_covers || 0), 'guests this week')
+      // ⭐ THE HERO READS THE SAME BASIS AS THE TABLE BELOW IT, and that is not scope creep: these
+      // three tiles and the projection's first row are THE SAME WEEK. Dashing one and printing
+      // $0.00 on the other would put two answers to one question on a single screen.
+      + stat('This Week', this._noBasis(f0, 'total') ? this._dash() : this.fmt(f0.total || 0), sub(thisMon, f0))
+      + stat('Next Week', this._noBasis(f1, 'total') ? this._dash() : this.fmt(f1.total || 0), sub(nextMon, f1))
+      + stat('Cover Goal', this._noBasis(f0, 'total_covers') ? this._dash() : String(f0.total_covers || 0), 'guests this week')
       + '</div></div>';
   },
+
+  /* ── NO BASIS IS NOT A FORECAST OF ZERO ──────────────────────────────────────
+     Kyle, 2026-08-27, looking at a brand new account: *"on revenue forecast the projection is
+     showing future months on empty state for a new user.. is that right?"* It was not. This page
+     built six week rows unconditionally and printed $0.00 forecast, 0 covers and a $0.00 labor
+     budget for every one of them, which is a confident-looking number standing in for the absence
+     of one. `r-forecast` had NO day-one handling at all, while `c-forecast` one row down the same
+     Forecasts drop-down already gates on `hasData`.
+
+     ⛔ THE DISTINCTION THIS TURNS ON, AND IT IS LOAD-BEARING: a SAVED zero is a real answer and
+     must keep printing as $0.00. An operator closing a week for renovation saves a 0 on purpose,
+     and `cash-engine.revenueForWeek` carries a comment protecting exactly that — a truthiness test
+     there once discarded the saved 0, fell through to the 8-week average, and projected a full
+     average week of phantom revenue into the balance curve, the low-point week, the runway and the
+     lender PDF. So the test may never be "is it zero".
+     ⭐ THE DISCRIMINATOR ALREADY EXISTED: `App.effectiveForecast` stamps `source` as 'saved' or
+     'auto'. And an AUTO zero genuinely means no basis, by construction: `forecastDefaultsFor`
+     skips every sample with `r <= 0`, so a zero total is the 8-week same-weekday lookback finding
+     NOTHING to average, never a bar that averaged out to nothing.
+     ⚠ `{}` counts as no basis too: both callers here fall back to `|| {}`, which has no `source`. */
+  _noBasis(f, key) { return (!f || !f.source || f.source === 'auto') && !(Number(f && f[key]) > 0); },
+  _dash() { return '<span style="color:var(--t4);">-</span>'; },
 
   // ── Projection: the next several weeks, read-only ───────────────────────────
   // Shared colgroup so the Projection and Forecast Accuracy tables line up column
@@ -73,12 +98,16 @@ S.RevenueForecast = {
       const ws = this.addDays(thisMon, i * 7);
       const f = App.effectiveForecast(ws) || {};
       const total = f.total || 0;
-      const ev = (f.events_total || 0) > 0 ? this.fmt(f.events_total) : '<span style="color:var(--t4);">-</span>';
+      const ev = (f.events_total || 0) > 0 ? this.fmt(f.events_total) : this._dash();
+      // The labor budget is DERIVED from the forecast, so it reads the forecast's basis, not its
+      // own: a budget of $0.00 under a dashed forecast would be the same invented number wearing
+      // a different column heading.
+      const noRev = this._noBasis(f, 'total');
       rows.push('<tr><td>' + esc(this.weekRangeLabel(ws)) + (i === 0 ? ' <span style="color:var(--gold);font-size:10px;font-weight:800;letter-spacing:.5px;">NOW</span>' : '') + '</td>'
-        + '<td>' + this.fmt(total) + '</td>'
+        + '<td>' + (noRev ? this._dash() : this.fmt(total)) + '</td>'
         + '<td>' + ev + '</td>'
-        + '<td>' + (f.total_covers || 0) + '</td>'
-        + '<td>' + this.fmt(total * laborPct / 100) + '</td></tr>');
+        + '<td>' + (this._noBasis(f, 'total_covers') ? this._dash() : (f.total_covers || 0)) + '</td>'
+        + '<td>' + (noRev ? this._dash() : this.fmt(total * laborPct / 100)) + '</td></tr>');
     }
     return '<div class="sh" style="margin:22px 0 10px;">Projection</div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
