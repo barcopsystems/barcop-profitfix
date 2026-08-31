@@ -1482,15 +1482,17 @@ const App = {
       + '<div style="font-size:13px;color:var(--t2);text-align:center;line-height:1.5;margin-bottom:18px;">' + bodyHtml + '</div>'
       + (showPicker
           ? '<div id="gate-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">'
-            /* ⛔ BOTH PLANS ARE PRICED PER MONTH. Setting $189/mo against a $1,890 annual TOTAL
+            /* ⛔ BOTH PLANS ARE PRICED PER MONTH. Setting $87/mo against an $804 annual TOTAL
                makes the cheaper plan read as the expensive one, which is why that comparison came
                off the pricing page — and this gate, the screen a LAPSED customer is recovered on,
-               was still running it. $157.50 is the figure the website toggle and Stripe's own
+               was still running it. $67 is the figure the website toggle and Stripe's own
                checkout page both print, so the three surfaces now say one thing.
+               ⚠ REPRICED 2026-08-31: $189/$1,890 -> $87/$804. 87 x 12 = 1,044, so the annual
+               saves 240. Every figure here is derived from those two and moves with them.
                ⛔ `data-plan` IS THE SERVER'S PLAN ID: only the LABEL is "Yearly". Renaming the
                value sends a plan `planPrice()` does not know and the checkout is refused. */
-            +   planOpt('monthly', '<b>Monthly</b> &middot; $189 / month', '')
-            +   planOpt('annual',  '<b>Yearly</b> &middot; $157.50 / month', 'billed annually &middot; save $378')
+            +   planOpt('monthly', '<b>Monthly</b> &middot; $87 / month', '')
+            +   planOpt('annual',  '<b>Yearly</b> &middot; $67 / month', 'billed annually &middot; save $240')
             + '</div>'
             // In-app billing clause: the terms the operator agrees to by paying. Kept
             // in step with the website Refund Policy (recurring, per bar, auto-renews,
