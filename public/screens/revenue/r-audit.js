@@ -512,7 +512,7 @@ S.RevenueAudit = {
       if (lp != null) cd.labor_pct_blended = lp;
       if (rp != null) cd.rplh_blended = rp;
       if (ca != null) cd.check_average = ca;
-      if (lp != null || rp != null) cd.sources.push('Labor Control (confirmed weekly labor)');
+      if (lp != null || rp != null) cd.sources.push('The Floor (confirmed weekly labor)');
     }
 
     // Labor Control — raw actual hours and cost, WINDOWED to the audit's trailing
@@ -539,7 +539,7 @@ S.RevenueAudit = {
       // Fixed salaried (exempt) cost over the SAME window, not the whole history.
       laborCost += App.salariedCost(winStart, winEnd).total;
       cd.labor_cost = Math.round(laborCost);
-      cd.sources.push('Labor Control actuals');
+      cd.sources.push('The Floor actuals');
     }
 
     /* Server comp discipline (Revenue S4): comps as a % of server sales. Server sales come from the
