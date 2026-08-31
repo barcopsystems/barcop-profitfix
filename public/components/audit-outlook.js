@@ -161,9 +161,11 @@ window.AuditOutlook = {
   },
 
   _typeLabel(auditType) {
-    if (auditType === 'profit')   return 'Profit Recovery';
-    if (auditType === 'revenue')  return 'Revenue Recovery';
-    if (auditType === 'cash')     return 'Cash Recovery';
+    /* ⚠ THE AUDITS, NOT THE SECTIONS. Profit, Revenue and Cash were rail sections until
+       2026-08-24 and are not any more; what survived is the audit of each, under Run Audit. */
+    if (auditType === 'profit')   return 'Profit Audit';
+    if (auditType === 'revenue')  return 'Revenue Audit';
+    if (auditType === 'cash')     return 'Cash Audit';
     if (auditType === 'bar-cop')  return 'Bar Cop';
     return 'Operational';
   },
