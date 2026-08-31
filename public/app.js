@@ -2119,28 +2119,28 @@ const App = {
   // Used by showStaffHub() to render the staff landing page.
   STAFF_TILES: [
     // Inventory Control
-    { group:'inventory-dashboard', label:'Inventory Overview',       module:'inventory', screen:'ic-take-inventory',    moduleName:'Inventory Control' },
-    { group:'take-inventory',      label:'Take Inventory',           module:'inventory', screen:'ic-take-inventory',    moduleName:'Inventory Control' },
-    { group:'receive-delivery',    label:'Receive Delivery',         module:'inventory', screen:'ic-receive-delivery',  moduleName:'Inventory Control' },
-    { group:'place-orders',        label:'Place Orders',             module:'inventory', screen:'ic-order-sheet',       moduleName:'Inventory Control' },
-    { group:'spot-check',          label:'Spot Check',               module:'inventory', screen:'ic-spot-check',        moduleName:'Inventory Control' },
-    { group:'manage-products',     label:'Manage Products & Vendors',module:'inventory', screen:'ic-product-setup',     moduleName:'Inventory Control' },
-    { group:'inventory-reports',   label:'Inventory Reports',        module:'inventory', screen:'ic-report-stock',      moduleName:'Inventory Control' },
+    { group:'inventory-dashboard', label:'Inventory Overview',       module:'inventory', screen:'ic-take-inventory' },
+    { group:'take-inventory',      label:'Take Inventory',           module:'inventory', screen:'ic-take-inventory' },
+    { group:'receive-delivery',    label:'Receive Delivery',         module:'inventory', screen:'ic-receive-delivery' },
+    { group:'place-orders',        label:'Place Orders',             module:'inventory', screen:'ic-order-sheet' },
+    { group:'spot-check',          label:'Spot Check',               module:'inventory', screen:'ic-spot-check' },
+    { group:'manage-products',     label:'Manage Products & Vendors',module:'inventory', screen:'ic-product-setup' },
+    { group:'inventory-reports',   label:'Inventory Reports',        module:'inventory', screen:'ic-report-stock' },
     // Labor Control
-    { group:'labor-dashboard',     label:'Labor Overview',           module:'labor',     screen:'lc-build-schedule',    moduleName:'Labor Control' },
-    { group:'log-hours',           label:'Log Hours',                module:'labor',     screen:'lc-log-hours',         moduleName:'Labor Control' },
-    { group:'log-tips',            label:'Tip Tracking',             module:'labor',     screen:'lc-tip-log',           moduleName:'Labor Control' },
-    { group:'view-schedule',       label:'View Schedule',            module:'labor',     screen:'lc-schedule-history',  moduleName:'Labor Control' },
-    { group:'manage-schedule',     label:'Manage Schedule',          module:'labor',     screen:'lc-build-schedule',    moduleName:'Labor Control' },
-    { group:'manage-staff',        label:'Manage Staff & Positions', module:'labor',     screen:'lc-staff-roster',      moduleName:'Labor Control' },
-    { group:'time-off',            label:'Time Off Log',             module:'labor',     screen:'lc-time-off',          moduleName:'Labor Control' },
-    { group:'call-out-log',        label:'Call-Out Log',             module:'labor',     screen:'lc-callout-log',       moduleName:'Labor Control' },
-    { group:'labor-reports',       label:'Labor History',            module:'labor',     screen:'lc-reports',           moduleName:'Labor Control' },
+    { group:'labor-dashboard',     label:'Labor Overview',           module:'labor',     screen:'lc-build-schedule' },
+    { group:'log-hours',           label:'Log Hours',                module:'labor',     screen:'lc-log-hours' },
+    { group:'log-tips',            label:'Tip Tracking',             module:'labor',     screen:'lc-tip-log' },
+    { group:'view-schedule',       label:'View Schedule',            module:'labor',     screen:'lc-schedule-history' },
+    { group:'manage-schedule',     label:'Manage Schedule',          module:'labor',     screen:'lc-build-schedule' },
+    { group:'manage-staff',        label:'Manage Staff & Positions', module:'labor',     screen:'lc-staff-roster' },
+    { group:'time-off',            label:'Time Off Log',             module:'labor',     screen:'lc-time-off' },
+    { group:'call-out-log',        label:'Call-Out Log',             module:'labor',     screen:'lc-callout-log' },
+    { group:'labor-reports',       label:'Labor History',            module:'labor',     screen:'lc-reports' },
     // Shift Control
-    { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-cash-control',      moduleName:'Shift Control' },
-    { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-control',      moduleName:'Shift Control' },
-    { group:'checklists',          label:'Run Checklists',               module:'shift', screen:'sc-checklists',        moduleName:'Shift Control' },
-    { group:'preshift',            label:'Pre-Shift Briefing',       module:'shift',     screen:'sc-preshift',          moduleName:'Shift Control' },
+    { group:'shift-dashboard',     label:'Shift Overview',           module:'shift',     screen:'sc-cash-control' },
+    { group:'cash-mgmt',           label:'Cash Management',          module:'shift',     screen:'sc-cash-control' },
+    { group:'checklists',          label:'Run Checklists',               module:'shift', screen:'sc-checklists' },
+    { group:'preshift',            label:'Pre-Shift Briefing',       module:'shift',     screen:'sc-preshift' },
     /* ⛔⛔⛔ THESE TWO SAY `inventory` NOW, AND IT IS THE HALF OF THE MOVE NOBODY CAN WALK.
        `staffLanding()` returns `{ module, screen }` for a NON-ADMIN member and the shell is opened
        from THIS field. Leave it saying 'shift' after the screens move and a staff user whose first
@@ -2148,22 +2148,22 @@ const App = {
        can draw, which renders "Coming soon." Neither the owner nor the demo can meet it, because
        both short-circuit every gate ([[the-loop]] #149; #124 — moving an id between module blocks
        leaves every piece of per-id logic behind in the old block's path). */
-    { group:'void-comp',           label:'Void / Comp Log',          module:'inventory', screen:'sc-void-comp',         moduleName:'Inventory Control' },
-    { group:'waste',               label:'Waste / Spill Log',        module:'inventory', screen:'sc-waste',             moduleName:'Inventory Control' },
-    { group:'maintenance',         label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance',       moduleName:'Shift Control' },
-    { group:'maintenance',         label:'Licensing',                module:'shift',     screen:'sc-licensing',         moduleName:'Shift Control' },
-    { group:'incident',            label:'Incident Log',             module:'shift',     screen:'sc-incidents',         moduleName:'Shift Control' },
+    { group:'void-comp',           label:'Void / Comp Log',          module:'inventory', screen:'sc-void-comp' },
+    { group:'waste',               label:'Waste / Spill Log',        module:'inventory', screen:'sc-waste' },
+    { group:'maintenance',         label:'Maintenance Log',          module:'shift',     screen:'sc-maintenance' },
+    { group:'maintenance',         label:'Licensing',                module:'shift',     screen:'sc-licensing' },
+    { group:'incident',            label:'Incident Log',             module:'shift',     screen:'sc-incidents' },
     // Recovery
-    { group:'profit-recovery',     label:'Profit Recovery',          module:'profit',    screen:'audit-tracker',        moduleName:'Profit Recovery' },
-    { group:'revenue-recovery',    label:'Revenue Recovery',         module:'revenue',   screen:'r-audit',              moduleName:'Revenue Recovery' },
-    { group:'cash-recovery',       label:'Cash Recovery',            module:'cash',      screen:'c-audit',              moduleName:'Cash Recovery' },
+    { group:'profit-recovery',     label:'Profit Audit',          module:'profit',    screen:'audit-tracker' },
+    { group:'revenue-recovery',    label:'Revenue Audit',         module:'revenue',   screen:'r-audit' },
+    { group:'cash-recovery',       label:'Cash Audit',            module:'cash',      screen:'c-audit' },
     /* ⛔ `ev-bookings`, NOT `ev-dashboard`, since the Events dashboard was deleted 2026-08-12.
        `staffLanding()` walks this table IN ORDER and returns the FIRST accessible screen, so a
        scoped Events user lands here and nowhere else. **No walk can catch a mistake in this line**:
        the demo carries no role and an owner short-circuits before it is read, which is exactly how
        six of seven areas nearly shipped pointing at deleted screens at 1c. Bookings is the section's
        pipeline and `bookings` is its unified store, so it is the honest landing. */
-    { group:'events',              label:'Events',                   module:'events',    screen:'ev-bookings',          moduleName:'Events' }
+    { group:'events',              label:'Events',                   module:'events',    screen:'ev-bookings' }
   ],
 
   // Pick the first accessible screen as a non-admin user's landing.
@@ -2261,15 +2261,20 @@ const App = {
      from here rather than from the code** ([[code-is-truth]]).
      ⚠ AND IT HAD NO READER AT ALL until `_isSection` below — a table kept alive for a control that
      no longer existed. Naming what it IS is what stops it being deleted as dead code. */
+  /* ⚠ THE LABELS ARE NOT DISPLAYED ANYWHERE. `_isSection` is the only reader and it takes s[0].
+     They are corrected rather than deleted because the PAIR SHAPE is what that reader walks, and a
+     list of section names that nobody renders is exactly what rotted the retired AREAS table.
+     profit / revenue / cash are module RENDERER keys, not rail sections: the rail rows went on
+     2026-08-24 and the shells stayed ([[app-nav-section-links]]). */
   SECTIONS: [
-    ['hub',       'The Hub'],
-    ['profit',    'Profit Recovery'],
-    ['revenue',   'Revenue Recovery'],
-    ['cash',      'Cash Recovery'],
+    ['hub',       'Hub'],
+    ['profit',    'Profit'],
+    ['revenue',   'Revenue'],
+    ['cash',      'Cash'],
     ['events',    'Events'],
-    ['inventory', 'Inventory Control'],
-    ['labor',     'Labor Control'],
-    ['shift',     'Shift Control'],
+    ['inventory', 'Inventory'],
+    ['labor',     'The Floor'],
+    ['shift',     'The Floor'],
   ],
 
   /* ⛔⛔⛔ THIS IS A LANDING MAP AND NOTHING ELSE. It answers "which screen does this module open
@@ -2773,7 +2778,7 @@ const App = {
     'hub': { title: 'How the Hub Works', sections: [
       { h: 'What this is', p: ['Your home screen. The Hub answers one question: are you running the bar better than you were? Every band on it is about movement, not a snapshot, and every number is a door into the screen behind it.'] },
       { h: 'The money line', p: ['Four figures across the top. Total Opportunity is every dollar your audits have surfaced that you have not closed yet. Recovered, in gold, is the proven dollars you have put back, counted only after Bar Cop has measured that gap moving. Trapped Cash is the dead and overstocked inventory you could free. Break-Even is the sales you need to clear your costs. The first three open the audit that found that money.'] },
-      { h: 'Your Operations Audit', p: ['The left panel is the whole history in two numbers: your first score, today\'s score, and the points between them. Under it sit the three Recovery audits, Profit, Revenue and Cash, each with the date it last ran. A score that has never run reads as a dash, not a zero.'] },
+      { h: 'Your Operations Audit', p: ['The left panel is the whole history in two numbers: your first score, today\'s score, and the points between them. Under it sit the Profit, Revenue and Cash audits, each with the date it last ran. A score that has never run reads as a dash, not a zero.'] },
       { h: 'Where you were, where you are', p: ['A fixed two-week comparison. Prime cost, labor, check average and weekly sales, each shown as the reading two weeks ago against the reading now. Green means the number moved the way you want it to, which is not always up: labor falling is good, check average falling is not. The headline turns the prime cost move into dollars a month. Under about a hundred dollars a month it says you are holding steady instead, because twenty-five dollars a week is not a result.'] },
       { h: 'Do this first', p: ['The single biggest money move across all your audits, with what it is worth and a button into the fix. One item, not a list: Bar Cop has already done the ranking, so it tells you the answer. Before your first audit this space is your Get Started steps instead.'] },
       { h: 'Your biggest gain and worst drag', p: ['The operating number that moved furthest in your favour over the same two weeks, and the one that moved furthest against you, each with what the move is worth a week at your current volume. Bar pour cost, food cost, labor, check average, voids and comps, and overtime all compete for the two slots, so the card names whichever actually moved the money. Two weeks where nothing slipped shows no drag, which is the truth rather than a hole in the page.'] },
@@ -2822,7 +2827,7 @@ const App = {
     ] },
     'bar-cop-audit': { title: 'How the Operations Audit Works', sections: [
       { h: 'What this is', p: [
-        'Your read on how well the whole operation is being run, separate from the Profit, Revenue, and Cash audits that hunt for dollars to recover. This one answers a different question: is the place being run with discipline. It scores entirely from the data you already log across Inventory, Shift, and Labor Control, so there is nothing to upload. Run it whenever you want a fresh read.',
+        'Your read on how well the whole operation is being run, separate from the Profit, Revenue, and Cash audits that hunt for dollars to recover. This one answers a different question: is the place being run with discipline. It scores entirely from the data you already log across Inventory, Shift, and The Floor, so there is nothing to upload. Run it whenever you want a fresh read.',
         'The Operational Health score up top is the average of the six sub-scores that have enough data behind them. It needs at least three of the six covered to show a number; below that it reads N/A and fills in as you log more.'
       ] },
       { h: 'The six sub-scores', p: [
@@ -2889,7 +2894,7 @@ const App = {
        `books-home`, where the controls actually are. What is left is the LEDGER, which is what this
        page now is: three tabs, the stat strip, By Category and the log. */
     'operating-expenses': { title: 'How All Money Out Works', sections: [
-      { h: 'What this page is', p: ['The record of everything that left the bank: the bills that are not COGS or labor (wages and salaries both live in Labor Control, not here) plus the cash outflows that are not a cost of running the bar. You log it on the card at the top of this page; the tabs below are where it all lives afterwards, and it is what feeds the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
+      { h: 'What this page is', p: ['The record of everything that left the bank: the bills that are not COGS or labor (wages and salaries both live in The Floor, not here) plus the cash outflows that are not a cost of running the bar. You log it on the card at the top of this page; the tabs below are where it all lives afterwards, and it is what feeds the Month-End income statement so it shows a real operating income instead of stopping at prime cost.'] },
       /* ⚠ THIS SECTION DESCRIBED A PAGE THAT NO LONGER EXISTS, in four separate claims. It promised
          month cards for "this month and next", a Recurring/Variable split inside each, next month's
          recurring bills listed as Expected before they post, and Expense History as its own sidebar
@@ -2971,7 +2976,7 @@ const App = {
     ] },
     'user-data': { title: 'How Data and Backup Works', sections: [
       { h: 'What this page is', p: ['Everything that gets your data out of Bar Cop and back in. Because a backup is the whole account, this page is the account owner only. Admins and staff never see it.'] },
-      { h: 'Your own copy', p: ['Export Backup writes the entire account to one file: settings, targets, weekly numbers, all three Recovery Audits, your Operations Audits, recipes, the fix log, your money out log, Permits, and every Inventory, Labor and Shift record. Keep it offsite. Restore from Backup reads that same file back to recover your data or move it to another account.'] },
+      { h: 'Your own copy', p: ['Export Backup writes the entire account to one file: settings, targets, weekly numbers, your Profit, Revenue and Cash audits, your Operations Audits, recipes, the fix log, your money out log, Permits, and every Inventory, Labor and Shift record. Keep it offsite. Restore from Backup reads that same file back to recover your data or move it to another account.'] },
       { h: 'Automatic backups', p: ['Bar Cop saves a full backup of this bar on its own, about once a day, so there is always a recent point to fall back to without you remembering anything. Pick a date in the list and Restore rolls the whole account back to how it stood then.'] },
       { h: 'Restore points you take yourself', p: ['Create Restore Point saves the account as it is right now. Take one before anything big: a price change across the menu, a bulk import, a first inventory count. Those are the only ones you can delete by hand, because the automatic dailies are the safety net and must not be crowded out.'] },
       { h: 'How far back it goes', p: ['Bar Cop keeps the last 30 automatic daily backups and the last 10 restore points you took yourself, each in its own pool so a busy day of manual saves can never push the dailies off the end.'] },
@@ -10223,7 +10228,7 @@ const App = {
     // Events module screens
     if (this._activeModule === 'events') {
       const evTitles = {
-        'hub':          ['Recovery Hub', ''],
+        'hub':          ['Hub', ''],
         'ev-bookings':  ['Bookings', 'Events'],
         'ev-calendar':  ['Calendar', 'Events'],
         'ev-regulars':  ['Regulars', 'Events'],
@@ -10249,7 +10254,7 @@ const App = {
     // Revenue module screens
     if (this._activeModule === 'revenue') {
       const revTitles = {
-        'hub':                    ['Recovery Hub', ''],
+        'hub':                    ['Hub', ''],
         'r-audit':            ['Revenue Audit', 'Monthly Score and Progress'],
         'r-forecast':             ['Revenue Forecast', 'Plan Next Week'],
         'week-history':           ['Week History', 'Weekly Recovery'],
@@ -10284,14 +10289,14 @@ const App = {
     // Cash Recovery module screens
     if (this._activeModule === 'cash') {
       const cashTitles = {
-        'hub':           ['Recovery Hub', ''],
+        'hub':           ['Hub', ''],
         'c-audit':       ['Cash Audit', 'Weekly Score and Progress'],
         // ⛔ Trapped Cash and Purchasing left for INVENTORY, 2026-08-23 — registered there now, and
         //   out of here so one page renders from one shell whatever door the operator came through.
-        'c-capital':     ['Capital Efficiency', 'Cash Recovery'],
-        'c-forecast':    ['Cash Forecast', 'Cash Recovery'],
-        'c-position':    ['Cash Position', 'Cash Recovery'],
-        'c-bridge':      ['Cash Bridge', 'Cash Recovery'],
+        'c-capital':     ['Capital Efficiency', 'Books'],
+        'c-forecast':    ['Cash Forecast', 'Books'],
+        'c-position':    ['Cash Position', 'Books'],
+        'c-bridge':      ['Cash Bridge', 'Books'],
         'c-help':        ['Help and FAQ', ''],
       };
       const cashScreens = {
@@ -10314,32 +10319,32 @@ const App = {
     // Inventory Control module screens
     if (this._activeModule === 'inventory') {
       const icTitles = {
-        'hub':                 ['Recovery Hub', ''],
-        'ic-product-setup':    ['Add Products', 'Inventory Control'],
-        'ic-prep-batches':     ['Prep Batches', 'Inventory Control'],
-        'ic-locations':        ['Set Locations', 'Inventory Control'],
-        'ic-vendors':          ['List Vendors', 'Inventory Control'],
-        'ic-take-inventory':   ['Take Inventory', 'Inventory Control'],
-        'ic-count-history':    ['Count History', 'Inventory Control'],
-        'ic-spot-check':       ['Spot Check', 'Inventory Control'],
-        'ic-transfers':        ['Transfer Log', 'Inventory Control'],
-        'ic-empties':          ['Empties Log', 'Inventory Control'],
-        'ic-adjustments':      ['Adjustment Log', 'Inventory Control'],
-        'ic-par-suggestions':  ['Dynamic Pars', 'Inventory Control'],
-        'ic-receive-delivery': ['Receive Delivery', 'Inventory Control'],
-        'ic-delivery-history': ['Delivery History', 'Inventory Control'],
-        'ic-order-sheet':      ['Order Sheet', 'Inventory Control'],
-        'ic-order-history':    ['Order History', 'Inventory Control'],
-        'ic-report-usage':     ['Usage Report', 'Inventory Control'],
-        'ic-report-variance':  ['Variance Report', 'Inventory Control'],
-        'ic-report-stock':     ['Stock Report', 'Inventory Control'],
+        'hub':                 ['Hub', ''],
+        'ic-product-setup':    ['Add Products', 'Inventory'],
+        'ic-prep-batches':     ['Prep Batches', 'Inventory'],
+        'ic-locations':        ['Set Locations', 'Inventory'],
+        'ic-vendors':          ['List Vendors', 'Inventory'],
+        'ic-take-inventory':   ['Take Inventory', 'Inventory'],
+        'ic-count-history':    ['Count History', 'Inventory'],
+        'ic-spot-check':       ['Spot Check', 'Inventory'],
+        'ic-transfers':        ['Transfer Log', 'Inventory'],
+        'ic-empties':          ['Empties Log', 'Inventory'],
+        'ic-adjustments':      ['Adjustment Log', 'Inventory'],
+        'ic-par-suggestions':  ['Dynamic Pars', 'Inventory'],
+        'ic-receive-delivery': ['Receive Delivery', 'Inventory'],
+        'ic-delivery-history': ['Delivery History', 'Inventory'],
+        'ic-order-sheet':      ['Order Sheet', 'Inventory'],
+        'ic-order-history':    ['Order History', 'Inventory'],
+        'ic-report-usage':     ['Usage Report', 'Inventory'],
+        'ic-report-variance':  ['Variance Report', 'Inventory'],
+        'ic-report-stock':     ['Stock Report', 'Inventory'],
         /* ⭐ MOVED IN FROM CASH AND SHIFT (Kyle, 2026-08-23). The SUBTITLE moves with the page: it
            says which section you are in, and these are Inventory pages now. Their files did not
            move and their screen objects are unchanged; what moved is where the app files them. */
-        'c-purchasing':        ['Purchasing', 'Inventory Control'],
-        'c-trapped':           ['Trapped Cash', 'Inventory Control'],
-        'sc-void-comp':        ['Voids / Comps Log', 'Inventory Control'],
-        'sc-waste':            ['Waste / Spill Log', 'Inventory Control'],
+        'c-purchasing':        ['Purchasing', 'Inventory'],
+        'c-trapped':           ['Trapped Cash', 'Inventory'],
+        'sc-void-comp':        ['Voids / Comps Log', 'Inventory'],
+        'sc-waste':            ['Waste / Spill Log', 'Inventory'],
         /* ⛔⛔⛔ THE VENDOR PAGES MOVED HERE FROM THE PROFIT BLOCK ON 2026-08-23, AND WITHOUT THIS
            THE THREE NEW NAV LINKS RENDER "Coming soon." `navigate` keeps a SEPARATE screen map per
            module and only ever consults the ACTIVE one, so re-pointing the nav row, `_moduleOf` and
@@ -10351,11 +10356,11 @@ const App = {
            have said a word.
            ⚠ ONE SCREEN, FOUR IDS: the id selects the TAB (see the deep-link block further down), so
            all four resolve to the same object and share its page name. */
-        'vendor-tracker':      ['Vendor Tracker', 'Inventory Control'],
-        'vendor-scorecard':    ['Vendor Tracker', 'Inventory Control'],
-        'vendor-watch':        ['Vendor Tracker', 'Inventory Control'],
-        'vendor-discrepancy':  ['Vendor Tracker', 'Inventory Control'],
-        'ic-help':             ['Help and FAQ', 'Inventory Control'],
+        'vendor-tracker':      ['Vendor Tracker', 'Inventory'],
+        'vendor-scorecard':    ['Vendor Tracker', 'Inventory'],
+        'vendor-watch':        ['Vendor Tracker', 'Inventory'],
+        'vendor-discrepancy':  ['Vendor Tracker', 'Inventory'],
+        'ic-help':             ['Help and FAQ', 'Inventory'],
       };
       const icScreens = {
         'ic-product-setup':  S.InventoryProducts,
@@ -10402,19 +10407,19 @@ const App = {
     // Shift Control module screens
     if (this._activeModule === 'shift') {
       const scTitles = {
-        'hub':                   ['Recovery Hub', ''],
-        'sc-cash-control':       ['Cash Control', 'Shift Control'],
-        'sc-cash-history':       ['Cash History', 'Shift Control'],
+        'hub':                   ['Hub', ''],
+        'sc-cash-control':       ['Cash Control', 'The Floor'],
+        'sc-cash-history':       ['Cash History', 'The Floor'],
         // ⛔ The Void/Comp and Waste/Spill logs left for INVENTORY's "Logs" group, 2026-08-23. Both
         //   feed Inventory's own Variance Report, so that is where they were always filed in fact.
-        'sc-maintenance':        ['Maintenance Log', 'Shift Control'],
-        'sc-incidents':          ['Incidents', 'Shift Control'],
-        'sc-licensing':          ['Licensing', 'Shift Control'],
-        'sc-walked-tabs':        ['Walked Tabs', 'Shift Control'],
-        'sc-checklists':         ['Run Checklists', 'Shift Control'],        'sc-checklist-templates':['Build Checklists', 'Shift Control'],
-        'sc-preshift':           ['Pre-Shift Briefing', 'Shift Control'],
-        'sc-drawers':            ['Drawers / Registers', 'Shift Control'],
-        'sc-help':               ['Help and FAQ', 'Shift Control'],
+        'sc-maintenance':        ['Maintenance Log', 'The Floor'],
+        'sc-incidents':          ['Incidents', 'The Floor'],
+        'sc-licensing':          ['Licensing', 'The Floor'],
+        'sc-walked-tabs':        ['Walked Tabs', 'The Floor'],
+        'sc-checklists':         ['Run Checklists', 'The Floor'],        'sc-checklist-templates':['Build Checklists', 'The Floor'],
+        'sc-preshift':           ['Pre-Shift Briefing', 'The Floor'],
+        'sc-drawers':            ['Drawers / Registers', 'The Floor'],
+        'sc-help':               ['Help and FAQ', 'The Floor'],
       };
       const scScreens = {
         'sc-cash-control': S.ShiftCashControl,
@@ -10443,21 +10448,21 @@ const App = {
     // Labor Control module screens
     if (this._activeModule === 'labor') {
       const lcTitles = {
-        'hub':                   ['Recovery Hub', ''],
-        'lc-build-schedule':     ['Build Schedule', 'Labor Control'],        'lc-schedule-history':   ['Schedule History', 'Labor Control'],
-        'lc-log-hours':          ['Log Hours', 'Labor Control'],
-        'lc-pay-periods':        ['Pay Periods', 'Labor Control'],
-        'lc-payroll-export':     ['Payroll Export', 'Labor Control'],
-        'lc-positions':          ['Add Positions', 'Labor Control'],
-        'lc-staff-roster':       ['Staff Roster', 'Labor Control'],
-        'lc-training':           ['Training', 'Labor Control'],
-        'lc-tip-log':            ['Tip Tracking', 'Labor Control'],
-        'lc-tip-history':        ['Tip History', 'Labor Control'],
-        'lc-reports':            ['Labor History', 'Labor Control'],
-        'lc-overtime-watch':     ['Overtime Watch', 'Labor Control'],
-        'lc-callout-log':        ['Call-Out Log', 'Labor Control'],
-        'lc-time-off':           ['Time Off Log', 'Labor Control'],
-        'lc-help':               ['Help and FAQ', 'Labor Control'],
+        'hub':                   ['Hub', ''],
+        'lc-build-schedule':     ['Build Schedule', 'The Floor'],        'lc-schedule-history':   ['Schedule History', 'The Floor'],
+        'lc-log-hours':          ['Log Hours', 'The Floor'],
+        'lc-pay-periods':        ['Pay Periods', 'The Floor'],
+        'lc-payroll-export':     ['Payroll Export', 'The Floor'],
+        'lc-positions':          ['Add Positions', 'The Floor'],
+        'lc-staff-roster':       ['Staff Roster', 'The Floor'],
+        'lc-training':           ['Training', 'The Floor'],
+        'lc-tip-log':            ['Tip Tracking', 'The Floor'],
+        'lc-tip-history':        ['Tip History', 'The Floor'],
+        'lc-reports':            ['Labor History', 'The Floor'],
+        'lc-overtime-watch':     ['Overtime Watch', 'The Floor'],
+        'lc-callout-log':        ['Call-Out Log', 'The Floor'],
+        'lc-time-off':           ['Time Off Log', 'The Floor'],
+        'lc-help':               ['Help and FAQ', 'The Floor'],
       };
       const lcScreens = {
         'lc-positions': S.LaborPositions,
@@ -10485,7 +10490,7 @@ const App = {
     }
 
     const titles = {
-      'hub':           ['Recovery Hub', ''],
+      'hub':           ['Hub', ''],
       // T1: no 'this-week' entry. The interception above returns before this map is
       // ever read for that id, and the grid it titled is gone. The interception STAYS —
       // three callers still openScreen('this-week') to reach Confirm the Week.
