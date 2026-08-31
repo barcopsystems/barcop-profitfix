@@ -172,7 +172,7 @@ S.InventoryTakeInventory = {
     if (prods.length === 0) {
       App.setupCard(this.container, {
         title: 'Take Your First Count',
-        lead: 'A count is the backbone of Inventory Control. It sets your stock value and feeds usage, variance, and your reorder list. Add your products and you can count.',
+        lead: 'A count is the backbone of Inventory. It sets your stock value and feeds usage, variance, and your reorder list. Add your products and you can count.',
         steps: [
           { title: 'Add your products', desc: 'Add the products you stock so there is something to count.', btn: 'Add Products', screen: 'ic-product-setup', done: prods.length > 0 }
         ]
