@@ -186,9 +186,9 @@ S.HubBarCopAudit = {
 
     // Recovery-audit cadence. N/A until that audit has been run at least once.
     const recoveryAudits = [
-      { name: 'Profit Recovery',  list: App.data?.audits },
-      { name: 'Revenue Recovery', list: App.data?.revenue_audits },
-      { name: 'Cash Recovery',    list: App.data?.cash_audits }
+      { name: 'Profit Audit',  list: App.data?.audits },
+      { name: 'Revenue Audit', list: App.data?.revenue_audits },
+      { name: 'Cash Audit',    list: App.data?.cash_audits }
     ];
     recoveryAudits.forEach(r => {
       const arr = r.list || [];
@@ -625,9 +625,9 @@ S.HubBarCopAudit = {
 
     // Recovery audits overdue (35+ days since latest).
     [
-      { name: 'Profit Recovery',  list: App.data?.audits,         screen: 'audit-tracker' },
-      { name: 'Revenue Recovery', list: App.data?.revenue_audits, screen: 'r-audit' },
-      { name: 'Cash Recovery',    list: App.data?.cash_audits,    screen: 'c-audit' }
+      { name: 'Profit Audit',  list: App.data?.audits,         screen: 'audit-tracker' },
+      { name: 'Revenue Audit', list: App.data?.revenue_audits, screen: 'r-audit' },
+      { name: 'Cash Audit',    list: App.data?.cash_audits,    screen: 'c-audit' }
     ].forEach(r => {
       const arr = r.list || [];
       const latest = App.latestEvent(arr);
@@ -878,7 +878,7 @@ S.HubBarCopAudit = {
     // logged there is nothing to score, so say so rather than fail silently.
     if (!this._hasEnoughData()) {
       const st = document.getElementById('bca-gen-status');
-      if (st) { st.style.display = 'block'; st.style.color = 'var(--red)'; st.textContent = 'No data to score yet. Log a week of Inventory, Shift, or Labor Control first.'; }
+      if (st) { st.style.display = 'block'; st.style.color = 'var(--red)'; st.textContent = 'No data to score yet. Log a week of Inventory, Shift, or The Floor first.'; }
       return;
     }
     // Row-per-record in core_events now; full executive-audit history is kept
@@ -1088,7 +1088,7 @@ S.HubBarCopAudit = {
       + '</div></div>';
 
     const naNote = overallNA
-      ? '<div style="font-size:11px;color:var(--t3);margin:-6px 0 16px;line-height:1.5;">' + (audit.sub_scores_covered || 0) + ' of 6 sub-scores have data. Keep logging Inventory, Shift, and Labor Control and the overall fills in.</div>'
+      ? '<div style="font-size:11px;color:var(--t3);margin:-6px 0 16px;line-height:1.5;">' + (audit.sub_scores_covered || 0) + ' of 6 sub-scores have data. Keep logging Inventory, Shift, and The Floor and the overall fills in.</div>'
       : '';
 
     // Detail page. The shared AuditUI.viewHero gives the same header as the three
@@ -1152,7 +1152,7 @@ S.HubBarCopAudit = {
     if (dq) b.kv('Data Quality', dq);
     if (overallNA) {
       b.paragraph((audit.sub_scores_covered || 0) + ' of 6 sub-scores have data. Keep logging Inventory, '
-        + 'Shift, and Labor Control and the overall fills in.', { gray: 90 });
+        + 'Shift, and The Floor and the overall fills in.', { gray: 90 });
     }
 
     // Six sub-scores, each with its score and breakdown (same as subBlock).

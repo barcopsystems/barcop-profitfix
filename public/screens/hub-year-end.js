@@ -435,7 +435,7 @@ S.HubYearEnd = {
     pctRow('  Prime Cost %', Y.totalCogs + Y.totalLabor, Y.totalRev, P.totalCogs + P.totalLabor, P.totalRev);
 
     this._pushFooter(rows, merges,
-      'Revenue from Shift Control. COGS from Inventory Control weekly counts. Labor from Labor Control actuals. Comps from Shift Control void and comp log.',
+      'Revenue from your confirmed weeks. COGS from Inventory weekly counts. Labor from The Floor actuals. Comps from the Inventory void and comp log.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -628,7 +628,7 @@ S.HubYearEnd = {
     }
     rows.push(['Total', totalPurchases, yearDeliveries.length, '']);
 
-    this._pushFooter(rows, merges, 'Beginning and ending counts from Inventory Control count history. Purchases from receive-delivery log. Used for Schedule C Part III (Cost of Goods Sold) line items 35, 36, 41, 42.', COL_COUNT);
+    this._pushFooter(rows, merges, 'Beginning and ending counts from Inventory count history. Purchases from receive-delivery log. Used for Schedule C Part III (Cost of Goods Sold) line items 35, 36, 41, 42.', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
@@ -714,7 +714,7 @@ S.HubYearEnd = {
       totalRev ? (totalWages / totalRev) : null,
       totalHours ? (totalRev / totalHours) : null]);
 
-    this._pushFooter(rows, merges, 'Hours and wages from Labor Control logged actuals. Overtime computed per staff per whole Mon-Sun week (hours over 40 = OT; priced at 1.5x the rate those hours were logged at, or on your state minimum wage where a tipped employee is paid below it on a tip credit), then allocated to the month by the share of that week worked in it, so a week spanning two months is never split and tested against 40 twice. Revenue from Shift Control shifts (bar and food only, excluding catering and ancillary), so Labor % and RPLH here can differ from the Annual Summary and P&L by Month sheets, which measure against net sales. RPLH = Revenue per Labor Hour. These wages are recomputed from logged hours and may not exactly match Total Labor on those sheets, which use your weekly booked labor.', COL_COUNT);
+    this._pushFooter(rows, merges, 'Hours and wages from The Floor logged actuals. Overtime computed per staff per whole Mon-Sun week (hours over 40 = OT; priced at 1.5x the rate those hours were logged at, or on your state minimum wage where a tipped employee is paid below it on a tip credit), then allocated to the month by the share of that week worked in it, so a week spanning two months is never split and tested against 40 twice. Revenue from The Floor shifts (bar and food only, excluding catering and ancillary), so Labor % and RPLH here can differ from the Annual Summary and P&L by Month sheets, which measure against net sales. RPLH = Revenue per Labor Hour. These wages are recomputed from logged hours and may not exactly match Total Labor on those sheets, which use your weekly booked labor.', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
@@ -828,7 +828,7 @@ S.HubYearEnd = {
       mergeFull(rows.length - 1);
     }
 
-    this._pushFooter(rows, merges, 'Source: Labor Control tip pool splits when saved per shift (taxable allocation per employee), tip log entries for shifts without a saved pool, and Shift Control shifts for gross receipts.', COL_COUNT);
+    this._pushFooter(rows, merges, 'Source: The Floor tip pool splits when saved per shift (taxable allocation per employee), tip log entries for shifts without a saved pool, and The Floor shifts for gross receipts.', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
@@ -927,7 +927,7 @@ S.HubYearEnd = {
       ]));
     }
 
-    this._pushFooter(rows, merges, 'Drops from Shift Control cash drop log. Variances from Shift Control variance log. Over = counted more than expected. Short = counted less than expected.', COL_COUNT);
+    this._pushFooter(rows, merges, 'Drops from The Floor cash drop log. Variances from The Floor variance log. Over = counted more than expected. Short = counted less than expected.', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
@@ -1090,7 +1090,7 @@ S.HubYearEnd = {
         .forEach(n => rows.push(['  ' + n, byStaff[n], '', '']));
     }
 
-    this._pushFooter(rows, merges, 'Sources: Shift Control (voids, comps, walked tabs), Labor Control (call-outs, certifications).', COL_COUNT);
+    this._pushFooter(rows, merges, 'Sources: Inventory (voids, comps), The Floor (walked tabs, call-outs, certifications).', COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';

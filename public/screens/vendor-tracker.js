@@ -53,9 +53,9 @@ S.VendorTracker = {
     if (!this.vendors().length) {
       App.setupCard(this.container, {
         title: 'Vendor Tracker',
-        lead: 'Track vendor cost performance, price drift, and the credits you are owed. Add your vendors in Inventory Control first.',
+        lead: 'Track vendor cost performance, price drift, and the credits you are owed. Add your vendors in Inventory first.',
         steps: [
-          { title: 'Add your vendors', desc: 'Set up vendors in Inventory Control. Vendor Tracker rolls up their deliveries, price changes, and discrepancies here.', btn: 'Go to Vendors', screen: 'ic-vendors', done: false }
+          { title: 'Add your vendors', desc: 'Set up vendors in Inventory. Vendor Tracker rolls up their deliveries, price changes, and discrepancies here.', btn: 'Go to Vendors', screen: 'ic-vendors', done: false }
         ]
       });
       this.container.onclick = ev => {
@@ -321,7 +321,7 @@ S.VendorTracker = {
 
     if (!all.length) {
       return '<div class="card"><div class="empty"><div class="empty-title">No vendor price changes yet</div>'
-        + '<div class="empty-sub">Price changes are captured automatically when a delivery\'s invoice price differs from the product\'s current cost. Record deliveries in Inventory Control and any drift shows up here, with what it costs you per year.</div>'
+        + '<div class="empty-sub">Price changes are captured automatically when a delivery\'s invoice price differs from the product\'s current cost. Record deliveries in Inventory and any drift shows up here, with what it costs you per year.</div>'
         + '</div></div>';
     }
 
@@ -786,7 +786,7 @@ S.VendorTracker = {
     App.showHelpModal('How Vendor Tracker Works', [
       { p: ['One place to keep your vendors honest. Three pages read the same delivery, price, and discrepancy data: a per-vendor Scorecard, the line-by-line Price Changes, and the Discrepancies log. Pick one from the Vendors menu.'] },
       { h: 'Scorecard', p: ['Each vendor rolled up over the range you pick: total spend, net price drift, short counts, open and recovered credits, and average days to a credit. Vendors causing the most pain sort to the top, with a status read of High, Watch, or Clean. Take this into your quarterly vendor review and ask for a price match on every line that drifted up. Export PDF saves the rollup.'] },
-      { h: 'Price Changes', p: ['Every per-line price change captured automatically when a delivery is received in Inventory Control, with the annual cost of each increase based on that product\'s usage rate. Read-only; the data comes from receiving deliveries.'] },
+      { h: 'Price Changes', p: ['Every per-line price change captured automatically when a delivery is received in Inventory, with the annual cost of each increase based on that product\'s usage rate. Read-only; the data comes from receiving deliveries.'] },
       { h: 'Discrepancies', p: ['A read-only rollup of every credit claim you are owed, open and resolved, with its status, how long it has waited, and what you have recovered, for the recovery math. You do not work claims here. They are filed and chased over in Inventory: flag the line when you receive a delivery in Receive Delivery (or open a saved one in Delivery History), then work the Credits to Chase list under the Receive Delivery form to request the credit, log a follow-up, and mark it resolved. This page is just the picture of where all your vendor credits stand.'] }
     ]);
   }

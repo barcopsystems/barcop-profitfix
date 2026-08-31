@@ -106,7 +106,7 @@ S.HubReportBug = {
       + '</div>'
       + '<div style="margin-bottom:18px;">'
       +   '<label style="' + labelStyle + '">Steps to Reproduce</label>'
-      +   '<textarea id="hrb-steps" placeholder="Number the steps to make the bug happen again. Example: 1. Open Profit Recovery. 2. Click This Week. 3. Enter $1,200. 4. The save button does not respond." style="' + taStyle + '"></textarea>'
+      +   '<textarea id="hrb-steps" placeholder="Number the steps to make the bug happen again. Example: 1. Open Run Audit. 2. Click This Week. 3. Enter $1,200. 4. The save button does not respond." style="' + taStyle + '"></textarea>'
       + '</div>'
       + '<div style="margin-bottom:18px;">'
       +   '<label style="' + labelStyle + '">What Did You Expect to Happen</label>'

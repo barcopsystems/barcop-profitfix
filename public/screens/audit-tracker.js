@@ -353,7 +353,7 @@ S.AuditTracker = {
   showHowTo() {
     App.showHelpModal('How the Profit Audit Works', [
       { p: ['The Profit Audit scores five areas: Pour and Bar Cost, Food Cost, Shrink and Waste, Theft and Cash Loss, and Vendor Cost Control. Prime cost shows below the sections as context, not scored (it is pour plus food plus labor, so scoring it would double-count). It scores whatever data it can see and shows N/A for anything it cannot, so the more you give it, the more it covers.'] },
-      { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your Inventory, Shift, and Labor Control numbers feed it as verified ground truth. Your sales come from the weeks you close, and until the first one is in Bar Cop asks once for last week\'s bar and food sales so the score has real numbers to work from. There are no questions to answer, nothing self-reported. Every score is measured, so no one can talk the number up by claiming a practice the data does not back.'] },
+      { h: 'What Bar Cop reads', p: ['The audit runs off data you already keep, so there is no form to fill in. Your Inventory, Shift, and The Floor numbers feed it as verified ground truth. Your sales come from the weeks you close, and until the first one is in Bar Cop asks once for last week\'s bar and food sales so the score has real numbers to work from. There are no questions to answer, nothing self-reported. Every score is measured, so no one can talk the number up by claiming a practice the data does not back.'] },
       { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: an inventory count, hours logged, deliveries logged, voids logged, cash reconciled, and the week confirmed. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
       { h: 'The steps', p: ['1. Get your week in: confirm the week in Close The Week and log your Control data. 2. Generate. If no week is closed yet, enter last week\'s bar and food sales when Bar Cop asks. Sections with no data show N/A and fill in as you log more.'] },
       { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each naming the work and what closing it is worth a month. Bar Cop Briefing is a short written read of where you stand, and Export PDF saves the whole audit. Run it whenever you want a fresh read; it scores your trailing four weeks, and Bar Cop keeps one record a day so you can watch the score trend on the audit landing.'] },
@@ -527,7 +527,7 @@ S.AuditTracker = {
 
     // Inventory Control — counts
     const counts = (inv.ic_counts || []).filter(inWindow);
-    if (counts.length) { cd.inventory_counts = counts.length; cd.sources.push('Inventory Control counts'); }
+    if (counts.length) { cd.inventory_counts = counts.length; cd.sources.push('Inventory counts'); }
 
     // Inventory Control — deliveries and vendor price drift
     const dels = (inv.ic_deliveries || []).filter(inWindow);
@@ -538,7 +538,7 @@ S.AuditTracker = {
       }));
       cd.deliveries_logged = dels.length;
       cd.vendor_price_changes = changes;
-      cd.sources.push('Inventory Control deliveries');
+      cd.sources.push('Inventory deliveries');
     }
 
     // Inventory Control — spot checks (theft pour-variance signal)
@@ -547,7 +547,7 @@ S.AuditTracker = {
       cd.spot_checks = spots.length;
       cd.spot_check_flagged = spots.reduce((s,c) => s + (c.flagged_count || 0), 0);
       cd.spot_check_variance_dollar = r1(spots.reduce((s,c) => s + (c.total_variance_dollar || 0), 0));
-      cd.sources.push('Inventory Control spot checks');
+      cd.sources.push('Inventory spot checks');
     }
 
     // Inventory Control — variance report runs (theoretical vs actual usage $ =
@@ -555,14 +555,14 @@ S.AuditTracker = {
     const vruns = (inv.ic_variance_runs || []).filter(inWindow);
     if (vruns.length) {
       cd.inv_variance_dollar = r1(vruns.reduce((s,v) => s + (v.total_sales_variance || 0), 0));
-      cd.sources.push('Inventory Control variance report');
+      cd.sources.push('Inventory variance report');
     }
 
     // Shift Control — waste and spill log (food and bev loss $). Feeds S3.
     const waste = (sh.sc_waste || []).filter(inWindow);
     if (waste.length) {
       cd.waste_total = r1(waste.reduce((s,w) => s + (w.cost || 0), 0));
-      cd.sources.push('Shift Control waste log');
+      cd.sources.push('Inventory waste log');
     }
 
     // Shift Control — walked tabs (revenue lost to walk-outs). Feeds S4.
@@ -570,7 +570,7 @@ S.AuditTracker = {
     if (walked.length) {
       cd.walked_tabs_total = r1(walked.reduce((s,w) => s + (w.amount || 0), 0));
       cd.walked_tabs_count = walked.length;
-      cd.sources.push('Shift Control walked tabs');
+      cd.sources.push('The Floor walked tabs');
     }
 
     // Sales Integrity — per-server fraud reviews (flagged server count). Feeds S4.
@@ -586,7 +586,7 @@ S.AuditTracker = {
       cd.void_comp_count = vc.length;
       cd.void_comp_total = r1(vc.reduce((s,v) => s + (v.amount || 0), 0));
       cd.void_comp_unauthorized = vc.filter(v => !v.authorized_by).length;
-      cd.sources.push('Shift Control void and comp log');
+      cd.sources.push('Inventory void and comp log');
     }
 
     // Shift Control — drawer reconciliations and cash drops
@@ -595,7 +595,7 @@ S.AuditTracker = {
       cd.cash_reconciliations = variances.length;
       cd.cash_variance_total = r1(variances.reduce((s,v) => s + (v.variance || 0), 0));
       cd.cash_short_count = variances.filter(v => v.status === 'Short').length;
-      cd.sources.push('Shift Control drawer reconciliation');
+      cd.sources.push('The Floor drawer reconciliation');
     }
     const drops = (sh.sc_cash_drops || []).filter(inWindow);
     if (drops.length) cd.cash_drops = drops.length;
@@ -613,7 +613,7 @@ S.AuditTracker = {
       const dts = actuals.map(a => a.date).filter(Boolean).sort();
       if (dts.length) laborCost += App.salariedCost(dts[0], dts[dts.length - 1]).total;
       cd.labor_cost = Math.round(laborCost);
-      cd.sources.push('Labor Control actuals');
+      cd.sources.push('The Floor actuals');
     }
 
     return cd.sources.length ? cd : null;

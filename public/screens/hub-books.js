@@ -780,7 +780,7 @@ S.HubBooks = {
     rows.push(r('  Catering Revenue', M.cateringRev, YTD.cateringRev));
     rows.push(r('  Other / Ancillary Revenue', M.otherRev, YTD.otherRev));
     rows.push(r('Total Revenue (net sales)', M.totalRev, YTD.totalRev));
-    rows.push(['  Revenue is net sales as entered; comps and discounts are tracked in Shift Control.', '', '']);
+    rows.push(['  Revenue is net sales as entered; comps and discounts are tracked in Inventory.', '', '']);
     rows.push(blank());
 
     // COGS
@@ -841,9 +841,9 @@ S.HubBooks = {
 
     // Source notes (each line as its own merged row)
     rows.push(blank());
-    rows.push(this._lineRow('Revenue from Shift Control. COGS from Inventory Control weekly counts. Labor from Labor Control actuals.', COL_COUNT));
+    rows.push(this._lineRow('Revenue from your confirmed weeks. COGS from Inventory weekly counts. Labor from The Floor actuals.', COL_COUNT));
     merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
-    rows.push(this._lineRow('Revenue is net sales as entered; comps and discounts are tracked in Shift Control, not re-subtracted here. Maintenance from the maintenance log. Operating expenses from your Operating Expenses log.', COL_COUNT));
+    rows.push(this._lineRow('Revenue is net sales as entered; comps and discounts are tracked in Inventory, not re-subtracted here. Maintenance from the maintenance log. Operating expenses from your Operating Expenses log.', COL_COUNT));
     merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
 
     // Footer + disclaimer
@@ -884,7 +884,7 @@ S.HubBooks = {
     }
     rows.push(this._blankRow(COL_COUNT));
     this._pushFooter(rows, merges,
-      'Estimated sales tax at your ' + rate + '% rate on your taxable sales (Shift Control revenue). The exact tax you collected is on your POS sales tax report; confirm against it before filing. You file ' + (freq === 'quarterly' ? 'quarterly' : 'monthly') + '.',
+      'Estimated sales tax at your ' + rate + '% rate on your taxable sales (your confirmed weekly revenue). The exact tax you collected is on your POS sales tax report; confirm against it before filing. You file ' + (freq === 'quarterly' ? 'quarterly' : 'monthly') + '.',
       COL_COUNT);
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';
@@ -1067,7 +1067,7 @@ S.HubBooks = {
     if (!endingCount) {
       rows.push(this._lineRow('No inventory count on file for this period.', COL_COUNT));
       merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
-      rows.push(this._lineRow('Take a count in Inventory Control before closing the month so this sheet can value your inventory.', COL_COUNT));
+      rows.push(this._lineRow('Take a count in Inventory before closing the month so this sheet can value your inventory.', COL_COUNT));
       merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
       this._pushFooter(rows, merges, null, COL_COUNT);
       const wsEmpty = XLSX.utils.aoa_to_sheet(rows);
@@ -1179,7 +1179,7 @@ S.HubBooks = {
 
     // Source + disclaimer footer
     this._pushFooter(rows, merges,
-      'Source: Inventory Control count dated ' + endingCount.date + ' (type: ' + (endingCount.type || 'Full') + ', counted by ' + (endingCount.counted_by || 'unrecorded') + ').',
+      'Source: Inventory count dated ' + endingCount.date + ' (type: ' + (endingCount.type || 'Full') + ', counted by ' + (endingCount.counted_by || 'unrecorded') + ').',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1305,7 +1305,7 @@ S.HubBooks = {
     rows.push(['Monthly Totals', '', '', totalRev, totalExp, totalCnt, totalVar, '', '']);
 
     this._pushFooter(rows, merges,
-      'Source: Shift Control. Variance equals counted cash minus expected cash. Status comes from your tolerance setting in App Settings.',
+      'Source: The Floor. Variance equals counted cash minus expected cash. Status comes from your tolerance setting in App Settings.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1401,7 +1401,7 @@ S.HubBooks = {
     }
 
     this._pushFooter(rows, merges,
-      'Source: Shift Control void and comp log. Used for sales tax reconciliation and internal controls documentation. Staff Meal and Shift Drink reasons are policy expense, not loss.',
+      'Source: Inventory void and comp log. Used for sales tax reconciliation and internal controls documentation. Staff Meal and Shift Drink reasons are policy expense, not loss.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1552,7 +1552,7 @@ S.HubBooks = {
     }
 
     this._pushFooter(rows, merges,
-      'Source: Labor Control tip pool splits when saved per shift (taxable allocation per employee), tip log entries for shifts without a saved pool, and Shift Control shifts for gross receipts.',
+      'Source: The Floor tip pool splits when saved per shift (taxable allocation per employee), tip log entries for shifts without a saved pool, and The Floor shifts for gross receipts.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1618,7 +1618,7 @@ S.HubBooks = {
     if (!startCount || !endCount || startCount.id === endCount.id) {
       rows.push(this._lineRow('Two counts on file are needed for a variance period. Bar Cop did not find a count before this month and a count on or before month end.', COL_COUNT));
       mergeFull(rows.length - 1);
-      rows.push(this._lineRow('Take an end-of-month count in Inventory Control before closing the books so this report can compute usage.', COL_COUNT));
+      rows.push(this._lineRow('Take an end-of-month count in Inventory before closing the books so this report can compute usage.', COL_COUNT));
       mergeFull(rows.length - 1);
       this._pushFooter(rows, merges, null, COL_COUNT);
       const wsEmpty = XLSX.utils.aoa_to_sheet(rows);
@@ -1661,7 +1661,7 @@ S.HubBooks = {
     }
 
     this._pushFooter(rows, merges,
-      'Source: Inventory Control counts and receive-delivery records between ' + startCount.date + ' and ' + endCount.date + '. Recipe-based shrinkage detection requires POS sales detail, which is loaded on demand in the Variance Report screen inside Inventory Control.',
+      'Source: Inventory counts and receive-delivery records between ' + startCount.date + ' and ' + endCount.date + '. Recipe-based shrinkage detection requires POS sales detail, which is loaded on demand in the Variance Report screen inside Inventory.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1827,7 +1827,7 @@ S.HubBooks = {
     }
 
     this._pushFooter(rows, merges,
-      'Source: Labor Control logged hours plus salaried staff pay, and the call-out log. Revenue from Shift Control. Overtime classification and tip credit treatment are your accountant\'s call based on your state and payroll setup.',
+      'Source: The Floor logged hours plus salaried staff pay, and the call-out log. Revenue from your confirmed weeks. Overtime classification and tip credit treatment are your accountant\'s call based on your state and payroll setup.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1928,9 +1928,9 @@ S.HubBooks = {
       rows.push(blank());
     };
 
-    renderAudit('Profit Recovery',  profitAudit);
-    renderAudit('Revenue Recovery', revenueAudit);
-    renderAudit('Cash Recovery', cashAudit);
+    renderAudit('Profit Audit',  profitAudit);
+    renderAudit('Revenue Audit', revenueAudit);
+    renderAudit('Cash Audit', cashAudit);
 
     this._pushFooter(rows, merges,
       'Source: latest Profit, Revenue, and Cash audits at or before ' + monthEnd + '. Action items and their dollar impacts come from the audit you ran in Bar Cop.',
@@ -2007,7 +2007,7 @@ S.HubBooks = {
 
     rows.push(['Schedule C Line', 'Amount', 'Source', '']);
     rows.push(['Line 1: Gross receipts', YTD.totalRev, 'Sum of Profit weekly revenue for ' + year, '']);
-    rows.push(['Line 2: Returns and allowances', 0, 'Line 1 is net sales; comps are tracked in Shift Control, not income or a return', '']);
+    rows.push(['Line 2: Returns and allowances', 0, 'Line 1 is net sales; comps are tracked in Inventory, not income or a return', '']);
     rows.push(['Line 3: Subtract Line 2 from Line 1', YTD.totalRev, 'Calculated', '']);
     rows.push(['Line 4: Cost of goods sold', calcCogs != null ? calcCogs : YTD.totalCogs, calcCogs != null ? 'Begin + purchases - end' : 'Sum of Profit weekly COGS (no end-of-year count on file)', '']);
     rows.push(['Line 5: Gross profit (Line 3 minus Line 4)', YTD.totalRev - (calcCogs != null ? calcCogs : YTD.totalCogs), 'Calculated', '']);
@@ -2026,7 +2026,7 @@ S.HubBooks = {
     rows.push(['Line 21: Repairs and maintenance', ov('Repairs and Maintenance'), 'Operating Expenses: Repairs and Maintenance', '']);
     rows.push(['Line 23: Taxes and licenses', ov('Licenses and Permits'), 'Operating Expenses: Licenses and Permits', '']);
     rows.push(['Line 25: Utilities', ov('Utilities'), 'Operating Expenses: Utilities', '']);
-    rows.push(['Line 26: Wages (less employment credits)', YTD.totalLabor, 'Sum of Labor Control wages for ' + year, '']);
+    rows.push(['Line 26: Wages (less employment credits)', YTD.totalLabor, 'Sum of The Floor wages for ' + year, '']);
     /* ⛔⛔ EVERY CATEGORY THE OPERATOR ADDED LANDS HERE, OR IT LEAVES THE TAX FORM ENTIRELY.
        The lines above name nine categories by hand, and `_opExSums` stopped folding unknowns into
        'Other' when the roll-up started following the operator's own list. So a category they added

@@ -120,7 +120,7 @@ S.CashRecon = {
     if (!allV.length && !allD.length) {
       App.setupCard(this.container, {
         title: 'Over and Short',
-        lead: 'Your drawer counts and cash drops flow here from Shift Control. Once a few shifts are reconciled, this shows which cashier and which register keep coming up short. Set up a register and run a shift to start the picture.',
+        lead: 'Your drawer counts and cash drops flow here from The Floor. Once a few shifts are reconciled, this shows which cashier and which register keep coming up short. Set up a register and run a shift to start the picture.',
         steps: [
           { title: 'Set up a register', desc: 'Add your registers under The Floor, in Setup, so drawers can be counted.', btn: 'Set Up Registers', screen: 'sc-drawers', done: false },
           { title: 'Reconcile your drawers', desc: 'Count drawers and log over/short in Cash Control. Those land here.', btn: 'Go to Cash Control', screen: 'sc-cash-control', done: false }
@@ -192,10 +192,10 @@ S.CashRecon = {
 
   showHowTo() {
     App.showHelpModal('How Over and Short Works', [
-      { p: ['This finds who and what is repeatedly coming up short. Every drawer count you reconcile in Shift Control flows here automatically and gets grouped by cashier and by register, so a pattern stands out even when any single night looks minor. No double entry.'] },
+      { p: ['This finds who and what is repeatedly coming up short. Every drawer count you reconcile in The Floor flows here automatically and gets grouped by cashier and by register, so a pattern stands out even when any single night looks minor. No double entry.'] },
       { h: 'By Cashier and By Register', p: ['Each row is one cashier or one register over the range you pick: how many drawer counts ran, how many came up short, the net over or short for the period, and the short rate (times short divided by counts). Both lists rank worst first.'] },
       { h: 'Reading the Status', p: ['Repeat short (red) means it comes up short often enough to act on. Watch (amber) is an early pattern worth keeping an eye on. Clean (green) is a spotless range. OK is fine. A cashier or register with only a couple of counts reads Not enough data and is never flagged, so nobody gets branded off one or two nights.'] },
-      { h: 'How This Differs From Cash History', p: ['Cash History in Shift Control is the log, every count in the order it happened. This is the diagnosis on top of it: who and what to look at. A cash short here also raises a Needs Attention row on the Hub.'] },
+      { h: 'How This Differs From Cash History', p: ['Cash History in The Floor is the log, every count in the order it happened. This is the diagnosis on top of it: who and what to look at. A cash short here also raises a Needs Attention row on the Hub.'] },
       { h: 'Filter and Export', p: ['The range chips pull a stretch of activity and the numbers up top reflect the range you pick. Export PDF saves it for your records or your bookkeeper.'] }
     ]);
   }

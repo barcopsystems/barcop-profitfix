@@ -273,7 +273,7 @@ S.HubBreakEven = {
     }
     if (c.breakEven == null) {
       mount.innerHTML = '<div class="screen"><div class="card"><div style="font-size:13px;color:var(--t2);line-height:1.7;">'
-        + '<span style="color:var(--red);font-weight:700;">There is no break-even.</span> Your product and labor are eating ' + (c.varRate != null ? (c.varRate * 100).toFixed(0) + '%' : 'all') + ' of every dollar, so no sales number covers the nut. Fix the cost structure in Profit Recovery first.'
+        + '<span style="color:var(--red);font-weight:700;">There is no break-even.</span> Your product and labor are eating ' + (c.varRate != null ? (c.varRate * 100).toFixed(0) + '%' : 'all') + ' of every dollar, so no sales number covers the nut. Fix the cost structure in the Profit Audit first.'
         + '</div></div></div>';
       return;
     }
