@@ -106,7 +106,7 @@ S.LaborPayrollExport = {
 
   showHowTo() {
     App.showHelpModal('How Payroll Export Works', [
-      { p: ['Pick a pay period and Bar Cop pulls everyone\'s hours, overtime, tip share, and pay into one file you hand to whoever runs payroll. It is all built from what you log in Labor Control, so there is nothing to re-enter.'] },
+      { p: ['Pick a pay period and Bar Cop pulls everyone\'s hours, overtime, tip share, and pay into one file you hand to whoever runs payroll. It is all built from what you log in The Floor, so there is nothing to re-enter.'] },
       { h: 'Two Formats', p: ['Download the Workbook for a clean, readable Excel file with your establishment header and the disclaimer, made for a person to review. Download the CSV for a payroll system that imports a file, just the columns with no extra rows.'] },
       { h: 'Salaried Staff', p: ['Salaried staff show a fixed weekly salary, their annual divided by 52, with no overtime. Their logged hours appear as coverage only and do not drive pay.'] },
       { h: 'A Worksheet, Not The Record', p: ['Bar Cop is a software tool, not a payroll provider, tax preparer, or legal advisor. Overtime eligibility, exempt and non-exempt classification, tip credit, and tax withholding are determined by you and your payroll provider. Verify every figure before running payroll.'] }
@@ -224,7 +224,7 @@ S.LaborPayrollExport = {
 
       aoa.push(line(barName + ' - Payroll Worksheet')); fullMerge(aoa.length - 1);
       aoa.push(line('Pay Period: ' + pp.fmtDate(d.ws) + ' to ' + pp.fmtDate(d.we))); fullMerge(aoa.length - 1);
-      aoa.push(line('Prepared ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' from Bar Cop Labor Control')); fullMerge(aoa.length - 1);
+      aoa.push(line('Prepared ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' from Bar Cop The Floor')); fullMerge(aoa.length - 1);
       aoa.push(blank());
       aoa.push(COLS.slice());
       const headerRow = aoa.length - 1;
@@ -286,7 +286,7 @@ S.LaborPayrollExport = {
   // canonical deliverable disclaimer lines. Each line merged across the row.
   _pushFooter(aoa, merges, line, fullMerge) {
     aoa.push(line('')); // spacer
-    aoa.push(line('Source: Labor Control hours and tip pools. Revenue and shifts from Shift Control.')); fullMerge(aoa.length - 1);
+    aoa.push(line('Source: The Floor hours and tip pools. Revenue from your confirmed weeks, shifts from The Floor.')); fullMerge(aoa.length - 1);
     // Split the payroll disclaimer across rows so each sentence fits the merged
     // width and reads in full without widening a column. The worksheet caveat
     // gets its own row so it is never clipped at the merge edge.
