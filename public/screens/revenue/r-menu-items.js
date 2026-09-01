@@ -59,6 +59,41 @@ S.RevenueMenuItems = {
   // One implementation, mirrored on the server, held by verify-menu-grouping-tieout.js.
   classifyItem(item) { return App.menuTypeOf(item); },
 
+  // The list search. Empty until typed; cleared whenever the tab changes.
+  listQuery: '',
+
+  // ⚠ THE ONE DOOR FOR "WHAT DOES THIS TAB HOLD", before any search. It used to be an inline
+  // `const tabItems = ...` in renderLanding while Select All re-derived the same set by hand
+  // twenty lines away — two implementations of one question, which is the drift this suite exists
+  // to catch. A search would have made it three.
+  visibleItems() {
+    const all = this.items();
+    return this.activeTab === this.INACTIVE_TAB
+      ? all.filter(i => i && i.archived)
+      : all.filter(i => i && !i.archived && this.classifyItem(i) === this.activeTab);
+  },
+
+  /* ⛔ THE SEARCH FILTERS THE LIST, NEVER THE COUNTS. `visibleItems()` feeds the three tiles, the
+     tab counts and the "N items missing price or cost" banner — and all of those are statements
+     about the TAB, not about what you happen to be looking at. Filtered, the banner would read
+     "1 item missing price or cost" with five behind the search, which is a count that is true of
+     the view and false about the menu ([[output-honesty]]).
+     ⛔ BUT SELECT ALL AND THE SELECTION PRUNE MUST USE THIS ONE. This screen already records what
+     a Select All over rows you cannot see costs: it took every live item of every type, so the
+     Dishes tab with 36 rows on screen offered "Delete 64 Selected" and would have wiped every
+     cocktail and beer. A search hides rows exactly the way switching tabs does, so anything that
+     ACTS on a selection reads `listItems()` and nothing can act on a row that is not on screen. */
+  listItems() {
+    const q = String(this.listQuery || '').trim().toLowerCase();
+    const rows = this.visibleItems();
+    if (!q) return rows;
+    // Name and category: the two an operator would type. Category is in there because the list is
+    // GROUPED by it, so "appetizers" finding a whole section is the obvious read — the same reason
+    // Add Products searches sub-category. A menu item carries no brand and no vendor.
+    return rows.filter(i => ['name', 'category']
+      .some(k => String((i && i[k]) || '').toLowerCase().includes(q)));
+  },
+
   // ── Ingredient picker helpers (shared by Plate + Cocktail forms) ─────
   ingredientOptions(selKey, mode) {
     const prods = this.products();
@@ -344,6 +379,17 @@ S.RevenueMenuItems = {
       this.activeTab = 'plate';
     }
     const onInactive = this.activeTab === this.INACTIVE_TAB;
+    const q = String(this.listQuery || '').trim();
+    /* ⚠ THE SELECTION MAY ONLY EVER HOLD ROWS THAT ARE ON SCREEN, and it is enforced here rather
+       than at each action so a new door cannot reintroduce it. Switching tabs already clears the
+       selection outright; a SEARCH does not, and without this an operator could tick three rows,
+       type one more character, and be offered "Delete 3 Selected" over one visible row — the exact
+       shape of the defect recorded at Select All below. Placed after the activeTab fallback above,
+       so a bogus tab cannot empty the selection on the way past. */
+    if (this._selected && this._selected.size) {
+      const onScreen = new Set(this.listItems().map(i => i.id));
+      [...this._selected].forEach(id => { if (!onScreen.has(id)) this._selected.delete(id); });
+    }
     const tabDefs = this.TYPES.map(t => ({ key: t.key, label: t.label, n: all.filter(i => this.classifyItem(i) === t.key).length }))
       .concat([{ key: this.INACTIVE_TAB, label: this.INACTIVE_TAB, n: archivedItems.length }]);
     // ⚠ USE THE SHARED TAB COMPONENT (ch-tabs / ch-tab / .on), the same one Add Products uses.
@@ -357,14 +403,28 @@ S.RevenueMenuItems = {
     // (the only place Make Active / Delete Permanently render) were unreachable.
     // The harness passed because it asserted the two spellings SEPARATELY and never that they
     // agree — a node test cannot click, so nothing else could have caught it.
+    /* ⭐ THE SEARCH SITS INSIDE `.ch-tabs`, PUSHED RIGHT — the same control in the same place Kyle
+       put it on Add Products by hand: same row as the tab names, above the divider line and above
+       Export PDF. Inside the block rather than in a wrapper because `.ch-tabs` already carries the
+       flex row AND the `border-bottom` that draws that divider, so a wrapper would put the box
+       above the line or split the rule. `margin-left:auto` is the whole trick, and `flex-wrap`
+       (already on the class) drops it to its own line on a narrow screen instead of overflowing.
+       ⚠ THE VALUE IS RE-RENDERED FROM STATE, so focus and the caret have to be restored after a
+       redraw. wireLanding does that; without it every keystroke would drop the cursor. */
+    const search = '<div class="f" style="margin-left:auto;max-width:260px;margin-bottom:6px;">'
+      + '<input type="text" id="mi-list-search" placeholder="Search menu items..." autocomplete="off"'
+      + ' value="' + esc(this.listQuery || '') + '"/></div>';
     const tabsBlock = '<div class="ch-tabs no-print">'
       + tabDefs.map(t => '<button class="ch-tab mi-tab' + (t.key === this.activeTab ? ' on' : '')
         + '" data-tab="' + esc(t.key) + '">' + esc(t.label)
         + (t.n ? ' <span style="opacity:0.55;">' + t.n + '</span>' : '') + '</button>').join('')
+      + search
       + '</div>';
 
-    // The visible list is this tab's items only. Inactive gets its own view below.
-    const tabItems = onInactive ? [] : all.filter(i => this.classifyItem(i) === this.activeTab);
+    // The visible list is this tab's items only, narrowed by the search. Inactive gets its own
+    // view below, off the same door, so both tabs search their own contents.
+    const tabItems = onInactive ? [] : this.listItems();
+    const inactiveRows = onInactive ? this.listItems() : [];
     /* ⛔ THE CONFIRM SCREEN TAKES THE UPLOAD PANEL'S SLOT. Nothing is written until its button, so
        the operator can still see which prices a file is about to move before it moves them. */
     const lower = this._menuReview ? this.menuReviewHTML()
@@ -377,8 +437,14 @@ S.RevenueMenuItems = {
     // while the populated case was a full table — two different-looking pages for the same tab.
     // Add Products renders the SAME card with the SAME column headers either way and puts the
     // empty message in the body, so the tab keeps its shape and you can see what will appear here.
-    const INACTIVE_EMPTY_MSG = 'No inactive menu items. Edit any item and use Make Inactive to pull a '
-      + 'seasonal dish or drink off the live menu without deleting it.';
+    /* ⛔ A SEARCH THAT MATCHES NOTHING IS NOT AN EMPTY TAB. Without the first branch, typing a
+       misspelling on a tab holding 40 retired items said "No inactive menu items" — telling an
+       operator with a full archive that they have none. It names the search and says how many are
+       behind it, so the way out is obvious. */
+    const INACTIVE_EMPTY_MSG = q
+      ? 'No inactive items match "' + q + '". Clear the search to see all ' + this.visibleItems().length + '.'
+      : 'No inactive menu items. Edit any item and use Make Inactive to pull a '
+        + 'seasonal dish or drink off the live menu without deleting it.';
     /* ⛔ NO HEADING, NO EXPLAINER, AND AN EXPORT WHERE EVERY OTHER TAB HAS ONE (Kyle, 2026-08-04).
        The tab is already labelled "Inactive" in the tab strip directly above, so an "Inactive"
        heading under it named the same thing twice; and the paragraph explaining what inactive means
@@ -394,8 +460,10 @@ S.RevenueMenuItems = {
     const selCount = this._selected ? this._selected.size : 0;
     const archivedSection = onInactive
       // ⚠ NO TOOLBAR ON AN EMPTY TAB, which is what Add Products does: Select All over nothing, and
-      // an Export of an empty list, are controls that cannot do anything.
-      ? (archivedItems.length
+      // an Export of an empty list, are controls that cannot do anything. ⚠ Gated on the rows ON
+      // SCREEN, not on `archivedItems`: "can this control do anything" is a question about what is
+      // rendered, and a search matching nothing leaves nothing to select or export.
+      ? (inactiveRows.length
           ? '<div class="no-print" style="display:flex;align-items:center;gap:8px;margin:16px 0 10px;flex-wrap:wrap;">'
             + '<button class="btn btn-ghost btn-sm mi-sel-all">Select All</button>'
             + '<button class="btn btn-ghost btn-sm mi-sel-clear">Clear</button>'
@@ -411,8 +479,8 @@ S.RevenueMenuItems = {
         + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
         + '<th></th><th>Item</th><th>Category</th><th>Price</th><th></th>'
         + '</tr></thead><tbody>'
-        + (archivedItems.length
-          ? archivedItems.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(item => '<tr>'
+        + (inactiveRows.length
+          ? inactiveRows.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(item => '<tr>'
               + '<td class="cb-left" style="width:40px;text-align:center;"><input type="checkbox" class="bc-check mi-sel" data-id="' + esc(item.id) + '"'
                 + ((this._selected && this._selected.has(item.id)) ? ' checked' : '') + '/></td>'
               + '<td><div class="val">' + esc(item.name) + '</div></td>'
@@ -455,9 +523,22 @@ S.RevenueMenuItems = {
   // would sort a dish page by cocktail sections. Leftovers fall to the end, Uncategorized last.
   listHTML(all, type) {
     if (!all.length) {
-      return '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">No menu items yet. Use a <strong>+ Add</strong> tile above, or Upload to bring your menu in at once.</div></div>';
+      /* ⛔ A SEARCH THAT MATCHES NOTHING IS NOT AN EMPTY TAB. Without this, typing a misspelling on
+         a tab holding 60 dishes said "No menu items yet. Use a + Add tile above" — telling an
+         operator with a full menu that they have none, and pointing them at Add. It names the
+         search and the count behind it so the way out is obvious. */
+      const q = String(this.listQuery || '').trim();
+      const emptyMsg = q
+        ? 'No menu items match "' + esc(q) + '". Clear the search to see all ' + this.visibleItems().length + '.'
+        : 'No menu items yet. Use a <strong>+ Add</strong> tile above, or Upload to bring your menu in at once.';
+      return '<div class="card" style="margin-top:18px;padding:14px 20px;"><div style="font-size:12px;color:var(--t3);line-height:1.6;">' + emptyMsg + '</div></div>';
     }
-    const incompleteN = all.filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
+    /* ⛔ THE BANNER COUNTS THE TAB, NOT THE SEARCH — `this.visibleItems()`, deliberately not the
+       `all` parameter, which is the filtered list being rendered. Behind a search this would have
+       read "1 item missing price or cost" with five more hidden: true of the view and false about
+       the menu, on the one line that tells an operator what is keeping items out of Menu
+       Engineering ([[output-honesty]]). */
+    const incompleteN = this.visibleItems().filter(i => !i.price || (App.menuItemCost(i) || 0) === 0).length;
     const order = App.menuCatOptions(type || this.activeTab);
     // ⚠ CASE-INSENSITIVE, the way the list itself dedupes (listOptions and absorbMenuCats both
     // compare lowercased). Matching exactly split ONE section into TWO headings whenever a POS
@@ -584,8 +665,26 @@ S.RevenueMenuItems = {
   wireLanding() {
     // Tiles: + Add opens the popup editor scoped to the type; Upload opens the
     // in-place import panel for that type.
+    // ⚠ THE SEARCH CLEARS ON A TAB SWITCH, like the selection beside it. A query carried across
+    //   tabs shows an empty Mixed Drinks tab to somebody who typed a dish name and has forgotten it.
     this.container.querySelectorAll('.mi-tab').forEach(b =>
-      b.addEventListener('click', () => { this.activeTab = b.dataset.tab; this._selected = new Set(); this.renderLanding(); }));
+      b.addEventListener('click', () => { this.activeTab = b.dataset.tab; this._selected = new Set(); this.listQuery = ''; this.renderLanding(); }));
+
+    /* THE LIST SEARCH. Every keystroke re-renders the landing, which destroys and rebuilds this
+       input, so focus and the caret have to be put back by hand — without it the cursor jumps to
+       the start after the first character and the box is unusable. The caret goes back to where it
+       was rather than to the end, so editing the middle of a word behaves.
+       ⚠ AN `input` LISTENER, NOT A CLICK. Everything else on this screen is wired through per-
+       control click handlers, and a keystroke never fires one — bound the way its neighbours are
+       bound, the box would render and do nothing. */
+    const sBox = document.getElementById('mi-list-search');
+    if (sBox) sBox.addEventListener('input', e => {
+      const pos = e.target.selectionStart;
+      this.listQuery = e.target.value;
+      this.renderLanding();
+      const again = document.getElementById('mi-list-search');
+      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (_) { /* not all inputs support it */ } }
+    });
     this.container.querySelectorAll('.mi-card-add').forEach(el =>
       el.addEventListener('click', () => this.openEditor(null, { type: el.dataset.type })));
     this.container.querySelectorAll('.mi-card-imp').forEach(el =>
@@ -600,9 +699,12 @@ S.RevenueMenuItems = {
          the Dishes tab it read "Delete 64 Selected" and would have wiped every cocktail and beer.
          The Inactive tab is the same rule with a different filter — it lists archived items across
          every type, so selecting by `classifyItem` there selected NOTHING and the button was inert. */
-      const rows = this.activeTab === this.INACTIVE_TAB
-        ? this.items().filter(i => i.archived)
-        : this.items().filter(i => !i.archived && this.classifyItem(i) === this.activeTab);
+      /* ⚠ AND NOW THROUGH listItems(), the ONE door the list itself renders from — which is this
+         tab's items narrowed by the search. It used to re-derive the tab by hand right here, a
+         second implementation of the same question sitting twenty lines from the first; with a
+         search that becomes a third, and left on the unfiltered set Select All would tick 40 rows
+         behind a search showing 3, which is the exact shape of the defect described above. */
+      const rows = this.listItems();
       this._selected = new Set(rows.map(i => i.id));
       this.renderLanding();
     }));
