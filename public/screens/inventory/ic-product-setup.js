@@ -40,6 +40,28 @@ S.InventoryProducts = {
       : all.filter(p => p && this._tabFor(p) === this.activeCat && p.active !== false);
   },
 
+  // The list search. Empty until typed; cleared whenever the tab changes.
+  listQuery: '',
+
+  /* ⛔ THE SEARCH FILTERS THE LIST, NEVER THE COUNTS. `visibleProducts()` feeds three other things:
+     the tab badges, the category cards, and the "N incomplete" alert bar — and all three are
+     statements about the TAB, not about what you happen to be looking at. Filtering there would
+     have made the alert read "1 incomplete" while five sat behind the search, which is a count that
+     is true of the view and false about the bar ([[output-honesty]]).
+     ⛔ BUT SELECT ALL AND THE SELECTION PRUNE MUST USE THIS ONE. This file already records the
+     defect: the toolbar offered "Delete 5 Selected" for rows with no representation on screen. A
+     search makes rows disappear exactly the way switching tabs does, so anything that ACTS on a
+     selection reads `listProducts()` and nothing can act on a row you cannot see. */
+  listProducts() {
+    const q = String(this.listQuery || '').trim().toLowerCase();
+    const rows = this.visibleProducts();
+    if (!q) return rows;
+    // Name, brand, sub-category and vendor: the four an operator would type. Sub-category is in
+    // there because the list is GROUPED by it, so "vodka" finding a whole group is the obvious read.
+    return rows.filter(p => ['name', 'brand', 'sub_category', 'vendor']
+      .some(k => String((p && p[k]) || '').toLowerCase().includes(q)));
+  },
+
   // ⚠ THE ONE DOOR FOR "WHICH TAB DOES THIS PRODUCT BELONG ON" (S124). Both the tab filter above
   // and the category CARD counts used a bare `(p.category || '') === c`, so an ACTIVE product whose
   // category is missing, '' or a legacy value ('Beer') was listed by NO tab and counted by NO card
@@ -482,7 +504,8 @@ S.InventoryProducts = {
     // deliberate keep-the-failures-selected retry: a product whose delete was REFUSED is
     // still present and still rendered, so it survives the prune.
     if (this._selected && this._selected.size) {
-      const onScreen = new Set(this.visibleProducts().map(p => p.id));
+      // listProducts, not visibleProducts: a search hides rows the same way a tab switch does.
+      const onScreen = new Set(this.listProducts().map(p => p.id));
       [...this._selected].forEach(id => { if (!onScreen.has(id)) this._selected.delete(id); });
     }
     // Short, category-specific labels for the per-card upload button.
@@ -524,13 +547,17 @@ S.InventoryProducts = {
     // Existing-products table, filtered by activeCat. Tabs flip the filter.
     // One door: the working tabs list ACTIVE products of that category, the Inactive tab lists every
     // inactive product whatever category it came from. See visibleProducts.
-    const prods = this.visibleProducts();
+    const prods = this.listProducts();
     const onInactiveTab = this.activeCat === this.INACTIVE_TAB;
     const target = App.data?.settings?.targets?.bar_pour_cost_pct ?? 22;
     // ⚠ ACTIVE ONLY (S123). On the Inactive tab `prods` is every archived product, so this alert
     // counted retired products as a problem — the same active-only rule the tab counts and the row
     // flags already follow.
-    const incompleteHere = prods.filter(p => p.active !== false && !this.isComplete(p));
+    /* ⛔ THE ALERT COUNTS THE TAB, NOT THE SEARCH — `visibleProducts()`, deliberately not `prods`.
+       Pointing it at the filtered list made it read "1 product has no cost" while five sat behind
+       the search: true of what is on screen and false about their bar, which is the one thing this
+       bar must never be. Search narrows what you LOOK at; it does not restate your numbers. */
+    const incompleteHere = this.visibleProducts().filter(p => p.active !== false && !this.isComplete(p));
 
     const tabs = this.catTabs();
 
@@ -589,7 +616,15 @@ S.InventoryProducts = {
       // empty table scroll sideways). Auto layout fits the container, no scroll.
       // Tab-aware: the Inactive tab has no "Inactive card" to click and you never ADD an inactive
       // product (they land here by being archived), so it gets its own copy instead of the add pitch.
-      const emptyMsg = onInactiveTab
+      /* ⛔ A SEARCH THAT MATCHES NOTHING IS NOT AN EMPTY TAB. Without this, typing a misspelling on
+         a tab holding 35 products said "No Liquor products yet. Click the Liquor card above to add
+         your first one" — telling an operator with a full bar that they have none, and pointing
+         them at Add. It names the search and the tab so the way out is obvious. */
+      const q = String(this.listQuery || '').trim();
+      const emptyMsg = q
+        ? 'No ' + esc(onInactiveTab ? 'inactive' : this.activeCat) + ' products match "' + esc(q)
+          + '". Clear the search to see all ' + this.visibleProducts().length + '.'
+        : onInactiveTab
         ? 'No inactive products. Products you archive from the tabs above show up here.'
         : 'No ' + esc(this.activeCat) + ' products yet. Click the ' + esc(this.activeCat) + ' card above to add your first one.';
       body = '<div class="card" style="margin-top:18px;"><table class="row-list" style="width:100%;">'
@@ -787,11 +822,23 @@ S.InventoryProducts = {
         + esc(label) + (n ? ' <span style="opacity:0.55;">' + n + '</span>' : '') + '</button>';
     };
     const inactiveN = all.filter(p => p && p.active === false).length;
+    /* ⭐ THE SEARCH SITS INSIDE `.ch-tabs`, PUSHED RIGHT (Kyle, 2026-08-31: *"same row as the tab
+       names ... above the divider line and the export pdf button"*). Inside rather than in a
+       wrapper because `.ch-tabs` already carries the flex row AND the `border-bottom` that draws
+       that divider — a wrapper would have put the box above the line or split the rule.
+       `margin-left:auto` is the whole trick, and `flex-wrap` (already on the class) drops it to its
+       own line on a narrow screen instead of overflowing.
+       ⚠ THE VALUE IS RE-RENDERED FROM STATE, so focus has to be restored after a redraw. wireLanding
+       does that; without it every keystroke would drop the cursor. */
+    const search = '<div class="f" style="margin-left:auto;max-width:260px;margin-bottom:6px;">'
+      + '<input type="text" id="ip-list-search" placeholder="Search products..." autocomplete="off"'
+      + ' value="' + esc(this.listQuery || '') + '"/></div>';
     return '<div class="ch-tabs no-print">'
       + this.CATEGORIES.map(c =>
           tab(c, all.filter(p => p && this._tabFor(p) === c && p.active !== false).length)).join('')
       // Last, after Misc: one place for everything retired, whatever category it came from.
       + tab(this.INACTIVE_TAB, inactiveN)
+      + search
       + '</div>';
   },
 
@@ -815,7 +862,9 @@ S.InventoryProducts = {
       if (exp)     { ev.stopPropagation(); App.exportPDF({ title: this.activeCat + ' Products', root: document.getElementById('ip-list-export') }); return; }
       if (addLink) { ev.stopPropagation(); this.showForm(addLink.dataset.cat); return; }
       if (impLink) { ev.stopPropagation(); this._import = { cat: impLink.dataset.cat }; this._formCategory = impLink.dataset.cat; this.renderLanding(); setTimeout(() => document.getElementById('ip-import-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); return; }
-      if (tab)     { ev.stopPropagation(); this.activeCat = tab.dataset.cat; this._selected = new Set(); this.renderLanding(); return; }
+      // ⚠ THE SEARCH CLEARS ON A TAB SWITCH, like the selection beside it. A query carried across
+      //   tabs shows an empty Wine tab to somebody who typed a liquor name and has forgotten it.
+      if (tab)     { ev.stopPropagation(); this.activeCat = tab.dataset.cat; this._selected = new Set(); this.listQuery = ''; this.renderLanding(); return; }
       if (edit)    { ev.stopPropagation(); this.showFormForId(edit.dataset.id); return; }
       // Restore in one click. Routed through setActiveBulk, which is the door that already
       // snapshots and puts the row back if the write is refused, so this cannot leave the
@@ -831,7 +880,11 @@ S.InventoryProducts = {
       // archived ones, none of which had ever been shown. And on the Inactive tab it
       // selected NOTHING, because no product has category 'Inactive', so the tab's whole
       // purpose (clearing 100 mis-imported wines) had no bulk path at all.
-      if (selAll)  { ev.stopPropagation(); this._selected = new Set(this.visibleProducts().map(p => p.id)); this.renderLanding(); return; }
+      // ⚠ AND NOW THROUGH listProducts(), which is visibleProducts() narrowed by the search. Same
+      //   argument one step on: with a search active, Select All must mean the rows on screen. Left
+      //   on visibleProducts it would tick 35 rows behind a search showing 3, which is the exact
+      //   shape of the defect described above.
+      if (selAll)  { ev.stopPropagation(); this._selected = new Set(this.listProducts().map(p => p.id)); this.renderLanding(); return; }
       if (selClr)  { ev.stopPropagation(); this._selected = new Set(); this.renderLanding(); return; }
       if (selEdit) { ev.stopPropagation(); this.openBulkEdit(); return; }
       // Bulk restore. Through setActiveBulk, the door that snapshots and puts every row
@@ -841,6 +894,21 @@ S.InventoryProducts = {
       if (selDel)  { ev.stopPropagation(); this.confirmDel([...(this._selected || [])]); return; }
       if (selBox)  { const id = selBox.dataset.id; this._selected = this._selected || new Set(); if (this._selected.has(id)) this._selected.delete(id); else this._selected.add(id); this.renderLanding(); return; }
     };
+
+    /* THE LIST SEARCH. Every keystroke re-renders the landing, which destroys and rebuilds this
+       input, so focus and the caret have to be put back by hand — without it the cursor jumps to
+       the start after the first character and the box is unusable. The caret is restored to where
+       it was rather than to the end, so editing the middle of a word behaves.
+       ⚠ Bound HERE and not on the container's `onclick`: that handler is click-only, and an
+       `input` event never reaches it. */
+    const sBox = document.getElementById('ip-list-search');
+    if (sBox) sBox.addEventListener('input', e => {
+      const pos = e.target.selectionStart;
+      this.listQuery = e.target.value;
+      this.renderLanding();
+      const again = document.getElementById('ip-list-search');
+      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (_) { /* not all inputs support it */ } }
+    });
 
     // In-place import panel (drop zone -> column mapper, same spot). Wired only
     // while an upload is active for a category.
