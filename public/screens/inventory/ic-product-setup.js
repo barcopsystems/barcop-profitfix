@@ -931,6 +931,11 @@ S.InventoryProducts = {
        re-render rebuilds the field from state rather than from a node about to be destroyed. */
     document.getElementById('ip-route-vendor-new')?.addEventListener('input', e => { r.vendor = e.target.value.trim(); });
 
+    /* T130. Writes to STATE and re-renders, like every other control on this screen, so the button
+       gate and the answer can never disagree. */
+    this.container.querySelectorAll('[data-cost-basis]').forEach(b =>
+      b.addEventListener('click', () => { r.costBasis = b.getAttribute('data-cost-basis'); redraw(); }));
+
     document.getElementById('ip-route-back')?.addEventListener('click', () => {
       // Back to the drop zone, not out of the import. A mapping belongs to the file it
       // was made for, so the file is re-dropped from scratch.
@@ -2703,7 +2708,11 @@ S.InventoryProducts = {
       removed: {},      // _rid -> true. Not a product; never written.
       open: {},         // which category groups are expanded on screen
       checked: {},      // _rid -> true, the current selection
-      vendor: '', vendorNew: false
+      vendor: '', vendorNew: false,
+      /* T130. '' until answered, then 'case' or 'unit'. Deliberately has NO default: both answers
+         are common on a real distributor file and the wrong one is invisible, so the operator says
+         which rather than Bar Cop guessing ([[empty-is-not-an-answer]]). */
+      costBasis: ''
     };
     this._prefillAssign();
     /* ⛔ THE SCREEN ALWAYS OPENS (Kyle, chat 27): *"i would actually prefer the process
@@ -3228,15 +3237,95 @@ S.InventoryProducts = {
        every section invisible against the page.
        ⚠ THE HEADING STAYS `.sh ic-head`, NOT `.card-title` — that pairing is the heading-outside-a-
        card shape and it is now literally outside a card. */
+    /* ⛔ T130. Only asked when it is a real question: a per-container category, a pack above 1 and
+       a cost to divide. No pack column, or a pack of 1, and this never appears.
+       ⚠ NO DEFAULT AND THE BUTTON IS GATED. Both answers are ordinary on a distributor file and the
+       wrong one is invisible for the life of the account, so a guess would be the worst option
+       available ([[empty-is-not-an-answer]]). One example row from their OWN file does the
+       explaining, because "$150 for a 6-pack" settles it faster than a sentence about case costs. */
+    let costBlock = '';
+    const packRows = this._importPackRows(rows);
+    if (packRows.length) {
+      const ex = packRows[0];
+      const exPack = this._packCount(ex.case_size);
+      const exCost = App.parseNum(ex.unit_cost);
+      const exName = String(ex.name || '').trim() || 'that row';
+      costBlock = '<div class="card" id="ip-route-cost-card" style="margin-top:16px;">'
+        + this._sectionHead('Is That Cost Per Case Or Per Bottle?',
+            packRows.length + ' of your rows have a pack size, so the cost could be either. '
+            + esc(exName) + ' is a pack of ' + exPack + ' at ' + esc(App.fmtCurrency(exCost))
+            + ', which is either ' + esc(App.fmtCurrency(exCost / exPack)) + ' a bottle or '
+            + esc(App.fmtCurrency(exCost)) + ' a bottle. Bar Cop will not guess.')
+        + '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button type="button" class="btn ' + (r.costBasis === 'case' ? 'btn-primary' : 'btn-ghost')
+        + '" data-cost-basis="case">Per case</button>'
+        + '<button type="button" class="btn ' + (r.costBasis === 'unit' ? 'btn-primary' : 'btn-ghost')
+        + '" data-cost-basis="unit">Per bottle</button>'
+        + '</div></div>';
+    }
+    const costAnswered = !packRows.length || !!r.costBasis;
+
     return this._sectionHead('Your ' + rows.length + ' Product' + (rows.length === 1 ? '' : 's'), lead)
       + body
       + vendorBlock
+      + costBlock
       + '<div class="no-print" style="margin:22px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && !busy ? '' : ' disabled')
+      + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && costAnswered && !busy ? '' : ' disabled')
       + '>' + (busy ? 'Adding...' : 'Add ' + ready + ' Product' + (ready === 1 ? '' : 's')) + '</button>'
       + '<button type="button" class="btn btn-ghost" id="ip-route-back"' + (busy ? ' disabled' : '') + '>Start Over</button>'
       + '</div>'
       + '<div id="ip-csv-actions" class="no-print" style="margin:0 0 24px;"></div>';
+  },
+
+  /* ── A CASE COST IS NOT A BOTTLE COST (T130, 2026-08-31) ──────────────────────────────────────
+     Found by Kyle dropping a realistic distributor file: Tito's, pack 6, cost 150. It imported as
+     **$150 a bottle** against a truth of $25.
+     ⛔ TWO FAULTS COMPOUNDED, and the second is why it looked fine.
+       1. Only Bottle Beer had a case concept (`spec.showCaseSize`), so a Pack column on Liquor or
+          Wine mapped and was then DISCARDED at build time.
+       2. `unit_cost`'s alias list accepts `case cost` and `case price`, and on Liquor/Wine that
+          field is the per-BOTTLE cost the manual form labels "COST PER BOTTLE". A column headed
+          "Case Cost" was taken as a bottle cost, silently.
+     MEASURED on that eight-row file: the three beers imported CORRECTLY (Bottle Beer binds both
+     case cost and case size) while the five spirits and wines came in 6x to 12x high. A file where
+     most rows are right is the worst shape this can take.
+     ⭐ THE APP ALREADY HAD THE RIGHT INSTINCT ONE CATEGORY OVER: `App.bottleCost` refuses (returns
+     null) for case-priced beer with no case size rather than hand back a ~24x figure. Liquor had no
+     equivalent because it has no case concept, so a 6x number passed straight through.
+     ⛔ THE FIX DOES NOT GIVE LIQUOR A `case_size`. Spirits are COUNTED by the bottle; a case is a
+     PURCHASE unit, not a count unit. Storing one would change the model everywhere (`bottleCost`,
+     `isCaseBeer`, the form, every count) to fix a door. The pack divides HERE and a real per-bottle
+     cost is what lands, so nothing downstream moves. */
+  _PER_CONTAINER_CATS: ['Liquor', 'Wine', 'Draft Beer'],
+
+  /* The cost to store, given what the file said. Small and pure ON PURPOSE so a harness can lift
+     and run the real thing rather than assert the spelling of it ([[the-loop]] #8). */
+  _importCostPerContainer(cost, packRaw, cat, basis) {
+    if (cost == null) return null;
+    // Bottle Beer is unchanged: it STORES the case cost and divides at read time through
+    // App.bottleCost. That is the model and this must not touch it.
+    if (this._PER_CONTAINER_CATS.indexOf(cat) === -1) return cost;
+    if (basis !== 'case') return cost;
+    const n = this._packCount(packRaw);
+    return (n && n > 1) ? cost / n : cost;
+  },
+
+  /* Rows where the question is live: a per-container category, a pack above 1, and a cost to
+     divide. Below 1 there is nothing to ask — a pack of 1 makes case and bottle the same number.
+     ⚠ THE CATEGORY IS NOT ON THE ROW YET when this runs. The routing screen holds it in
+     `assignById` and only `_routeStamp` writes `_category`, so reading `row.category` here would
+     have matched nothing and the question would never have appeared — a guard that cannot fire
+     ([[the-loop]] #62). Both spellings are read so this works before and after the stamp. */
+  _importPackRows(rows) {
+    const r = this._routing;
+    return (rows || []).filter(row => {
+      const cat = String((row && row._category) || (r && r.assignById[row._rid]) || '').trim();
+      if (this._PER_CONTAINER_CATS.indexOf(cat) === -1) return false;
+      const n = this._packCount(row.case_size);
+      if (!(n && n > 1)) return false;
+      const c = App.parseNum(row.unit_cost);
+      return c != null && !isNaN(c) && c > 0;
+    });
   },
 
   // CSVMapper hands back rows already keyed by field (name, unit_cost, ...). Build
@@ -3369,7 +3458,12 @@ S.InventoryProducts = {
          negative unit cost with `isComplete()` returning TRUE, giving negative COGS and negative
          inventory value. Dropping it to null leaves the row Incomplete, which is the honest state. */
       const pour = spec.showPour ? nonNeg(numOf(val(row, 'pour_size_oz'))) : null;
-      const cost = nonNeg(numOf(val(row, 'unit_cost')));
+      /* ⛔ T130: a per-container category divides a CASE cost by the pack before storing. The
+         operator answers case-or-bottle once on the routing screen; with no pack column, or with
+         the answer "per bottle", this is a pass-through and behaves exactly as it always did. */
+      const cost = this._importCostPerContainer(
+        nonNeg(numOf(val(row, 'unit_cost'))), val(row, 'case_size'), cat,
+        (this._routing && this._routing.costBasis) || '');
       // Menu price + servings come in for resale Food/Misc as well as pourables.
       const price = (spec.showMenuPrice || spec.showUnitType) ? nonNeg(numOf(val(row, 'menu_price'))) : null;
       const soldOnMenu = spec.showUnitType && price != null && price > 0;
