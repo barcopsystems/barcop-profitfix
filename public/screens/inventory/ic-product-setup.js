@@ -2936,7 +2936,20 @@ S.InventoryProducts = {
     if (landed == null) return '';
     const pack = this._packCount(row.case_size);
     const divided = landed !== raw && pack > 1;
+    /* ⛔ FOOD AND MISC SHOW THE UNIT, AND THEY ARE THE ONLY ONES THAT NEED IT. A liquor row has one
+       possible answer, so "$25.00" is unambiguous. A Food row does not: its tracked unit is CHOSEN
+       (lb · each · case · bag · box · gallon · quart · pint · dozen), so "$31.00" alone says
+       nothing about whether that is a pound or a case.
+       ⚠ AND THE DEFAULT IS THE DANGEROUS CASE, which is why this exists. A food file with a pack
+       column but NO unit column falls back to `lb` for Food and `each` for Misc, so a case cost
+       lands against one pound. That is a wrong UNIT, not a wrong division — dividing by the pack
+       would make it worse — and until now nothing on this screen showed the unit at all, so it was
+       invisible at the one moment it is still free to fix. */
+    const spec = this.FORM_SPEC[cat];
+    const unit = (spec && spec.showUnitType)
+      ? (String(row.unit_type || '').trim().toLowerCase() || spec.defaultUnitType) : '';
     return App.fmtCurrency(landed)
+      + (unit ? ' <span style="font-size:9px;color:var(--t3);">/' + esc(unit) + '</span>' : '')
       + (divided
           ? '<div style="font-size:10px;color:var(--t3);margin-top:2px;">'
             + esc(App.fmtCurrency(raw)) + ' &divide; ' + pack + '</div>'
