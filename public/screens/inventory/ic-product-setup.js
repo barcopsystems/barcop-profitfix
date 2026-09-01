@@ -2709,10 +2709,22 @@ S.InventoryProducts = {
       open: {},         // which category groups are expanded on screen
       checked: {},      // _rid -> true, the current selection
       vendor: '', vendorNew: false,
-      /* T130. '' until answered, then 'case' or 'unit'. Deliberately has NO default: both answers
-         are common on a real distributor file and the wrong one is invisible, so the operator says
-         which rather than Bar Cop guessing ([[empty-is-not-an-answer]]). */
-      costBasis: ''
+      /* ⭐⭐ T130, CORRECTED THE SAME DAY BY KYLE, AND HE IS RIGHT: *"if bar cop automatically tracks
+         liquor, wine, and kegs as 1 each and never by a pack or case.. if there is a pack/case for
+         liquor, wine, and kegs.. why can't bar cop just auto divide it to the price per each?"*
+         My first version stopped and ASKED, with no default and the button gated. That was the
+         wrong shape twice over:
+           · It asks a question Bar Cop can already answer. These three categories are tracked as
+             ONE container, always, so a pack above 1 can only be describing how it was purchased
+             ([[automate-obvious-step]]).
+           · The question argued against itself. It said "Tito's is a pack of 6 at $150, which is
+             either $25 a bottle or $150 a bottle" — and as Kyle put it, if Bar Cop knows it is a
+             pack of 6 then $150 a bottle is not a live option. Offering it made the screen look
+             like it did not trust its own reading.
+         So it DIVIDES by default and shows the result in the Cost column, where a wrong answer is
+         visible on the row it belongs to rather than behind a question. 'unit' is the correction,
+         not the starting point. */
+      costBasis: 'case'
     };
     this._prefillAssign();
     /* ⛔ THE SCREEN ALWAYS OPENS (Kyle, chat 27): *"i would actually prefer the process
@@ -2903,9 +2915,32 @@ S.InventoryProducts = {
      Not-Sorted table and every Going-Into table, AND each table always fits its card so
      nothing scrolls sideways. Kyle: *"column in different sections should still be
      aligned with each other"*. */
+  /* ⚠ EIGHT COLUMNS SINCE T130. The Cost column was added because the review could not previously
+     show what cost was about to land AT ALL, which is how a case price could import as a bottle
+     price with nothing on screen contradicting it. Width came out of Brand and What Happens. */
   _routeColgroup() {
-    return '<colgroup><col style="width:4%;"/><col style="width:25%;"/><col style="width:13%;"/>'
-      + '<col style="width:11%;"/><col style="width:12%;"/><col style="width:23%;"/><col style="width:12%;"/></colgroup>';
+    return '<colgroup><col style="width:4%;"/><col style="width:23%;"/><col style="width:11%;"/>'
+      + '<col style="width:10%;"/><col style="width:11%;"/><col style="width:12%;"/>'
+      + '<col style="width:19%;"/><col style="width:10%;"/></colgroup>';
+  },
+
+  /* What the Cost cell shows: the per-container cost that will actually be stored, and where a pack
+     divided it, the working. Showing "$25.00" alone would be honest and unreadable — an operator
+     looking at a $150 line in their own file needs to see WHY the screen says 25. */
+  _routeCostCell(row) {
+    const r = this._routing;
+    const cat = String(row._category || (r && r.assignById[row._rid]) || '').trim();
+    const raw = App.parseNum(row.unit_cost);
+    if (raw == null || isNaN(raw)) return '';
+    const landed = this._importCostPerContainer(raw, row.case_size, cat, (r && r.costBasis) || '');
+    if (landed == null) return '';
+    const pack = this._packCount(row.case_size);
+    const divided = landed !== raw && pack > 1;
+    return App.fmtCurrency(landed)
+      + (divided
+          ? '<div style="font-size:10px;color:var(--t3);margin-top:2px;">'
+            + esc(App.fmtCurrency(raw)) + ' &divide; ' + pack + '</div>'
+          : '');
   },
   /* ⛔ A ROW THAT WILL NOT LAND SAYS SO ON ITSELF (Kyle, chat 27). Dim, plus one short
      line under the name giving the actual reason. That is what lets the header above it
@@ -2991,6 +3026,7 @@ S.InventoryProducts = {
       + '<td>' + esc(row.brand || '') + '</td>'
       + '<td>' + esc(size) + '</td>'
       + '<td>' + esc(row[this._routeFileCol().key] || '') + '</td>'
+      + '<td>' + this._routeCostCell(row) + '</td>'
       + '<td><div style="font-size:12px;color:var(--t2);">' + esc(note) + '</div></td>'
       + '<td><div class="row-actions"><button type="button" class="btn btn-ghost btn-sm '
         + (restorable ? 'ip-rt-pb' : 'ip-rt-rm')
@@ -3022,6 +3058,7 @@ S.InventoryProducts = {
       + '<table class="row-list" style="table-layout:fixed;width:100%;">' + this._routeColgroup()
       + '<thead><tr><th></th><th>Product</th><th>Brand</th><th>Size</th>'
       + '<th>' + esc(this._routeFileCol().label) + '</th>'
+      + '<th>Cost</th>'
       + '<th>What Happens</th><th></th></tr></thead>'
       + '<tbody>' + rows.map(row => this._routeRowHtml(row, (status || {})[row._rid], restorable)).join('') + '</tbody></table></div>';
     /* ⚠ THE `--bg` FILL THAT WAS HERE IS GONE, and it was here for about an hour. Kyle asked for
@@ -3237,40 +3274,41 @@ S.InventoryProducts = {
        every section invisible against the page.
        ⚠ THE HEADING STAYS `.sh ic-head`, NOT `.card-title` — that pairing is the heading-outside-a-
        card shape and it is now literally outside a card. */
-    /* ⛔ T130. Only asked when it is a real question: a per-container category, a pack above 1 and
-       a cost to divide. No pack column, or a pack of 1, and this never appears.
-       ⚠ NO DEFAULT AND THE BUTTON IS GATED. Both answers are ordinary on a distributor file and the
-       wrong one is invisible for the life of the account, so a guess would be the worst option
-       available ([[empty-is-not-an-answer]]). One example row from their OWN file does the
-       explaining, because "$150 for a 6-pack" settles it faster than a sentence about case costs. */
+    /* ⛔ T130. A STATEMENT OF WHAT WAS DONE, NOT A QUESTION, and it only appears when a pack was
+       actually applied. It NAMES THE CATEGORIES rather than counting rows: my first version said
+       "5 of your rows", Kyle read that as including his bottle beer, and he could not tell from
+       the sentence which five it meant. The three beers were never in it — Bottle Beer genuinely
+       stores a case cost — but a count the reader cannot resolve is a count that misinforms.
+       ⚠ NOT A GATE. The correction is one press and the Import button is never disabled by it. */
     let costBlock = '';
     const packRows = this._importPackRows(rows);
     if (packRows.length) {
-      const ex = packRows[0];
-      const exPack = this._packCount(ex.case_size);
-      const exCost = App.parseNum(ex.unit_cost);
-      const exName = String(ex.name || '').trim() || 'that row';
+      const cats = [...new Set(packRows.map(x =>
+        String(x._category || (r.assignById[x._rid]) || '').trim()))].filter(Boolean).sort();
+      const catList = cats.length === 1 ? cats[0]
+        : cats.slice(0, -1).join(', ') + ' and ' + cats[cats.length - 1];
+      const divided = r.costBasis === 'case';
       costBlock = '<div class="card" id="ip-route-cost-card" style="margin-top:16px;">'
-        + this._sectionHead('Is That Cost Per Case Or Per Bottle?',
-            packRows.length + ' of your rows have a pack size, so the cost could be either. '
-            + esc(exName) + ' is a pack of ' + exPack + ' at ' + esc(App.fmtCurrency(exCost))
-            + ', which is either ' + esc(App.fmtCurrency(exCost / exPack)) + ' a bottle or '
-            + esc(App.fmtCurrency(exCost)) + ' a bottle. Bar Cop will not guess.')
-        + '<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;">'
-        + '<button type="button" class="btn ' + (r.costBasis === 'case' ? 'btn-primary' : 'btn-ghost')
-        + '" data-cost-basis="case">Per case</button>'
-        + '<button type="button" class="btn ' + (r.costBasis === 'unit' ? 'btn-primary' : 'btn-ghost')
-        + '" data-cost-basis="unit">Per bottle</button>'
-        + '</div></div>';
+        + this._sectionHead(divided ? 'Costs Divided By Pack Size' : 'Costs Left As They Are',
+            divided
+              ? 'Your ' + esc(catList) + ' rows carry a pack size, and Bar Cop tracks these one '
+                + 'container at a time, so the cost has been divided down to one. The Cost column '
+                + 'shows what will land.'
+              : 'Bar Cop is taking the cost in your file as the price of ONE container and ignoring '
+                + 'the pack size. The Cost column shows what will land.')
+        + '<div class="no-print">'
+        + '<button type="button" class="btn btn-ghost btn-sm" data-cost-basis="'
+        + (divided ? 'unit' : 'case') + '">'
+        + (divided ? 'No, that cost is already per container' : 'Divide by the pack size after all')
+        + '</button></div></div>';
     }
-    const costAnswered = !packRows.length || !!r.costBasis;
 
     return this._sectionHead('Your ' + rows.length + ' Product' + (rows.length === 1 ? '' : 's'), lead)
       + body
       + vendorBlock
       + costBlock
       + '<div class="no-print" style="margin:22px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && costAnswered && !busy ? '' : ' disabled')
+      + '<button type="button" class="btn btn-primary" id="ip-route-go"' + (ready && !busy ? '' : ' disabled')
       + '>' + (busy ? 'Adding...' : 'Add ' + ready + ' Product' + (ready === 1 ? '' : 's')) + '</button>'
       + '<button type="button" class="btn btn-ghost" id="ip-route-back"' + (busy ? ' disabled' : '') + '>Start Over</button>'
       + '</div>'
