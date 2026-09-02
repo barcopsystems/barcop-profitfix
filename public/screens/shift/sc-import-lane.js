@@ -889,15 +889,19 @@ S.ShiftLane = {
       '<div class="f" style="flex:1 1 150px;"><label>' + label + '</label>'
       + '<div class="fw" style="margin:0;">' + (pre ? '<span class="pre">$</span>' : '')
       + '<input class="form-input' + (pre ? ' pre' : '') + '" type="number" step="' + step + '" min="0" id="' + id + '" value="' + val + '"/></div></div>';
+    /* ⚠ THE SAVE SITS IN THE SAME ROW AS THE THREE CELLS (Kyle, 2026-09-02), vertically centred
+       against them rather than sitting on its own line underneath. `align-self:center` on the
+       button alone: the row stays `align-items:flex-end` so the three inputs keep their baselines
+       lined up under their labels, and only the button centres. `flex:0 0 auto` stops it stretching
+       when the row wraps on a narrow screen. */
     return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
       + 'Enter your week-end totals. Two numbers close the week, plus covers if you count them.</div>'
       + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">'
       +   cell(z + '-wkbar', 'Bar Sales', v('bar_revenue'), true, '0.01')
       +   cell(z + '-wkfood', 'Food Sales', v('floor_revenue'), true, '0.01')
       +   cell(z + '-wkcov', 'Covers', v('covers'), false, '1')
-      + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
-      +   '<button class="btn btn-primary btn-sm wc-saveweek" data-saveweek="1">Save the Week</button>'
+      +   '<button class="btn btn-primary btn-sm wc-saveweek" data-saveweek="1"'
+      +     ' style="align-self:center;flex:0 0 auto;">Save the Week</button>'
       + '</div>';
   },
 
