@@ -94,6 +94,29 @@ S.RevenueMenuItems = {
       .some(k => String((i && i[k]) || '').toLowerCase().includes(q)));
   },
 
+  /* The export's title. `App.exportPDF` is handed the RENDERED root, so with a search active the
+     file holds only the matching rows, and the person reading that PDF cannot see the search box
+     that produced it. The title has to say it is a subset or the document claims to be the whole
+     tab ([[output-honesty]]: what leaves the building carries the hardest honesty bar).
+     ⚠ THE COUNTS, NOT THE QUERY, and that was measured rather than chosen. The PDF header is ONE
+     unwrapped right-aligned `doc.text` sharing `pageW - 80` with the venue name: against the real
+     jsPDF, `Menu - Mixed Drinks - matching "old fashioned"` beside a long bar name leaves 3.5pt of
+     headroom, and a query has no length limit, so a title built from one is unbounded by
+     construction. `App.pdfFileName` also concatenates the title without sanitising, and `"` is
+     illegal in a Windows filename. Counts are bounded and legal, and they say how much is MISSING,
+     which naming the query does not.
+     ⭐ `shown < all`, never "is there a query": a search that happens to match every row is not a
+     subset, so the title makes no claim about one. The sentence is true or it is absent. */
+  exportTitle() {
+    const t = this.TYPES.find(x => x.key === this.activeTab);
+    // ⚠ The Inactive tab is not in TYPES, so `t` is undefined there and the file was once titled a
+    // bare "Menu" — the one export where saying WHICH list it is matters most.
+    const base = t ? 'Menu - ' + t.label
+      : (this.activeTab === this.INACTIVE_TAB ? 'Menu - Inactive' : 'Menu');
+    const shown = this.listItems().length, all = this.visibleItems().length;
+    return shown < all ? base + ' (' + shown + ' of ' + all + ' shown)' : base;
+  },
+
   // ── Ingredient picker helpers (shared by Plate + Cocktail forms) ─────
   ingredientOptions(selKey, mode) {
     const prods = this.products();
@@ -832,11 +855,9 @@ S.RevenueMenuItems = {
     // "Menu" it handed staff a document with no cocktails and no beer in it and nothing on the
     // page said so.
     document.getElementById('mi-export')?.addEventListener('click', () => {
-      const t = this.TYPES.find(x => x.key === this.activeTab);
-      // ⚠ The Inactive tab is not in TYPES, so `t` is undefined there and the file was titled a bare
-      // "Menu" — the one export where saying WHICH list it is matters most.
-      App.exportPDF({ title: t ? 'Menu - ' + t.label
-        : (this.activeTab === this.INACTIVE_TAB ? 'Menu - Inactive' : 'Menu'),
+      // ⚠ THROUGH exportTitle(), which also says when the file is only part of the tab. Built here
+      // inline, the title could not be tested and the two list screens drifted on the same rule.
+      App.exportPDF({ title: this.exportTitle(),
         root: document.getElementById('mi-list-export') });
     });
   },
