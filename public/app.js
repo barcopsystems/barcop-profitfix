@@ -2793,6 +2793,13 @@ const App = {
     'week-close': { title: 'How Closing The Week Works', sections: [
       { h: 'What this is', p: ['The one place a week gets closed. It reads what you have already logged, tells you what the week still needs, and then you confirm it. Every line is read from your real records, so it cannot say the sales are in when they are not.'] },
       { h: 'What the week needs', p: ['Sales and hours are what the numbers are built from. Tips, cash over and short, and catering fill in when you have them, and a week closes fine without any of the three. Anything marked optional is not a gap.'] },
+      /* ⛔ THIS SECTION DID NOT EXIST, AND SALES IS THE FIRST ROW ON THE PAGE. The help explained how
+         to get HOURS in and said nothing about how to get SALES in beyond one clause in "What the
+         week needs" — so the row an operator meets first was the one with no directions. Added with
+         the week-total door (T135), and every claim below was walked on the live build: three
+         numbers write ONE row for the week, the file drop still reads each day, and typing days
+         over a week total replaces it. */
+      { h: 'Getting the sales in', p: ['Enter the Week is the quickest way and it is two numbers: your bar sales and your food sales for the whole week, plus covers if you count them. That is enough to close a week. Or drop your POS sales export in the box underneath and Bar Cop reads each day off it and shows you every row before anything saves. Enter by Day is there if you would rather key each day in yourself.', 'A week total is stored as the week, not split across seven days, because Bar Cop does not know what your Tuesday was. If the week already has days in it and you save a week total, it asks you first and says how many days it would replace. Filling the days in afterwards replaces the week total the same way.'] },
       { h: 'Getting the hours in', p: ['Import file on the Hours row opens a drop zone for your weekly timeclock export. Bar Cop reads the file, matches each row to your roster and rates, and shows you every row with what it worked out before anything is saved. Take out anything you do not want, then press the button to add them. Re-dropping the same file will not double-count, and a week that arrives in two files is fine. Open takes you to Log Hours if you would rather type them in.'] },
       { h: 'Cost of goods', p: ['If your counts happen to span this week, Bar Cop prices the cost of goods from them and says so. If they do not, you type it on the confirm. Counting weekly is not required, and Bar Cop will never book a month of usage onto one week.'] },
       { h: 'Confirming', p: ['Confirm the Week saves the week\'s figures. Anything missing reads as blank, so you can confirm now and fill the rest in later. Once it is confirmed the button reopens the same form so you can correct it.'] }
@@ -2819,7 +2826,7 @@ const App = {
       { h: 'It only shows finished weeks', p: ['The most recent week you can open is the one that just ended, and the arrows step back from there. A week still being lived has only half its records in it, so a recap of it would report a bar that looks like it did nothing about a week nobody has finished. It opens on the last week you confirmed.'] },
       { h: 'Open a row to read it', p: ['Every row opens and closes. Inventory is open when you land; click any other heading to open it and click it again to shut it. The mark on the left is what that part of the business left open, so you can scan the closed page and see which rows are worth opening. A green tick means nothing is carrying over.'] },
       { h: 'The three groups', p: ['What fed the week is the work that produced the week\'s records: Inventory, The Floor and Events. The week itself is the close, where sales, hours and your count came together. What the week fed is what reads finished weeks back: Run Audit, Menus and Books. That is the same order the Guide builds them in.'] },
-      { h: 'Read a row', p: ['Done This Week is the activity that got logged, written out: counts and spot checks, deliveries and orders, hours and tips, the days you traded, drawer counts, bookings, bills. What It Turned Up is the result those records produced. Carrying Into Next Week is what that part of the business left open, worst first.'] },
+      { h: 'Read a row', p: ['Done This Week is the activity that got logged, written out: counts and spot checks, deliveries and orders, hours and tips, the week\'s sales, drawer counts, bookings, bills. What It Turned Up is the result those records produced. Carrying Into Next Week is what that part of the business left open, worst first.'] },
       { h: 'Everything here is a record', p: ['Every figure and every carried-over item comes from something Bar Cop actually has on file for that week, never from a box anyone ticked. If a row logged nothing all week it says so once, instead of listing what did not happen.'] },
       { h: 'Some figures are about today, not the week', p: ['A few numbers cannot be pinned to a finished week because they only exist as they stand right now: what is below par, what is trapped on the shelf, your event pipeline, your menu, your runway. Those bands say so in their own heading, with Current Stock, Current Pipeline, Current Menu or Today after the label. Everything without that suffix belongs to the week you are reading.'] },
       { h: 'Why some numbers read a dash', p: ['The Week card carries the cost percentages, and they only exist once that week is confirmed, which rolls up its revenue, cost of goods and labor. If a week was never confirmed those cells read a dash and the card says so. You can still confirm a past week from Close The Week and the numbers fill in. A dash is an honest blank, never a made-up number.'] },
@@ -11277,6 +11284,25 @@ const App = {
      ⚠ ZERO, NEVER NULL. A genuine $0.00 rendered as a blank cell reads as "never counted", which is
      the opposite of what happened — the defect `verify-export-zero-not-blank` exists for. The
      difference between "measured zero" and "no basis" lives in `basis`, never in an empty cell. */
+  /* ⛔ ONE DOOR FOR "IS THIS SALES ROW A WHOLE WEEK". Close The Week's week-total entry writes ONE
+     `sc_shifts` row dated the week's end and marks it here, so nothing downstream has to infer it
+     from the date. Two screens need to ask: the lane itself (to keep the week row out of the daily
+     grid) and Week in Review (whose recap counts rows as DAYS and would call a week "1 day of sales
+     logged"). A literal in both is the drift this suite exists to catch, and a member borrowed off
+     another screen carries that screen's assumptions ([[lessons-paid-for]] #135) — so it lives here.
+     ⚠ The string is the stored value; `shift_type` on a sales row is a LABEL and the Books cash
+     reconciliation prints it, which is why the week row says what it is rather than 'Full Day'.
+     ⛔⛔ A METHOD, NOT A DATA PROPERTY, AND I LEARNED THIS TWICE IN ONE DAY. Written as
+     `WEEK_TOTAL_SHIFT_TYPE: 'Week Total'` it was invisible to `_app-lift`, which closes over the
+     `App.x(` CALLS a lifted body makes and cannot see a property — so `_weekTotalType()` returned
+     `undefined` in every harness, and `s.shift_type !== undefined` then EXCLUDED every row that had
+     no shift_type from the save's prior-state map. `verify-manual-sales-grid` went red claiming
+     three untouched days had been hand-entered, which is a data-loss shape, not a cosmetic one.
+     I had already converted the screen's own `WEEK_TOTAL_TYPE` to a method for this exact reason an
+     hour earlier ([[the-loop]] #16/#26/#120 — the tell is writing `NAME:` at object level). */
+  weekTotalShiftType() { return 'Week Total'; },
+  isWeekTotalShift(s) { return !!s && s.shift_type === this.weekTotalShiftType(); },
+
   grossReceiptsFor(prefix) {
     const p = String(prefix || '');
     const inP = (d) => d && String(d).slice(0, p.length) === p;
