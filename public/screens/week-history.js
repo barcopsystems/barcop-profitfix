@@ -18,8 +18,10 @@ S.WeekHistory = {
     App.showHelpModal('How Week History Works', [
       { p: ['Every week you have confirmed, newest first, in one table. It joins your Profit numbers and your Revenue numbers for the same week, so one row is the whole picture of how that week actually went.'] },
       { h: 'What The Columns Mean', p: ['Revenue is the week\'s total sales including catering. Prime Cost is COGS plus labor against total sales, the one number that says whether the week paid. Pour Cost is your bar COGS against bar sales and Food Cost is your food COGS against food sales, the two halves of the COGS side, so you can see which one moved when prime cost does. Check Avg is food and beverage sales per cover. Labor % is total labor, hourly plus salaried, against total sales. RPLH is revenue per labor hour. Reading down the list is how you see a trend instead of a single week.'] },
-      { h: 'Fixing A Week', p: ['Edit on any row re-opens that week in the same Confirm the Week popup you closed it with, prefilled with what you saved. Correct a figure and confirm again, and everything downstream, your audits and Books, follows the corrected number. A week you never closed shows up here too if Shift has sales imported for it, so you can catch one you missed and confirm it late.'] },
-      { h: 'One Set Of Records', p: ['Week History is the third tab on The Week, beside Close The Week and Week in Review. One set of weekly records sits behind all three, so a week you correct here is corrected everywhere at the same moment: your Profit numbers, your Revenue numbers, your audits and your Books.'] }
+      { h: 'Fixing A Week', p: ['Edit on any row re-opens that week in the same Confirm the Week popup you closed it with, prefilled with what you saved. Correct a figure and confirm again, and everything downstream, your audits and Books, follows the corrected number. A week you never closed shows up here too if it has any sales in for it, so you can catch one you missed and confirm it late.'] },
+      /* ⚠ "the third TAB" WAS STALE. The Week's nav builds three LINKS in the top bar (`S.Week.navHTML`
+         off `PAGES`); the tab strip was cut a while back and nothing here followed it. */
+      { h: 'One Set Of Records', p: ['Week History is the third page in The Week, beside Close The Week and Week in Review. One set of weekly records sits behind all three, so a week you correct here is corrected everywhere at the same moment: your Profit numbers, your Revenue numbers, your audits and your Books.'] }
     ]);
   },
 
