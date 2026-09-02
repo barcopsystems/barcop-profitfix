@@ -900,8 +900,20 @@ S.ShiftLane = {
       +   cell(z + '-wkbar', 'Bar Sales', v('bar_revenue'), true, '0.01')
       +   cell(z + '-wkfood', 'Food Sales', v('floor_revenue'), true, '0.01')
       +   cell(z + '-wkcov', 'Covers', v('covers'), false, '1')
-      +   '<button class="btn btn-primary btn-sm wc-saveweek" data-saveweek="1"'
-      +     ' style="align-self:center;flex:0 0 auto;">Save the Week</button>'
+      /* ⚠ CENTRED ON THE INPUT, NOT ON THE ROW (Kyle, 2026-09-02: *"vertical center with the data
+         cell"*). `align-self:center` centred it against the whole CELL STACK — label + gap + input
+         — which is 50px tall while the input is 34px, so the button sat 8px high. Measured live:
+         cell 50px from y=835, input 34px from y=851 (mid 868), button 20px landing at mid 860.
+         ⭐ NO MAGIC NUMBER. The button gets its own `.f` cell that STRETCHES to the row height, with
+         a hidden label taking the same 11px + 5px gap the real labels take — so the remaining band
+         is exactly the input's 34px, and centring inside it makes the two mid-lines equal by
+         construction. If the form input's padding ever changes, both move together. */
+      +   '<div class="f" style="flex:0 0 auto;align-self:stretch;">'
+      +     '<label aria-hidden="true" style="visibility:hidden;">Save</label>'
+      +     '<div style="flex:1;display:flex;align-items:center;">'
+      +       '<button class="btn btn-primary btn-sm wc-saveweek" data-saveweek="1">Save the Week</button>'
+      +     '</div>'
+      +   '</div>'
       + '</div>';
   },
 
