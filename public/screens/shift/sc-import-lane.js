@@ -906,7 +906,15 @@ S.ShiftLane = {
        when the row wraps on a narrow screen. */
     return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
       + 'Enter your week-end totals. Two numbers close the week, plus covers if you count them.</div>'
-      + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">'
+      /* ⭐ `.form-row`, NOT A HAND-ROLLED FLEX ROW (Kyle, 2026-09-02: *"on mobile they need to stack
+         one row each"*). The inline version was a second copy of a component that already exists —
+         `.form-row` is `display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap`, which is
+         byte-for-byte what was written here by hand — and the class carries the mobile rule with it:
+         at 768px `.form-row > .f` becomes `flex:1 1 100%`, so every cell takes its own row. Using
+         the class means no new media query, no second breakpoint to keep in step, and nothing added
+         to `style.css`. The desktop widths below still win, because that rule only exists inside the
+         breakpoint. */
+      + '<div class="form-row" style="gap:12px;margin-bottom:0;">'
       +   cell(z + '-wkbar', 'Bar Sales', v('bar_revenue'), true, '0.01', 190)
       +   cell(z + '-wkfood', 'Food Sales', v('floor_revenue'), true, '0.01', 190)
       +   cell(z + '-wkcov', 'Covers', v('covers'), false, '1', 130)
