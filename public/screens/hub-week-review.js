@@ -1188,8 +1188,20 @@ S.WeekReview = {
     // Named only when one day genuinely beats every other — see `_topOf`.
     const bestDay = this._topOf(wkS, s => parseFloat(s.total_revenue) || 0);
 
+    /* ⛔ A WEEK TOTAL IS NOT ONE DAY. `days` is a ROW COUNT, which was the same thing as a day count
+       for as long as the only way sales arrived was a file or the day-by-day grid. Close The Week
+       now takes three numbers for the whole week and writes ONE row, so this read "1 day of sales
+       logged, $19,000 on 500 covers" about a full seven days ([[output-honesty]] — a number that is
+       true of the record and false about the bar).
+       ⭐ The row says what it is, so this asks rather than infers. And when it IS a week total there
+       is no honest day count to give, so the sentence names the week instead of counting.
+       ⚠ `_topOf` already refuses below two rows, so the "Best night" clause cannot fire on a week
+       total and name a whole week as one night — checked, not assumed. */
+    const weekTotalOnly = wkS.length > 0 && wkS.every(s => App.isWeekTotalShift(s));
     const did = [];
-    if (days) did.push(this._n(days + ' ' + this._plu(days, 'day')) + ' of sales logged, ' + this._m0(rev)
+    if (days && weekTotalOnly) did.push(this._n('The week\'s sales') + ', ' + this._m0(rev)
+      + ' on ' + covers + ' ' + this._plu(covers, 'cover') + '.');
+    else if (days) did.push(this._n(days + ' ' + this._plu(days, 'day')) + ' of sales logged, ' + this._m0(rev)
       + ' on ' + covers + ' ' + this._plu(covers, 'cover') + '.'
       + (bestDay ? ' Best night' + this._on(bestDay.date) + ', ' + this._m0(bestDay.total_revenue)
           + (bestDay.covers ? ' on ' + bestDay.covers + ' covers' : '') + '.' : ''));
