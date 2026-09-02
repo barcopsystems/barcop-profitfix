@@ -62,6 +62,25 @@ S.InventoryProducts = {
       .some(k => String((p && p[k]) || '').toLowerCase().includes(q)));
   },
 
+  /* The export's title. `App.exportPDF` is handed the RENDERED root, so with a search active the
+     file holds only the matching rows, and the person reading that PDF cannot see the search box
+     that produced it. The title has to say it is a subset or the document claims to be the whole
+     tab ([[output-honesty]]: what leaves the building carries the hardest honesty bar).
+     ⚠ THE COUNTS, NOT THE QUERY, and that was measured rather than chosen. The PDF header is ONE
+     unwrapped right-aligned `doc.text` sharing `pageW - 80` with the venue name, so a title built
+     from an unbounded query overruns it; and `App.pdfFileName` concatenates the title without
+     sanitising, where `"` is illegal in a Windows filename. Counts are bounded and legal, and they
+     say how much is MISSING, which naming the query does not.
+     ⭐ `shown < all`, never "is there a query": a search that happens to match every row is not a
+     subset, so the title makes no claim about one.
+     ⚠ WORDED IDENTICALLY TO MENU BUILDER ON PURPOSE. It is one rule on two list screens, and
+     `verify-export-title-says-filtered.js` asserts the two suffixes are the same string. */
+  exportTitle() {
+    const base = this.activeCat + ' Products';
+    const shown = this.listProducts().length, all = this.visibleProducts().length;
+    return shown < all ? base + ' (' + shown + ' of ' + all + ' shown)' : base;
+  },
+
   // ⚠ THE ONE DOOR FOR "WHICH TAB DOES THIS PRODUCT BELONG ON" (S124). Both the tab filter above
   // and the category CARD counts used a bare `(p.category || '') === c`, so an ACTIVE product whose
   // category is missing, '' or a legacy value ('Beer') was listed by NO tab and counted by NO card
@@ -859,7 +878,8 @@ S.InventoryProducts = {
       const selBox  = ev.target.closest('.ip-sel');
       const exp     = ev.target.closest('#ip-export');
 
-      if (exp)     { ev.stopPropagation(); App.exportPDF({ title: this.activeCat + ' Products', root: document.getElementById('ip-list-export') }); return; }
+      // ⚠ THROUGH exportTitle(), which also says when the file is only part of the tab.
+      if (exp)     { ev.stopPropagation(); App.exportPDF({ title: this.exportTitle(), root: document.getElementById('ip-list-export') }); return; }
       if (addLink) { ev.stopPropagation(); this.showForm(addLink.dataset.cat); return; }
       if (impLink) { ev.stopPropagation(); this._import = { cat: impLink.dataset.cat }; this._formCategory = impLink.dataset.cat; this.renderLanding(); setTimeout(() => document.getElementById('ip-import-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); return; }
       // ⚠ THE SEARCH CLEARS ON A TAB SWITCH, like the selection beside it. A query carried across
