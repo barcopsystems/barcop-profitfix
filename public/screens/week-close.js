@@ -291,7 +291,11 @@ S.WeekClose = {
          labelled for one of them hides the other from the operator who most needs it: the one with
          no export to drop. */
       { key: 'sales', label: 'Sales', ready: st.sales.length > 0, lane: 'sales', laneLabel: 'Add sales',
-        note: st.sales.length ? st.sales.length + ' day' + (st.sales.length === 1 ? '' : 's') + ' in, ' + money(st.salesTotal) : 'Not in yet' },
+        /* ⚠ THE MONEY, NOT A ROW COUNT (T135). This read "7 days in, $19,150.00" off the number of
+           `sc_shifts` rows — which is right for a file or the daily grid and WRONG the moment a
+           week can arrive as one row, where it would read "1 day in" about a full week. The count
+           was never the fact the operator wanted; the week's takings is. */
+        note: st.sales.length ? money(st.salesTotal) + ' in' : 'Not in yet' },
       /* ⛔ THE DROP BELONGS WHERE THE RESULT SHOWS. This row is where the operator reads what the
          week's hours are, so it is where the file goes in; a door whose answer appears on a
          different page is a signpost, not a door. `lane` is the key the host names a zone for. */
@@ -476,7 +480,15 @@ S.WeekClose = {
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">'
         +   '<button class="btn btn-primary btn-sm wc-savesales" data-savesales="1">Save Sales</button>'
         + '</div>'
-      : this._explain('sales') + '<div id="' + z + '"></div><div id="' + z + '-actions"></div>';
+      /* ⭐ THE WEEK TOTAL FIRST, THEN THE FILE (T135, Kyle 2026-09-02: *"a top section .. enter your
+         week end sales and covers then the three manual entry boxes .. a divider line .. or drop in
+         your week sales report"*). The point of the order is that an operator SEES that closing a
+         week is two or three numbers, not a file they may not have. The daily grid is still there,
+         one button along, for somebody reading a stack of Z-reports who would rather type what is
+         in front of them than add it up. */
+      : (o && o._weekSalesForm ? o._weekSalesForm() : '')
+        + '<div style="border-top:1px solid var(--b-edge);margin:20px 0 16px;"></div>'
+        + this._explain('sales') + '<div id="' + z + '"></div><div id="' + z + '-actions"></div>';
     /* ⚠ THE IMPORT SIDE ONLY. Enter Manually already carries its own line — it comes from the SHIFT
        cockpit's grid, which this page hosts rather than reimplements — so adding one here would put
        two explainers under one toggle, on the mode that already had the better of them. */
@@ -697,6 +709,12 @@ S.WeekClose = {
     c.querySelector('.wc-savesales')?.addEventListener('click', () => {
       const o = this._laneObj('sales');
       if (o && o.saveManualSales) o.saveManualSales();
+    });
+    // The week-total save, the other half of the same lane. Same shape: the cockpit owns the write
+    // and redraws through `_ckRerender`, so this page hands it nothing and stubs nothing.
+    c.querySelector('.wc-saveweek')?.addEventListener('click', () => {
+      const o = this._laneObj('sales');
+      if (o && o.saveWeekSales) o.saveWeekSales();
     });
     /* The confirm is the EXISTING popup, not a second copy of that form. It writes the `week` and
        `revenue_week` records, which is the whole definition of a closed week. */
