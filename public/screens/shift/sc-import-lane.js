@@ -885,8 +885,18 @@ S.ShiftLane = {
     const w = this._weekTotalRow();
     const v = f => (w && w[f] != null && w[f] !== '') ? w[f] : '';
     const z = this._ckZone('import');
-    const cell = (id, label, val, pre, step) =>
-      '<div class="f" style="flex:1 1 150px;"><label>' + label + '</label>'
+    /* ⚠ THEY DO NOT GROW (Kyle, 2026-09-02: *"the 3 cells don't have to be full width.. just make
+       their width normal cell width and the entire row align left.. but on mobile they need to
+       stack"*). `flex:1 1 150px` stretched all three across the whole card, which made three short
+       numbers look like a form ten fields wide.
+       ⭐ `0 1 <basis>` IS THE WHOLE ANSWER, and it does both halves at once: no GROW, so on desktop
+       each cell sits at its own width and the row is left-aligned by `justify-content`'s default;
+       but still SHRINK plus the row's `flex-wrap`, so on a phone they narrow and then stack rather
+       than overflowing. No media query and no second layout to keep in step.
+       ⚠ COVERS IS NARROWER ON PURPOSE — it holds a count, not money, and giving it a money field's
+       width is what made the row look full in the first place. */
+    const cell = (id, label, val, pre, step, basis) =>
+      '<div class="f" style="flex:0 1 ' + basis + 'px;"><label>' + label + '</label>'
       + '<div class="fw" style="margin:0;">' + (pre ? '<span class="pre">$</span>' : '')
       + '<input class="form-input' + (pre ? ' pre' : '') + '" type="number" step="' + step + '" min="0" id="' + id + '" value="' + val + '"/></div></div>';
     /* ⚠ THE SAVE SITS IN THE SAME ROW AS THE THREE CELLS (Kyle, 2026-09-02), vertically centred
@@ -897,9 +907,9 @@ S.ShiftLane = {
     return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
       + 'Enter your week-end totals. Two numbers close the week, plus covers if you count them.</div>'
       + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">'
-      +   cell(z + '-wkbar', 'Bar Sales', v('bar_revenue'), true, '0.01')
-      +   cell(z + '-wkfood', 'Food Sales', v('floor_revenue'), true, '0.01')
-      +   cell(z + '-wkcov', 'Covers', v('covers'), false, '1')
+      +   cell(z + '-wkbar', 'Bar Sales', v('bar_revenue'), true, '0.01', 190)
+      +   cell(z + '-wkfood', 'Food Sales', v('floor_revenue'), true, '0.01', 190)
+      +   cell(z + '-wkcov', 'Covers', v('covers'), false, '1', 130)
       /* ⚠ CENTRED ON THE INPUT, NOT ON THE ROW (Kyle, 2026-09-02: *"vertical center with the data
          cell"*). `align-self:center` centred it against the whole CELL STACK — label + gap + input
          — which is 50px tall while the input is 34px, so the button sat 8px high. Measured live:
