@@ -980,6 +980,16 @@ S.ShiftLane = {
        ⚠ A ROW, NOT A PARAGRAPH. The first version was an explainer box above the grid, which is
        card prose and `verify-design-code` RULE 2b caught it. The state is data; showing it as data
        says the same thing and adds no prose to a card. */
+    /* ⛔⛔ DECLARED ABOVE ITS FIRST USE, AND THAT IS THE WHOLE BUG THIS LINE FIXES. `const wk` sat
+       BELOW the row builder that reads it — a temporal dead zone, so every render of this grid threw
+       `Cannot access 'wk' before initialization` and took the Sales lane down with it: the toggle
+       did nothing, the accordion would not open, and a cancelled file drop had no way out. It got
+       there because I moved the week note out of the prose block and left the declaration where the
+       old code had put it.
+       ⚠ `node --check` PASSES ON A TDZ ERROR — it is valid syntax — and 520 harnesses passed too,
+       because not one of them RAN this member. Kyle found it by clicking ([[the-loop]] #103, the
+       same error class in the same family). */
+    const wk = this._weekTotalRow();
     const ro = val => '<td style="background:var(--zone);color:var(--t2);">' + (val === '' ? '' : esc(String(val))) + '</td>';
     const wkRowHtml = wk
       ? '<tr class="cw-line">'
@@ -996,7 +1006,6 @@ S.ShiftLane = {
        week total is one row dated the week's end — so without this it would render as a lone Sunday
        holding the whole week with six blank days above it, which reads as six days lost. Name it
        instead, above the grid, and say what typing days would do to it. */
-    const wk = this._weekTotalRow();
     return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">No POS export this week? Key it in by hand. Enter each day\'s bar and food sales, plus covers if you track them, then save. It lands exactly like the file drop and feeds Confirm the Week the same way.</div>'
       + '<div style="overflow-x:auto;"><table class="ing-tbl pill" style="table-layout:fixed;width:100%;">'
       + '<colgroup><col style="width:120px;"/><col/><col/><col style="width:90px;"/></colgroup>'
