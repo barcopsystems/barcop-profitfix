@@ -660,14 +660,15 @@ S.HubYearEnd = {
     const inYear = (d) => d && String(d).slice(0, 4) === year;
     const allActuals = (App.laborData?.lc_actuals || []);
     const yearActuals = allActuals.filter(a => inYear(a.date));
-    const yearShifts = (App.shiftData?.sc_shifts || []).filter(s => inYear(s.date));
+    // ⚠ The year-wide shift filter that used to sit here is gone: its only consumer was the
+    // per-month revenue sum below, which now asks App for the period and does its own filtering.
+    // Retiring a read orphans its helper in the same edit ([[the-loop]] #61).
 
     let totalHours = 0, totalOt = 0, totalWages = 0, totalRev = 0;
 
     for (let m = 1; m <= 12; m++) {
       const mk = year + '-' + String(m).padStart(2, '0');
       const monthActuals = yearActuals.filter(a => String(a.date).slice(0, 7) === mk);
-      const monthShifts  = yearShifts.filter(s => String(s.date).slice(0, 7) === mk);
 
       const mLastDay = new Date(parseInt(year, 10), m, 0).getDate();
       const mStart = mk + '-01', mEnd = mk + '-' + String(mLastDay).padStart(2, '0');
@@ -701,7 +702,13 @@ S.HubYearEnd = {
       // Salaried (exempt) staff: fixed monthly salary (annual/52 by the weeks
       // the month spans), no overtime.
       mWages += App.salariedCost(mStart, mEnd).total;
-      const mRev = monthShifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
+      /* ⛔ THROUGH THE SHARED DOOR, like the annual 8027 above. Summing the nightly rows directly,
+         every month of this table read $0 revenue with a blank labor % and RPLH for an operator who
+         confirms weeks and never logs nightly — the annual twin of the same defect in
+         `hub-books._buildLaborCostAnalysis`. `mk` is already the month prefix the door wants.
+         ⚠ The per-month shift filter this replaced is gone with it; the door does its own. */
+      const mGr = App.grossReceiptsFor(mk);
+      const mRev = mGr.value;
       const laborPct = mRev ? (mWages / mRev) : null;
       const rplh = mHours ? (mRev / mHours) : null;
 
@@ -746,7 +753,13 @@ S.HubYearEnd = {
     const pools  = (App.laborData?.lc_tip_pools || []).filter(p => inYear(p.date));
     const shifts = (App.shiftData?.sc_shifts    || []).filter(s => inYear(s.date));
 
-    const grossReceipts = shifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
+    /* ⛔ THROUGH THE SHARED DOOR. This summed `shifts` directly and was byte-identical to the two
+       in `hub-books.js` — so an operator who confirms weeks without logging nightly got $0 gross
+       receipts on the ANNUAL Form 8027, the one that actually gets filed. Same rule, one
+       implementation, on App because two screens need it. Bare call: a guarded one would revert a
+       tax figure to $0 in silence ([[the-loop]] #40). */
+    const gr = App.grossReceiptsFor(String(year));
+    const grossReceipts = gr.value;
     const totalChargedTips = tips.reduce((s, t) => s + (parseFloat(t.card_tips) || 0), 0);
     const totalCashTips    = tips.reduce((s, t) => s + (parseFloat(t.cash_tips) || 0), 0);
     const totalReported    = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
@@ -828,7 +841,9 @@ S.HubYearEnd = {
       mergeFull(rows.length - 1);
     }
 
-    this._pushFooter(rows, merges, 'Source: The Floor tip pool splits when saved per shift (taxable allocation per employee), tip log entries for shifts without a saved pool, and The Floor shifts for gross receipts.', COL_COUNT);
+    // ⚠ The gross-receipts half is MEASURED now, not typed: it used to say "The Floor shifts"
+    // unconditionally, which is false whenever the figure came from the confirmed weeks.
+    this._pushFooter(rows, merges, 'Source: The Floor tip pool splits when saved per shift (taxable allocation per employee), and tip log entries for shifts without a saved pool. ' + App.grossReceiptsBasisNote(gr.basis), COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const moneyFmt = '"$"#,##0.00;[Red]("$"#,##0.00)';

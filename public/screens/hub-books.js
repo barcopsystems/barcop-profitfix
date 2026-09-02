@@ -1302,7 +1302,29 @@ S.HubBooks = {
     }
 
     rows.push(blank());
+    /* ⛔ THE TOTALS ROW STILL TOTALS THE ROWS ABOVE IT, and $0 stays $0. This is a per-shift table,
+       so its revenue column can only ever be the sum of the shifts it printed — swapping in a
+       confirmed-week figure would make the column stop adding up, and blanking the zero would read
+       as "never counted", the defect `verify-export-zero-not-blank` exists for. */
     rows.push(['Monthly Totals', '', '', totalRev, totalExp, totalCnt, totalVar, '', '']);
+
+    /* ⚠ BUT AN UNEXPLAINED ZERO BESIDE COUNTED CASH IS ITS OWN LIE. A weekly-only operator got a
+       sheet reading $0 revenue against $96,260 of counted cash, with nothing saying why. The number
+       is right; what was missing is that no per-shift revenue was ever logged. */
+    /* ⚠ ONLY THE CONFUSING CASE: cash WAS counted and sales were not logged. A month with neither
+       already says so above (`no shifts or cash variances logged this month`), and repeating it
+       there would be two explanations of one absence.
+       ⚠ `merges.push` directly, matching the idiom fourteen lines up — `mergeFull` is a local of a
+       DIFFERENT builder in this file, and calling it here is a ReferenceError that `node --check`
+       passes happily ([[the-loop]] #72). It would have thrown only on the weekly-only path, which
+       is the exact operator this change exists for. */
+    if (!shifts.length && variances.length) {
+      rows.push(blank());
+      rows.push(this._lineRow('No per-shift sales were logged for this month, so the Total Revenue column reads zero. '
+        + 'Cash counted is still shown in full above. Your month revenue is on the Income Statement, '
+        + 'which is built from your confirmed weeks.', COL_COUNT));
+      merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: COL_COUNT - 1 } });
+    }
 
     this._pushFooter(rows, merges,
       'Source: The Floor. Variance equals counted cash minus expected cash. Status comes from your tolerance setting in App Settings.',
@@ -1434,7 +1456,10 @@ S.HubBooks = {
     const pools  = (App.laborData?.lc_tip_pools  || []).filter(p => inMonth(p.date));
     const shifts = (App.shiftData?.sc_shifts     || []).filter(s => inMonth(s.date));
 
-    const grossReceipts = shifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
+    // ⛔ THROUGH THE ONE DOOR. This summed `shifts` directly, so a weekly-only operator got Line 6
+    // and Line 7 of an IRS worksheet reading $0 whatever they actually took.
+    const gr = this._monthGrossReceipts(monthKey);
+    const grossReceipts = gr.value;
     const totalChargedTips = tips.reduce((s, t) => s + (parseFloat(t.card_tips) || 0), 0);
     const totalCashTips    = tips.reduce((s, t) => s + (parseFloat(t.cash_tips) || 0), 0);
     const totalReported    = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
@@ -1552,7 +1577,10 @@ S.HubBooks = {
     }
 
     this._pushFooter(rows, merges,
-      'Source: The Floor tip pool splits when saved per shift (taxable allocation per employee), tip log entries for shifts without a saved pool, and The Floor shifts for gross receipts.',
+      // ⚠ THE GROSS-RECEIPTS HALF IS NOW MEASURED, NOT TYPED. It used to say "The Floor shifts"
+      // unconditionally, which is false for a weekly-only operator whose figure comes from the
+      // confirmed weeks. `_basisNote` says whichever was actually used.
+      'Source: The Floor tip pool splits when saved per shift (taxable allocation per employee), and tip log entries for shifts without a saved pool. ' + this._basisNote(gr.basis),
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1767,7 +1795,10 @@ S.HubBooks = {
       byStaff[st.id].wages += cost;
     });
 
-    const totalRev = shifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0);
+    // ⛔ THROUGH THE ONE DOOR, same as the 8027 sheet. Summed straight off `shifts`, this printed
+    // $0 revenue and a blank labor % for any operator who confirms weeks without logging nightly.
+    const gr = this._monthGrossReceipts(monthKey);
+    const totalRev = gr.value;
     const laborPct = totalRev > 0 ? (totalWages / totalRev) : null;
 
     const blank = () => this._blankRow(COL_COUNT);
@@ -1777,7 +1808,9 @@ S.HubBooks = {
 
     rows.push(this._lineRow(this._baseTitle('Labor Cost Analysis', monthKey), COL_COUNT));
     mergeFull(0);
-    rows.push(this._lineRow('This sheet totals wages from logged hours by calendar month and accrues salary by days-in-month, measured against POS shift revenue (bar and food). The Income Statement labor is built from confirmed weekly records (a week is booked whole to the month it ends in) and its labor percent is measured against net sales, which also includes catering and ancillary revenue. So the two Total Labor figures can differ by a partial straddling week and the salary accrual method, and the two Labor Percent figures can differ by that revenue base. Both are correct on their own basis.', COL_COUNT));
+    // ⚠ "POS shift revenue" WAS HARDCODED HERE TOO. It is only one of the two bases this sheet can
+    // now use, so the sentence names the measured basis at the foot instead of asserting a source.
+    rows.push(this._lineRow('This sheet totals wages from logged hours by calendar month and accrues salary by days-in-month, measured against bar and food revenue on the basis named at the foot of this sheet. The Income Statement labor is built from confirmed weekly records (a week is booked whole to the month it ends in) and its labor percent is measured against net sales, which also includes catering and ancillary revenue. So the two Total Labor figures can differ by a partial straddling week and the salary accrual method, and the two Labor Percent figures can differ by that revenue base. Both are correct on their own basis.', COL_COUNT));
     mergeFull(rows.length - 1);
     rows.push(blank());
 
@@ -1827,7 +1860,11 @@ S.HubBooks = {
     }
 
     this._pushFooter(rows, merges,
-      'Source: The Floor logged hours plus salaried staff pay, and the call-out log. Revenue from your confirmed weeks. Overtime classification and tip credit treatment are your accountant\'s call based on your state and payroll setup.',
+      // ⛔ THIS SHEET USED TO CONTRADICT ITSELF. Its intro says the revenue is "measured against POS
+      // shift revenue (bar and food)" while this line claimed "Revenue from your confirmed weeks" —
+      // and it read the nightly log, so the footer named a source it does not use. Now it names
+      // whichever one the figure was actually measured from.
+      'Source: The Floor logged hours plus salaried staff pay, and the call-out log. ' + this._basisNote(gr.basis) + ' Overtime classification and tip credit treatment are your accountant\'s call based on your state and payroll setup.',
       COL_COUNT);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -2105,6 +2142,35 @@ S.HubBooks = {
   // calendar month. Profit weeks carry bar/food revenue, COGS, and labor as
   // already-aggregated weekly figures from Profit > This Week (which itself
   // auto-fills from Shift Control + Inventory Control + Labor Control).
+  /* ⛔ ONE DOOR FOR "WHAT DID THIS MONTH TAKE", read by the Form 8027 worksheet and the Labor Cost
+     Analysis. Both carried the identical `shifts.reduce(… total_revenue …)` and neither knew about
+     the operator `cash-engine.js` names explicitly: *"a weekly-only operator confirms weeks and
+     never logs nightly"*. For them `sc_shifts` is empty, so both sheets printed $0 — the 8027's
+     gross receipts AND its 8% threshold, and the labor sheet's revenue and labor %. On tax-facing
+     documents. Measured on the deployed demo, August 2026: Line 6 $84,304 -> $0.
+     ⭐ THE FALLBACK IS SAFE BECAUSE THE TWO BASES RECONCILE EXACTLY, which was measured before it
+     was written. A confirmed week is booked whole to the month it ENDS in, so the weeks basis is a
+     different WINDOW, not a different number: on the live seed the nightly log across Jul 27 to
+     Aug 30 equals the confirmed weeks' bar+food for August to the cent, 94,723 both ways. The
+     $10,419 gap against the Aug 1-31 log is entirely that straddle.
+     ⚠ IT RETURNS THE BASIS AND THE SHEETS PRINT IT. A figure whose window moved without saying so
+     is worse than the $0 it replaces ([[output-honesty]]).
+     ⚠ THROUGH `_sumWeeks`, never by reading week fields here. A `weeks` record is NESTED
+     (`w.bar.revenue`), not the flat `bar_revenue` of a `revenue_week` row — reading the wrong
+     store's field names would have returned a silent 0, which is the defect wearing the fix's name
+     ([[lessons-paid-for]] #63). Going through the Income Statement's own reader is also what makes
+     the two agree rather than merely look alike.
+     ⚠ BAR + FOOD ONLY, matching what `sc_shifts.total_revenue` covers. Catering and ancillary stay
+     out, or the fallback would quietly widen the DEFINITION as well as the window. */
+  /* ⚠ BARE `App.` CALLS, DELIBERATELY. This is required for correctness, not optional: a guarded
+     `App.grossReceiptsFor && …` would silently revert a tax sheet to $0 on any load where app.js
+     was late, which is a silent wrong number in place of a loud failure ([[the-loop]] #40).
+     ⚠ THIN ON PURPOSE. The rule lives on App because `hub-year-end.js`'s ANNUAL Form 8027 has the
+     identical question and had the identical $0; these two members exist only so this file's call
+     sites and its pins read in month terms. */
+  _monthGrossReceipts(monthKey) { return App.grossReceiptsFor(monthKey); },
+  _basisNote(basis) { return App.grossReceiptsBasisNote(basis); },
+
   _aggregateMonth(monthKey) {
     const inMonth = (dateStr) => {
       if (!dateStr) return false;
