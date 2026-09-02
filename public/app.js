@@ -11252,6 +11252,66 @@ const App = {
      ⚠ Compare DATE STRINGS, not Date objects. Building the cutoff from `new Date()` keeps the
      current time of day, so a row stamped earlier in the day on the boundary date falls out and
      the same window returns different answers at 9am and 5pm. */
+  /* ⛔ ONE DOOR FOR "WHAT DID THIS PERIOD TAKE", shared by the MONTHLY Form 8027 and Labor Cost
+     Analysis in `hub-books.js` and the ANNUAL Form 8027 in `hub-year-end.js`. All three carried the
+     identical `shifts.reduce(… total_revenue …)`, and none of them knew about the operator
+     `cash-engine.js` names explicitly: *"a weekly-only operator confirms weeks and never logs
+     nightly"*. For them `sc_shifts` is empty, so every one of those sheets printed $0 gross
+     receipts — including the annual 8027, which is the one that gets filed. Measured on the
+     deployed demo, August 2026: Line 6 $84,304 -> $0, Line 7 $6,744.32 -> $0.
+     ⭐ IT LIVES ON App RATHER THAN ON EITHER SCREEN because two screens need it, and a member one
+     screen borrows off another carries that screen's assumptions with it ([[lessons-paid-for]]
+     #135). Two copies of a rule about a tax figure is the drift this suite exists to catch.
+     ⭐ THE FALLBACK IS SAFE BECAUSE THE TWO BASES RECONCILE EXACTLY, measured before it was written:
+     a confirmed week is booked whole to the month it ENDS in, so the weeks basis is a different
+     WINDOW, not a different number. On the live seed the nightly log across Jul 27 to Aug 30 equals
+     the confirmed weeks' bar+food for August to the cent, 94,723 both ways.
+     ⚠ PREFIX, NOT A MONTH KEY, so the annual sheet asks the same question of '2026' that the
+     monthly one asks of '2026-08'. `slice(0, prefix.length)` is the whole generalisation.
+     ⚠ BAR + FOOD ONLY, matching what `sc_shifts.total_revenue` covers — catering and ancillary stay
+     out, or the fallback widens the DEFINITION as well as the window. The field names are the
+     NESTED week shape (`w.bar.revenue`), not `revenue_week`'s flat `bar_revenue`; reading the wrong
+     store's names returns a silent 0, which is the defect wearing the fix's name ([[the-loop]]
+     #113). `verify-books-weekly-only-operator` pins this against the Income Statement's own
+     `_sumWeeks` so the two can never disagree.
+     ⚠ ZERO, NEVER NULL. A genuine $0.00 rendered as a blank cell reads as "never counted", which is
+     the opposite of what happened — the defect `verify-export-zero-not-blank` exists for. The
+     difference between "measured zero" and "no basis" lives in `basis`, never in an empty cell. */
+  grossReceiptsFor(prefix) {
+    const p = String(prefix || '');
+    const inP = (d) => d && String(d).slice(0, p.length) === p;
+    const shifts = ((this.shiftData && this.shiftData.sc_shifts) || []).filter(s => inP(s.date));
+    if (shifts.length) {
+      return { value: shifts.reduce((s, sh) => s + (parseFloat(sh.total_revenue) || 0), 0), basis: 'log' };
+    }
+    const weeks = ((this.data && this.data.weeks) || []).filter(w => inP(w.period_end));
+    if (weeks.length) {
+      return {
+        value: weeks.reduce((s, w) => s
+          + (parseFloat(w.bar && w.bar.revenue) || 0)
+          + (parseFloat(w.food && w.food.revenue) || 0), 0),
+        basis: 'weeks'
+      };
+    }
+    return { value: 0, basis: 'none' };
+  },
+
+  /* The one place a basis becomes words, so no sheet can describe a source it did not read. The
+     labor analysis used to claim "Revenue from your confirmed weeks" in its footer while summing
+     the nightly log — a name asserting something untrue ([[lessons-paid-for]] #99). */
+  grossReceiptsBasisNote(basis) {
+    if (basis === 'weeks') {
+      return 'Revenue is taken from your confirmed weeks, because no nightly sales were logged for '
+        + 'this period. A week is counted whole in the period it ends in, so this window can start '
+        + 'before it.';
+    }
+    if (basis === 'none') {
+      return 'No revenue basis for this period: no nightly sales were logged and no week was '
+        + 'confirmed, so revenue reads zero here rather than being left blank.';
+    }
+    return 'Revenue is taken from your nightly logged sales for this period.';
+  },
+
   windowCutoff(days) {
     const n = Math.max(1, Math.floor(Number(days) || 1));
     const d = new Date(); d.setHours(0, 0, 0, 0);
